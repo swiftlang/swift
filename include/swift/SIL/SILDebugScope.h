@@ -18,8 +18,6 @@
 #ifndef SWIFT_SIL_DEBUGSCOPE_H
 #define SWIFT_SIL_DEBUGSCOPE_H
 
-#include "swift/SIL/SILAllocated.h"
-#include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILFunction.h"
 
 namespace swift {
