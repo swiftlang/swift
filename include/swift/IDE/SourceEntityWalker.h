@@ -13,10 +13,8 @@
 #ifndef SWIFT_IDE_SEMANTIC_SOURCE_ENTITY_WALKER_H
 #define SWIFT_IDE_SEMANTIC_SOURCE_ENTITY_WALKER_H
 
-#include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/PointerUnion.h"
-#include <string>
 
 namespace clang {
   class Module;
