@@ -18,7 +18,6 @@
 #define SWIFT_AST_REQUIREMENT_H
 
 #include "swift/AST/Type.h"
-#include "llvm/ADT/PointerIntPair.h"
 
 namespace swift {
 
