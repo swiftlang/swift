@@ -178,7 +178,7 @@ REPLCompletions::REPLCompletions()
   // Create a CodeCompletionConsumer.
   Consumer.reset(new REPLCodeCompletionConsumer(*this));
 
-  // Cerate a factory for code completion callbacks that will feed the
+  // Create a factory for code completion callbacks that will feed the
   // Consumer.
   CompletionCallbacksFactory.reset(
       ide::makeCodeCompletionCallbacksFactory(CompletionContext,

@@ -540,7 +540,7 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
       new ide::PrintingCodeCompletionConsumer(
           llvm::outs(), CodeCompletionKeywords));
 
-  // Cerate a factory for code completion callbacks that will feed the
+  // Create a factory for code completion callbacks that will feed the
   // Consumer.
   std::unique_ptr<CodeCompletionCallbacksFactory> CompletionCallbacksFactory(
       ide::makeCodeCompletionCallbacksFactory(CompletionContext,
