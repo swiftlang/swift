@@ -13,8 +13,6 @@
 #ifndef SWIFT_PARSE_DELAYED_PARSING_CALLBACKS_H
 #define SWIFT_PARSE_DELAYED_PARSING_CALLBACKS_H
 
-#include "swift/Basic/SourceLoc.h"
-#include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Parser.h"
 
 namespace swift {
