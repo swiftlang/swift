@@ -12,12 +12,6 @@
 
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
-#include "llvm/Support/Casting.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/ErrorHandling.h"
-#include <vector>
 
 #ifndef SWIFT_SILOPTIMIZER_PASSMANAGER_PASSMANAGER_H
 #define SWIFT_SILOPTIMIZER_PASSMANAGER_PASSMANAGER_H
