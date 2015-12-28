@@ -18,14 +18,8 @@
 #ifndef SWIFT_TYPEREFINEMENTCONTEXT_H
 #define SWIFT_TYPEREFINEMENTCONTEXT_H
 
-#include "swift/AST/Identifier.h"
-#include "swift/AST/Availability.h"
 #include "swift/AST/Stmt.h" // for PoundAvailableInfo
-#include "swift/Basic/LLVM.h"
-#include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/STLExtras.h"
-#include "llvm/ADT/PointerUnion.h"
-#include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
   class BraceStmt;
