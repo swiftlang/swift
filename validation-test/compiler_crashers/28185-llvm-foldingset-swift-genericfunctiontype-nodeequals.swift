@@ -1,5 +1,8 @@
 // RUN: not --crash %target-swift-frontend %s -parse
-// REQUIRES: objc_interop
+
+// The test requires that NSControl is a class.  Remove this requirement when
+// the crash is fixed.
+// REQUIRES: OS=macosx
 
 // Distributed under the terms of the MIT license
 // Test case found by https://github.com/benshan (Ben Shanfelder)
