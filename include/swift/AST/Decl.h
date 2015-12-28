@@ -17,25 +17,14 @@
 #ifndef SWIFT_DECL_H
 #define SWIFT_DECL_H
 
-#include "swift/AST/Attr.h"
 #include "swift/AST/CaptureInfo.h"
-#include "swift/AST/DeclContext.h"
 #include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/KnownProtocols.h"
-#include "swift/AST/Identifier.h"
 #include "swift/AST/LazyResolver.h"
-#include "swift/AST/Requirement.h"
-#include "swift/AST/Substitution.h"
-#include "swift/AST/TypeLoc.h"
 #include "swift/Basic/OptionalEnum.h"
 #include "swift/Basic/Range.h"
-#include "swift/Basic/SourceLoc.h"
-#include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallPtrSet.h"
-#include <cstddef>
 
 namespace clang {
   class Decl;

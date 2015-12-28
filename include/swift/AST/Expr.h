@@ -19,13 +19,8 @@
 
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ConcreteDeclRef.h"
-#include "swift/AST/DeclContext.h"
-#include "swift/AST/Identifier.h"
-#include "swift/AST/Substitution.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/Availability.h"
-#include "swift/Basic/SourceLoc.h"
-#include "swift/Config.h"
 
 namespace llvm {
   struct fltSemantics;

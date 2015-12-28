@@ -19,10 +19,7 @@
 #ifndef SWIFT_BASIC_DIAGNOSTIC_CONSUMER_H
 #define SWIFT_BASIC_DIAGNOSTIC_CONSUMER_H
 
-#include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/SourceMgr.h"
 
 namespace swift {
