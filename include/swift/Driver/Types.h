@@ -15,7 +15,6 @@
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseMapInfo.h"
-#include "llvm/ADT/StringRef.h"
 #include <functional>
 
 namespace swift {
