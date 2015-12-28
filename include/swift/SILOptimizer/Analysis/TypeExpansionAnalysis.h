@@ -13,10 +13,7 @@
 #define SWIFT_SILOPTIMIZER_ANALYSIS_TYPEEXPANSIONANALYSIS_H
 
 #include "swift/SIL/Projection.h"
-#include "swift/SIL/SILType.h"
-#include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
-#include "llvm/ADT/DenseMap.h"
 
 namespace swift {
 
