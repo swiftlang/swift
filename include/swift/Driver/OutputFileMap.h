@@ -13,16 +13,11 @@
 #ifndef SWIFT_DRIVER_OUTPUTFILEMAP_H
 #define SWIFT_DRIVER_OUTPUTFILEMAP_H
 
-#include "swift/Basic/LLVM.h"
 #include "swift/Driver/Types.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/StringMap.h"
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/YAMLParser.h"
 
-#include <memory>
-#include <string>
 
 namespace swift {
 namespace driver {
