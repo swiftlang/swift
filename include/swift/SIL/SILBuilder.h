@@ -14,9 +14,7 @@
 #define SWIFT_SIL_SILBUILDER_H
 
 #include "swift/SIL/SILDebugScope.h"
-#include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
-#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringExtras.h"
 
 namespace swift {
