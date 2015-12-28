@@ -13,15 +13,9 @@
 #ifndef SWIFT_IDE_UTILS_H
 #define SWIFT_IDE_UTILS_H
 
-#include "swift/Basic/LLVM.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/IDE/SourceEntityWalker.h"
-#include "llvm/ADT/StringRef.h"
-#include <memory>
-#include <string>
-#include <functional>
-#include <vector>
 
 namespace llvm {
   template<typename Fn> class function_ref;
