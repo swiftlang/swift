@@ -19,7 +19,6 @@
 #ifndef SWIFT_BASIC_VERSION_H
 #define SWIFT_BASIC_VERSION_H
 
-#include <string>
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/SmallVector.h"
