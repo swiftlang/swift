@@ -304,7 +304,7 @@ def splitGybLines(sourceLines):
     dedents = 0
     try:
         for tokenKind, tokenText, tokenStart, (tokenEndLine, tokenEndCol), lineText \
-            in tokenize.generate_tokens(sourceLines.__iter__().next):
+            in tokenize.generate_tokens(lambda i = iter(sourceLines): next(i)):
 
             if tokenKind in (tokenize.COMMENT, tokenize.ENDMARKER): 
                 continue
@@ -347,7 +347,7 @@ def codeStartsWithDedentKeyword(sourceLines):
     """
     tokenText = None
     for tokenKind, tokenText, _, _, _ \
-        in tokenize.generate_tokens(sourceLines.__iter__().next):
+        in tokenize.generate_tokens(lambda i = iter(sourceLines): next(i)):
 
         if tokenKind != tokenize.COMMENT and tokenText.strip() != '':
             break
