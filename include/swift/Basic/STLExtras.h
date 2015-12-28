@@ -19,11 +19,8 @@
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/Optional.h"
-#include "llvm/Support/Casting.h"
-#include <cassert>
 #include <functional>
 #include <iterator>
-#include <type_traits>
 #include <algorithm>
 
 namespace swift {
