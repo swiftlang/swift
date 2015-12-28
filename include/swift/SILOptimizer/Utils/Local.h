@@ -13,15 +13,8 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_LOCAL_H
 #define SWIFT_SILOPTIMIZER_UTILS_LOCAL_H
 
-#include "swift/Basic/ArrayRefView.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
-#include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
-#include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/Support/Allocator.h"
-#include <functional>
-#include <utility>
 
 namespace swift {
 
