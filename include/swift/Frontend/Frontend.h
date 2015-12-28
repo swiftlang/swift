@@ -18,30 +18,17 @@
 #ifndef SWIFT_FRONTEND_H
 #define SWIFT_FRONTEND_H
 
-#include "swift/Basic/DiagnosticConsumer.h"
 #include "swift/Basic/DiagnosticOptions.h"
-#include "swift/Basic/LangOptions.h"
-#include "swift/Basic/SourceManager.h"
-#include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/IRGenOptions.h"
-#include "swift/AST/LinkLibrary.h"
-#include "swift/AST/Module.h"
-#include "swift/AST/SearchPathOptions.h"
-#include "swift/AST/SILOptions.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
-#include "swift/Parse/Parser.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterOptions.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Sema/SourceLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/SIL/SILModule.h"
-#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/Option/ArgList.h"
-#include "llvm/Support/Host.h"
-#include "llvm/Support/MemoryBuffer.h"
 
-#include <memory>
 
 namespace swift {
 
