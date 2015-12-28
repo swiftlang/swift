@@ -187,7 +187,7 @@ static void emitDeallocatingCall(IRGenFunction &IGF, llvm::Constant *fn,
 void IRGenFunction::emitDeallocRawCall(llvm::Value *pointer,
                                        llvm::Value *size,
                                        llvm::Value *alignMask) {
-  // For now, all we have is swift_slowDelloc.
+  // For now, all we have is swift_slowDealloc.
   return emitDeallocatingCall(*this, IGM.getSlowDeallocFn(),
                               {pointer, size, alignMask});
 }

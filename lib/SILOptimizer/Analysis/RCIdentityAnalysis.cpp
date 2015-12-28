@@ -317,7 +317,7 @@ SILValue RCIdentityFunctionInfo::stripRCIdentityPreservingArgs(SILValue V,
       continue;
     }
 
-    // Try to strip off the RCIdentityPresrvingArg for IV. If it matches
+    // Try to strip off the RCIdentityPreservingArg for IV. If it matches
     // FirstIV, we may be able to succeed here.
     if (FirstIV == stripOneRCIdentityIncomingValue(A, IV))
       continue;

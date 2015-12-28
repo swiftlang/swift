@@ -139,7 +139,7 @@ FloatLiteralConvertible {
   /// For other values of `x`, `x.significand` is defined as follows:
   ///
   /// - If `x` is zero, then `x.significand` is 0.0.
-  /// - If `x` is infinity, then `x.signficand` is 1.0.
+  /// - If `x` is infinity, then `x.significand` is 1.0.
   /// - If `x` is NaN, then `x.significand` is NaN.
   ///
   /// For all floating-point `x`, if we define y by:
@@ -154,14 +154,14 @@ FloatLiteralConvertible {
   /// the payload of NaN are preserved.
   var significand: Self { get }
   
-  /// Combines a signbit, exponent, and signficand to produce a floating-point
+  /// Combines a signbit, exponent, and significand to produce a floating-point
   /// datum.
   ///
   /// In common usage, `significand` will generally be a number in the range
   /// `[1,2)`, but this is not required; the initializer supports any valid
   /// floating-point datum.  The result is:
   ///
-  ///    `(-1)^signbit * signficand * 2^exponent`
+  ///    `(-1)^signbit * significand * 2^exponent`
   ///
   /// (where ^ denotes the mathematical operation of exponentiation) computed
   /// as if by a single correctly-rounded floating-point operation.  If this
@@ -529,12 +529,12 @@ public protocol BinaryFloatingPointType: FloatingPointType {
   
   /// The least-magnitude member of the binade of `self`.
   ///
-  /// If `x` is `+/-signficand * 2^exponent`, then `x.binade` is
+  /// If `x` is `+/-significand * 2^exponent`, then `x.binade` is
   /// `+/- 2^exponent`; i.e. the floating point number with the same sign
   /// and exponent, but a significand of 1.0.
   var binade: Self { get }
   
-  /// Combines a signbit, exponent and signficand bit patterns to produce a
+  /// Combines a signbit, exponent and significand bit patterns to produce a
   /// floating-point datum.  No error-checking is performed by this function;
   /// the bit patterns are simply concatenated to produce the floating-point
   /// encoding of the result.
@@ -1032,7 +1032,7 @@ extension Float80 : BinaryFloatingPointType {
         //  If the exponent is non-zero and the leading bit of the significand
         //  is clear, then we have an invalid operand (unnormal, pseudo-inf, or
         //  pseudo-nan).  All of these are treated as NaN by the hardware, so
-        //  we make sure that bit of the signficand field is set.
+        //  we make sure that bit of the significand field is set.
         return _representation.explicitSignificand | Float80._quietBitMask
     }
     //  Otherwise we always get the "right" significand by simply clearing the

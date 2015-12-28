@@ -849,7 +849,7 @@ static bool tryToSinkRefCountInst(SILBasicBlock::iterator T,
 
   // Ok, it is legal for us to sink this increment to our successors. Create a
   // copy of this instruction in each one of our successors unless they are
-  // ignoreable trap blocks.
+  // ignorable trap blocks.
   DEBUG(llvm::dbgs() << "    Sinking " << *I);
   SILBuilderWithScope Builder(T, &*I);
   for (auto &Succ : T->getParent()->getSuccessors()) {

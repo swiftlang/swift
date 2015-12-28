@@ -187,7 +187,7 @@ static bool isKnownFinalClass(ClassDecl *CD, SILModule &M,
     break;
   }
 
-  // Take the ClassHieararchyAnalysis into account.
+  // Take the ClassHierarchyAnalysis into account.
   // If a given class has no subclasses and
   // - private
   // - or internal and it is a WMO compilation

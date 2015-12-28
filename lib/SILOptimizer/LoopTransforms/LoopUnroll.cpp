@@ -197,9 +197,9 @@ static void redirectTerminator(SILBasicBlock *Latch, unsigned CurLoopIter,
   // We can either have a split backedge as our latch terminator.
   //   HeaderBlock:
   //     ...
-  //     cond_br %cond, ExitBlock, BackegdeBlock
+  //     cond_br %cond, ExitBlock, BackedgeBlock
   //
-  //   BackegdeBlock:
+  //   BackedgeBlock:
   //     br HeaderBlock:
   //
   // Or a conditional branch back to the header.
