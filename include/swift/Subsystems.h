@@ -20,11 +20,8 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "llvm/IR/LLVMContext.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
-#include "llvm/ADT/StringRef.h"
 
-#include <memory>
 
 namespace llvm {
   class MemoryBuffer;
