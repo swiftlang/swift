@@ -17,12 +17,9 @@
 #ifndef SWIFT_AST_BUILTINS_H
 #define SWIFT_AST_BUILTINS_H
 
-#include "swift/Basic/LLVM.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/Attributes.h"
 #include "swift/AST/Type.h"
 #include "llvm/IR/Intrinsics.h"
-#include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
   class ASTContext;
