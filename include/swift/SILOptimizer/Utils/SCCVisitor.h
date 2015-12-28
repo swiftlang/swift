@@ -16,16 +16,8 @@
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILBasicBlock.h"
-#include "swift/SIL/SILFunction.h"
-#include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/SILValue.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/SetVector.h"
-#include "llvm/ADT/SmallVector.h"
-#include <algorithm>
-#include <tuple>
 
 namespace swift {
 
