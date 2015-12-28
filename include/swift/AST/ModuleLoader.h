@@ -18,7 +18,6 @@
 #define SWIFT_AST_MODULE_LOADER_H
 
 #include "swift/AST/Identifier.h"
-#include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
