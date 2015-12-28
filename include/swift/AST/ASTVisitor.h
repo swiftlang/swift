@@ -18,13 +18,9 @@
 #ifndef SWIFT_AST_ASTVISITOR_H
 #define SWIFT_AST_ASTVISITOR_H
 
-#include "swift/AST/Decl.h"
-#include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
-#include "swift/AST/TypeRepr.h"
-#include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
   
