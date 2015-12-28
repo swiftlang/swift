@@ -13,10 +13,8 @@
 #ifndef SWIFT_DRIVER_ACTION_H
 #define SWIFT_DRIVER_ACTION_H
 
-#include "swift/Basic/LLVM.h"
 #include "swift/Driver/Types.h"
 #include "swift/Driver/Util.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/TimeValue.h"
 
 namespace llvm {
