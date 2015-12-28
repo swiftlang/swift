@@ -21,10 +21,7 @@
 #include "swift/Basic/LLVM.h"
 #include "clang/Basic/VersionTuple.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Triple.h"
-#include <string>
 
 namespace swift {
   /// \brief A collection of options that affect the language dialect and
