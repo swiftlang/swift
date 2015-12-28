@@ -14,12 +14,10 @@
 #define SWIFT_BASIC_TASKQUEUE_H
 
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/Program.h"
 
 #include <functional>
-#include <memory>
 #include <queue>
 
 namespace swift {
