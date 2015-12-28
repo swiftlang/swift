@@ -19,7 +19,6 @@
 #define SWIFT_PRETTYSTACKTRACE_H
 
 #include "llvm/Support/PrettyStackTrace.h"
-#include "swift/Basic/SourceLoc.h"
 #include "swift/AST/Type.h"
 
 namespace swift {
