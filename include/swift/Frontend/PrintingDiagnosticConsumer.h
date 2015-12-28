@@ -18,7 +18,6 @@
 #ifndef SWIFT_PRINTINGDIAGNOSTICCONSUMER_H
 #define SWIFT_PRINTINGDIAGNOSTICCONSUMER_H
 
-#include "swift/Basic/LLVM.h"
 #include "swift/Basic/DiagnosticConsumer.h"
 
 #include "llvm/Support/raw_ostream.h"
