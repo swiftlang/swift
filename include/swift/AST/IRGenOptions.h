@@ -19,7 +19,6 @@
 #define SWIFT_AST_IRGENOPTIONS_H
 
 #include "swift/AST/LinkLibrary.h"
-#include <string>
 #include <vector>
 
 namespace swift {
