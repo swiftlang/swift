@@ -14,7 +14,6 @@
 #define SWIFT_BASIC_OPTIONALENUM_H
 
 #include "swift/Basic/type_traits.h"
-#include <type_traits>
 
 namespace swift {
   template<typename T>
