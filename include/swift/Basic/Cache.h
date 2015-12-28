@@ -15,7 +15,6 @@
 
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Optional.h"
 
 namespace swift {
