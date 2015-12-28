@@ -17,14 +17,9 @@
 #ifndef SWIFT_AST_TYPEREPR_H
 #define SWIFT_AST_TYPEREPR_H
 
-#include "swift/AST/Attr.h"
 #include "swift/AST/DeclContext.h"
-#include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
   class ASTWalker;
