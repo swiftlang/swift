@@ -27,17 +27,13 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Substitution.h"
-#include "swift/AST/Type.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Basic/OptionalEnum.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/STLExtras.h"
-#include "llvm/Support/ErrorHandling.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include <cstddef>
 

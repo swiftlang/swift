@@ -26,8 +26,6 @@
 #include "swift/AST/Availability.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Config.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/StringRef.h"
 
 namespace llvm {
   struct fltSemantics;

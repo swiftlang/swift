@@ -25,11 +25,6 @@
 #include "swift/Basic/DiagnosticConsumer.h"
 #include "swift/Basic/SourceLoc.h"
 #include "clang/Basic/VersionTuple.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/StringRef.h"
-#include <string>
-#include <utility>
 
 namespace swift {
   class Decl;
