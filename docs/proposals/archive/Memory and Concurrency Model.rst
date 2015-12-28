@@ -48,7 +48,7 @@ Swift. Given a static type, it is obvious what kind it is from its
 definition. These kinds are:
 
 1. **Immutable Data** - Immutable data (which can have a constructor, but whose
-   value cannot be changed after it completes) is sharable across actors, and it
+   value cannot be changed after it completes) is shareable across actors, and it
    would make sense to unique them where possible.  Immutable data can
    (transitively) point to other immutable data, but it isn't valid (and the
    compiler rejects) immutable data that is pointing to mutable data. For
