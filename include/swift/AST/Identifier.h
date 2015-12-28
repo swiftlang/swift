@@ -20,7 +20,6 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerUnion.h"
-#include <cstring>
 
 namespace llvm {
   class raw_ostream;

@@ -18,13 +18,8 @@
 #ifndef SWIFT_BASIC_DIAGNOSTICENGINE_H
 #define SWIFT_BASIC_DIAGNOSTICENGINE_H
 
-#include "swift/Basic/LLVM.h"
-#include "swift/AST/Identifier.h"
-#include "swift/AST/Type.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Basic/DiagnosticConsumer.h"
-#include "swift/Basic/SourceLoc.h"
-#include "clang/Basic/VersionTuple.h"
 
 namespace swift {
   class Decl;
