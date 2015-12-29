@@ -13,8 +13,6 @@
 #ifndef SWIFT_AST_RAW_COMMENT_H
 #define SWIFT_AST_RAW_COMMENT_H
 
-#include "swift/Basic/LLVM.h"
-#include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
 
 namespace swift {

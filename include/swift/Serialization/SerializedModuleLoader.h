@@ -15,7 +15,6 @@
 
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
-#include "llvm/Support/MemoryBuffer.h"
 
 namespace swift {
 class ModuleFile;

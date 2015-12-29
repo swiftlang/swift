@@ -14,7 +14,6 @@
 #define LLVM_MARKUP_LINELIST_H
 
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/StringRef.h"
 #include "swift/Basic/SourceLoc.h"
 
 namespace llvm {

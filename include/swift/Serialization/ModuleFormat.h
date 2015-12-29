@@ -21,7 +21,6 @@
 
 #include "swift/AST/Decl.h"
 #include "llvm/Bitcode/RecordLayout.h"
-#include "llvm/Bitcode/BitCodes.h"
 
 namespace swift {
 namespace serialization {

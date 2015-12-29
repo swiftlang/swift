@@ -17,11 +17,9 @@
 #ifndef SWIFT_LEXER_H
 #define SWIFT_LEXER_H
 
-#include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Token.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
   class DiagnosticEngine;

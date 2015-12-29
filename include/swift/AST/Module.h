@@ -18,21 +18,9 @@
 #define SWIFT_MODULE_H
 
 #include "swift/AST/Decl.h"
-#include "swift/AST/DeclContext.h"
-#include "swift/AST/Identifier.h"
 #include "swift/AST/RawComment.h"
-#include "swift/AST/Type.h"
-#include "swift/Basic/OptionSet.h"
-#include "swift/Basic/SourceLoc.h"
-#include "swift/Basic/STLExtras.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallSet.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/StringMap.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TinyPtrVector.h"
-#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MD5.h"
 
 namespace clang {

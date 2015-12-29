@@ -17,7 +17,6 @@
 #ifndef SWIFT_SIL_BASICBLOCK_H
 #define SWIFT_SIL_BASICBLOCK_H
 
-#include "swift/Basic/Range.h"
 #include "swift/SIL/SILInstruction.h"
 
 namespace llvm {

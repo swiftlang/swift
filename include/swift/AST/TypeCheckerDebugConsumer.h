@@ -14,7 +14,6 @@
 #define SWIFT_AST_TYPE_CHECKER_DEBUG_CONSUMER_H
 
 #include "llvm/Support/raw_ostream.h"
-#include <string>
 
 namespace swift {
 

@@ -19,7 +19,6 @@
 
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILLinkage.h"
-#include "llvm/ADT/StringMap.h"
 
 /// The symbol name used for the program entry point function.
 /// FIXME: Hardcoding this is lame.

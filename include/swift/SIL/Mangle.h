@@ -13,13 +13,8 @@
 #ifndef SWIFT_SIL_MANGLE_H
 #define SWIFT_SIL_MANGLE_H
 
-#include "llvm/ADT/DenseMap.h"
 #include "swift/Basic/Demangle.h"
-#include "swift/Basic/NullablePtr.h"
-#include "swift/AST/Decl.h"
 #include "swift/AST/Mangle.h"
-#include "swift/AST/ResilienceExpansion.h"
-#include "swift/AST/Types.h"
 #include "swift/SIL/SILFunction.h"
 
 namespace swift {

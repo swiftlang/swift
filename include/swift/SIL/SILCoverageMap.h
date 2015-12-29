@@ -18,11 +18,7 @@
 #ifndef SWIFT_SIL_SILCOVERAGEMAP_H
 #define SWIFT_SIL_SILCOVERAGEMAP_H
 
-#include "swift/Basic/SourceLoc.h"
-#include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILFunction.h"
-#include "llvm/ADT/ilist_node.h"
-#include "llvm/ADT/ilist.h"
 #include "llvm/ProfileData/CoverageMapping.h"
 
 namespace llvm {

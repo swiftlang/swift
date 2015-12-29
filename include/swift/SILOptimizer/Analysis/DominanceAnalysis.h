@@ -13,10 +13,8 @@
 #ifndef SWIFT_SILOPTIMIZER_ANALYSIS_DOMINANCEANALYSIS_H
 #define SWIFT_SILOPTIMIZER_ANALYSIS_DOMINANCEANALYSIS_H
 
-#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
-#include "llvm/ADT/DenseMap.h"
 
 namespace swift {
 class SILModule;

@@ -19,8 +19,6 @@
 
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Substitution.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/FoldingSet.h"
 
 namespace swift {
 

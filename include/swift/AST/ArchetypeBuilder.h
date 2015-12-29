@@ -19,17 +19,10 @@
 #ifndef SWIFT_ARCHETYPEBUILDER_H
 #define SWIFT_ARCHETYPEBUILDER_H
 
-#include "swift/AST/Identifier.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeLoc.h"
-#include "swift/Basic/LLVM.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/PointerUnion.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
-#include <functional>
-#include <memory>
 
 namespace swift {
 

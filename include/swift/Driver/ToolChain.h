@@ -14,12 +14,9 @@
 #define SWIFT_DRIVER_TOOLCHAIN_H
 
 #include "swift/Driver/Action.h"
-#include "swift/Driver/Types.h"
-#include "swift/Basic/LLVM.h"
 #include "llvm/Option/Option.h"
 #include "llvm/ADT/Triple.h"
 
-#include <memory>
 
 namespace swift {
 namespace driver {

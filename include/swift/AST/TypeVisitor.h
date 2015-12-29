@@ -18,7 +18,6 @@
 #define SWIFT_AST_TYPEVISITOR_H
 
 #include "swift/AST/Types.h"
-#include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
   

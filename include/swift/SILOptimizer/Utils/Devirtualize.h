@@ -18,17 +18,8 @@
 #ifndef SWIFT_SIL_DEVIRTUALIZE_H
 #define SWIFT_SIL_DEVIRTUALIZE_H
 
-#include "swift/AST/Decl.h"
-#include "swift/AST/Types.h"
-#include "swift/SIL/SILDeclRef.h"
-#include "swift/SIL/SILFunction.h"
-#include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/SILModule.h"
-#include "swift/SIL/SILType.h"
-#include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "swift/SILOptimizer/Utils/Local.h"
-#include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
 /// A pair representing results of devirtualization.

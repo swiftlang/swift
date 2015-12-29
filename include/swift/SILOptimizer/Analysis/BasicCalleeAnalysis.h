@@ -14,14 +14,7 @@
 #define SWIFT_SILOPTIMIZER_ANALYSIS_BASICCALLEEANALYSIS_H
 
 #include "swift/SILOptimizer/Analysis/Analysis.h"
-#include "swift/SIL/SILFunction.h"
-#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/PointerIntPair.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
 class ClassDecl;

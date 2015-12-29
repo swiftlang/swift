@@ -15,7 +15,6 @@
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/SmallString.h"
-#include <string>
 
 namespace swift {
 

@@ -14,15 +14,8 @@
 #define SWIFT_IDE_CODE_COMPLETION_H
 
 #include "swift/AST/Identifier.h"
-#include "swift/Basic/LLVM.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/Support/Allocator.h"
 #include "llvm/Support/TimeValue.h"
 #include <functional>
-#include <memory>
-#include <string>
-#include <vector>
 
 namespace swift {
 class CodeCompletionCallbacksFactory;

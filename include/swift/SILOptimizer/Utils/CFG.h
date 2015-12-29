@@ -13,7 +13,6 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_CFG_H
 #define SWIFT_SILOPTIMIZER_UTILS_CFG_H
 
-#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILBuilder.h"
 
 namespace swift {

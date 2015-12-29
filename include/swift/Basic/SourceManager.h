@@ -15,7 +15,6 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/Optional.h"
-#include "llvm/ADT/StringMap.h"
 #include "llvm/Support/SourceMgr.h"
 #include <map>
 

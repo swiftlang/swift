@@ -18,7 +18,6 @@
 #ifndef SWIFT_DRIVER_PARSEABLEOUTPUT_H
 #define SWIFT_DRIVER_PARSEABLEOUTPUT_H
 
-#include "swift/Basic/LLVM.h"
 #include "swift/Basic/TaskQueue.h"
 
 namespace swift {

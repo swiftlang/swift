@@ -18,9 +18,6 @@
 #define SWIFT_AST_AVAILABILITY_H
 
 #include "swift/AST/Type.h"
-#include "swift/Basic/LLVM.h"
-#include "clang/Basic/VersionTuple.h"
-#include "llvm/ADT/Optional.h"
 
 namespace swift {
 class ASTContext;

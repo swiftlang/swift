@@ -13,11 +13,8 @@
 #ifndef SWIFT_SILOPTIMIZER_ANALYSIS_LOOPINFOANALYSIS_H
 #define SWIFT_SILOPTIMIZER_ANALYSIS_LOOPINFOANALYSIS_H
 
-#include "swift/SIL/CFG.h"
 #include "swift/SIL/LoopInfo.h"
-#include "swift/SIL/SILBasicBlock.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
-#include "llvm/ADT/DenseMap.h"
 
 namespace swift {
   class DominanceInfo;

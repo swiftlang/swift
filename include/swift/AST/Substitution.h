@@ -18,7 +18,6 @@
 #define SWIFT_AST_SUBSTITUTION_H
 
 #include "swift/AST/Type.h"
-#include "llvm/ADT/ArrayRef.h"
 
 namespace llvm {
   class raw_ostream;

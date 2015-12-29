@@ -17,10 +17,7 @@
 #ifndef SWIFT_TYPELOC_H
 #define SWIFT_TYPELOC_H
 
-#include "swift/Basic/SourceLoc.h"
-#include "swift/AST/Type.h"
 #include "swift/AST/TypeRepr.h"
-#include "llvm/ADT/PointerIntPair.h"
 
 namespace swift {
 

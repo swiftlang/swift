@@ -21,9 +21,6 @@
 
 #include "swift/Sema/TypeCheckRequest.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/Basic/LLVM.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/STLExtras.h"
 
 namespace swift {
 

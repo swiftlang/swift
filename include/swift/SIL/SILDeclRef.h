@@ -23,9 +23,6 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/Types.h"
-#include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/PrettyStackTrace.h"
 
 namespace llvm {

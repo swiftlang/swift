@@ -13,11 +13,7 @@
 #ifndef SWIFT_SERIALIZATION_SILLOADER_H
 #define SWIFT_SERIALIZATION_SILLOADER_H
 
-#include "swift/AST/Decl.h"
-#include "swift/AST/Identifier.h"
 #include "swift/SIL/SILDeclRef.h"
-#include <memory>
-#include <vector>
 
 namespace swift {
 class ASTContext;

@@ -17,29 +17,13 @@
 #ifndef SWIFT_AST_ASTCONTEXT_H
 #define SWIFT_AST_ASTCONTEXT_H
 
-#include "llvm/Support/DataTypes.h"
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ClangModuleLoader.h"
-#include "swift/AST/Identifier.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SearchPathOptions.h"
-#include "swift/AST/Type.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Malloc.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
-#include "llvm/ADT/PointerIntPair.h"
-#include "llvm/ADT/SetVector.h"
-#include "llvm/ADT/StringMap.h"
-#include "llvm/ADT/TinyPtrVector.h"
-#include "llvm/ADT/StringMap.h"
-#include "llvm/Support/Allocator.h"
-#include <functional>
-#include <memory>
-#include <utility>
-#include <vector>
 
 namespace clang {
   class Decl;

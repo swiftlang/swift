@@ -18,10 +18,8 @@
 #define SWIFT_RUNTIME_METADATA_H
 
 #include <atomic>
-#include <cassert>
 #include <climits>
 #include <cstddef>
-#include <cstdint>
 #include <string>
 #include <type_traits>
 #include <utility>

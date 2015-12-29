@@ -13,12 +13,9 @@
 #ifndef SWIFT_SILOPTIMIZER_ANALYSIS_ESCAPEANALYSIS_H_
 #define SWIFT_SILOPTIMIZER_ANALYSIS_ESCAPEANALYSIS_H_
 
-#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/Analysis/BottomUpIPAnalysis.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SmallBitVector.h"
 
 struct CGForDotView;

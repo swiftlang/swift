@@ -13,7 +13,6 @@
 #ifndef LLVM_MARKUP_XML_UTILS_H
 #define LLVM_MARKUP_XML_UTILS_H
 
-#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace llvm {

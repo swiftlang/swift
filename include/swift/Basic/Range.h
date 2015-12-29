@@ -33,10 +33,6 @@
 #ifndef SWIFT_BASIC_RANGE_H
 #define SWIFT_BASIC_RANGE_H
 
-#include <algorithm>
-#include <type_traits>
-#include <utility>
-#include "llvm/ADT/iterator_range.h"
 #include "llvm/ADT/ArrayRef.h"
 
 namespace swift {

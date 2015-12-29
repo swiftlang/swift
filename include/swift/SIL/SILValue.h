@@ -17,12 +17,7 @@
 #ifndef SWIFT_SIL_SILVALUE_H
 #define SWIFT_SIL_SILVALUE_H
 
-#include "swift/Basic/Range.h"
 #include "swift/SIL/SILType.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/PointerUnion.h"
-#include "llvm/ADT/Hashing.h"
-#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
   class SILTypeList;

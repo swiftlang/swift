@@ -22,12 +22,7 @@
 #ifndef SWIFT_SIL_SILWITNESSTABLE_H
 #define SWIFT_SIL_SILWITNESSTABLE_H
 
-#include "swift/SIL/SILAllocated.h"
-#include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
-#include "llvm/ADT/ilist_node.h"
-#include "llvm/ADT/ilist.h"
-#include <string>
 
 namespace swift {
 

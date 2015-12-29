@@ -14,9 +14,6 @@
 #define SWIFT_SILOPTIMIZER_ANALYSIS_ARCANALYSIS_H
 
 #include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILValue.h"
-#include "swift/SIL/SILBasicBlock.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/TinyPtrVector.h"

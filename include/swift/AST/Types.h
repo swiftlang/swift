@@ -19,18 +19,9 @@
 
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/DefaultArgumentKind.h"
-#include "swift/AST/Ownership.h"
 #include "swift/AST/Requirement.h"
-#include "swift/AST/Type.h"
-#include "swift/AST/Identifier.h"
 #include "swift/Basic/ArrayRefView.h"
-#include "swift/Basic/UUID.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/Fixnum.h"
-#include "llvm/ADT/FoldingSet.h"
-#include "llvm/ADT/PointerUnion.h"
-#include "llvm/Support/ErrorHandling.h"
 
 namespace llvm {
   struct fltSemantics;

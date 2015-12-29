@@ -15,9 +15,6 @@
 #define LLVM_REST_SOURCELOC_H
 
 #include "llvm/ADT/StringRef.h"
-#include <algorithm>
-#include <cassert>
-#include <utility>
 #include <vector>
 
 namespace llvm {

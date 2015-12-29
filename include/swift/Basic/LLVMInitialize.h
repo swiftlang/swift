@@ -20,7 +20,6 @@
 #define SWIFT_BASIC_LLVMINITIALIZE_H
 
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/Host.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PrettyStackTrace.h"

@@ -14,7 +14,6 @@
 #define SWIFT_AST_PRINTOPTIONS_H
 
 #include "swift/AST/Attr.h"
-#include <vector>
 
 namespace swift {
 class GenericParamList;

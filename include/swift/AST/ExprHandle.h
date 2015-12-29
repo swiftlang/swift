@@ -17,7 +17,6 @@
 #ifndef SWIFT_EXPRHANDLE_H
 #define SWIFT_EXPRHANDLE_H
 
-#include "llvm/Support/DataTypes.h"
 #include "llvm/ADT/PointerIntPair.h"
 
 namespace swift {

@@ -13,13 +13,10 @@
 #ifndef SWIFT_SIL_LOCATION_H
 #define SWIFT_SIL_LOCATION_H
 
-#include "llvm/ADT/PointerUnion.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
 
-#include <cstddef>
-#include <type_traits>
 
 namespace swift {
 

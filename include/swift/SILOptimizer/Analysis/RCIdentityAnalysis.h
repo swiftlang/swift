@@ -19,9 +19,7 @@
 #ifndef SWIFT_SILOPTIMIZER_ANALYSIS_RCIDENTITYANALYSIS_H
 #define SWIFT_SILOPTIMIZER_ANALYSIS_RCIDENTITYANALYSIS_H
 
-#include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 

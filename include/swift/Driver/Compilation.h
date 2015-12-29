@@ -19,13 +19,8 @@
 
 #include "swift/Driver/Job.h"
 #include "swift/Basic/ArrayRefView.h"
-#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/Support/TimeValue.h"
 
-#include <memory>
-#include <vector>
 
 namespace llvm {
 namespace opt {

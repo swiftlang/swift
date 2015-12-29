@@ -20,13 +20,8 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/LocalContext.h"
 #include "swift/Parse/PersistentParserState.h"
-#include "swift/Parse/Token.h"
 #include "swift/Parse/ParserResult.h"
-#include "swift/Basic/OptionSet.h"
-#include "swift/Config.h"
-#include "llvm/ADT/SetVector.h"
 
 namespace llvm {
   template <typename PT1, typename PT2, typename PT3> class PointerUnion3;

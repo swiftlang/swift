@@ -18,7 +18,6 @@
 #define SWIFT_SIL_SILCLONER_H
 
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILVisitor.h"
 
 namespace swift {

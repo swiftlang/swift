@@ -14,14 +14,8 @@
 #define SWIFT_SILOPTIMIZER_ANALYSIS_POSTORDERANALYSIS_H
 
 #include "swift/SILOptimizer/Analysis/Analysis.h"
-#include "swift/Basic/Range.h"
 #include "swift/SIL/CFG.h"
-#include "swift/SIL/SILBasicBlock.h"
-#include "swift/SIL/SILFunction.h"
 #include "llvm/ADT/PostOrderIterator.h"
-#include "llvm/ADT/iterator_range.h"
-#include "llvm/ADT/DenseMap.h"
-#include <vector>
 
 namespace swift {
 

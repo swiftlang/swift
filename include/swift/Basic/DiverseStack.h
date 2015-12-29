@@ -20,7 +20,6 @@
 #ifndef SWIFT_IRGEN_DIVERSESTACK_H
 #define SWIFT_IRGEN_DIVERSESTACK_H
 
-#include <cassert>
 #include <cstring>
 #include <utility>
 #include "swift/Basic/Malloc.h"

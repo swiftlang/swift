@@ -13,10 +13,8 @@
 #ifndef SWIFT_AST_ASTPRINTER_H
 #define SWIFT_AST_ASTPRINTER_H
 
-#include "swift/Basic/LLVM.h"
 #include "swift/Basic/UUID.h"
 #include "swift/AST/Identifier.h"
-#include "llvm/ADT/StringRef.h"
 
 namespace swift {
   class Decl;

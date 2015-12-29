@@ -13,12 +13,8 @@
 #ifndef LLVM_MARKUP_MARKUP_H
 #define LLVM_MARKUP_MARKUP_H
 
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/Support/Allocator.h"
 #include "llvm/Support/raw_ostream.h"
-#include "swift/Basic/SourceLoc.h"
 #include "swift/Markup/AST.h"
-#include "swift/Markup/LineList.h"
 
 
 namespace swift {

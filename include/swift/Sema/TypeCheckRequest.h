@@ -18,13 +18,8 @@
 #ifndef SWIFT_SEMA_TYPE_CHECK_REQUEST_H
 #define SWIFT_SEMA_TYPE_CHECK_REQUEST_H
 
-#include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
-#include "swift/Basic/LLVM.h"
-#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
-#include <cassert>
-#include <utility>
 
 namespace swift {
 

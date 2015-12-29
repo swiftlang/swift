@@ -13,10 +13,8 @@
 #ifndef __SWIFT_AST_MANGLE_H__
 #define __SWIFT_AST_MANGLE_H__
 
-#include "llvm/ADT/DenseMap.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ResilienceExpansion.h"
 
 namespace swift {

@@ -19,11 +19,7 @@
 #define SWIFT_SIL_SILTYPE_H
 
 #include "swift/AST/CanTypeVisitor.h"
-#include "swift/AST/Types.h"
-#include "llvm/ADT/PointerIntPair.h"
-#include "llvm/Support/ErrorHandling.h"
 #include "swift/SIL/SILAllocated.h"
-#include "llvm/ADT/Hashing.h"
 #include "swift/SIL/SILDeclRef.h"
 
 namespace swift {

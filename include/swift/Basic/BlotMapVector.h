@@ -16,7 +16,6 @@
 #include "llvm/ADT/DenseMap.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
-#include <vector>
 
 namespace swift {
 
