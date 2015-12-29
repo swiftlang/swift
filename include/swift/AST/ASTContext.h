@@ -34,7 +34,6 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
-#include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Allocator.h"
 #include <functional>
 #include <memory>
