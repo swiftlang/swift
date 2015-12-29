@@ -448,7 +448,7 @@ void BlockState::init(DSEContext &Ctx, bool OneIterationFunction)  {
   std::vector<LSLocation> &LV = Ctx.getLocationVault();
   LocationNum = LV.size();
   // For function that requires just 1 iteration of the data flow to converge
-  // we set the initiali state of BBWriteSetIn to 0.
+  // we set the initial state of BBWriteSetIn to 0.
   //
   // For other functions, the initial state of BBWriteSetIn should be all 1's.
   // Otherwise the dataflow solution could be too conservative.

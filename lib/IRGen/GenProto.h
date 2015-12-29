@@ -48,7 +48,7 @@ namespace irgen {
                               ProtocolConformance *conformance,
                               Explosion &out);
 
-  /// Given a type T and an associated type X of some protoocol P to
+  /// Given a type T and an associated type X of some protocol P to
   /// which T conforms, return the type metadata for T.X.
   ///
   /// \param parentMetadata - the type metadata for T

@@ -2060,7 +2060,7 @@ emitReturnOfCheckedLoadFromCache(IRGenFunction &IGF, Address destTable,
   result->addIncoming(fetchedResult, fetchedResultBB);
 }
 
-/// Within an metadata or witness-table accessor on this conformance, bind
+/// Within a metadata or witness-table accessor on this conformance, bind
 /// the type metadata and witness tables for all the associated types.
 void WitnessTableBuilder::bindArchetypes(IRGenFunction &IGF,
                                          llvm::Value *selfMetadata) {
