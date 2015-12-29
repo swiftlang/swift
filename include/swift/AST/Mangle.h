@@ -99,9 +99,8 @@ public:
   /// Finish the mangling of the symbol and write the mangled name into
   /// \p stream.
   void finalize(llvm::raw_ostream &stream) {
-    assert(Storage.size() && "Mangling an empty name");
-    stream.write(Storage.data(), Storage.size());
-    Storage.clear();
+    std::string result = finalize();
+    stream.write(result.data(), result.size());
   }
 
   void setModuleContext(ModuleDecl *M) { Mod = M; }
