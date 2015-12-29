@@ -58,20 +58,23 @@ namespace {
     }
   };        
 }
-        
+
+// Translates operator fixity to demangler operators.
+static Demangle::OperatorKind TranslateOperator(OperatorFixity fixity) {
+  switch (fixity) {
+  case OperatorFixity::NotOperator:return Demangle::OperatorKind::NotOperator;
+  case OperatorFixity::Prefix: return Demangle::OperatorKind::Prefix;
+  case OperatorFixity::Postfix: return Demangle::OperatorKind::Postfix;
+  case OperatorFixity::Infix: return Demangle::OperatorKind::Infix;
+  }
+  llvm_unreachable("invalid operator fixity");
+}
+
 /// Mangle a StringRef as an identifier into a buffer.
 void Mangler::mangleIdentifier(StringRef str, OperatorFixity fixity,
                                bool isOperator) {
-  auto operatorKind = [=]() -> Demangle::OperatorKind {
-    if (!isOperator) return Demangle::OperatorKind::NotOperator;
-    switch (fixity) {
-    case OperatorFixity::NotOperator:return Demangle::OperatorKind::NotOperator;
-    case OperatorFixity::Prefix: return Demangle::OperatorKind::Prefix;
-    case OperatorFixity::Postfix: return Demangle::OperatorKind::Postfix;
-    case OperatorFixity::Infix: return Demangle::OperatorKind::Infix;
-    }
-    llvm_unreachable("invalid operator fixity");
-  }();
+  auto operatorKind = isOperator ? TranslateOperator(fixity) :
+                      Demangle::OperatorKind::NotOperator;
 
   std::string buf;
   Demangle::mangleIdentifier(str.data(), str.size(), operatorKind, buf,
