@@ -169,6 +169,14 @@ public:
   /// Adds the char \p C into the mangled name.
   void append(char C);
 
+  /// Add the already mangled symbol \p Name as an indentifier. (using the
+  /// length prefix).
+  void mangleIdentifierSymbol(StringRef Name);
+
+  /// Add the already mangled symbol \p Name. This gives the mangler the
+  /// opportunity to decode \p Name before adding it to the mangled name.
+  void appendSymbol(StringRef Name);
+
   /// Mangle the integer \p Nat into the name.
   void mangleNatural(const APInt &Nat);
 

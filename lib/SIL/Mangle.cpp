@@ -146,13 +146,13 @@ FunctionSignatureSpecializationMangler::mangleConstantProp(LiteralInst *LI) {
   case ValueKind::FunctionRefInst: {
     SILFunction *F = cast<FunctionRefInst>(LI)->getReferencedFunction();
     M.append("fr");
-    M.mangleIdentifier(F->getName());
+    M.mangleIdentifierSymbol(F->getName());
     break;
   }
   case ValueKind::GlobalAddrInst: {
     SILGlobalVariable *G = cast<GlobalAddrInst>(LI)->getReferencedGlobal();
     M.append("g");
-    M.mangleIdentifier(G->getName());
+    M.mangleIdentifierSymbol(G->getName());
     break;
   }
   case ValueKind::IntegerLiteralInst: {
@@ -196,7 +196,7 @@ mangleClosureProp(PartialApplyInst *PAI) {
   // closure specialization if we know the function_ref in question. When this
   // restriction is removed, the assert here will fire.
   auto *FRI = cast<FunctionRefInst>(PAI->getCallee());
-  M.mangleIdentifier(FRI->getReferencedFunction()->getName());
+  M.mangleIdentifierSymbol(FRI->getReferencedFunction()->getName());
 
   // Then we mangle the types of the arguments that the partial apply is
   // specializing.
@@ -216,7 +216,7 @@ void FunctionSignatureSpecializationMangler::mangleClosureProp(
   // closure specialization if we know the function_ref in question. When this
   // restriction is removed, the assert here will fire.
   auto *FRI = cast<FunctionRefInst>(TTTFI->getCallee());
-  M.mangleIdentifier(FRI->getReferencedFunction()->getName());
+  M.mangleIdentifierSymbol(FRI->getReferencedFunction()->getName());
 }
 
 void FunctionSignatureSpecializationMangler::mangleArgument(

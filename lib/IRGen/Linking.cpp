@@ -299,10 +299,10 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   }
 
   case Kind::SILFunction:
-    mangler.append(getSILFunction()->getName());
+    mangler.appendSymbol(getSILFunction()->getName());
     return mangler.finalize(buffer);
   case Kind::SILGlobalVariable:
-    mangler.append(getSILGlobalVariable()->getName());
+    mangler.appendSymbol(getSILGlobalVariable()->getName());
     return mangler.finalize(buffer);
   }
   llvm_unreachable("bad entity kind!");

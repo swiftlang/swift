@@ -1850,6 +1850,18 @@ void Mangler::mangleNatural(const APInt &Nat) {
   Buffer << Nat;
 }
 
+void Mangler::mangleIdentifierSymbol(StringRef Name) {
+  // Mangle normal identifiers as:
+  //   count identifier-char+
+  // where the count is the number of characters in the identifier,
+  // and where individual identifier characters represent themselves.
+  Buffer << Name.size() << Name;
+}
+
+void Mangler::appendSymbol(StringRef Name) {
+   Buffer << Name;
+}
+
 void Mangler::mangleGlobalVariableFull(const VarDecl *decl) {
   // As a special case, Clang functions and globals don't get mangled at all.
   // FIXME: When we can import C++, use Clang's mangler.

@@ -82,7 +82,7 @@ protected:
 
   void mangleFunctionName() {
     M.append("_");
-    M.append(Function->getName());
+    M.appendSymbol(Function->getName());
   }
 };
 
