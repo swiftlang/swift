@@ -16,7 +16,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/CFG.h"
-#include "swift/SIL/SILModule.h"
 // FIXME: For mapTypeInContext
 #include "swift/AST/ArchetypeBuilder.h"
 #include "llvm/ADT/Optional.h"
