@@ -1197,7 +1197,7 @@ static SILValue skipInvert(SILValue Cond, bool &Inverted,
 
 /// \brief Returns the first cond_fail if it is the first side-effect
 /// instruction in this block.
-static CondFailInst *getFistCondFail(SILBasicBlock *BB) {
+static CondFailInst *getFirstCondFail(SILBasicBlock *BB) {
   auto It = BB->begin();
   CondFailInst *CondFail = nullptr;
   // Skip instructions that don't have side-effects.
@@ -1216,7 +1216,7 @@ static CondFailInst *getFistCondFail(SILBasicBlock *BB) {
 /// If \p Inverted is true, \p BB is on the false-edge of the cond_br.
 static CondFailInst *getUnConditionalFail(SILBasicBlock *BB, SILValue Cond,
                                           bool Inverted) {
-  CondFailInst *CondFail = getFistCondFail(BB);
+  CondFailInst *CondFail = getFirstCondFail(BB);
   if (!CondFail)
     return nullptr;
   
@@ -2024,7 +2024,7 @@ bool RemoveUnreachable::run() {
 ///
 static bool tryMoveCondFailToPreds(SILBasicBlock *BB) {
   
-  CondFailInst *CFI = getFistCondFail(BB);
+  CondFailInst *CFI = getFirstCondFail(BB);
   if (!CFI)
     return false;
   
@@ -3484,4 +3484,3 @@ SILTransform *swift::createSROABBArgs() { return new SROABBArgs(); }
 SILTransform *swift::createSimplifyBBArgs() {
   return new SimplifyBBArgs();
 }
-
