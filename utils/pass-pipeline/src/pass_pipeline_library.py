@@ -103,7 +103,7 @@ def normal_passpipelines():
     result = []
 
     x = ppipe.PassPipeline('PreSpecialize', {'name': 'run_to_fixed_point'})
-    x.addPass(specialization_passlist())
+    x.addPass(diagnostic_passlist())
     result.append(x)
 
     x = ppipe.PassPipeline('HighLevel', {'name': 'run_n_times', 'count': 2})
