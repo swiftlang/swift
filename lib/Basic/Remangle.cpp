@@ -70,6 +70,16 @@ static bool isNonAscii(StringRef str) {
   return false;
 }
 
+static char mangleOperatorKind(OperatorKind operatorKind) {
+  switch (operatorKind) {
+    case OperatorKind::NotOperator: unreachable("invalid");
+    case OperatorKind::Infix: return 'i';
+    case OperatorKind::Prefix: return 'p';
+    case OperatorKind::Postfix: return 'P';
+  }
+  unreachable("invalid");
+}
+
 static void mangleIdentifier(StringRef ident, OperatorKind operatorKind,
                              bool usePunycode, DemanglerPrinter &out) {
   std::string punycodeBuf;
@@ -99,15 +109,7 @@ static void mangleIdentifier(StringRef ident, OperatorKind operatorKind,
   //   operator-fixity ::= 'i' // infix
   // where the count is the number of characters in the operator,
   // and where the individual operator characters are translated.
-  out << 'o' << [=] {
-    switch (operatorKind) {
-    case OperatorKind::NotOperator: unreachable("invalid");
-    case OperatorKind::Infix: return 'i';
-    case OperatorKind::Prefix: return 'p';
-    case OperatorKind::Postfix: return 'P';
-    }
-    unreachable("invalid");
-  }();
+  out << 'o' << mangleOperatorKind(operatorKind);
 
   // Mangle ASCII operators directly.
   out << ident.size();
