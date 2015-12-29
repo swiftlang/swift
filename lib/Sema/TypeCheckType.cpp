@@ -351,6 +351,44 @@ Type TypeChecker::resolveTypeInContext(
                                  fromType, /*isTypeReference=*/true);
 }
 
+Type TypeChecker::applyGenericArguments(Type type, SourceLoc loc,
+                                        DeclContext *dc,
+                                        GenericIdentTypeRepr *generic,
+                                        bool isGenericSignature,
+                                        GenericTypeResolver *resolver) {
+
+  auto unbound = type->getAs<UnboundGenericType>();
+  if (!unbound) {
+    if (!type->is<ErrorType>())
+      diagnose(loc, diag::not_a_generic_type, type)
+          .fixItRemove(generic->getAngleBrackets());
+    return type;
+  }
+
+  // Make sure we have the right number of generic arguments.
+  // FIXME: If we have fewer arguments than we need, that might be okay, if
+  // we're allowed to deduce the remaining arguments from context.
+  auto unboundDecl = unbound->getDecl();
+  auto genericArgs = generic->getGenericArgs();
+  auto genericParams = unboundDecl->getGenericParams();
+  if (genericParams->size() != genericArgs.size()) {
+    diagnose(loc, diag::type_parameter_count_mismatch, unboundDecl->getName(),
+             genericParams->size(), genericArgs.size(),
+             genericArgs.size() < genericParams->size())
+        .highlight(generic->getAngleBrackets());
+    diagnose(unboundDecl, diag::generic_type_declared_here,
+             unboundDecl->getName());
+    return nullptr;
+  }
+
+  SmallVector<TypeLoc, 8> args;
+  for (auto tyR : genericArgs)
+    args.push_back(tyR);
+
+  return applyUnboundGenericArguments(unbound, loc, dc, args,
+                                      isGenericSignature, resolver);
+}
+
 /// Apply generic arguments to the given type.
 Type TypeChecker::applyUnboundGenericArguments(
     UnboundGenericType *unbound, SourceLoc loc, DeclContext *dc,
@@ -359,7 +397,7 @@ Type TypeChecker::applyUnboundGenericArguments(
 
   assert(unbound &&
          genericArgs.size() == unbound->getDecl()->getGenericParams()->size() &&
-         "Did you enter via applyGenericTypeReprArgs?");
+         "invalid arguments, use applyGenricArguments for diagnostic emitting");
 
   // Make sure we always have a resolver to use.
   PartialGenericTypeToArchetypeResolver defaultResolver(*this);
@@ -418,37 +456,8 @@ static Type applyGenericTypeReprArgs(TypeChecker &TC, Type type, SourceLoc loc,
                                      bool isGenericSignature,
                                      GenericTypeResolver *resolver) {
 
-  auto unbound = type->getAs<UnboundGenericType>();
-  if (!unbound) {
-    if (!type->is<ErrorType>())
-      TC.diagnose(loc, diag::not_a_generic_type, type)
-          .fixItRemove(generic->getAngleBrackets());
-    return type;
-  }
-
-  // Make sure we have the right number of generic arguments.
-  // FIXME: If we have fewer arguments than we need, that might be okay, if
-  // we're allowed to deduce the remaining arguments from context.
-  auto unboundDecl = unbound->getDecl();
-  auto genericArgs = generic->getGenericArgs();
-  auto genericParams = unboundDecl->getGenericParams();
-  if (genericParams->size() != genericArgs.size()) {
-    TC.diagnose(loc, diag::type_parameter_count_mismatch,
-                unboundDecl->getName(), genericParams->size(),
-                genericArgs.size(), genericArgs.size() < genericParams->size())
-        .highlight(generic->getAngleBrackets());
-    TC.diagnose(unboundDecl, diag::generic_type_declared_here,
-                unboundDecl->getName());
-    return ErrorType::get(TC.Context);
-  }
-
-  SmallVector<TypeLoc, 8> args;
-  for (auto tyR : genericArgs)
-    args.push_back(tyR);
-
-  Type ty = TC.applyUnboundGenericArguments(unbound, loc, dc, args,
-                                            isGenericSignature, resolver);
-
+  Type ty = TC.applyGenericArguments(type, loc, dc, generic, isGenericSignature,
+                                     resolver);
   if (!ty)
     return ErrorType::get(TC.Context);
   return ty;

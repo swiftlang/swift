@@ -702,7 +702,35 @@ public:
                             UnsatisfiedDependency *unsatisfiedDependency
                               = nullptr);
 
-  /// \brief Apply generic arguments to the given type.
+  /// Apply generic arguments to the given type.
+  ///
+  /// This function emits diagnostics about an invalid type or the wrong number
+  /// of generic arguments, whereas applyUnboundGenericArguments requires this
+  /// to be in a correct and valid form.
+  ///
+  /// \param type The generic type to which to apply arguments.
+  /// \param loc The source location for diagnostic reporting.
+  /// \param dc The context where the arguments are applied.
+  /// \param generic The arguments to apply with the angle bracket range for
+  /// diagnostics.
+  /// \param isGenericSignature True if we are looking only in the generic
+  /// signature of the context.
+  /// \param resolver The generic type resolver.
+  ///
+  /// \returns A BoundGenericType bound to the given arguments, or null on
+  /// error.
+  ///
+  /// \see applyUnboundGenericArguments
+  Type applyGenericArguments(Type type, SourceLoc loc, DeclContext *dc,
+                             GenericIdentTypeRepr *generic,
+                             bool isGenericSignature,
+                             GenericTypeResolver *resolver);
+
+  /// Apply generic arguments to the given type.
+  ///
+  /// This functions requires a valid unbound generic type with the correct
+  /// number of generic arguments given, whereas applyGenericArguments emits
+  /// diagnostics in those cases.
   ///
   /// \param unbound The unbound generic type to which to apply arguments.
   /// \param loc The source location for diagnostic reporting.
@@ -714,8 +742,9 @@ public:
   ///
   /// \returns A BoundGenericType bound to the given arguments, or null on
   /// error.
-  Type applyUnboundGenericArguments(UnboundGenericType *unbound,
-                                    SourceLoc loc,
+  ///
+  /// \see applyGenericArguments
+  Type applyUnboundGenericArguments(UnboundGenericType *unbound, SourceLoc loc,
                                     DeclContext *dc,
                                     MutableArrayRef<TypeLoc> genericArgs,
                                     bool isGenericSignature,
