@@ -98,7 +98,7 @@ using namespace swift;
 
 STATISTIC(NumForwardedLoads, "Number of loads forwarded");
 
-/// ComputeMaxAvailSet - If we ignore all unknow writes, what is the max
+/// ComputeMaxAvailSet - If we ignore all unknown writes, what is the max
 /// available set that can reach the beginning of a basic block. This helps
 /// generating the genset and kill`set. i.e. if there is no downward visible
 /// value that can reach the end of a basic block, then we know that the genset
@@ -108,7 +108,7 @@ STATISTIC(NumForwardedLoads, "Number of loads forwarded");
 ///
 /// ComputeAvailSet - Compute the available set at the end of the basic block.
 ///
-/// ComputeAvailValue - Compute the avaliable value at the end of the basic
+/// ComputeAvailValue - Compute the available value at the end of the basic
 /// block.
 ///
 /// PerformRLE - Perform the actual redundant load elimination.
@@ -486,7 +486,7 @@ public:
   /// Process basic blocks w.r.t. to the given Kind.
   void processBasicBlocksForRLE();
 
-  /// Iterate over the basic block in abitrary order and process each for
+  /// Iterate over the basic block in arbitrary order and process each for
   /// its genset and killset.
   void processBasicBlocksForGenKillSet();
 
