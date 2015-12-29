@@ -169,7 +169,7 @@ public:
   /// Adds the char \p C into the mangled name.
   void append(char C);
 
-  /// Add the already mangled symbol \p Name as an indentifier. (using the
+  /// Add the already mangled symbol \p Name as an identifier. (using the
   /// length prefix).
   void mangleIdentifierSymbol(StringRef Name);
 
