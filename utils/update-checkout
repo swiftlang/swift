@@ -50,7 +50,11 @@ def update_working_copy(repo_path):
         if os.path.isdir(os.path.join(".git", "svn")):
             update_git_svn(repo_path)
         elif os.path.isdir(".git"):
-            check_call([ "git", "pull", "--rebase" ])
+            # Prior to Git 2.6, this is the way to do a "git pull
+            # --rebase" that respects rebase.autostash.  See
+            # http://stackoverflow.com/a/30209750/125349
+            check_call([ "git", "fetch" ])
+            check_call([ "git", "rebase", "FETCH_HEAD" ])
         else:
             check_call([ "svn", "update" ])
 

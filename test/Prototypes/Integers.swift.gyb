@@ -215,6 +215,11 @@ extension IntegerType {
   }
 }
 
+//===--- SignExtending ----------------------------------------------------===//
+// A SignedIntegerType wrapper over any UnsignedIntegerType; it
+// represents the full width of the unsigned number by adding bits
+// to the representation.
+
 //===--- Homogeneous comparison -------------------------------------------===//
 @_transparent
 @warn_unused_result
