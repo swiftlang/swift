@@ -100,6 +100,10 @@ public:
 
   /// Use super_method for native super method calls instead of function_ref.
   bool UseNativeSuperMethod = false;
+  
+  /// Emit captures and function contexts using +0 caller-guaranteed ARC
+  /// conventions.
+  bool EnableGuaranteedClosureContexts = false;
 };
 
 } // end namespace swift
