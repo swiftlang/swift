@@ -535,14 +535,14 @@ extension FixedWidthIntegerType {
 
   @_transparent
   public func uword(n: Word) -> UWord {
-    var n = n
     _precondition(n >= 0, "Negative word index")
-    var x = self
-    while n > 0 {
-      x &>>= Swift.min(Self(_truncatingBits: UWord(Self.bitWidth._storage)) &- 1, ${word_bits})
-      n -= 1
+    if _fastPath(n < countRepresentedWords) {
+      let shift = UWord(n._storage) &* ${word_bits}
+      let bitWidth = UWord(Self.bitWidth._storage)
+      _sanityCheck(shift < bitWidth)
+      return (self &>> Self(_truncatingBits: shift))._lowUWord
     }
-    return x._lowUWord
+    return self < 0 ? ~0 : 0
   }
 
   public var countRepresentedWords: Word {
@@ -1300,6 +1300,20 @@ tests.test("Basics") {
   expectEqual(8, I8.bitWidth)
   expectEqual(16, Int16.bitWidth)
   expectEqual(32, Int32.bitWidth)
+}
+
+tests.test("uword") {
+  let x = UDWord(Word.max)
+  expectEqual(Word.max._lowUWord, x.uword(0))
+  expectEqual(0, x.uword(1))
+  
+  let y = DWord(Word.min)
+  expectEqual(Word.min._lowUWord, y.uword(0))
+  expectEqual(~0, y.uword(1))
+
+  let z = UWord(~Word.min) + 1
+  expectEqual(Word.min._lowUWord, z.uword(0))
+  expectEqual(0, z.uword(1))
 }
 
 tests.test("Multiprecision/+/DWord") {
