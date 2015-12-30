@@ -4474,7 +4474,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.kind: source.lang.swift.decl.var.parameter,
         key.offset: 2070,
         key.length: 1,
-        key.typename: "Int32",
+        key.typename: "_",
         key.nameoffset: 0,
         key.namelength: 0
       }
@@ -5495,7 +5495,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.kind: source.lang.swift.decl.var.parameter,
         key.offset: 6245,
         key.length: 1,
-        key.typename: "FooCFTypeRef",
+        key.typename: "_",
         key.nameoffset: 0,
         key.namelength: 0
       }

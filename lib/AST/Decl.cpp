@@ -3155,6 +3155,28 @@ SourceRange VarDecl::getSourceRange() const {
 
 SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
   Pattern *Pat = getParentPattern();
+
+  // For a parameter, map back to it's declcontext (the enclosing function)
+  // and dig out the pattern that encloses it.
+  if (!Pat && isa<ParamDecl>(this)) {
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(getDeclContext())) {
+      for (auto params : AFD->getBodyParamPatterns()) {
+        // Check to see if this tuple or scalar pattern contains the parameter.
+        if (auto *TP = dyn_cast<TuplePattern>(params)) {
+          for (auto &Elt : TP->getElements())
+            if (Elt.getPattern()->getSingleVar() == this) {
+              Pat = Elt.getPattern();
+              break;
+            }
+          
+        } else if (params->getSingleVar() == this) {
+          Pat = params;
+          break;
+        }
+      }
+    }
+  }
+  
   
   if (!Pat || Pat->isImplicit())
     return getSourceRange();
