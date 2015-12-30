@@ -122,6 +122,7 @@ enum class ConventionsKind : uint8_t {
   CFunction = 4,
   SelectorFamily = 5,
   Deallocator = 6,
+  Capture = 7,
 };
 
   class Conventions {
@@ -359,9 +360,6 @@ enum class ConventionsKind : uint8_t {
       if (isa<InOutType>(substType)) {
         assert(origType.isOpaque() || origType.getAs<InOutType>());
         convention = ParameterConvention::Indirect_Inout;
-      } else if (isa<LValueType>(substType)) {
-        assert(origType.isOpaque() || origType.getAs<LValueType>());
-        convention = ParameterConvention::Indirect_InoutAliasable;
       } else if (isPassedIndirectly(origType, substType, substTL)) {
         convention = Convs.getIndirectParameter(origParamIndex, origType);
         assert(isIndirectParameter(convention));
@@ -430,7 +428,8 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
                         CanAnyFunctionType substFnInterfaceType,
                         AnyFunctionType::ExtInfo extInfo,
                         const Conventions &conventions,
-                        const Optional<ForeignErrorConvention> &foreignError) {
+                        const Optional<ForeignErrorConvention> &foreignError,
+                        Optional<SILDeclRef> constant) {
   SmallVector<SILParameterInfo, 8> inputs;
 
   // Per above, only fully honor opaqueness in the abstraction pattern
@@ -564,7 +563,92 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
                                   substFnInterfaceType.getInput(),
                                   extInfo);
   }
-
+  
+  // Lower the capture context parameters, if any.
+  if (constant)
+  if (auto function = constant->getAnyFunctionRef()) {
+    auto &Types = M.Types;
+    auto loweredCaptures = Types.getLoweredLocalCaptures(*function);
+    
+    for (auto capture : loweredCaptures.getCaptures()) {
+      auto *VD = capture.getDecl();
+      auto type = VD->getType()->getCanonicalType();
+      
+      type = Types.getInterfaceTypeOutOfContext(type,
+                                                function->getAsDeclContext());
+      
+      auto loweredTy = Types.getLoweredType(
+                                    AbstractionPattern(genericSig, type), type);
+      
+      switch (Types.getDeclCaptureKind(capture)) {
+      case CaptureKind::None:
+        break;
+      case CaptureKind::Constant: {
+        class CaptureConventions final : public Conventions {
+        public:
+          ParameterConvention getIndirectParameter(unsigned index,
+                                                 const AbstractionPattern &type)
+          const override {
+            return ParameterConvention::Indirect_In;
+          }
+          ParameterConvention getDirectParameter(unsigned index,
+                                                 const AbstractionPattern &type)
+          const override {
+            return ParameterConvention::Direct_Owned;
+          }
+          ParameterConvention getCallee() const override {
+            llvm_unreachable("captures are never callees");
+          }
+          ResultConvention getResult(const TypeLowering &) const override {
+            llvm_unreachable("captures are never results");
+          }
+          ParameterConvention getIndirectSelfParameter(
+                                                 const AbstractionPattern &type)
+          const override {
+            llvm_unreachable("captures are never self");
+          }
+          ParameterConvention getDirectSelfParameter(
+                                                 const AbstractionPattern &type)
+          const override {
+            llvm_unreachable("captures are never self");
+          }
+          
+          CaptureConventions() : Conventions(ConventionsKind::Capture) {}
+          
+          static bool classof(const Conventions *C) {
+            return C->getKind() == ConventionsKind::Capture;
+          }
+        };
+      
+        // Constants are captured by value. Destructure like a value parameter.
+        Optional<ForeignErrorConvention> foreignError;
+        DestructureInputs DestructureCaptures(M, CaptureConventions(),
+                                              foreignError, inputs);
+        DestructureCaptures.destructure(AbstractionPattern(genericSig, type),
+                                        type, extInfo);
+        break;
+      }
+      case CaptureKind::Box: {
+        // Lvalues are captured as a box that owns the captured value.
+        SILType ty = loweredTy.getAddressType();
+        CanType boxTy = SILBoxType::get(ty.getSwiftRValueType());
+        auto param = SILParameterInfo(boxTy,
+                                      ParameterConvention::Direct_Owned);
+        inputs.push_back(param);
+        break;
+      }
+      case CaptureKind::StorageAddress: {
+        // Non-escaping lvalues are captured as the address of the value.
+        SILType ty = loweredTy.getAddressType();
+        auto param = SILParameterInfo(ty.getSwiftRValueType(),
+                                  ParameterConvention::Indirect_InoutAliasable);
+        inputs.push_back(param);
+        break;
+      }
+      }
+    }
+  }
+  
   auto calleeConvention = ParameterConvention::Direct_Unowned;
   if (extInfo.hasContext())
     calleeConvention = conventions.getCallee();
@@ -730,17 +814,19 @@ namespace {
 }
 
 static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
-                                           AbstractionPattern origType,
-                                           CanAnyFunctionType substType,
-                                           CanAnyFunctionType substInterfaceType,
-                                           AnyFunctionType::ExtInfo extInfo,
-                                           SILDeclRef::Kind kind) {
+                                         AbstractionPattern origType,
+                                         CanAnyFunctionType substType,
+                                         CanAnyFunctionType substInterfaceType,
+                                         AnyFunctionType::ExtInfo extInfo,
+                                         Optional<SILDeclRef> constant,
+                                         SILDeclRef::Kind kind) {
   switch (extInfo.getSILRepresentation()) {
   case SILFunctionType::Representation::Block:
   case SILFunctionType::Representation::CFunctionPointer:
+    // TODO: Ought to support captures in block funcs.
     return getSILFunctionType(M, origType, substType, substInterfaceType,
                               extInfo, DefaultBlockConventions(),
-                              None);
+                              None, constant);
 
   case SILFunctionType::Representation::Thin:
   case SILFunctionType::Representation::ObjCMethod:
@@ -751,7 +837,7 @@ static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
     case SILDeclRef::Kind::Initializer:
       return getSILFunctionType(M, origType, substType, substInterfaceType,
                                 extInfo, DefaultInitializerConventions(),
-                                None);
+                                None, constant);
     
     case SILDeclRef::Kind::Func:
     case SILDeclRef::Kind::Allocator:
@@ -764,10 +850,11 @@ static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
     case SILDeclRef::Kind::EnumElement:
       return getSILFunctionType(M, origType, substType, substInterfaceType,
                                 extInfo, DefaultConventions(),
-                                None);
+                                None, constant);
     case SILDeclRef::Kind::Deallocator:
       return getSILFunctionType(M, origType, substType, substInterfaceType,
-                                extInfo, DeallocatorConventions(), None);
+                                extInfo, DeallocatorConventions(), None,
+                                constant);
     }
   }
   }
@@ -789,7 +876,7 @@ CanSILFunctionType swift::getNativeSILFunctionType(SILModule &M,
     extInfo = substType->getExtInfo();
   }
   return ::getNativeSILFunctionType(M, origType, substType, substInterfaceType,
-                                    extInfo, kind);
+                                    extInfo, None, kind);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1101,7 +1188,7 @@ getSILFunctionTypeForClangDecl(SILModule &M, const clang::Decl *clangDecl,
       AbstractionPattern::getObjCMethod(origType, method, foreignError);
     return getSILFunctionType(M, origPattern, substType, substInterfaceType,
                               extInfo, ObjCMethodConventions(method),
-                              foreignError);
+                              foreignError, None);
   }
 
   if (auto func = dyn_cast<clang::FunctionDecl>(clangDecl)) {
@@ -1109,7 +1196,7 @@ getSILFunctionTypeForClangDecl(SILModule &M, const clang::Decl *clangDecl,
                                    func->getType().getTypePtr());
     return getSILFunctionType(M, origPattern, substType, substInterfaceType,
                               extInfo, CFunctionConventions(func),
-                              foreignError);
+                              foreignError, None);
   }
 
   llvm_unreachable("call to unknown kind of C function");
@@ -1297,7 +1384,7 @@ getSILFunctionTypeForSelectorFamily(SILModule &M, SelectorFamily family,
                             substType, substInterfaceType,
                             extInfo,
                             SelectorFamilyConventions(family),
-                            foreignError);
+                            foreignError, None);
 }
 
 static CanSILFunctionType
@@ -1334,10 +1421,11 @@ getUncachedSILFunctionTypeForConstant(SILModule &M, SILDeclRef constant,
 
   if (!constant.isForeign) {
     return getNativeSILFunctionType(M, AbstractionPattern(origLoweredType),
-                                    substLoweredType,
-                                    substLoweredInterfaceType,
-                                    extInfo,
-                                    constant.kind);
+                  substLoweredType,
+                  substLoweredInterfaceType,
+                  extInfo,
+                  constant,
+                  constant.kind);
   }
 
   Optional<ForeignErrorConvention> foreignError;

@@ -267,13 +267,6 @@ class AbstractionPattern {
 
   Kind getKind() const { return Kind(TheKind); }
 
-  CanGenericSignature getGenericSignature() const {
-    assert(getKind() == Kind::Type ||
-           hasStoredClangType() ||
-           hasStoredObjCMethod());
-    return CanGenericSignature(GenericSig);
-  }
-
   CanGenericSignature getGenericSignatureForFunctionComponent() const {
     if (auto genericFn = dyn_cast<GenericFunctionType>(getType())) {
       return genericFn.getGenericSignature();
@@ -362,6 +355,13 @@ public:
     return AbstractionPattern(Kind::Invalid);
   }
 
+  CanGenericSignature getGenericSignature() const {
+    assert(getKind() == Kind::Type ||
+           hasStoredClangType() ||
+           hasStoredObjCMethod());
+    return CanGenericSignature(GenericSig);
+  }
+  
   /// Return an open-coded abstraction pattern for a tuple.  The
   /// caller is responsible for ensuring that the storage for the
   /// tuple elements is valid for as long as the abstraction pattern is.
