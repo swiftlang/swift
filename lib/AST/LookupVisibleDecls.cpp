@@ -500,6 +500,8 @@ static void lookupVisibleMemberDeclsImpl(
     ClassDecl *CurClass = dyn_cast<ClassDecl>(CurNominal);
 
     if (CurClass && CurClass->hasSuperclass()) {
+      assert(BaseTy.getPointer() != CurClass->getSuperclass().getPointer() &&
+             "type is its own superclass");
       BaseTy = CurClass->getSuperclass();
       Reason = getReasonForSuper(Reason);
 
