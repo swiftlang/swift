@@ -376,17 +376,6 @@ public:
                          LSLocationValueMap &LocAndVal,
                          SILInstruction *InsertPt,
                          TypeExpansionAnalysis *TE);
-
-  /// Enumerate the given LSValue.
-  static void enumerateLSValue(SILModule *M, SILValue Val,
-                               std::vector<LSValue> &Vault,
-                               LSValueIndexMap &ValToBit,
-                               TypeExpansionAnalysis *TE);
-
-  /// Enumerate all the LSValues in the function.
-  static void enumerateLSValues(SILFunction &F, std::vector<LSValue> &Vault,
-                                LSValueIndexMap &ValToBit,
-                                TypeExpansionAnalysis *TE);
 };
 
 static inline llvm::hash_code hash_value(const LSValue &V) {

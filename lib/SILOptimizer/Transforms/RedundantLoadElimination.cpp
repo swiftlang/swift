@@ -1018,9 +1018,6 @@ RLEContext::RLEContext(SILFunction *F, AliasAnalysis *AA,
   // this function.
   LSLocation::enumerateLSLocations(*Fn, LocationVault, LocToBitIndex, TE);
 
-  // Walk over the function and find all the values used in this function.
-  LSValue::enumerateLSValues(*Fn, LSValueVault, ValToBitIndex, TE);
-
   // For all basic blocks in the function, initialize a BB state. Since we
   // know all the locations accessed in this function, we can resize the bit
   // vector to the appropriate size.
@@ -1053,6 +1050,11 @@ unsigned RLEContext::getValueBit(const LSValue &Val) {
   // Return the bit position of the given Val in the LSValueVault. The bit
   // position is then used to set/reset the bitvector kept by each g.
   auto Iter = ValToBitIndex.find(Val);
+
+  // We do not walk over the function and find all the possible LSValues
+  // in this funciton, as some of the these values will not be used, i.e.
+  // if the LoadInst that generates this value is actually RLE'ed.
+  // Instead, we create the LSValues when we need them.
   if (Iter == ValToBitIndex.end()) {
     ValToBitIndex[Val] = LSValueVault.size();
     LSValueVault.push_back(Val);
