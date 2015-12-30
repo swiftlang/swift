@@ -310,7 +310,6 @@ static Pattern *buildImplicitLetParameter(ASTContext &ctx, Identifier name,
   P->setType(tyLoc.getType());
   P = new (ctx) TypedPattern(P, tyLoc, /*Implicit=*/true);
   P->setType(tyLoc.getType());
-  paramDecl->setParamParentPattern(P);
   return P;
 }
 

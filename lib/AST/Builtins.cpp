@@ -157,8 +157,6 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
     Pattern *Pat = new (Context) NamedPattern(PD, /*implicit=*/true);
     Pat = new (Context) TypedPattern(Pat, TypeLoc::withoutLoc(argType),
                                      /*implicit=*/true);
-    PD->setParamParentPattern(Pat);
-
     ParamPatternElts.push_back(TuplePatternElt(Pat));
   }
 
@@ -228,7 +226,6 @@ getBuiltinGenericFunction(Identifier Id,
     Pattern *Pat = new (Context) NamedPattern(PD, /*implicit=*/true);
     Pat = new (Context) TypedPattern(Pat,
             TypeLoc::withoutLoc(ArgTupleElt.getType()), /*implicit=*/true);
-    PD->setParamParentPattern(Pat);
 
     ParamPatternElts.push_back(TuplePatternElt(Pat));
   }

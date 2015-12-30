@@ -392,9 +392,6 @@ mapParsedParameters(Parser &parser,
       bool isLet = specifierKind == Parser::ParsedParameter::Let;
       param = new (ctx) VarPattern(letVarInOutLoc, isLet, param);
     }
-
-    if (var)
-      var->setParamParentPattern(param);
     return param;
   };
 

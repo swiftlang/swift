@@ -1492,17 +1492,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       }
 
       // If this is a parameter explicitly marked 'var', remove it.
-      if (auto *param = dyn_cast<ParamDecl>(var))
-        if (auto *pattern = param->getParamParentPattern())
-          if (auto *vp = dyn_cast<VarPattern>(pattern)) {
-            TC.diagnose(var->getLoc(), diag::variable_never_mutated,
-                        var->getName(), /*param*/1)
-              .fixItRemove(vp->getLoc());
-            continue;
-          }
-      
       unsigned varKind = isa<ParamDecl>(var);
-      // FIXME: fixit when we can find a pattern binding.
       if (FixItLoc.isInvalid())
         TC.diagnose(var->getLoc(), diag::variable_never_mutated,
                     var->getName(), varKind);

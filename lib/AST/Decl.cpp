@@ -3154,11 +3154,7 @@ SourceRange VarDecl::getSourceRange() const {
 }
 
 SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
-  Pattern *Pat = nullptr;
-  if (ParentPattern.is<Pattern*>())
-    Pat = ParentPattern.dyn_cast<Pattern *>();
-  else
-    Pat = getParentPattern();
+  Pattern *Pat = getParentPattern();
   
   if (!Pat || Pat->isImplicit())
     return getSourceRange();

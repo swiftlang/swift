@@ -4007,7 +4007,7 @@ public:
 /// VarDecl - 'var' and 'let' declarations.
 class VarDecl : public AbstractStorageDecl {
 protected:
-  llvm::PointerUnion3<PatternBindingDecl*, Pattern*, Stmt*> ParentPattern;
+  llvm::PointerUnion<PatternBindingDecl*, Stmt*> ParentPattern;
 
   VarDecl(DeclKind Kind, bool IsStatic, bool IsLet, SourceLoc NameLoc,
           Identifier Name, Type Ty, DeclContext *DC)
@@ -4184,13 +4184,6 @@ public:
     if (ArgumentNameLoc.isInvalid() && getNameLoc().isValid())
       return getNameLoc();
     return SourceRange(ArgumentNameLoc, getNameLoc());
-  }
-
-  Pattern *getParamParentPattern() const {
-    return ParentPattern.dyn_cast<Pattern *>();
-  }
-  void setParamParentPattern(Pattern *Pat) {
-    ParentPattern = Pat;
   }
 
   // Implement isa/cast/dyncast/etc.
