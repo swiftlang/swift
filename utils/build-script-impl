@@ -36,6 +36,11 @@ LLVM_TARGETS_TO_BUILD="X86;ARM;AArch64"
 # End of configurable options.
 #
 
+# There is an existing issue around OS X & Python locale setting for sphinx
+# See https://bugs.python.org/issue18378#msg215215 for explanation
+LC_CTYPE="en_US.UTF-8"
+
+
 # Declare the set of known settings along with each one's description
 #
 # If you add a user-settable variable, add it to this list.
