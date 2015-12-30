@@ -491,6 +491,10 @@ void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
   // may be reallocated during this traversal, so pay the lookup cost
   // during each iteration.
   for (unsigned i = 0; i != AllConformances[dc].size(); ++i) {
+    /// FIXME: Avoid the possibility of an infinite loop by fixing the root
+    ///        cause instead (incomplete circularity detection).
+    assert(i <= 16384 &&
+           "Infinite loop due to circular protocol inheritance?");
     ConformanceEntry *conformanceEntry = AllConformances[dc][i];
     ProtocolDecl *conformingProtocol = conformanceEntry->getProtocol();
 
