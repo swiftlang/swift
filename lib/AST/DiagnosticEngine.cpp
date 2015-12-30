@@ -502,12 +502,6 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     // If a declaration was provided instead of a location, and that declaration
     // has a location we can point to, use that location.
     loc = decl->getLoc();
-    // With an implicit parameter try to point to its type.
-    if (loc.isInvalid() && isa<ParamDecl>(decl)) {
-      if (auto Pat =
-            cast<ParamDecl>(decl)->getParamParentPattern())
-        loc = Pat->getLoc();
-    }
 
     if (loc.isInvalid()) {
       // There is no location we can point to. Pretty-print the declaration
