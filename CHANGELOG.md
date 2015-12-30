@@ -91,6 +91,14 @@ Latest
   back-ticks. For more information, see
   [SE-0001](https://github.com/apple/swift-evolution/blob/master/proposals/0001-keywords-as-argument-labels.md).
 
+* Tuples (up to arity 6) whose elements are all `Comparable` or `Equatable` now
+  implement the full set of comparison/equality operators. The comparison
+  operators are defined in terms of [lexicographical order][]. See [SE-0015][]
+  for more information.
+
+[lexicographical order]: https://en.wikipedia.org/wiki/Lexicographical_order
+[SE-0015]: https://github.com/apple/swift-evolution/blob/master/proposals/0015-tuple-comparison-operators.md
+
 2015-09-17 [Xcode 7.1, Swift 2.1]
 ----------
 
