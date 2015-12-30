@@ -856,7 +856,7 @@ public:
 
   // Only allow allocation of Decls using the allocator in ASTContext
   // or by doing a placement new.
-  void *operator new(size_t Bytes, ASTContext &C,
+  void *operator new(size_t Bytes, const ASTContext &C,
                      unsigned Alignment = alignof(Decl));
   void *operator new(size_t Bytes, void *Mem) { 
     assert(Mem); 

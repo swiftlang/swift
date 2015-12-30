@@ -72,13 +72,13 @@ const clang::Module *ClangNode::getClangModule() const {
 }
 
 // Only allow allocation of Decls using the allocator in ASTContext.
-void *Decl::operator new(size_t Bytes, ASTContext &C,
+void *Decl::operator new(size_t Bytes, const ASTContext &C,
                          unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
 }
 
 // Only allow allocation of Modules using the allocator in ASTContext.
-void *Module::operator new(size_t Bytes, ASTContext &C,
+void *Module::operator new(size_t Bytes, const ASTContext &C,
                            unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
 }
