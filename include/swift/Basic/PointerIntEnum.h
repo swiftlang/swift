@@ -81,7 +81,7 @@ namespace swift {
 /// \tparam PtrTraits The pointer traits of PointerTy
 /// \tparam ScribbleMemory Instead of freeing any malloced memory, scribble the
 /// memory. This enables us to test that memory is properly being
-/// deallocated. Should only be set to true during unittesting.
+/// deallocated. Should only be set to true during unit testing.
 template <typename EnumTy, typename PointerTy, unsigned NumPointerKindBits,
           unsigned NumIndexKindBits,
           typename PtrTraits = llvm::PointerLikeTypeTraits<PointerTy>,
@@ -153,7 +153,7 @@ public:
   }
 
   PointerIntEnum &operator=(const PointerIntEnum &P) {
-    // If we already haev a raw kind, we need to free memory.
+    // If we already have a raw kind, we need to free memory.
     if (getRawKind() == EnumTy::LargeIndex)
       freeMemory();
 
@@ -197,7 +197,7 @@ public:
   /// Convenience method for getting the raw underlying kind.
   EnumTy getKind() const {
     // First grab the bits of projection excluding the top 3 bits. If these bits
-    // take ona value <= 4095, then we have a small index.
+    // take on a value <= 4095, then we have a small index.
     if ((Index & IndexKindOffsetBitMask) <= MaxSmallIndex) {
       return EnumTy(unsigned(Index >> IndexKindBitOffset));
     }
@@ -252,7 +252,7 @@ public:
   /// lower bits of the malloced large index.
   EnumTy getRawKind() const {
     // First grab the bits of projection excluding the top 3 bits. If these bits
-    // take ona value <= 2047, then we have a small index.
+    // take on a value <= 2047, then we have a small index.
     if ((Index & IndexKindOffsetBitMask) <= MaxSmallIndex) {
       return EnumTy(unsigned(Index >> IndexKindBitOffset));
     }

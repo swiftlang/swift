@@ -202,7 +202,7 @@ class NewProjection {
                                  NumPointerKindBits, NumIndexKindBits>;
   /// A pointer sized type that is used to store the kind of projection that is
   /// being represented and also all of the necessary information to convert a
-  /// base SILTyepe to a derived field SILType.
+  /// base SILType to a derived field SILType.
   ValueTy Value;
 
 public:
@@ -535,7 +535,7 @@ public:
   /// to an address derived type.
   bool isAddressProjectionPath() const;
 
-  /// Returns true if this is an projection path that takes an object base type
+  /// Returns true if this is a projection path that takes an object base type
   /// to an object derived type.
   bool isObjectProjectionPath() const;
 
@@ -547,7 +547,7 @@ public:
 
   /// If this is an address projection path and \p Base is a SILValue with the
   /// object version of said type, use \p B and \p Loc to recreate the stored
-  /// address projection path as a object projection path from \p Base. Return
+  /// address projection path as an object projection path from \p Base. Return
   /// the SILValue at the end of the path.
   SILValue createObjectProjections(SILBuilder &B, SILLocation Loc,
                                    SILValue Base);
