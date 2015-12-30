@@ -157,7 +157,17 @@ public:
   SILValueCategory getCategory() const {
     return SILValueCategory(value.getInt());
   }
-  
+
+  /// Returns the \p Category variant of this type.
+  SILType getCategoryType(SILValueCategory Category) const {
+    return SILType(getSwiftRValueType(), Category);
+  }
+
+  /// Returns the variant of this type that matches \p Ty.getCategory()
+  SILType copyCategory(SILType Ty) const {
+    return getCategoryType(Ty.getCategory());
+  }
+
   /// Returns the address variant of this type.  Instructions which
   /// manipulate memory will generally work with object addresses.
   SILType getAddressType() const {
