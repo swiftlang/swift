@@ -11,7 +11,7 @@ class IBOutletClassTy {}
 struct IBStructTy {}
 
 @IBOutlet // expected-error {{@IBOutlet may only be used on 'var' declarations}} {{1-11=}}
-func IBFunction() -> () {}
+func IBFunction() -> Void {}
 
 @objc
 class IBOutletWrapperTy {
@@ -24,7 +24,7 @@ class IBOutletWrapperTy {
   // expected-error@-2 {{class stored properties not yet supported}}
 
   @IBOutlet // expected-error {{@IBOutlet may only be used on 'var' declarations}} {{3-13=}}
-  func click() -> () {}
+  func click() -> Void {}
 
   @IBOutlet // expected-error {{@IBOutlet attribute requires property to be mutable}} {{3-13=}}
   let immutable: IBOutletWrapperTy? = nil

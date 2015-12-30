@@ -609,45 +609,45 @@ class infer_instanceFunc1 {
 
   @objc func func16_(a: AnyObject) {} // no-error
 
-  func func17(a: () -> ()) {}
-// CHECK-LABEL: {{^}}  @objc func func17(a: () -> ()) {
+  func func17(a: () -> Void) {}
+// CHECK-LABEL: {{^}}  @objc func func17(a: () -> Void) {
 
-  @objc func func17_(a: () -> ()) {}
+  @objc func func17_(a: () -> Void) {}
 
-  func func18(a: (Int) -> (), b: Int) {}
-// CHECK-LABEL: {{^}}  @objc func func18(a: (Int) -> (), b: Int)
+  func func18(a: (Int) -> Void, b: Int) {}
+// CHECK-LABEL: {{^}}  @objc func func18(a: (Int) -> Void, b: Int)
 
-  @objc func func18_(a: (Int) -> (), b: Int) {}
+  @objc func func18_(a: (Int) -> Void, b: Int) {}
 
-  func func19(a: (String) -> (), b: Int) {}
-// CHECK-LABEL: {{^}}  @objc func func19(a: (String) -> (), b: Int) {
+  func func19(a: (String) -> Void, b: Int) {}
+// CHECK-LABEL: {{^}}  @objc func func19(a: (String) -> Void, b: Int) {
 
-  @objc func func19_(a: (String) -> (), b: Int) {}
+  @objc func func19_(a: (String) -> Void, b: Int) {}
 
-  func func_FunctionReturn1() -> () -> () {}
-// CHECK-LABEL: {{^}}  @objc func func_FunctionReturn1() -> () -> () {
+  func func_FunctionReturn1() -> Void -> Void {}
+// CHECK-LABEL: {{^}}  @objc func func_FunctionReturn1() -> Void -> Void {
 
-  @objc func func_FunctionReturn1_() -> () -> () {}
+  @objc func func_FunctionReturn1_() -> Void -> Void {}
 
-  func func_FunctionReturn2() -> (Int) -> () {}
-// CHECK-LABEL: {{^}}  @objc func func_FunctionReturn2() -> (Int) -> () {
+  func func_FunctionReturn2() -> (Int) -> Void {}
+// CHECK-LABEL: {{^}}  @objc func func_FunctionReturn2() -> (Int) -> Void {
 
-  @objc func func_FunctionReturn2_() -> (Int) -> () {}
+  @objc func func_FunctionReturn2_() -> (Int) -> Void {}
 
-  func func_FunctionReturn3() -> () -> Int {}
-// CHECK-LABEL: {{^}}  @objc func func_FunctionReturn3() -> () -> Int {
+  func func_FunctionReturn3() -> Void -> Int {}
+// CHECK-LABEL: {{^}}  @objc func func_FunctionReturn3() -> Void -> Int {
 
-  @objc func func_FunctionReturn3_() -> () -> Int {}
+  @objc func func_FunctionReturn3_() -> Void -> Int {}
 
-  func func_FunctionReturn4() -> (String) -> () {}
-// CHECK-LABEL: {{^}}  @objc func func_FunctionReturn4() -> (String) -> () {
+  func func_FunctionReturn4() -> (String) -> Void {}
+// CHECK-LABEL: {{^}}  @objc func func_FunctionReturn4() -> (String) -> Void {
 
-  @objc func func_FunctionReturn4_() -> (String) -> () {}
+  @objc func func_FunctionReturn4_() -> (String) -> Void {}
 
-  func func_FunctionReturn5() -> () -> String {}
-// CHECK-LABEL: {{^}}  @objc func func_FunctionReturn5() -> () -> String {
+  func func_FunctionReturn5() -> Void -> String {}
+// CHECK-LABEL: {{^}}  @objc func func_FunctionReturn5() -> Void -> String {
 
-  @objc func func_FunctionReturn5_() -> () -> String {}
+  @objc func func_FunctionReturn5_() -> Void -> String {}
 
 
   func func_ZeroParams1() {}
@@ -1176,8 +1176,8 @@ class infer_instanceVar1 {
   var var_Optional_fail21: AnyObject.Type??
 // CHECK-NOT: @objc{{.*}}Optional_fail
 
-  // CHECK-LABEL: @objc var var_CFunctionPointer_1: @convention(c) () -> ()
-  var var_CFunctionPointer_1: @convention(c) () -> ()
+  // CHECK-LABEL: @objc var var_CFunctionPointer_1: @convention(c) () -> Void
+  var var_CFunctionPointer_1: @convention(c) () -> Void
   // CHECK-LABEL: @objc var var_CFunctionPointer_invalid_1: Int
   var var_CFunctionPointer_invalid_1: @convention(c) Int // expected-error {{attribute only applies to syntactic function types}}
   // CHECK-LABEL: {{^}} var var_CFunctionPointer_invalid_2: @convention(c) PlainStruct -> Int
@@ -1240,94 +1240,94 @@ class infer_instanceVar1 {
 // CHECK-NOT: @objc{{.*}}Unowned_fail
 
 
-  var var_FunctionType1: () -> ()
-// CHECK-LABEL: {{^}}  @objc var var_FunctionType1: () -> ()
+  var var_FunctionType1: () -> Void
+// CHECK-LABEL: {{^}}  @objc var var_FunctionType1: () -> Void
 
-  var var_FunctionType2: (Int) -> ()
-// CHECK-LABEL: {{^}}  @objc var var_FunctionType2: (Int) -> ()
+  var var_FunctionType2: (Int) -> Void
+// CHECK-LABEL: {{^}}  @objc var var_FunctionType2: (Int) -> Void
 
   var var_FunctionType3: (Int) -> Int
 // CHECK-LABEL: {{^}}  @objc var var_FunctionType3: (Int) -> Int
 
-  var var_FunctionType4: (Int, Double) -> ()
-// CHECK-LABEL: {{^}}  @objc var var_FunctionType4: (Int, Double) -> ()
+  var var_FunctionType4: (Int, Double) -> Void
+// CHECK-LABEL: {{^}}  @objc var var_FunctionType4: (Int, Double) -> Void
 
-  var var_FunctionType5: (String) -> ()
-// CHECK-LABEL: {{^}}  @objc var var_FunctionType5: (String) -> ()
+  var var_FunctionType5: (String) -> Void
+// CHECK-LABEL: {{^}}  @objc var var_FunctionType5: (String) -> Void
 
   var var_FunctionType6: () -> String
 // CHECK-LABEL: {{^}}  @objc var var_FunctionType6: () -> String
 
-  var var_FunctionType7: (PlainClass) -> ()
-// CHECK-NOT: @objc var var_FunctionType7: (PlainClass) -> ()
+  var var_FunctionType7: (PlainClass) -> Void
+// CHECK-NOT: @objc var var_FunctionType7: (PlainClass) -> Void
 
   var var_FunctionType8: () -> PlainClass
 // CHECK-NOT: @objc var var_FunctionType8: () -> PlainClass
 
-  var var_FunctionType9: (PlainStruct) -> ()
-// CHECK-LABEL: {{^}}  var var_FunctionType9: (PlainStruct) -> ()
+  var var_FunctionType9: (PlainStruct) -> Void
+// CHECK-LABEL: {{^}}  var var_FunctionType9: (PlainStruct) -> Void
 
   var var_FunctionType10: () -> PlainStruct
 // CHECK-LABEL: {{^}}  var var_FunctionType10: () -> PlainStruct
 
-  var var_FunctionType11: (PlainEnum) -> ()
-// CHECK-LABEL: {{^}}  var var_FunctionType11: (PlainEnum) -> ()
+  var var_FunctionType11: (PlainEnum) -> Void
+// CHECK-LABEL: {{^}}  var var_FunctionType11: (PlainEnum) -> Void
 
-  var var_FunctionType12: (PlainProtocol) -> ()
-// CHECK-LABEL: {{^}}  var var_FunctionType12: (PlainProtocol) -> ()
+  var var_FunctionType12: (PlainProtocol) -> Void
+// CHECK-LABEL: {{^}}  var var_FunctionType12: (PlainProtocol) -> Void
 
-  var var_FunctionType13: (Class_ObjC1) -> ()
-// CHECK-LABEL: {{^}}  @objc var var_FunctionType13: (Class_ObjC1) -> ()
+  var var_FunctionType13: (Class_ObjC1) -> Void
+// CHECK-LABEL: {{^}}  @objc var var_FunctionType13: (Class_ObjC1) -> Void
 
-  var var_FunctionType14: (Protocol_Class1) -> ()
-// CHECK-LABEL: {{^}}  var var_FunctionType14: (Protocol_Class1) -> ()
+  var var_FunctionType14: (Protocol_Class1) -> Void
+// CHECK-LABEL: {{^}}  var var_FunctionType14: (Protocol_Class1) -> Void
 
-  var var_FunctionType15: (Protocol_ObjC1) -> ()
-// CHECK-LABEL: {{^}}  @objc var var_FunctionType15: (Protocol_ObjC1) -> ()
+  var var_FunctionType15: (Protocol_ObjC1) -> Void
+// CHECK-LABEL: {{^}}  @objc var var_FunctionType15: (Protocol_ObjC1) -> Void
 
-  var var_FunctionType16: (AnyObject) -> ()
-// CHECK-LABEL: {{^}}  @objc var var_FunctionType16: (AnyObject) -> ()
+  var var_FunctionType16: (AnyObject) -> Void
+// CHECK-LABEL: {{^}}  @objc var var_FunctionType16: (AnyObject) -> Void
 
-  var var_FunctionType17: (() -> ()) -> ()
-// CHECK-LABEL: {{^}}  @objc var var_FunctionType17: (() -> ()) -> ()
+  var var_FunctionType17: (() -> Void) -> Void
+// CHECK-LABEL: {{^}}  @objc var var_FunctionType17: (() -> Void) -> Void
 
-  var var_FunctionType18: ((Int) -> (), Int) -> ()
-// CHECK-LABEL: {{^}}  @objc var var_FunctionType18: ((Int) -> (), Int) -> ()
+  var var_FunctionType18: ((Int) -> Void, Int) -> Void
+// CHECK-LABEL: {{^}}  @objc var var_FunctionType18: ((Int) -> Void, Int) -> Void
 
-  var var_FunctionType19: ((String) -> (), Int) -> ()
-// CHECK-LABEL: {{^}}  @objc var var_FunctionType19: ((String) -> (), Int) -> ()
-
-
-  var var_FunctionTypeReturn1: () -> () -> ()
-// CHECK-LABEL: {{^}}  @objc var var_FunctionTypeReturn1: () -> () -> ()
-
-  @objc var var_FunctionTypeReturn1_: () -> () -> () // no-error
-
-  var var_FunctionTypeReturn2: () -> (Int) -> ()
-// CHECK-LABEL: {{^}}  @objc var var_FunctionTypeReturn2: () -> (Int) -> ()
-
-  @objc var var_FunctionTypeReturn2_: () -> (Int) -> () // no-error
-
-  var var_FunctionTypeReturn3: () -> () -> Int
-// CHECK-LABEL: {{^}}  @objc var var_FunctionTypeReturn3: () -> () -> Int
-
-  @objc var var_FunctionTypeReturn3_: () -> () -> Int // no-error
-
-  var var_FunctionTypeReturn4: () -> (String) -> ()
-// CHECK-LABEL: {{^}}  @objc var var_FunctionTypeReturn4: () -> (String) -> ()
-
-  @objc var var_FunctionTypeReturn4_: () -> (String) -> () // no-error
-
-  var var_FunctionTypeReturn5: () -> () -> String
-// CHECK-LABEL: {{^}}  @objc var var_FunctionTypeReturn5: () -> () -> String
-
-  @objc var var_FunctionTypeReturn5_: () -> () -> String // no-error
+  var var_FunctionType19: ((String) -> Void, Int) -> Void
+// CHECK-LABEL: {{^}}  @objc var var_FunctionType19: ((String) -> Void, Int) -> Void
 
 
-  var var_BlockFunctionType1: @convention(block) () -> ()
-// CHECK-LABEL: @objc var var_BlockFunctionType1: @convention(block) () -> ()
+  var var_FunctionTypeReturn1: () -> Void -> Void
+// CHECK-LABEL: {{^}}  @objc var var_FunctionTypeReturn1: () -> Void -> Void
 
-  @objc var var_BlockFunctionType1_: @convention(block) () -> () // no-error
+  @objc var var_FunctionTypeReturn1_: () -> Void -> Void // no-error
+
+  var var_FunctionTypeReturn2: () -> (Int) -> Void
+// CHECK-LABEL: {{^}}  @objc var var_FunctionTypeReturn2: () -> (Int) -> Void
+
+  @objc var var_FunctionTypeReturn2_: () -> (Int) -> Void // no-error
+
+  var var_FunctionTypeReturn3: () -> Void -> Int
+// CHECK-LABEL: {{^}}  @objc var var_FunctionTypeReturn3: () -> Void -> Int
+
+  @objc var var_FunctionTypeReturn3_: () -> Void -> Int // no-error
+
+  var var_FunctionTypeReturn4: () -> (String) -> Void
+// CHECK-LABEL: {{^}}  @objc var var_FunctionTypeReturn4: () -> (String) -> Void
+
+  @objc var var_FunctionTypeReturn4_: () -> (String) -> Void // no-error
+
+  var var_FunctionTypeReturn5: () -> Void -> String
+// CHECK-LABEL: {{^}}  @objc var var_FunctionTypeReturn5: () -> Void -> String
+
+  @objc var var_FunctionTypeReturn5_: () -> Void -> String // no-error
+
+
+  var var_BlockFunctionType1: @convention(block) () -> Void
+// CHECK-LABEL: @objc var var_BlockFunctionType1: @convention(block) () -> Void
+
+  @objc var var_BlockFunctionType1_: @convention(block) () -> Void // no-error
 
   var var_ArrayType1: [AnyObject]
   // CHECK-LABEL: {{^}}  @objc var var_ArrayType1: [AnyObject]
@@ -1695,7 +1695,7 @@ class HasNSManaged {
   func mutableAutoreleasingUnsafeMutablePointerToAnyObject(p: AutoreleasingUnsafeMutablePointer<AnyObject>) {}
   // CHECK-LABEL: {{^}} @objc func mutableAutoreleasingUnsafeMutablePointerToAnyObject(p: AutoreleasingUnsafeMutablePointer<AnyObject>) {
 
-  func cFunctionPointer(p: CFunctionPointer<() -> ()>) {} // expected-error{{unavailable}}
+  func cFunctionPointer(p: CFunctionPointer<() -> Void>) {} // expected-error{{unavailable}}
   // CHECK-LABEL: {{^}} func cFunctionPointer(p: <<error type>>) -> <<error type>>
 }
 
@@ -1848,32 +1848,32 @@ struct NotObjCStruct {}
 // CHECK-LABEL: @objc class ClosureArguments
 @objc class ClosureArguments {
   // CHECK: @objc func foo
-  @objc func foo(f: Int -> ()) {}
+  @objc func foo(f: Int -> Void) {}
   // CHECK: @objc func bar
   @objc func bar(f: NotObjCEnum -> NotObjCStruct) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
   // CHECK: @objc func bas
-  @objc func bas(f: NotObjCEnum -> ()) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
+  @objc func bas(f: NotObjCEnum -> Void) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
   // CHECK: @objc func zim
   @objc func zim(f: () -> NotObjCStruct) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
   // CHECK: @objc func zang
-  @objc func zang(f: (NotObjCEnum, NotObjCStruct) -> ()) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
-  @objc func zangZang(f: (Int...) -> ()) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
+  @objc func zang(f: (NotObjCEnum, NotObjCStruct) -> Void) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
+  @objc func zangZang(f: (Int...) -> Void) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
   // CHECK: @objc func fooImplicit
-  func fooImplicit(f: Int -> ()) {}
+  func fooImplicit(f: Int -> Void) {}
   // CHECK: {{^}}  func barImplicit
   func barImplicit(f: NotObjCEnum -> NotObjCStruct) {}
   // CHECK: {{^}}  func basImplicit
-  func basImplicit(f: NotObjCEnum -> ()) {}
+  func basImplicit(f: NotObjCEnum -> Void) {}
   // CHECK: {{^}}  func zimImplicit
   func zimImplicit(f: () -> NotObjCStruct) {}
   // CHECK: {{^}}  func zangImplicit
-  func zangImplicit(f: (NotObjCEnum, NotObjCStruct) -> ()) {}
+  func zangImplicit(f: (NotObjCEnum, NotObjCStruct) -> Void) {}
   // CHECK: {{^}}  func zangZangImplicit
-  func zangZangImplicit(f: (Int...) -> ()) {}
+  func zangZangImplicit(f: (Int...) -> Void) {}
 }
 
-typealias GoodBlock = @convention(block) Int -> ()
-typealias BadBlock = @convention(block) NotObjCEnum -> () // expected-error{{'NotObjCEnum -> ()' is not representable in Objective-C, so it cannot be used with '@convention(block)'}}
+typealias GoodBlock = @convention(block) Int -> Void
+typealias BadBlock = @convention(block) NotObjCEnum -> Void // expected-error{{'NotObjCEnum -> Void' is not representable in Objective-C, so it cannot be used with '@convention(block)'}}
 
 
 @objc class AccessControl {

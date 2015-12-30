@@ -36,7 +36,7 @@ public func || <T: BooleanType>(
 }
 
 // <rdar://problem/19707366> QoI: @autoclosure declaration change fixit
-let migrate4 : @autoclosure() -> ()   // expected-error {{@autoclosure is now an attribute of the parameter declaration, not its type}} {{1-1=@autoclosure }} {{16-28=}}
+let migrate4 : @autoclosure() -> Void   // expected-error {{@autoclosure is now an attribute of the parameter declaration, not its type}} {{1-1=@autoclosure }} {{16-28=}}
 
 
 struct SomeStruct {
@@ -62,17 +62,17 @@ protocol P2 : P1 {
   typealias Element
 }
 
-func overloadedEach<O: P1>(source: O, _ closure: () -> ()) {
+func overloadedEach<O: P1>(source: O, _ closure: () -> Void) {
 }
 
-func overloadedEach<P: P2>(source: P, _ closure: () -> ()) {
+func overloadedEach<P: P2>(source: P, _ closure: () -> Void) {
 }
 
 struct S : P2 {
   typealias Element = Int
-  func each(@autoclosure closure: () -> ()) {
-    overloadedEach(self, closure) // expected-error {{cannot invoke 'overloadedEach' with an argument list of type '(S, @autoclosure () -> ())'}}
- // expected-note @-1 {{overloads for 'overloadedEach' exist with these partially matching parameter lists: (O, () -> ()), (P, () -> ())}}
+  func each(@autoclosure closure: () -> Void) {
+    overloadedEach(self, closure) // expected-error {{cannot invoke 'overloadedEach' with an argument list of type '(S, @autoclosure () -> Void)'}}
+ // expected-note @-1 {{overloads for 'overloadedEach' exist with these partially matching parameter lists: (O, () -> Void), (P, () -> Void)}}
   }
 }
 
@@ -82,22 +82,22 @@ struct AutoclosureEscapeTest {
 }
 
 // @autoclosure(escaping)
-func func10(@autoclosure(escaping _: () -> ()) { } // expected-error{{expected ')' in @autoclosure}}
+func func10(@autoclosure(escaping _: () -> Void) { } // expected-error{{expected ')' in @autoclosure}}
 // expected-note@-1{{to match this opening '('}}
 
-func func11(@autoclosure(escaping) @noescape _: () -> ()) { } // expected-error{{@noescape conflicts with @autoclosure(escaping)}} {{36-46=}}
+func func11(@autoclosure(escaping) @noescape _: () -> Void) { } // expected-error{{@noescape conflicts with @autoclosure(escaping)}} {{36-46=}}
 
 
 class Super {
-  func f1(@autoclosure(escaping) x: () -> ()) { }
-  func f2(@autoclosure(escaping) x: () -> ()) { }
-  func f3(@autoclosure x: () -> ()) { }
+  func f1(@autoclosure(escaping) x: () -> Void) { }
+  func f2(@autoclosure(escaping) x: () -> Void) { }
+  func f3(@autoclosure x: () -> Void) { }
 }
 
 class Sub : Super {
-  override func f1(@autoclosure(escaping) x: () -> ()) { }
-  override func f2(@autoclosure x: () -> ()) { } // expected-error{{does not override any method}}
-  override func f3(@autoclosure(escaping) x: () -> ()) { }  // expected-error{{does not override any method}}
+  override func f1(@autoclosure(escaping) x: () -> Void) { }
+  override func f2(@autoclosure x: () -> Void) { } // expected-error{{does not override any method}}
+  override func f3(@autoclosure(escaping) x: () -> Void) { }  // expected-error{{does not override any method}}
 }
 
 func func12_sink(x: () -> Int) { }

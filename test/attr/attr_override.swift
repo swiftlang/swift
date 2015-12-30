@@ -167,17 +167,17 @@ var rdar16654075b = {
     override func foo() {}  // expected-error{{method does not override any method from its superclass}}
   }
 }
-var rdar16654075c = { () -> () in
+var rdar16654075c = { () -> Void in
   override func foo() {} // expected-error {{'override' can only be specified on class members}} {{3-12=}}
   ()
 }
-var rdar16654075d = { () -> () in
+var rdar16654075d = { () -> Void in
   class A {
     override func foo() {} // expected-error {{method does not override any method from its superclass}}
   }
   A().foo()
 }
-var rdar16654075e = { () -> () in
+var rdar16654075e = { () -> Void in
   class A {
     func foo() {}
   }
