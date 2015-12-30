@@ -22,16 +22,24 @@
 /// component of `rhs`.
 @warn_unused_result
 public func == <${equatableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool {
-%   ops = ["lhs.{} == rhs.{}".format(i,i) for i in range(arity)]
-  return ${" && ".join(ops)}
+  guard lhs.0 == rhs.0 else { return false }
+  /*tail*/ return (
+    ${", ".join("lhs.{}".format(i) for i in range(1, arity))}
+  ) == (
+    ${", ".join("rhs.{}".format(i) for i in range(1, arity))}
+  )
 }
 
 /// Returns `true` iff any component of `lhs` is not equal to the corresponding
 /// component of `rhs`.
 @warn_unused_result
 public func != <${equatableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool {
-%   ops = ["lhs.{} != rhs.{}".format(i,i) for i in range(arity)]
-  return ${" || ".join(ops)}
+  guard lhs.0 == rhs.0 else { return true }
+  /*tail*/ return (
+    ${", ".join("lhs.{}".format(i) for i in range(1, arity))}
+  ) != (
+    ${", ".join("rhs.{}".format(i) for i in range(1, arity))}
+  )
 }
 
 %   comparableTypeParams = ", ".join(["{} : Comparable".format(c) for c in typeParams])
@@ -45,10 +53,12 @@ public func != <${equatableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool 
 /// (`a1 == b1` and `(a2, ..., aN) ${op}${opeq} (b2, ..., bN)`).
 @warn_unused_result
 public func ${op}${opeq} <${comparableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool {
-%   for i in range(arity-1):
-  if lhs.${i} != rhs.${i} { return lhs.${i} ${op} rhs.${i} }
-%   end
-  return lhs.${arity-1} ${op}${opeq} rhs.${arity-1}
+  if lhs.0 != rhs.0 { return lhs.0 ${op}${opeq} rhs.0 }
+  /*tail*/ return (
+    ${", ".join("lhs.{}".format(i) for i in range(1, arity))}
+  ) ${op}${opeq} (
+    ${", ".join("rhs.{}".format(i) for i in range(1, arity))}
+  )
 }
 %     end
 %   end
