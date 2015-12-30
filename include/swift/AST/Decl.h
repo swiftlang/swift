@@ -4782,22 +4782,24 @@ public:
   }
 
   /// isUnaryOperator - Determine whether this is a unary operator
-  /// implementation, in other words, the name of the function is an operator,
-  /// and the argument list consists syntactically of a single-element tuple
-  /// pattern. This check is syntactic rather than type-based in order to allow
+  /// implementation.  This check is a syntactic rather than type-based check,
+  /// which looks at the number of parameters specified, in order to allow
   /// for the definition of unary operators on tuples, as in:
-  ///   func [prefix] + (_:(a:Int, b:Int))
+  ///
+  ///   prefix func + (param : (a:Int, b:Int))
+  ///
   /// This also allows the unary-operator-ness of a func decl to be determined
   /// prior to type checking.
   bool isUnaryOperator() const;
   
   /// isBinaryOperator - Determine whether this is a binary operator
-  /// implementation, in other words, the name of the function is an operator,
-  /// and the argument list consists syntactically of a two-element tuple
-  /// pattern. This check is syntactic rather than type-based in order to
-  /// distinguish a binary operator from a unary operator on tuples, as in:
-  ///   func [prefix] + (_:(a:Int, b:Int)) // unary operator +(1,2)
-  ///   func [infix]  + (a:Int, b:Int)     // binary operator 1 + 2
+  /// implementation.  This check is a syntactic rather than type-based check,
+  /// which looks at the number of parameters specified, in order to allow
+  /// distinguishing a binary operator from a unary operator on tuples, as in:
+  ///
+  ///   prefix func + (_:(a:Int, b:Int)) // unary operator +(1,2)
+  ///   infix func  + (a:Int, b:Int)     // binary operator 1 + 2
+  ///
   /// This also allows the binary-operator-ness of a func decl to be determined
   /// prior to type checking.
   bool isBinaryOperator() const;
