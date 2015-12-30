@@ -4060,9 +4060,9 @@ public:
     ParentPattern = PBD;
   }
   
-  /// Return the Pattern involved in initializing this VarDecl.  However, recall that 
-  /// the Pattern may be involved in initializing more than just this one vardecl.
-  /// For example, if this is a VarDecl for "x", the pattern may be
+  /// Return the Pattern involved in initializing this VarDecl.  However, recall
+  /// that the Pattern may be involved in initializing more than just this one
+  /// vardecl.  For example, if this is a VarDecl for "x", the pattern may be
   /// "(x, y)" and the initializer on the PatternBindingDecl may be "(1,2)" or
   /// "foo()".
   ///
@@ -4164,10 +4164,7 @@ class ParamDecl : public VarDecl {
 public:
   ParamDecl(bool isLet, SourceLoc argumentNameLoc, 
             Identifier argumentName, SourceLoc parameterNameLoc,
-            Identifier parameterName, Type ty, DeclContext *dc)
-    : VarDecl(DeclKind::Param, /*IsStatic=*/false, isLet, parameterNameLoc, 
-              parameterName, ty, dc),
-      ArgumentName(argumentName), ArgumentNameLoc(argumentNameLoc) { }
+            Identifier parameterName, Type ty, DeclContext *dc);
 
   /// Retrieve the argument (API) name for this function parameter.
   Identifier getArgumentName() const { return ArgumentName; }
@@ -4185,6 +4182,16 @@ public:
       return getNameLoc();
     return SourceRange(ArgumentNameLoc, getNameLoc());
   }
+
+  /// Create an implicit 'self' decl for a method in the specified decl context.
+  /// If 'static' is true, then this is self for a static method in the type.
+  ///
+  /// Note that this decl is created, but it is returned with an incorrect
+  /// DeclContext that needs to be set correctly.  This is automatically handled
+  /// when a function is created with this as part of its argument list.
+  ///
+  static ParamDecl *createSelf(SourceLoc loc, DeclContext *DC,
+                               bool isStatic = false, bool isInOut = false);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { 

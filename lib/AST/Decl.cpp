@@ -3333,6 +3333,53 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
   }
 }
 
+ParamDecl::ParamDecl(bool isLet, SourceLoc argumentNameLoc,
+                     Identifier argumentName, SourceLoc parameterNameLoc,
+                     Identifier parameterName, Type ty, DeclContext *dc)
+  : VarDecl(DeclKind::Param, /*IsStatic=*/false, isLet, parameterNameLoc,
+            parameterName, ty, dc),
+  ArgumentName(argumentName), ArgumentNameLoc(argumentNameLoc) {
+}
+
+/// \brief Retrieve the type of 'self' for the given context.
+static Type getSelfTypeForContext(DeclContext *dc) {
+  // For a protocol or extension thereof, the type is 'Self'.
+  // FIXME: Weird that we're producing an archetype for protocol Self,
+  // but the declared type of the context in non-protocol cases.
+  if (dc->isProtocolOrProtocolExtensionContext())
+    return dc->getProtocolSelf()->getArchetype();
+  return dc->getDeclaredTypeOfContext();
+}
+
+
+/// Create an implicit 'self' decl for a method in the specified decl context.
+/// If 'static' is true, then this is self for a static method in the type.
+///
+/// Note that this decl is created, but it is returned with an incorrect
+/// DeclContext that needs to be set correctly.  This is automatically handled
+/// when a function is created with this as part of its argument list.
+///
+ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
+                                 bool isStaticMethod, bool isInOut) {
+  auto selfType = getSelfTypeForContext(DC);
+  
+  ASTContext &C = DC->getASTContext();
+  if (isStaticMethod)
+    selfType = MetatypeType::get(selfType);
+  
+  bool isLet = true;
+  if (auto *ND = selfType->getAnyNominal())
+    isLet = !isInOut && !isa<StructDecl>(ND) && !isa<EnumDecl>(ND);
+  
+  if (isInOut)
+    selfType = InOutType::get(selfType);
+  
+  auto *selfDecl = new (C) ParamDecl(/*IsLet*/isLet, SourceLoc(), Identifier(),
+                                     loc, C.Id_self, selfType, DC);
+  selfDecl->setImplicit();
+  return selfDecl;
+}
+
 
 /// Determine whether the given Swift type is an integral type, i.e.,
 /// a type that wraps a builtin integer.
