@@ -589,6 +589,10 @@ extension FixedWidthIntegerType {
 }
 
 extension UWord {
+  public typealias AdditiveOperator
+    = (UWord) -> (UWord, carryIn: Bool)
+     -> (result: UWord, carryFlag: Bool, overflowFlag: Bool)
+
   % for name in 'add', 'subtract':
   // @_transparent
   public // transparent
@@ -932,18 +936,20 @@ public struct ${Self}
 //
 extension IntegerType {
   public mutating func unsignedAddInPlace<RHS: IntegerType>(
-    rhs: RHS
+    rhs: RHS, uwordOperator: UWord.AdditiveOperator
   ) -> ArithmeticOverflow {
     _log("* \(Self.self)(\(self.hex)).unsignedAddInPlace"
       + "(\(RHS.self)(\(rhs.hex)))")
     let (carry, knownOverflow) = self.unsignedAddInPlace(
       rhs,
-      countWords: max(self.countRepresentedWords, rhs.countRepresentedWords))
+      countWords: max(self.countRepresentedWords, rhs.countRepresentedWords),
+      uwordOperator: uwordOperator
+    )
     return knownOverflow ?? ArithmeticOverflow(carry)
   }
   
   public mutating func unsignedAddInPlace<RHS: IntegerType>(
-    rhs: RHS, countWords: Word
+    rhs: RHS, countWords: Word, uwordOperator: UWord.AdditiveOperator
   ) -> (carry: Bool, knownOverflow: ArithmeticOverflow?) {
     _log("** \(Self.self)(\(self.hex)).unsignedAddInPlace"
       + "(\(RHS.self)(\(rhs.hex)), countWords: \(countWords))")
@@ -954,7 +960,7 @@ extension IntegerType {
     
     while i < countWords {
       let sum: UWord
-      (sum, carry, _) = uword(i)._adding(rhs.uword(i), carryIn: carry)
+      (sum, carry, _) = uwordOperator(uword(i))(rhs.uword(i), carryIn: carry)
       
       if !self.replaceUWord(i, with: sum) {
         return (false, .Overflow)
@@ -975,7 +981,7 @@ extension IntegerType {
   }
   
   public mutating func signedAddInPlace<RHS: IntegerType>(
-    rhs: RHS
+    rhs: RHS, uwordOperator: UWord.AdditiveOperator
   ) -> ArithmeticOverflow {
     _log("* \(Self.self)(\(self.hex)).signedAddInPlace"
       + "(\(RHS.self)(\(rhs.hex)))")
@@ -983,8 +989,11 @@ extension IntegerType {
     // word.  We may overflow here or discover that there is no
     // overflow.
     let lowWordCount = self.signWordIndex
+    
     let (lowCarry, lowOverflowKnown)
-      = self.unsignedAddInPlace(rhs, countWords: lowWordCount)
+      = self.unsignedAddInPlace(
+        rhs, countWords: lowWordCount, uwordOperator: uwordOperator)
+
     if let finalOverflow = lowOverflowKnown { return finalOverflow }
     
     // Save off the sign word so that we don't lose it if the highest
@@ -998,7 +1007,7 @@ extension IntegerType {
     
     repeat {
       let bits: UWord
-      (bits, carry, overflow) = oldSign._lowUWord._adding(
+      (bits, carry, overflow) = uwordOperator(oldSign._lowUWord)(
         rhs.uword(wordIndex), carryIn: carry)
       if !self.replaceUWord(wordIndex, with: bits) {
         return .Overflow
@@ -1014,12 +1023,15 @@ extension IntegerType {
 }
 
 extension IntegerType {
-  public mutating func addInPlace<RHS: IntegerType>(
+  % for name in 'add', 'subtract':
+  public mutating func ${name}InPlace<RHS: IntegerType>(
     rhs: RHS
   ) -> ArithmeticOverflow {
     return Self.isSigned || RHS.isSigned
-    ? signedAddInPlace(rhs) : unsignedAddInPlace(rhs)
+    ? signedAddInPlace(rhs, uwordOperator: UWord._${name}ing)
+    : unsignedAddInPlace(rhs, uwordOperator: UWord._${name}ing)
   }
+  % end
 }
 
 % for x in binaryArithmetic:
@@ -1033,6 +1045,12 @@ public func ${x.operator}= <T: IntegerType>(inout lhs: T, rhs: T) {
 public func +=<T: IntegerType, U: IntegerType>(inout lhs: T, rhs: U) {
   let overflow = lhs.addInPlace(rhs)
   _assertCond(overflow == .None, "overflow in multiprecision add.")
+}
+
+@inline(__always)
+public func -=<T: IntegerType, U: IntegerType>(inout lhs: T, rhs: U) {
+  let overflow = lhs.subtractInPlace(rhs)
+  _assertCond(overflow == .None, "overflow in multiprecision subtract.")
 }
 
 //===--- Tests ------------------------------------------------------------===//
@@ -1536,6 +1554,104 @@ tests.test("Multiprecision/+/UDWord") {
   overflow = x.addInPlace(UDWord.max)
   expectEqual(.Overflow, overflow)
   expectEqual(0, x)
+}
+
+tests.test("Multiprecision/-/DWord") {
+  var x = DWord.max - 2
+  x -= (-1 as Int8)
+  expectEqual(DWord.max - 1, x)
+  x -= (1 as Int8)
+  expectEqual(DWord.max - 2, x)
+
+  x = DWord.min
+  x -= (-1 as Int8)
+  expectEqual(DWord.min + 1, x)
+
+  x -= (1 as Int8)
+  expectEqual(DWord.min, x)
+
+  x = DWord(UWord.max)
+  x -= (-1 as Int8)
+  expectEqual(DWord(UWord.max) + 1, x)
+  x -= (1 as Int8)
+  expectEqual(DWord(UWord.max), x)
+  x -= (-1 as DWord)
+  expectEqual(DWord(UWord.max) + 1, x)
+  
+  x = DWord(Word.max)
+  var overflow: ArithmeticOverflow
+  overflow = x.subtractInPlace(UWord(~Word.min) + 1)
+  expectEqual(.None, overflow)
+  expectEqual(-1, x)
+
+  overflow = x.subtractInPlace(UDWord(~DWord.min) + 1)
+  expectEqual(.Overflow, overflow)
+  expectEqual(DWord.max, x)
+
+  overflow = x.subtractInPlace(-1 as Word)
+  expectEqual(.Overflow, overflow)
+  expectEqual(DWord.min, x)
+
+  x = 1
+  overflow = x.subtractInPlace(DWord.min + 1)
+  expectEqual(.Overflow, overflow)
+  expectEqual(DWord.min, x)
+}
+
+tests.test("Multiprecision/-/UDWord") {
+  var x = UDWord.max - 2
+  x -= (-1 as Int8)
+  expectEqual(UDWord.max - 1, x)
+  x -= (1 as UInt8)
+  expectEqual(UDWord.max - 2, x)
+
+  x = UDWord.min
+  x -= (-1 as Int8)
+  expectEqual(1, x)
+
+  x -= (1 as Int8)
+  expectEqual(UDWord.min, x)
+
+  x = UDWord(UWord.max)
+  x -= (-1 as Int8)
+  expectEqual(UDWord(UWord.max) + 1, x)
+  x -= (1 as Int8)
+  expectEqual(UDWord(UWord.max), x)
+  x -= (-1 as DWord)
+  expectEqual(UDWord(UWord.max) + 1, x)
+  x -= (1 as DWord)
+  expectEqual(UDWord(UWord.max), x)
+  
+  x = UDWord(Word.max)
+  var overflow: ArithmeticOverflow
+  overflow = x.subtractInPlace(UWord(~Word.min) + 1)
+  expectEqual(.Overflow, overflow)
+  expectEqual(UDWord.max, x)
+
+  overflow = x.subtractInPlace(UDWord(DWord.max) + 1)
+  expectEqual(.None, overflow)
+  overflow = x.subtractInPlace(UDWord(DWord.max) + 1)
+  expectEqual(.Overflow, overflow)
+  expectEqual(UDWord.max, x)
+
+  overflow = x.subtractInPlace(DWord.max)
+  expectEqual(.None, overflow)
+  overflow = x.subtractInPlace(DWord.max)
+  expectEqual(.None, overflow)
+  expectEqual(1, x)
+  
+  overflow = x.subtractInPlace(2 as UDWord)
+  expectEqual(.Overflow, overflow)
+  expectEqual(UDWord.max, x)
+  
+  overflow = x.subtractInPlace(-1 as Int8)
+  expectEqual(.Overflow, overflow)
+  expectEqual(0, x)
+
+  x = 1
+  overflow = x.subtractInPlace(UDWord.max)
+  expectEqual(.Overflow, overflow)
+  expectEqual(2, x)
 }
 
 tests.test("Multiprecision/+/Int16") {
