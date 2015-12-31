@@ -208,9 +208,6 @@ public protocol IntegerType
 
   mutating func addInPlace<RHS: IntegerType>(rhs: RHS) -> ArithmeticOverflow
 
-  func overflowInPlace(carry: Bool, overflow: Bool)
-    -> ArithmeticOverflow
-
   /// The most significant word in a signed representation of `self`.
   ///
   ///     (x.word(x.signWordIndex) < 0) == (self < 0)
@@ -688,13 +685,6 @@ extension UnsignedIntegerType where Self : FixedWidthIntegerType {
   }
   
   @_transparent
-  public func overflowInPlace(
-    carry: Bool, overflow: Bool) -> ArithmeticOverflow {
-    _log("\(Self.self).overflowInPlace(carry: \(carry), overflow: \(overflow))")
-    return ArithmeticOverflow(carry)
-  }
-
-  @_transparent
   public var signWordIndex: Word {
     // If our high bit is set, then our signed representation contains
     // one additional word.
@@ -756,13 +746,6 @@ extension SignedIntegerType where Self : FixedWidthIntegerType {
   public var mostSignificantBit: Word {
     let x = self < 0 ? ~self : self
     return Self.bitWidth - 1 - x.countLeadingZeros()
-  }
-
-  @_transparent
-  public func overflowInPlace(
-    carry: Bool, overflow: Bool) -> ArithmeticOverflow {
-    _log("\(Self.self).overflowInPlace(carry: \(carry), overflow: \(overflow))")
-    return ArithmeticOverflow(overflow)
   }
 
   @_transparent
