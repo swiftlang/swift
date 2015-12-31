@@ -866,6 +866,11 @@ FUNCTION(RegisterProtocolConformances,
          RETURNS(VoidTy),
          ARGS(ProtocolConformanceRecordPtrTy, ProtocolConformanceRecordPtrTy),
          ATTRS(NoUnwind))
+FUNCTION(RegisterTypeMetadataRecords,
+         swift_registerTypeMetadataRecords, RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(TypeMetadataRecordPtrTy, TypeMetadataRecordPtrTy),
+         ATTRS(NoUnwind))
 
 FUNCTION(InitializeSuperclass, swift_initializeSuperclass, RuntimeCC,
          RETURNS(VoidTy),

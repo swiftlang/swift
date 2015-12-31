@@ -500,6 +500,7 @@ emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakVH> handles,
 void IRGenModule::emitRuntimeRegistration() {
   // Duck out early if we have nothing to register.
   if (ProtocolConformances.empty()
+      && RuntimeResolvableTypes.empty()
       && (!ObjCInterop || (ObjCProtocols.empty() &&
                            ObjCClasses.empty() &&
                            ObjCCategoryDecls.empty())))
@@ -620,6 +621,26 @@ void IRGenModule::emitRuntimeRegistration() {
     
     RegIGF.Builder.CreateCall(getRegisterProtocolConformancesFn(), {begin, end});
   }
+
+  if (!RuntimeResolvableTypes.empty()) {
+    llvm::Constant *records = emitTypeMetadataRecords();
+
+    llvm::Constant *beginIndices[] = {
+      llvm::ConstantInt::get(Int32Ty, 0),
+      llvm::ConstantInt::get(Int32Ty, 0),
+    };
+    auto begin = llvm::ConstantExpr::getGetElementPtr(
+        /*Ty=*/nullptr, records, beginIndices);
+    llvm::Constant *endIndices[] = {
+      llvm::ConstantInt::get(Int32Ty, 0),
+      llvm::ConstantInt::get(Int32Ty, RuntimeResolvableTypes.size()),
+    };
+    auto end = llvm::ConstantExpr::getGetElementPtr(
+        /*Ty=*/nullptr, records, endIndices);
+
+    RegIGF.Builder.CreateCall(getRegisterTypeMetadataRecordsFn(), {begin, end});
+  }
+
   RegIGF.Builder.CreateRetVoid();
 }
 
@@ -642,6 +663,42 @@ void IRGenModule::addObjCClass(llvm::Constant *classPtr, bool nonlazy) {
 void IRGenModule::addProtocolConformanceRecord(
                                        NormalProtocolConformance *conformance) {
   ProtocolConformances.push_back(conformance);
+}
+
+static bool
+typeHasExplicitProtocolConformance(CanType type) {
+  auto conformances =
+    type->getNominalOrBoundGenericNominal()->getAllConformances();
+
+  for (auto conformance : conformances) {
+    // inherited protocols do not emit explicit conformance records
+    // TODO any special handling required for Specialized conformances?
+    if (conformance->getKind() == ProtocolConformanceKind::Inherited)
+      continue;
+
+    auto P = conformance->getProtocol();
+
+    // @objc protocols do not have conformance records
+    if (P->isObjC())
+      continue;
+
+    // neither does AnyObject
+    if (P->getKnownProtocolKind().hasValue() &&
+        *P->getKnownProtocolKind() == KnownProtocolKind::AnyObject)
+      continue;
+
+    return true;
+  }
+
+  return false;
+}
+
+void IRGenModule::addRuntimeResolvableType(CanType type) {
+  // Don't emit type metadata records for types that can be found in the protocol
+  // conformance table as the runtime will search both tables when resolving a
+  // type by name.
+  if (!typeHasExplicitProtocolConformance(type))
+    RuntimeResolvableTypes.push_back(type);
 }
 
 void IRGenModule::emitGlobalLists() {
@@ -786,6 +843,12 @@ static void emitLazyTypeMetadata(IRGenModule &IGM, CanType type) {
 void IRGenModuleDispatcher::emitProtocolConformances() {
   for (auto &m : *this) {
     m.second->emitProtocolConformances();
+  }
+}
+
+void IRGenModuleDispatcher::emitTypeMetadataRecords() {
+  for (auto &m : *this) {
+    m.second->emitTypeMetadataRecords();
   }
 }
 
@@ -1732,28 +1795,22 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
 
 namespace {
 struct TypeEntityInfo {
-  unsigned flags;
+  ProtocolConformanceFlags flags;
   LinkEntity entity;
   llvm::Type *defaultTy, *defaultPtrTy;
 };
 } // end anonymous namespace
 
 static TypeEntityInfo
-getTypeEntityForProtocolConformanceRecord(IRGenModule &IGM,
-                                       NormalProtocolConformance *conformance) {
-  ProtocolConformanceTypeKind typeKind;
+getTypeEntityInfo(IRGenModule &IGM, CanType conformingType) {
+  TypeMetadataRecordKind typeKind;
   Optional<LinkEntity> entity;
   llvm::Type *defaultTy, *defaultPtrTy;
 
-  // TODO: Should use accessor kind for lazy conformances
-  ProtocolConformanceReferenceKind conformanceKind
-    = ProtocolConformanceReferenceKind::WitnessTable;
-
-  auto conformingType = conformance->getType()->getCanonicalType();
   if (auto bgt = dyn_cast<BoundGenericType>(conformingType)) {
     // Conformances for generics are represented by referencing the metadata
     // pattern for the generic type.
-    typeKind = ProtocolConformanceTypeKind::UniqueGenericPattern;
+    typeKind = TypeMetadataRecordKind::UniqueGenericPattern;
     entity = LinkEntity::forTypeMetadata(
                          bgt->getDecl()->getDeclaredType()->getCanonicalType(),
                          TypeMetadataAddress::AddressPoint,
@@ -1763,7 +1820,7 @@ getTypeEntityForProtocolConformanceRecord(IRGenModule &IGM,
   } else if (auto ct = dyn_cast<ClassType>(conformingType)) {
     auto clas = ct->getDecl();
     if (clas->isForeign()) {
-      typeKind = ProtocolConformanceTypeKind::NonuniqueDirectType;
+      typeKind = TypeMetadataRecordKind::NonuniqueDirectType;
       entity = LinkEntity::forForeignTypeMetadataCandidate(conformingType);
       defaultTy = IGM.TypeMetadataStructTy;
       defaultPtrTy = IGM.TypeMetadataPtrTy;
@@ -1771,7 +1828,7 @@ getTypeEntityForProtocolConformanceRecord(IRGenModule &IGM,
       // TODO: We should indirectly reference classes. For now directly
       // reference the class object, which is totally wrong for ObjC interop.
 
-      typeKind = ProtocolConformanceTypeKind::UniqueDirectClass;
+      typeKind = TypeMetadataRecordKind::UniqueDirectClass;
       if (hasKnownSwiftMetadata(IGM, clas))
         entity = LinkEntity::forTypeMetadata(
                          conformingType,
@@ -1785,14 +1842,14 @@ getTypeEntityForProtocolConformanceRecord(IRGenModule &IGM,
   } else if (auto nom = conformingType->getNominalOrBoundGenericNominal()) {
     // Metadata for Clang types should be uniqued like foreign classes.
     if (nom->hasClangNode()) {
-      typeKind = ProtocolConformanceTypeKind::NonuniqueDirectType;
+      typeKind = TypeMetadataRecordKind::NonuniqueDirectType;
       entity = LinkEntity::forForeignTypeMetadataCandidate(conformingType);
       defaultTy = IGM.TypeMetadataStructTy;
       defaultPtrTy = IGM.TypeMetadataPtrTy;
     } else {
       // We can reference the canonical metadata for native value types
       // directly.
-      typeKind = ProtocolConformanceTypeKind::UniqueDirectType;
+      typeKind = TypeMetadataRecordKind::UniqueDirectType;
       entity = LinkEntity::forTypeMetadata(
                        conformingType,
                        TypeMetadataAddress::AddressPoint,
@@ -1805,11 +1862,9 @@ getTypeEntityForProtocolConformanceRecord(IRGenModule &IGM,
     llvm_unreachable("unhandled protocol conformance");
   }
 
-  auto flags = ProtocolConformanceFlags()
-    .withTypeKind(typeKind)
-    .withConformanceKind(conformanceKind);
+  auto flags = ProtocolConformanceFlags().withTypeKind(typeKind);
 
-  return {flags.getValue(), *entity, defaultTy, defaultPtrTy};
+  return {flags, *entity, defaultTy, defaultPtrTy};
 }
 
 /// Form an LLVM constant for the relative distance between a reference
@@ -1908,13 +1963,15 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
     auto descriptorRef = getAddrOfLLVMVariableOrGOTEquivalent(
                   LinkEntity::forProtocolDescriptor(conformance->getProtocol()),
                   getPointerAlignment(), ProtocolDescriptorStructTy);
-
-    auto typeEntity
-      = getTypeEntityForProtocolConformanceRecord(*this, conformance);
+    auto typeEntity = getTypeEntityInfo(*this,
+                                        conformance->getType()->getCanonicalType());
+    auto flags = typeEntity.flags
+        .withConformanceKind(ProtocolConformanceReferenceKind::WitnessTable);
 
     // If the conformance is in this object's table, then the witness table
     // should also be in this object file, so we can always directly reference
     // it.
+    // TODO: Should use accessor kind for lazy conformances
     // TODO: Produce a relative reference to a private generator function
     // if the witness table requires lazy initialization, instantiation, or
     // conditional conformance checking.
@@ -1930,10 +1987,72 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
       emitRelativeReference(*this, descriptorRef,   var, elts.size(), 0),
       emitRelativeReference(*this, typeRef,         var, elts.size(), 1),
       emitRelativeReference(*this, witnessTableRef, var, elts.size(), 2),
-      llvm::ConstantInt::get(Int32Ty, typeEntity.flags),
+      llvm::ConstantInt::get(Int32Ty, flags.getValue()),
     };
 
     auto record = llvm::ConstantStruct::get(ProtocolConformanceRecordTy,
+                                            recordFields);
+    elts.push_back(record);
+  }
+
+  auto initializer = llvm::ConstantArray::get(arrayTy, elts);
+
+  var->setInitializer(initializer);
+  var->setSection(sectionName);
+  var->setAlignment(getPointerAlignment().getValue());
+  addUsedGlobal(var);
+  return var;
+}
+
+/// Emit type metadata for types that might not have explicit protocol conformances.
+llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
+  std::string sectionName;
+  switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::MachO:
+    sectionName = "__TEXT, __swift2_types, regular, no_dead_strip";
+    break;
+  case llvm::Triple::ELF:
+    sectionName = ".swift2_type_metadata";
+    break;
+  default:
+    llvm_unreachable("Don't know how to emit type metadata table for "
+                     "the selected object format.");
+  }
+
+  // Do nothing if the list is empty.
+  if (RuntimeResolvableTypes.empty())
+    return nullptr;
+
+  // Define the global variable for the conformance list.
+  // We have to do this before defining the initializer since the entries will
+  // contain offsets relative to themselves.
+  auto arrayTy = llvm::ArrayType::get(TypeMetadataRecordTy,
+                                      RuntimeResolvableTypes.size());
+
+  // FIXME: This needs to be a linker-local symbol in order for Darwin ld to
+  // resolve relocations relative to it.
+  auto var = new llvm::GlobalVariable(Module, arrayTy,
+                                      /*isConstant*/ true,
+                                      llvm::GlobalValue::PrivateLinkage,
+                                      /*initializer*/ nullptr,
+                                      "\x01l_type_metadata_table");
+
+  SmallVector<llvm::Constant *, 8> elts;
+  for (auto type : RuntimeResolvableTypes) {
+    // Type metadata records for generic patterns are never emitted at
+    // compile time.
+    assert(!isa<BoundGenericType>(type));
+
+    auto typeEntity = getTypeEntityInfo(*this, type);
+    auto typeRef = getAddrOfLLVMVariableOrGOTEquivalent(
+            typeEntity.entity, getPointerAlignment(), typeEntity.defaultTy);
+
+    llvm::Constant *recordFields[] = {
+      emitRelativeReference(*this, typeRef, var, elts.size(), 0),
+      llvm::ConstantInt::get(Int32Ty, typeEntity.flags.getValue()),
+    };
+
+    auto record = llvm::ConstantStruct::get(TypeMetadataRecordTy,
                                             recordFields);
     elts.push_back(record);
   }
@@ -2083,6 +2202,10 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
   var->setConstant(isConstant);
   if (!section.empty())
     var->setSection(section);
+
+  // Remove this test if we eventually support unbound generic types
+  if (!isPattern)
+    addRuntimeResolvableType(concreteType);
 
   // For metadata patterns, we're done.
   if (isPattern)
