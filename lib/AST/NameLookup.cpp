@@ -71,6 +71,9 @@ bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
       // A.init are in the chain. Make sure we still remove A.init from the
       // set in this case.
       if (decl->getFullName().getBaseName() == ctx.Id_init) {
+        /// FIXME: Avoid the possibility of an infinite loop by fixing the root
+        ///        cause instead (incomplete circularity detection).
+        assert(decl != overrides && "Circular class inheritance?");
         decl = overrides;
         continue;
       }
