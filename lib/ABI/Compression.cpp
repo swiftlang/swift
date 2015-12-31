@@ -151,7 +151,7 @@ static char DecodeFixedWidth(APInt &num) {
 
   APInt Quotient(BW, 0), Remainder(BW, 0);
   APInt::udivrem(num, C, Quotient, Remainder);
-  num = Quotient.zext(BW);
+  num = Quotient.zextOrSelf(BW);
   return Huffman::Charset[Remainder.getZExtValue()];
 }
 
