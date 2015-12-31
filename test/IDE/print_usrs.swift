@@ -46,7 +46,7 @@ class GenericClass {
   }
 
   // CHECK: [[@LINE+2]]:3 s:iC14swift_ide_test12GenericClass9subscriptFSiSf{{$}}
-  // CHECK: [[@LINE+1]]:13 s:vC14swift_ide_test12GenericClass1iSi{{$}}
+  // CHECK: [[@LINE+1]]:13 s:vC14swift_ide_test12GenericClassL_1iSi{{$}}
   subscript(i: Int) -> Float {
     // CHECK: [[@LINE+1]]:5 s:FC14swift_ide_test12GenericClassg9subscriptFSiSf{{$}}
     get { return 0.0 }

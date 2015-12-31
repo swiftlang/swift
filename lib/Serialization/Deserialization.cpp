@@ -1441,6 +1441,8 @@ DeclContext *ModuleFile::getDeclContext(DeclContextID DCID) {
     declContextOrOffset = ED;
   } else if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
     declContextOrOffset = AFD;
+  } else if (auto SD = dyn_cast<SubscriptDecl>(D)) {
+    declContextOrOffset = SD;
   } else {
     llvm_unreachable("Unknown Decl : DeclContext kind");
   }
@@ -2934,23 +2936,19 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    Pattern *indices = maybeReadPattern();
-    assert(indices);
-
-    auto elemTy = TypeLoc::withoutLoc(getType(elemTypeID));
-    if (declOrOffset.isComplete())
-      return declOrOffset;
-
     // Resolve the name ids.
     SmallVector<Identifier, 2> argNames;
     for (auto argNameID : argNameIDs)
       argNames.push_back(getIdentifier(argNameID));
 
     DeclName name(ctx, ctx.Id_subscript, argNames);
-    auto subscript = createDecl<SubscriptDecl>(name, SourceLoc(), indices,
-                                               SourceLoc(), elemTy, DC);
+    auto subscript = createDecl<SubscriptDecl>(name, SourceLoc(), nullptr,
+                                               SourceLoc(), TypeLoc(), DC);
     declOrOffset = subscript;
 
+    subscript->setIndices(maybeReadPattern());    
+    subscript->getElementTypeLoc() = TypeLoc::withoutLoc(getType(elemTypeID));
+    
     configureStorage(subscript, rawStorageKind,
                      getterID, setterID, materializeForSetID,
                      addressorID, mutableAddressorID, willSetID, didSetID);

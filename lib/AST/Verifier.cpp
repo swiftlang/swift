@@ -516,6 +516,7 @@ struct ASTNodeBase {};
       case DeclContextKind::Initializer:
       case DeclContextKind::AbstractClosureExpr:
       case DeclContextKind::SerializedLocal:
+      case DeclContextKind::SubscriptDecl:
         return nullptr;
 
       case DeclContextKind::AbstractFunctionDecl:
@@ -1601,6 +1602,7 @@ struct ASTNodeBase {};
       case DeclContextKind::Initializer:
       case DeclContextKind::NominalTypeDecl:
       case DeclContextKind::ExtensionDecl:
+      case DeclContextKind::SubscriptDecl:
         return hasEnclosingFunctionContext(dc->getParent());
       }
     }
@@ -1616,7 +1618,7 @@ struct ASTNodeBase {};
       // Make sure that there are no archetypes in the interface type.
       if (VD->getDeclContext()->isTypeContext() &&
           !hasEnclosingFunctionContext(VD->getDeclContext()) &&
-          !isa<ParamDecl>(VD) && /* because of subscripts */
+      //    !isa<ParamDecl>(VD) && /* because of subscripts */
           VD->getInterfaceType().findIf([](Type type) {
             return type->is<ArchetypeType>();
           })) {

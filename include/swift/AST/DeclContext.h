@@ -66,6 +66,7 @@ enum class DeclContextKind : uint8_t {
   AbstractClosureExpr,
   Initializer,
   TopLevelCodeDecl,
+  SubscriptDecl,
   AbstractFunctionDecl,
   SerializedLocal,
   Last_LocalDeclContextKind = SerializedLocal,

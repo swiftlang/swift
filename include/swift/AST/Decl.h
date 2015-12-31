@@ -4239,7 +4239,7 @@ enum class ObjCSubscriptKind {
 /// A given type can have multiple subscript declarations, so long as the
 /// signatures (indices and element type) are distinct.
 ///
-class SubscriptDecl : public AbstractStorageDecl {
+class SubscriptDecl : public AbstractStorageDecl, public DeclContext {
   SourceLoc ArrowLoc;
   Pattern *Indices;
   TypeLoc ElementTy;
@@ -4248,6 +4248,7 @@ public:
   SubscriptDecl(DeclName Name, SourceLoc SubscriptLoc, Pattern *Indices,
                 SourceLoc ArrowLoc, TypeLoc ElementTy, DeclContext *Parent)
     : AbstractStorageDecl(DeclKind::Subscript, Parent, Name, SubscriptLoc),
+      DeclContext(DeclContextKind::SubscriptDecl, Parent),
       ArrowLoc(ArrowLoc), Indices(nullptr), ElementTy(ElementTy) {
     setIndices(Indices);
   }
@@ -4288,6 +4289,13 @@ public:
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Subscript;
   }
+  
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() == DeclContextKind::SubscriptDecl;
+  }
+
+  using DeclContext::operator new;
+  using Decl::getASTContext;
 };
 
 /// \brief Base class for function-like declarations.

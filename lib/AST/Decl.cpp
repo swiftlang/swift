@@ -3432,10 +3432,18 @@ static bool isIntegralType(Type type) {
   return false;
 }
 
+/// Set the DeclContext of any VarDecls in P to the specified DeclContext.
+static void setDeclContextOfPatternVars(Pattern *P, DeclContext *DC) {
+  if (!P) return;
+  P->forEachVariable([&](VarDecl *VD) {
+    assert(isa<ParamDecl>(VD) && "Pattern variable is not a parameter?");
+    VD->setDeclContext(DC);
+  });
+}
+
 void SubscriptDecl::setIndices(Pattern *p) {
   Indices = p;
-  
-  // FIXME: What context should the indices patterns be in?
+  setDeclContextOfPatternVars(Indices, this);
 }
 
 Type SubscriptDecl::getIndicesType() const {
@@ -3879,15 +3887,6 @@ AbstractFunctionDecl *AbstractFunctionDecl::getOverriddenDecl() const {
     return ctor->getOverriddenDecl();
   
   return nullptr;
-}
-
-/// Set the DeclContext of any VarDecls in P to the specified DeclContext.
-static void setDeclContextOfPatternVars(Pattern *P, DeclContext *DC) {
-  if (!P) return;
-  P->forEachVariable([&](VarDecl *VD) {
-    assert(isa<ParamDecl>(VD) && "Pattern variable is not a parameter?");
-    VD->setDeclContext(DC);
-  });
 }
 
 FuncDecl *FuncDecl::createImpl(ASTContext &Context,

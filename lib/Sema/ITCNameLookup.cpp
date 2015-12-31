@@ -35,6 +35,7 @@ bool IterativeTypeChecker::isQualifiedLookupInDeclContextSatisfied(
   case DeclContextKind::Initializer:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::SerializedLocal:
+  case DeclContextKind::SubscriptDecl:
     llvm_unreachable("not a DeclContext that supports name lookup");
 
   case DeclContextKind::Module:
@@ -131,6 +132,7 @@ bool IterativeTypeChecker::isUnqualifiedLookupInDeclContextSatisfied(
   switch (dc->getContextKind()) {
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::SubscriptDecl:
   case DeclContextKind::Initializer:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::SerializedLocal:

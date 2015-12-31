@@ -212,6 +212,10 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
     // FIXME
     Buffer << "<abstract function>";
     return;
+  case DeclContextKind::SubscriptDecl:
+    // FIXME
+    Buffer << "<subscript>";
+    return;
   }
   llvm_unreachable("bad decl context");
 }

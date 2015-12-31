@@ -2388,6 +2388,10 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     case DeclContextKind::AbstractFunctionDecl:
       visit(cast<AbstractFunctionDecl>(DC)->getType());
       return;
+        
+    case DeclContextKind::SubscriptDecl:
+      visit(cast<SubscriptDecl>(DC)->getType());
+      return;
     }
   }
 

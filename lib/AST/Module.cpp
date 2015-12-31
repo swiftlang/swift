@@ -458,6 +458,7 @@ void Module::lookupMember(SmallVectorImpl<ValueDecl*> &results,
   case DeclContextKind::Initializer:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::SubscriptDecl:
     llvm_unreachable("This context does not support lookup.");
 
   case DeclContextKind::FileUnit:

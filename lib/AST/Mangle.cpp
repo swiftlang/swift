@@ -299,6 +299,9 @@ void Mangler::mangleContext(const DeclContext *ctx, BindGenerics shouldBind) {
     return mangleEntity(fn, ResilienceExpansion::Minimal, /*uncurry*/ 0);
   }
 
+  case DeclContextKind::SubscriptDecl:
+    return mangleContext(ctx->getParent(), shouldBind);
+      
   case DeclContextKind::Initializer:
     switch (cast<Initializer>(ctx)->getInitializerKind()) {
     case InitializerKind::DefaultArgument: {

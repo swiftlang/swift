@@ -1326,6 +1326,7 @@ static bool isTopLevelContext(const DeclContext *DC) {
     case DeclContextKind::TopLevelCodeDecl:
       return true;
     case DeclContextKind::AbstractFunctionDecl:
+    case DeclContextKind::SubscriptDecl:
       return false;
     default:
       continue;

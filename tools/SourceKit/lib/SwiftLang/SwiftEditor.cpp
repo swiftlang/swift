@@ -1051,6 +1051,7 @@ static Accessibility inferAccessibility(const ValueDecl *D) {
   case DeclContextKind::Initializer:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::SubscriptDecl:
     return Accessibility::Private;
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:

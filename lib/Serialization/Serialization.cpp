@@ -164,7 +164,8 @@ static ASTContext &getContext(ModuleOrSourceFile DC) {
 }
 
 static bool shouldSerializeAsLocalContext(const DeclContext *DC) {
-  return DC->isLocalContext() && !isa<AbstractFunctionDecl>(DC);
+  return DC->isLocalContext() && !isa<AbstractFunctionDecl>(DC) &&
+        !isa<SubscriptDecl>(DC);
 }
 
 static const Decl *getDeclForContext(const DeclContext *DC) {
@@ -188,6 +189,8 @@ static const Decl *getDeclForContext(const DeclContext *DC) {
     llvm_unreachable("shouldn't serialize the main module");
   case DeclContextKind::AbstractFunctionDecl:
     return cast<AbstractFunctionDecl>(DC);
+  case DeclContextKind::SubscriptDecl:
+    return cast<SubscriptDecl>(DC);
   }
 }
 
@@ -1326,6 +1329,21 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
     break;
   }
 
+  case DeclContextKind::SubscriptDecl: {
+    auto SD = cast<SubscriptDecl>(DC);
+    writeCrossReference(DC->getParent(), pathLen + 1);
+    
+    Type ty = SD->getInterfaceType()->getCanonicalType();
+
+    abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
+    bool isProtocolExt = SD->getDeclContext()->isProtocolExtensionContext();
+    XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                         addTypeRef(ty),
+                                         addIdentifierRef(SD->getName()),
+                                         isProtocolExt);
+    break;
+  }
+      
   case DeclContextKind::AbstractFunctionDecl: {
     if (auto fn = dyn_cast<FuncDecl>(DC)) {
       if (auto storage = fn->getAccessorStorageDecl()) {
@@ -1740,6 +1758,7 @@ void Serializer::writeDeclContext(const DeclContext *DC) {
 
   switch (DC->getContextKind()) {
   case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::SubscriptDecl:
   case DeclContextKind::NominalTypeDecl:
   case DeclContextKind::ExtensionDecl:
     declOrDeclContextID = addDeclRef(getDeclForContext(DC));

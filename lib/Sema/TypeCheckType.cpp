@@ -211,7 +211,7 @@ Type TypeChecker::resolveTypeInContext(
   // type within the context.
   if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
     
-    this->forceExternalDeclMembers(nominal);
+    forceExternalDeclMembers(nominal);
     
     if (!nominal->getGenericParams() || !isSpecialized) {
       for (DeclContext *dc = fromDC; dc; dc = dc->getParent()) {
@@ -240,6 +240,7 @@ Type TypeChecker::resolveTypeInContext(
 
         case DeclContextKind::AbstractClosureExpr:
         case DeclContextKind::AbstractFunctionDecl:
+        case DeclContextKind::SubscriptDecl:
           continue;
         case DeclContextKind::SerializedLocal:
           llvm_unreachable("should not be typechecking deserialized things");

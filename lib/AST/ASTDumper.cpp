@@ -986,6 +986,9 @@ static void printContext(raw_ostream &os, DeclContext *dc) {
       os << "deinit";
     break;
   }
+  case DeclContextKind::SubscriptDecl:
+    os << "subscript decl";
+    break;
   }
 }
 
