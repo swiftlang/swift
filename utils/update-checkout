@@ -24,39 +24,17 @@ from SwiftBuildSupport import (
     check_output,
 )
 
-def update_git_svn(repo_path):
-    with WorkingDirectory(repo_path):
-        use_stash = (check_output([ "git", "status", "--porcelain" ]) != "")
-        if use_stash:
-            check_call([ "git", "stash", "save", "--all"])
-
-        # Try first to pull from an upstream Git repo, assuming there is one
-        if check_output([ "git", "remote" ]) != "":
-            check_call([ "git", "pull", "--rebase" ])
-            check_call([ "git", "svn", "rebase", "-l" ])
-        else:
-            check_call([ "git", "svn", "rebase" ])
-
-        if use_stash:
-            check_call([ "git", "stash", "pop" ])
-
-
 def update_working_copy(repo_path):
     if not os.path.isdir(repo_path):
         return
 
     print("--- Updating '" + repo_path + "' ---")
     with WorkingDirectory(repo_path):
-        if os.path.isdir(os.path.join(".git", "svn")):
-            update_git_svn(repo_path)
-        elif os.path.isdir(".git"):
-            # Prior to Git 2.6, this is the way to do a "git pull
-            # --rebase" that respects rebase.autostash.  See
-            # http://stackoverflow.com/a/30209750/125349
-            check_call([ "git", "fetch" ])
-            check_call([ "git", "rebase", "FETCH_HEAD" ])
-        else:
-            check_call([ "svn", "update" ])
+        # Prior to Git 2.6, this is the way to do a "git pull
+        # --rebase" that respects rebase.autostash.  See
+        # http://stackoverflow.com/a/30209750/125349
+        check_call([ "git", "fetch" ])
+        check_call([ "git", "rebase", "FETCH_HEAD" ])
 
 def obtain_additional_swift_sources(opts = {'with_ssh': False}):
     additional_repos = {
