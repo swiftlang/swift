@@ -59,8 +59,9 @@ Type Parameter::getVarargBaseTy(Type VarArgT) {
 }
 
 
-/// TODO: unique and reuse the () parameter list in ASTContext, as well as the
-/// "(self : T)" parameter lists common to many methods.
+/// TODO: unique and reuse the () parameter list in ASTContext, it is common to
+/// many methods.  Other parameter lists cannot be uniqued because the decls
+/// within them are always different anyway (they have different DeclContext's).
 ParameterList *
 ParameterList::create(const ASTContext &C, SourceLoc LParenLoc,
                       ArrayRef<Parameter> params, SourceLoc RParenLoc) {
@@ -139,7 +140,7 @@ ParameterList *ParameterList::clone(const ASTContext &C,
     }
   }
   
-  return create(C, getParameters());
+  return create(C, params);
 }
 
 /// Return a TupleType or ParenType for this parameter list.  This returns a
