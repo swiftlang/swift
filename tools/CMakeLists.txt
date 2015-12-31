@@ -5,6 +5,7 @@ add_subdirectory(swift-demangle)
 add_subdirectory(lldb-moduleimport-test)
 add_subdirectory(sil-extract)
 add_subdirectory(swift-llvm-opt)
+add_subdirectory(swift-compress)
 
 if(SWIFT_BUILD_SOURCEKIT)
   add_subdirectory(SourceKit)

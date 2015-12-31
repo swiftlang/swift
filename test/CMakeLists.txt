@@ -40,7 +40,7 @@ function(get_test_dependencies SDK result_var_name)
   endif()
 
   set(deps_binaries
-      swift swift-ide-test sil-opt swift-llvm-opt swift-demangle sil-extract
+      swift swift-ide-test sil-opt swift-llvm-opt swift-demangle sil-extract swift-compress
       lldb-moduleimport-test)
   if(NOT SWIFT_BUILT_STANDALONE)
     list(APPEND deps_binaries llc)
