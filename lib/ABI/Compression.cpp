@@ -144,12 +144,14 @@ StartMatch:
 }
 
 static char DecodeFixedWidth(APInt &num) {
-  unsigned BW = std::max(num.getBitWidth(), 32u);
+  unsigned BW = num.getBitWidth();
+  assert(BW > 16 &&
+         "The APInt needs to be large enough for arithmetic on CharsetLength");
   APInt C = APInt(BW, Huffman::CharsetLength);
 
   APInt Quotient(BW, 0), Remainder(BW, 0);
   APInt::udivrem(num, C, Quotient, Remainder);
-  num = Quotient;
+  num = Quotient.zext(BW);
   return Huffman::Charset[Remainder.getZExtValue()];
 }
 
@@ -169,7 +171,7 @@ static void EncodeFixedWidth(APInt &num, char ch) {
 
 APInt
 swift::Compress::EncodeStringAsNumber(StringRef In, EncodingKind Kind) {
-  unsigned BW = std::max(1u, (unsigned) In.size() *
+  unsigned BW = std::max(32u, (unsigned) In.size() *
                          Huffman::LongestEncodingLength);
     APInt num = APInt(BW, 0);
 
