@@ -20,7 +20,6 @@ add_swift_unittest(SwiftBasicTests
   Unicode.cpp
   BlotMapVectorTest.cpp
   PointerIntEnumTest.cpp
-  CompressionTests.cpp
   ${generated_tests}
   )
 
