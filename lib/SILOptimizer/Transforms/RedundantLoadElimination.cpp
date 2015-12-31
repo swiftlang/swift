@@ -1052,7 +1052,7 @@ unsigned RLEContext::getValueBit(const LSValue &Val) {
   auto Iter = ValToBitIndex.find(Val);
 
   // We do not walk over the function and find all the possible LSValues
-  // in this funciton, as some of the these values will not be used, i.e.
+  // in this function, as some of the these values will not be used, i.e.
   // if the LoadInst that generates this value is actually RLE'ed.
   // Instead, we create the LSValues when we need them.
   if (Iter == ValToBitIndex.end()) {
