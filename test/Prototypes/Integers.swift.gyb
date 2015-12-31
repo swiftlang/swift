@@ -190,8 +190,10 @@ public protocol IntegerType
 
   var countRepresentedWords: Word { get }
 
-  /// Replace the `n`th UWord of our representation with newBits.
-  mutating func replaceUWord(n: Word, with newBits: UWord) -> ArithmeticOverflow
+  /// Replace as many bits as possible of the `n`th UWord of our
+  /// representation with newBits, returning `true` iff all of the
+  /// bits were replaced.
+  mutating func replaceUWord(n: Word, with newBits: UWord) -> Bool
   
   init<T : IntegerType>(_ source: T)
   
@@ -201,9 +203,30 @@ public protocol IntegerType
 
   func overflowInPlace(carry: Bool, overflow: Bool)
     -> ArithmeticOverflow
+
+  /// The most significant word in a signed representation of `self`.
+  ///
+  ///     (x.word(x.signWordIndex) < 0) == (self < 0)
+  ///
+  /// and, for all `i` > `x.signWordIndex`,
+  ///
+  ///     x.word(i) == x.word(x.signWordIndex) >> (Word.bitWidth - 1)
+  ///
+  var signWordIndex: Word { get }
+  
+  mutating func signedOverflowIntoWord(
+    wordIndex: Word, overflow: Bool, originalSign: Word) -> ArithmeticOverflow  
+
+  static var isSigned: Bool { get }
 }
 
 extension IntegerType {
+  @_transparent
+  @warn_unused_result
+  public func word(n: Word) -> Word {
+    return Word(uword(n)._storage)
+  }
+
   /// The number of words required to represent our value.  If `self`
   /// is negative, returns the index of the least significant words of
   /// our representation such that all more-significant words are -1.
@@ -424,7 +447,7 @@ public func ${x.nonMaskingOperator} <
 public func ${x.nonMaskingOperator} <
   T: FixedWidthIntegerType
 >(lhs: T, rhs: Word) -> T {
-  let overshiftR = T.min < 0 ? lhs &>> (T.bitWidth - 1) : 0
+  let overshiftR = T.isSigned ? lhs &>> (T.bitWidth - 1) : 0
   let overshiftL: T = 0
   if _fastPath(rhs >= 0) {
     if _fastPath(rhs < T.bitWidth) {
@@ -545,13 +568,13 @@ extension FixedWidthIntegerType {
   }
   
   // @_transparent
-  public mutating func replaceUWord(n: Word, with newBits: UWord) -> ArithmeticOverflow {
+  public mutating func replaceUWord(n: Word, with newBits: UWord) -> Bool {
     let flippedBits = uword(n) ^ newBits
     self ^= Self(_truncatingBits: flippedBits) << (${word_bits} * n)
     if uword(n) != newBits {
       print("###### overflow replacing word \(n) with \(newBits.hex)")
     }
-    return ArithmeticOverflow(uword(n) != newBits)
+    return uword(n) == newBits
   }
   
   @_transparent
@@ -566,23 +589,23 @@ extension UWord {
   // @_transparent
   public // transparent
   func _${name}ing(
-    rhs: UWord, carryIn: UWord
-  ) -> (result: UWord, unsignedOverflow: Bool, signedOverflow: Bool) {
+    rhs: UWord, carryIn: Bool
+  ) -> (result: UWord, carryFlag: Bool, overflowFlag: Bool) {
     print("**** \(self.hex)._${name}ing(\(rhs.hex), carryIn: \(carryIn))")
     let signedRHS = Word(bitPattern: rhs)
     
     let (uResult0, carry0) = self.${name}WithOverflow(rhs)
     let (sResult0, overflow0) = Word(bitPattern: self).${name}WithOverflow(signedRHS)
     
-    let (uResult1, carry1) = uResult0.${name}WithOverflow(carryIn)
-    let (_, overflow1) = sResult0.${name}WithOverflow(Word(_truncatingBits: carryIn))
+    let (uResult1, carry1) = uResult0.${name}WithOverflow(carryIn ? 1 : 0)
+    let (_, overflow1) = sResult0.${name}WithOverflow(carryIn ? 1 : 0)
 
     let result = (
       result: uResult1,
-      unsignedOverflow: carry0 != .None || carry1 != .None,
-      signedOverflow: overflow0 != .None || overflow1 != .None
+      carryFlag: carry0 != .None || carry1 != .None,
+      overflowFlag: overflow0 != .None || overflow1 != .None
     )
-    print("**** -> sum: \(result.result.hex), unsignedOverflow: \(result.unsignedOverflow), signedOverflow: \(result.signedOverflow)")
+    print("**** -> sum: \(result.result.hex), carry: \(result.carryFlag), overflow: \(result.overflowFlag)")
     return result
   }
   % end
@@ -603,6 +626,9 @@ public func &${x.operator} <T: FixedWidthIntegerType>(lhs: T, rhs: T) -> T {
 public protocol UnsignedIntegerType : IntegerType {
 }
 extension UnsignedIntegerType {
+  @_transparent
+  public static var isSigned: Bool { return false }
+  
   public var description: String {
     if self == 0 {
       return "0"
@@ -658,6 +684,23 @@ extension UnsignedIntegerType where Self : FixedWidthIntegerType {
     print("\(Self.self).overflowInPlace(carry: \(carry), overflow: \(overflow))")
     return ArithmeticOverflow(carry)
   }
+
+  @_transparent
+  public var signWordIndex: Word {
+    // If our high bit is set, then our signed representation contains
+    // one additional word.
+    let ifHighBitSetThen0Else1 = Word((~self &>> (Self.bitWidth - 1))._lowUWord)
+    return (Self.bitWidth - ifHighBitSetThen0Else1) / ${word_bits}
+  }
+
+  @_transparent
+  public mutating func signedOverflowIntoWord(
+    wordIndex: Word, overflow: Bool, originalSign: Word
+  ) -> ArithmeticOverflow {
+    // We were performing a signed operation on unsigned storage.  If
+    // the result was negative, we've overflowed.
+    return word(countRepresentedWords - 1) < 0 ? .Overflow : .None
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -674,6 +717,9 @@ extension SignedIntegerType {
     let base = String(absoluteValue)
     return self < 0 ? "-" + base : base
   }
+  
+  @_transparent
+  public static var isSigned: Bool { return true }
 }
 
 extension SignedIntegerType where Self : FixedWidthIntegerType {
@@ -708,6 +754,18 @@ extension SignedIntegerType where Self : FixedWidthIntegerType {
     carry: Bool, overflow: Bool) -> ArithmeticOverflow {
     print("\(Self.self).overflowInPlace(carry: \(carry), overflow: \(overflow))")
     return ArithmeticOverflow(overflow)
+  }
+
+  @_transparent
+  public var signWordIndex: Word {
+    return (Self.bitWidth - 1) / ${word_bits}
+  }
+
+  @_transparent
+  public mutating func signedOverflowIntoWord(
+    wordIndex: Word, overflow: Bool, originalSign: Word
+  ) -> ArithmeticOverflow {
+    return overflow ? .Overflow : .None
   }
 }
 
@@ -852,34 +910,121 @@ public struct ${Self}
 %   end
 % end
 
+//===----------------------------------------------------------------------===//
 //===--- Multiprecision ---------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
+//===--- Addition and Subtraction -----------------------------------------===//
+//
+// * Treat both operands as infinite-precision numbers, proceeding a
+//   word-at-a-time.
+//
+// * Signed/Unsigned mixes treat the unsigned number as signed,
+//   thereby adding 1 significant bit (which could result in using an
+//   extra word), and doing a signed operation.
+//
+// * Operations proceed one word at a time.  Signed operations are
+//   composed of unsigned operations for all but the highest word.
+//
+// * Overflows in fixed-width integers are detected by two methods:
+//   - Checking the overflow flag when the most significant word of the
+//     result is computed.
+//   - Attempting to store bits that can't be represented.
+//
+// * In [un]signed operations, the maximum number of bits required to
+//   store a result is one more than the maximum number of bits
+//   required to store the [un]signed representation of both operands.
+//   When that number is one more than the number of bits
+//   representable by the [un]signed result type, we can use the
+//   carry/overflow flag to detect overflow.
+//
+extension IntegerType {
+  public mutating func unsignedAddInPlace<RHS: IntegerType>(
+    rhs: RHS
+  ) -> ArithmeticOverflow {
+    print("* \(Self.self)(\(self.hex)).unsignedAddInPlace(\(RHS.self)(\(rhs.hex)))")
+    let (carry, knownOverflow) = self.unsignedAddInPlace(
+      rhs,
+      countWords: max(self.countRepresentedWords, rhs.countRepresentedWords))
+    return knownOverflow ?? ArithmeticOverflow(carry)
+  }
+  
+  public mutating func unsignedAddInPlace<RHS: IntegerType>(
+    rhs: RHS, countWords: Word
+  ) -> (carry: Bool, knownOverflow: ArithmeticOverflow?) {
+    print("** \(Self.self)(\(self.hex)).unsignedAddInPlace(\(RHS.self)(\(rhs.hex)), countWords: \(countWords))")
+    print("*** rhs.countRepresentedWords: \(rhs.countRepresentedWords)")
+    
+    var i: Word = 0
+    var carry: Bool = false
+    
+    while i < countWords {
+      let sum: UWord
+      (sum, carry, _) = uword(i)._adding(rhs.uword(i), carryIn: carry)
+      
+      if !self.replaceUWord(i, with: sum) {
+        return (false, .Overflow)
+      }
+      i += 1
+      // optimization: if we've processed all represented words on the
+      // rhs and there's no carry out, the lhs can not be further
+      // affected and no overflow can occur.  This probably doesn't
+      // matter for fixed-width integers but may be significant with
+      // larger BigNums.  On the other hand, we may not want to
+      // optimize for that :-)
+      print("*** checking for early exit: carry: \(carry), rhs < 0: \(rhs < 0), i: \(i), rhs.countRepresentedWords: \(rhs.countRepresentedWords)")
+      if carry == (rhs < 0) && i >= rhs.countRepresentedWords {
+        print("")
+        return (carry, .None as ArithmeticOverflow)
+      }
+    }
+    return (carry, nil)
+  }
+  
+  public mutating func signedAddInPlace<RHS: IntegerType>(
+    rhs: RHS
+  ) -> ArithmeticOverflow {
+    print("* \(Self.self)(\(self.hex)).signedAddInPlace(\(RHS.self)(\(rhs.hex)))")
+    // Do a multiword unsigned operation on all the words below the sign
+    // word.  We may overflow here or discover that there is no
+    // overflow.
+    let lowWordCount = self.signWordIndex
+    let (lowCarry, lowOverflowKnown)
+      = self.unsignedAddInPlace(rhs, countWords: lowWordCount)
+    if let finalOverflow = lowOverflowKnown { return finalOverflow }
+    
+    // Save off the sign word so that we don't lose it if the highest
+    // stored bit of the lhs flips.  When this addition proceeds past
+    // the highest stored word, we still need to be able to retrieve
+    // the old sign word.
+    var oldSign = self.word(lowWordCount)
+    
+    var wordIndex: Word = lowWordCount
+    var overflow: Bool, carry: Bool = lowCarry
+    
+    repeat {
+      let bits: UWord
+      (bits, carry, overflow) = oldSign._lowUWord._adding(
+        rhs.uword(wordIndex), carryIn: carry)
+      if !self.replaceUWord(wordIndex, with: bits) {
+        return .Overflow
+      }
+      oldSign &>>= ${word_bits - 1} // further sign words are 0 or -1
+      wordIndex += 1
+    }
+    while wordIndex <= rhs.signWordIndex
+
+    return signedOverflowIntoWord(
+      wordIndex, overflow: overflow, originalSign: oldSign)
+  }
+}
 
 extension IntegerType {
   public mutating func addInPlace<RHS: IntegerType>(
     rhs: RHS
   ) -> ArithmeticOverflow {
-    var sum: UWord, wordOverflow: Bool, wordCarry: Bool = false
-    
-    var i: Word = 0
-    repeat {
-      (sum, wordCarry, wordOverflow) = uword(i)._adding(
-        rhs.uword(i), carryIn: wordCarry ? 1 : 0)
-      
-      if self.replaceUWord(i, with: sum) == .Overflow {
-        return .Overflow
-      }
-      i += 1
-      
-      // If the carry cancels with the high bits of the rhs, further
-      // additions can't affect the result; we're done
-      if i > rhs._mostSignificantWord && (rhs < 0) == wordCarry {
-        break
-      }
-    }
-    while i < countRepresentedWords
-    return overflowInPlace(
-      (rhs < 0) != wordCarry,
-      overflow: wordOverflow && i == countRepresentedWords)
+    return Self.isSigned || RHS.isSigned
+    ? signedAddInPlace(rhs) : unsignedAddInPlace(rhs)
   }
 }
 
