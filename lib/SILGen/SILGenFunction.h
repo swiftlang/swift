@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -255,6 +255,16 @@ public:
                                  CanType ConcreteType,
                                  SILType ConcreteLoweredType,
                                  ArrayRef<ProtocolConformance *> Conformances);
+};
+
+/// Parameter to \c SILGenFunction::emitCaptures that indicates what the
+/// capture parameters are being emitted for.
+enum class CaptureEmission {
+  /// Captures are being emitted for immediate application to a local function.
+  ImmediateApplication,
+  /// Captures are being emitted for partial application to form a closure
+  /// value.
+  PartialApplication,
 };
 
 /// SILGenFunction - an ASTVisitor for producing SIL from function bodies.
@@ -1031,6 +1041,7 @@ public:
 
   void emitCaptures(SILLocation loc,
                     AnyFunctionRef TheClosure,
+                    CaptureEmission purpose,
                     SmallVectorImpl<ManagedValue> &captures);
 
   ManagedValue emitClosureValue(SILLocation loc,

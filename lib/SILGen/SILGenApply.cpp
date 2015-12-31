@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -1168,7 +1168,8 @@ public:
                && "generic local fns not implemented");
         
         SmallVector<ManagedValue, 4> captures;
-        SGF.emitCaptures(e, afd, captures);
+        SGF.emitCaptures(e, afd, CaptureEmission::ImmediateApplication,
+                         captures);
         ApplyCallee->setCaptures(std::move(captures));
       }
       
@@ -1214,7 +1215,8 @@ public:
     // If the closure requires captures, emit them.
     if (e->getCaptureInfo().hasLocalCaptures()) {
       SmallVector<ManagedValue, 4> captures;
-      SGF.emitCaptures(e, e, captures);
+      SGF.emitCaptures(e, e, CaptureEmission::ImmediateApplication,
+                       captures);
       ApplyCallee->setCaptures(std::move(captures));
     }
     // If there are substitutions, add them, always at depth 0.
@@ -3840,7 +3842,8 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
   if (accessorFn->getCaptureInfo().hasLocalCaptures()) {
     assert(!selfValue && "local property has self param?!");
     SmallVector<ManagedValue, 4> captures;
-    gen.emitCaptures(loc, accessorFn, captures);
+    gen.emitCaptures(loc, accessorFn, CaptureEmission::ImmediateApplication,
+                     captures);
     callee.setCaptures(std::move(captures));
   }
 

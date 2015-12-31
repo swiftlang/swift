@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -1366,19 +1366,8 @@ void SignatureExpansion::expand(SILParameterInfo param) {
 
   case ParameterConvention::Direct_Owned:
   case ParameterConvention::Direct_Unowned:
-  case ParameterConvention::Direct_Guaranteed: /*
-    // Go ahead and further decompose tuples.
-    if (auto tuple = dyn_cast<TupleType>(param.getType())) {
-      for (auto elt : tuple.getElementTypes()) {
-        // Propagate the same ownedness down to the element.
-        expand(SILParameterInfo(elt, param.getConvention()));
-      }
-      return;
-    }
-    */
-    SWIFT_FALLTHROUGH;
+  case ParameterConvention::Direct_Guaranteed:
   case ParameterConvention::Direct_Deallocating:
-
     switch (FnType->getLanguage()) {
     case SILFunctionLanguage::C: {
       llvm_unreachable("Unexpected C/ObjC method in parameter expansion!");
