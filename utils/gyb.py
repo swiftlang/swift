@@ -5,7 +5,10 @@
 from __future__ import print_function
 
 import re
-from cStringIO import StringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from io import StringIO
 import tokenize
 import textwrap
 from bisect import bisect
@@ -135,7 +138,8 @@ def tokenizePythonToUnmatchedCloseCurly(sourceText, start, lineStarts):
                 if nesting < 0:
                     return tokenPosToIndex(tokenStart, start, lineStarts)
 
-    except tokenize.TokenError, (message, errorPos):
+    except tokenize.TokenError as error:
+        (message, errorPos) = error.args
         return tokenPosToIndex(errorPos, start, lineStarts)
 
     return len(sourceText)
@@ -304,7 +308,7 @@ def splitGybLines(sourceLines):
     dedents = 0
     try:
         for tokenKind, tokenText, tokenStart, (tokenEndLine, tokenEndCol), lineText \
-            in tokenize.generate_tokens(sourceLines.__iter__().next):
+            in tokenize.generate_tokens(lambda i = iter(sourceLines): next(i)):
 
             if tokenKind in (tokenize.COMMENT, tokenize.ENDMARKER): 
                 continue
@@ -324,7 +328,7 @@ def splitGybLines(sourceLines):
                 
             lastTokenText,lastTokenKind = tokenText,tokenKind
 
-    except tokenize.TokenError, (message, errorPos):
+    except tokenize.TokenError:
         return [] # Let the later compile() call report the error
 
     if lastTokenText == ':':
@@ -347,7 +351,7 @@ def codeStartsWithDedentKeyword(sourceLines):
     """
     tokenText = None
     for tokenKind, tokenText, _, _, _ \
-        in tokenize.generate_tokens(sourceLines.__iter__().next):
+        in tokenize.generate_tokens(lambda i = iter(sourceLines): next(i)):
 
         if tokenKind != tokenize.COMMENT and tokenText.strip() != '':
             break

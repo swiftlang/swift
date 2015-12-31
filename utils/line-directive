@@ -71,7 +71,10 @@ def run():
         sources = sys.argv[1:dashes]
 
         command = subprocess.Popen(
-            sys.argv[dashes + 1:], stderr = subprocess.STDOUT, stdout = subprocess.PIPE
+            sys.argv[dashes + 1:],
+            stderr = subprocess.STDOUT,
+            stdout = subprocess.PIPE,
+            universal_newlines = True
         )
         
         error_pattern = re.compile(
