@@ -453,10 +453,9 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
 
   case CaptureKind::Constant: {
     auto &lowering = gen.getTypeLowering(VD->getType());
-    // Constant decls are captured by value.  If the captured value is a tuple
-    // value, we need to reconstitute it before sticking it in VarLocs.
+    // Constant decls are captured by value.
     SILType ty = lowering.getLoweredType();
-    SILValue val = emitReconstitutedConstantCaptureArguments(ty, VD, gen);
+    SILValue val = new (gen.SGM.M) SILArgument(gen.F.begin(), ty, VD);
 
     // If the original variable was settable, then Sema will have treated the
     // VarDecl as an lvalue, even in the closure's use.  As such, we need to

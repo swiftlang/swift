@@ -250,20 +250,15 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         Val = emitLoad(loc, Val, tl, SGFContext(), IsNotTake).forward(*this);
       }
 
-      // Use an RValue to explode Val if it is a tuple.
-      RValue RV(*this, loc, vd->getType()->getCanonicalType(),
-                ManagedValue::forUnmanaged(Val));
-
       // If we're capturing an unowned pointer by value, we will have just
       // loaded it into a normal retained class pointer, but we capture it as
       // an unowned pointer.  Convert back now.
       if (vd->getType()->is<ReferenceStorageType>()) {
         auto type = getTypeLowering(vd->getType()).getLoweredType();
-        auto val = std::move(RV).forwardAsSingleStorageValue(*this, type,loc);
-        capturedArgs.push_back(emitManagedRValueWithCleanup(val));
-      } else {
-        std::move(RV).getAll(capturedArgs);
+        Val = emitConversionFromSemanticValue(loc, Val, type);
       }
+      
+      capturedArgs.push_back(emitManagedRValueWithCleanup(Val));
       break;
     }
 

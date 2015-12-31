@@ -577,55 +577,27 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
       type = Types.getInterfaceTypeOutOfContext(type,
                                                 function->getAsDeclContext());
       
-      auto loweredTy = Types.getLoweredType(
+      auto &loweredTL = Types.getTypeLowering(
                                     AbstractionPattern(genericSig, type), type);
-      
+      auto loweredTy = loweredTL.getLoweredType();
       switch (Types.getDeclCaptureKind(capture)) {
       case CaptureKind::None:
         break;
       case CaptureKind::Constant: {
-        class CaptureConventions final : public Conventions {
-        public:
-          ParameterConvention getIndirectParameter(unsigned index,
-                                                 const AbstractionPattern &type)
-          const override {
-            return ParameterConvention::Indirect_In;
-          }
-          ParameterConvention getDirectParameter(unsigned index,
-                                                 const AbstractionPattern &type)
-          const override {
-            return ParameterConvention::Direct_Owned;
-          }
-          ParameterConvention getCallee() const override {
-            llvm_unreachable("captures are never callees");
-          }
-          ResultConvention getResult(const TypeLowering &) const override {
-            llvm_unreachable("captures are never results");
-          }
-          ParameterConvention getIndirectSelfParameter(
-                                                 const AbstractionPattern &type)
-          const override {
-            llvm_unreachable("captures are never self");
-          }
-          ParameterConvention getDirectSelfParameter(
-                                                 const AbstractionPattern &type)
-          const override {
-            llvm_unreachable("captures are never self");
-          }
+        // Constants are captured by value.
+        SILParameterInfo param;
+        if (loweredTL.isAddressOnly()) {
+          param = SILParameterInfo(loweredTy.getSwiftRValueType(),
+                                   ParameterConvention::Indirect_In);
           
-          CaptureConventions() : Conventions(ConventionsKind::Capture) {}
-          
-          static bool classof(const Conventions *C) {
-            return C->getKind() == ConventionsKind::Capture;
-          }
-        };
-      
-        // Constants are captured by value. Destructure like a value parameter.
-        Optional<ForeignErrorConvention> foreignError;
-        DestructureInputs DestructureCaptures(M, CaptureConventions(),
-                                              foreignError, inputs);
-        DestructureCaptures.destructure(AbstractionPattern(genericSig, type),
-                                        type, extInfo);
+        } else if (loweredTL.isTrivial()) {
+          param = SILParameterInfo(loweredTy.getSwiftRValueType(),
+                                   ParameterConvention::Direct_Unowned);
+        } else {
+          param = SILParameterInfo(loweredTy.getSwiftRValueType(),
+                                   ParameterConvention::Direct_Owned);
+        }
+        inputs.push_back(param);
         break;
       }
       case CaptureKind::Box: {
