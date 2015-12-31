@@ -705,9 +705,8 @@ public func transcode<
 
   var inputDecoder = inputEncoding.init()
   var hadError = false
-  for var scalar = inputDecoder.decode(&input);
-          !scalar.isEmptyInput();
-          scalar = inputDecoder.decode(&input) {
+  var scalar = inputDecoder.decode(&input)
+  while !scalar.isEmptyInput() {
     switch scalar {
     case .Result(let us):
       OutputEncoding.encode(us, output: output)
@@ -721,6 +720,7 @@ public func transcode<
         hadError = true
       }
     }
+    scalar = inputDecoder.decode(&input)
   }
   return hadError
 }
