@@ -256,6 +256,7 @@ void NewProjection::getFirstLevelProjections(
   if (auto *S = Ty.getStructOrBoundGenericStruct()) {
     unsigned Count = 0;
     for (auto *VDecl : S->getStoredProperties()) {
+      (void) VDecl;
       NewProjection P(NewProjectionKind::Struct, Count++);
       DEBUG(NewProjectionPath X(Ty);
             assert(X.getMostDerivedType(Mod) == Ty);
@@ -283,6 +284,7 @@ void NewProjection::getFirstLevelProjections(
   if (auto *C = Ty.getClassOrBoundGenericClass()) {
     unsigned Count = 0;
     for (auto *VDecl : C->getStoredProperties()) {
+      (void) VDecl;
       NewProjection P(NewProjectionKind::Class, Count++);
       DEBUG(NewProjectionPath X(Ty);
             assert(X.getMostDerivedType(Mod) == Ty);
