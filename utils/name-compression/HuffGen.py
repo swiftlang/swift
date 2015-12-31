@@ -52,19 +52,20 @@ class Node:
     if self.right: v = max(v, 1 + self.right.getMaxEncodingLength())
     return v
 
-  def generate_decoder(self, indent = 0):
+  def generate_decoder(self, depth):
     """
     Generate the CPP code for the decoder.
     """
-    space = " " * indent
+    space = " " * depth
 
     if self.val:
-      return space  + "return \'" + str(self.val) + "\';"
+      return space + "num = num.lshr(%d);\n" % depth +\
+             space + "return \'" + str(self.val) + "\';"
 
-    T = """{0}if (getLastBit(num) == {1}) {{\n{0} num = num.lshr(1);\n{2}\n{0}}}"""
+    T = """{0}if ((tailbits & 1) == {1}) {{\n{0} tailbits/=2;\n{2}\n{0}}}"""
     sb = ""
-    if self.left:  sb += T.format(space, 0, self.left .generate_decoder(indent + 1)) + "\n"
-    if self.right: sb += T.format(space, 1, self.right.generate_decoder(indent + 1))
+    if self.left:  sb += T.format(space, 0, self.left .generate_decoder(depth + 1)) + "\n"
+    if self.right: sb += T.format(space, 1, self.right.generate_decoder(depth + 1))
     return sb
 
   def generate_encoder(self, stack):
@@ -115,8 +116,7 @@ print "// The charset that the fragment indices can use:"
 print "unsigned CharsetLength = %d;" % len(charset)
 print "unsigned LongestEncodingLength = %d;" % (nodes[0].getMaxEncodingLength())
 print "const char *Charset = \"%s\";" % charset
-print "unsigned getLastBit(const APInt &In) { return *In.getRawData() & 1; }\n"
-print "char variable_decode(APInt &num) {\n", nodes[0].generate_decoder(), "\n assert(false); return 0;\n}"
+print "char variable_decode(APInt &num) {\n uint64_t tailbits = *num.getRawData();\n", nodes[0].generate_decoder(0), "\n assert(false); return 0;\n}"
 print "void variable_encode(APInt &num, char ch) {\n", nodes[0].generate_encoder([]),"assert(false);\n}"
 print "} // namespace"
 print "#endif /* SWIFT_MANGLER_HUFFMAN_H */"
