@@ -420,27 +420,6 @@ void SILGenFunction::bindParametersForForwarding(Pattern *pattern,
   ArgumentForwardVisitor(*this, parameters).visit(pattern);
 }
 
-/// Tuple values captured by a closure are passed as individual arguments to the
-/// SILFunction since SILFunctionType canonicalizes away tuple types.
-static SILValue
-emitReconstitutedConstantCaptureArguments(SILType ty,
-                                          ValueDecl *capture,
-                                          SILGenFunction &gen) {
-  auto TT = ty.getAs<TupleType>();
-  if (!TT)
-    return new (gen.SGM.M) SILArgument(gen.F.begin(), ty, capture);
-
-  SmallVector<SILValue, 4> Elts;
-  for (unsigned i = 0, e = TT->getNumElements(); i != e; ++i) {
-    auto EltTy = ty.getTupleElementType(i);
-    auto EV =
-      emitReconstitutedConstantCaptureArguments(EltTy, capture, gen);
-    Elts.push_back(EV);
-  }
-
-  return gen.B.createTuple(capture, ty, Elts);
-}
-
 static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
                                  unsigned ArgNo) {
   auto *VD = capture.getDecl();
@@ -472,7 +451,10 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
       AllocStack->setArgNo(ArgNo);
     else 
       gen.B.createDebugValue(Loc, val, {/*Constant*/true, ArgNo});
-    if (!lowering.isTrivial())
+
+    // TODO: Closure contexts should always be guaranteed.
+    if (!gen.SGM.M.getOptions().EnableGuaranteedClosureContexts
+        && !lowering.isTrivial())
       gen.enterDestroyCleanup(val);
     break;
   }
@@ -487,7 +469,8 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
     SILValue addr = gen.B.createProjectBox(VD, box);
     gen.VarLocs[VD] = SILGenFunction::VarLoc::get(addr, box);
     gen.B.createDebugValueAddr(Loc, addr, {/*Constant*/false, ArgNo});
-    gen.Cleanups.pushCleanup<StrongReleaseCleanup>(box);
+    if (!gen.SGM.M.getOptions().EnableGuaranteedClosureContexts)
+      gen.Cleanups.pushCleanup<StrongReleaseCleanup>(box);
     break;
   }
   case CaptureKind::StorageAddress: {

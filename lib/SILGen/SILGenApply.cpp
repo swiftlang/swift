@@ -1168,7 +1168,8 @@ public:
                && "generic local fns not implemented");
         
         SmallVector<ManagedValue, 4> captures;
-        SGF.emitCaptures(e, afd, captures);
+        SGF.emitCaptures(e, afd, CaptureEmission::ImmediateApplication,
+                         captures);
         ApplyCallee->setCaptures(std::move(captures));
       }
       
@@ -1214,7 +1215,8 @@ public:
     // If the closure requires captures, emit them.
     if (e->getCaptureInfo().hasLocalCaptures()) {
       SmallVector<ManagedValue, 4> captures;
-      SGF.emitCaptures(e, e, captures);
+      SGF.emitCaptures(e, e, CaptureEmission::ImmediateApplication,
+                       captures);
       ApplyCallee->setCaptures(std::move(captures));
     }
     // If there are substitutions, add them, always at depth 0.
@@ -3840,7 +3842,8 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
   if (accessorFn->getCaptureInfo().hasLocalCaptures()) {
     assert(!selfValue && "local property has self param?!");
     SmallVector<ManagedValue, 4> captures;
-    gen.emitCaptures(loc, accessorFn, captures);
+    gen.emitCaptures(loc, accessorFn, CaptureEmission::ImmediateApplication,
+                     captures);
     callee.setCaptures(std::move(captures));
   }
 

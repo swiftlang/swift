@@ -257,6 +257,16 @@ public:
                                  ArrayRef<ProtocolConformance *> Conformances);
 };
 
+/// Parameter to \c SILGenFunction::emitCaptures that indicates what the
+/// capture parameters are being emitted for.
+enum class CaptureEmission {
+  /// Captures are being emitted for immediate application to a local function.
+  ImmediateApplication,
+  /// Captures are being emitted for partial application to form a closure
+  /// value.
+  PartialApplication,
+};
+
 /// SILGenFunction - an ASTVisitor for producing SIL from function bodies.
 class LLVM_LIBRARY_VISIBILITY SILGenFunction
   : public ASTVisitor<SILGenFunction>
@@ -1031,6 +1041,7 @@ public:
 
   void emitCaptures(SILLocation loc,
                     AnyFunctionRef TheClosure,
+                    CaptureEmission purpose,
                     SmallVectorImpl<ManagedValue> &captures);
 
   ManagedValue emitClosureValue(SILLocation loc,

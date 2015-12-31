@@ -585,18 +585,19 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
         break;
       case CaptureKind::Constant: {
         // Constants are captured by value.
-        SILParameterInfo param;
+        ParameterConvention convention;
         if (loweredTL.isAddressOnly()) {
-          param = SILParameterInfo(loweredTy.getSwiftRValueType(),
-                                   ParameterConvention::Indirect_In);
-          
+          convention = M.getOptions().EnableGuaranteedClosureContexts
+            ? ParameterConvention::Indirect_In_Guaranteed
+            : ParameterConvention::Indirect_In;
         } else if (loweredTL.isTrivial()) {
-          param = SILParameterInfo(loweredTy.getSwiftRValueType(),
-                                   ParameterConvention::Direct_Unowned);
+          convention = ParameterConvention::Direct_Unowned;
         } else {
-          param = SILParameterInfo(loweredTy.getSwiftRValueType(),
-                                   ParameterConvention::Direct_Owned);
+          convention = M.getOptions().EnableGuaranteedClosureContexts
+            ? ParameterConvention::Direct_Guaranteed
+            : ParameterConvention::Direct_Owned;
         }
+        SILParameterInfo param(loweredTy.getSwiftRValueType(), convention);
         inputs.push_back(param);
         break;
       }
@@ -604,8 +605,10 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
         // Lvalues are captured as a box that owns the captured value.
         SILType ty = loweredTy.getAddressType();
         CanType boxTy = SILBoxType::get(ty.getSwiftRValueType());
-        auto param = SILParameterInfo(boxTy,
-                                      ParameterConvention::Direct_Owned);
+        auto convention = M.getOptions().EnableGuaranteedClosureContexts
+          ? ParameterConvention::Direct_Guaranteed
+          : ParameterConvention::Direct_Owned;
+        auto param = SILParameterInfo(boxTy, convention);
         inputs.push_back(param);
         break;
       }

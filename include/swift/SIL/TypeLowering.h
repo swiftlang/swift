@@ -420,7 +420,7 @@ enum class CaptureKind {
   /// A local value captured as a single pointer to storage (formed with
   /// @noescape closures).
   StorageAddress,
-  // A local value captures as a constant.
+  /// A local value captured as a constant.
   Constant,
 };
 
