@@ -12,6 +12,8 @@ if(CXX_SUPPORTS_EXIT_TIME_DESTRUCTORS_WARNING)
   list(APPEND SWIFT_CORE_CXX_FLAGS "-Wexit-time-destructors")
 endif()
 
+list(APPEND SWIFT_CORE_CXX_FLAGS "-mcmodel=large")
+
 if(SWIFT_BUILD_STDLIB)
   # These must be kept in dependency order so that any referenced targets
   # exist at the time we look for them in add_swift_*.
