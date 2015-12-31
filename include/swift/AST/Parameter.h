@@ -66,7 +66,7 @@ struct Parameter {
   void setVariadic(bool value = true) {defaultValueAndIsVariadic.setInt(value);}
   
   /// Information about a symbolic default argument, like __FILE__.
-  DefaultArgumentKind defaultArgumentKind;
+  DefaultArgumentKind defaultArgumentKind = DefaultArgumentKind::None;
   
   /// Remove the type of this varargs element designator, without the array
   /// type wrapping it.  A parameter like "Int..." will have formal parameter
@@ -84,7 +84,6 @@ struct Parameter {
   static Parameter withoutLoc(ParamDecl *decl) {
     Parameter result;
     result.decl = decl;
-    result.type = TypeLoc::withoutLoc(decl->getType());
     return result;
   }
   
