@@ -36,7 +36,8 @@ public protocol Indexable {
   ///
   /// In an empty collection, `startIndex == endIndex`.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1) in most cases, possibly O(N) for some lazy
+  ///   collections.
   var startIndex: Index {get}
 
   /// The collection's "past the end" position.
