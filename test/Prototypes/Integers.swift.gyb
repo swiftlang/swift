@@ -602,7 +602,8 @@ extension UWord {
     let signedRHS = Word(bitPattern: rhs)
     
     let (uResult0, carry0) = self.${name}WithOverflow(rhs)
-    let (sResult0, overflow0) = Word(bitPattern: self).${name}WithOverflow(signedRHS)
+    let (sResult0, overflow0)
+      = Word(bitPattern: self).${name}WithOverflow(signedRHS)
     
     let (uResult1, carry1) = uResult0.${name}WithOverflow(carryIn ? 1 : 0)
     let (_, overflow1) = sResult0.${name}WithOverflow(carryIn ? 1 : 0)
@@ -612,7 +613,8 @@ extension UWord {
       carryFlag: carry0 != .None || carry1 != .None,
       overflowFlag: overflow0 != .None || overflow1 != .None
     )
-    _log("**** -> sum: \(result.result.hex), carry: \(result.carryFlag), overflow: \(result.overflowFlag)")
+    _log("**** -> sum: \(result.result.hex), "
+      + "carry: \(result.carryFlag), overflow: \(result.overflowFlag)")
     return result
   }
   % end
@@ -949,7 +951,8 @@ extension IntegerType {
   public mutating func unsignedAddInPlace<RHS: IntegerType>(
     rhs: RHS
   ) -> ArithmeticOverflow {
-    _log("* \(Self.self)(\(self.hex)).unsignedAddInPlace(\(RHS.self)(\(rhs.hex)))")
+    _log("* \(Self.self)(\(self.hex)).unsignedAddInPlace"
+      + "(\(RHS.self)(\(rhs.hex)))")
     let (carry, knownOverflow) = self.unsignedAddInPlace(
       rhs,
       countWords: max(self.countRepresentedWords, rhs.countRepresentedWords))
@@ -959,7 +962,8 @@ extension IntegerType {
   public mutating func unsignedAddInPlace<RHS: IntegerType>(
     rhs: RHS, countWords: Word
   ) -> (carry: Bool, knownOverflow: ArithmeticOverflow?) {
-    _log("** \(Self.self)(\(self.hex)).unsignedAddInPlace(\(RHS.self)(\(rhs.hex)), countWords: \(countWords))")
+    _log("** \(Self.self)(\(self.hex)).unsignedAddInPlace"
+      + "(\(RHS.self)(\(rhs.hex)), countWords: \(countWords))")
     _log("*** rhs.countRepresentedWords: \(rhs.countRepresentedWords)")
     
     var i: Word = 0
@@ -979,9 +983,8 @@ extension IntegerType {
       // matter for fixed-width integers but may be significant with
       // larger BigNums.  On the other hand, we may not want to
       // optimize for that :-)
-      _log("*** checking for early exit: carry: \(carry), rhs < 0: \(rhs < 0), i: \(i), rhs.countRepresentedWords: \(rhs.countRepresentedWords)")
       if carry == (rhs < 0) && i >= rhs.countRepresentedWords {
-        _log("")
+        _log("*** early exit; carry can't affect lhs")
         return (carry, .None as ArithmeticOverflow)
       }
     }
@@ -991,7 +994,8 @@ extension IntegerType {
   public mutating func signedAddInPlace<RHS: IntegerType>(
     rhs: RHS
   ) -> ArithmeticOverflow {
-    _log("* \(Self.self)(\(self.hex)).signedAddInPlace(\(RHS.self)(\(rhs.hex)))")
+    _log("* \(Self.self)(\(self.hex)).signedAddInPlace"
+      + "(\(RHS.self)(\(rhs.hex)))")
     // Do a multiword unsigned operation on all the words below the sign
     // word.  We may overflow here or discover that there is no
     // overflow.
