@@ -148,12 +148,12 @@ public func == <Base : CollectionType>(
 /// A lazy `CollectionType` wrapper that includes the elements of an
 /// underlying collection that satisfy a predicate.
 ///
-/// - Note: The performance of advancing a `LazyFilterIndex`
-///   depends on how sparsely the filtering predicate is satisfied,
-///   and may not offer the usual performance given by models of
-///   `ForwardIndexType`.  Be aware, therefore, that general operations
-///   on `LazyFilterCollection` instances may not have the
-///   documented complexity.
+/// - Note: The performance of accessing `startIndex`, `first`, any methods
+///   that depend on `startIndex`, or of advancing a `LazyFilterIndex` depends
+///   on how sparsely the filtering predicate is satisfied, and may not offer
+///   the usual performance given by `CollectionType` or `ForwardIndexType`. Be
+///   aware, therefore, that general operations on `LazyFilterCollection`
+///   instances may not have the documented complexity.
 public struct LazyFilterCollection<
   Base : CollectionType
 > : LazyCollectionType {

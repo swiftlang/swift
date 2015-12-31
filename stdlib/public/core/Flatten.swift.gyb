@@ -225,6 +225,14 @@ public func == <BaseElements> (
 /// * `c.flatten().map(f)` maps eagerly and returns a new array
 /// * `c.lazy.flatten().map(f)` maps lazily and returns a `LazyMapCollection`
 ///
+/// - Note: The performance of accessing `startIndex`, `first`, any methods
+///   that depend on `startIndex`, or of advancing a `${Collection}Index`
+///   depends on how many empty subcollections are found in the base
+///   collection, and may not offer the usual performance given by
+///   `CollectionType` or `${traversal}IndexType`. Be aware, therefore, that
+///   general operations on `${Collection}` instances may not have the
+///   documented complexity.
+///
 /// - See also: `FlattenSequence`
 public struct ${Collection}<
   Base: CollectionType where ${constraints % {'Base': 'Base.'}}
