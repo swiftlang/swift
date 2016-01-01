@@ -47,7 +47,7 @@ class Node:
 
   def getMaxEncodingLength(self):
     """ Return the length of the longest possible encoding word"""
-    v = 1
+    v = 0
     if self.left:  v = max(v, 1 + self.left .getMaxEncodingLength())
     if self.right: v = max(v, 1 + self.right.getMaxEncodingLength())
     return v
