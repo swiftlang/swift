@@ -788,12 +788,11 @@ namespace {
              (cast<FuncDecl>(func)->hasDynamicSelf() ||
               (openedExistential && cast<FuncDecl>(func)->hasArchetypeSelf()))) ||
             isPolymorphicConstructor(func)) {
-          refTy = refTy->replaceCovariantResultType(
-                    containerTy,
-                    func->getNumParamPatterns());
+          refTy = refTy->replaceCovariantResultType(containerTy,
+                    func->getNumParameterLists());
           dynamicSelfFnType = refTy->replaceCovariantResultType(
                                 baseTy,
-                                func->getNumParamPatterns());
+                                func->getNumParameterLists());
 
           if (openedExistential) {
             // Replace the covariant result type in the opened type. We need to
@@ -804,7 +803,7 @@ namespace {
               openedType = optObject;
             openedType = openedType->replaceCovariantResultType(
                            baseTy,
-                           func->getNumParamPatterns()-1);
+                           func->getNumParameterLists()-1);
             if (optKind != OptionalTypeKind::OTK_None)
               openedType = OptionalType::get(optKind, openedType);
           }
@@ -4838,11 +4837,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       auto discriminator = AutoClosureExpr::InvalidDiscriminator;
       auto closure = new (tc.Context) AutoClosureExpr(expr, toType,
                                                       discriminator, dc);
-      Pattern *pattern = TuplePattern::create(tc.Context, expr->getLoc(),
-                                              ArrayRef<TuplePatternElt>(),
-                                              expr->getLoc());
-      pattern->setType(TupleType::getEmpty(tc.Context));
-      closure->setParams(pattern);
+      closure->setParameterList(ParameterList::createEmpty(tc.Context));
 
       // Compute the capture list, now that we have analyzed the expression.
       tc.ClosuresWithUncomputedCaptures.push_back(closure);
@@ -5672,16 +5667,9 @@ namespace {
 
         // Coerce the pattern, in case we resolved something.
         auto fnType = closure->getType()->castTo<FunctionType>();
-        Pattern *params = closure->getParams();
-        TypeResolutionOptions TROptions;
-        TROptions |= TR_OverrideType;
-        TROptions |= TR_FromNonInferredPattern;
-        TROptions |= TR_InExpression;
-        TROptions |= TR_ImmediateFunctionInput;
-        if (tc.coercePatternToType(params, closure, fnType->getInput(),
-                                   TROptions))
+        auto *params = closure->getParameters();
+        if (tc.coerceParameterListToType(params, closure, fnType->getInput()))
           return { false, nullptr };
-        closure->setParams(params);
 
         // If this is a single-expression closure, convert the expression
         // in the body to the result type of the closure.
@@ -6218,10 +6206,9 @@ static bool isVariadicWitness(AbstractFunctionDecl *afd) {
   if (afd->getExtensionType())
     ++index;
 
-  auto params = afd->getBodyParamPatterns()[index];
-  if (auto *tuple = dyn_cast<TuplePattern>(params)) {
-    return tuple->hasAnyEllipsis();
-  }
+  for (auto &param : *afd->getParameterList(index))
+    if (param.isVariadic())
+      return true;
 
   return false;
 }

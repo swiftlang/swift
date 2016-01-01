@@ -147,11 +147,10 @@ static ValueDecl *deriveErrorType_code(TypeChecker &tc, Decl *parentDecl,
   ASTContext &C = tc.Context;
   
   auto intTy = C.getIntDecl()->getDeclaredType();
-  Type nominalType = cast<DeclContext>(parentDecl)->getDeclaredTypeInContext();
 
   // Define the getter.
   auto getterDecl = declareDerivedPropertyGetter(tc, parentDecl, nominal,
-                                                 nominalType, intTy, intTy);
+                                                 intTy, intTy);
   if (isa<EnumDecl>(nominal))
     getterDecl->setBodySynthesizer(&deriveBodyErrorType_enum_code);
   else
@@ -225,11 +224,10 @@ static ValueDecl *deriveBridgedNSError_enum_NSErrorDomain(TypeChecker &tc,
   ASTContext &C = tc.Context;
   
   auto stringTy = C.getStringDecl()->getDeclaredType();
-  Type enumType = enumDecl->getDeclaredTypeInContext();
 
   // Define the getter.
   auto getterDecl = declareDerivedPropertyGetter(tc, parentDecl, enumDecl,
-                                                 enumType, stringTy, stringTy,
+                                                 stringTy, stringTy,
                                                  /*isStatic=*/true);
   getterDecl->setBodySynthesizer(&deriveBodyBridgedNSError_enum_NSErrorDomain);
   

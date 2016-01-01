@@ -3410,8 +3410,8 @@ void DeclName::CompoundDeclName::Profile(llvm::FoldingSetNodeID &id,
     id.AddPointer(arg.get());
 }
 
-DeclName::DeclName(ASTContext &C, Identifier baseName,
-                   ArrayRef<Identifier> argumentNames) {
+void DeclName::initialize(ASTContext &C, Identifier baseName,
+                          ArrayRef<Identifier> argumentNames) {
   if (argumentNames.size() == 0) {
     SimpleOrCompound = IdentifierAndCompound(baseName, true);
     return;
@@ -3435,6 +3435,17 @@ DeclName::DeclName(ASTContext &C, Identifier baseName,
                           compoundName->getArgumentNames().begin());
   SimpleOrCompound = compoundName;
   C.Impl.CompoundNames.InsertNode(compoundName, insert);
+}
+
+/// Build a compound value name given a base name and a set of argument names
+/// extracted from a parameter list.
+DeclName::DeclName(ASTContext &C, Identifier baseName,
+                   ParameterList *paramList) {
+  SmallVector<Identifier, 4> names;
+  
+  for (auto &P : *paramList)
+    names.push_back(P.decl->getArgumentName());
+  initialize(C, baseName, names);
 }
 
 Optional<Type>

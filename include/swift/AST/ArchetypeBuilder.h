@@ -289,7 +289,7 @@ public:
   /// because the type \c Dictionary<K,V> cannot be formed without it.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool inferRequirements(Pattern *pattern, GenericParamList *genericParams);
+  bool inferRequirements(ParameterList *params,GenericParamList *genericParams);
 
   /// Finalize the set of requirements, performing any remaining checking
   /// required before generating archetypes.

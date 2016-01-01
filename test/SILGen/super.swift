@@ -49,7 +49,7 @@ public class Child : Parent {
 public class Grandchild : Child {
   // CHECK-LABEL: sil @_TFC5super10Grandchild16onlyInGrandchildfT_T_
   public func onlyInGrandchild() {
-    // CHECK: super_method %0 : $Grandchild, #Parent.methodOnlyInParent!1 : Parent -> () -> ()
+    // CHECK: super_method %0 : $Grandchild, #Parent.methodOnlyInParent!1 : (Parent) -> () -> ()
     super.methodOnlyInParent()
     // CHECK: function_ref @_TFC5super6Parent23finalMethodOnlyInParentfT_T_
     super.finalMethodOnlyInParent()
@@ -57,7 +57,7 @@ public class Grandchild : Child {
 
   // CHECK-LABEL: sil @_TFC5super10Grandchild6methodfT_T_
   public override func method() {
-    // CHECK: super_method %0 : $Grandchild, #Parent.method!1 : Parent -> () -> ()
+    // CHECK: super_method %0 : $Grandchild, #Parent.method!1 : (Parent) -> () -> ()
     super.method()
   }
 }
@@ -65,7 +65,7 @@ public class Grandchild : Child {
 public class GreatGrandchild : Grandchild {
   // CHECK-LABEL: sil @_TFC5super15GreatGrandchild6methodfT_T_
   public override func method() {
-    // CHECK: super_method {{%[0-9]+}} : $GreatGrandchild, #Grandchild.method!1 : Grandchild -> () -> () , $@convention(method) (@guaranteed Grandchild) -> ()
+    // CHECK: super_method {{%[0-9]+}} : $GreatGrandchild, #Grandchild.method!1 : (Grandchild) -> () -> () , $@convention(method) (@guaranteed Grandchild) -> ()
     super.method()
   }
 }

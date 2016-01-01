@@ -253,7 +253,7 @@ class ClassWithGetter : PropertyWithGetter {
 // CHECK-NEXT: [[CCOPY:%.*]] = alloc_stack $ClassWithGetter
 // CHECK-NEXT: copy_addr [[C]] to [initialization] [[CCOPY]]#1
 // CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load [[CCOPY]]#1
-// CHECK-NEXT: [[FUN:%.*]] = class_method [[CCOPY_LOADED]] : $ClassWithGetter, #ClassWithGetter.a!getter.1 : ClassWithGetter -> () -> Int , $@convention(method) (@guaranteed ClassWithGetter) -> Int
+// CHECK-NEXT: [[FUN:%.*]] = class_method [[CCOPY_LOADED]] : $ClassWithGetter, #ClassWithGetter.a!getter.1 : (ClassWithGetter) -> () -> Int , $@convention(method) (@guaranteed ClassWithGetter) -> Int
 // CHECK-NEXT: apply [[FUN]]([[CCOPY_LOADED]])
 // CHECK-NEXT: strong_release [[CCOPY_LOADED]]
 // CHECK-NEXT: dealloc_stack [[CCOPY]]#0
@@ -279,7 +279,7 @@ class ClassWithGetterSetter : PropertyWithGetterSetter, PropertyWithGetter {
 // CHECK-NEXT: [[CCOPY:%.*]] = alloc_stack $ClassWithGetterSetter
 // CHECK-NEXT: copy_addr [[C]] to [initialization] [[CCOPY]]#1
 // CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load [[CCOPY]]#1
-// CHECK-NEXT: [[FUN:%.*]] = class_method [[CCOPY_LOADED]] : $ClassWithGetterSetter, #ClassWithGetterSetter.b!getter.1 : ClassWithGetterSetter -> () -> Int , $@convention(method) (@guaranteed ClassWithGetterSetter) -> Int
+// CHECK-NEXT: [[FUN:%.*]] = class_method [[CCOPY_LOADED]] : $ClassWithGetterSetter, #ClassWithGetterSetter.b!getter.1 : (ClassWithGetterSetter) -> () -> Int , $@convention(method) (@guaranteed ClassWithGetterSetter) -> Int
 // CHECK-NEXT: apply [[FUN]]([[CCOPY_LOADED]])
 // CHECK-NEXT: strong_release [[CCOPY_LOADED]]
 // CHECK-NEXT: dealloc_stack [[CCOPY]]#0
@@ -298,7 +298,7 @@ class ClassWithStoredProperty : PropertyWithGetter {
   // CHECK: bb0([[ARG:%.*]] : $ClassWithStoredProperty):
   // CHECK-NEXT: debug_value [[ARG]]
   // CHECK-NOT: strong_retain
-  // CHECK-NEXT: [[FUN:%.*]] = class_method [[ARG]] : $ClassWithStoredProperty, #ClassWithStoredProperty.a!getter.1 : ClassWithStoredProperty -> () -> Int , $@convention(method) (@guaranteed ClassWithStoredProperty) -> Int
+  // CHECK-NEXT: [[FUN:%.*]] = class_method [[ARG]] : $ClassWithStoredProperty, #ClassWithStoredProperty.a!getter.1 : (ClassWithStoredProperty) -> () -> Int , $@convention(method) (@guaranteed ClassWithStoredProperty) -> Int
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[FUN]]([[ARG]])
   // CHECK-NOT: strong_release
   // CHECK-NEXT: return [[RESULT]] : $Int

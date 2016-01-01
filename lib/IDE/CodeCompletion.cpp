@@ -1797,31 +1797,21 @@ public:
     addTypeAnnotation(Builder, VarType);
   }
 
-  void addPatternParameters(CodeCompletionResultBuilder &Builder,
-                            const Pattern *P) {
-    if (auto *TP = dyn_cast<TuplePattern>(P)) {
-      bool NeedComma = false;
-      for (unsigned i = 0, end = TP->getNumElements(); i < end; ++i) {
-        TuplePatternElt TupleElt = TP->getElement(i);
-        if (NeedComma)
-          Builder.addComma();
-        NeedComma = true;
+  void addParameters(CodeCompletionResultBuilder &Builder,
+                     const ParameterList *params) {
+    bool NeedComma = false;
+    for (auto &param : *params) {
+      if (NeedComma)
+        Builder.addComma();
+      NeedComma = true;
 
-        bool HasEllipsis = TupleElt.hasEllipsis();
-        Type EltT = TupleElt.getPattern()->getType();
-        if (HasEllipsis)
-          EltT = TupleTypeElt::getVarargBaseTy(EltT);
+      Type type = param.decl->getType();
+      if (param.isVariadic())
+        type = Parameter::getVarargBaseTy(type);
 
-        Builder.addCallParameter(TupleElt.getPattern()->getBoundName(),
-                                 EltT, HasEllipsis);
-      }
-      return;
+      Builder.addCallParameter(param.decl->getArgumentName(), type,
+                               param.isVariadic());
     }
-
-    Type PType = P->getType();
-    if (auto Parens = dyn_cast<ParenType>(PType.getPointer()))
-      PType = Parens->getUnderlyingType();
-    Builder.addCallParameter(P->getBoundName(), PType, /*IsVarArg*/false);
   }
 
   void addPatternFromTypeImpl(CodeCompletionResultBuilder &Builder, Type T,
@@ -1895,17 +1885,9 @@ public:
                                    const AbstractFunctionDecl *AFD,
                                    bool includeDefaultArgs = true) {
 
-    const TuplePattern *BodyTuple = nullptr;
-    if (AFD) {
-      auto BodyPatterns = AFD->getBodyParamPatterns();
-      // Skip over the implicit 'self'.
-      if (AFD->getImplicitSelfDecl()) {
-        BodyPatterns = BodyPatterns.slice(1);
-      }
-
-      if (!BodyPatterns.empty())
-        BodyTuple = dyn_cast<TuplePattern>(BodyPatterns.front());
-    }
+    const ParameterList *BodyParams = nullptr;
+    if (AFD)
+      BodyParams = AFD->getParameterList(AFD->getImplicitSelfDecl() ? 1 : 0);
 
     bool modifiedBuilder = false;
 
@@ -1942,11 +1924,10 @@ public:
 
         if (NeedComma)
           Builder.addComma();
-        if (BodyTuple) {
+        if (BodyParams) {
           // If we have a local name for the parameter, pass in that as well.
-          auto ParamPat = BodyTuple->getElement(i).getPattern();
-          Builder.addCallParameter(Name, ParamPat->getBodyName(), ParamType,
-                                   TupleElt.isVararg());
+          auto name = BodyParams->get(i).decl->getName();
+          Builder.addCallParameter(Name, name, ParamType, TupleElt.isVararg());
         } else {
           Builder.addCallParameter(Name, ParamType, TupleElt.isVararg());
         }
@@ -1962,9 +1943,9 @@ public:
       }
 
       modifiedBuilder = true;
-      if (BodyTuple) {
-        auto ParamPat = BodyTuple->getElement(0).getPattern();
-        Builder.addCallParameter(Identifier(), ParamPat->getBodyName(), T,
+      if (BodyParams) {
+        auto name = BodyParams->get(0).decl->getName();
+        Builder.addCallParameter(Identifier(), name, T,
                                  /*IsVarArg*/false);
       } else
         Builder.addCallParameter(Identifier(), T, /*IsVarArg*/false);
@@ -2123,7 +2104,7 @@ public:
       // Build type annotation.
       {
         llvm::raw_svector_ostream OS(TypeStr);
-        for (unsigned i = FirstIndex + 1, e = FD->getBodyParamPatterns().size();
+        for (unsigned i = FirstIndex + 1, e = FD->getParameterLists().size();
              i != e; ++i) {
           ResultType->castTo<AnyFunctionType>()->getInput()->print(OS);
           ResultType = ResultType->castTo<AnyFunctionType>()->getResult();
@@ -2255,7 +2236,7 @@ public:
     Builder.setAssociatedDecl(SD);
     setClangDeclKeywords(SD, Pairs, Builder);
     Builder.addLeftBracket();
-    addPatternParameters(Builder, SD->getIndices());
+    addParameters(Builder, SD->getIndices());
     Builder.addRightBracket();
 
     // Add a type annotation.

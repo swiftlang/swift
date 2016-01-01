@@ -154,7 +154,7 @@ bb0(%0 : $*T):
 // CHECK: function_ref @_TF14optimize_never10transform1urFxVs5Int32
 // CHECK: apply
 // CHECK-NOT: checked_cast_br
-// CHECK: class_method {{%.*}} : $C, #C.foo!1 : C -> () -> Int32 , $@convention(method) (@guaranteed C) -> Int32
+// CHECK: class_method {{%.*}} : $C, #C.foo!1 : (C) -> () -> Int32 , $@convention(method) (@guaranteed C) -> Int32
 // CHECK: apply
 // CHECK: return
 sil [_semantics "optimize.sil.never"] @_TF14optimize_never4foo1urFTxCS_1C_Vs5Int32 : $@convention(thin) <T> (@in T, @owned C) -> Int32 {
@@ -219,7 +219,7 @@ bb0(%0 : $Int32):
 // CHECK: function_ref @_TF14optimize_never10transform2FVs5Int32S0_
 // CHECK: apply
 // CHECK-NOT: checked_cast_br
-// CHECK: class_method {{%.*}} : $C, #C.foo!1 : C -> () -> Int32 , $@convention(method) (@guaranteed C) -> Int32
+// CHECK: class_method {{%.*}} : $C, #C.foo!1 : (C) -> () -> Int32 , $@convention(method) (@guaranteed C) -> Int32
 // CHECK: apply
 // CHECK: return
 sil [_semantics "optimize.sil.never"] @_TF14optimize_never4foo2FTVs5Int32CS_1C_S0_ : $@convention(thin) (Int32, @owned C) -> Int32 {

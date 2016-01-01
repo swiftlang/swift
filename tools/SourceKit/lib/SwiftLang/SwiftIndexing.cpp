@@ -725,15 +725,11 @@ static bool isTestCandidate(ValueDecl *D) {
     if (!NTD)
       return false;
     Type RetTy = FD->getResultType();
-    if (FD->getBodyParamPatterns().size() != 2)
+    if (FD->getParameterLists().size() != 2)
       return false;
-    TuplePattern *ArgP = dyn_cast<TuplePattern>(FD->getBodyParamPatterns()[1]);
-    if (!ArgP)
-      return false;
-    if (RetTy && RetTy->isVoid() &&
-        isa<ClassDecl>(NTD) &&
-        ArgP->getNumElements() == 0 &&
-        FD->getName().str().startswith("test"))
+    auto paramList = FD->getParameterList(1);
+    if (RetTy && RetTy->isVoid() && isa<ClassDecl>(NTD) &&
+        paramList->size() == 0 && FD->getName().str().startswith("test"))
       return true;
   }
 

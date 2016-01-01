@@ -68,20 +68,20 @@ func g_recover_missing_tuple_paren(b: Int) {
 
 //===--- Parse errors.
 
-func parseError1a(a: ) {} // expected-error {{type annotation missing in pattern}} expected-error {{expected parameter type following ':'}}
+func parseError1a(a: ) {} // expected-error {{expected parameter type following ':'}}
 
-func parseError1b(a: // expected-error {{type annotation missing in pattern}} expected-error {{expected parameter type following ':'}}
+func parseError1b(a: // expected-error {{expected parameter type following ':'}}
                   ) {}
 
-func parseError2(a: Int, b: ) {} // expected-error {{type annotation missing in pattern}} expected-error {{expected parameter type following ':'}}
+func parseError2(a: Int, b: ) {} // expected-error {{expected parameter type following ':'}}
 
-func parseError3(a: unknown_type, b: ) {} // expected-error {{use of undeclared type 'unknown_type'}} expected-error {{type annotation missing in pattern}} expected-error {{expected parameter type following ':'}}
+func parseError3(a: unknown_type, b: ) {} // expected-error {{use of undeclared type 'unknown_type'}}  expected-error {{expected parameter type following ':'}}
 
-func parseError4(a: , b: ) {} // expected-error 2{{type annotation missing in pattern}} expected-error 2{{expected parameter type following ':'}}
+func parseError4(a: , b: ) {} // expected-error 2{{expected parameter type following ':'}}
 
 func parseError5(a: b: ) {} // expected-error {{use of undeclared type 'b'}} expected-error 2{{expected ',' separator}} {{22-22=,}} {{22-22=,}} expected-error {{expected parameter type following ':'}}
 
-func parseError6(a: unknown_type, b: ) {} // expected-error {{use of undeclared type 'unknown_type'}} expected-error {{type annotation missing in pattern}} expected-error {{expected parameter type following ':'}}
+func parseError6(a: unknown_type, b: ) {} // expected-error {{use of undeclared type 'unknown_type'}}  expected-error {{expected parameter type following ':'}}
 
 func parseError7(a: Int, goo b: unknown_type) {} // expected-error {{use of undeclared type 'unknown_type'}}
 

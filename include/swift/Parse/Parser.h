@@ -83,7 +83,7 @@ public:
   DeclContext *CurDeclContext;
   ASTContext &Context;
   CodeCompletionCallbacks *CodeCompletion = nullptr;
-  std::vector<std::pair<SourceLoc, std::vector<VarDecl*>>> AnonClosureVars;
+  std::vector<std::pair<SourceLoc, std::vector<ParamDecl*>>> AnonClosureVars;
 
   bool IsParsingInterfaceTokens = false;
   
@@ -760,18 +760,18 @@ public:
     void record(Parser &P, AbstractStorageDecl *storage, bool invalid,
                 ParseDeclOptions flags, SourceLoc staticLoc,
                 const DeclAttributes &attrs,
-                TypeLoc elementTy, Pattern *indices,
+                TypeLoc elementTy, ParameterList *indices,
                 SmallVectorImpl<Decl *> &decls);
   };
 
   bool parseGetSetImpl(ParseDeclOptions Flags,
-                       Pattern *Indices, TypeLoc ElementTy,
+                       ParameterList *Indices, TypeLoc ElementTy,
                        ParsedAccessors &accessors,
                        SourceLoc &LastValidLoc,
                        SourceLoc StaticLoc, SourceLoc VarLBLoc,
                        SmallVectorImpl<Decl *> &Decls);
   bool parseGetSet(ParseDeclOptions Flags,
-                   Pattern *Indices, TypeLoc ElementTy,
+                   ParameterList *Indices, TypeLoc ElementTy,
                    ParsedAccessors &accessors,
                    SourceLoc StaticLoc, SmallVectorImpl<Decl *> &Decls);
   void recordAccessors(AbstractStorageDecl *storage, ParseDeclOptions flags,
@@ -803,6 +803,7 @@ public:
   parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes);
 
   void addPatternVariablesToScope(ArrayRef<Pattern *> Patterns);
+  void addParametersToScope(ParameterList *PL);
 
   ParserResult<OperatorDecl> parseDeclOperator(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
@@ -900,8 +901,8 @@ public:
     /// function.
     void setFunctionContext(DeclContext *DC);
     
-    DefaultArgumentInfo() {
-      NextIndex = 0;
+    DefaultArgumentInfo(bool inTypeContext) {
+      NextIndex = inTypeContext ? 1 : 0;
       HasDefaultArgument = false;
     }
   };
@@ -997,23 +998,23 @@ public:
                                     DefaultArgumentInfo *defaultArgs,
                                     ParameterContextKind paramContext);
 
-  ParserResult<Pattern> parseSingleParameterClause(
+  ParserResult<ParameterList> parseSingleParameterClause(
                           ParameterContextKind paramContext,
                           SmallVectorImpl<Identifier> *namePieces = nullptr);
 
   ParserStatus parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
-                                      SmallVectorImpl<Pattern*> &BodyPatterns,
+                                    SmallVectorImpl<ParameterList*> &BodyParams,
                                       ParameterContextKind paramContext,
                                       DefaultArgumentInfo &defaultArgs);
   ParserStatus parseFunctionSignature(Identifier functionName,
                                       DeclName &fullName,
-                                      SmallVectorImpl<Pattern *> &bodyPatterns,
+                              SmallVectorImpl<ParameterList *> &bodyParams,
                                       DefaultArgumentInfo &defaultArgs,
                                       SourceLoc &throws,
                                       bool &rethrows,
                                       TypeRepr *&retType);
   ParserStatus parseConstructorArguments(DeclName &FullName,
-                                         Pattern *&BodyPattern,
+                                         ParameterList *&BodyParams,
                                          DefaultArgumentInfo &defaultArgs);
 
   //===--------------------------------------------------------------------===//
@@ -1137,7 +1138,7 @@ public:
   /// \returns true if an error occurred, false otherwise.
   bool parseClosureSignatureIfPresent(
                                 SmallVectorImpl<CaptureListEntry> &captureList,
-                                      Pattern *&params,
+                                      ParameterList *&params,
                                       SourceLoc &throwsLoc,
                                       SourceLoc &arrowLoc,
                                       TypeRepr *&explicitResultType,

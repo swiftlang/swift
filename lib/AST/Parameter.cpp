@@ -23,7 +23,18 @@ using namespace swift;
 
 /// Return the full source range of this parameter.
 SourceRange Parameter::getSourceRange() const {
-  SourceRange range = decl->getSourceRange();
+  SourceRange range;
+  
+  SourceLoc APINameLoc = decl->getArgumentNameLoc();
+  SourceLoc nameLoc = decl->getNameLoc();
+  
+  if (APINameLoc.isValid() && nameLoc.isInvalid())
+    range = APINameLoc;
+  else if (APINameLoc.isInvalid() && nameLoc.isValid())
+    range = nameLoc;
+  else
+    range = SourceRange(APINameLoc, nameLoc);
+
   if (range.isInvalid()) return range;
   
   // It would be nice to extend the front of the range to show where inout is,
@@ -72,10 +83,10 @@ ParameterList::create(const ASTContext &C, SourceLoc LParenLoc,
   auto rawMem = C.Allocate(byteSize, alignof(ParameterList));
   
   //  Placement initialize the ParameterList and the Parameter's.
-  auto PL = ::new (rawMem) ParameterList(params.size());
+  auto PL = ::new (rawMem) ParameterList(LParenLoc, params.size(), RParenLoc);
 
   for (size_t i = 0, e = params.size(); i != e; ++i)
-    ::new (&PL->getParameter(i)) Parameter(params[i]);
+    ::new (&PL->get(i)) Parameter(params[i]);
   
   return PL;
 }
@@ -89,14 +100,14 @@ ParameterList::create(const ASTContext &C, SourceLoc LParenLoc,
 ///
 ParameterList *ParameterList::createSelf(SourceLoc loc, DeclContext *DC,
                                          bool isStaticMethod, bool isInOut) {
-  auto *param = ParamDecl::createSelf(loc, DC, isStaticMethod, isInOut);
-  return create(DC->getASTContext(), Parameter::withoutLoc(param));
+  auto *PD = ParamDecl::createSelf(loc, DC, isStaticMethod, isInOut);
+  return create(DC->getASTContext(), Parameter::withoutLoc(PD));
 }
 
 /// Change the DeclContext of any contained parameters to the specified
 /// DeclContext.
 void ParameterList::setDeclContextOfParamDecls(DeclContext *DC) {
-  for (auto &P : getParameters())
+  for (auto &P : *this)
     P.decl->setDeclContext(DC);
 }
 
@@ -107,11 +118,10 @@ void ParameterList::setDeclContextOfParamDecls(DeclContext *DC) {
 ParameterList *ParameterList::clone(const ASTContext &C,
                                     OptionSet<CloneFlags> options) const {
   // If this list is empty, don't actually bother with a copy.
-  if (getNumParameters() == 0)
+  if (size() == 0)
     return const_cast<ParameterList*>(this);
   
-  SmallVector<Parameter, 8> params(getParameters().begin(),
-                                   getParameters().end());
+  SmallVector<Parameter, 8> params(begin(), end());
 
   // Remap the ParamDecls inside of the ParameterList.
   for (auto &param : params) {
@@ -146,12 +156,12 @@ ParameterList *ParameterList::clone(const ASTContext &C,
 /// Return a TupleType or ParenType for this parameter list.  This returns a
 /// null type if one of the ParamDecls does not have a type set for it yet.
 Type ParameterList::getType(const ASTContext &C) const {
-  if (getNumParameters() == 0)
+  if (size() == 0)
     return TupleType::getEmpty(C);
   
   SmallVector<TupleTypeElt, 8> argumentInfo;
   
-  for (auto &P : getParameters()) {
+  for (auto &P : *this) {
     if (!P.decl->hasType()) return Type();
     
     argumentInfo.push_back({
@@ -187,9 +197,9 @@ SourceRange ParameterList::getSourceRange() const {
     return { LParenLoc, RParenLoc };
   
   // Otherwise, try the first and last parameter.
-  if (getNumParameters() != 0) {
-    auto Start = getParameter(0).getStartLoc();
-    auto End = getParameters().back().getEndLoc();
+  if (size() != 0) {
+    auto Start = get(0).getStartLoc();
+    auto End = getArray().back().getEndLoc();
     if (Start.isValid() && End.isValid())
       return { Start, End };
   }

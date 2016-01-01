@@ -27,6 +27,7 @@ namespace llvm {
 
 namespace swift {
   class ASTContext;
+  class ParameterList;
 
 /// DeclRefKind - The kind of reference to an identifier.
 enum class DeclRefKind {
@@ -239,6 +240,9 @@ class DeclName {
     : SimpleOrCompound(decltype(SimpleOrCompound)::getFromOpaqueValue(Opaque))
   {}
 
+  void initialize(ASTContext &C, Identifier baseName,
+                  ArrayRef<Identifier> argumentNames);
+  
 public:
   /// Build a null name.
   DeclName() : SimpleOrCompound(IdentifierAndCompound()) {}
@@ -249,7 +253,13 @@ public:
   
   /// Build a compound value name given a base name and a set of argument names.
   DeclName(ASTContext &C, Identifier baseName,
-           ArrayRef<Identifier> argumentNames);
+           ArrayRef<Identifier> argumentNames) {
+    initialize(C, baseName, argumentNames);
+  }
+
+  /// Build a compound value name given a base name and a set of argument names
+  /// extracted from a parameter list.
+  DeclName(ASTContext &C, Identifier baseName, ParameterList *paramList);
   
   /// Retrieve the 'base' name, i.e., the name that follows the introducer,
   /// such as the 'foo' in 'func foo(x:Int, y:Int)' or the 'bar' in

@@ -677,8 +677,8 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
     /// Return true if this is an implicit reference to self.
     static bool isImplicitSelfUse(Expr *E) {
       auto *DRE = dyn_cast<DeclRefExpr>(E);
-      return DRE && DRE->isImplicit() && DRE->getDecl()->hasName() &&
-             DRE->getDecl()->getName().str() == "self" &&
+      return DRE && DRE->isImplicit() && isa<VarDecl>(DRE->getDecl()) &&
+             cast<VarDecl>(DRE->getDecl())->isSelfParameter() &&
              // Metatype self captures don't extend the lifetime of an object.
              !DRE->getType()->is<MetatypeType>();
     }
@@ -1193,11 +1193,11 @@ class VarDeclUsageChecker : public ASTWalker {
 public:
   VarDeclUsageChecker(TypeChecker &TC, AbstractFunctionDecl *AFD) : TC(TC) {
     // Track the parameters of the function.
-    for (auto P : AFD->getBodyParamPatterns())
-      P->forEachVariable([&](VarDecl *VD) {
-        if (shouldTrackVarDecl(VD))
-          VarDecls[VD] = 0;
-      });
+    for (auto PL : AFD->getParameterLists())
+      for (auto &param : *PL)
+        if (shouldTrackVarDecl(param.decl))
+          VarDecls[param.decl] = 0;
+    
   }
     
   VarDeclUsageChecker(TypeChecker &TC, VarDecl *VD) : TC(TC) {
@@ -2076,18 +2076,9 @@ static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
 
   // Figure out the first parameter name.
   StringRef firstParamName;
-  unsigned skipBodyPatterns = afd->getImplicitSelfDecl() ? 1 : 0;
-  auto bodyPattern = afd->getBodyParamPatterns()[skipBodyPatterns];
-  if (auto tuplePattern = dyn_cast<TuplePattern>(bodyPattern)) {
-    if (tuplePattern->getNumElements() > 0) {
-      auto firstParam = tuplePattern->getElement(0).getPattern();
-      if (auto named = dyn_cast<NamedPattern>(
-                         firstParam->getSemanticsProvidingPattern())) {
-        if (!named->getBodyName().empty())
-          firstParamName = named->getBodyName().str();
-      }
-    }
-  }
+  auto params = afd->getParameterList(afd->getImplicitSelfDecl() ? 1 : 0);
+  if (params->size() != 0)
+    firstParamName = params->get(0).decl->getName().str();
 
   // Find the set of property names.
   const InheritedNameSet *allPropertyNames = nullptr;
@@ -2245,12 +2236,10 @@ namespace {
 
 /// Find the source ranges of extraneous default arguments within a
 /// call to the given function.
-static bool hasExtraneousDefaultArguments(
-              AbstractFunctionDecl *afd,
-              Expr *arg,
-              DeclName name,
-              SmallVectorImpl<SourceRange> &ranges,
-              SmallVectorImpl<unsigned> &removedArgs) {
+static bool hasExtraneousDefaultArguments(AbstractFunctionDecl *afd,
+                                          Expr *arg, DeclName name,
+                                          SmallVectorImpl<SourceRange> &ranges,
+                                      SmallVectorImpl<unsigned> &removedArgs) {
   if (!afd->getClangDecl())
     return false;
 
@@ -2262,133 +2251,125 @@ static bool hasExtraneousDefaultArguments(
     
   TupleExpr *argTuple = dyn_cast<TupleExpr>(arg);
   ParenExpr *argParen = dyn_cast<ParenExpr>(arg);
-
-  ArrayRef<Pattern *> bodyPatterns = afd->getBodyParamPatterns();
-
-  // Skip over the implicit 'self'.
-  if (afd->getImplicitSelfDecl()) {
-    bodyPatterns = bodyPatterns.slice(1);
-  }
-    
+  
   ASTContext &ctx = afd->getASTContext();
-  Pattern *bodyPattern = bodyPatterns[0];
-  if (auto *tuple = dyn_cast<TuplePattern>(bodyPattern)) {
-    Optional<unsigned> firstRemoved;
-    Optional<unsigned> lastRemoved;
-    unsigned numElementsInParens;
-    if (argTuple) {
-      numElementsInParens = (argTuple->getNumElements() -
-                             argTuple->hasTrailingClosure());
-    } else if (argParen) {
-      numElementsInParens = 1 - argParen->hasTrailingClosure();
-    } else {
-      numElementsInParens = 0;
-    }
+  // Skip over the implicit 'self'.
+  auto *bodyParams = afd->getParameterList(afd->getImplicitSelfDecl()?1:0);
 
-    for (unsigned i = 0; i != numElementsInParens; ++i) {
-      auto &elt = tuple->getElements()[i];
-      if (elt.getDefaultArgKind() == DefaultArgumentKind::None)
+  Optional<unsigned> firstRemoved;
+  Optional<unsigned> lastRemoved;
+  unsigned numElementsInParens;
+  if (argTuple) {
+    numElementsInParens = (argTuple->getNumElements() -
+                           argTuple->hasTrailingClosure());
+  } else if (argParen) {
+    numElementsInParens = 1 - argParen->hasTrailingClosure();
+  } else {
+    numElementsInParens = 0;
+  }
+
+  for (unsigned i = 0; i != numElementsInParens; ++i) {
+    auto &param = bodyParams->get(i);
+    if (param.defaultArgumentKind == DefaultArgumentKind::None)
+      continue;
+
+    auto defaultArg = param.decl->getType()->getInferredDefaultArgString();
+
+    // Never consider removing the first argument for a "set" method
+    // with an unnamed first argument.
+    if (i == 0 &&
+        !name.getBaseName().empty() &&
+        camel_case::getFirstWord(name.getBaseName().str()) == "set" &&
+        name.getArgumentNames().size() > 0 &&
+        name.getArgumentNames()[0].empty())
+      continue;
+
+    SourceRange removalRange;
+    if (argTuple && i < argTuple->getNumElements()) {
+      // Check whether we have a default argument.
+      auto exprArg = getDefaultArgForExpr(argTuple->getElement(i));
+      if (!exprArg || defaultArg != *exprArg)
         continue;
 
-      auto defaultArg
-        = elt.getPattern()->getType()->getInferredDefaultArgString();
-
-      // Never consider removing the first argument for a "set" method
-      // with an unnamed first argument.
-      if (i == 0 &&
-          !name.getBaseName().empty() &&
-          camel_case::getFirstWord(name.getBaseName().str()) == "set" &&
-          name.getArgumentNames().size() > 0 &&
-          name.getArgumentNames()[0].empty())
-        continue;
-
-      SourceRange removalRange;
-      if (argTuple && i < argTuple->getNumElements()) {
-        // Check whether we have a default argument.
-        auto exprArg = getDefaultArgForExpr(argTuple->getElement(i));
-        if (!exprArg || defaultArg != *exprArg)
-          continue;
-
-        // Figure out where to start removing this argument.
-        if (i == 0) {
-          // Start removing right after the opening parenthesis.
-          removalRange.Start = argTuple->getLParenLoc();
-        } else {
-          // Start removing right after the preceding argument, so we
-          // consume the comma as well.
-          removalRange.Start = argTuple->getElement(i-1)->getEndLoc();
-        }
-
-        // Adjust to the end of the starting token.
-        removalRange.Start
-          = Lexer::getLocForEndOfToken(ctx.SourceMgr, removalRange.Start);
-
-        // Figure out where to finish removing this element.
-        if (i == 0 && i < numElementsInParens - 1) {
-          // We're the first of several arguments; consume the
-          // following comma as well.
-          removalRange.End = argTuple->getElementNameLoc(i+1);
-          if (removalRange.End.isInvalid())
-            removalRange.End = argTuple->getElement(i+1)->getStartLoc();
-        } else if (i < numElementsInParens - 1) {
-          // We're in the middle; consume through the end of this
-          // element.
-          removalRange.End
-            = Lexer::getLocForEndOfToken(ctx.SourceMgr,
-                                         argTuple->getElement(i)->getEndLoc());
-        } else {
-          // We're at the end; consume up to the closing parentheses.
-          removalRange.End = argTuple->getRParenLoc();
-        }
-      } else if (argParen) {
-        // Check whether we have a default argument.
-        auto exprArg = getDefaultArgForExpr(argParen->getSubExpr());
-        if (!exprArg || defaultArg != *exprArg)
-          continue;
-
-        removalRange = SourceRange(argParen->getSubExpr()->getStartLoc(),
-                                   argParen->getRParenLoc());
+      // Figure out where to start removing this argument.
+      if (i == 0) {
+        // Start removing right after the opening parenthesis.
+        removalRange.Start = argTuple->getLParenLoc();
       } else {
-        continue;
+        // Start removing right after the preceding argument, so we
+        // consume the comma as well.
+        removalRange.Start = argTuple->getElement(i-1)->getEndLoc();
       }
 
-      if (removalRange.isInvalid())
-        continue;
+      // Adjust to the end of the starting token.
+      removalRange.Start
+        = Lexer::getLocForEndOfToken(ctx.SourceMgr, removalRange.Start);
 
-      // Note that we're removing this argument.
-      removedArgs.push_back(i);
-
-      // If we hadn't removed anything before, this is the first
-      // removal.
-      if (!firstRemoved) {
-        ranges.push_back(removalRange);
-        firstRemoved = i;
-        lastRemoved = i;
-        continue;
+      // Figure out where to finish removing this element.
+      if (i == 0 && i < numElementsInParens - 1) {
+        // We're the first of several arguments; consume the
+        // following comma as well.
+        removalRange.End = argTuple->getElementNameLoc(i+1);
+        if (removalRange.End.isInvalid())
+          removalRange.End = argTuple->getElement(i+1)->getStartLoc();
+      } else if (i < numElementsInParens - 1) {
+        // We're in the middle; consume through the end of this
+        // element.
+        removalRange.End
+          = Lexer::getLocForEndOfToken(ctx.SourceMgr,
+                                       argTuple->getElement(i)->getEndLoc());
+      } else {
+        // We're at the end; consume up to the closing parentheses.
+        removalRange.End = argTuple->getRParenLoc();
       }
-
-      // If the previous removal range was the previous argument,
-      // combine the ranges.
-      if (*lastRemoved == i - 1) {
-        ranges.back().End = removalRange.End;
-        lastRemoved = i;
+    } else if (argParen) {
+      // Check whether we have a default argument.
+      auto exprArg = getDefaultArgForExpr(argParen->getSubExpr());
+      if (!exprArg || defaultArg != *exprArg)
         continue;
-      }
 
-      // Otherwise, add this new removal range.
+      removalRange = SourceRange(argParen->getSubExpr()->getStartLoc(),
+                                 argParen->getRParenLoc());
+    } else {
+      continue;
+    }
+
+    if (removalRange.isInvalid())
+      continue;
+
+    // Note that we're removing this argument.
+    removedArgs.push_back(i);
+
+    // If we hadn't removed anything before, this is the first
+    // removal.
+    if (!firstRemoved) {
       ranges.push_back(removalRange);
+      firstRemoved = i;
       lastRemoved = i;
+      continue;
     }
 
-    // If there is a single removal range that covers everything but
-    // the trailing closure at the end, also zap the parentheses.
-    if (ranges.size() == 1 &&
-        *firstRemoved == 0 && *lastRemoved == tuple->getNumElements() - 2 &&
-        argTuple && argTuple->hasTrailingClosure()) {
-      ranges.front().Start = argTuple->getLParenLoc();
-      ranges.front().End
-        = Lexer::getLocForEndOfToken(ctx.SourceMgr, argTuple->getRParenLoc());
+    // If the previous removal range was the previous argument,
+    // combine the ranges.
+    if (*lastRemoved == i - 1) {
+      ranges.back().End = removalRange.End;
+      lastRemoved = i;
+      continue;
     }
+
+    // Otherwise, add this new removal range.
+    ranges.push_back(removalRange);
+    lastRemoved = i;
+  }
+
+  // If there is a single removal range that covers everything but
+  // the trailing closure at the end, also zap the parentheses.
+  if (ranges.size() == 1 &&
+      *firstRemoved == 0 && *lastRemoved == bodyParams->size() - 2 &&
+      argTuple && argTuple->hasTrailingClosure()) {
+    ranges.front().Start = argTuple->getLParenLoc();
+    ranges.front().End
+      = Lexer::getLocForEndOfToken(ctx.SourceMgr, argTuple->getRParenLoc());
   }
 
   return !ranges.empty();

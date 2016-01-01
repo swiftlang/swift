@@ -1911,12 +1911,10 @@ class FormatWalker: public ide::SourceEntityWalker {
         }
 
         // Function parameters are siblings.
-        for (auto P : AFD->getBodyParamPatterns()) {
-          if (auto TU = dyn_cast<TuplePattern>(P)) {
-            for (unsigned I = 0, N = TU->getNumElements(); I < N; I ++) {
-              addPair(TU->getElement(I).getPattern()->getEndLoc(),
-                      FindAlignLoc(TU->getElement(I).getLabelLoc()), tok::comma);
-            }
+        for (auto P : AFD->getParameterLists()) {
+          for (auto &param : *P) {
+            addPair(param.getEndLoc(),
+                    FindAlignLoc(param.getStartLoc()), tok::comma);
           }
         }
       }

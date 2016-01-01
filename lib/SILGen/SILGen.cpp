@@ -406,10 +406,10 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
 void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   // Emit any default argument generators.
   {
-    auto patterns = AFD->getBodyParamPatterns();
+    auto paramLists = AFD->getParameterLists();
     if (AFD->getDeclContext()->isTypeContext())
-      patterns = patterns.slice(1);
-    emitDefaultArgGenerators(AFD, patterns);
+      paramLists = paramLists.slice(1);
+    emitDefaultArgGenerators(AFD, paramLists);
   }
 
   // If this is a function at global scope, it may close over a global variable.
@@ -769,21 +769,13 @@ void SILGenModule::emitGlobalGetter(VarDecl *global,
 }
 
 void SILGenModule::emitDefaultArgGenerators(SILDeclRef::Loc decl,
-                                            ArrayRef<Pattern*> patterns) {
+                                        ArrayRef<ParameterList*> paramLists) {
   unsigned index = 0;
-  for (auto pattern : patterns) {
-    pattern = pattern->getSemanticsProvidingPattern();
-    auto tuplePattern = dyn_cast<TuplePattern>(pattern);
-    if (!tuplePattern) {
-      ++index;
-      continue;
-    }
-
-    for (auto &elt : tuplePattern->getElements()) {
-      if (auto handle = elt.getInit()) {
-        emitDefaultArgGenerator(SILDeclRef::getDefaultArgGenerator(decl,index),
+  for (auto paramList : paramLists) {
+    for (auto &param : *paramList) {
+      if (auto handle = param.getDefaultValue())
+        emitDefaultArgGenerator(SILDeclRef::getDefaultArgGenerator(decl, index),
                                 handle->getExpr());
-      }
       ++index;
     }
   }

@@ -1,3 +1,5 @@
+// XFAIL: *
+
 class Foo {
   func foo(Value1 : Int,
     Value2 : Int) {

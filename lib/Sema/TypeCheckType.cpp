@@ -1342,7 +1342,13 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
     resolver = &defaultResolver;
 
   TypeResolver typeResolver(*this, DC, resolver, unsatisfiedDependency);
-  return typeResolver.resolveType(TyR, options);
+  auto result = typeResolver.resolveType(TyR, options);
+  
+  // If we resolved down to an error, make sure to mark the typeRepr as invalid
+  // so we don't produce a redundant diagnostic.
+  if (result && result->is<ErrorType>())
+    TyR->setInvalid();
+  return result;
 }
 
 Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
@@ -2081,6 +2087,7 @@ Type TypeResolver::resolveInOutType(InOutTypeRepr *repr,
   if (!(options & TR_FunctionInput) &&
       !(options & TR_ImmediateFunctionInput)) {
     TC.diagnose(repr->getInOutLoc(), diag::inout_only_parameter);
+    repr->setInvalid();
     return ErrorType::get(Context);
   }
   
@@ -2095,8 +2102,6 @@ Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
   if (!baseTy || baseTy->is<ErrorType>()) return baseTy;
   
   if (ExprHandle *sizeEx = repr->getSize()) {
-    // FIXME: We don't support fixed-length arrays yet.
-    // FIXME: We need to check Size! (It also has to be convertible to int).
     TC.diagnose(repr->getBrackets().Start, diag::unsupported_fixed_length_array)
       .highlight(sizeEx->getExpr()->getSourceRange());
     return ErrorType::get(Context);
@@ -2409,37 +2414,9 @@ static void describeObjCReason(TypeChecker &TC, const ValueDecl *VD,
   }
 }
 
-static Type getFunctionParamType(const Pattern *P) {
-  if (auto *TP = dyn_cast<TypedPattern>(P))
-    return TP->getType();
-  return {};
-}
-
-static SourceRange getFunctionParamTypeSourceRange(const Pattern *P) {
-  if (auto *TP = dyn_cast<TypedPattern>(P))
-    return TP->getTypeLoc().getTypeRepr()->getSourceRange();
-  return {};
-}
-
-static bool isParamRepresentableInObjC(TypeChecker &TC,
-                                       const DeclContext *DC,
-                                       const Pattern *P) {
-  // Look through 'var' pattern.
-  if (auto VP = dyn_cast<VarPattern>(P))
-    P = VP->getSubPattern();
-
-  auto *TP = dyn_cast<TypedPattern>(P);
-  if (!TP)
-    return false;
-  if (!TC.isRepresentableInObjC(DC, TP->getType()))
-    return false;
-  auto *SubPattern = TP->getSubPattern();
-  return isa<NamedPattern>(SubPattern) || isa<AnyPattern>(SubPattern);
-}
-
 static void diagnoseFunctionParamNotRepresentable(
     TypeChecker &TC, const AbstractFunctionDecl *AFD, unsigned NumParams,
-    unsigned ParamIndex, const Pattern *P, ObjCReason Reason) {
+    unsigned ParamIndex, const Parameter &P, ObjCReason Reason) {
   if (Reason == ObjCReason::DoNotDiagnose)
     return;
 
@@ -2450,77 +2427,69 @@ static void diagnoseFunctionParamNotRepresentable(
     TC.diagnose(AFD->getLoc(), diag::objc_invalid_on_func_param_type,
                 ParamIndex + 1, getObjCDiagnosticAttrKind(Reason));
   }
-  if (Type ParamTy = getFunctionParamType(P)) {
-    SourceRange SR = getFunctionParamTypeSourceRange(P);
+  if (P.decl->hasType()) {
+    Type ParamTy = P.decl->getType();
+    SourceRange SR;
+    if (auto typeRepr = P.type.getTypeRepr())
+      SR = typeRepr->getSourceRange();
     TC.diagnoseTypeNotRepresentableInObjC(AFD, ParamTy, SR);
   }
   describeObjCReason(TC, AFD, Reason);
 }
 
-static bool isParamPatternRepresentableInObjC(TypeChecker &TC,
-                                              const AbstractFunctionDecl *AFD,
-                                              const Pattern *P,
-                                              ObjCReason Reason) {
+static bool isParamListRepresentableInObjC(TypeChecker &TC,
+                                           const AbstractFunctionDecl *AFD,
+                                           const ParameterList *PL,
+                                           ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsObjC.
 
   bool Diagnose = (Reason != ObjCReason::DoNotDiagnose);
-  if (auto *TP = dyn_cast<TuplePattern>(P)) {
-    auto Fields = TP->getElements();
-    unsigned NumParams = Fields.size();
 
-    // Varargs are not representable in Objective-C.
-    if (TP->hasAnyEllipsis()) {
+  bool IsObjC = true;
+  unsigned NumParams = PL->size();
+  for (unsigned ParamIndex = 0; ParamIndex != NumParams; ParamIndex++) {
+    auto &param = PL->get(ParamIndex);
+    
+    // Swift Varargs are not representable in Objective-C.
+    if (param.isVariadic()) {
       if (Diagnose && Reason != ObjCReason::DoNotDiagnose) {
-        TC.diagnose(TP->getAnyEllipsisLoc(),
+        TC.diagnose(param.getStartLoc(),
                     diag::objc_invalid_on_func_variadic,
-                    getObjCDiagnosticAttrKind(Reason));
+                    getObjCDiagnosticAttrKind(Reason))
+          .highlight(param.getSourceRange());
         describeObjCReason(TC, AFD, Reason);
       }
-
+      
       return false;
     }
-
-    if (NumParams == 0)
-      return true;
-
-    bool IsObjC = true;
-    for (unsigned ParamIndex = 0; ParamIndex != NumParams; ParamIndex++) {
-      auto &TupleElt = Fields[ParamIndex];
-      if (!isParamRepresentableInObjC(TC, AFD, TupleElt.getPattern())) {
-        // Permit '()' when this method overrides a method with a
-        // foreign error convention that replaces NSErrorPointer with ()
-        // and this is the replaced parameter.
-        AbstractFunctionDecl *overridden;
-        if (TupleElt.getPattern()->getType()->isVoid() &&
-            AFD->isBodyThrowing() &&
-            (overridden = AFD->getOverriddenDecl())) {
-          auto foreignError = overridden->getForeignErrorConvention();
-          if (foreignError &&
-              foreignError->isErrorParameterReplacedWithVoid() &&
-              foreignError->getErrorParameterIndex() == ParamIndex) {
-            continue;
-          }
-        }
-
-        IsObjC = false;
-        if (!Diagnose) {
-          // Save some work and return as soon as possible if we are not
-          // producing diagnostics.
-          return IsObjC;
-        }
-        diagnoseFunctionParamNotRepresentable(TC, AFD, NumParams, ParamIndex,
-                                              TupleElt.getPattern(), Reason);
+    
+    if (TC.isRepresentableInObjC(AFD, param.decl->getType()))
+      continue;
+    
+    // Permit '()' when this method overrides a method with a
+    // foreign error convention that replaces NSErrorPointer with ()
+    // and this is the replaced parameter.
+    AbstractFunctionDecl *overridden;
+    if (param.decl->getType()->isVoid() && AFD->isBodyThrowing() &&
+        (overridden = AFD->getOverriddenDecl())) {
+      auto foreignError = overridden->getForeignErrorConvention();
+      if (foreignError &&
+          foreignError->isErrorParameterReplacedWithVoid() &&
+          foreignError->getErrorParameterIndex() == ParamIndex) {
+        continue;
       }
     }
-    return IsObjC;
+
+    IsObjC = false;
+    if (!Diagnose) {
+      // Save some work and return as soon as possible if we are not
+      // producing diagnostics.
+      return IsObjC;
+    }
+    diagnoseFunctionParamNotRepresentable(TC, AFD, NumParams, ParamIndex,
+                                          param, Reason);
   }
-  auto *PP = cast<ParenPattern>(P);
-  if (!isParamRepresentableInObjC(TC, AFD, PP->getSubPattern())) {
-    diagnoseFunctionParamNotRepresentable(TC, AFD, 1, 1, PP->getSubPattern(),
-                                          Reason);
-    return false;
-  }
-  return true;
+  return IsObjC;
 }
 
 /// Check whether the given declaration occurs within a constrained
@@ -2643,19 +2612,6 @@ static bool isBridgedToObjectiveCClass(DeclContext *dc, Type type) {
   return classDecl->getName().str() != "NSNumber";
 }
 
-/// Determine whether this is a trailing closure type.
-static AnyFunctionType *isTrailingClosure(Type type) {
-  // Only consider the rvalue type.
-  type = type->getRValueType();
-
-  // Look through one level of optionality.
-  if (auto objectType = type->getAnyOptionalObjectType())
-    type = objectType;
-
-  // Is it a function type?
-  return type->getAs<AnyFunctionType>();
-}
-
 bool TypeChecker::isRepresentableInObjC(
        const AbstractFunctionDecl *AFD,
        ObjCReason Reason,
@@ -2698,7 +2654,7 @@ bool TypeChecker::isRepresentableInObjC(
       unsigned ExpectedParamPatterns = 1;
       if (FD->getImplicitSelfDecl())
         ExpectedParamPatterns++;
-      if (FD->getBodyParamPatterns().size() != ExpectedParamPatterns) {
+      if (FD->getParameterLists().size() != ExpectedParamPatterns) {
         if (Diagnose) {
           diagnose(AFD->getLoc(), diag::objc_invalid_on_func_curried,
                    getObjCDiagnosticAttrKind(Reason));
@@ -2734,9 +2690,8 @@ bool TypeChecker::isRepresentableInObjC(
     isSpecialInit = init->isObjCZeroParameterWithLongSelector();
 
   if (!isSpecialInit &&
-      !isParamPatternRepresentableInObjC(*this, AFD,
-                                         AFD->getBodyParamPatterns()[1],
-                                         Reason)) {
+      !isParamListRepresentableInObjC(*this, AFD, AFD->getParameterList(1),
+                                      Reason)) {
     if (!Diagnose) {
       // Return as soon as possible if we are not producing diagnostics.
       return false;
@@ -2871,18 +2826,24 @@ bool TypeChecker::isRepresentableInObjC(
     // If the selector did not provide an index for the error, find
     // the last parameter that is not a trailing closure.
     if (!foundErrorParameterIndex) {
-      const Pattern *paramPattern = AFD->getBodyParamPatterns()[1];
-      if (auto *tuple = dyn_cast<TuplePattern>(paramPattern)) {
-        errorParameterIndex = tuple->getNumElements();
-        while (errorParameterIndex > 0 &&
-               isTrailingClosure(
-                 tuple->getElement(errorParameterIndex - 1).getPattern()
-                   ->getType()))
-          --errorParameterIndex;
-      } else {
-        auto paren = cast<ParenPattern>(paramPattern);
-        errorParameterIndex
-          = isTrailingClosure(paren->getSubPattern()->getType()) ? 0 : 1;
+      auto *paramList = AFD->getParameterList(1);
+      errorParameterIndex = paramList->size();
+      while (errorParameterIndex > 0) {
+        // Skip over trailing closures.
+        auto type =
+          paramList->get(errorParameterIndex - 1).decl->getType();
+
+        // It can't be a trailing closure unless it has a specific form.
+        // Only consider the rvalue type.
+        type = type->getRValueType();
+        
+        // Look through one level of optionality.
+        if (auto objectType = type->getAnyOptionalObjectType())
+          type = objectType;
+        
+        // Is it a function type?
+        if (!type->is<AnyFunctionType>()) break;
+        --errorParameterIndex;
       }
     }
 

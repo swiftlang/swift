@@ -49,12 +49,16 @@ struct Parameter {
   /// This is the type specified, including location information.
   TypeLoc type;
   
-  // TODO: ExprHandle can probably go away now, we should be able to just have
-  // an Expr* here, along with a "is checked" bit.
-
   /// The default value, if any, along with whether this is varargs.
   llvm::PointerIntPair<ExprHandle *, 1, bool> defaultValueAndIsVariadic;
 
+  /// True if the type is implicitly specified in the source, but this has an
+  /// apparently valid typeRepr.  This is used in accessors, which look like:
+  ///    set (value) {
+  /// but need to get the typeRepr from the property as a whole so Sema can
+  /// resolve the type.
+  bool isTypeImplicit = false;
+  
   void setDefaultValue(ExprHandle *H) {
     defaultValueAndIsVariadic.setPointer(H);
   }
@@ -111,7 +115,8 @@ class alignas(alignof(Parameter)) ParameterList {
   SourceLoc LParenLoc, RParenLoc;
   size_t numParameters;
 
-  ParameterList(size_t numParameters) : numParameters(numParameters) {}
+  ParameterList(SourceLoc LParenLoc, size_t numParameters, SourceLoc RParenLoc)
+    : LParenLoc(LParenLoc), RParenLoc(RParenLoc), numParameters(numParameters){}
   void operator=(const ParameterList&) = delete;
 public:
   /// Create a parameter list with the specified parameters.
@@ -152,26 +157,36 @@ public:
   SourceLoc getLParenLoc() const { return LParenLoc; }
   SourceLoc getRParenLoc() const { return RParenLoc; }
   
-  size_t getNumParameters() const {
-    return numParameters;
-  }
+  typedef MutableArrayRef<Parameter>::iterator iterator;
+  typedef ArrayRef<Parameter>::iterator const_iterator;
+  iterator begin() { return getArray().begin(); }
+  iterator end() { return getArray().end(); }
+  const_iterator begin() const { return getArray().begin(); }
+  const_iterator end() const { return getArray().end(); }
   
-  MutableArrayRef<Parameter> getParameters() {
+  MutableArrayRef<Parameter> getArray() {
     auto Ptr = reinterpret_cast<Parameter*>(this + 1);
     return { Ptr, numParameters };
   }
-  ArrayRef<Parameter> getParameters() const {
+  ArrayRef<Parameter> getArray() const {
     auto Ptr = reinterpret_cast<const Parameter*>(this + 1);
     return { Ptr, numParameters };
   }
+
+  size_t size() const {
+    return numParameters;
+  }
   
-  const Parameter &getParameter(unsigned i) const {
-    return getParameters()[i];
+  const Parameter &get(unsigned i) const {
+    return getArray()[i];
+  }
+  
+  Parameter &get(unsigned i) {
+    return getArray()[i];
   }
 
-  Parameter &getParameter(unsigned i) {
-    return getParameters()[i];
-  }
+  const Parameter &operator[](unsigned i) const { return get(i); }
+  Parameter &operator[](unsigned i) { return get(i); }
   
   /// Change the DeclContext of any contained parameters to the specified
   /// DeclContext.

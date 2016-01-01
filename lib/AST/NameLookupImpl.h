@@ -15,6 +15,7 @@
 
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/Parameter.h"
 
 namespace swift {
 namespace namelookup {
@@ -89,14 +90,20 @@ public:
       return;
     }
   }
+  
+  void checkParameterList(const ParameterList *params) {
+    for (auto &param : *params) {
+      checkValueDecl(param.decl,
+                     DeclVisibilityKind::FunctionParameter);
+    }
+  }
 
-  void checkGenericParams(GenericParamList *Params,
-                          DeclVisibilityKind Reason) {
+  void checkGenericParams(GenericParamList *Params) {
     if (!Params)
       return;
 
     for (auto P : *Params)
-      checkValueDecl(P, Reason);
+      checkValueDecl(P, DeclVisibilityKind::GenericParameter);
   }
 
   void checkSourceFile(const SourceFile &SF) {

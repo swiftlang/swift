@@ -1109,75 +1109,51 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
 }
 
 /// Check the default arguments that occur within this pattern.
-static void checkDefaultArguments(TypeChecker &tc, Pattern *pattern,
-                                  unsigned &nextArgIndex,
-                                  DeclContext *dc) {
+static void checkDefaultArguments(TypeChecker &tc, ParameterList *params,
+                                  unsigned &nextArgIndex, DeclContext *dc) {
   assert(dc->isLocalContext());
 
-  switch (pattern->getKind()) {
-  case PatternKind::Tuple:
-    for (auto &field : cast<TuplePattern>(pattern)->getElements()) {
-      unsigned curArgIndex = nextArgIndex++;
-      if (field.getInit() &&
-          field.getPattern()->hasType() &&
-          !field.getPattern()->getType()->is<ErrorType>()) {
+  for (auto &param : *params) {
+    unsigned curArgIndex = nextArgIndex++;
+    if (!param.getDefaultValue() || !param.decl->hasType() ||
+        param.decl->getType()->is<ErrorType>())
+      continue;
+    
+    auto defaultValueHandle = param.getDefaultValue();
+    Expr *e = defaultValueHandle->getExpr();
 
-        Expr *e = field.getInit()->getExpr();
+    // Re-use an existing initializer context if possible.
+    auto existingContext = e->findExistingInitializerContext();
+    DefaultArgumentInitializer *initContext;
+    if (existingContext) {
+      initContext = cast<DefaultArgumentInitializer>(existingContext);
+      assert(initContext->getIndex() == curArgIndex);
+      assert(initContext->getParent() == dc);
 
-        // Re-use an existing initializer context if possible.
-        auto existingContext = e->findExistingInitializerContext();
-        DefaultArgumentInitializer *initContext;
-        if (existingContext) {
-          initContext = cast<DefaultArgumentInitializer>(existingContext);
-          assert(initContext->getIndex() == curArgIndex);
-          assert(initContext->getParent() == dc);
-
-        // Otherwise, allocate one temporarily.
-        } else {
-          initContext =
-            tc.Context.createDefaultArgumentContext(dc, curArgIndex);
-        }
-
-        // Type-check the initializer, then flag that we did so.
-        if (tc.typeCheckExpression(e, initContext,field.getPattern()->getType(),
-                                   CTP_DefaultParameter))
-          field.getInit()->setExpr(field.getInit()->getExpr(), true);
-        else
-          field.getInit()->setExpr(e, true);
-
-        tc.checkInitializerErrorHandling(initContext, e);
-
-        // Walk the checked initializer and contextualize any closures
-        // we saw there.
-        bool hasClosures = tc.contextualizeInitializer(initContext, e);
-
-        // If we created a new context and didn't run into any autoclosures
-        // during the walk, give the context back to the ASTContext.
-        if (!hasClosures && !existingContext)
-          tc.Context.destroyDefaultArgumentContext(initContext);
-      }
+    // Otherwise, allocate one temporarily.
+    } else {
+      initContext =
+        tc.Context.createDefaultArgumentContext(dc, curArgIndex);
     }
-    return;
-  case PatternKind::Paren:
-    return checkDefaultArguments(tc,
-                                 cast<ParenPattern>(pattern)->getSubPattern(),
-                                 nextArgIndex,
-                                 dc);
-  case PatternKind::Var:
-    return checkDefaultArguments(tc, cast<VarPattern>(pattern)->getSubPattern(),
-                                 nextArgIndex,
-                                 dc);
-  case PatternKind::Typed:
-  case PatternKind::Named:
-  case PatternKind::Any:
-    return;
 
-#define PATTERN(Id, Parent)
-#define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
-#include "swift/AST/PatternNodes.def"
-    llvm_unreachable("pattern can't appear in argument list!");
+    // Type-check the initializer, then flag that we did so.
+    if (tc.typeCheckExpression(e, initContext, param.decl->getType(),
+                               CTP_DefaultParameter))
+      defaultValueHandle->setExpr(defaultValueHandle->getExpr(), true);
+    else
+      defaultValueHandle->setExpr(e, true);
+
+    tc.checkInitializerErrorHandling(initContext, e);
+
+    // Walk the checked initializer and contextualize any closures
+    // we saw there.
+    bool hasClosures = tc.contextualizeInitializer(initContext, e);
+
+    // If we created a new context and didn't run into any autoclosures
+    // during the walk, give the context back to the ASTContext.
+    if (!hasClosures && !existingContext)
+      tc.Context.destroyDefaultArgumentContext(initContext);
   }
-  llvm_unreachable("bad pattern kind!");
 }
 
 bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
@@ -1213,9 +1189,8 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
                                              SourceLoc EndTypeCheckLoc) {
   // Check the default argument definitions.
   unsigned nextArgIndex = 0;
-  for (auto pattern : FD->getBodyParamPatterns()) {
-    checkDefaultArguments(*this, pattern, nextArgIndex, FD);
-  }
+  for (auto paramList : FD->getParameterLists())
+    checkDefaultArguments(*this, paramList, nextArgIndex, FD);
 
   // Clang imported inline functions do not have a Swift body to
   // typecheck.
@@ -1314,8 +1289,8 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
                                                 SourceLoc EndTypeCheckLoc) {
   // Check the default argument definitions.
   unsigned nextArgIndex = 0;
-  for (auto pattern : ctor->getBodyParamPatterns())
-    checkDefaultArguments(*this, pattern, nextArgIndex, ctor);
+  for (auto paramList : ctor->getParameterLists())
+    checkDefaultArguments(*this, paramList, nextArgIndex, ctor);
 
   BraceStmt *body = ctor->getBody();
   if (!body)

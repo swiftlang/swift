@@ -421,8 +421,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           localVal.visit(AFD->getBody());
           if (!Results.empty())
             return;
-          for (Pattern *P : AFD->getBodyParamPatterns())
-            localVal.checkPattern(P, DeclVisibilityKind::FunctionParameter);
+          for (auto *PL : AFD->getParameterLists())
+            localVal.checkParameterList(PL);
           if (!Results.empty())
             return;
         }
@@ -468,8 +468,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             localVal.visit(CE->getBody());
             if (!Results.empty())
               return;
-            localVal.checkPattern(CE->getParams(),
-                                  DeclVisibilityKind::FunctionParameter);
+            localVal.checkParameterList(CE->getParameters());
             if (!Results.empty())
               return;
           }
@@ -508,8 +507,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
       // Check the generic parameters for something with the given name.
       if (GenericParams) {
         namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-        localVal.checkGenericParams(GenericParams,
-                                    DeclVisibilityKind::GenericParameter);
+        localVal.checkGenericParams(GenericParams);
 
         if (!Results.empty())
           return;
@@ -579,8 +577,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
         if (dcGenericParams) {
           namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-          localVal.checkGenericParams(dcGenericParams,
-                                      DeclVisibilityKind::GenericParameter);
+          localVal.checkGenericParams(dcGenericParams);
 
           if (!Results.empty())
             return;

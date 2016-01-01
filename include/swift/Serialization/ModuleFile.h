@@ -408,6 +408,8 @@ private:
   /// If the record at the cursor is not a pattern, returns null.
   Pattern *maybeReadPattern();
 
+  ParameterList *readParameterList();
+  
   GenericParamList *maybeGetOrReadGenericParams(serialization::DeclID contextID,
                                                 DeclContext *DC,
                                                 llvm::BitstreamCursor &Cursor);

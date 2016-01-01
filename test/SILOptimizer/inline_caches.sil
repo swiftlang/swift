@@ -60,7 +60,7 @@ bb0(%0 : $@thick C.Type):
   // CHECK: apply [[REF]]
   // CHECK: br bb1
   // CHECK: bb3
-  // CHECK: [[METHOD:%.*]] = class_method %0 : $@thick C.Type, #C.foo!1 : C.Type -> () -> () , $@convention(thin) (@thick C.Type) -> ()
+  // CHECK: [[METHOD:%.*]] = class_method %0 : $@thick C.Type, #C.foo!1 : (C.Type) -> () -> () , $@convention(thin) (@thick C.Type) -> ()
   // CHECK: apply [[METHOD]]
   %2 = class_method %0 : $@thick C.Type, #C.foo!1 : C.Type -> () -> () , $@convention(thin) (@thick C.Type) -> ()
   %3 = apply %2(%0) : $@convention(thin) (@thick C.Type) -> ()

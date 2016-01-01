@@ -274,7 +274,7 @@ private:
   }
 
   void printSingleMethodParam(StringRef selectorPiece,
-                              const Pattern *param,
+                              const Parameter &param,
                               const clang::ParmVarDecl *clangParam,
                               bool isNSUIntegerSubscript,
                               bool isLastPiece) {
@@ -283,14 +283,14 @@ private:
         (clangParam && isNSUInteger(clangParam->getType()))) {
       os << "NSUInteger";
     } else {
-      this->print(param->getType(), OTK_None);
+      print(param.decl->getType(), OTK_None);
     }
     os << ")";
 
-    if (isa<AnyPattern>(param)) {
+    if (!param.decl->hasName()) {
       os << "_";
     } else {
-      Identifier name = cast<NamedPattern>(param)->getBodyName();
+      Identifier name = param.decl->getName();
       os << name;
       if (isClangKeyword(name))
         os << "_";
@@ -394,17 +394,14 @@ private:
 
     os << ")";
 
-    auto bodyPatterns = AFD->getBodyParamPatterns();
-    assert(bodyPatterns.size() == 2 && "not an ObjC-compatible method");
+    auto paramLists = AFD->getParameterLists();
+    assert(paramLists.size() == 2 && "not an ObjC-compatible method");
 
     llvm::SmallString<128> selectorBuf;
     ArrayRef<Identifier> selectorPieces
       = AFD->getObjCSelector().getSelectorPieces();
-    const TuplePattern *paramTuple
-      = dyn_cast<TuplePattern>(bodyPatterns.back());
-    const ParenPattern *paramParen
-      = dyn_cast<ParenPattern>(bodyPatterns.back());
-    assert((paramTuple || paramParen) && "Bad body parameters?");
+    
+    const auto &params = paramLists[1]->getArray();
     unsigned paramIndex = 0;
     for (unsigned i = 0, n = selectorPieces.size(); i != n; ++i) {
       if (i > 0) os << ' ';
@@ -429,37 +426,21 @@ private:
         continue;
       }
 
-      // Single-parameter methods.
-      if (paramParen) {
-        assert(paramIndex == 0);
-        auto clangParam = clangMethod ? clangMethod->parameters()[0] : nullptr;
-        printSingleMethodParam(piece,
-                               paramParen->getSemanticsProvidingPattern(),
-                               clangParam,
-                               isNSUIntegerSubscript,
-                               i == n-1);
-        paramIndex = 1;
-        continue;
-      }
-
       // Zero-parameter methods.
-      if (paramTuple->getNumElements() == 0) {
+      if (params.size() == 0) {
         assert(paramIndex == 0);
         os << piece;
         paramIndex = 1;
         continue;
       }
 
-      // Multi-parameter methods.
       const clang::ParmVarDecl *clangParam = nullptr;
       if (clangMethod)
         clangParam = clangMethod->parameters()[paramIndex];
 
-      const TuplePatternElt &param = paramTuple->getElements()[paramIndex];
-      auto pattern = param.getPattern()->getSemanticsProvidingPattern();
-      printSingleMethodParam(piece, pattern, clangParam,
-                             isNSUIntegerSubscript,
-                             i == n-1);
+      // Single-parameter methods.
+      printSingleMethodParam(piece, params[paramIndex], clangParam,
+                             isNSUIntegerSubscript, i == n-1);
       ++paramIndex;
     }
 

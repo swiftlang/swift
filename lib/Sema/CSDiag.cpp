@@ -335,11 +335,11 @@ static Expr *simplifyLocatorToAnchor(ConstraintSystem &cs,
 
 /// Retrieve the argument pattern for the given declaration.
 ///
-static Pattern *getParameterPattern(ValueDecl *decl) {
+static ParameterList *getParameterList(ValueDecl *decl) {
   if (auto func = dyn_cast<FuncDecl>(decl))
-    return func->getBodyParamPatterns()[0];
+    return func->getParameterList(0);
   if (auto constructor = dyn_cast<ConstructorDecl>(decl))
-    return constructor->getBodyParamPatterns()[1];
+    return constructor->getParameterList(1);
   if (auto subscript = dyn_cast<SubscriptDecl>(decl))
     return subscript->getIndices();
 
@@ -441,79 +441,37 @@ ResolvedLocator constraints::resolveLocatorToDecl(
   // FIXME: This is an egregious hack. We'd be far better off
   // FIXME: Perform deeper path resolution?
   auto path = locator->getPath();
-  Pattern *parameterPattern = nullptr;
+  ParameterList *parameterList = nullptr;
   bool impliesFullPattern = false;
   while (!path.empty()) {
     switch (path[0].getKind()) {
     case ConstraintLocator::ApplyArgument:
       // If we're calling into something that has parameters, dig into the
       // actual parameter pattern.
-      parameterPattern = getParameterPattern(declRef.getDecl());
-      if (!parameterPattern)
+      parameterList = getParameterList(declRef.getDecl());
+      if (!parameterList)
         break;
 
       impliesFullPattern = true;
       path = path.slice(1);
       continue;
 
-    case ConstraintLocator::TupleElement:
-    case ConstraintLocator::NamedTupleElement:
-      if (parameterPattern) {
-        unsigned index = path[0].getValue();
-        if (auto tuple = dyn_cast<TuplePattern>(
-                           parameterPattern->getSemanticsProvidingPattern())) {
-          if (index < tuple->getNumElements()) {
-            parameterPattern = tuple->getElement(index).getPattern();
-            impliesFullPattern = false;
-            path = path.slice(1);
-            continue;
-          }
-        }
-        parameterPattern = nullptr;
+    case ConstraintLocator::ApplyArgToParam: {
+      if (!parameterList) break;
+        
+      unsigned index = path[0].getValue2();
+      if (index < parameterList->size()) {
+        auto param = parameterList->get(index);
+        return ResolvedLocator(ResolvedLocator::ForVar, param.decl);
       }
       break;
-
-    case ConstraintLocator::ApplyArgToParam:
-      if (parameterPattern) {
-        unsigned index = path[0].getValue2();
-        if (auto tuple = dyn_cast<TuplePattern>(
-                           parameterPattern->getSemanticsProvidingPattern())) {
-          if (index < tuple->getNumElements()) {
-            parameterPattern = tuple->getElement(index).getPattern();
-            impliesFullPattern = false;
-            path = path.slice(1);
-            continue;
-          }
-        }
-        parameterPattern = nullptr;
-      }
-      break;
-
-    case ConstraintLocator::ScalarToTuple:
-      continue;
+    }
 
     default:
       break;
     }
 
     break;
-  }
-
-  // If we have a parameter pattern that refers to a parameter, grab it.
-  if (parameterPattern) {
-    parameterPattern = parameterPattern->getSemanticsProvidingPattern();
-    if (impliesFullPattern) {
-      if (auto tuple = dyn_cast<TuplePattern>(parameterPattern)) {
-        if (tuple->getNumElements() == 1) {
-          parameterPattern = tuple->getElement(0).getPattern();
-          parameterPattern = parameterPattern->getSemanticsProvidingPattern();
-        }
-      }
-    }
-
-    if (auto named = dyn_cast<NamedPattern>(parameterPattern)) {
-      return ResolvedLocator(ResolvedLocator::ForVar, named->getDecl());
-    }
   }
 
   // Otherwise, do the best we can with the declaration we found.
@@ -2619,6 +2577,7 @@ namespace {
     llvm::DenseMap<Expr*, Type> ExprTypes;
     llvm::DenseMap<TypeLoc*, std::pair<Type, bool>> TypeLocTypes;
     llvm::DenseMap<Pattern*, Type> PatternTypes;
+    llvm::DenseMap<ParamDecl*, Type> ParamDeclTypes;
   public:
 
     void save(Expr *E) {
@@ -2628,6 +2587,13 @@ namespace {
         
         std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
           TS->ExprTypes[expr] = expr->getType();
+          
+          // Save the types on ClosureExpr parameters.
+          if (auto *CE = dyn_cast<ClosureExpr>(expr))
+            for (auto &P : *CE->getParameters())
+              if (P.decl->hasType())
+                TS->ParamDeclTypes[P.decl] = P.decl->getType();
+          
           return { true, expr };
         }
         
@@ -2664,6 +2630,9 @@ namespace {
       for (auto patternElt : PatternTypes)
         patternElt.first->setType(patternElt.second);
       
+      for (auto paramDeclElt : ParamDeclTypes)
+        paramDeclElt.first->setType(paramDeclElt.second);
+      
       // Done, don't do redundant work on destruction.
       ExprTypes.clear();
       TypeLocTypes.clear();
@@ -2690,6 +2659,11 @@ namespace {
       for (auto patternElt : PatternTypes)
         if (!patternElt.first->hasType())
           patternElt.first->setType(patternElt.second);
+      
+      for (auto paramDeclElt : ParamDeclTypes)
+        if (!paramDeclElt.first->hasType())
+          paramDeclElt.first->setType(paramDeclElt.second);
+
     }
   };
 }
@@ -2726,6 +2700,14 @@ static void eraseTypeData(Expr *expr) {
       if (isa<LiteralExpr>(expr) &&
           !(expr->getType() && expr->getType()->is<ErrorType>()))
         return { false, expr };
+      
+      // If a ClosureExpr's parameter list has types on the decls, remove them
+      // so that they'll get regenerated from the associated TypeLocs or
+      // resynthesized.
+      if (auto *CE = dyn_cast<ClosureExpr>(expr))
+        for (auto &P : *CE->getParameters())
+          if (P.decl->hasType())
+            P.decl->overwriteType(Type());
       
       expr->setType(nullptr);
       expr->clearLValueAccessKind();
@@ -2974,10 +2956,11 @@ typeCheckArbitrarySubExprIndependently(Expr *subExpr, TCCOptions options) {
     // none of its arguments are type variables.  If so, these type variables
     // would be accessible to name lookup of the subexpression and may thus leak
     // in.  Reset them to UnresolvedTypes for safe measures.
-    CE->getParams()->forEachVariable([&](VarDecl *VD) {
+    for (auto &param : *CE->getParameters()) {
+      auto VD = param.decl;
       if (VD->getType()->hasTypeVariable() || VD->getType()->is<ErrorType>())
         VD->overwriteType(CS->getASTContext().TheUnresolvedType);
-    });
+    }
   }
 
   // When we're type checking a single-expression closure, we need to reset the
@@ -4212,7 +4195,7 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
       CS->getContextualType()->is<AnyFunctionType>()) {
 
     auto fnType = CS->getContextualType()->castTo<AnyFunctionType>();
-    Pattern *params = CE->getParams();
+    auto *params = CE->getParameters();
     Type inferredArgType = fnType->getInput();
     
     // It is very common for a contextual type to disagree with the argument
@@ -4222,9 +4205,7 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
     // or could be because the closure has an implicitly generated one:
     //    { $0 + $1 }
     // in either case, we want to produce nice and clear diagnostics.
-    unsigned actualArgCount = 1;
-    if (auto *TP = dyn_cast<TuplePattern>(params))
-      actualArgCount = TP->getNumElements();
+    unsigned actualArgCount = params->size();
     unsigned inferredArgCount = 1;
     if (auto *argTupleTy = inferredArgType->getAs<TupleType>())
       inferredArgCount = argTupleTy->getNumElements();
@@ -4267,15 +4248,9 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
                fnType, inferredArgCount, actualArgCount);
       return true;
     }
-    
-    TypeResolutionOptions TROptions;
-    TROptions |= TR_OverrideType;
-    TROptions |= TR_FromNonInferredPattern;
-    TROptions |= TR_InExpression;
-    TROptions |= TR_ImmediateFunctionInput;
-    if (CS->TC.coercePatternToType(params, CE, inferredArgType, TROptions))
+
+    if (CS->TC.coerceParameterListToType(params, CE, inferredArgType))
       return true;
-    CE->setParams(params);
 
     expectedResultType = fnType->getResult();
   } else {
@@ -4286,10 +4261,11 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
     // lookups against the parameter decls.
     //
     // Handle this by rewriting the arguments to UnresolvedType().
-    CE->getParams()->forEachVariable([&](VarDecl *VD) {
+    for (auto &param : *CE->getParameters()) {
+      auto VD = param.decl;
       if (VD->getType()->hasTypeVariable() || VD->getType()->is<ErrorType>())
         VD->overwriteType(CS->getASTContext().TheUnresolvedType);
-    });
+    }
   }
 
   // If this is a complex leaf closure, there is nothing more we can do.

@@ -274,6 +274,45 @@ getActualDefaultArgKind(uint8_t raw) {
   return None;
 }
 
+ParameterList *ModuleFile::readParameterList() {
+  using namespace decls_block;
+
+  SmallVector<uint64_t, 8> scratch;
+  auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+  unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch);
+  assert(recordID == PARAMETERLIST);
+  unsigned numParams;
+  decls_block::ParameterListLayout::readRecord(scratch, numParams);
+
+  SmallVector<Parameter, 8> params;
+  for (unsigned i = 0; i != numParams; ++i) {
+    scratch.clear();
+    auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+    unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch);
+    assert(recordID == PARAMETERLIST_ELT);
+
+    
+    DeclID paramID;
+    bool isVariadic;
+    uint8_t rawDefaultArg;
+    decls_block::ParameterListEltLayout::readRecord(scratch, paramID,
+                                                    isVariadic, rawDefaultArg);
+    
+
+    Parameter result;
+    result.decl = cast<ParamDecl>(getDecl(paramID));
+    result.setVariadic(isVariadic);
+
+    // Decode the default argument kind.
+    // FIXME: Default argument expression, if available.
+    if (auto defaultArg = getActualDefaultArgKind(rawDefaultArg))
+      result.defaultArgumentKind = *defaultArg;
+    params.push_back(result);
+  }
+  
+  return ParameterList::create(getContext(), params);
+}
+
 Pattern *ModuleFile::maybeReadPattern() {
   using namespace decls_block;
 
@@ -2251,10 +2290,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       return nullptr;
     }
 
-    Pattern *bodyParams0 = maybeReadPattern();
-    Pattern *bodyParams1 = maybeReadPattern();
-    assert(bodyParams0&&bodyParams1 && "missing body patterns for constructor");
-    ctor->setBodyParams(bodyParams0, bodyParams1);
+    auto *bodyParams0 = readParameterList();
+    auto *bodyParams1 = readParameterList();
+    assert(bodyParams0 && bodyParams1 && "missing parameters for constructor");
+    ctor->setParameterLists(bodyParams0->get(0).decl, bodyParams1);
 
     // This must be set after recording the constructor in the map.
     // A polymorphic constructor type needs to refer to the constructor to get
@@ -2511,16 +2550,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       fn->setInterfaceType(interfaceType);
     }
 
-    SmallVector<Pattern *, 16> patternBuf;
-    while (Pattern *pattern = maybeReadPattern())
-      patternBuf.push_back(pattern);
+    SmallVector<ParameterList*, 2> paramLists;
+    for (unsigned i = 0, e = numParamPatterns; i != e; ++i)
+      paramLists.push_back(readParameterList());
 
-    assert(!patternBuf.empty());
-    assert((patternBuf.size() == numParamPatterns) &&
-           "incorrect number of parameters");
-
-    ArrayRef<Pattern *> patterns(patternBuf);
-    fn->setDeserializedSignature(patterns,
+    fn->setDeserializedSignature(paramLists,
                                  TypeLoc::withoutLoc(signature->getResult()));
 
     if (auto errorConvention = maybeReadForeignErrorConvention())
@@ -2946,7 +2980,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                                SourceLoc(), TypeLoc(), DC);
     declOrOffset = subscript;
 
-    subscript->setIndices(maybeReadPattern());    
+    subscript->setIndices(readParameterList());    
     subscript->getElementTypeLoc() = TypeLoc::withoutLoc(getType(elemTypeID));
     
     configureStorage(subscript, rawStorageKind,
@@ -3073,9 +3107,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     declOrOffset = dtor;
 
     dtor->setAccessibility(cast<ClassDecl>(DC)->getFormalAccess());
-    Pattern *selfParams = maybeReadPattern();
+    auto *selfParams = readParameterList();
     assert(selfParams && "Didn't get self pattern?");
-    dtor->setSelfPattern(selfParams);
+    dtor->setSelfDecl(selfParams->get(0).decl);
 
     dtor->setType(getType(signatureID));
     dtor->setInterfaceType(getType(interfaceID));

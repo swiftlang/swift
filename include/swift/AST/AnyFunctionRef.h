@@ -61,10 +61,10 @@ public:
     getCaptureInfo().getLocalCaptures(Result);
   }
 
-  ArrayRef<Pattern *> getBodyParamPatterns() const {
+  ArrayRef<ParameterList *> getParameterLists() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
-      return AFD->getBodyParamPatterns();
-    return TheFunction.get<AbstractClosureExpr *>()->getParamPatterns();
+      return AFD->getParameterLists();
+    return TheFunction.get<AbstractClosureExpr *>()->getParameterLists();
   }
   
   bool hasType() const {

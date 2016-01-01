@@ -22,7 +22,6 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/LLVMContext.h"
-#include <cstring>
 #include <tuple>
 using namespace swift;
 
@@ -147,29 +146,23 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
   Module *M = Context.TheBuiltinModule;
   DeclContext *DC = &M->getMainFile(FileUnitKind::Builtin);
 
-  SmallVector<TuplePatternElt, 4> ParamPatternElts;
+  SmallVector<Parameter, 4> params;
   for (Type argType : argTypes) {
     auto PD = new (Context) ParamDecl(/*IsLet*/true, SourceLoc(),
                                       Identifier(), SourceLoc(),
                                       Identifier(), argType,
                                       DC);
     PD->setImplicit();
-    Pattern *Pat = new (Context) NamedPattern(PD, /*implicit=*/true);
-    Pat = new (Context) TypedPattern(Pat, TypeLoc::withoutLoc(argType),
-                                     /*implicit=*/true);
-    ParamPatternElts.push_back(TuplePatternElt(Pat));
+    params.push_back(Parameter::withoutLoc(PD));
   }
 
-  Pattern *ParamPattern = TuplePattern::createSimple(
-      Context, SourceLoc(), ParamPatternElts, SourceLoc());
-
-  llvm::SmallVector<Identifier, 2> ArgNames(ParamPattern->numTopLevelVariables(),
-                                            Identifier());
-  DeclName Name(Context, Id, ArgNames);
+  auto *paramList = ParameterList::create(Context, params);
+  
+  DeclName Name(Context, Id, paramList);
   auto FD = FuncDecl::create(Context, SourceLoc(), StaticSpellingKind::None,
                           SourceLoc(), Name, SourceLoc(), SourceLoc(),
                           SourceLoc(), /*GenericParams=*/nullptr, FnType,
-                          ParamPattern, TypeLoc::withoutLoc(ResType), DC);
+                          paramList, TypeLoc::withoutLoc(ResType), DC);
   FD->setImplicit();
   FD->setAccessibility(Accessibility::Public);
   return FD;
@@ -179,20 +172,15 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
 static FuncDecl *
 getBuiltinGenericFunction(Identifier Id,
                           ArrayRef<TupleTypeElt> ArgParamTypes,
-                          ArrayRef<TupleTypeElt> ArgBodyTypes,
+                          ArrayRef<Type> ArgBodyTypes,
                           Type ResType,
                           Type ResBodyType,
                           GenericParamList *GenericParams,
-                          FunctionType::ExtInfo Info = FunctionType::ExtInfo()) {
+                          FunctionType::ExtInfo Info = FunctionType::ExtInfo()){
   assert(GenericParams && "Missing generic parameters");
   auto &Context = ResType->getASTContext();
 
   Type ArgParamType = TupleType::get(ArgParamTypes, Context);
-  Type ArgBodyType = TupleType::get(ArgBodyTypes, Context);
-
-  // Compute the function type.
-  Type FnType = PolymorphicFunctionType::get(ArgBodyType, ResBodyType,
-                                             GenericParams, Info);
 
   // Compute the interface type.
   SmallVector<GenericTypeParamType *, 1> GenericParamTypes;
@@ -216,30 +204,27 @@ getBuiltinGenericFunction(Identifier Id,
   Module *M = Context.TheBuiltinModule;
   DeclContext *DC = &M->getMainFile(FileUnitKind::Builtin);
 
-  SmallVector<TuplePatternElt, 4> ParamPatternElts;
-  for (auto &ArgTupleElt : ArgBodyTypes) {
+  SmallVector<Parameter, 4> params;
+  for (auto paramType : ArgBodyTypes) {
     auto PD = new (Context) ParamDecl(/*IsLet*/true, SourceLoc(),
                                       Identifier(), SourceLoc(),
-                                      Identifier(), ArgTupleElt.getType(),
-                                      DC);
+                                      Identifier(), paramType, DC);
     PD->setImplicit();
-    Pattern *Pat = new (Context) NamedPattern(PD, /*implicit=*/true);
-    Pat = new (Context) TypedPattern(Pat,
-            TypeLoc::withoutLoc(ArgTupleElt.getType()), /*implicit=*/true);
-
-    ParamPatternElts.push_back(TuplePatternElt(Pat));
+    params.push_back(Parameter::withoutLoc(PD));
   }
 
-  Pattern *ParamPattern = TuplePattern::createSimple(
-                          Context, SourceLoc(), ParamPatternElts, SourceLoc());
-  llvm::SmallVector<Identifier, 2> ArgNames(
-                                     ParamPattern->numTopLevelVariables(),
-                                     Identifier());
-  DeclName Name(Context, Id, ArgNames);
+  
+  auto *paramList = ParameterList::create(Context, params);
+  
+  // Compute the function type.
+  Type FnType = PolymorphicFunctionType::get(paramList->getType(Context),
+                                             ResBodyType, GenericParams, Info);
+  
+  DeclName Name(Context, Id, paramList);
   auto func = FuncDecl::create(Context, SourceLoc(), StaticSpellingKind::None,
                                SourceLoc(), Name,
                                SourceLoc(), SourceLoc(), SourceLoc(),
-                               GenericParams, FnType, ParamPattern,
+                               GenericParams, FnType, paramList,
                                TypeLoc::withoutLoc(ResBodyType), DC);
     
   func->setInterfaceType(InterfaceType);
@@ -476,7 +461,7 @@ namespace {
     SmallVector<ArchetypeType*, 2> Archetypes;
 
     SmallVector<TupleTypeElt, 4> InterfaceParams;
-    SmallVector<TupleTypeElt, 4> BodyParams;
+    SmallVector<Type, 4> BodyParams;
 
     Type InterfaceResult;
     Type BodyResult;

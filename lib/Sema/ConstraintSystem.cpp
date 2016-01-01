@@ -849,7 +849,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
       Type selfTy = openedFnType->getInput()->getRValueInstanceType();
       openedType = openedType->replaceCovariantResultType(
                      selfTy,
-                     func->getNumParamPatterns());
+                     func->getNumParameterLists());
       openedFnType = openedType->castTo<FunctionType>();
     }
 
@@ -1218,7 +1218,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
          func->hasArchetypeSelf())) {
       openedType = openedType->replaceCovariantResultType(
                      baseObjTy,
-                     func->getNumParamPatterns());
+                     func->getNumParameterLists());
     }
   }
   // If this is an initializer, replace the result type with the base

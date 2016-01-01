@@ -327,14 +327,14 @@ func calls(i: Int, j: Int, k: Int) {
 
   // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
-  // CHECK: [[SETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.someProperty!setter.1 : SomeClass -> (Builtin.Int64) -> ()
+  // CHECK: [[SETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.someProperty!setter.1 : (SomeClass) -> (Builtin.Int64) -> ()
   // CHECK: apply [[SETTER]]([[I]], [[C]])
   c.someProperty = i
 
   // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
   // CHECK: [[K:%[0-9]+]] = load [[KADDR]]
-  // CHECK: [[GETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.subscript!getter.1 : SomeClass -> (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 , $@convention(method) (Builtin.Int64, Builtin.Int64, @guaranteed SomeClass) -> Builtin.Int64
+  // CHECK: [[GETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.subscript!getter.1 : (SomeClass) -> (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 , $@convention(method) (Builtin.Int64, Builtin.Int64, @guaranteed SomeClass) -> Builtin.Int64
   // CHECK: apply [[GETTER]]([[J]], [[K]], [[C]])
   i = c[j, k]
 
@@ -342,7 +342,7 @@ func calls(i: Int, j: Int, k: Int) {
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
   // CHECK: [[K:%[0-9]+]] = load [[KADDR]]
-  // CHECK: [[SETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.subscript!setter.1 : SomeClass -> (Builtin.Int64, Builtin.Int64, Builtin.Int64) -> () , $@convention(method) (Builtin.Int64, Builtin.Int64, Builtin.Int64, @guaranteed SomeClass) -> () 
+  // CHECK: [[SETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.subscript!setter.1 : (SomeClass) -> (Builtin.Int64, Builtin.Int64, Builtin.Int64) -> () , $@convention(method) (Builtin.Int64, Builtin.Int64, Builtin.Int64, @guaranteed SomeClass) -> ()
   // CHECK: apply [[SETTER]]([[K]], [[I]], [[J]], [[C]])
   c[i, j] = k
 
@@ -466,7 +466,7 @@ func calls(i: Int, j: Int, k: Int) {
 
 // CHECK-LABEL: sil shared @_TFC9functions9SomeClass6method{{.*}} : $@convention(thin) (@owned SomeClass) -> @owned @callee_owned (Builtin.Int64) -> ()
 // CHECK: bb0(%0 : $SomeClass):
-// CHECK:   class_method %0 : $SomeClass, #SomeClass.method!1 : SomeClass -> (Builtin.Int64) -> ()
+// CHECK:   class_method %0 : $SomeClass, #SomeClass.method!1 : (SomeClass) -> (Builtin.Int64) -> ()
 // CHECK:   %2 = partial_apply %1(%0)
 // CHECK:   return %2
 

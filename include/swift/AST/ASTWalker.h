@@ -25,6 +25,7 @@ class Stmt;
 class Pattern;
 class TypeRepr;
 struct TypeLoc;
+class ParameterList;
 
 /// \brief An abstract class used to traverse an AST.
 class ASTWalker {
@@ -182,6 +183,18 @@ public:
   /// params in an AbstractFunctionDecl.
   virtual bool shouldWalkIntoFunctionGenericParams() { return false; }
 
+  /// walkToParameterListPre - This method is called when first visiting a
+  /// ParameterList, before walking into its parameters.  If it returns false,
+  /// the subtree is skipped.
+  ///
+  virtual bool walkToParameterListPre(ParameterList *PL) { return true; }
+  
+  /// walkToParameterListPost - This method is called after visiting the
+  /// children of a parameter list.  If it returns false, the remaining
+  /// traversal is terminated and returns failure.
+  virtual bool walkToParameterListPost(ParameterList *PL) { return true; }
+ 
+  
 protected:
   ASTWalker() = default;
   ASTWalker(const ASTWalker &) = default;

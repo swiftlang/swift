@@ -22,6 +22,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Parameter.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 using namespace swift;
@@ -41,69 +42,36 @@ static void addMemberToContextIfNeeded(Decl *D, DeclContext *DC,
            "Unknown declcontext");
 }
 
-static VarDecl *getParamDeclAtIndex(FuncDecl *fn, unsigned index) {
-  TuplePatternElt singleParam;
-  Pattern *paramPattern = fn->getBodyParamPatterns().back();
-  ArrayRef<TuplePatternElt> params;
-  if (auto paramTuple = dyn_cast<TuplePattern>(paramPattern)) {
-    params = paramTuple->getElements();
-  } else {
-    singleParam = TuplePatternElt(
-                      cast<ParenPattern>(paramPattern)->getSubPattern());
-    params = singleParam;
-  }
-
-  auto firstParamPattern = params[index].getPattern();
-  return firstParamPattern->getSingleVar();    
+static ParamDecl *getParamDeclAtIndex(FuncDecl *fn, unsigned index) {
+  return fn->getParameterLists().back()->get(index).decl;
 }
 
 static VarDecl *getFirstParamDecl(FuncDecl *fn) {
   return getParamDeclAtIndex(fn, 0);
 };
 
-/// \brief Build an implicit 'self' parameter for the specified DeclContext.
-static Pattern *buildImplicitSelfParameter(SourceLoc Loc, DeclContext *DC) {
-  ASTContext &Ctx = DC->getASTContext();
-  auto *SelfDecl = new (Ctx) ParamDecl(/*IsLet*/ true, Loc, Identifier(),
-                                       Loc, Ctx.Id_self, Type(), DC);
-  SelfDecl->setImplicit();
-  Pattern *P = new (Ctx) NamedPattern(SelfDecl, /*Implicit=*/true);
-  return new (Ctx) TypedPattern(P, TypeLoc());
-}
 
-static TuplePatternElt buildArgumentPattern(SourceLoc loc, DeclContext *DC,
-                                            StringRef name, Type type,
-                                            bool isLet,
-                                            VarDecl **paramDecl,
-                                            ASTContext &Context) {
-  auto *param = new (Context) ParamDecl(isLet, SourceLoc(), Identifier(),
-                                        loc, Context.getIdentifier(name),
+static Parameter buildArgument(SourceLoc loc, DeclContext *DC,
+                               StringRef name, Type type, bool isLet) {
+  auto &context = DC->getASTContext();
+  auto *param = new (context) ParamDecl(isLet, SourceLoc(), Identifier(),
+                                        loc, context.getIdentifier(name),
                                         Type(), DC);
-  if (paramDecl) *paramDecl = param;
   param->setImplicit();
-
-  Pattern *valuePattern
-    = new (Context) TypedPattern(new (Context) NamedPattern(param, true),
-                                 TypeLoc::withoutLoc(type));
-  valuePattern->setImplicit();
   
-  return TuplePatternElt(valuePattern);
+  Parameter P = Parameter::withoutLoc(param);
+  P.type.setType(type);
+  return P;
 }
 
-static TuplePatternElt buildLetArgumentPattern(SourceLoc loc, DeclContext *DC,
-                                               StringRef name, Type type,
-                                               VarDecl **paramDecl,
-                                               ASTContext &ctx) {
-  return buildArgumentPattern(loc, DC, name, type,
-                              /*isLet*/ true, paramDecl, ctx);
+static Parameter buildLetArgument(SourceLoc loc, DeclContext *DC,
+                                  StringRef name, Type type) {
+  return buildArgument(loc, DC, name, type, /*isLet*/ true);
 }
 
-static TuplePatternElt buildInOutArgumentPattern(SourceLoc loc, DeclContext *DC,
-                                                 StringRef name, Type type,
-                                                 VarDecl **paramDecl,
-                                                 ASTContext &ctx) {
-  return buildArgumentPattern(loc, DC, name, InOutType::get(type),
-                              /*isLet*/ false, paramDecl, ctx);
+static Parameter buildInOutArgument(SourceLoc loc, DeclContext *DC,
+                                     StringRef name, Type type) {
+  return buildArgument(loc, DC, name, InOutType::get(type), /*isLet*/ false);
 }
 
 static Type getTypeOfStorage(AbstractStorageDecl *storage,
@@ -118,62 +86,34 @@ static Type getTypeOfStorage(AbstractStorageDecl *storage,
   }
 }
 
-static TuplePatternElt
-buildSetterValueArgumentPattern(AbstractStorageDecl *storage,
-                                VarDecl **valueDecl, TypeChecker &TC) {
-  auto storageType = getTypeOfStorage(storage, TC);
-  return buildLetArgumentPattern(storage->getLoc(),
-                                 storage->getDeclContext(),
-                                 "value", storageType, valueDecl, TC.Context);
-}
-
-/// Build a pattern which can forward the formal index parameters of a
+/// Build a parameter list which can forward the formal index parameters of a
 /// declaration.
 ///
 /// \param prefix optional arguments to be prefixed onto the index
-///   forwarding pattern
-static Pattern *buildIndexForwardingPattern(AbstractStorageDecl *storage,
-                                     MutableArrayRef<TuplePatternElt> prefix,
-                                            TypeChecker &TC) {
+///   forwarding pattern.
+static ParameterList *
+buildIndexForwardingParamList(AbstractStorageDecl *storage,
+                              ArrayRef<Parameter> prefix) {
+  auto &context = storage->getASTContext();
   auto subscript = dyn_cast<SubscriptDecl>(storage);
 
-  // Fast path: if this isn't a subscript, and we have a first
-  // pattern, we can just use that.
-  if (!subscript) {
-    auto tuple = TuplePattern::createSimple(TC.Context, SourceLoc(), prefix,
-                                            SourceLoc());
-    tuple->setImplicit();
-    return tuple;
-  }
+  // Fast path: if this isn't a subscript, just use whatever we have.
+  if (!subscript)
+    return ParameterList::create(context, prefix);
 
-  // Otherwise, we need to build up a new TuplePattern.
-  SmallVector<TuplePatternElt, 4> elements;
+  // Clone the parameter list over for a new decl, so we get new ParamDecls.
+  auto indices = subscript->getIndices()->clone(context);
+  if (prefix.empty())
+    return indices;
+  
+  
+  // Otherwise, we need to build up a new parameter list.
+  SmallVector<Parameter, 4> elements;
 
-  // Start with the fields from the first pattern, if there are any.
+  // Start with the fields we were given, if there are any.
   elements.append(prefix.begin(), prefix.end());
-
-  // Clone index patterns in a manner that allows them to be
-  // perfectly forwarded.
-  DeclContext *DC = storage->getDeclContext();
-  auto addVarPatternFor = [&](Pattern *P, Identifier label = Identifier()) {
-    Pattern *vp = P->cloneForwardable(TC.Context, DC, Pattern::Implicit);
-    elements.push_back(TuplePatternElt(vp));
-    elements.back().setLabel(label, SourceLoc());
-  };
-
-  // This is the same breakdown the parser does.
-  auto indices = subscript->getIndices();
-  if (auto pp = dyn_cast<ParenPattern>(indices)) {
-    addVarPatternFor(pp);
-  } else {
-    auto tp = cast<TuplePattern>(indices);
-    for (auto &element : tp->getElements()) {
-      addVarPatternFor(element.getPattern(), element.getLabel());
-    }
-  }
-
-  return TuplePattern::createSimple(TC.Context, SourceLoc(), elements,
-                                    SourceLoc());
+  elements.append(indices->begin(), indices->end());
+  return ParameterList::create(context, elements);
 }
 
 static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
@@ -181,15 +121,16 @@ static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
   SourceLoc loc = storage->getLoc();
 
   // Create the parameter list for the getter.
-  SmallVector<Pattern *, 2> getterParams;
+  SmallVector<ParameterList*, 2> getterParams;
 
   // The implicit 'self' argument if in a type context.
   if (storage->getDeclContext()->isTypeContext())
-    getterParams.push_back(
-                  buildImplicitSelfParameter(loc, storage->getDeclContext()));
+    getterParams.push_back(ParameterList::createSelf(loc,
+                                                     storage->getDeclContext(),
+                                                     /*isStatic*/false));
     
   // Add an index-forwarding clause.
-  getterParams.push_back(buildIndexForwardingPattern(storage, {}, TC));
+  getterParams.push_back(buildIndexForwardingParamList(storage, {}));
 
   SourceLoc staticLoc;
   if (auto var = dyn_cast<VarDecl>(storage)) {
@@ -219,23 +160,27 @@ static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
 }
 
 static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
-                                       VarDecl *&valueDecl,
+                                       ParamDecl *&valueDecl,
                                        TypeChecker &TC) {
   SourceLoc loc = storage->getLoc();
 
   // Create the parameter list for the setter.
-  SmallVector<Pattern *, 2> params;
+  SmallVector<ParameterList*, 2> params;
 
   // The implicit 'self' argument if in a type context.
   if (storage->getDeclContext()->isTypeContext()) {
-    params.push_back(
-                  buildImplicitSelfParameter(loc, storage->getDeclContext()));
+    params.push_back(ParameterList::createSelf(loc,
+                                               storage->getDeclContext(),
+                                               /*isStatic*/false));
   }
-
-  // Add a "(value : T, indices...)" pattern.
-  TuplePatternElt valuePattern =
-    buildSetterValueArgumentPattern(storage, &valueDecl, TC);
-  params.push_back(buildIndexForwardingPattern(storage, valuePattern, TC));
+  
+  // Add a "(value : T, indices...)" argument list.
+  auto storageType = getTypeOfStorage(storage, TC);
+  auto valueParam = buildLetArgument(storage->getLoc(),
+                                     storage->getDeclContext(), "value",
+                                     storageType);
+  valueDecl = valueParam.decl;
+  params.push_back(buildIndexForwardingParamList(storage, valueParam));
 
   Type setterRetTy = TupleType::getEmpty(TC.Context);
   FuncDecl *setter = FuncDecl::create(
@@ -346,30 +291,27 @@ static Type createMaterializeForSetReturnType(AbstractStorageDecl *storage,
 }
 
 static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
-                                                  VarDecl *&bufferParamDecl,
                                                   TypeChecker &TC) {
   auto &ctx = storage->getASTContext();
   SourceLoc loc = storage->getLoc();
 
   // Create the parameter list:
-  SmallVector<Pattern *, 2> params;
+  SmallVector<ParameterList*, 2> params;
 
   //  - The implicit 'self' argument if in a type context.
   auto DC = storage->getDeclContext();
   if (DC->isTypeContext())
-    params.push_back(buildImplicitSelfParameter(loc, DC));
+    params.push_back(ParameterList::createSelf(loc, DC, /*isStatic*/false));
 
   //  - The buffer parameter, (buffer: Builtin.RawPointer,
   //                           inout storage: Builtin.UnsafeValueBuffer,
   //                           indices...).
-  TuplePatternElt bufferElements[] = {
-    buildLetArgumentPattern(loc, DC, "buffer", ctx.TheRawPointerType,
-                            &bufferParamDecl, TC.Context),
-    buildInOutArgumentPattern(loc, DC, "callbackStorage",
-                              ctx.TheUnsafeValueBufferType,
-                              nullptr, TC.Context),
+  
+  Parameter bufferElements[] = {
+    buildLetArgument(loc, DC, "buffer", ctx.TheRawPointerType),
+    buildInOutArgument(loc, DC, "callbackStorage", ctx.TheUnsafeValueBufferType)
   };
-  params.push_back(buildIndexForwardingPattern(storage, bufferElements, TC));
+  params.push_back(buildIndexForwardingParamList(storage, bufferElements));
 
   // The accessor returns (Builtin.RawPointer, (@convention(thin) (...) -> ())?),
   // where the first pointer is the materialized address and the
@@ -447,48 +389,52 @@ static Expr *buildTupleExpr(ASTContext &ctx, ArrayRef<Expr*> args) {
 }
 
 
-static Expr *buildTupleForwardingRefExpr(ASTContext &ctx,
-                                         ArrayRef<TuplePatternElt> params) {
+/// Build an expression that evaluates the specified parameter list as a tuple
+/// or paren expr, suitable for use in an applyexpr.
+///
+/// NOTE: This returns null if a varargs parameter exists in the list, as it
+/// cannot be forwarded correctly yet.
+///
+static Expr *buildArgumentForwardingExpr(ArrayRef<Parameter> params,
+                                         ASTContext &ctx) {
   SmallVector<Identifier, 4> labels;
   SmallVector<SourceLoc, 4> labelLocs;
   SmallVector<Expr *, 4> args;
-
-  for (unsigned i = 0, e = params.size(); i != e; ++i) {
-    const Pattern *param = params[i].getPattern();
-    args.push_back(param->buildForwardingRefExpr(ctx));
-    // If this parameter pattern has a name, extract it.
-    if (auto *np =dyn_cast<NamedPattern>(param->getSemanticsProvidingPattern()))
-      labels.push_back(np->getBoundName());
-    else
-      labels.push_back(Identifier());
+  
+  for (auto param : params) {
+    // We cannot express how to forward variadic parameters yet.
+    if (param.isVariadic())
+      return nullptr;
     
+    Expr *ref = new (ctx) DeclRefExpr(param.decl, SourceLoc(),
+                                      /*implicit*/ true);
+    if (param.decl->getType()->is<InOutType>())
+      ref = new (ctx) InOutExpr(SourceLoc(), ref, Type(), /*implicit=*/true);
+    args.push_back(ref);
+    
+    labels.push_back(param.decl->getArgumentName());
     labelLocs.push_back(SourceLoc());
   }
-
+  
   // A single unlabelled value is not a tuple.
   if (args.size() == 1 && labels[0].empty())
     return args[0];
-
+  
   return TupleExpr::create(ctx, SourceLoc(), args, labels, labelLocs,
                            SourceLoc(), false, IsImplicit);
 }
 
-/// Build a reference to the subscript index variables for this
-/// subscript accessor.
+
+
+
+
+/// Build a reference to the subscript index variables for this subscript
+/// accessor.
 static Expr *buildSubscriptIndexReference(ASTContext &ctx, FuncDecl *accessor) {
   // Pull out the body parameters, which we should have cloned
   // previously to be forwardable.  Drop the initial buffer/value
   // parameter in accessors that have one.
-  TuplePatternElt singleParam;
-  Pattern *paramPattern = accessor->getBodyParamPatterns().back();
-  ArrayRef<TuplePatternElt> params;
-  if (auto paramTuple = dyn_cast<TuplePattern>(paramPattern)) {
-    params = paramTuple->getElements();
-  } else {
-    singleParam = TuplePatternElt(
-                    cast<ParenPattern>(paramPattern)->getSubPattern());
-    params = singleParam;
-  }
+  auto params = accessor->getParameterLists().back()->getArray();
   auto accessorKind = accessor->getAccessorKind();
 
   // Ignore the value/buffer parameter.
@@ -498,8 +444,11 @@ static Expr *buildSubscriptIndexReference(ASTContext &ctx, FuncDecl *accessor) {
   // Ignore the materializeForSet callback storage parameter.
   if (accessorKind == AccessorKind::IsMaterializeForSet)
     params = params.slice(1);
-
-  return buildTupleForwardingRefExpr(ctx, params);
+  
+  // Okay, everything else should be forwarded, build the expression.
+  auto result = buildArgumentForwardingExpr(params, ctx);
+  assert(result && "FIXME: Cannot forward varargs");
+  return result;
 }
 
 enum class SelfAccessKind {
@@ -889,9 +838,7 @@ static bool doesStorageNeedSetter(AbstractStorageDecl *storage) {
 /// Add a materializeForSet accessor to the given declaration.
 static FuncDecl *addMaterializeForSet(AbstractStorageDecl *storage,
                                       TypeChecker &TC) {
-  VarDecl *bufferDecl;
-  auto materializeForSet =
-    createMaterializeForSetPrototype(storage, bufferDecl, TC);
+  auto materializeForSet = createMaterializeForSetPrototype(storage, TC);
   addMemberToContextIfNeeded(materializeForSet, storage->getDeclContext(),
                              storage->getSetter());
   storage->setMaterializeForSetFunc(materializeForSet);
@@ -913,7 +860,7 @@ void swift::addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
 
   // Create the setter.
   FuncDecl *setter = nullptr;
-  VarDecl *setterValueParam = nullptr;
+  ParamDecl *setterValueParam = nullptr;
   if (doesStorageNeedSetter(storage)) {
     setter = createSetterPrototype(storage, setterValueParam, TC);
   }
@@ -1030,31 +977,30 @@ static Expr *buildMaterializeForSetCallback(ASTContext &ctx,
   // Unexpected subtlety: it actually important to call the inout self
   // parameter something other than 'self' so that we don't trigger
   // the "implicit use of self" diagnostic.
-  VarDecl *bufferDecl;
-  VarDecl *callbackStorageDecl;
-  VarDecl *selfDecl;
-  TuplePatternElt argPatterns[] = {
-    buildLetArgumentPattern(loc, DC, "buffer", ctx.TheRawPointerType,
-                            &bufferDecl, ctx),
-    buildInOutArgumentPattern(loc, DC, "callbackStorage",
-                              ctx.TheUnsafeValueBufferType,
-                              &callbackStorageDecl, ctx),
-    buildInOutArgumentPattern(loc, DC, "selfValue", selfType, &selfDecl, ctx),
-    buildLetArgumentPattern(loc, DC, "selfType", MetatypeType::get(selfType),
-                            nullptr, ctx),
-  };
-  auto args = TuplePattern::createSimple(ctx, SourceLoc(), argPatterns,
-                                         SourceLoc());
-  args->setImplicit();
+  auto bufferParam =
+    buildLetArgument(loc, DC, "buffer", ctx.TheRawPointerType);
+  auto callbackStorageParam =
+    buildInOutArgument(loc, DC, "callbackStorage",ctx.TheUnsafeValueBufferType);
+  auto selfValueParam = buildInOutArgument(loc, DC, "selfValue", selfType);
+  auto selfTypeParam = buildLetArgument(loc, DC, "selfType",
+                                        MetatypeType::get(selfType));
+
+  auto paramList = ParameterList::create(ctx, {
+    bufferParam,
+    callbackStorageParam,
+    selfValueParam,
+    selfTypeParam
+  });
 
   // Create the closure expression itself.
-  auto closure = new (ctx) ClosureExpr(args, SourceLoc(), SourceLoc(),
+  auto closure = new (ctx) ClosureExpr(paramList, SourceLoc(), SourceLoc(),
                                        SourceLoc(), TypeLoc(),
                                        /*discriminator*/ 0, materializeForSet);
 
   // Generate the body of the closure.
   SmallVector<ASTNode, 4> body;
-  generator(body, selfDecl, bufferDecl, callbackStorageDecl);
+  generator(body, selfValueParam.decl, bufferParam.decl,
+            callbackStorageParam.decl);
   closure->setBody(BraceStmt::create(ctx, SourceLoc(), body, SourceLoc(),
                                      IsImplicit),
                    /*isSingleExpression*/ false);
@@ -1471,11 +1417,7 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
   // decls for 'self' and 'value'.
   auto *Set = VD->getSetter();
   auto *SelfDecl = Set->getImplicitSelfDecl();
-  VarDecl *ValueDecl = nullptr;
-  Set->getBodyParamPatterns().back()->forEachVariable([&](VarDecl *VD) {
-    assert(!ValueDecl && "Already found 'value'?");
-    ValueDecl = VD;
-  });
+  VarDecl *ValueDecl = Set->getParameterLists().back()->get(0).decl;
 
   // The setter loads the oldValue, invokes willSet with the incoming value,
   // does a direct store, then invokes didSet with the oldValue.
@@ -1567,7 +1509,7 @@ static void convertNSManagedStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
   auto *Get = createGetterPrototype(VD, TC);
 
   // Create the setter.
-  VarDecl *SetValueDecl = nullptr;
+  ParamDecl *SetValueDecl = nullptr;
   auto *Set = createSetterPrototype(VD, SetValueDecl, TC);
 
   // Okay, we have both the getter and setter.  Set them in VD.
@@ -1847,7 +1789,7 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
       getter->setMutating();
     getter->setAccessibility(var->getFormalAccess());
 
-    VarDecl *newValueParam = nullptr;
+    ParamDecl *newValueParam = nullptr;
     auto *setter = createSetterPrototype(var, newValueParam, TC);
     var->makeComputed(var->getLoc(), getter, setter, nullptr,
                       var->getLoc());
@@ -1913,8 +1855,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
     accessLevel = std::min(accessLevel, Accessibility::Internal);
 
   // Determine the parameter type of the implicit constructor.
-  SmallVector<TuplePatternElt, 8> patternElts;
-  SmallVector<Identifier, 8> argNames;
+  SmallVector<Parameter, 8> params;
   if (ICK == ImplicitConstructorKind::Memberwise) {
     assert(isa<StructDecl>(decl) && "Only struct have memberwise constructor");
 
@@ -1923,7 +1864,6 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       if (var->isImplicit())
         continue;
       tc.validateDecl(var);
-      
       
       // Initialized 'let' properties have storage, but don't get an argument
       // to the memberwise initializer since they already have an initial
@@ -1947,24 +1887,18 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       auto *arg = new (context) ParamDecl(/*IsLet*/true, Loc, var->getName(),
                                           Loc, var->getName(), varType, decl);
       arg->setImplicit();
-      argNames.push_back(var->getName());
-      Pattern *pattern = new (context) NamedPattern(arg);
-      pattern->setImplicit();
-      TypeLoc tyLoc = TypeLoc::withoutLoc(varType);
-      pattern = new (context) TypedPattern(pattern, tyLoc);
-      patternElts.push_back(TuplePatternElt(var->getName(), SourceLoc(),
-                                            pattern, false));
+      params.push_back(Parameter::withoutLoc(arg));
     }
   }
 
-  auto pattern = TuplePattern::create(context, Loc, patternElts, Loc);
-  pattern->setImplicit();
-
+  auto paramList = ParameterList::create(context, params);
+  
   // Create the constructor.
-  DeclName name(context, context.Id_init, argNames);
-  Pattern *selfPat = buildImplicitSelfParameter(Loc, decl);
+  DeclName name(context, context.Id_init, paramList);
+  auto *selfParam = ParamDecl::createSelf(Loc, decl,
+                                          /*static*/false, /*inout*/true);
   auto *ctor = new (context) ConstructorDecl(name, Loc, OTK_None, SourceLoc(),
-                                             selfPat, pattern,
+                                             selfParam, paramList,
                                              nullptr, SourceLoc(), decl);
 
   // Mark implicit.
@@ -1992,105 +1926,6 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
   }
 
   return ctor;
-}
-
-/// Create an expression that references the variables in the given
-/// pattern for, e.g., forwarding of these variables to another
-/// function with the same signature.
-static Expr *forwardArguments(TypeChecker &tc, ClassDecl *classDecl,
-                              ConstructorDecl *toDecl,
-                              Pattern *bodyPattern,
-                              ArrayRef<Identifier> argumentNames) {
-  switch (bodyPattern->getKind()) {
-#define PATTERN(Id, Parent)
-#define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
-#include "swift/AST/PatternNodes.def"
-    return nullptr;
-    
-  case PatternKind::Paren: {
-    auto subExpr = forwardArguments(tc, classDecl, toDecl,
-                              cast<ParenPattern>(bodyPattern)->getSubPattern(),
-                                    { });
-    if (!subExpr) return nullptr;
-
-    // If there is a name for this single-argument thing, then form a tupleexpr.
-    if (argumentNames.size() != 1 || argumentNames[0].empty())
-      return new (tc.Context) ParenExpr(SourceLoc(), subExpr, SourceLoc(),
-                                        /*hasTrailingClosure=*/false);
-
-    return TupleExpr::createImplicit(tc.Context, subExpr, argumentNames);
-  }
-
-
-  case PatternKind::Tuple: {
-    auto bodyTuple = cast<TuplePattern>(bodyPattern);
-    SmallVector<Expr *, 4> values;
-
-    // FIXME: Can't forward varargs yet.
-    if (bodyTuple->hasAnyEllipsis()) {
-      tc.diagnose(classDecl->getLoc(),
-                  diag::unsupported_synthesize_init_variadic,
-                  classDecl->getDeclaredType());
-      tc.diagnose(toDecl, diag::variadic_superclass_init_here);
-      return nullptr;
-    }
-
-    for (unsigned i = 0, n = bodyTuple->getNumElements(); i != n; ++i) {
-      // Forward the value.
-      auto subExpr = forwardArguments(tc, classDecl, toDecl,
-                                      bodyTuple->getElement(i).getPattern(),
-                                      { });
-      if (!subExpr)
-        return nullptr;
-      values.push_back(subExpr);
-      
-      // Dig out the name.
-      auto subPattern = bodyTuple->getElement(i).getPattern();
-      do {
-        if (auto typed = dyn_cast<TypedPattern>(subPattern)) {
-          subPattern = typed->getSubPattern();
-          continue;
-        }
-
-        if (auto paren = dyn_cast<ParenPattern>(subPattern)) {
-          subPattern = paren->getSubPattern();
-          continue;
-        }
-
-        break;
-      } while (true);
-    }
-
-    if (values.size() == 1 && 
-        (argumentNames.empty() || argumentNames[0].empty()))
-      return new (tc.Context) ParenExpr(SourceLoc(), values[0], SourceLoc(),
-                                        /*hasTrailingClosure=*/false);
-
-    return TupleExpr::createImplicit(tc.Context, values, argumentNames);
-  }
-
-  case PatternKind::Any:
-  case PatternKind::Named: {
-    auto decl = cast<NamedPattern>(bodyPattern)->getDecl();
-    Expr *declRef = new (tc.Context) DeclRefExpr(decl, SourceLoc(),
-                                                 /*Implicit=*/true);
-    if (decl->getType()->is<InOutType>())
-      declRef = new (tc.Context) InOutExpr(SourceLoc(), declRef,
-                                           Type(), /*isImplicit=*/true);
-    return declRef;
-  }
-
-  case PatternKind::Typed:
-    return forwardArguments(tc, classDecl, toDecl,
-                            cast<TypedPattern>(bodyPattern)->getSubPattern(),
-                            argumentNames);
-
-  case PatternKind::Var:
-    return forwardArguments(tc, classDecl, toDecl,
-                            cast<VarPattern>(bodyPattern)->getSubPattern(),
-                            argumentNames);
-
-  }
 }
 
 /// Create a stub body that emits a fatal error message.
@@ -2141,87 +1976,18 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   auto &ctx = tc.Context;
 
   // Create the 'self' declaration and patterns.
-  auto *selfDecl = new (ctx) ParamDecl(/*IsLet*/ true,
-                                       SourceLoc(), Identifier(),
-                                       SourceLoc(), ctx.Id_self,
-                                       Type(), classDecl);
-  selfDecl->setImplicit();
-  Pattern *selfBodyPattern 
-    = new (ctx) NamedPattern(selfDecl, /*Implicit=*/true);
-  selfBodyPattern = new (ctx) TypedPattern(selfBodyPattern, TypeLoc());
+  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), classDecl);
 
   // Create the initializer parameter patterns.
-  OptionSet<Pattern::CloneFlags> options = Pattern::Implicit;
-  options |= Pattern::Inherited;
-  Pattern *bodyParamPatterns
-    = superclassCtor->getBodyParamPatterns()[1]->clone(ctx, options);
-
-  // Fix up the default arguments in the type to refer to inherited default
-  // arguments.
-  // FIXME: If we weren't cloning the type along with the pattern, this would be
-  // a lot more direct.
-  Type argType = bodyParamPatterns->getType();
-
-  // Local function that maps default arguments to inherited default arguments.
-  std::function<Type(Type)> inheritDefaultArgs = [&](Type type) -> Type {
-    auto tuple = type->getAs<TupleType>();
-    if (!tuple)
-      return type;
-
-    bool anyChanged = false;
-    SmallVector<TupleTypeElt, 4> elements;
-    unsigned index = 0;
-    for (const auto &elt : tuple->getElements()) {
-      Type eltTy = elt.getType().transform(inheritDefaultArgs);
-      if (!eltTy)
-        return Type();
-
-      // If nothing has changed, just keep going.
-      if (!anyChanged && eltTy.getPointer() == elt.getType().getPointer() &&
-          (elt.getDefaultArgKind() == DefaultArgumentKind::None ||
-           elt.getDefaultArgKind() == DefaultArgumentKind::Inherited)) {
-        ++index;
-        continue;
-      }
-
-      // If this is the first change we've seen, copy all of the previous
-      // elements.
-      if (!anyChanged) {
-        // Copy all of the previous elements.
-        for (unsigned i = 0; i != index; ++i) {
-          const TupleTypeElt &FromElt = tuple->getElement(i);
-          elements.push_back(TupleTypeElt(FromElt.getType(), FromElt.getName(),
-                                          FromElt.getDefaultArgKind(),
-                                          FromElt.isVararg()));
-        }
-
-        anyChanged = true;
-      }
-
-      // Add the new tuple element, with the new type, no initializer,
-      auto defaultArgKind = elt.getDefaultArgKind();
-      if (defaultArgKind != DefaultArgumentKind::None)
-        defaultArgKind = DefaultArgumentKind::Inherited;
-      elements.push_back(TupleTypeElt(eltTy, elt.getName(), defaultArgKind,
-                                      elt.isVararg()));
-      ++index;
-    }
-
-    if (!anyChanged)
-      return type;
-
-    return TupleType::get(elements, ctx);
-  };
-
-  argType = argType.transform(inheritDefaultArgs);
-  bodyParamPatterns->setType(argType);
-
+  OptionSet<ParameterList::CloneFlags> options = ParameterList::Implicit;
+  options |= ParameterList::Inherited;
+  auto *bodyParams = superclassCtor->getParameterList(1)->clone(ctx,options);
+  
   // Create the initializer declaration.
   auto ctor = new (ctx) ConstructorDecl(superclassCtor->getFullName(), 
                                         classDecl->getBraces().Start,
                                         superclassCtor->getFailability(),
-                                        SourceLoc(),
-                                        selfBodyPattern, bodyParamPatterns,
+                                        SourceLoc(), selfDecl, bodyParams,
                                         nullptr, SourceLoc(), classDecl);
   ctor->setImplicit();
   ctor->setAccessibility(std::min(classDecl->getFormalAccess(),
@@ -2233,13 +1999,10 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                                                         ctx);
 
   // Configure 'self'.
-  Type selfType = configureImplicitSelf(tc, ctor);
-  selfBodyPattern->setType(selfType);
-  cast<TypedPattern>(selfBodyPattern)->getSubPattern()->setType(selfType);
+  auto selfType = configureImplicitSelf(tc, ctor);
 
   // Set the type of the initializer.
-  configureConstructorType(ctor, selfType,
-                           bodyParamPatterns->getType(),
+  configureConstructorType(ctor, selfType, bodyParams->getType(ctx),
                            superclassCtor->isBodyThrowing());
   if (superclassCtor->isObjC()) {
     auto errorConvention = superclassCtor->getForeignErrorConvention();
@@ -2280,14 +2043,16 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                                                        SourceLoc(),
                                                        /*Implicit=*/true);
 
-  Expr *ctorArgs = forwardArguments(tc, classDecl, superclassCtor,
-                                    ctor->getBodyParamPatterns()[1],
-                                    ctor->getFullName().getArgumentNames());
+  auto ctorArgs = buildArgumentForwardingExpr(bodyParams->getArray(), ctx);
+
+  // If buildArgumentForwardingExpr failed, then it was because we tried to
+  // forward varargs, which cannot be done yet.
+  // TODO: We should be able to forward varargs!
   if (!ctorArgs) {
-    // FIXME: We should be able to assert that this never happens,
-    // but there are currently holes when dealing with vararg
-    // initializers and _ parameters. Fail somewhat gracefully by
-    // generating a stub here.
+    tc.diagnose(classDecl->getLoc(),
+                diag::unsupported_synthesize_init_variadic,
+                classDecl->getDeclaredType());
+    tc.diagnose(superclassCtor, diag::variadic_superclass_init_here);
     createStubBody(tc, ctor);
     return ctor;
   }
@@ -2309,10 +2074,10 @@ void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
   if (CD->hasDestructor() || CD->isInvalid())
     return;
 
-  Pattern *selfPat = buildImplicitSelfParameter(CD->getLoc(), CD);
+  auto *selfDecl = ParamDecl::createSelf(CD->getLoc(), CD);
 
   auto *DD = new (Context) DestructorDecl(Context.Id_deinit, CD->getLoc(),
-                                          selfPat, CD);
+                                          selfDecl, CD);
 
   DD->setImplicit();
 

@@ -806,10 +806,9 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   TypeResolutionOptions options;
   options |= TR_AllowUnspecifiedTypes;
   options |= TR_AllowUnboundGenerics;
-  options |= TR_ImmediateFunctionInput;
   options |= TR_InExpression;
   bool hadParameterError = false;
-  if (TC.typeCheckPattern(closure->getParams(), DC, options)) {
+  if (TC.typeCheckParameterList(closure->getParameters(), DC, options)) {
     closure->setType(ErrorType::get(TC.Context));
 
     // If we encounter an error validating the parameter list, don't bail.
@@ -2467,7 +2466,7 @@ void ConstraintSystem::print(raw_ostream &out) {
       case OverloadChoiceKind::DeclViaUnwrappedOptional:
         if (choice.getBaseType())
           out << choice.getBaseType()->getString() << ".";
-        out << choice.getDecl()->getName().str() << ": "
+        out << choice.getDecl()->getName() << ": "
           << resolved->BoundType->getString() << " == "
           << resolved->ImpliedType->getString() << "\n";
         break;

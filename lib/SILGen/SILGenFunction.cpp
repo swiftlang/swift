@@ -407,7 +407,7 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(fd);
 
   Type resultTy = fd->getResultType();
-  emitProlog(fd, fd->getBodyParamPatterns(), resultTy);
+  emitProlog(fd, fd->getParameterLists(), resultTy);
   prepareEpilog(resultTy, fd->isBodyThrowing(), CleanupLocation(fd));
 
   emitProfilerIncrement(fd->getBody());
@@ -419,7 +419,7 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
 void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(ace);
 
-  emitProlog(ace, ace->getParams(), ace->getResultType());
+  emitProlog(ace, ace->getParameters(), ace->getResultType());
   prepareEpilog(ace->getResultType(), ace->isBodyThrowing(),
                 CleanupLocation(ace));
   if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
@@ -698,7 +698,7 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
       --paramCount;
 
     // Forward the curried formal arguments.
-    auto forwardedPatterns = fd->getBodyParamPatterns().slice(0, paramCount);
+    auto forwardedPatterns = fd->getParameterLists().slice(0, paramCount);
     for (auto *paramPattern : reversed(forwardedPatterns))
       bindParametersForForwarding(paramPattern, curriedArgs);
 

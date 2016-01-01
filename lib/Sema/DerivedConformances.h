@@ -127,7 +127,6 @@ inline SomeDecl *insertOperatorDecl(ASTContext &C,
 FuncDecl *declareDerivedPropertyGetter(TypeChecker &tc,
                                        Decl *parentDecl,
                                        NominalTypeDecl *typeDecl,
-                                       Type contextType,
                                        Type propertyInterfaceType,
                                        Type propertyContextType,
                                        bool isStatic = false);

@@ -27,6 +27,8 @@
 #include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
+  class ParameterList;
+  struct Parameter;
   
 /// ASTVisitor - This is a simple visitor class for Swift expressions.
 template<typename ImplClass,
@@ -158,6 +160,16 @@ public:
              A, ::std::forward<Args>(AA)...);                       \
   }
 #include "swift/AST/Attr.def"
+  
+  bool visit(ParameterList *PL) {
+    return static_cast<ImplClass*>(this)->visitParameterList(PL);
+  }
+  bool visit(Parameter &P) {
+    return static_cast<ImplClass*>(this)->visitParameter(P);
+  }
+  
+  bool visitParameterList(ParameterList *PL) { return false; }
+  bool visitParameter(Parameter &P) { return false; }
 };
   
   

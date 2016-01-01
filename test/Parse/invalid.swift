@@ -46,9 +46,8 @@ func test4() {
 // rdar://problem/18507467
 func d(b: String -> <T>() -> T) {} // expected-error {{expected type for function result}}
 // expected-error @-1 {{expected ',' separator}} {{20-20=,}}
-// expected-error @-2 {{type annotation missing in pattern}}
-// expected-error @-3 {{expected parameter type following ':'}}
-// expected-error @-4 {{expected ',' separator}}
+// expected-error @-2 {{expected parameter type following ':'}}
+// expected-error @-3 {{expected ',' separator}}
 
 
 // <rdar://problem/22143680> QoI: terrible diagnostic when trying to form a generic protocol

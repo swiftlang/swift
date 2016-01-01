@@ -19,6 +19,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/Parameter.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/APFloat.h"
@@ -42,6 +43,42 @@ DEF_COLOR(Type, BLUE)
 DEF_COLOR(TypeField, CYAN)
 
 #undef DEF_COLOR
+
+namespace {
+  /// RAII object that prints with the given color, if color is supported on the
+  /// given stream.
+  class PrintWithColorRAII {
+    raw_ostream &OS;
+    bool ShowColors;
+    
+  public:
+    PrintWithColorRAII(raw_ostream &os, llvm::raw_ostream::Colors color)
+    : OS(os), ShowColors(false)
+    {
+      if (&os == &llvm::errs() || &os == &llvm::outs())
+        ShowColors = llvm::errs().has_colors() && llvm::outs().has_colors();
+      
+      if (ShowColors) {
+        if (auto str = llvm::sys::Process::OutputColor(color, false, false)) {
+          OS << str;
+        }
+      }
+    }
+    
+    ~PrintWithColorRAII() {
+      if (ShowColors) {
+        OS << llvm::sys::Process::ResetColor();
+      }
+    }
+    
+    template<typename T>
+    friend raw_ostream &operator<<(PrintWithColorRAII &&printer,
+                                   const T &value){
+      printer.OS << value;
+      return printer.OS;
+    }
+  };
+} // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
 //  Generic param list printing.
@@ -338,6 +375,15 @@ namespace {
     void printRec(Stmt *S) { S->print(OS, Indent+2); }
     void printRec(Pattern *P) { PrintPattern(OS, Indent+2).visit(P); }
     void printRec(TypeRepr *T);
+
+    // Print a field with a value.
+    template<typename T>
+    raw_ostream &printField(StringRef name, const T &value) {
+      OS << " ";
+      PrintWithColorRAII(OS, TypeFieldColor) << name;
+      OS << "=" << value;
+      return OS;
+    }
 
     void printCommon(Decl *D, const char *Name,
                      llvm::Optional<llvm::raw_ostream::Colors> Color =
@@ -732,27 +778,79 @@ namespace {
           OS << ",resulttype=" << fec->getResultType().getString();
       }
     }
+    
+    void printParameter(const Parameter &P) {
+      OS.indent(Indent) << "(parameter ";
+      printDeclName(P.decl);
+      if (!P.decl->getArgumentName().empty())
+        OS << " apiName=" << P.decl->getArgumentName();
+      
+      OS << " type=";
+      if (P.decl->hasType()) {
+        OS << '\'';
+        P.decl->getType().print(OS);
+        OS << '\'';
+      } else
+        OS << "<null type>";
+      
+      if (!P.decl->isLet())
+        OS << " mutable";
+      
+      if (P.isVariadic())
+        OS << " variadic";
 
-    void printPatterns(StringRef Text, ArrayRef<Pattern*> Pats) {
-      if (Pats.empty())
-        return;
-      if (!Text.empty()) {
+      switch (P.defaultArgumentKind) {
+      case DefaultArgumentKind::None: break;
+      case DefaultArgumentKind::Column:
+        printField("default_arg", "__COLUMN__");
+        break;
+      case DefaultArgumentKind::DSOHandle:
+        printField("default_arg", "__DSO_HANDLE__");
+        break;
+      case DefaultArgumentKind::File:
+        printField("default_arg", "__FILE__");
+        break;
+      case DefaultArgumentKind::Function:
+        printField("default_arg", "__FUNCTION__");
+        break;
+      case DefaultArgumentKind::Inherited:
+        printField("default_arg", "inherited");
+        break;
+      case DefaultArgumentKind::Line:
+        printField("default_arg", "__LINE__");
+        break;
+      case DefaultArgumentKind::Normal:
+        printField("default_arg", "normal");
+        break;
+      }
+      
+      if (auto init = P.getDefaultValue()) {
+        OS << " expression=\n";
+        printRec(init->getExpr());
+      }
+      
+      OS << ')';
+    }
+    
+
+    void printParameterList(const ParameterList *params) {
+      OS.indent(Indent) << "(parameter_list";
+      Indent += 2;
+      for (auto P : *params) {
         OS << '\n';
-        Indent += 2;
-        OS.indent(Indent) << '(' << Text;
+        printParameter(P);
       }
-      for (auto P : Pats) {
-        OS << '\n';
-        printRec(P);
-      }
-      if (!Text.empty()) {
-        OS << ')';
-        Indent -= 2;
-      }
+      OS << ')';
+      Indent -= 2;
     }
 
     void printAbstractFunctionDecl(AbstractFunctionDecl *D) {
-      printPatterns("body_params", D->getBodyParamPatterns());
+      for (auto pl : D->getParameterLists()) {
+        OS << '\n';
+        Indent += 2;
+        printParameterList(pl);
+        Indent -= 2;
+     }
       if (auto FD = dyn_cast<FuncDecl>(D)) {
         if (FD->getBodyResultTypeLoc().getTypeRepr()) {
           OS << '\n';
@@ -903,6 +1001,44 @@ namespace {
     }
   };
 } // end anonymous namespace.
+
+
+void Parameter::dump() const {
+  dump(llvm::errs(), 0);
+}
+
+void Parameter::dump(raw_ostream &OS, unsigned Indent) const {
+  llvm::Optional<llvm::SaveAndRestore<bool>> X;
+  
+  // Make sure to print type variables if we can get to ASTContext.
+  if (decl) {
+    X.emplace(llvm::SaveAndRestore<bool>(decl->getASTContext().LangOpts.DebugConstraintSolver,
+                                 true));
+  }
+
+  PrintDecl(OS, Indent).printParameter(*this);
+  llvm::errs() << '\n';
+}
+
+void ParameterList::dump() const {
+  dump(llvm::errs(), 0);
+}
+
+void ParameterList::dump(raw_ostream &OS, unsigned Indent) const {
+  llvm::Optional<llvm::SaveAndRestore<bool>> X;
+  
+  // Make sure to print type variables if we can get to ASTContext.
+  if (size() != 0 && get(0).decl) {
+    auto &ctx = get(0).decl->getASTContext();
+    X.emplace(llvm::SaveAndRestore<bool>(ctx.LangOpts.DebugConstraintSolver,
+                                         true));
+  }
+  
+  PrintDecl(OS, Indent).printParameterList(this);
+  llvm::errs() << '\n';
+}
+
+
 
 void Decl::dump() const {
   dump(llvm::errs(), 0);
@@ -1492,7 +1628,7 @@ public:
 
   void visitObjectLiteralExpr(ObjectLiteralExpr *E) {
     printCommon(E, "object_literal")
-      << " name=" << E->getName().str();
+      << " name=" << E->getName();
     OS << '\n';
     printRec(E->getArg());
   }
@@ -1541,7 +1677,7 @@ public:
   }
   void visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *E) {
     printCommon(E, "overloaded_decl_ref_expr")
-      << " name=" << E->getDecls()[0]->getName().str()
+      << " name=" << E->getDecls()[0]->getName()
       << " #decls=" << E->getDecls().size()
       << " specialized=" << (E->isSpecialized()? "yes" : "no");
 
@@ -1554,7 +1690,7 @@ public:
   }
   void visitOverloadedMemberRefExpr(OverloadedMemberRefExpr *E) {
     printCommon(E, "overloaded_member_ref_expr")
-      << " name=" << E->getDecls()[0]->getName().str()
+      << " name=" << E->getDecls()[0]->getName()
       << " #decls=" << E->getDecls().size() << "\n";
     printRec(E->getBase());
     for (ValueDecl *D : E->getDecls()) {
@@ -1688,7 +1824,7 @@ public:
   }
   void visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     printCommon(E, "unresolved_dot_expr")
-      << " field '" << E->getName().str() << "'";
+      << " field '" << E->getName() << "'";
     if (E->getBase()) {
       OS << '\n';
       printRec(E->getBase());
@@ -1890,24 +2026,37 @@ public:
       OS << " ";
       E->getCaptureInfo().print(OS);
     }
+    
     return OS;
   }
 
-  void visitClosureExpr(ClosureExpr *expr) {
-    printClosure(expr, "closure_expr");
-    if (expr->hasSingleExpressionBody())
+  void visitClosureExpr(ClosureExpr *E) {
+    printClosure(E, "closure_expr");
+    if (E->hasSingleExpressionBody())
       OS << " single-expression";
+    
+    if (E->getParameters()) {
+      OS << '\n';
+      PrintDecl(OS, Indent+2).printParameterList(E->getParameters());
+    }
+    
     OS << '\n';
-
-    if (expr->hasSingleExpressionBody()) {
-      printRec(expr->getSingleExpressionBody());
+    if (E->hasSingleExpressionBody()) {
+      printRec(E->getSingleExpressionBody());
     } else {
-      printRec(expr->getBody());
+      printRec(E->getBody());
     }
     OS << ')';
   }
   void visitAutoClosureExpr(AutoClosureExpr *E) {
     printClosure(E, "autoclosure_expr") << '\n';
+    
+    if (E->getParameters()) {
+      OS << '\n';
+      PrintDecl(OS, Indent+2).printParameterList(E->getParameters());
+    }
+
+    OS << '\n';
     printRec(E->getSingleExpressionBody());
     OS << ')';
   }
@@ -2287,40 +2436,6 @@ void ProtocolConformance::dump() const {
 //===----------------------------------------------------------------------===//
 
 namespace {
-  /// RAII object that prints with the given color, if color is supported on the
-  /// given stream.
-  class PrintWithColorRAII {
-    raw_ostream &OS;
-    bool ShowColors;
-
-  public:
-    PrintWithColorRAII(raw_ostream &os, llvm::raw_ostream::Colors color)
-      : OS(os), ShowColors(false)
-    {
-      if (&os == &llvm::errs() || &os == &llvm::outs())
-        ShowColors = llvm::errs().has_colors() && llvm::outs().has_colors();
-
-      if (ShowColors) {
-        if (auto str = llvm::sys::Process::OutputColor(color, false, false)) {
-          OS << str;
-        }
-      }
-    }
-
-    ~PrintWithColorRAII() {
-      if (ShowColors) {
-        OS << llvm::sys::Process::ResetColor();
-      }
-    }
-
-    template<typename T>
-    friend raw_ostream &operator<<(PrintWithColorRAII &&printer,
-                                   const T &value){
-      printer.OS << value;
-      return printer.OS;
-    }
-  };
-
   class PrintType : public TypeVisitor<PrintType, void, StringRef> {
     raw_ostream &OS;
     unsigned Indent;
@@ -2444,31 +2559,31 @@ namespace {
           break;
 
         case DefaultArgumentKind::Column:
-          printFlag("default_arg", "__COLUMN__");
+          printField("default_arg", "__COLUMN__");
           break;
 
         case DefaultArgumentKind::DSOHandle:
-          printFlag("default_arg", "__DSO_HANDLE__");
+          printField("default_arg", "__DSO_HANDLE__");
           break;
 
         case DefaultArgumentKind::File:
-          printFlag("default_arg", "__FILE__");
+          printField("default_arg", "__FILE__");
           break;
 
         case DefaultArgumentKind::Function:
-          printFlag("default_arg", "__FUNCTION__");
+          printField("default_arg", "__FUNCTION__");
           break;
 
         case DefaultArgumentKind::Inherited:
-          printFlag("default_arg", "inherited");
+          printField("default_arg", "inherited");
           break;
 
         case DefaultArgumentKind::Line:
-          printFlag("default_arg", "__LINE__");
+          printField("default_arg", "__LINE__");
           break;
 
         case DefaultArgumentKind::Normal:
-          printFlag("default_arg", "normal");
+          printField("default_arg", "normal");
           break;
         }
 

@@ -31,6 +31,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/Parameter.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -1410,15 +1411,12 @@ void IRGenSILFunction::estimateStackSize() {
 /// Determine the number of source-level Swift of a function or closure.
 static unsigned countArgs(DeclContext *DC) {
   unsigned N = 0;
-  auto count = [&](ArrayRef<Pattern *> Patterns) {
-    for (auto p : Patterns)
-      p->forEachVariable([&](VarDecl *VD) { ++N; });
-  };
-
-  if (auto *Fn = dyn_cast<AbstractFunctionDecl>(DC))
-    count(Fn->getBodyParamPatterns());
-  else if (auto *Closure = dyn_cast<AbstractClosureExpr>(DC))
-    count(Closure->getParamPatterns());
+  if (auto *Fn = dyn_cast<AbstractFunctionDecl>(DC)) {
+    for (auto *PL : Fn->getParameterLists())
+      N += PL->size();
+    
+  } else if (auto *Closure = dyn_cast<AbstractClosureExpr>(DC))
+    N += Closure->getParameters()->size();
   else
     llvm_unreachable("unhandled declcontext type");
   return N;

@@ -710,7 +710,8 @@ void ClangImporter::Implementation::addEntryToLookupTable(
 
     // Also add the subscript entry, if needed.
     if (importedName.IsSubscriptAccessor)
-      table.addEntry(DeclName(SwiftContext, SwiftContext.Id_subscript, { }),
+      table.addEntry(DeclName(SwiftContext, SwiftContext.Id_subscript,
+                              ArrayRef<Identifier>()),
                      named, effectiveContext);
   } else if (auto category = dyn_cast<clang::ObjCCategoryDecl>(named)) {
     table.addCategory(category);

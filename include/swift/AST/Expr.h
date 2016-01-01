@@ -47,6 +47,7 @@ namespace swift {
   class ConstructorDecl;
   class TypeDecl;
   class PatternBindingDecl;
+  class ParameterList;
   
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
@@ -2768,14 +2769,14 @@ class AbstractClosureExpr : public Expr, public DeclContext {
   CaptureInfo Captures;
 
   /// \brief The set of parameters.
-  Pattern *ParamPattern;
+  ParameterList *parameterList;
 
 public:
   AbstractClosureExpr(ExprKind Kind, Type FnType, bool Implicit,
                       unsigned Discriminator, DeclContext *Parent)
       : Expr(Kind, Implicit, FnType),
         DeclContext(DeclContextKind::AbstractClosureExpr, Parent),
-        ParamPattern(nullptr) {
+        parameterList(nullptr) {
     AbstractClosureExprBits.Discriminator = Discriminator;
   }
 
@@ -2783,9 +2784,9 @@ public:
   const CaptureInfo &getCaptureInfo() const { return Captures; }
 
   /// \brief Retrieve the parameters of this closure.
-  Pattern *getParams() { return ParamPattern; }
-  const Pattern *getParams() const { return ParamPattern; }
-  void setParams(Pattern *P);
+  ParameterList *getParameters() { return parameterList; }
+  const ParameterList *getParameters() const { return parameterList; }
+  void setParameterList(ParameterList *P);
 
   // Expose this to users.
   using DeclContext::setParent;
@@ -2818,11 +2819,12 @@ public:
       decltype(AbstractClosureExprBits)::InvalidDiscriminator
   };
 
-  ArrayRef<Pattern *> getParamPatterns() {
-    return ParamPattern ? ParamPattern : ArrayRef<Pattern *> ();
+  ArrayRef<ParameterList *> getParameterLists() {
+    return parameterList ? parameterList : ArrayRef<ParameterList *>();
   }
-  ArrayRef<const Pattern *> getParamPatterns() const {
-    return ParamPattern ? ParamPattern : ArrayRef<const Pattern *> ();
+  
+  ArrayRef<const ParameterList *> getParameterLists() const {
+    return parameterList ? parameterList : ArrayRef<const ParameterList *>();
   }
 
   unsigned getNaturalArgumentCount() const { return 1; }
@@ -2914,7 +2916,7 @@ class ClosureExpr : public AbstractClosureExpr {
   llvm::PointerIntPair<BraceStmt *, 1, bool> Body;
   
 public:
-  ClosureExpr(Pattern *params, SourceLoc throwsLoc, SourceLoc arrowLoc,
+  ClosureExpr(ParameterList *params, SourceLoc throwsLoc, SourceLoc arrowLoc,
               SourceLoc inLoc, TypeLoc explicitResultType,
               unsigned discriminator, DeclContext *parent)
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
@@ -2922,7 +2924,7 @@ public:
       ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc), InLoc(inLoc),
       ExplicitResultType(explicitResultType),
       Body(nullptr) {
-    setParams(params);
+    setParameterList(params);
     ClosureExprBits.HasAnonymousClosureVars = false;
     ClosureExprBits.IsVoidConversionClosure = false;
   }

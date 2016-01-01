@@ -105,8 +105,8 @@ bool swift::requiresObjCDispatch(ValueDecl *vd) {
 }
 
 static unsigned getFuncNaturalUncurryLevel(AnyFunctionRef AFR) {
-  assert(AFR.getBodyParamPatterns().size() >= 1 && "no arguments for func?!");
-  unsigned Level = AFR.getBodyParamPatterns().size() - 1;
+  assert(AFR.getParameterLists().size() >= 1 && "no arguments for func?!");
+  unsigned Level = AFR.getParameterLists().size() - 1;
   // Functions with captures have an extra uncurry level for the capture
   // context.
   if (AFR.getCaptureInfo().hasLocalCaptures())
@@ -209,7 +209,7 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
   } else if (auto *ACE = baseLoc.dyn_cast<AbstractClosureExpr *>()) {
     loc = ACE;
     kind = Kind::Func;
-    assert(ACE->getParamPatterns().size() >= 1 &&
+    assert(ACE->getParameterLists().size() >= 1 &&
            "no param patterns for function?!");
     naturalUncurryLevel = getFuncNaturalUncurryLevel(ACE);
   } else {

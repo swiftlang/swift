@@ -1118,7 +1118,7 @@ public:
   /// \param params The parameter types to the function.
   /// \param isVariadic Whether the function is variadic.
   /// \param isNoReturn Whether the function is noreturn.
-  /// \param bodyPatterns The patterns visible inside the function body.
+  /// \param parameterList The parameters visible inside the function body.
   ///
   /// \returns the imported function type, or null if the type cannot be
   /// imported.
@@ -1128,7 +1128,7 @@ public:
                           bool isVariadic, bool isNoReturn,
                           bool isFromSystemModule,
                           bool hasCustomName,
-                          SmallVectorImpl<Pattern*> &bodyPatterns,
+                          ParameterList **parameterList,
                           DeclName &name);
 
   Type importPropertyType(const clang::ObjCPropertyDecl *clangDecl,
@@ -1164,7 +1164,7 @@ public:
   /// \param isNoReturn Whether the function is noreturn.
   /// \param isFromSystemModule Whether to apply special rules that only apply
   ///   to system APIs.
-  /// \param bodyPatterns The patterns visible inside the function body.
+  /// \param bodyParams The patterns visible inside the function body.
   ///   whether the created arg/body patterns are different (selector-style).
   /// \param importedName The name of the imported method.
   /// \param errorConvention Information about the method's error conventions.
@@ -1178,7 +1178,7 @@ public:
                         ArrayRef<const clang::ParmVarDecl *> params,
                         bool isVariadic, bool isNoReturn,
                         bool isFromSystemModule,
-                        SmallVectorImpl<Pattern*> &bodyPatterns,
+                        ParameterList **bodyParams,
                         ImportedName importedName,
                         DeclName &name,
                         Optional<ForeignErrorConvention> &errorConvention,

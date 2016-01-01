@@ -1521,7 +1521,7 @@ Expr *Parser::parseExprEditorPlaceholder(Token PlaceholderTok,
 
 bool Parser::
 parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
-                               Pattern *&params, SourceLoc &throwsLoc,
+                               ParameterList *&params, SourceLoc &throwsLoc,
                                SourceLoc &arrowLoc,
                                TypeRepr *&explicitResultType, SourceLoc &inLoc){
   // Clear out result parameters.
@@ -1708,33 +1708,26 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
         invalid = true;
     } else {
       // Parse identifier (',' identifier)*
-      SmallVector<TuplePatternElt, 4> elements;
+      SmallVector<Parameter, 4> elements;
       do {
-        if (Tok.is(tok::identifier) || Tok.is(tok::kw__)) {
-          Identifier name = Tok.is(tok::identifier) ?
-              Context.getIdentifier(Tok.getText()) : Identifier();
-          auto var = new (Context) ParamDecl(/*IsLet*/ true,
-                                             SourceLoc(), Identifier(),
-                                             Tok.getLoc(),
-                                             name,
-                                             Type(), nullptr);
-          elements.push_back(TuplePatternElt(new (Context) NamedPattern(var)));
-          consumeToken();
-        } else {
+        if (Tok.isNot(tok::identifier, tok::kw__)) {
           diagnose(Tok, diag::expected_closure_parameter_name);
           invalid = true;
           break;
         }
 
+        Identifier name = Tok.is(tok::identifier) ?
+            Context.getIdentifier(Tok.getText()) : Identifier();
+        auto var = new (Context) ParamDecl(/*IsLet*/ true, SourceLoc(),
+                                           Identifier(), Tok.getLoc(), name,
+                                           Type(), nullptr);
+        elements.push_back(Parameter::withoutLoc(var));
+        consumeToken();
+ 
         // Consume a comma to continue.
-        if (consumeIf(tok::comma)) {
-          continue;
-        }
+      } while (consumeIf(tok::comma));
 
-        break;
-      } while (true);
-
-      params = TuplePattern::create(Context, SourceLoc(), elements,SourceLoc());
+      params = ParameterList::create(Context, elements);
     }
     
     if (Tok.is(tok::kw_throws)) {
@@ -1807,7 +1800,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
   SourceLoc leftBrace = consumeToken();
 
   // Parse the closure-signature, if present.
-  Pattern *params = nullptr;
+  ParameterList *params = nullptr;
   SourceLoc throwsLoc;
   SourceLoc arrowLoc;
   TypeRepr *explicitResultType;
@@ -1839,7 +1832,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
   // Handle parameters.
   if (params) {
     // Add the parameters into scope.
-    addPatternVariablesToScope(params);
+    addParametersToScope(params);
   } else {
     // There are no parameters; allow anonymous closure variables.
     // FIXME: We could do this all the time, and then provide Fix-Its
@@ -1867,18 +1860,17 @@ ParserResult<Expr> Parser::parseExprClosure() {
   if (!params) {
     // Create a parameter pattern containing the anonymous variables.
     auto &anonVars = AnonClosureVars.back().second;
-    SmallVector<TuplePatternElt, 4> elements;
-    for (auto anonVar : anonVars) {
-      elements.push_back(TuplePatternElt(new (Context) NamedPattern(anonVar)));
-    }
-    params = TuplePattern::createSimple(Context, leftBrace, elements,
-                                        leftBrace, /*implicit*/true);
+    SmallVector<Parameter, 4> elements;
+    for (auto anonVar : anonVars)
+      elements.push_back(Parameter::withoutLoc(anonVar));
+    
+    params = ParameterList::create(Context, leftBrace, elements, leftBrace);
 
     // Pop out of the anonymous closure variables scope.
     AnonClosureVars.pop_back();
 
     // Attach the parameters to the closure.
-    closure->setParams(params);
+    closure->setParameterList(params);
     closure->setHasAnonymousClosureVars();
   }
 
@@ -1954,7 +1946,7 @@ Expr *Parser::parseExprAnonClosureArg() {
   // generate the anonymous variables we need.
   auto closure = dyn_cast_or_null<ClosureExpr>(
       dyn_cast<AbstractClosureExpr>(CurDeclContext));
-  if (!closure || closure->getParams()) {
+  if (!closure || closure->getParameters()) {
     // FIXME: specialize diagnostic when there were closure parameters.
     // We can be fairly smart here.
     diagnose(Loc, closure ? diag::anon_closure_arg_in_closure_with_args
@@ -1970,9 +1962,9 @@ Expr *Parser::parseExprAnonClosureArg() {
     StringRef varName = ("$" + Twine(nextIdx)).toStringRef(StrBuf);
     Identifier ident = Context.getIdentifier(varName);
     SourceLoc varLoc = leftBraceLoc;
-    VarDecl *var = new (Context) ParamDecl(/*IsLet*/ true,
-                                           SourceLoc(), Identifier(),
-                                           varLoc, ident, Type(), closure);
+    auto *var = new (Context) ParamDecl(/*IsLet*/ true, SourceLoc(),
+                                        Identifier(), varLoc, ident, Type(),
+                                        closure);
     decls.push_back(var);
   }
 
@@ -2350,6 +2342,13 @@ void Parser::addPatternVariablesToScope(ArrayRef<Pattern *> Patterns) {
     });
   }
 }
+
+void Parser::addParametersToScope(ParameterList *PL) {
+  for (auto &param : *PL)
+    if (param.decl->hasName())
+      addToScope(param.decl);
+}
+
 
 
 /// Parse availability query specification.

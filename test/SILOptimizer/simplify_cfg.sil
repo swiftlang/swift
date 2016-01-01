@@ -993,7 +993,7 @@ sil @_TFC3ccb4Base6middlefS0_FT_T_ : $@convention(method) (@guaranteed Base) -> 
 // CHECK-LABEL: sil @redundant_checked_cast_br
 sil @redundant_checked_cast_br : $@convention(method) (@guaranteed Base) -> () {
 bb0(%0 : $Base):
-// CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle!1 : Base -> () -> () , $@convention(method) (@guaranteed Base) -> ()
+// CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle!1 : (Base) -> () -> () , $@convention(method) (@guaranteed Base) -> ()
   %1 = class_method %0 : $Base, #Base.middle!1 : Base -> () -> () , $@convention(method) (@guaranteed Base) -> ()
 // CHECK: checked_cast_br [exact] %0 : $Base to $Base, [[SUCCESS:bb[0-9]+]], [[FAIL:bb[0-9]+]]
   checked_cast_br [exact] %0 : $Base to $Base, bb2, bb7
@@ -1041,7 +1041,7 @@ bb7:
 // CHECK-LABEL: sil @not_redundant_checked_cast_br : $@convention(method) (@guaranteed Base) -> () {
 sil @not_redundant_checked_cast_br : $@convention(method) (@guaranteed Base) -> () {
 bb0(%0 : $Base):
-// CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle!1 : Base -> () -> () , $@convention(method) (@guaranteed Base) -> ()
+// CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle!1 : (Base) -> () -> () , $@convention(method) (@guaranteed Base) -> ()
   %1 = class_method %0 : $Base, #Base.middle!1 : Base -> () -> () , $@convention(method) (@guaranteed Base) -> ()
 // CHECK: checked_cast_br [exact] %0 : $Base to $Base, [[SUCCESS:bb[0-9]+]], [[FAIL:bb[0-9]+]]
   checked_cast_br [exact] %0 : $Base to $Base, bb2, bb7
@@ -1052,7 +1052,7 @@ bb1:
 
 bb2(%5 : $Base):
 // CHECK: [[SUCCESS]]
-// CHECK: [[METHOD2:%.*]] = class_method %0 : $Base, #Base.inner!1 : Base -> () -> () , $@convention(method) (@guaranteed Base) -> ()
+// CHECK: [[METHOD2:%.*]] = class_method %0 : $Base, #Base.inner!1 : (Base) -> () -> () , $@convention(method) (@guaranteed Base) -> ()
   %7 = class_method %0 : $Base, #Base.inner!1 : Base -> () -> () , $@convention(method) (@guaranteed Base) -> ()
   %8 = apply %7(%0) : $@convention(method) (@guaranteed Base) -> ()
   br bb4
@@ -1067,7 +1067,7 @@ bb4:
   br bb6(%13 : $())
 
 bb5:
-  %14 = class_method %0 : $Base, #Base.inner!1 : Base -> () -> () , $@convention(method) (@guaranteed Base) -> ()
+  %14 = class_method %0 : $Base, #Base.inner!1 : (Base) -> () -> () , $@convention(method) (@guaranteed Base) -> ()
   %15 = apply %14(%0) : $@convention(method) (@guaranteed Base) -> ()
   br bb4
 
@@ -1086,7 +1086,7 @@ bb7:
 // CHECK-LABEL: sil @failing_checked_cast_br
 sil @failing_checked_cast_br : $@convention(method) (@guaranteed Base) -> () {
 bb0(%0 : $Base):
-// CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle!1 : Base -> () -> () , $@convention(method) (@guaranteed Base) -> ()
+// CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle!1 : (Base) -> () -> () , $@convention(method) (@guaranteed Base) -> ()
   %1 = class_method %0 : $Base, #Base.middle!1 : Base -> () -> () , $@convention(method) (@guaranteed Base) -> ()
 // CHECK: checked_cast_br [exact] %0 : $Base to $Base, [[SUCCESS:bb[0-9]+]], [[FAIL:bb[0-9]+]]
   checked_cast_br [exact] %0 : $Base to $Base, bb2, bb7
@@ -1098,7 +1098,7 @@ bb1:
 
 bb2(%5 : $Base):
 // CHECK: [[SUCCESS]]
-// CHECK: [[METHOD2:%.*]] = class_method %0 : $Base, #Base.inner!1 : Base -> () -> () , $@convention(method) (@guaranteed Base) -> ()
+// CHECK: [[METHOD2:%.*]] = class_method %0 : $Base, #Base.inner!1 : (Base) -> () -> () , $@convention(method) (@guaranteed Base) -> ()
   %7 = class_method %0 : $Base, #Base.inner!1 : Base -> () -> () , $@convention(method) (@guaranteed Base) -> ()
 // CHECK-NOT: checked_cast_br [exact] %0 : $Base to $Derived
 // CHECK: apply [[METHOD2]]

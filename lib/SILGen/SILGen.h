@@ -247,7 +247,7 @@ public:
   
   /// Emits the default argument generator for the given function.
   void emitDefaultArgGenerators(SILDeclRef::Loc decl,
-                                ArrayRef<Pattern*> patterns);
+                                ArrayRef<ParameterList*> paramLists);
 
   /// Emits the curry thunk between two uncurry levels of a function.
   void emitCurryThunk(ValueDecl *fd,

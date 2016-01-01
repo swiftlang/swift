@@ -2562,7 +2562,7 @@ static bool isUnavailableInExistential(TypeChecker &tc, ValueDecl *decl) {
 
     // Allow functions to return Self, but not have Self anywhere in
     // their argument types.
-    for (unsigned i = 1, n = afd->getNumParamPatterns(); i != n; ++i) {
+    for (unsigned i = 1, n = afd->getNumParameterLists(); i != n; ++i) {
       // Check whether the input type contains Self anywhere.
       auto fnType = type->castTo<AnyFunctionType>();
       if (containsProtocolSelf(fnType->getInput()))

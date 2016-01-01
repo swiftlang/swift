@@ -702,67 +702,6 @@ static void revertDependentTypeLoc(TypeLoc &tl) {
   tl.setType(Type(), /*validated=*/false);
 }
 
-static void revertDependentPattern(Pattern *pattern) {
-  // Clear out the pattern's type.
-  if (pattern->hasType()) {
-    // If the type of the pattern was in error, we're done.
-    if (pattern->getType()->is<ErrorType>())
-      return;
-
-    pattern->overwriteType(Type());
-  }
-
-  switch (pattern->getKind()) {
-#define PATTERN(Id, Parent)
-#define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
-#include "swift/AST/PatternNodes.def"
-    // Do nothing for refutable patterns.
-    break;
-
-  case PatternKind::Any:
-    // Do nothing;
-    break;
-
-  case PatternKind::Named: {
-    // Clear out the type of the variable.
-    auto named = cast<NamedPattern>(pattern);
-    if (named->getDecl()->hasType() &&
-        !named->getDecl()->isInvalid())
-      named->getDecl()->overwriteType(Type());
-    break;
-  }
-
-  case PatternKind::Paren:
-    // Recurse into parentheses patterns.
-    revertDependentPattern(cast<ParenPattern>(pattern)->getSubPattern());
-    break;
-      
-  case PatternKind::Var:
-    // Recurse into var patterns.
-    revertDependentPattern(cast<VarPattern>(pattern)->getSubPattern());
-    break;
-
-  case PatternKind::Tuple: {
-    // Recurse into tuple elements.
-    auto tuple = cast<TuplePattern>(pattern);
-    for (auto &field : tuple->getElements()) {
-      revertDependentPattern(field.getPattern());
-    }
-    break;
-  }
-
-  case PatternKind::Typed: {
-    // Revert the type annotation.
-    auto typed = cast<TypedPattern>(pattern);
-    revertDependentTypeLoc(typed->getTypeLoc());
-
-    // Revert the subpattern.
-    revertDependentPattern(typed->getSubPattern());
-    break;
-  }
-  }
-}
-
 /// Revert the dependent types within the given generic parameter list.
 void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
   // Revert the inherited clause of the generic parameter list.
@@ -938,16 +877,18 @@ bool TypeChecker::handleSILGenericParams(
 
 void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {
   // Revert the result type.
-  if (auto fn = dyn_cast<FuncDecl>(func)) {
-    if (!fn->getBodyResultTypeLoc().isNull()) {
+  if (auto fn = dyn_cast<FuncDecl>(func))
+    if (!fn->getBodyResultTypeLoc().isNull())
       revertDependentTypeLoc(fn->getBodyResultTypeLoc());
-    }
-  }
 
-  // Revert the body patterns.
-  ArrayRef<Pattern *> bodyPatterns = func->getBodyParamPatterns();
-  for (auto bodyPattern : bodyPatterns) {
-    revertDependentPattern(bodyPattern);
+  // Revert the body parameter types.
+  for (auto paramList : func->getParameterLists()) {
+    for (auto &param : *paramList) {
+      // Clear out the type of the decl.
+      if (param.decl->hasType() && !param.decl->isInvalid())
+        param.decl->overwriteType(Type());
+      revertDependentTypeLoc(param.type);
+    }
   }
 
   // Revert the generic parameter list.
@@ -1390,18 +1331,14 @@ Type swift::configureImplicitSelf(TypeChecker &tc,
   Type selfTy = func->computeSelfType();
   assert(selfDecl && selfTy && "Not a method");
 
-  if (selfDecl->hasType())
-    return selfDecl->getType();
-
   // 'self' is 'let' for reference types (i.e., classes) or when 'self' is
   // neither inout.
   selfDecl->setLet(!selfTy->is<InOutType>());
-  selfDecl->setType(selfTy);
-
-  auto bodyPattern = cast<TypedPattern>(func->getBodyParamPatterns()[0]);
-  if (!bodyPattern->getTypeLoc().getTypeRepr())
-    bodyPattern->getTypeLoc() = TypeLoc::withoutLoc(selfTy);
-
+  selfDecl->overwriteType(selfTy);
+  
+  // Install the self type on the Parameter that contains it.  This ensures that
+  // we don't lose it when generic types get reverted.
+  selfDecl->getParameter().type = TypeLoc::withoutLoc(selfTy);
   return selfTy;
 }
 
@@ -2054,12 +1991,8 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
     Optional<Accessibility> minAccess;
     const TypeRepr *complainRepr = nullptr;
     bool problemIsElement = false;
-    SD->getIndices()->forEachNode([&](const Pattern *P) {
-      auto *TP = dyn_cast<TypedPattern>(P);
-      if (!TP)
-        return;
-
-      checkTypeAccessibility(TC, TP->getTypeLoc(), SD,
+    for (auto &P : *SD->getIndices()) {
+      checkTypeAccessibility(TC, P.type, SD,
                              [&](Accessibility typeAccess,
                                  const TypeRepr *thisComplainRepr) {
         if (!minAccess || *minAccess > typeAccess) {
@@ -2067,7 +2000,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
           complainRepr = thisComplainRepr;
         }
       });
-    });
+    }
 
     checkTypeAccessibility(TC, SD->getElementTypeLoc(), SD,
                            [&](Accessibility typeAccess,
@@ -2112,16 +2045,9 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
 
     Optional<Accessibility> minAccess;
     const TypeRepr *complainRepr = nullptr;
-    bool problemIsResult = false;
-    std::for_each(fn->getBodyParamPatterns().begin() + isTypeContext,
-                  fn->getBodyParamPatterns().end(),
-                  [&](const Pattern *paramList) {
-      paramList->forEachNode([&](const Pattern *P) {
-        auto *TP = dyn_cast<TypedPattern>(P);
-        if (!TP)
-          return;
-
-        checkTypeAccessibility(TC, TP->getTypeLoc(), fn,
+    for (auto *PL : fn->getParameterLists().slice(isTypeContext)) {
+      for (auto &P : *PL) {
+        checkTypeAccessibility(TC, P.type, fn,
                                [&](Accessibility typeAccess,
                                    const TypeRepr *thisComplainRepr) {
           if (!minAccess || *minAccess > typeAccess) {
@@ -2129,9 +2055,10 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
             complainRepr = thisComplainRepr;
           }
         });
-      });
-    });
+      }
+    }
 
+    bool problemIsResult = false;
     if (auto FD = dyn_cast<FuncDecl>(fn)) {
       checkTypeAccessibility(TC, FD->getBodyResultTypeLoc(), FD,
                              [&](Accessibility typeAccess,
@@ -3038,8 +2965,8 @@ public:
 
     auto dc = SD->getDeclContext();
     bool isInvalid = TC.validateType(SD->getElementTypeLoc(), dc);
-    isInvalid |= TC.typeCheckPattern(SD->getIndices(), dc,
-                                     TR_ImmediateFunctionInput);
+    isInvalid |= TC.typeCheckParameterList(SD->getIndices(), dc,
+                                           TypeResolutionOptions());
 
     if (isInvalid) {
       SD->overwriteType(ErrorType::get(TC.Context));
@@ -3051,7 +2978,7 @@ public:
         return;
 
       // Relabel the indices according to the subscript name.
-      auto indicesType = SD->getIndices()->getType();
+      auto indicesType = SD->getIndices()->getType(TC.Context);
       SD->setType(FunctionType::get(indicesType, SD->getElementType()));
 
       // If we're in a generic context, set the interface type.
@@ -3604,20 +3531,14 @@ public:
 
   bool semaFuncParamPatterns(AbstractFunctionDecl *fd,
                              GenericTypeResolver *resolver = nullptr) {
-    // Type check the body patterns.
-    bool badType = false;
-    auto bodyPatterns = fd->getBodyParamPatterns();
-    for (unsigned i = 0, e = bodyPatterns.size(); i != e; ++i) {
-      auto *bodyPat = bodyPatterns[i];
-
-      if (bodyPat->hasType())
-        continue;
-
-      if (TC.typeCheckPattern(bodyPat, fd, TR_ImmediateFunctionInput, resolver))
-        badType = true;
+    bool hadError = false;
+    for (auto paramList : fd->getParameterLists()) {
+      hadError |= TC.typeCheckParameterList(paramList, fd,
+                                            TypeResolutionOptions(),
+                                            resolver);
     }
 
-    return badType;
+    return hadError;
   }
 
   void semaFuncDecl(FuncDecl *FD, GenericTypeResolver *resolver) {
@@ -3667,19 +3588,18 @@ public:
     // patterns.
     GenericParamList *genericParams = FD->getGenericParams();
     GenericParamList *outerGenericParams = nullptr;
-    auto patterns = FD->getBodyParamPatterns();
+    auto paramLists = FD->getParameterLists();
     bool hasSelf = FD->getDeclContext()->isTypeContext();
     if (FD->getDeclContext()->isGenericTypeContext())
       outerGenericParams = FD->getDeclContext()->getGenericParamsOfContext();
 
-    for (unsigned i = 0, e = patterns.size(); i != e; ++i) {
-      if (!patterns[e - i - 1]->hasType()) {
+    for (unsigned i = 0, e = paramLists.size(); i != e; ++i) {
+      Type argTy = paramLists[e - i - 1]->getType(TC.Context);
+      if (!argTy) {
         FD->setType(ErrorType::get(TC.Context));
         FD->setInvalid();
         return;
       }
-      
-      Type argTy = patterns[e - i - 1]->getType();
 
       // Determine the appropriate generic parameters at this level.
       GenericParamList *params = nullptr;
@@ -3995,11 +3915,8 @@ public:
         Type valueTy = ASD->getType()->getReferenceStorageReferent();
         if (FD->isObservingAccessor() || (FD->isSetter() && FD->isImplicit())) {
           unsigned firstParamIdx = FD->getParent()->isTypeContext();
-          auto *firstParamPattern = FD->getBodyParamPatterns()[firstParamIdx];
-          auto *tuplePattern = cast<TuplePattern>(firstParamPattern);
-          auto *paramPattern = tuplePattern->getElements().front().getPattern();
-          auto *paramTypePattern = cast<TypedPattern>(paramPattern);
-          paramTypePattern->getTypeLoc().setType(valueTy, true);
+          auto *firstParamPattern = FD->getParameterList(firstParamIdx);
+          firstParamPattern->get(0).type.setType(valueTy, true);
         } else if (FD->isGetter() && FD->isImplicit()) {
           FD->getBodyResultTypeLoc().setType(valueTy, true);
         }
@@ -4023,7 +3940,7 @@ public:
         TC.checkGenericParamList(&builder, gp, FD->getDeclContext());
 
         // Infer requirements from parameter patterns.
-        for (auto pattern : FD->getBodyParamPatterns()) {
+        for (auto pattern : FD->getParameterLists()) {
           builder.inferRequirements(pattern, gp);
         }
 
@@ -4152,41 +4069,37 @@ public:
     // closure parameter; warn about such things, because the closure will not
     // be treated as a trailing closure.
     if (!FD->isImplicit()) {
-      auto paramPattern = FD->getBodyParamPatterns()[
-                            FD->getDeclContext()->isTypeContext() ? 1 : 0];
-      if (auto paramTuple = dyn_cast<TuplePattern>(paramPattern)) {
-        ArrayRef<TuplePatternElt> fields = paramTuple->getElements();
-        unsigned n = fields.size();
-        bool anyDefaultArguments = false;
-        for (unsigned i = n; i > 0; --i) {
-          // Determine whether the parameter is of (possibly lvalue, possibly
-          // optional), non-autoclosure function type, which could receive a
-          // closure. We look at the type sugar directly, so that one can
-          // suppress this warning by adding parentheses.
-          auto paramType = fields[i-1].getPattern()->getType();
+      auto paramList = FD->getParameterList(FD->getImplicitSelfDecl() ? 1 : 0);
+      bool anyDefaultArguments = false;
+      for (unsigned i = paramList->size(); i != 0; --i) {
+        // Determine whether the parameter is of (possibly lvalue, possibly
+        // optional), non-autoclosure function type, which could receive a
+        // closure. We look at the type sugar directly, so that one can
+        // suppress this warning by adding parentheses.
+        auto &param = paramList->get(i-1);
+        auto paramType = param.decl->getType();
 
-          if (auto *funcTy = isUnparenthesizedTrailingClosure(paramType)) {
-            // If we saw any default arguments before this, complain.
-            // This doesn't apply to autoclosures.
-            if (anyDefaultArguments && !funcTy->getExtInfo().isAutoClosure()) {
-              TC.diagnose(fields[i-1].getPattern()->getStartLoc(),
-                          diag::non_trailing_closure_before_default_args)
-              .highlight(SourceRange(fields[i].getPattern()->getStartLoc(),
-                                     fields[n-1].getPattern()->getEndLoc()));
-            }
-
-            break;
+        if (auto *funcTy = isUnparenthesizedTrailingClosure(paramType)) {
+          // If we saw any default arguments before this, complain.
+          // This doesn't apply to autoclosures.
+          if (anyDefaultArguments && !funcTy->getExtInfo().isAutoClosure()) {
+            TC.diagnose(param.getStartLoc(),
+                        diag::non_trailing_closure_before_default_args)
+            .highlight(SourceRange(param.getStartLoc(),
+                                   param.getEndLoc()));
           }
 
-          // If we have a default argument, keep going.
-          if (fields[i-1].getDefaultArgKind() != DefaultArgumentKind::None) {
-            anyDefaultArguments = true;
-            continue;
-          }
-
-          // We're done.
           break;
         }
+
+        // If we have a default argument, keep going.
+        if (param.defaultArgumentKind != DefaultArgumentKind::None) {
+          anyDefaultArguments = true;
+          continue;
+        }
+
+        // We're done.
+        break;
       }
     }
   }
@@ -4243,10 +4156,6 @@ public:
     return true;
   }
 
-  static const Pattern *getTupleElementPattern(const TuplePatternElt &elt) {
-    return elt.getPattern();
-  }
-
   /// Drop the optionality of the result type of the given function type.
   static Type dropResultOptionality(Type type, unsigned uncurryLevel) {
     // We've hit the result type.
@@ -4285,28 +4194,22 @@ public:
     parentTy = parentTy->getResult()->castTo<AnyFunctionType>();
 
     // Check the parameter types.
-    auto checkParam = [&](const Pattern *paramPattern, Type parentParamTy) {
-      Type paramTy = paramPattern->getType();
+    auto checkParam = [&](const Parameter &param, Type parentParamTy) {
+      Type paramTy = param.decl->getType();
       if (!paramTy || !paramTy->getImplicitlyUnwrappedOptionalObjectType())
         return;
       if (!parentParamTy || parentParamTy->getAnyOptionalObjectType())
         return;
 
-      if (auto parenPattern = dyn_cast<ParenPattern>(paramPattern))
-        paramPattern = parenPattern->getSubPattern();
-      if (auto varPattern = dyn_cast<VarPattern>(paramPattern))
-        paramPattern = varPattern->getSubPattern();
-      auto typedParamPattern = dyn_cast<TypedPattern>(paramPattern);
-      if (!typedParamPattern)
+      TypeLoc TL = param.type;
+      if (!param.type.getTypeRepr())
         return;
-
-      TypeLoc TL = typedParamPattern->getTypeLoc();
 
       // Allow silencing this warning using parens.
       if (isa<ParenType>(TL.getType().getPointer()))
         return;
 
-      TC.diagnose(paramPattern->getLoc(), diag::override_unnecessary_IUO,
+      TC.diagnose(param.getStartLoc(), diag::override_unnecessary_IUO,
                   method->getDescriptiveKind(), parentParamTy, paramTy)
         .highlight(TL.getSourceRange());
 
@@ -4324,33 +4227,17 @@ public:
         .fixItInsertAfter(TL.getSourceRange().End, ")");
     };
 
-    auto rawParamPatterns = method->getBodyParamPatterns()[1];
-    auto paramPatterns = dyn_cast<TuplePattern>(rawParamPatterns);
-
+    auto paramList = method->getParameterList(1);
     auto parentInput = parentTy->getInput();
-    auto parentTupleInput = parentInput->getAs<TupleType>();
-    if (parentTupleInput) {
-      if (paramPatterns) {
-        // FIXME: If we ever allow argument reordering, this is incorrect.
-        ArrayRef<TuplePatternElt> sharedParams = paramPatterns->getElements();
-        sharedParams = sharedParams.slice(0,
-                                          parentTupleInput->getNumElements());
-
-        using PatternView = ArrayRefView<TuplePatternElt, const Pattern *,
-                                         getTupleElementPattern>;
-        for_each(PatternView(sharedParams), parentTupleInput->getElementTypes(),
-                 checkParam);
-      } else if (parentTupleInput->getNumElements() > 0) {
-        checkParam(rawParamPatterns, parentTupleInput->getElementType(0));
-      }
+    
+    if (auto parentTupleInput = parentInput->getAs<TupleType>()) {
+      // FIXME: If we ever allow argument reordering, this is incorrect.
+      ArrayRef<Parameter> sharedParams = paramList->getArray();
+      sharedParams = sharedParams.slice(0, parentTupleInput->getNumElements());
+      for_each(sharedParams, parentTupleInput->getElementTypes(), checkParam);
     } else {
       // Otherwise, the parent has a single parameter with no label.
-      if (paramPatterns) {
-        checkParam(paramPatterns->getElements().front().getPattern(),
-                   parentInput);
-      } else {
-        checkParam(rawParamPatterns, parentInput);
-      }
+      checkParam(paramList->get(0), parentInput);
     }
 
     auto methodAsFunc = dyn_cast<FuncDecl>(method);
@@ -5407,7 +5294,7 @@ public:
         TC.checkGenericParamList(&builder, gp, CD->getDeclContext());
 
         // Infer requirements from the parameters of the constructor.
-        builder.inferRequirements(CD->getBodyParamPatterns()[1], gp);
+        builder.inferRequirements(CD->getParameterList(1), gp);
 
         // Revert the types within the signature so it can be type-checked with
         // archetypes below.
@@ -5431,7 +5318,7 @@ public:
       CD->setInvalid();
     } else {
       configureConstructorType(CD, SelfTy,
-                               CD->getBodyParamPatterns()[1]->getType(),
+                               CD->getParameterList(1)->getType(TC.Context),
                                CD->getThrowsLoc().isValid());
     }
 
@@ -5973,8 +5860,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
           
           return;
         }
-      } else if (VD->isImplicit() &&
-                 (VD->getName() == Context.Id_self)) {
+      } else if (VD->isSelfParameter()) {
         // If the variable declaration is for a 'self' parameter, it may be
         // because the self variable was reverted whilst validating the function
         // signature.  In that case, reset the type.
@@ -7062,15 +6948,11 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
         // We have a function. Make sure that the number of parameters
         // matches the "number of colons" in the name.
         auto func = cast<AbstractFunctionDecl>(D);
-        auto bodyPattern = func->getBodyParamPatterns()[1];
-        unsigned numParameters;
-        if (isa<ConstructorDecl>(func) &&
-            cast<ConstructorDecl>(func)->isObjCZeroParameterWithLongSelector())
-          numParameters = 0;
-        else if (auto tuple = dyn_cast<TuplePattern>(bodyPattern))
-          numParameters = tuple->getNumElements();
-        else
-          numParameters = 1;
+        auto params = func->getParameterList(1);
+        unsigned numParameters = params->size();
+        if (auto CD = dyn_cast<ConstructorDecl>(func))
+          if (CD->isObjCZeroParameterWithLongSelector())
+            numParameters = 0;  // Something like "init(foo: ())"
 
         // A throwing method has an error parameter.
         if (func->isBodyThrowing())
@@ -7167,10 +7049,7 @@ void TypeChecker::fixAbstractFunctionNames(InFlightDiagnostic &diag,
   // Fix the argument names that need fixing.
   assert(name.getArgumentNames().size()
            == targetName.getArgumentNames().size());
-  auto pattern
-    = func->getBodyParamPatterns()[func->getDeclContext()->isTypeContext()];
-  auto tuplePattern = dyn_cast<TuplePattern>(
-                        pattern->getSemanticsProvidingPattern());
+  auto params = func->getParameterList(func->getDeclContext()->isTypeContext());
   for (unsigned i = 0, n = name.getArgumentNames().size(); i != n; ++i) {
     auto origArg = name.getArgumentNames()[i];
     auto targetArg = targetName.getArgumentNames()[i];
@@ -7178,60 +7057,37 @@ void TypeChecker::fixAbstractFunctionNames(InFlightDiagnostic &diag,
     if (origArg == targetArg)
       continue;
     
-    // Find the location to update or insert.
-    SourceLoc loc;
-    if (tuplePattern) {
-      auto origPattern = tuplePattern->getElement(i).getPattern();
-      if (auto param = cast_or_null<ParamDecl>(origPattern->getSingleVar())) {
-        // The parameter has an explicitly-specified API name, and it's wrong.
-        if (param->getArgumentNameLoc() != param->getLoc() &&
-            param->getArgumentNameLoc().isValid()) {
-          // ... but the internal parameter name was right. Just zap the
-          // incorrect explicit specialization.
-          if (param->getName() == targetArg) {
-            diag.fixItRemoveChars(param->getArgumentNameLoc(),
-                                  param->getLoc());
-            continue;
-          }
-          
-          // Fix the API name.
-          StringRef targetArgStr = targetArg.empty()? "_" : targetArg.str();
-          diag.fixItReplace(param->getArgumentNameLoc(), targetArgStr);
-          continue;
-        }
-        
-        // The parameter did not specify a separate API name. Insert one.
-        if (targetArg.empty())
-          diag.fixItInsert(param->getLoc(), "_ ");
-        else {
-          llvm::SmallString<8> targetArgStr;
-          targetArgStr += targetArg.str();
-          targetArgStr += ' ';
-          diag.fixItInsert(param->getLoc(), targetArgStr);
-        }
-
-        if (param->isImplicit()) {
-          loc = origPattern->getLoc();
-        } else {
-          continue;
-        }
+    auto *param = params->get(i).decl;
+    
+    // The parameter has an explicitly-specified API name, and it's wrong.
+    if (param->getArgumentNameLoc() != param->getLoc() &&
+        param->getArgumentNameLoc().isValid()) {
+      // ... but the internal parameter name was right. Just zap the
+      // incorrect explicit specialization.
+      if (param->getName() == targetArg) {
+        diag.fixItRemoveChars(param->getArgumentNameLoc(),
+                              param->getLoc());
+        continue;
       }
       
-      if (auto any = dyn_cast<AnyPattern>(
-                       origPattern->getSemanticsProvidingPattern())) {
-        if (any->isImplicit()) {
-          loc = origPattern->getLoc();
-        } else {
-          loc = any->getLoc();
-        }
-      } else {
-        loc = origPattern->getLoc();
-      }
-    } else if (auto paren = dyn_cast<ParenPattern>(pattern)) {
-      loc = paren->getSubPattern()->getLoc();
-    } else {
-      loc = pattern->getLoc();
+      // Fix the API name.
+      StringRef targetArgStr = targetArg.empty()? "_" : targetArg.str();
+      diag.fixItReplace(param->getArgumentNameLoc(), targetArgStr);
+      continue;
     }
+    
+    // The parameter did not specify a separate API name. Insert one.
+    if (targetArg.empty())
+      diag.fixItInsert(param->getLoc(), "_ ");
+    else {
+      llvm::SmallString<8> targetArgStr;
+      targetArgStr += targetArg.str();
+      targetArgStr += ' ';
+      diag.fixItInsert(param->getLoc(), targetArgStr);
+    }
+
+    // Find the location to update or insert.
+    SourceLoc loc = func->getLoc();
     
     StringRef replacement;
     if (targetArg.empty())

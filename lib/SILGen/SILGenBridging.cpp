@@ -15,6 +15,7 @@
 #include "Scope.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/Parameter.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"
@@ -1023,19 +1024,19 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
   }
 
   // Forward the arguments.
-  auto forwardedPatterns = fd->getBodyParamPatterns();
+  auto forwardedParameters = fd->getParameterLists();
 
   // For allocating constructors, 'self' is a metatype, not the 'self' value
   // formally present in the constructor body.
   Type allocatorSelfType;
   if (thunk.kind == SILDeclRef::Kind::Allocator) {
-    allocatorSelfType = forwardedPatterns[0]->getType();
-    forwardedPatterns = forwardedPatterns.slice(1);
+    allocatorSelfType = forwardedParameters[0]->getType(getASTContext());
+    forwardedParameters = forwardedParameters.slice(1);
   }
 
   SmallVector<SILValue, 8> params;
-  for (auto *paramPattern : reversed(forwardedPatterns))
-    bindParametersForForwarding(paramPattern, params);
+  for (auto *paramList : reversed(forwardedParameters))
+    bindParametersForForwarding(paramList, params);
 
   if (allocatorSelfType) {
     auto selfMetatype = CanMetatypeType::get(allocatorSelfType->getCanonicalType(),

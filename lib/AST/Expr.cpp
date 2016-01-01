@@ -1059,14 +1059,11 @@ RebindSelfInConstructorExpr::getCalledConstructor(bool &isChainToSuper) const {
   return otherCtorRef;
 }
 
-void AbstractClosureExpr::setParams(Pattern *P) {
-  ParamPattern = P;
+void AbstractClosureExpr::setParameterList(ParameterList *P) {
+  parameterList = P;
   // Change the DeclContext of any parameters to be this closure.
-  if (P) {
-    P->forEachVariable([&](VarDecl *VD) {
-      VD->setDeclContext(this);
-    });
-  }
+  if (P)
+    P->setDeclContextOfParamDecls(this);
 }
 
 

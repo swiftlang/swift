@@ -788,6 +788,26 @@ static uint8_t getRawStableAddressorKind(swift::AddressorKind kind) {
   llvm_unreachable("bad addressor kind");
 }
 
+void Serializer::writeParameterList(const ParameterList *PL) {
+  using namespace decls_block;
+
+  unsigned abbrCode = DeclTypeAbbrCodes[ParameterListLayout::Code];
+  ParameterListLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                  PL->size());
+
+  abbrCode = DeclTypeAbbrCodes[ParameterListEltLayout::Code];
+  for (auto &param : *PL) {
+    // FIXME: Default argument expressions?
+    
+    auto defaultArg =getRawStableDefaultArgumentKind(param.defaultArgumentKind);
+    ParameterListEltLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                       addDeclRef(param.decl),
+                                       param.isVariadic(),
+                                       defaultArg);
+  }
+}
+
+
 void Serializer::writePattern(const Pattern *pattern) {
   using namespace decls_block;
 
@@ -2394,7 +2414,7 @@ void Serializer::writeDecl(const Decl *D) {
                            fn->isObjC(),
                            fn->isMutating(),
                            fn->hasDynamicSelf(),
-                           fn->getBodyParamPatterns().size(),
+                           fn->getParameterLists().size(),
                            addTypeRef(fn->getType()),
                            addTypeRef(fn->getInterfaceType()),
                            addDeclRef(fn->getOperatorDecl()),
@@ -2408,8 +2428,8 @@ void Serializer::writeDecl(const Decl *D) {
     writeGenericParams(fn->getGenericParams(), DeclTypeAbbrCodes);
 
     // Write the body parameters.
-    for (auto pattern : fn->getBodyParamPatterns())
-      writePattern(pattern);
+    for (auto pattern : fn->getParameterLists())
+      writeParameterList(pattern);
 
     if (auto errorConvention = fn->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
@@ -2487,7 +2507,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 rawSetterAccessLevel,
                                 nameComponents);
 
-    writePattern(subscript->getIndices());
+    writeParameterList(subscript->getIndices());
     break;
   }
 
@@ -2522,9 +2542,10 @@ void Serializer::writeDecl(const Decl *D) {
                                   nameComponents);
 
     writeGenericParams(ctor->getGenericParams(), DeclTypeAbbrCodes);
-    assert(ctor->getBodyParamPatterns().size() == 2);
-    for (auto pattern : ctor->getBodyParamPatterns())
-      writePattern(pattern);
+    assert(ctor->getParameterLists().size() == 2);
+    // Why is this writing out the param list for self?
+    for (auto paramList : ctor->getParameterLists())
+      writeParameterList(paramList);
     if (auto errorConvention = ctor->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
     break;
@@ -2543,9 +2564,9 @@ void Serializer::writeDecl(const Decl *D) {
                                  dtor->isObjC(),
                                  addTypeRef(dtor->getType()),
                                  addTypeRef(dtor->getInterfaceType()));
-    assert(dtor->getBodyParamPatterns().size() == 1);
-    for (auto pattern : dtor->getBodyParamPatterns())
-      writePattern(pattern);
+    assert(dtor->getParameterLists().size() == 1);
+    // Why is this writing out the param list for self?
+    writeParameterList(dtor->getParameterLists()[0]);
     break;
   }
 
@@ -3220,6 +3241,9 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<SubscriptLayout>();
   registerDeclTypeAbbr<ExtensionLayout>();
   registerDeclTypeAbbr<DestructorLayout>();
+
+  registerDeclTypeAbbr<ParameterListLayout>();
+  registerDeclTypeAbbr<ParameterListEltLayout>();
 
   registerDeclTypeAbbr<ParenPatternLayout>();
   registerDeclTypeAbbr<TuplePatternLayout>();

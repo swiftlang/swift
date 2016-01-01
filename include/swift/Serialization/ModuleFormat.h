@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 223; // Last change: SIL @inout_aliasable
+const uint16_t VERSION_MINOR = 224; // Last change: parameter lists
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -990,6 +990,18 @@ namespace decls_block {
     // Trailed by a pattern for self.
   >;
 
+  using ParameterListLayout = BCRecordLayout<
+    PARAMETERLIST,
+    BCVBR<5>    // numparams
+  >;
+  
+  using ParameterListEltLayout = BCRecordLayout<
+    PARAMETERLIST_ELT,
+    DeclIDField,           // ParamDecl
+    BCFixed<1>,            // isVariadic?
+    DefaultArgumentField   // default argument
+    // The element pattern trails the record.
+    >;
 
   using ParenPatternLayout = BCRecordLayout<
     PAREN_PATTERN,

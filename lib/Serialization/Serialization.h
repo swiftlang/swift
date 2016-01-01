@@ -235,6 +235,8 @@ private:
   /// modules and its source files.
   void writeInputBlock(const SerializationOptions &options);
 
+  void writeParameterList(const ParameterList *PL);
+
   /// Writes the given pattern, recursively.
   void writePattern(const Pattern *pattern);
 

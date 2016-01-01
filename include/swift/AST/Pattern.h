@@ -170,22 +170,6 @@ public:
     });
   }
   
-  /// Return the number of "top-level" variables in the given pattern,
-  /// which looks into one level of tuple pattern to determine the #
-  /// of variables. If the pattern is not a tuple, the result is one.
-  unsigned numTopLevelVariables() const;
-
-  /// \brief Build an implicit 'self' parameter for the specified DeclContext.
-  static Pattern *buildImplicitSelfParameter(SourceLoc Loc,
-                                             TypeLoc TyLoc,
-                                             DeclContext *CurDeclContext);
-
-  /// \brief Build an implicit let parameter pattern for the specified
-  /// DeclContext.
-  static Pattern *buildImplicitLetParameter(SourceLoc loc, StringRef name,
-                                            TypeLoc TyLoc,
-                                            DeclContext *CurDeclContext);
-
   /// Flags used to indicate how pattern cloning should operate.
   enum CloneFlags {
     /// The cloned pattern should be implicit.
@@ -201,17 +185,6 @@ public:
   Pattern *clone(ASTContext &context,
                  OptionSet<CloneFlags> options = None) const;
 
-  /// Given that this is a function-parameter pattern, clone it in a
-  /// way that permits makeForwardingReference to be called on the
-  /// result.
-  Pattern *cloneForwardable(ASTContext &context, DeclContext *DC,
-                            OptionSet<CloneFlags> options = None) const;
-
-  /// Form an un-typechecked reference to the variables bound by this
-  /// pattern in a manner which perfectly forwards the values.  Not
-  /// all patterns can be forwarded.
-  Expr *buildForwardingRefExpr(ASTContext &context) const;
-  
   static bool classof(const Pattern *P) { return true; }
   
   //*** Allocation Routines ************************************************/

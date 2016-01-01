@@ -20,6 +20,7 @@
 #include "swift/SIL/SILBuilder.h"
 
 namespace swift {
+  class ParameterList;
 namespace Lowering {
 
 class ArgumentSource;
@@ -679,15 +680,15 @@ public:
   
   /// emitProlog - Generates prolog code to allocate and clean up mutable
   /// storage for closure captures and local arguments.
-  void emitProlog(AnyFunctionRef TheClosure, ArrayRef<Pattern*> paramPatterns,
-                  Type resultType);
+  void emitProlog(AnyFunctionRef TheClosure,
+                  ArrayRef<ParameterList*> paramPatterns, Type resultType);
   /// returns the number of variables in paramPatterns.
-  unsigned emitProlog(ArrayRef<Pattern*> paramPatterns,
+  unsigned emitProlog(ArrayRef<ParameterList*> paramPatterns,
                       Type resultType, DeclContext *DeclCtx);
 
   /// Create SILArguments in the entry block that bind all the values
   /// of the given pattern suitably for being forwarded.
-  void bindParametersForForwarding(Pattern *paramPattern,
+  void bindParametersForForwarding(const ParameterList *params,
                                    SmallVectorImpl<SILValue> &parameters);
 
   /// \brief Create (but do not emit) the epilog branch, and save the

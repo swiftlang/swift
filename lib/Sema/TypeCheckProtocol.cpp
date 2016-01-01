@@ -561,37 +561,19 @@ SourceLoc OptionalAdjustment::getOptionalityLoc(ValueDecl *witness) const {
   }
 
   // For parameter adjustments, dig out the pattern.
-  Pattern *pattern = nullptr;
+  ParameterList *params = nullptr;
   if (auto func = dyn_cast<AbstractFunctionDecl>(witness)) {
-    auto bodyPatterns = func->getBodyParamPatterns();
+    auto bodyParamLists = func->getParameterLists();
     if (func->getDeclContext()->isTypeContext())
-      bodyPatterns = bodyPatterns.slice(1);
-    pattern = bodyPatterns[0];
+      bodyParamLists = bodyParamLists.slice(1);
+    params = bodyParamLists[0];
   } else if (auto subscript = dyn_cast<SubscriptDecl>(witness)) {
-    pattern = subscript->getIndices();
+    params = subscript->getIndices();
   } else {
     return SourceLoc();
   }
 
-  // Handle parentheses.
-  if (auto paren = dyn_cast<ParenPattern>(pattern)) {
-    assert(getParameterIndex() == 0 && "just the one parameter");
-    if (auto typed = dyn_cast<TypedPattern>(paren->getSubPattern())) {
-      return getOptionalityLoc(typed->getTypeLoc().getTypeRepr());
-    }
-    return SourceLoc();
-  }
-
-  // Handle tuples.
-  auto tuple = dyn_cast<TuplePattern>(pattern);
-  if (!tuple)
-    return SourceLoc();
-
-  const auto &tupleElt = tuple->getElement(getParameterIndex());
-  if (auto typed = dyn_cast<TypedPattern>(tupleElt.getPattern())) {
-    return getOptionalityLoc(typed->getTypeLoc().getTypeRepr());
-  }
-  return SourceLoc();
+  return getOptionalityLoc(params->get(getParameterIndex()).type.getTypeRepr());
 }
 
 SourceLoc OptionalAdjustment::getOptionalityLoc(TypeRepr *tyR) const {
