@@ -20,7 +20,6 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/Expr.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Type.h"
@@ -30,7 +29,6 @@
 
 namespace swift {
   class ASTContext;
-  class ExprHandle;
 
 /// PatternKind - The classification of different kinds of
 /// value-matching pattern.
@@ -120,11 +118,6 @@ public:
   /// identifier if the pattern does not bind a name directly.
   Identifier getBoundName() const;
 
-  /// Returns the name directly bound by this pattern within the body of
-  /// a function, or the null identifier if the pattern does not bind a name
-  /// directly.
-  Identifier getBodyName() const;
-
   /// If this pattern binds a single variable without any
   /// destructuring or conditionalizing, return that variable.
   VarDecl *getSingleVar() const;
@@ -170,20 +163,7 @@ public:
     });
   }
   
-  /// Flags used to indicate how pattern cloning should operate.
-  enum CloneFlags {
-    /// The cloned pattern should be implicit.
-    Implicit = 0x01,
-    /// The cloned pattern is for an inherited constructor; mark default
-    /// arguments as inherited, and mark unnamed arguments as named.
-    Inherited = 0x02,
-    /// Whether the named patterns produced from a cloned 'any' pattern is
-    /// are 'var'.
-    IsVar = 0x04
-  };
-
-  Pattern *clone(ASTContext &context,
-                 OptionSet<CloneFlags> options = None) const;
+  Pattern *clone(ASTContext &context) const;
 
   static bool classof(const Pattern *P) { return true; }
   
@@ -244,23 +224,14 @@ public:
 class TuplePatternElt {
   Identifier Label;
   SourceLoc LabelLoc;
-  llvm::PointerIntPair<Pattern *, 1, bool> ThePatternAndEllipsis;
-  SourceLoc EllipsisLoc;
-  ExprHandle *Init;
-  DefaultArgumentKind DefArgKind;
+  Pattern *ThePattern;
 
 public:
   TuplePatternElt() = default;
-  explicit TuplePatternElt(Pattern *P)
-    : ThePatternAndEllipsis(P, false), Init(nullptr), DefArgKind(DefaultArgumentKind::None) {}
+  explicit TuplePatternElt(Pattern *P) : ThePattern(P) {}
 
-  TuplePatternElt(Identifier Label, SourceLoc LabelLoc,
-                  Pattern *p, bool hasEllipsis,
-                  SourceLoc ellipsisLoc = SourceLoc(),
-                  ExprHandle *init = nullptr,
-                  DefaultArgumentKind defArgKind = DefaultArgumentKind::None)
-    : Label(Label), LabelLoc(LabelLoc), ThePatternAndEllipsis(p, hasEllipsis),
-      EllipsisLoc(ellipsisLoc), Init(init), DefArgKind(defArgKind) {}
+  TuplePatternElt(Identifier Label, SourceLoc LabelLoc, Pattern *p)
+    : Label(Label), LabelLoc(LabelLoc), ThePattern(p) {}
 
   Identifier getLabel() const { return Label; }
   SourceLoc getLabelLoc() const { return LabelLoc; }
@@ -269,20 +240,12 @@ public:
     LabelLoc = Loc;
   }
 
-  Pattern *getPattern() { return ThePatternAndEllipsis.getPointer(); }
+  Pattern *getPattern() { return ThePattern; }
   const Pattern *getPattern() const {
-    return ThePatternAndEllipsis.getPointer();
+    return ThePattern;
   }
   
-  void setPattern(Pattern *p) { ThePatternAndEllipsis.setPointer(p); }
-
-  bool hasEllipsis() const { return ThePatternAndEllipsis.getInt(); }
-  SourceLoc getEllipsisLoc() const { return EllipsisLoc; }
-
-  ExprHandle *getInit() const { return Init; }
-
-  DefaultArgumentKind getDefaultArgKind() const { return DefArgKind; }
-  void setDefaultArgKind(DefaultArgumentKind DAK) { DefArgKind = DAK; }
+  void setPattern(Pattern *p) { ThePattern = p; }
 };
 
 /// A pattern consisting of a tuple of patterns.
@@ -339,9 +302,6 @@ public:
   SourceLoc getRParenLoc() const { return RPLoc; }
   SourceRange getSourceRange() const;
 
-  bool hasAnyEllipsis() const;
-  SourceLoc getAnyEllipsisLoc() const;
-
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::Tuple;
   }
@@ -360,7 +320,6 @@ public:
 
   VarDecl *getDecl() const { return Var; }
   Identifier getBoundName() const;
-  Identifier getBodyName() const;
   StringRef getNameStr() const { return Var->getNameStr(); }
 
   SourceLoc getLoc() const { return Var->getLoc(); }

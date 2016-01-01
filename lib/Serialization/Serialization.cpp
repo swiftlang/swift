@@ -833,9 +833,7 @@ void Serializer::writePattern(const Pattern *pattern) {
     for (auto &elt : tuple->getElements()) {
       // FIXME: Default argument expressions?
       TuplePatternEltLayout::emitRecord(
-        Out, ScratchRecord, abbrCode, addIdentifierRef(elt.getLabel()),
-        elt.hasEllipsis(),
-        getRawStableDefaultArgumentKind(elt.getDefaultArgKind()));
+        Out, ScratchRecord, abbrCode, addIdentifierRef(elt.getLabel()));
       writePattern(elt.getPattern());
     }
     break;

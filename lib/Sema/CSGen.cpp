@@ -1781,15 +1781,10 @@ namespace {
         tupleTypeElts.reserve(tuplePat->getNumElements());
         for (unsigned i = 0, e = tuplePat->getNumElements(); i != e; ++i) {
           auto &tupleElt = tuplePat->getElement(i);
-          bool hasEllipsis = tupleElt.hasEllipsis();
           Type eltTy = getTypeForPattern(tupleElt.getPattern(),forFunctionParam,
                                          locator.withPathElement(
                                            LocatorPathElt::getTupleElement(i)));
-
-          Type varArgBaseTy;
-          tupleTypeElts.push_back(TupleTypeElt(eltTy, tupleElt.getLabel(),
-                                               tupleElt.getDefaultArgKind(),
-                                               hasEllipsis));
+          tupleTypeElts.push_back(TupleTypeElt(eltTy, tupleElt.getLabel()));
         }
         return TupleType::get(tupleTypeElts, CS.getASTContext());
       }

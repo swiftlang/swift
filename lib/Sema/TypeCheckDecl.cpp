@@ -5855,7 +5855,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
           if (VD->getParentInitializer() &&
               !VD->getParentInitializer()->getType()) {
             diagnose(parentPattern->getLoc(), diag::identifier_init_failure,
-                     parentPattern->getBodyName());
+                     parentPattern->getBoundName());
           }
           
           return;

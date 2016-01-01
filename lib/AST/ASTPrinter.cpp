@@ -571,9 +571,8 @@ void PrintAST::printPattern(const Pattern *pattern) {
 
   case PatternKind::Named: {
     auto named = cast<NamedPattern>(pattern);
-    recordDeclLoc(named->getDecl(),
-      [&]{
-        Printer.printName(named->getBodyName());
+    recordDeclLoc(named->getDecl(), [&]{
+        Printer.printName(named->getBoundName());
       });
     break;
   }
@@ -592,21 +591,8 @@ void PrintAST::printPattern(const Pattern *pattern) {
       const auto &Elt = Fields[i];
       if (i != 0)
         Printer << ", ";
-
-      if (Elt.hasEllipsis()) {
-        printTypedPattern(cast<TypedPattern>(Elt.getPattern()),
-                          /*StripOuterSliceType=*/true);
-        Printer << "...";
-      } else {
-        printPattern(Elt.getPattern());
-      }
-      if (Elt.getDefaultArgKind() != DefaultArgumentKind::None) {
-        if (Options.PrintDefaultParameterPlaceholder)
-          Printer << " = default";
-        else if (Options.VarInitializers) {
-          // FIXME: Print initializer here.
-        }
-      }
+      
+      printPattern(Elt.getPattern());
     }
     Printer << ")";
     break;

@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 224; // Last change: parameter lists
+const uint16_t VERSION_MINOR = 225; // Last change: simplify tuple patterns.
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -1019,9 +1019,7 @@ namespace decls_block {
 
   using TuplePatternEltLayout = BCRecordLayout<
     TUPLE_PATTERN_ELT,
-    IdentifierIDField,     // label
-    BCFixed<1>,            // has ellipsis?
-    DefaultArgumentField   // default argument
+    IdentifierIDField     // label
     // The element pattern trails the record.
   >;
 

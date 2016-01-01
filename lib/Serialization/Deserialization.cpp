@@ -358,25 +358,12 @@ Pattern *ModuleFile::maybeReadPattern() {
 
       // FIXME: Add something for this record or remove it.
       IdentifierID labelID;
-      uint8_t rawDefaultArg;
-      bool hasEllipsis;
-      TuplePatternEltLayout::readRecord(scratch, labelID, hasEllipsis,
-                                        rawDefaultArg);
+      TuplePatternEltLayout::readRecord(scratch, labelID);
       Identifier label = getIdentifier(labelID);
 
       Pattern *subPattern = maybeReadPattern();
       assert(subPattern);
-
-      // Decode the default argument kind.
-      // FIXME: Default argument expression, if available.
-      swift::DefaultArgumentKind defaultArgKind
-        = swift::DefaultArgumentKind::None;
-      if (auto defaultArg = getActualDefaultArgKind(rawDefaultArg))
-        defaultArgKind = *defaultArg;
-
-      elements.push_back(TuplePatternElt(label, SourceLoc(), subPattern,
-                                         hasEllipsis, SourceLoc(),
-                                         nullptr, defaultArgKind));
+      elements.push_back(TuplePatternElt(label, SourceLoc(), subPattern));
     }
 
     auto result = TuplePattern::create(getContext(), SourceLoc(),

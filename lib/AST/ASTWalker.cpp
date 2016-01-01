@@ -1331,14 +1331,6 @@ Pattern *Traversal::visitTuplePattern(TuplePattern *P) {
       element.setPattern(newField);
     else
       return nullptr;
-
-    if (auto handle = element.getInit()) {
-      if (auto init = doIt(handle->getExpr())) {
-        handle->setExpr(init, handle->alreadyChecked());
-      } else {
-        return nullptr;
-      }
-    }
   }
   return P;
 }

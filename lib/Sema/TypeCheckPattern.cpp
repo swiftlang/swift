@@ -368,8 +368,7 @@ public:
       Pattern *pattern = getSubExprPattern(E->getElement(i));
       patternElts.push_back(TuplePatternElt(E->getElementName(i),
                                             E->getElementNameLoc(i),
-                                            pattern,
-                                            false));
+                                            pattern));
     }
     
     return TuplePattern::create(TC.Context, E->getLoc(),
@@ -878,11 +877,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     for (unsigned i = 0, e = tuplePat->getNumElements(); i != e; ++i) {
       TuplePatternElt &elt = tuplePat->getElement(i);
       Pattern *pattern = elt.getPattern();
-      bool hasEllipsis = elt.hasEllipsis();
-      TypeResolutionOptions eltOptions = elementOptions;
-      if (hasEllipsis)
-        eltOptions |= TR_Variadic;
-      if (typeCheckPattern(pattern, dc, eltOptions, resolver)){
+      if (typeCheckPattern(pattern, dc, elementOptions, resolver)){
         hadError = true;
         continue;
       }
@@ -891,10 +886,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
         continue;
       }
 
-      typeElts.push_back(TupleTypeElt(pattern->getType(),
-                                      elt.getLabel(),
-                                      elt.getDefaultArgKind(),
-                                      hasEllipsis));
+      typeElts.push_back(TupleTypeElt(pattern->getType(), elt.getLabel()));
     }
 
     if (hadError) {
@@ -1163,7 +1155,6 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     for (unsigned i = 0, e = TP->getNumElements(); i != e; ++i) {
       TuplePatternElt &elt = TP->getElement(i);
       Pattern *pattern = elt.getPattern();
-      bool hasEllipsis = elt.hasEllipsis();
 
       Type CoercionType;
       if (hadError)
@@ -1182,17 +1173,10 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
         hadError = true;
       }
       
-      TypeResolutionOptions subOptions = options - TR_Variadic;
-      if (hasEllipsis)
-        subOptions |= TR_Variadic;
-      hadError |= coercePatternToType(pattern, dc, CoercionType, subOptions, 
-                                      resolver);
+      hadError |= coercePatternToType(pattern, dc, CoercionType,
+                                      options - TR_Variadic, resolver);
       if (!hadError)
         elt.setPattern(pattern);
-
-      // Type-check the initialization expression.
-      assert(!elt.getInit() &&
-             "Tuples cannot have default values, only parameters");
     }
 
     // For Swift 2.0, we ban single-element tuple patterns that have labels.

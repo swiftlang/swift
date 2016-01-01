@@ -902,14 +902,7 @@ Parser::parsePatternTupleElement() {
   if (pattern.isNull())
     return std::make_pair(makeParserError(), None);
 
-  // Consume the '...'.
-  SourceLoc ellipsisLoc;
-  if (Tok.isEllipsis())
-    ellipsisLoc = consumeToken();
-  auto Elt = TuplePatternElt(Label, LabelLoc, pattern.get(),
-                             ellipsisLoc.isValid(), ellipsisLoc,
-                             nullptr, DefaultArgumentKind::None);
-
+  auto Elt = TuplePatternElt(Label, LabelLoc, pattern.get());
   return std::make_pair(makeParserSuccess(), Elt);
 }
 

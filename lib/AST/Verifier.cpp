@@ -2342,36 +2342,11 @@ struct ASTNodeBase {};
 
     void verifyParsed(TuplePattern *TP) {
       PrettyStackTracePattern debugStack(Ctx, "verifying TuplePattern", TP);
-
-      for (const auto &elt : TP->getElements()) {
-        if (elt.hasEllipsis()) {
-          if (!isa<TypedPattern>(elt.getPattern())) {
-            Out << "a vararg subpattern of a TuplePattern should be "
-            "a TypedPattern\n";
-            abort();
-          }
-        }
-      }
-
       verifyParsedBase(TP);
     }
 
     void verifyChecked(TuplePattern *TP) {
       PrettyStackTracePattern debugStack(Ctx, "verifying TuplePattern", TP);
-
-      for (const auto &elt : TP->getElements()) {
-        if (elt.hasEllipsis()) {
-          Type T = cast<TypedPattern>(elt.getPattern())->getType()
-                     ->getCanonicalType();
-          if (auto *BGT = T->getAs<BoundGenericType>()) {
-            if (BGT->getDecl() == Ctx.getArrayDecl())
-              continue;
-          }
-          Out << "a vararg subpattern of a TuplePattern has wrong type";
-          abort();
-        }
-      }
-
       verifyCheckedBase(TP);
     }
 

@@ -272,12 +272,6 @@ namespace {
       for (auto &elt : P->getElements()) {
         OS << '\n';
         printRec(elt.getPattern());
-        if (elt.hasEllipsis())
-          OS << " ellipsis";
-        if (elt.getInit()) {
-          OS << '\n';
-          printRec(elt.getInit()->getExpr());
-        }
       }
       OS << ')';
     }
