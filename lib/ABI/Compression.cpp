@@ -143,15 +143,22 @@ StartMatch:
   return SB;
 }
 
-static char DecodeFixedWidth(APInt &num) {
-  unsigned BW = num.getBitWidth();
-  assert(BW > 16 &&
-         "The APInt needs to be large enough for arithmetic on CharsetLength");
+/// Extract a single character from the numner \p Num.
+static char DecodeFixedWidth(APInt &Num) {
+  unsigned BW = Num.getBitWidth();
+  assert(BW > 16 && "Num too small for arithmetic on CharsetLength");
+
+  /// This is the number of characters in our alphabet.
   APInt C = APInt(BW, Huffman::CharsetLength);
 
-  APInt Quotient(BW, 0), Remainder(BW, 0);
-  APInt::udivrem(num, C, Quotient, Remainder);
-  num = Quotient.zextOrSelf(BW);
+  APInt Quotient(1, 0), Remainder(1, 0);
+  APInt::udivrem(Num, C, Quotient, Remainder);
+  // Try to reduce the bitwidth of the API after the division. This can
+  // accelerate the division operation in future iterations because the
+  // number becomes smaller (fewer bits) with each iteration. However,
+  // We can't reduce the number to something too small because we still
+  // need to be able to perform the "mod charset_length" operation.
+  Num = Quotient.zextOrTrunc(std::max(Quotient.getActiveBits(), 64u));
   return Huffman::Charset[Remainder.getZExtValue()];
 }
 
@@ -171,7 +178,7 @@ static void EncodeFixedWidth(APInt &num, char ch) {
 
 APInt
 swift::Compress::EncodeStringAsNumber(StringRef In, EncodingKind Kind) {
-  unsigned BW = std::max(32u, (unsigned) In.size() *
+  unsigned BW = std::max(64u, (unsigned) In.size() *
                          Huffman::LongestEncodingLength);
     APInt num = APInt(BW, 0);
 
