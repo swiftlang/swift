@@ -1098,6 +1098,26 @@ import SwiftPrivate
 import ObjectiveC
 #endif
 
+func expectEqual<T: IntegerType>(
+  expected: T, _ actual: T,
+  @autoclosure _ message: () -> String = "",
+  showFrame: Bool = true,
+  stackTrace: SourceLocStack = SourceLocStack(),  
+  file: String = __FILE__, line: UInt = __LINE__
+) {
+  if expected != actual {
+    expectationFailure(
+      "expected: \(String(reflecting: expected))"
+      + " (of type \(String(reflecting: expected.dynamicType)))\n"
+      + "  = \(expected.hex)\n"
+      + "actual: \(String(reflecting: actual))"
+      + " (of type \(String(reflecting: actual.dynamicType)))\n"
+      + "  = \(actual.hex)\n",
+      trace: message(),
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  }
+}
+
 var tests = TestSuite("Integers")
 
 tests.test("Literals") {
