@@ -185,10 +185,6 @@ ERROR(cskeyword_not_attribute,decl_parsing,none,
 ERROR(decl_already_static,decl_parsing,none,
       "%0 specified twice", (StaticSpellingKind))
 
-ERROR(autoclosure_is_decl_attribute,attribute_parsing,none,
-      "@autoclosure is now an attribute of the parameter "
-      "declaration, not its type", ())
-
 ERROR(enum_case_dot_prefix,decl_parsing,none,
       "extraneous '.' in enum 'case' declaration", ())
 
