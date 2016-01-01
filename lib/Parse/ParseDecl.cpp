@@ -2905,9 +2905,6 @@ createSetterAccessorArgument(SourceLoc nameLoc, Identifier name,
     result.decl->setImplicit();
 
   result.type = elementTy.clone(P.Context);
-  
-  // AST Walker shouldn't go into the type recursively.
-  result.isTypeImplicit = true;
   return result;
 }
 

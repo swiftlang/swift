@@ -52,13 +52,6 @@ struct Parameter {
   /// The default value, if any, along with whether this is varargs.
   llvm::PointerIntPair<ExprHandle *, 1, bool> defaultValueAndIsVariadic;
 
-  /// True if the type is implicitly specified in the source, but this has an
-  /// apparently valid typeRepr.  This is used in accessors, which look like:
-  ///    set (value) {
-  /// but need to get the typeRepr from the property as a whole so Sema can
-  /// resolve the type.
-  bool isTypeImplicit = false;
-  
   bool hasDefaultValue() const { return getDefaultValue() != nullptr; }
   
   void setDefaultValue(ExprHandle *H) {

@@ -3903,11 +3903,14 @@ public:
     if (checkDynamicSelfReturn(FD))
       FD->setInvalid();
 
-    // Observing accessors (and their generated regular accessors) may have
-    // the type of the var inferred.
+    // Do accessor-specific processing.
     if (AbstractStorageDecl *ASD = FD->getAccessorStorageDecl()) {
+      // Type check the subscript or var that this accessor is part of.
+      TC.validateDecl(ASD);
+      
+      // Observing accessors (and their generated regular accessors) may have
+      // the type of the var inferred.
       if (ASD->hasObservers()) {
-        TC.validateDecl(ASD);
         Type valueTy = ASD->getType()->getReferenceStorageReferent();
         if (FD->isObservingAccessor() || (FD->isSetter() && FD->isImplicit())) {
           unsigned firstParamIdx = FD->getParent()->isTypeContext();
@@ -3916,6 +3919,26 @@ public:
         } else if (FD->isGetter() && FD->isImplicit()) {
           FD->getBodyResultTypeLoc().setType(valueTy, true);
         }
+      }
+      
+      // When the user writes an explicit "(Value)" parameter on an accessor,
+      // the parser copies the typeloc from the ASD onto the typeloc of the
+      // value, even though the value never has a type written.  Since the ASD
+      // has already been checked, replace the typeloc with a resolved type.
+      // (value) is always the first parameter of the last arg list.
+      if (FD->getAccessorKind() == AccessorKind::IsSetter ||
+          FD->getAccessorKind() == AccessorKind::IsWillSet) {
+        Type type;
+        if (auto *SD = dyn_cast<SubscriptDecl>(ASD))
+          type = SD->getElementType();
+        else
+          type = cast<VarDecl>(ASD)->getType();
+        
+        // Strip storage-only types.
+        type = type->getReferenceStorageReferent();
+        
+        auto &valueParam = FD->getParameterLists().back()->get(0);
+        valueParam.type = TypeLoc::withoutLoc(type);
       }
     }
 
