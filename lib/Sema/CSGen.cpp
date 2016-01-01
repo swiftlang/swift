@@ -1705,17 +1705,16 @@ namespace {
     /// type information with fresh type variables.
     ///
     /// \param pattern The pattern.
-    Type getTypeForPattern(Pattern *pattern, bool forFunctionParam,
-                           ConstraintLocatorBuilder locator) {
+    Type getTypeForPattern(Pattern *pattern, ConstraintLocatorBuilder locator) {
       switch (pattern->getKind()) {
       case PatternKind::Paren:
         // Parentheses don't affect the type.
         return getTypeForPattern(cast<ParenPattern>(pattern)->getSubPattern(),
-                                 forFunctionParam, locator);
+                                 locator);
       case PatternKind::Var:
         // Var doesn't affect the type.
         return getTypeForPattern(cast<VarPattern>(pattern)->getSubPattern(),
-                                 forFunctionParam, locator);
+                                 locator);
       case PatternKind::Any:
         // For a pattern of unknown type, create a new type variable.
         return CS.createTypeVariable(CS.getConstraintLocator(locator),
@@ -1746,20 +1745,11 @@ namespace {
 
         // For weak variables, use Optional<T>.
         if (auto *OA = var->getAttrs().getAttribute<OwnershipAttr>())
-          if (!forFunctionParam && OA->get() == Ownership::Weak) {
+          if (OA->get() == Ownership::Weak) {
             ty = CS.getTypeChecker().getOptionalType(var->getLoc(), ty);
             if (!ty) return Type();
           }
 
-        // We want to set the variable's type here when type-checking
-        // a function's parameter clauses because we're going to
-        // type-check the entire function body within the context of
-        // the constraint system.  In contrast, when type-checking a
-        // variable binding, we really don't want to set the
-        // variable's type because it can easily escape the constraint
-        // system and become a dangling type reference.
-        if (forFunctionParam)
-          var->overwriteType(ty);
         return ty;
       }
 
@@ -1781,7 +1771,7 @@ namespace {
         tupleTypeElts.reserve(tuplePat->getNumElements());
         for (unsigned i = 0, e = tuplePat->getNumElements(); i != e; ++i) {
           auto &tupleElt = tuplePat->getElement(i);
-          Type eltTy = getTypeForPattern(tupleElt.getPattern(),forFunctionParam,
+          Type eltTy = getTypeForPattern(tupleElt.getPattern(),
                                          locator.withPathElement(
                                            LocatorPathElt::getTupleElement(i)));
           tupleTypeElts.push_back(TupleTypeElt(eltTy, tupleElt.getLabel()));
@@ -2729,7 +2719,7 @@ Expr *ConstraintSystem::generateConstraintsShallow(Expr *expr) {
 Type ConstraintSystem::generateConstraints(Pattern *pattern,
                                            ConstraintLocatorBuilder locator) {
   ConstraintGenerator cg(*this);
-  return cg.getTypeForPattern(pattern, /*forFunctionParam*/ false, locator);
+  return cg.getTypeForPattern(pattern, locator);
 }
 
 void ConstraintSystem::optimizeConstraints(Expr *e) {
