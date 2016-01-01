@@ -1304,11 +1304,6 @@ public:
   TupleTypeElt getWithType(Type T) const {
     return TupleTypeElt(T, getName(), getDefaultArgKind(), isVararg());
   }
-
-  /// Determine whether this tuple element has an initializer.
-  bool hasInit() const {
-    return getDefaultArgKind() != DefaultArgumentKind::None;
-  }
 };
 
 inline Type getTupleEltType(const TupleTypeElt &elt) {

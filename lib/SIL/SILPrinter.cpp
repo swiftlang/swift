@@ -1091,7 +1091,7 @@ public:
     // elements.
     bool SimpleType = true;
     for (auto &Elt : TI->getType().castTo<TupleType>()->getElements()) {
-      if (Elt.hasName() || Elt.isVararg() || Elt.hasInit()) {
+      if (Elt.hasName() || Elt.isVararg() || Elt.hasDefaultArg()) {
         SimpleType = false;
         break;
       }

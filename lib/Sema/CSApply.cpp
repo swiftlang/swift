@@ -3600,7 +3600,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
                                            toElt.getDefaultArgKind(),
                                            toElt.isVararg()));
       fromTupleExprFields[sources[i]] = fromElt;
-      hasInits |= toElt.hasInit();
+      hasInits |= toElt.hasDefaultArg();
       continue;
     }
 
@@ -3632,7 +3632,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
                                                    fromElt.getName(),
                                                    fromElt.getDefaultArgKind(),
                                                    fromElt.isVararg());
-    hasInits |= toElt.hasInit();
+    hasInits |= toElt.hasDefaultArg();
   }
 
   // Convert all of the variadic arguments to the destination type.
@@ -3761,7 +3761,7 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
   bool hasInit = false;
   int i = 0;
   for (auto &field : toTuple->getElements()) {
-    if (field.hasInit()) {
+    if (field.hasDefaultArg()) {
       hasInit = true;
       break;
     }
@@ -3813,7 +3813,7 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
       continue;
     }
 
-    assert(field.hasInit() && "Expected a default argument");
+    assert(field.hasDefaultArg() && "Expected a default argument");
 
     ConcreteDeclRef argOwner;
     // Dig out the owner of the default arguments.

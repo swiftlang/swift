@@ -1548,7 +1548,7 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
     for (const auto &elt : tupleTy->getElements()) {
       Type eltTy = mapSignatureParamType(ctx, elt.getType());
       if (anyChanged || eltTy.getPointer() != elt.getType().getPointer() ||
-          elt.hasInit()) {
+          elt.getDefaultArgKind() != DefaultArgumentKind::None) {
         if (!anyChanged) {
           elements.reserve(tupleTy->getNumElements());
           for (unsigned i = 0; i != idx; ++i) {

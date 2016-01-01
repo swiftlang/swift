@@ -185,7 +185,7 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
 
     // If there aren't any more inputs, we can use a default argument.
     if (fromNext == fromLast) {
-      if (elt2.hasInit()) {
+      if (elt2.hasDefaultArg()) {
         sources[i] = TupleShuffleExpr::DefaultInitialize;
         continue;
       }
