@@ -765,38 +765,6 @@ Type TypeBase::getUnlabeledType(ASTContext &Context) {
                          /*defaultArgs=*/true);
 }
 
-Type TypeBase::getRelabeledType(ASTContext &ctx, 
-                                ArrayRef<Identifier> labels) {
-  if (auto tupleTy = dyn_cast<TupleType>(this)) {
-    assert(labels.size() == tupleTy->getNumElements() && 
-           "Wrong number of labels");
-    SmallVector<TupleTypeElt, 4> elements;
-    unsigned i = 0;
-    bool anyChanged = false;
-    for (const auto &elt : tupleTy->getElements()) {
-      if (elt.getName() != labels[i])
-        anyChanged = true;
-
-      elements.push_back(TupleTypeElt(elt.getType(), labels[i], 
-                                      elt.getDefaultArgKind(), elt.isVararg()));
-      ++i;
-    }
-
-    if (!anyChanged)
-      return this;
-
-    return TupleType::get(elements, ctx);
-  }
-
-  // If there is no label, the type is unchanged.
-  if (labels[0].empty())
-    return this;
-
-  // Create a one-element tuple to capture the label.
-  TupleTypeElt elt(this, labels[0]);
-  return TupleType::get(elt, ctx);  
-}
-
 Type TypeBase::getWithoutDefaultArgs(const ASTContext &Context) {
   return getStrippedType(Context, Type(this), /*labels=*/false,
                          /*defaultArgs=*/true);

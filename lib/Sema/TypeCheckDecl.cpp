@@ -1356,10 +1356,6 @@ void swift::configureConstructorType(ConstructorDecl *ctor,
     resultType = OptionalType::get(ctor->getFailability(), resultType);
   }
 
-  // Use the argument names in the argument type.
-  argType = argType->getRelabeledType(ctor->getASTContext(), 
-                                      ctor->getFullName().getArgumentNames());
-
   auto extInfo = AnyFunctionType::ExtInfo().withThrows(throws);
 
   GenericParamList *outerGenericParams =

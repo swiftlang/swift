@@ -672,10 +672,6 @@ public:
   /// the result would be the (parenthesized) type ((int, int)).
   Type getUnlabeledType(ASTContext &Context);
 
-  /// Relabel the elements of the given type with the given new
-  /// (top-level) labels.
-  Type getRelabeledType(ASTContext &Context, ArrayRef<Identifier> labels);
-
   /// \brief Retrieve the type without any default arguments.
   Type getWithoutDefaultArgs(const ASTContext &Context);
 
