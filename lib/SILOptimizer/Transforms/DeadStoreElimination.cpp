@@ -313,6 +313,16 @@ class DSEContext {
   /// has an upward visible store.
   std::vector<LSLocation> LocationVault;
 
+  /// Keeps a list of basic blocks that have StoreInsts. If a basic block does
+  /// not have StoreInst, we do not actually perform the last iteration where
+  /// DSE is actually performed on the basic block.
+  ///
+  /// NOTE: This is never populated for functions which will only require 1
+  /// data flow iteration. For function that requires more than 1 iteration of
+  /// the data flow this is populated when the first time the functions is
+  /// walked, i.e. when the we generate the genset and killset.
+  llvm::DenseSet<SILBasicBlock *> BBWithStores;
+
   /// Contains a map between location to their index in the LocationVault.
   /// used to facilitate fast location to index lookup.
   LSLocationIndexMap LocToBitIndex;
@@ -412,7 +422,7 @@ public:
 
   /// Compute the kill set for the basic block. return true if the store set
   /// changes.
-  void processBasicBlockForDSE(SILBasicBlock *BB);
+  void processBasicBlockForDSE(SILBasicBlock *BB, bool OneIterationFunction);
 
   /// Compute the genset and killset for the current basic block.
   void processBasicBlockForGenKillSet(SILBasicBlock *BB);
@@ -518,8 +528,11 @@ void DSEContext::processBasicBlockForGenKillSet(SILBasicBlock *BB) {
   // the AA interface.
   for (auto I = BB->rbegin(), E = BB->rend(); I != E; ++I) {
     // Only process store insts.
-    if (isa<StoreInst>(*I))
+    if (isa<StoreInst>(*I)) {
+      if (BBWithStores.find(BB) == BBWithStores.end())
+        BBWithStores.insert(BB);
       processStoreInst(&(*I), DSEKind::ComputeMaxStoreSet);
+    }
 
     // Compute the genset and killset for this instruction.
     processInstruction(&(*I), DSEKind::BuildGenKillSet);
@@ -540,7 +553,16 @@ bool DSEContext::processBasicBlockWithGenKillSet(SILBasicBlock *BB) {
   return S->updateBBWriteSetIn(S->BBWriteSetMid);
 }
 
-void DSEContext::processBasicBlockForDSE(SILBasicBlock *BB) {
+void DSEContext::processBasicBlockForDSE(SILBasicBlock *BB,
+                                         bool OneIterationFunction) {
+  // If we know this is not a one iteration function which means its
+  // its BBWriteSetIn and BBWriteSetOut have been computed and converged, 
+  // and this basic block does not even have StoreInsts, there is no point
+  // in processing every instruction in the basic block again as no store
+  // will be eliminated. 
+  if (!OneIterationFunction && BBWithStores.find(BB) == BBWithStores.end())
+       return;
+
   // Intersect in the successor WriteSetIns. A store is dead if it is not read
   // from any path to the end of the program. Thus an intersection.
   mergeSuccessorLiveIns(BB);
@@ -1057,7 +1079,7 @@ bool DSEContext::run() {
   // The data flow has stabilized, run one last iteration over all the basic
   // blocks and try to remove dead stores.
   for (SILBasicBlock *B : PO->getPostOrder()) {
-    processBasicBlockForDSE(B);
+    processBasicBlockForDSE(B, OneIterationFunction);
   }
 
   // Finally, delete the dead stores and create the live stores.
