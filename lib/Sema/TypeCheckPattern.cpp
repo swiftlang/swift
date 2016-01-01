@@ -1597,8 +1597,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
 /// all specific to closures.
 ///
 bool TypeChecker::coerceParameterListToType(ParameterList *P, DeclContext *DC,
-                                            Type paramListType,
-                                            GenericTypeResolver *resolver) {
+                                            Type paramListType) {
   TypeResolutionOptions options;
 
   bool hadError = paramListType->is<ErrorType>();
@@ -1609,7 +1608,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, DeclContext *DC,
     
     // Check that the type, if explicitly spelled, is ok.
     if (param.type.getTypeRepr()) {
-      hadError |= validateParameterType(param, DC, options, resolver, *this);
+      hadError |= validateParameterType(param, DC, options, nullptr, *this);
       
       // Now that we've type checked the explicit argument type, see if it
       // agrees with the contextual type.

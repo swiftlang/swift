@@ -1232,8 +1232,7 @@ public:
   /// contextual type.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool coerceParameterListToType(ParameterList *P, DeclContext *dc, Type type,
-                                 GenericTypeResolver *resolver = nullptr);
+  bool coerceParameterListToType(ParameterList *P, DeclContext *dc, Type type);
 
   
   /// Type-check an initialized variable pattern declaration.
