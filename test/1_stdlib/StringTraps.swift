@@ -7,10 +7,7 @@
 // RUN: %target-run %t/a.out_Release
 // REQUIRES: executable_test
 
-// XFAIL: linux
-
 import StdlibUnittest
-import Foundation
 
 // Also import modules which are used by StdlibUnittest internally. This
 // workaround is needed to link all required libraries in case we compile
