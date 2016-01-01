@@ -18,7 +18,6 @@
 #define SWIFT_AST_AST_NODE_H
 
 #include "llvm/ADT/PointerUnion.h"
-#include "swift/AST/ASTWalker.h"
 #include "swift/AST/TypeAlignments.h"
 
 namespace swift {
@@ -27,6 +26,7 @@ namespace swift {
   class Decl;
   class SourceLoc;
   class SourceRange;
+  class ASTWalker;
   
   struct ASTNode : public llvm::PointerUnion3<Expr*, Stmt*, Decl*> {
     // Inherit the constructors from PointerUnion.

@@ -18,6 +18,7 @@
 #include "TypeChecker.h"
 #include "swift/Sema/IterativeTypeChecker.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 using namespace swift;
 

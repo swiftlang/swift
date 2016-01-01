@@ -16,6 +16,7 @@
 
 #include "swift/AST/Pattern.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/Support/raw_ostream.h"

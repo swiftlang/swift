@@ -16,6 +16,7 @@
 
 #include "ConstraintSystem.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "swift/AST/ASTWalker.h"
 
 using namespace swift;
 using namespace constraints;
