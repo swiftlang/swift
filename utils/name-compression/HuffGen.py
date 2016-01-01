@@ -75,10 +75,15 @@ class Node:
     if self.val:
       sb = "if (ch == '" + str(self.val) +"') {"
       sb += "/*" +  "".join(map(str, reversed(stack))) + "*/ "
-      for bit in reversed(stack):
-        sb += "num = num.shl(1); "
-        if bit: sb += "num = ++num; "
-      sb += "return;}\n"
+      # Encode the bit stream as a numeric value. Updating the APInt in one go
+      # is much faster than inserting one bit at a time.
+      numeric_val = 0
+      for bit in reversed(stack): numeric_val = numeric_val * 2 + bit
+      # Shift the value to make room in the bitstream and then add the numeric
+      # value that represents the sequence of bits that we need to add.
+      sb += "num = num.shl(%d); " % len(stack)
+      sb += "num = num + %d; " % (numeric_val)
+      sb += "return; }\n"
       return sb
     sb = ""
     if (self.left):  sb += self.left .generate_encoder(stack + [0])
