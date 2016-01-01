@@ -861,8 +861,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
            "the TypeExpr should have been built correctly in the first place");
 
     auto *NewTypeRepr =
-      new (TC.Context) ArrayTypeRepr(InnerTypeRepr, nullptr,
-                                     Indexes->getSourceRange(),
+      new (TC.Context) ArrayTypeRepr(InnerTypeRepr, Indexes->getSourceRange(),
                                      /*OldSyntax=*/true);
 
     TC.diagnose(Indexes->getStartLoc(), diag::new_array_syntax)
@@ -997,7 +996,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       return nullptr;
 
     auto *NewTypeRepr =
-      new (TC.Context) ArrayTypeRepr(TyExpr->getTypeRepr(), nullptr,
+      new (TC.Context) ArrayTypeRepr(TyExpr->getTypeRepr(), 
                                      SourceRange(AE->getLBracketLoc(),
                                                  AE->getRBracketLoc()),
                                      /*OldSyntax=*/false);

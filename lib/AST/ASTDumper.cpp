@@ -2314,10 +2314,6 @@ public:
   void visitArrayTypeRepr(ArrayTypeRepr *T) {
     printCommon(T, "type_array") << '\n';
     printRec(T->getBase());
-    if (T->getSize()) {
-      OS << '\n';
-      printRec(T->getSize()->getExpr());
-    }
     OS << ')';
   }
 

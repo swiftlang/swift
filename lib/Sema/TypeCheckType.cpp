@@ -2097,12 +2097,6 @@ Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
   // FIXME: diagnose non-materializability of element type!
   Type baseTy = resolveType(repr->getBase(), withoutContext(options));
   if (!baseTy || baseTy->is<ErrorType>()) return baseTy;
-  
-  if (ExprHandle *sizeEx = repr->getSize()) {
-    TC.diagnose(repr->getBrackets().Start, diag::unsupported_fixed_length_array)
-      .highlight(sizeEx->getExpr()->getSourceRange());
-    return ErrorType::get(Context);
-  }
 
   auto sliceTy = TC.getArraySliceType(repr->getBrackets().Start, baseTy);
   if (!sliceTy)

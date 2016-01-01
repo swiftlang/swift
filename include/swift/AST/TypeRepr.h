@@ -394,21 +394,18 @@ private:
 class ArrayTypeRepr : public TypeRepr {
   // FIXME: Tail allocation. Use bits to determine whether Base/Size are
   // available.
-  TypeRepr *Base;
-  llvm::PointerIntPair<ExprHandle *, 1, bool> SizeAndOldSyntax;
+  llvm::PointerIntPair<TypeRepr *, 1, bool> BaseAndIsOldSyntax;
   SourceRange Brackets;
 
 public:
-  ArrayTypeRepr(TypeRepr *Base, ExprHandle *Size, SourceRange Brackets,
-                bool OldSyntax)
-    : TypeRepr(TypeReprKind::Array), Base(Base),
-      SizeAndOldSyntax(Size, OldSyntax), Brackets(Brackets) { }
+  ArrayTypeRepr(TypeRepr *Base, SourceRange Brackets, bool OldSyntax)
+    : TypeRepr(TypeReprKind::Array), BaseAndIsOldSyntax(Base, OldSyntax),
+      Brackets(Brackets) { }
 
-  TypeRepr *getBase() const { return Base; }
-  ExprHandle *getSize() const { return SizeAndOldSyntax.getPointer(); }
+  TypeRepr *getBase() const { return BaseAndIsOldSyntax.getPointer(); }
   SourceRange getBrackets() const { return Brackets; }
 
-  bool usesOldSyntax() const { return SizeAndOldSyntax.getInt(); }
+  bool usesOldSyntax() const { return BaseAndIsOldSyntax.getInt(); }
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Array;
@@ -418,16 +415,16 @@ public:
 private:
   SourceLoc getStartLocImpl() const {
     if (usesOldSyntax())
-      return Base->getStartLoc();
+      return getBase()->getStartLoc();
 
     return Brackets.Start;
   }
   SourceLoc getEndLocImpl() const {
-    // This test is necessary because the type Int[4][2] is represented as
-    // ArrayTypeRepr(ArrayTypeRepr(Int, 2), 4), so the range needs to cover both
+    // This test is necessary because the type Int[][] is represented as
+    // ArrayTypeRepr(ArrayTypeRepr(Int)), so the range needs to cover both
     // sets of brackets.
-    if (usesOldSyntax() && isa<ArrayTypeRepr>(Base))
-      return Base->getEndLoc();
+    if (usesOldSyntax() && isa<ArrayTypeRepr>(getBase()))
+      return getBase()->getEndLoc();
     return Brackets.End;
   }
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;

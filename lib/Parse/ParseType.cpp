@@ -586,8 +586,8 @@ ParserResult<ArrayTypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
     }
     
     // Just build a normal array slice type.
-    ATR = new (Context) ArrayTypeRepr(NestedType.get(), nullptr,
-                                           SourceRange(lsquareLoc, rsquareLoc),
+    ATR = new (Context) ArrayTypeRepr(NestedType.get(),
+                                      SourceRange(lsquareLoc, rsquareLoc),
                                       /*OldSyntax=*/true);
 
     if (NestedType.isParseError())
@@ -623,7 +623,6 @@ ParserResult<ArrayTypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
     .highlight(sizeEx.get()->getSourceRange());
     
     ATR = new (Context) ArrayTypeRepr(NestedType.get(),
-                                      nullptr,
                                       SourceRange(lsquareLoc,
                                                   getEndOfPreviousLoc()),
                                       /*OldSyntax=*/true);
@@ -643,9 +642,8 @@ ParserResult<ArrayTypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
 
   // Create an array slice type for the malformed array type specification
   NestedType = makeParserErrorResult(Base);
-  ATR = new (Context) ArrayTypeRepr(NestedType.get(), nullptr,
-                                    SourceRange(lsquareLoc,
-                                                PreviousLoc),
+  ATR = new (Context) ArrayTypeRepr(NestedType.get(),
+                                    SourceRange(lsquareLoc, PreviousLoc),
                                     /*OldSyntax=*/true);
   return makeParserErrorResult(ATR);
 }
@@ -693,7 +691,6 @@ ParserResult<TypeRepr> Parser::parseTypeCollection() {
   // Form the array type.
   return makeParserResult(firstTy,
                           new (Context) ArrayTypeRepr(firstTy.get(),
-                                                      nullptr,
                                                       brackets,
                                                       /*OldSyntax=*/false));
 }

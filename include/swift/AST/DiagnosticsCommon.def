@@ -73,8 +73,6 @@ ERROR(class_var_not_in_class,common,none,
 // FIXME: Used by both the parser and the type-checker.
 ERROR(func_decl_without_brace,decl_parsing,PointsToFirstBadToken,
       "expected '{' in body of function declaration", ())
-ERROR(unsupported_fixed_length_array,type_parsing,none,
-      "fixed-length arrays are not yet supported", ())
 
 ERROR(new_array_syntax,type_parsing,none,
       "array types are now written with the brackets around the element type",
