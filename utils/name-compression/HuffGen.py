@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import sys
-from heapq import heappush, heappop, heapify
+from heapq import heappush, heappop
 from collections import defaultdict
 
 filenames = sys.argv[1:]
