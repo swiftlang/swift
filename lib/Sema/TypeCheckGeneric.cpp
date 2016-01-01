@@ -395,7 +395,7 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   if (auto fn = dyn_cast<FuncDecl>(func)) {
     if (!fn->getBodyResultTypeLoc().isNull()) {
       // Check the result type of the function.
-      TypeResolutionOptions options = TR_FunctionResult;
+      TypeResolutionOptions options;
       if (fn->hasDynamicSelf())
         options |= TR_DynamicSelfResult;
 

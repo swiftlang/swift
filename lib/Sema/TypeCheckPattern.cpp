@@ -19,6 +19,7 @@
 #include "GenericTypeResolver.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/ExprHandle.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/NameLookup.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -696,26 +697,11 @@ static bool validateTypedPattern(TypeChecker &TC, DeclContext *DC,
 
   TypeLoc &TL = TP->getTypeLoc();
   bool hadError = TC.validateType(TL, DC, options, resolver);
-  Type Ty = TL.getType();
 
-  if ((options & TR_Variadic) && !hadError) {
-    // If isn't legal to declare something both inout and variadic.
-    if (Ty->is<InOutType>()) {
-      TC.diagnose(TP->getLoc(), diag::inout_cant_be_variadic);
-      hadError = true;
-    } else {
-      // FIXME: Use ellipsis loc for diagnostic.
-      Ty = TC.getArraySliceType(TP->getLoc(), Ty);
-      if (Ty.isNull())
-        hadError = true;
-    }
-  }
-
-  if (hadError) {
+  if (hadError)
     TP->setType(ErrorType::get(TC.Context));
-  } else {
-    TP->setType(Ty);
-  }
+  else
+    TP->setType(TL.getType());
   return hadError;
 }
 
@@ -802,7 +788,6 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
   if (!resolver)
     resolver = &defaultResolver;
   
-  TypeResolutionOptions subOptions = options - TR_Variadic;
   switch (P->getKind()) {
   // Type-check paren patterns by checking the sub-pattern and
   // propagating that type out.
@@ -813,7 +798,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
       SP = PP->getSubPattern();
     else
       SP = cast<VarPattern>(P)->getSubPattern();
-    if (typeCheckPattern(SP, dc, subOptions, resolver)) {
+    if (typeCheckPattern(SP, dc, options, resolver)) {
       P->setType(ErrorType::get(Context));
       return true;
     }
@@ -869,8 +854,8 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
 
     // If this is the top level of a function input list, peel off the
     // ImmediateFunctionInput marker and install a FunctionInput one instead.
-    auto elementOptions = withoutContext(subOptions);
-    if (subOptions & TR_ImmediateFunctionInput)
+    auto elementOptions = withoutContext(options);
+    if (options & TR_ImmediateFunctionInput)
       elementOptions |= TR_FunctionInput;
 
     bool missingType = false;
@@ -973,8 +958,7 @@ static bool coercePatternViaConditionalDowncast(TypeChecker &tc,
 bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                                       TypeResolutionOptions options,
                                       GenericTypeResolver *resolver) {
-  TypeResolutionOptions subOptions
-    = options - TR_Variadic - TR_EnumPatternPayload;
+  TypeResolutionOptions subOptions = options - TR_EnumPatternPayload;
   switch (P->getKind()) {
   // For parens and vars, just set the type annotation and propagate inwards.
   case PatternKind::Paren: {
@@ -1174,7 +1158,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       }
       
       hadError |= coercePatternToType(pattern, dc, CoercionType,
-                                      options - TR_Variadic, resolver);
+                                      options, resolver);
       if (!hadError)
         elt.setPattern(pattern);
     }

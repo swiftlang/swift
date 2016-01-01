@@ -3551,7 +3551,7 @@ public:
 
     bool badType = false;
     if (!FD->getBodyResultTypeLoc().isNull()) {
-      TypeResolutionOptions options = TR_FunctionResult;
+      TypeResolutionOptions options;
       if (FD->hasDynamicSelf())
         options |= TR_DynamicSelfResult;
       if (TC.validateType(FD->getBodyResultTypeLoc(), FD, options,

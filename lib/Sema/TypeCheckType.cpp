@@ -1770,8 +1770,7 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
                              options | TR_ImmediateFunctionInput);
   if (!inputTy || inputTy->is<ErrorType>()) return inputTy;
 
-  Type outputTy = resolveType(repr->getResultTypeRepr(),
-                              options | TR_FunctionResult);
+  Type outputTy = resolveType(repr->getResultTypeRepr(), options);
   if (!outputTy || outputTy->is<ErrorType>()) return outputTy;
 
   extInfo = extInfo.withThrows(repr->throws());
@@ -1848,8 +1847,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     // For now, resolveSILResults only returns a single ordinary result.
     // FIXME: Deal with unsatisfied dependencies.
     SmallVector<SILResultInfo, 1> ordinaryResults;
-    if (resolveSILResults(repr->getResultTypeRepr(),
-                          options | TR_FunctionResult,
+    if (resolveSILResults(repr->getResultTypeRepr(), options,
                           ordinaryResults, errorResult)) {
       hasError = true;
     } else {
@@ -2059,7 +2057,6 @@ bool TypeResolver::resolveSILResults(TypeRepr *repr,
                                      TypeResolutionOptions options,
                                 SmallVectorImpl<SILResultInfo> &ordinaryResults,
                                 Optional<SILResultInfo> &errorResult) {
-  assert(options & TR_FunctionResult && "Should be marked as a result");
 
   // When we generalize SIL to handle multiple normal results, we
   // should always split up a tuple (a single level deep only).  Until

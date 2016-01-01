@@ -301,9 +301,6 @@ enum TypeResolutionFlags : unsigned {
   /// Whether to allow unspecified types within a pattern.
   TR_AllowUnspecifiedTypes = 0x01,
 
-  /// Whether the pattern is variadic.
-  TR_Variadic = 0x02,
-
   /// Whether the given type can override the type of a typed pattern.
   TR_OverrideType = 0x04,
 
@@ -319,9 +316,6 @@ enum TypeResolutionFlags : unsigned {
   
   /// Whether this is the immediate input type to a function type,
   TR_ImmediateFunctionInput = 0x40,
-
-  /// Whether we are in the result type of a function type.
-  TR_FunctionResult = 0x80,
 
   /// Whether we are in the result type of a function body that is
   /// known to produce dynamic Self.
@@ -387,7 +381,6 @@ static inline TypeResolutionOptions
 withoutContext(TypeResolutionOptions options) {
   options -= TR_ImmediateFunctionInput;
   options -= TR_FunctionInput;
-  options -= TR_FunctionResult;
   options -= TR_EnumCase;
   return options;
 }
