@@ -81,8 +81,7 @@ class Node:
       for bit in reversed(stack): numeric_val = numeric_val * 2 + bit
       # Shift the value to make room in the bitstream and then add the numeric
       # value that represents the sequence of bits that we need to add.
-      sb += "num = num.shl(%d); " % len(stack)
-      sb += "num = num + %d; " % (numeric_val)
+      sb += "num = num.shl(%d) + %d; " % (len(stack), numeric_val)
       sb += "return; }\n"
       return sb
     sb = ""
@@ -92,7 +91,6 @@ class Node:
 
 # Only accept these characters into the tree.
 charset = r"0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ$"
-charset_length = str(len(charset))
 
 # Convert the characters and frequencies to a list of trees
 # where each tree is a node that holds a single character.
