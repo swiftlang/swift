@@ -815,6 +815,7 @@ bool SKIndexingConsumer::recordRelatedEntity(const EntityInfo &Info) {
 bool SKIndexingConsumer::finishSourceEntity(UIdent Kind) {
   Entity &CurrEnt = EntitiesStack.back();
   assert(CurrEnt.Kind == Kind);
+  (void) CurrEnt;
   EntitiesStack.pop_back();
   return true;
 }
@@ -1036,6 +1037,7 @@ bool SKDocConsumer::handleAvailableAttribute(const AvailableAttrInfo &Info) {
 bool SKDocConsumer::finishSourceEntity(UIdent Kind) {
   Entity &CurrEnt = EntitiesStack.back();
   assert(CurrEnt.Kind == Kind);
+  (void) CurrEnt;
   EntitiesStack.pop_back();
   return true;
 }
