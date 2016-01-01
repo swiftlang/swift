@@ -2430,7 +2430,7 @@ static void diagnoseFunctionParamNotRepresentable(
   if (P.decl->hasType()) {
     Type ParamTy = P.decl->getType();
     SourceRange SR;
-    if (auto typeRepr = P.type.getTypeRepr())
+    if (auto typeRepr = P.decl->getTypeLoc().getTypeRepr())
       SR = typeRepr->getSourceRange();
     TC.diagnoseTypeNotRepresentableInObjC(AFD, ParamTy, SR);
   }

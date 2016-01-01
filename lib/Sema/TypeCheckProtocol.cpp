@@ -573,7 +573,8 @@ SourceLoc OptionalAdjustment::getOptionalityLoc(ValueDecl *witness) const {
     return SourceLoc();
   }
 
-  return getOptionalityLoc(params->get(getParameterIndex()).type.getTypeRepr());
+  return getOptionalityLoc(params->get(getParameterIndex()).decl->getTypeLoc()
+                           .getTypeRepr());
 }
 
 SourceLoc OptionalAdjustment::getOptionalityLoc(TypeRepr *tyR) const {

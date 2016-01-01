@@ -58,10 +58,8 @@ static Parameter buildArgument(SourceLoc loc, DeclContext *DC,
                                         loc, context.getIdentifier(name),
                                         Type(), DC);
   param->setImplicit();
-  
-  Parameter P = Parameter::withoutLoc(param);
-  P.type.setType(type);
-  return P;
+  param->getTypeLoc().setType(type);
+  return Parameter::withoutLoc(param);
 }
 
 static Parameter buildLetArgument(SourceLoc loc, DeclContext *DC,

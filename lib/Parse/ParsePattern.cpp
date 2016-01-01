@@ -329,7 +329,7 @@ mapParsedParameters(Parser &parser,
       if (specifierKind == Parser::ParsedParameter::InOut)
         type = new (ctx) InOutTypeRepr(type, letVarInOutLoc);
 
-      param.type = TypeLoc(type);
+      param.decl->getTypeLoc() = TypeLoc(type);
     } else if (specifierKind == Parser::ParsedParameter::InOut) {
       parser.diagnose(letVarInOutLoc, diag::inout_must_have_type);
       letVarInOutLoc = SourceLoc();
@@ -420,7 +420,7 @@ mapParsedParameters(Parser &parser,
           .fixItRemove(param.EllipsisLoc);
 
         param.EllipsisLoc = SourceLoc();
-      } else if (!result.type.getTypeRepr()) {
+      } else if (!result.decl->getTypeLoc().getTypeRepr()) {
         parser.diagnose(param.EllipsisLoc, diag::untyped_pattern_ellipsis)
           .highlight(result.getSourceRange());
 

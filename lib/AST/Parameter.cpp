@@ -47,7 +47,7 @@ SourceRange Parameter::getSourceRange() const {
   }
 
   // If the typeloc has a valid location, use it to end the range.
-  if (auto typeRepr = type.getTypeRepr()) {
+  if (auto typeRepr = decl->getTypeLoc().getTypeRepr()) {
     auto endLoc = typeRepr->getEndLoc();
     if (endLoc.isValid())
       return SourceRange(range.Start, endLoc);
@@ -142,6 +142,8 @@ ParameterList *ParameterList::clone(const ASTContext &C,
     if ((options & Implicit) || decl->isImplicit())
       param.decl->setImplicit();
 
+    param.decl->getTypeLoc() = decl->getTypeLoc();
+    
     // If we're inheriting a default argument, mark it as such.
     if (param.defaultArgumentKind != DefaultArgumentKind::None &&
         (options & Inherited)) {

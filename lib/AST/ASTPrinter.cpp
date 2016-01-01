@@ -1572,7 +1572,7 @@ void PrintAST::printOneParameter(const Parameter &param, bool Curried,
     Printer << ": ";
   };
 
-  auto TheTypeLoc = param.type;
+  auto TheTypeLoc = param.decl->getTypeLoc();
   if (TheTypeLoc.getTypeRepr()) {
     // If the outer typeloc is an InOutTypeRepr, print the 'inout' before the
     // subpattern.

@@ -46,9 +46,6 @@ struct Parameter {
   /// This is the location of the ":" token.
   SourceLoc colonLoc;
   
-  /// This is the type specified, including location information.
-  TypeLoc type;
-  
   /// The default value, if any, along with whether this is varargs.
   llvm::PointerIntPair<ExprHandle *, 1, bool> defaultValueAndIsVariadic;
 

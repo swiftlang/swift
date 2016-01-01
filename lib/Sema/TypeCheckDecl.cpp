@@ -887,7 +887,7 @@ void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {
       // Clear out the type of the decl.
       if (param.decl->hasType() && !param.decl->isInvalid())
         param.decl->overwriteType(Type());
-      revertDependentTypeLoc(param.type);
+      revertDependentTypeLoc(param.decl->getTypeLoc());
     }
   }
 
@@ -1338,7 +1338,7 @@ Type swift::configureImplicitSelf(TypeChecker &tc,
   
   // Install the self type on the Parameter that contains it.  This ensures that
   // we don't lose it when generic types get reverted.
-  selfDecl->getParameter().type = TypeLoc::withoutLoc(selfTy);
+  selfDecl->getTypeLoc() = TypeLoc::withoutLoc(selfTy);
   return selfTy;
 }
 
@@ -1988,7 +1988,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
     const TypeRepr *complainRepr = nullptr;
     bool problemIsElement = false;
     for (auto &P : *SD->getIndices()) {
-      checkTypeAccessibility(TC, P.type, SD,
+      checkTypeAccessibility(TC, P.decl->getTypeLoc(), SD,
                              [&](Accessibility typeAccess,
                                  const TypeRepr *thisComplainRepr) {
         if (!minAccess || *minAccess > typeAccess) {
@@ -2043,7 +2043,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
     const TypeRepr *complainRepr = nullptr;
     for (auto *PL : fn->getParameterLists().slice(isTypeContext)) {
       for (auto &P : *PL) {
-        checkTypeAccessibility(TC, P.type, fn,
+        checkTypeAccessibility(TC, P.decl->getTypeLoc(), fn,
                                [&](Accessibility typeAccess,
                                    const TypeRepr *thisComplainRepr) {
           if (!minAccess || *minAccess > typeAccess) {
@@ -3915,7 +3915,7 @@ public:
         if (FD->isObservingAccessor() || (FD->isSetter() && FD->isImplicit())) {
           unsigned firstParamIdx = FD->getParent()->isTypeContext();
           auto *firstParamPattern = FD->getParameterList(firstParamIdx);
-          firstParamPattern->get(0).type.setType(valueTy, true);
+          firstParamPattern->get(0).decl->getTypeLoc().setType(valueTy, true);
         } else if (FD->isGetter() && FD->isImplicit()) {
           FD->getBodyResultTypeLoc().setType(valueTy, true);
         }
@@ -3938,7 +3938,7 @@ public:
         type = type->getReferenceStorageReferent();
         
         auto &valueParam = FD->getParameterLists().back()->get(0);
-        valueParam.type = TypeLoc::withoutLoc(type);
+        valueParam.decl->getTypeLoc() = TypeLoc::withoutLoc(type);
       }
     }
 
@@ -4220,8 +4220,8 @@ public:
       if (!parentParamTy || parentParamTy->getAnyOptionalObjectType())
         return;
 
-      TypeLoc TL = param.type;
-      if (!param.type.getTypeRepr())
+      TypeLoc TL = param.decl->getTypeLoc();
+      if (!TL.getTypeRepr())
         return;
 
       // Allow silencing this warning using parens.

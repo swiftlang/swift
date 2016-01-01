@@ -2904,7 +2904,7 @@ createSetterAccessorArgument(SourceLoc nameLoc, Identifier name,
   if (isNameImplicit)
     result.decl->setImplicit();
 
-  result.type = elementTy.clone(P.Context);
+  result.decl->getTypeLoc() = elementTy.clone(P.Context);
   return result;
 }
 

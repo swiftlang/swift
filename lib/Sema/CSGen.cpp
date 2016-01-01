@@ -1683,9 +1683,9 @@ namespace {
                                  ConstraintLocatorBuilder locator) {
       for (auto &param : *params) {
         // If a type was explicitly specified, use its opened type.
-        if (param.type.getType()) {
+        if (auto type = param.decl->getTypeLoc().getType()) {
           // FIXME: Need a better locator for a pattern as a base.
-          Type openedType = CS.openType(param.type.getType(), locator);
+          Type openedType = CS.openType(type, locator);
           param.decl->overwriteType(openedType);
           continue;
         }

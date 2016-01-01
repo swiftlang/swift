@@ -3152,15 +3152,14 @@ SourceRange VarDecl::getSourceRange() const {
 }
 
 SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
-  Pattern *Pat = getParentPattern();
-
   // For a parameter, map back to it's parameter to get the TypeLoc.
   if (auto *PD = dyn_cast<ParamDecl>(this)) {
     auto &P = PD->getParameter();
-    if (P.type.getTypeRepr())
-      return P.type.getTypeRepr()->getSourceRange();
+    if (auto typeRepr = P.decl->getTypeLoc().getTypeRepr())
+      return typeRepr->getSourceRange();
   }
   
+  Pattern *Pat = getParentPattern();
   if (!Pat || Pat->isImplicit())
     return getSourceRange();
 

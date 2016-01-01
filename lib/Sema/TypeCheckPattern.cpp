@@ -710,13 +710,14 @@ static bool validateParameterType(Parameter &param, DeclContext *DC,
                                   TypeResolutionOptions options,
                                   GenericTypeResolver *resolver,
                                   TypeChecker &TC) {
-  if (auto ty = param.type.getType())
+  auto decl = param.decl;
+  if (auto ty = decl->getTypeLoc().getType())
     return ty->is<ErrorType>();
   
-  bool hadError = TC.validateType(param.type, DC, options|TR_FunctionInput,
-                                  resolver);
+  bool hadError = TC.validateType(decl->getTypeLoc(), DC,
+                                  options|TR_FunctionInput, resolver);
   
-  Type Ty = param.type.getType();
+  Type Ty = decl->getTypeLoc().getType();
   if (param.isVariadic() && !hadError) {
     // If isn't legal to declare something both inout and variadic.
     if (Ty->is<InOutType>()) {
@@ -728,11 +729,11 @@ static bool validateParameterType(Parameter &param, DeclContext *DC,
         hadError = true;
       }
     }
-    param.type.setType(Ty);
+    decl->getTypeLoc().setType(Ty);
   }
 
   if (hadError)
-    param.type.setType(ErrorType::get(TC.Context), /*validated*/true);
+    decl->getTypeLoc().setType(ErrorType::get(TC.Context), /*validated*/true);
   
   return hadError;
 }
@@ -744,13 +745,13 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
   bool hadError = false;
   
   for (auto &param : *PL) {
-    if (param.type.getTypeRepr())
+    if (param.decl->getTypeLoc().getTypeRepr())
       hadError |= validateParameterType(param, DC, options, resolver, *this);
     
-    auto type = param.type.getType();
+    auto type = param.decl->getTypeLoc().getType();
     if (!type && param.decl->hasType()) {
       type = param.decl->getType();
-      param.type.setType(type);
+      param.decl->getTypeLoc().setType(type);
     }
     
     // If there was no type specified, and if we're not looking at a
@@ -1561,13 +1562,13 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, DeclContext *DC,
     bool hadError = false;
     
     // Check that the type, if explicitly spelled, is ok.
-    if (param.type.getTypeRepr()) {
+    if (param.decl->getTypeLoc().getTypeRepr()) {
       hadError |= validateParameterType(param, DC, TypeResolutionOptions(),
                                         nullptr, *this);
       
       // Now that we've type checked the explicit argument type, see if it
       // agrees with the contextual type.
-      if (!hadError && !ty->isEqual(param.type.getType()) &&
+      if (!hadError && !ty->isEqual(param.decl->getTypeLoc().getType()) &&
           !ty->is<ErrorType>())
         param.decl->overwriteType(ty);
     }

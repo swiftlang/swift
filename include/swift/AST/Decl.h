@@ -4163,6 +4163,8 @@ class ParamDecl : public VarDecl {
   Identifier ArgumentName;
   SourceLoc ArgumentNameLoc;
 
+  /// This is the type specified, including location information.
+  TypeLoc typeLoc;
 public:
   ParamDecl(bool isLet, SourceLoc argumentNameLoc, 
             Identifier argumentName, SourceLoc parameterNameLoc,
@@ -4182,6 +4184,9 @@ public:
   const Parameter &getParameter() const {
     return const_cast<ParamDecl*>(this)->getParameter();
   }
+  
+  TypeLoc &getTypeLoc() { return typeLoc; }
+  TypeLoc getTypeLoc() const { return typeLoc; }
   
   SourceRange getSourceRange() const;
 
