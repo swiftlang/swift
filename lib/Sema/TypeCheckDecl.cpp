@@ -6794,40 +6794,34 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
         if (!ctor || ctor->isInvalid())
           continue;
 
-        auto paramTuple = ctor->getArgumentType()->getAs<TupleType>();
-        if (!paramTuple) {
-          // A designated initializer other than a default initializer
-          // means we can't call super.init().
-          if (ctor->isDesignatedInit())
-            return;
-
-          continue;
-        }
-
-        // Check whether any of the tuple elements are missing an initializer.
+        // Check to see if this ctor has zero arguments, or if they all have
+        // default values.
+        auto params = ctor->getParameters();
+        
         bool missingInit = false;
-        for (auto &elt : paramTuple->getElements()) {
-          if (elt.hasInit())
-            continue;
-
-          missingInit = true;
-          break;
+        for (auto &param : *params) {
+          if (!param.hasDefaultValue()) {
+            missingInit = true;
+            break;
+          }
         }
+
+        // Check to see if this is an impossible candidate.
         if (missingInit) {
-          // A designated initializer other than a default initializer
-          // means we can't call super.init().
+          // If we found an impossible designated initializer, then we cannot
+          // call super.init(), even if there is a match.
           if (ctor->isDesignatedInit())
             return;
 
+          // Otherwise, keep looking.
           continue;
         }
 
-        // We found a constructor that can be invoked with an empty tuple.
-        if (foundDefaultConstructor) {
-          // We found two constructors that can be invoked with an empty tuple.
-          foundDefaultConstructor = false;
-          break;
-        }
+        // Ok, we found a constructor that can be invoked with an empty tuple.
+        // If this is our second, then we bail out, because we don't want to
+        // pick one arbitrarily.
+        if (foundDefaultConstructor)
+          return;
 
         foundDefaultConstructor = true;
       }
