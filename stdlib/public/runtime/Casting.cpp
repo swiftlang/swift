@@ -2397,6 +2397,8 @@ namespace {
 
 // Conformance Cache.
 
+static void _initializeCallbacksToInspectDylib();
+
 struct ConformanceState {
   ConcurrentMap<size_t, ConformanceCacheEntry> Cache;
   std::vector<ConformanceSection> SectionsToScan;
@@ -2405,24 +2407,18 @@ struct ConformanceState {
   ConformanceState() {
     SectionsToScan.reserve(16);
     pthread_mutex_init(&SectionsToScanLock, nullptr);
+    _initializeCallbacksToInspectDylib();
   }
 };
 
 static Lazy<ConformanceState> Conformances;
 
-// This variable is used to signal when a cache was generated and
-// it is correct to avoid a new scan.
-static unsigned ConformanceCacheGeneration = 0;
-
-void
-swift::swift_registerProtocolConformances(const ProtocolConformanceRecord *begin,
-                                          const ProtocolConformanceRecord *end){
-  auto &C = Conformances.get();
-
+static void
+_registerProtocolConformances(ConformanceState &C,
+                              const ProtocolConformanceRecord *begin,
+                              const ProtocolConformanceRecord *end) {
   pthread_mutex_lock(&C.SectionsToScanLock);
-
   C.SectionsToScan.push_back(ConformanceSection{begin, end});
-
   pthread_mutex_unlock(&C.SectionsToScanLock);
 }
 
@@ -2437,7 +2433,10 @@ static void _addImageProtocolConformancesBlock(const uint8_t *conformances,
   auto recordsEnd
     = reinterpret_cast<const ProtocolConformanceRecord*>
                                             (conformances + conformancesSize);
-  swift_registerProtocolConformances(recordsBegin, recordsEnd);
+  
+  // Conformance cache should always be sufficiently initialized by this point.
+  _registerProtocolConformances(Conformances.unsafeGetAlreadyInitialized(),
+                                recordsBegin, recordsEnd);
 }
 
 #if defined(__APPLE__) && defined(__MACH__)
@@ -2490,26 +2489,32 @@ static int _addImageProtocolConformances(struct dl_phdr_info *info,
 }
 #endif
 
-static void installCallbacksToInspectDylib() {
-  static OnceToken_t token;
-  auto callback = [](void*) {
-  #if defined(__APPLE__) && defined(__MACH__)
-    // Install our dyld callback if we haven't already.
-    // Dyld will invoke this on our behalf for all images that have already
-    // been loaded.
-    _dyld_register_func_for_add_image(_addImageProtocolConformances);
-  #elif defined(__ELF__)
-    // Search the loaded dls. Unlike the above, this only searches the already
-    // loaded ones.
-    // FIXME: Find a way to have this continue to happen after.
-    // rdar://problem/19045112
-    dl_iterate_phdr(_addImageProtocolConformances, nullptr);
-  #else
-  # error No known mechanism to inspect dynamic libraries on this platform.
-  #endif
-  };
-  
-  SWIFT_ONCE_F(token, callback, nullptr);
+static void _initializeCallbacksToInspectDylib() {
+#if defined(__APPLE__) && defined(__MACH__)
+  // Install our dyld callback.
+  // Dyld will invoke this on our behalf for all images that have already
+  // been loaded.
+  _dyld_register_func_for_add_image(_addImageProtocolConformances);
+#elif defined(__ELF__)
+  // Search the loaded dls. Unlike the above, this only searches the already
+  // loaded ones.
+  // FIXME: Find a way to have this continue to happen after.
+  // rdar://problem/19045112
+  dl_iterate_phdr(_addImageProtocolConformances, nullptr);
+#else
+# error No known mechanism to inspect dynamic libraries on this platform.
+#endif
+}
+
+// This variable is used to signal when a cache was generated and
+// it is correct to avoid a new scan.
+static unsigned ConformanceCacheGeneration = 0;
+
+void
+swift::swift_registerProtocolConformances(const ProtocolConformanceRecord *begin,
+                                          const ProtocolConformanceRecord *end){
+  auto &C = Conformances.get();
+  _registerProtocolConformances(C, begin, end);
 }
 
 static size_t hashTypeProtocolPair(const void *type,
@@ -2630,7 +2635,6 @@ swift::swift_conformsToProtocol(const Metadata *type,
   
   // Install callbacks for tracking when a new dylib is loaded so we can
   // scan it.
-  installCallbacksToInspectDylib();
   auto origType = type;
   
   unsigned numSections = 0;
