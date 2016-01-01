@@ -262,7 +262,12 @@ extension CollectionType {
   ///
   /// - Complexity: O(1)
   public var first: Generator.Element? {
-    return isEmpty ? nil : self[startIndex]
+    // NB: Accessing `startIndex` may not be O(1) for some lazy collections,
+    // so instead of testing `isEmpty` and then returning the first element,
+    // we'll just rely on the fact that the generator always yields the
+    // first element first.
+    var gen = generate()
+    return gen.next()
   }
 
   /// Returns a value less than or equal to the number of elements in
