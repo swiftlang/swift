@@ -206,7 +206,8 @@ public protocol IntegerType
   
   init<T : IntegerType>(extendingOrTruncating source: T)
 
-  mutating func addInPlace<RHS: IntegerType>(rhs: RHS) -> ArithmeticOverflow
+  mutating func addInPlace<RHS: IntegerType>(
+    rhs: RHS, rhsWordShift: Word) -> ArithmeticOverflow
 
   /// The most significant word in a signed representation of `self`.
   ///
@@ -936,43 +937,52 @@ public struct ${Self}
 //
 extension IntegerType {
   public mutating func unsignedAddInPlace<RHS: IntegerType>(
-    rhs: RHS, uwordOperator: UWord.AdditiveOperator
+    rhs: RHS,
+    rhsWordShift: Word = 0,
+    uwordOperator: UWord.AdditiveOperator
   ) -> ArithmeticOverflow {
     _log("* \(Self.self)(\(self.hex)).unsignedAddInPlace"
       + "(\(RHS.self)(\(rhs.hex)))")
     let (carry, knownOverflow) = self.unsignedAddInPlace(
       rhs,
-      countWords: max(self.countRepresentedWords, rhs.countRepresentedWords),
+      countWords: max(
+        self.countRepresentedWords - rhsWordShift, rhs.countRepresentedWords),
+      rhsWordShift: rhsWordShift,
       uwordOperator: uwordOperator
     )
     return knownOverflow ?? ArithmeticOverflow(carry)
   }
   
   public mutating func unsignedAddInPlace<RHS: IntegerType>(
-    rhs: RHS, countWords: Word, uwordOperator: UWord.AdditiveOperator
+    rhs: RHS,
+    countWords: Word,
+    rhsWordShift: Word,
+    uwordOperator: UWord.AdditiveOperator
   ) -> (carry: Bool, knownOverflow: ArithmeticOverflow?) {
     _log("** \(Self.self)(\(self.hex)).unsignedAddInPlace"
       + "(\(RHS.self)(\(rhs.hex)), countWords: \(countWords))")
     _log("*** rhs.countRepresentedWords: \(rhs.countRepresentedWords)")
     
-    var i: Word = 0
+    var rhsWordIndex: Word = 0
     var carry: Bool = false
     
-    while i < countWords {
+    while rhsWordIndex < countWords {
+      let lhsWordIndex = rhsWordIndex + rhsWordShift
       let sum: UWord
-      (sum, carry, _) = uwordOperator(uword(i))(rhs.uword(i), carryIn: carry)
+      (sum, carry, _) = uwordOperator(uword(lhsWordIndex))(
+        rhs.uword(rhsWordIndex), carryIn: carry)
       
-      if !self.replaceUWord(i, with: sum) {
+      if !self.replaceUWord(lhsWordIndex, with: sum) {
         return (false, .Overflow)
       }
-      i += 1
+      rhsWordIndex += 1
       // optimization: if we've processed all represented words on the
       // rhs and there's no carry out, the lhs can not be further
       // affected and no overflow can occur.  This probably doesn't
       // matter for fixed-width integers but may be significant with
       // larger BigNums.  On the other hand, we may not want to
       // optimize for that :-)
-      if carry == (rhs < 0) && i >= rhs.countRepresentedWords {
+      if carry == (rhs < 0) && rhsWordIndex >= rhs.countRepresentedWords {
         _log("*** early exit; carry can't affect lhs")
         return (carry, .None as ArithmeticOverflow)
       }
@@ -981,7 +991,9 @@ extension IntegerType {
   }
   
   public mutating func signedAddInPlace<RHS: IntegerType>(
-    rhs: RHS, uwordOperator: UWord.AdditiveOperator
+    rhs: RHS,
+    rhsWordShift: Word,
+    uwordOperator: UWord.AdditiveOperator
   ) -> ArithmeticOverflow {
     _log("* \(Self.self)(\(self.hex)).signedAddInPlace"
       + "(\(RHS.self)(\(rhs.hex)))")
@@ -989,10 +1001,12 @@ extension IntegerType {
     // word.  We may overflow here or discover that there is no
     // overflow.
     let lowWordCount = self.signWordIndex
-    
-    let (lowCarry, lowOverflowKnown)
-      = self.unsignedAddInPlace(
-        rhs, countWords: lowWordCount, uwordOperator: uwordOperator)
+    let (lowCarry, lowOverflowKnown) = self.unsignedAddInPlace(
+      rhs,
+      countWords: lowWordCount - rhsWordShift,
+      rhsWordShift: rhsWordShift,
+      uwordOperator: uwordOperator
+    )
 
     if let finalOverflow = lowOverflowKnown { return finalOverflow }
     
@@ -1002,34 +1016,37 @@ extension IntegerType {
     // the old sign word.
     var oldSign = self.word(lowWordCount)
     
-    var wordIndex: Word = lowWordCount
+    var rhsWordIndex: Word = lowWordCount - rhsWordShift
     var overflow: Bool, carry: Bool = lowCarry
     
     repeat {
       let bits: UWord
       (bits, carry, overflow) = uwordOperator(oldSign._lowUWord)(
-        rhs.uword(wordIndex), carryIn: carry)
-      if !self.replaceUWord(wordIndex, with: bits) {
+        rhs.uword(rhsWordIndex), carryIn: carry)
+      if !self.replaceUWord(rhsWordIndex + rhsWordShift, with: bits) {
         return .Overflow
       }
       oldSign &>>= ${word_bits - 1} // further sign words are 0 or -1
-      wordIndex += 1
+      rhsWordIndex += 1
     }
-    while wordIndex <= rhs.signWordIndex
+    while rhsWordIndex <= rhs.signWordIndex
 
     return signedOverflowIntoWord(
-      wordIndex, overflow: overflow, originalSign: oldSign)
+      rhsWordIndex + rhsWordShift, overflow: overflow, originalSign: oldSign)
   }
 }
 
 extension IntegerType {
   % for name in 'add', 'subtract':
   public mutating func ${name}InPlace<RHS: IntegerType>(
-    rhs: RHS
+    rhs: RHS,
+    rhsWordShift: Word = 0
   ) -> ArithmeticOverflow {
     return Self.isSigned || RHS.isSigned
-    ? signedAddInPlace(rhs, uwordOperator: UWord._${name}ing)
-    : unsignedAddInPlace(rhs, uwordOperator: UWord._${name}ing)
+    ? signedAddInPlace(
+        rhs, rhsWordShift: rhsWordShift, uwordOperator: UWord._${name}ing)
+    : unsignedAddInPlace(
+        rhs, rhsWordShift: rhsWordShift, uwordOperator: UWord._${name}ing)
   }
   % end
 }
@@ -1508,6 +1525,15 @@ tests.test("Multiprecision/+/DWord") {
   overflow = x.addInPlace(DWord.max)
   expectEqual(.Overflow, overflow)
   expectEqual(DWord.min, x)
+
+  x = DWord(Word.max - 1) << Word.bitWidth
+  overflow = x.addInPlace(1 as Word, rhsWordShift: 1)
+  expectEqual(.None, overflow)
+  expectEqual(DWord(Word.max) << Word.bitWidth, x)
+  
+  overflow = x.addInPlace(1 as Word, rhsWordShift: 1)
+  expectEqual(.Overflow, overflow)
+  expectEqual(DWord.min, x)
 }
 
 tests.test("Multiprecision/+/UDWord") {
@@ -1554,6 +1580,15 @@ tests.test("Multiprecision/+/UDWord") {
   overflow = x.addInPlace(UDWord.max)
   expectEqual(.Overflow, overflow)
   expectEqual(0, x)
+
+  x = UDWord(UWord.max - 1) << UWord.bitWidth
+  overflow = x.addInPlace(1 as Word, rhsWordShift: 1)
+  expectEqual(.None, overflow)
+  expectEqual(UDWord(UWord.max) << UWord.bitWidth, x)
+  
+  overflow = x.addInPlace(1 as UWord, rhsWordShift: 1)
+  expectEqual(.Overflow, overflow)
+  expectEqual(UDWord.min, x)
 }
 
 tests.test("Multiprecision/-/DWord") {
@@ -1596,6 +1631,15 @@ tests.test("Multiprecision/-/DWord") {
   overflow = x.subtractInPlace(DWord.min + 1)
   expectEqual(.Overflow, overflow)
   expectEqual(DWord.min, x)
+
+  x = DWord(Word.min + 1) << Word.bitWidth
+  overflow = x.subtractInPlace(1 as Word, rhsWordShift: 1)
+  expectEqual(.None, overflow)
+  expectEqual(DWord(Word.min) << Word.bitWidth, x)
+  
+  overflow = x.subtractInPlace(1 as Word, rhsWordShift: 1)
+  expectEqual(.Overflow, overflow)
+  expectEqual(DWord(Word.max) << Word.bitWidth, x)
 }
 
 tests.test("Multiprecision/-/UDWord") {
@@ -1652,6 +1696,15 @@ tests.test("Multiprecision/-/UDWord") {
   overflow = x.subtractInPlace(UDWord.max)
   expectEqual(.Overflow, overflow)
   expectEqual(2, x)
+
+  x = UDWord(UWord.min + 1) << UWord.bitWidth
+  overflow = x.subtractInPlace(1 as Word, rhsWordShift: 1)
+  expectEqual(.None, overflow)
+  expectEqual(UDWord(UWord.min) << Word.bitWidth, x)
+  
+  overflow = x.subtractInPlace(1 as Word, rhsWordShift: 1)
+  expectEqual(.Overflow, overflow)
+  expectEqual(UDWord(UWord.max) << Word.bitWidth, x)
 }
 
 tests.test("Multiprecision/+/Int16") {
@@ -1756,6 +1809,5 @@ tests.test("Multiprecision/Underflow/+/UDWord") {
   expectCrashLater()
   x += -1 as DWord
 }
-
 
 runAllTests()
