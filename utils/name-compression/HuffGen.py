@@ -86,7 +86,7 @@ class Node:
     return sb
 
 # Only accept these characters into the tree.
-charset = r"0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+charset = r"0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ$"
 charser_length = str(len(charset))
 
 # Convert the characters and frequencies to a list of trees

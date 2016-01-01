@@ -25,6 +25,7 @@ const char* TestValues[] = {"AA", "r", "J", "Swift","A", "ArrayStringPrintable",
   "__TMPVs15ContiguousArray",
   "__TIF14StdlibUnittest13checkSequenceu0_Rxs14CollectionType_s12SequenceTypeWx9Generator7Element_zW_9GeneratorS3__rFTxq",
   "__TTSg5VSS13CharacterViewS_s14CollectionTypes_GVs17IndexingGeneratorS__GS1_S__s13GeneratorTypes_VS_5IndexS3_s16Forwar",
+  "__TMANameWith$dollar$inIt",
   ""};
 
 // Test that the code book compression round trips.

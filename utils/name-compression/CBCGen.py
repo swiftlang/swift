@@ -49,7 +49,7 @@ escape_char0 = 'Y'
 escape_char1 = 'J'
 
 # notice that Y and J are missing because they are escape chars:
-charset = r"0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIKLMNOPQRSTUVWXZ"
+charset = r"0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIKLMNOPQRSTUVWXZ$"
 encoders = [c for c in charset] # alphabet without the escape chars.
 enc_len = len(encoders)
 
