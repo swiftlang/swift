@@ -2300,10 +2300,6 @@ const {
 #define SWIFT_PROTOCOL_CONFORMANCES_SECTION ".swift2_protocol_conformances_start"
 #endif
 
-// std:once_flag token to install the dyld callback to enqueue images for
-// protocol conformance lookup.
-static std::once_flag InstallProtocolConformanceAddImageCallbackOnce;
-
 namespace {
   struct ConformanceSection {
     const ProtocolConformanceRecord *Begin, *End;
