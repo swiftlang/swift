@@ -345,6 +345,7 @@ Type TypeChecker::resolveTypeInContext(
              "Infinite loop due to circular class inheritance.");
       assert(traversedClassHierarchyDepth++ <= 16384 &&
              "Infinite loop due to circular class inheritance?");
+      (void) traversedClassHierarchyDepth;
     }
   }
 
