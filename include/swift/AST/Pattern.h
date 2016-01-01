@@ -162,14 +162,12 @@ public:
       VD->setParentPatternStmt(S);
     });
   }
-  
-  Pattern *clone(ASTContext &context) const;
 
   static bool classof(const Pattern *P) { return true; }
   
   //*** Allocation Routines ************************************************/
 
-  void *operator new(size_t bytes, ASTContext &C);
+  void *operator new(size_t bytes, const ASTContext &C);
 
   // Make placement new and vanilla new/delete illegal for Patterns.
   void *operator new(size_t bytes) = delete;
