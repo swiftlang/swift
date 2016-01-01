@@ -437,8 +437,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
   }
 
   void printAttributes(const Decl *D);
-  void printTypedPattern(const TypedPattern *TP,
-                         bool StripOuterSliceType = false);
+  void printTypedPattern(const TypedPattern *TP);
 
 public:
   void printPattern(const Pattern *pattern);
@@ -514,8 +513,7 @@ void PrintAST::printAttributes(const Decl *D) {
   D->getAttrs().print(Printer, Options);
 }
 
-void PrintAST::printTypedPattern(const TypedPattern *TP,
-                                 bool StripOuterSliceType) {
+void PrintAST::printTypedPattern(const TypedPattern *TP) {
   auto TheTypeLoc = TP->getTypeLoc();
   if (TheTypeLoc.hasLocation()) {
     // If the outer typeloc is an InOutTypeRepr, print the inout before the
@@ -535,13 +533,6 @@ void PrintAST::printTypedPattern(const TypedPattern *TP,
 
     printPattern(TP->getSubPattern());
     Printer << ": ";
-    if (StripOuterSliceType) {
-      Type T = TP->getType();
-      if (auto *BGT = T->getAs<BoundGenericType>()) {
-        BGT->getGenericArgs()[0].print(Printer, Options);
-        return;
-      }
-    }
     printTypeLoc(TheTypeLoc);
     return;
   }
@@ -554,12 +545,6 @@ void PrintAST::printTypedPattern(const TypedPattern *TP,
 
   printPattern(TP->getSubPattern());
   Printer << ": ";
-  if (StripOuterSliceType) {
-    if (auto *BGT = T->getAs<BoundGenericType>()) {
-      BGT->getGenericArgs()[0].print(Printer, Options);
-      return;
-    }
-  }
   T.print(Printer, Options);
 }
 
