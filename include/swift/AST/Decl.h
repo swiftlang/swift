@@ -2164,6 +2164,7 @@ public:
   /// Retrieve the full name of the declaration.
   /// TODO: Rename to getName?
   DeclName getFullName() const { return Name; }
+  void setName(DeclName name) { Name = name; }
 
   /// Retrieve the base name of the declaration, ignoring any argument
   /// names.
@@ -4170,6 +4171,11 @@ public:
             Identifier argumentName, SourceLoc parameterNameLoc,
             Identifier parameterName, Type ty, DeclContext *dc);
 
+  /// Clone constructor, allocates a new ParamDecl identical to the first.
+  /// Intentionally not defined as a typical copy constructor to avoid
+  /// accidental copies.
+  ParamDecl(ParamDecl *PD);
+  
   /// Retrieve the argument (API) name for this function parameter.
   Identifier getArgumentName() const { return ArgumentName; }
 

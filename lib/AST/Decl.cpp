@@ -3345,6 +3345,17 @@ ParamDecl::ParamDecl(bool isLet, SourceLoc argumentNameLoc,
   ArgumentName(argumentName), ArgumentNameLoc(argumentNameLoc) {
 }
 
+/// Clone constructor, allocates a new ParamDecl identical to the first.
+/// Intentionally not defined as a copy constructor to avoid accidental copies.
+ParamDecl::ParamDecl(ParamDecl *PD)
+  : VarDecl(DeclKind::Param, /*IsStatic=*/false, PD->isLet(), PD->getNameLoc(),
+            PD->getName(), PD->hasType() ? PD->getType() : Type(),
+            PD->getDeclContext()),
+    ArgumentName(PD->getArgumentName()),
+    ArgumentNameLoc(PD->getArgumentNameLoc()),
+    typeLoc(PD->getTypeLoc()) {
+}
+
 Parameter &ParamDecl::getParameter() {
   ArrayRef<ParameterList*> paramLists;
   

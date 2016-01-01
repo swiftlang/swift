@@ -126,23 +126,16 @@ ParameterList *ParameterList::clone(const ASTContext &C,
   // Remap the ParamDecls inside of the ParameterList.
   for (auto &param : params) {
     auto decl = param.decl;
-    auto name = decl->getName();
+    
+    param.decl = new (C) ParamDecl(decl);
+    if (options & Implicit)
+      param.decl->setImplicit();
+
     // If the argument isn't named, and we're cloning for an inherited
     // constructor, give the parameter a name so that silgen will produce a
     // value for it.
-    if (name.empty() && (options & Inherited))
-      name = C.getIdentifier("argument");
-    
-    param.decl = new (C) ParamDecl(decl->isLet(),
-                                   decl->getArgumentNameLoc(),
-                                   decl->getArgumentName(),
-                                   decl->getLoc(), name,
-                                   decl->hasType() ? decl->getType() : Type(),
-                                   decl->getDeclContext());
-    if ((options & Implicit) || decl->isImplicit())
-      param.decl->setImplicit();
-
-    param.decl->getTypeLoc() = decl->getTypeLoc();
+    if (decl->getName().empty() && (options & Inherited))
+      param.decl->setName(C.getIdentifier("argument"));
     
     // If we're inheriting a default argument, mark it as such.
     if (param.defaultArgumentKind != DefaultArgumentKind::None &&
