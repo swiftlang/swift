@@ -116,7 +116,7 @@ contain 61 entries (a-zA-Z0-9_, minus two escape characters).
 
 A reference to the very frequent substrings is encoded as “Yx”, where x is the
 character that is translated into a numeric index. This is two chars per
-substring. 
+substring.
 
 3. The less frequently used substrings are encoded as three-character sequence.
 “Zxx”, where xx is the numeric index in the large table (that can hold 61*61
@@ -179,6 +179,36 @@ a sequence of strings.
 
 The external programs CBCGen.py and HuffGen.py generate the header files
 HuffTables.h and CBC.h.
+
+Generating the compiler header files
+------------------------------------
+
+This section describes how to generate the compression tables using a training
+set and create the header files (that are currently checked in as part of the
+compiler). We generate the compression codebook and the Huffman tables using
+data that we think represent the kind of symbol names people use in Swift. It is
+important to select training data that is representitive or else the compression
+will be less effective.
+
+Step1: Generate a list of mangled names from swift dylibs. This is done using
+the "nm" command: "nm libSwiftCode.dylib > names.txt". Next, remove the prefix
+that nm is adding (stuff like "U", "T" and "t" and addresses of symbols in the
+dylib) and keep one name per line.
+
+Once we enable compression in our manglers you will need to decompress these
+names using the utility swift-compress:
+"cat compressed_names.txt | swift-compress -decompress > names.txt"
+
+Step2: Run "CBCGen.py file1.txt file2.txt file3.txt > CBC.h"
+This will create the CBC header file.
+
+Step3: Recompile swift-compress and use it to compress names without applying
+huffman encoding: "cat names.txt | swift-compress -cbc-only > names.txt.cbc"
+This will create a file with names that are only compressed with the CBC
+encoder, which is the input of our huffman encoder.
+
+Step4: Run HuffGen on the cbc-compressed file to generate the huffman encoding
+tables: "./HuffGen.py names.txt.cbc > HuffTables.h"
 
 Error handling
 --------------
