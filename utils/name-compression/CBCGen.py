@@ -81,7 +81,7 @@ class Trie:
     first_letter = word[0]
 
     # Create a new entry in the Trie node if needed.
-    if not first_letter in self.children:
+    if first_letter not in self.children:
       self.children[first_letter] = Trie()
 
     # Insert the rest of the string recursively.
