@@ -5230,6 +5230,12 @@ public:
   const ParameterList *getParameterList(unsigned i) const {
     return getParameterLists()[i];
   }
+  
+  /// Returns the normal parameters to the initializer, not including self.
+  ParameterList *getParameters() { return ParameterLists[1]; }
+
+  /// Returns the normal parameters to the initializer, not including self.
+  const ParameterList *getParameters() const { return ParameterLists[1]; }
 
 
   /// Specifies the kind of initialization call performed within the body

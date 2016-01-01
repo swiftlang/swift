@@ -59,6 +59,8 @@ struct Parameter {
   /// resolve the type.
   bool isTypeImplicit = false;
   
+  bool hasDefaultValue() const { return getDefaultValue() != nullptr; }
+  
   void setDefaultValue(ExprHandle *H) {
     defaultValueAndIsVariadic.setPointer(H);
   }
