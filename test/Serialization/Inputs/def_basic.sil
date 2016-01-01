@@ -2,7 +2,6 @@ sil_stage raw // CHECK: sil_stage raw
 
 import Builtin
 import Swift
-import Foundation
 
 // Test SIL Global variable.
 // TODO: Handling of global variables has changed: the globalinit_* symbols are now mangled.
@@ -211,19 +210,6 @@ bb0:
   %6 = tuple ()
   %7 = return %6 : $()
 }
-
-// CHECK-LABEL: @objc_classes : $@convention(thin) (@thick NSObject.Type) -> ()
-sil [fragile] @objc_classes : $@convention(thin) (@thick NSObject.Type) -> () {
-bb0(%0 : $@thick NSObject.Type):
-  %1 = thick_to_objc_metatype %0 : $@thick NSObject.Type to $@objc_metatype NSObject.Type
-  // CHECK: %2 = alloc_ref_dynamic [objc] %1 : $@objc_metatype NSObject.Type, $NSObject
-  %2 = alloc_ref_dynamic [objc] %1 : $@objc_metatype NSObject.Type, $NSObject
-  %3 = value_metatype $@thick NSObject.Type, %2 : $NSObject
-  dealloc_partial_ref %2 : $NSObject, %3 : $@thick NSObject.Type
-
-  %void = tuple ()
-  return %void : $()
-} // CHECK: {{^}$}}
 
 // Generated from:
 // func archetype_member_ref<T : Runcible>(x: T) {
@@ -610,15 +596,6 @@ bb3(%4 : $Int):
   return %4 : $Int
 }
 
-class Bas : NSObject {
-  var strRealProp : String
-  override init()
-}
-sil [fragile] @test_super_method : $@convention(method) (@guaranteed Bas) -> Bas
-
-sil [fragile] @swift_StringToNSString : $@convention(thin) (@inout String) -> @owned NSString
-sil [fragile] @_TFSSCfMSSFT_SS : $@convention(thin) (@thin String.Type) -> @owned String
-
 // CHECK-LABEL: sil public_external [fragile] @test_builtin_func_ref
 sil [fragile] @test_builtin_func_ref : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
@@ -969,19 +946,6 @@ entry(%0 : $Int):
   return %b : $@convention(block) () -> ()
 }
 
-protocol SomeClassProtocol : class {}
-
-// CHECK-LABEL: sil public_external [fragile] @metatype_to_object
-// CHECK:         {{%.*}} = objc_metatype_to_object {{%.*}} : $@objc_metatype SomeClass.Type to $AnyObject
-// CHECK:         {{%.*}} = objc_existential_metatype_to_object {{%.*}} : $@objc_metatype SomeClassProtocol.Type to $AnyObject
-sil [fragile] @metatype_to_object : $@convention(thin) (@objc_metatype SomeClass.Type, @objc_metatype SomeClassProtocol.Type) -> @owned (AnyObject, AnyObject) {
-entry(%a : $@objc_metatype SomeClass.Type, %b : $@objc_metatype SomeClassProtocol.Type):
-  %x = objc_metatype_to_object %a : $@objc_metatype SomeClass.Type to $AnyObject
-  %y = objc_existential_metatype_to_object %b : $@objc_metatype SomeClassProtocol.Type to $AnyObject
-  %z = tuple (%x : $AnyObject, %y : $AnyObject)
-  return %z : $(AnyObject, AnyObject)
-}
-
 // CHECK-LABEL: sil public_external [fragile] @bitcasts : $@convention(thin) (@owned Class1) -> @owned (Class2, Int) {
 // CHECK:  bb0(%0 : $Class1):
 // CHECK-NEXT:    %1 = unchecked_ref_cast %0 : $Class1 to $Class2
@@ -994,16 +958,6 @@ entry(%0 : $Class1):
   %2 = unchecked_trivial_bit_cast %0 : $Class1 to $Int
   %3 = tuple (%1 : $Class2, %2 : $Int)
   return %3 : $(Class2, Int)
-}
-
-@objc protocol ObjCProto {}
-
-// CHECK-LABEL: sil public_external [fragile] @protocol_conversion
-sil [fragile] @protocol_conversion : $@convention(thin) () -> @owned Protocol {
-entry:
-  // CHECK: {{%.*}} = objc_protocol #ObjCProto : $Protocol
-  %p = objc_protocol #ObjCProto : $Protocol
-  return %p : $Protocol
 }
 
 sil [fragile] @block_invoke : $@convention(c) (@inout_aliasable @block_storage Int) -> ()
@@ -1310,7 +1264,6 @@ bb0:
   %13 = function_ref @return_constant : $@convention(thin) () -> Int
   %23 = function_ref @existentials : $@convention(thin) (@in P) -> ()
   %25 = function_ref @classes : $@convention(thin) () -> ()
-  %26 = function_ref @objc_classes : $@convention(thin) (@thick NSObject.Type) -> ()
   %27 = function_ref @_TF4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $@convention(thin) (@out Runcible, @in protocol<Bendable, Runcible>) -> ()
   %29 = function_ref @_TF4todo18class_bound_methodFT1xPS_10ClassBound__T_ : $@convention(thin) (@owned ClassBound) -> ()
   %31 = function_ref @_TFV6struct5AlephCfMS0_FT1aCS_3Ref1bVS_3Val_S0_ : $@convention(thin) (Ref, Val, @thin Aleph.Type) -> Aleph
@@ -1336,7 +1289,6 @@ bb0:
   %73 = function_ref @test_basic_block_arguments : $@convention(thin) (Builtin.Int1) -> Builtin.Word
   %75 = function_ref @test_cond_branch_basic_block_args : $@convention(thin) (Int, Builtin.Int1) -> Int
 
-  %79 = function_ref @test_super_method : $@convention(method) (@guaranteed Bas) -> Bas
   %81 = function_ref @test_builtin_func_ref : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
   %83 = function_ref @test_dealloc_ref : $@convention(thin) () -> ()
   %84 = function_ref @test_dealloc_partial_ref : $@convention(thin) () -> ()
@@ -1362,9 +1314,7 @@ bb0:
   %118 = function_ref @cond_fail_test : $@convention(thin) Builtin.Int1 -> ()
 
   %124 = function_ref @block_storage_type : $@convention(thin) Int -> @convention(block) () -> ()
-  %125 = function_ref @metatype_to_object : $@convention(thin) (@objc_metatype SomeClass.Type, @objc_metatype SomeClassProtocol.Type) -> @owned (AnyObject, AnyObject)
   %127 = function_ref @bitcasts : $@convention(thin) (@owned Class1) -> @owned (Class2, Int)
-  %126 = function_ref @protocol_conversion : $@convention(thin) () -> @owned Protocol
   %133 = function_ref @test_try_apply : $@convention(thin) (@convention(thin) () -> @error ErrorType) -> @error ErrorType
   %135 = function_ref @test_try_nothrow : $@convention(thin) (@convention(thin) () -> @error ErrorType) -> ()
   %134 = function_ref @box_type : $@convention(thin) (@box Int, Int) -> ()
