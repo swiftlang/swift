@@ -523,8 +523,8 @@ static void addParameters(ArrayRef<Identifier> &ArgNames,
       ArgNames = ArgNames.slice(1);
     }
 
-    if (auto typeRepr = param.type.getTypeRepr()) {
-      SourceRange TypeRange = param.type.getSourceRange();
+    if (auto typeRepr = param.decl->getTypeLoc().getTypeRepr()) {
+      SourceRange TypeRange = param.decl->getTypeLoc().getSourceRange();
       if (auto InOutTyR = dyn_cast_or_null<InOutTypeRepr>(typeRepr))
         TypeRange = InOutTyR->getBase()->getSourceRange();
       if (TypeRange.isInvalid())
