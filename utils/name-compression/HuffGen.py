@@ -16,7 +16,6 @@ def addLine(line):
   """
   Analyze the frequency of letters in \p line.
   """
-  max_string_length = 8
   for c in line: hist[c] += 1
 
 # Read all of the input files and analyze the content of the files.
