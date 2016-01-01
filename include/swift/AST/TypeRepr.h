@@ -85,7 +85,7 @@ public:
 
   //*** Allocation Routines ************************************************/
 
-  void *operator new(size_t bytes, ASTContext &C,
+  void *operator new(size_t bytes, const ASTContext &C,
                      unsigned Alignment = alignof(TypeRepr));
 
   // Make placement new and vanilla new/delete illegal for TypeReprs.
@@ -98,7 +98,7 @@ public:
   void dump() const;
 
   /// Clone the given type representation.
-  TypeRepr *clone(ASTContext &ctx) const;
+  TypeRepr *clone(const ASTContext &ctx) const;
 
   /// Visit the top-level types in the given type representation,
   /// which includes the types referenced by \c IdentTypeReprs either

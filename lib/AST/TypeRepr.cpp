@@ -68,7 +68,8 @@ SourceRange TypeRepr::getSourceRange() const {
 }
 
 /// Standard allocator for TypeReprs.
-void *TypeRepr::operator new(size_t Bytes, ASTContext &C, unsigned Alignment) {
+void *TypeRepr::operator new(size_t Bytes, const ASTContext &C,
+                             unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
 }
 
@@ -106,10 +107,10 @@ void TypeRepr::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
 
 namespace {
   class CloneVisitor : public TypeReprVisitor<CloneVisitor, TypeRepr *> {
-    ASTContext &Ctx;
+    const ASTContext &Ctx;
 
   public:
-    explicit CloneVisitor(ASTContext &ctx) : Ctx(ctx) { }
+    explicit CloneVisitor(const ASTContext &ctx) : Ctx(ctx) { }
 
 #define TYPEREPR(CLASS, PARENT) \
     TypeRepr *visit##CLASS##TypeRepr(CLASS##TypeRepr* type);
@@ -221,7 +222,7 @@ TypeRepr *CloneVisitor::visitFixedTypeRepr(FixedTypeRepr *T) {
   return new (Ctx) FixedTypeRepr(T->getType(), T->getLoc());
 }
 
-TypeRepr *TypeRepr::clone(ASTContext &ctx) const {
+TypeRepr *TypeRepr::clone(const ASTContext &ctx) const {
   CloneVisitor visitor(ctx);
   return visitor.visit(const_cast<TypeRepr *>(this));
 }
