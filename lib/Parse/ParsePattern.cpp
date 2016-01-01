@@ -438,7 +438,7 @@ mapParsedParameters(Parser &parser,
           .fixItRemove(SourceRange(param.EqualLoc,
                                    param.DefaultArg->getExpr()->getEndLoc()));
       } else {
-        result.defaultArgumentKind = getDefaultArgKind(param.DefaultArg);
+        result.decl->setDefaultArgumentKind(getDefaultArgKind(param.DefaultArg));
         result.setDefaultValue(param.DefaultArg);
       }
     }

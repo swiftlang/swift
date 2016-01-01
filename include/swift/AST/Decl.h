@@ -4166,6 +4166,20 @@ class ParamDecl : public VarDecl {
 
   /// This is the type specified, including location information.
   TypeLoc typeLoc;
+  
+  /// The default value, if any, along with whether this is varargs.
+  llvm::PointerIntPair<ExprHandle *, 1, bool> DefaultValueAndIsVariadic;
+  
+  /// True if the type is implicitly specified in the source, but this has an
+  /// apparently valid typeRepr.  This is used in accessors, which look like:
+  ///    set (value) {
+  /// but need to get the typeRepr from the property as a whole so Sema can
+  /// resolve the type.
+  bool IsTypeLocImplicit = false;
+  
+  /// Information about a symbolic default argument, like __FILE__.
+  DefaultArgumentKind defaultArgumentKind = DefaultArgumentKind::None;
+  
 public:
   ParamDecl(bool isLet, SourceLoc argumentNameLoc, 
             Identifier argumentName, SourceLoc parameterNameLoc,
@@ -4193,6 +4207,41 @@ public:
   
   TypeLoc &getTypeLoc() { return typeLoc; }
   TypeLoc getTypeLoc() const { return typeLoc; }
+
+  bool isTypeLocImplicit() const { return IsTypeLocImplicit; }
+  void setIsTypeLocImplicit(bool val) { IsTypeLocImplicit = val; }
+  
+  bool isDefaultArgument() const {
+    return defaultArgumentKind != DefaultArgumentKind::None;
+  }
+  DefaultArgumentKind getDefaultArgumentKind() const {
+    return defaultArgumentKind;
+  }
+  void setDefaultArgumentKind(DefaultArgumentKind K) {
+    defaultArgumentKind = K;
+  }
+  
+  void setDefaultValue(ExprHandle *H) {
+    DefaultValueAndIsVariadic.setPointer(H);
+  }
+  ExprHandle *getDefaultValue() const {
+    return DefaultValueAndIsVariadic.getPointer();
+  }
+  /// Whether or not this parameter is varargs.
+  bool isVariadic() const { return DefaultValueAndIsVariadic.getInt(); }
+  void setVariadic(bool value = true) {DefaultValueAndIsVariadic.setInt(value);}
+  
+  /// Remove the type of this varargs element designator, without the array
+  /// type wrapping it.  A parameter like "Int..." will have formal parameter
+  /// type of "[Int]" and this returns "Int".
+  static Type getVarargBaseTy(Type VarArgT);
+  
+  /// Remove the type of this varargs element designator, without the array
+  /// type wrapping it.
+  Type getVarargBaseTy() const {
+    assert(isVariadic());
+    return getVarargBaseTy(getType());
+  }
   
   SourceRange getSourceRange() const;
 

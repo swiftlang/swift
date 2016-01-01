@@ -494,7 +494,7 @@ static unsigned countDefaultArguments(AbstractFunctionDecl *func) {
 
   unsigned count = 0;
   for (const auto &elt : *paramList) {
-    if (elt.defaultArgumentKind != DefaultArgumentKind::None)
+    if (elt.decl->isDefaultArgument())
       ++count;
   }
 

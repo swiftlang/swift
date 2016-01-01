@@ -138,10 +138,9 @@ ParameterList *ParameterList::clone(const ASTContext &C,
       param.decl->setName(C.getIdentifier("argument"));
     
     // If we're inheriting a default argument, mark it as such.
-    if (param.defaultArgumentKind != DefaultArgumentKind::None &&
-        (options & Inherited)) {
-      param.defaultArgumentKind = DefaultArgumentKind::Inherited;
-      param.setDefaultValue(nullptr);
+    if (param.decl->isDefaultArgument() && (options & Inherited)) {
+      param.decl->setDefaultArgumentKind(DefaultArgumentKind::Inherited);
+      param.decl->setDefaultValue(nullptr);
     }
   }
   
@@ -160,8 +159,8 @@ Type ParameterList::getType(const ASTContext &C) const {
     if (!P.decl->hasType()) return Type();
     
     argumentInfo.push_back({
-      P.decl->getType(), P.decl->getArgumentName(), P.defaultArgumentKind,
-      P.isVariadic()
+      P.decl->getType(), P.decl->getArgumentName(),
+      P.decl->getDefaultArgumentKind(), P.decl->isVariadic()
     });
   }
   

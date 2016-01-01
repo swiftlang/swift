@@ -561,7 +561,7 @@ namespace {
     if (auto AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
       for (auto params : AFD->getParameterLists()) {
         for (auto &param : *params) {
-          if (param.defaultArgumentKind == DefaultArgumentKind::None)
+          if (!param.decl->isDefaultArgument())
             nNoDefault++;
         }
       }

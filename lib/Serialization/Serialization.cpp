@@ -799,7 +799,8 @@ void Serializer::writeParameterList(const ParameterList *PL) {
   for (auto &param : *PL) {
     // FIXME: Default argument expressions?
     
-    auto defaultArg =getRawStableDefaultArgumentKind(param.defaultArgumentKind);
+    auto defaultArg =
+      getRawStableDefaultArgumentKind(param.decl->getDefaultArgumentKind());
     ParameterListEltLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                        addDeclRef(param.decl),
                                        param.isVariadic(),

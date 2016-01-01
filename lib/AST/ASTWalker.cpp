@@ -852,7 +852,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       
       // Don't walk into the type if the decl is implicit, or if the type is
       // implicit.
-      if (!P.decl->isImplicit() && !P.isTypeImplicit &&
+      if (!P.decl->isImplicit() && !P.decl->isTypeLocImplicit() &&
           doIt(P.decl->getTypeLoc()))
         return true;
       

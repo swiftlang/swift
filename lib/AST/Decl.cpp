@@ -3353,7 +3353,10 @@ ParamDecl::ParamDecl(ParamDecl *PD)
             PD->getDeclContext()),
     ArgumentName(PD->getArgumentName()),
     ArgumentNameLoc(PD->getArgumentNameLoc()),
-    typeLoc(PD->getTypeLoc()) {
+    typeLoc(PD->getTypeLoc()),
+    DefaultValueAndIsVariadic(PD->DefaultValueAndIsVariadic),
+    IsTypeLocImplicit(PD->IsTypeLocImplicit),
+    defaultArgumentKind(PD->defaultArgumentKind) {
 }
 
 Parameter &ParamDecl::getParameter() {
@@ -3423,7 +3426,9 @@ SourceRange ParamDecl::getSourceRange() const {
   return getParameter().getSourceRange();
 }
 
-
+Type ParamDecl::getVarargBaseTy(Type VarArgT) {
+  return Parameter::getVarargBaseTy(VarArgT);
+}
 
 /// Determine whether the given Swift type is an integral type, i.e.,
 /// a type that wraps a builtin integer.
@@ -3675,7 +3680,7 @@ AbstractFunctionDecl::getDefaultArg(unsigned Index) const {
   for (auto paramList : paramLists) {
     if (Index < paramList->size()) {
       auto &param = paramList->get(Index);
-      return { param.defaultArgumentKind, param.decl->getType() };
+      return { param.decl->getDefaultArgumentKind(), param.decl->getType() };
     }
     
     Index -= paramList->size();

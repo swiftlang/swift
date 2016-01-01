@@ -4089,7 +4089,7 @@ public:
         }
 
         // If we have a default argument, keep going.
-        if (param.defaultArgumentKind != DefaultArgumentKind::None) {
+        if (param.decl->isDefaultArgument()) {
           anyDefaultArguments = true;
           continue;
         }

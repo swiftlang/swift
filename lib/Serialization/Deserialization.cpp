@@ -307,7 +307,7 @@ ParameterList *ModuleFile::readParameterList() {
     // Decode the default argument kind.
     // FIXME: Default argument expression, if available.
     if (auto defaultArg = getActualDefaultArgKind(rawDefaultArg))
-      result.defaultArgumentKind = *defaultArg;
+      result.decl->setDefaultArgumentKind(*defaultArg);
     params.push_back(result);
   }
   

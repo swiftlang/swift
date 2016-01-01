@@ -18,7 +18,6 @@
 #ifndef SWIFT_AST_PARAMETER_H
 #define SWIFT_AST_PARAMETER_H
 
-#include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/Decl.h"
 #include "swift/Basic/OptionSet.h"
@@ -43,30 +42,19 @@ struct Parameter {
   /// as the parameter attributes.
   ParamDecl *decl;
 
-  /// The default value, if any, along with whether this is varargs.
-  llvm::PointerIntPair<ExprHandle *, 1, bool> defaultValueAndIsVariadic;
-
-  /// True if the type is implicitly specified in the source, but this has an
-  /// apparently valid typeRepr.  This is used in accessors, which look like:
-  ///    set (value) {
-  /// but need to get the typeRepr from the property as a whole so Sema can
-  /// resolve the type.
-  bool isTypeImplicit = false;
-  
-  bool hasDefaultValue() const { return getDefaultValue() != nullptr; }
+  bool hasDefaultValue() const {
+    return decl->getDefaultValue() != nullptr;
+  }
   
   void setDefaultValue(ExprHandle *H) {
-    defaultValueAndIsVariadic.setPointer(H);
+    decl->setDefaultValue(H);
   }
   ExprHandle *getDefaultValue() const {
-    return defaultValueAndIsVariadic.getPointer();
+    return decl->getDefaultValue();
   }
   /// Whether or not this parameter is varargs.
-  bool isVariadic() const { return defaultValueAndIsVariadic.getInt(); }
-  void setVariadic(bool value = true) {defaultValueAndIsVariadic.setInt(value);}
-  
-  /// Information about a symbolic default argument, like __FILE__.
-  DefaultArgumentKind defaultArgumentKind = DefaultArgumentKind::None;
+  bool isVariadic() const { return decl->isVariadic(); }
+  void setVariadic(bool value = true) { decl->setVariadic(value); }
   
   /// Remove the type of this varargs element designator, without the array
   /// type wrapping it.  A parameter like "Int..." will have formal parameter

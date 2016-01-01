@@ -2212,7 +2212,7 @@ Type ClangImporter::Implementation::importMethodType(
                                   param->getType(), optionalityOfParam,
                                   methodName.getBaseName(), numEffectiveParams,
                                   isLastParameter))
-        paramInfo.defaultArgumentKind = DefaultArgumentKind::Normal;
+        paramInfo.decl->setDefaultArgumentKind(DefaultArgumentKind::Normal);
     }
     swiftParams.push_back(paramInfo);
   }

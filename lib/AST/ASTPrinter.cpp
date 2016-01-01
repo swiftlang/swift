@@ -1654,7 +1654,7 @@ void PrintAST::printOneParameter(const Parameter &param, bool Curried,
   
   
   if (Options.PrintDefaultParameterPlaceholder &&
-      param.defaultArgumentKind != DefaultArgumentKind::None) {
+      param.decl->isDefaultArgument()) {
     // For Clang declarations, figure out the default we're using.
     auto AFD = dyn_cast<AbstractFunctionDecl>(param.decl->getDeclContext());
     if (AFD && AFD->getClangDecl() && param.decl->hasType()) {

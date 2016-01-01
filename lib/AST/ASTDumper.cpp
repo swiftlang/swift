@@ -793,7 +793,7 @@ namespace {
       if (P.isVariadic())
         OS << " variadic";
 
-      switch (P.defaultArgumentKind) {
+      switch (P.decl->getDefaultArgumentKind()) {
       case DefaultArgumentKind::None: break;
       case DefaultArgumentKind::Column:
         printField("default_arg", "__COLUMN__");

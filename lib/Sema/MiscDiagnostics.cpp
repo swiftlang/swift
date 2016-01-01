@@ -2261,7 +2261,7 @@ static bool hasExtraneousDefaultArguments(AbstractFunctionDecl *afd,
 
   for (unsigned i = 0; i != numElementsInParens; ++i) {
     auto &param = bodyParams->get(i);
-    if (param.defaultArgumentKind == DefaultArgumentKind::None)
+    if (!param.decl->isDefaultArgument())
       continue;
 
     auto defaultArg = param.decl->getType()->getInferredDefaultArgString();
