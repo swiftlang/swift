@@ -29,7 +29,7 @@ sorted_chars = sorted(hist.items(), key=lambda x: x[1] * len(x[0]) , reverse=Tru
 class Node:
   """ This is a node in the Huffman tree """
   def __init__(self, hits, value = None, l = None, r = None):
-    self.hit = hits  # Number of occurrencs for this node.
+    self.hit = hits  # Number of occurrences for this node.
     self.left = l    # Left subtree.
     self.right = r   # Right subtree.
     self.val = value # Character value for leaf nodes.
@@ -91,7 +91,7 @@ class Node:
 
 # Only accept these characters into the tree.
 charset = r"0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ$"
-charser_length = str(len(charset))
+charset_length = str(len(charset))
 
 # Convert the characters and frequencies to a list of trees
 # where each tree is a node that holds a single character.
