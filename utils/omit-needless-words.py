@@ -81,7 +81,8 @@ def main():
     subprocess.call(['rm', '-f', source_filename])
 
     # Diff them
-    subprocess.call([args.diff_tool, args.before_file, args.after_file])
+    if args.diff_tool != "":
+        subprocess.call([args.diff_tool, args.before_file, args.after_file])
 
 if __name__ == '__main__':
     main()
