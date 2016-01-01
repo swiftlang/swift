@@ -21,7 +21,6 @@ from SwiftBuildSupport import (
     SWIFT_SOURCE_ROOT,
     WorkingDirectory,
     check_call,
-    check_output,
 )
 
 def update_working_copy(repo_path):
