@@ -305,9 +305,10 @@ Type TypeChecker::resolveTypeInContext(
       continue;
 
     // Search the type of this context and its supertypes.
+    Type superClassOfFromType;
     for (auto fromType = resolver->resolveTypeOfContext(parentDC);
          fromType;
-         fromType = getSuperClassOf(fromType)) {
+         fromType = superClassOfFromType) {
       // If the nominal type declaration of the context type we're looking at
       // matches the owner's nominal type declaration, this is how we found
       // the member type declaration. Substitute the type we're coming from as
@@ -336,6 +337,11 @@ Type TypeChecker::resolveTypeInContext(
           conformance) {
         return conformance->getTypeWitness(assocType, this).getReplacement();
       }
+      superClassOfFromType = getSuperClassOf(fromType);
+      /// FIXME: Avoid the possibility of an infinite loop by fixing the root
+      ///        cause instead (incomplete circularity detection).
+      assert(fromType.getPointer() != superClassOfFromType.getPointer() &&
+             "Infinite loop due to circular class inheritance?");
     }
   }
 
