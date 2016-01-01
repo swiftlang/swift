@@ -306,6 +306,7 @@ Type TypeChecker::resolveTypeInContext(
 
     // Search the type of this context and its supertypes.
     Type superClassOfFromType;
+    int traversedClassHierarchyDepth = 0;
     for (auto fromType = resolver->resolveTypeOfContext(parentDC);
          fromType;
          fromType = superClassOfFromType) {
@@ -341,6 +342,8 @@ Type TypeChecker::resolveTypeInContext(
       /// FIXME: Avoid the possibility of an infinite loop by fixing the root
       ///        cause instead (incomplete circularity detection).
       assert(fromType.getPointer() != superClassOfFromType.getPointer() &&
+             "Infinite loop due to circular class inheritance.");
+      assert(traversedClassHierarchyDepth++ <= 16384 &&
              "Infinite loop due to circular class inheritance?");
     }
   }
