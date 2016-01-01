@@ -281,6 +281,7 @@ ParameterList *ModuleFile::readParameterList() {
   auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
   unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch);
   assert(recordID == PARAMETERLIST);
+  (void) recordID;
   unsigned numParams;
   decls_block::ParameterListLayout::readRecord(scratch, numParams);
 
@@ -290,7 +291,7 @@ ParameterList *ModuleFile::readParameterList() {
     auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
     unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch);
     assert(recordID == PARAMETERLIST_ELT);
-
+    (void) recordID;
     
     DeclID paramID;
     bool isVariadic;
