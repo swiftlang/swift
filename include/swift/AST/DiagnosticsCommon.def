@@ -74,10 +74,6 @@ ERROR(class_var_not_in_class,common,none,
 ERROR(func_decl_without_brace,decl_parsing,PointsToFirstBadToken,
       "expected '{' in body of function declaration", ())
 
-ERROR(new_array_syntax,type_parsing,none,
-      "array types are now written with the brackets around the element type",
-      ())
-
 NOTE(convert_let_to_var,sema,none,
      "change 'let' to 'var' to make it mutable", ())
 NOTE(change_let_to_var_param,sema,none,

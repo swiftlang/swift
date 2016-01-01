@@ -559,9 +559,7 @@ private:
 
     if (Kind == DiagnosticKind::Error)
       return true;
-    if (Info.ID == diag::parameter_extraneous_pound.ID ||
-        Info.ID == diag::parameter_pound_double_up.ID ||
-        Info.ID == diag::forced_downcast_coercion.ID ||
+    if (Info.ID == diag::forced_downcast_coercion.ID ||
         Info.ID == diag::forced_downcast_noop.ID ||
         Info.ID == diag::variable_never_mutated.ID)
       return true;

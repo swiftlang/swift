@@ -392,20 +392,15 @@ private:
 ///   [Foo]
 /// \endcode
 class ArrayTypeRepr : public TypeRepr {
-  // FIXME: Tail allocation. Use bits to determine whether Base/Size are
-  // available.
-  llvm::PointerIntPair<TypeRepr *, 1, bool> BaseAndIsOldSyntax;
+  TypeRepr *Base;
   SourceRange Brackets;
 
 public:
-  ArrayTypeRepr(TypeRepr *Base, SourceRange Brackets, bool OldSyntax)
-    : TypeRepr(TypeReprKind::Array), BaseAndIsOldSyntax(Base, OldSyntax),
-      Brackets(Brackets) { }
+  ArrayTypeRepr(TypeRepr *Base, SourceRange Brackets)
+    : TypeRepr(TypeReprKind::Array), Base(Base), Brackets(Brackets) { }
 
-  TypeRepr *getBase() const { return BaseAndIsOldSyntax.getPointer(); }
+  TypeRepr *getBase() const { return Base; }
   SourceRange getBrackets() const { return Brackets; }
-
-  bool usesOldSyntax() const { return BaseAndIsOldSyntax.getInt(); }
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Array;
@@ -413,20 +408,8 @@ public:
   static bool classof(const ArrayTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const {
-    if (usesOldSyntax())
-      return getBase()->getStartLoc();
-
-    return Brackets.Start;
-  }
-  SourceLoc getEndLocImpl() const {
-    // This test is necessary because the type Int[][] is represented as
-    // ArrayTypeRepr(ArrayTypeRepr(Int)), so the range needs to cover both
-    // sets of brackets.
-    if (usesOldSyntax() && isa<ArrayTypeRepr>(getBase()))
-      return getBase()->getEndLoc();
-    return Brackets.End;
-  }
+  SourceLoc getStartLocImpl() const { return Brackets.Start; }
+  SourceLoc getEndLocImpl() const { return Brackets.End; }
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
@@ -778,10 +761,8 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::ProtocolComposition:
   case TypeReprKind::Tuple:
   case TypeReprKind::Fixed:
-    return true;
-
   case TypeReprKind::Array:
-    return !cast<ArrayTypeRepr>(this)->usesOldSyntax();
+    return true;
   }
   llvm_unreachable("bad TypeRepr kind");
 }

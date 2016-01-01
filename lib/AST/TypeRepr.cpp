@@ -158,8 +158,7 @@ TypeRepr *CloneVisitor::visitFunctionTypeRepr(FunctionTypeRepr *T) {
 }
 
 TypeRepr *CloneVisitor::visitArrayTypeRepr(ArrayTypeRepr *T) {
-  return new (Ctx) ArrayTypeRepr(visit(T->getBase()), T->getBrackets(),
-                                 T->usesOldSyntax());
+  return new (Ctx) ArrayTypeRepr(visit(T->getBase()), T->getBrackets());
 }
 
 TypeRepr *CloneVisitor::visitDictionaryTypeRepr(DictionaryTypeRepr *T) {
@@ -338,14 +337,9 @@ void FunctionTypeRepr::printImpl(ASTPrinter &Printer,
 
 void ArrayTypeRepr::printImpl(ASTPrinter &Printer,
                               const PrintOptions &Opts) const {
-  if (usesOldSyntax()) {
-    printTypeRepr(getBase(), Printer, Opts);
-    Printer << "[]";
-  } else {
-    Printer << "[";
-    printTypeRepr(getBase(), Printer, Opts);
-    Printer << "]";
-  }
+  Printer << "[";
+  printTypeRepr(getBase(), Printer, Opts);
+  Printer << "]";
 }
 
 void DictionaryTypeRepr::printImpl(ASTPrinter &Printer,

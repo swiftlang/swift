@@ -199,38 +199,14 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       consumeToken();
     }
 
-    // '#'?
-    if (Tok.is(tok::pound))
-      param.PoundLoc = consumeToken(tok::pound);
-
-    if (param.PoundLoc.isValid() || startsParameterName(*this, isClosure)) {
+    if (startsParameterName(*this, isClosure)) {
       // identifier-or-none for the first name
       if (Tok.is(tok::kw__)) {
-        // A back-tick cannot precede an empty name marker.
-        if (param.PoundLoc.isValid()) {
-          diagnose(Tok, diag::parameter_backtick_empty_name)
-          .fixItRemove(param.PoundLoc);
-          param.PoundLoc = SourceLoc();
-        }
-
         param.FirstNameLoc = consumeToken();
-      } else if (Tok.canBeArgumentLabel()) {
+      } else {
+        assert(Tok.canBeArgumentLabel() && "startsParameterName() lied");
         param.FirstName = Context.getIdentifier(Tok.getText());
         param.FirstNameLoc = consumeToken();
-
-        // Operators cannot have API names.
-        if (paramContext == ParameterContextKind::Operator &&
-            param.PoundLoc.isValid()) {
-          diagnose(param.PoundLoc, 
-                   diag::parameter_operator_keyword_argument)
-            .fixItRemove(param.PoundLoc);
-          param.PoundLoc = SourceLoc();
-        }
-      } else {
-        assert(param.PoundLoc.isValid() && "startsParameterName() lied");
-        diagnose(Tok, diag::parameter_backtick_missing_name);
-        param.FirstNameLoc = param.PoundLoc;
-        param.PoundLoc = SourceLoc();
       }
 
       // identifier-or-none? for the second name
@@ -254,30 +230,9 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         param.SecondNameLoc = SourceLoc();
       }
 
-      // Cannot have a pound and two names.
-      if (param.PoundLoc.isValid() && param.SecondNameLoc.isValid()) {
-        diagnose(param.PoundLoc, diag::parameter_backtick_two_names)
-          .fixItRemove(param.PoundLoc);
-        param.PoundLoc = SourceLoc();
-      }
-
       // (':' type)?
       if (Tok.is(tok::colon)) {
         param.ColonLoc = consumeToken();
-
-        // Special case handling of @autoclosure attribute on the type, which
-        // was supported in Swift 1.0 and 1.1, but removed in Swift 1.2 (moved
-        // to a decl attribute).
-        if (Tok.is(tok::at_sign) &&
-            peekToken().isContextualKeyword("autoclosure")) {
-          SourceLoc AtLoc = consumeToken(tok::at_sign);
-          SourceLoc ACLoc = consumeToken(tok::identifier);
-          diagnose(AtLoc, diag::autoclosure_is_decl_attribute)
-            .fixItRemove(SourceRange(AtLoc, ACLoc))
-            .fixItInsert(StartLoc, "@autoclosure ");
-          param.Attrs.add(new (Context) AutoClosureAttr(AtLoc, ACLoc,
-                                                        /*escaping=*/false));
-        }
 
         auto type = parseType(diag::expected_parameter_type);
         status |= type;
@@ -447,25 +402,8 @@ mapParsedParameters(Parser &parser,
           .fixItRemoveChars(param.FirstNameLoc, param.SecondNameLoc);
       }
     } else {
-      // If it's an API name by default, or there was a pound, we have an
-      // API name.
-      if (isKeywordArgumentByDefault || param.PoundLoc.isValid()) {
+      if (isKeywordArgumentByDefault)
         argName = param.FirstName;
-
-        // The pound is going away. Complain.
-        if (param.PoundLoc.isValid()) {
-          if (isKeywordArgumentByDefault) {
-            parser.diagnose(param.PoundLoc, diag::parameter_extraneous_pound,
-                            argName)
-              .fixItRemove(param.PoundLoc);
-          } else {
-            parser.diagnose(param.PoundLoc, diag::parameter_pound_double_up,
-                            argName.str())
-              .fixItReplace(param.PoundLoc, (argName.str() + " ").str());
-          }
-        }
-      }
-
       paramName = param.FirstName;
 
       result = createParamPattern(param.LetVarInOutLoc, param.SpecifierKind,

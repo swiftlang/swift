@@ -1124,7 +1124,6 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     }
 
     // The number of elements must match exactly.
-    // TODO: incomplete tuple patterns, with some syntax.
     if (!hadError && tupleTy->getNumElements() != TP->getNumElements()) {
       if (canDecayToParen)
         return decayToParen();
@@ -1148,8 +1147,6 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       
       // If the tuple pattern had a label for the tuple element, it must match
       // the label for the tuple type being matched.
-      // TODO: detect and diagnose shuffling
-      // TODO: permit shuffling
       if (!hadError && !elt.getLabel().empty() &&
           elt.getLabel() != tupleTy->getElement(i).getName()) {
         diagnose(elt.getLabelLoc(), diag::tuple_pattern_label_mismatch,
@@ -1161,31 +1158,6 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                                       options, resolver);
       if (!hadError)
         elt.setPattern(pattern);
-    }
-
-    // For Swift 2.0, we ban single-element tuple patterns that have labels.
-    // They are too confusingly similar to parenthesized typed patterns that
-    // were allowed in Swift 1.x, and it is always safe to just remove the tuple
-    // label if it was desired. We can relax this limitation later if necessary.
-    //
-    // Note that we allow these in enum contexts and in function/closure
-    // argument lists, since being able to name the first argument of a function
-    // is still considered to be important.
-    if (!hadError && TP->getNumElements() == 1 &&
-        !TP->getElement(0).getLabel().empty() &&
-        !(options & TR_EnumPatternPayload) &&
-        !(options & TR_FunctionInput) &&
-        !(options & TR_ImmediateFunctionInput)) {
-      SourceLoc LabelLoc = TP->getElement(0).getLabelLoc();
-      diagnose(LabelLoc, diag::label_single_entry_tuple);
-      // Emit two notes with fixits offering help to resolve this ambiguity.
-      diagnose(TP->getLParenLoc(), diag::remove_parens_for_type_annotation)
-        .fixItRemove(TP->getLParenLoc()).fixItRemove(TP->getRParenLoc());
-      unsigned LabelLen = TP->getElement(0).getLabel().getLength();
-      diagnose(LabelLoc, diag::remove_label_for_tuple_pattern)
-        .fixItRemove(SourceRange(LabelLoc,
-                                 LabelLoc.getAdvancedLocOrInvalid(LabelLen)));
-      hadError = true;
     }
 
     return hadError;

@@ -1440,18 +1440,6 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
       // Otherwise this is a valid decl attribute so they should have put it on
       // the decl instead of the type.
 
-      auto diagID = diag::decl_attribute_applied_to_type;
-      if (declAttrID == DAK_AutoClosure) {
-        // Special case handling of @autoclosure attribute on the type, which
-        // was supported in Swift 1.0 and 1.1, but removed in Swift 1.2.
-        diagID = diag::autoclosure_is_decl_attribute;
-
-        // Further special case handling of @autoclosure attribute in
-        // enumerators in EnumDecl's to produce a nice diagnostic.
-        if (CurDeclContext && isa<EnumDecl>(CurDeclContext))
-          diagID = diag::autoclosure_not_on_enums;
-      }
-
       // If this is the first attribute, and if we are on a simple decl, emit a
       // fixit to move the attribute.  Otherwise, we don't have the location of
       // the @ sign, or we don't have confidence that the fixit will be right.
@@ -1459,21 +1447,19 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
           StructureMarkers.back().Kind != StructureMarkerKind::Declaration ||
           StructureMarkers.back().Loc.isInvalid() ||
           peekToken().is(tok::equal)) {
-        diagnose(Tok, diagID);
+        diagnose(Tok, diag::decl_attribute_applied_to_type);
       } else {
         // Otherwise, this is the first type attribute and we know where the
         // declaration is.  Emit the same diagnostic, but include a fixit to
         // move the attribute.  Unfortunately, we don't have enough info to add
         // the attribute to DeclAttributes.
-        diagnose(Tok, diagID)
+        diagnose(Tok, diag::decl_attribute_applied_to_type)
           .fixItRemove(SourceRange(Attributes.AtLoc, Tok.getLoc()))
           .fixItInsert(StructureMarkers.back().Loc,
                        "@" + Tok.getText().str()+" ");
       }
     }
     
-    
-
     // Recover by eating @foo when foo is not known.
     consumeToken();
       

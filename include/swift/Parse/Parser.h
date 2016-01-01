@@ -860,7 +860,7 @@ public:
 
   ParserResult<ProtocolCompositionTypeRepr> parseTypeComposition();
   ParserResult<TupleTypeRepr> parseTypeTupleBody();
-  ParserResult<ArrayTypeRepr> parseTypeArray(TypeRepr *Base);
+  ParserResult<TypeRepr> parseTypeArray(TypeRepr *Base);
 
   /// Parse a collection type.
   ///   type-simple:
@@ -922,10 +922,6 @@ public:
       InOut
     };
     SpecifierKindTy SpecifierKind = Let; // Defaults to let.
-
-    
-    /// The location of the back-tick preceding the first name, if any.
-    SourceLoc PoundLoc;
 
     /// The location of the first name.
     ///

@@ -845,32 +845,7 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
 /// as expressions due to the parser not knowing which identifiers are
 /// type names.
 TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
-  // Fold T[] into an array, it isn't a subscript on a metatype.
-  if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
-    auto *TyExpr = dyn_cast<TypeExpr>(SE->getBase());
-    if (!TyExpr) return nullptr;
-    
-    // We don't fold subscripts with indexes, just an empty subscript.
-    TupleExpr *Indexes = dyn_cast<TupleExpr>(SE->getIndex());
-    if (!Indexes || Indexes->getNumElements() != 0)
-      return nullptr;
 
-    auto *InnerTypeRepr = TyExpr->getTypeRepr();
-    assert(!TyExpr->isImplicit() && InnerTypeRepr &&
-           "SubscriptExpr doesn't work on implicit TypeExpr's, "
-           "the TypeExpr should have been built correctly in the first place");
-
-    auto *NewTypeRepr =
-      new (TC.Context) ArrayTypeRepr(InnerTypeRepr, Indexes->getSourceRange(),
-                                     /*OldSyntax=*/true);
-
-    TC.diagnose(Indexes->getStartLoc(), diag::new_array_syntax)
-      .fixItInsert(SE->getStartLoc(), "[")
-      .fixItRemove(Indexes->getStartLoc());
-
-    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
-  }
-  
   // Fold 'T.Type' or 'T.Protocol' into a metatype when T is a TypeExpr.
   if (auto *MRE = dyn_cast<UnresolvedDotExpr>(E)) {
     auto *TyExpr = dyn_cast<TypeExpr>(MRE->getBase());
@@ -998,8 +973,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     auto *NewTypeRepr =
       new (TC.Context) ArrayTypeRepr(TyExpr->getTypeRepr(), 
                                      SourceRange(AE->getLBracketLoc(),
-                                                 AE->getRBracketLoc()),
-                                     /*OldSyntax=*/false);
+                                                 AE->getRBracketLoc()));
     return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
 
   }
