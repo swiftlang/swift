@@ -43,9 +43,6 @@ struct Parameter {
   /// as the parameter attributes.
   ParamDecl *decl;
 
-  /// This is the location of the ":" token.
-  SourceLoc colonLoc;
-  
   /// The default value, if any, along with whether this is varargs.
   llvm::PointerIntPair<ExprHandle *, 1, bool> defaultValueAndIsVariadic;
 
