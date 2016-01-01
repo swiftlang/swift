@@ -157,10 +157,8 @@ struct Foo {
 func rdar22834017() {
   Foo(#^RDAR_22834017^#)
 }
-// We should provide a useful completion here. rdar://problem/22846558
-// INVALID_TYPE_INIT: Begin completions, 1 items
-// INVALID_TYPE_INIT: Decl[Constructor]/CurrNominal:      ['(']{#a: <<error type>>#}, {#b: <<error type>>#}, {#c: <<error type>>#}[')'][#Foo#]; name=a: <<error type>>, b: <<error type>>, c: <<error type>>
-// INVALID_TYPE_INIT: End completions
+// FIXME: We could provide a useful completion here. rdar://problem/22846558
+// INVALID_TYPE_INIT-NOT: Begin completions
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_23173692 | FileCheck %s -check-prefix=RDAR_23173692
 func rdar23173692() {
