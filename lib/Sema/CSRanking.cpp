@@ -227,25 +227,6 @@ static Comparison compareWitnessAndRequirement(TypeChecker &tc, DeclContext *dc,
 }
 
 namespace {
-  /// Dependent type opener that maps from a dependent type to its corresponding
-  /// archetype in the given context.
-  class ArchetypeOpener : public constraints::DependentTypeOpener {
-    DeclContext *DC;
-
-  public:
-    explicit ArchetypeOpener(DeclContext *dc) : DC(dc) { }
-
-    virtual Type mapGenericTypeParamType(GenericTypeParamType *param) {
-      return ArchetypeBuilder::mapTypeIntoContext(DC, param);
-    }
-
-    virtual Type mapDependentMemberType(DependentMemberType *memberType) {
-      return ArchetypeBuilder::mapTypeIntoContext(DC, memberType);
-    }
-  };
-}
-
-namespace {
   /// Describes the relationship between the context types for two declarations.
   enum class SelfTypeRelationship {
     /// The types are unrelated; ignore the bases entirely.
@@ -596,10 +577,16 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
 
   // Get the type of a reference to the first declaration, swapping in
   // archetypes for the dependent types.
-  ArchetypeOpener opener(decl1->getInnermostDeclContext());
-  Type openedType1 = cs.openType(type1, locator,
-                                 decl1->getInnermostDeclContext(),
-                                 &opener);
+  llvm::DenseMap<CanType, TypeVariableType *> replacements;
+  auto dc1 = decl1->getInnermostDeclContext();
+  Type openedType1 = cs.openType(type1, locator, replacements, dc1);
+  for (const auto &replacement : replacements) {
+    if (auto mapped = ArchetypeBuilder::mapTypeIntoContext(dc1,
+                                                           replacement.first)) {
+      cs.addConstraint(ConstraintKind::Bind, replacement.second, mapped,
+                       locator);
+    }
+  }
 
   // Extract the self types from the declarations, if they have them.
   Type selfTy1;
