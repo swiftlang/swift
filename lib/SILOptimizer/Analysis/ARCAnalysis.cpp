@@ -643,15 +643,11 @@ bool swift::getFinalReleasesForValue(SILValue V, ReleaseTracker &Tracker) {
 //===----------------------------------------------------------------------===//
 
 static bool ignorableApplyInstInUnreachableBlock(const ApplyInst *AI) {
-  const char *fatalName = "_TFs18_fatalErrorMessageFTVs12StaticStringS_S_Su_T_";
   const auto *Fn = AI->getCalleeFunction();
-
-  // We use endswith here since if we specialize fatal error we will always
-  // prepend the specialization records to fatalName.
-  if (!Fn || !Fn->getName().endswith(fatalName))
+  if (!Fn)
     return false;
 
-  return true;
+  return Fn->hasSemanticsAttr("arc.programtermination_point");
 }
 
 static bool ignorableBuiltinInstInUnreachableBlock(const BuiltinInst *BI) {

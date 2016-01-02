@@ -148,6 +148,7 @@ func _assertionFailed(
 /// bloats code.
 @noreturn @inline(never)
 @_semantics("stdlib_binary_only")
+@_semantics("arc.programtermination_point")
 func _fatalErrorMessage(prefix: StaticString, _ message: StaticString,
                         _ file: StaticString, _ line: UInt) {
 #if INTERNAL_CHECKS_ENABLED
