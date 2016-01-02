@@ -146,7 +146,7 @@ StartMatch:
 /// Extract a single character from the numner \p Num.
 static char DecodeFixedWidth(APInt &Num) {
   unsigned BW = Num.getBitWidth();
-  assert(BW > 16 && "Num too small for arithmetic on CharsetLength");
+  assert(BW > 8 && "Num too small for arithmetic on CharsetLength");
 
   /// This is the number of characters in our alphabet.
   APInt C = APInt(BW, Huffman::CharsetLength);
@@ -175,11 +175,10 @@ static void EncodeFixedWidth(APInt &num, char ch) {
   assert(false);
 }
 
-
 APInt
 swift::Compress::EncodeStringAsNumber(StringRef In, EncodingKind Kind) {
-  unsigned BW = std::max(64u, (unsigned) In.size() *
-                         Huffman::LongestEncodingLength);
+  // Allocate enough space for the first word plus
+  unsigned BW = (1 + Huffman::LongestEncodingLength);
     APInt num = APInt(BW, 0);
 
   // We set the high bit to zero in order to support encoding
@@ -192,6 +191,11 @@ swift::Compress::EncodeStringAsNumber(StringRef In, EncodingKind Kind) {
   // us to decode by appending to a string and not prepending.
   for (int i = In.size() - 1; i >= 0; i--) {
     char ch = In[i];
+
+    // Extend the number and create enough room for encoding another
+    // character.
+    num = num.zextOrTrunc(num.getActiveBits() + Huffman::LongestEncodingLength);
+
     if (Kind == EncodingKind::Variable) {
       Huffman::variable_encode(num, ch);
     } else  {
