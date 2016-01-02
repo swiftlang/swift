@@ -137,7 +137,7 @@ private:
   std::string SemanticsAttr;
 
   /// The function's effects attribute.
-  EffectsKind EK;
+  EffectsKind EffectsKindAttr;
     
   /// True if this function is inlined at least once. This means that the
   /// debug info keeps a pointer to this function.
@@ -175,7 +175,8 @@ private:
                              IsThunk_t isThunk = IsNotThunk,
                              ClassVisibility_t classVisibility = NotRelevant,
                              Inline_t inlineStrategy = InlineDefault,
-                             EffectsKind EK = EffectsKind::Unspecified,
+                             EffectsKind EffectsKindAttr =
+                               EffectsKind::Unspecified,
                              SILFunction *InsertBefore = nullptr,
                              const SILDebugScope *DebugScope = nullptr,
                              DeclContext *DC = nullptr);
@@ -412,13 +413,17 @@ public:
   void setInlineStrategy(Inline_t inStr) { InlineStrategy = inStr; }
 
   /// \return the function side effects information.
-  EffectsKind getEffectsKind() const { return EK; }
+  EffectsKind getEffectsKind() const { return EffectsKindAttr; }
 
   /// \return True if the function is annotated with the @effects attribute.
-  bool hasEffectsKind() const { return EK != EffectsKind::Unspecified; }
+  bool hasEffectsKind() const {
+    return EffectsKindAttr != EffectsKind::Unspecified;
+  }
 
   /// \brief Set the function side effect information.
-  void setEffectsKind(EffectsKind E) { EK = E; }
+  void setEffectsKind(EffectsKind E) {
+    EffectsKindAttr = E;
+  }
 
   /// Get this function's global_init attribute.
   ///

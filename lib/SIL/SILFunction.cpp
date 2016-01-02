@@ -89,7 +89,7 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
     Linkage(unsigned(Linkage)),
     KeepAsPublic(false),
     ForeignBody(false),
-    EK(E) {
+    EffectsKindAttr(E) {
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);
   else
