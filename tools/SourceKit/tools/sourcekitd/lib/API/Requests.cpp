@@ -667,6 +667,7 @@ public:
   ~SKIndexingConsumer() {
     assert(Cancelled ||
            (EntitiesStack.size() == 1 && DependenciesStack.size() == 1));
+    (void) Cancelled;
   }
 
   void failed(StringRef ErrDescription) override;
@@ -866,6 +867,7 @@ public:
   }
   ~SKDocConsumer() {
     assert(Cancelled || EntitiesStack.size() == 1);
+    (void) Cancelled;
   }
 
   sourcekitd_response_t createResponse() {
