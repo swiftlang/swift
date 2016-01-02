@@ -33,7 +33,7 @@ STATISTIC(NumFuncLinked, "Number of SIL functions linked");
 static bool shouldImportFunction(SILFunction *F) {
   // Skip functions that are marked with the 'no import' tag. These
   // are functions that we don't want to copy from the module.
-  if (F->hasSemanticsString("stdlib_binary_only")) {
+  if (F->hasSemanticsAttr("stdlib_binary_only")) {
     // If we are importing a function declaration mark it as external since we
     // are not importing the body.
     if (F->isExternalDeclaration())

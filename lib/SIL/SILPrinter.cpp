@@ -1608,8 +1608,8 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose,
   if (getEffectsKind() == EffectsKind::ReadWrite)
     OS << "[readwrite] ";
 
-  if (!getSemanticsAttr().empty())
-    OS << "[_semantics \"" << getSemanticsAttr() << "\"] ";
+  for (auto &Attr : getSemanticsAttrs())
+    OS << "[_semantics \"" << Attr << "\"] ";
 
   printName(OS);
   OS << " : $";

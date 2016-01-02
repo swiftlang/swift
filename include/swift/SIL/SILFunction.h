@@ -133,12 +133,14 @@ private:
   /// It does not include references from debug scopes.
   unsigned RefCount = 0;
 
-  /// The function's semantics attribute.
-  std::string SemanticsAttr;
+  /// The function's set of semantics attributes.
+  ///
+  /// TODO: Why is this using a std::string? Why don't we use StringRef.
+  llvm::SmallVector<std::string, 1> SemanticsAttrSet;
 
   /// The function's effects attribute.
   EffectsKind EffectsKindAttr;
-    
+
   /// True if this function is inlined at least once. This means that the
   /// debug info keeps a pointer to this function.
   bool Inlined = false;
@@ -345,20 +347,40 @@ public:
   /// \returns True if the function is marked with the @_semantics attribute
   /// and has special semantics that the optimizer can use to optimize the
   /// function.
-  bool hasDefinedSemantics() const {
-    return SemanticsAttr.length() > 0;
+  bool hasSemanticsAttrs() const { return SemanticsAttrSet.size() > 0; }
+
+  /// \returns True if the function has a semantic attribute that starts with a
+  /// specific string.
+  ///
+  /// TODO: This needs a better name.
+  bool hasSemanticsAttrsThatStartsWith(StringRef S) {
+    return count_if(getSemanticsAttrs(), [&S](const std::string &Attr) -> bool {
+      return StringRef(Attr).startswith(S);
+    });
   }
 
   /// \returns the semantics tag that describes this function.
-  StringRef getSemanticsString() const {
-    assert(hasDefinedSemantics() &&
-           "Accessing a function with no semantics tag");
-    return SemanticsAttr;
-  }
+  ArrayRef<std::string> getSemanticsAttrs() const { return SemanticsAttrSet; }
 
   /// \returns True if the function has the semantics flag \p Value;
-  bool hasSemanticsString(StringRef Value) const {
-    return SemanticsAttr == Value;
+  bool hasSemanticsAttr(StringRef Value) const {
+    return std::count(SemanticsAttrSet.begin(), SemanticsAttrSet.end(), Value);
+  }
+
+  /// Add the given semantics attribute to the attr list set.
+  void addSemanticsAttr(StringRef Ref) {
+    if (hasSemanticsAttr(Ref))
+      return;
+    SemanticsAttrSet.push_back(Ref);
+    std::sort(SemanticsAttrSet.begin(), SemanticsAttrSet.end());
+  }
+
+  /// Remove the semantics
+  void removeSemanticsAttr(StringRef Ref) {
+    auto Iter =
+        std::remove(SemanticsAttrSet.begin(), SemanticsAttrSet.end(), Ref);
+    SemanticsAttrSet.erase(Iter);
+    std::sort(SemanticsAttrSet.begin(), SemanticsAttrSet.end());
   }
 
   /// \returns True if the function is optimizable (i.e. not marked as no-opt),
@@ -439,9 +461,6 @@ public:
   /// called within the addressor.
   bool isGlobalInit() const { return GlobalInitFlag; }
   void setGlobalInit(bool isGI) { GlobalInitFlag = isGI; }
-
-  StringRef getSemanticsAttr() const { return SemanticsAttr; }
-  void setSemanticsAttr(StringRef attr) { SemanticsAttr = attr; }
 
   bool isKeepAsPublic() const { return KeepAsPublic; }
   void setKeepAsPublic(bool keep) { KeepAsPublic = keep; }

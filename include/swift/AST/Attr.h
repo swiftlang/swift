@@ -1287,10 +1287,8 @@ public:
 
 private:
   /// Predicate used to filter MatchingAttributeRange.
-  template <typename ATTR> struct ToAttributeKind {
-    bool AllowInvalid;
-
-    ToAttributeKind(bool AllowInvalid) : AllowInvalid(AllowInvalid) {}
+  template <typename ATTR, bool AllowInvalid> struct ToAttributeKind {
+    ToAttributeKind() {}
 
     Optional<const DeclAttribute *>
     operator()(const DeclAttribute *Attr) const {
@@ -1301,17 +1299,18 @@ private:
   };
 
 public:
-  template <typename ATTR>
+  template <typename ATTR, bool AllowInvalid>
   using AttributeKindRange =
       OptionalTransformRange<llvm::iterator_range<const_iterator>,
-                             ToAttributeKind<ATTR>>;
+                             ToAttributeKind<ATTR, AllowInvalid>,
+                             const_iterator>;
 
   /// Return a range with all attributes in DeclAttributes with AttrKind
   /// ATTR.
-  template <typename ATTR>
-  AttributeKindRange<ATTR> getAttributes() const {
-    return AttributeKindRange<ATTR>(make_range(begin(), end()),
-                                    ToAttributeKind<ATTR>());
+  template <typename ATTR, bool AllowInvalid>
+  AttributeKindRange<ATTR, AllowInvalid> getAttributes() const {
+    return AttributeKindRange<ATTR, AllowInvalid>(
+        make_range(begin(), end()), ToAttributeKind<ATTR, AllowInvalid>());
   }
 
   // Remove the given attribute from the list of attributes. Used when

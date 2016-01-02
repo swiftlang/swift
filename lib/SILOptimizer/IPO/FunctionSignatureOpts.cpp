@@ -612,8 +612,9 @@ SILFunction *FunctionAnalyzer::createEmptyFunctionWithOptimizedSig(
 
   // Array semantic clients rely on the signature being as in the original
   // version.
-  if (!F->getSemanticsAttr().startswith("array."))
-    NewF->setSemanticsAttr(F->getSemanticsAttr());
+  for (auto &Attr : F->getSemanticsAttrs())
+    if (!StringRef(Attr).startswith("array."))
+      NewF->addSemanticsAttr(Attr);
 
   return NewF;
 }

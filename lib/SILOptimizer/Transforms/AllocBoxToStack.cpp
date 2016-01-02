@@ -565,7 +565,9 @@ PromotedParamCloner::initCloned(SILFunction *Orig,
       Orig->getLocation(), Orig->isBare(), IsNotTransparent, Orig->isFragile(),
       Orig->isThunk(), Orig->getClassVisibility(), Orig->getInlineStrategy(),
       Orig->getEffectsKind(), Orig, Orig->getDebugScope());
-  Fn->setSemanticsAttr(Orig->getSemanticsAttr());
+  for (auto &Attr : Orig->getSemanticsAttrs()) {
+    Fn->addSemanticsAttr(Attr);
+  }
   Fn->setDeclCtx(Orig->getDeclContext());
   return Fn;
 }

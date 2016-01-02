@@ -50,7 +50,9 @@ SILFunction *GenericCloner::initCloned(SILFunction *Orig,
       Orig->getInlineStrategy(), Orig->getEffectsKind(), Orig,
       Orig->getDebugScope(), Orig->getDeclContext());
   NewF->setDeclCtx(Orig->getDeclContext());
-  NewF->setSemanticsAttr(Orig->getSemanticsAttr());
+  for (auto &Attr : Orig->getSemanticsAttrs()) {
+    NewF->addSemanticsAttr(Attr);
+  }
   return NewF;
 }
 

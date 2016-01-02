@@ -343,10 +343,10 @@ static bool isAvailabilityCheck(SILBasicBlock *BB) {
     return false;
   
   SILFunction *F = AI->getCalleeFunction();
-  if (!F || !F->hasDefinedSemantics())
+  if (!F || !F->hasSemanticsAttrs())
     return false;
-  
-  return F->getSemanticsString().startswith("availability");
+
+  return F->hasSemanticsAttrsThatStartsWith("availability");
 }
 
 /// Returns true if there are any availability checks along the dominator tree

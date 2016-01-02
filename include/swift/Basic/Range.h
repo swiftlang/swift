@@ -292,6 +292,11 @@ none_of(Range R, Predicate P) {
   return std::none_of(R.begin(), R.end(), P);
 }
 
+template <class Range, class Predicate>
+inline unsigned count_if(Range R, Predicate P) {
+  return std::count_if(R.begin(), R.end(), P);
+}
+
 } // namespace swift
 
 #endif

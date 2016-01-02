@@ -216,19 +216,18 @@ namespace sil_block {
     BCFixed<1>           // Is this a let variable.
   >;
 
-  using SILFunctionLayout = BCRecordLayout<
-    SIL_FUNCTION,
-    SILLinkageField,
-    BCFixed<1>,        // transparent
-    BCFixed<1>,        // fragile
-    BCFixed<2>,        // thunk/reabstraction_thunk
-    BCFixed<1>,        // global_init
-    BCFixed<2>,        // inlineStrategy
-    BCFixed<2>,        // side effect info.
-    TypeIDField,
-    IdentifierIDField  // Semantics Attribute
-                       // followed by generic param list, if any
-  >;
+  using SILFunctionLayout =
+      BCRecordLayout<SIL_FUNCTION, SILLinkageField,
+                     BCFixed<1>, // transparent
+                     BCFixed<1>, // fragile
+                     BCFixed<2>, // thunk/reabstraction_thunk
+                     BCFixed<1>, // global_init
+                     BCFixed<2>, // inlineStrategy
+                     BCFixed<2>, // side effect info.
+                     TypeIDField,
+                     BCArray<IdentifierIDField> // Semantics Attribute
+                     // followed by generic param list, if any
+                     >;
 
   // Has an optional argument list where each argument is a typed valueref.
   using SILBasicBlockLayout = BCRecordLayout<

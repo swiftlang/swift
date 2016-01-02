@@ -341,8 +341,8 @@ SILLinkage swift::getSpecializedLinkage(SILFunction *F, SILLinkage L) {
     // Treat stdlib_binary_only specially. We don't serialize the body of
     // stdlib_binary_only functions so we can't mark them as Shared (making
     // their visibility in the dylib hidden).
-    return F->hasSemanticsString("stdlib_binary_only") ? SILLinkage::Public
-                                                       : SILLinkage::Shared;
+    return F->hasSemanticsAttr("stdlib_binary_only") ? SILLinkage::Public
+                                                     : SILLinkage::Shared;
 
   case SILLinkage::Private:
   case SILLinkage::PrivateExternal:
@@ -684,8 +684,7 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
   if (!Fn)
     return false;
 
-  if (AI->getNumOperands() != 3 ||
-      !Fn->hasSemanticsString("string.concat"))
+  if (AI->getNumOperands() != 3 || !Fn->hasSemanticsAttr("string.concat"))
     return false;
 
   // Left and right operands of a string concatenation operation.
@@ -708,12 +707,9 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
       FRIRightFun->getEffectsKind() >= EffectsKind::ReadWrite)
     return false;
 
-  if (!FRILeftFun->hasDefinedSemantics() ||
-      !FRIRightFun->hasDefinedSemantics())
+  if (!FRILeftFun->hasSemanticsAttrs() || !FRIRightFun->hasSemanticsAttrs())
     return false;
 
-  auto SemanticsLeft = FRILeftFun->getSemanticsString();
-  auto SemanticsRight = FRIRightFun->getSemanticsString();
   auto AILeftOperandsNum = AILeft->getNumOperands();
   auto AIRightOperandsNum = AIRight->getNumOperands();
 
@@ -721,10 +717,14 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
   // (start: RawPointer, numberOfCodeUnits: Word)
   // makeUTF8 should have following parameters:
   // (start: RawPointer, byteSize: Word, isASCII: Int1)
-  if (!((SemanticsLeft == "string.makeUTF16" && AILeftOperandsNum == 4) ||
-        (SemanticsLeft == "string.makeUTF8" && AILeftOperandsNum == 5) ||
-        (SemanticsRight == "string.makeUTF16" && AIRightOperandsNum == 4) ||
-        (SemanticsRight == "string.makeUTF8" && AIRightOperandsNum == 5)))
+  if (!((FRILeftFun->hasSemanticsAttr("string.makeUTF16") &&
+         AILeftOperandsNum == 4) ||
+        (FRILeftFun->hasSemanticsAttr("string.makeUTF8") &&
+         AILeftOperandsNum == 5) ||
+        (FRIRightFun->hasSemanticsAttr("string.makeUTF16") &&
+         AIRightOperandsNum == 4) ||
+        (FRIRightFun->hasSemanticsAttr("string.makeUTF8") &&
+         AIRightOperandsNum == 5)))
     return false;
 
   SLILeft = dyn_cast<StringLiteralInst>(AILeft->getOperand(1));

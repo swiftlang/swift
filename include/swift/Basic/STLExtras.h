@@ -451,9 +451,9 @@ makeOptionalTransformIterator(Iterator current, Iterator end,
 }
 
 /// A range filtered and transformed by the optional transform.
-template<typename Range, typename OptionalTransform>
+template <typename Range, typename OptionalTransform,
+          typename Iterator = typename Range::iterator>
 class OptionalTransformRange {
-  typedef typename Range::iterator Iterator;
 
   Iterator First, Last;
   OptionalTransform Op;

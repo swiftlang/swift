@@ -20,6 +20,7 @@
 
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -235,9 +236,10 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
                      << " FnID " << FnID << "\n");
   DEBUG(llvm::dbgs() << "Serialized SIL:\n"; F.dump());
 
-  IdentifierID SemanticsID =
-    F.getSemanticsAttr().empty() ? (IdentifierID)0 :
-    S.addIdentifierRef(Ctx.getIdentifier(F.getSemanticsAttr()));
+  llvm::SmallVector<IdentifierID, 1> SemanticsIDs;
+  for (auto SemanticAttr : F.getSemanticsAttrs()) {
+    SemanticsIDs.push_back(S.addIdentifierRef(Ctx.getIdentifier(SemanticAttr)));
+  }
 
   SILLinkage Linkage = F.getLinkage();
 
@@ -268,8 +270,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       Out, ScratchRecord, abbrCode, toStableSILLinkage(Linkage),
       (unsigned)F.isTransparent(), (unsigned)F.isFragile(),
       (unsigned)F.isThunk(), (unsigned)F.isGlobalInit(),
-      (unsigned)F.getInlineStrategy(), (unsigned)F.getEffectsKind(),
-      FnID, SemanticsID);
+      (unsigned)F.getInlineStrategy(), (unsigned)F.getEffectsKind(), FnID,
+      SemanticsIDs);
 
   if (NoBody)
     return;

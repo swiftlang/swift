@@ -111,9 +111,8 @@ swift::ArraySemanticsCall::ArraySemanticsCall(ValueBase *V,
   if (auto *AI = dyn_cast<ApplyInst>(V))
     if (auto *Fn = AI->getCalleeFunction())
       if ((MatchPartialName &&
-           (Fn->hasDefinedSemantics() &&
-            Fn->getSemanticsString().startswith(SemanticStr))) ||
-          (!MatchPartialName && Fn->hasSemanticsString(SemanticStr))) {
+           Fn->hasSemanticsAttrsThatStartsWith(SemanticStr)) ||
+          (!MatchPartialName && Fn->hasSemanticsAttr(SemanticStr))) {
         SemanticsCall = AI;
         // Need a 'self' argument otherwise this is not a semantic call that
         // we recognize.
@@ -137,22 +136,32 @@ ArrayCallKind swift::ArraySemanticsCall::getKind() const {
   auto F = cast<FunctionRefInst>(SemanticsCall->getCallee())
                ->getReferencedFunction();
 
-  auto Kind =
-      llvm::StringSwitch<ArrayCallKind>(F->getSemanticsString())
-          .Case("array.props.isNativeTypeChecked",
-                ArrayCallKind::kArrayPropsIsNativeTypeChecked)
-          .Case("array.init", ArrayCallKind::kArrayInit)
-          .Case("array.uninitialized", ArrayCallKind::kArrayUninitialized)
-          .Case("array.check_subscript", ArrayCallKind::kCheckSubscript)
-          .Case("array.check_index", ArrayCallKind::kCheckIndex)
-          .Case("array.get_count", ArrayCallKind::kGetCount)
-          .Case("array.get_capacity", ArrayCallKind::kGetCapacity)
-          .Case("array.get_element", ArrayCallKind::kGetElement)
-          .Case("array.owner", ArrayCallKind::kGetArrayOwner)
-          .Case("array.make_mutable", ArrayCallKind::kMakeMutable)
-          .Case("array.get_element_address", ArrayCallKind::kGetElementAddress)
-          .Case("array.mutate_unknown", ArrayCallKind::kMutateUnknown)
-          .Default(ArrayCallKind::kNone);
+  ArrayCallKind Kind = ArrayCallKind::kNone;
+
+  for (auto &Attrs : F->getSemanticsAttrs()) {
+    auto Tmp =
+        llvm::StringSwitch<ArrayCallKind>(Attrs)
+            .Case("array.props.isNativeTypeChecked",
+                  ArrayCallKind::kArrayPropsIsNativeTypeChecked)
+            .Case("array.init", ArrayCallKind::kArrayInit)
+            .Case("array.uninitialized", ArrayCallKind::kArrayUninitialized)
+            .Case("array.check_subscript", ArrayCallKind::kCheckSubscript)
+            .Case("array.check_index", ArrayCallKind::kCheckIndex)
+            .Case("array.get_count", ArrayCallKind::kGetCount)
+            .Case("array.get_capacity", ArrayCallKind::kGetCapacity)
+            .Case("array.get_element", ArrayCallKind::kGetElement)
+            .Case("array.owner", ArrayCallKind::kGetArrayOwner)
+            .Case("array.make_mutable", ArrayCallKind::kMakeMutable)
+            .Case("array.get_element_address",
+                  ArrayCallKind::kGetElementAddress)
+            .Case("array.mutate_unknown", ArrayCallKind::kMutateUnknown)
+            .Default(ArrayCallKind::kNone);
+    if (Tmp != ArrayCallKind::kNone) {
+      assert(Kind == ArrayCallKind::kNone && "Multiple array semantic "
+                                             "strings?!");
+      Kind = Tmp;
+    }
+  }
 
   return Kind;
 }

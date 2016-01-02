@@ -1,8 +1,6 @@
 // RUN: %target-sil-opt %s | FileCheck %s
 
-// Make sure that we can parse multiple @_semantics, but that we only take the last one.
-//
-// CHECK-LABEL: sil [_semantics "456"] @foo : $@convention(thin) () -> () {
+// CHECK-LABEL: sil [_semantics "123"] [_semantics "456"] @foo : $@convention(thin) () -> () {
 sil [_semantics "123"] [_semantics "456"] @foo : $@convention(thin) () -> () {
 bb0:
   return undef : $()
