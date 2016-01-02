@@ -4,4 +4,4 @@
 //
 // CHECK: [_semantics "123"] @func1
 @_semantics("223") @_semantics("123")
-func @_silgen_name("func1") func func1() { }
+@_silgen_name("func1") func func1() { }
