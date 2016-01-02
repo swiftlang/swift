@@ -147,6 +147,29 @@ public struct Range<
   }
 }
 
+/// O(1) implementation of `contains()` for ranges of comparable elements.
+extension Range where Element: Comparable {
+  @warn_unused_result
+  func _customContainsEquatableElement(element: Generator.Element) -> Bool? {
+    return element >= self.startIndex && element < self.endIndex
+  }
+    
+  // FIXME: copied from SequenceAlgorithms as a workaround for https://bugs.swift.org/browse/SR-435
+  @warn_unused_result
+  public func contains(element: Generator.Element) -> Bool {
+    if let result = _customContainsEquatableElement(element) {
+      return result
+    }
+
+    for e in self {
+      if e == element {
+        return true
+      }
+    }
+    return false
+  }
+}
+
 @warn_unused_result
 public func == <Element>(lhs: Range<Element>, rhs: Range<Element>) -> Bool {
   return lhs.startIndex == rhs.startIndex &&
@@ -201,8 +224,6 @@ public func ... <Pos : ForwardIndexType where Pos : Comparable> (
 public func ~= <I : ForwardIndexType where I : Comparable> (
   pattern: Range<I>, value: I
 ) -> Bool {
-  // Intervals can check for containment in O(1).
-  return 
-    HalfOpenInterval(pattern.startIndex, pattern.endIndex).contains(value)
+  return pattern.contains(value)
 }
 
