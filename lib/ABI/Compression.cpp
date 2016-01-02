@@ -143,7 +143,7 @@ StartMatch:
   return SB;
 }
 
-/// Extract a single character from the numner \p Num.
+/// Extract a single character from the number \p Num.
 static char DecodeFixedWidth(APInt &Num) {
   unsigned BW = Num.getBitWidth();
   assert(BW > 8 && "Num too small for arithmetic on CharsetLength");
