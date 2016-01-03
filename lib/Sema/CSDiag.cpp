@@ -463,7 +463,7 @@ ResolvedLocator constraints::resolveLocatorToDecl(
       unsigned index = path[0].getValue2();
       if (index < parameterList->size()) {
         auto param = parameterList->get(index);
-        return ResolvedLocator(ResolvedLocator::ForVar, param.decl);
+        return ResolvedLocator(ResolvedLocator::ForVar, param);
       }
       break;
     }
@@ -2591,9 +2591,9 @@ namespace {
           
           // Save the types on ClosureExpr parameters.
           if (auto *CE = dyn_cast<ClosureExpr>(expr))
-            for (auto &P : *CE->getParameters())
-              if (P.decl->hasType())
-                TS->ParamDeclTypes[P.decl] = P.decl->getType();
+            for (auto P : *CE->getParameters())
+              if (P->hasType())
+                TS->ParamDeclTypes[P] = P->getType();
           
           return { true, expr };
         }
@@ -2706,9 +2706,9 @@ static void eraseTypeData(Expr *expr) {
       // so that they'll get regenerated from the associated TypeLocs or
       // resynthesized.
       if (auto *CE = dyn_cast<ClosureExpr>(expr))
-        for (auto &P : *CE->getParameters())
-          if (P.decl->hasType())
-            P.decl->overwriteType(Type());
+        for (auto P : *CE->getParameters())
+          if (P->hasType())
+            P->overwriteType(Type());
       
       expr->setType(nullptr);
       expr->clearLValueAccessKind();
@@ -2957,8 +2957,8 @@ typeCheckArbitrarySubExprIndependently(Expr *subExpr, TCCOptions options) {
     // none of its arguments are type variables.  If so, these type variables
     // would be accessible to name lookup of the subexpression and may thus leak
     // in.  Reset them to UnresolvedTypes for safe measures.
-    for (auto &param : *CE->getParameters()) {
-      auto VD = param.decl;
+    for (auto param : *CE->getParameters()) {
+      auto VD = param;
       if (VD->getType()->hasTypeVariable() || VD->getType()->is<ErrorType>())
         VD->overwriteType(CS->getASTContext().TheUnresolvedType);
     }
@@ -4262,8 +4262,7 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
     // lookups against the parameter decls.
     //
     // Handle this by rewriting the arguments to UnresolvedType().
-    for (auto &param : *CE->getParameters()) {
-      auto VD = param.decl;
+    for (auto VD : *CE->getParameters()) {
       if (VD->getType()->hasTypeVariable() || VD->getType()->is<ErrorType>())
         VD->overwriteType(CS->getASTContext().TheUnresolvedType);
     }

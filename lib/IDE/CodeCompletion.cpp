@@ -1805,12 +1805,12 @@ public:
         Builder.addComma();
       NeedComma = true;
 
-      Type type = param.decl->getType();
-      if (param.isVariadic())
-        type = Parameter::getVarargBaseTy(type);
+      Type type = param->getType();
+      if (param->isVariadic())
+        type = ParamDecl::getVarargBaseTy(type);
 
-      Builder.addCallParameter(param.decl->getArgumentName(), type,
-                               param.isVariadic());
+      Builder.addCallParameter(param->getArgumentName(), type,
+                               param->isVariadic());
     }
   }
 
@@ -1926,7 +1926,7 @@ public:
           Builder.addComma();
         if (BodyParams) {
           // If we have a local name for the parameter, pass in that as well.
-          auto name = BodyParams->get(i).decl->getName();
+          auto name = BodyParams->get(i)->getName();
           Builder.addCallParameter(Name, name, ParamType, TupleElt.isVararg());
         } else {
           Builder.addCallParameter(Name, ParamType, TupleElt.isVararg());
@@ -1944,7 +1944,7 @@ public:
 
       modifiedBuilder = true;
       if (BodyParams) {
-        auto name = BodyParams->get(0).decl->getName();
+        auto name = BodyParams->get(0)->getName();
         Builder.addCallParameter(Identifier(), name, T,
                                  /*IsVarArg*/false);
       } else

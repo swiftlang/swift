@@ -643,7 +643,7 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
     auto inoutSelf = new (C) InOutExpr(SourceLoc(), inoutSelfRef,
       InOutType::get(importedUnionDecl->getType()), /*implicit*/ true);
 
-    auto newValueDecl = setterDecl->getParameterList(1)->get(0).decl;
+    auto newValueDecl = setterDecl->getParameterList(1)->get(0);
 
     auto newValueRef = new (C) DeclRefExpr(newValueDecl, SourceLoc(),
                                            /*implicit*/ true);
@@ -1593,7 +1593,7 @@ namespace {
                                             /*static*/false, /*inout*/true);
 
       // Construct the set of parameters from the list of members.
-      SmallVector<Parameter, 8> valueParameters;
+      SmallVector<ParamDecl*, 8> valueParameters;
       for (auto var : members) {
         Identifier argName = wantCtorParamNames ? var->getName()
                                                 : Identifier();
@@ -1601,7 +1601,7 @@ namespace {
                                              SourceLoc(), argName,
                                              SourceLoc(), var->getName(),
                                              var->getType(), structDecl);
-        valueParameters.push_back(Parameter::withoutLoc(param));
+        valueParameters.push_back(param);
       }
 
       // self & param.
@@ -1652,7 +1652,7 @@ namespace {
                                               /*Implicit=*/true);
 
             // Construct right-hand side.
-            auto rhs = new (context) DeclRefExpr(valueParameters[i].decl,
+            auto rhs = new (context) DeclRefExpr(valueParameters[i],
                                                  SourceLoc(),
                                                  /*Implicit=*/true);
 
@@ -3518,7 +3518,7 @@ namespace {
 
     /// Build a declaration for an Objective-C subscript getter.
     FuncDecl *buildSubscriptGetterDecl(const FuncDecl *getter, Type elementTy,
-                               DeclContext *dc, Parameter index) {
+                                       DeclContext *dc, ParamDecl *index) {
       auto &context = Impl.SwiftContext;
       auto loc = getter->getLoc();
 
@@ -3558,7 +3558,7 @@ namespace {
 
       /// Build a declaration for an Objective-C subscript setter.
     FuncDecl *buildSubscriptSetterDecl(const FuncDecl *setter, Type elementTy,
-                                       DeclContext *dc, Parameter index) {
+                                       DeclContext *dc, ParamDecl *index) {
       auto &context = Impl.SwiftContext;
       auto loc = setter->getLoc();
 
@@ -3576,12 +3576,12 @@ namespace {
 
       auto paramVarDecl = new (context) ParamDecl(/*isLet=*/false, SourceLoc(),
                                                   Identifier(), loc,
-                                            valueIndex->get(0).decl->getName(),
+                                                  valueIndex->get(0)->getName(),
                                                   elementTy, dc);
       
       
       auto valueIndicesPL = ParameterList::create(context, {
-        Parameter::withoutLoc(paramVarDecl),
+        paramVarDecl,
         index
       });
       
@@ -3622,13 +3622,13 @@ namespace {
     }
     
     /// Retrieve the element type and of a subscript setter.
-    std::pair<Type, Parameter>
+    std::pair<Type, ParamDecl *>
     decomposeSubscriptSetter(FuncDecl *setter) {
       auto *PL = setter->getParameterList(1);
       if (PL->size() != 2)
-        return { nullptr, Parameter() };
+        return { nullptr, nullptr };
 
-      return { PL->get(0).decl->getType(), PL->get(1) };
+      return { PL->get(0)->getType(), PL->get(1) };
     }
 
     /// Rectify the (possibly different) types determined by the
@@ -3822,7 +3822,7 @@ namespace {
       }
 
       // Find the getter indices and make sure they match.
-      Parameter getterIndex;
+      ParamDecl *getterIndex;
       {
         auto params = getter->getParameterList(1);
         if (params->size() != 1)
@@ -3844,7 +3844,7 @@ namespace {
       };
 
       // If we have a setter, rectify it with the getter.
-      Parameter setterIndex;
+      ParamDecl *setterIndex;
       bool getterAndSetterInSameType = false;
       if (setter) {
         // Whether there is an existing read-only subscript for which
@@ -3879,7 +3879,7 @@ namespace {
 
         // Make sure that the index types are equivalent.
         // FIXME: Rectify these the same way we do for element types.
-        if (!setterIndex.decl->getType()->isEqual(getterIndex.decl->getType())){
+        if (!setterIndex->getType()->isEqual(getterIndex->getType())) {
           // If there is an existing subscript operation, we're done.
           if (existingSubscript)
             return decl == getter ? existingSubscript : nullptr;
@@ -3887,7 +3887,7 @@ namespace {
           // Otherwise, just forget we had a setter.
           // FIXME: This feels very, very wrong.
           setter = nullptr;
-          setterIndex = Parameter();
+          setterIndex = nullptr;
         }
 
         // If there is an existing subscript within this context, we

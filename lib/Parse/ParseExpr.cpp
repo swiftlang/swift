@@ -1708,7 +1708,7 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
         invalid = true;
     } else {
       // Parse identifier (',' identifier)*
-      SmallVector<Parameter, 4> elements;
+      SmallVector<ParamDecl*, 4> elements;
       do {
         if (Tok.isNot(tok::identifier, tok::kw__)) {
           diagnose(Tok, diag::expected_closure_parameter_name);
@@ -1721,7 +1721,7 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
         auto var = new (Context) ParamDecl(/*IsLet*/ true, SourceLoc(),
                                            Identifier(), Tok.getLoc(), name,
                                            Type(), nullptr);
-        elements.push_back(Parameter::withoutLoc(var));
+        elements.push_back(var);
         consumeToken();
  
         // Consume a comma to continue.
@@ -1860,9 +1860,9 @@ ParserResult<Expr> Parser::parseExprClosure() {
   if (!params) {
     // Create a parameter pattern containing the anonymous variables.
     auto &anonVars = AnonClosureVars.back().second;
-    SmallVector<Parameter, 4> elements;
+    SmallVector<ParamDecl*, 4> elements;
     for (auto anonVar : anonVars)
-      elements.push_back(Parameter::withoutLoc(anonVar));
+      elements.push_back(anonVar);
     
     params = ParameterList::create(Context, leftBrace, elements, leftBrace);
 
@@ -2344,9 +2344,9 @@ void Parser::addPatternVariablesToScope(ArrayRef<Pattern *> Patterns) {
 }
 
 void Parser::addParametersToScope(ParameterList *PL) {
-  for (auto &param : *PL)
-    if (param.decl->hasName())
-      addToScope(param.decl);
+  for (auto param : *PL)
+    if (param->hasName())
+      addToScope(param);
 }
 
 

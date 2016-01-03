@@ -560,8 +560,8 @@ namespace {
     
     if (auto AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
       for (auto params : AFD->getParameterLists()) {
-        for (auto &param : *params) {
-          if (!param.decl->isDefaultArgument())
+        for (auto param : *params) {
+          if (!param->isDefaultArgument())
             nNoDefault++;
         }
       }
@@ -1681,12 +1681,12 @@ namespace {
     /// types were not specified, and return the eventual function type.
     Type getTypeForParameterList(ParameterList *params,
                                  ConstraintLocatorBuilder locator) {
-      for (auto &param : *params) {
+      for (auto param : *params) {
         // If a type was explicitly specified, use its opened type.
-        if (auto type = param.decl->getTypeLoc().getType()) {
+        if (auto type = param->getTypeLoc().getType()) {
           // FIXME: Need a better locator for a pattern as a base.
           Type openedType = CS.openType(type, locator);
-          param.decl->overwriteType(openedType);
+          param->overwriteType(openedType);
           continue;
         }
 
@@ -1694,7 +1694,7 @@ namespace {
         Type ty = CS.createTypeVariable(CS.getConstraintLocator(locator),
                                         /*options=*/0);
         
-        param.decl->overwriteType(ty);
+        param->overwriteType(ty);
       }
       
       return params->getType(CS.getASTContext());

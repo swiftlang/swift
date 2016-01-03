@@ -91,7 +91,7 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
 
     elements.push_back(
       emitImplicitValueConstructorArg(gen, Loc,
-                                      param.decl->getType()->getCanonicalType(),
+                                      param->getType()->getCanonicalType(),
                                       ctor));
   }
 

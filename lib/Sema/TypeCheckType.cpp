@@ -2417,7 +2417,7 @@ static void describeObjCReason(TypeChecker &TC, const ValueDecl *VD,
 
 static void diagnoseFunctionParamNotRepresentable(
     TypeChecker &TC, const AbstractFunctionDecl *AFD, unsigned NumParams,
-    unsigned ParamIndex, const Parameter &P, ObjCReason Reason) {
+    unsigned ParamIndex, const ParamDecl *P, ObjCReason Reason) {
   if (Reason == ObjCReason::DoNotDiagnose)
     return;
 
@@ -2428,10 +2428,10 @@ static void diagnoseFunctionParamNotRepresentable(
     TC.diagnose(AFD->getLoc(), diag::objc_invalid_on_func_param_type,
                 ParamIndex + 1, getObjCDiagnosticAttrKind(Reason));
   }
-  if (P.decl->hasType()) {
-    Type ParamTy = P.decl->getType();
+  if (P->hasType()) {
+    Type ParamTy = P->getType();
     SourceRange SR;
-    if (auto typeRepr = P.decl->getTypeLoc().getTypeRepr())
+    if (auto typeRepr = P->getTypeLoc().getTypeRepr())
       SR = typeRepr->getSourceRange();
     TC.diagnoseTypeNotRepresentableInObjC(AFD, ParamTy, SR);
   }
@@ -2449,29 +2449,28 @@ static bool isParamListRepresentableInObjC(TypeChecker &TC,
   bool IsObjC = true;
   unsigned NumParams = PL->size();
   for (unsigned ParamIndex = 0; ParamIndex != NumParams; ParamIndex++) {
-    auto &param = PL->get(ParamIndex);
+    auto param = PL->get(ParamIndex);
     
     // Swift Varargs are not representable in Objective-C.
-    if (param.isVariadic()) {
+    if (param->isVariadic()) {
       if (Diagnose && Reason != ObjCReason::DoNotDiagnose) {
-        TC.diagnose(param.getStartLoc(),
-                    diag::objc_invalid_on_func_variadic,
+        TC.diagnose(param->getStartLoc(), diag::objc_invalid_on_func_variadic,
                     getObjCDiagnosticAttrKind(Reason))
-          .highlight(param.getSourceRange());
+          .highlight(param->getSourceRange());
         describeObjCReason(TC, AFD, Reason);
       }
       
       return false;
     }
     
-    if (TC.isRepresentableInObjC(AFD, param.decl->getType()))
+    if (TC.isRepresentableInObjC(AFD, param->getType()))
       continue;
     
     // Permit '()' when this method overrides a method with a
     // foreign error convention that replaces NSErrorPointer with ()
     // and this is the replaced parameter.
     AbstractFunctionDecl *overridden;
-    if (param.decl->getType()->isVoid() && AFD->isBodyThrowing() &&
+    if (param->getType()->isVoid() && AFD->isBodyThrowing() &&
         (overridden = AFD->getOverriddenDecl())) {
       auto foreignError = overridden->getForeignErrorConvention();
       if (foreignError &&
@@ -2831,8 +2830,7 @@ bool TypeChecker::isRepresentableInObjC(
       errorParameterIndex = paramList->size();
       while (errorParameterIndex > 0) {
         // Skip over trailing closures.
-        auto type =
-          paramList->get(errorParameterIndex - 1).decl->getType();
+        auto type = paramList->get(errorParameterIndex - 1)->getType();
 
         // It can't be a trailing closure unless it has a specific form.
         // Only consider the rvalue type.

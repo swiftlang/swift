@@ -1194,9 +1194,9 @@ public:
   VarDeclUsageChecker(TypeChecker &TC, AbstractFunctionDecl *AFD) : TC(TC) {
     // Track the parameters of the function.
     for (auto PL : AFD->getParameterLists())
-      for (auto &param : *PL)
-        if (shouldTrackVarDecl(param.decl))
-          VarDecls[param.decl] = 0;
+      for (auto param : *PL)
+        if (shouldTrackVarDecl(param))
+          VarDecls[param] = 0;
     
   }
     
@@ -2047,9 +2047,9 @@ static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
   SmallVector<OmissionTypeName, 4> paramTypes;
 
   // Always look at the parameters in the last parameter list.
-  for (auto &param : *afd->getParameterLists().back()) {
-    paramTypes.push_back(getTypeNameForOmission(param.decl->getType())
-                         .withDefaultArgument(param.decl->isDefaultArgument()));
+  for (auto param : *afd->getParameterLists().back()) {
+    paramTypes.push_back(getTypeNameForOmission(param->getType())
+                         .withDefaultArgument(param->isDefaultArgument()));
   }
   
   // Handle contextual type, result type, and returnsSelf.
@@ -2069,7 +2069,7 @@ static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
   StringRef firstParamName;
   auto params = afd->getParameterList(afd->getImplicitSelfDecl() ? 1 : 0);
   if (params->size() != 0)
-    firstParamName = params->get(0).decl->getName().str();
+    firstParamName = params->get(0)->getName().str();
 
   // Find the set of property names.
   const InheritedNameSet *allPropertyNames = nullptr;
@@ -2260,11 +2260,11 @@ static bool hasExtraneousDefaultArguments(AbstractFunctionDecl *afd,
   }
 
   for (unsigned i = 0; i != numElementsInParens; ++i) {
-    auto &param = bodyParams->get(i);
-    if (!param.decl->isDefaultArgument())
+    auto param = bodyParams->get(i);
+    if (!param->isDefaultArgument())
       continue;
 
-    auto defaultArg = param.decl->getType()->getInferredDefaultArgString();
+    auto defaultArg = param->getType()->getInferredDefaultArgString();
 
     // Never consider removing the first argument for a "set" method
     // with an unnamed first argument.

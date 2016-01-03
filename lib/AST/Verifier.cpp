@@ -2139,7 +2139,7 @@ struct ASTNodeBase {};
           auto &param = firstParams->get(i);
 
           if (checkParamNames &&
-              param.decl->getArgumentName() != paramNames[i]) {
+              param->getArgumentName() != paramNames[i]) {
             Out << "Function full name doesn't match variable name\n";
             AFD->dump(Out);
             abort();

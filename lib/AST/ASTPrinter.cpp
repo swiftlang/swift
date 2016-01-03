@@ -471,7 +471,7 @@ private:
   /// \returns true if anything was printed.
   bool printASTNodes(const ArrayRef<ASTNode> &Elements, bool NeedIndent = true);
 
-  void printOneParameter(const Parameter &param, bool Curried,
+  void printOneParameter(const ParamDecl *param, bool Curried,
                          bool ArgNameIsAPIByDefault);
 
   void printParameterList(ParameterList *PL, bool isCurried,
@@ -1540,12 +1540,12 @@ void PrintAST::visitParamDecl(ParamDecl *decl) {
   return visitVarDecl(decl);
 }
 
-void PrintAST::printOneParameter(const Parameter &param, bool Curried,
+void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
                                  bool ArgNameIsAPIByDefault) {
   auto printArgName = [&]() {
     // Print argument name.
-    auto ArgName = param.decl->getArgumentName();
-    auto BodyName = param.decl->getName();
+    auto ArgName = param->getArgumentName();
+    auto BodyName = param->getName();
     switch (Options.ArgAndParamPrinting) {
     case PrintOptions::ArgAndParamPrintingMode::ArgumentOnly:
       Printer.printName(ArgName, PrintNameContext::FunctionParameter);
@@ -1572,7 +1572,7 @@ void PrintAST::printOneParameter(const Parameter &param, bool Curried,
     Printer << ": ";
   };
 
-  auto TheTypeLoc = param.decl->getTypeLoc();
+  auto TheTypeLoc = param->getTypeLoc();
   if (TheTypeLoc.getTypeRepr()) {
     // If the outer typeloc is an InOutTypeRepr, print the 'inout' before the
     // subpattern.
@@ -1587,8 +1587,8 @@ void PrintAST::printOneParameter(const Parameter &param, bool Curried,
       Printer << "inout ";
     }
   } else {
-    if (param.decl->hasType())
-      TheTypeLoc = TypeLoc::withoutLoc(param.decl->getType());
+    if (param->hasType())
+      TheTypeLoc = TypeLoc::withoutLoc(param->getType());
     
     if (Type T = TheTypeLoc.getType()) {
       if (auto *IOT = T->getAs<InOutType>()) {
@@ -1600,8 +1600,8 @@ void PrintAST::printOneParameter(const Parameter &param, bool Curried,
 
   // If the parameter is autoclosure, or noescape, print it.  This is stored
   // on the type of the decl, not on the typerepr.
-  if (param.decl->hasType()) {
-    auto bodyCanType = param.decl->getType()->getCanonicalType();
+  if (param->hasType()) {
+    auto bodyCanType = param->getType()->getCanonicalType();
     if (auto patternType = dyn_cast<AnyFunctionType>(bodyCanType)) {
       switch (patternType->isAutoClosure()*2 + patternType->isNoEscape()) {
       case 0: break; // neither.
@@ -1636,14 +1636,14 @@ void PrintAST::printOneParameter(const Parameter &param, bool Curried,
   
   // If the parameter is variadic, we will print the "..." after it, but we have
   // to strip off the added array type.
-  if (param.isVariadic() && TheTypeLoc.getType()) {
+  if (param->isVariadic() && TheTypeLoc.getType()) {
     if (auto *BGT = TheTypeLoc.getType()->getAs<BoundGenericType>())
       TheTypeLoc.setType(BGT->getGenericArgs()[0]);
   }
   
   printTypeLoc(TheTypeLoc);
   
-  if (param.isVariadic())
+  if (param->isVariadic())
     Printer << "...";
 
   // After printing the type, we need to restore what the option used to be.
@@ -1654,11 +1654,11 @@ void PrintAST::printOneParameter(const Parameter &param, bool Curried,
   
   
   if (Options.PrintDefaultParameterPlaceholder &&
-      param.decl->isDefaultArgument()) {
+      param->isDefaultArgument()) {
     // For Clang declarations, figure out the default we're using.
-    auto AFD = dyn_cast<AbstractFunctionDecl>(param.decl->getDeclContext());
-    if (AFD && AFD->getClangDecl() && param.decl->hasType()) {
-      auto CurrType = param.decl->getType();
+    auto AFD = dyn_cast<AbstractFunctionDecl>(param->getDeclContext());
+    if (AFD && AFD->getClangDecl() && param->hasType()) {
+      auto CurrType = param->getType();
       Printer << " = " << CurrType->getInferredDefaultArgString();
     } else {
       // Use placeholder anywhere else.
@@ -1765,8 +1765,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
           Printer << (decl->isSetter() ? "set" : "willSet");
 
           auto params = decl->getParameterLists().back();
-          if (params->size() != 0 && !params->get(0).decl->isImplicit()) {
-            auto Name = params->get(0).decl->getName();
+          if (params->size() != 0 && !params->get(0)->isImplicit()) {
+            auto Name = params->get(0)->getName();
             if (!Name.empty()) {
               Printer << "(";
               Printer.printName(Name);

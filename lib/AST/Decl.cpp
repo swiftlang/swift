@@ -401,7 +401,7 @@ bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
 
   auto hasInternalParameter = [](const ParameterList *params) -> bool {
     for (auto param : *params) {
-      if (param.decl->hasName() && param.decl->getNameStr().startswith("_"))
+      if (param->hasName() && param->getNameStr().startswith("_"))
         return true;
     }
     return false;
@@ -3154,8 +3154,7 @@ SourceRange VarDecl::getSourceRange() const {
 SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
   // For a parameter, map back to it's parameter to get the TypeLoc.
   if (auto *PD = dyn_cast<ParamDecl>(this)) {
-    auto &P = PD->getParameter();
-    if (auto typeRepr = P.decl->getTypeLoc().getTypeRepr())
+    if (auto typeRepr = PD->getTypeLoc().getTypeRepr())
       return typeRepr->getSourceRange();
   }
   
@@ -3359,24 +3358,6 @@ ParamDecl::ParamDecl(ParamDecl *PD)
     defaultArgumentKind(PD->defaultArgumentKind) {
 }
 
-Parameter &ParamDecl::getParameter() {
-  ArrayRef<ParameterList*> paramLists;
-  
-  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(getDeclContext()))
-    paramLists = AFD->getParameterLists();
-  else if (auto *CE = dyn_cast<ClosureExpr>(getDeclContext()))
-    paramLists = CE->getParameters();
-  else
-    paramLists = cast<SubscriptDecl>(getDeclContext())->getIndices();
-  
-  for (auto paramList : paramLists)
-    for (auto &param : *paramList)
-      if (param.decl == this)
-        return param;
-  llvm_unreachable("ParamDecl has no associated Parameter value?");
-}
-
-
 
 /// \brief Retrieve the type of 'self' for the given context.
 static Type getSelfTypeForContext(DeclContext *dc) {
@@ -3422,12 +3403,52 @@ ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
   return selfDecl;
 }
 
+/// Return the full source range of this parameter.
 SourceRange ParamDecl::getSourceRange() const {
-  return getParameter().getSourceRange();
+  SourceRange range;
+  
+  SourceLoc APINameLoc = getArgumentNameLoc();
+  SourceLoc nameLoc = getNameLoc();
+  
+  if (APINameLoc.isValid() && nameLoc.isInvalid())
+    range = APINameLoc;
+  else if (APINameLoc.isInvalid() && nameLoc.isValid())
+    range = nameLoc;
+  else
+    range = SourceRange(APINameLoc, nameLoc);
+  
+  if (range.isInvalid()) return range;
+  
+  // It would be nice to extend the front of the range to show where inout is,
+  // but we don't have that location info.  Extend the back of the range to the
+  // location of the default argument, or the typeloc if they are valid.
+  if (auto expr = getDefaultValue()) {
+    auto endLoc = expr->getExpr()->getEndLoc();
+    if (endLoc.isValid())
+      return SourceRange(range.Start, endLoc);
+  }
+  
+  // If the typeloc has a valid location, use it to end the range.
+  if (auto typeRepr = getTypeLoc().getTypeRepr()) {
+    auto endLoc = typeRepr->getEndLoc();
+    if (endLoc.isValid())
+      return SourceRange(range.Start, endLoc);
+  }
+  
+  // Otherwise, just return the info we have about the parameter.
+  return range;
 }
 
 Type ParamDecl::getVarargBaseTy(Type VarArgT) {
-  return Parameter::getVarargBaseTy(VarArgT);
+  TypeBase *T = VarArgT.getPointer();
+  if (ArraySliceType *AT = dyn_cast<ArraySliceType>(T))
+    return AT->getBaseType();
+  if (BoundGenericType *BGT = dyn_cast<BoundGenericType>(T)) {
+    // It's the stdlib Array<T>.
+    return BGT->getGenericArgs()[0];
+  }
+  assert(isa<ErrorType>(T));
+  return T;
 }
 
 /// Determine whether the given Swift type is an integral type, i.e.,
@@ -3654,15 +3675,14 @@ Type AbstractFunctionDecl::computeInterfaceSelfType(bool isInitializingCtor) {
 ///
 /// Note that some functions don't have an implicit 'self' decl, for example,
 /// free functions.  In this case nullptr is returned.
-ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl() const {
+ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl() {
   auto paramLists = getParameterLists();
   if (paramLists.empty())
     return nullptr;
 
   // "self" is always the first parameter list.
-  if (paramLists[0]->size() == 1 &&
-      paramLists[0]->get(0).decl->isSelfParameter())
-    return paramLists[0]->get(0).decl;
+  if (paramLists[0]->size() == 1 && paramLists[0]->get(0)->isSelfParameter())
+    return paramLists[0]->get(0);
   return nullptr;
 }
 
@@ -3679,8 +3699,8 @@ AbstractFunctionDecl::getDefaultArg(unsigned Index) const {
 
   for (auto paramList : paramLists) {
     if (Index < paramList->size()) {
-      auto &param = paramList->get(Index);
-      return { param.decl->getDefaultArgumentKind(), param.decl->getType() };
+      auto param = paramList->get(Index);
+      return { param->getDefaultArgumentKind(), param->getType() };
     }
     
     Index -= paramList->size();
@@ -4016,7 +4036,7 @@ bool FuncDecl::isUnaryOperator() const {
     = getDeclContext()->isProtocolOrProtocolExtensionContext() ? 1 : 0;
   
   auto *params = getParameterList(opArgIndex);
-  return params->size() == 1 && !params->get(0).isVariadic();
+  return params->size() == 1 && !params->get(0)->isVariadic();
 }
 
 bool FuncDecl::isBinaryOperator() const {
@@ -4027,7 +4047,7 @@ bool FuncDecl::isBinaryOperator() const {
     = getDeclContext()->isProtocolOrProtocolExtensionContext() ? 1 : 0;
   
   auto *params = getParameterList(opArgIndex);
-  return params->size() == 2 && !params->get(1).isVariadic();
+  return params->size() == 2 && !params->get(1)->isVariadic();
 }
 
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
@@ -4079,7 +4099,7 @@ bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
   if (params->size() != 1)
     return false;
 
-  return params->get(0).decl->getType()->isVoid();
+  return params->get(0)->getType()->isVoid();
 }
 
 DestructorDecl::DestructorDecl(Identifier NameHack, SourceLoc DestructorLoc,

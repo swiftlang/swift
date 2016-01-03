@@ -1394,8 +1394,8 @@ bool ArchetypeBuilder::inferRequirements(ParameterList *params,
     return false;
   
   bool hadError = false;
-  for (auto &P : *params)
-    hadError |= inferRequirements(P.decl->getTypeLoc(), genericParams);
+  for (auto P : *params)
+    hadError |= inferRequirements(P->getTypeLoc(), genericParams);
   return hadError;
 }
 

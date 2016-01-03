@@ -6206,8 +6206,8 @@ static bool isVariadicWitness(AbstractFunctionDecl *afd) {
   if (afd->getExtensionType())
     ++index;
 
-  for (auto &param : *afd->getParameterList(index))
-    if (param.isVariadic())
+  for (auto param : *afd->getParameterList(index))
+    if (param->isVariadic())
       return true;
 
   return false;

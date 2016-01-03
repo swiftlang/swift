@@ -1912,9 +1912,9 @@ class FormatWalker: public ide::SourceEntityWalker {
 
         // Function parameters are siblings.
         for (auto P : AFD->getParameterLists()) {
-          for (auto &param : *P) {
-            addPair(param.getEndLoc(),
-                    FindAlignLoc(param.getStartLoc()), tok::comma);
+          for (auto param : *P) {
+            addPair(param->getEndLoc(),
+                    FindAlignLoc(param->getStartLoc()), tok::comma);
           }
         }
       }

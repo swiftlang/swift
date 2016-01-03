@@ -473,7 +473,7 @@ namespace {
       OS << ")";
     }
 
-    void printDeclName(ValueDecl *D) {
+    void printDeclName(const ValueDecl *D) {
       if (D->getFullName())
         OS << '\"' << D->getFullName() << '\"';
       else
@@ -653,15 +653,8 @@ namespace {
       }
     }
 
-    void visitParamDecl(ParamDecl *VD) {
-      printCommon(VD, "param_decl");
-      if (!VD->isLet())
-        OS << " var";
-      if (VD->getName() != VD->getArgumentName()) {
-        OS << " argument_name=";
-        printName(OS, VD->getArgumentName());
-      }
-      OS << ')';
+    void visitParamDecl(ParamDecl *PD) {
+      printParameter(PD);
     }
 
     void visitEnumCaseDecl(EnumCaseDecl *ECD) {
@@ -773,27 +766,27 @@ namespace {
       }
     }
     
-    void printParameter(const Parameter &P) {
+    void printParameter(const ParamDecl *P) {
       OS.indent(Indent) << "(parameter ";
-      printDeclName(P.decl);
-      if (!P.decl->getArgumentName().empty())
-        OS << " apiName=" << P.decl->getArgumentName();
+      printDeclName(P);
+      if (!P->getArgumentName().empty())
+        OS << " apiName=" << P->getArgumentName();
       
       OS << " type=";
-      if (P.decl->hasType()) {
+      if (P->hasType()) {
         OS << '\'';
-        P.decl->getType().print(OS);
+        P->getType().print(OS);
         OS << '\'';
       } else
         OS << "<null type>";
       
-      if (!P.decl->isLet())
+      if (!P->isLet())
         OS << " mutable";
       
-      if (P.isVariadic())
+      if (P->isVariadic())
         OS << " variadic";
 
-      switch (P.decl->getDefaultArgumentKind()) {
+      switch (P->getDefaultArgumentKind()) {
       case DefaultArgumentKind::None: break;
       case DefaultArgumentKind::Column:
         printField("default_arg", "__COLUMN__");
@@ -818,7 +811,7 @@ namespace {
         break;
       }
       
-      if (auto init = P.getDefaultValue()) {
+      if (auto init = P->getDefaultValue()) {
         OS << " expression=\n";
         printRec(init->getExpr());
       }
@@ -996,24 +989,6 @@ namespace {
   };
 } // end anonymous namespace.
 
-
-void Parameter::dump() const {
-  dump(llvm::errs(), 0);
-}
-
-void Parameter::dump(raw_ostream &OS, unsigned Indent) const {
-  llvm::Optional<llvm::SaveAndRestore<bool>> X;
-  
-  // Make sure to print type variables if we can get to ASTContext.
-  if (decl) {
-    X.emplace(llvm::SaveAndRestore<bool>(decl->getASTContext().LangOpts.DebugConstraintSolver,
-                                 true));
-  }
-
-  PrintDecl(OS, Indent).printParameter(*this);
-  llvm::errs() << '\n';
-}
-
 void ParameterList::dump() const {
   dump(llvm::errs(), 0);
 }
@@ -1022,8 +997,8 @@ void ParameterList::dump(raw_ostream &OS, unsigned Indent) const {
   llvm::Optional<llvm::SaveAndRestore<bool>> X;
   
   // Make sure to print type variables if we can get to ASTContext.
-  if (size() != 0 && get(0).decl) {
-    auto &ctx = get(0).decl->getASTContext();
+  if (size() != 0 && get(0)) {
+    auto &ctx = get(0)->getASTContext();
     X.emplace(llvm::SaveAndRestore<bool>(ctx.LangOpts.DebugConstraintSolver,
                                          true));
   }

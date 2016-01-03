@@ -1115,11 +1115,11 @@ static void checkDefaultArguments(TypeChecker &tc, ParameterList *params,
 
   for (auto &param : *params) {
     unsigned curArgIndex = nextArgIndex++;
-    if (!param.getDefaultValue() || !param.decl->hasType() ||
-        param.decl->getType()->is<ErrorType>())
+    if (!param->getDefaultValue() || !param->hasType() ||
+        param->getType()->is<ErrorType>())
       continue;
     
-    auto defaultValueHandle = param.getDefaultValue();
+    auto defaultValueHandle = param->getDefaultValue();
     Expr *e = defaultValueHandle->getExpr();
 
     // Re-use an existing initializer context if possible.
@@ -1137,7 +1137,7 @@ static void checkDefaultArguments(TypeChecker &tc, ParameterList *params,
     }
 
     // Type-check the initializer, then flag that we did so.
-    if (tc.typeCheckExpression(e, initContext, param.decl->getType(),
+    if (tc.typeCheckExpression(e, initContext, param->getType(),
                                CTP_DefaultParameter))
       defaultValueHandle->setExpr(defaultValueHandle->getExpr(), true);
     else

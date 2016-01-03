@@ -21,72 +21,23 @@
 #include "swift/AST/ExprHandle.h"
 using namespace swift;
 
-/// Return the full source range of this parameter.
-SourceRange Parameter::getSourceRange() const {
-  SourceRange range;
-  
-  SourceLoc APINameLoc = decl->getArgumentNameLoc();
-  SourceLoc nameLoc = decl->getNameLoc();
-  
-  if (APINameLoc.isValid() && nameLoc.isInvalid())
-    range = APINameLoc;
-  else if (APINameLoc.isInvalid() && nameLoc.isValid())
-    range = nameLoc;
-  else
-    range = SourceRange(APINameLoc, nameLoc);
-
-  if (range.isInvalid()) return range;
-  
-  // It would be nice to extend the front of the range to show where inout is,
-  // but we don't have that location info.  Extend the back of the range to the
-  // location of the default argument, or the typeloc if they are valid.
-  if (auto expr = getDefaultValue()) {
-    auto endLoc = expr->getExpr()->getEndLoc();
-    if (endLoc.isValid())
-      return SourceRange(range.Start, endLoc);
-  }
-
-  // If the typeloc has a valid location, use it to end the range.
-  if (auto typeRepr = decl->getTypeLoc().getTypeRepr()) {
-    auto endLoc = typeRepr->getEndLoc();
-    if (endLoc.isValid())
-      return SourceRange(range.Start, endLoc);
-  }
-  
-  // Otherwise, just return the info we have about the parameter.
-  return range;
-}
-
-Type Parameter::getVarargBaseTy(Type VarArgT) {
-  TypeBase *T = VarArgT.getPointer();
-  if (ArraySliceType *AT = dyn_cast<ArraySliceType>(T))
-    return AT->getBaseType();
-  if (BoundGenericType *BGT = dyn_cast<BoundGenericType>(T)) {
-    // It's the stdlib Array<T>.
-    return BGT->getGenericArgs()[0];
-  }
-  assert(isa<ErrorType>(T));
-  return T;
-}
-
-
 /// TODO: unique and reuse the () parameter list in ASTContext, it is common to
 /// many methods.  Other parameter lists cannot be uniqued because the decls
 /// within them are always different anyway (they have different DeclContext's).
 ParameterList *
 ParameterList::create(const ASTContext &C, SourceLoc LParenLoc,
-                      ArrayRef<Parameter> params, SourceLoc RParenLoc) {
+                      ArrayRef<ParamDecl*> params, SourceLoc RParenLoc) {
   assert(LParenLoc.isValid() == RParenLoc.isValid() &&
          "Either both paren locs are valid or neither are");
   
-  auto byteSize = sizeof(ParameterList)+params.size()*sizeof(Parameter);
+  auto byteSize = sizeof(ParameterList)+params.size()*sizeof(ParamDecl*);
   auto rawMem = C.Allocate(byteSize, alignof(ParameterList));
   
   //  Placement initialize the ParameterList and the Parameter's.
   auto PL = ::new (rawMem) ParameterList(LParenLoc, params.size(), RParenLoc);
 
   for (size_t i = 0, e = params.size(); i != e; ++i)
-    ::new (&PL->get(i)) Parameter(params[i]);
+    ::new (&PL->get(i)) ParamDecl*(params[i]);
   
   return PL;
 }
@@ -101,14 +52,14 @@ ParameterList::create(const ASTContext &C, SourceLoc LParenLoc,
 ParameterList *ParameterList::createSelf(SourceLoc loc, DeclContext *DC,
                                          bool isStaticMethod, bool isInOut) {
   auto *PD = ParamDecl::createSelf(loc, DC, isStaticMethod, isInOut);
-  return create(DC->getASTContext(), Parameter::withoutLoc(PD));
+  return create(DC->getASTContext(), PD);
 }
 
 /// Change the DeclContext of any contained parameters to the specified
 /// DeclContext.
 void ParameterList::setDeclContextOfParamDecls(DeclContext *DC) {
-  for (auto &P : *this)
-    P.decl->setDeclContext(DC);
+  for (auto P : *this)
+    P->setDeclContext(DC);
 }
 
 
@@ -121,26 +72,24 @@ ParameterList *ParameterList::clone(const ASTContext &C,
   if (size() == 0)
     return const_cast<ParameterList*>(this);
   
-  SmallVector<Parameter, 8> params(begin(), end());
+  SmallVector<ParamDecl*, 8> params(begin(), end());
 
   // Remap the ParamDecls inside of the ParameterList.
-  for (auto &param : params) {
-    auto decl = param.decl;
-    
-    param.decl = new (C) ParamDecl(decl);
+  for (auto &decl : params) {
+    decl = new (C) ParamDecl(decl);
     if (options & Implicit)
-      param.decl->setImplicit();
+      decl->setImplicit();
 
     // If the argument isn't named, and we're cloning for an inherited
     // constructor, give the parameter a name so that silgen will produce a
     // value for it.
     if (decl->getName().empty() && (options & Inherited))
-      param.decl->setName(C.getIdentifier("argument"));
+      decl->setName(C.getIdentifier("argument"));
     
     // If we're inheriting a default argument, mark it as such.
-    if (param.decl->isDefaultArgument() && (options & Inherited)) {
-      param.decl->setDefaultArgumentKind(DefaultArgumentKind::Inherited);
-      param.decl->setDefaultValue(nullptr);
+    if (decl->isDefaultArgument() && (options & Inherited)) {
+      decl->setDefaultArgumentKind(DefaultArgumentKind::Inherited);
+      decl->setDefaultValue(nullptr);
     }
   }
   
@@ -155,12 +104,12 @@ Type ParameterList::getType(const ASTContext &C) const {
   
   SmallVector<TupleTypeElt, 8> argumentInfo;
   
-  for (auto &P : *this) {
-    if (!P.decl->hasType()) return Type();
+  for (auto P : *this) {
+    if (!P->hasType()) return Type();
     
     argumentInfo.push_back({
-      P.decl->getType(), P.decl->getArgumentName(),
-      P.decl->getDefaultArgumentKind(), P.decl->isVariadic()
+      P->getType(), P->getArgumentName(),
+      P->getDefaultArgumentKind(), P->isVariadic()
     });
   }
   
@@ -192,8 +141,8 @@ SourceRange ParameterList::getSourceRange() const {
   
   // Otherwise, try the first and last parameter.
   if (size() != 0) {
-    auto Start = get(0).getStartLoc();
-    auto End = getArray().back().getEndLoc();
+    auto Start = get(0)->getStartLoc();
+    auto End = getArray().back()->getEndLoc();
     if (Start.isValid() && End.isValid())
       return { Start, End };
   }

@@ -2740,7 +2740,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
   // micro-optimization for Objective-C thunk generation.
   ParameterList *ValueArg;
   {
-    SmallVector<Parameter, 2> ValueArgElements;
+    SmallVector<ParamDecl*, 2> ValueArgElements;
     SourceLoc StartLoc, EndLoc;
     if (param) {
       assert(param->size() == 1 &&
@@ -2884,7 +2884,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
   return D;
 }
 
-static Parameter
+static ParamDecl *
 createSetterAccessorArgument(SourceLoc nameLoc, Identifier name,
                              TypeLoc elementTy, AccessorKind accessorKind,
                              Parser &P) {
@@ -2897,17 +2897,16 @@ createSetterAccessorArgument(SourceLoc nameLoc, Identifier name,
     name = P.Context.getIdentifier(implName);
   }
 
-  Parameter result;
-  result.decl = new (P.Context) ParamDecl(/*IsLet*/true, SourceLoc(),
+  auto result = new (P.Context) ParamDecl(/*IsLet*/true, SourceLoc(),
                                           Identifier(), nameLoc, name,
                                           Type(), P.CurDeclContext);
   if (isNameImplicit)
-    result.decl->setImplicit();
+    result->setImplicit();
 
-  result.decl->getTypeLoc() = elementTy.clone(P.Context);
+  result->getTypeLoc() = elementTy.clone(P.Context);
   
   // AST Walker shouldn't go into the type recursively.
-  result.decl->setIsTypeLocImplicit(true);
+  result->setIsTypeLocImplicit(true);
   return result;
 }
 

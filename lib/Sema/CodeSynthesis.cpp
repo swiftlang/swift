@@ -43,7 +43,7 @@ static void addMemberToContextIfNeeded(Decl *D, DeclContext *DC,
 }
 
 static ParamDecl *getParamDeclAtIndex(FuncDecl *fn, unsigned index) {
-  return fn->getParameterLists().back()->get(index).decl;
+  return fn->getParameterLists().back()->get(index);
 }
 
 static VarDecl *getFirstParamDecl(FuncDecl *fn) {
@@ -51,7 +51,7 @@ static VarDecl *getFirstParamDecl(FuncDecl *fn) {
 };
 
 
-static Parameter buildArgument(SourceLoc loc, DeclContext *DC,
+static ParamDecl *buildArgument(SourceLoc loc, DeclContext *DC,
                                StringRef name, Type type, bool isLet) {
   auto &context = DC->getASTContext();
   auto *param = new (context) ParamDecl(isLet, SourceLoc(), Identifier(),
@@ -59,15 +59,15 @@ static Parameter buildArgument(SourceLoc loc, DeclContext *DC,
                                         Type(), DC);
   param->setImplicit();
   param->getTypeLoc().setType(type);
-  return Parameter::withoutLoc(param);
+  return param;
 }
 
-static Parameter buildLetArgument(SourceLoc loc, DeclContext *DC,
+static ParamDecl *buildLetArgument(SourceLoc loc, DeclContext *DC,
                                   StringRef name, Type type) {
   return buildArgument(loc, DC, name, type, /*isLet*/ true);
 }
 
-static Parameter buildInOutArgument(SourceLoc loc, DeclContext *DC,
+static ParamDecl *buildInOutArgument(SourceLoc loc, DeclContext *DC,
                                      StringRef name, Type type) {
   return buildArgument(loc, DC, name, InOutType::get(type), /*isLet*/ false);
 }
@@ -91,7 +91,7 @@ static Type getTypeOfStorage(AbstractStorageDecl *storage,
 ///   forwarding pattern.
 static ParameterList *
 buildIndexForwardingParamList(AbstractStorageDecl *storage,
-                              ArrayRef<Parameter> prefix) {
+                              ArrayRef<ParamDecl*> prefix) {
   auto &context = storage->getASTContext();
   auto subscript = dyn_cast<SubscriptDecl>(storage);
 
@@ -107,7 +107,7 @@ buildIndexForwardingParamList(AbstractStorageDecl *storage,
   
   
   // Otherwise, we need to build up a new parameter list.
-  SmallVector<Parameter, 4> elements;
+  SmallVector<ParamDecl*, 4> elements;
 
   // Start with the fields we were given, if there are any.
   elements.append(prefix.begin(), prefix.end());
@@ -175,11 +175,10 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
   
   // Add a "(value : T, indices...)" argument list.
   auto storageType = getTypeOfStorage(storage, TC);
-  auto valueParam = buildLetArgument(storage->getLoc(),
+  valueDecl = buildLetArgument(storage->getLoc(),
                                      storage->getDeclContext(), "value",
                                      storageType);
-  valueDecl = valueParam.decl;
-  params.push_back(buildIndexForwardingParamList(storage, valueParam));
+  params.push_back(buildIndexForwardingParamList(storage, valueDecl));
 
   Type setterRetTy = TupleType::getEmpty(TC.Context);
   FuncDecl *setter = FuncDecl::create(
@@ -305,8 +304,7 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   //  - The buffer parameter, (buffer: Builtin.RawPointer,
   //                           inout storage: Builtin.UnsafeValueBuffer,
   //                           indices...).
-  
-  Parameter bufferElements[] = {
+  ParamDecl *bufferElements[] = {
     buildLetArgument(loc, DC, "buffer", ctx.TheRawPointerType),
     buildInOutArgument(loc, DC, "callbackStorage", ctx.TheUnsafeValueBufferType)
   };
@@ -394,7 +392,7 @@ static Expr *buildTupleExpr(ASTContext &ctx, ArrayRef<Expr*> args) {
 /// NOTE: This returns null if a varargs parameter exists in the list, as it
 /// cannot be forwarded correctly yet.
 ///
-static Expr *buildArgumentForwardingExpr(ArrayRef<Parameter> params,
+static Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
                                          ASTContext &ctx) {
   SmallVector<Identifier, 4> labels;
   SmallVector<SourceLoc, 4> labelLocs;
@@ -402,16 +400,15 @@ static Expr *buildArgumentForwardingExpr(ArrayRef<Parameter> params,
   
   for (auto param : params) {
     // We cannot express how to forward variadic parameters yet.
-    if (param.isVariadic())
+    if (param->isVariadic())
       return nullptr;
     
-    Expr *ref = new (ctx) DeclRefExpr(param.decl, SourceLoc(),
-                                      /*implicit*/ true);
-    if (param.decl->getType()->is<InOutType>())
+    Expr *ref = new (ctx) DeclRefExpr(param, SourceLoc(), /*implicit*/ true);
+    if (param->getType()->is<InOutType>())
       ref = new (ctx) InOutExpr(SourceLoc(), ref, Type(), /*implicit=*/true);
     args.push_back(ref);
     
-    labels.push_back(param.decl->getArgumentName());
+    labels.push_back(param->getArgumentName());
     labelLocs.push_back(SourceLoc());
   }
   
@@ -998,8 +995,7 @@ static Expr *buildMaterializeForSetCallback(ASTContext &ctx,
 
   // Generate the body of the closure.
   SmallVector<ASTNode, 4> body;
-  generator(body, selfValueParam.decl, bufferParam.decl,
-            callbackStorageParam.decl);
+  generator(body, selfValueParam, bufferParam, callbackStorageParam);
   closure->setBody(BraceStmt::create(ctx, SourceLoc(), body, SourceLoc(),
                                      IsImplicit),
                    /*isSingleExpression*/ false);
@@ -1416,7 +1412,7 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
   // decls for 'self' and 'value'.
   auto *Set = VD->getSetter();
   auto *SelfDecl = Set->getImplicitSelfDecl();
-  VarDecl *ValueDecl = Set->getParameterLists().back()->get(0).decl;
+  VarDecl *ValueDecl = Set->getParameterLists().back()->get(0);
 
   // The setter loads the oldValue, invokes willSet with the incoming value,
   // does a direct store, then invokes didSet with the oldValue.
@@ -1854,7 +1850,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
     accessLevel = std::min(accessLevel, Accessibility::Internal);
 
   // Determine the parameter type of the implicit constructor.
-  SmallVector<Parameter, 8> params;
+  SmallVector<ParamDecl*, 8> params;
   if (ICK == ImplicitConstructorKind::Memberwise) {
     assert(isa<StructDecl>(decl) && "Only struct have memberwise constructor");
 
@@ -1886,7 +1882,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       auto *arg = new (context) ParamDecl(/*IsLet*/true, Loc, var->getName(),
                                           Loc, var->getName(), varType, decl);
       arg->setImplicit();
-      params.push_back(Parameter::withoutLoc(arg));
+      params.push_back(arg);
     }
   }
 

@@ -685,8 +685,8 @@ public:
 
 
 static bool checkObjectOrOptionalObjectType(TypeChecker &TC, Decl *D,
-                                            Parameter &param) {
-  Type ty = param.decl->getType();
+                                            ParamDecl *param) {
+  Type ty = param->getType();
   if (auto unwrapped = ty->getAnyOptionalObjectType())
     ty = unwrapped;
 
@@ -694,8 +694,8 @@ static bool checkObjectOrOptionalObjectType(TypeChecker &TC, Decl *D,
     // @objc class types are okay.
     if (!classDecl->isObjC()) {
       TC.diagnose(D, diag::ibaction_nonobjc_class_argument,
-                  param.decl->getType())
-        .highlight(param.getSourceRange());
+                  param->getType())
+        .highlight(param->getSourceRange());
       return true;
     }
   } else if (ty->isObjCExistentialType()) {
@@ -704,8 +704,8 @@ static bool checkObjectOrOptionalObjectType(TypeChecker &TC, Decl *D,
   } else {
     // No other types are permitted.
     TC.diagnose(D, diag::ibaction_nonobject_argument,
-                param.decl->getType())
-      .highlight(param.getSourceRange());
+                param->getType())
+      .highlight(param->getSourceRange());
     return true;
   }
 
@@ -751,7 +751,7 @@ void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
     if (isRelaxedIBAction(TC)) {
       // Do a rough check to allow any ObjC-representable struct or enum type
       // on iOS.
-      Type ty = paramList->get(0).decl->getType();
+      Type ty = paramList->get(0)->getType();
       if (auto nominal = ty->getAnyNominal())
         if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))
           if (nominal->classifyAsOptionalType() == OTK_None)
@@ -1219,8 +1219,7 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
   auto fn = cast<AbstractFunctionDecl>(D);
   for (auto paramList : fn->getParameterLists()) {
     for (auto param : *paramList)
-      if (hasThrowingFunctionParameter(param.decl->getType()
-                                       ->getCanonicalType()))
+      if (hasThrowingFunctionParameter(param->getType()->getCanonicalType()))
         return;
   }
 

@@ -92,9 +92,8 @@ public:
   }
   
   void checkParameterList(const ParameterList *params) {
-    for (auto &param : *params) {
-      checkValueDecl(param.decl,
-                     DeclVisibilityKind::FunctionParameter);
+    for (auto param : *params) {
+      checkValueDecl(param, DeclVisibilityKind::FunctionParameter);
     }
   }
 

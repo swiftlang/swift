@@ -61,7 +61,6 @@ namespace swift {
   class NameAliasType;
   class EnumCaseDecl;
   class EnumElementDecl;
-  struct Parameter;
   class ParameterList;
   class Pattern;
   struct PrintOptions;
@@ -4198,12 +4197,6 @@ public:
   /// The resulting source location will be valid if the argument name
   /// was specified separately from the parameter name.
   SourceLoc getArgumentNameLoc() const { return ArgumentNameLoc; }
-
-  /// Return the Parameter value corresponding to this ParamDecl.
-  Parameter &getParameter();
-  const Parameter &getParameter() const {
-    return const_cast<ParamDecl*>(this)->getParameter();
-  }
   
   TypeLoc &getTypeLoc() { return typeLoc; }
   TypeLoc getTypeLoc() const { return typeLoc; }
@@ -4631,7 +4624,10 @@ public:
   ///
   /// Note that some functions don't have an implicit 'self' decl, for example,
   /// free functions.  In this case nullptr is returned.
-  ParamDecl *getImplicitSelfDecl() const;
+  const ParamDecl *getImplicitSelfDecl() const {
+    return const_cast<AbstractFunctionDecl*>(this)->getImplicitSelfDecl();
+  }
+  ParamDecl *getImplicitSelfDecl();
 
   /// \brief Retrieve the set of parameters to a generic function, or null if
   /// this function is not generic.

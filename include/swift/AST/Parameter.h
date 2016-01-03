@@ -18,78 +18,14 @@
 #ifndef SWIFT_AST_PARAMETER_H
 #define SWIFT_AST_PARAMETER_H
 
-#include "swift/AST/TypeLoc.h"
 #include "swift/AST/Decl.h"
 #include "swift/Basic/OptionSet.h"
 
 namespace swift {
-  class ParamDecl;
-  class ExprHandle;
-  
-/// This describes a single parameter, including such feats as:
-///
-///   a b : Int           //< Differing internal vs external name.
-///   inout a : Int       //< inout parameter.
-///   @autoclosure a : T  //< Parameter attribute.
-///   a : Int = 42        //< Default value.
-///   a : Int...          //< Varargs parameter.
-///
-/// A parameter is stored as ParamDecls with additional information in the
-/// Parameter struct to represent source information as well as extra semantics.
-///
-struct Parameter {
-  /// The decl keeps track of the internal and external parameter name, as well
-  /// as the parameter attributes.
-  ParamDecl *decl;
-
-  bool hasDefaultValue() const {
-    return decl->getDefaultValue() != nullptr;
-  }
-  
-  void setDefaultValue(ExprHandle *H) {
-    decl->setDefaultValue(H);
-  }
-  ExprHandle *getDefaultValue() const {
-    return decl->getDefaultValue();
-  }
-  /// Whether or not this parameter is varargs.
-  bool isVariadic() const { return decl->isVariadic(); }
-  void setVariadic(bool value = true) { decl->setVariadic(value); }
-  
-  /// Remove the type of this varargs element designator, without the array
-  /// type wrapping it.  A parameter like "Int..." will have formal parameter
-  /// type of "[Int]" and this returns "Int".
-  static Type getVarargBaseTy(Type VarArgT);
-  
-  /// Remove the type of this varargs element designator, without the array
-  /// type wrapping it.
-  Type getVarargBaseTy() const {
-    assert(isVariadic());
-    return getVarargBaseTy(decl->getType());
-  }
-  
-  /// Create a simple parameter without location information.
-  static Parameter withoutLoc(ParamDecl *decl) {
-    Parameter result;
-    result.decl = decl;
-    return result;
-  }
-  
-  /// Return the full source range of this parameter.
-  SourceRange getSourceRange() const;
-  SourceLoc getStartLoc() const { return getSourceRange().Start; }
-  SourceLoc getEndLoc() const { return getSourceRange().End; }
-
-  void dump() const;
-  void dump(raw_ostream &OS, unsigned Indent = 0) const;
-  
-  //  void print(raw_ostream &OS) const;
-};
-
 
 /// This describes a list of parameters.  Each parameter descriptor is tail
 /// allocated onto this list.
-class alignas(alignof(Parameter)) ParameterList {
+class alignas(alignof(ParamDecl*)) ParameterList {
   void *operator new(size_t Bytes) throw() = delete;
   void operator delete(void *Data) throw() = delete;
   void *operator new(size_t Bytes, void *Mem) throw() = delete;
@@ -105,13 +41,13 @@ class alignas(alignof(Parameter)) ParameterList {
 public:
   /// Create a parameter list with the specified parameters.
   static ParameterList *create(const ASTContext &C, SourceLoc LParenLoc,
-                               ArrayRef<Parameter> params,
+                               ArrayRef<ParamDecl*> params,
                                SourceLoc RParenLoc);
 
   /// Create a parameter list with the specified parameters, with no location
   /// info for the parens.
   static ParameterList *create(const ASTContext &C,
-                               ArrayRef<Parameter> params) {
+                               ArrayRef<ParamDecl*> params) {
     return create(C, SourceLoc(), params, SourceLoc());
   }
  
@@ -124,7 +60,7 @@ public:
   
   /// Create a parameter list for a single parameter lacking location info.
   static ParameterList *createWithoutLoc(ParamDecl *decl) {
-    return create(decl->getASTContext(), Parameter::withoutLoc(decl));
+    return create(decl->getASTContext(), decl);
   }
   
   /// Create an implicit 'self' decl for a method in the specified decl context.
@@ -141,19 +77,19 @@ public:
   SourceLoc getLParenLoc() const { return LParenLoc; }
   SourceLoc getRParenLoc() const { return RParenLoc; }
   
-  typedef MutableArrayRef<Parameter>::iterator iterator;
-  typedef ArrayRef<Parameter>::iterator const_iterator;
+  typedef MutableArrayRef<ParamDecl*>::iterator iterator;
+  typedef ArrayRef<ParamDecl*>::iterator const_iterator;
   iterator begin() { return getArray().begin(); }
   iterator end() { return getArray().end(); }
   const_iterator begin() const { return getArray().begin(); }
   const_iterator end() const { return getArray().end(); }
   
-  MutableArrayRef<Parameter> getArray() {
-    auto Ptr = reinterpret_cast<Parameter*>(this + 1);
+  MutableArrayRef<ParamDecl*> getArray() {
+    auto Ptr = reinterpret_cast<ParamDecl**>(this + 1);
     return { Ptr, numParameters };
   }
-  ArrayRef<Parameter> getArray() const {
-    auto Ptr = reinterpret_cast<const Parameter*>(this + 1);
+  ArrayRef<ParamDecl*> getArray() const {
+    auto Ptr = reinterpret_cast<ParamDecl*const*>(this + 1);
     return { Ptr, numParameters };
   }
 
@@ -161,16 +97,16 @@ public:
     return numParameters;
   }
   
-  const Parameter &get(unsigned i) const {
+  const ParamDecl *get(unsigned i) const {
     return getArray()[i];
   }
   
-  Parameter &get(unsigned i) {
+  ParamDecl *&get(unsigned i) {
     return getArray()[i];
   }
 
-  const Parameter &operator[](unsigned i) const { return get(i); }
-  Parameter &operator[](unsigned i) { return get(i); }
+  const ParamDecl *operator[](unsigned i) const { return get(i); }
+  ParamDecl *&operator[](unsigned i) { return get(i); }
   
   /// Change the DeclContext of any contained parameters to the specified
   /// DeclContext.

@@ -3443,8 +3443,8 @@ DeclName::DeclName(ASTContext &C, Identifier baseName,
                    ParameterList *paramList) {
   SmallVector<Identifier, 4> names;
   
-  for (auto &P : *paramList)
-    names.push_back(P.decl->getArgumentName());
+  for (auto P : *paramList)
+    names.push_back(P->getArgumentName());
   initialize(C, baseName, names);
 }
 

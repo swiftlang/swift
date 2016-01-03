@@ -231,7 +231,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
                                    /*HasBoundDecls=*/false, SourceLoc(),
                                    dfltBody));
 
-  auto rawDecl = initDecl->getParameterList(1)->get(0).decl;
+  auto rawDecl = initDecl->getParameterList(1)->get(0);
   auto rawRef = new (C) DeclRefExpr(rawDecl, SourceLoc(), /*implicit*/true);
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), rawRef,
                                        SourceLoc(), cases, SourceLoc(), C);

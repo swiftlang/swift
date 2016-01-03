@@ -885,9 +885,9 @@ void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {
   for (auto paramList : func->getParameterLists()) {
     for (auto &param : *paramList) {
       // Clear out the type of the decl.
-      if (param.decl->hasType() && !param.decl->isInvalid())
-        param.decl->overwriteType(Type());
-      revertDependentTypeLoc(param.decl->getTypeLoc());
+      if (param->hasType() && !param->isInvalid())
+        param->overwriteType(Type());
+      revertDependentTypeLoc(param->getTypeLoc());
     }
   }
 
@@ -1988,7 +1988,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
     const TypeRepr *complainRepr = nullptr;
     bool problemIsElement = false;
     for (auto &P : *SD->getIndices()) {
-      checkTypeAccessibility(TC, P.decl->getTypeLoc(), SD,
+      checkTypeAccessibility(TC, P->getTypeLoc(), SD,
                              [&](Accessibility typeAccess,
                                  const TypeRepr *thisComplainRepr) {
         if (!minAccess || *minAccess > typeAccess) {
@@ -2043,7 +2043,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
     const TypeRepr *complainRepr = nullptr;
     for (auto *PL : fn->getParameterLists().slice(isTypeContext)) {
       for (auto &P : *PL) {
-        checkTypeAccessibility(TC, P.decl->getTypeLoc(), fn,
+        checkTypeAccessibility(TC, P->getTypeLoc(), fn,
                                [&](Accessibility typeAccess,
                                    const TypeRepr *thisComplainRepr) {
           if (!minAccess || *minAccess > typeAccess) {
@@ -3912,7 +3912,7 @@ public:
         if (FD->isObservingAccessor() || (FD->isSetter() && FD->isImplicit())) {
           unsigned firstParamIdx = FD->getParent()->isTypeContext();
           auto *firstParamPattern = FD->getParameterList(firstParamIdx);
-          firstParamPattern->get(0).decl->getTypeLoc().setType(valueTy, true);
+          firstParamPattern->get(0)->getTypeLoc().setType(valueTy, true);
         } else if (FD->isGetter() && FD->isImplicit()) {
           FD->getBodyResultTypeLoc().setType(valueTy, true);
         }
@@ -4073,23 +4073,22 @@ public:
         // closure. We look at the type sugar directly, so that one can
         // suppress this warning by adding parentheses.
         auto &param = paramList->get(i-1);
-        auto paramType = param.decl->getType();
+        auto paramType = param->getType();
 
         if (auto *funcTy = isUnparenthesizedTrailingClosure(paramType)) {
           // If we saw any default arguments before this, complain.
           // This doesn't apply to autoclosures.
           if (anyDefaultArguments && !funcTy->getExtInfo().isAutoClosure()) {
-            TC.diagnose(param.getStartLoc(),
+            TC.diagnose(param->getStartLoc(),
                         diag::non_trailing_closure_before_default_args)
-            .highlight(SourceRange(param.getStartLoc(),
-                                   param.getEndLoc()));
+              .highlight(param->getSourceRange());
           }
 
           break;
         }
 
         // If we have a default argument, keep going.
-        if (param.decl->isDefaultArgument()) {
+        if (param->isDefaultArgument()) {
           anyDefaultArguments = true;
           continue;
         }
@@ -4190,14 +4189,14 @@ public:
     parentTy = parentTy->getResult()->castTo<AnyFunctionType>();
 
     // Check the parameter types.
-    auto checkParam = [&](const Parameter &param, Type parentParamTy) {
-      Type paramTy = param.decl->getType();
+    auto checkParam = [&](const ParamDecl *decl, Type parentParamTy) {
+      Type paramTy = decl->getType();
       if (!paramTy || !paramTy->getImplicitlyUnwrappedOptionalObjectType())
         return;
       if (!parentParamTy || parentParamTy->getAnyOptionalObjectType())
         return;
 
-      TypeLoc TL = param.decl->getTypeLoc();
+      TypeLoc TL = decl->getTypeLoc();
       if (!TL.getTypeRepr())
         return;
 
@@ -4205,7 +4204,7 @@ public:
       if (isa<ParenType>(TL.getType().getPointer()))
         return;
 
-      TC.diagnose(param.getStartLoc(), diag::override_unnecessary_IUO,
+      TC.diagnose(decl->getStartLoc(), diag::override_unnecessary_IUO,
                   method->getDescriptiveKind(), parentParamTy, paramTy)
         .highlight(TL.getSourceRange());
 
@@ -4228,7 +4227,7 @@ public:
     
     if (auto parentTupleInput = parentInput->getAs<TupleType>()) {
       // FIXME: If we ever allow argument reordering, this is incorrect.
-      ArrayRef<Parameter> sharedParams = paramList->getArray();
+      ArrayRef<ParamDecl*> sharedParams = paramList->getArray();
       sharedParams = sharedParams.slice(0, parentTupleInput->getNumElements());
       for_each(sharedParams, parentTupleInput->getElementTypes(), checkParam);
     } else {
@@ -6799,8 +6798,8 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
         auto params = ctor->getParameters();
         
         bool missingInit = false;
-        for (auto &param : *params) {
-          if (!param.hasDefaultValue()) {
+        for (auto param : *params) {
+          if (!param->isDefaultArgument()) {
             missingInit = true;
             break;
           }
@@ -7047,7 +7046,7 @@ void TypeChecker::fixAbstractFunctionNames(InFlightDiagnostic &diag,
     if (origArg == targetArg)
       continue;
     
-    auto *param = params->get(i).decl;
+    auto *param = params->get(i);
     
     // The parameter has an explicitly-specified API name, and it's wrong.
     if (param->getArgumentNameLoc() != param->getLoc() &&

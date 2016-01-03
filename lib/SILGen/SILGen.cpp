@@ -772,8 +772,8 @@ void SILGenModule::emitDefaultArgGenerators(SILDeclRef::Loc decl,
                                         ArrayRef<ParameterList*> paramLists) {
   unsigned index = 0;
   for (auto paramList : paramLists) {
-    for (auto &param : *paramList) {
-      if (auto handle = param.getDefaultValue())
+    for (auto param : *paramList) {
+      if (auto handle = param->getDefaultValue())
         emitDefaultArgGenerator(SILDeclRef::getDefaultArgGenerator(decl, index),
                                 handle->getExpr());
       ++index;

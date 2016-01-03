@@ -146,14 +146,14 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
   Module *M = Context.TheBuiltinModule;
   DeclContext *DC = &M->getMainFile(FileUnitKind::Builtin);
 
-  SmallVector<Parameter, 4> params;
+  SmallVector<ParamDecl*, 4> params;
   for (Type argType : argTypes) {
     auto PD = new (Context) ParamDecl(/*IsLet*/true, SourceLoc(),
                                       Identifier(), SourceLoc(),
                                       Identifier(), argType,
                                       DC);
     PD->setImplicit();
-    params.push_back(Parameter::withoutLoc(PD));
+    params.push_back(PD);
   }
 
   auto *paramList = ParameterList::create(Context, params);
@@ -204,13 +204,13 @@ getBuiltinGenericFunction(Identifier Id,
   Module *M = Context.TheBuiltinModule;
   DeclContext *DC = &M->getMainFile(FileUnitKind::Builtin);
 
-  SmallVector<Parameter, 4> params;
+  SmallVector<ParamDecl*, 4> params;
   for (auto paramType : ArgBodyTypes) {
     auto PD = new (Context) ParamDecl(/*IsLet*/true, SourceLoc(),
                                       Identifier(), SourceLoc(),
                                       Identifier(), paramType, DC);
     PD->setImplicit();
-    params.push_back(Parameter::withoutLoc(PD));
+    params.push_back(PD);
   }
 
   

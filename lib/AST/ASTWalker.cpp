@@ -123,10 +123,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return inherited::visit(PL);
   }
   
-  bool visit(Parameter &P) {
-    return inherited::visit(P);
-  }
-
   //===--------------------------------------------------------------------===//
   //                                 Decls
   //===--------------------------------------------------------------------===//
@@ -845,18 +841,18 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     if (!Walker.walkToParameterListPre(PL))
       return false;
     
-    for (auto &P : *PL) {
+    for (auto P : *PL) {
       // Walk each parameter's decl and typeloc and default value.
-      if (doIt(P.decl))
+      if (doIt(P))
         return true;
       
       // Don't walk into the type if the decl is implicit, or if the type is
       // implicit.
-      if (!P.decl->isImplicit() && !P.decl->isTypeLocImplicit() &&
-          doIt(P.decl->getTypeLoc()))
+      if (!P->isImplicit() && !P->isTypeLocImplicit() &&
+          doIt(P->getTypeLoc()))
         return true;
       
-      if (auto *E = P.getDefaultValue()) {
+      if (auto *E = P->getDefaultValue()) {
         auto res = doIt(E->getExpr());
         if (!res) return true;
         E->setExpr(res, E->alreadyChecked());

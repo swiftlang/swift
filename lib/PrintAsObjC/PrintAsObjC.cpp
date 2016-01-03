@@ -274,7 +274,7 @@ private:
   }
 
   void printSingleMethodParam(StringRef selectorPiece,
-                              const Parameter &param,
+                              const ParamDecl *param,
                               const clang::ParmVarDecl *clangParam,
                               bool isNSUIntegerSubscript,
                               bool isLastPiece) {
@@ -283,14 +283,14 @@ private:
         (clangParam && isNSUInteger(clangParam->getType()))) {
       os << "NSUInteger";
     } else {
-      print(param.decl->getType(), OTK_None);
+      print(param->getType(), OTK_None);
     }
     os << ")";
 
-    if (!param.decl->hasName()) {
+    if (!param->hasName()) {
       os << "_";
     } else {
-      Identifier name = param.decl->getName();
+      Identifier name = param->getName();
       os << name;
       if (isClangKeyword(name))
         os << "_";

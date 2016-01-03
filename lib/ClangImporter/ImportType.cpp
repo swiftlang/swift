@@ -1377,7 +1377,7 @@ importFunctionType(const clang::FunctionDecl *clangDecl,
     return Type();
 
   // Import the parameters.
-  SmallVector<Parameter, 4> parameters;
+  SmallVector<ParamDecl*, 4> parameters;
   unsigned index = 0;
   llvm::SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
   ArrayRef<Identifier> argNames = name.getArgumentNames();
@@ -1442,7 +1442,7 @@ importFunctionType(const clang::FunctionDecl *clangDecl,
       bodyVar->getAttrs().add(
         new (SwiftContext) NoEscapeAttr(/*IsImplicit=*/false));
 
-    parameters.push_back(Parameter::withoutLoc(bodyVar));
+    parameters.push_back(bodyVar);
     ++index;
   }
 
@@ -1451,13 +1451,12 @@ importFunctionType(const clang::FunctionDecl *clangDecl,
     auto paramTy =  BoundGenericType::get(SwiftContext.getArrayDecl(), Type(),
       {SwiftContext.getAnyDecl()->getDeclaredType()});
     auto name = SwiftContext.getIdentifier("varargs");
-    auto bodyVar = new (SwiftContext) ParamDecl(true, SourceLoc(),
+    auto param = new (SwiftContext) ParamDecl(true, SourceLoc(),
                                                 Identifier(),
                                                 SourceLoc(), name, paramTy,
                                                 ImportedHeaderUnit);
 
-    auto param = Parameter::withoutLoc(bodyVar);
-    param.setVariadic();
+    param->setVariadic();
     parameters.push_back(param);
   }
 
@@ -2068,7 +2067,7 @@ Type ClangImporter::Implementation::importMethodType(
   llvm::SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
 
   // Import the parameters.
-  SmallVector<Parameter, 4> swiftParams;
+  SmallVector<ParamDecl*, 4> swiftParams;
 
   auto addEmptyTupleParameter = [&](Identifier argName) {
     // It doesn't actually matter which DeclContext we use, so just
@@ -2078,7 +2077,7 @@ Type ClangImporter::Implementation::importMethodType(
                                             SourceLoc(), argName,
                                             SourceLoc(), argName, type,
                                             ImportedHeaderUnit);
-    swiftParams.push_back(Parameter::withoutLoc(var));
+    swiftParams.push_back(var);
   };
 
   // Determine the number of parameters.
@@ -2198,7 +2197,7 @@ Type ClangImporter::Implementation::importMethodType(
     }
 
     // Set up the parameter info.
-    auto paramInfo = Parameter::withoutLoc(bodyVar);
+    auto paramInfo = bodyVar;
     
     // Determine whether we have a default argument.
     if (InferDefaultArguments &&
@@ -2212,7 +2211,7 @@ Type ClangImporter::Implementation::importMethodType(
                                   param->getType(), optionalityOfParam,
                                   methodName.getBaseName(), numEffectiveParams,
                                   isLastParameter))
-        paramInfo.decl->setDefaultArgumentKind(DefaultArgumentKind::Normal);
+        paramInfo->setDefaultArgumentKind(DefaultArgumentKind::Normal);
     }
     swiftParams.push_back(paramInfo);
   }

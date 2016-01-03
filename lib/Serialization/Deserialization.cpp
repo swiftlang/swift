@@ -285,7 +285,7 @@ ParameterList *ModuleFile::readParameterList() {
   unsigned numParams;
   decls_block::ParameterListLayout::readRecord(scratch, numParams);
 
-  SmallVector<Parameter, 8> params;
+  SmallVector<ParamDecl*, 8> params;
   for (unsigned i = 0; i != numParams; ++i) {
     scratch.clear();
     auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
@@ -300,15 +300,14 @@ ParameterList *ModuleFile::readParameterList() {
                                                     isVariadic, rawDefaultArg);
     
 
-    Parameter result;
-    result.decl = cast<ParamDecl>(getDecl(paramID));
-    result.setVariadic(isVariadic);
+    auto decl = cast<ParamDecl>(getDecl(paramID));
+    decl->setVariadic(isVariadic);
 
     // Decode the default argument kind.
     // FIXME: Default argument expression, if available.
     if (auto defaultArg = getActualDefaultArgKind(rawDefaultArg))
-      result.decl->setDefaultArgumentKind(*defaultArg);
-    params.push_back(result);
+      decl->setDefaultArgumentKind(*defaultArg);
+    params.push_back(decl);
   }
   
   return ParameterList::create(getContext(), params);
@@ -2281,7 +2280,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     auto *bodyParams0 = readParameterList();
     auto *bodyParams1 = readParameterList();
     assert(bodyParams0 && bodyParams1 && "missing parameters for constructor");
-    ctor->setParameterLists(bodyParams0->get(0).decl, bodyParams1);
+    ctor->setParameterLists(bodyParams0->get(0), bodyParams1);
 
     // This must be set after recording the constructor in the map.
     // A polymorphic constructor type needs to refer to the constructor to get
@@ -3097,7 +3096,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     dtor->setAccessibility(cast<ClassDecl>(DC)->getFormalAccess());
     auto *selfParams = readParameterList();
     assert(selfParams && "Didn't get self pattern?");
-    dtor->setSelfDecl(selfParams->get(0).decl);
+    dtor->setSelfDecl(selfParams->get(0));
 
     dtor->setType(getType(signatureID));
     dtor->setInterfaceType(getType(interfaceID));

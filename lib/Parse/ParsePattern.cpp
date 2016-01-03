@@ -307,21 +307,20 @@ mapParsedParameters(Parser &parser,
   auto &ctx = parser.Context;
 
   // Local function to create a pattern for a single parameter.
-  auto createParamPattern = [&](SourceLoc &letVarInOutLoc,
+  auto createParam = [&](SourceLoc &letVarInOutLoc,
                         Parser::ParsedParameter::SpecifierKindTy &specifierKind,
                                 Identifier argName, SourceLoc argNameLoc,
                                 Identifier paramName, SourceLoc paramNameLoc,
                                 TypeRepr *type,
-                                const DeclAttributes &Attrs) -> Parameter {
-    Parameter param;
+                                const DeclAttributes &Attrs) -> ParamDecl * {
     bool isLet = specifierKind == Parser::ParsedParameter::Let;
-    param.decl = new (ctx) ParamDecl(isLet, argNameLoc, argName,
+    auto param = new (ctx) ParamDecl(isLet, argNameLoc, argName,
                                      paramNameLoc, paramName, Type(),
                                      parser.CurDeclContext);
-    param.decl->getAttrs() = Attrs;
+    param->getAttrs() = Attrs;
     
     if (argNameLoc.isInvalid() && paramNameLoc.isInvalid())
-      param.decl->setImplicit();
+      param->setImplicit();
     
     // If a type was provided, create the typed pattern.
     if (type) {
@@ -329,7 +328,7 @@ mapParsedParameters(Parser &parser,
       if (specifierKind == Parser::ParsedParameter::InOut)
         type = new (ctx) InOutTypeRepr(type, letVarInOutLoc);
 
-      param.decl->getTypeLoc() = TypeLoc(type);
+      param->getTypeLoc() = TypeLoc(type);
     } else if (specifierKind == Parser::ParsedParameter::InOut) {
       parser.diagnose(letVarInOutLoc, diag::inout_must_have_type);
       letVarInOutLoc = SourceLoc();
@@ -340,7 +339,7 @@ mapParsedParameters(Parser &parser,
 
   // Collect the elements of the tuple patterns for argument and body
   // parameters.
-  SmallVector<Parameter, 4> elements;
+  SmallVector<ParamDecl*, 4> elements;
   SourceLoc ellipsisLoc;
   bool isFirstParameter = true;
   for (auto &param : params) {
@@ -368,7 +367,7 @@ mapParsedParameters(Parser &parser,
     }
 
     // Create the pattern.
-    Parameter result;
+    ParamDecl *result = nullptr;
     Identifier argName;
     Identifier paramName;
     if (param.SecondNameLoc.isValid()) {
@@ -376,10 +375,10 @@ mapParsedParameters(Parser &parser,
       paramName = param.SecondName;
 
       // Both names were provided, so pass them in directly.
-      result = createParamPattern(param.LetVarInOutLoc, param.SpecifierKind,
-                                   argName, param.FirstNameLoc,
-                                   paramName, param.SecondNameLoc,
-                                   param.Type, param.Attrs);
+      result = createParam(param.LetVarInOutLoc, param.SpecifierKind,
+                           argName, param.FirstNameLoc,
+                           paramName, param.SecondNameLoc,
+                           param.Type, param.Attrs);
 
       // If the first name is empty and this parameter would not have been
       // an API name by default, complain.
@@ -406,10 +405,10 @@ mapParsedParameters(Parser &parser,
         argName = param.FirstName;
       paramName = param.FirstName;
 
-      result = createParamPattern(param.LetVarInOutLoc, param.SpecifierKind,
-                                  argName, SourceLoc(),
-                                  param.FirstName, param.FirstNameLoc,
-                                  param.Type, param.Attrs);
+      result = createParam(param.LetVarInOutLoc, param.SpecifierKind,
+                           argName, SourceLoc(),
+                           param.FirstName, param.FirstNameLoc,
+                           param.Type, param.Attrs);
     }
 
     // If this parameter had an ellipsis, check whether it's the last parameter.
@@ -420,14 +419,14 @@ mapParsedParameters(Parser &parser,
           .fixItRemove(param.EllipsisLoc);
 
         param.EllipsisLoc = SourceLoc();
-      } else if (!result.decl->getTypeLoc().getTypeRepr()) {
+      } else if (!result->getTypeLoc().getTypeRepr()) {
         parser.diagnose(param.EllipsisLoc, diag::untyped_pattern_ellipsis)
-          .highlight(result.getSourceRange());
+          .highlight(result->getSourceRange());
 
         param.EllipsisLoc = SourceLoc();
       } else {
         ellipsisLoc = param.EllipsisLoc;
-        result.setVariadic();
+        result->setVariadic();
       }
     }
 
@@ -438,8 +437,8 @@ mapParsedParameters(Parser &parser,
           .fixItRemove(SourceRange(param.EqualLoc,
                                    param.DefaultArg->getExpr()->getEndLoc()));
       } else {
-        result.decl->setDefaultArgumentKind(getDefaultArgKind(param.DefaultArg));
-        result.setDefaultValue(param.DefaultArg);
+        result->setDefaultArgumentKind(getDefaultArgKind(param.DefaultArg));
+        result->setDefaultValue(param.DefaultArg);
       }
     }
 

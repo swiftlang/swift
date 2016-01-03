@@ -374,18 +374,18 @@ static Type getTypeAtIndex(const ParameterList *params, size_t index) {
     return nullptr;
 
   if (index < params->size()) {
-    auto &param = params->get(index);
-    if (param.isVariadic())
-      return param.getVarargBaseTy();
+    auto param = params->get(index);
+    if (param->isVariadic())
+      return param->getVarargBaseTy();
   
-    return param.decl->getType();
+    return param->getType();
   }
   
   /// FIXME: This looks completely wrong for varargs within a parameter list.
   if (params->size() != 0) {
     auto lastParam = params->getArray().back();
-    if (lastParam.isVariadic())
-      return lastParam.getVarargBaseTy();
+    if (lastParam->isVariadic())
+      return lastParam->getVarargBaseTy();
   }
   
   return nullptr;
@@ -474,8 +474,8 @@ static unsigned countDefaultArguments(AbstractFunctionDecl *func) {
   auto paramList = func->getParameterList(func->getImplicitSelfDecl() != 0);
 
   unsigned count = 0;
-  for (const auto &elt : *paramList) {
-    if (elt.decl->isDefaultArgument())
+  for (auto elt : *paramList) {
+    if (elt->isDefaultArgument())
       ++count;
   }
 

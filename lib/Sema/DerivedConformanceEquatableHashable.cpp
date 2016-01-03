@@ -129,8 +129,8 @@ static void deriveBodyEquatable_enum_eq(AbstractFunctionDecl *eqDecl) {
   ASTContext &C = parentDC->getASTContext();
 
   auto args = eqDecl->getParameterLists().back();
-  auto aParam = args->get(0).decl;
-  auto bParam = args->get(1).decl;
+  auto aParam = args->get(0);
+  auto bParam = args->get(1);
 
   CanType boolTy = C.getBoolDecl()->getDeclaredType().getCanonicalTypeOrNull();
 
@@ -201,8 +201,8 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
   };
   
   auto params = ParameterList::create(C, {
-    Parameter::withoutLoc(getParamDecl("a")),
-    Parameter::withoutLoc(getParamDecl("b"))
+    getParamDecl("a"),
+    getParamDecl("b")
   });
   
   auto genericParams = parentDC->getGenericParamsOfContext();
