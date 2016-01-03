@@ -14,6 +14,7 @@ set(UTILITYPASSES_SOURCES
   UtilityPasses/LoopRegionPrinter.cpp
   UtilityPasses/LSLocationPrinter.cpp
   UtilityPasses/MemBehaviorDumper.cpp
+  UtilityPasses/RCIdentityDumper.cpp
   UtilityPasses/SideEffectsDumper.cpp
   UtilityPasses/StripDebugInfo.cpp
   PARENT_SCOPE)

@@ -157,6 +157,8 @@ PASS(MergeCondFails, "merge-cond_fails",
      "Remove redundant overflow checks")
 PASS(NoReturnFolding, "noreturn-folding",
      "Add 'unreachable' after noreturn calls")
+PASS(RCIdentityDumper, "rc-id-dumper",
+     "Dump the RCIdentity of all values in a function")
 // TODO: It makes no sense to have early inliner, late inliner, and
 // perf inliner in terms of names.
 PASS(PerfInliner, "inline",
