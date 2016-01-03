@@ -100,7 +100,8 @@ buildIndexForwardingParamList(AbstractStorageDecl *storage,
     return ParameterList::create(context, prefix);
 
   // Clone the parameter list over for a new decl, so we get new ParamDecls.
-  auto indices = subscript->getIndices()->clone(context);
+  auto indices = subscript->getIndices()->clone(context,
+                                                ParameterList::Implicit);
   if (prefix.empty())
     return indices;
   
