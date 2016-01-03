@@ -147,6 +147,8 @@ StartMatch:
 /// insert them into the string builder \p SB.
 static void DecodeFixedWidth(APInt &Num, std::string &SB) {
   uint64_t CL = Huffman::CharsetLength;
+  assert(Num.getBitWidth() > 8 &&
+         "Not enough bits for arithmetic on this alphabet");
 
   // Try to decode eight numbers at once. It is much faster to work with
   // local 64bit numbers than working with APInt. In this loop we try to
@@ -177,7 +179,6 @@ static void DecodeFixedWidth(APInt &Num, std::string &SB) {
   // Pop characters out of the APInt one by one.
   while (Num.getBoolValue()) {
     unsigned BW = Num.getBitWidth();
-    assert(BW > 8 && "Num too small for arithmetic on CharsetLength");
 
     APInt C = APInt(BW, CL);
     APInt Quotient(1, 0), Remainder(1, 0);
@@ -205,7 +206,7 @@ swift::Compress::EncodeStringAsNumber(StringRef In, EncodingKind Kind) {
   // Allocate enough space for the first character plus one bit which is the
   // stop bit for variable length encoding.
   unsigned BW = (1 + Huffman::LongestEncodingLength);
-    APInt num = APInt(BW, 0);
+  APInt num = APInt(BW, 0);
 
   // We set the high bit to zero in order to support encoding
   // of chars that start with zero (for variable length encoding).
@@ -213,23 +214,59 @@ swift::Compress::EncodeStringAsNumber(StringRef In, EncodingKind Kind) {
     num = ++num;
   }
 
-  // Append the characters in the string in reverse. This will allow
-  // us to decode by appending to a string and not prepending.
+  // Encode variable-length strings.
+  if (Kind == EncodingKind::Variable) {
+    size_t num_bits = 0;
+    size_t bits = 0;
+
+    // Append the characters in the string in reverse. This will allow
+    // us to decode by appending to a string and not prepending.
+    for (int i = In.size() - 1; i >= 0; i--) {
+      char ch = In[i];
+
+      // The local variables 'bits' and 'num_bits' are used as a small
+      // bitstream. Keep accumulating bits into them until they overflow.
+      // At that point move them into the APInt.
+      uint64_t local_bits;
+      uint64_t local_num_bits;
+      // Find the huffman encoding of the character.
+      Huffman::variable_encode(local_bits, local_num_bits, ch);
+      // Add the encoded character into our bitstream.
+      num_bits += local_num_bits;
+      bits = (bits << local_num_bits) + local_bits;
+
+      // Check if there is enough room for another word. If not, flush
+      // the local bitstream into the APInt.
+      if (num_bits >= (64 - Huffman::LongestEncodingLength)) {
+        // Make room for the new bits and add the bits.
+        num = num.zext(num.getBitWidth() + num_bits);
+        num = num.shl(num_bits); num = num + bits;
+        num_bits = 0; bits = 0;
+      }
+    }
+
+    // Flush the local bitstream into the APInt number.
+    if (num_bits) {
+      num = num.zext(num.getBitWidth() + num_bits);
+      num = num.shl(num_bits); num = num + bits;
+      num_bits = 0; bits = 0;
+    }
+
+    // Make sure that we have a minimal word size to be able to perform
+    // calculations on our alphabet.
+    return num.zextOrSelf(std::max(64u, num.getBitWidth()));
+  }
+
+  // Encode fixed width strings.
   for (int i = In.size() - 1; i >= 0; i--) {
     char ch = In[i];
-
-    // Extend the number and create enough room for encoding another
-    // character.
-    num = num.zextOrTrunc(num.getActiveBits() + Huffman::LongestEncodingLength);
-
-    if (Kind == EncodingKind::Variable) {
-      Huffman::variable_encode(num, ch);
-    } else  {
-      EncodeFixedWidth(num, ch);
-    }
+    // Extend the number and create room for encoding another character.
+    unsigned MinBits = num.getActiveBits() + Huffman::LongestEncodingLength;
+    num = num.zextOrTrunc(std::max(64u, MinBits));
+    EncodeFixedWidth(num, ch);
   }
-  return num;
 
+  return num;
 }
 
 std::string swift::Compress::DecodeStringFromNumber(const APInt &In,

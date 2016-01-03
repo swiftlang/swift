@@ -79,9 +79,9 @@ class Node:
       # is much faster than inserting one bit at a time.
       numeric_val = 0
       for bit in reversed(stack): numeric_val = numeric_val * 2 + bit
-      # Shift the value to make room in the bitstream and then add the numeric
-      # value that represents the sequence of bits that we need to add.
-      sb += "num = num.shl(%d) + %d; " % (len(stack), numeric_val)
+      # num_bits - the number of bits that we use in the bitstream.
+      # bits - the numeric value of the bits that we encode in the bitstream.
+      sb += "bits = %d; num_bits = %d; " % (numeric_val, len(stack))
       sb += "return; }\n"
       return sb
     sb = ""
@@ -120,7 +120,7 @@ print "unsigned CharsetLength = %d;" % len(charset)
 print "unsigned LongestEncodingLength = %d;" % (nodes[0].getMaxEncodingLength())
 print "const char *Charset = \"%s\";" % charset
 print "char variable_decode(APInt &num) {\n uint64_t tailbits = *num.getRawData();\n", nodes[0].generate_decoder(0), "\n assert(false); return 0;\n}"
-print "void variable_encode(APInt &num, char ch) {\n", nodes[0].generate_encoder([]),"assert(false);\n}"
+print "void variable_encode(uint64_t &bits, uint64_t &num_bits, char ch) {\n", nodes[0].generate_encoder([]),"assert(false);\n}"
 print "} // namespace"
 print "#endif /* SWIFT_MANGLER_HUFFMAN_H */"
 
