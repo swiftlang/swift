@@ -1906,10 +1906,7 @@ static bool _dynamicCastToExistentialMetatype(OpaqueValue *dest,
   case MetadataKind::Opaque:
   case MetadataKind::Struct:
   case MetadataKind::Tuple:
-    if (flags & DynamicCastFlags::Unconditional) {
-      swift_dynamicCastFailure(srcType, targetType);
-    }
-    return false;
+    return _fail(src, srcType, targetType, flags);
   }
   _failCorruptType(srcType);
 }
