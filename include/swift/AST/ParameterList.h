@@ -1,4 +1,4 @@
-//===--- Parameter.h - Functions & closures parameters ----------*- C++ -*-===//
+//===--- ParameterList.h - Functions & closures parameter lists -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,13 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the Parameter class, the ParameterList class and support
-// logic.
+// This file defines the ParameterList class and support logic.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_AST_PARAMETER_H
-#define SWIFT_AST_PARAMETER_H
+#ifndef SWIFT_AST_PARAMETERLIST_H
+#define SWIFT_AST_PARAMETERLIST_H
 
 #include "swift/AST/Decl.h"
 #include "swift/Basic/OptionSet.h"
