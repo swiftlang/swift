@@ -2045,22 +2045,13 @@ static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
 
   // String'ify the parameter types.
   SmallVector<OmissionTypeName, 4> paramTypes;
-  Type functionType = afd->getInterfaceType();
-  Type argumentType;
-  for (unsigned i = 0, n = afd->getNaturalArgumentCount()-1; i != n; ++i)
-    functionType = functionType->getAs<AnyFunctionType>()->getResult();
-  argumentType = functionType->getAs<AnyFunctionType>()->getInput();
-  if (auto tupleTy = argumentType->getAs<TupleType>()) {
-    if (tupleTy->getNumElements() == argNameStrs.size()) {
-      for (const auto &elt : tupleTy->getElements())
-        paramTypes.push_back(getTypeNameForOmission(elt.getType())
-                               .withDefaultArgument(elt.hasDefaultArg()));
-    }
+
+  // Always look at the parameters in the last parameter list.
+  for (auto &param : *afd->getParameterLists().back()) {
+    paramTypes.push_back(getTypeNameForOmission(param.decl->getType())
+                         .withDefaultArgument(param.decl->isDefaultArgument()));
   }
-
-  if (argNameStrs.size() == 1 && paramTypes.empty())
-    paramTypes.push_back(getTypeNameForOmission(argumentType));
-
+  
   // Handle contextual type, result type, and returnsSelf.
   Type contextType = afd->getDeclContext()->getDeclaredInterfaceType();
   Type resultType;
