@@ -21,7 +21,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/Parameter.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/TypeWalker.h"

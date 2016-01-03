@@ -22,7 +22,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/Parameter.h"
+#include "swift/AST/ParameterList.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 using namespace swift;

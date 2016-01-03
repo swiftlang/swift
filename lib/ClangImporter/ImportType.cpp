@@ -23,7 +23,7 @@
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/Parameter.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Token.h"

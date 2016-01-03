@@ -23,7 +23,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/Parameter.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"

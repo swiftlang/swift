@@ -22,7 +22,7 @@
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/Parameter.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Fallthrough.h"
 #include "llvm/Support/MemoryBuffer.h"

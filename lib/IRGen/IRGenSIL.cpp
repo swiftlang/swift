@@ -31,7 +31,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Pattern.h"
-#include "swift/AST/Parameter.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"

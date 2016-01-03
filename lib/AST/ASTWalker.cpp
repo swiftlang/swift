@@ -56,7 +56,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ExprHandle.h"
-#include "swift/AST/Parameter.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 using namespace swift;
 

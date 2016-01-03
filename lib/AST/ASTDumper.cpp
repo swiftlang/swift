@@ -19,7 +19,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ForeignErrorConvention.h"
-#include "swift/AST/Parameter.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/APFloat.h"

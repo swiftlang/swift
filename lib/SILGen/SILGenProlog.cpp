@@ -15,7 +15,7 @@
 #include "ManagedValue.h"
 #include "Scope.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/AST/Parameter.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/Basic/Fallthrough.h"
 
 using namespace swift;

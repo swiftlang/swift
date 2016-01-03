@@ -15,7 +15,7 @@
 #include "Scope.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ForeignErrorConvention.h"
-#include "swift/AST/Parameter.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"

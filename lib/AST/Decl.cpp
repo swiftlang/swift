@@ -25,7 +25,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Mangle.h"
-#include "swift/AST/Parameter.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeLoc.h"
 #include "clang/Lex/MacroInfo.h"
 #include "llvm/ADT/SmallString.h"
