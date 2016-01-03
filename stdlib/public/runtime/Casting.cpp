@@ -469,9 +469,14 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
 
 /// A convenient method for failing out of a dynamic cast.
 static bool _fail(OpaqueValue *srcValue, const Metadata *srcType,
-                  const Metadata *targetType, DynamicCastFlags flags) {
-  if (flags & DynamicCastFlags::Unconditional)
-    swift_dynamicCastFailure(srcType, targetType);
+                  const Metadata *targetType, DynamicCastFlags flags,
+                  const Metadata *srcDynamicType = nullptr) {
+  if (flags & DynamicCastFlags::Unconditional) {
+    const Metadata *srcTypeToReport =
+        srcDynamicType ? srcDynamicType
+                       : srcType;
+    swift_dynamicCastFailure(srcTypeToReport, targetType);
+  }
   if (flags & DynamicCastFlags::DestroyOnFailure)
     srcType->vw_destroy(srcValue);
   return false;
@@ -986,7 +991,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
     if (!_conformsToProtocols(srcDynamicValue, srcDynamicType,
                               targetType->Protocols,
                               destExistential->getWitnessTables())) {
-      return _fail(srcDynamicValue, srcDynamicType, targetType, flags);
+      return _fail(src, srcType, targetType, flags, srcDynamicType);
     }
 
     auto object = *(reinterpret_cast<HeapObject**>(srcDynamicValue));
@@ -1005,7 +1010,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
     if (!_conformsToProtocols(srcDynamicValue, srcDynamicType,
                               targetType->Protocols,
                               destExistential->getWitnessTables()))
-      return _fail(srcDynamicValue, srcDynamicType, targetType, flags);
+      return _fail(src, srcType, targetType, flags, srcDynamicType);
 
     // Fill in the type and value.
     destExistential->Type = srcDynamicType;
@@ -1029,7 +1034,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
     if (!_conformsToProtocols(srcDynamicValue, srcDynamicType,
                               targetType->Protocols,
                               &errorWitness))
-      return _fail(srcDynamicValue, srcDynamicType, targetType, flags);
+      return _fail(src, srcType, targetType, flags, srcDynamicType);
     
     BoxPair destBox = swift_allocError(srcDynamicType, errorWitness,
                                        srcDynamicValue,

@@ -54,4 +54,23 @@ CastsTests.test("No leak for failed tuple casts") {
     expectTrue(deinitRan)
 }
 
+protocol P {}
+class ErrClass : ErrorType { }
+
+CastsTests.test("No overrelease of existential boxes in failed casts") {
+    // Test for crash from SR-392
+    // We fail casts of an existential box repeatedly
+    // to ensure it does not get over-released.
+    func bar<T>(t: T) {
+        for i in 0..<10 {
+            if case let a as P = t {
+                _ = a
+            }
+        }
+    }
+    
+    let err: ErrorType = ErrClass()
+    bar(err)
+}
+
 runAllTests()
