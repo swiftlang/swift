@@ -4,7 +4,6 @@
 
 sil_stage canonical
 
-import Swift
 import Builtin
 
 // Utilities
@@ -37,8 +36,14 @@ class Cls {
   init()
 }
 
+public enum FakeOptional<T> {
+  case None
+  case Some(T)
+}
+
 class C {
-  var w : Optional<Builtin.NativeObject>
+  init()
+  var w : FakeOptional<Builtin.NativeObject>
 }
 
 class Container {
@@ -49,16 +54,35 @@ class Container {
 
 class RetainUser { }
 
-sil @rawpointer_use: $@convention(thin) (Builtin.RawPointer) -> Bool
-
-enum FakeOptional<T> {
-  case None
-  case Some(T)
-}
+sil @rawpointer_use: $@convention(thin) (Builtin.RawPointer) -> ()
 
 enum Either<LTy, RTy> {
   case Left(LTy)
   case Right(RTy)
+}
+
+struct StaticString {
+  /// Either a pointer to the start of UTF-8 data, or an integer representation
+  /// of a single Unicode scalar.
+  var _startPtrOrData: Builtin.RawPointer
+
+  /// If `_startPtrOrData` is a pointer, contains the length of the UTF-8 data
+  /// in bytes.
+  var _byteSize: Builtin.Word
+
+  /// Extra flags:
+  ///
+  /// - bit 0: set to 0 if `_startPtrOrData` is a pointer, or to 1 if it is a
+  ///   Unicode scalar.
+  ///
+  /// - bit 1: set to 1 if `_startPtrOrData` is a pointer and string data is
+  ///   ASCII.
+  var _flags: Builtin.Int8
+}
+
+public protocol ErrorType {
+  var _domain: Builtin.Int32 { get }
+  var _code: Builtin.Int32 { get }
 }
 
 sil [fragile] @guaranteed_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()

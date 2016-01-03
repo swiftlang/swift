@@ -1,13 +1,16 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -arc-sequence-opts -enable-loop-arc=0 %s | FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all -arc-sequence-opts -enable-loop-arc=1 %s | FileCheck %s
-
-// This file is separate from the normal ARC optimizer tests to make
-// it easy to remove when layout compatible types are removed.
+// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -arc-sequence-opts -enable-loop-arc=0 %s | FileCheck %s
+// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -arc-sequence-opts -enable-loop-arc=1 %s | FileCheck %s
 
 import Builtin
-import Swift
 
-class C {}
+public enum Optional<T> {
+  case None
+  case Some(T)
+}
+
+class C {
+  init()
+}
 
 // Simple test that stripping works.
 // CHECK-LABEL: sil @test1 : $@convention(thin) (C) -> () {

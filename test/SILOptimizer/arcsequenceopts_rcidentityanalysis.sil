@@ -3,7 +3,6 @@
 
 sil_stage canonical
 
-import Swift
 import Builtin
 
 // Utilities
@@ -34,18 +33,22 @@ class Cls {
   init()
 }
 
+public enum FakeOptional<T> {
+  case None
+  case Some(T)
+}
+
+public protocol AnyObject : class {}
+
 class C {
-  var w : Optional<Builtin.NativeObject>
+  init()
+  var w : FakeOptional<Builtin.NativeObject>
 }
 
 class RetainUser { }
 
-sil @rawpointer_use: $@convention(thin) (Builtin.RawPointer) -> Bool
+sil @rawpointer_use: $@convention(thin) (Builtin.RawPointer) -> ()
 
-enum FakeOptional<T> {
-  case None
-  case Some(T)
-}
 sil @fakeoptional_user : $@convention(thin) (FakeOptional<Builtin.NativeObject>) -> ()
 
 enum Either<LTy, RTy> {
