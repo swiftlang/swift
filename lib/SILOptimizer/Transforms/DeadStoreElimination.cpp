@@ -112,20 +112,6 @@ static inline bool isPerformingDSE(DSEKind Kind) {
   return Kind == DSEKind::PerformDSE;
 }
 
-/// Return true if all basic blocks will have their successors processed if
-/// the basic blocks in the functions are iterated in post order.
-static bool isOneIterationFunction(PostOrderFunctionInfo *PO) {
-  llvm::DenseSet<SILBasicBlock *> HandledBBs;
-  for (SILBasicBlock *B : PO->getPostOrder()) {
-    for (auto &X : B->getSuccessors()) {
-      if (HandledBBs.find(X) == HandledBBs.end())
-        return false;
-    }
-    HandledBBs.insert(B);
-  }
-  return true;
-}
-
 /// Returns true if this is an instruction that may have side effects in a
 /// general sense but are inert from a load store perspective.
 static bool isDeadStoreInertInstruction(SILInstruction *Inst) {
@@ -152,6 +138,10 @@ namespace {
 
 // If there are too many locations in the function, we bail out.
 constexpr unsigned MaxLSLocationLimit = 2048;
+
+constexpr unsigned MaxOneIterationFunctionBBLimit = 32;
+
+constexpr unsigned MaxOneIterationFunctionLSLocationLimit = 64;
 
 /// If a large store is broken down to too many smaller stores, bail out.
 /// Currently, we only do partial dead store if we can form a single contiguous
@@ -423,6 +413,10 @@ public:
   /// Returns the location vault of the current function.
   std::vector<LSLocation> &getLocationVault() { return LocationVault; }
 
+  /// Use a set of adhoc rules to tell whether we should run a pessimistic
+  /// one iteration data flow on the function.
+  bool isOneIterationFunction();
+
   /// Compute the kill set for the basic block. return true if the store set
   /// changes.
   void processBasicBlockForDSE(SILBasicBlock *BB, bool OneIterationFunction);
@@ -502,6 +496,42 @@ unsigned DSEContext::getLocationBit(const LSLocation &Loc) {
   auto Iter = LocToBitIndex.find(Loc);
   assert(Iter != LocToBitIndex.end() && "LSLocation should have been enum'ed");
   return Iter->second;
+}
+
+bool DSEContext::isOneIterationFunction() {
+  bool RunOneIteration = true;
+  unsigned BBCount = 0;
+
+  // If all basic blocks will have their successors processed if
+  // the basic blocks in the functions are iterated in post order.
+  // Then this function can be processed in one iteration, i.e. no
+  // need to generate the genset and killset.
+  auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
+  llvm::DenseSet<SILBasicBlock *> HandledBBs;
+  for (SILBasicBlock *B : PO->getPostOrder()) {
+    ++BBCount;
+    for (auto &X : B->getSuccessors()) {
+      if (HandledBBs.find(X) == HandledBBs.end()) {
+        RunOneIteration = false;
+        break;
+      }
+    }
+    HandledBBs.insert(B);
+  }
+
+  // If this function has too many basic blocks or too many locations, it may
+  // take a long time to compute the genset and killset. The number of memory
+  // behavior or alias query we need to do in worst case is roughly linear to
+  // # of BBs x(times) # of locations.
+  //
+  // Instead, we run one pessimistic data flow to do dead store elimination on
+  // the function.
+  if (BBCount > MaxOneIterationFunctionBBLimit)
+    RunOneIteration = true;
+  if (LocationVault.size() > MaxOneIterationFunctionLSLocationLimit)
+    RunOneIteration = true;
+
+  return RunOneIteration;
 }
 
 void DSEContext::processBasicBlockForGenKillSet(SILBasicBlock *BB) {
@@ -1033,12 +1063,15 @@ bool DSEContext::run() {
   // Is this a one iteration function.
   auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
 
-  // Do we really need to run the iterative data flow on the function.
-  bool OneIterationFunction = isOneIterationFunction(PO);
-
   // Walk over the function and find all the locations accessed by
   // this function.
   LSLocation::enumerateLSLocations(*F, LocationVault, LocToBitIndex, TE);
+
+  // Do we really need to run the iterative data flow on the function.
+  //
+  // Alos check whether this function meets other criteria for pessimistic
+  // one iteration data flow.
+  bool OneIterationFunction = isOneIterationFunction();
 
   // Data flow may take too long to converge.
   if (LocationVault.size() > MaxLSLocationLimit)
