@@ -413,7 +413,7 @@ public:
   /// Returns the location vault of the current function.
   std::vector<LSLocation> &getLocationVault() { return LocationVault; }
 
-  /// Use a set of adhoc rules to tell whether we should run a pessimistic
+  /// Use a set of ad hoc rules to tell whether we should run a pessimistic
   /// one iteration data flow on the function.
   bool isOneIterationFunction();
 
@@ -1069,7 +1069,7 @@ bool DSEContext::run() {
 
   // Do we really need to run the iterative data flow on the function.
   //
-  // Alos check whether this function meets other criteria for pessimistic
+  // Also check whether this function meets other criteria for pessimistic
   // one iteration data flow.
   bool OneIterationFunction = isOneIterationFunction();
 
