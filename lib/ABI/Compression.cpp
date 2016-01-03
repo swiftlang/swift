@@ -143,23 +143,48 @@ StartMatch:
   return SB;
 }
 
-/// Extract a single character from the number \p Num.
-static char DecodeFixedWidth(APInt &Num) {
-  unsigned BW = Num.getBitWidth();
-  assert(BW > 8 && "Num too small for arithmetic on CharsetLength");
+/// Extract all of the characters from the number \p Num one by one and
+/// insert them into the string builder \p SB.
+static void DecodeFixedWidth(APInt &Num, std::string &SB) {
+  uint64_t CL = Huffman::CharsetLength;
 
-  /// This is the number of characters in our alphabet.
-  APInt C = APInt(BW, Huffman::CharsetLength);
+  // Try to decode eight numbers at once. It is much faster to work with
+  // local 64bit numbers than working with APInt. In this loop we try to
+  // extract 8 characters at one and process them using a local 64bit number.
+  // In this code we assume a worse case scenario where our alphabet is a full
+  // 8-bit ascii. It is possible to improve this code by packing one or two
+  // more characters into the 64bit local variable.
+  uint64_t CL8 = CL * CL * CL * CL * CL * CL * CL * CL;
+  while (Num.ugt(CL8)) {
+    unsigned BW = Num.getBitWidth();
+    APInt C = APInt(BW, CL8);
+    APInt Quotient(1, 0), Remainder(1, 0);
+    APInt::udivrem(Num, C, Quotient, Remainder);
 
-  APInt Quotient(1, 0), Remainder(1, 0);
-  APInt::udivrem(Num, C, Quotient, Remainder);
-  // Try to reduce the bitwidth of the API after the division. This can
-  // accelerate the division operation in future iterations because the
-  // number becomes smaller (fewer bits) with each iteration. However,
-  // We can't reduce the number to something too small because we still
-  // need to be able to perform the "mod charset_length" operation.
-  Num = Quotient.zextOrTrunc(std::max(Quotient.getActiveBits(), 64u));
-  return Huffman::Charset[Remainder.getZExtValue()];
+    // Try to reduce the bitwidth of the API after the division. This can
+    // accelerate the division operation in future iterations because the
+    // number becomes smaller (fewer bits) with each iteration. However,
+    // We can't reduce the number to something too small because we still
+    // need to be able to perform the "mod charset_length" operation.
+    Num = Quotient.zextOrTrunc(std::max(Quotient.getActiveBits(), 64u));
+    uint64_t Tail = Remainder.getZExtValue();
+    for (int i=0; i < 8; i++) {
+      SB += Huffman::Charset[Tail % CL];
+      Tail = Tail / CL;
+    }
+  }
+
+  // Pop characters out of the APInt one by one.
+  while (Num.getBoolValue()) {
+    unsigned BW = Num.getBitWidth();
+    assert(BW > 8 && "Num too small for arithmetic on CharsetLength");
+
+    APInt C = APInt(BW, CL);
+    APInt Quotient(1, 0), Remainder(1, 0);
+    APInt::udivrem(Num, C, Quotient, Remainder);
+    Num = Quotient;
+    SB += Huffman::Charset[Remainder.getZExtValue()];
+  }
 }
 
 static void EncodeFixedWidth(APInt &num, char ch) {
@@ -219,10 +244,8 @@ std::string swift::Compress::DecodeStringFromNumber(const APInt &In,
     }
   } else {
     // Decode this number as a regular fixed-width sequence of characters.
-    while (num.getBoolValue()) {
-      sb += DecodeFixedWidth(num);
-    }
-  }
+    DecodeFixedWidth(num, sb);
+ }
 
   return sb;
 }
