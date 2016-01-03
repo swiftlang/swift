@@ -202,7 +202,8 @@ static void EncodeFixedWidth(APInt &num, char ch) {
 
 APInt
 swift::Compress::EncodeStringAsNumber(StringRef In, EncodingKind Kind) {
-  // Allocate enough space for the first word plus
+  // Allocate enough space for the first character plus one bit which is the
+  // stop bit for variable length encoding.
   unsigned BW = (1 + Huffman::LongestEncodingLength);
     APInt num = APInt(BW, 0);
 
