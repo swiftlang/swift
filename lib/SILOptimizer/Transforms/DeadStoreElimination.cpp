@@ -150,6 +150,9 @@ static bool isDeadStoreInertInstruction(SILInstruction *Inst) {
 
 namespace {
 
+// If there are too many locations in the function, we bail out.
+constexpr unsigned MaxLSLocationLimit = 2048;
+
 /// If a large store is broken down to too many smaller stores, bail out.
 /// Currently, we only do partial dead store if we can form a single contiguous
 /// non-dead store.
@@ -1036,6 +1039,10 @@ bool DSEContext::run() {
   // Walk over the function and find all the locations accessed by
   // this function.
   LSLocation::enumerateLSLocations(*F, LocationVault, LocToBitIndex, TE);
+
+  // Data flow may take too long to converge.
+  if (LocationVault.size() > MaxLSLocationLimit)
+    return false;
 
   // For all basic blocks in the function, initialize a BB state.
   //
