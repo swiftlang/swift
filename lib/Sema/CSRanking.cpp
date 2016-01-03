@@ -452,7 +452,7 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
   llvm::DenseMap<CanType, TypeVariableType *> replacements;
   cs.openGeneric(dc2, sig2->getGenericParams(), sig2->getRequirements(),
                  false, dc2->getGenericTypeContextDepth(),
-                 nullptr, ConstraintLocatorBuilder(nullptr),
+                 ConstraintLocatorBuilder(nullptr),
                  replacements);
 
   // Bind the 'Self' type from the first extension to the type parameter from
