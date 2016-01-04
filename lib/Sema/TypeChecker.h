@@ -1225,7 +1225,7 @@ public:
   /// contextual type.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool coerceParameterListToType(ParameterList *P, DeclContext *dc, Type type);
+  bool coerceParameterListToType(ClosureExpr *CE, AnyFunctionType *closureType);
 
   
   /// Type-check an initialized variable pattern declaration.

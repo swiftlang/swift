@@ -5667,8 +5667,7 @@ namespace {
 
         // Coerce the pattern, in case we resolved something.
         auto fnType = closure->getType()->castTo<FunctionType>();
-        auto *params = closure->getParameters();
-        if (tc.coerceParameterListToType(params, closure, fnType->getInput()))
+        if (tc.coerceParameterListToType(closure, fnType))
           return { false, nullptr };
 
         // If this is a single-expression closure, convert the expression

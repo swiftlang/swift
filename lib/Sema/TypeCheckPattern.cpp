@@ -1548,11 +1548,11 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
 ///
 /// \returns true if an error occurred, false otherwise.
 ///
-/// TODO: These diagnostics should be a lot better now that we know this is
-/// all specific to closures.
-///
-bool TypeChecker::coerceParameterListToType(ParameterList *P, DeclContext *DC,
-                                            Type paramListType) {
+bool TypeChecker::coerceParameterListToType(ClosureExpr *CE,
+                                            AnyFunctionType *closureType) {
+  auto paramListType = closureType->getInput();
+  
+  ParameterList *P = CE->getParameters();  
   bool hadError = paramListType->is<ErrorType>();
 
   // Sometimes a scalar type gets applied to a single-argument parameter list.
@@ -1561,7 +1561,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, DeclContext *DC,
     
     // Check that the type, if explicitly spelled, is ok.
     if (param->getTypeLoc().getTypeRepr()) {
-      hadError |= validateParameterType(param, DC, TypeResolutionOptions(),
+      hadError |= validateParameterType(param, CE, TypeResolutionOptions(),
                                         nullptr, *this);
       
       // Now that we've type checked the explicit argument type, see if it
@@ -1582,29 +1582,74 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, DeclContext *DC,
     return hadError;
   };
 
-  
-  // The context type must be a tuple.
+  // If there is one parameter to the closure, then it gets inferred to be the
+  // complete type presented.
+  if (P->size() == 1)
+    return handleParameter(P->get(0), paramListType);
+
+  // The context type must be a tuple if we have multiple parameters, and match
+  // in element count.  If it doesn't, we'll diagnose it and force the
+  // parameters to ErrorType.
   TupleType *tupleTy = paramListType->getAs<TupleType>();
-  if (!tupleTy && !hadError) {
-    if (P->size() == 1)
-      return handleParameter(P->get(0), paramListType);
-    diagnose(P->getStartLoc(), diag::tuple_pattern_in_non_tuple_context,
-             paramListType);
-    hadError = true;
-  }
-  
-  // The number of elements must match exactly.
-  // TODO: incomplete tuple patterns, with some syntax.
-  if (!hadError && tupleTy->getNumElements() != P->size()) {
-    if (P->size() == 1)
-      return handleParameter(P->get(0), paramListType);
+  unsigned inferredArgCount = 1;
+  if (tupleTy)
+    inferredArgCount = tupleTy->getNumElements();
+
+  // If we already emitted a diagnostic, or if our argument count matches up,
+  // then there is nothing to do.
+  if (hadError || P->size() == inferredArgCount) {
+    // I just said, nothing to do!
     
-    diagnose(P->getStartLoc(), diag::tuple_pattern_length_mismatch,
-             paramListType);
+  // It is very common for a contextual type to disagree with the closure
+  // argument list.  This can be because the closure expr had an explicitly
+  // specified parameter list, a la:
+  //    { a,b in ... }
+  // or could be because the closure has an implicitly generated one:
+  //    { $0 + $1 }
+  // in either case, we want to produce nice and clear diagnostics.
+  
+  // If the closure didn't specify any arguments and it is in a context that
+  // needs some, produce a fixit to turn "{...}" into "{ _,_ in ...}".
+  } else if (P->size() == 0 && CE->getInLoc().isInvalid()) {
+    auto diag =
+      diagnose(CE->getStartLoc(), diag::closure_argument_list_missing,
+               inferredArgCount);
+    StringRef fixText;  // We only handle the most common cases.
+    if (inferredArgCount == 1)
+      fixText = " _ in ";
+    else if (inferredArgCount == 2)
+      fixText = " _,_ in ";
+    else if (inferredArgCount == 3)
+      fixText = " _,_,_ in ";
+    
+    if (!fixText.empty()) {
+      // Determine if there is already a space after the { in the closure to
+      // make sure we introduce the right whitespace.
+      auto afterBrace = CE->getStartLoc().getAdvancedLoc(1);
+      auto text = Context.SourceMgr.extractText({afterBrace, 1});
+      if (text.size() == 1 && text == " ")
+        fixText = fixText.drop_back();
+      else
+        fixText = fixText.drop_front();
+      diag.fixItInsertAfter(CE->getStartLoc(), fixText);
+    }
+    hadError = true;
+  } else {
+    // Okay, the wrong number of arguments was used, so complain about that
+    // generically.  We should try even harder here :-)
+    //
+    // Before doing so, strip attributes off the function type so that they
+    // don't confuse the issue.
+    auto fnType = FunctionType::get(closureType->getInput(),
+                                    closureType->getResult());
+    
+    diagnose(P->getStartLoc(), diag::closure_argument_list_tuple,
+             fnType, inferredArgCount, P->size());
     hadError = true;
   }
 
-  // Coerce each parameter to the respective type.
+  // Coerce each parameter to the respective type, or ErrorType if we already
+  // detected and diagnosed an error.
   for (unsigned i = 0, e = P->size(); i != e; ++i) {
     auto &param = P->get(i);
     
@@ -1613,9 +1658,10 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, DeclContext *DC,
       CoercionType = ErrorType::get(Context);
     else
       CoercionType = tupleTy->getElement(i).getType();
-    
+
     // If the tuple pattern had a label for the tuple element, it must match
     // the label for the tuple type being matched.
+    // FIXME: closure should probably not be allowed to have API/argument names.
     auto argName = param->getArgumentName();
     if (!hadError && !argName.empty() &&
         argName != tupleTy->getElement(i).getName()) {
