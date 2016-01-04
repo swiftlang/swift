@@ -212,7 +212,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
     auto &TrackingList = *Builder.getTrackingList();
     for (SILInstruction *I : TrackingList) {
       DEBUG(llvm::dbgs() << "SC: add " << *I <<
-            " from trackinglist to worklist\n");
+            " from tracking list to worklist\n");
       Worklist.add(I);
     }
     TrackingList.clear();

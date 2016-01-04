@@ -145,7 +145,7 @@ namespace {
 /// which is a large function.  
 constexpr unsigned MaxLSLocationBBMultiplicationNone = 256*256;
 
-/// we could run optimsitic DSE on functions with less than 64 basic blocks
+/// we could run optimistic DSE on functions with less than 64 basic blocks
 /// and 64 locations which is a sizeable function.
 constexpr unsigned MaxLSLocationBBMultiplicationPessimistic = 64*64;
 
