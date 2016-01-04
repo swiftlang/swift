@@ -9,11 +9,12 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// This pass collects all values in a function and applies alias analysis to
-// them. The purpose of this is to enable unit tests for SIL Alias Analysis
-// implementations independent of any other passes.
-//
+///
+/// \file
+/// This pass collects all values in a function and applies alias analysis to
+/// them. The purpose of this is to enable unit tests for SIL Alias Analysis
+/// implementations independent of any other passes.
+///
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-aa-evaluator"
