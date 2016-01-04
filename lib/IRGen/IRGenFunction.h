@@ -1,4 +1,4 @@
-//===--- IRGenFunction.h - IR Generation for Swift Functions ---*- C++ -*-===//
+//===--- IRGenFunction.h - IR Generation for Swift Functions ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

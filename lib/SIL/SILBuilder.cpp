@@ -1,4 +1,4 @@
-//===--- SILBuilder.cpp - Class for creating SIL Constructs ----------------==//
+//===--- SILBuilder.cpp - Class for creating SIL Constructs ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //

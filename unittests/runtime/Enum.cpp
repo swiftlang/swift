@@ -1,4 +1,4 @@
-//===- swift/unittests/runtime/Enum.cpp - Enum tests --------------------===//
+//===- swift/unittests/runtime/Enum.cpp - Enum tests ----------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

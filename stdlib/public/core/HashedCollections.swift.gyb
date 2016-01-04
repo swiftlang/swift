@@ -1313,7 +1313,7 @@ internal func _stdlib_NSDictionary_allKeys(nsd: _NSDictionaryType)
 }
 #endif
 
-//===--- Compiler conversion/casting entry points for Dictionary<Key, Value> =//
+//===--- Compiler conversion/casting entry points for Dictionary<K, V> ----===//
 
 #if _runtime(_ObjC)
 /// Perform a non-bridged upcast that always succeeds.

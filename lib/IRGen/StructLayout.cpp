@@ -1,4 +1,4 @@
-//===--- StructLayout.cpp - Layout of structures -------------------------===//
+//===--- StructLayout.cpp - Layout of structures --------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

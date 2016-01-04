@@ -1,4 +1,4 @@
-//===--- TypeCheckREPL.cpp - Type Checking for the REPL -----------------===//
+//===--- TypeCheckREPL.cpp - Type Checking for the REPL -------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -1,4 +1,4 @@
-//===- TreeScopedHashTable.h - A scoped hash table with multiple active scopes -===//
+//===- TreeScopedHashTable.h - Hash table with multiple active scopes -----===//
 //
 // This source file is part of the Swift.org open source project
 //

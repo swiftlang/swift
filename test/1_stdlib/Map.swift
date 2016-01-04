@@ -52,7 +52,7 @@ for x in s {
 }
 print(">")
 
-//===--- Avoid creating gratuitously self-destructive sequences ----------===//
+//===--- Avoid creating gratuitously self-destructive sequences -----------===//
 
 // In a naive implementation, mapping over a non-self-destructive
 // SequenceType having a reference-semantics GeneratorType produces a

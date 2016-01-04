@@ -1,4 +1,4 @@
-//===-------- RedundantLoadElimination.cpp - SIL Load Forwarding ---------===//
+//===-------- RedundantLoadElimination.cpp - SIL Load Forwarding ----------===//
 //
 // This source file is part of the Swift.org open source project
 //

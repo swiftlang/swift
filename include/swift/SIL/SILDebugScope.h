@@ -1,4 +1,4 @@
-//===--- SILDebugScope.h - DebugScopes for SIL code -----------*- C++ -*-===//
+//===--- SILDebugScope.h - DebugScopes for SIL code -------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

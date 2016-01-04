@@ -1,4 +1,4 @@
-//===--- SILVisitor.h - Defines the SILVisitor class -------------*- C++ -*-==//
+//===--- SILVisitor.h - Defines the SILVisitor class ------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

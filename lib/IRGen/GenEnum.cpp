@@ -1,4 +1,4 @@
-//===--- GenEnum.cpp - Swift IR Generation For 'enum' Types -------------===//
+//===--- GenEnum.cpp - Swift IR Generation For 'enum' Types ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //

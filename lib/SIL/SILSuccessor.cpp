@@ -1,4 +1,4 @@
-//===--- SILSuccessor.cpp - Implementation of SILSuccessor.h ---------------==//
+//===--- SILSuccessor.cpp - Implementation of SILSuccessor.h --------------===//
 //
 // This source file is part of the Swift.org open source project
 //

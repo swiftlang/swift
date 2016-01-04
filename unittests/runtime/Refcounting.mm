@@ -1,4 +1,4 @@
-//=== swift/unittests/runtime/Refcounting.mm - Reference-counting for ObjC-===//
+//===--- Refcounting.mm - Reference-counting for ObjC ---------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

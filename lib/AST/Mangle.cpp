@@ -1,4 +1,4 @@
-//===--- Mangle.cpp - Swift Name Mangling --------------------------------===//
+//===--- Mangle.cpp - Swift Name Mangling ---------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

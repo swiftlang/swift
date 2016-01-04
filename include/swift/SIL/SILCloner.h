@@ -1,4 +1,4 @@
-//===--- SILCloner.h - Defines the SILCloner class ---------------*- C++ -*-==//
+//===--- SILCloner.h - Defines the SILCloner class --------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

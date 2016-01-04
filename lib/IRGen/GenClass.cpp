@@ -1,4 +1,4 @@
-//===--- GenClass.cpp - Swift IR Generation For 'class' Types -----------===//
+//===--- GenClass.cpp - Swift IR Generation For 'class' Types -------------===//
 //
 // This source file is part of the Swift.org open source project
 //
