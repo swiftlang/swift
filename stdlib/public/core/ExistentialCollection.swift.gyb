@@ -378,7 +378,7 @@ internal class _BidirectionalIndexBox<
   }
 }
 
-//===--- RandomAccessIndex -----------------------------------------------===//
+//===--- RandomAccessIndex ------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
 internal protocol _RandomAccessIndexBoxType : _BidirectionalIndexBoxType {}

@@ -32,9 +32,9 @@
 using namespace swift;
 using namespace Lowering;
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // SILGenModule Class implementation
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 SILGenModule::SILGenModule(SILModule &M, Module *SM, bool makeModuleFragile)
   : M(M), Types(M.Types), SwiftModule(SM), TopLevelSGF(nullptr),
@@ -1138,9 +1138,9 @@ void SILGenModule::emitSourceFile(SourceFile *sf, unsigned startElem) {
     visit(D);
 }
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // SILModule::constructSIL method implementation
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 std::unique_ptr<SILModule>
 SILModule::constructSIL(Module *mod, SILOptions &options, FileUnit *SF,

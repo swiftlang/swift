@@ -634,9 +634,9 @@ void SwiftToSourceKitCompletionAdapter::getResultAssociatedUSRs(
   }
 }
 
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 // CodeCompletion::SessionCache
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 void CodeCompletion::SessionCache::setSortedCompletions(
     std::vector<Completion *> &&completions) {
   llvm::sys::ScopedLock L(mtx);
@@ -659,9 +659,9 @@ CompletionKind CodeCompletion::SessionCache::getCompletionKind() {
   return completionKind;
 }
 
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 // CodeCompletion::SessionCacheMap
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 
 unsigned CodeCompletion::SessionCacheMap::getBufferID(StringRef name) const {
   auto pair = nameToBufferMap.insert(std::make_pair(name, nextBufferID));
@@ -691,9 +691,9 @@ bool CodeCompletion::SessionCacheMap::remove(StringRef name, unsigned offset) {
   return sessions.erase(key);
 }
 
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 // (New) Code completion interface
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 
 namespace {
 class SwiftGroupedCodeCompletionConsumer : public CodeCompletionView::Walker {

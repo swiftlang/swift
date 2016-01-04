@@ -1,4 +1,4 @@
-//===--- SILInliner.cpp - Inlines SIL functions ----------------------------==//
+//===--- SILInliner.cpp - Inlines SIL functions ---------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

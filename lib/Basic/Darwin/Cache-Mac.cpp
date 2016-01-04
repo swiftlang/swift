@@ -1,4 +1,4 @@
-//===--- Cache-Mac.cpp - Caching mechanism implementation ----------------===//
+//===--- Cache-Mac.cpp - Caching mechanism implementation -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -8,11 +8,11 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 //
 //  This file implements the caching mechanism using darwin's libcache.
 //
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Cache.h"
 #include "llvm/ADT/SmallString.h"

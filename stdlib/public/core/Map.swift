@@ -135,7 +135,7 @@ public struct LazyMapCollection<Base : CollectionType, Element>
   public typealias T = Element
 }
 
-//===--- Support for s.lazy ----------------------------------------------===//
+//===--- Support for s.lazy -----------------------------------------------===//
 
 extension LazySequenceType {
   /// Return a `LazyMapSequence` over this `Sequence`.  The elements of

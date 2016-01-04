@@ -1,4 +1,4 @@
-//===--- SILArgument.cpp - Arguments for high-level SIL code ---------------==//
+//===--- SILArgument.cpp - Arguments for high-level SIL code --------------===//
 //
 // This source file is part of the Swift.org open source project
 //

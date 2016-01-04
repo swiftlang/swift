@@ -1,4 +1,4 @@
-//===---- DeadStoreElimination.cpp - SIL Dead Store Elimination -----===//
+//===---- DeadStoreElimination.cpp - SIL Dead Store Elimination -----------===//
 //
 // This source file is part of the Swift.org open source project
 //

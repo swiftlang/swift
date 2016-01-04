@@ -1,4 +1,4 @@
-//===--- EnumMetadataLayout.h - CRTP for enum metadata ------*- C++ -*-===//
+//===--- EnumMetadataLayout.h - CRTP for enum metadata ----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

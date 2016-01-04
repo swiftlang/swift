@@ -1,4 +1,4 @@
-//===--- Remangle.cpp - Swift re-mangling from a demangling tree ---------===//
+//===--- Remangle.cpp - Swift re-mangling from a demangling tree ----------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -8,13 +8,13 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 //
 //  This file implements the remangler, which turns a demangling parse
 //  tree back into a mangled string.  This is useful for tools which
 //  want to extract subtrees from mangled strings.
 //
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/LLVM.h"

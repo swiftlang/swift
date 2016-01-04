@@ -1,4 +1,4 @@
-//===--- Availability.h - Swift Availability Structures -----*- C++ -*-===//
+//===--- Availability.h - Swift Availability Structures ---------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

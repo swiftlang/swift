@@ -1,4 +1,4 @@
-//===swift/unittests/runtime/Refcounting.cpp - Reference-counting for swift===//
+//===--- Refcounting.cpp - Reference-counting for Swift ---------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -1,4 +1,4 @@
-//===--- Dominance.h - SIL dominance analysis ------------------*- C++ -*-===//
+//===--- Dominance.h - SIL dominance analysis -------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

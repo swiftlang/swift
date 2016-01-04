@@ -1,4 +1,4 @@
-//===--- Cleanup.cpp - Implements the Cleanup mechanics --------------------==//
+//===--- Cleanup.cpp - Implements the Cleanup mechanics -------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

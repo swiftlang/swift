@@ -1,4 +1,4 @@
-//===--- Mirrors.swift.gyb - Common _MirrorType implementations -*- swift -*-==//
+//===--- Mirrors.swift.gyb - Common _MirrorType impls. --------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
