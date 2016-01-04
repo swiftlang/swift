@@ -1,8 +1,8 @@
-//===--- AST.h - Markup AST nodes ---------------------------------------===//
+//===--- AST.h - Markup AST nodes -----------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -201,10 +201,10 @@ class CodeBlock final : public MarkupASTNode {
   StringRef LiteralContent;
   StringRef Language;
 
-  CodeBlock(StringRef LiteralContent, StringRef Langauge)
+  CodeBlock(StringRef LiteralContent, StringRef Language)
       : MarkupASTNode(ASTNodeKind::CodeBlock),
         LiteralContent(LiteralContent),
-        Language(Langauge) {}
+        Language(Language) {}
 
 public:
   static CodeBlock *create(MarkupContext &MC, StringRef LiteralContent,

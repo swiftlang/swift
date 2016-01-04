@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -355,7 +355,7 @@ typedef OpaqueValue *initializeBufferWithTake(ValueBuffer *dest,
 /// the value from one to the other, leaving the source object
 /// uninitialized.
 ///
-/// There is no need for a initializeBufferWithTakeOfBuffer, because that
+/// There is no need for an initializeBufferWithTakeOfBuffer, because that
 /// can simply be a pointer-aligned memcpy of sizeof(ValueBuffer)
 /// bytes.
 ///
@@ -2818,17 +2818,6 @@ extern "C"
 void swift_registerProtocolConformances(const ProtocolConformanceRecord *begin,
                                         const ProtocolConformanceRecord *end);
   
-/// FIXME: This doesn't belong in the runtime.
-extern "C" void swift_printAny(OpaqueValue *value, const Metadata *type);
-
-/// \brief Demangle a mangled class name into module+class.
-/// Returns true if the name was successfully decoded.
-/// On success, *outModule and *outClass must be freed with free().
-extern "C" bool
-swift_demangleSimpleClass(const char *mangledName, 
-                          char **outModule, char **outClass);
-  
-
 /// Return the type name for a given type metadata.
 std::string nameForMetadata(const Metadata *type,
                             bool qualified = true);

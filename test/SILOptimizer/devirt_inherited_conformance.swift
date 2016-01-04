@@ -109,12 +109,12 @@ public protocol Comparable {
 // Define a custom operator to be used instead of ==
 infix operator --- { associativity left precedence 140 } 
 
-// Simple is a protocol tat simply defines an operator and
+// Simple is a protocol that simply defines an operator and
 // a few methods with different number of arguments.
 public protocol Simple {
    func foo(_: Self) -> Bool
    func boo(_: Self, _: Self) -> Bool
-   func ---(_: Self, _: Self)->Bool
+   func ---(_: Self, _: Self) -> Bool
 }
 
 public class C: Equatable, Comparable, Simple {

@@ -288,7 +288,7 @@ bb0:
 
 
 // sizeof is known to return strictly positive values
-// But Word->Int64 is not a safe conversion
+// But Word ->Int64 is not a safe conversion
 // No peephole for UInt16(UInt32(sizeof(Int)))
 // CHECK-LABEL: sil @_TF4test35test_int16_trunc_s_to_u_zext_sizeofFT_Vs6UInt16 : $@convention(thin) () -> UInt16
 // CHECK: builtin "zextOrBitCast_Word_Int64"

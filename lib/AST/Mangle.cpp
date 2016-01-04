@@ -1,8 +1,8 @@
-//===--- Mangle.cpp - Swift Name Mangling --------------------------------===//
+//===--- Mangle.cpp - Swift Name Mangling ---------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -58,20 +58,23 @@ namespace {
     }
   };        
 }
-        
+
+// Translates operator fixity to demangler operators.
+static Demangle::OperatorKind TranslateOperator(OperatorFixity fixity) {
+  switch (fixity) {
+  case OperatorFixity::NotOperator:return Demangle::OperatorKind::NotOperator;
+  case OperatorFixity::Prefix: return Demangle::OperatorKind::Prefix;
+  case OperatorFixity::Postfix: return Demangle::OperatorKind::Postfix;
+  case OperatorFixity::Infix: return Demangle::OperatorKind::Infix;
+  }
+  llvm_unreachable("invalid operator fixity");
+}
+
 /// Mangle a StringRef as an identifier into a buffer.
 void Mangler::mangleIdentifier(StringRef str, OperatorFixity fixity,
                                bool isOperator) {
-  auto operatorKind = [=]() -> Demangle::OperatorKind {
-    if (!isOperator) return Demangle::OperatorKind::NotOperator;
-    switch (fixity) {
-    case OperatorFixity::NotOperator:return Demangle::OperatorKind::NotOperator;
-    case OperatorFixity::Prefix: return Demangle::OperatorKind::Prefix;
-    case OperatorFixity::Postfix: return Demangle::OperatorKind::Postfix;
-    case OperatorFixity::Infix: return Demangle::OperatorKind::Infix;
-    }
-    llvm_unreachable("invalid operator fixity");
-  }();
+  auto operatorKind = isOperator ? TranslateOperator(fixity) :
+                      Demangle::OperatorKind::NotOperator;
 
   std::string buf;
   Demangle::mangleIdentifier(str.data(), str.size(), operatorKind, buf,
@@ -296,6 +299,9 @@ void Mangler::mangleContext(const DeclContext *ctx, BindGenerics shouldBind) {
     return mangleEntity(fn, ResilienceExpansion::Minimal, /*uncurry*/ 0);
   }
 
+  case DeclContextKind::SubscriptDecl:
+    return mangleContext(ctx->getParent(), shouldBind);
+      
   case DeclContextKind::Initializer:
     switch (cast<Initializer>(ctx)->getInitializerKind()) {
     case InitializerKind::DefaultArgument: {
@@ -1281,19 +1287,20 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
       Buffer << 'q' << Index(info.Index);
 
       {
-      // The DWARF output created by Swift is intentionally flat,
-      // therefore archetypes are emitted with their DeclContext if
-      // they appear at the top level of a type (_Tt).
-      // Clone a new, non-DWARF Mangler for the DeclContext.
-      Mangler ContextMangler(Buffer, /*DWARFMangling=*/false);
-      SmallVector<const void *, 4> SortedSubsts(Substitutions.size());
-      for (auto S : Substitutions) SortedSubsts[S.second] = S.first;
-      for (auto S : SortedSubsts) ContextMangler.addSubstitution(S);
-      for (; relativeDepth > 0; --relativeDepth)
-        DC = DC->getParent();
-      assert(DC && "no decl context for archetype found");
-      if (!DC) return;
-      ContextMangler.mangleContext(DC, BindGenerics::None);
+        // The DWARF output created by Swift is intentionally flat,
+        // therefore archetypes are emitted with their DeclContext if
+        // they appear at the top level of a type (_Tt).
+        // Clone a new, non-DWARF Mangler for the DeclContext.
+        Mangler ContextMangler(/*DWARFMangling=*/false);
+        SmallVector<const void *, 4> SortedSubsts(Substitutions.size());
+        for (auto S : Substitutions) SortedSubsts[S.second] = S.first;
+        for (auto S : SortedSubsts) ContextMangler.addSubstitution(S);
+        for (; relativeDepth > 0; --relativeDepth)
+          DC = DC->getParent();
+        assert(DC && "no decl context for archetype found");
+        if (!DC) return;
+        ContextMangler.mangleContext(DC, BindGenerics::None);
+        ContextMangler.finalize(Buffer);
       }
 
     } else {
@@ -1834,16 +1841,28 @@ void Mangler::mangleTypeMetadataFull(CanType ty, bool isPattern) {
   mangleType(ty, ResilienceExpansion::Minimal, 0);
 }
 
-void Mangler::manglePrefix(StringRef Prefix) {
-  Buffer << Prefix;
+void Mangler::append(StringRef S) {
+  Buffer << S;
 }
 
-void Mangler::manglePrefix(char Prefix) {
-  Buffer << Prefix;
+void Mangler::append(char C) {
+  Buffer << C;
 }
 
-void Mangler::manglePrefix(const APInt &Prefix) {
-  Buffer << Prefix;
+void Mangler::mangleNatural(const APInt &Nat) {
+  Buffer << Nat;
+}
+
+void Mangler::mangleIdentifierSymbol(StringRef Name) {
+  // Mangle normal identifiers as:
+  //   count identifier-char+
+  // where the count is the number of characters in the identifier,
+  // and where individual identifier characters represent themselves.
+  Buffer << Name.size() << Name;
+}
+
+void Mangler::appendSymbol(StringRef Name) {
+   Buffer << Name;
 }
 
 void Mangler::mangleGlobalVariableFull(const VarDecl *decl) {

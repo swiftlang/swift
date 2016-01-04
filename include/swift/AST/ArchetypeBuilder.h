@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -289,7 +289,7 @@ public:
   /// because the type \c Dictionary<K,V> cannot be formed without it.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool inferRequirements(Pattern *pattern, GenericParamList *genericParams);
+  bool inferRequirements(ParameterList *params,GenericParamList *genericParams);
 
   /// Finalize the set of requirements, performing any remaining checking
   /// required before generating archetypes.

@@ -172,9 +172,13 @@ class Foo {
 
   // x86_64-macosx:      define hidden { i32, i32 } @_TFC8abitypes3Foo9getnested{{.*}}(%CSo13StructReturns*, %C8abitypes3Foo*) {{.*}} {
   // x86_64-macosx:      call i64 bitcast (void ()* @objc_msgSend to i64 ([[OPAQUE:.*]]*, i8*)*)
+  // x86_64-macosx-NEXT: bitcast
+  // x86_64-macosx-NEXT: llvm.lifetime.start
   // x86_64-macosx-NEXT: store i64
   // x86_64-macosx-NEXT: bitcast i64* {{[^ ]*}} to { i32, i32 }*
   // x86_64-macosx-NEXT: load { i32, i32 }, { i32, i32 }*
+  // x86_64-macosx-NEXT: bitcast
+  // x86_64-macosx-NEXT: llvm.lifetime.end
   // x86_64-macosx:      ret { i32, i32 }
   func getnested(p: StructReturns) -> NestedInts {
     return p.newNestedInts()

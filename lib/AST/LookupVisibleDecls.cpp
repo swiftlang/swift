@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -500,6 +500,8 @@ static void lookupVisibleMemberDeclsImpl(
     ClassDecl *CurClass = dyn_cast<ClassDecl>(CurNominal);
 
     if (CurClass && CurClass->hasSuperclass()) {
+      assert(BaseTy.getPointer() != CurClass->getSuperclass().getPointer() &&
+             "type is its own superclass");
       BaseTy = CurClass->getSuperclass();
       Reason = getReasonForSuper(Reason);
 
@@ -712,13 +714,12 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
         namelookup::FindLocalVal(SM, Loc, Consumer).visit(AFD->getBody());
       }
 
-      for (auto *P : AFD->getBodyParamPatterns())
-        namelookup::FindLocalVal(SM, Loc, Consumer)
-            .checkPattern(P, DeclVisibilityKind::FunctionParameter);
+      for (auto *P : AFD->getParameterLists())
+        namelookup::FindLocalVal(SM, Loc, Consumer).checkParameterList(P);
 
       // Constructors and destructors don't have 'self' in parameter patterns.
       if (isa<ConstructorDecl>(AFD) || isa<DestructorDecl>(AFD))
-        Consumer.foundDecl(AFD->getImplicitSelfDecl(),
+        Consumer.foundDecl(const_cast<ParamDecl*>(AFD->getImplicitSelfDecl()),
                            DeclVisibilityKind::FunctionParameter);
 
       if (AFD->getExtensionType()) {
@@ -740,9 +741,8 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       if (Loc.isValid()) {
         auto CE = cast<ClosureExpr>(ACE);
         namelookup::FindLocalVal(SM, Loc, Consumer).visit(CE->getBody());
-        if (auto P = CE->getParams()) {
-          namelookup::FindLocalVal(SM, Loc, Consumer)
-            .checkPattern(P, DeclVisibilityKind::FunctionParameter);
+        if (auto P = CE->getParameters()) {
+          namelookup::FindLocalVal(SM, Loc, Consumer).checkParameterList(P);
         }
       }
     } else if (auto ED = dyn_cast<ExtensionDecl>(DC)) {
@@ -759,13 +759,10 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
                                  TypeResolver);
     }
 
-    // Check the generic parameters for something with the given name.
-    if (GenericParams) {
-      namelookup::FindLocalVal(SM, Loc, Consumer)
-          .checkGenericParams(GenericParams,
-                              DeclVisibilityKind::GenericParameter);
-    }
-
+    // Check any generic parameters for something with the given name.
+    namelookup::FindLocalVal(SM, Loc, Consumer)
+          .checkGenericParams(GenericParams);
+    
     DC = DC->getParent();
     Reason = DeclVisibilityKind::MemberOfOutsideNominal;
   }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -672,10 +672,6 @@ public:
   /// the result would be the (parenthesized) type ((int, int)).
   Type getUnlabeledType(ASTContext &Context);
 
-  /// Relabel the elements of the given type with the given new
-  /// (top-level) labels.
-  Type getRelabeledType(ASTContext &Context, ArrayRef<Identifier> labels);
-
   /// \brief Retrieve the type without any default arguments.
   Type getWithoutDefaultArgs(const ASTContext &Context);
 
@@ -1308,11 +1304,6 @@ public:
   TupleTypeElt getWithType(Type T) const {
     return TupleTypeElt(T, getName(), getDefaultArgKind(), isVararg());
   }
-
-  /// Determine whether this tuple element has an initializer.
-  bool hasInit() const {
-    return getDefaultArgKind() != DefaultArgumentKind::None;
-  }
 };
 
 inline Type getTupleEltType(const TupleTypeElt &elt) {
@@ -1358,7 +1349,7 @@ public:
     return TupleEltTypeArrayRef(getElements());
   }
   
-  /// getNamedElementId - If this tuple has a element with the specified name,
+  /// getNamedElementId - If this tuple has an element with the specified name,
   /// return the element index, otherwise return -1.
   int getNamedElementId(Identifier I) const;
   

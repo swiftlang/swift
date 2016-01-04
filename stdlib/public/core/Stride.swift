@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -132,9 +132,9 @@ public struct StrideToIterator<Element : Strideable> : IteratorProtocol {
     if _stride > 0 ? _current >= _end : _current <= _end {
       return nil
     }
-    let ret = _current
+    let result = _current
     _current += _stride
-    return ret
+    return result
   }
 }
 
@@ -193,9 +193,9 @@ public struct StrideThroughIterator<Element : Strideable> : IteratorProtocol {
       }
       return nil
     }
-    let ret = _current
+    let result = _current
     _current += _stride
-    return ret
+    return result
   }
 }
 

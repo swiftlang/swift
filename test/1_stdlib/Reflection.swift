@@ -173,7 +173,7 @@ print("\(intArrayMirror[0].0): \(intArrayMirror[0].1.summary)")
 // CHECK-NEXT: [4]: 5
 print("\(intArrayMirror[4].0): \(intArrayMirror[4].1.summary)")
 
-var justSomeFunction = { (x:Int)->Int in return x + 1 }
+var justSomeFunction = { (x:Int) -> Int in return x + 1 }
 // CHECK-NEXT: (Function)
 print(_reflect(justSomeFunction).summary)
 

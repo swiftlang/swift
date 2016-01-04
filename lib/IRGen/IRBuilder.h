@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -210,6 +210,18 @@ public:
                         size.getValue(),
                         std::min(dest.getAlignment(),
                                  src.getAlignment()).getValue());
+  }
+  
+  using IRBuilderBase::CreateLifetimeStart;
+  llvm::CallInst *CreateLifetimeStart(Address buf, Size size) {
+    return CreateLifetimeStart(buf.getAddress(),
+                   llvm::ConstantInt::get(Context, APInt(64, size.getValue())));
+  }
+  
+  using IRBuilderBase::CreateLifetimeEnd;
+  llvm::CallInst *CreateLifetimeEnd(Address buf, Size size) {
+    return CreateLifetimeEnd(buf.getAddress(),
+                   llvm::ConstantInt::get(Context, APInt(64, size.getValue())));
   }
 };
 

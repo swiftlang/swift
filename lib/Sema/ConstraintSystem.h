@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -973,66 +973,6 @@ struct SpecificConstraint {
   ConstraintKind Kind;
 };
 
-/// Abstract class implemented by clients that want to be involved in
-/// the process of opening dependent types to type variables.
-class DependentTypeOpener {
-public:
-  virtual ~DependentTypeOpener() { }
-
-  /// Directly map a generic type parameter to a type, or return null if
-  /// the type parameter should be opened.
-  virtual Type mapGenericTypeParamType(GenericTypeParamType *param) {
-    return Type();
-  }
-
-  /// Directly map a dependent member type to a type, or return null if
-  /// the dependent member type should be opened.
-  virtual Type mapDependentMemberType(DependentMemberType *memberType) {
-    return Type();
-  }
-
-  /// Invoked when a generic type parameter is opened to a type variable.
-  ///
-  /// \param param The generic type parameter.
-  ///
-  /// \param typeVar The type variable to which the generic parameter was
-  /// opened.
-  ///
-  /// \param replacementType If the caller sets this to a non-null type, the
-  /// type variable will be bound directly to this type.
-  virtual void openedGenericParameter(GenericTypeParamType *param,
-                                      TypeVariableType *typeVar,
-                                      Type &replacementType) { }
-
-  /// Invoked when an associated type reference is opened to a type
-  /// variable to determine how the associated type should be resolved.
-  ///
-  /// \param baseType The type of the base of the reference.
-  ///
-  /// \param baseTypeVar The type variable to which the base type was
-  /// opened.
-  ///
-  /// \param assocType The associated type being opened.
-  ///
-  /// \param memberTypeVar The type variable representing the
-  /// dependent member type.
-  ///
-  /// \param replacementType If the caller sets this to a non-null type, the
-  /// member type variable will be bound directly to this type.
-  ///
-  /// \returns true if the constraint system should introduce a
-  /// constraint that specifies that the member type is in fact a the
-  /// named member of the base's type variable.
-  virtual bool shouldBindAssociatedType(Type baseType,
-                                        TypeVariableType *baseTypeVar,
-                                        AssociatedTypeDecl *assocType,
-                                        TypeVariableType *memberTypeVar,
-                                        Type &replacementType) { 
-    return true;
-  }
-};
-
-
 /// An intrusive, doubly-linked list of constraints.
 typedef llvm::ilist<Constraint> ConstraintList;
 
@@ -1605,7 +1545,7 @@ public:
   /// \brief Whether we should be recording failures.
   bool shouldRecordFailures() {
     // FIXME: It still makes sense to record failures when there are fixes
-    // present, but they shold be less desirable.
+    // present, but they should be less desirable.
     if (!Fixes.empty())
       return false;
 
@@ -1848,13 +1788,11 @@ public:
   ///
   /// \returns The opened type.
   Type openType(Type type, ConstraintLocatorBuilder locator,
-                DeclContext *dc = nullptr,
-                DependentTypeOpener *opener = nullptr) {
+                DeclContext *dc = nullptr) {
     llvm::DenseMap<CanType, TypeVariableType *> replacements;
     return openType(type, locator, replacements, dc,
                     /*skipProtocolSelfConstraint=*/false,
-                    /*minOpeningDepth=*/0,
-                    /*opener=*/opener);
+                    /*minOpeningDepth=*/0);
   }
 
   /// \brief "Open" the given type by replacing any occurrences of generic
@@ -1874,17 +1812,13 @@ public:
   /// contexts that we're inheriting context archetypes from. See the comment
   /// on openGeneric().
   ///
-  /// \param opener Abstract class that assists in opening dependent
-  /// types.
-  ///
   /// \returns The opened type, or \c type if there are no archetypes in it.
   Type openType(Type type,
                 ConstraintLocatorBuilder locator,
                 llvm::DenseMap<CanType, TypeVariableType *> &replacements,
                 DeclContext *dc = nullptr,
                 bool skipProtocolSelfConstraint = false,
-                unsigned minOpeningDepth = 0,
-                DependentTypeOpener *opener = nullptr);
+                unsigned minOpeningDepth = 0);
 
   /// \brief "Open" the given binding type by replacing any occurrences of
   /// archetypes (including those implicit in unbound generic types) with
@@ -1924,7 +1858,6 @@ public:
                    ArrayRef<Requirement> requirements,
                    bool skipProtocolSelfConstraint,
                    unsigned minOpeningDepth,
-                   DependentTypeOpener *opener,
                    ConstraintLocatorBuilder locator,
                    llvm::DenseMap<CanType, TypeVariableType *> &replacements);
 
@@ -1953,8 +1886,7 @@ public:
                           bool isTypeReference,
                           bool isSpecialized,
                           ConstraintLocatorBuilder locator,
-                          const DeclRefExpr *base = nullptr,
-                          DependentTypeOpener *opener = nullptr);
+                          const DeclRefExpr *base = nullptr);
 
   /// Replace the 'Self' type in the archetype with the appropriate
   /// type variable, if needed.
@@ -1982,7 +1914,8 @@ public:
                           bool isDynamicResult,
                           ConstraintLocatorBuilder locator,
                           const DeclRefExpr *base = nullptr,
-                          DependentTypeOpener *opener = nullptr);
+                          llvm::DenseMap<CanType, TypeVariableType *>
+                            *replacements = nullptr);
 
   /// \brief Add a new overload set to the list of unresolved overload
   /// sets.
@@ -2072,7 +2005,7 @@ public:
     /// Indicates we're matching an operator parameter.
     TMF_ApplyingOperatorParameter = 0x4,
     
-    /// Indicates we're unwrapping an optional type for an value-to-optional
+    /// Indicates we're unwrapping an optional type for a value-to-optional
     /// conversion.
     TMF_UnwrappingOptional = 0x8,
     

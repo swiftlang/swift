@@ -1,8 +1,8 @@
-//===- DiagnosticsParse.def - Diagnostics Text ------------------*- C++ -*-===//
+//===--- DiagnosticsParse.def - Diagnostics Text ----------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -184,12 +184,6 @@ ERROR(cskeyword_not_attribute,decl_parsing,none,
 
 ERROR(decl_already_static,decl_parsing,none,
       "%0 specified twice", (StaticSpellingKind))
-
-ERROR(autoclosure_is_decl_attribute,attribute_parsing,none,
-      "@autoclosure is now an attribute of the parameter "
-      "declaration, not its type", ())
-ERROR(autoclosure_not_on_enums,attribute_parsing,none,
-      "@autoclosure is only allowed on parameters, not on enum cases", ())
 
 ERROR(enum_case_dot_prefix,decl_parsing,none,
       "extraneous '.' in enum 'case' declaration", ())
@@ -598,8 +592,9 @@ ERROR(nonliteral_enum_case_raw_value,type_parsing,PointsToFirstBadToken,
       "raw value for enum case must be a literal", ())
 
 // Collection Types
-ERROR(expected_expr_array_type,expr_parsing,PointsToFirstBadToken,
-      "expected expression for size of array type", ())
+ERROR(new_array_syntax,type_parsing,none,
+      "array types are now written with the brackets around the element type",
+      ())
 ERROR(expected_rbracket_array_type,type_parsing,PointsToFirstBadToken,
       "expected ']' in array type", ())
 ERROR(expected_element_type,type_parsing,PointsToFirstBadToken,
@@ -660,26 +655,13 @@ ERROR(multiple_parameter_ellipsis,decl_parsing,none,
       "only a single variadic parameter '...' is permitted", ())
 ERROR(parameter_vararg_default,decl_parsing,none,
       "variadic parameter cannot have a default value", ())
-ERROR(parameter_backtick_missing_name,decl_parsing,PointsToFirstBadToken,
-      "expected parameter name after '#'", ())
-ERROR(parameter_backtick_empty_name,decl_parsing,none,
-      "expected non-empty parameter name after '#'", ())
 ERROR(parameter_inout_var_let,decl_parsing,none,
       "parameter may not have multiple 'inout', 'var', or 'let' specifiers",
       ())
 
-WARNING(parameter_backtick_two_names,decl_parsing,none,
-      "extraneous '#' in parameter; keyword argument and parameter name "
-      "already specified separately", ())
 WARNING(parameter_extraneous_double_up,decl_parsing,none,
         "extraneous duplicate parameter name; %0 already has an argument "
         "label", (Identifier))
-ERROR(parameter_extraneous_pound,decl_parsing,none,
-        "'#' has been removed from Swift; %0 already has an argument label",
-        (Identifier))
-ERROR(parameter_pound_double_up,decl_parsing,none,
-        "'#' has been removed from Swift; double up '%0 %0' to make the "
-        "argument label the same as the parameter name", (StringRef))
 WARNING(parameter_extraneous_empty_name,decl_parsing,none,
         "extraneous '_' in parameter: %0 has no keyword argument name",
         (Identifier))

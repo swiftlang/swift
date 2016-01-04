@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -175,8 +175,8 @@ func _conditionallyUnreachable() {
 }
 
 @warn_unused_result
-@_silgen_name("swift_isClassOrObjCExistential")
-func _swift_isClassOrObjCExistential<T>(x: T.Type) -> Bool
+@_silgen_name("swift_isClassOrObjCExistentialType")
+func _swift_isClassOrObjCExistentialType<T>(x: T.Type) -> Bool
 
 /// Returns `true` iff `T` is a class type or an `@objc` existential such as
 /// `AnyObject`.
@@ -194,7 +194,7 @@ internal func _isClassOrObjCExistential<T>(x: T.Type) -> Bool {
   }
 
   // Maybe a class.
-  return _swift_isClassOrObjCExistential(x)
+  return _swift_isClassOrObjCExistentialType(x)
 }
 
 /// Returns an `UnsafePointer` to the storage used for `object`.  There's
@@ -285,7 +285,7 @@ public func _slowPath<C : Boolean>(x: C) -> Bool {
 @warn_unused_result
 internal func _usesNativeSwiftReferenceCounting(theClass: AnyClass) -> Bool {
 #if _runtime(_ObjC)
-  return _swift_usesNativeSwiftReferenceCounting_class(
+  return swift_objc_class_usesNativeSwiftReferenceCounting(
     unsafeAddressOf(theClass)
   )
 #else
@@ -294,18 +294,23 @@ internal func _usesNativeSwiftReferenceCounting(theClass: AnyClass) -> Bool {
 }
 
 @warn_unused_result
-@_silgen_name("_swift_class_getInstancePositiveExtentSize_native")
-func _swift_class_getInstancePositiveExtentSize_native(theClass: AnyClass) -> UInt
+@_silgen_name("swift_class_getInstanceExtents")
+func swift_class_getInstanceExtents(theClass: AnyClass)
+  -> (negative: UInt, positive: UInt)
 
-/// - Returns: `class_getInstanceSize(theClass)`.
+@warn_unused_result
+@_silgen_name("swift_objc_class_unknownGetInstanceExtents")
+func swift_objc_class_unknownGetInstanceExtents(theClass: AnyClass)
+  -> (negative: UInt, positive: UInt)
+
+/// - Returns: 
 @inline(__always)
 @warn_unused_result
 internal func _class_getInstancePositiveExtentSize(theClass: AnyClass) -> Int {
 #if _runtime(_ObjC)
-  return Int(_swift_class_getInstancePositiveExtentSize(
-      unsafeAddressOf(theClass)))
+  return Int(swift_objc_class_unknownGetInstanceExtents(theClass).positive)
 #else
-  return Int(_swift_class_getInstancePositiveExtentSize_native(theClass))
+  return Int(swift_class_getInstanceExtents(theClass).positive)
 #endif
 }
 
@@ -444,7 +449,7 @@ internal func _makeBridgeObject(
 public // @testable
 func _getSuperclass(t: AnyClass) -> AnyClass? {
   return unsafeBitCast(
-    _swift_getSuperclass_nonNull(unsafeBitCast(t, OpaquePointer.self)),
+    swift_class_getSuperclass(unsafeBitCast(t, OpaquePointer.self)),
     AnyClass.self)
 }
 

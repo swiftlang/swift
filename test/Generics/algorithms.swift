@@ -85,7 +85,7 @@ func equal<
 
 func equalIf<R1 : IteratorProtocol, R2 : IteratorProtocol>
        (range1 : R1, range2 : R2,
-        predicate : (R1.Element, R2.Element)-> Bool) -> Bool {
+        predicate : (R1.Element, R2.Element) -> Bool) -> Bool {
   var range1 = range1
   var range2 = range2
   var e1 = range1.next()

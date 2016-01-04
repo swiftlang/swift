@@ -9,7 +9,7 @@ Latest
   for operators that start with a dot (".").  The new rule is that an operator
   that starts with a dot may contain other dots in it, but operators that start
   with some other character may not contain dots.  For example:
- 
+
     ```
     x....foo   --> "x" "...." "foo"
     x&%^.foo   --> "x" "&%^"  ".foo"
@@ -90,6 +90,14 @@ Latest
   would previously have required `protocol` to be surrounded in
   back-ticks. For more information, see
   [SE-0001](https://github.com/apple/swift-evolution/blob/master/proposals/0001-keywords-as-argument-labels.md).
+
+* Tuples (up to arity 6) whose elements are all `Comparable` or `Equatable` now
+  implement the full set of comparison/equality operators. The comparison
+  operators are defined in terms of [lexicographical order][]. See [SE-0015][]
+  for more information.
+
+[lexicographical order]: https://en.wikipedia.org/wiki/Lexicographical_order
+[SE-0015]: https://github.com/apple/swift-evolution/blob/master/proposals/0015-tuple-comparison-operators.md
 
 2015-09-17 [Xcode 7.1, Swift 2.1]
 ----------
@@ -3897,9 +3905,9 @@ Latest
   themselves.
 
   Overall, a property now may either be "stored" (the default), "computed"
-  (have a `get:` and optionally a `set:` specifier), or a observed
+  (have a `get:` and optionally a `set:` specifier), or an observed
   (`willSet`/`didSet`) property.  It is not possible to have a custom getter
-  or setter on a observed property, since they have storage.
+  or setter on an observed property, since they have storage.
 
   Two known-missing bits are:
   - **(rdar://problem/15920332) didSet/willSet variables need to allow initializers**

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -780,8 +780,8 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
   //
   // As such, the body of the 'defer' is actually type checked within the
   // closure's DeclContext.
-  auto params = TuplePattern::create(Context, SourceLoc(), {}, SourceLoc());
-  DeclName name(Context, Context.getIdentifier("$defer"), {});
+  auto params = ParameterList::createEmpty(Context);
+  DeclName name(Context, Context.getIdentifier("$defer"), params);
   auto tempDecl
     = FuncDecl::create(Context,
                        /*static*/ SourceLoc(),
@@ -2010,9 +2010,7 @@ static BraceStmt *ConvertClosureToBraceStmt(Expr *E, ASTContext &Ctx) {
   // doesn't "look" like the body of a control flow statement, it looks like a
   // closure.
   if (CE->getInLoc().isValid() || CE->hasExplicitResultType() ||
-      !CE->getParams()->isImplicit() ||
-      !isa<TuplePattern>(CE->getParams()) ||
-      cast<TuplePattern>(CE->getParams())->getNumElements() != 0)
+      CE->getParameters()->size() != 0)
     return nullptr;
 
   // Silence downstream errors by giving it type ()->(), to match up with the

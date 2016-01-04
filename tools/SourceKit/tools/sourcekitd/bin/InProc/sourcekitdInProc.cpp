@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -79,7 +79,7 @@ UIdent sourcekitd::UIdentFromSKDUID(sourcekitd_uid_t uid) {
 }
 
 std::string sourcekitd::getRuntimeLibPath() {
-  // FIXME: Move to a llvm API. Note that libclang does the same thing.
+  // FIXME: Move to an LLVM API. Note that libclang does the same thing.
 #ifdef LLVM_ON_WIN32
 #error Not implemented
 #else

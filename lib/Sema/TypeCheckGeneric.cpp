@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -379,15 +379,15 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
                            false, &resolver);
 
   // Check the parameter patterns.
-  for (auto pattern : func->getBodyParamPatterns()) {
+  for (auto params : func->getParameterLists()) {
     // Check the pattern.
-    if (tc.typeCheckPattern(pattern, func, TR_ImmediateFunctionInput,
-                            &resolver))
+    if (tc.typeCheckParameterList(params, func, TypeResolutionOptions(),
+                                  &resolver))
       badType = true;
 
     // Infer requirements from the pattern.
     if (builder) {
-      builder->inferRequirements(pattern, genericParams);
+      builder->inferRequirements(params, genericParams);
     }
   }
 
@@ -395,7 +395,7 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   if (auto fn = dyn_cast<FuncDecl>(func)) {
     if (!fn->getBodyResultTypeLoc().isNull()) {
       // Check the result type of the function.
-      TypeResolutionOptions options = TR_FunctionResult;
+      TypeResolutionOptions options;
       if (fn->hasDynamicSelf())
         options |= TR_DynamicSelfResult;
 
@@ -553,23 +553,20 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     funcTy = TupleType::getEmpty(Context);
   }
 
-  auto patterns = func->getBodyParamPatterns();
-  SmallVector<Pattern *, 4> storedPatterns;
+  auto paramLists = func->getParameterLists();
+  SmallVector<ParameterList*, 4> storedParamLists;
 
   // FIXME: Destructors don't have the '()' pattern in their signature, so
   // paste it here.
   if (isa<DestructorDecl>(func)) {
-    storedPatterns.append(patterns.begin(), patterns.end());
-
-    Pattern *pattern = TuplePattern::create(Context, SourceLoc(), { },
-                                            SourceLoc(), /*Implicit=*/true);
-    pattern->setType(TupleType::getEmpty(Context));
-    storedPatterns.push_back(pattern);
-    patterns = storedPatterns;
+    assert(paramLists.size() == 1 && "Only the self paramlist");
+    storedParamLists.push_back(paramLists[0]);
+    storedParamLists.push_back(ParameterList::createEmpty(Context));
+    paramLists = storedParamLists;
   }
 
   bool hasSelf = func->getDeclContext()->isTypeContext();
-  for (unsigned i = 0, e = patterns.size(); i != e; ++i) {
+  for (unsigned i = 0, e = paramLists.size(); i != e; ++i) {
     Type argTy;
     Type initArgTy;
 
@@ -583,7 +580,7 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
         initArgTy = func->computeInterfaceSelfType(/*isInitializingCtor=*/true);
       }
     } else {
-      argTy = patterns[e - i - 1]->getType();
+      argTy = paramLists[e - i - 1]->getType(Context);
 
       // For an implicit declaration, our argument type will be in terms of
       // archetypes rather than dependent types. Replace the

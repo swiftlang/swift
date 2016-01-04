@@ -44,7 +44,12 @@ bb0(%p : $P, %q : $P):
 
   // CHECK:      [[X:%.*]] = alloca [[UREF:{ %swift.unowned, i8.. }]], align 8
   // CHECK-NEXT: [[Y:%.*]] = alloca [[UREF]], align 8
+
+  // CHECK-NEXT: bitcast
+  // CHECK-NEXT: llvm.lifetime.start
   %x = alloc_stack $@sil_unowned P
+  // CHECK-NEXT: bitcast
+  // CHECK-NEXT: llvm.lifetime.start
   %y = alloc_stack $@sil_unowned P
 
   // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[X]], i32 0, i32 1
@@ -123,7 +128,11 @@ bb0(%p : $P, %q : $P):
   // CHECK-NEXT: call void @swift_unknownUnownedDestroy(%swift.unowned* [[T0]])
   destroy_addr %x#1 : $*@sil_unowned P
 
+  // CHECK-NEXT: bitcast
+  // CHECK-NEXT: llvm.lifetime.end
   dealloc_stack %y#0 : $*@local_storage @sil_unowned P
+  // CHECK-NEXT: bitcast
+  // CHECK-NEXT: llvm.lifetime.end
   dealloc_stack %x#0 : $*@local_storage @sil_unowned P
 
   // CHECK-NEXT: call void @swift_unknownRelease([[UNKNOWN]]* [[PV]])

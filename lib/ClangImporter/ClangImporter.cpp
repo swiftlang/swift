@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -710,7 +710,8 @@ void ClangImporter::Implementation::addEntryToLookupTable(
 
     // Also add the subscript entry, if needed.
     if (importedName.IsSubscriptAccessor)
-      table.addEntry(DeclName(SwiftContext, SwiftContext.Id_subscript, { }),
+      table.addEntry(DeclName(SwiftContext, SwiftContext.Id_subscript,
+                              ArrayRef<Identifier>()),
                      named, effectiveContext);
   } else if (auto category = dyn_cast<clang::ObjCCategoryDecl>(named)) {
     table.addCategory(category);
@@ -1567,7 +1568,7 @@ StringRef ClangImporter::Implementation::getEnumConstantNamePrefix(
     }
   }
 
-  // Compute th e common prefix.
+  // Compute the common prefix.
   StringRef commonPrefix = (*ec)->getName();
   bool followedByNonIdentifier = false;
   for (++ec; ec != ecEnd; ++ec) {
@@ -1602,15 +1603,9 @@ StringRef ClangImporter::Implementation::getEnumConstantNamePrefix(
         checkPrefix = checkPrefix.drop_front();
     }
 
-    // Account for the enum being imported using
-    // __attribute__((swift_private)). This is a little ad hoc, but it's a
-    // rare case anyway.
-    Identifier enumName = importFullName(decl, None, nullptr, &sema).Imported
-                            .getBaseName();
-    StringRef enumNameStr = enumName.str();
-    if (enumNameStr.startswith("__") && !checkPrefix.startswith("__"))
-      enumNameStr = enumNameStr.drop_front(2);
-
+    // Don't use importFullName() here, we want to ignore the swift_name
+    // and swift_private attributes.
+    StringRef enumNameStr = decl->getName();
     StringRef commonWithEnum = getCommonPluralPrefix(checkPrefix,
                                                      enumNameStr);
     size_t delta = commonPrefix.size() - checkPrefix.size();

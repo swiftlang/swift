@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -625,9 +625,9 @@ handleSemanticRequest(RequestDict Req,
   return Rec(createErrorRequestInvalid(ErrBuf.c_str()));
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // Index
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 namespace {
 class SKIndexingConsumer : public IndexingConsumer {
@@ -667,6 +667,7 @@ public:
   ~SKIndexingConsumer() {
     assert(Cancelled ||
            (EntitiesStack.size() == 1 && DependenciesStack.size() == 1));
+    (void) Cancelled;
   }
 
   void failed(StringRef ErrDescription) override;
@@ -815,13 +816,14 @@ bool SKIndexingConsumer::recordRelatedEntity(const EntityInfo &Info) {
 bool SKIndexingConsumer::finishSourceEntity(UIdent Kind) {
   Entity &CurrEnt = EntitiesStack.back();
   assert(CurrEnt.Kind == Kind);
+  (void) CurrEnt;
   EntitiesStack.pop_back();
   return true;
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // ReportDocInfo
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 namespace {
 
@@ -865,6 +867,7 @@ public:
   }
   ~SKDocConsumer() {
     assert(Cancelled || EntitiesStack.size() == 1);
+    (void) Cancelled;
   }
 
   sourcekitd_response_t createResponse() {
@@ -1036,6 +1039,7 @@ bool SKDocConsumer::handleAvailableAttribute(const AvailableAttrInfo &Info) {
 bool SKDocConsumer::finishSourceEntity(UIdent Kind) {
   Entity &CurrEnt = EntitiesStack.back();
   assert(CurrEnt.Kind == Kind);
+  (void) CurrEnt;
   EntitiesStack.pop_back();
   return true;
 }
@@ -1071,9 +1075,9 @@ bool SKDocConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info) {
   return true;
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // ReportCursorInfo
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 static void reportCursorInfo(StringRef Filename,
                              int64_t Offset,
@@ -1125,16 +1129,16 @@ static void reportCursorInfo(StringRef Filename,
     }
     if (Info.IsSystem)
       Elem.setBool(KeyIsSystem, true);
-    if (!Info.TypeInteface.empty())
-      Elem.set(KeyTypeInterface, Info.TypeInteface);
+    if (!Info.TypeInterface.empty())
+      Elem.set(KeyTypeInterface, Info.TypeInterface);
 
     return Rec(RespBuilder.createResponse());
   });
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // FindRelatedIdents
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 static void findRelatedIdents(StringRef Filename,
                               int64_t Offset,
@@ -1158,9 +1162,9 @@ static void findRelatedIdents(StringRef Filename,
   });
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // CodeComplete
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 namespace {
 class SKCodeCompletionConsumer : public CodeCompletionConsumer {
@@ -1233,9 +1237,9 @@ bool SKCodeCompletionConsumer::handleResult(const CodeCompletionInfo &R) {
 }
 
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // (New) CodeComplete
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 namespace {
 class SKGroupedCodeCompletionConsumer : public GroupedCodeCompletionConsumer {
@@ -1413,9 +1417,9 @@ void SKGroupedCodeCompletionConsumer::setNextRequestStart(unsigned offset) {
   Response.set(KeyNextRequestStart, offset);
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // Editor
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 namespace {
 class SKEditorConsumer : public EditorConsumer {

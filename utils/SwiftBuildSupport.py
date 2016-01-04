@@ -1,18 +1,20 @@
-#===--- SwiftBuildSupport.py - Utilities for Swift build scripts -----------===#
+# utils/SwiftBuildSupport.py - Utilities for Swift build scripts -*- python -*-
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-#
-#===------------------------------------------------------------------------===#
 
 from __future__ import print_function
 
-import ConfigParser
+try:
+    import ConfigParser # Python 2
+except ImportError:
+    import configparser as ConfigParser # Python 3
+
 import os
 import pipes
 import subprocess
@@ -63,11 +65,6 @@ SWIFT_BUILD_ROOT = os.environ.get(
 def print_with_argv0(message):
     print(sys.argv[0] + ": " + message)
 
-
-def bad_usage(message):
-    print_with_argv0(message)
-    print("Run '" + pipes.quote(sys.argv[0]) + " --help' for more information.")
-    sys.exit(1)
 
 def quote_shell_command(args):
     return " ".join([ pipes.quote(a) for a in args ])
@@ -139,7 +136,7 @@ def _get_preset_options_impl(config, substitutions, preset_name):
     for o in config.options(section_name):
         try:
             a = config.get(section_name, o)
-        except ConfigParser.InterpolationMissingOptionError, e:
+        except ConfigParser.InterpolationMissingOptionError as e:
             # e.reference contains the correctly formatted option
             missing_opts.append(e.reference)
             continue

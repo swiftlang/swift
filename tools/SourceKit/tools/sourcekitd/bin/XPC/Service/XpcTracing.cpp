@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -81,7 +81,7 @@ struct llvm::yaml::MappingTraits<SwiftArguments> {
 };
 
 static std::string serializeCompilerArguments(const SwiftArguments &Args) {
-  // Serialize comiler instance
+  // Serialize compiler instance
   std::string OptionsAsYaml;
   llvm::raw_string_ostream OptionsStream(OptionsAsYaml);
   llvm::yaml::Output YamlOutput(OptionsStream);
@@ -104,16 +104,16 @@ public:
   virtual void operationFinished(uint64_t OpId) override;
 
   // Trace start of SourceKit operation
-  virtual void opertationStarted(uint64_t OpId, OperationKind OpKind,
-                                 const SwiftInvocation &Inv,
-                                 const StringPairs &OpArgs) override;
+  virtual void operationStarted(uint64_t OpId, OperationKind OpKind,
+                                const SwiftInvocation &Inv,
+                                const StringPairs &OpArgs) override;
 };
 
 // Trace start of SourceKit operation
-void XpcTraceConsumer::opertationStarted(uint64_t OpId,
-                                         OperationKind OpKind,
-                                         const SwiftInvocation &Inv,
-                                         const StringPairs &OpArgs) {
+void XpcTraceConsumer::operationStarted(uint64_t OpId,
+                                        OperationKind OpKind,
+                                        const SwiftInvocation &Inv,
+                                        const StringPairs &OpArgs) {
   xpc_object_t Contents = xpc_array_create(nullptr, 0);
   append(Contents, ActionKind::OperationStarted);
   append(Contents, OpId);

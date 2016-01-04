@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -199,38 +199,14 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       consumeToken();
     }
 
-    // '#'?
-    if (Tok.is(tok::pound))
-      param.PoundLoc = consumeToken(tok::pound);
-
-    if (param.PoundLoc.isValid() || startsParameterName(*this, isClosure)) {
+    if (startsParameterName(*this, isClosure)) {
       // identifier-or-none for the first name
       if (Tok.is(tok::kw__)) {
-        // A back-tick cannot precede an empty name marker.
-        if (param.PoundLoc.isValid()) {
-          diagnose(Tok, diag::parameter_backtick_empty_name)
-          .fixItRemove(param.PoundLoc);
-          param.PoundLoc = SourceLoc();
-        }
-
         param.FirstNameLoc = consumeToken();
-      } else if (Tok.canBeArgumentLabel()) {
+      } else {
+        assert(Tok.canBeArgumentLabel() && "startsParameterName() lied");
         param.FirstName = Context.getIdentifier(Tok.getText());
         param.FirstNameLoc = consumeToken();
-
-        // Operators cannot have API names.
-        if (paramContext == ParameterContextKind::Operator &&
-            param.PoundLoc.isValid()) {
-          diagnose(param.PoundLoc, 
-                   diag::parameter_operator_keyword_argument)
-            .fixItRemove(param.PoundLoc);
-          param.PoundLoc = SourceLoc();
-        }
-      } else {
-        assert(param.PoundLoc.isValid() && "startsParameterName() lied");
-        diagnose(Tok, diag::parameter_backtick_missing_name);
-        param.FirstNameLoc = param.PoundLoc;
-        param.PoundLoc = SourceLoc();
       }
 
       // identifier-or-none? for the second name
@@ -254,30 +230,9 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         param.SecondNameLoc = SourceLoc();
       }
 
-      // Cannot have a pound and two names.
-      if (param.PoundLoc.isValid() && param.SecondNameLoc.isValid()) {
-        diagnose(param.PoundLoc, diag::parameter_backtick_two_names)
-          .fixItRemove(param.PoundLoc);
-        param.PoundLoc = SourceLoc();
-      }
-
       // (':' type)?
       if (Tok.is(tok::colon)) {
         param.ColonLoc = consumeToken();
-
-        // Special case handling of @autoclosure attribute on the type, which
-        // was supported in Swift 1.0 and 1.1, but removed in Swift 1.2 (moved
-        // to a decl attribute).
-        if (Tok.is(tok::at_sign) &&
-            peekToken().isContextualKeyword("autoclosure")) {
-          SourceLoc AtLoc = consumeToken(tok::at_sign);
-          SourceLoc ACLoc = consumeToken(tok::identifier);
-          diagnose(AtLoc, diag::autoclosure_is_decl_attribute)
-            .fixItRemove(SourceRange(AtLoc, ACLoc))
-            .fixItInsert(StartLoc, "@autoclosure ");
-          param.Attrs.add(new (Context) AutoClosureAttr(AtLoc, ACLoc,
-                                                        /*escaping=*/false));
-        }
 
         auto type = parseType(diag::expected_parameter_type);
         status |= type;
@@ -340,10 +295,8 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
   });
 }
 
-/// Map parsed parameters to argument and body patterns.
-///
-/// \returns the pattern describing the parsed parameters.
-static Pattern*
+/// Map parsed parameters to a ParameterList.
+static ParameterList *
 mapParsedParameters(Parser &parser,
                     SourceLoc leftParenLoc,
                     MutableArrayRef<Parser::ParsedParameter> params,
@@ -354,53 +307,39 @@ mapParsedParameters(Parser &parser,
   auto &ctx = parser.Context;
 
   // Local function to create a pattern for a single parameter.
-  auto createParamPattern = [&](SourceLoc &letVarInOutLoc,
+  auto createParam = [&](SourceLoc &letVarInOutLoc,
                         Parser::ParsedParameter::SpecifierKindTy &specifierKind,
                                 Identifier argName, SourceLoc argNameLoc,
                                 Identifier paramName, SourceLoc paramNameLoc,
                                 TypeRepr *type,
-                                const DeclAttributes &Attrs) -> Pattern * {
-    // Create the parameter based on the name.
-    Pattern *param;
-    ParamDecl *var = nullptr;
-    // Create a variable to capture this.
-    var = new (ctx) ParamDecl(specifierKind == Parser::ParsedParameter::Let,
-                              argNameLoc, argName,
-                              paramNameLoc, paramName, Type(),
-                              parser.CurDeclContext);
-    var->getAttrs() = Attrs;
+                                const DeclAttributes &Attrs) -> ParamDecl * {
+    bool isLet = specifierKind == Parser::ParsedParameter::Let;
+    auto param = new (ctx) ParamDecl(isLet, argNameLoc, argName,
+                                     paramNameLoc, paramName, Type(),
+                                     parser.CurDeclContext);
+    param->getAttrs() = Attrs;
+    
     if (argNameLoc.isInvalid() && paramNameLoc.isInvalid())
-      var->setImplicit();
-    param = new (ctx) NamedPattern(var);
-
+      param->setImplicit();
+    
     // If a type was provided, create the typed pattern.
     if (type) {
       // If 'inout' was specified, turn the type into an in-out type.
       if (specifierKind == Parser::ParsedParameter::InOut)
         type = new (ctx) InOutTypeRepr(type, letVarInOutLoc);
 
-      param = new (ctx) TypedPattern(param, type);
+      param->getTypeLoc() = TypeLoc(type);
     } else if (specifierKind == Parser::ParsedParameter::InOut) {
       parser.diagnose(letVarInOutLoc, diag::inout_must_have_type);
       letVarInOutLoc = SourceLoc();
       specifierKind = Parser::ParsedParameter::Let;
     }
-
-    // If 'var' or 'let' was specified explicitly, create a pattern for it.
-    if (specifierKind != Parser::ParsedParameter::InOut &&
-        letVarInOutLoc.isValid()) {
-      bool isLet = specifierKind == Parser::ParsedParameter::Let;
-      param = new (ctx) VarPattern(letVarInOutLoc, isLet, param);
-    }
-
-    if (var)
-      var->setParamParentPattern(param);
     return param;
   };
 
   // Collect the elements of the tuple patterns for argument and body
   // parameters.
-  SmallVector<TuplePatternElt, 4> elements;
+  SmallVector<ParamDecl*, 4> elements;
   SourceLoc ellipsisLoc;
   bool isFirstParameter = true;
   for (auto &param : params) {
@@ -428,7 +367,7 @@ mapParsedParameters(Parser &parser,
     }
 
     // Create the pattern.
-    Pattern *pattern;
+    ParamDecl *result = nullptr;
     Identifier argName;
     Identifier paramName;
     if (param.SecondNameLoc.isValid()) {
@@ -436,10 +375,10 @@ mapParsedParameters(Parser &parser,
       paramName = param.SecondName;
 
       // Both names were provided, so pass them in directly.
-      pattern = createParamPattern(param.LetVarInOutLoc, param.SpecifierKind,
-                                   argName, param.FirstNameLoc,
-                                   paramName, param.SecondNameLoc,
-                                   param.Type, param.Attrs);
+      result = createParam(param.LetVarInOutLoc, param.SpecifierKind,
+                           argName, param.FirstNameLoc,
+                           paramName, param.SecondNameLoc,
+                           param.Type, param.Attrs);
 
       // If the first name is empty and this parameter would not have been
       // an API name by default, complain.
@@ -462,31 +401,14 @@ mapParsedParameters(Parser &parser,
           .fixItRemoveChars(param.FirstNameLoc, param.SecondNameLoc);
       }
     } else {
-      // If it's an API name by default, or there was a pound, we have an
-      // API name.
-      if (isKeywordArgumentByDefault || param.PoundLoc.isValid()) {
+      if (isKeywordArgumentByDefault)
         argName = param.FirstName;
-
-        // THe pound is going away. Complain.
-        if (param.PoundLoc.isValid()) {
-          if (isKeywordArgumentByDefault) {
-            parser.diagnose(param.PoundLoc, diag::parameter_extraneous_pound,
-                            argName)
-              .fixItRemove(param.PoundLoc);
-          } else {
-            parser.diagnose(param.PoundLoc, diag::parameter_pound_double_up,
-                            argName.str())
-              .fixItReplace(param.PoundLoc, (argName.str() + " ").str());
-          }
-        }
-      }
-
       paramName = param.FirstName;
 
-      pattern = createParamPattern(param.LetVarInOutLoc, param.SpecifierKind,
-                                   argName, SourceLoc(),
-                                   param.FirstName, param.FirstNameLoc,
-                                   param.Type, param.Attrs);
+      result = createParam(param.LetVarInOutLoc, param.SpecifierKind,
+                           argName, SourceLoc(),
+                           param.FirstName, param.FirstNameLoc,
+                           param.Type, param.Attrs);
     }
 
     // If this parameter had an ellipsis, check whether it's the last parameter.
@@ -497,29 +419,30 @@ mapParsedParameters(Parser &parser,
           .fixItRemove(param.EllipsisLoc);
 
         param.EllipsisLoc = SourceLoc();
-      } else if (!isa<TypedPattern>(pattern)) {
+      } else if (!result->getTypeLoc().getTypeRepr()) {
         parser.diagnose(param.EllipsisLoc, diag::untyped_pattern_ellipsis)
-          .highlight(pattern->getSourceRange());
+          .highlight(result->getSourceRange());
 
         param.EllipsisLoc = SourceLoc();
       } else {
         ellipsisLoc = param.EllipsisLoc;
+        result->setVariadic();
       }
     }
 
-    // Default arguments are only permitted on the first parameter clause.
-    if (param.DefaultArg && !isFirstParameterClause) {
-      parser.diagnose(param.EqualLoc, diag::non_func_decl_pattern_init)
-        .fixItRemove(SourceRange(param.EqualLoc,
-                                 param.DefaultArg->getExpr()->getEndLoc()));
+    if (param.DefaultArg) {
+      if (!isFirstParameterClause) {
+        // Default arguments are only permitted on the first parameter clause.
+        parser.diagnose(param.EqualLoc, diag::non_func_decl_pattern_init)
+          .fixItRemove(SourceRange(param.EqualLoc,
+                                   param.DefaultArg->getExpr()->getEndLoc()));
+      } else {
+        result->setDefaultArgumentKind(getDefaultArgKind(param.DefaultArg));
+        result->setDefaultValue(param.DefaultArg);
+      }
     }
 
-    // Create the tuple pattern elements.
-    auto defArgKind = getDefaultArgKind(param.DefaultArg);
-    elements.push_back(TuplePatternElt(argName, param.FirstNameLoc, pattern,
-                                       param.EllipsisLoc.isValid(),
-                                       param.EllipsisLoc, param.DefaultArg,
-                                       defArgKind));
+    elements.push_back(result);
 
     if (argNames)
       argNames->push_back(argName);
@@ -527,11 +450,11 @@ mapParsedParameters(Parser &parser,
     isFirstParameter = false;
   }
 
-  return TuplePattern::createSimple(ctx, leftParenLoc, elements, rightParenLoc);
+  return ParameterList::create(ctx, leftParenLoc, elements, rightParenLoc);
 }
 
 /// Parse a single parameter-clause.
-ParserResult<Pattern> Parser::parseSingleParameterClause(
+ParserResult<ParameterList> Parser::parseSingleParameterClause(
                                 ParameterContextKind paramContext,
                                 SmallVectorImpl<Identifier> *namePieces) {
   ParserStatus status;
@@ -543,11 +466,11 @@ ParserResult<Pattern> Parser::parseSingleParameterClause(
                                  /*defaultArgs=*/nullptr, paramContext);
   
   // Turn the parameter clause into argument and body patterns.
-  auto pattern = mapParsedParameters(*this, leftParenLoc, params,
+  auto paramList = mapParsedParameters(*this, leftParenLoc, params,
                                      rightParenLoc, true, namePieces,
                                      paramContext);
 
-  return makeParserResult(status, pattern);
+  return makeParserResult(status, paramList);
 }
 
 /// Parse function arguments.
@@ -562,13 +485,13 @@ ParserResult<Pattern> Parser::parseSingleParameterClause(
 ///
 ParserStatus
 Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
-                               SmallVectorImpl<Pattern *> &BodyPatterns,
+                               SmallVectorImpl<ParameterList*> &BodyParams,
                                ParameterContextKind paramContext,
                                DefaultArgumentInfo &DefaultArgs) {
   // Parse parameter-clauses.
   ParserStatus status;
   bool isFirstParameterClause = true;
-  unsigned FirstBodyPatternIndex = BodyPatterns.size();
+  unsigned FirstBodyPatternIndex = BodyParams.size();
   while (Tok.is(tok::l_paren)) {
     SmallVector<ParsedParameter, 4> params;
     SourceLoc leftParenLoc, rightParenLoc;
@@ -584,39 +507,34 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
                                        isFirstParameterClause ? &NamePieces
                                                               : nullptr,
                                        paramContext);
-    BodyPatterns.push_back(pattern);
+    BodyParams.push_back(pattern);
     isFirstParameterClause = false;
     paramContext = ParameterContextKind::Curried;
   }
 
   // If the decl uses currying syntax, warn that that syntax is going away.
-  if (BodyPatterns.size() - FirstBodyPatternIndex > 1) {
+  if (BodyParams.size() - FirstBodyPatternIndex > 1) {
     SourceRange allPatternsRange(
-      BodyPatterns[FirstBodyPatternIndex]->getStartLoc(),
-      BodyPatterns.back()->getEndLoc());
+      BodyParams[FirstBodyPatternIndex]->getStartLoc(),
+      BodyParams.back()->getEndLoc());
     auto diag = diagnose(allPatternsRange.Start,
                          diag::parameter_curry_syntax_removed);
     diag.highlight(allPatternsRange);
     bool seenArg = false;
-    auto isEmptyPattern = [](Pattern *pattern) -> bool {
-      auto *tuplePattern = dyn_cast<TuplePattern>(pattern);
-      return tuplePattern && tuplePattern->getNumElements() == 0;
-    };
-    for (unsigned i = FirstBodyPatternIndex; i < BodyPatterns.size() - 1; i++) {
+    for (unsigned i = FirstBodyPatternIndex; i < BodyParams.size() - 1; i++) {
       // Replace ")(" with ", ", so "(x: Int)(y: Int)" becomes
       // "(x: Int, y: Int)". But just delete them if they're not actually
       // separating any arguments, e.g. in "()(y: Int)".
       StringRef replacement(", ");
-      Pattern *leftPattern = BodyPatterns[i];
-      Pattern *rightPattern = BodyPatterns[i + 1];
-      if (!isEmptyPattern(leftPattern)) {
+      auto *leftParamList = BodyParams[i];
+      auto *rightParamList = BodyParams[i + 1];
+      if (leftParamList->size() != 0)
         seenArg = true;
-      }
-      if (!seenArg || isEmptyPattern(rightPattern)) {
+      if (!seenArg || rightParamList->size() == 0)
         replacement = "";
-      }
-      diag.fixItReplace(SourceRange(leftPattern->getEndLoc(),
-                                    rightPattern->getStartLoc()),
+    
+      diag.fixItReplace(SourceRange(leftParamList->getEndLoc(),
+                                    rightParamList->getStartLoc()),
                         replacement);
     }
   }
@@ -634,7 +552,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
 ParserStatus
 Parser::parseFunctionSignature(Identifier SimpleName,
                                DeclName &FullName,
-                               SmallVectorImpl<Pattern *> &bodyPatterns,
+                               SmallVectorImpl<ParameterList*> &bodyParams,
                                DefaultArgumentInfo &defaultArgs,
                                SourceLoc &throwsLoc,
                                bool &rethrows,
@@ -652,28 +570,26 @@ Parser::parseFunctionSignature(Identifier SimpleName,
     else
       paramContext = ParameterContextKind::Function;
 
-    Status = parseFunctionArguments(NamePieces, bodyPatterns, paramContext,
+    Status = parseFunctionArguments(NamePieces, bodyParams, paramContext,
                                     defaultArgs);
     FullName = DeclName(Context, SimpleName, 
                         llvm::makeArrayRef(NamePieces.begin() + 1,
                                            NamePieces.end()));
 
-    if (bodyPatterns.empty()) {
+    if (bodyParams.empty()) {
       // If we didn't get anything, add a () pattern to avoid breaking
       // invariants.
       assert(Status.hasCodeCompletion() || Status.isError());
-      bodyPatterns.push_back(TuplePattern::create(Context, Tok.getLoc(),
-                                                  {}, Tok.getLoc()));
+      bodyParams.push_back(ParameterList::createEmpty(Context));
     }
   } else {
     diagnose(Tok, diag::func_decl_without_paren);
     Status = makeParserError();
 
     // Recover by creating a '() -> ?' signature.
-    auto *EmptyTuplePattern =
-        TuplePattern::create(Context, PreviousLoc, {}, PreviousLoc);
-    bodyPatterns.push_back(EmptyTuplePattern);
-    FullName = DeclName(Context, SimpleName, { });
+    bodyParams.push_back(ParameterList::createEmpty(Context, PreviousLoc,
+                                                    PreviousLoc));
+    FullName = DeclName(Context, SimpleName, bodyParams.back());
   }
   
   // Check for the 'throws' keyword.
@@ -740,7 +656,8 @@ Parser::parseFunctionSignature(Identifier SimpleName,
 }
 
 ParserStatus
-Parser::parseConstructorArguments(DeclName &FullName, Pattern *&BodyPattern,
+Parser::parseConstructorArguments(DeclName &FullName,
+                                  ParameterList *&BodyParams,
                                   DefaultArgumentInfo &DefaultArgs) {
   // If we don't have the leading '(', complain.
   if (!Tok.is(tok::l_paren)) {
@@ -751,10 +668,9 @@ Parser::parseConstructorArguments(DeclName &FullName, Pattern *&BodyPattern,
         diag.fixItInsert(Tok.getLoc(), "() ");
     }
 
-    // Create an empty tuple to recover.
-    BodyPattern = TuplePattern::createSimple(Context, PreviousLoc, {},
-                                             PreviousLoc, true);
-    FullName = DeclName(Context, Context.Id_init, { });
+    // Create an empty parameter list to recover.
+    BodyParams = ParameterList::createEmpty(Context, PreviousLoc, PreviousLoc);
+    FullName = DeclName(Context, Context.Id_init, BodyParams);
     return makeParserError();
   }
 
@@ -769,11 +685,11 @@ Parser::parseConstructorArguments(DeclName &FullName, Pattern *&BodyPattern,
 
   // Turn the parameter clause into argument and body patterns.
   llvm::SmallVector<Identifier, 2> namePieces;
-  BodyPattern = mapParsedParameters(*this, leftParenLoc, params,
-                                    rightParenLoc, 
-                                    /*isFirstParameterClause=*/true,
-                                    &namePieces,
-                                    ParameterContextKind::Initializer);
+  BodyParams = mapParsedParameters(*this, leftParenLoc, params,
+                                   rightParenLoc,
+                                   /*isFirstParameterClause=*/true,
+                                   &namePieces,
+                                   ParameterContextKind::Initializer);
 
   FullName = DeclName(Context, Context.Id_init, namePieces);
   return status;
@@ -923,14 +839,7 @@ Parser::parsePatternTupleElement() {
   if (pattern.isNull())
     return std::make_pair(makeParserError(), None);
 
-  // Consume the '...'.
-  SourceLoc ellipsisLoc;
-  if (Tok.isEllipsis())
-    ellipsisLoc = consumeToken();
-  auto Elt = TuplePatternElt(Label, LabelLoc, pattern.get(),
-                             ellipsisLoc.isValid(), ellipsisLoc,
-                             nullptr, DefaultArgumentKind::None);
-
+  auto Elt = TuplePatternElt(Label, LabelLoc, pattern.get());
   return std::make_pair(makeParserSuccess(), Elt);
 }
 

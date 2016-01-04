@@ -188,7 +188,7 @@ struct FooStruct {
   mutating
   func instanceFunc6() -> Int! {}
   mutating
-  func instanceFunc7(#a: Int) {}
+  func instanceFunc7(a a: Int) {}
   mutating
   func instanceFunc8(a: (Int, Int)) {}
   mutating

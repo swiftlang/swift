@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -45,7 +45,7 @@ func _insertionSort<
 >(
   inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"inout _ isOrderedBefore: (C.Iterator.Element, C.Iterator.Element)->Bool" if p else ""}
+  ${"inout _ isOrderedBefore: (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) {
   if !range.isEmpty {
     let start = range.startIndex
@@ -92,7 +92,7 @@ func _partition<
 >(
   inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"inout _ isOrderedBefore: (C.Iterator.Element, C.Iterator.Element)->Bool" if p else ""}
+  ${"inout _ isOrderedBefore: (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) -> C.Index {
   var lo = range.startIndex
   var hi = range.endIndex
@@ -147,7 +147,7 @@ func _introSort<
 >(
   inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"_ isOrderedBefore: (C.Iterator.Element, C.Iterator.Element)->Bool" if p else ""}
+  ${"_ isOrderedBefore: (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) {
 %   if p:
   var comp = isOrderedBefore
@@ -168,7 +168,7 @@ func _introSortImpl<
 >(
   inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"inout _ isOrderedBefore: (C.Iterator.Element, C.Iterator.Element)->Bool" if p else ""},
+  ${"inout _ isOrderedBefore: (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""},
   _ depthLimit: Int
 ) {
 
@@ -200,7 +200,7 @@ func _siftDown<
   inout elements: C,
   _ index: C.Index,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"inout _ isOrderedBefore: (C.Iterator.Element, C.Iterator.Element)->Bool" if p else ""}
+  ${"inout _ isOrderedBefore: (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) {
   let lengthToIndex = (range.startIndex..<index).length
   let lengthFromIndex = (index..<range.endIndex).length
@@ -234,7 +234,7 @@ func _heapify<
 >(
   inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"inout _ isOrderedBefore: (C.Iterator.Element, C.Iterator.Element)->Bool" if p else ""}
+  ${"inout _ isOrderedBefore: (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) {
   // Here we build a heap starting from the lowest nodes and moving to the root.
   // On every step we sift down the current node to obey the max-heap property:
@@ -255,7 +255,7 @@ func _heapSort<
 >(
   inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"inout _ isOrderedBefore: (C.Iterator.Element, C.Iterator.Element)->Bool" if p else ""}
+  ${"inout _ isOrderedBefore: (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) {
   var hi = range.endIndex
   let lo = range.startIndex

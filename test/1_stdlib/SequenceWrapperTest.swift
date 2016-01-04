@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -27,11 +27,11 @@ let indirect = LoggingSequence(direct)
 let dispatchLog = base.log
 
 func expectWrapperDispatch<R1, R2>(
-  @autoclosure directOperation: ()->R1,
-  @autoclosure _ indirectOperation: ()->R2,
+  @autoclosure directOperation: () -> R1,
+  @autoclosure _ indirectOperation: () -> R2,
   _ counters: TypeIndexed<Int>,
   //===--- TRACE boilerplate ----------------------------------------------===//
-  @autoclosure _ message: ()->String = "",
+  @autoclosure _ message: () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
   file: String = __FILE__, line: UInt = __LINE__

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -404,7 +404,7 @@ func expectSequencePassthrough<
     _ = s._copyToNativeArrayBuffer()
   }
   
-  SequenceLog._initializeTo.expectIncrement(baseType) { ()->Void in
+  SequenceLog._initializeTo.expectIncrement(baseType) { () -> Void in
     let buf = UnsafeMutablePointer<S.Iterator.Element>(allocatingCapacity: length)
   
     let end = s._initializeTo(buf)
@@ -490,7 +490,7 @@ tests.test("LazyMapSequence") {
 
   var calls = 0
   var mapped = base.map {
-    (x: OpaqueValue<Int>)->OpaqueValue<Double> in
+    (x: OpaqueValue<Int>) -> OpaqueValue<Double> in
     calls += 1
     return OpaqueValue(Double(x.value) / 2.0)
   }
@@ -532,7 +532,7 @@ tests.test("LazyMapCollection/${traversal}") {
 
   var calls = 0
   var mapped = base.map {
-    (x: OpaqueValue<Int>)->OpaqueValue<Double> in
+    (x: OpaqueValue<Int>) -> OpaqueValue<Double> in
     calls += 1
     return OpaqueValue(Double(x.value) / 2.0)
   }
@@ -639,7 +639,7 @@ tests.test("ReverseCollection/Lazy") {
     ExpectType<LazyReversedBase>.test(reversed)
     
     var calls = 0
-    let reversedAndMapped = reversed.map { (x)->Int in calls += 1; return x }
+    let reversedAndMapped = reversed.map { (x) -> Int in calls += 1; return x }
     expectEqual(0, calls)
     checkRandomAccessCollection(0...11, reversedAndMapped)
     expectNotEqual(0, calls)
@@ -661,7 +661,7 @@ tests.test("ReverseCollection/Lazy") {
     ExpectType<LazyReversedBase>.test(reversed)
     
     var calls = 0
-    let reversedAndMapped = reversed.map { (x)->Character in calls += 1; return x }
+    let reversedAndMapped = reversed.map { (x) -> Character in calls += 1; return x }
     expectEqual(0, calls)
     checkBidirectionalCollection("raboof".characters, reversedAndMapped)
     expectNotEqual(0, calls)

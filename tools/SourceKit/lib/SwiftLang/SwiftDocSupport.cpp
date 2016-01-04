@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -511,48 +511,33 @@ static void collectFuncEntities(std::vector<TextEntity> &Ents,
 }
 
 static void addParameters(ArrayRef<Identifier> &ArgNames,
-                          const Pattern *Pat,
+                          const ParameterList *paramList,
                           TextEntity &Ent,
                           SourceManager &SM,
                           unsigned BufferID) {
-  if (auto ParenPat = dyn_cast<ParenPattern>(Pat)) {
-    addParameters(ArgNames, ParenPat->getSubPattern(), Ent, SM, BufferID);
-    return;
-  }
-
-  if (auto Tuple = dyn_cast<TuplePattern>(Pat)) {
-    for (const auto &Elt : Tuple->getElements())
-      addParameters(ArgNames, Elt.getPattern(), Ent, SM, BufferID);
-
-    return;
-  }
-
-  StringRef Arg;
-  if (!ArgNames.empty()) {
-    Identifier Id = ArgNames.front();
-    Arg = Id.empty() ? "_" : Id.str();
-    ArgNames = ArgNames.slice(1);
-  }
-
-  if (auto Typed = dyn_cast<TypedPattern>(Pat)) {
-    VarDecl *VD = nullptr;
-    if (auto Named = dyn_cast<NamedPattern>(Typed->getSubPattern())) {
-      VD = Named->getDecl();
+  for (auto &param : *paramList) {
+    StringRef Arg;
+    if (!ArgNames.empty()) {
+      Identifier Id = ArgNames.front();
+      Arg = Id.empty() ? "_" : Id.str();
+      ArgNames = ArgNames.slice(1);
     }
-    SourceRange TypeRange = Typed->getTypeLoc().getSourceRange();
-    if (auto InOutTyR =
-        dyn_cast_or_null<InOutTypeRepr>(Typed->getTypeLoc().getTypeRepr())) {
-      TypeRange = InOutTyR->getBase()->getSourceRange();
+
+    if (auto typeRepr = param->getTypeLoc().getTypeRepr()) {
+      SourceRange TypeRange = param->getTypeLoc().getSourceRange();
+      if (auto InOutTyR = dyn_cast_or_null<InOutTypeRepr>(typeRepr))
+        TypeRange = InOutTyR->getBase()->getSourceRange();
+      if (TypeRange.isInvalid())
+        continue;
+      
+      unsigned StartOffs = SM.getLocOffsetInBuffer(TypeRange.Start, BufferID);
+      unsigned EndOffs =
+        SM.getLocOffsetInBuffer(Lexer::getLocForEndOfToken(SM, TypeRange.End),
+                                BufferID);
+      TextRange TR{ StartOffs, EndOffs-StartOffs };
+      TextEntity Param(param, Arg, TR, StartOffs);
+      Ent.SubEntities.push_back(std::move(Param));
     }
-    if (TypeRange.isInvalid())
-      return;
-    unsigned StartOffs = SM.getLocOffsetInBuffer(TypeRange.Start, BufferID);
-    unsigned EndOffs =
-      SM.getLocOffsetInBuffer(Lexer::getLocForEndOfToken(SM, TypeRange.End),
-                              BufferID);
-    TextRange TR{ StartOffs, EndOffs-StartOffs };
-    TextEntity Param(VD, Arg, TR, StartOffs);
-    Ent.SubEntities.push_back(std::move(Param));
   }
 }
 
@@ -560,19 +545,18 @@ static void addParameters(const AbstractFunctionDecl *FD,
                           TextEntity &Ent,
                           SourceManager &SM,
                           unsigned BufferID) {
-  auto Pats = FD->getBodyParamPatterns();
+  auto params = FD->getParameterLists();
   // Ignore 'self'.
-  if (FD->getDeclContext()->isTypeContext() &&
-      !Pats.empty() && isa<TypedPattern>(Pats.front())) {
-    Pats = Pats.slice(1);
-  }
+  if (FD->getDeclContext()->isTypeContext())
+    params = params.slice(1);
+
   ArrayRef<Identifier> ArgNames;
   DeclName Name = FD->getFullName();
   if (Name) {
     ArgNames = Name.getArgumentNames();
   }
-  for (auto Pat : Pats) {
-    addParameters(ArgNames, Pat, Ent, SM, BufferID);
+  for (auto paramList : params) {
+    addParameters(ArgNames, paramList, Ent, SM, BufferID);
   }
 }
 

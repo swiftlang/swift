@@ -133,7 +133,8 @@ def collectBenchmarks(exeNames, treeish = None, repeat = 3, build_script_args = 
                     
                 rebuilt = True
         else:
-            timingsText = open(timingsFile).read()
+            with open(timingsFile) as f:
+                timingsText = f.read()
             oldRepeat = timingsText.count('\nTotal')
             if oldRepeat < repeat:
                 print('Only %s repeats in existing %s timings file' % (oldRepeat, exe))
@@ -146,8 +147,9 @@ def collectBenchmarks(exeNames, treeish = None, repeat = 3, build_script_args = 
                 output = check_output(os.path.join(binDir, exe))
                 print(output)
                 timingsText += output
-                
-            open(timingsFile, 'w').write(timingsText)
+
+            with open(timingsFile, 'w') as outfile:
+                outfile.write(timingsText)
             print('done.')
             
     return cacheDir

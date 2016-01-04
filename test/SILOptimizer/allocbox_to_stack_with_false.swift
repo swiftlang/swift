@@ -16,11 +16,11 @@ func g() {
 infix operator ~> { precedence 255 }
 protocol Target {}
 
-func ~> <Target, Arg0, Result>(inout x: Target, f: (inout _: Target, _: Arg0)->Result) -> (Arg0)->Result {
+func ~> <Target, Arg0, Result>(inout x: Target, f: (inout _: Target, _: Arg0) -> Result) -> (Arg0) -> Result {
   return { f(&x, $0) }
 }
 
-func ~> (inout x: Int, f: (inout _: Int, _: Target)->Target) -> (Target)->Target {
+func ~> (inout x: Int, f: (inout _: Int, _: Target) -> Target) -> (Target) -> Target {
   return { f(&x, $0) }
 }
 

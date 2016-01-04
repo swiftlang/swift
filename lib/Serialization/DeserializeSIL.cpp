@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -383,12 +383,11 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   TypeID funcTyID;
   unsigned rawLinkage, isTransparent, isFragile, isThunk, isGlobal,
            inlineStrategy, effect;
-  IdentifierID SemanticsID;
+  ArrayRef<uint64_t> SemanticsIDs;
   // TODO: read fragile
-  SILFunctionLayout::readRecord(scratch, rawLinkage,
-                                isTransparent, isFragile, isThunk, isGlobal,
-                                inlineStrategy, effect, funcTyID,
-                                SemanticsID);
+  SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isFragile,
+                                isThunk, isGlobal, inlineStrategy, effect,
+                                funcTyID, SemanticsIDs);
 
   if (funcTyID == 0) {
     DEBUG(llvm::dbgs() << "SILFunction typeID is 0.\n");
@@ -441,8 +440,9 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
         SILFunction::NotRelevant, (Inline_t)inlineStrategy);
     fn->setGlobalInit(isGlobal == 1);
     fn->setEffectsKind((EffectsKind)effect);
-    if (SemanticsID)
-      fn->setSemanticsAttr(MF->getIdentifier(SemanticsID).str());
+    for (auto ID : SemanticsIDs) {
+      fn->addSemanticsAttr(MF->getIdentifier(ID).str());
+    }
 
     if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), fn);
   }

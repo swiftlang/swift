@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -29,7 +29,7 @@ public struct LazyMapIterator<
   public var base: Base { return _base }
   
   internal var _base: Base
-  internal var _transform: (Base.Element)->Element
+  internal var _transform: (Base.Element) -> Element
 }
 
 /// A `Sequence` whose elements consist of those in a `Base`
@@ -58,13 +58,13 @@ public struct LazyMapSequence<Base : Sequence, Element>
 
   /// Create an instance with elements `transform(x)` for each element
   /// `x` of base.
-  internal init(_ base: Base, transform: (Base.Iterator.Element)->Element) {
+  internal init(_ base: Base, transform: (Base.Iterator.Element) -> Element) {
     self._base = base
     self._transform = transform
   }
   
   internal var _base: Base
-  internal var _transform: (Base.Iterator.Element)->Element
+  internal var _transform: (Base.Iterator.Element) -> Element
 }
 
 //===--- Collections ------------------------------------------------------===//
@@ -117,16 +117,16 @@ public struct LazyMapCollection<Base : Collection, Element>
 
   /// Create an instance with elements `transform(x)` for each element
   /// `x` of base.
-  internal init(_ base: Base, transform: (Base.Iterator.Element)->Element) {
+  internal init(_ base: Base, transform: (Base.Iterator.Element) -> Element) {
     self._base = base
     self._transform = transform
   }
   
   internal var _base: Base
-  internal var _transform: (Base.Iterator.Element)->Element
+  internal var _transform: (Base.Iterator.Element) -> Element
 }
 
-//===--- Support for s.lazy ----------------------------------------------===//
+//===--- Support for s.lazy -----------------------------------------------===//
 
 extension LazySequenceProtocol {
   /// Return a `LazyMapSequence` over this `Sequence`.  The elements of

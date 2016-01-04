@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -341,7 +341,7 @@ private:
   template <typename T, typename ...Args>
   T *createDecl(Args &&... args);
 
-  /// Constructs an new module and validates it.
+  /// Constructs a new module and validates it.
   ModuleFile(std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
              std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
              bool isFramework, serialization::ExtendedValidationInfo *extInfo);
@@ -408,6 +408,8 @@ private:
   /// If the record at the cursor is not a pattern, returns null.
   Pattern *maybeReadPattern();
 
+  ParameterList *readParameterList();
+  
   GenericParamList *maybeGetOrReadGenericParams(serialization::DeclID contextID,
                                                 DeclContext *DC,
                                                 llvm::BitstreamCursor &Cursor);
@@ -589,8 +591,7 @@ public:
   void verify() const;
 
   virtual void loadAllMembers(Decl *D,
-                              uint64_t contextData,
-                              bool *ignored) override;
+                              uint64_t contextData) override;
 
   virtual void
   loadAllConformances(const Decl *D, uint64_t contextData,

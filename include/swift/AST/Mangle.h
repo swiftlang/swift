@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -35,14 +35,18 @@ enum class OperatorFixity {
 };
 
   
-/// A class for mangling declarations.
+/// A class for mangling declarations. The Mangler accumulates name fragments
+/// with the mangleXXX methods, and the final string is constructed with the
+/// `finalize` method, after which the Mangler should not be used.
 class Mangler {
   struct ArchetypeInfo {
     unsigned Depth;
     unsigned Index;
   };
 
-  raw_ostream &Buffer;
+  llvm::SmallVector<char, 128> Storage;
+  llvm::raw_svector_ostream Buffer;
+
   llvm::DenseMap<const void *, unsigned> Substitutions;
   llvm::DenseMap<const ArchetypeType *, ArchetypeInfo> Archetypes;
   CanGenericSignature CurGenericSignature;
@@ -84,14 +88,29 @@ public:
     ~ContextStack() { M.ArchetypesDepth = OldDepth; }
   };
 
+  /// Finish the mangling of the symbol and return the mangled name.
+  std::string finalize() {
+    assert(Storage.size() && "Mangling an empty name");
+    std::string result = std::string(Storage.data(), Storage.size());
+    Storage.clear();
+    return result;
+  }
+
+  /// Finish the mangling of the symbol and write the mangled name into
+  /// \p stream.
+  void finalize(llvm::raw_ostream &stream) {
+    std::string result = finalize();
+    stream.write(result.data(), result.size());
+  }
+
   void setModuleContext(ModuleDecl *M) { Mod = M; }
 
   /// \param DWARFMangling - use the 'Qq' mangling format for
   /// archetypes and the 'a' mangling for alias types.
   /// \param usePunycode - emit modified Punycode instead of UTF-8.
-  Mangler(raw_ostream &buffer, bool DWARFMangling = false, 
+  Mangler(bool DWARFMangling = false,
           bool usePunycode = true)
-    : Buffer(buffer), DWARFMangling(DWARFMangling), UsePunycode(usePunycode) {}
+    : Buffer(Storage), DWARFMangling(DWARFMangling), UsePunycode(usePunycode) {}
   void mangleContextOf(const ValueDecl *decl, BindGenerics shouldBind);
   void mangleContext(const DeclContext *ctx, BindGenerics shouldBind);
   void mangleModule(const ModuleDecl *module);
@@ -144,15 +163,22 @@ public:
   void mangleTypeFullMetadataFull(CanType ty);
   void mangleGlobalVariableFull(const VarDecl *decl);
 
-  /// Mangle the string \p Prefix into the name. This is used by SIL passes
-  /// that specialize/clone functions.
-  void manglePrefix(StringRef Prefix);
+  /// Adds the string \p S into the mangled name.
+  void append(StringRef S);
 
-  /// Mangle the char \p Prefix into the name.
-  void manglePrefix(char Prefix);
+  /// Adds the char \p C into the mangled name.
+  void append(char C);
 
-  /// Mangle the integer \p Prefix into the name.
-  void manglePrefix(const APInt &Prefix);
+  /// Add the already mangled symbol \p Name as an identifier. (using the
+  /// length prefix).
+  void mangleIdentifierSymbol(StringRef Name);
+
+  /// Add the already mangled symbol \p Name. This gives the mangler the
+  /// opportunity to decode \p Name before adding it to the mangled name.
+  void appendSymbol(StringRef Name);
+
+  /// Mangle the integer \p Nat into the name.
+  void mangleNatural(const APInt &Nat);
 
   /// Mangles globalinit_token and globalinit_func, which are used to
   /// initialize global variables.

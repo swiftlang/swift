@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -68,7 +68,8 @@ SourceRange TypeRepr::getSourceRange() const {
 }
 
 /// Standard allocator for TypeReprs.
-void *TypeRepr::operator new(size_t Bytes, ASTContext &C, unsigned Alignment) {
+void *TypeRepr::operator new(size_t Bytes, const ASTContext &C,
+                             unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
 }
 
@@ -106,10 +107,10 @@ void TypeRepr::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
 
 namespace {
   class CloneVisitor : public TypeReprVisitor<CloneVisitor, TypeRepr *> {
-    ASTContext &Ctx;
+    const ASTContext &Ctx;
 
   public:
-    explicit CloneVisitor(ASTContext &ctx) : Ctx(ctx) { }
+    explicit CloneVisitor(const ASTContext &ctx) : Ctx(ctx) { }
 
 #define TYPEREPR(CLASS, PARENT) \
     TypeRepr *visit##CLASS##TypeRepr(CLASS##TypeRepr* type);
@@ -157,8 +158,7 @@ TypeRepr *CloneVisitor::visitFunctionTypeRepr(FunctionTypeRepr *T) {
 }
 
 TypeRepr *CloneVisitor::visitArrayTypeRepr(ArrayTypeRepr *T) {
-  return new (Ctx) ArrayTypeRepr(visit(T->getBase()), T->getSize(),
-                                 T->getBrackets(), T->usesOldSyntax());
+  return new (Ctx) ArrayTypeRepr(visit(T->getBase()), T->getBrackets());
 }
 
 TypeRepr *CloneVisitor::visitDictionaryTypeRepr(DictionaryTypeRepr *T) {
@@ -221,7 +221,7 @@ TypeRepr *CloneVisitor::visitFixedTypeRepr(FixedTypeRepr *T) {
   return new (Ctx) FixedTypeRepr(T->getType(), T->getLoc());
 }
 
-TypeRepr *TypeRepr::clone(ASTContext &ctx) const {
+TypeRepr *TypeRepr::clone(const ASTContext &ctx) const {
   CloneVisitor visitor(ctx);
   return visitor.visit(const_cast<TypeRepr *>(this));
 }
@@ -337,17 +337,9 @@ void FunctionTypeRepr::printImpl(ASTPrinter &Printer,
 
 void ArrayTypeRepr::printImpl(ASTPrinter &Printer,
                               const PrintOptions &Opts) const {
-  if (usesOldSyntax()) {
-    printTypeRepr(Base, Printer, Opts);
-    Printer << "[";
-    if (auto size = getSize())
-      size->getExpr()->print(Printer, Opts);
-    Printer << "]";
-  } else {
-    Printer << "[";
-    printTypeRepr(Base, Printer, Opts);
-    Printer << "]";
-  }
+  Printer << "[";
+  printTypeRepr(getBase(), Printer, Opts);
+  Printer << "]";
 }
 
 void DictionaryTypeRepr::printImpl(ASTPrinter &Printer,

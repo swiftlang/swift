@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -317,7 +317,7 @@ SILValue RCIdentityFunctionInfo::stripRCIdentityPreservingArgs(SILValue V,
       continue;
     }
 
-    // Try to strip off the RCIdentityPresrvingArg for IV. If it matches
+    // Try to strip off the RCIdentityPreservingArg for IV. If it matches
     // FirstIV, we may be able to succeed here.
     if (FirstIV == stripOneRCIdentityIncomingValue(A, IV))
       continue;

@@ -1,15 +1,13 @@
 #!/usr/bin/env python
-#===--- update-checkout - Utility to update your local checkouts -----------===#
+# utils/update-checkout - Utility to update your local checkouts -*- python -*-
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-#
-#===------------------------------------------------------------------------===#
 
 from __future__ import print_function
 
@@ -19,25 +17,11 @@ import sys
 
 sys.path.append(os.path.dirname(__file__))
 
-from SwiftBuildSupport import *
-
-
-def update_git_svn(repo_path):
-    with WorkingDirectory(repo_path):
-        use_stash = (check_output([ "git", "status", "--porcelain" ]) != "")
-        if use_stash:
-            check_call([ "git", "stash", "save", "--all"])
-
-        # Try first to pull from an upstream Git repo, assuming there is one
-        if check_output([ "git", "remote" ]) != "":
-            check_call([ "git", "pull", "--rebase" ])
-            check_call([ "git", "svn", "rebase", "-l" ])
-        else:
-            check_call([ "git", "svn", "rebase" ])
-
-        if use_stash:
-            check_call([ "git", "stash", "pop" ])
-
+from SwiftBuildSupport import (
+    SWIFT_SOURCE_ROOT,
+    WorkingDirectory,
+    check_call,
+)
 
 def update_working_copy(repo_path):
     if not os.path.isdir(repo_path):
@@ -45,12 +29,11 @@ def update_working_copy(repo_path):
 
     print("--- Updating '" + repo_path + "' ---")
     with WorkingDirectory(repo_path):
-        if os.path.isdir(os.path.join(".git", "svn")):
-            update_git_svn(repo_path)
-        elif os.path.isdir(".git"):
-            check_call([ "git", "pull", "--rebase" ])
-        else:
-            check_call([ "svn", "update" ])
+        # Prior to Git 2.6, this is the way to do a "git pull
+        # --rebase" that respects rebase.autostash.  See
+        # http://stackoverflow.com/a/30209750/125349
+        check_call([ "git", "fetch" ])
+        check_call([ "git", "rebase", "FETCH_HEAD" ])
 
 def obtain_additional_swift_sources(opts = {'with_ssh': False}):
     additional_repos = {
@@ -64,7 +47,7 @@ def obtain_additional_swift_sources(opts = {'with_ssh': False}):
         'swift-corelibs-foundation': 'apple/swift-corelibs-foundation',
         'swift-integration-tests': 'apple/swift-integration-tests',
     }
-    for dir_name, repo in additional_repos.iteritems():
+    for dir_name, repo in additional_repos.items():
         with WorkingDirectory(SWIFT_SOURCE_ROOT):
             if not os.path.isdir(os.path.join(dir_name, ".git")):
                 print("--- Cloning '" + dir_name + "' ---")

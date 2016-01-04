@@ -6,7 +6,7 @@
 // functions for the @thick, @thin, and @objc_metatype metatypes.
 //
 // This can occur if we do not properly mangle in the metatype representation
-// into the name of functions and thus reuse the incorrect already specisalized
+// into the name of functions and thus reuse the incorrect already specialized
 // method instead of the new specialized method.
 
 sil_stage canonical

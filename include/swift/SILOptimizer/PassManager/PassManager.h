@@ -1,8 +1,8 @@
-//===-- PassManager.h  - Swift Pass Manager ---------------------*- C++ -*-===//
+//===--- PassManager.h  - Swift Pass Manager --------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -128,7 +128,7 @@ public:
   }
 
   /// \brief Reset the state of the pass manager and remove all transformation
-  /// owned by the pass manager. Anaysis passes will be kept.
+  /// owned by the pass manager. Analysis passes will be kept.
   void resetAndRemoveTransformations();
 
   // Sets the name of the current optimization stage used for debugging.

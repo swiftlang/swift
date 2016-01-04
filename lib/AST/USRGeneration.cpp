@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -71,7 +71,7 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
       return true;
 
   OS << getUSRSpacePrefix();
-  Mangler Mangler(OS);
+  Mangler Mangler;
   if (auto Ctor = dyn_cast<ConstructorDecl>(VD)) {
     Mangler.mangleConstructorEntity(Ctor, /*isAllocating=*/false,
         ResilienceExpansion::Minimal, /*uncurryingLevel=*/0);
@@ -87,6 +87,8 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
     Mangler.mangleEntity(VD, ResilienceExpansion::Minimal,
                          /*uncurryingLevel=*/0);
   }
+
+  Mangler.finalize(OS);
   return false;
 }
 
@@ -108,9 +110,10 @@ bool ide::printAccessorUSR(const AbstractStorageDecl *D, AccessorKind AccKind,
 
   AbstractStorageDecl *SD = const_cast<AbstractStorageDecl*>(D);
   OS << getUSRSpacePrefix();
-  Mangler Mangler(OS);
+  Mangler Mangler;
   Mangler.mangleAccessorEntity(AccKind, AddressorKind::NotAddressor,
                                SD, ResilienceExpansion::Minimal);
+  Mangler.finalize(OS);
   return false;
 }
 

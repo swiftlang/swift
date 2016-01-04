@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -103,7 +103,7 @@ extension String {
   /// memory referred to by `index`
   func _withOptionalOutParameter<Result>(
     index: UnsafeMutablePointer<Index>,
-    @noescape body: (UnsafeMutablePointer<Int>)->Result
+    @noescape body: (UnsafeMutablePointer<Int>) -> Result
   ) -> Result {
     var utf16Index: Int = 0
     let result = index._withBridgeValue(&utf16Index) {
@@ -118,7 +118,7 @@ extension String {
   /// it into the memory referred to by `range`
   func _withOptionalOutParameter<Result>(
     range: UnsafeMutablePointer<Range<Index>>,
-    @noescape body: (UnsafeMutablePointer<NSRange>)->Result
+    @noescape body: (UnsafeMutablePointer<NSRange>) -> Result
   ) -> Result {
     var nsRange = NSRange(location: 0, length: 0)
     let result = range._withBridgeValue(&nsRange) {
@@ -476,10 +476,10 @@ extension String {
   // @property double doubleValue;
 
   // - (void)
-  //     enumerateLinesUsingBlock:(void (^)(NSString *line, BOOL *stop))block
+  //     enumerateLinesUsing:(void (^)(NSString *line, BOOL *stop))block
 
   /// Enumerates all the lines in a string.
-  public func enumerateLines(body: (line: String, inout stop: Bool)->()) {
+  public func enumerateLines(body: (line: String, inout stop: Bool) -> ()) {
     _ns.enumerateLinesUsing {
       (line: String, stop: UnsafeMutablePointer<ObjCBool>)
     in
@@ -511,7 +511,7 @@ extension String {
     options opts: NSLinguisticTaggerOptions,
     orthography: NSOrthography?,
     _ body:
-      (String, Range<Index>, Range<Index>, inout Bool)->()
+      (String, Range<Index>, Range<Index>, inout Bool) -> ()
   ) {
     _ns.enumerateLinguisticTagsIn(
       _toNSRange(range),
@@ -546,7 +546,7 @@ extension String {
     _ body: (
       substring: String?, substringRange: Range<Index>,
       enclosingRange: Range<Index>, inout Bool
-    )->()
+    ) -> ()
   ) {
     _ns.enumerateSubstringsIn(_toNSRange(range), options: opts) {
       var stop_ = false
@@ -1181,7 +1181,7 @@ extension String {
     aSet: NSCharacterSet,
     options mask:NSStringCompareOptions = [],
     range aRange: Range<Index>? = nil
-  )-> Range<Index>? {
+  ) -> Range<Index>? {
     return _optionalRange(
       _ns.rangeOfCharacterFrom(
         aSet, options: mask,

@@ -1,4 +1,13 @@
 #!/usr/bin/env python
+# cmpcodesize/main.py - Command-line entry point for cmpcodesize -*- python -*-
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See http://swift.org/LICENSE.txt for license information
+# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 from __future__ import print_function
 
@@ -92,7 +101,7 @@ How to specify files:
                         default=False)
 
     # Positional arguments.
-    # These can be specififed in means beyond what argparse supports,
+    # These can be specified in means beyond what argparse supports,
     # so we gather them in a list and parse them manually.
     parser.add_argument('files', nargs='*',
                         help='A list of old and new files.')

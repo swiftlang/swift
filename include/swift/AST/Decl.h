@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -17,29 +17,14 @@
 #ifndef SWIFT_DECL_H
 #define SWIFT_DECL_H
 
-#include "swift/AST/Attr.h"
 #include "swift/AST/CaptureInfo.h"
-#include "swift/AST/DeclContext.h"
 #include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/KnownProtocols.h"
-#include "swift/AST/Identifier.h"
 #include "swift/AST/LazyResolver.h"
-#include "swift/AST/Requirement.h"
-#include "swift/AST/Substitution.h"
-#include "swift/AST/Type.h"
-#include "swift/AST/TypeLoc.h"
 #include "swift/Basic/OptionalEnum.h"
 #include "swift/Basic/Range.h"
-#include "swift/Basic/SourceLoc.h"
-#include "swift/Basic/STLExtras.h"
-#include "llvm/Support/ErrorHandling.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
-#include <cstddef>
 
 namespace clang {
   class Decl;
@@ -76,6 +61,7 @@ namespace swift {
   class NameAliasType;
   class EnumCaseDecl;
   class EnumElementDecl;
+  class ParameterList;
   class Pattern;
   struct PrintOptions;
   class ProtocolDecl;
@@ -386,8 +372,8 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// \see AbstractFunctionDecl::BodyKind
     unsigned BodyKind : 3;
 
-    /// Number of curried parameter patterns (tuples).
-    unsigned NumParamPatterns : 6;
+    /// Number of curried parameter lists.
+    unsigned NumParameterLists : 6;
 
     /// Whether we are overridden later.
     unsigned Overridden : 1;
@@ -871,7 +857,7 @@ public:
 
   // Only allow allocation of Decls using the allocator in ASTContext
   // or by doing a placement new.
-  void *operator new(size_t Bytes, ASTContext &C,
+  void *operator new(size_t Bytes, const ASTContext &C,
                      unsigned Alignment = alignof(Decl));
   void *operator new(size_t Bytes, void *Mem) { 
     assert(Mem); 
@@ -2177,6 +2163,7 @@ public:
   /// Retrieve the full name of the declaration.
   /// TODO: Rename to getName?
   DeclName getFullName() const { return Name; }
+  void setName(DeclName name) { Name = name; }
 
   /// Retrieve the base name of the declaration, ignoring any argument
   /// names.
@@ -4022,7 +4009,7 @@ public:
 /// VarDecl - 'var' and 'let' declarations.
 class VarDecl : public AbstractStorageDecl {
 protected:
-  llvm::PointerUnion3<PatternBindingDecl*, Pattern*, Stmt*> ParentPattern;
+  llvm::PointerUnion<PatternBindingDecl*, Stmt*> ParentPattern;
 
   VarDecl(DeclKind Kind, bool IsStatic, bool IsLet, SourceLoc NameLoc,
           Identifier Name, Type Ty, DeclContext *DC)
@@ -4075,9 +4062,9 @@ public:
     ParentPattern = PBD;
   }
   
-  /// Return the Pattern involved in initializing this VarDecl.  However, recall that 
-  /// the Pattern may be involved in initializing more than just this one vardecl.
-  /// For example, if this is a VarDecl for "x", the pattern may be
+  /// Return the Pattern involved in initializing this VarDecl.  However, recall
+  /// that the Pattern may be involved in initializing more than just this one
+  /// vardecl.  For example, if this is a VarDecl for "x", the pattern may be
   /// "(x, y)" and the initializer on the PatternBindingDecl may be "(1,2)" or
   /// "foo()".
   ///
@@ -4163,7 +4150,7 @@ public:
   void emitLetToVarNoteIfSimple(DeclContext *UseDC) const;
 
   /// Returns true if the name is the self identifier and is implicit.
-  bool isImplicitSelf() const;
+  bool isSelfParameter() const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { 
@@ -4176,14 +4163,32 @@ class ParamDecl : public VarDecl {
   Identifier ArgumentName;
   SourceLoc ArgumentNameLoc;
 
+  /// This is the type specified, including location information.
+  TypeLoc typeLoc;
+  
+  /// The default value, if any, along with whether this is varargs.
+  llvm::PointerIntPair<ExprHandle *, 1, bool> DefaultValueAndIsVariadic;
+  
+  /// True if the type is implicitly specified in the source, but this has an
+  /// apparently valid typeRepr.  This is used in accessors, which look like:
+  ///    set (value) {
+  /// but need to get the typeRepr from the property as a whole so Sema can
+  /// resolve the type.
+  bool IsTypeLocImplicit = false;
+  
+  /// Information about a symbolic default argument, like __FILE__.
+  DefaultArgumentKind defaultArgumentKind = DefaultArgumentKind::None;
+  
 public:
   ParamDecl(bool isLet, SourceLoc argumentNameLoc, 
             Identifier argumentName, SourceLoc parameterNameLoc,
-            Identifier parameterName, Type ty, DeclContext *dc)
-    : VarDecl(DeclKind::Param, /*IsStatic=*/false, isLet, parameterNameLoc, 
-              parameterName, ty, dc),
-      ArgumentName(argumentName), ArgumentNameLoc(argumentNameLoc) { }
+            Identifier parameterName, Type ty, DeclContext *dc);
 
+  /// Clone constructor, allocates a new ParamDecl identical to the first.
+  /// Intentionally not defined as a typical copy constructor to avoid
+  /// accidental copies.
+  ParamDecl(ParamDecl *PD);
+  
   /// Retrieve the argument (API) name for this function parameter.
   Identifier getArgumentName() const { return ArgumentName; }
 
@@ -4192,21 +4197,56 @@ public:
   /// The resulting source location will be valid if the argument name
   /// was specified separately from the parameter name.
   SourceLoc getArgumentNameLoc() const { return ArgumentNameLoc; }
+  
+  TypeLoc &getTypeLoc() { return typeLoc; }
+  TypeLoc getTypeLoc() const { return typeLoc; }
 
-  SourceRange getSourceRange() const {
-    if (ArgumentNameLoc.isValid() && getNameLoc().isInvalid())
-      return ArgumentNameLoc;
-    if (ArgumentNameLoc.isInvalid() && getNameLoc().isValid())
-      return getNameLoc();
-    return SourceRange(ArgumentNameLoc, getNameLoc());
+  bool isTypeLocImplicit() const { return IsTypeLocImplicit; }
+  void setIsTypeLocImplicit(bool val) { IsTypeLocImplicit = val; }
+  
+  bool isDefaultArgument() const {
+    return defaultArgumentKind != DefaultArgumentKind::None;
   }
+  DefaultArgumentKind getDefaultArgumentKind() const {
+    return defaultArgumentKind;
+  }
+  void setDefaultArgumentKind(DefaultArgumentKind K) {
+    defaultArgumentKind = K;
+  }
+  
+  void setDefaultValue(ExprHandle *H) {
+    DefaultValueAndIsVariadic.setPointer(H);
+  }
+  ExprHandle *getDefaultValue() const {
+    return DefaultValueAndIsVariadic.getPointer();
+  }
+  /// Whether or not this parameter is varargs.
+  bool isVariadic() const { return DefaultValueAndIsVariadic.getInt(); }
+  void setVariadic(bool value = true) {DefaultValueAndIsVariadic.setInt(value);}
+  
+  /// Remove the type of this varargs element designator, without the array
+  /// type wrapping it.  A parameter like "Int..." will have formal parameter
+  /// type of "[Int]" and this returns "Int".
+  static Type getVarargBaseTy(Type VarArgT);
+  
+  /// Remove the type of this varargs element designator, without the array
+  /// type wrapping it.
+  Type getVarargBaseTy() const {
+    assert(isVariadic());
+    return getVarargBaseTy(getType());
+  }
+  
+  SourceRange getSourceRange() const;
 
-  Pattern *getParamParentPattern() const {
-    return ParentPattern.dyn_cast<Pattern *>();
-  }
-  void setParamParentPattern(Pattern *Pat) {
-    ParentPattern = Pat;
-  }
+  /// Create an implicit 'self' decl for a method in the specified decl context.
+  /// If 'static' is true, then this is self for a static method in the type.
+  ///
+  /// Note that this decl is created, but it is returned with an incorrect
+  /// DeclContext that needs to be set correctly.  This is automatically handled
+  /// when a function is created with this as part of its argument list.
+  ///
+  static ParamDecl *createSelf(SourceLoc loc, DeclContext *DC,
+                               bool isStatic = false, bool isInOut = false);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { 
@@ -4254,15 +4294,16 @@ enum class ObjCSubscriptKind {
 /// A given type can have multiple subscript declarations, so long as the
 /// signatures (indices and element type) are distinct.
 ///
-class SubscriptDecl : public AbstractStorageDecl {
+class SubscriptDecl : public AbstractStorageDecl, public DeclContext {
   SourceLoc ArrowLoc;
-  Pattern *Indices;
+  ParameterList *Indices;
   TypeLoc ElementTy;
 
 public:
-  SubscriptDecl(DeclName Name, SourceLoc SubscriptLoc, Pattern *Indices,
+  SubscriptDecl(DeclName Name, SourceLoc SubscriptLoc, ParameterList *Indices,
                 SourceLoc ArrowLoc, TypeLoc ElementTy, DeclContext *Parent)
     : AbstractStorageDecl(DeclKind::Subscript, Parent, Name, SubscriptLoc),
+      DeclContext(DeclContextKind::SubscriptDecl, Parent),
       ArrowLoc(ArrowLoc), Indices(nullptr), ElementTy(ElementTy) {
     setIndices(Indices);
   }
@@ -4272,9 +4313,9 @@ public:
   SourceRange getSourceRange() const;
 
   /// \brief Retrieve the indices for this subscript operation.
-  Pattern *getIndices() { return Indices; }
-  const Pattern *getIndices() const { return Indices; }
-  void setIndices(Pattern *p);
+  ParameterList *getIndices() { return Indices; }
+  const ParameterList *getIndices() const { return Indices; }
+  void setIndices(ParameterList *p);
 
   /// Retrieve the type of the indices.
   Type getIndicesType() const;
@@ -4303,6 +4344,13 @@ public:
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Subscript;
   }
+  
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() == DeclContextKind::SubscriptDecl;
+  }
+
+  using DeclContext::operator new;
+  using Decl::getASTContext;
 };
 
 /// \brief Base class for function-like declarations.
@@ -4363,21 +4411,19 @@ protected:
   CaptureInfo Captures;
 
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, DeclName Name,
-                       SourceLoc NameLoc, unsigned NumParamPatterns,
+                       SourceLoc NameLoc, unsigned NumParameterLists,
                        GenericParamList *GenericParams)
       : ValueDecl(Kind, Parent, Name, NameLoc),
         DeclContext(DeclContextKind::AbstractFunctionDecl, Parent),
         Body(nullptr), GenericParams(nullptr), GenericSig(nullptr) {
     setBodyKind(BodyKind::None);
     setGenericParams(GenericParams);
-    AbstractFunctionDeclBits.NumParamPatterns = NumParamPatterns;
+    AbstractFunctionDeclBits.NumParameterLists = NumParameterLists;
     AbstractFunctionDeclBits.Overridden = false;
 
     // Verify no bitfield truncation.
-    assert(AbstractFunctionDeclBits.NumParamPatterns == NumParamPatterns);
+    assert(AbstractFunctionDeclBits.NumParameterLists == NumParameterLists);
   }
-
-  MutableArrayRef<Pattern *> getBodyParamBuffer();
 
   void setBodyKind(BodyKind K) {
     AbstractFunctionDeclBits.BodyKind = unsigned(K);
@@ -4511,8 +4557,8 @@ public:
   /// Determine whether the name of the ith argument is an API name by default.
   bool argumentNameIsAPIByDefault(unsigned i) const;
 
-  unsigned getNumParamPatterns() const {
-    return AbstractFunctionDeclBits.NumParamPatterns;
+  unsigned getNumParameterLists() const {
+    return AbstractFunctionDeclBits.NumParameterLists;
   }
 
   /// \brief Returns the "natural" number of argument clauses taken by this
@@ -4537,7 +4583,7 @@ public:
   ///   func const(x : Int) -> () -> Int { return { x } } // NAC==1
   /// \endcode
   unsigned getNaturalArgumentCount() const {
-    return getNumParamPatterns();
+    return getNumParameterLists();
   }
 
   /// \brief Returns the parameter pattern(s) for the function definition that
@@ -4545,13 +4591,17 @@ public:
   ///
   /// The number of "top-level" elements in this pattern will match the number
   /// of argument names in the compound name of the function or constructor.
-  MutableArrayRef<Pattern *> getBodyParamPatterns() {
-    return getBodyParamBuffer();
+  MutableArrayRef<ParameterList *> getParameterLists();
+  ArrayRef<const ParameterList *> getParameterLists() const {
+    auto paramLists =
+        const_cast<AbstractFunctionDecl *>(this)->getParameterLists();
+    return ArrayRef<const ParameterList *>(paramLists.data(),paramLists.size());
   }
-  ArrayRef<const Pattern *> getBodyParamPatterns() const {
-    auto Patterns =
-        const_cast<AbstractFunctionDecl *>(this)->getBodyParamBuffer();
-    return ArrayRef<const Pattern *>(Patterns.data(), Patterns.size());
+  ParameterList *getParameterList(unsigned i) {
+    return getParameterLists()[i];
+  }
+  const ParameterList *getParameterList(unsigned i) const {
+    return getParameterLists()[i];
   }
 
   /// \brief If this is a method in a type or extension thereof, compute
@@ -4574,7 +4624,10 @@ public:
   ///
   /// Note that some functions don't have an implicit 'self' decl, for example,
   /// free functions.  In this case nullptr is returned.
-  VarDecl *getImplicitSelfDecl() const;
+  const ParamDecl *getImplicitSelfDecl() const {
+    return const_cast<AbstractFunctionDecl*>(this)->getImplicitSelfDecl();
+  }
+  ParamDecl *getImplicitSelfDecl();
 
   /// \brief Retrieve the set of parameters to a generic function, or null if
   /// this function is not generic.
@@ -4639,7 +4692,7 @@ class FuncDecl : public AbstractFunctionDecl {
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
   SourceLoc ThrowsLoc;  // Location of the 'throws' token.
-  SourceLoc AccessorKeywordLoc; // Location of the accessor keyword token, e,g. 'set'.
+  SourceLoc AccessorKeywordLoc; // Location of the accessor keyword, e.g. 'set'.
 
   TypeLoc FnRetType;
 
@@ -4658,23 +4711,24 @@ class FuncDecl : public AbstractFunctionDecl {
   /// which property and what kind of accessor.
   llvm::PointerIntPair<AbstractStorageDecl*, 3, AccessorKind> AccessorDecl;
   llvm::PointerUnion<FuncDecl *, NominalTypeDecl*> OverriddenOrDerivedForDecl;
-  llvm::PointerIntPair<OperatorDecl *, 3, AddressorKind> OperatorAndAddressorKind;
+  llvm::PointerIntPair<OperatorDecl *, 3,
+                       AddressorKind> OperatorAndAddressorKind;
 
   FuncDecl(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
            SourceLoc FuncLoc, DeclName Name,
            SourceLoc NameLoc, SourceLoc ThrowsLoc,
            SourceLoc AccessorKeywordLoc,
-           unsigned NumParamPatterns,
+           unsigned NumParameterLists,
            GenericParamList *GenericParams, Type Ty, DeclContext *Parent)
     : AbstractFunctionDecl(DeclKind::Func, Parent, Name, NameLoc,
-                           NumParamPatterns, GenericParams),
+                           NumParameterLists, GenericParams),
       StaticLoc(StaticLoc), FuncLoc(FuncLoc), ThrowsLoc(ThrowsLoc),
       AccessorKeywordLoc(AccessorKeywordLoc),
       OverriddenOrDerivedForDecl(),
       OperatorAndAddressorKind(nullptr, AddressorKind::NotAddressor) {
     FuncDeclBits.IsStatic = StaticLoc.isValid() || getName().isOperator();
     FuncDeclBits.StaticSpelling = static_cast<unsigned>(StaticSpelling);
-    assert(NumParamPatterns > 0 && "Must have at least an empty tuple arg");
+    assert(NumParameterLists > 0 && "Must have at least an empty tuple arg");
     setType(Ty);
     FuncDeclBits.Mutating = false;
     FuncDeclBits.HasDynamicSelf = false;
@@ -4690,7 +4744,7 @@ class FuncDecl : public AbstractFunctionDecl {
                               SourceLoc NameLoc, SourceLoc ThrowsLoc,
                               SourceLoc AccessorKeywordLoc,
                               GenericParamList *GenericParams, Type Ty,
-                              unsigned NumParamPatterns,
+                              unsigned NumParameterLists,
                               DeclContext *Parent,
                               ClangNode ClangN);
 
@@ -4702,7 +4756,7 @@ public:
                                       SourceLoc NameLoc, SourceLoc ThrowsLoc,
                                       SourceLoc AccessorKeywordLoc,
                                       GenericParamList *GenericParams, Type Ty,
-                                      unsigned NumParamPatterns,
+                                      unsigned NumParameterLists,
                                       DeclContext *Parent);
 
   static FuncDecl *create(ASTContext &Context, SourceLoc StaticLoc,
@@ -4710,7 +4764,7 @@ public:
                           SourceLoc FuncLoc, DeclName Name, SourceLoc NameLoc,
                           SourceLoc ThrowsLoc, SourceLoc AccessorKeywordLoc,
                           GenericParamList *GenericParams,
-                          Type Ty, ArrayRef<Pattern *> BodyParams,
+                          Type Ty, ArrayRef<ParameterList *> ParameterLists,
                           TypeLoc FnRetType, DeclContext *Parent,
                           ClangNode ClangN = ClangNode());
 
@@ -4733,6 +4787,25 @@ public:
     FuncDeclBits.Mutating = Mutating;
   }
   
+  /// \brief Returns the parameter lists(s) for the function definition.
+  ///
+  /// The number of "top-level" elements will match the number of argument names
+  /// in the compound name of the function or constructor.
+  MutableArrayRef<ParameterList *> getParameterLists() {
+    auto Ptr = reinterpret_cast<ParameterList **>(cast<FuncDecl>(this) + 1);
+    return { Ptr, getNumParameterLists() };
+  }
+  ArrayRef<const ParameterList *> getParameterLists() const {
+    return AbstractFunctionDecl::getParameterLists();
+  }
+  ParameterList *getParameterList(unsigned i) {
+    return getParameterLists()[i];
+  }
+  const ParameterList *getParameterList(unsigned i) const {
+    return getParameterLists()[i];
+  }
+  
+
   bool getHaveSearchedForCommonOverloadReturnType() {
     return HaveSearchedForCommonOverloadReturnType;
   }
@@ -4750,7 +4823,7 @@ public:
   /// attribute. For example a "mutating set" accessor.
   bool isExplicitNonMutating() const;
 
-  void setDeserializedSignature(ArrayRef<Pattern *> BodyParams,
+  void setDeserializedSignature(ArrayRef<ParameterList *> ParameterLists,
                                 TypeLoc FnRetType);
 
   SourceLoc getStaticLoc() const { return StaticLoc; }
@@ -4796,22 +4869,24 @@ public:
   }
 
   /// isUnaryOperator - Determine whether this is a unary operator
-  /// implementation, in other words, the name of the function is an operator,
-  /// and the argument list consists syntactically of a single-element tuple
-  /// pattern. This check is syntactic rather than type-based in order to allow
+  /// implementation.  This check is a syntactic rather than type-based check,
+  /// which looks at the number of parameters specified, in order to allow
   /// for the definition of unary operators on tuples, as in:
-  ///   func [prefix] + (_:(a:Int, b:Int))
+  ///
+  ///   prefix func + (param : (a:Int, b:Int))
+  ///
   /// This also allows the unary-operator-ness of a func decl to be determined
   /// prior to type checking.
   bool isUnaryOperator() const;
   
   /// isBinaryOperator - Determine whether this is a binary operator
-  /// implementation, in other words, the name of the function is an operator,
-  /// and the argument list consists syntactically of a two-element tuple
-  /// pattern. This check is syntactic rather than type-based in order to
-  /// distinguish a binary operator from a unary operator on tuples, as in:
-  ///   func [prefix] + (_:(a:Int, b:Int)) // unary operator +(1,2)
-  ///   func [infix]  + (a:Int, b:Int)     // binary operator 1 + 2
+  /// implementation.  This check is a syntactic rather than type-based check,
+  /// which looks at the number of parameters specified, in order to allow
+  /// distinguishing a binary operator from a unary operator on tuples, as in:
+  ///
+  ///   prefix func + (_:(a:Int, b:Int)) // unary operator +(1,2)
+  ///   infix func  + (a:Int, b:Int)     // binary operator 1 + 2
+  ///
   /// This also allows the binary-operator-ness of a func decl to be determined
   /// prior to type checking.
   bool isBinaryOperator() const;
@@ -5142,8 +5217,6 @@ enum class CtorInitializerKind {
 /// }
 /// \endcode
 class ConstructorDecl : public AbstractFunctionDecl {
-  friend class AbstractFunctionDecl;
-
   /// The failability of this initializer, which is an OptionalTypeKind.
   unsigned Failability : 2;
 
@@ -5153,7 +5226,7 @@ class ConstructorDecl : public AbstractFunctionDecl {
   // Location of the 'throws' token.
   SourceLoc ThrowsLoc;
 
-  Pattern *BodyParams[2];
+  ParameterList *ParameterLists[2];
 
   /// The type of the initializing constructor.
   Type InitializerType;
@@ -5172,11 +5245,11 @@ class ConstructorDecl : public AbstractFunctionDecl {
 public:
   ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc, 
                   OptionalTypeKind Failability, SourceLoc FailabilityLoc,
-                  Pattern *SelfBodyParam, Pattern *BodyParams,
+                  ParamDecl *selfParam, ParameterList *BodyParams,
                   GenericParamList *GenericParams, 
                   SourceLoc throwsLoc, DeclContext *Parent);
 
-  void setBodyParams(Pattern *selfPattern, Pattern *bodyParams);
+  void setParameterLists(ParamDecl *selfParam, ParameterList *bodyParams);
 
   SourceLoc getConstructorLoc() const { return getNameLoc(); }
   SourceLoc getStartLoc() const { return getConstructorLoc(); }
@@ -5200,6 +5273,26 @@ public:
   /// inserted at the end of the initializer by SILGen.
   Expr *getSuperInitCall() { return CallToSuperInit; }
   void setSuperInitCall(Expr *CallExpr) { CallToSuperInit = CallExpr; }
+
+  MutableArrayRef<ParameterList *> getParameterLists() {
+    return { ParameterLists, 2 };
+  }
+  ArrayRef<const ParameterList *> getParameterLists() const {
+    return AbstractFunctionDecl::getParameterLists();
+  }
+  ParameterList *getParameterList(unsigned i) {
+    return getParameterLists()[i];
+  }
+  const ParameterList *getParameterList(unsigned i) const {
+    return getParameterLists()[i];
+  }
+  
+  /// Returns the normal parameters to the initializer, not including self.
+  ParameterList *getParameters() { return ParameterLists[1]; }
+
+  /// Returns the normal parameters to the initializer, not including self.
+  const ParameterList *getParameters() const { return ParameterLists[1]; }
+
 
   /// Specifies the kind of initialization call performed within the body
   /// of the constructor, e.g., self.init or super.init.
@@ -5349,14 +5442,22 @@ public:
 /// }
 /// \endcode
 class DestructorDecl : public AbstractFunctionDecl {
-  friend class AbstractFunctionDecl;
-  Pattern *SelfPattern;
+  ParameterList *SelfParameter;
 public:
   DestructorDecl(Identifier NameHack, SourceLoc DestructorLoc,
-                 Pattern *SelfPattern, DeclContext *Parent);
+                 ParamDecl *selfDecl, DeclContext *Parent);
   
-  void setSelfPattern(Pattern *selfPattern);
+  void setSelfDecl(ParamDecl *selfDecl);
 
+  MutableArrayRef<ParameterList *> getParameterLists() {
+    return { &SelfParameter, 1 };
+  }
+  ArrayRef<const ParameterList *> getParameterLists() const {
+    return { &SelfParameter, 1 };
+  }
+
+
+  
   SourceLoc getDestructorLoc() const { return getNameLoc(); }
   SourceLoc getStartLoc() const { return getDestructorLoc(); }
   SourceRange getSourceRange() const;
@@ -5615,25 +5716,17 @@ inline bool AbstractStorageDecl::isStatic() const {
   return false;
 }
 
-inline MutableArrayRef<Pattern *> AbstractFunctionDecl::getBodyParamBuffer() {
-  unsigned NumPatterns = AbstractFunctionDeclBits.NumParamPatterns;
-  Pattern **Ptr;
+inline MutableArrayRef<ParameterList *>
+AbstractFunctionDecl::getParameterLists() {
   switch (getKind()) {
   default: llvm_unreachable("Unknown AbstractFunctionDecl!");
   case DeclKind::Constructor:
-    Ptr = cast<ConstructorDecl>(this)->BodyParams;
-    break;
-
+    return cast<ConstructorDecl>(this)->getParameterLists();
   case DeclKind::Destructor:
-    Ptr = &cast<DestructorDecl>(this)->SelfPattern;
-    break;
-
+    return cast<DestructorDecl>(this)->getParameterLists();
   case DeclKind::Func:
-    // Body patterns are tail allocated.
-    Ptr = reinterpret_cast<Pattern **>(cast<FuncDecl>(this) + 1);
-    break;
+    return cast<FuncDecl>(this)->getParameterLists();
   }
-  return MutableArrayRef<Pattern *>(Ptr, NumPatterns);
 }
 
 inline DeclIterator &DeclIterator::operator++() {

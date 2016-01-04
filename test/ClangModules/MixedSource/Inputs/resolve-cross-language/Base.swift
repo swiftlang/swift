@@ -21,7 +21,14 @@ extension BaseClass {
   case Zung
 }
 
+@objc(RenamedEnum) public enum SwiftEnum: CShort {
+  case Quux
+  case Corge
+  case Grault
+}
+
 @objc public class AnotherClass {
   @objc public func getEnum() -> BaseEnum { return .Zung }
+  @objc public func getSwiftEnum() -> SwiftEnum { return .Quux }
   public init() {}
 }

@@ -112,7 +112,7 @@ extension Derived : Abstractable {}
 // SILGEN-NEXT: function_ref
 // SILGEN-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_TTRXFo__iSi_XFo__dSi_ : $@convention(thin) (@owned @callee_owned (@out Int) -> ()) -> Int
 // SILGEN-NEXT: [[NEWVALUE:%.*]] = partial_apply [[REABSTRACTOR]]([[VALUE]])
-// SILGEN-NEXT: [[FN:%.*]] = class_method [[SELF]] : $Base, #Base.storedFunction!setter.1 : Base -> (() -> Int) -> ()
+// SILGEN-NEXT: [[FN:%.*]] = class_method [[SELF]] : $Base, #Base.storedFunction!setter.1 : (Base) -> (() -> Int) -> ()
 // SILGEN-NEXT: apply [[FN]]([[NEWVALUE]], [[SELF]])
 // SILGEN-NEXT: tuple ()
 // SILGEN-NEXT: return

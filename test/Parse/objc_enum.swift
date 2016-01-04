@@ -8,7 +8,7 @@
   case Zim, Zang, Zung
 }
 
-@objc(EnumRuntimeName) enum RuntimeNamed: Int { // expected-error{{'@objc' enum cannot have a name}}
+@objc(EnumRuntimeName) enum RuntimeNamed: Int {
   case Zim, Zang, Zung
 }
 

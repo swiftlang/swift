@@ -579,7 +579,7 @@ OrderedCollection>) are just sugar for a where clause.  For example, the
 above find() signature is equivalent to::
 
   func find<C where C : OrderedCollection, C.Element : Comparable>(
-         collection : C, value : C.Element)-> Int
+         collection : C, value : C.Element) -> Int
 
 Note that find<C> is shorthand for (and equivalent to) find<C : Any>, since
 every type conforms to the Any protocol composition.

@@ -59,25 +59,25 @@ class A {
 
 // CHECK-LABEL: sil hidden @_TF15objc_properties11testPropGet
 func testPropGet(a: A) -> Int {
-  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.prop!getter.1.foreign : A -> () -> Int , $@convention(objc_method) (A) -> Int
+  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.prop!getter.1.foreign : (A) -> () -> Int , $@convention(objc_method) (A) -> Int
   return a.prop
 }
 
 // CHECK-LABEL: sil hidden @_TF15objc_properties11testPropSet
 func testPropSet(a: A, i: Int) {
-  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.prop!setter.1.foreign : A -> (Int) -> () , $@convention(objc_method) (Int, A) -> ()
+  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.prop!setter.1.foreign : (A) -> (Int) -> () , $@convention(objc_method) (Int, A) -> ()
   a.prop = i
 }
 
 // CHECK-LABEL: sil hidden @_TF15objc_properties19testComputedPropGet
 func testComputedPropGet(a: A) -> Int {
-  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.computedProp!getter.1.foreign : A -> () -> Int , $@convention(objc_method) (A) -> Int
+  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.computedProp!getter.1.foreign : (A) -> () -> Int , $@convention(objc_method) (A) -> Int
   return a.computedProp
 }
 
 // CHECK-LABEL: sil hidden @_TF15objc_properties19testComputedPropSet
 func testComputedPropSet(a: A, i: Int) {
-  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.computedProp!setter.1.foreign : A -> (Int) -> () , $@convention(objc_method) (Int, A) -> ()
+  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.computedProp!setter.1.foreign : (A) -> (Int) -> () , $@convention(objc_method) (Int, A) -> ()
   a.computedProp = i
 }
 
@@ -86,12 +86,12 @@ class B : A {
   @objc override var computedProp: Int {
     // CHECK-LABEL: sil hidden @_TFC15objc_properties1Bg12computedPropSi : $@convention(method) (@guaranteed B) -> Int
     get {
-      // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $B, #A.computedProp!getter.1.foreign : A -> () -> Int , $@convention(objc_method) (A) -> Int
+      // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $B, #A.computedProp!getter.1.foreign : (A) -> () -> Int , $@convention(objc_method) (A) -> Int
       return super.computedProp
     }
     // CHECK-LABEL: sil hidden @_TFC15objc_properties1Bs12computedPropSi : $@convention(method) (Int, @guaranteed B) -> ()
     set(value) {
-      // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $B, #A.computedProp!setter.1.foreign : A -> (Int) -> () , $@convention(objc_method) (Int, A) -> ()
+      // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $B, #A.computedProp!setter.1.foreign : (A) -> (Int) -> () , $@convention(objc_method) (Int, A) -> ()
       super.computedProp = value
     }
   }

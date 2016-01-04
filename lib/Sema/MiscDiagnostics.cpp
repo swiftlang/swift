@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -25,9 +25,9 @@
 #include "llvm/ADT/MapVector.h"
 using namespace swift;
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Diagnose assigning variable to itself.
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 static Decl *findSimpleReferencedDecl(const Expr *E) {
   if (auto *LE = dyn_cast<LoadExpr>(E))
@@ -677,8 +677,8 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
     /// Return true if this is an implicit reference to self.
     static bool isImplicitSelfUse(Expr *E) {
       auto *DRE = dyn_cast<DeclRefExpr>(E);
-      return DRE && DRE->isImplicit() && DRE->getDecl()->hasName() &&
-             DRE->getDecl()->getName().str() == "self" &&
+      return DRE && DRE->isImplicit() && isa<VarDecl>(DRE->getDecl()) &&
+             cast<VarDecl>(DRE->getDecl())->isSelfParameter() &&
              // Metatype self captures don't extend the lifetime of an object.
              !DRE->getType()->is<MetatypeType>();
     }
@@ -771,9 +771,9 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
   const_cast<Expr *>(E)->walk(DiagnoseWalker(TC, isAlreadyInClosure));
 }
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Diagnose availability.
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted=".
@@ -1156,9 +1156,9 @@ static void diagAvailability(TypeChecker &TC, const Expr *E,
   const_cast<Expr*>(E)->walk(walker);
 }
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Per func/init diagnostics
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 namespace {
 class VarDeclUsageChecker : public ASTWalker {
@@ -1193,11 +1193,11 @@ class VarDeclUsageChecker : public ASTWalker {
 public:
   VarDeclUsageChecker(TypeChecker &TC, AbstractFunctionDecl *AFD) : TC(TC) {
     // Track the parameters of the function.
-    for (auto P : AFD->getBodyParamPatterns())
-      P->forEachVariable([&](VarDecl *VD) {
-        if (shouldTrackVarDecl(VD))
-          VarDecls[VD] = 0;
-      });
+    for (auto PL : AFD->getParameterLists())
+      for (auto param : *PL)
+        if (shouldTrackVarDecl(param))
+          VarDecls[param] = 0;
+    
   }
     
   VarDeclUsageChecker(TypeChecker &TC, VarDecl *VD) : TC(TC) {
@@ -1492,17 +1492,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       }
 
       // If this is a parameter explicitly marked 'var', remove it.
-      if (auto *param = dyn_cast<ParamDecl>(var))
-        if (auto *pattern = param->getParamParentPattern())
-          if (auto *vp = dyn_cast<VarPattern>(pattern)) {
-            TC.diagnose(var->getLoc(), diag::variable_never_mutated,
-                        var->getName(), /*param*/1)
-              .fixItRemove(vp->getLoc());
-            continue;
-          }
-      
       unsigned varKind = isa<ParamDecl>(var);
-      // FIXME: fixit when we can find a pattern binding.
       if (FixItLoc.isInvalid())
         TC.diagnose(var->getLoc(), diag::variable_never_mutated,
                     var->getName(), varKind);
@@ -1735,7 +1725,7 @@ static Expr *endConditionValueForConvertingCStyleForLoop(const ForStmt *FS, VarD
   return args[1];
 }
 
-static bool simpleIncrementForConvertingCStyleForLoop(const ForStmt *FS, VarDecl *loopVar) {
+static bool unaryIncrementForConvertingCStyleForLoop(const ForStmt *FS, VarDecl *loopVar) {
   auto *Increment = FS->getIncrement().getPtrOrNull();
   if (!Increment)
     return false;
@@ -1758,6 +1748,39 @@ static bool simpleIncrementForConvertingCStyleForLoop(const ForStmt *FS, VarDecl
   return incrementDeclRefExpr->getDecl() == loopVar;    
 }
 
+static bool plusEqualOneIncrementForConvertingCStyleForLoop(TypeChecker &TC, const ForStmt *FS, VarDecl *loopVar) {
+  auto *Increment = FS->getIncrement().getPtrOrNull();
+  if (!Increment)
+    return false;
+  ApplyExpr *binaryExpr = dyn_cast<BinaryExpr>(Increment);
+  if (!binaryExpr)
+    return false;
+  auto binaryFuncExpr = dyn_cast<DeclRefExpr>(binaryExpr->getFn());
+  if (!binaryFuncExpr)
+    return false;
+  if (binaryFuncExpr->getDecl()->getNameStr() != "+=")
+    return false;
+  auto argTupleExpr = dyn_cast<TupleExpr>(binaryExpr->getArg());
+  if (!argTupleExpr)
+    return false;
+  auto addOneConstExpr = argTupleExpr->getElement(1);
+
+  // Rather than unwrapping expressions all the way down implicit constructors, etc, just check that the
+  // source text for the += argument is "1".
+  SourceLoc constEndLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr, addOneConstExpr->getEndLoc());
+  auto range = CharSourceRange(TC.Context.SourceMgr, addOneConstExpr->getStartLoc(), constEndLoc);
+  if (range.str() != "1")
+    return false;
+
+  auto inoutExpr = dyn_cast<InOutExpr>(argTupleExpr->getElement(0));
+  if (!inoutExpr)
+    return false;
+  auto declRefExpr = dyn_cast<DeclRefExpr>(inoutExpr->getSubExpr());
+  if (!declRefExpr)
+    return false;
+  return declRefExpr->getDecl() == loopVar;
+}
+
 static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
   // If we're missing semi-colons we'll already be erroring out, and this may not even have been intended as C-style.
   if (FS->getFirstSemicolonLoc().isInvalid() || FS->getSecondSemicolonLoc().isInvalid())
@@ -1776,7 +1799,8 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
   VarDecl *loopVar = dyn_cast<VarDecl>(initializers[1]);
   Expr *startValue = loopVarDecl->getInit(0);
   Expr *endValue = endConditionValueForConvertingCStyleForLoop(FS, loopVar);
-  bool strideByOne = simpleIncrementForConvertingCStyleForLoop(FS, loopVar);
+  bool strideByOne = unaryIncrementForConvertingCStyleForLoop(FS, loopVar) ||
+                     plusEqualOneIncrementForConvertingCStyleForLoop(TC, FS, loopVar);
 
   if (!loopVar || !startValue || !endValue || !strideByOne)
     return;
@@ -1801,9 +1825,9 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
    .fixItRemoveChars(FS->getSecondSemicolonLoc(), endOfIncrementLoc);
 }
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // High-level entry points.
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 /// \brief Emit diagnostics for syntactic restrictions on a given expression.
 void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
@@ -1823,9 +1847,9 @@ void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
     checkCStyleForLoop(TC, forStmt);
 }
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Utility functions
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 void swift::fixItAccessibility(InFlightDiagnostic &diag, ValueDecl *VD,
                                Accessibility desiredAccess, bool isForSetter) {
@@ -2021,22 +2045,13 @@ static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
 
   // String'ify the parameter types.
   SmallVector<OmissionTypeName, 4> paramTypes;
-  Type functionType = afd->getInterfaceType();
-  Type argumentType;
-  for (unsigned i = 0, n = afd->getNaturalArgumentCount()-1; i != n; ++i)
-    functionType = functionType->getAs<AnyFunctionType>()->getResult();
-  argumentType = functionType->getAs<AnyFunctionType>()->getInput();
-  if (auto tupleTy = argumentType->getAs<TupleType>()) {
-    if (tupleTy->getNumElements() == argNameStrs.size()) {
-      for (const auto &elt : tupleTy->getElements())
-        paramTypes.push_back(getTypeNameForOmission(elt.getType())
-                               .withDefaultArgument(elt.hasDefaultArg()));
-    }
+
+  // Always look at the parameters in the last parameter list.
+  for (auto param : *afd->getParameterLists().back()) {
+    paramTypes.push_back(getTypeNameForOmission(param->getType())
+                         .withDefaultArgument(param->isDefaultArgument()));
   }
-
-  if (argNameStrs.size() == 1 && paramTypes.empty())
-    paramTypes.push_back(getTypeNameForOmission(argumentType));
-
+  
   // Handle contextual type, result type, and returnsSelf.
   Type contextType = afd->getDeclContext()->getDeclaredInterfaceType();
   Type resultType;
@@ -2052,18 +2067,9 @@ static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
 
   // Figure out the first parameter name.
   StringRef firstParamName;
-  unsigned skipBodyPatterns = afd->getImplicitSelfDecl() ? 1 : 0;
-  auto bodyPattern = afd->getBodyParamPatterns()[skipBodyPatterns];
-  if (auto tuplePattern = dyn_cast<TuplePattern>(bodyPattern)) {
-    if (tuplePattern->getNumElements() > 0) {
-      auto firstParam = tuplePattern->getElement(0).getPattern();
-      if (auto named = dyn_cast<NamedPattern>(
-                         firstParam->getSemanticsProvidingPattern())) {
-        if (!named->getBodyName().empty())
-          firstParamName = named->getBodyName().str();
-      }
-    }
-  }
+  auto params = afd->getParameterList(afd->getImplicitSelfDecl() ? 1 : 0);
+  if (params->size() != 0)
+    firstParamName = params->get(0)->getName().str();
 
   // Find the set of property names.
   const InheritedNameSet *allPropertyNames = nullptr;
@@ -2221,12 +2227,10 @@ namespace {
 
 /// Find the source ranges of extraneous default arguments within a
 /// call to the given function.
-static bool hasExtraneousDefaultArguments(
-              AbstractFunctionDecl *afd,
-              Expr *arg,
-              DeclName name,
-              SmallVectorImpl<SourceRange> &ranges,
-              SmallVectorImpl<unsigned> &removedArgs) {
+static bool hasExtraneousDefaultArguments(AbstractFunctionDecl *afd,
+                                          Expr *arg, DeclName name,
+                                          SmallVectorImpl<SourceRange> &ranges,
+                                      SmallVectorImpl<unsigned> &removedArgs) {
   if (!afd->getClangDecl())
     return false;
 
@@ -2238,133 +2242,125 @@ static bool hasExtraneousDefaultArguments(
     
   TupleExpr *argTuple = dyn_cast<TupleExpr>(arg);
   ParenExpr *argParen = dyn_cast<ParenExpr>(arg);
-
-  ArrayRef<Pattern *> bodyPatterns = afd->getBodyParamPatterns();
-
-  // Skip over the implicit 'self'.
-  if (afd->getImplicitSelfDecl()) {
-    bodyPatterns = bodyPatterns.slice(1);
-  }
-    
+  
   ASTContext &ctx = afd->getASTContext();
-  Pattern *bodyPattern = bodyPatterns[0];
-  if (auto *tuple = dyn_cast<TuplePattern>(bodyPattern)) {
-    Optional<unsigned> firstRemoved;
-    Optional<unsigned> lastRemoved;
-    unsigned numElementsInParens;
-    if (argTuple) {
-      numElementsInParens = (argTuple->getNumElements() -
-                             argTuple->hasTrailingClosure());
-    } else if (argParen) {
-      numElementsInParens = 1 - argParen->hasTrailingClosure();
-    } else {
-      numElementsInParens = 0;
-    }
+  // Skip over the implicit 'self'.
+  auto *bodyParams = afd->getParameterList(afd->getImplicitSelfDecl()?1:0);
 
-    for (unsigned i = 0; i != numElementsInParens; ++i) {
-      auto &elt = tuple->getElements()[i];
-      if (elt.getDefaultArgKind() == DefaultArgumentKind::None)
+  Optional<unsigned> firstRemoved;
+  Optional<unsigned> lastRemoved;
+  unsigned numElementsInParens;
+  if (argTuple) {
+    numElementsInParens = (argTuple->getNumElements() -
+                           argTuple->hasTrailingClosure());
+  } else if (argParen) {
+    numElementsInParens = 1 - argParen->hasTrailingClosure();
+  } else {
+    numElementsInParens = 0;
+  }
+
+  for (unsigned i = 0; i != numElementsInParens; ++i) {
+    auto param = bodyParams->get(i);
+    if (!param->isDefaultArgument())
+      continue;
+
+    auto defaultArg = param->getType()->getInferredDefaultArgString();
+
+    // Never consider removing the first argument for a "set" method
+    // with an unnamed first argument.
+    if (i == 0 &&
+        !name.getBaseName().empty() &&
+        camel_case::getFirstWord(name.getBaseName().str()) == "set" &&
+        name.getArgumentNames().size() > 0 &&
+        name.getArgumentNames()[0].empty())
+      continue;
+
+    SourceRange removalRange;
+    if (argTuple && i < argTuple->getNumElements()) {
+      // Check whether we have a default argument.
+      auto exprArg = getDefaultArgForExpr(argTuple->getElement(i));
+      if (!exprArg || defaultArg != *exprArg)
         continue;
 
-      auto defaultArg
-        = elt.getPattern()->getType()->getInferredDefaultArgString();
-
-      // Never consider removing the first argument for a "set" method
-      // with an unnamed first argument.
-      if (i == 0 &&
-          !name.getBaseName().empty() &&
-          camel_case::getFirstWord(name.getBaseName().str()) == "set" &&
-          name.getArgumentNames().size() > 0 &&
-          name.getArgumentNames()[0].empty())
-        continue;
-
-      SourceRange removalRange;
-      if (argTuple && i < argTuple->getNumElements()) {
-        // Check whether we have a default argument.
-        auto exprArg = getDefaultArgForExpr(argTuple->getElement(i));
-        if (!exprArg || defaultArg != *exprArg)
-          continue;
-
-        // Figure out where to start removing this argument.
-        if (i == 0) {
-          // Start removing right after the opening parenthesis.
-          removalRange.Start = argTuple->getLParenLoc();
-        } else {
-          // Start removing right after the preceding argument, so we
-          // consume the comma as well.
-          removalRange.Start = argTuple->getElement(i-1)->getEndLoc();
-        }
-
-        // Adjust to the end of the starting token.
-        removalRange.Start
-          = Lexer::getLocForEndOfToken(ctx.SourceMgr, removalRange.Start);
-
-        // Figure out where to finish removing this element.
-        if (i == 0 && i < numElementsInParens - 1) {
-          // We're the first of several arguments; consume the
-          // following comma as well.
-          removalRange.End = argTuple->getElementNameLoc(i+1);
-          if (removalRange.End.isInvalid())
-            removalRange.End = argTuple->getElement(i+1)->getStartLoc();
-        } else if (i < numElementsInParens - 1) {
-          // We're in the middle; consume through the end of this
-          // element.
-          removalRange.End
-            = Lexer::getLocForEndOfToken(ctx.SourceMgr,
-                                         argTuple->getElement(i)->getEndLoc());
-        } else {
-          // We're at the end; consume up to the closing parentheses.
-          removalRange.End = argTuple->getRParenLoc();
-        }
-      } else if (argParen) {
-        // Check whether we have a default argument.
-        auto exprArg = getDefaultArgForExpr(argParen->getSubExpr());
-        if (!exprArg || defaultArg != *exprArg)
-          continue;
-
-        removalRange = SourceRange(argParen->getSubExpr()->getStartLoc(),
-                                   argParen->getRParenLoc());
+      // Figure out where to start removing this argument.
+      if (i == 0) {
+        // Start removing right after the opening parenthesis.
+        removalRange.Start = argTuple->getLParenLoc();
       } else {
-        continue;
+        // Start removing right after the preceding argument, so we
+        // consume the comma as well.
+        removalRange.Start = argTuple->getElement(i-1)->getEndLoc();
       }
 
-      if (removalRange.isInvalid())
-        continue;
+      // Adjust to the end of the starting token.
+      removalRange.Start
+        = Lexer::getLocForEndOfToken(ctx.SourceMgr, removalRange.Start);
 
-      // Note that we're removing this argument.
-      removedArgs.push_back(i);
-
-      // If we hadn't removed anything before, this is the first
-      // removal.
-      if (!firstRemoved) {
-        ranges.push_back(removalRange);
-        firstRemoved = i;
-        lastRemoved = i;
-        continue;
+      // Figure out where to finish removing this element.
+      if (i == 0 && i < numElementsInParens - 1) {
+        // We're the first of several arguments; consume the
+        // following comma as well.
+        removalRange.End = argTuple->getElementNameLoc(i+1);
+        if (removalRange.End.isInvalid())
+          removalRange.End = argTuple->getElement(i+1)->getStartLoc();
+      } else if (i < numElementsInParens - 1) {
+        // We're in the middle; consume through the end of this
+        // element.
+        removalRange.End
+          = Lexer::getLocForEndOfToken(ctx.SourceMgr,
+                                       argTuple->getElement(i)->getEndLoc());
+      } else {
+        // We're at the end; consume up to the closing parentheses.
+        removalRange.End = argTuple->getRParenLoc();
       }
-
-      // If the previous removal range was the previous argument,
-      // combine the ranges.
-      if (*lastRemoved == i - 1) {
-        ranges.back().End = removalRange.End;
-        lastRemoved = i;
+    } else if (argParen) {
+      // Check whether we have a default argument.
+      auto exprArg = getDefaultArgForExpr(argParen->getSubExpr());
+      if (!exprArg || defaultArg != *exprArg)
         continue;
-      }
 
-      // Otherwise, add this new removal range.
+      removalRange = SourceRange(argParen->getSubExpr()->getStartLoc(),
+                                 argParen->getRParenLoc());
+    } else {
+      continue;
+    }
+
+    if (removalRange.isInvalid())
+      continue;
+
+    // Note that we're removing this argument.
+    removedArgs.push_back(i);
+
+    // If we hadn't removed anything before, this is the first
+    // removal.
+    if (!firstRemoved) {
       ranges.push_back(removalRange);
+      firstRemoved = i;
       lastRemoved = i;
+      continue;
     }
 
-    // If there is a single removal range that covers everything but
-    // the trailing closure at the end, also zap the parentheses.
-    if (ranges.size() == 1 &&
-        *firstRemoved == 0 && *lastRemoved == tuple->getNumElements() - 2 &&
-        argTuple && argTuple->hasTrailingClosure()) {
-      ranges.front().Start = argTuple->getLParenLoc();
-      ranges.front().End
-        = Lexer::getLocForEndOfToken(ctx.SourceMgr, argTuple->getRParenLoc());
+    // If the previous removal range was the previous argument,
+    // combine the ranges.
+    if (*lastRemoved == i - 1) {
+      ranges.back().End = removalRange.End;
+      lastRemoved = i;
+      continue;
     }
+
+    // Otherwise, add this new removal range.
+    ranges.push_back(removalRange);
+    lastRemoved = i;
+  }
+
+  // If there is a single removal range that covers everything but
+  // the trailing closure at the end, also zap the parentheses.
+  if (ranges.size() == 1 &&
+      *firstRemoved == 0 && *lastRemoved == bodyParams->size() - 2 &&
+      argTuple && argTuple->hasTrailingClosure()) {
+    ranges.front().Start = argTuple->getLParenLoc();
+    ranges.front().End
+      = Lexer::getLocForEndOfToken(ctx.SourceMgr, argTuple->getRParenLoc());
   }
 
   return !ranges.empty();

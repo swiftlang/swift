@@ -83,9 +83,9 @@ struct OuterNominal {
 // POPULAR_STMT_0:   CCModuleColor
 // POPULAR_STMT_0:   EEModuleColor
 // bad() ends up here because it's an unpopular global but that's still better
-// than a random "other module" result like ModuleColaborate.
+// than a random "other module" result like ModuleCollaborate.
 // POPULAR_STMT_0:   bad()
-// POPULAR_STMT_0:   ModuleColaborate
+// POPULAR_STMT_0:   ModuleCollaborate
 // POPULAR_STMT_0: ]
 // POPULAR_STMT_0-LABEL: Results for filterText: col [
 // POPULAR_STMT_0:   argColor
@@ -97,7 +97,7 @@ struct OuterNominal {
 // POPULAR_STMT_0:   DDModuleColor
 // POPULAR_STMT_0:   CCModuleColor
 // POPULAR_STMT_0:   EEModuleColor
-// POPULAR_STMT_0:   ModuleColaborate
+// POPULAR_STMT_0:   ModuleCollaborate
 // POPULAR_STMT_0:   BBModuleColor
 // POPULAR_STMT_0:   AAModuleColor
 // POPULAR_STMT_0: ]

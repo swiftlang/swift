@@ -1,14 +1,14 @@
-//===--- Local.cpp - Functions that perform local SIL transformations. ---===//
+//===--- Local.cpp - Functions that perform local SIL transformations. ----===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
@@ -270,7 +270,7 @@ bool swift::computeMayBindDynamicSelf(SILFunction *F) {
 }
 
 /// Find a new position for an ApplyInst's FuncRef so that it dominates its
-/// use. Not that FuncionRefInsts may be shared by multiple ApplyInsts.
+/// use. Not that FunctionRefInsts may be shared by multiple ApplyInsts.
 void swift::placeFuncRef(ApplyInst *AI, DominanceInfo *DT) {
   FunctionRefInst *FuncRef = cast<FunctionRefInst>(AI->getCallee());
   SILBasicBlock *DomBB =
@@ -341,8 +341,8 @@ SILLinkage swift::getSpecializedLinkage(SILFunction *F, SILLinkage L) {
     // Treat stdlib_binary_only specially. We don't serialize the body of
     // stdlib_binary_only functions so we can't mark them as Shared (making
     // their visibility in the dylib hidden).
-    return F->hasSemanticsString("stdlib_binary_only") ? SILLinkage::Public
-                                                       : SILLinkage::Shared;
+    return F->hasSemanticsAttr("stdlib_binary_only") ? SILLinkage::Public
+                                                     : SILLinkage::Shared;
 
   case SILLinkage::Private:
   case SILLinkage::PrivateExternal:
@@ -684,8 +684,7 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
   if (!Fn)
     return false;
 
-  if (AI->getNumOperands() != 3 ||
-      !Fn->hasSemanticsString("string.concat"))
+  if (AI->getNumOperands() != 3 || !Fn->hasSemanticsAttr("string.concat"))
     return false;
 
   // Left and right operands of a string concatenation operation.
@@ -708,12 +707,9 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
       FRIRightFun->getEffectsKind() >= EffectsKind::ReadWrite)
     return false;
 
-  if (!FRILeftFun->hasDefinedSemantics() ||
-      !FRIRightFun->hasDefinedSemantics())
+  if (!FRILeftFun->hasSemanticsAttrs() || !FRIRightFun->hasSemanticsAttrs())
     return false;
 
-  auto SemanticsLeft = FRILeftFun->getSemanticsString();
-  auto SemanticsRight = FRIRightFun->getSemanticsString();
   auto AILeftOperandsNum = AILeft->getNumOperands();
   auto AIRightOperandsNum = AIRight->getNumOperands();
 
@@ -721,10 +717,14 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
   // (start: RawPointer, numberOfCodeUnits: Word)
   // makeUTF8 should have following parameters:
   // (start: RawPointer, byteSize: Word, isASCII: Int1)
-  if (!((SemanticsLeft == "string.makeUTF16" && AILeftOperandsNum == 4) ||
-        (SemanticsLeft == "string.makeUTF8" && AILeftOperandsNum == 5) ||
-        (SemanticsRight == "string.makeUTF16" && AIRightOperandsNum == 4) ||
-        (SemanticsRight == "string.makeUTF8" && AIRightOperandsNum == 5)))
+  if (!((FRILeftFun->hasSemanticsAttr("string.makeUTF16") &&
+         AILeftOperandsNum == 4) ||
+        (FRILeftFun->hasSemanticsAttr("string.makeUTF8") &&
+         AILeftOperandsNum == 5) ||
+        (FRIRightFun->hasSemanticsAttr("string.makeUTF16") &&
+         AIRightOperandsNum == 4) ||
+        (FRIRightFun->hasSemanticsAttr("string.makeUTF8") &&
+         AIRightOperandsNum == 5)))
     return false;
 
   SLILeft = dyn_cast<StringLiteralInst>(AILeft->getOperand(1));
@@ -1921,7 +1921,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       // Should be in the same BB.
       if (ASI->getParent() != EMI->getParent())
         return nullptr;
-      // Check if this alloc_stac is only initialized once by means of
+      // Check if this alloc_stack is only initialized once by means of
       // single init_existential_addr.
       bool isLegal = true;
       // init_existential instruction used to initialize this alloc_stack.
@@ -1983,7 +1983,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       if (ASRI->getParent() != EMI->getParent())
         return nullptr;
       // Check if this alloc_stack is only initialized once by means of
-      // a single initt_existential_ref.
+      // a single init_existential_ref.
       bool isLegal = true;
       for (auto Use: getNonDebugUses(*ASRI)) {
         auto *User = Use->getUser();

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -455,7 +455,7 @@ static void handleInterruptedConnection(xpc_object_t event, xpc_connection_t con
   sendNotification(event);
 
   // Retain connection while we try to ping it.
-  // Since this happens implicitely, we can't blame the client if it shutsdown
+  // Since this happens implicitly, we can't blame the client if it shuts down
   // while we are trying to ping.
   pingService((xpc_connection_t)xpc_retain(conn));
 }

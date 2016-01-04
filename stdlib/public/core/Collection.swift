@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -247,7 +247,12 @@ extension Collection {
   ///
   /// - Complexity: O(1)
   public var first: Iterator.Element? {
-    return isEmpty ? nil : self[startIndex]
+    // NB: Accessing `startIndex` may not be O(1) for some lazy collections,
+    // so instead of testing `isEmpty` and then returning the first element,
+    // we'll just rely on the fact that the generator always yields the
+    // first element first.
+    var i = iterator()
+    return i.next()
   }
 
   /// Returns a value less than or equal to the number of elements in
@@ -600,7 +605,7 @@ extension Sequence
 }
 
 extension Collection {
-  public func _preprocessingPass<R>(preprocess: (Self)->R) -> R? {
+  public func _preprocessingPass<R>(@noescape preprocess: (Self) -> R) -> R? {
     return preprocess(self)
   }
 }

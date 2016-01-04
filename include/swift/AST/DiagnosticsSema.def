@@ -1,8 +1,8 @@
-//===- DiagnosticsSema.def - Diagnostics Text -------------------*- C++ -*-===//
+//===--- DiagnosticsSema.def - Diagnostics Text -----------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -1710,7 +1710,7 @@ ERROR(try_assign_rhs_noncovering,sema_tce,none,
       "everything to its right", (unsigned))
 
 ERROR(reference_non_inout,sema_tce,none,
-      "reference to %0 not used to initialize a inout parameter", (Type))
+      "reference to %0 not used to initialize an inout parameter", (Type))
 NOTE(subscript_decl_here,sema_tca,none,
      "subscript operator declared here", ())
 ERROR(condition_broken_proto,sema_tce,none,
@@ -2052,12 +2052,6 @@ ERROR(type_pattern_missing_is,sema_tcp,none,
 
 ERROR(pattern_type_mismatch_context,sema_tcp,none,
       "type annotation does not match contextual type %0", (Type))
-ERROR(label_single_entry_tuple,sema_tcp,none,
-      "label is not allowed on single element tuple pattern", ())
-NOTE(remove_parens_for_type_annotation,sema_tcp,none,
-     "remove the parentheses to make this a type annotation", ())
-NOTE(remove_label_for_tuple_pattern,sema_tcp,none,
-     "remove the label to make this a tuple pattern", ())
 
 ERROR(tuple_pattern_in_non_tuple_context,sema_tcp,none,
       "tuple pattern cannot match values of the non-tuple type %0", (Type))
@@ -2333,9 +2327,7 @@ ERROR(objc_setter_for_nonobjc_subscript,sema_tcd,none,
 ERROR(objc_enum_generic,sema_tcd,none,
       "'@objc' enum cannot be generic", ())
 ERROR(objc_name_req_nullary,sema_objc,none,
-      "'@objc' %select{class|protocol|property}0 must have a simple name", (int))
-ERROR(objc_name_enum,sema_objc,none,
-      "'@objc' enum cannot have a name", ())
+      "'@objc' %select{class|protocol|enum|property}0 must have a simple name", (int))
 ERROR(objc_name_subscript,sema_objc,none,
       "'@objc' subscript cannot have a name; did you mean to put "
       "the name on the getter or setter?", ())

@@ -185,7 +185,7 @@ public struct NUPixelSize {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "width",
             key.offset: 116,
-            key.length: 5,
+            key.length: 10,
             key.typename: "Int",
             key.nameoffset: 116,
             key.namelength: 5
@@ -194,7 +194,7 @@ public struct NUPixelSize {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "height",
             key.offset: 128,
-            key.length: 6,
+            key.length: 11,
             key.typename: "Int",
             key.nameoffset: 128,
             key.namelength: 6

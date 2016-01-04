@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -711,10 +711,9 @@ static bool parseSILOptional(bool &Result, SILParser &SP, StringRef Expected) {
 
 static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
                                  IsThunk_t *isThunk, bool *isGlobalInit,
-                                 Inline_t *inlineStrategy,
-                                 bool *isLet,
-                                 std::string *Semantics, EffectsKind *MRK,
-                                 Parser &P) {
+                                 Inline_t *inlineStrategy, bool *isLet,
+                                 llvm::SmallVectorImpl<std::string> *Semantics,
+                                 EffectsKind *MRK, Parser &P) {
   while (P.consumeIf(tok::l_square)) {
     if (isLet && P.Tok.is(tok::kw_let)) {
       *isLet = true;
@@ -754,7 +753,7 @@ static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
   
       // Drop the double quotes.
       StringRef rawString = P.Tok.getText().drop_front().drop_back();
-      *Semantics = rawString;
+      Semantics->push_back(rawString);
       P.consumeToken(tok::string_literal);
 
       P.parseToken(tok::r_square, diag::expected_in_attribute_list);
@@ -3663,7 +3662,7 @@ bool Parser::parseDeclSIL() {
   IsThunk_t isThunk = IsNotThunk;
   bool isGlobalInit = false;
   Inline_t inlineStrategy = InlineDefault;
-  std::string Semantics;
+  llvm::SmallVector<std::string, 1> Semantics;
   EffectsKind MRK = EffectsKind::Unspecified;
   if (parseSILLinkage(FnLinkage, *this) ||
       parseDeclSILOptional(&isTransparent, &isFragile, &isThunk, &isGlobalInit,
@@ -3694,8 +3693,9 @@ bool Parser::parseDeclSIL() {
     FunctionState.F->setGlobalInit(isGlobalInit);
     FunctionState.F->setInlineStrategy(inlineStrategy);
     FunctionState.F->setEffectsKind(MRK);
-    if (!Semantics.empty())
-      FunctionState.F->setSemanticsAttr(Semantics);
+    for (auto &Attr : Semantics) {
+      FunctionState.F->addSemanticsAttr(Attr);
+    }
 
     // Now that we have a SILFunction parse the body, if present.
 
@@ -3726,7 +3726,7 @@ bool Parser::parseDeclSIL() {
   if (FunctionState.diagnoseProblems())
     return true;
 
-  // If SIL prsing succeeded, verify the generated SIL.
+  // If SIL parsing succeeded, verify the generated SIL.
   if (!FunctionState.P.Diags.hadAnyError())
     FunctionState.F->verify();
 

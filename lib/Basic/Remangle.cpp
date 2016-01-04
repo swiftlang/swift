@@ -1,20 +1,20 @@
-//===--- Remangle.cpp - Swift re-mangling from a demangling tree ---------===//
+//===--- Remangle.cpp - Swift re-mangling from a demangling tree ----------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 //
 //  This file implements the remangler, which turns a demangling parse
 //  tree back into a mangled string.  This is useful for tools which
 //  want to extract subtrees from mangled strings.
 //
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/LLVM.h"
@@ -70,6 +70,16 @@ static bool isNonAscii(StringRef str) {
   return false;
 }
 
+static char mangleOperatorKind(OperatorKind operatorKind) {
+  switch (operatorKind) {
+    case OperatorKind::NotOperator: unreachable("invalid");
+    case OperatorKind::Infix: return 'i';
+    case OperatorKind::Prefix: return 'p';
+    case OperatorKind::Postfix: return 'P';
+  }
+  unreachable("invalid");
+}
+
 static void mangleIdentifier(StringRef ident, OperatorKind operatorKind,
                              bool usePunycode, DemanglerPrinter &out) {
   std::string punycodeBuf;
@@ -99,15 +109,7 @@ static void mangleIdentifier(StringRef ident, OperatorKind operatorKind,
   //   operator-fixity ::= 'i' // infix
   // where the count is the number of characters in the operator,
   // and where the individual operator characters are translated.
-  out << 'o' << [=] {
-    switch (operatorKind) {
-    case OperatorKind::NotOperator: unreachable("invalid");
-    case OperatorKind::Infix: return 'i';
-    case OperatorKind::Prefix: return 'p';
-    case OperatorKind::Postfix: return 'P';
-    }
-    unreachable("invalid");
-  }();
+  out << 'o' << mangleOperatorKind(operatorKind);
 
   // Mangle ASCII operators directly.
   out << ident.size();

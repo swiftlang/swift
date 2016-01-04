@@ -1,6 +1,6 @@
-typealias MyFnTy = Int->Int
+typealias MyFnTy = Int ->Int
 class C {
-  func foo(x: Int->Int) {}
+  func foo(x: Int ->Int) {}
   func foo2(x: MyFnTy) {}
 }
 

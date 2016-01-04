@@ -115,13 +115,13 @@ struct Model_P3_P4_Eq<T : P3, U : P4 where T.P3Assoc == U.P4Assoc> { }
 // CHECK-LABEL: .inferSameType1@
 // CHECK-NEXT: Requirements:
 // CHECK-NEXT:   T witness marker
-// CHECK-NEXT:   T : P3 [inferred @ {{.*}}:26]
+// CHECK-NEXT:   T : P3 [inferred @ {{.*}}:30]
 // CHECK-NEXT:   U witness marker
-// CHECK-NEXT:   U : P4 [inferred @ {{.*}}:26]
+// CHECK-NEXT:   U : P4 [inferred @ {{.*}}:30]
 // CHECK-NEXT:   T[.P3].P3Assoc witness marker
 // CHECK-NEXT:   T[.P3].P3Assoc : P1 [protocol @ {{.*}}:13]
 // CHECK-NEXT:   T[.P3].P3Assoc : P2 [protocol @ {{.*}}:13]
-// CHECK-NEXT:   U[.P4].P4Assoc == T[.P3].P3Assoc [inferred @ {{.*}}26]
+// CHECK-NEXT:   U[.P4].P4Assoc == T[.P3].P3Assoc [inferred @ {{.*}}30]
 func inferSameType1<T, U>(x: Model_P3_P4_Eq<T, U>) { }
 
 // CHECK-LABEL: .inferSameType2@

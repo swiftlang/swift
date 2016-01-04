@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -1013,7 +1013,7 @@ public:
     auto PointerRVType = PointerType.getSwiftRValueType();
     require(PointerType.isAddress() &&
             PointerRVType->is<WeakStorageType>(),
-            "load_weak operand must be an weak address");
+            "load_weak operand must be a weak address");
     require(PointerRVType->getReferenceStorageReferent()->getCanonicalType() ==
             LWI->getType().getSwiftType(),
             "Load operand type and result type mismatch");
@@ -1028,7 +1028,7 @@ public:
     auto PointerRVType = PointerType.getSwiftRValueType();
     require(PointerType.isAddress() &&
             PointerRVType->is<WeakStorageType>(),
-            "store_weak address operand must be an weak address");
+            "store_weak address operand must be a weak address");
     require(PointerRVType->getReferenceStorageReferent()->getCanonicalType() ==
             SWI->getSrc().getType().getSwiftType(),
             "Store operand type and dest type mismatch");

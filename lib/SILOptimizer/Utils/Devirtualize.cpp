@@ -1,8 +1,8 @@
-//===-- Devirtualize.cpp - Helper for devirtualizing apply ------*- C++ -*-===//
+//===--- Devirtualize.cpp - Helper for devirtualizing apply -----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -187,7 +187,7 @@ static bool isKnownFinalClass(ClassDecl *CD, SILModule &M,
     break;
   }
 
-  // Take the ClassHieararchyAnalysis into account.
+  // Take the ClassHierarchyAnalysis into account.
   // If a given class has no subclasses and
   // - private
   // - or internal and it is a WMO compilation

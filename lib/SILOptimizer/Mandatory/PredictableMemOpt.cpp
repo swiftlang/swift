@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -86,7 +86,7 @@ static SILValue getAccessPathRoot(SILValue Pointer) {
 ///
 /// This will return a subelement number of 2.
 ///
-/// If this pointer is to within a existential projection, it returns ~0U.
+/// If this pointer is to within an existential projection, it returns ~0U.
 ///
 static unsigned computeSubelement(SILValue Pointer, SILInstruction *RootInst) {
   unsigned SubEltNumber = 0;
@@ -350,7 +350,7 @@ updateAvailableValues(SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
     if (!AnyRequired)
       return;
     
-    // If the copyaddr is of an non-loadable type, we can't promote it.  Just
+    // If the copyaddr is of a non-loadable type, we can't promote it.  Just
     // consider it to be a clobber.
     if (CAI->getOperand(0).getType().isLoadable(Module)) {
       // Otherwise, some part of the copy_addr's value is demanded by a load, so

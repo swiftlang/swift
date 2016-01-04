@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -21,7 +21,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/Pattern.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/TypeWalker.h"
@@ -1388,17 +1388,15 @@ bool ArchetypeBuilder::inferRequirements(TypeLoc type,
   return walker.hadError();
 }
 
-bool ArchetypeBuilder::inferRequirements(Pattern *pattern,
+bool ArchetypeBuilder::inferRequirements(ParameterList *params,
                                          GenericParamList *genericParams) {
-  if (!pattern->hasType())
-    return true;
   if (genericParams == nullptr)
     return false;
-  // FIXME: Crummy source-location information.
-  InferRequirementsWalker walker(*this, pattern->getSourceRange().Start,
-                                 genericParams->getDepth());
-  pattern->getType().walk(walker);
-  return walker.hadError();
+  
+  bool hadError = false;
+  for (auto P : *params)
+    hadError |= inferRequirements(P->getTypeLoc(), genericParams);
+  return hadError;
 }
 
 /// Perform typo correction on the given nested type, producing the

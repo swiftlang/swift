@@ -1,8 +1,8 @@
-//===--- SILDeclRef.h - Defines the SILDeclRef struct ---------*- C++ -*---===//
+//===--- SILDeclRef.h - Defines the SILDeclRef struct -----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -234,8 +234,7 @@ struct SILDeclRef {
   ///
   /// If 'prefix' is non-empty, it will be used in place of the standard '_T'
   /// prefix.
-  llvm::StringRef mangle(llvm::SmallVectorImpl<char> &buffer,
-                         StringRef prefix = {}) const;
+  std::string mangle(StringRef prefix = {}) const;
 
   /// True if the SILDeclRef references a function.
   bool isFunc() const {
@@ -270,7 +269,7 @@ struct SILDeclRef {
   /// \brief True if the function has __always inline attribute.
   bool isAlwaysInline() const;
   
-  /// \return True if the function has a effects attribute.
+  /// \return True if the function has an effects attribute.
   bool hasEffectsAttribute() const;
 
   /// \return the effects kind of the function.

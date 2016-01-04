@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -301,9 +301,6 @@ enum TypeResolutionFlags : unsigned {
   /// Whether to allow unspecified types within a pattern.
   TR_AllowUnspecifiedTypes = 0x01,
 
-  /// Whether the pattern is variadic.
-  TR_Variadic = 0x02,
-
   /// Whether the given type can override the type of a typed pattern.
   TR_OverrideType = 0x04,
 
@@ -319,9 +316,6 @@ enum TypeResolutionFlags : unsigned {
   
   /// Whether this is the immediate input type to a function type,
   TR_ImmediateFunctionInput = 0x40,
-
-  /// Whether we are in the result type of a function type.
-  TR_FunctionResult = 0x80,
 
   /// Whether we are in the result type of a function body that is
   /// known to produce dynamic Self.
@@ -387,7 +381,6 @@ static inline TypeResolutionOptions
 withoutContext(TypeResolutionOptions options) {
   options -= TR_ImmediateFunctionInput;
   options -= TR_FunctionInput;
-  options -= TR_FunctionResult;
   options -= TR_EnumCase;
   return options;
 }
@@ -1208,6 +1201,11 @@ public:
 
   bool typeCheckCatchPattern(CatchStmt *S, DeclContext *dc);
 
+  /// Type check a parameter list.
+  bool typeCheckParameterList(ParameterList *PL, DeclContext *dc,
+                              TypeResolutionOptions options,
+                              GenericTypeResolver *resolver = nullptr);
+  
   /// Coerce a pattern to the given type.
   ///
   /// \param P The pattern, which may be modified by this coercion.
@@ -1223,6 +1221,13 @@ public:
   bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                             Type type);
 
+  /// Coerce the specified parameter list of a ClosureExpr to the specified
+  /// contextual type.
+  ///
+  /// \returns true if an error occurred, false otherwise.
+  bool coerceParameterListToType(ClosureExpr *CE, AnyFunctionType *closureType);
+
+  
   /// Type-check an initialized variable pattern declaration.
   bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC);
   bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber);

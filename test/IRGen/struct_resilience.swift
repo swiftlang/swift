@@ -85,6 +85,8 @@ public struct MySize {
 public func functionWithMyResilientTypes(s: MySize, f: MySize -> MySize) -> MySize {
 
 // CHECK: [[TEMP:%.*]] = alloca %V17struct_resilience6MySize
+// CHECK: bitcast
+// CHECK: llvm.lifetime.start
 // CHECK: [[COPY:%.*]] = bitcast %V17struct_resilience6MySize* %4 to i8*
 // CHECK: [[ARG:%.*]] = bitcast %V17struct_resilience6MySize* %1 to i8*
 // CHECK: call void @llvm.memcpy{{.*}}(i8* [[COPY]], i8* [[ARG]], {{i32 8|i64 16}}, i32 {{.*}}, i1 false)

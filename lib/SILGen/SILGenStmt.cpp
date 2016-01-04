@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -511,7 +511,7 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
   SILArgument *exnArg =
     throwDest.getBlock()->createBBArg(exnTL.getLoweredType());
 
-  // We always need an continuation block because we might fall out of
+  // We always need a continuation block because we might fall out of
   // a catch block.  But we don't need a loop block unless the 'do'
   // statement is labeled.
   JumpDest endDest = createJumpDest(S->getBody());

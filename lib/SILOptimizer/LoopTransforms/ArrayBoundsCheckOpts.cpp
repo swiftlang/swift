@@ -1,8 +1,8 @@
-//===----- ArrayBoundsCheckOpts.cpp - Bounds check elim ---*- C++ -*-------===//
+//===--- ArrayBoundsCheckOpts.cpp - Bounds check elim -----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -250,7 +250,7 @@ public:
   ABCAnalysis(const ABCAnalysis &) = delete;
   ABCAnalysis &operator=(const ABCAnalysis &) = delete;
 
-  /// Find safe array bounds check in a loop. An bounds_check is safe if no size
+  /// Find safe array bounds check in a loop. A bounds_check is safe if no size
   /// modifying instruction to the same array has been seen so far.
   ///
   /// The code relies on isIdentifiedUnderlyingArrayObject' to make sure that a
@@ -792,7 +792,7 @@ public:
       // Look for induction variables.
       IVInfo::IVDesc IV;
       if (!(IV = IVs.getInductionDesc(Arg))) {
-        DEBUG(llvm::dbgs() << " not a induction variable: " << *Arg);
+        DEBUG(llvm::dbgs() << " not an induction variable: " << *Arg);
         continue;
       }
 

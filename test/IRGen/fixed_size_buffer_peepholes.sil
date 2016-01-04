@@ -9,12 +9,16 @@ sil @produce : $@convention(thin) <T> (@out T) -> ()
 sil @join_alloc_stack_copy_addr : $@convention(thin) <T> (@in T) -> () {
 entry(%x : $*T):
   // CHECK: [[BUFFER:%.*]] = alloca [[BUFFER_TYPE:\[.* x i8\]]]
+  // CHECK: [[BUFFERLIFE:%.*]] = bitcast [[BUFFER_TYPE]]* [[BUFFER]]
+  // CHECK: llvm.lifetime.start(i64 [[BUFFER_SIZE:12|24]], i8* [[BUFFERLIFE]])
   %a = alloc_stack $T
   // CHECK: [[ADDR:%.*]] = call %swift.opaque* %initializeBufferWithCopy([[BUFFER_TYPE]]* [[BUFFER]], %swift.opaque* %0, %swift.type* %T)
   copy_addr %x to [initialization] %a#1 : $*T
   // CHECK: call void @consume(%swift.opaque* noalias nocapture [[ADDR]], %swift.type* %T)
   %u = function_ref @consume : $@convention(thin) <T> (@in T) -> ()
   %z = apply %u<T>(%a#1) : $@convention(thin) <T> (@in T) -> ()
+  // CHECK: [[BUFFERLIFE:%.*]] = bitcast [[BUFFER_TYPE]]* [[BUFFER]]
+  // CHECK: llvm.lifetime.end(i64 [[BUFFER_SIZE]], i8* [[BUFFERLIFE]])
   dealloc_stack %a#0 : $*@local_storage T
   return undef : $()
 }

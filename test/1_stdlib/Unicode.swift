@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -22,11 +22,11 @@ UnicodeInternals.test("copy") {
   var u16: [UTF16.CodeUnit] = [ 6, 7, 8, 9, 10, 11 ]
 
   u16.withUnsafeMutableBufferPointer {
-    (u16)->() in
+    (u16) -> () in
     let p16 = u16.baseAddress
 
     u8.withUnsafeMutableBufferPointer {
-      (u8)->() in
+      (u8) -> () in
       let p8 = u8.baseAddress
 
       UTF16._copy(p8, destination: p16, length: 3)

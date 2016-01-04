@@ -73,5 +73,5 @@ presentBase(Base(x: 2))
 // CHECK:         [[TMP:%.*]] = call %swift.type* @_TMaC3foo7Derived()
 // CHECK-NEXT:    [[SUPER:%.*]] = bitcast %swift.type* [[TMP:%.*]] to %objc_class*
 // CHECK-NEXT:    [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* [[SUPER]])
-// CHECK:         call void @swift_initializeSuperclass(%swift.type* [[METADATA]], i1 true)
+// CHECK:         call void @swift_initializeSuperclass(%swift.type* [[METADATA]], i1 false)
 // CHECK-NEXT:    ret %swift.type* [[METADATA]]

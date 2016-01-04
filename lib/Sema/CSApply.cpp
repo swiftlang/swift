@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -21,6 +21,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
+#include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
@@ -239,7 +240,7 @@ static DeclTy *findNamedWitnessImpl(TypeChecker &tc, DeclContext *dc, Type type,
   if (!conforms)
     return nullptr;
 
-  // For an type with dependent conformance, just return the requirement from
+  // For a type with dependent conformance, just return the requirement from
   // the protocol. There are no protocol conformance tables.
   if (type->hasDependentProtocolConformances()) {
     return requirement;
@@ -787,12 +788,11 @@ namespace {
              (cast<FuncDecl>(func)->hasDynamicSelf() ||
               (openedExistential && cast<FuncDecl>(func)->hasArchetypeSelf()))) ||
             isPolymorphicConstructor(func)) {
-          refTy = refTy->replaceCovariantResultType(
-                    containerTy,
-                    func->getNumParamPatterns());
+          refTy = refTy->replaceCovariantResultType(containerTy,
+                    func->getNumParameterLists());
           dynamicSelfFnType = refTy->replaceCovariantResultType(
                                 baseTy,
-                                func->getNumParamPatterns());
+                                func->getNumParameterLists());
 
           if (openedExistential) {
             // Replace the covariant result type in the opened type. We need to
@@ -803,7 +803,7 @@ namespace {
               openedType = optObject;
             openedType = openedType->replaceCovariantResultType(
                            baseTy,
-                           func->getNumParamPatterns()-1);
+                           func->getNumParameterLists()-1);
             if (optKind != OptionalTypeKind::OTK_None)
               openedType = OptionalType::get(optKind, openedType);
           }
@@ -3600,7 +3600,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
                                            toElt.getDefaultArgKind(),
                                            toElt.isVararg()));
       fromTupleExprFields[sources[i]] = fromElt;
-      hasInits |= toElt.hasInit();
+      hasInits |= toElt.hasDefaultArg();
       continue;
     }
 
@@ -3632,7 +3632,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
                                                    fromElt.getName(),
                                                    fromElt.getDefaultArgKind(),
                                                    fromElt.isVararg());
-    hasInits |= toElt.hasInit();
+    hasInits |= toElt.hasDefaultArg();
   }
 
   // Convert all of the variadic arguments to the destination type.
@@ -3761,7 +3761,7 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
   bool hasInit = false;
   int i = 0;
   for (auto &field : toTuple->getElements()) {
-    if (field.hasInit()) {
+    if (field.hasDefaultArg()) {
       hasInit = true;
       break;
     }
@@ -3813,7 +3813,7 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
       continue;
     }
 
-    assert(field.hasInit() && "Expected a default argument");
+    assert(field.hasDefaultArg() && "Expected a default argument");
 
     ConcreteDeclRef argOwner;
     // Dig out the owner of the default arguments.
@@ -4838,11 +4838,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       auto discriminator = AutoClosureExpr::InvalidDiscriminator;
       auto closure = new (tc.Context) AutoClosureExpr(expr, toType,
                                                       discriminator, dc);
-      Pattern *pattern = TuplePattern::create(tc.Context, expr->getLoc(),
-                                              ArrayRef<TuplePatternElt>(),
-                                              expr->getLoc());
-      pattern->setType(TupleType::getEmpty(tc.Context));
-      closure->setParams(pattern);
+      closure->setParameterList(ParameterList::createEmpty(tc.Context));
 
       // Compute the capture list, now that we have analyzed the expression.
       tc.ClosuresWithUncomputedCaptures.push_back(closure);
@@ -5461,9 +5457,7 @@ diagnoseArgumentLabelError(Expr *expr, ArrayRef<Identifier> newNames,
       continue;
     }
 
-    tok newNameKind =
-      Lexer::kindOfIdentifier(newName.str(), /*inSILMode=*/false);
-    bool newNameIsReserved = newNameKind != tok::identifier;
+    bool newNameIsReserved = !canBeArgumentLabel(newName.str());
     llvm::SmallString<16> newStr;
     if (newNameIsReserved)
       newStr += "`";
@@ -5674,16 +5668,8 @@ namespace {
 
         // Coerce the pattern, in case we resolved something.
         auto fnType = closure->getType()->castTo<FunctionType>();
-        Pattern *params = closure->getParams();
-        TypeResolutionOptions TROptions;
-        TROptions |= TR_OverrideType;
-        TROptions |= TR_FromNonInferredPattern;
-        TROptions |= TR_InExpression;
-        TROptions |= TR_ImmediateFunctionInput;
-        if (tc.coercePatternToType(params, closure, fnType->getInput(),
-                                   TROptions))
+        if (tc.coerceParameterListToType(closure, fnType))
           return { false, nullptr };
-        closure->setParams(params);
 
         // If this is a single-expression closure, convert the expression
         // in the body to the result type of the closure.
@@ -6220,10 +6206,9 @@ static bool isVariadicWitness(AbstractFunctionDecl *afd) {
   if (afd->getExtensionType())
     ++index;
 
-  auto params = afd->getBodyParamPatterns()[index];
-  if (auto *tuple = dyn_cast<TuplePattern>(params)) {
-    return tuple->hasAnyEllipsis();
-  }
+  for (auto param : *afd->getParameterList(index))
+    if (param->isVariadic())
+      return true;
 
   return false;
 }

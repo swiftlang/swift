@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -415,6 +415,8 @@ namespace {
                        llvm::ArrayType::get(IGF.IGM.Int8PtrPtrTy,
                                             storedProperties.size()),
                        IGF.IGM.getPointerAlignment(), "structFields");
+      IGF.Builder.CreateLifetimeStart(fields,
+                            IGF.IGM.getPointerSize() * storedProperties.size());
 
       fields = IGF.Builder.CreateStructGEP(fields, 0, Size(0));
       unsigned index = 0;
@@ -433,6 +435,8 @@ namespace {
       IGF.Builder.CreateCall(IGF.IGM.getInitStructMetadataUniversalFn(),
                              {numFields, fields.getAddress(),
                               fieldVector, vwtable});
+      IGF.Builder.CreateLifetimeEnd(fields,
+                            IGF.IGM.getPointerSize() * storedProperties.size());
     }
   };
 

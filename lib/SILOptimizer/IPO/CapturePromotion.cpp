@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -365,28 +365,23 @@ computeNewArgInterfaceTypes(SILFunction *F,
   }
 }
 
-static llvm::SmallString<64> getSpecializedName(SILFunction *F,
-                                                IndicesSet &PromotableIndices) {
-  llvm::SmallString<64> Name;
+static std::string getSpecializedName(SILFunction *F,
+                                      IndicesSet &PromotableIndices) {
+  Mangle::Mangler M;
+  auto P = SpecializationPass::CapturePromotion;
+  FunctionSignatureSpecializationMangler FSSM(P, M, F);
+  CanSILFunctionType FTy = F->getLoweredFunctionType();
 
-  {
-    llvm::raw_svector_ostream buffer(Name);
-    Mangle::Mangler M(buffer);
-    auto P = SpecializationPass::CapturePromotion;
-    FunctionSignatureSpecializationMangler FSSM(P, M, F);
-    CanSILFunctionType FTy = F->getLoweredFunctionType();
-
-    ArrayRef<SILParameterInfo> Parameters = FTy->getParameters();
-    for (unsigned Index : indices(Parameters)) {
-      if (!PromotableIndices.count(Index))
-        continue;
-      FSSM.setArgumentBoxToValue(Index);
-    }
-
-    FSSM.mangle();
+  ArrayRef<SILParameterInfo> Parameters = FTy->getParameters();
+  for (unsigned Index : indices(Parameters)) {
+    if (!PromotableIndices.count(Index))
+      continue;
+    FSSM.setArgumentBoxToValue(Index);
   }
 
-  return Name;
+  FSSM.mangle();
+
+  return M.finalize();
 }
 
 /// \brief Create the function corresponding to the clone of the original
@@ -435,7 +430,8 @@ ClosureCloner::initCloned(SILFunction *Orig, StringRef ClonedName,
       Orig->getLocation(), Orig->isBare(), IsNotTransparent, Orig->isFragile(),
       Orig->isThunk(), Orig->getClassVisibility(), Orig->getInlineStrategy(),
       Orig->getEffectsKind(), Orig, Orig->getDebugScope());
-  Fn->setSemanticsAttr(Orig->getSemanticsAttr());
+  for (auto &Attr : Orig->getSemanticsAttrs())
+    Fn->addSemanticsAttr(Attr);
   Fn->setDeclCtx(Orig->getDeclContext());
   return Fn;
 }
@@ -956,8 +952,8 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
 }
 
 static void
-constructMapFromPartialApplyToPromoteableIndices(SILFunction *F,
-                                                 PartialApplyIndicesMap &Map) {
+constructMapFromPartialApplyToPromotableIndices(SILFunction *F,
+                                                PartialApplyIndicesMap &Map) {
   ReachabilityInfo RS(F);
 
   // This is a map from each partial apply to a single index which is a
@@ -985,7 +981,7 @@ processFunction(SILFunction *F, SmallVectorImpl<SILFunction*> &Worklist) {
   // This is a map from each partial apply to a set of indices of promotable
   // box variables.
   PartialApplyIndicesMap IndicesMap;
-  constructMapFromPartialApplyToPromoteableIndices(F, IndicesMap);
+  constructMapFromPartialApplyToPromotableIndices(F, IndicesMap);
 
   // Do the actual promotions; all promotions on a single partial_apply are
   // handled together.

@@ -1,0 +1,46 @@
+// RUN: swift-compress < %s  | FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class X
+{
+  private func ping() -> Int
+  @objc deinit
+  init()
+}
+
+class Y : X
+{
+  @objc deinit
+  override init()
+}
+
+//CHECK: _TcFDbNLPuN5mHx7uPzDVMqMw$Wfp3V
+//CHECK: _TcFDbNLPuN5mHx7uP4Mm4ZK3E2dg
+//CHECK: _TcFDbNLPuN5mHx7uPKxK8Xu7h5rx
+//CHECK: _TcFDbNLPuN5mHx7Ky3gX5w$WfFvi4
+//CHECK: _TcFDbNLPuN5mHx7KyOGTa2$Swj1C8
+sil @_TFC14devirt_access21X4pingfS0_FT_Si : $@convention(method) (@guaranteed X) -> Int 
+sil @_TFC14devirt_access21XcfMS0_FT_S0_ : $@convention(method) (@owned X) -> @owned X 
+sil @_TFC14devirt_access21XCfMS0_FT_S0_ : $@convention(thin) (@thick X.Type) -> @owned X 
+sil @_TFC14devirt_access21YcfMS0_FT_S0_ : $@convention(method) (@owned Y) -> @owned Y 
+sil @_TFC14devirt_access21YCfMS0_FT_S0_ : $@convention(thin) (@thick Y.Type) -> @owned Y 
+
+//CHECK: _TcFDbNLPuN5mHx7uPzDVMqMw$Wfp3V 
+//CHECK: _TcFDbNLPuN5mHx7uP4Mm4ZK3E2dg 
+sil_vtable X {
+  #X.ping!1: _TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int
+  #X.init!initializer.1: _TFC14devirt_access21XcfMS0_FT_S0_	// devirt_access2.X.init (devirt_access2.X.Type)() -> devirt_access2.X
+}
+
+//CHECK: _TcFDbNLPuN5mHx7uPzDVMqMw$Wfp3V
+//CHECK: _TcFDbNLPuN5mHx7Ky3gX5w$WfFvi4
+sil_vtable Y {
+  #X.ping!1: _TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int
+  #X.init!initializer.1: _TFC14devirt_access21YcfMS0_FT_S0_	// devirt_access2.Y.init (devirt_access2.Y.Type)() -> devirt_access2.Y
+}
+

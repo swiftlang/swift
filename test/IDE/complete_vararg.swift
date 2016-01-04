@@ -11,23 +11,23 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_FREE_FUNC_1 | FileCheck %s -check-prefix=GENERIC_FREE_FUNC_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INTERESTING_TYPE_1 | FileCheck %s -check-prefix=INTERESTING_TYPE_1
 
-func freeFunc1(#x: Int...) { }
-func freeFunc2(#x: Int, #y: Int...) { }
-func freeFunc3(#w: Int...)(#x: Int...) { }
+func freeFunc1(x x: Int...) { }
+func freeFunc2(x x: Int, y y: Int...) { }
+func freeFunc3(w w: Int...)(x x: Int...) { }
 
 class C {
   init(x: Int...) { }
-  func method1(#x: Int...) { }
-  func method2(#x: Int, y: Int...) { }
-  func method3(#w: Int...)(#x: Int...) { }
-  func method4(#`do` : Int...) {}
+  func method1(x x: Int...) { }
+  func method2(x x: Int, y: Int...) { }
+  func method3(w w: Int...)(x x: Int...) { }
+  func method4(`do` `do` : Int...) {}
   func method5(`class` : Int...) {}
   func method6(`class` `protocol`: Int...) {}
   subscript(i: Int...) -> Int { return 0 }
 }
 
-func genericFreeFunc1<T>(#t: T...) { }
-func interestingType1(#x: (Int, (Int, String))...) { }
+func genericFreeFunc1<T>(t t: T...) { }
+func interestingType1(x x: (Int, (Int, String))...) { }
 
 func testTopLevel() {
   #^TOP_LEVEL_1^#

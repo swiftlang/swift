@@ -313,7 +313,7 @@ struct LazyVar3 {
 }
 
 func closureTaker(theFunc:(theValue:Int) -> ()) {}
-func closureTaker2(theFunc: (Value1:Int, Value2:Int) ->()) {}
+func closureTaker2(theFunc: (Value1:Int, Value2:Int) -> ()) {}
 func testClosureParam1() {
   closureTaker { (theValue) -> () in
     #^CLOSURE_PARAM_1^#

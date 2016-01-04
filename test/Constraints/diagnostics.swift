@@ -273,9 +273,9 @@ func rdar21784170() {
 }
 
 // <rdar://problem/21829141> BOGUS: unexpected trailing closure
-func expect<T, U>(_: T)(_: U.Type) {} // expected-note {{found this candidate}} expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-func expect<T, U>(_: T, _: Int = 1)(_: U.Type) {} // expected-note {{found this candidate}} expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-expect(Optional(3))(Optional<Int>.self)  // expected-error {{ambiguous use of 'expect'}}
+func expect<T, U>(_: T)(_: U.Type) {}  //  expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
+func expect<T, U>(_: T, _: Int = 1)(_: U.Type) {} //  expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
+expect(Optional(3))(Optional<Int>.self)
 
 // <rdar://problem/19804707> Swift Enum Scoping Oddity
 func rdar19804707() {

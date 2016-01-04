@@ -310,7 +310,7 @@ as though it were written:
 .. parsed-literal::
 
   { 
-    (var y: X)->X in
+    (var y: X) -> X in
     y\ **.=**\ *f*\ (a₀, p₁: a₁, p₂: a₂, …p\ *n*: a\ *n*)
     return y
   }(x)
@@ -344,7 +344,7 @@ as though it were written:
 .. parsed-literal::
 
   { 
-    (var y: X)->X in
+    (var y: X) -> X in
     y *op*\ **=**\ *expression*
     return y
   }(x)

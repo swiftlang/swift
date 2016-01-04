@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -561,93 +561,39 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
 ///     type-array '[' ']'
 ///     type-array '[' expr ']'
 ///
-ParserResult<ArrayTypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
+ParserResult<TypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
   assert(Tok.isFollowingLSquare());
   Parser::StructureMarkerRAII ParsingArrayBound(*this, Tok);
   SourceLoc lsquareLoc = consumeToken();
-  ParserResult<TypeRepr> NestedType = makeParserResult(Base);
   ArrayTypeRepr *ATR = nullptr;
   
-  // Handle the [] production, meaning an array slice.
-  if (Tok.is(tok::r_square)) {
-    SourceLoc rsquareLoc = consumeToken(tok::r_square);
-    
-      
-    // If we're starting another square-bracket clause, recur.
-    if (Tok.isFollowingLSquare()) {
-      NestedType = parseTypeArray(Base);
-      if (NestedType.hasCodeCompletion())
-        return makeParserCodeCompletionResult<ArrayTypeRepr>();
-      if (NestedType.isNull()) {
-        // We could not parse the rest of the type, but we still have the base
-        // type.
-        NestedType = makeParserErrorResult(Base);
-      }
-    }
-    
-    // Just build a normal array slice type.
-    ATR = new (Context) ArrayTypeRepr(NestedType.get(), nullptr,
-                                           SourceRange(lsquareLoc, rsquareLoc),
-                                      /*OldSyntax=*/true);
+  // Handle a postfix [] production, a common typo for a C-like array.
 
-    if (NestedType.isParseError())
-      return makeParserErrorResult(ATR);
-    else {
-      diagnose(lsquareLoc, diag::new_array_syntax)
-        .fixItInsert(Base->getStartLoc(), "[")
-        .fixItRemove(lsquareLoc);
-
-      return makeParserResult(ATR);
-    }
-  }
-
-  SourceLoc rsquareLoc;
-
-  // We currently only accept an integer literal as the inner expression.
-  // FIXME: Should we decide to support integer constant expressions in the
-  // future, we will need to remove this check to accept any compositional
-  // expressions
-  ParserResult<Expr> sizeEx = parseExprBasic(diag::expected_expr_array_type);
-
-  parseMatchingToken(tok::r_square, rsquareLoc,
-                     diag::expected_rbracket_array_type, lsquareLoc);
-
-  if (!sizeEx.isNull() && isa<IntegerLiteralExpr>(sizeEx.get())) {
+  // If we have something that might be an array size expression, parse it as
+  // such, for better error recovery.
+  if (Tok.isNot(tok::r_square)) {
+    auto sizeEx = parseExprBasic(diag::expected_expr);
     if (sizeEx.hasCodeCompletion())
       return makeParserCodeCompletionStatus();
-
-    NestedType = makeParserErrorResult(Base);
-    
-    // FIXME: We don't supported fixed-length arrays yet.
-    diagnose(lsquareLoc, diag::unsupported_fixed_length_array)
-    .highlight(sizeEx.get()->getSourceRange());
-    
-    ATR = new (Context) ArrayTypeRepr(NestedType.get(),
-                                      nullptr,
-                                      SourceRange(lsquareLoc,
-                                                  getEndOfPreviousLoc()),
-                                      /*OldSyntax=*/true);
-    return makeParserErrorResult(ATR);
+    if (sizeEx.isNull())
+      return makeParserErrorResult(Base);
   }
+  
+  SourceLoc rsquareLoc;
+  if (parseMatchingToken(tok::r_square, rsquareLoc,
+                         diag::expected_rbracket_array_type, lsquareLoc))
+    return makeParserErrorResult(Base);
 
-  // If the size expression is null, we would have raised the
-  // expected_expr_array_type error above when the token stream failed to
-  // parse as an expression
-  if (!sizeEx.isNull()) {
-    diagnose(lsquareLoc, diag::expected_expr_array_type)
-    .highlight(sizeEx.get()->getSourceRange());
-  } else {
-    // Skip until the next decl, statement or block
-    skipUntilDeclStmtRBrace(tok::l_brace);
-  }
-
-  // Create an array slice type for the malformed array type specification
-  NestedType = makeParserErrorResult(Base);
-  ATR = new (Context) ArrayTypeRepr(NestedType.get(), nullptr,
-                                    SourceRange(lsquareLoc,
-                                                PreviousLoc),
-                                    /*OldSyntax=*/true);
-  return makeParserErrorResult(ATR);
+  // If we parsed something valid, diagnose it with a fixit to rewrite it to
+  // Swift syntax.
+  diagnose(lsquareLoc, diag::new_array_syntax)
+    .fixItInsert(Base->getStartLoc(), "[")
+    .fixItRemove(lsquareLoc);
+  
+  // Build a normal array slice type for recovery.
+  ATR = new (Context) ArrayTypeRepr(Base,
+                              SourceRange(Base->getStartLoc(), rsquareLoc));
+  return makeParserResult(ATR);
 }
 
 ParserResult<TypeRepr> Parser::parseTypeCollection() {
@@ -693,9 +639,7 @@ ParserResult<TypeRepr> Parser::parseTypeCollection() {
   // Form the array type.
   return makeParserResult(firstTy,
                           new (Context) ArrayTypeRepr(firstTy.get(),
-                                                      nullptr,
-                                                      brackets,
-                                                      /*OldSyntax=*/false));
+                                                      brackets));
 }
 
 bool Parser::isOptionalToken(const Token &T) const {
@@ -755,9 +699,9 @@ Parser::parseTypeImplicitlyUnwrappedOptional(TypeRepr *base) {
                            base, exclamationLoc));
 }
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Speculative type list parsing
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 static bool isGenericTypeDisambiguatingToken(Parser &P) {
   auto &tok = P.Tok;

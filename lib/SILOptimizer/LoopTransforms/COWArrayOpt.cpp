@@ -1,8 +1,8 @@
-//===------- COWArrayOpt.cpp - Optimize Copy-On-Write Array Checks --------===//
+//===--- COWArrayOpt.cpp - Optimize Copy-On-Write Array Checks ------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -17,7 +17,6 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
-#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
@@ -449,7 +448,7 @@ bool COWArrayOpt::checkUniqueArrayContainer(SILValue ArrayContainer) {
   return false;
 }
 
-/// Lazilly compute blocks that may reach the loop.
+/// Lazily compute blocks that may reach the loop.
 SmallPtrSetImpl<SILBasicBlock*> &COWArrayOpt::getReachingBlocks() {
   if (ReachingBlocks.empty()) {
     SmallVector<SILBasicBlock*, 8> Worklist;
@@ -536,7 +535,7 @@ bool COWArrayOpt::isRetainReleasedBeforeMutate(SILInstruction *RetainInst,
       //   release %ptr
       //   array_operation(..., @owned %ptr)
       //
-      // This is not the case for an potentially aliased array because a release
+      // This is not the case for a potentially aliased array because a release
       // can cause a destructor to run. The destructor in turn can cause
       // arbitrary side effects.
       if (isa<ReleaseValueInst>(II) || isa<StrongReleaseInst>(II))
@@ -1346,7 +1345,7 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
         // All array types must be the same. This is a stronger guaranteed than
         // we actually need. The requirement is that we can't create another
         // reference to the array by performing an array operation: for example,
-        // storing or appending one array into an two-dimensional array.
+        // storing or appending one array into a two-dimensional array.
         // Checking
         // that all types are the same make guarantees that this cannot happen.
         if (SameTy.isNull()) {
@@ -1770,7 +1769,7 @@ private:
       return false;
     }
 
-    // Otherwise, all of our users are sane. The array does not scape.
+    // Otherwise, all of our users are sane. The array does not escape.
     return true;
   }
 
@@ -2287,7 +2286,7 @@ class SwiftArrayOptPass : public SILFunctionTransform {
 
     // Check whether we can hoist 'array.props' calls out of loops, collecting
     // the preheader we can hoist to. We only hoist out of loops if 'all'
-    // arrray.props call can be hoisted for a given loop nest.
+    // array.props call can be hoisted for a given loop nest.
     // We process the loop tree preorder (top-down) to hoist over the biggest
     // possible loop-nest.
     SmallVector<SILBasicBlock *, 16> HoistableLoopNests;

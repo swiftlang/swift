@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -253,12 +253,13 @@ MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
          Idx < End && Behavior < MemBehavior::MayHaveSideEffects; ++Idx) {
       auto &ArgEffect = ApplyEffects.getParameterEffects()[Idx];
       auto ArgBehavior = ArgEffect.getMemBehavior(InspectionMode);
-      if (ArgBehavior > Behavior) {
+      auto NewBehavior = combineMemoryBehavior(Behavior, ArgBehavior);
+      if (NewBehavior != Behavior) {
         SILValue Arg = AI->getArgument(Idx);
         // We only consider the argument effects if the argument aliases V.
         if (!Arg.getType().isAddress() ||
             !AA->isNoAlias(Arg, V, computeTBAAType(Arg), getValueTBAAType())) {
-          Behavior = ArgBehavior;
+          Behavior = NewBehavior;
         }
       }
     }
@@ -314,6 +315,9 @@ AliasAnalysis::computeMemoryBehavior(SILInstruction *Inst, SILValue V,
   if (MemoryBehaviorCache.size() > MemoryBehaviorAnalysisMaxCacheSize) {
     MemoryBehaviorCache.clear();
     MemoryBehaviorValueBaseToIndex.clear();
+
+    // Key is no longer valid as we cleared the MemoryBehaviorValueBaseToIndex.
+    Key = toMemoryBehaviorKey(SILValue(Inst), V, InspectionMode);
   }
 
   // Calculate the aliasing result and store it in the cache.

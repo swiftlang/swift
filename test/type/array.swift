@@ -41,6 +41,4 @@ func constructArray(n: Int) {
 // Fix-Its from the old syntax to the new.
 
 typealias FixIt0 = Int[] // expected-error{{array types are now written with the brackets around the element type}}{{20-20=[}}{{23-24=}}
-typealias FixIt1 = Int[][] // expected-error{{array types are now written with the brackets around the element type}}{{20-20=[}}{{25-26=}}
-// expected-error@-1{{array types are now written with the brackets around the element type}}{{20-20=[}}{{23-24=}}
 

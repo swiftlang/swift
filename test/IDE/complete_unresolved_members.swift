@@ -178,7 +178,7 @@ OptionSetTaker6(.Option4, .#^UNRESOLVED_17^#,)
 var a = {() in
   OptionSetTaker5([.#^UNRESOLVED_18^#], .Option4, .South, .West)
 }
-var Containner = OptionTakerContainer1()
+var Container = OptionTakerContainer1()
 Container.OptionSetTaker1(.#^UNRESOLVED_19^#
 Container.EnumTaker1(.#^UNRESOLVED_20^#
 

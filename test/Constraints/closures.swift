@@ -45,7 +45,7 @@ func foo() {
 
 // <rdar://problem/15536725>
 struct X3<T> {
-  init(_: (T)->()) {}
+  init(_: (T) -> ()) {}
 }
 
 func testX3(x: Int) {
@@ -104,40 +104,40 @@ func testMap() {
 
 
 // <rdar://problem/22333281> QoI: improve diagnostic when contextual type of closure disagrees with arguments
-var _: ()-> Int = {0}
+var _: () -> Int = {0}
 
-// expected-error @+1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{23-23=_ in }}
-var _: (Int)-> Int = {0}
+// expected-error @+1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{24-24=_ in }}
+var _: (Int) -> Int = {0}
 
-// expected-error @+1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{23-23= _ in}}
-var _: (Int)-> Int = { 0 }
+// expected-error @+1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{24-24= _ in}}
+var _: (Int) -> Int = { 0 }
 
-// expected-error @+1 {{contextual type for closure argument list expects 2 arguments, which cannot be implicitly ignored}} {{28-28=_,_ in }}
-var _: (Int, Int)-> Int = {0}
+// expected-error @+1 {{contextual type for closure argument list expects 2 arguments, which cannot be implicitly ignored}} {{29-29=_,_ in }}
+var _: (Int, Int) -> Int = {0}
 
 // expected-error @+1 {{contextual closure type '(Int, Int) -> Int' expects 2 arguments, but 3 were used in closure body}}
-var _: (Int,Int)-> Int = {$0+$1+$2}
+var _: (Int,Int) -> Int = {$0+$1+$2}
 
 // expected-error @+1 {{contextual closure type '(Int, Int, Int) -> Int' expects 3 arguments, but 2 were used in closure body}}
-var _: (Int, Int, Int)-> Int = {$0+$1}
+var _: (Int, Int, Int) -> Int = {$0+$1}
 
 
-var _: ()-> Int = {a in 0}
+var _: () -> Int = {a in 0}
 
 // expected-error @+1 {{contextual closure type '(Int) -> Int' expects 1 argument, but 2 were used in closure body}}
-var _: (Int)-> Int = {a,b in 0}
+var _: (Int) -> Int = {a,b in 0}
 
 // expected-error @+1 {{contextual closure type '(Int) -> Int' expects 1 argument, but 3 were used in closure body}}
-var _: (Int)-> Int = {a,b,c in 0}
+var _: (Int) -> Int = {a,b,c in 0}
 
-var _: (Int, Int)-> Int = {a in 0}
+var _: (Int, Int) -> Int = {a in 0}
 
 // expected-error @+1 {{contextual closure type '(Int, Int, Int) -> Int' expects 3 arguments, but 2 were used in closure body}}
-var _: (Int, Int, Int)-> Int = {a, b in a+b}
+var _: (Int, Int, Int) -> Int = {a, b in a+b}
 
 // <rdar://problem/15998821> Fail to infer types for closure that takes an inout argument
 func r15998821() {
-  func take_closure(x : (inout Int)-> ()) { }
+  func take_closure(x : (inout Int) -> ()) { }
 
   func test1() {
     take_closure { (inout a : Int) in
@@ -159,7 +159,7 @@ func r15998821() {
 }
 
 // <rdar://problem/22602657> better diagnostics for closures w/o "in" clause
-var _: (Int,Int)-> Int = {$0+$1+$2}  // expected-error {{contextual closure type '(Int, Int) -> Int' expects 2 arguments, but 3 were used in closure body}}
+var _: (Int,Int) -> Int = {$0+$1+$2}  // expected-error {{contextual closure type '(Int, Int) -> Int' expects 2 arguments, but 3 were used in closure body}}
 
 
 // Crash when re-typechecking bodies of non-single expression closures

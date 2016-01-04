@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -20,6 +20,7 @@
 #include "swift/SIL/SILBuilder.h"
 
 namespace swift {
+  class ParameterList;
 namespace Lowering {
 
 class ArgumentSource;
@@ -37,7 +38,7 @@ class TemporaryInitialization;
 /// In general, emission methods which take an SGFContext indicate
 /// that they've initialized the emit-into buffer (if they have) by
 /// returning a "isInContext()" ManagedValue of whatever type.  Callers who
-/// propagate down an SGFContext that might have a emit-into buffer must be
+/// propagate down an SGFContext that might have an emit-into buffer must be
 /// aware of this.
 ///
 /// Clients of emission routines that take an SGFContext can also specify that
@@ -201,7 +202,7 @@ public:
   
   MetatypeInst *createMetatype(SILLocation Loc, SILType Metatype);
 
-  // Generic pply instructions use the conformances necessary to form the call.
+  // Generic apply instructions use the conformances necessary to form the call.
 
   using SILBuilder::createApply;
 
@@ -255,6 +256,16 @@ public:
                                  CanType ConcreteType,
                                  SILType ConcreteLoweredType,
                                  ArrayRef<ProtocolConformance *> Conformances);
+};
+
+/// Parameter to \c SILGenFunction::emitCaptures that indicates what the
+/// capture parameters are being emitted for.
+enum class CaptureEmission {
+  /// Captures are being emitted for immediate application to a local function.
+  ImmediateApplication,
+  /// Captures are being emitted for partial application to form a closure
+  /// value.
+  PartialApplication,
 };
 
 /// SILGenFunction - an ASTVisitor for producing SIL from function bodies.
@@ -669,15 +680,15 @@ public:
   
   /// emitProlog - Generates prolog code to allocate and clean up mutable
   /// storage for closure captures and local arguments.
-  void emitProlog(AnyFunctionRef TheClosure, ArrayRef<Pattern*> paramPatterns,
-                  Type resultType);
+  void emitProlog(AnyFunctionRef TheClosure,
+                  ArrayRef<ParameterList*> paramPatterns, Type resultType);
   /// returns the number of variables in paramPatterns.
-  unsigned emitProlog(ArrayRef<Pattern*> paramPatterns,
+  unsigned emitProlog(ArrayRef<ParameterList*> paramPatterns,
                       Type resultType, DeclContext *DeclCtx);
 
   /// Create SILArguments in the entry block that bind all the values
   /// of the given pattern suitably for being forwarded.
-  void bindParametersForForwarding(Pattern *paramPattern,
+  void bindParametersForForwarding(const ParameterList *params,
                                    SmallVectorImpl<SILValue> &parameters);
 
   /// \brief Create (but do not emit) the epilog branch, and save the
@@ -1031,6 +1042,7 @@ public:
 
   void emitCaptures(SILLocation loc,
                     AnyFunctionRef TheClosure,
+                    CaptureEmission purpose,
                     SmallVectorImpl<ManagedValue> &captures);
 
   ManagedValue emitClosureValue(SILLocation loc,

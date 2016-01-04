@@ -1,17 +1,20 @@
-//===-- Sink.cpp ----- Code Sinking -----------------------------*- C++ -*-===//
+//===--- Sink.cpp ----- Code Sinking ----------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// Many SIL instructions that don't have side effects at the SIL level are
-// lowered to a sequence of LLVM instructions that does have side effects that
-// LLVM can't sink. This pass sinks instructions close to their users.
+///
+/// \file
+/// Many SIL instructions that don't have side effects at the SIL level are
+/// lowered to a sequence of LLVM instructions that does have side effects that
+/// LLVM can't sink. This pass sinks instructions close to their users.
+///
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sink-instructions"

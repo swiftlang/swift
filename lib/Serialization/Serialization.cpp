@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -164,7 +164,8 @@ static ASTContext &getContext(ModuleOrSourceFile DC) {
 }
 
 static bool shouldSerializeAsLocalContext(const DeclContext *DC) {
-  return DC->isLocalContext() && !isa<AbstractFunctionDecl>(DC);
+  return DC->isLocalContext() && !isa<AbstractFunctionDecl>(DC) &&
+        !isa<SubscriptDecl>(DC);
 }
 
 static const Decl *getDeclForContext(const DeclContext *DC) {
@@ -188,6 +189,8 @@ static const Decl *getDeclForContext(const DeclContext *DC) {
     llvm_unreachable("shouldn't serialize the main module");
   case DeclContextKind::AbstractFunctionDecl:
     return cast<AbstractFunctionDecl>(DC);
+  case DeclContextKind::SubscriptDecl:
+    return cast<SubscriptDecl>(DC);
   }
 }
 
@@ -785,6 +788,27 @@ static uint8_t getRawStableAddressorKind(swift::AddressorKind kind) {
   llvm_unreachable("bad addressor kind");
 }
 
+void Serializer::writeParameterList(const ParameterList *PL) {
+  using namespace decls_block;
+
+  unsigned abbrCode = DeclTypeAbbrCodes[ParameterListLayout::Code];
+  ParameterListLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                  PL->size());
+
+  abbrCode = DeclTypeAbbrCodes[ParameterListEltLayout::Code];
+  for (auto &param : *PL) {
+    // FIXME: Default argument expressions?
+    
+    auto defaultArg =
+      getRawStableDefaultArgumentKind(param->getDefaultArgumentKind());
+    ParameterListEltLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                       addDeclRef(param),
+                                       param->isVariadic(),
+                                       defaultArg);
+  }
+}
+
+
 void Serializer::writePattern(const Pattern *pattern) {
   using namespace decls_block;
 
@@ -810,9 +834,7 @@ void Serializer::writePattern(const Pattern *pattern) {
     for (auto &elt : tuple->getElements()) {
       // FIXME: Default argument expressions?
       TuplePatternEltLayout::emitRecord(
-        Out, ScratchRecord, abbrCode, addIdentifierRef(elt.getLabel()),
-        elt.hasEllipsis(),
-        getRawStableDefaultArgumentKind(elt.getDefaultArgKind()));
+        Out, ScratchRecord, abbrCode, addIdentifierRef(elt.getLabel()));
       writePattern(elt.getPattern());
     }
     break;
@@ -1326,6 +1348,21 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
     break;
   }
 
+  case DeclContextKind::SubscriptDecl: {
+    auto SD = cast<SubscriptDecl>(DC);
+    writeCrossReference(DC->getParent(), pathLen + 1);
+    
+    Type ty = SD->getInterfaceType()->getCanonicalType();
+
+    abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
+    bool isProtocolExt = SD->getDeclContext()->isProtocolExtensionContext();
+    XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                         addTypeRef(ty),
+                                         addIdentifierRef(SD->getName()),
+                                         isProtocolExt);
+    break;
+  }
+      
   case DeclContextKind::AbstractFunctionDecl: {
     if (auto fn = dyn_cast<FuncDecl>(DC)) {
       if (auto storage = fn->getAccessorStorageDecl()) {
@@ -1740,6 +1777,7 @@ void Serializer::writeDeclContext(const DeclContext *DC) {
 
   switch (DC->getContextKind()) {
   case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::SubscriptDecl:
   case DeclContextKind::NominalTypeDecl:
   case DeclContextKind::ExtensionDecl:
     declOrDeclContextID = addDeclRef(getDeclForContext(DC));
@@ -2375,7 +2413,7 @@ void Serializer::writeDecl(const Decl *D) {
                            fn->isObjC(),
                            fn->isMutating(),
                            fn->hasDynamicSelf(),
-                           fn->getBodyParamPatterns().size(),
+                           fn->getParameterLists().size(),
                            addTypeRef(fn->getType()),
                            addTypeRef(fn->getInterfaceType()),
                            addDeclRef(fn->getOperatorDecl()),
@@ -2389,8 +2427,8 @@ void Serializer::writeDecl(const Decl *D) {
     writeGenericParams(fn->getGenericParams(), DeclTypeAbbrCodes);
 
     // Write the body parameters.
-    for (auto pattern : fn->getBodyParamPatterns())
-      writePattern(pattern);
+    for (auto pattern : fn->getParameterLists())
+      writeParameterList(pattern);
 
     if (auto errorConvention = fn->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
@@ -2468,7 +2506,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 rawSetterAccessLevel,
                                 nameComponents);
 
-    writePattern(subscript->getIndices());
+    writeParameterList(subscript->getIndices());
     break;
   }
 
@@ -2503,9 +2541,10 @@ void Serializer::writeDecl(const Decl *D) {
                                   nameComponents);
 
     writeGenericParams(ctor->getGenericParams(), DeclTypeAbbrCodes);
-    assert(ctor->getBodyParamPatterns().size() == 2);
-    for (auto pattern : ctor->getBodyParamPatterns())
-      writePattern(pattern);
+    assert(ctor->getParameterLists().size() == 2);
+    // Why is this writing out the param list for self?
+    for (auto paramList : ctor->getParameterLists())
+      writeParameterList(paramList);
     if (auto errorConvention = ctor->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
     break;
@@ -2524,9 +2563,9 @@ void Serializer::writeDecl(const Decl *D) {
                                  dtor->isObjC(),
                                  addTypeRef(dtor->getType()),
                                  addTypeRef(dtor->getInterfaceType()));
-    assert(dtor->getBodyParamPatterns().size() == 1);
-    for (auto pattern : dtor->getBodyParamPatterns())
-      writePattern(pattern);
+    assert(dtor->getParameterLists().size() == 1);
+    // Why is this writing out the param list for self?
+    writeParameterList(dtor->getParameterLists()[0]);
     break;
   }
 
@@ -3202,6 +3241,9 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<ExtensionLayout>();
   registerDeclTypeAbbr<DestructorLayout>();
 
+  registerDeclTypeAbbr<ParameterListLayout>();
+  registerDeclTypeAbbr<ParameterListEltLayout>();
+
   registerDeclTypeAbbr<ParenPatternLayout>();
   registerDeclTypeAbbr<TuplePatternLayout>();
   registerDeclTypeAbbr<TuplePatternEltLayout>();
@@ -3648,13 +3690,10 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     for (auto TD : localTypeDecls) {
       hasLocalTypes = true;
 
-      SmallString<32> MangledName;
-      llvm::raw_svector_ostream Stream(MangledName);
-      {
-      Mangle::Mangler DebugMangler(Stream, false);
+      Mangle::Mangler DebugMangler(false);
       DebugMangler.mangleType(TD->getDeclaredType(),
                               ResilienceExpansion::Minimal, 0);
-      }
+      auto MangledName = DebugMangler.finalize();
       assert(!MangledName.empty() && "Mangled type came back empty!");
       localTypeGenerator.insert(MangledName, {
         addDeclRef(TD), TD->getLocalDiscriminator()

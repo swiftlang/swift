@@ -1,8 +1,8 @@
-//===------ SILSSAUpdater.cpp - Unstructured SSA Update Tool ----*- C++ -*-===//
+//===--- SILSSAUpdater.cpp - Unstructured SSA Update Tool -------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -174,7 +174,7 @@ SILValue SILSSAUpdater::GetValueInMiddleOfBlock(SILBasicBlock *BB) {
   SmallVector<std::pair<SILBasicBlock*, SILValue>, 4> PredVals;
   bool FirstPred = true;
 
-  // SSAupdater can modify TerminatorInst and therefore invalidate the
+  // SSAUpdater can modify TerminatorInst and therefore invalidate the
   // predecessor iterator. Find all the predecessors before the SSA update.
   SmallVector<SILBasicBlock *, 4> Preds;
   for (auto *PredBB: BB->getPreds()) {

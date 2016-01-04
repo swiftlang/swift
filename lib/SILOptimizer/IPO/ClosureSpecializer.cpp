@@ -1,8 +1,8 @@
-//===---- ClosureSpecializer.cpp ------ Performs Closure Specialization----===//
+//===--- ClosureSpecializer.cpp - Performs Closure Specialization ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -201,7 +201,7 @@ public:
 
   FullApplySite getApplyInst() const { return AI; }
 
-  void createName(llvm::SmallString<64> &NewName) const;
+  std::string createName() const;
 
   OperandValueArrayRef getArguments() const {
     if (auto *PAI = dyn_cast<PartialApplyInst>(getClosure()))
@@ -314,7 +314,7 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
     // executed more frequently than the closure (for example, if the closure is
     // created in a loop preheader and the callee taking the closure is executed
     // in the loop). In such a case we must keep the argument live across the
-    // call site of the callee and emit a matching retain for every innvocation
+    // call site of the callee and emit a matching retain for every invocation
     // of the callee.
     //
     //    %closure = partial_apply (%arg)
@@ -386,20 +386,21 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
   // AI from parent?
 }
 
-void CallSiteDescriptor::createName(llvm::SmallString<64> &NewName) const {
-  llvm::raw_svector_ostream buffer(NewName);
-  Mangle::Mangler M(buffer);
+std::string CallSiteDescriptor::createName() const {
+  Mangle::Mangler M;
   auto P = SpecializationPass::ClosureSpecializer;
   FunctionSignatureSpecializationMangler FSSM(P, M, getApplyCallee());
+
   if (auto *PAI = dyn_cast<PartialApplyInst>(getClosure())) {
     FSSM.setArgumentClosureProp(getClosureIndex(), PAI);
     FSSM.mangle();
-    return;
+    return M.finalize();
   }
 
   auto *TTTFI = cast<ThinToThickFunctionInst>(getClosure());
   FSSM.setArgumentClosureProp(getClosureIndex(), TTTFI);
   FSSM.mangle();
+  return M.finalize();
 }
 
 void CallSiteDescriptor::extendArgumentLifetime(SILValue Arg) const {
@@ -418,8 +419,7 @@ void CallSiteDescriptor::extendArgumentLifetime(SILValue Arg) const {
 
 static void specializeClosure(ClosureInfo &CInfo,
                               CallSiteDescriptor &CallDesc) {
-  llvm::SmallString<64> NewFName;
-  CallDesc.createName(NewFName);
+  auto NewFName = CallDesc.createName();
   DEBUG(llvm::dbgs() << "    Perform optimizations with new name " << NewFName
                      << '\n');
 
@@ -559,7 +559,8 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
       ClosureUser->getInlineStrategy(), ClosureUser->getEffectsKind(),
       ClosureUser, ClosureUser->getDebugScope());
   Fn->setDeclCtx(ClosureUser->getDeclContext());
-  Fn->setSemanticsAttr(ClosureUser->getSemanticsAttr());
+  for (auto &Attr : ClosureUser->getSemanticsAttrs())
+    Fn->addSemanticsAttr(Attr);
   return Fn;
 }
 

@@ -1,8 +1,8 @@
-//===-- FunctionSignatureOpts.cpp - Optimizes function signatures ---------===//
+//===--- FunctionSignatureOpts.cpp - Optimizes function signatures --------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -461,13 +461,13 @@ public:
 
   /// Returns the mangled name of the function that should be generated from
   /// this function analyzer.
-  llvm::SmallString<64> getOptimizedName();
+  std::string getOptimizedName();
 
   /// Create a new empty function with the optimized signature found by this
   /// analysis.
   ///
   /// *NOTE* This occurs in the same module as F.
-  SILFunction *createEmptyFunctionWithOptimizedSig(llvm::SmallString<64> &Name);
+  SILFunction *createEmptyFunctionWithOptimizedSig(const std::string &Name);
 
   ArrayRef<ArgumentDescriptor> getArgDescList() const { return ArgDescList; }
   MutableArrayRef<ArgumentDescriptor> getArgDescList() { return ArgDescList; }
@@ -595,7 +595,7 @@ CanSILFunctionType FunctionAnalyzer::createOptimizedSILFunctionType() {
 }
 
 SILFunction *FunctionAnalyzer::createEmptyFunctionWithOptimizedSig(
-    llvm::SmallString<64> &NewFName) {
+                                     const std::string &NewFName) {
   SILModule &M = F->getModule();
 
   // Create the new optimized function type.
@@ -612,8 +612,9 @@ SILFunction *FunctionAnalyzer::createEmptyFunctionWithOptimizedSig(
 
   // Array semantic clients rely on the signature being as in the original
   // version.
-  if (!F->getSemanticsAttr().startswith("array."))
-    NewF->setSemanticsAttr(F->getSemanticsAttr());
+  for (auto &Attr : F->getSemanticsAttrs())
+    if (!StringRef(Attr).startswith("array."))
+      NewF->addSemanticsAttr(Attr);
 
   return NewF;
 }
@@ -622,38 +623,33 @@ SILFunction *FunctionAnalyzer::createEmptyFunctionWithOptimizedSig(
 //                                  Mangling
 //===----------------------------------------------------------------------===//
 
-llvm::SmallString<64> FunctionAnalyzer::getOptimizedName() {
-  llvm::SmallString<64> Name;
+std::string FunctionAnalyzer::getOptimizedName() {
+  Mangle::Mangler M;
+  auto P = SpecializationPass::FunctionSignatureOpts;
+  FunctionSignatureSpecializationMangler FSSM(P, M, F);
 
-  {
-    llvm::raw_svector_ostream buffer(Name);
-    Mangle::Mangler M(buffer);
-    auto P = SpecializationPass::FunctionSignatureOpts;
-    FunctionSignatureSpecializationMangler FSSM(P, M, F);
-
-    for (unsigned i : indices(ArgDescList)) {
-      const ArgumentDescriptor &Arg = ArgDescList[i];
-      if (Arg.IsDead) {
-        FSSM.setArgumentDead(i);
-      }
-
-      // If we have an @owned argument and found a callee release for it,
-      // convert the argument to guaranteed.
-      if (Arg.CalleeRelease) {
-        FSSM.setArgumentOwnedToGuaranteed(i);
-      }
-
-      // If this argument is not dead and we can explode it, add 's' to the
-      // mangling.
-      if (Arg.shouldExplode() && !Arg.IsDead) {
-        FSSM.setArgumentSROA(i);
-      }
+  for (unsigned i : indices(ArgDescList)) {
+    const ArgumentDescriptor &Arg = ArgDescList[i];
+    if (Arg.IsDead) {
+      FSSM.setArgumentDead(i);
     }
 
-    FSSM.mangle();
+    // If we have an @owned argument and found a callee release for it,
+    // convert the argument to guaranteed.
+    if (Arg.CalleeRelease) {
+      FSSM.setArgumentOwnedToGuaranteed(i);
+    }
+
+    // If this argument is not dead and we can explode it, add 's' to the
+    // mangling.
+    if (Arg.shouldExplode() && !Arg.IsDead) {
+      FSSM.setArgumentSROA(i);
+    }
   }
 
-  return Name;
+  FSSM.mangle();
+
+  return M.finalize();
 }
 
 //===----------------------------------------------------------------------===//
@@ -800,7 +796,7 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
 
 static SILFunction *
 moveFunctionBodyToNewFunctionWithName(SILFunction *F,
-                                      llvm::SmallString<64> &NewFName,
+                                      const std::string &NewFName,
                                       FunctionAnalyzer &Analyzer) {
   // First we create an empty function (i.e. no BB) whose function signature has
   // had its arity modified.
@@ -874,7 +870,7 @@ static bool optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
 
   ++NumFunctionSignaturesOptimized;
 
-  llvm::SmallString<64> NewFName = Analyzer.getOptimizedName();
+  auto NewFName = Analyzer.getOptimizedName();
 
   // If we already have a specialized version of this function, do not
   // respecialize. For now just bail.

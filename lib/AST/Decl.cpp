@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -25,6 +25,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Mangle.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeLoc.h"
 #include "clang/Lex/MacroInfo.h"
 #include "llvm/ADT/SmallString.h"
@@ -72,13 +73,13 @@ const clang::Module *ClangNode::getClangModule() const {
 }
 
 // Only allow allocation of Decls using the allocator in ASTContext.
-void *Decl::operator new(size_t Bytes, ASTContext &C,
+void *Decl::operator new(size_t Bytes, const ASTContext &C,
                          unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
 }
 
 // Only allow allocation of Modules using the allocator in ASTContext.
-void *Module::operator new(size_t Bytes, ASTContext &C,
+void *Module::operator new(size_t Bytes, const ASTContext &C,
                            unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
 }
@@ -398,16 +399,12 @@ bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
       FU->getKind() != FileUnitKind::SerializedAST)
     return false;
 
-  auto hasInternalParameter = [](ArrayRef<const Pattern *> Pats) -> bool {
-    bool hasInternalParam = false;
-    for (auto Pat : Pats) {
-      Pat->forEachVariable([&](VarDecl *Param) {
-        if (Param->hasName() && Param->getNameStr().startswith("_")) {
-          hasInternalParam = true;
-        }
-      });
+  auto hasInternalParameter = [](const ParameterList *params) -> bool {
+    for (auto param : *params) {
+      if (param->hasName() && param->getNameStr().startswith("_"))
+        return true;
     }
-    return hasInternalParam;
+    return false;
   };
 
   if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
@@ -418,8 +415,9 @@ bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
 
     // If it's a function with a parameter with leading underscore, it's a
     // private function.
-    if (hasInternalParameter(AFD->getBodyParamPatterns()))
-      return true;
+    for (auto *PL : AFD->getParameterLists())
+      if (hasInternalParameter(PL))
+        return true;
   }
 
   if (auto SubscriptD = dyn_cast<SubscriptDecl>(D)) {
@@ -1550,7 +1548,7 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
     for (const auto &elt : tupleTy->getElements()) {
       Type eltTy = mapSignatureParamType(ctx, elt.getType());
       if (anyChanged || eltTy.getPointer() != elt.getType().getPointer() ||
-          elt.hasInit()) {
+          elt.getDefaultArgKind() != DefaultArgumentKind::None) {
         if (!anyChanged) {
           elements.reserve(tupleTy->getNumElements());
           for (unsigned i = 0; i != idx; ++i) {
@@ -1619,7 +1617,7 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
             /*topLevelFunction=*/true,
             /*isMethod=*/afd->getImplicitSelfDecl() != nullptr,
             /*isInitializer=*/isa<ConstructorDecl>(afd),
-            afd->getNumParamPatterns())->getCanonicalType();
+             afd->getNumParameterLists())->getCanonicalType();
 
     signature.IsInstanceMember = isInstanceMember();
     // Unary operators also include prefix/postfix.
@@ -2316,15 +2314,12 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
 static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
                                        llvm::SmallVectorImpl<char> &buffer) {
   {
-    buffer.clear();
-    llvm::raw_svector_ostream os(buffer);
-    
     // Mangle the type.
-    Mangle::Mangler mangler(os, false/*dwarf*/, false/*punycode*/);
+    Mangle::Mangler mangler(false/*dwarf*/, false/*punycode*/);
 
     // We add the "_Tt" prefix to make this a reserved name that will
     // not conflict with any valid Objective-C class or protocol name.
-    mangler.manglePrefix("_Tt");
+    mangler.append("_Tt");
 
     NominalTypeDecl *NTD = const_cast<NominalTypeDecl*>(nominal);
     if (isa<ClassDecl>(nominal)) {
@@ -2334,8 +2329,13 @@ static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
     } else {
       mangler.mangleProtocolDecl(cast<ProtocolDecl>(NTD));
     }
+
+    buffer.clear();
+    llvm::raw_svector_ostream os(buffer);
+    mangler.finalize(os);
   }
 
+  assert(buffer.size() && "Invalid buffer size");
   return StringRef(buffer.data(), buffer.size());
 }
 
@@ -3152,12 +3152,13 @@ SourceRange VarDecl::getSourceRange() const {
 }
 
 SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
-  Pattern *Pat = nullptr;
-  if (ParentPattern.is<Pattern*>())
-    Pat = ParentPattern.dyn_cast<Pattern *>();
-  else
-    Pat = getParentPattern();
+  // For a parameter, map back to it's parameter to get the TypeLoc.
+  if (auto *PD = dyn_cast<ParamDecl>(this)) {
+    if (auto typeRepr = PD->getTypeLoc().getTypeRepr())
+      return typeRepr->getSourceRange();
+  }
   
+  Pattern *Pat = getParentPattern();
   if (!Pat || Pat->isImplicit())
     return getSourceRange();
 
@@ -3219,8 +3220,8 @@ Pattern *VarDecl::getParentPattern() const {
   return nullptr;
 }
 
-bool VarDecl::isImplicitSelf() const {
-  return isImplicit() && getName() == getASTContext().Id_self;
+bool VarDecl::isSelfParameter() const {
+  return isa<ParamDecl>(this) && getName() == getASTContext().Id_self;
 }
 
 /// Return true if this stored property needs to be accessed with getters and
@@ -3300,12 +3301,9 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
   // If it isn't a 'let', don't touch it.
   if (!isLet()) return;
 
-  // Don't suggest mutability for explicit function parameters
-  if (isa<ParamDecl>(this) && !isImplicitSelf()) return;
-
   // If this is the 'self' argument of a non-mutating method in a value type,
   // suggest adding 'mutating' to the method.
-  if (isImplicitSelf() && UseDC) {
+  if (isSelfParameter() && UseDC) {
     // If the problematic decl is 'self', then we might be trying to mutate
     // a property in a non-mutating method.
     auto FD = dyn_cast<FuncDecl>(UseDC->getInnermostMethodContext());
@@ -3319,6 +3317,9 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
     }
   }
 
+  // Besides self, don't suggest mutability for explicit function parameters.
+  if (isa<ParamDecl>(this)) return;
+  
   // If this is a normal variable definition, then we can change 'let' to 'var'.
   // We even are willing to suggest this for multi-variable binding, like
   //   "let (a,b) = "
@@ -3335,6 +3336,120 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
   }
 }
 
+ParamDecl::ParamDecl(bool isLet, SourceLoc argumentNameLoc,
+                     Identifier argumentName, SourceLoc parameterNameLoc,
+                     Identifier parameterName, Type ty, DeclContext *dc)
+  : VarDecl(DeclKind::Param, /*IsStatic=*/false, isLet, parameterNameLoc,
+            parameterName, ty, dc),
+  ArgumentName(argumentName), ArgumentNameLoc(argumentNameLoc) {
+}
+
+/// Clone constructor, allocates a new ParamDecl identical to the first.
+/// Intentionally not defined as a copy constructor to avoid accidental copies.
+ParamDecl::ParamDecl(ParamDecl *PD)
+  : VarDecl(DeclKind::Param, /*IsStatic=*/false, PD->isLet(), PD->getNameLoc(),
+            PD->getName(), PD->hasType() ? PD->getType() : Type(),
+            PD->getDeclContext()),
+    ArgumentName(PD->getArgumentName()),
+    ArgumentNameLoc(PD->getArgumentNameLoc()),
+    typeLoc(PD->getTypeLoc()),
+    DefaultValueAndIsVariadic(PD->DefaultValueAndIsVariadic),
+    IsTypeLocImplicit(PD->IsTypeLocImplicit),
+    defaultArgumentKind(PD->defaultArgumentKind) {
+}
+
+
+/// \brief Retrieve the type of 'self' for the given context.
+static Type getSelfTypeForContext(DeclContext *dc) {
+  // For a protocol or extension thereof, the type is 'Self'.
+  // FIXME: Weird that we're producing an archetype for protocol Self,
+  // but the declared type of the context in non-protocol cases.
+  if (dc->isProtocolOrProtocolExtensionContext()) {
+    // In the parser, generic parameters won't be wired up yet, just give up on
+    // producing a type.
+    if (dc->getGenericParamsOfContext() == nullptr)
+      return Type();
+    return dc->getProtocolSelf()->getArchetype();
+  }
+  return dc->getDeclaredTypeOfContext();
+}
+
+
+/// Create an implicit 'self' decl for a method in the specified decl context.
+/// If 'static' is true, then this is self for a static method in the type.
+///
+/// Note that this decl is created, but it is returned with an incorrect
+/// DeclContext that needs to be set correctly.  This is automatically handled
+/// when a function is created with this as part of its argument list.
+///
+ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
+                                 bool isStaticMethod, bool isInOut) {
+  ASTContext &C = DC->getASTContext();
+  auto selfType = getSelfTypeForContext(DC);
+
+  // If we have a selfType (i.e. we're not in the parser before we know such
+  // things, configure it.
+  if (selfType) {
+    if (isStaticMethod)
+      selfType = MetatypeType::get(selfType);
+    
+    if (isInOut)
+      selfType = InOutType::get(selfType);
+  }
+    
+  auto *selfDecl = new (C) ParamDecl(/*IsLet*/!isInOut, SourceLoc(),
+                                     Identifier(), loc, C.Id_self, selfType,DC);
+  selfDecl->setImplicit();
+  return selfDecl;
+}
+
+/// Return the full source range of this parameter.
+SourceRange ParamDecl::getSourceRange() const {
+  SourceRange range;
+  
+  SourceLoc APINameLoc = getArgumentNameLoc();
+  SourceLoc nameLoc = getNameLoc();
+  
+  if (APINameLoc.isValid() && nameLoc.isInvalid())
+    range = APINameLoc;
+  else if (APINameLoc.isInvalid() && nameLoc.isValid())
+    range = nameLoc;
+  else
+    range = SourceRange(APINameLoc, nameLoc);
+  
+  if (range.isInvalid()) return range;
+  
+  // It would be nice to extend the front of the range to show where inout is,
+  // but we don't have that location info.  Extend the back of the range to the
+  // location of the default argument, or the typeloc if they are valid.
+  if (auto expr = getDefaultValue()) {
+    auto endLoc = expr->getExpr()->getEndLoc();
+    if (endLoc.isValid())
+      return SourceRange(range.Start, endLoc);
+  }
+  
+  // If the typeloc has a valid location, use it to end the range.
+  if (auto typeRepr = getTypeLoc().getTypeRepr()) {
+    auto endLoc = typeRepr->getEndLoc();
+    if (endLoc.isValid())
+      return SourceRange(range.Start, endLoc);
+  }
+  
+  // Otherwise, just return the info we have about the parameter.
+  return range;
+}
+
+Type ParamDecl::getVarargBaseTy(Type VarArgT) {
+  TypeBase *T = VarArgT.getPointer();
+  if (ArraySliceType *AT = dyn_cast<ArraySliceType>(T))
+    return AT->getBaseType();
+  if (BoundGenericType *BGT = dyn_cast<BoundGenericType>(T)) {
+    // It's the stdlib Array<T>.
+    return BGT->getGenericArgs()[0];
+  }
+  assert(isa<ErrorType>(T));
+  return T;
+}
 
 /// Determine whether the given Swift type is an integral type, i.e.,
 /// a type that wraps a builtin integer.
@@ -3365,10 +3480,11 @@ static bool isIntegralType(Type type) {
   return false;
 }
 
-void SubscriptDecl::setIndices(Pattern *p) {
+void SubscriptDecl::setIndices(ParameterList *p) {
   Indices = p;
   
-  // FIXME: What context should the indices patterns be in?
+  if (Indices)
+    Indices->setDeclContextOfParamDecls(this);
 }
 
 Type SubscriptDecl::getIndicesType() const {
@@ -3510,7 +3626,8 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
         case AccessorKind::IsMutableAddressor:
         case AccessorKind::IsGetter:
           return subscript ? subscript->getFullName()
-                           : DeclName(ctx, afd->getName(), { });
+                           : DeclName(ctx, afd->getName(),
+                                      ArrayRef<Identifier>());
 
         case AccessorKind::IsSetter:
         case AccessorKind::IsMaterializeForSet:
@@ -3558,19 +3675,14 @@ Type AbstractFunctionDecl::computeInterfaceSelfType(bool isInitializingCtor) {
 ///
 /// Note that some functions don't have an implicit 'self' decl, for example,
 /// free functions.  In this case nullptr is returned.
-VarDecl *AbstractFunctionDecl::getImplicitSelfDecl() const {
-  ArrayRef<const Pattern *> ParamPatterns = getBodyParamPatterns();
-  if (ParamPatterns.empty())
+ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl() {
+  auto paramLists = getParameterLists();
+  if (paramLists.empty())
     return nullptr;
 
-  // "self" is represented as (typed_pattern (named_pattern (var_decl 'self')).
-  const Pattern *P = ParamPatterns[0]->getSemanticsProvidingPattern();
-
-  // The decl should be named 'self' and be implicit.
-  auto NP = dyn_cast<NamedPattern>(P);
-  if (NP && NP->isImplicit() &&
-      NP->getDecl()->getName() == getASTContext().Id_self)
-    return NP->getDecl();
+  // "self" is always the first parameter list.
+  if (paramLists[0]->size() == 1 && paramLists[0]->get(0)->isSelfParameter())
+    return paramLists[0]->get(0);
   return nullptr;
 }
 
@@ -3580,43 +3692,21 @@ Type AbstractFunctionDecl::getExtensionType() const {
 
 std::pair<DefaultArgumentKind, Type>
 AbstractFunctionDecl::getDefaultArg(unsigned Index) const {
-  ArrayRef<const Pattern *> Patterns = getBodyParamPatterns();
+  auto paramLists = getParameterLists();
 
-  if (getImplicitSelfDecl()) {
-    // Skip the 'self' parameter; it is not counted.
-    Patterns = Patterns.slice(1);
+  if (getImplicitSelfDecl()) // Skip the 'self' parameter; it is not counted.
+    paramLists = paramLists.slice(1);
+
+  for (auto paramList : paramLists) {
+    if (Index < paramList->size()) {
+      auto param = paramList->get(Index);
+      return { param->getDefaultArgumentKind(), param->getType() };
+    }
+    
+    Index -= paramList->size();
   }
 
-  // Find the (sub-)pattern for this index.
-  // FIXME: This is O(n), which is lame. We should fix the FuncDecl
-  // representation.
-  const TuplePatternElt *Found = nullptr;
-  for (auto OrigPattern : Patterns) {
-    auto Params =
-        dyn_cast<TuplePattern>(OrigPattern->getSemanticsProvidingPattern());
-    if (!Params) {
-      if (Index == 0) {
-        return { DefaultArgumentKind::None, Type() };
-      }
-
-      --Index;
-      continue;
-    }
-
-    for (auto &Elt : Params->getElements()) {
-      if (Index == 0) {
-        Found = &Elt;
-        break;
-      }
-      --Index;
-    }
-
-    if (Found)
-      break;
-  }
-
-  assert(Found && "No argument with this index");
-  return { Found->getDefaultArgKind(), Found->getPattern()->getType() };
+  llvm_unreachable("Invalid parameter index");
 }
 
 bool AbstractFunctionDecl::argumentNameIsAPIByDefault(unsigned i) const {
@@ -3662,15 +3752,14 @@ SourceRange AbstractFunctionDecl::getSignatureSourceRange() const {
   if (isImplicit())
     return SourceRange();
 
-  auto Pats = getBodyParamPatterns();
-  if (Pats.empty())
+  auto paramLists = getParameterLists();
+  if (paramLists.empty())
     return getNameLoc();
 
-  for (int I = Pats.size() - 1; I >= 0; I--) {
-    auto endLoc = Pats[I]->getEndLoc();
-    if (endLoc.isValid()) {
+  for (auto *paramList : reversed(paramLists)) {
+    auto endLoc = paramList->getSourceRange().End;
+    if (endLoc.isValid())
       return SourceRange(getNameLoc(), endLoc);
-    }
   }
   return getNameLoc();
 }
@@ -3814,15 +3903,6 @@ AbstractFunctionDecl *AbstractFunctionDecl::getOverriddenDecl() const {
   return nullptr;
 }
 
-/// Set the DeclContext of any VarDecls in P to the specified DeclContext.
-static void setDeclContextOfPatternVars(Pattern *P, DeclContext *DC) {
-  if (!P) return;
-  P->forEachVariable([&](VarDecl *VD) {
-    assert(isa<ParamDecl>(VD) && "Pattern variable is not a parameter?");
-    VD->setDeclContext(DC);
-  });
-}
-
 FuncDecl *FuncDecl::createImpl(ASTContext &Context,
                                SourceLoc StaticLoc,
                                StaticSpellingKind StaticSpelling,
@@ -3867,7 +3947,7 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
                            SourceLoc NameLoc, SourceLoc ThrowsLoc,
                            SourceLoc AccessorKeywordLoc,
                            GenericParamList *GenericParams,
-                           Type Ty, ArrayRef<Pattern *> BodyParams,
+                           Type Ty, ArrayRef<ParameterList*> BodyParams,
                            TypeLoc FnRetType, DeclContext *Parent,
                            ClangNode ClangN) {
   const unsigned NumParamPatterns = BodyParams.size();
@@ -3893,15 +3973,13 @@ bool FuncDecl::isExplicitNonMutating() const {
          !getDeclContext()->getDeclaredTypeInContext()->hasReferenceSemantics();
 }
 
-void FuncDecl::setDeserializedSignature(ArrayRef<Pattern *> BodyParams,
+void FuncDecl::setDeserializedSignature(ArrayRef<ParameterList *> BodyParams,
                                         TypeLoc FnRetType) {
-  MutableArrayRef<Pattern *> BodyParamsRef = getBodyParamPatterns();
+  MutableArrayRef<ParameterList *> BodyParamsRef = getParameterLists();
   unsigned NumParamPatterns = BodyParamsRef.size();
 
 #ifndef NDEBUG
-  unsigned NumParams = getDeclContext()->isTypeContext()
-                         ? BodyParams[1]->numTopLevelVariables()
-                         : BodyParams[0]->numTopLevelVariables();
+  unsigned NumParams = BodyParams[getDeclContext()->isTypeContext()]->size();
   auto Name = getFullName();
   assert((!Name || !Name.isSimpleName()) && "Must have a simple name");
   assert(!Name || (Name.getArgumentNames().size() == NumParams));
@@ -3912,7 +3990,8 @@ void FuncDecl::setDeserializedSignature(ArrayRef<Pattern *> BodyParams,
 
   // Set the decl context of any vardecls to this FuncDecl.
   for (auto P : BodyParams)
-    setDeclContextOfPatternVars(P, this);
+    if (P)
+      P->setDeclContextOfParamDecls(this);
 
   this->FnRetType = FnRetType;
 }
@@ -3956,12 +4035,8 @@ bool FuncDecl::isUnaryOperator() const {
   unsigned opArgIndex
     = getDeclContext()->isProtocolOrProtocolExtensionContext() ? 1 : 0;
   
-  auto *argTuple = dyn_cast<TuplePattern>(getBodyParamPatterns()[opArgIndex]);
-  if (!argTuple)
-    return true;
-
-  return argTuple->getNumElements() == 1 &&
-         !argTuple->getElement(0).hasEllipsis();
+  auto *params = getParameterList(opArgIndex);
+  return params->size() == 1 && !params->get(0)->isVariadic();
 }
 
 bool FuncDecl::isBinaryOperator() const {
@@ -3971,19 +4046,15 @@ bool FuncDecl::isBinaryOperator() const {
   unsigned opArgIndex
     = getDeclContext()->isProtocolOrProtocolExtensionContext() ? 1 : 0;
   
-  auto *argTuple = dyn_cast<TuplePattern>(getBodyParamPatterns()[opArgIndex]);
-  if (!argTuple)
-    return false;
-  
-  return argTuple->getNumElements() == 2
-    || (argTuple->getNumElements() == 1 &&
-        argTuple->getElement(0).hasEllipsis());
+  auto *params = getParameterList(opArgIndex);
+  return params->size() == 2 && !params->get(1)->isVariadic();
 }
 
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
                                  OptionalTypeKind Failability, 
                                  SourceLoc FailabilityLoc,
-                                 Pattern *SelfBodyParam, Pattern *BodyParams,
+                                 ParamDecl *selfDecl,
+                                 ParameterList *BodyParams,
                                  GenericParamList *GenericParams,
                                  SourceLoc throwsLoc,
                                  DeclContext *Parent)
@@ -3991,7 +4062,7 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
                          ConstructorLoc, 2, GenericParams),
     FailabilityLoc(FailabilityLoc), ThrowsLoc(throwsLoc)
 {
-  setBodyParams(SelfBodyParam, BodyParams);
+  setParameterLists(selfDecl, BodyParams);
   
   ConstructorDeclBits.ComputedBodyInitKind = 0;
   ConstructorDeclBits.InitKind
@@ -4000,16 +4071,22 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
   this->Failability = static_cast<unsigned>(Failability);
 }
 
-void ConstructorDecl::setBodyParams(Pattern *selfPattern, Pattern *bodyParams) {
-  BodyParams[0] = selfPattern;
-  BodyParams[1] = bodyParams;
-  setDeclContextOfPatternVars(selfPattern, this);
-  setDeclContextOfPatternVars(bodyParams, this);
+void ConstructorDecl::setParameterLists(ParamDecl *selfDecl,
+                                        ParameterList *bodyParams) {
+  if (selfDecl) {
+    ParameterLists[0] = ParameterList::createWithoutLoc(selfDecl);
+    ParameterLists[0]->setDeclContextOfParamDecls(this);
+  } else {
+    ParameterLists[0] = nullptr;
+  }
+  
+  ParameterLists[1] = bodyParams;
+  if (bodyParams)
+    bodyParams->setDeclContextOfParamDecls(this);
   
   assert(!getFullName().isSimpleName() && "Constructor name must be compound");
   assert(!bodyParams || 
-         (getFullName().getArgumentNames().size() 
-          == bodyParams->numTopLevelVariables()));
+         (getFullName().getArgumentNames().size() == bodyParams->size()));
 }
 
 bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
@@ -4018,31 +4095,27 @@ bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
       getFullName().getArgumentNames()[0].empty())
     return false;
 
-  const Pattern *paramPattern = getBodyParamPatterns()[1];
-  Type paramType;
-  if (auto tuplePattern = dyn_cast<TuplePattern>(paramPattern)) {
-    if (tuplePattern->getNumElements() != 1 ||
-        tuplePattern->getElement(0).hasEllipsis())
-      return false;
+  auto *params = getParameterList(1);
+  if (params->size() != 1)
+    return false;
 
-    paramType = tuplePattern->getElement(0).getPattern()->getType();
-  } else {
-    paramType = paramPattern->getType();
-  }
-
-  return paramType->isVoid();
+  return params->get(0)->getType()->isVoid();
 }
 
 DestructorDecl::DestructorDecl(Identifier NameHack, SourceLoc DestructorLoc,
-                               Pattern *SelfPattern, DeclContext *Parent)
+                               ParamDecl *selfDecl, DeclContext *Parent)
   : AbstractFunctionDecl(DeclKind::Destructor, Parent, NameHack,
                          DestructorLoc, 1, nullptr) {
-  setSelfPattern(SelfPattern);
+  setSelfDecl(selfDecl);
 }
 
-void DestructorDecl::setSelfPattern(Pattern *selfPattern) {
-  SelfPattern = selfPattern;
-  setDeclContextOfPatternVars(SelfPattern, this);
+void DestructorDecl::setSelfDecl(ParamDecl *selfDecl) {
+  if (selfDecl) {
+    SelfParameter = ParameterList::createWithoutLoc(selfDecl);
+    SelfParameter->setDeclContextOfParamDecls(this);
+  } else {
+    SelfParameter = nullptr;
+  }
 }
 
 
@@ -4099,9 +4172,9 @@ SourceRange FuncDecl::getSourceRange() const {
       getBodyResultTypeLoc().getSourceRange().End.isValid() &&
       !this->isAccessor())
     return { StartLoc, getBodyResultTypeLoc().getSourceRange().End };
-  const Pattern *LastPat = getBodyParamPatterns().back();
-  if (!LastPat->isImplicit())
-    return { StartLoc, LastPat->getEndLoc() };
+  auto LastParamListEndLoc = getParameterLists().back()->getSourceRange().End;
+  if (LastParamListEndLoc.isValid())
+    return { StartLoc, LastParamListEndLoc };
   return StartLoc;
 }
 

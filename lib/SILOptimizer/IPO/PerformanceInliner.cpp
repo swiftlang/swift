@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -574,16 +574,16 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
 
   // Don't inline functions that are marked with the @_semantics or @effects
   // attribute if the inliner is asked not to inline them.
-  if (Callee->hasDefinedSemantics() || Callee->hasEffectsKind()) {
+  if (Callee->hasSemanticsAttrs() || Callee->hasEffectsKind()) {
     if (WhatToInline == InlineSelection::NoSemanticsAndGlobalInit) {
       DEBUG(llvm::dbgs() << "        FAIL: Function " << Callee->getName()
             << " has special semantics or effects attribute.\n");
       return nullptr;
     }
     // The "availability" semantics attribute is treated like global-init.
-    if (Callee->hasDefinedSemantics() &&
+    if (Callee->hasSemanticsAttrs() &&
         WhatToInline != InlineSelection::Everything &&
-        Callee->getSemanticsString().startswith("availability")) {
+        Callee->hasSemanticsAttrsThatStartsWith("availability")) {
       return nullptr;
     }
   } else if (Callee->isGlobalInit()) {
@@ -1289,7 +1289,7 @@ void SILPerformanceInliner::visitColdBlocks(
 
 
 //===----------------------------------------------------------------------===//
-//                          Performane Inliner Pass
+//                          Performance Inliner Pass
 //===----------------------------------------------------------------------===//
 
 namespace {

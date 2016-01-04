@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -64,25 +64,25 @@ protected:
   void mangleKind() {
     switch (Kind) {
     case SpecializationKind::Generic:
-      M.manglePrefix("g");
+      M.append("g");
       break;
     case SpecializationKind::FunctionSignature:
-      M.manglePrefix("f");
+      M.append("f");
       break;
     }
   }
 
   void manglePass() {
-    M.manglePrefix(encodeSpecializationPass(Pass));
+    M.append(encodeSpecializationPass(Pass));
   }
 
   void mangleSpecializationPrefix() {
-    M.manglePrefix("_TTS");
+    M.append("_TTS");
   }
 
   void mangleFunctionName() {
-    M.manglePrefix("_");
-    M.manglePrefix(Function->getName());
+    M.append("_");
+    M.appendSymbol(Function->getName());
   }
 };
 

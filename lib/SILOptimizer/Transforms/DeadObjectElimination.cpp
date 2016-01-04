@@ -1,8 +1,8 @@
-//===-- DeadObjectElimination.cpp - Remove unused objects  ----------------===//
+//===--- DeadObjectElimination.cpp - Remove unused objects  ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -227,7 +227,7 @@ static bool canZapInstruction(SILInstruction *Inst) {
 /// Analyze the use graph of AllocRef for any uses that would prevent us from
 /// zapping it completely.
 static bool
-hasUnremoveableUsers(SILInstruction *AllocRef, UserList &Users) {
+hasUnremovableUsers(SILInstruction *AllocRef, UserList &Users) {
   SmallVector<SILInstruction *, 16> Worklist;
   Worklist.push_back(AllocRef);
 
@@ -331,7 +331,7 @@ namespace {
 /// dead arrays. We just need a slightly better destructor analysis to prove
 /// that it only releases elements.
 class DeadObjectAnalysis {
-  // Map a each address projection of this object to a list of stores.
+  // Map each address projection of this object to a list of stores.
   // Do not iterate over this map's entries.
   using AddressToStoreMap =
     llvm::DenseMap<IndexTrieNode*, llvm::SmallVector<StoreInst*, 4> >;
@@ -740,7 +740,7 @@ bool DeadObjectElimination::processAllocRef(AllocRefInst *ARI) {
   // Our destructor has no side effects, so if we can prove that no loads
   // escape, then we can completely remove the use graph of this alloc_ref.
   UserList UsersToRemove;
-  if (hasUnremoveableUsers(ARI, UsersToRemove)) {
+  if (hasUnremovableUsers(ARI, UsersToRemove)) {
     DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
     return false;
   }
@@ -760,7 +760,7 @@ bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
     return false;
 
   UserList UsersToRemove;
-  if (hasUnremoveableUsers(ASI, UsersToRemove)) {
+  if (hasUnremovableUsers(ASI, UsersToRemove)) {
     DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
     return false;
   }

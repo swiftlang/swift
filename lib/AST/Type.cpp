@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -721,7 +721,7 @@ static Type getStrippedType(const ASTContext &context, Type type,
       Type eltTy = getStrippedType(context, elt.getType(),
                                    stripLabels, stripDefaultArgs);
       if (anyChanged || eltTy.getPointer() != elt.getType().getPointer() ||
-          (elt.hasInit() && stripDefaultArgs) ||
+          (elt.hasDefaultArg() && stripDefaultArgs) ||
           (elt.hasName() && stripLabels)) {
         if (!anyChanged) {
           elements.reserve(tuple->getNumElements());
@@ -763,38 +763,6 @@ static Type getStrippedType(const ASTContext &context, Type type,
 Type TypeBase::getUnlabeledType(ASTContext &Context) {
   return getStrippedType(Context, Type(this), /*labels=*/true,
                          /*defaultArgs=*/true);
-}
-
-Type TypeBase::getRelabeledType(ASTContext &ctx, 
-                                ArrayRef<Identifier> labels) {
-  if (auto tupleTy = dyn_cast<TupleType>(this)) {
-    assert(labels.size() == tupleTy->getNumElements() && 
-           "Wrong number of labels");
-    SmallVector<TupleTypeElt, 4> elements;
-    unsigned i = 0;
-    bool anyChanged = false;
-    for (const auto &elt : tupleTy->getElements()) {
-      if (elt.getName() != labels[i])
-        anyChanged = true;
-
-      elements.push_back(TupleTypeElt(elt.getType(), labels[i], 
-                                      elt.getDefaultArgKind(), elt.isVararg()));
-      ++i;
-    }
-
-    if (!anyChanged)
-      return this;
-
-    return TupleType::get(elements, ctx);
-  }
-
-  // If there is no label, the type is unchanged.
-  if (labels[0].empty())
-    return this;
-
-  // Create a one-element tuple to capture the label.
-  TupleTypeElt elt(this, labels[0]);
-  return TupleType::get(elt, ctx);  
 }
 
 Type TypeBase::getWithoutDefaultArgs(const ASTContext &Context) {
@@ -1501,7 +1469,7 @@ bool TypeBase::isSpelledLike(Type other) {
       return false;
     for (size_t i = 0, sz = tMe->getNumElements(); i < sz; ++i) {
       auto &myField = tMe->getElement(i), &theirField = tThem->getElement(i);
-      if (myField.hasInit() != theirField.hasInit())
+      if (myField.hasDefaultArg() != theirField.hasDefaultArg())
         return false;
       
       if (myField.getName() != theirField.getName())
@@ -1867,7 +1835,7 @@ bool TypeBase::canOverride(Type other, bool allowUnsafeParameterOverride,
 /// value.
 bool TupleType::hasAnyDefaultValues() const {
   for (const TupleTypeElt &Elt : Elements)
-    if (Elt.hasInit())
+    if (Elt.hasDefaultArg())
       return true;
   return false;
 }
@@ -1893,7 +1861,7 @@ int TupleType::getElementForScalarInit() const {
   int FieldWithoutDefault = -1;
   for (unsigned i = 0, e = Elements.size(); i != e; ++i) {
     // Ignore fields with a default value.
-    if (Elements[i].hasInit()) continue;
+    if (Elements[i].hasDefaultArg()) continue;
     
     // If we already saw a non-vararg field missing a default value, then we
     // cannot assign a scalar to this tuple.

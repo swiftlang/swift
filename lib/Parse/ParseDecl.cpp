@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -20,8 +20,9 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/DebuggerClient.h"
-#include "swift/AST/Module.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Fallthrough.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -33,12 +34,6 @@
 #include <algorithm>
 
 using namespace swift;
-
-/// \brief Build an implicit 'self' parameter for the specified DeclContext.
-static Pattern *buildImplicitSelfParameter(SourceLoc Loc,
-                                           DeclContext *CurDeclContext) {
-  return Pattern::buildImplicitSelfParameter(Loc, TypeLoc(), CurDeclContext);
-}
 
 namespace {
   /// A RAII object for deciding whether this DeclKind needs special
@@ -1445,18 +1440,6 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
       // Otherwise this is a valid decl attribute so they should have put it on
       // the decl instead of the type.
 
-      auto diagID = diag::decl_attribute_applied_to_type;
-      if (declAttrID == DAK_AutoClosure) {
-        // Special case handling of @autoclosure attribute on the type, which
-        // was supported in Swift 1.0 and 1.1, but removed in Swift 1.2.
-        diagID = diag::autoclosure_is_decl_attribute;
-
-        // Further special case handling of @autoclosure attribute in
-        // enumerators in EnumDecl's to produce a nice diagnostic.
-        if (CurDeclContext && isa<EnumDecl>(CurDeclContext))
-          diagID = diag::autoclosure_not_on_enums;
-      }
-
       // If this is the first attribute, and if we are on a simple decl, emit a
       // fixit to move the attribute.  Otherwise, we don't have the location of
       // the @ sign, or we don't have confidence that the fixit will be right.
@@ -1464,21 +1447,19 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
           StructureMarkers.back().Kind != StructureMarkerKind::Declaration ||
           StructureMarkers.back().Loc.isInvalid() ||
           peekToken().is(tok::equal)) {
-        diagnose(Tok, diagID);
+        diagnose(Tok, diag::decl_attribute_applied_to_type);
       } else {
         // Otherwise, this is the first type attribute and we know where the
         // declaration is.  Emit the same diagnostic, but include a fixit to
         // move the attribute.  Unfortunately, we don't have enough info to add
         // the attribute to DeclAttributes.
-        diagnose(Tok, diagID)
+        diagnose(Tok, diag::decl_attribute_applied_to_type)
           .fixItRemove(SourceRange(Attributes.AtLoc, Tok.getLoc()))
           .fixItInsert(StructureMarkers.back().Loc,
                        "@" + Tok.getText().str()+" ");
       }
     }
     
-    
-
     // Recover by eating @foo when foo is not known.
     consumeToken();
       
@@ -2292,9 +2273,9 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
     auto BufferId = SourceMgr.getCodeCompletionBufferID();
     auto IdEndOffset = SourceMgr.getLocOffsetInBuffer(ImportPath.back().second,
       BufferId) + ImportPath.back().first.str().size();
-    auto CCTokenOffeset =  SourceMgr.getLocOffsetInBuffer(SourceMgr.
+    auto CCTokenOffset = SourceMgr.getLocOffsetInBuffer(SourceMgr.
       getCodeCompletionLoc(), BufferId);
-    if (IdEndOffset == CCTokenOffeset) {
+    if (IdEndOffset == CCTokenOffset) {
       consumeToken();
     }
   }
@@ -2744,71 +2725,51 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
 
 /// This function creates an accessor function (with no body) for a computed
 /// property or subscript.
-static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
-                                    TypedPattern *TypedPattern,
+static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
                                     TypeLoc ElementTy,
-                                    Pattern *Indices, SourceLoc StaticLoc,
+                                    ParameterList *Indices, SourceLoc StaticLoc,
                                     Parser::ParseDeclOptions Flags,
                                     AccessorKind Kind,
                                     AddressorKind addressorKind,
                                     Parser *P, SourceLoc AccessorKeywordLoc) {
-  // First task, set up the value argument pattern.  This is the NamePattern
+  // First task, set up the value argument list.  This is the "newValue" name
   // (for setters) followed by the index list (for subscripts).  For
   // non-subscript getters, this degenerates down to "()".
   //
-  // We put the 'value' argument before the subscript index list as a
+  // We put the 'newValue' argument before the subscript index list as a
   // micro-optimization for Objective-C thunk generation.
-  Pattern *ValueArg;
+  ParameterList *ValueArg;
   {
-    SmallVector<TuplePatternElt, 2> ValueArgElements;
+    SmallVector<ParamDecl*, 2> ValueArgElements;
     SourceLoc StartLoc, EndLoc;
-    bool ExplicitArgument = TypedPattern &&
-      (!TypedPattern->isImplicit() ||
-       !TypedPattern->getSubPattern()->isImplicit());
-
-    if (TypedPattern) {
-      ValueArgElements.push_back(TuplePatternElt(TypedPattern));
-      StartLoc = TypedPattern->getStartLoc();
-      EndLoc = TypedPattern->getEndLoc();
+    if (param) {
+      assert(param->size() == 1 &&
+             "Should only have a single parameter in the list");
+      ValueArgElements.push_back(param->get(0));
+      StartLoc = param->getStartLoc();
+      EndLoc = param->getEndLoc();
     }
 
     if (Indices) {
-      auto clonePattern = [&](const Pattern *p) -> Pattern* {
-        return p->clone(P->Context, Pattern::Implicit);
-      };
-
-      if (auto *PP = dyn_cast<ParenPattern>(Indices)) {
-        ValueArgElements.push_back(
-          TuplePatternElt(clonePattern(PP->getSubPattern())));
-      } else {
-        auto *TP = cast<TuplePattern>(Indices);
-        for (const auto &elt : TP->getElements()) {
-          ValueArgElements.push_back(
-            TuplePatternElt(elt.getLabel(), elt.getLabelLoc(),
-                            clonePattern(elt.getPattern()),
-                            elt.hasEllipsis()));
-        }
-      }
-
-      if (!ExplicitArgument) {
+      Indices = Indices->clone(P->Context, ParameterList::Implicit);
+      ValueArgElements.append(Indices->begin(), Indices->end());
+      if (StartLoc.isInvalid()) {
         StartLoc = Indices->getStartLoc();
         EndLoc = Indices->getEndLoc();
       }
     }
 
-    ValueArg = TuplePattern::create(P->Context, StartLoc, ValueArgElements,
-                                    EndLoc);
-    if (!ExplicitArgument)
-      ValueArg->setImplicit();
+    ValueArg = ParameterList::create(P->Context, StartLoc, ValueArgElements,
+                                     EndLoc);
   }
 
 
   // Create the parameter list(s) for the getter.
-  SmallVector<Pattern *, 4> Params;
+  SmallVector<ParameterList*, 4> Params;
   
   // Add the implicit 'self' to Params, if needed.
   if (Flags & Parser::PD_HasContainerType)
-    Params.push_back(buildImplicitSelfParameter(DeclLoc, P->CurDeclContext));
+    Params.push_back(ParameterList::createSelf(DeclLoc, P->CurDeclContext));
   
   // Add the "(value)" and subscript indices parameter clause.
   Params.push_back(ValueArg);
@@ -2923,11 +2884,10 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
   return D;
 }
 
-static TypedPattern *createSetterAccessorArgument(SourceLoc nameLoc,
-                                                  Identifier name,
-                                                  TypeLoc elementTy,
-                                                  AccessorKind accessorKind,
-                                                  Parser &P) {
+static ParamDecl *
+createSetterAccessorArgument(SourceLoc nameLoc, Identifier name,
+                             TypeLoc elementTy, AccessorKind accessorKind,
+                             Parser &P) {
   // Add the parameter. If no name was specified, the name defaults to
   // 'value'.
   bool isNameImplicit = name.empty();
@@ -2937,22 +2897,23 @@ static TypedPattern *createSetterAccessorArgument(SourceLoc nameLoc,
     name = P.Context.getIdentifier(implName);
   }
 
-  VarDecl *value = new (P.Context) ParamDecl(/*IsLet*/true,
-                                             SourceLoc(), Identifier(),
-                                             nameLoc, name,
-                                             Type(), P.CurDeclContext);
+  auto result = new (P.Context) ParamDecl(/*IsLet*/true, SourceLoc(),
+                                          Identifier(), nameLoc, name,
+                                          Type(), P.CurDeclContext);
   if (isNameImplicit)
-    value->setImplicit();
+    result->setImplicit();
 
-  Pattern *namedPat = new (P.Context) NamedPattern(value, isNameImplicit);
-  return new (P.Context) TypedPattern(namedPat, elementTy.clone(P.Context),
-                                      /*Implicit*/true);
+  result->getTypeLoc() = elementTy.clone(P.Context);
+  
+  // AST Walker shouldn't go into the type recursively.
+  result->setIsTypeLocImplicit(true);
+  return result;
 }
 
 /// Parse a "(value)" specifier for "set" or "willSet" if present.  Create a
-/// pattern to represent the spelled argument or the implicit one if it is
-/// missing.
-static TypedPattern *
+/// parameter list to represent the spelled argument or return null if none is
+/// present.
+static ParameterList *
 parseOptionalAccessorArgument(SourceLoc SpecifierLoc, TypeLoc ElementTy,
                               Parser &P, AccessorKind Kind) {
   // 'set' and 'willSet' have a (value) parameter, 'didSet' takes an (oldValue)
@@ -2972,7 +2933,9 @@ parseOptionalAccessorArgument(SourceLoc SpecifierLoc, TypeLoc ElementTy,
       P.diagnose(P.Tok, diag::expected_accessor_name, (unsigned)Kind);
       P.skipUntil(tok::r_paren, tok::l_brace);
       if (P.Tok.is(tok::r_paren))
-        P.consumeToken();
+        EndLoc = P.consumeToken();
+      else
+        EndLoc = StartLoc;
     } else {
       // We have a name.
       Name = P.Context.getIdentifier(P.Tok.getText());
@@ -2989,7 +2952,8 @@ parseOptionalAccessorArgument(SourceLoc SpecifierLoc, TypeLoc ElementTy,
   }
 
   if (Name.empty()) NameLoc = SpecifierLoc;
-  return createSetterAccessorArgument(NameLoc, Name, ElementTy, Kind, P);
+  auto param = createSetterAccessorArgument(NameLoc, Name, ElementTy, Kind, P);
+  return ParameterList::create(P.Context, StartLoc, param, EndLoc);
 }
 
 static unsigned skipUntilMatchingRBrace(Parser &P) {
@@ -3131,7 +3095,7 @@ static void diagnoseRedundantAccessors(Parser &P, SourceLoc loc,
 /// \brief Parse a get-set clause, optionally containing a getter, setter,
 /// willSet, and/or didSet clauses.  'Indices' is a paren or tuple pattern,
 /// specifying the index list for a subscript.
-bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
+bool Parser::parseGetSetImpl(ParseDeclOptions Flags, ParameterList *Indices,
                              TypeLoc ElementTy, ParsedAccessors &accessors,
                              SourceLoc &LastValidLoc, SourceLoc StaticLoc,
                              SourceLoc VarLBLoc,
@@ -3201,11 +3165,11 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
       if (Tok.is(tok::l_paren))
         diagnose(Loc, diag::protocol_setter_name);
 
-      auto *ValueNamePattern
+      auto *ValueNameParams
         = parseOptionalAccessorArgument(Loc, ElementTy, *this, Kind);
 
       // Set up a function declaration.
-      TheDecl = createAccessorFunc(Loc, ValueNamePattern, ElementTy, Indices,
+      TheDecl = createAccessorFunc(Loc, ValueNameParams, ElementTy, Indices,
                                    StaticLoc, Flags, Kind, addressorKind, this,
                                    AccessorKeywordLoc);
       TheDecl->getAttrs() = Attributes;
@@ -3346,7 +3310,8 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
       LastValidLoc = Loc;
     } else {
       Scope S(this, ScopeKind::FunctionBody);
-      addPatternVariablesToScope(TheDecl->getBodyParamPatterns());
+      for (auto PL : TheDecl->getParameterLists())
+        addParametersToScope(PL);
 
       // Establish the new context.
       ParseFunctionBody CC(*this, TheDecl);
@@ -3382,7 +3347,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
   return false;
 }
 
-bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
+bool Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
                          TypeLoc ElementTy, ParsedAccessors &accessors,
                          SourceLoc StaticLoc,
                          SmallVectorImpl<Decl *> &Decls) {
@@ -3441,7 +3406,8 @@ void Parser::parseAccessorBodyDelayed(AbstractFunctionDecl *AFD) {
 }
 
 /// \brief Parse the brace-enclosed getter and setter for a variable.
-VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
+VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
+                                    ParseDeclOptions Flags,
                                     SourceLoc StaticLoc, bool hasInitializer,
                                     const DeclAttributes &Attributes,
                                     SmallVectorImpl<Decl *> &Decls) {
@@ -3522,7 +3488,7 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
                                      bool invalid, ParseDeclOptions flags,
                                      SourceLoc staticLoc,
                                      const DeclAttributes &attrs,
-                                     TypeLoc elementTy, Pattern *indices,
+                                     TypeLoc elementTy, ParameterList *indices,
                                      SmallVectorImpl<Decl *> &decls) {
   auto flagInvalidAccessor = [&](FuncDecl *&func) {
     if (func) {
@@ -3546,10 +3512,10 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
   // Create an implicit accessor declaration.
   auto createImplicitAccessor =
   [&](AccessorKind kind, AddressorKind addressorKind,
-      TypedPattern *argPattern) -> FuncDecl* {
-    auto accessor = createAccessorFunc(SourceLoc(), argPattern,
-                                       elementTy, indices, staticLoc, flags,
-                                       kind, addressorKind, &P, SourceLoc());
+      ParameterList *argList) -> FuncDecl* {
+    auto accessor = createAccessorFunc(SourceLoc(), argList, elementTy, indices,
+                                       staticLoc, flags, kind, addressorKind,
+                                       &P, SourceLoc());
     accessor->setImplicit();
     decls.push_back(accessor);
     return accessor;
@@ -3649,12 +3615,13 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
                                  AddressorKind::NotAddressor, nullptr);
 
     auto argFunc = (WillSet ? WillSet : DidSet);
-    auto argLoc = argFunc->getBodyParamPatterns().back()->getLoc();
+    auto argLoc = argFunc->getParameterLists().back()->getStartLoc();
 
-    auto argPattern = createSetterAccessorArgument(argLoc, Identifier(),
-                                        elementTy, AccessorKind::IsSetter, P);
+    auto argument = createSetterAccessorArgument(argLoc, Identifier(),elementTy,
+                                                 AccessorKind::IsSetter, P);
+    auto argList = ParameterList::create(P.Context, argument);
     Set = createImplicitAccessor(AccessorKind::IsSetter,
-                                 AddressorKind::NotAddressor, argPattern);
+                                 AddressorKind::NotAddressor, argList);
 
     storage->setObservingAccessors(Get, Set, nullptr);
     return;
@@ -3671,11 +3638,12 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
   // setter and record what we've got.
   if (MutableAddressor) {
     assert(Get && !Set);
-    auto argPattern =
+    auto argument =
       createSetterAccessorArgument(MutableAddressor->getLoc(), Identifier(),
                                    elementTy, AccessorKind::IsSetter, P);
+    auto argList = ParameterList::create(P.Context, argument);
     Set = createImplicitAccessor(AccessorKind::IsSetter,
-                                 AddressorKind::NotAddressor, argPattern);
+                                 AddressorKind::NotAddressor, argList);
 
     storage->makeComputedWithMutableAddress(LBLoc, Get, Set, nullptr,
                                             MutableAddressor, RBLoc);
@@ -4099,7 +4067,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     GenericParams = maybeParseGenericParams();
   }
 
-  SmallVector<Pattern*, 8> BodyParams;
+  SmallVector<ParameterList*, 8> BodyParams;
   
   // If we're within a container, add an implicit first pattern to match the
   // container type as an element named 'self'.
@@ -4108,12 +4076,10 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   // "(inout self: FooTy)->(int)->int", and a static function
   // "(int)->int" on FooTy into "(self: FooTy.Type)->(int)->int".
   // Note that we can't actually compute the type here until Sema.
-  if (HasContainerType) {
-    Pattern *SelfPattern = buildImplicitSelfParameter(NameLoc, CurDeclContext);
-    BodyParams.push_back(SelfPattern);
-  }
+  if (HasContainerType)
+    BodyParams.push_back(ParameterList::createSelf(NameLoc, CurDeclContext));
 
-  DefaultArgumentInfo DefaultArgs;
+  DefaultArgumentInfo DefaultArgs(HasContainerType);
   TypeRepr *FuncRetTy = nullptr;
   DeclName FullName;
   SourceLoc throwsLoc;
@@ -4160,7 +4126,8 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
       CodeCompletion->setDelayedParsedDecl(FD);
 
     DefaultArgs.setFunctionContext(FD);
-    addPatternVariablesToScope(FD->getBodyParamPatterns());
+    for (auto PL : FD->getParameterLists())
+      addParametersToScope(PL);
     setLocalDiscriminator(FD);
     
     // Establish the new context.
@@ -4804,7 +4771,7 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
   }
 
   SmallVector<Identifier, 4> argumentNames;
-  ParserResult<Pattern> Indices
+  ParserResult<ParameterList> Indices
     = parseSingleParameterClause(ParameterContextKind::Subscript,
                                  &argumentNames);
   if (Indices.isNull() || Indices.hasCodeCompletion())
@@ -4903,8 +4870,8 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   // Parse the parameters.
   // FIXME: handle code completion in Arguments.
-  DefaultArgumentInfo DefaultArgs;
-  Pattern *BodyPattern;
+  DefaultArgumentInfo DefaultArgs(/*hasSelf*/true);
+  ParameterList *BodyPattern;
   DeclName FullName;
   ParserStatus SignatureStatus
     = parseConstructorArguments(FullName, BodyPattern, DefaultArgs);
@@ -4928,12 +4895,12 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     Attributes.add(new (Context) RethrowsAttr(throwsLoc));
   }
 
-  auto *SelfPattern = buildImplicitSelfParameter(ConstructorLoc,CurDeclContext);
+  auto *SelfDecl = ParamDecl::createSelf(ConstructorLoc, CurDeclContext);
 
   Scope S2(this, ScopeKind::ConstructorBody);
   auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
                                            Failability, FailabilityLoc,
-                                           SelfPattern, BodyPattern,
+                                           SelfDecl, BodyPattern,
                                            GenericParams, throwsLoc,
                                            CurDeclContext);
   
@@ -4954,7 +4921,9 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     // Tell the type checker not to touch this constructor.
     CD->setInvalid();
   }
-  addPatternVariablesToScope(ArrayRef<Pattern*>{SelfPattern, BodyPattern} );
+  
+  addToScope(SelfDecl);
+  addParametersToScope(BodyPattern);
 
   // '{'
   if (Tok.is(tok::l_brace)) {
@@ -5021,11 +4990,11 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     }
   }
 
-  auto *SelfPattern = buildImplicitSelfParameter(DestructorLoc, CurDeclContext);
+  auto *SelfDecl = ParamDecl::createSelf(DestructorLoc, CurDeclContext);
 
   Scope S(this, ScopeKind::DestructorBody);
   auto *DD = new (Context) DestructorDecl(Context.Id_deinit, DestructorLoc,
-                                          SelfPattern, CurDeclContext);
+                                          SelfDecl, CurDeclContext);
 
   // Parse the body.
   if (Tok.is(tok::l_brace)) {

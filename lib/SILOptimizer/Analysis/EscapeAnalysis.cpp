@@ -1,8 +1,8 @@
-//===-------------- EscapeAnalysis.cpp - SIL Escape Analysis --------------===//
+//===--- EscapeAnalysis.cpp - SIL Escape Analysis -------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -126,7 +126,7 @@ EscapeAnalysis::CGNode *EscapeAnalysis::ConnectionGraph::getContentNode(
 }
 
 bool EscapeAnalysis::ConnectionGraph::addDeferEdge(CGNode *From, CGNode *To) {
-  if (!From->addDefered(To))
+  if (!From->addDeferred(To))
     return false;
 
   CGNode *FromPointsTo = From->pointsTo;
@@ -167,7 +167,7 @@ void EscapeAnalysis::ConnectionGraph::mergeAllScheduledNodes() {
           PredNode->setPointsTo(To);
       } else {
         assert(PredNode != From);
-        auto Iter = PredNode->findDefered(From);
+        auto Iter = PredNode->findDeferred(From);
         assert(Iter != PredNode->defersTo.end() &&
                "Incoming defer-edge not found in predecessor's defer list");
         PredNode->defersTo.erase(Iter);
@@ -280,10 +280,10 @@ updatePointsTo(CGNode *InitialNode, CGNode *pointsTo) {
     }
 
     // Add all adjacent nodes to the WorkList.
-    for (auto *Defered : Node->defersTo) {
-      if (!Defered->isInWorkList) {
-        WorkList.push_back(Defered);
-        Defered->isInWorkList = true;
+    for (auto *Deferred : Node->defersTo) {
+      if (!Deferred->isInWorkList) {
+        WorkList.push_back(Deferred);
+        Deferred->isInWorkList = true;
       }
     }
     for (Predecessor Pred : Node->Preds) {
@@ -300,7 +300,7 @@ updatePointsTo(CGNode *InitialNode, CGNode *pointsTo) {
     // Here we handle a special case: all defer-edge paths must eventually end
     // in a points-to edge to pointsTo. We ensure this by setting the edge on
     // nodes which have no defer-successors (see above). But this does not cover
-    // the case where there is a terminating cyle in the defer-edge path,
+    // the case where there is a terminating cycle in the defer-edge path,
     // e.g.  A -> B -> C -> B
     // We find all nodes which don't reach a points-to edge and add additional
     // points-to edges to fix that.
@@ -506,10 +506,10 @@ bool EscapeAnalysis::ConnectionGraph::mergeFrom(ConnectionGraph *SourceGraph,
         DestFrom = DestFrom->getMergeTarget();
       }
 
-      for (auto *Defered : SourceReachable->defersTo) {
-        if (!Defered->isInWorkList) {
-          WorkList.push_back(Defered);
-          Defered->isInWorkList = true;
+      for (auto *Deferred : SourceReachable->defersTo) {
+        if (!Deferred->isInWorkList) {
+          WorkList.push_back(Deferred);
+          Deferred->isInWorkList = true;
         }
       }
     }
@@ -572,7 +572,7 @@ struct CGForDotView {
 
   enum EdgeTypes {
     PointsTo,
-    Defered
+    Deferred
   };
 
   struct Node {
@@ -629,7 +629,7 @@ CGForDotView::CGForDotView(const EscapeAnalysis::ConnectionGraph *CG) :
     }
     for (auto *Def : OrigNode->defersTo) {
       Nd.Children.push_back(Orig2Node[Def]);
-      Nd.ChildrenTypes.push_back(Defered);
+      Nd.ChildrenTypes.push_back(Deferred);
     }
   }
 }
@@ -767,7 +767,7 @@ namespace llvm {
       unsigned ChildIdx = I - Node->Children.begin();
       switch (Node->ChildrenTypes[ChildIdx]) {
         case CGForDotView::PointsTo: return "";
-        case CGForDotView::Defered: return "color=\"gray\"";
+        case CGForDotView::Deferred: return "color=\"gray\"";
       }
     }
   };
@@ -930,7 +930,7 @@ void EscapeAnalysis::ConnectionGraph::verifyStructure() const {
     for (Predecessor Pred : Nd->Preds) {
       CGNode *PredNode = Pred.getPointer();
       if (Pred.getInt() == EdgeType::Defer) {
-        assert(PredNode->findDefered(Nd) != PredNode->defersTo.end());
+        assert(PredNode->findDeferred(Nd) != PredNode->defersTo.end());
       } else {
         assert(Pred.getInt() == EdgeType::PointsTo);
         assert(PredNode->getPointsToEdge() == Nd);
@@ -1350,13 +1350,13 @@ analyzeSelectInst(SelectInst *SI, ConnectionGraph *ConGraph) {
       SILValue CaseVal = SI->getCase(Idx).second;
       auto *ArgNode = ConGraph->getNode(CaseVal, this);
       assert(ArgNode &&
-             "there should be an argument node if there is an result node");
+             "there should be an argument node if there is a result node");
       ConGraph->defer(ResultNode, ArgNode);
     }
     // ... also including the default value.
     auto *DefaultNode = ConGraph->getNode(SI->getDefaultResult(), this);
     assert(DefaultNode &&
-           "there should be an argument node if there is an result node");
+           "there should be an argument node if there is a result node");
     ConGraph->defer(ResultNode, DefaultNode);
   }
 }

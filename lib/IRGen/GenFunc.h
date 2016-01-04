@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -111,10 +111,11 @@ namespace irgen {
   
   /// Allocate a stack buffer of the appropriate size to bitwise-coerce a value
   /// between two LLVM types.
-  Address allocateForCoercion(IRGenFunction &IGF,
-                              llvm::Type *fromTy,
-                              llvm::Type *toTy,
-                              const llvm::Twine &basename);
+  std::pair<Address, Size>
+  allocateForCoercion(IRGenFunction &IGF,
+                      llvm::Type *fromTy,
+                      llvm::Type *toTy,
+                      const llvm::Twine &basename);
 
 } // end namespace irgen
 } // end namespace swift

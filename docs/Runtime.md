@@ -242,7 +242,6 @@ process start and the function returns.
 ## Debugging
 
 ```
-0000000000024040 T __swift_debug_verifyTypeLayoutAttribute
 0000000000027140 T _swift_willThrow
 ```
 
@@ -307,6 +306,9 @@ detail used to implement resilient per-type metadata accessor functions.
 0000000000028bc0 T _swift_getInitializedObjCClass
 ```
 
+**ABI TODO**: Fast entry points for `getExistential*TypeMetadata1-3`. Static
+metadata for `Any` and `AnyObject` is probably worth considering too.
+
 ## Type metadata initialization
 
 Calls to these entry points are emitted when instantiating type metadata at
@@ -325,13 +327,6 @@ runtime.
 0000000000028b60 T _swift_instantiateObjCClass
 ```
 
-## Objective-C Runtime Interop
-
-```
-0000000000023e60 T _swift_demangleSimpleClass
-0000000000028770 T _swift_objcRespondsToSelector
-```
-
 ## Metatypes
 
 ```
@@ -339,12 +334,12 @@ runtime.
 0000000000022fb0 T _swift_getObjectType
 00000000000006f0 T _swift_getTypeName
 00000000000040c0 T _swift_isClassType
-0000000000003f50 T _swift_isClassOrObjCExistential
+0000000000003f50 T _swift_isClassOrObjCExistentialType
 0000000000004130 T _swift_isOptionalType
-00000000000279f0 T __swift_usesNativeSwiftReferenceCounting_class
-000000000002b340 T __swift_class_getInstancePositiveExtentSize
-000000000002b350 T __swift_class_getInstancePositiveExtentSize_native
-0000000000004080 T __swift_getSuperclass_nonNull
+00000000000279f0 T _swift_objc_class_usesNativeSwiftReferenceCounting
+000000000002b340 T _swift_objc_class_unknownGetInstanceExtents
+000000000002b350 T _swift_class_getInstanceExtents
+0000000000004080 T _swift_class_getSuperclass
 ```
 
 **ABI TODO**: getTypeByName entry point.
@@ -353,9 +348,6 @@ runtime.
 constants to supersede `swift_is*Type`.
 
 **ABI TODO**: Rename class metadata queries with a consistent naming scheme.
-
-**ABI TODO**: `swift_isClassOrObjCExistential` should end in `-Type` for
-consistency.
 
 ## Protocol conformance lookup
 
@@ -375,7 +367,10 @@ consistency.
 
 The Swift runtime exports standard metadata objects for `Builtin` types
 as well as standard value witness tables that can be freely adopted by
-types with common layout attributes.
+types with common layout attributes. Note that, unlike public-facing types,
+the runtime does not guarantee a 1:1 mapping of Builtin types to metadata
+objects, and will reuse metadata objects to represent builtins with the same
+layout characteristics.
 
 ```
 000000000004faa8 S __TMBB
@@ -419,4 +414,6 @@ types with common layout attributes.
 
 - Unsynchronized retain/release
 
-- Decouple dynamic casting and reflection from the standard library
+- Nonnull retain/release
+
+- Decouple dynamic casting, bridging, and reflection from the standard library

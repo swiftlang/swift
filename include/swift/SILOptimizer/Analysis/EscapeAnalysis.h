@@ -1,8 +1,8 @@
-//===----------- EscapeAnalysis.h - SIL Escape Analysis -*- C++ -*---------===//
+//===--- EscapeAnalysis.h - SIL Escape Analysis -----------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -192,7 +192,7 @@ private:
     }
 
     /// Finds a successor node in the outgoing defer edges.
-    llvm::SmallVectorImpl<CGNode *>::iterator findDefered(CGNode *Def) {
+    llvm::SmallVectorImpl<CGNode *>::iterator findDeferred(CGNode *Def) {
       return std::find(defersTo.begin(), defersTo.end(), Def);
     }
 
@@ -209,7 +209,7 @@ private:
     }
 
     /// Adds a defer-edge to another node \p To. Not done if \p To is this node.
-    bool addDefered(CGNode *To) {
+    bool addDeferred(CGNode *To) {
       assert(!To->isMerged);
       if (To == this)
         return false;

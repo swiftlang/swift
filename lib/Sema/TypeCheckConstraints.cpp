@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -46,9 +46,9 @@
 using namespace swift;
 using namespace constraints;
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Type variable implementation.
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 #pragma mark Type variable implementation
 
 void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
@@ -185,7 +185,7 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
 
     // If there aren't any more inputs, we can use a default argument.
     if (fromNext == fromLast) {
-      if (elt2.hasInit()) {
+      if (elt2.hasDefaultArg()) {
         sources[i] = TupleShuffleExpr::DefaultInitialize;
         continue;
       }
@@ -239,9 +239,9 @@ bool constraints::hasTrailingClosure(const ConstraintLocatorBuilder &locator) {
   return false;
 }
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // High-level entry points.
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 static unsigned getNumArgs(ValueDecl *value) {
   if (!isa<FuncDecl>(value)) return ~0U;
@@ -357,7 +357,7 @@ static bool diagnoseOperatorJuxtaposition(UnresolvedDeclRefExpr *UDRE,
   // Check all the potential splits.
   for (unsigned splitLoc = 1, e = nameStr.size(); splitLoc != e; ++splitLoc) {
     // For it to be a valid split, the start and end section must be valid
-    // operators, spliting a unicode code point isn't kosher.
+    // operators, splitting a unicode code point isn't kosher.
     auto startStr = nameStr.substr(0, splitLoc);
     auto endStr = nameStr.drop_front(splitLoc);
     if (!Lexer::isOperator(startStr) || !Lexer::isOperator(endStr))
@@ -806,10 +806,9 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   TypeResolutionOptions options;
   options |= TR_AllowUnspecifiedTypes;
   options |= TR_AllowUnboundGenerics;
-  options |= TR_ImmediateFunctionInput;
   options |= TR_InExpression;
   bool hadParameterError = false;
-  if (TC.typeCheckPattern(closure->getParams(), DC, options)) {
+  if (TC.typeCheckParameterList(closure->getParameters(), DC, options)) {
     closure->setType(ErrorType::get(TC.Context));
 
     // If we encounter an error validating the parameter list, don't bail.
@@ -846,33 +845,7 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
 /// as expressions due to the parser not knowing which identifiers are
 /// type names.
 TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
-  // Fold T[] into an array, it isn't a subscript on a metatype.
-  if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
-    auto *TyExpr = dyn_cast<TypeExpr>(SE->getBase());
-    if (!TyExpr) return nullptr;
-    
-    // We don't fold subscripts with indexes, just an empty subscript.
-    TupleExpr *Indexes = dyn_cast<TupleExpr>(SE->getIndex());
-    if (!Indexes || Indexes->getNumElements() != 0)
-      return nullptr;
 
-    auto *InnerTypeRepr = TyExpr->getTypeRepr();
-    assert(!TyExpr->isImplicit() && InnerTypeRepr &&
-           "SubscriptExpr doesn't work on implicit TypeExpr's, "
-           "the TypeExpr should have been built correctly in the first place");
-
-    auto *NewTypeRepr =
-      new (TC.Context) ArrayTypeRepr(InnerTypeRepr, nullptr,
-                                     Indexes->getSourceRange(),
-                                     /*OldSyntax=*/true);
-
-    TC.diagnose(Indexes->getStartLoc(), diag::new_array_syntax)
-      .fixItInsert(SE->getStartLoc(), "[")
-      .fixItRemove(Indexes->getStartLoc());
-
-    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
-  }
-  
   // Fold 'T.Type' or 'T.Protocol' into a metatype when T is a TypeExpr.
   if (auto *MRE = dyn_cast<UnresolvedDotExpr>(E)) {
     auto *TyExpr = dyn_cast<TypeExpr>(MRE->getBase());
@@ -998,10 +971,9 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       return nullptr;
 
     auto *NewTypeRepr =
-      new (TC.Context) ArrayTypeRepr(TyExpr->getTypeRepr(), nullptr,
+      new (TC.Context) ArrayTypeRepr(TyExpr->getTypeRepr(), 
                                      SourceRange(AE->getLBracketLoc(),
-                                                 AE->getRBracketLoc()),
-                                     /*OldSyntax=*/false);
+                                                 AE->getRBracketLoc()));
     return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
 
   }
@@ -2275,9 +2247,9 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc) {
   return false;
 }
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Debugging
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 #pragma mark Debugging
 
 void Solution::dump() const {
@@ -2469,7 +2441,7 @@ void ConstraintSystem::print(raw_ostream &out) {
       case OverloadChoiceKind::DeclViaUnwrappedOptional:
         if (choice.getBaseType())
           out << choice.getBaseType()->getString() << ".";
-        out << choice.getDecl()->getName().str() << ": "
+        out << choice.getDecl()->getName() << ": "
           << resolved->BoundType->getString() << " == "
           << resolved->ImpliedType->getString() << "\n";
         break;
@@ -2742,7 +2714,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   return CheckedCastKind::ValueCast;
 }
 
-/// If the expression is a an implicit call to _forceBridgeFromObjectiveC or
+/// If the expression is an implicit call to _forceBridgeFromObjectiveC or
 /// _conditionallyBridgeFromObjectiveC, returns the argument of that call.
 static Expr *lookThroughBridgeFromObjCCall(ASTContext &ctx, Expr *expr) {
   auto call = dyn_cast<CallExpr>(expr);

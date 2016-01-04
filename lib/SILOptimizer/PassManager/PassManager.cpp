@@ -1,8 +1,8 @@
-//===----- PassManager.cpp - Swift Pass Manager ---------------------------===//
+//===--- PassManager.cpp - Swift Pass Manager -----------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -433,7 +433,7 @@ SILPassManager::~SILPassManager() {
 }
 
 /// \brief Reset the state of the pass manager and remove all transformation
-/// owned by the pass manager. Anaysis passes will be kept.
+/// owned by the pass manager. Analysis passes will be kept.
 void SILPassManager::resetAndRemoveTransformations() {
   for (auto T : Transformations)
     delete T;

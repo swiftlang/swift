@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -31,6 +31,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -968,10 +969,12 @@ static void emitDirectExternalParameter(IRGenSILFunction &IGF,
 
   // Otherwise, we need to traffic through memory.
   // Create a temporary.
-  Address temporary = allocateForCoercion(IGF,
+  Address temporary; Size tempSize;
+  std::tie(temporary, tempSize) = allocateForCoercion(IGF,
                                           coercionTy,
                                           paramTI.getStorageType(),
                                           "");
+  IGF.Builder.CreateLifetimeStart(temporary, tempSize);
 
   // Write the input parameters into the temporary:
   Address coercedAddr =
@@ -997,6 +1000,7 @@ static void emitDirectExternalParameter(IRGenSILFunction &IGF,
   paramTI.loadAsTake(IGF, temporary, out);
 
   // Deallocate the temporary.
+  // `deallocateStack` emits the lifetime.end marker for us.
   paramTI.deallocateStack(IGF, temporary, paramType);
 }
 
@@ -1407,15 +1411,12 @@ void IRGenSILFunction::estimateStackSize() {
 /// Determine the number of source-level Swift of a function or closure.
 static unsigned countArgs(DeclContext *DC) {
   unsigned N = 0;
-  auto count = [&](ArrayRef<Pattern *> Patterns) {
-    for (auto p : Patterns)
-      p->forEachVariable([&](VarDecl *VD) { ++N; });
-  };
-
-  if (auto *Fn = dyn_cast<AbstractFunctionDecl>(DC))
-    count(Fn->getBodyParamPatterns());
-  else if (auto *Closure = dyn_cast<AbstractClosureExpr>(DC))
-    count(Closure->getParamPatterns());
+  if (auto *Fn = dyn_cast<AbstractFunctionDecl>(DC)) {
+    for (auto *PL : Fn->getParameterLists())
+      N += PL->size();
+    
+  } else if (auto *Closure = dyn_cast<AbstractClosureExpr>(DC))
+    N += Closure->getParameters()->size();
   else
     llvm_unreachable("unhandled declcontext type");
   return N;
@@ -1509,8 +1510,7 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
       if (!DS) {
         if (CurSILFn->isBare())
           DS = CurSILFn->getDebugScope();
-        // FIXME: Enable this assertion.
-        //assert(maybeScopeless(I) && "instruction has location, but no scope");
+        assert(maybeScopeless(I) && "instruction has location, but no scope");
       }
 
       // Ignore scope-less instructions and have IRBuilder reuse the
@@ -2746,7 +2746,7 @@ void IRGenSILFunction::visitDynamicMethodBranchInst(DynamicMethodBranchInst *i){
   LoweredBB &hasMethodBB = getLoweredBB(i->getHasMethodBB());
   LoweredBB &noMethodBB = getLoweredBB(i->getNoMethodBB());
 
-  // Emit the swift_objcRespondsToSelector() call.
+  // Emit the respondsToSelector: call.
   StringRef selector;
   llvm::SmallString<64> selectorBuffer;
   if (auto fnDecl = dyn_cast<FuncDecl>(i->getMember().getDecl()))
@@ -2760,8 +2760,24 @@ void IRGenSILFunction::visitDynamicMethodBranchInst(DynamicMethodBranchInst *i){
   if (object->getType() != IGM.ObjCPtrTy)
     object = Builder.CreateBitCast(object, IGM.ObjCPtrTy);
   llvm::Value *loadSel = emitObjCSelectorRefLoad(selector);
-  llvm::CallInst *call = Builder.CreateCall(IGM.getObjCRespondsToSelectorFn(),
-                                            {object, loadSel});
+  
+  llvm::Value *respondsToSelector
+    = emitObjCSelectorRefLoad("respondsToSelector:");
+  
+  llvm::Constant *messenger = IGM.getObjCMsgSendFn();
+  llvm::Type *argTys[] = {
+    IGM.ObjCPtrTy,
+    IGM.Int8PtrTy,
+    IGM.Int8PtrTy,
+  };
+  auto respondsToSelectorTy = llvm::FunctionType::get(IGM.Int1Ty,
+                                                      argTys,
+                                                      /*isVarArg*/ false)
+  ->getPointerTo();
+  messenger = llvm::ConstantExpr::getBitCast(messenger,
+                                             respondsToSelectorTy);
+  llvm::CallInst *call = Builder.CreateCall(messenger,
+                                        {object, respondsToSelector, loadSel});
   call->setDoesNotThrow();
 
   // FIXME: Assume (probably safely) that the hasMethodBB has only us as a
@@ -3254,8 +3270,11 @@ static bool tryDeferFixedSizeBufferInitialization(IRGenSILFunction &IGF,
     
     // We can defer to this initialization. Allocate the fixed-size buffer
     // now, but don't allocate the value inside it.
-    if (!fixedSizeBuffer.getAddress())
+    if (!fixedSizeBuffer.getAddress()) {
       fixedSizeBuffer = IGF.createFixedSizeBufferAlloca(name);
+      IGF.Builder.CreateLifetimeStart(fixedSizeBuffer,
+                                      getFixedBufferSize(IGF.IGM));
+    }
     if (containerValue)
       IGF.setLoweredAddress(containerValue, fixedSizeBuffer);
     IGF.setLoweredUnallocatedAddressInBuffer(addressValue, fixedSizeBuffer);
@@ -3613,12 +3632,17 @@ static void emitUncheckedValueBitCast(IRGenSILFunction &IGF,
                                            outTI.getFixedAlignment()),
                                   "bitcast");
   
+  auto maxSize = std::max(inTI.getFixedSize(), outTI.getFixedSize());
+  IGF.Builder.CreateLifetimeStart(inStorage, maxSize);
+  
   // Store the 'in' value.
   inTI.initialize(IGF, in, inStorage);
   // Load the 'out' value as the destination type.
   auto outStorage = IGF.Builder.CreateBitCast(inStorage,
                                         outTI.getStorageType()->getPointerTo());
   outTI.loadAsTake(IGF, outStorage, out);
+  
+  IGF.Builder.CreateLifetimeEnd(inStorage, maxSize);
   return;
 }
 

@@ -58,7 +58,7 @@ bb0(%0 : $Int32, %1 : $*Int32, %2 : $*Int32):
 // CHECK-NEXT:  (0):   %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @inout Int32) -> ()
 // CHECK-NEXT:  (0):   %2 = argument of bb0 : $*Int32
 // CHECK-NEXT:  r=0,w=0,se=0
-sil @call_store_to_int_not_aliased : $@convention(thin) (Int32, @inout Int32, @inout Int32) -> () {
+sil @call_store_to_int_not_aliased : $@convention(thin) (Int32, @inout Int32, @in Int32) -> () {
 bb0(%0 : $Int32, %1 : $*Int32, %2 : $*Int32):
   %3 = function_ref @store_to_int : $@convention(thin) (Int32, @inout Int32) -> ()
   %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @inout Int32) -> ()
@@ -167,3 +167,32 @@ bb0(%0 : $*X):
   return %2 : $()
 }
 
+struct TwoInts {
+  var i1 : Int32
+  var i2 : Int32
+}
+
+// CHECK-LABEL: @combination_of_read_and_write_effects
+// CHECK:     PAIR #1.
+// CHECK-NEXT: (0):   %4 = apply %3(%1, %2) : $@convention(thin) (@inout Int32, @inout Int32) -> ()
+// CHECK-NEXT: (1):   %0 = alloc_stack $TwoInts                       // users: %1, %2, %5
+// CHECK-NEXT: r=1,w=1,se=1
+sil @combination_of_read_and_write_effects : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $TwoInts
+  %1 = struct_element_addr %0#1 : $*TwoInts, #TwoInts.i1
+  %2 = struct_element_addr %0#1 : $*TwoInts, #TwoInts.i2
+  %3 = function_ref @copy_ints : $@convention(thin) (@inout Int32, @inout Int32) -> ()
+  apply %3 (%1, %2) : $@convention(thin) (@inout Int32, @inout Int32) -> ()
+  dealloc_stack %0#0 : $*@local_storage TwoInts
+  %r = tuple()
+  return %r : $()
+}
+
+sil @copy_ints : $@convention(thin) (@inout Int32, @inout Int32) -> () {
+bb0(%0 : $*Int32, %1 : $*Int32):
+  %2 = load %0 : $*Int32
+  store %2 to %1 : $*Int32
+  %r = tuple()
+  return %r : $()
+}

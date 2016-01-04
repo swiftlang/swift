@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -241,7 +241,7 @@ ApplyInst *ApplyInst::create(SILDebugLocation *Loc, SILValue Callee,
 bool swift::doesApplyCalleeHaveSemantics(SILValue callee, StringRef semantics) {
   if (auto *FRI = dyn_cast<FunctionRefInst>(callee))
     if (auto *F = FRI->getReferencedFunction())
-      return F->hasSemanticsString(semantics);
+      return F->hasSemanticsAttr(semantics);
   return false;
 }
 
@@ -951,7 +951,7 @@ SelectValueInst::create(SILDebugLocation *Loc, SILValue Operand, SILType Type,
                         SILFunction &F) {
   // Allocate enough room for the instruction with tail-allocated data for all
   // the case values and the SILSuccessor arrays. There are `CaseBBs.size()`
-  // SILValuues and `CaseBBs.size() + (DefaultBB ? 1 : 0)` successors.
+  // SILValues and `CaseBBs.size() + (DefaultBB ? 1 : 0)` successors.
   SmallVector<SILValue, 8> CaseValuesAndResults;
   for (auto pair : CaseValues) {
     CaseValuesAndResults.push_back(pair.first);

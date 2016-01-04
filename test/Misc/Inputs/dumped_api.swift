@@ -14,7 +14,7 @@ public class _AnyIteratorBase {
 ///
 ///     struct AnySequence<S: Sequence>
 ///     func anyIterator<I: IteratorProtocol>(base: I) -> AnyIterator<I.Element>
-///     func anyIterator<T>(nextImplementation: ()->T?) -> AnyIterator<T>
+///     func anyIterator<T>(nextImplementation: () -> T?) -> AnyIterator<T>
 public class AnyIterator<T> : _AnyIteratorBase, IteratorProtocol {
   /// Initialize the instance.  May only be called from a subclass
   /// initializer.

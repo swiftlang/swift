@@ -98,6 +98,8 @@ bb0(%0 : $Optional<P>):
 // CHECK-NEXT: call void @swift_unknownWeakInit([[WEAK]]* [[T0]], [[UNKNOWN]]* [[TMPOBJ:%.*]])
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }, { [[WEAK]], i8** }* [[X]], i32 0, i32 0
 // CHECK-NEXT: call void @swift_unknownWeakDestroy([[WEAK]]* [[T0]])
+// CHECK-NEXT: bitcast
+// CHECK-NEXT: llvm.lifetime.end
 // CHECK-NEXT: ret void
 
 // Value witnesses for A:

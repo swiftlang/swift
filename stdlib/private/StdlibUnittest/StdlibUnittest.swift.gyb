@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -87,7 +87,7 @@ public struct SourceLocStack {
 }
 
 %{
-  TRACE = '''@autoclosure _ message: ()->String = "",
+  TRACE = '''@autoclosure _ message: () -> String = "",
     showFrame: Bool = true,
     stackTrace: SourceLocStack = SourceLocStack(),  
     file: String = __FILE__, line: UInt = __LINE__'''
@@ -166,7 +166,7 @@ public func expectationFailure(
 }
 
 public func expectEqual<T>(
-  expected: T, _ actual: T, ${TRACE}, sameValue equal: (T,T)->Bool
+  expected: T, _ actual: T, ${TRACE}, sameValue equal: (T,T) -> Bool
 ) {
   if !equal(expected, actual) {
     expectationFailure(
@@ -195,7 +195,7 @@ public func expectOptionalEqual<T : Equatable>(
 }
 
 public func expectOptionalEqual<T>(
-  expected: T, _ actual: T?, ${TRACE}, sameValue equal: (T,T)->Bool
+  expected: T, _ actual: T?, ${TRACE}, sameValue equal: (T,T) -> Bool
 ) {
   if (actual == nil) || !equal(expected, actual!) {
     expectationFailure(
@@ -477,15 +477,17 @@ struct _ParentProcess {
 
   internal var _runTestsInProcess: Bool
   internal var _filter: String?
+  internal var _args: [String]
 
-  init(runTestsInProcess: Bool, filter: String?) {
+  init(runTestsInProcess: Bool, args: [String], filter: String?) {
     self._runTestsInProcess = runTestsInProcess
     self._filter = filter
+    self._args = args
   }
 
   mutating func _spawnChild() {
-    let (pid, childStdinFD, childStdoutFD, childStderrFD) =
-      spawnChild([ "--stdlib-unittest-run-child" ])
+    let params = [ "--stdlib-unittest-run-child" ] + _args
+    let (pid, childStdinFD, childStdoutFD, childStderrFD) = spawnChild(params)
     _pid = pid
     _childStdin = _FDOutputStream(fd: childStdinFD)
     _childStdout = _FDInputStream(fd: childStdoutFD)
@@ -782,7 +784,9 @@ public func runAllTests() {
   } else {
     var runTestsInProcess: Bool = false
     var filter: String? = nil
+    var args = [String]()
     var i = 0
+    i += 1 // Skip the name of the executable.
     while i < Process.arguments.length {
       let arg = Process.arguments[i]
       if arg == "--stdlib-unittest-in-process" {
@@ -808,12 +812,14 @@ public func runAllTests() {
         return
       }
 
-      // FIXME: skipping unrecognized parameters.
+      // Pass through unparsed arguments to the child process.
+      args.append(Process.arguments[i])
+
       i += 1
     }
 
     var parent = _ParentProcess(
-      runTestsInProcess: runTestsInProcess, filter: filter)
+      runTestsInProcess: runTestsInProcess, args: args, filter: filter)
     parent.run()
   }
 }
@@ -1476,7 +1482,7 @@ public func checkHashable<
   Instances: Collection where Instances.Iterator.Element : Hashable
 >(
   instances: Instances,
-  equalityOracle: (Instances.Index, Instances.Index)->Bool,
+  equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   ${TRACE}
 ) {
   checkEquatable(instances, oracle: equalityOracle, ${trace})
@@ -1515,7 +1521,7 @@ public func check${inc.capitalize()}rementable<
   where Instances.Iterator.Element : ${protocol}
 >(
   instances: Instances,
-  equalityOracle: (Instances.Index, Instances.Index)->Bool,
+  equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   ${end}Index: Instances.Iterator.Element, ${TRACE}
 ) {
   checkEquatable(instances, oracle: equalityOracle, ${trace})
@@ -1727,7 +1733,7 @@ internal func _checkIncrementalAdvance<
   Instances.Iterator.Element : ForwardIndex
 >(
   instances: Instances,
-  equalityOracle: (Instances.Index, Instances.Index)->Bool,
+  equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   limit: Instances.Iterator.Element,
   sign: Instances.Iterator.Element.Distance, // 1 or -1
   next: (Instances.Iterator.Element) -> Instances.Iterator.Element,
@@ -1763,7 +1769,7 @@ public func checkForwardIndex<
   Instances.Iterator.Element : ForwardIndex
 >(
   instances: Instances,
-  equalityOracle: (Instances.Index, Instances.Index)->Bool,
+  equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   endIndex: Instances.Iterator.Element, ${TRACE}
 ) {
   typealias Index = Instances.Iterator.Element
@@ -1790,8 +1796,8 @@ public func checkBidirectionalIndex<
   Instances.Iterator.Element : BidirectionalIndex
 >(
   instances: Instances,
-  equalityOracle: (Instances.Index, Instances.Index)->Bool,
-  startIndex: Instances.Iterator.Element,
+  equalityOracle: (Instances.Index, Instances.Index) -> Bool,
+  startIndex: Instances.Iterator.Element, 
   endIndex: Instances.Iterator.Element,
   ${TRACE}
 ) {
@@ -1916,7 +1922,7 @@ public func checkSequence<
 
   // Check that _initializeTo does the right thing if we can do so
   // without destroying the sequence.
-  sequence._preprocessingPass { (sequence)->Void in 
+  sequence._preprocessingPass { (sequence) -> Void in 
     var length = 0
     for _ in sequence { length += 1 }
     let buf = UnsafeMutablePointer<S.Iterator.Element>(allocatingCapacity: length)
@@ -2203,8 +2209,8 @@ public func checkRangeReplaceable<
   C.Iterator.Element : Equatable,
   C.Iterator.Element == N.Iterator.Element
 >(
-  makeCollection: ()->C,
-  _ makeNewValues: (Int)->N
+  makeCollection: () -> C,
+  _ makeNewValues: (Int) -> N
 ) {
   typealias A = C
 
@@ -2290,7 +2296,7 @@ public func expectEqualSequence<
   where
   Expected.Iterator.Element == Actual.Iterator.Element
 >(expected: Expected, _ actual: Actual, ${TRACE},
-  sameValue: (Expected.Iterator.Element, Expected.Iterator.Element)->Bool) {
+  sameValue: (Expected.Iterator.Element, Expected.Iterator.Element) -> Bool) {
 
   if !expected.elementsEqual(actual, isEquivalent: sameValue) {
     expectationFailure("expected elements: \"\(expected)\"\n"

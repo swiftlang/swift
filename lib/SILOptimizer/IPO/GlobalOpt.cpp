@@ -1,8 +1,8 @@
-//===---------- SILGlobalOpt.cpp - Optimize global initializers -----------===//
+//===--- GlobalOpt.cpp - Optimize global initializers ---------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -195,15 +195,13 @@ static void removeToken(SILValue Op) {
 static SILFunction *genGetterFromInit(StoreInst *Store,
                                       SILGlobalVariable *SILG) {
   auto *varDecl = SILG->getDecl();
-  llvm::SmallString<20> getterBuffer;
-  llvm::raw_svector_ostream getterStream(getterBuffer);
-  {
-  Mangle::Mangler getterMangler(getterStream);
+
+  Mangle::Mangler getterMangler;
   getterMangler.mangleGlobalGetterEntity(varDecl);
-  }
+  auto getterName = getterMangler.finalize();
 
   // Check if a getter was generated already.
-  if (auto *F = Store->getModule().lookUpFunction(getterStream.str()))
+  if (auto *F = Store->getModule().lookUpFunction(getterName))
     return F;
 
   // Find the code that performs the initialization first.
@@ -233,7 +231,7 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
       ParameterConvention::Direct_Owned, { }, ResultInfo, None,
       Store->getModule().getASTContext());
   auto *GetterF = Store->getModule().getOrCreateFunction(Store->getLoc(),
-      getterStream.str(), SILLinkage::PrivateExternal, LoweredType,
+      getterName, SILLinkage::PrivateExternal, LoweredType,
       IsBare_t::IsBare, IsTransparent_t::IsNotTransparent,
       IsFragile_t::IsFragile);
   GetterF->setDebugScope(Store->getFunction()->getDebugScope());
@@ -345,10 +343,10 @@ static bool isAvailabilityCheck(SILBasicBlock *BB) {
     return false;
   
   SILFunction *F = AI->getCalleeFunction();
-  if (!F || !F->hasDefinedSemantics())
+  if (!F || !F->hasSemanticsAttrs())
     return false;
-  
-  return F->getSemanticsString().startswith("availability");
+
+  return F->hasSemanticsAttrsThatStartsWith("availability");
 }
 
 /// Returns true if there are any availability checks along the dominator tree
@@ -459,15 +457,13 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
 /// Create a getter function from the initializer function.
 static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
   // Generate a getter from the global init function without side-effects.
-  llvm::SmallString<20> getterBuffer;
-  llvm::raw_svector_ostream getterStream(getterBuffer);
-  {
-  Mangle::Mangler getterMangler(getterStream);
+
+  Mangle::Mangler getterMangler;
   getterMangler.mangleGlobalGetterEntity(varDecl);
-  }
+  auto getterName = getterMangler.finalize();
 
   // Check if a getter was generated already.
-  if (auto *F = InitF->getModule().lookUpFunction(getterStream.str()))
+  if (auto *F = InitF->getModule().lookUpFunction(getterName))
     return F;
 
   auto refType = varDecl->getType().getCanonicalTypeOrNull();
@@ -479,7 +475,7 @@ static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
       ParameterConvention::Direct_Owned, { }, ResultInfo, None,
       InitF->getASTContext());
   auto *GetterF = InitF->getModule().getOrCreateFunction(InitF->getLocation(),
-      getterStream.str(), SILLinkage::PrivateExternal, LoweredType,
+     getterName, SILLinkage::PrivateExternal, LoweredType,
       IsBare_t::IsBare, IsTransparent_t::IsNotTransparent,
       IsFragile_t::IsFragile);
 

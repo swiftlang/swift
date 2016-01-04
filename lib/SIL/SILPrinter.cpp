@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -211,6 +211,10 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
   case DeclContextKind::AbstractFunctionDecl:
     // FIXME
     Buffer << "<abstract function>";
+    return;
+  case DeclContextKind::SubscriptDecl:
+    // FIXME
+    Buffer << "<subscript>";
     return;
   }
   llvm_unreachable("bad decl context");
@@ -1087,7 +1091,7 @@ public:
     // elements.
     bool SimpleType = true;
     for (auto &Elt : TI->getType().castTo<TupleType>()->getElements()) {
-      if (Elt.hasName() || Elt.isVararg() || Elt.hasInit()) {
+      if (Elt.hasName() || Elt.isVararg() || Elt.hasDefaultArg()) {
         SimpleType = false;
         break;
       }
@@ -1604,8 +1608,8 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose,
   if (getEffectsKind() == EffectsKind::ReadWrite)
     OS << "[readwrite] ";
 
-  if (!getSemanticsAttr().empty())
-    OS << "[_semantics \"" << getSemanticsAttr() << "\"] ";
+  for (auto &Attr : getSemanticsAttrs())
+    OS << "[_semantics \"" << Attr << "\"] ";
 
   printName(OS);
   OS << " : $";

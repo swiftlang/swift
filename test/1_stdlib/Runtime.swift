@@ -238,11 +238,11 @@ Runtime.test("_isClassOrObjCExistential") {
   expectFalse(_isClassOrObjCExistential(SwiftObjectCanaryStruct.self))
   expectFalse(_isClassOrObjCExistential_Opaque(SwiftObjectCanaryStruct.self))
 
-  typealias SwiftClosure = ()->()
+  typealias SwiftClosure = () -> ()
   expectFalse(_isClassOrObjCExistential(SwiftClosure.self))
   expectFalse(_isClassOrObjCExistential_Opaque(SwiftClosure.self))
 
-  typealias ObjCClosure = @convention(block) ()->()
+  typealias ObjCClosure = @convention(block) () -> ()
   expectTrue(_isClassOrObjCExistential(ObjCClosure.self))
   expectTrue(_isClassOrObjCExistential_Opaque(ObjCClosure.self))
 
@@ -272,10 +272,10 @@ Runtime.test("_canBeClass") {
   expectEqual(1, _canBeClass(SwiftObjectCanary.self))
   expectEqual(0, _canBeClass(SwiftObjectCanaryStruct.self))
 
-  typealias SwiftClosure = ()->()
+  typealias SwiftClosure = () -> ()
   expectEqual(0, _canBeClass(SwiftClosure.self))
 
-  typealias ObjCClosure = @convention(block) ()->()
+  typealias ObjCClosure = @convention(block) () -> ()
   expectEqual(1, _canBeClass(ObjCClosure.self))
 
   expectEqual(1, _canBeClass(CFArray.self))
@@ -383,7 +383,7 @@ Runtime.test("isBridgedVerbatimToObjectiveC") {
   expectTrue(_isBridgedVerbatimToObjectiveC(BridgedVerbatimRefType))
 }
 
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 // The protocol should be defined in the standard library, otherwise the cast
 // does not work.

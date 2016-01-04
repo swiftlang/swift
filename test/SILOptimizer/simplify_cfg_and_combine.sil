@@ -7,10 +7,10 @@ sil_stage canonical
 import Builtin
 import Swift
 
-sil @external_f1 : $@convention(thin) ()->()
-sil @external_f2 : $@convention(thin) ()->()
-sil @external_f3 : $@convention(thin) ()->()
-sil @external_f4 : $@convention(thin) ()->()
+sil @external_f1 : $@convention(thin) () -> ()
+sil @external_f2 : $@convention(thin) () -> ()
+sil @external_f3 : $@convention(thin) () -> ()
+sil @external_f4 : $@convention(thin) () -> ()
 
 // CHECK-LABEL: sil @select_enum_dominance_simplification : $@convention(thin) (Optional<Int32>) -> () {
 // CHECK-NOT: external_f2
@@ -34,23 +34,23 @@ bb2:
   cond_br %3, bb5, bb6
 
 bb3:
-  %f1 = function_ref @external_f1 : $@convention(thin) ()->()
-  apply %f1() : $@convention(thin) ()->()
+  %f1 = function_ref @external_f1 : $@convention(thin) () -> ()
+  apply %f1() : $@convention(thin) () -> ()
   br bb7
 
 bb4:
-  %f2 = function_ref @external_f2 : $@convention(thin) ()->()
-  apply %f2() : $@convention(thin) ()->()
+  %f2 = function_ref @external_f2 : $@convention(thin) () -> ()
+  apply %f2() : $@convention(thin) () -> ()
   br bb7
 
 bb5:
-  %f3 = function_ref @external_f3 : $@convention(thin) ()->()
-  apply %f3() : $@convention(thin) ()->()
+  %f3 = function_ref @external_f3 : $@convention(thin) () -> ()
+  apply %f3() : $@convention(thin) () -> ()
   br bb7
 
 bb6:
-  %f4 = function_ref @external_f4 : $@convention(thin) ()->()
-  apply %f4() : $@convention(thin) ()->()
+  %f4 = function_ref @external_f4 : $@convention(thin) () -> ()
+  apply %f4() : $@convention(thin) () -> ()
   br bb7
 
 bb7:
@@ -74,18 +74,18 @@ bb1:
   cond_br %c, bb2, bb3
 
 bb2:
-  %f1 = function_ref @external_f1 : $@convention(thin) ()->()
-  apply %f1() : $@convention(thin) ()->()
+  %f1 = function_ref @external_f1 : $@convention(thin) () -> ()
+  apply %f1() : $@convention(thin) () -> ()
   br bb5
 
 bb3:
-  %f2 = function_ref @external_f2 : $@convention(thin) ()->()
-  apply %f2() : $@convention(thin) ()->()
+  %f2 = function_ref @external_f2 : $@convention(thin) () -> ()
+  apply %f2() : $@convention(thin) () -> ()
   br bb5
 
 bb4:
-  %f3 = function_ref @external_f3 : $@convention(thin) ()->()
-  apply %f3() : $@convention(thin) ()->()
+  %f3 = function_ref @external_f3 : $@convention(thin) () -> ()
+  apply %f3() : $@convention(thin) () -> ()
   br bb5
 
 bb5:

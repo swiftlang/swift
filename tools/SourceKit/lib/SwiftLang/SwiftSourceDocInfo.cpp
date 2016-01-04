@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -99,9 +99,9 @@ void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   }
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // SwiftLangSupport::getCursorInfo
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 static StringRef getSourceToken(unsigned Offset,
                                 ImmutableTextSnapshotRef Snap) {
@@ -391,8 +391,8 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   Info.OverrideUSRs = OverUSRs;
   Info.AnnotatedRelatedDeclarations = AnnotatedRelatedDecls;
   Info.IsSystem = IsSystem;
-  Info.TypeInteface = ASTPrinter::printTypeInterface(Ty, VD->getDeclContext(),
-                                                     TypeInterface) ?
+  Info.TypeInterface = ASTPrinter::printTypeInterface(Ty, VD->getDeclContext(),
+                                                      TypeInterface) ?
     StringRef(TypeInterface) : StringRef();
   Receiver(Info);
   return false;
@@ -562,7 +562,7 @@ void SwiftLangSupport::getCursorInfo(
     if (trace::enabled()) {
       trace::SwiftInvocation SwiftArgs;
       trace::initTraceInfo(SwiftArgs, InputFile, Args);
-      // Do we nedd to record any files? If yes -- which ones?
+      // Do we need to record any files? If yes -- which ones?
       trace::StringPairs OpArgs {
         std::make_pair("DocumentName", IFaceGenRef->getDocumentName()),
         std::make_pair("ModuleOrHeaderName", IFaceGenRef->getModuleOrHeaderName()),
@@ -605,9 +605,9 @@ void SwiftLangSupport::getCursorInfo(
                 Receiver);
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // SwiftLangSupport::findUSRRange
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 llvm::Optional<std::pair<unsigned, unsigned>>
 SwiftLangSupport::findUSRRange(StringRef DocumentName, StringRef USR) {
@@ -619,9 +619,9 @@ SwiftLangSupport::findUSRRange(StringRef DocumentName, StringRef USR) {
   return None;
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // SwiftLangSupport::findRelatedIdentifiersInFile
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 namespace {
 class RelatedIdScanner : public ide::SourceEntityWalker {

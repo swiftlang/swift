@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -629,7 +629,7 @@ bool LifetimeChecker::shouldEmitError(SILInstruction *Inst) {
 /// initializer.
 void LifetimeChecker::noteUninitializedMembers(const DIMemoryUse &Use) {
   assert(TheMemory.isAnyInitSelf() && !TheMemory.isDelegatingInit() &&
-         "Not an designated initializer");
+         "Not a designated initializer");
 
   // Root protocol initializers (ones that reassign to self, not delegating to
   // self.init) have no members to initialize and self itself has already been
@@ -1226,7 +1226,7 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
     }
   }
 
-  // If this is an apply instruction and we're in an class initializer, we're
+  // If this is an apply instruction and we're in a class initializer, we're
   // calling a method on self.
   if (isa<ApplyInst>(Inst) && TheMemory.isClassInitSelf()) {
     // If this is a method application, produce a nice, specific, error.

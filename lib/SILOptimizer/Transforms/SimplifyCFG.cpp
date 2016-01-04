@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -420,7 +420,7 @@ static bool isKnownEdgeValue(TermInst *Term, SILBasicBlock *SuccBB,
   return SuccBB->getSinglePredecessor() != nullptr;
 }
 
-/// Create a enum element by extracting the operand of a switch_enum.
+/// Create an enum element by extracting the operand of a switch_enum.
 static SILInstruction *createEnumElement(SILBuilder &Builder,
                                          SwitchEnumInst *SEI,
                                          EnumElementDecl *EnumElement) {
@@ -454,7 +454,7 @@ static SILInstruction *createValueForEdge(SILInstruction *UserInst,
   return createEnumElement(Builder, SEI, Case.get());
 }
 
-/// Peform dominator based value simplifications and jump threading on all users
+/// Perform dominator based value simplifications and jump threading on all users
 /// of the operand of 'DominatingBB's terminator.
 static bool tryDominatorBasedSimplifications(
     SILBasicBlock *DominatingBB, DominanceInfo *DT,
@@ -1197,7 +1197,7 @@ static SILValue skipInvert(SILValue Cond, bool &Inverted,
 
 /// \brief Returns the first cond_fail if it is the first side-effect
 /// instruction in this block.
-static CondFailInst *getFistCondFail(SILBasicBlock *BB) {
+static CondFailInst *getFirstCondFail(SILBasicBlock *BB) {
   auto It = BB->begin();
   CondFailInst *CondFail = nullptr;
   // Skip instructions that don't have side-effects.
@@ -1216,7 +1216,7 @@ static CondFailInst *getFistCondFail(SILBasicBlock *BB) {
 /// If \p Inverted is true, \p BB is on the false-edge of the cond_br.
 static CondFailInst *getUnConditionalFail(SILBasicBlock *BB, SILValue Cond,
                                           bool Inverted) {
-  CondFailInst *CondFail = getFistCondFail(BB);
+  CondFailInst *CondFail = getFirstCondFail(BB);
   if (!CondFail)
     return nullptr;
   
@@ -1557,7 +1557,7 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
 }
 
 /// simplifySwitchEnumBlock - Simplify a basic block that ends with a
-/// switch_enum instruction that gets its operand from a an enum
+/// switch_enum instruction that gets its operand from an enum
 /// instruction.
 bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
   auto *EI = dyn_cast<EnumInst>(SEI->getOperand());
@@ -1600,7 +1600,7 @@ bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
 }
 
 /// simplifySwitchValueBlock - Simplify a basic block that ends with a
-/// switch_value instruction that gets its operand from a an integer
+/// switch_value instruction that gets its operand from an integer
 /// literal instruction.
 bool SimplifyCFG::simplifySwitchValueBlock(SwitchValueInst *SVI) {
   auto *ThisBB = SVI->getParent();
@@ -2024,7 +2024,7 @@ bool RemoveUnreachable::run() {
 ///
 static bool tryMoveCondFailToPreds(SILBasicBlock *BB) {
   
-  CondFailInst *CFI = getFistCondFail(BB);
+  CondFailInst *CFI = getFirstCondFail(BB);
   if (!CFI)
     return false;
   
@@ -2190,7 +2190,7 @@ static SILBasicBlock *isObjCMethodCallBlock(SILBasicBlock &Block) {
     return nullptr;
 
   for (auto &Inst : Block) {
-    // Look for a objc method call.
+    // Look for an objc method call.
     auto *Apply = dyn_cast<ApplyInst>(&Inst);
     if (!Apply)
       continue;
@@ -2590,7 +2590,7 @@ static bool splitBBArguments(SILFunction &Fn) {
   bool Changed = false;
   std::vector<SILArgument *> Worklist;
 
-  // We know that we have atleast one BB, so this is safe since in such a case
+  // We know that we have at least one BB, so this is safe since in such a case
   // std::next(Fn->begin()) == Fn->end(), the exit case of iteration on a range.
   for (auto &BB : make_range(std::next(Fn.begin()), Fn.end())) {
     for (auto *Arg : BB.getBBArgs()) {
@@ -3484,4 +3484,3 @@ SILTransform *swift::createSROABBArgs() { return new SROABBArgs(); }
 SILTransform *swift::createSimplifyBBArgs() {
   return new SimplifyBBArgs();
 }
-

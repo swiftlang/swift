@@ -1,8 +1,8 @@
-//===- SILCodeMotion.cpp - Code Motion Optimizations ----------------------===//
+//===--- SILCodeMotion.cpp - Code Motion Optimizations --------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -485,7 +485,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
 
 /// Try to sink literals that are passed to arguments that are coming from
 /// multiple predecessors.
-/// Notice that unline other sinking methods in this file we do allow sinking
+/// Notice that unlike other sinking methods in this file we do allow sinking
 /// of literals from blocks with multiple successors.
 static bool sinkLiteralsFromPredecessors(SILBasicBlock *BB) {
   if (BB->pred_empty() || BB->getSinglePredecessor())
@@ -849,7 +849,7 @@ static bool tryToSinkRefCountInst(SILBasicBlock::iterator T,
 
   // Ok, it is legal for us to sink this increment to our successors. Create a
   // copy of this instruction in each one of our successors unless they are
-  // ignoreable trap blocks.
+  // ignorable trap blocks.
   DEBUG(llvm::dbgs() << "    Sinking " << *I);
   SILBuilderWithScope Builder(T, &*I);
   for (auto &Succ : T->getParent()->getSuccessors()) {

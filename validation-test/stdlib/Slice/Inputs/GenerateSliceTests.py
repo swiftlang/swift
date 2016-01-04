@@ -19,8 +19,8 @@ for traversal, base_kind, mutable in itertools.product(
         ]:
             Base = '%s%s%sCollection' % (base_kind, traversal, 'Mutable' if mutable else '')
             testFilename = Wrapper + '_Of_' + Base + '_' + name + '.swift'
-            testFile = open(testFilename + '.gyb', 'w')
-            testFile.write("""
+            with open(testFilename + '.gyb', 'w') as testFile:
+                testFile.write("""
 //// Automatically Generated From validation-test/stdlib/Inputs/GenerateSliceTests.py
 //////// Do Not Edit Directly!
 // -*- swift -*-
@@ -69,9 +69,3 @@ runAllTests()
     prefix=prefix,
     suffix=suffix
 ))
-            testFile.close()
-
-
-
-
-

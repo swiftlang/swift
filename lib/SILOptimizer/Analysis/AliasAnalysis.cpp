@@ -1,8 +1,8 @@
-//===-------------- AliasAnalysis.cpp - SIL Alias Analysis ----------------===//
+//===--- AliasAnalysis.cpp - SIL Alias Analysis ---------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -112,25 +112,19 @@ static bool isFunctionArgument(SILValue V) {
   return Arg->isFunctionArg();
 }
 
-/// A no alias argument is an argument that is an address type of the entry
-/// basic block of a function.
-static bool isNoAliasArgument(SILValue V) {
-  return isFunctionArgument(V) && V.getType().isAddress();
-}
-
 /// Return true if V is an object that at compile time can be uniquely
 /// identified.
 static bool isIdentifiableObject(SILValue V) {
   if (isa<AllocationInst>(V) || isa<LiteralInst>(V))
     return true;
-  if (isNoAliasArgument(V))
+  if (isNotAliasingArgument(V))
     return true;
   return false;
 }
 
 /// Return true if V1 and V2 are distinct objects that can be uniquely
 /// identified at compile time.
-static bool areDistinctIdentifyableObjects(SILValue V1, SILValue V2) {
+static bool areDistinctIdentifiableObjects(SILValue V1, SILValue V2) {
   // Do both values refer to the same global variable?
   if (auto *GA1 = dyn_cast<GlobalAddrInst>(V1)) {
     if (auto *GA2 = dyn_cast<GlobalAddrInst>(V2)) {
@@ -173,7 +167,8 @@ static bool isLocalLiteral(SILValue V) {
 /// Is this a value that can be unambiguously identified as being defined at the
 /// function level.
 static bool isIdentifiedFunctionLocal(SILValue V) {
-  return isa<AllocationInst>(*V) || isNoAliasArgument(V) || isLocalLiteral(V);
+  return isa<AllocationInst>(*V) || isNotAliasingArgument(V) ||
+         isLocalLiteral(V);
 }
 
 /// Returns true if we can prove that the two input SILValues which do not equal
@@ -183,7 +178,7 @@ static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
 
   // If O1 and O2 do not equal and they are both values that can be statically
   // and uniquely identified, they cannot alias.
-  if (areDistinctIdentifyableObjects(O1, O2)) {
+  if (areDistinctIdentifiableObjects(O1, O2)) {
     DEBUG(llvm::dbgs() << "            Found two unequal identified "
           "objects.\n");
     return true;
@@ -540,6 +535,9 @@ AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2,
   if (AliasCache.size() > AliasAnalysisMaxCacheSize) {
     AliasCache.clear();
     AliasValueBaseToIndex.clear();
+
+    // Key is no longer valid as we cleared the AliasValueBaseToIndex.
+    Key = toAliasKey(V1, V2, TBAAType1, TBAAType2);
   }
 
   // Calculate the aliasing result and store it in the cache.
@@ -601,7 +599,7 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
   // uses the connection graph to check if the pointers may point to the same
   // content.
   // Note that escape analysis must work with the original pointers and not the
-  // underlying objects because it treats projecetions differently.
+  // underlying objects because it treats projections differently.
   if (!EA->canPointToSameMemory(V1, V2)) {
     DEBUG(llvm::dbgs() << "            Found not-aliased objects based on"
                                       "escape analysis\n");

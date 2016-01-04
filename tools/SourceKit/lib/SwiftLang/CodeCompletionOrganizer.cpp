@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -75,9 +75,9 @@ struct CodeCompletion::Group : public Item {
   }
 };
 
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 // extendCompletions
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 
 std::vector<Completion *> SourceKit::CodeCompletion::extendCompletions(
     ArrayRef<SwiftResult *> swiftResults, CompletionSink &sink,
@@ -181,9 +181,9 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
   return changed;
 }
 
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 // CodeCompletionOrganizer::Impl declaration
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 
 class CodeCompletionOrganizer::Impl {
   std::unique_ptr<Group> rootGroup;
@@ -243,9 +243,9 @@ public:
   }
 };
 
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 // CodeCompletionOrganizer implementation
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 
 CodeCompletionOrganizer::CodeCompletionOrganizer(const Options &options,
                                                  CompletionKind kind)
@@ -288,9 +288,9 @@ CodeCompletionViewRef CodeCompletionOrganizer::takeResultsView() {
   return impl.takeView();
 }
 
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 // ImportDepth
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 
 ImportDepth::ImportDepth(ASTContext &context, CompilerInvocation &invocation) {
   llvm::DenseSet<Module *> seen;
@@ -352,9 +352,9 @@ ImportDepth::ImportDepth(ASTContext &context, CompilerInvocation &invocation) {
   }
 }
 
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 // CodeCompletionOrganizer::Impl utilities
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 
 static StringRef copyString(llvm::BumpPtrAllocator &allocator, StringRef str) {
   char *newStr = allocator.Allocate<char>(str.size());
@@ -377,9 +377,9 @@ static std::unique_ptr<Result> make_result(Completion *result) {
 }
 
 
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 // CodeCompletionOrganizer::Impl implementation
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 
 CodeCompletionOrganizer::Impl::Impl(CompletionKind kind)
     : completionKind(kind) {
@@ -789,9 +789,9 @@ void CodeCompletionOrganizer::Impl::groupStemsRecursive(
   group->contents = std::move(newContents);
 }
 
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 // CodeCompletionView
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 
 static bool walkRecursive(CodeCompletionView::Walker &walker, const Item *item) {
   if (auto *result = dyn_cast<Result>(item))
@@ -843,9 +843,9 @@ bool LimitedResultView::walk(CodeCompletionView::Walker &walker) const {
   return true;
 }
 
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 // CompletionBuilder
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 
 void CompletionBuilder::getFilterName(CodeCompletionString *str,
                                       raw_ostream &OS) {
@@ -994,9 +994,9 @@ Completion *CompletionBuilder::finish() {
   return result;
 }
 
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 // NameStyle
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 
 NameStyle::NameStyle(StringRef name)
     : leadingUnderscores(0), trailingUnderscores(0) {

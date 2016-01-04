@@ -16,7 +16,7 @@ import Swift
 // CHECK-NEXT: %0 = argument of bb0
 // CHECK-NEXT: %1 = argument of bb0
 // CHECK-NEXT: NoAlias
-sil @address_args_dont_alias_in_first_bb : $@convention(thin) (@inout Builtin.NativeObject, @inout Builtin.NativeObject) -> () {
+sil @address_args_dont_alias_in_first_bb : $@convention(thin) (@in Builtin.NativeObject, @in Builtin.NativeObject) -> () {
 bb0(%0 : $*Builtin.NativeObject, %1 : $*Builtin.NativeObject):
   %2 = tuple()
   return %2 : $()
@@ -35,6 +35,19 @@ bb0(%0 : $*Builtin.NativeObject):
 bb1(%1 : $*Builtin.NativeObject, %2 : $*Builtin.NativeObject):
   %3 = tuple()
   return %3 : $()
+}
+
+// Assume that inout arguments alias to preserve memory safety.
+//
+// CHECK-LABEL: @inout_args_may_alias
+// CHECK: PAIR #1.
+// CHECK-NEXT: %0 = argument of bb0
+// CHECK-NEXT: %1 = argument of bb0
+// CHECK-NEXT: MayAlias
+sil @inout_args_may_alias: $@convention(thin) (@inout Builtin.NativeObject, @inout Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : $*Builtin.NativeObject):
+  %2 = tuple()
+  return %2 : $()
 }
 
 struct StructLvl2 {
@@ -200,7 +213,7 @@ sil @different_alloc_stack_dont_alias : $@convention(thin) () -> () {
 // CHECK-NEXT: (0):   %2 = argument of bb0 : $*Builtin.NativeObject
 // CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.NativeObject
 // CHECK-NEXT: NoAlias
-sil @args_dont_alias_with_identified_function_locals : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject, @inout Builtin.NativeObject) -> () {
+sil @args_dont_alias_with_identified_function_locals : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject, @in Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject, %2 : $*Builtin.NativeObject):
   %3 = alloc_stack $Builtin.NativeObject
   dealloc_stack %3#0 : $*@local_storage Builtin.NativeObject

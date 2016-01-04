@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -28,9 +28,9 @@
 using namespace swift;
 using namespace Lowering;
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // SILGenFunction Class implementation
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F)
   : SGM(SGM), F(F),
@@ -55,9 +55,9 @@ SILGenFunction::~SILGenFunction() {
   freeWritebackStack();
 }
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Function emission
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 // Get the __FUNCTION__ name for a declaration.
 DeclName SILGenModule::getMagicFunctionName(DeclContext *dc) {
@@ -220,11 +220,27 @@ ManagedValue SILGenFunction::emitFunctionRef(SILLocation loc,
 
 void SILGenFunction::emitCaptures(SILLocation loc,
                                   AnyFunctionRef TheClosure,
+                                  CaptureEmission purpose,
                                   SmallVectorImpl<ManagedValue> &capturedArgs) {
   auto captureInfo = SGM.Types.getLoweredLocalCaptures(TheClosure);
   // For boxed captures, we need to mark the contained variables as having
   // escaped for DI diagnostics.
   SmallVector<SILValue, 2> escapesToMark;
+  
+  // Partial applications take ownership of the context parameters, so we'll
+  // need to pass ownership rather than merely guaranteeing parameters.
+  bool canGuarantee;
+  switch (purpose) {
+  case CaptureEmission::PartialApplication:
+    canGuarantee = false;
+    break;
+  case CaptureEmission::ImmediateApplication:
+    canGuarantee = true;
+    break;
+  }
+  // TODO: Or we always retain them when guaranteed contexts aren't enabled.
+  if (!SGM.M.getOptions().EnableGuaranteedClosureContexts)
+    canGuarantee = false;
   
   for (auto capture : captureInfo.getCaptures()) {
     auto *vd = capture.getDecl();
@@ -237,11 +253,18 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       // let declarations.
       auto Entry = VarLocs[vd];
 
-      // Non-address-only constants are passed at +1.
       auto &tl = getTypeLowering(vd->getType()->getReferenceStorageReferent());
       SILValue Val = Entry.value;
 
       if (!Val.getType().isAddress()) {
+        // Our 'let' binding can guarantee the lifetime for the callee,
+        // if we don't need to do anything more to it.
+        if (canGuarantee && !vd->getType()->is<ReferenceStorageType>()) {
+          auto guaranteed = ManagedValue::forUnmanaged(Val);
+          capturedArgs.push_back(guaranteed);
+          break;
+        }
+      
         // Just retain a by-val let.
         B.emitRetainValueOperation(loc, Val);
       } else {
@@ -250,20 +273,15 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         Val = emitLoad(loc, Val, tl, SGFContext(), IsNotTake).forward(*this);
       }
 
-      // Use an RValue to explode Val if it is a tuple.
-      RValue RV(*this, loc, vd->getType()->getCanonicalType(),
-                ManagedValue::forUnmanaged(Val));
-
       // If we're capturing an unowned pointer by value, we will have just
       // loaded it into a normal retained class pointer, but we capture it as
       // an unowned pointer.  Convert back now.
       if (vd->getType()->is<ReferenceStorageType>()) {
         auto type = getTypeLowering(vd->getType()).getLoweredType();
-        auto val = std::move(RV).forwardAsSingleStorageValue(*this, type,loc);
-        capturedArgs.push_back(emitManagedRValueWithCleanup(val));
-      } else {
-        std::move(RV).getAll(capturedArgs);
+        Val = emitConversionFromSemanticValue(loc, Val, type);
       }
+      
+      capturedArgs.push_back(emitManagedRValueWithCleanup(Val));
       break;
     }
 
@@ -286,15 +304,25 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 
       // If this is a boxed variable, we can use it directly.
       if (vl.box) {
-        B.createStrongRetain(loc, vl.box);
-        capturedArgs.push_back(emitManagedRValueWithCleanup(vl.box));
+        // We can guarantee our own box to the callee.
+        if (canGuarantee) {
+          capturedArgs.push_back(ManagedValue::forUnmanaged(vl.box));
+        } else {
+          B.createStrongRetain(loc, vl.box);
+          capturedArgs.push_back(emitManagedRValueWithCleanup(vl.box));
+        }
         escapesToMark.push_back(vl.value);
       } else {
         // Address only 'let' values are passed by box.  This isn't great, in
         // that a variable captured by multiple closures will be boxed for each
         // one.  This could be improved by doing an "isCaptured" analysis when
-        // emitting address-only let constants, and emit them into a alloc_box
+        // emitting address-only let constants, and emit them into an alloc_box
         // like a variable instead of into an alloc_stack.
+        //
+        // TODO: This might not be profitable anymore with guaranteed captures,
+        // since we could conceivably forward the copied value into the
+        // closure context and pass it down to the partially applied function
+        // in-place.
         AllocBoxInst *allocBox =
           B.createAllocBox(loc, vl.value.getType().getObjectType());
         auto boxAddress = SILValue(allocBox, 1);
@@ -353,10 +381,10 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   }
 
   SmallVector<ManagedValue, 4> capturedArgs;
-  emitCaptures(loc, TheClosure, capturedArgs);
+  emitCaptures(loc, TheClosure, CaptureEmission::PartialApplication,
+               capturedArgs);
 
-  // Currently all capture arguments are captured at +1.
-  // TODO: Ideally this would be +0.
+  // The partial application takes ownership of the context parameters.
   SmallVector<SILValue, 4> forwardedArgs;
   for (auto capture : capturedArgs)
     forwardedArgs.push_back(capture.forward(*this));
@@ -379,7 +407,7 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(fd);
 
   Type resultTy = fd->getResultType();
-  emitProlog(fd, fd->getBodyParamPatterns(), resultTy);
+  emitProlog(fd, fd->getParameterLists(), resultTy);
   prepareEpilog(resultTy, fd->isBodyThrowing(), CleanupLocation(fd));
 
   emitProfilerIncrement(fd->getBody());
@@ -391,7 +419,7 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
 void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(ace);
 
-  emitProlog(ace, ace->getParams(), ace->getResultType());
+  emitProlog(ace, ace->getParameters(), ace->getResultType());
   prepareEpilog(ace->getResultType(), ace->isBodyThrowing(),
                 CleanupLocation(ace));
   if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
@@ -670,7 +698,7 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
       --paramCount;
 
     // Forward the curried formal arguments.
-    auto forwardedPatterns = fd->getBodyParamPatterns().slice(0, paramCount);
+    auto forwardedPatterns = fd->getParameterLists().slice(0, paramCount);
     for (auto *paramPattern : reversed(forwardedPatterns))
       bindParametersForForwarding(paramPattern, curriedArgs);
 

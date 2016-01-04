@@ -1,11 +1,11 @@
 // RUN: %sourcekitd-test -req=expand-placeholder %s | FileCheck %s
 
-foo(x: <#T##()->Void#>)
+foo(x: <#T##() -> Void#>)
 // CHECK:      foo {
 // CHECK-NEXT: <#code#>
 // CHECK-NEXT: }
 
-foo(x: <#T##()->Void#>, y: <#T##Int#>)
+foo(x: <#T##() -> Void#>, y: <#T##Int#>)
 // CHECK:      foo(x: {
 // CHECK-NEXT: <#code#>
 // CHECK-NEXT: }, y: Int)

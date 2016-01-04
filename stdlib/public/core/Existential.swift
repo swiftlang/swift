@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -22,7 +22,7 @@ internal struct _CollectionOf<
   IndexType_ : ForwardIndex, T
 > : Collection {
   init(startIndex: IndexType_, endIndex: IndexType_,
-      _ subscriptImpl: (IndexType_)->T) {
+      _ subscriptImpl: (IndexType_) -> T) {
     self.startIndex = startIndex
     self.endIndex = endIndex
     _subscriptImpl = subscriptImpl
@@ -50,6 +50,5 @@ internal struct _CollectionOf<
     return _subscriptImpl(i)
   }
 
-  let _subscriptImpl: (IndexType_)->T
+  let _subscriptImpl: (IndexType_) -> T
 }
-

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -562,7 +562,7 @@ namespace {
 static bool isReadNoneFunction(const Expr *e) {
   // If this is a curried call to an integer literal conversion operations, then
   // we can "safely" assume it is readnone (btw, yes this is totally gross).
-  // This is better to be attribute driven, ala rdar://15587352.
+  // This is better to be attribute driven, a la rdar://15587352.
   if (auto *dre = dyn_cast<DeclRefExpr>(e)) {
     DeclName name = dre->getDecl()->getFullName();
     return (name.getArgumentNames().size() == 1 &&
@@ -2873,7 +2873,7 @@ SILFunction *MaterializeForSetEmitter::createCallback(GeneratorFn generator) {
  
   // Mangle this as if it were a conformance thunk for a closure
   // within the witness.
-  llvm::SmallString<128> name;
+  std::string name;
   {
     ClosureExpr closure(/*patterns*/ nullptr,
                         /*throws*/ SourceLoc(),
@@ -2887,11 +2887,11 @@ SILFunction *MaterializeForSetEmitter::createCallback(GeneratorFn generator) {
                                                      nullptr));
     closure.getCaptureInfo().setGenericParamCaptures(true);
 
-    llvm::raw_svector_ostream stream(name);
-    Mangle::Mangler mangler(stream);
-    mangler.manglePrefix("_TTW");
+    Mangle::Mangler mangler;
+    mangler.append("_TTW");
     mangler.mangleProtocolConformance(Conformance);
     mangler.mangleClosureEntity(&closure, ResilienceExpansion::Minimal, 1);
+    name = mangler.finalize();
   }
 
   // Create the SILFunctionType for the callback.

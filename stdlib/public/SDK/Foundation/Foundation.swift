@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -313,8 +313,7 @@ extension Bool: _ObjectiveCBridgeable {
   }
 
   public init(_ number: NSNumber) {
-    if number.isBoolValue { self = true }
-    else { self = false }
+    self = number.isBoolValue
   }
 
   public static func _getObjectiveCType() -> Any.Type {
@@ -1172,7 +1171,7 @@ extension NSOrderedSet : ArrayLiteralConvertible {
 
 //===--- "Copy constructors" ----------------------------------------------===//
 // These are needed to make Cocoa feel natural since we eliminated
-// implicit briding conversions from Objective-C to Swift
+// implicit bridging conversions from Objective-C to Swift
 //===----------------------------------------------------------------------===//
 
 extension NSArray {

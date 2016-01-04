@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -83,7 +83,7 @@ public struct Mirror {
   ///         children: ["someProperty": self.someProperty],
   ///         ancestorRepresentation: .Customized({ super.customMirror })) // <==
   ///     }
-  case Customized(()->Mirror)
+  case Customized(() -> Mirror)
 
   /// Suppress the representation of all ancestor classes.  The
   /// resulting `Mirror`'s `superclassMirror` is `nil`.
@@ -169,7 +169,7 @@ public struct Mirror {
   @warn_unused_result
   internal static func _superclassIterator<Subject : Any>(
     subject: Subject, _ ancestorRepresentation: AncestorRepresentation
-  ) -> ()->Mirror? {
+  ) -> () -> Mirror? {
 
     if let subject = subject as? AnyObject,
       let subjectClass = Subject.self as? AnyClass,
@@ -337,7 +337,7 @@ public struct Mirror {
     return _makeSuperclassMirror()
   }
 
-  internal let _makeSuperclassMirror: ()->Mirror?
+  internal let _makeSuperclassMirror: () -> Mirror?
   internal let _defaultDescendantRepresentation: DefaultDescendantRepresentation
 }
 
@@ -549,7 +549,7 @@ internal extension Mirror {
   internal init(
     legacy legacyMirror: _Mirror,
     subjectType: Any.Type,
-    makeSuperclassMirror: (()->Mirror?)? = nil
+    makeSuperclassMirror: (() -> Mirror?)? = nil
   ) {
     if let makeSuperclassMirror = makeSuperclassMirror {
       self._makeSuperclassMirror = makeSuperclassMirror

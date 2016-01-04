@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -43,12 +43,6 @@
 # import <CoreFoundation/CFBase.h> // for CFTypeID
 # include <malloc/malloc.h>
 # include <dispatch/dispatch.h>
-#endif
-#if SWIFT_RUNTIME_ENABLE_DTRACE
-# include "SwiftRuntimeDTraceProbes.h"
-#else
-#define SWIFT_ISUNIQUELYREFERENCED()
-#define SWIFT_ISUNIQUELYREFERENCEDORPINNED()
 #endif
 
 using namespace swift;
@@ -451,7 +445,7 @@ bool swift::usesNativeSwiftReferenceCounting(const ClassMetadata *theClass) {
 
 // version for SwiftShims
 bool
-swift::_swift_usesNativeSwiftReferenceCounting_class(const void *theClass) {
+swift::swift_objc_class_usesNativeSwiftReferenceCounting(const void *theClass) {
 #if SWIFT_OBJC_INTEROP
   return usesNativeSwiftReferenceCounting((const ClassMetadata *)theClass);
 #else
@@ -1025,10 +1019,6 @@ swift::swift_dynamicCastForeignClassUnconditional(
   return object;
 }
 
-extern "C" bool swift_objcRespondsToSelector(id object, SEL selector) {
-  return [object respondsToSelector:selector];
-}
-
 bool swift::objectConformsToObjCProtocol(const void *theObject,
                                          const ProtocolDescriptor *protocol) {
   return [((id) theObject) conformsToProtocol: (Protocol*) protocol];
@@ -1235,7 +1225,6 @@ bool swift::swift_isUniquelyReferenced_nonNull_native(
 ) {
   assert(object != nullptr);
   assert(!object->refCount.isDeallocating());
-  SWIFT_ISUNIQUELYREFERENCED();
   return object->refCount.isUniquelyReferenced();
 }
 
@@ -1339,27 +1328,35 @@ bool swift::swift_isUniquelyReferencedOrPinned_native(
 /// pinned flag is set.
 bool swift::swift_isUniquelyReferencedOrPinned_nonNull_native(
                                                     const HeapObject* object) {
-  SWIFT_ISUNIQUELYREFERENCEDORPINNED();
   assert(object != nullptr);
   assert(!object->refCount.isDeallocating());
   return object->refCount.isUniquelyReferencedOrPinned();
 }
 
-#if SWIFT_OBJC_INTEROP
-/// Returns class_getInstanceSize(c)
-///
-/// That function is otherwise unavailable to the core stdlib.
-size_t swift::_swift_class_getInstancePositiveExtentSize(const void* c) {
-  return class_getInstanceSize((Class)c);
-}
-#endif
+using ClassExtents = TwoWordPair<size_t, size_t>;
 
-extern "C" size_t _swift_class_getInstancePositiveExtentSize_native(
-    const Metadata *c) {
+extern "C"
+ClassExtents::Return
+swift_class_getInstanceExtents(const Metadata *c) {
   assert(c && c->isClassObject());
   auto metaData = c->getClassObject();
-  return metaData->getInstanceSize() - metaData->getInstanceAddressPoint();
+  return ClassExtents{
+    metaData->getInstanceAddressPoint(),
+    metaData->getInstanceSize() - metaData->getInstanceAddressPoint()
+  };
 }
+
+#if SWIFT_OBJC_INTEROP
+extern "C"
+ClassExtents::Return
+swift_objc_class_unknownGetInstanceExtents(const ClassMetadata* c) {
+  // Pure ObjC classes never have negative extents.
+  if (c->isPureObjC())
+    return ClassExtents{0, class_getInstanceSize((Class)c)};
+  
+  return swift_class_getInstanceExtents(c);
+}
+#endif
 
 const ClassMetadata *swift::getRootSuperclass() {
 #if SWIFT_OBJC_INTEROP

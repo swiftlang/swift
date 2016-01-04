@@ -1389,7 +1389,7 @@ gets lowered to SIL as::
 
   sil @inout : $(@inout Int) -> () {
   entry(%x : $*Int):
-    %1 = integer_literal 1 : $Int
+    %1 = integer_literal $Int, 1
     store %1 to %x
     return
   }
@@ -4049,7 +4049,7 @@ select_value
   sil-instruction ::= 'select_value' sil-operand sil-select-value-case*
                       (',' 'default' sil-value)?
                       ':' sil-type
-  sil-selct-value-case ::= 'case' sil-value ':' sil-value
+  sil-select-value-case ::= 'case' sil-value ':' sil-value
 
 
   %n = select_value %0 : $U, \
@@ -4130,7 +4130,7 @@ original enum value.  For example::
       case #Foo.TwoInts!enumelt.1: two_ints
 
   nothing:
-    %zero = integer_literal 0 : $Int
+    %zero = integer_literal $Int, 0
     return %zero : $Int
 
   one_int(%y : $Int):

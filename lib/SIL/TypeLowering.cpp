@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -1454,12 +1454,14 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
 
     AbstractionPattern origLoweredType = [&] {
       if (origType.isExactType(substType)) {
-        return AbstractionPattern(substLoweredType);
+        return AbstractionPattern(origType.getGenericSignature(),
+                                  substLoweredType);
       } else if (origType.isOpaque()) {
         return origType;
       } else {
         auto origFnType = cast<AnyFunctionType>(origType.getType());
-        return AbstractionPattern(getLoweredASTFunctionType(origFnType,
+        return AbstractionPattern(origType.getGenericSignature(),
+                                  getLoweredASTFunctionType(origFnType,
                                                             uncurryLevel,
                                                             None));
       }
@@ -1480,9 +1482,9 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
 
   assert(uncurryLevel == 0);
 
-  // inout and lvalue types are a special case for lowering, because they get
+  // inout types are a special case for lowering, because they get
   // completely removed and represented as 'address' SILTypes.
-  if (isa<InOutType>(substType) || isa<LValueType>(substType)) {
+  if (isa<InOutType>(substType)) {
     // Derive SILType for InOutType from the object type.
     CanType substObjectType = substType.getLValueOrInOutObjectType();
     AbstractionPattern origObjectType = origType.getLValueObjectType();
@@ -1492,22 +1494,6 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
 
     auto *theInfo = new (*this, key.isDependent())
       TrivialTypeLowering(loweredType);
-    insert(key, theInfo);
-    return *theInfo;
-  }
-
-  // Lower the object type of boxes.
-  if (auto substBoxType = dyn_cast<SILBoxType>(substType)) {
-    AbstractionPattern origBoxed(origType.getAs<SILBoxType>()->getBoxedType());
-    SILType loweredBoxedType = getLoweredType(origBoxed,
-                                              substBoxType->getBoxedType());
-    auto loweredBoxType
-      = SILBoxType::get(loweredBoxedType.getSwiftRValueType());
-    auto loweredBoxSILType
-      = SILType::getPrimitiveObjectType(loweredBoxType);
-
-    auto *theInfo = new (*this, key.isDependent())
-      ReferenceTypeLowering(loweredBoxSILType);
     insert(key, theInfo);
     return *theInfo;
   }
@@ -1921,40 +1907,8 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
 
   }
 
-  SmallVector<TupleTypeElt, 8> inputFields;
-
-  for (auto capture : captureInfo.getCaptures()) {
-    auto VD = capture.getDecl();
-    // A capture of a 'var' or 'inout' variable is done with the underlying
-    // object type.
-    auto captureType =
-      VD->getType()->getLValueOrInOutObjectType()->getCanonicalType();
-
-    switch (getDeclCaptureKind(capture)) {
-    case CaptureKind::None:
-      break;
-        
-    case CaptureKind::StorageAddress:
-      // No-escape stored decls are captured by their raw address.
-      inputFields.push_back(TupleTypeElt(CanLValueType::get(captureType)));
-      break;
-
-    case CaptureKind::Constant:
-      // Capture the value directly.
-      inputFields.push_back(TupleTypeElt(captureType));
-      break;
-    case CaptureKind::Box: {
-      // Capture the owning box.
-      CanType boxTy = SILBoxType::get(captureType);
-      inputFields.push_back(boxTy);
-      break;
-    }
-    }
-  }
-  
-  CanType capturedInputs =
-    TupleType::get(inputFields, Context)->getCanonicalType();
-
+  // Build the type with an extra empty tuple clause. We'll lower the captures
+  // into this position later.
   auto extInfo = AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
                                           /*noreturn*/ false,
                                           funcType->throws());
@@ -1962,10 +1916,10 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
     extInfo = extInfo.withNoEscape();
 
   if (genericParams)
-    return CanPolymorphicFunctionType::get(capturedInputs, funcType,
+    return CanPolymorphicFunctionType::get(Context.TheEmptyTupleType, funcType,
                                            genericParams, extInfo);
   
-  return CanFunctionType::get(capturedInputs, funcType, extInfo);
+  return CanFunctionType::get(Context.TheEmptyTupleType, funcType, extInfo);
 }
 
 CanAnyFunctionType
@@ -1996,57 +1950,18 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
                                        extInfo);
   }
 
-  SmallVector<TupleTypeElt, 8> inputFields;
-
-  for (auto capture : captureInfo.getCaptures()) {
-    // A capture of a 'var' or 'inout' variable is done with the underlying
-    // object type.
-    auto vd = capture.getDecl();
-    auto captureType =
-      vd->getType()->getLValueOrInOutObjectType()->getCanonicalType();
-
-    switch (getDeclCaptureKind(capture)) {
-    case CaptureKind::None:
-      break;
-        
-    case CaptureKind::StorageAddress:
-      // No-escape stored decls are captured by their raw address.
-      // Unlike 'inout', captures are allowed to have well-typed, synchronized
-      // aliasing references, so capture the raw lvalue type instead.
-      inputFields.push_back(TupleTypeElt(CanLValueType::get(captureType)));
-      break;
-
-    case CaptureKind::Constant:
-      // Capture the value directly.
-      inputFields.push_back(TupleTypeElt(captureType));
-      break;
-    case CaptureKind::Box: {
-      // Capture the owning box.
-      CanType boxTy = SILBoxType::get(captureType);
-      inputFields.push_back(boxTy);
-      break;
-    }
-    }
-  }
-  
-  CanType capturedInputs =
-    TupleType::get(inputFields, Context)->getCanonicalType();
-  
-  // Map context archetypes out of the captures.
-  capturedInputs =
-      getInterfaceTypeOutOfContext(capturedInputs,
-                                   theClosure.getAsDeclContext());
-
+  // Add an extra empty tuple level to represent the captures. We'll append the
+  // lowered capture types here.
   auto extInfo = AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
                                           /*noreturn*/ false,
                                           funcType->throws());
 
   if (genericSig)
     return CanGenericFunctionType::get(genericSig,
-                                       capturedInputs, funcType,
+                                       Context.TheEmptyTupleType, funcType,
                                        extInfo);
   
-  return CanFunctionType::get(capturedInputs, funcType, extInfo);
+  return CanFunctionType::get(Context.TheEmptyTupleType, funcType, extInfo);
 }
 
 /// Replace any DynamicSelf types with their underlying Self type.
@@ -2073,7 +1988,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
       // parameters.
       auto funcTy = cast<AnyFunctionType>(ACE->getType()->getCanonicalType());
       funcTy = cast<AnyFunctionType>(
-                           getInterfaceTypeOutOfContext(funcTy, ACE->getParent()));
+                        getInterfaceTypeOutOfContext(funcTy, ACE->getParent()));
       return getFunctionInterfaceTypeWithCaptures(funcTy, ACE);
     }
 
@@ -2082,7 +1997,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
                                   func->getInterfaceType()->getCanonicalType());
     if (func->getParent() && func->getParent()->isLocalContext())
       funcTy = cast<AnyFunctionType>(
-                         getInterfaceTypeOutOfContext(funcTy, func->getParent()));
+                       getInterfaceTypeOutOfContext(funcTy, func->getParent()));
     funcTy = cast<AnyFunctionType>(replaceDynamicSelfWithSelf(funcTy));
     return getFunctionInterfaceTypeWithCaptures(funcTy, func);
   }

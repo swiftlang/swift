@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -1626,15 +1626,12 @@ namespace {
     CanType ConcreteType;
     const NormalProtocolConformance &Conformance;
     ArrayRef<SILWitnessTable::Entry> SILEntries;
+    const ProtocolInfo &PI;
     Optional<FulfillmentMap> Fulfillments;
     SmallVector<std::pair<size_t, const ConformanceInfo *>, 4>
       SpecializedBaseConformances;
     unsigned NextCacheIndex = 0;
     bool RequiresSpecialization = false;
-
-#ifndef NDEBUG
-    const ProtocolInfo &PI;
-#endif
 
   public:
     WitnessTableBuilder(IRGenModule &IGM,
@@ -2063,7 +2060,7 @@ emitReturnOfCheckedLoadFromCache(IRGenFunction &IGF, Address destTable,
   result->addIncoming(fetchedResult, fetchedResultBB);
 }
 
-/// Within an metadata or witness-table accessor on this conformance, bind
+/// Within a metadata or witness-table accessor on this conformance, bind
 /// the type metadata and witness tables for all the associated types.
 void WitnessTableBuilder::bindArchetypes(IRGenFunction &IGF,
                                          llvm::Value *selfMetadata) {
@@ -3223,7 +3220,7 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
     llvm_unreachable("following an impossible path!");
 
   } 
-  llvm_unreachable("bad metata path component");
+  llvm_unreachable("bad metadata path component");
 }
 
 /// Collect any required metadata for a witness method from the end of

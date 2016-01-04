@@ -1,8 +1,8 @@
-//===- DiagnosticsCommon.def - Diagnostics Text -----------------*- C++ -*-===//
+//===--- DiagnosticsCommon.def - Diagnostics Text ---------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -73,12 +73,6 @@ ERROR(class_var_not_in_class,common,none,
 // FIXME: Used by both the parser and the type-checker.
 ERROR(func_decl_without_brace,decl_parsing,PointsToFirstBadToken,
       "expected '{' in body of function declaration", ())
-ERROR(unsupported_fixed_length_array,type_parsing,none,
-      "fixed-length arrays are not yet supported", ())
-
-ERROR(new_array_syntax,type_parsing,none,
-      "array types are now written with the brackets around the element type",
-      ())
 
 NOTE(convert_let_to_var,sema,none,
      "change 'let' to 'var' to make it mutable", ())

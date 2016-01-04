@@ -1,8 +1,8 @@
-//===-- ValueTracking.h - SIL Value Tracking Analysis ----------*- C++ -*--===//
+//===--- ValueTracking.h - SIL Value Tracking Analysis ----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -41,10 +41,6 @@ bool isNotAliasingArgument(SILValue V, InoutAliasingAssumption isInoutAliasing =
 /// the @inout convention. See swift::isNotAliasedIndirectParameter().
   bool pointsToLocalObject(SILValue V, InoutAliasingAssumption isInoutAliasing =
                                          InoutAliasingAssumption::Aliasing);
-
-/// Return true if the pointer is to a function-local object that never escapes
-/// from the function.
-bool isNonEscapingLocalObject(SILValue V);
 
 enum class IsZeroKind {
   Zero,

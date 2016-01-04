@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -2216,7 +2216,7 @@ void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
                                      const AvailableAttr *Attr,
                                      DeclName Name,
                    std::function<void(InFlightDiagnostic&)> extraInfoHandler) {
-  // We match the behavior of clang to not report deprecation warnigs
+  // We match the behavior of clang to not report deprecation warnings
   // inside declarations that are themselves deprecated on all deployment
   // targets.
   if (isInsideDeprecatedDeclaration(ReferenceRange, ReferenceDC, *this)) {

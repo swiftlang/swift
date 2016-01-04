@@ -112,7 +112,7 @@ infix operator ||| {
   precedence 110
 }
 
-@_transparent func &&& (lhs: Bool, @autoclosure rhs: ()->Bool) -> Bool {
+@_transparent func &&& (lhs: Bool, @autoclosure rhs: () -> Bool) -> Bool {
   if lhs {
     return rhs()
   }
@@ -120,7 +120,7 @@ infix operator ||| {
   return false
 }
 
-@_transparent func ||| (lhs: Bool, @autoclosure rhs: ()->Bool) -> Bool {
+@_transparent func ||| (lhs: Bool, @autoclosure rhs: () -> Bool) -> Bool {
   if lhs {
     return true
   }

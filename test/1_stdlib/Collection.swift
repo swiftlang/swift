@@ -1,5 +1,12 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift --stdlib-unittest-in-process | tee %t.txt
+// RUN: FileCheck %s < %t.txt
+// note: remove the --stdlib-unittest-in-process once all the FileCheck tests
+// have been converted to StdlibUnittest
 // REQUIRES: executable_test
+
+import StdlibUnittest
+
+var CollectionTests = TestSuite("CollectionTests")
 
 /// An *iterator* that adapts a *collection* `C` and any *sequence* of
 /// its `Index` type to present the collection's elements in a
@@ -246,5 +253,38 @@ func testIsEmptyFirstLast() {
 }
 testIsEmptyFirstLast()
 
+/// A `Collection` that vends just the default implementations for
+/// `CollectionType` methods.
+struct CollectionOnly<T: Collection> : Collection {
+  var base: T
+
+  var startIndex: T.Index {
+    return base.startIndex
+  }
+
+  var endIndex: T.Index {
+    return base.endIndex
+  }
+
+  func iterator() -> T.Iterator {
+    return base.iterator()
+  }
+
+  subscript(position: T.Index) -> T.Iterator.Element {
+    return base[position]
+  }
+}
+
 // CHECK: all done.
 print("all done.")
+
+CollectionTests.test("first/performance") {
+  // accessing `first` should not perform duplicate work on lazy collections
+  var log: [Int] = []
+  let col_ = (0..<10).lazy.filter({ log.append($0); return (2..<8).contains($0) })
+  let col = CollectionOnly(base: col_)
+  expectEqual(2, col.first)
+  expectEqual([0, 1, 2], log)
+}
+
+runAllTests()

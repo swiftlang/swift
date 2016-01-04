@@ -260,9 +260,9 @@ NSStringAPIs.test("localizedCapitalized") {
 ///   executed in the given localeID
 func expectLocalizedEquality(
   expected: String,
-  _ op: (_: NSLocale?)->String,
+  _ op: (_: NSLocale?) -> String,
   _ localeID: String? = nil,
-  @autoclosure _ message: ()->String = "",
+  @autoclosure _ message: () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
   file: String = __FILE__, line: UInt = __LINE__
@@ -2144,7 +2144,7 @@ func getNullCString() -> UnsafeMutablePointer<CChar> {
   return nil
 }
 
-func getASCIICString() -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {
+func getASCIICString() -> (UnsafeMutablePointer<CChar>, dealloc: () -> ()) {
   let up = UnsafeMutablePointer<CChar>(allocatingCapacity: 100)
   up[0] = 0x61
   up[1] = 0x62
@@ -2152,7 +2152,7 @@ func getASCIICString() -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {
   return (up, { up.deallocateCapacity(100) })
 }
 
-func getNonASCIICString() -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {
+func getNonASCIICString() -> (UnsafeMutablePointer<CChar>, dealloc: () -> ()) {
   let up = UnsafeMutablePointer<UInt8>(allocatingCapacity: 100)
   up[0] = 0xd0
   up[1] = 0xb0
@@ -2163,7 +2163,7 @@ func getNonASCIICString() -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {
 }
 
 func getIllFormedUTF8String1(
-) -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {
+) -> (UnsafeMutablePointer<CChar>, dealloc: () -> ()) {
   let up = UnsafeMutablePointer<UInt8>(allocatingCapacity: 100)
   up[0] = 0x41
   up[1] = 0xed
@@ -2175,7 +2175,7 @@ func getIllFormedUTF8String1(
 }
 
 func getIllFormedUTF8String2(
-) -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {
+) -> (UnsafeMutablePointer<CChar>, dealloc: () -> ()) {
   let up = UnsafeMutablePointer<UInt8>(allocatingCapacity: 100)
   up[0] = 0x41
   up[1] = 0xed

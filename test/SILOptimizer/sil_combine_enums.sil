@@ -80,10 +80,10 @@ bb1:
   return %16 : $Int
 
 bb2:
-  // Invoke something here and jump to bb1. This prevents an cond_br(select_enum) -> switch_enum conversion,
+  // Invoke something here and jump to bb1. This prevents a cond_br(select_enum) -> switch_enum conversion,
   // since it would introduce a critical edge.
-  %20 = function_ref @external_func: $@convention(thin) ()->()
-  apply %20(): $@convention(thin) ()->()
+  %20 = function_ref @external_func: $@convention(thin) () -> ()
+  apply %20(): $@convention(thin) () -> ()
   br bb1
 }
 
@@ -201,8 +201,8 @@ bb1:
   return %7 : $Int
 
 bb2:
-  %10 = function_ref @external_func: $@convention(thin) ()->()
-  apply %10(): $@convention(thin) ()->()
+  %10 = function_ref @external_func: $@convention(thin) () -> ()
+  apply %10(): $@convention(thin) () -> ()
   br bb1
 }
 

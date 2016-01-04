@@ -96,7 +96,7 @@ class ThisDerived1 : ThisBase1 {
     }
   }
 
-  subscript(#s: String) -> Int {
+  subscript(s s: String) -> Int {
     get {
       return 0
     }

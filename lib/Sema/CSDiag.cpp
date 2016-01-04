@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -16,6 +16,7 @@
 
 #include "ConstraintSystem.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "swift/AST/ASTWalker.h"
 
 using namespace swift;
 using namespace constraints;
@@ -335,11 +336,11 @@ static Expr *simplifyLocatorToAnchor(ConstraintSystem &cs,
 
 /// Retrieve the argument pattern for the given declaration.
 ///
-static Pattern *getParameterPattern(ValueDecl *decl) {
+static ParameterList *getParameterList(ValueDecl *decl) {
   if (auto func = dyn_cast<FuncDecl>(decl))
-    return func->getBodyParamPatterns()[0];
+    return func->getParameterList(0);
   if (auto constructor = dyn_cast<ConstructorDecl>(decl))
-    return constructor->getBodyParamPatterns()[1];
+    return constructor->getParameterList(1);
   if (auto subscript = dyn_cast<SubscriptDecl>(decl))
     return subscript->getIndices();
 
@@ -441,79 +442,37 @@ ResolvedLocator constraints::resolveLocatorToDecl(
   // FIXME: This is an egregious hack. We'd be far better off
   // FIXME: Perform deeper path resolution?
   auto path = locator->getPath();
-  Pattern *parameterPattern = nullptr;
+  ParameterList *parameterList = nullptr;
   bool impliesFullPattern = false;
   while (!path.empty()) {
     switch (path[0].getKind()) {
     case ConstraintLocator::ApplyArgument:
       // If we're calling into something that has parameters, dig into the
       // actual parameter pattern.
-      parameterPattern = getParameterPattern(declRef.getDecl());
-      if (!parameterPattern)
+      parameterList = getParameterList(declRef.getDecl());
+      if (!parameterList)
         break;
 
       impliesFullPattern = true;
       path = path.slice(1);
       continue;
 
-    case ConstraintLocator::TupleElement:
-    case ConstraintLocator::NamedTupleElement:
-      if (parameterPattern) {
-        unsigned index = path[0].getValue();
-        if (auto tuple = dyn_cast<TuplePattern>(
-                           parameterPattern->getSemanticsProvidingPattern())) {
-          if (index < tuple->getNumElements()) {
-            parameterPattern = tuple->getElement(index).getPattern();
-            impliesFullPattern = false;
-            path = path.slice(1);
-            continue;
-          }
-        }
-        parameterPattern = nullptr;
+    case ConstraintLocator::ApplyArgToParam: {
+      if (!parameterList) break;
+        
+      unsigned index = path[0].getValue2();
+      if (index < parameterList->size()) {
+        auto param = parameterList->get(index);
+        return ResolvedLocator(ResolvedLocator::ForVar, param);
       }
       break;
-
-    case ConstraintLocator::ApplyArgToParam:
-      if (parameterPattern) {
-        unsigned index = path[0].getValue2();
-        if (auto tuple = dyn_cast<TuplePattern>(
-                           parameterPattern->getSemanticsProvidingPattern())) {
-          if (index < tuple->getNumElements()) {
-            parameterPattern = tuple->getElement(index).getPattern();
-            impliesFullPattern = false;
-            path = path.slice(1);
-            continue;
-          }
-        }
-        parameterPattern = nullptr;
-      }
-      break;
-
-    case ConstraintLocator::ScalarToTuple:
-      continue;
+    }
 
     default:
       break;
     }
 
     break;
-  }
-
-  // If we have a parameter pattern that refers to a parameter, grab it.
-  if (parameterPattern) {
-    parameterPattern = parameterPattern->getSemanticsProvidingPattern();
-    if (impliesFullPattern) {
-      if (auto tuple = dyn_cast<TuplePattern>(parameterPattern)) {
-        if (tuple->getNumElements() == 1) {
-          parameterPattern = tuple->getElement(0).getPattern();
-          parameterPattern = parameterPattern->getSemanticsProvidingPattern();
-        }
-      }
-    }
-
-    if (auto named = dyn_cast<NamedPattern>(parameterPattern)) {
-      return ResolvedLocator(ResolvedLocator::ForVar, named->getDecl());
-    }
   }
 
   // Otherwise, do the best we can with the declaration we found.
@@ -1071,8 +1030,11 @@ namespace {
       // If this is an operator func decl in a type context, the 'self' isn't
       // actually going to be applied.
       if (auto *fd = dyn_cast<FuncDecl>(decl))
-        if (fd->isOperator() && fd->getDeclContext()->isTypeContext())
+        if (fd->isOperator() && fd->getDeclContext()->isTypeContext()) {
+          if (type->is<ErrorType>())
+            return nullptr;
           type = type->castTo<AnyFunctionType>()->getResult();
+        }
 
       for (unsigned i = 0, e = level; i != e; ++i) {
         auto funcTy = type->getAs<AnyFunctionType>();
@@ -1780,7 +1742,7 @@ bool CalleeCandidateInfo::diagnoseAnyStructuralArgumentError(Expr *fnExpr,
     return false;
   
   
-  // If we are missing an parameter, diagnose that.
+  // If we are missing a parameter, diagnose that.
   if (missingParamIdx != ~0U) {
     Identifier name = params[missingParamIdx].Label;
     auto loc = argExpr->getStartLoc();
@@ -2611,31 +2573,77 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
 }
 
 namespace {
-  class ExprTypeSaver {
+  class ExprTypeSaverAndEraser {
     llvm::DenseMap<Expr*, Type> ExprTypes;
     llvm::DenseMap<TypeLoc*, std::pair<Type, bool>> TypeLocTypes;
     llvm::DenseMap<Pattern*, Type> PatternTypes;
+    llvm::DenseMap<ParamDecl*, Type> ParamDeclTypes;
+    ExprTypeSaverAndEraser(const ExprTypeSaverAndEraser&) = delete;
+    void operator=(const ExprTypeSaverAndEraser&) = delete;
   public:
 
-    void save(Expr *E) {
+    ExprTypeSaverAndEraser(Expr *E) {
       struct TypeSaver : public ASTWalker {
-        ExprTypeSaver *TS;
-        TypeSaver(ExprTypeSaver *TS) : TS(TS) {}
+        ExprTypeSaverAndEraser *TS;
+        TypeSaver(ExprTypeSaverAndEraser *TS) : TS(TS) {}
         
         std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
           TS->ExprTypes[expr] = expr->getType();
+          
+          // Preserve module expr type data to prevent further lookups.
+          if (auto *declRef = dyn_cast<DeclRefExpr>(expr))
+            if (isa<ModuleDecl>(declRef->getDecl()))
+              return { false, expr };
+          
+          // Don't strip type info off OtherConstructorDeclRefExpr, because CSGen
+          // doesn't know how to reconstruct it.
+          if (isa<OtherConstructorDeclRefExpr>(expr))
+            return { false, expr };
+          
+          // TypeExpr's are relabeled by CSGen.
+          if (isa<TypeExpr>(expr))
+            return { false, expr };
+          
+          // If a literal has a Builtin.Int or Builtin.FP type on it already,
+          // then sema has already expanded out a call to
+          //   Init.init(<builtinliteral>)
+          // and we don't want it to make
+          //   Init.init(Init.init(<builtinliteral>))
+          // preserve the type info to prevent this from happening.
+          if (isa<LiteralExpr>(expr) &&
+              !(expr->getType() && expr->getType()->is<ErrorType>()))
+            return { false, expr };
+
+          // If a ClosureExpr's parameter list has types on the decls, and the
+          // types and remove them so that they'll get regenerated from the
+          // associated TypeLocs or resynthesized as fresh typevars.
+          if (auto *CE = dyn_cast<ClosureExpr>(expr))
+            for (auto P : *CE->getParameters())
+              if (P->hasType()) {
+                TS->ParamDeclTypes[P] = P->getType();
+                P->overwriteType(Type());
+              }
+          
+          expr->setType(nullptr);
+          expr->clearLValueAccessKind();
+
           return { true, expr };
         }
         
+        // If we find a TypeLoc (e.g. in an as? expr), save and erase it.
         bool walkToTypeLocPre(TypeLoc &TL) override {
-          if (TL.getTypeRepr() && TL.getType())
+          if (TL.getTypeRepr() && TL.getType()) {
             TS->TypeLocTypes[&TL] = { TL.getType(), TL.wasValidated() };
+            TL.setType(Type(), /*was validated*/false);
+          }
           return true;
         }
         
         std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-          if (P->hasType())
+          if (P->hasType()) {
             TS->PatternTypes[P] = P->getType();
+            P->setType(Type());
+          }
           return { true, P };
         }
         
@@ -2649,7 +2657,7 @@ namespace {
       E->walk(TypeSaver(this));
     }
     
-    void restore(Expr *E) {
+    void restore() {
       for (auto exprElt : ExprTypes)
         exprElt.first->setType(exprElt.second);
       
@@ -2659,6 +2667,9 @@ namespace {
       
       for (auto patternElt : PatternTypes)
         patternElt.first->setType(patternElt.second);
+      
+      for (auto paramDeclElt : ParamDeclTypes)
+        paramDeclElt.first->setType(paramDeclElt.second);
       
       // Done, don't do redundant work on destruction.
       ExprTypes.clear();
@@ -2673,7 +2684,7 @@ namespace {
     // and if expr-specific diagnostics fail to turn up anything useful to say,
     // we go digging through failed constraints, and expect their locators to
     // still be meaningful.
-    ~ExprTypeSaver() {
+    ~ExprTypeSaverAndEraser() {
       for (auto exprElt : ExprTypes)
         if (!exprElt.first->getType())
           exprElt.first->setType(exprElt.second);
@@ -2686,71 +2697,14 @@ namespace {
       for (auto patternElt : PatternTypes)
         if (!patternElt.first->hasType())
           patternElt.first->setType(patternElt.second);
+      
+      for (auto paramDeclElt : ParamDeclTypes)
+        if (!paramDeclElt.first->hasType())
+          paramDeclElt.first->setType(paramDeclElt.second);
+
     }
   };
 }
-
-/// \brief "Nullify" an expression tree's type data, to make it suitable for
-/// re-typecheck operations.
-static void eraseTypeData(Expr *expr) {
-  /// Private class to "cleanse" an expression tree of types. This is done in the
-  /// case of a typecheck failure, where we may want to re-typecheck partially-
-  /// typechecked subexpressions in a context-free manner.
-  class TypeNullifier : public ASTWalker {
-  public:
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // Preserve module expr type data to prevent further lookups.
-      if (auto *declRef = dyn_cast<DeclRefExpr>(expr))
-        if (isa<ModuleDecl>(declRef->getDecl()))
-          return { false, expr };
-      
-      // Don't strip type info off OtherConstructorDeclRefExpr, because CSGen
-      // doesn't know how to reconstruct it.
-      if (isa<OtherConstructorDeclRefExpr>(expr))
-        return { false, expr };
-
-      // TypeExpr's are relabeled by CSGen.
-      if (isa<TypeExpr>(expr))
-        return { false, expr };
-
-      // If a literal has a Builtin.Int or Builtin.FP type on it already,
-      // then sema has already expanded out a call to
-      //   Init.init(<builtinliteral>)
-      // and we don't want it to make
-      //   Init.init(Init.init(<builtinliteral>))
-      // preserve the type info to prevent this from happening.
-      if (isa<LiteralExpr>(expr) &&
-          !(expr->getType() && expr->getType()->is<ErrorType>()))
-        return { false, expr };
-      
-      expr->setType(nullptr);
-      expr->clearLValueAccessKind();
-      return { true, expr };
-    }
-    
-    // If we find a TypeLoc (e.g. in an as? expr) with a type variable, rewrite
-    // it.
-    bool walkToTypeLocPre(TypeLoc &TL) override {
-      if (TL.getTypeRepr())
-        TL.setType(Type(), /*was validated*/false);
-      return true;
-    }
-    
-    std::pair<bool, Pattern*> walkToPatternPre(Pattern *pattern) override {
-      pattern->setType(nullptr);
-      return { true, pattern };
-    }
-    
-    // Don't walk into statements.  This handles the BraceStmt in
-    // non-single-expr closures, so we don't walk into their body.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-      return { false, S };
-    }
-  };
-  
-  expr->walk(TypeNullifier());
-}
-
 
 /// Erase an expression tree's open existentials after a re-typecheck operation.
 ///
@@ -2886,15 +2840,15 @@ typeCheckChildIndependently(Expr *subExpr, Type convertType,
     return subExpr;
   }
   
-  ExprTypeSaver SavedTypeData;
-  SavedTypeData.save(subExpr);
+  // Save any existing type data of the subexpr tree, and reset it to null in
+  // prep for re-type-checking the tree.  If things fail, we can revert the
+  // types back to their original state.
+  ExprTypeSaverAndEraser SavedTypeData(subExpr);
   
   // Store off the sub-expression, in case a new one is provided via the
   // type check operation.
   Expr *preCheckedExpr = subExpr;
-
-  eraseTypeData(subExpr);
-      
+  
   // Disable structural checks, because we know that the overall expression
   // has type constraint problems, and we don't want to know about any
   // syntactic issues in a well-typed subexpression (which might be because
@@ -2937,7 +2891,7 @@ typeCheckChildIndependently(Expr *subExpr, Type convertType,
   // just pretend as though nothing happened.
   if (subExpr->getType()->is<ErrorType>()) {
     subExpr = preCheckedExpr;
-    SavedTypeData.restore(subExpr);
+    SavedTypeData.restore();
   }
   
   CS->TC.addExprForDiagnosis(preCheckedExpr, subExpr);
@@ -2970,10 +2924,11 @@ typeCheckArbitrarySubExprIndependently(Expr *subExpr, TCCOptions options) {
     // none of its arguments are type variables.  If so, these type variables
     // would be accessible to name lookup of the subexpression and may thus leak
     // in.  Reset them to UnresolvedTypes for safe measures.
-    CE->getParams()->forEachVariable([&](VarDecl *VD) {
+    for (auto param : *CE->getParameters()) {
+      auto VD = param;
       if (VD->getType()->hasTypeVariable() || VD->getType()->is<ErrorType>())
         VD->overwriteType(CS->getASTContext().TheUnresolvedType);
-    });
+    }
   }
 
   // When we're type checking a single-expression closure, we need to reset the
@@ -4208,70 +4163,8 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
       CS->getContextualType()->is<AnyFunctionType>()) {
 
     auto fnType = CS->getContextualType()->castTo<AnyFunctionType>();
-    Pattern *params = CE->getParams();
-    Type inferredArgType = fnType->getInput();
-    
-    // It is very common for a contextual type to disagree with the argument
-    // list built into the closure expr.  This can be because the closure expr
-    // had an explicitly specified pattern, ala:
-    //    { a,b in ... }
-    // or could be because the closure has an implicitly generated one:
-    //    { $0 + $1 }
-    // in either case, we want to produce nice and clear diagnostics.
-    unsigned actualArgCount = 1;
-    if (auto *TP = dyn_cast<TuplePattern>(params))
-      actualArgCount = TP->getNumElements();
-    unsigned inferredArgCount = 1;
-    if (auto *argTupleTy = inferredArgType->getAs<TupleType>())
-      inferredArgCount = argTupleTy->getNumElements();
-    
-    // If the actual argument count is 1, it can match a tuple as a whole.
-    if (actualArgCount != 1 && actualArgCount != inferredArgCount) {
-      // If the closure didn't specify any arguments and it is in a context that
-      // needs some, produce a fixit to turn "{...}" into "{ _,_ in ...}".
-      if (actualArgCount == 0 && CE->getInLoc().isInvalid()) {
-        auto diag =
-          diagnose(CE->getStartLoc(), diag::closure_argument_list_missing,
-                   inferredArgCount);
-        StringRef fixText;  // We only handle the most common cases.
-        if (inferredArgCount == 1)
-          fixText = " _ in ";
-        else if (inferredArgCount == 2)
-          fixText = " _,_ in ";
-        else if (inferredArgCount == 3)
-          fixText = " _,_,_ in ";
-        
-        if (!fixText.empty()) {
-          // Determine if there is already a space after the { in the closure to
-          // make sure we introduce the right whitespace.
-          auto afterBrace = CE->getStartLoc().getAdvancedLoc(1);
-          auto text = CS->TC.Context.SourceMgr.extractText({afterBrace, 1});
-          if (text.size() == 1 && text == " ")
-            fixText = fixText.drop_back();
-          else
-            fixText = fixText.drop_front();
-          diag.fixItInsertAfter(CE->getStartLoc(), fixText);
-        }
-        return true;
-      }
-      
-      // Okay, the wrong number of arguments was used, complain about that.
-      // Before doing so, strip attributes off the function type so that they
-      // don't confuse the issue.
-      fnType = FunctionType::get(fnType->getInput(), fnType->getResult());
-      diagnose(params->getStartLoc(), diag::closure_argument_list_tuple,
-               fnType, inferredArgCount, actualArgCount);
+    if (CS->TC.coerceParameterListToType(CE, fnType))
       return true;
-    }
-    
-    TypeResolutionOptions TROptions;
-    TROptions |= TR_OverrideType;
-    TROptions |= TR_FromNonInferredPattern;
-    TROptions |= TR_InExpression;
-    TROptions |= TR_ImmediateFunctionInput;
-    if (CS->TC.coercePatternToType(params, CE, inferredArgType, TROptions))
-      return true;
-    CE->setParams(params);
 
     expectedResultType = fnType->getResult();
   } else {
@@ -4282,10 +4175,10 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
     // lookups against the parameter decls.
     //
     // Handle this by rewriting the arguments to UnresolvedType().
-    CE->getParams()->forEachVariable([&](VarDecl *VD) {
+    for (auto VD : *CE->getParameters()) {
       if (VD->getType()->hasTypeVariable() || VD->getType()->is<ErrorType>())
         VD->overwriteType(CS->getASTContext().TheUnresolvedType);
-    });
+    }
   }
 
   // If this is a complex leaf closure, there is nothing more we can do.
@@ -4391,7 +4284,7 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
       diagnose(E->getStartLoc(), diag::type_is_not_array, contextualType)
         .highlight(E->getSourceRange());
 
-      // If the contextual type conforms to DicitonaryLiteralConvertible, then
+      // If the contextual type conforms to DictionaryLiteralConvertible, then
       // they wrote "x = [1,2]" but probably meant "x = [1:2]".
       if ((E->getElements().size() & 1) == 0 && !E->getElements().empty() &&
           isDictionaryLiteralCompatible(contextualType, CS, E->getLoc())) {

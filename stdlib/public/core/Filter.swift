@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -37,7 +37,7 @@ public struct LazyFilterIterator<
   /// for which `predicate(x) == true`.
   internal init(
     _ base: Base,
-    whereElementsSatisfy predicate: (Base.Element)->Bool
+    whereElementsSatisfy predicate: (Base.Element) -> Bool
   ) {
     self._base = base
     self._predicate = predicate
@@ -50,7 +50,7 @@ public struct LazyFilterIterator<
   
   /// The predicate used to determine which elements produced by
   /// `base` are also produced by `self`.
-  internal var _predicate: (Base.Element)->Bool
+  internal var _predicate: (Base.Element) -> Bool
 }
 
 /// A sequence whose elements consist of the elements of some base
@@ -74,7 +74,7 @@ public struct LazyFilterSequence<Base : Sequence>
   public // @testable
   init(
     _base base: Base,
-    whereElementsSatisfy predicate: (Base.Iterator.Element)->Bool
+    whereElementsSatisfy predicate: (Base.Iterator.Element) -> Bool
   ) {
     self.base = base
     self._include = predicate
@@ -85,7 +85,7 @@ public struct LazyFilterSequence<Base : Sequence>
 
   /// The predicate used to determine which elements of `base` are
   /// also elements of `self`.
-  internal let _include: (Base.Iterator.Element)->Bool
+  internal let _include: (Base.Iterator.Element) -> Bool
 }
 
 /// The `Index` used for subscripting a `LazyFilterCollection`.
@@ -131,7 +131,7 @@ public struct LazyFilterIndex<
 
   /// The predicate used to determine which elements of `base` are
   /// also elements of `self`.
-  internal let _include: (BaseElements.Iterator.Element)->Bool
+  internal let _include: (BaseElements.Iterator.Element) -> Bool
 }
 
 /// Returns `true` iff `lhs` is identical to `rhs`.
@@ -146,12 +146,12 @@ public func == <Base : Collection>(
 /// A lazy `Collection` wrapper that includes the elements of an
 /// underlying collection that satisfy a predicate.
 ///
-/// - Note: The performance of advancing a `LazyFilterIndex`
-///   depends on how sparsely the filtering predicate is satisfied,
-///   and may not offer the usual performance given by models of
-///   `ForwardIndex`.  Be aware, therefore, that general operations
-///   on `LazyFilterCollection` instances may not have the
-///   documented complexity.
+/// - Note: The performance of accessing `startIndex`, `first`, any methods
+///   that depend on `startIndex`, or of advancing a `LazyFilterIndex` depends
+///   on how sparsely the filtering predicate is satisfied, and may not offer
+///   the usual performance given by `Collection` or `ForwardIndex`. Be
+///   aware, therefore, that general operations on `LazyFilterCollection`
+///   instances may not have the documented complexity.
 public struct LazyFilterCollection<
   Base : Collection
 > : LazyCollectionProtocol {
@@ -167,7 +167,7 @@ public struct LazyFilterCollection<
   public // @testable
   init(
     _ base: Base,
-    whereElementsSatisfy predicate: (Base.Iterator.Element)->Bool
+    whereElementsSatisfy predicate: (Base.Iterator.Element) -> Bool
   ) {
     self._base = base
     self._predicate = predicate
@@ -220,7 +220,7 @@ public struct LazyFilterCollection<
   }
 
   var _base: Base
-  var _predicate: (Base.Iterator.Element)->Bool
+  var _predicate: (Base.Iterator.Element) -> Bool
 }
 
 extension LazySequenceProtocol {
@@ -232,7 +232,7 @@ extension LazySequenceProtocol {
   ///   elements.
   @warn_unused_result
   public func filter(
-    predicate: (Elements.Iterator.Element)->Bool
+    predicate: (Elements.Iterator.Element) -> Bool
   ) -> LazyFilterSequence<Self.Elements> {
     return LazyFilterSequence(
       _base: self.elements, whereElementsSatisfy: predicate)
@@ -248,7 +248,7 @@ extension LazyCollectionProtocol {
   ///   elements.
   @warn_unused_result
   public func filter(
-    predicate: (Elements.Iterator.Element)->Bool
+    predicate: (Elements.Iterator.Element) -> Bool
   ) -> LazyFilterCollection<Self.Elements> {
     return LazyFilterCollection(
       self.elements, whereElementsSatisfy: predicate)

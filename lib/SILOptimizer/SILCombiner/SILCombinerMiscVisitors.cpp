@@ -1,8 +1,8 @@
-//===---- SILCombinerMiscVisitors.cpp -------------------------------------===//
+//===--- SILCombinerMiscVisitors.cpp --------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -251,7 +251,7 @@ public:
       return;
     }
 
-    // Make sure tht the open_existential does not have any uses except
+    // Make sure that the open_existential does not have any uses except
     // destroy_addr.
     for (auto *Use : getNonDebugUses(*I)) {
       if (!isa<DestroyAddrInst>(Use->getUser())) {
@@ -964,7 +964,7 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
     if (!EnumOperandTy.isLoadable(SEI->getModule()))
       return nullptr;
 
-    // Result of the selec_enum should be a boolean.
+    // Result of the select_enum should be a boolean.
     if (SEI->getType() != CBI->getCondition().getType())
       return nullptr;
 
