@@ -130,13 +130,13 @@ print "// Processing text files:", " ".join([os.path.basename(f) for f in filena
 
 print "namespace CBC {"
 print "// The charset that the fragment indices can use:"
-print "unsigned CharsetLength = %d;" % len(charset)
+print "const unsigned CharsetLength = %d;" % len(charset)
 print "const char *Charset = \"%s\";" % charset
 print "const int IndexOfChar[] =  {", ",".join(index_of_char),"};"
 print "const char EscapeChar0 = '%s';" % escape_char0
 print "const char EscapeChar1 = '%s';" % escape_char1
 print "// The Fragments:"
-print "unsigned NumFragments = ", len(string_key_list), ";"
+print "const unsigned NumFragments = ", len(string_key_list), ";"
 print "const char* CodeBook[] = {", ",".join(string_key_list),"};"
 print "const unsigned CodeBookLen[] = {", ",".join(string_length_table),"};"
 print TrieHead.generateHeader()

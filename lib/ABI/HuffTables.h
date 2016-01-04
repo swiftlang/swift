@@ -7,8 +7,8 @@ using APInt = llvm::APInt;
 // Processing text files: CBC_Compressed.txt.cbc
 namespace Huffman {
 // The charset that the fragment indices can use:
-unsigned CharsetLength = 64;
-unsigned LongestEncodingLength = 8;
+const unsigned CharsetLength = 64;
+const unsigned LongestEncodingLength = 8;
 const char *Charset = "0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ$";
 char variable_decode(APInt &num) {
  uint64_t tailbits = *num.getRawData();
