@@ -48,6 +48,7 @@ struct SyntaxModelContext::Implementation {
 
 SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
   : Impl(*new Implementation(SrcFile)) {
+  const bool IsPlayground = Impl.LangOpts.Playground;
   const SourceManager &SM = Impl.SrcMgr;
   std::vector<Token> Tokens = swift::tokenize(Impl.LangOpts, SM,
                                               *Impl.SrcFile.getBufferID(),
@@ -111,7 +112,8 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
       case tok::floating_literal: Kind = SyntaxNodeKind::Floating; break;
       case tok::string_literal: Kind = SyntaxNodeKind::String; break;
       case tok::comment:
-        if (Tok.getText().startswith("///"))
+        if (Tok.getText().startswith("///") ||
+            (IsPlayground && Tok.getText().startswith("//:")))
           Kind = SyntaxNodeKind::DocCommentLine;
         else if (Tok.getText().startswith("/**"))
           Kind = SyntaxNodeKind::DocCommentBlock;

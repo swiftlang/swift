@@ -333,6 +333,11 @@ Typecheck("typecheck",
           llvm::cl::desc("Type check the AST"),
           llvm::cl::init(false));
 
+static llvm::cl::opt<bool>
+Playground("playground",
+           llvm::cl::desc("Whether coloring in playground"),
+           llvm::cl::init(false));
+
 // AST printing options.
 
 static llvm::cl::opt<bool>
@@ -769,7 +774,8 @@ public:
 static int doSyntaxColoring(const CompilerInvocation &InitInvok,
                             StringRef SourceFilename,
                             bool TerminalOutput,
-                            bool RunTypeChecker) {
+                            bool RunTypeChecker,
+                            bool Playground) {
   CompilerInvocation Invocation(InitInvok);
   Invocation.addInputFilename(SourceFilename);
   Invocation.getLangOptions().DisableAvailabilityChecking = false;
@@ -779,6 +785,7 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
+  Invocation.getLangOptions().Playground = Playground;
   if (CI.setup(Invocation))
     return 1;
   if (!RunTypeChecker)
@@ -2501,7 +2508,8 @@ int main(int argc, char *argv[]) {
     ExitCode = doSyntaxColoring(InitInvok,
                                 options::SourceFilename,
                                 options::TerminalOutput,
-                                options::Typecheck);
+                                options::Typecheck,
+                                options::Playground);
     break;
 
   case ActionType::DumpImporterLookupTable:
