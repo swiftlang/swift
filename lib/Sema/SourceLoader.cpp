@@ -1,4 +1,4 @@
-//===--- SourceLoader.cpp - Import .swift files as modules ------*- c++ -*-===//
+//===--- SourceLoader.cpp - Import .swift files as modules ------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -1,4 +1,4 @@
-//===--- SerializationOptions.h - Control swiftmodule emission --*- c++ -*-===//
+//===--- SerializationOptions.h - Control swiftmodule emission --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
