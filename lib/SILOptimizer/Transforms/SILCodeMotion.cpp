@@ -1,4 +1,4 @@
-//===- SILCodeMotion.cpp - Code Motion Optimizations ----------------------===//
+//===--- SILCodeMotion.cpp - Code Motion Optimizations --------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

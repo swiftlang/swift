@@ -1,4 +1,4 @@
-//===----- Analysis.cpp - Swift Analysis ----------------------------------===//
+//===--- Analysis.cpp - Swift Analysis ------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

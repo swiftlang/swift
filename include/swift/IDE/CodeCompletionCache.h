@@ -1,4 +1,4 @@
-//===- CodeCompletionCache.h - Routines for code completion caching -------===//
+//===--- CodeCompletionCache.h - Routines for code completion caching -----===//
 //
 // This source file is part of the Swift.org open source project
 //

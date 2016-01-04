@@ -1,4 +1,4 @@
-//===-- GenericSpecializer.cpp - Specialization of generic functions ------===//
+//===--- GenericSpecializer.cpp - Specialization of generic functions -----===//
 //
 // This source file is part of the Swift.org open source project
 //

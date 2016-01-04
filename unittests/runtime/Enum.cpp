@@ -1,4 +1,4 @@
-//===- Enum.cpp - Enum tests ----------------------------------------------===//
+//===--- Enum.cpp - Enum tests --------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -1,4 +1,4 @@
-//===-- SILExtract.cpp - SIL function extraction utility ------------------===//
+//===--- SILExtract.cpp - SIL function extraction utility -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //

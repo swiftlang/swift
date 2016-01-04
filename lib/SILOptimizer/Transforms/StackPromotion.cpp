@@ -1,4 +1,4 @@
-//===------- StackPromotion.cpp - Promotes allocations to the stack -------===//
+//===--- StackPromotion.cpp - Promotes allocations to the stack -----------===//
 //
 // This source file is part of the Swift.org open source project
 //

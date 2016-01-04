@@ -1,4 +1,4 @@
-//===- XpcTracing.h - XPC-side Tracing Interface ----------------*- C++ -*-===//
+//===--- XpcTracing.h - XPC-side Tracing Interface --------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

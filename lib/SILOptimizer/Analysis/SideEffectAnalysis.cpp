@@ -1,4 +1,4 @@
-//===---------- SideEffectAnalysis.cpp - SIL Side Effect Analysis ---------===//
+//===--- SideEffectAnalysis.cpp - SIL Side Effect Analysis ----------------===//
 //
 // This source file is part of the Swift.org open source project
 //

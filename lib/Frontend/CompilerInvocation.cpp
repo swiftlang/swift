@@ -1,4 +1,4 @@
-//===-- CompilerInvocation.cpp - CompilerInvocation methods ---------------===//
+//===--- CompilerInvocation.cpp - CompilerInvocation methods --------------===//
 //
 // This source file is part of the Swift.org open source project
 //

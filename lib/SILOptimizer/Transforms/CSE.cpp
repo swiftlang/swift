@@ -1,4 +1,4 @@
-//===- CSE.cpp - Simple and fast CSE pass ---------------------------------===//
+//===--- CSE.cpp - Simple and fast CSE pass -------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

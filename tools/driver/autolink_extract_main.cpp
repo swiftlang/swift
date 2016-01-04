@@ -1,4 +1,4 @@
-//===-- autolink_extract_main.cpp - autolink extraction utility -----------===//
+//===--- autolink_extract_main.cpp - autolink extraction utility ----------===//
 //
 // This source file is part of the Swift.org open source project
 //

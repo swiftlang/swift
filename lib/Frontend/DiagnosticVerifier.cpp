@@ -1,4 +1,4 @@
-//===- DiagnosticVerifier.cpp - Diagnostic Verifier (-verify) -------------===//
+//===--- DiagnosticVerifier.cpp - Diagnostic Verifier (-verify) -----------===//
 //
 // This source file is part of the Swift.org open source project
 //

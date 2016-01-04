@@ -1,4 +1,4 @@
-//===------------ IVInfoPrinter.cpp - Print SIL IV Info ---------*- C++ -*-===//
+//===--- IVInfoPrinter.cpp - Print SIL IV Info ------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

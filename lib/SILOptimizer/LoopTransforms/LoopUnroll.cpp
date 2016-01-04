@@ -1,4 +1,4 @@
-//===--------- LoopUnroll.cpp - Loop unrolling ------------------*- C++ -*-===//
+//===--- LoopUnroll.cpp - Loop unrolling ------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

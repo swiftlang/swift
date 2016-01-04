@@ -1,4 +1,4 @@
-//===-- DeclNodes.def - Swift Declaration AST Metaprogramming ---*- C++ -*-===//
+//===--- DeclNodes.def - Swift Declaration AST Metaprogramming --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

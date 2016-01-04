@@ -1,4 +1,4 @@
-//===- DiagnosticEngine.h - Diagnostic Display Engine -----------*- C++ -*-===//
+//===--- DiagnosticEngine.h - Diagnostic Display Engine ---------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

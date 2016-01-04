@@ -1,4 +1,4 @@
-//===- SourceLoc.h - Source Locations and Ranges ----------------*- C++ -*-===//
+//===--- SourceLoc.h - Source Locations and Ranges --------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

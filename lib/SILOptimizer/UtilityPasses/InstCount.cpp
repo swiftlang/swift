@@ -1,4 +1,4 @@
-//===-- InstCount.cpp - Collects the count of all instructions ------------===//
+//===--- InstCount.cpp - Collects the count of all instructions -----------===//
 //
 // This source file is part of the Swift.org open source project
 //

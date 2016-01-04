@@ -1,4 +1,4 @@
-//===- DiagnosticConsumer.h - Diagnostic Consumer Interface -----*- C++ -*-===//
+//===--- DiagnosticConsumer.h - Diagnostic Consumer Interface ---*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

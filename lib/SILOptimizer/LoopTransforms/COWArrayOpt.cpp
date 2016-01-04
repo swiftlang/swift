@@ -1,4 +1,4 @@
-//===------- COWArrayOpt.cpp - Optimize Copy-On-Write Array Checks --------===//
+//===--- COWArrayOpt.cpp - Optimize Copy-On-Write Array Checks ------------===//
 //
 // This source file is part of the Swift.org open source project
 //

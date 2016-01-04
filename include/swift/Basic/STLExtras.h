@@ -1,4 +1,4 @@
-//===- STLExtras.h - additions to the STL -----------------------*- C++ -*-===//
+//===--- STLExtras.h - additions to the STL ---------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

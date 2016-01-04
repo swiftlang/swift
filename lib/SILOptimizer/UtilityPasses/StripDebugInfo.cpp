@@ -1,4 +1,4 @@
-//===-------- StripDebugInfo.cpp - Strip debug info from SIL --------------===//
+//===--- StripDebugInfo.cpp - Strip debug info from SIL -------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

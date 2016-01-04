@@ -1,4 +1,4 @@
-//===-- MangleHack.cpp - Swift Mangle Hack for various clients ------------===//
+//===--- MangleHack.cpp - Swift Mangle Hack for various clients -----------===//
 //
 // This source file is part of the Swift.org open source project
 //

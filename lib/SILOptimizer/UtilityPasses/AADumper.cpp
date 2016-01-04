@@ -1,4 +1,4 @@
-//===-------- AADumper.cpp - Compare all values in Function with AA -------===//
+//===--- AADumper.cpp - Compare all values in Function with AA ------------===//
 //
 // This source file is part of the Swift.org open source project
 //

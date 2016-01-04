@@ -1,4 +1,4 @@
-//===----------- EscapeAnalysis.h - SIL Escape Analysis ---------*- C++ -*-===//
+//===--- EscapeAnalysis.h - SIL Escape Analysis -----------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

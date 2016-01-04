@@ -1,4 +1,4 @@
-//===------ ArrayCountPropagation.cpp - Propagate the count of arrays -----===//
+//===--- ArrayCountPropagation.cpp - Propagate the count of arrays --------===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -1,4 +1,4 @@
-//===- Defer.h - 'defer' helper macro ---------------------------*- C++ -*-===//
+//===--- Defer.h - 'defer' helper macro -------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

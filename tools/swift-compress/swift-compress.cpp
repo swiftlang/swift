@@ -1,4 +1,4 @@
-//===-- swift-compress.cpp - Swift compression tool  ----------------------===//
+//===--- swift-compress.cpp - Swift compression tool  ---------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

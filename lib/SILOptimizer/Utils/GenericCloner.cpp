@@ -1,4 +1,4 @@
-//===--------- GenericCloner.cpp - Specializes generic functions  ---------===//
+//===--- GenericCloner.cpp - Specializes generic functions  ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //

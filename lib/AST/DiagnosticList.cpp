@@ -1,4 +1,4 @@
-//===- DiagnosticList.cpp - Diagnostic Definitions ------------------------===//
+//===--- DiagnosticList.cpp - Diagnostic Definitions ----------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

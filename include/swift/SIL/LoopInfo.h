@@ -1,4 +1,4 @@
-//===-------------- LoopInfo.h - SIL Loop Analysis --------------*- C++ -*-===//
+//===--- LoopInfo.h - SIL Loop Analysis -------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

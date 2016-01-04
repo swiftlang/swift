@@ -1,4 +1,4 @@
-//===-- Frontend.cpp - frontend utility methods ---------------------------===//
+//===--- Frontend.cpp - frontend utility methods --------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

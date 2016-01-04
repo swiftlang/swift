@@ -1,4 +1,4 @@
-//===- SILLowerAggregateInstrs.cpp - Aggregate insts to Scalar insts  -----===//
+//===--- SILLowerAggregateInstrs.cpp - Aggregate insts to Scalar insts  ---===//
 //
 // This source file is part of the Swift.org open source project
 //

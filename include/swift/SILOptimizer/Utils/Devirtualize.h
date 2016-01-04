@@ -1,4 +1,4 @@
-//===-- Devirtualize.h - Helper for devirtualizing apply --------*- C++ -*-===//
+//===--- Devirtualize.h - Helper for devirtualizing apply -------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

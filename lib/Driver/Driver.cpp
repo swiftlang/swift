@@ -1,4 +1,4 @@
-//===-- Driver.cpp - Swift compiler driver --------------------------------===//
+//===--- Driver.cpp - Swift compiler driver -------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

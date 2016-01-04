@@ -1,4 +1,4 @@
-//===-- CFGPrinter.cpp - CFG printer pass ---------------------------------===//
+//===--- CFGPrinter.cpp - CFG printer pass --------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
