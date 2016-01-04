@@ -223,9 +223,9 @@ class NoEscapeImmediatelyApplied {
 
 
 // Reduced example from XCTest overlay, involves a TupleShuffleExpr
-public func XCTAssertTrue(@autoclosure expression: () -> BooleanType, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertTrue(@autoclosure expression: () -> BooleanType, _ message: String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
 }
-public func XCTAssert( @autoclosure expression: () -> BooleanType, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)  -> Void {
+public func XCTAssert( @autoclosure expression: () -> BooleanType, _ message: String = "", file: StaticString = __FILE__, line: UInt = __LINE__)  -> Void {
   XCTAssertTrue(expression, message, file: file, line: line);
 }
 
