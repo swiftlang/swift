@@ -1,4 +1,4 @@
-//===-- Frontend.h - frontend utility methods ------------------*- C++ -*--===//
+//===-- Frontend.h - frontend utility methods -------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -1,4 +1,4 @@
-//===-------------- LoopAnalysis.h - SIL Loop Analysis -*- C++ -*----------===//
+//===-------------- LoopAnalysis.h - SIL Loop Analysis ----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

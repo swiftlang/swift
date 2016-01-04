@@ -1,4 +1,4 @@
-//===- BottomUpIPAnalysis.h - Bottom-up IP analysis base-class -*- C++ -*--===//
+//===- BottomUpIPAnalysis.h - Bottom-up IP analysis base-class --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

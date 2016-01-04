@@ -1,4 +1,4 @@
-//===--- Private.h - Private runtime declarations --------------*- C++ -*--===//
+//===--- Private.h - Private runtime declarations ---------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

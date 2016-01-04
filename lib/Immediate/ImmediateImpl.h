@@ -1,4 +1,4 @@
-//===-- ImmediateImpl.h - Support functions for immediate mode -*- C++ -*--===//
+//===-- ImmediateImpl.h - Support functions for immediate mode --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
