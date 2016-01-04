@@ -130,17 +130,13 @@ class SILCombiner :
   /// Builder used to insert instructions.
   SILBuilder &Builder;
 
-  /// A set of instructions which have been deleted during this iteration. It is
-  /// used to make sure that we do not
-  llvm::DenseSet<SILInstruction *> DeletedInstSet;
-
   /// Cast optimizer
   CastOptimizer CastOpt;
 
 public:
   SILCombiner(SILBuilder &B, AliasAnalysis *AA, bool removeCondFails)
       : AA(AA), Worklist(), MadeChange(false), RemoveCondFails(removeCondFails),
-        Iteration(0), Builder(B), DeletedInstSet(128),
+        Iteration(0), Builder(B),
         CastOpt(/* ReplaceInstUsesAction */
                 [&](SILInstruction *I, ValueBase * V) {
                   replaceInstUsesWith(*I, V);
