@@ -147,19 +147,31 @@ StartMatch:
 /// insert them into the string builder \p SB.
 static void DecodeFixedWidth(APInt &Num, std::string &SB) {
   uint64_t CL = Huffman::CharsetLength;
+
+  // NL is the number of characters that we can hold in a 64bit number.
+  // Each letter takes Log2(CL) bits. Doing this computation in floating-
+  // point arithmetic could give a slightly better (more optimistic) result,
+  // but the computation may not be constant at compile time.
+  uint64_t NumLetters = 64 / Log2_64_Ceil(CL);
+
   assert(Num.getBitWidth() > 8 &&
          "Not enough bits for arithmetic on this alphabet");
 
   // Try to decode eight numbers at once. It is much faster to work with
   // local 64bit numbers than working with APInt. In this loop we try to
-  // extract 8 characters at one and process them using a local 64bit number.
-  // In this code we assume a worse case scenario where our alphabet is a full
-  // 8-bit ascii. It is possible to improve this code by packing one or two
-  // more characters into the 64bit local variable.
-  uint64_t CL8 = CL * CL * CL * CL * CL * CL * CL * CL;
-  while (Num.ugt(CL8)) {
+  // extract NL characters at once and process them using a local 64-bit
+  // number.
+
+  // Calculate CharsetLength**NumLetters (CL to the power of NL), which is the
+  // highest numeric value that can hold NumLetters characters in a 64bit
+  // number. Notice: this loop is optimized away and CLX is computed to a
+  // constant integer at compile time.
+  uint64_t CLX = 1;
+  for (unsigned  i = 0; i < NumLetters; i++) { CLX *= CL; }
+
+  while (Num.ugt(CLX)) {
     unsigned BW = Num.getBitWidth();
-    APInt C = APInt(BW, CL8);
+    APInt C = APInt(BW, CLX);
     APInt Quotient(1, 0), Remainder(1, 0);
     APInt::udivrem(Num, C, Quotient, Remainder);
 
@@ -170,7 +182,7 @@ static void DecodeFixedWidth(APInt &Num, std::string &SB) {
     // need to be able to perform the "mod charset_length" operation.
     Num = Quotient.zextOrTrunc(std::max(Quotient.getActiveBits(), 64u));
     uint64_t Tail = Remainder.getZExtValue();
-    for (int i=0; i < 8; i++) {
+    for (unsigned i = 0; i < NumLetters; i++) {
       SB += Huffman::Charset[Tail % CL];
       Tail = Tail / CL;
     }
