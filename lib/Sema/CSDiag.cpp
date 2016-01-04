@@ -2574,39 +2574,77 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
 }
 
 namespace {
-  class ExprTypeSaver {
+  class ExprTypeSaverAndEraser {
     llvm::DenseMap<Expr*, Type> ExprTypes;
     llvm::DenseMap<TypeLoc*, std::pair<Type, bool>> TypeLocTypes;
     llvm::DenseMap<Pattern*, Type> PatternTypes;
     llvm::DenseMap<ParamDecl*, Type> ParamDeclTypes;
+    ExprTypeSaverAndEraser(const ExprTypeSaverAndEraser&) = delete;
+    void operator=(const ExprTypeSaverAndEraser&) = delete;
   public:
 
-    void save(Expr *E) {
+    ExprTypeSaverAndEraser(Expr *E) {
       struct TypeSaver : public ASTWalker {
-        ExprTypeSaver *TS;
-        TypeSaver(ExprTypeSaver *TS) : TS(TS) {}
+        ExprTypeSaverAndEraser *TS;
+        TypeSaver(ExprTypeSaverAndEraser *TS) : TS(TS) {}
         
         std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
           TS->ExprTypes[expr] = expr->getType();
           
-          // Save the types on ClosureExpr parameters.
+          // Preserve module expr type data to prevent further lookups.
+          if (auto *declRef = dyn_cast<DeclRefExpr>(expr))
+            if (isa<ModuleDecl>(declRef->getDecl()))
+              return { false, expr };
+          
+          // Don't strip type info off OtherConstructorDeclRefExpr, because CSGen
+          // doesn't know how to reconstruct it.
+          if (isa<OtherConstructorDeclRefExpr>(expr))
+            return { false, expr };
+          
+          // TypeExpr's are relabeled by CSGen.
+          if (isa<TypeExpr>(expr))
+            return { false, expr };
+          
+          // If a literal has a Builtin.Int or Builtin.FP type on it already,
+          // then sema has already expanded out a call to
+          //   Init.init(<builtinliteral>)
+          // and we don't want it to make
+          //   Init.init(Init.init(<builtinliteral>))
+          // preserve the type info to prevent this from happening.
+          if (isa<LiteralExpr>(expr) &&
+              !(expr->getType() && expr->getType()->is<ErrorType>()))
+            return { false, expr };
+
+          // If a ClosureExpr's parameter list has types on the decls, and the
+          // types and remove them so that they'll get regenerated from the
+          // associated TypeLocs or resynthesized as fresh typevars.
           if (auto *CE = dyn_cast<ClosureExpr>(expr))
             for (auto P : *CE->getParameters())
-              if (P->hasType())
+              if (P->hasType()) {
                 TS->ParamDeclTypes[P] = P->getType();
+                P->overwriteType(Type());
+              }
           
+          expr->setType(nullptr);
+          expr->clearLValueAccessKind();
+
           return { true, expr };
         }
         
+        // If we find a TypeLoc (e.g. in an as? expr), save and erase it.
         bool walkToTypeLocPre(TypeLoc &TL) override {
-          if (TL.getTypeRepr() && TL.getType())
+          if (TL.getTypeRepr() && TL.getType()) {
             TS->TypeLocTypes[&TL] = { TL.getType(), TL.wasValidated() };
+            TL.setType(Type(), /*was validated*/false);
+          }
           return true;
         }
         
         std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-          if (P->hasType())
+          if (P->hasType()) {
             TS->PatternTypes[P] = P->getType();
+            P->setType(Type());
+          }
           return { true, P };
         }
         
@@ -2620,7 +2658,7 @@ namespace {
       E->walk(TypeSaver(this));
     }
     
-    void restore(Expr *E) {
+    void restore() {
       for (auto exprElt : ExprTypes)
         exprElt.first->setType(exprElt.second);
       
@@ -2647,7 +2685,7 @@ namespace {
     // and if expr-specific diagnostics fail to turn up anything useful to say,
     // we go digging through failed constraints, and expect their locators to
     // still be meaningful.
-    ~ExprTypeSaver() {
+    ~ExprTypeSaverAndEraser() {
       for (auto exprElt : ExprTypes)
         if (!exprElt.first->getType())
           exprElt.first->setType(exprElt.second);
@@ -2668,76 +2706,6 @@ namespace {
     }
   };
 }
-
-/// \brief "Nullify" an expression tree's type data, to make it suitable for
-/// re-typecheck operations.
-static void eraseTypeData(Expr *expr) {
-  /// Private class to "cleanse" an expression tree of types. This is done in the
-  /// case of a typecheck failure, where we may want to re-typecheck partially-
-  /// typechecked subexpressions in a context-free manner.
-  class TypeNullifier : public ASTWalker {
-  public:
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // Preserve module expr type data to prevent further lookups.
-      if (auto *declRef = dyn_cast<DeclRefExpr>(expr))
-        if (isa<ModuleDecl>(declRef->getDecl()))
-          return { false, expr };
-      
-      // Don't strip type info off OtherConstructorDeclRefExpr, because CSGen
-      // doesn't know how to reconstruct it.
-      if (isa<OtherConstructorDeclRefExpr>(expr))
-        return { false, expr };
-
-      // TypeExpr's are relabeled by CSGen.
-      if (isa<TypeExpr>(expr))
-        return { false, expr };
-
-      // If a literal has a Builtin.Int or Builtin.FP type on it already,
-      // then sema has already expanded out a call to
-      //   Init.init(<builtinliteral>)
-      // and we don't want it to make
-      //   Init.init(Init.init(<builtinliteral>))
-      // preserve the type info to prevent this from happening.
-      if (isa<LiteralExpr>(expr) &&
-          !(expr->getType() && expr->getType()->is<ErrorType>()))
-        return { false, expr };
-      
-      // If a ClosureExpr's parameter list has types on the decls, remove them
-      // so that they'll get regenerated from the associated TypeLocs or
-      // resynthesized.
-      if (auto *CE = dyn_cast<ClosureExpr>(expr))
-        for (auto P : *CE->getParameters())
-          if (P->hasType())
-            P->overwriteType(Type());
-      
-      expr->setType(nullptr);
-      expr->clearLValueAccessKind();
-      return { true, expr };
-    }
-    
-    // If we find a TypeLoc (e.g. in an as? expr) with a type variable, rewrite
-    // it.
-    bool walkToTypeLocPre(TypeLoc &TL) override {
-      if (TL.getTypeRepr())
-        TL.setType(Type(), /*was validated*/false);
-      return true;
-    }
-    
-    std::pair<bool, Pattern*> walkToPatternPre(Pattern *pattern) override {
-      pattern->setType(nullptr);
-      return { true, pattern };
-    }
-    
-    // Don't walk into statements.  This handles the BraceStmt in
-    // non-single-expr closures, so we don't walk into their body.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-      return { false, S };
-    }
-  };
-  
-  expr->walk(TypeNullifier());
-}
-
 
 /// Erase an expression tree's open existentials after a re-typecheck operation.
 ///
@@ -2873,15 +2841,15 @@ typeCheckChildIndependently(Expr *subExpr, Type convertType,
     return subExpr;
   }
   
-  ExprTypeSaver SavedTypeData;
-  SavedTypeData.save(subExpr);
+  // Save any existing type data of the subexpr tree, and reset it to null in
+  // prep for re-type-checking the tree.  If things fail, we can revert the
+  // types back to their original state.
+  ExprTypeSaverAndEraser SavedTypeData(subExpr);
   
   // Store off the sub-expression, in case a new one is provided via the
   // type check operation.
   Expr *preCheckedExpr = subExpr;
-
-  eraseTypeData(subExpr);
-      
+  
   // Disable structural checks, because we know that the overall expression
   // has type constraint problems, and we don't want to know about any
   // syntactic issues in a well-typed subexpression (which might be because
@@ -2924,7 +2892,7 @@ typeCheckChildIndependently(Expr *subExpr, Type convertType,
   // just pretend as though nothing happened.
   if (subExpr->getType()->is<ErrorType>()) {
     subExpr = preCheckedExpr;
-    SavedTypeData.restore(subExpr);
+    SavedTypeData.restore();
   }
   
   CS->TC.addExprForDiagnosis(preCheckedExpr, subExpr);
