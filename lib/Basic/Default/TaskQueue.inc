@@ -1,4 +1,4 @@
-//===--- Default/TaskQueue.inc - Default serial TaskQueue -------*- C++ -*-===//
+//===--- TaskQueue.inc - Default serial TaskQueue ---------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

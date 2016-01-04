@@ -1,4 +1,4 @@
-//===- swift/unittests/runtime/weak.mm - Weak-pointer tests ---------------===//
+//===- weak.mm - Weak-pointer tests ---------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
