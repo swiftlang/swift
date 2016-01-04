@@ -2018,6 +2018,18 @@ public:
             "failure dest of checked_cast_br must take no arguments");
   }
 
+  void checkCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
+    require(CCABI->getSrc().getType().isAddress(),
+            "checked_cast_addr_br src must be an address");
+    require(CCABI->getDest().getType().isAddress(),
+            "checked_cast_addr_br dest must be an address");
+
+    require(CCABI->getSuccessBB()->bbarg_size() == 0,
+        "success dest block of checked_cast_addr_br must not take an argument");
+    require(CCABI->getFailureBB()->bbarg_size() == 0,
+        "failure dest block of checked_cast_addr_br must not take an argument");
+  }
+
   void checkThinToThickFunctionInst(ThinToThickFunctionInst *TTFI) {
     auto opFTy = requireObjectType(SILFunctionType, TTFI->getOperand(),
                                    "thin_to_thick_function operand");
