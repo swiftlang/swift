@@ -1,4 +1,4 @@
-//===- BlotMapVector.h - Map vector with "blot" operation  ------*- C++ -*-===//
+//===--- BlotMapVector.h - Map vector with "blot" operation  ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

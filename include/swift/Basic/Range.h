@@ -1,4 +1,4 @@
-//===- Range.h - Classes for conveniently working with ranges ---*- C++ -*-===//
+//===--- Range.h - Classes for conveniently working with ranges -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

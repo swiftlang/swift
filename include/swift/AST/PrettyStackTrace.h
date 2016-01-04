@@ -1,4 +1,4 @@
-//===- PrettyStackTrace.h - Crash trace information -------------*- C++ -*-===//
+//===--- PrettyStackTrace.h - Crash trace information -----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

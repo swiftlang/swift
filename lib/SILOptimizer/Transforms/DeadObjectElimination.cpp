@@ -1,4 +1,4 @@
-//===-- DeadObjectElimination.cpp - Remove unused objects  ----------------===//
+//===--- DeadObjectElimination.cpp - Remove unused objects  ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //

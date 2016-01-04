@@ -1,4 +1,4 @@
-//===- CompressionTests.cpp - for swift/ABI/Compression.h -----------------===//
+//===--- CompressionTests.cpp - for swift/ABI/Compression.h ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //

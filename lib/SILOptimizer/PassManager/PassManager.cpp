@@ -1,4 +1,4 @@
-//===----- PassManager.cpp - Swift Pass Manager ---------------------------===//
+//===--- PassManager.cpp - Swift Pass Manager -----------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

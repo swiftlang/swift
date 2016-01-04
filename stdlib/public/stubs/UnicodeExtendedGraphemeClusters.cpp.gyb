@@ -1,4 +1,4 @@
-//===- UnicodeExtendedGraphemeClusters.cpp.gyb ------------------*- C++ -*-===//
+//===--- UnicodeExtendedGraphemeClusters.cpp.gyb ----------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

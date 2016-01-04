@@ -1,4 +1,4 @@
-//===- Utils.h - Misc utilities -------------------------------------------===//
+//===--- Utils.h - Misc utilities -----------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

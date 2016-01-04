@@ -1,4 +1,4 @@
-//===-- RelativePointer.h - Relative Pointer Support ------------*- C++ -*-===//
+//===--- RelativePointer.h - Relative Pointer Support -----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

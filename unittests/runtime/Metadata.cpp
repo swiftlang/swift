@@ -1,4 +1,4 @@
-//===- Metadata.cpp - Metadata tests --------------------------------------===//
+//===--- Metadata.cpp - Metadata tests ------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

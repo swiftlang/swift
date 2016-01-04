@@ -1,4 +1,4 @@
-//===-- ColdBlockInfo.h - Fast/slow path analysis for SIL CFG ---*- C++ -*-===//
+//===--- ColdBlockInfo.h - Fast/slow path analysis for SIL CFG --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

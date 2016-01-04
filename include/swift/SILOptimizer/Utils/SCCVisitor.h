@@ -1,4 +1,4 @@
-//===------------------- SCCVisitor.h - SIL SCC Visitor ---------*- C++ -*-===//
+//===--- SCCVisitor.h - SIL SCC Visitor -------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

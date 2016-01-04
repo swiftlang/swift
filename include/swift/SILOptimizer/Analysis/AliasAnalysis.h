@@ -1,4 +1,4 @@
-//===-------------- AliasAnalysis.h - SIL Alias Analysis --------*- C++ -*-===//
+//===--- AliasAnalysis.h - SIL Alias Analysis -------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -1,4 +1,4 @@
-//===- SourceEntityWalker.h - Routines for semantic source info -----------===//
+//===--- SourceEntityWalker.h - Routines for semantic source info ---------===//
 //
 // This source file is part of the Swift.org open source project
 //

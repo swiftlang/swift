@@ -1,4 +1,4 @@
-//===-------- Devirtualizer.cpp - Devirtualize indirect calls  ------------===//
+//===--- Devirtualizer.cpp - Devirtualize indirect calls  -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //

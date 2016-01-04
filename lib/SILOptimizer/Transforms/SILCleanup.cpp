@@ -1,4 +1,4 @@
-//===-- SILCleanup.cpp - Removes diagnostics instructions -----------------===//
+//===--- SILCleanup.cpp - Removes diagnostics instructions ----------------===//
 //
 // This source file is part of the Swift.org open source project
 //

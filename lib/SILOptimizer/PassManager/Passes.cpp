@@ -1,4 +1,4 @@
-//===-------- Passes.cpp - Swift Compiler SIL Pass Entrypoints ------------===//
+//===--- Passes.cpp - Swift Compiler SIL Pass Entrypoints -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -1,4 +1,4 @@
-//===-- FunctionSignatureOpts.cpp - Optimizes function signatures ---------===//
+//===--- FunctionSignatureOpts.cpp - Optimizes function signatures --------===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -1,4 +1,4 @@
-//===-- TypeMatcher.h - Recursive Type Matcher------- -----------*- C++ -*-===//
+//===--- TypeMatcher.h - Recursive Type Matcher -----------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

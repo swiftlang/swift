@@ -1,4 +1,4 @@
-//===-- REPL.cpp - the integrated REPL ------------------------------------===//
+//===--- REPL.cpp - the integrated REPL -----------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

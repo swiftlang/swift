@@ -1,4 +1,4 @@
-//===-- Immediate.h - Entry point for swift immediate mode ------*- C++ -*-===//
+//===--- Immediate.h - Entry point for swift immediate mode -----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

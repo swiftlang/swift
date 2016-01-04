@@ -1,4 +1,4 @@
-//===----- FunctionOrder.cpp - Utility for function ordering --------------===//
+//===--- FunctionOrder.cpp - Utility for function ordering ----------------===//
 //
 // This source file is part of the Swift.org open source project
 //

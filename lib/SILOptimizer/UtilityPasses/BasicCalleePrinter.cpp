@@ -1,4 +1,4 @@
-//===-- BasicCalleePrinter.cpp - Callee cache printing pass -----*- C++ -*-===//
+//===--- BasicCalleePrinter.cpp - Callee cache printing pass ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
