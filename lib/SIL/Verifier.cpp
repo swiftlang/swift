@@ -2542,7 +2542,7 @@ public:
 
   void checkSwitchEnumAddrInst(SwitchEnumAddrInst *SOI){
     require(SOI->getOperand().getType().isAddress(),
-            "switch_enum_addr operand must be an object");
+            "switch_enum_addr operand must be an address");
 
     SILType uTy = SOI->getOperand().getType();
     EnumDecl *uDecl = uTy.getEnumOrBoundGenericEnum();
