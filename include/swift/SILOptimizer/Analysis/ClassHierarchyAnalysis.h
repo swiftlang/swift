@@ -1,4 +1,4 @@
-//===-- ClassHierarchyAnalysis.h - Analysis of Class Hierarchy --*- C++ -*-===//
+//===--- ClassHierarchyAnalysis.h - Analysis of Class Hierarchy -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

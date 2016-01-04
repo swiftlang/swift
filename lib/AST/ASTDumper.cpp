@@ -1,4 +1,4 @@
-//===--- ASTDumper.cpp - Swift Language AST Dumper-------------------------===//
+//===--- ASTDumper.cpp - Swift Language AST Dumper ------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

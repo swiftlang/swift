@@ -1,4 +1,4 @@
-//===- PerformanceInliner.cpp - Basic cost based inlining for performance -===//
+//===--- PerformanceInliner.cpp - Basic cost based performance inlining ---===//
 //
 // This source file is part of the Swift.org open source project
 //

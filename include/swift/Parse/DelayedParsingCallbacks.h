@@ -1,4 +1,4 @@
-//===- DelayedParsingCallbacks.h - Callbacks for Parser's delayed parsing -===//
+//===--- DelayedParsingCallbacks.h - Delayed parsing callbacks ------------===//
 //
 // This source file is part of the Swift.org open source project
 //
