@@ -136,12 +136,18 @@ static bool isDeadStoreInertInstruction(SILInstruction *Inst) {
 
 namespace {
 
-// If there are too many locations in the function, we bail out.
-constexpr unsigned MaxLSLocationLimit = 2048;
+/// If this function has too many basic blocks or too many locations, it may
+/// take a long time to compute the genset and killset. The number of memory
+/// behavior or alias query we need to do in worst case is roughly linear to
+/// # of BBs x(times) # of locations.
+///
+/// we could run DSE on functions with 256 basic blocks and 256 locations,
+/// which is a large function.  
+constexpr unsigned MaxLSLocationBBMultiplicationNone = 256*256;
 
-constexpr unsigned MaxOneIterationFunctionBBLimit = 32;
-
-constexpr unsigned MaxOneIterationFunctionLSLocationLimit = 64;
+/// we could run optimsitic DSE on functions with less than 64 basic blocks
+/// and 64 locations which is a sizeable function.
+constexpr unsigned MaxLSLocationBBMultiplicationPessimistic = 64*64;
 
 /// If a large store is broken down to too many smaller stores, bail out.
 /// Currently, we only do partial dead store if we can form a single contiguous
@@ -234,7 +240,7 @@ public:
   void initReturnBlock(DSEContext &Ctx);
 
   /// Initialize the bitvectors for the current basic block.
-  void init(DSEContext &Ctx, bool OneIterationFunction);
+  void init(DSEContext &Ctx, bool PessimisticDF);
 
   /// Check whether the BBWriteSetIn has changed. If it does, we need to rerun
   /// the data flow on this block's predecessors to reach fixed point.
@@ -274,6 +280,12 @@ bool BlockState::isTrackingLocation(llvm::SmallBitVector &BV, unsigned i) {
 namespace {
 
 class DSEContext {
+  enum class ProcessKind {
+    ProcessOptimistic = 0,
+    ProcessPessimistic = 1,
+    ProcessNone = 2,
+  }; 
+private:
   /// The module we are currently processing.
   SILModule *Mod;
 
@@ -415,11 +427,11 @@ public:
 
   /// Use a set of ad hoc rules to tell whether we should run a pessimistic
   /// one iteration data flow on the function.
-  bool isOneIterationFunction();
+  ProcessKind getProcessFunctionKind();
 
   /// Compute the kill set for the basic block. return true if the store set
   /// changes.
-  void processBasicBlockForDSE(SILBasicBlock *BB, bool OneIterationFunction);
+  void processBasicBlockForDSE(SILBasicBlock *BB, bool PessimisticDF);
 
   /// Compute the genset and killset for the current basic block.
   void processBasicBlockForGenKillSet(SILBasicBlock *BB);
@@ -451,7 +463,7 @@ void BlockState::initReturnBlock(DSEContext &Ctx) {
   }
 }
 
-void BlockState::init(DSEContext &Ctx, bool OneIterationFunction)  {
+void BlockState::init(DSEContext &Ctx, bool PessimisticDF)  {
   std::vector<LSLocation> &LV = Ctx.getLocationVault();
   LocationNum = LV.size();
   // For function that requires just 1 iteration of the data flow to converge
@@ -470,7 +482,7 @@ void BlockState::init(DSEContext &Ctx, bool OneIterationFunction)  {
   // However, by doing so, we can only eliminate the dead stores after the
   // data flow stabilizes.
   //
-  BBWriteSetIn.resize(LocationNum, !OneIterationFunction);
+  BBWriteSetIn.resize(LocationNum, !PessimisticDF);
   BBWriteSetOut.resize(LocationNum, false);
   BBWriteSetMid.resize(LocationNum, false);
 
@@ -498,9 +510,10 @@ unsigned DSEContext::getLocationBit(const LSLocation &Loc) {
   return Iter->second;
 }
 
-bool DSEContext::isOneIterationFunction() {
+DSEContext::ProcessKind DSEContext::getProcessFunctionKind() {
   bool RunOneIteration = true;
   unsigned BBCount = 0;
+  unsigned LocationCount = LocationVault.size();
 
   // If all basic blocks will have their successors processed if
   // the basic blocks in the functions are iterated in post order.
@@ -519,19 +532,20 @@ bool DSEContext::isOneIterationFunction() {
     HandledBBs.insert(B);
   }
 
-  // If this function has too many basic blocks or too many locations, it may
-  // take a long time to compute the genset and killset. The number of memory
-  // behavior or alias query we need to do in worst case is roughly linear to
-  // # of BBs x(times) # of locations.
-  //
-  // Instead, we run one pessimistic data flow to do dead store elimination on
-  // the function.
-  if (BBCount > MaxOneIterationFunctionBBLimit)
-    RunOneIteration = true;
-  if (LocationVault.size() > MaxOneIterationFunctionLSLocationLimit)
-    RunOneIteration = true;
+  // Data flow may take too long to run.
+  if (BBCount * LocationCount > MaxLSLocationBBMultiplicationNone)
+    return ProcessKind::ProcessNone;
 
-  return RunOneIteration;
+  // This function's data flow would converge in 1 iteration.
+  if (RunOneIteration)
+    return ProcessKind::ProcessPessimistic;
+  
+  // We run one pessimistic data flow to do dead store elimination on
+  // the function.
+  if (BBCount * LocationCount > MaxLSLocationBBMultiplicationPessimistic)
+    return ProcessKind::ProcessPessimistic;
+
+  return ProcessKind::ProcessOptimistic;
 }
 
 void DSEContext::processBasicBlockForGenKillSet(SILBasicBlock *BB) {
@@ -587,13 +601,13 @@ bool DSEContext::processBasicBlockWithGenKillSet(SILBasicBlock *BB) {
 }
 
 void DSEContext::processBasicBlockForDSE(SILBasicBlock *BB,
-                                         bool OneIterationFunction) {
+                                         bool PessimisticDF) {
   // If we know this is not a one iteration function which means its
   // its BBWriteSetIn and BBWriteSetOut have been computed and converged, 
   // and this basic block does not even have StoreInsts, there is no point
   // in processing every instruction in the basic block again as no store
   // will be eliminated. 
-  if (!OneIterationFunction && BBWithStores.find(BB) == BBWithStores.end())
+  if (!PessimisticDF && BBWithStores.find(BB) == BBWithStores.end())
        return;
 
   // Intersect in the successor WriteSetIns. A store is dead if it is not read
@@ -1067,15 +1081,15 @@ bool DSEContext::run() {
   // this function.
   LSLocation::enumerateLSLocations(*F, LocationVault, LocToBitIndex, TE);
 
-  // Do we really need to run the iterative data flow on the function.
-  //
-  // Also check whether this function meets other criteria for pessimistic
-  // one iteration data flow.
-  bool OneIterationFunction = isOneIterationFunction();
+  // Check how to optimize this function.
+  ProcessKind Kind = getProcessFunctionKind();
+  
+  // We do not optimize this function at all.
+  if (Kind == ProcessKind::ProcessNone)
+      return false;
 
-  // Data flow may take too long to converge.
-  if (LocationVault.size() > MaxLSLocationLimit)
-    return false;
+  // Do we run a pessimistic data flow ?
+  bool PessimisticDF = Kind == ProcessKind::ProcessOptimistic ? false : true;
 
   // For all basic blocks in the function, initialize a BB state.
   //
@@ -1086,7 +1100,7 @@ bool DSEContext::run() {
     BlockStates.push_back(BlockState(&B));
     // Since we know all the locations accessed in this function, we can resize
     // the bit vector to the appropriate size.
-    BlockStates.back().init(*this, OneIterationFunction);
+    BlockStates.back().init(*this, PessimisticDF);
   }
 
   // Initialize the BBToLocState mapping.
@@ -1112,14 +1126,14 @@ bool DSEContext::run() {
   // on the function.
 
   // We need to run the iterative data flow on the function.
-  if (!OneIterationFunction) {
+  if (!PessimisticDF) {
     runIterativeDSE();
   }
 
   // The data flow has stabilized, run one last iteration over all the basic
   // blocks and try to remove dead stores.
   for (SILBasicBlock *B : PO->getPostOrder()) {
-    processBasicBlockForDSE(B, OneIterationFunction);
+    processBasicBlockForDSE(B, PessimisticDF);
   }
 
   // Finally, delete the dead stores and create the live stores.
