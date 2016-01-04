@@ -1,4 +1,4 @@
-//===---------- SILGlobalOpt.cpp - Optimize global initializers -----------===//
+//===--- GlobalOpt.cpp - Optimize global initializers ---------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
