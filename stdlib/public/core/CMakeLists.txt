@@ -130,6 +130,7 @@ set(SWIFTLIB_SOURCES
   Tuple.swift.gyb
   VarArgs.swift
   Zip.swift
+  ZipWithNilPadding.swift
   Prespecialized.swift
   )
 
