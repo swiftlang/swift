@@ -2806,9 +2806,9 @@ void SwiftEditorDocument::reportDocumentStructure(swift::SourceFile &SrcFile,
   ModelContext.walk(Walker);
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // EditorOpen
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
                                   bool EnableSyntaxMap,
@@ -2844,9 +2844,9 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
 }
 
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // EditorClose
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 void SwiftLangSupport::editorClose(StringRef Name, bool RemoveCache) {
   auto Removed = EditorDocuments.remove(Name);
@@ -2858,9 +2858,9 @@ void SwiftLangSupport::editorClose(StringRef Name, bool RemoveCache) {
 }
 
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // EditorReplaceText
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 void SwiftLangSupport::editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf,
                                          unsigned Offset, unsigned Length,
@@ -2886,9 +2886,9 @@ void SwiftLangSupport::editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf
 }
 
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // EditorFormatText
-//============================================================================//
+//===----------------------------------------------------------------------===//
 void SwiftLangSupport::editorApplyFormatOptions(StringRef Name,
                                                 OptionsDictionary &FmtOptions) {
   auto EditorDoc = EditorDocuments.getByUnresolvedName(Name);
@@ -2913,9 +2913,9 @@ void SwiftLangSupport::editorExtractTextFromComment(StringRef Source,
   Consumer.handleSourceText(extractPlainTextFromComment(Source));
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // EditorExpandPlaceholder
-//============================================================================//
+//===----------------------------------------------------------------------===//
 void SwiftLangSupport::editorExpandPlaceholder(StringRef Name, unsigned Offset,
                                                unsigned Length,
                                                EditorConsumer &Consumer) {

@@ -99,9 +99,9 @@ void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   }
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // SwiftLangSupport::getCursorInfo
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 static StringRef getSourceToken(unsigned Offset,
                                 ImmutableTextSnapshotRef Snap) {
@@ -605,9 +605,9 @@ void SwiftLangSupport::getCursorInfo(
                 Receiver);
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // SwiftLangSupport::findUSRRange
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 llvm::Optional<std::pair<unsigned, unsigned>>
 SwiftLangSupport::findUSRRange(StringRef DocumentName, StringRef USR) {
@@ -619,9 +619,9 @@ SwiftLangSupport::findUSRRange(StringRef DocumentName, StringRef USR) {
   return None;
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // SwiftLangSupport::findRelatedIdentifiersInFile
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 namespace {
 class RelatedIdScanner : public ide::SourceEntityWalker {
