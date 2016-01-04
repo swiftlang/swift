@@ -13,7 +13,6 @@ set(UTILITYPASSES_SOURCES
   UtilityPasses/LoopCanonicalizer.cpp
   UtilityPasses/LoopRegionPrinter.cpp
   UtilityPasses/LSLocationPrinter.cpp
-  UtilityPasses/MemoryBehaviorDumper.cpp
   UtilityPasses/SideEffectsDumper.cpp
   UtilityPasses/StripDebugInfo.cpp
   PARENT_SCOPE)
