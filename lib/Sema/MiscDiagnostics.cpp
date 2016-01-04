@@ -25,9 +25,9 @@
 #include "llvm/ADT/MapVector.h"
 using namespace swift;
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Diagnose assigning variable to itself.
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 static Decl *findSimpleReferencedDecl(const Expr *E) {
   if (auto *LE = dyn_cast<LoadExpr>(E))
@@ -771,9 +771,9 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
   const_cast<Expr *>(E)->walk(DiagnoseWalker(TC, isAlreadyInClosure));
 }
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Diagnose availability.
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted=".
@@ -1156,9 +1156,9 @@ static void diagAvailability(TypeChecker &TC, const Expr *E,
   const_cast<Expr*>(E)->walk(walker);
 }
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Per func/init diagnostics
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 namespace {
 class VarDeclUsageChecker : public ASTWalker {
@@ -1825,9 +1825,9 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
    .fixItRemoveChars(FS->getSecondSemicolonLoc(), endOfIncrementLoc);
 }
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // High-level entry points.
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 /// \brief Emit diagnostics for syntactic restrictions on a given expression.
 void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
@@ -1847,9 +1847,9 @@ void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
     checkCStyleForLoop(TC, forStmt);
 }
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Utility functions
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 void swift::fixItAccessibility(InFlightDiagnostic &diag, ValueDecl *VD,
                                Accessibility desiredAccess, bool isForSetter) {

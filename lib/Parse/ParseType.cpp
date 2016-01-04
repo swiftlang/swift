@@ -699,9 +699,9 @@ Parser::parseTypeImplicitlyUnwrappedOptional(TypeRepr *base) {
                            base, exclamationLoc));
 }
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Speculative type list parsing
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 static bool isGenericTypeDisambiguatingToken(Parser &P) {
   auto &tok = P.Tok;

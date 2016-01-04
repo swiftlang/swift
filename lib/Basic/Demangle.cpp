@@ -8,11 +8,11 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 //
 //  This file implements declaration name demangling in Swift.
 //
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/Fallthrough.h"

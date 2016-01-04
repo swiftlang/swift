@@ -383,7 +383,7 @@ Runtime.test("isBridgedVerbatimToObjectiveC") {
   expectTrue(_isBridgedVerbatimToObjectiveC(BridgedVerbatimRefType))
 }
 
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 // The protocol should be defined in the standard library, otherwise the cast
 // does not work.
