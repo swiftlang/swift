@@ -536,15 +536,6 @@ namespace {
         return type;
       }
 
-      // Replace archetypes with fresh type variables.
-      if (auto archetype = type->getAs<ArchetypeType>()) {
-        auto known = replacements.find(archetype->getCanonicalType());
-        if (known != replacements.end())
-          return known->second;
-
-        return archetype;
-      }
-
       // Replace a generic type parameter with its corresponding type variable.
       if (auto genericParam = type->getAs<GenericTypeParamType>()) {
         auto known = replacements.find(genericParam->getCanonicalType());
