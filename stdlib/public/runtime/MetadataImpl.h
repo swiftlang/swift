@@ -1,4 +1,4 @@
-//===--- MetadataImpl.h - Metadata implementation routines -----*- C++ -*--===//
+//===--- MetadataImpl.h - Metadata implementation routines ------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

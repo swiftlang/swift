@@ -1,4 +1,4 @@
-//===--- ARCEntryPointBuilder.h ----------------------------*- C++ -*------===//
+//===--- ARCEntryPointBuilder.h ---------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -1,4 +1,4 @@
-//===--- RefCountState.h - Represents a Reference Count -----*- C++ -*-----===//
+//===--- RefCountState.h - Represents a Reference Count ---------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

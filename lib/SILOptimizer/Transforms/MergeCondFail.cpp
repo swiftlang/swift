@@ -1,4 +1,4 @@
-//===-- MergeCondFail.cpp -  Merge cond_fail instructions -*- C++ -*-------===//
+//===-- MergeCondFail.cpp -  Merge cond_fail instructions -------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

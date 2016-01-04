@@ -1,4 +1,4 @@
-//===--- PostOrderAnalysis.h - SIL POT and RPOT Analysis -------*- C++ -*--===//
+//===--- PostOrderAnalysis.h - SIL POT and RPOT Analysis --------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

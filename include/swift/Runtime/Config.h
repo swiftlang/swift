@@ -1,4 +1,4 @@
-//===--- Config.h - Swift Language Platform Configuration ------*- C++ -*--===//
+//===--- Config.h - Swift Language Platform Configuration -------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

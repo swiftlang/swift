@@ -1,4 +1,4 @@
-//===--- SerializedSILLoader.h - Handle SIL section in modules --*- c++ -*-===//
+//===--- SerializedSILLoader.h - Handle SIL section in modules --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

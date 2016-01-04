@@ -1,4 +1,4 @@
-//===--- Once.h - Runtime support for lazy initialization ------*- C++ -*--===//
+//===--- Once.h - Runtime support for lazy initialization -------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
