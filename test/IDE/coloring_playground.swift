@@ -1,6 +1,5 @@
 // RUN: %target-swift-ide-test -syntax-coloring -playground -source-filename %s | FileCheck %s
 // RUN: %target-swift-ide-test -syntax-coloring -playground -typecheck -source-filename %s | FileCheck %s
-// XFAIL: broken_std_regex
 
 //: playground doc comment line
 func playgroundCommentLine(f : () throws -> ()) rethrows {}
