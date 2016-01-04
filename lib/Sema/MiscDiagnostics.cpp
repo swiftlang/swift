@@ -2068,7 +2068,7 @@ static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
   // Figure out the first parameter name.
   StringRef firstParamName;
   auto params = afd->getParameterList(afd->getImplicitSelfDecl() ? 1 : 0);
-  if (params->size() != 0)
+  if (params->size() != 0 && !params->get(0)->getName().empty())
     firstParamName = params->get(0)->getName().str();
 
   // Find the set of property names.
