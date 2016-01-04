@@ -1,4 +1,4 @@
-//===--- ArgumentSource.h - Abstracted source of an argument 000-*- C++ -*-===//
+//===--- ArgumentSource.h - Abstracted source of an argument ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

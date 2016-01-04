@@ -1,4 +1,4 @@
-//===- CodeCompletionCallbacks.h - Parser's interface to code completion --===//
+//===--- CodeCompletionCallbacks.h - Parser's interface to code completion ===//
 //
 // This source file is part of the Swift.org open source project
 //

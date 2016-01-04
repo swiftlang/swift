@@ -1,4 +1,4 @@
-//===-- DataflowDiagnostics.cpp - Emits diagnostics based on SIL analysis -===//
+//===--- DataflowDiagnostics.cpp - Emits diagnostics based on SIL analysis ===//
 //
 // This source file is part of the Swift.org open source project
 //

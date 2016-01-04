@@ -1,4 +1,4 @@
-//===-- SpeculativeDevirtualizer.cpp -- Speculatively devirtualize calls --===//
+//===--- SpeculativeDevirtualizer.cpp - Speculatively devirtualize calls --===//
 //
 // This source file is part of the Swift.org open source project
 //

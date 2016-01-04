@@ -1,4 +1,4 @@
-//===--- ASTPrinter.cpp - Swift Language AST Printer-----------------------===//
+//===--- ASTPrinter.cpp - Swift Language AST Printer ----------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

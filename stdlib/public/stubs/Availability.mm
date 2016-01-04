@@ -1,4 +1,4 @@
-//===--- Availability.mm - Swift Language API Availability Support---------===//
+//===--- Availability.mm - Swift Language API Availability Support --------===//
 //
 // This source file is part of the Swift.org open source project
 //

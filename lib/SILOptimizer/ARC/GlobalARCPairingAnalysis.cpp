@@ -1,4 +1,4 @@
-//===-- GlobalARCPairingAnalysis.cpp - Global ARC Retain Release Pairing --===//
+//===--- GlobalARCPairingAnalysis.cpp - Global ARC Retain Release Pairing -===//
 //
 // This source file is part of the Swift.org open source project
 //
