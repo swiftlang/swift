@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience %s | FileCheck %s
+// RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience %s | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 // RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience -O %s
 
 // CHECK: %swift.type = type { [[INT:i32|i64]] }
@@ -226,21 +226,34 @@ public class MyResilientChild : MyResilientParent {
 
 // ClassWithResilientProperty metadata instantiation function
 
-// FIXME: This is bogus since we don't emit code to initialize the
-// global ivar offsets yet.
-
 
 // CHECK-LABEL: define private %swift.type* @create_generic_metadata_ClassWithResilientProperty(%swift.type_pattern*, i8**)
-// CHECK:      [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(
-// CHECK:      [[SIZE_METADATA:%.*]] = call %swift.type* @_TMaV16resilient_struct4Size()
-// CHECK:      call void @swift_initClassMetadata_UniversalStrategy(
-// CHECK:      ret %swift.type* [[METADATA]]
+// CHECK:             [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(
+// CHECK:             [[SIZE_METADATA:%.*]] = call %swift.type* @_TMaV16resilient_struct4Size()
+// CHECK:             call void @swift_initClassMetadata_UniversalStrategy(
+// CHECK-native:      [[METADATA_PTR:%.*]] = bitcast %swift.type* [[METADATA]] to [[INT]]*
+// CHECK-native-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_PTR]], [[INT]] 12
+// CHECK-native-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_PTR]]
+// CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @_TWvdvC16class_resilience26ClassWithResilientProperty1sV16resilient_struct4Size
+// CHECK-native-NEXT: [[METADATA_PTR:%.*]] = bitcast %swift.type* [[METADATA]] to [[INT]]*
+// CHECK-native-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_PTR]], [[INT]] 13
+// CHECK-native-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_PTR]]
+// CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @_TWvdvC16class_resilience26ClassWithResilientProperty5colorVs5Int32
+// CHECK-NEXT:        ret %swift.type* [[METADATA]]
 
 
 // ClassWithResilientlySizedProperty metadata instantiation function
 
 // CHECK-LABEL: define private %swift.type* @create_generic_metadata_ClassWithResilientlySizedProperty(%swift.type_pattern*, i8**)
-// CHECK:      [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(
-// CHECK:      [[RECTANGLE_METADATA:%.*]] = call %swift.type* @_TMaV16resilient_struct9Rectangle()
-// CHECK:      call void @swift_initClassMetadata_UniversalStrategy(
-// CHECK:      ret %swift.type* [[METADATA]]
+// CHECK:             [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(
+// CHECK:             [[RECTANGLE_METADATA:%.*]] = call %swift.type* @_TMaV16resilient_struct9Rectangle()
+// CHECK:             call void @swift_initClassMetadata_UniversalStrategy(
+// CHECK-native:      [[METADATA_PTR:%.*]] = bitcast %swift.type* [[METADATA]] to [[INT]]*
+// CHECK-native-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_PTR]], [[INT]] 11
+// CHECK-native-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_PTR]]
+// CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @_TWvdvC16class_resilience33ClassWithResilientlySizedProperty1rV16resilient_struct9Rectangle
+// CHECK-native-NEXT: [[METADATA_PTR:%.*]] = bitcast %swift.type* [[METADATA]] to [[INT]]*
+// CHECK-native-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_PTR]], [[INT]] 12
+// CHECK-native-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_PTR]]
+// CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @_TWvdvC16class_resilience33ClassWithResilientlySizedProperty5colorVs5Int32
+// CHECK-NEXT:        ret %swift.type* [[METADATA]]

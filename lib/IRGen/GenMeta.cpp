@@ -59,6 +59,12 @@ using namespace irgen;
 
 static llvm::Value *emitLoadOfObjCHeapMetadataRef(IRGenFunction &IGF,
                                                   llvm::Value *object);
+static llvm::LoadInst *
+emitLoadFromMetadataAtIndex(IRGenFunction &IGF,
+                            llvm::Value *metadata,
+                            int index,
+                            llvm::Type *objectTy,
+                            const llvm::Twine &suffix = "");
 
 /// Produce a constant to place in a metatype's isa field
 /// corresponding to the given metadata kind.
@@ -3392,6 +3398,34 @@ namespace {
       }
     }
 
+    void emitInitializeFieldOffsets(IRGenFunction &IGF,
+                                    llvm::Value *metadata) {
+      // The Objective-C runtime will copy field offsets from the field offset
+      // vector into field offset globals for us, if present. If there's no
+      // Objective-C runtime, we have to do this ourselves.
+      unsigned index = FieldLayout.InheritedStoredProperties.size();
+
+      for (auto prop : Target->getStoredProperties()) {
+        auto access = FieldLayout.AllFieldAccesses[index];
+        if (access == FieldAccess::NonConstantDirect) {
+          Address offsetA = IGF.IGM.getAddrOfFieldOffset(prop,
+                                                         /*indirect*/ false,
+                                                         ForDefinition);
+
+          // We can't use emitClassFieldOffset() here because that creates
+          // an invariant load, which could be hoisted above the point
+          // where the metadata becomes fully initialized
+          Size offset = getClassFieldOffset(IGF.IGM, Target, prop);
+          int index = getOffsetInWords(IGF.IGM, offset);
+          auto offsetVal = emitLoadFromMetadataAtIndex(IGF, metadata, index,
+                                                       IGF.IGM.SizeTy);
+          IGF.Builder.CreateStore(offsetVal, offsetA);
+        }
+
+        index++;
+      }
+    }
+
     void emitInitializeMetadata(IRGenFunction &IGF,
                                 llvm::Value *metadata,
                                 llvm::Value *vwtable) {
@@ -3555,8 +3589,9 @@ namespace {
                                 llvm::ConstantInt::get(IGF.IGM.Int1Ty,
                                                        copyFieldOffsetVectors)});
       }
+
+      emitInitializeFieldOffsets(IGF, metadata);
     }
-    
   };
 }
 
@@ -3647,7 +3682,7 @@ static llvm::LoadInst *emitLoadFromMetadataAtIndex(IRGenFunction &IGF,
                                                    llvm::Value *metadata,
                                                    int index,
                                                    llvm::Type *objectTy,
-                                                const llvm::Twine &suffix = ""){
+                                                   const llvm::Twine &suffix) {
   // Require the metadata to be some type that we recognize as a
   // metadata pointer.
   assert(metadata->getType() == IGF.IGM.TypeMetadataPtrTy);
@@ -3676,12 +3711,12 @@ static llvm::LoadInst *emitLoadFromMetadataAtIndex(IRGenFunction &IGF,
 ///
 /// The load is marked invariant. This function should not be called
 /// on metadata objects that are in the process of being initialized.
-static llvm::LoadInst *emitInvariantLoadFromMetadataAtIndex(IRGenFunction &IGF,
-                                                         llvm::Value *metadata,
-                                                         int index,
-                                                         llvm::Type *objectTy,
-                                                const llvm::Twine &suffix = ""){
-
+static llvm::LoadInst *
+emitInvariantLoadFromMetadataAtIndex(IRGenFunction &IGF,
+                                     llvm::Value *metadata,
+                                     int index,
+                                     llvm::Type *objectTy,
+                                     const llvm::Twine &suffix = "") {
   auto result = emitLoadFromMetadataAtIndex(IGF, metadata, index, objectTy,
                                             suffix);
   IGF.setInvariantLoad(result);
