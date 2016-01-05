@@ -112,9 +112,9 @@ void IterativeTypeChecker::satisfy(TypeCheckRequest request) {
   }
 }
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Diagnostics
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 void IterativeTypeChecker::diagnoseCircularReference(
        ArrayRef<TypeCheckRequest> requests) {
   bool isFirst = true;
