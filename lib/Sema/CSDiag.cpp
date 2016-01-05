@@ -4164,7 +4164,61 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
       CS->getContextualType()->is<AnyFunctionType>()) {
 
     auto fnType = CS->getContextualType()->castTo<AnyFunctionType>();
-    if (CS->TC.coerceParameterListToType(CE, fnType))
+    auto *params = CE->getParameters();
+    Type inferredArgType = fnType->getInput();
+    
+    // It is very common for a contextual type to disagree with the argument
+    // list built into the closure expr.  This can be because the closure expr
+    // had an explicitly specified pattern, a la:
+    //    { a,b in ... }
+    // or could be because the closure has an implicitly generated one:
+    //    { $0 + $1 }
+    // in either case, we want to produce nice and clear diagnostics.
+    unsigned actualArgCount = params->size();
+    unsigned inferredArgCount = 1;
+    if (auto *argTupleTy = inferredArgType->getAs<TupleType>())
+      inferredArgCount = argTupleTy->getNumElements();
+    
+    // If the actual argument count is 1, it can match a tuple as a whole.
+    if (actualArgCount != 1 && actualArgCount != inferredArgCount) {
+      // If the closure didn't specify any arguments and it is in a context that
+      // needs some, produce a fixit to turn "{...}" into "{ _,_ in ...}".
+      if (actualArgCount == 0 && CE->getInLoc().isInvalid()) {
+        auto diag =
+          diagnose(CE->getStartLoc(), diag::closure_argument_list_missing,
+                   inferredArgCount);
+        StringRef fixText;  // We only handle the most common cases.
+        if (inferredArgCount == 1)
+          fixText = " _ in ";
+        else if (inferredArgCount == 2)
+          fixText = " _,_ in ";
+        else if (inferredArgCount == 3)
+          fixText = " _,_,_ in ";
+        
+        if (!fixText.empty()) {
+          // Determine if there is already a space after the { in the closure to
+          // make sure we introduce the right whitespace.
+          auto afterBrace = CE->getStartLoc().getAdvancedLoc(1);
+          auto text = CS->TC.Context.SourceMgr.extractText({afterBrace, 1});
+          if (text.size() == 1 && text == " ")
+            fixText = fixText.drop_back();
+          else
+            fixText = fixText.drop_front();
+          diag.fixItInsertAfter(CE->getStartLoc(), fixText);
+        }
+        return true;
+      }
+      
+      // Okay, the wrong number of arguments was used, complain about that.
+      // Before doing so, strip attributes off the function type so that they
+      // don't confuse the issue.
+      fnType = FunctionType::get(fnType->getInput(), fnType->getResult());
+      diagnose(params->getStartLoc(), diag::closure_argument_list_tuple,
+               fnType, inferredArgCount, actualArgCount);
+      return true;
+    }
+
+    if (CS->TC.coerceParameterListToType(params, CE, inferredArgType))
       return true;
 
     expectedResultType = fnType->getResult();
