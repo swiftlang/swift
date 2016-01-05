@@ -291,7 +291,7 @@ BUILTIN_SIL_OPERATION(FixLifetime, "fixLifetime", Special)
 ///
 /// This builtin takes an inout object reference and returns a boolean. Passing
 /// the reference inout forces the optimizer to preserve a retain distinct from
-/// what’s required to maintain lifetime for any of the reference's source-level
+/// what's required to maintain lifetime for any of the reference's source-level
 /// copies, because the called function is allowed to replace the reference,
 /// thereby releasing the referent.
 ///
