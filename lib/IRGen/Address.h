@@ -91,7 +91,7 @@ class ContainedAddress {
   /// The address of an object of type T.
   Address Addr;
 
-  /// The address of an object of [local_storage] T.
+  /// The container of the address.
   Address Container;
 
 public:

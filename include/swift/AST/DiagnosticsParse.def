@@ -405,8 +405,6 @@ ERROR(expected_sil_constant, decl_parsing,none,
       "expected constant in SIL code", ())
 ERROR(referenced_value_no_accessor, decl_parsing,none,
       "referenced declaration has no %select{getter|setter}0", (unsigned))
-ERROR(sil_local_storage_non_address, decl_parsing,none,
-      "can only work with the address of local storage", ())
 
 // SIL Values
 ERROR(sil_value_redefinition, decl_parsing,none,

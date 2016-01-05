@@ -352,28 +352,24 @@ public:
   
   /// Create a new Address corresponding to the given SIL address value.
   void setLoweredAddress(SILValue v, const Address &address) {
-    assert((v.getType().isAddress() || v.getType().isLocalStorage()) &&
-           "address for non-address value?!");
+    assert(v.getType().isAddress() && "address for non-address value?!");
     setLoweredValue(v, address);
   }
 
   void setLoweredContainedAddress(SILValue v, const ContainedAddress &address) {
-    assert((v.getType().isAddress() || v.getType().isLocalStorage()) &&
-           "address for non-address value?!");
+    assert(v.getType().isAddress() && "address for non-address value?!");
     setLoweredValue(v, address);
   }
   
   void setContainerOfUnallocatedAddress(SILValue v,
                                         const Address &buffer) {
-    assert((v.getType().isAddress() || v.getType().isLocalStorage()) &&
-           "address for non-address value?!");
+    assert(v.getType().isAddress() && "address for non-address value?!");
     setLoweredValue(v,
       LoweredValue(buffer, LoweredValue::ContainerForUnallocatedAddress));
   }
   
   void overwriteAllocatedAddress(SILValue v, const Address &address) {
-    assert((v.getType().isAddress() || v.getType().isLocalStorage()) &&
-           "address for non-address value?!");
+    assert(v.getType().isAddress() && "address for non-address value?!");
     auto it = LoweredValues.find(v);
     assert(it != LoweredValues.end() && "no existing entry for overwrite?");
     assert(it->second.isUnallocatedAddressInBuffer() &&
@@ -445,8 +441,7 @@ public:
     
     auto &ti = getTypeInfo(t);
     switch (t.getCategory()) {
-    case SILValueCategory::Address:
-    case SILValueCategory::LocalStorage: {
+    case SILValueCategory::Address: {
       Address undefAddr = ti.getAddressForPointer(
                   llvm::UndefValue::get(ti.getStorageType()->getPointerTo()));
       LoweredUndefs.insert({t, LoweredValue(undefAddr)});

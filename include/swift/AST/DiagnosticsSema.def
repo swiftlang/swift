@@ -2263,8 +2263,6 @@ WARNING(deprecated_convention_attribute,type_parsing,none,
         "instead", (StringRef, StringRef))
 
 // SIL
-ERROR(sil_local_storage_nested, decl_parsing,none,
-      "local storage types cannot be in nested positions", ())
 ERROR(opened_non_protocol, decl_parsing,none,
       "@opened cannot be applied to non-protocol type %0", (Type))
 ERROR(sil_function_ellipsis,type_parsing,PointsToFirstBadToken,

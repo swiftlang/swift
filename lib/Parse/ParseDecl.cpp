@@ -1495,7 +1495,6 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
 
   switch (attr) {
   default: break;
-  case TAK_local_storage:
   case TAK_out:
   case TAK_in:
   case TAK_owned:
@@ -1517,7 +1516,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   case TAK_sil_unowned:
     Attributes.clearAttribute(attr);
     if (!isInSILMode()) {
-      diagnose(Loc, diag::only_allowed_in_sil, "local_storage");
+      diagnose(Loc, diag::only_allowed_in_sil, Text);
       return false;
     }
       

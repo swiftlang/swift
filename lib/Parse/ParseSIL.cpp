@@ -917,16 +917,6 @@ bool SILParser::parseSILType(SILType &Result, GenericParamList *&GenericParams,
     attrs.setAttr(TAK_convention, P.PreviousLoc);
     attrs.convention = "thin";
   }
-
-  // Handle @local_storage, which changes the SIL value category.
-  if (attrs.has(TAK_local_storage)) {
-    // Require '*' on local_storage values.
-    if (category != SILValueCategory::Address)
-      P.diagnose(attrs.getLoc(TAK_local_storage),
-                 diag::sil_local_storage_non_address);
-    category = SILValueCategory::LocalStorage;
-    attrs.clearAttribute(TAK_local_storage);
-  }
   return parseSILTypeWithoutQualifiers(Result, category, attrs, GenericParams,
                                        IsFuncDecl);
 }
