@@ -2209,6 +2209,16 @@ auto ClangImporter::Implementation::importFullName(
   case clang::DeclarationName::Identifier:
     // Map the identifier.
     baseName = D->getDeclName().getAsIdentifierInfo()->getName();
+
+    if (OmitNeedlessWords) {
+      // For Objective-C BOOL properties, use the name of the getter
+      // which, conventionally, has an "is" prefix.
+      if (auto property = dyn_cast<clang::ObjCPropertyDecl>(D)) {
+        if (isBoolType(clangSema.Context, property->getType()))
+          baseName = property->getGetterName().getNameForSlot(0);
+      }
+    }
+
     break;
 
   case clang::DeclarationName::ObjCMultiArgSelector:

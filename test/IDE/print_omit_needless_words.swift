@@ -64,6 +64,9 @@
 // Note: Typedefs with a "_t" suffix".
 // CHECK-FOUNDATION: func subtract(_: Int32) -> NSNumber
 
+// Note: Respect the getter name for BOOL properties.
+// CHECK-FOUNDATION: var isMakingHoney: Bool
+
 // Note: multi-word enum name matching; "with" splits the first piece.
 // CHECK-FOUNDATION: func someMethod(deprecatedOptions _: NSDeprecatedOptions = [])
 
@@ -138,8 +141,8 @@
 // Collection element types.
 // CHECK-FOUNDATION: func adding(_: AnyObject) -> Set<NSObject>
 
-// Boolean properties get an "is" prefix.
-// CHECK-FOUNDATION: var isEmpty: Bool { get }
+// Boolean properties follow the getter.
+// CHECK-FOUNDATION: var empty: Bool { get }
 // CHECK-FOUNDATION: func nonEmpty() -> Bool
 // CHECK-FOUNDATION: var isStringSet: Bool { get }
 // CHECK-FOUNDATION: var wantsAUnion: Bool { get }

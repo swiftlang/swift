@@ -54,9 +54,6 @@ PartOfSpeech swift::getPartOfSpeech(StringRef word) {
 #define VERB(Word)                              \
   if (word.equals_lower(#Word))                 \
     return PartOfSpeech::Verb;
-#define AUXILIARY_VERB(Word)                    \
-  if (word.equals_lower(#Word))                 \
-    return PartOfSpeech::AuxiliaryVerb;
 #include "PartsOfSpeech.def"
 
   // Identify gerunds, which always end in "ing".
@@ -671,7 +668,6 @@ static StringRef omitNeedlessWords(StringRef name,
         break;
 
       case PartOfSpeech::Unknown:
-      case PartOfSpeech::AuxiliaryVerb:
         // Assume it's a noun or adjective; don't strip anything.
         break;
       }
@@ -701,23 +697,6 @@ static StringRef omitNeedlessWords(StringRef name,
 
   // We're done.
   return name;
-}
-
-/// Determine whether the given word indicates a boolean result.
-static bool nameIndicatesBooleanResult(StringRef name) {
-  for (auto word: camel_case::getWords(name)) {
-    // Auxiliary verbs indicate Boolean results.
-    if (getPartOfSpeech(word) == PartOfSpeech::AuxiliaryVerb)
-      return true;
-
-    // Words that end in "s" indicate either Boolean results---it
-    // could be a verb in the present continuous tense---or some kind
-    // of plural, for which "is" would be inappropriate anyway.
-    if (word.back() == 's')
-      return true;
-  }
-
-  return false;
 }
 
 /// A form of toLowercaseWord that also lowercases acronyms.
@@ -812,16 +791,6 @@ bool swift::omitNeedlessWords(StringRef &baseName,
       }
     }
 
-    // Boolean properties should start with "is", unless their
-    // first word already implies a Boolean result.
-    if (resultType.isBoolean() && isProperty &&
-        !nameIndicatesBooleanResult(baseName)) {
-      SmallString<32> newName("is");
-      camel_case::appendSentenceCase(newName, baseName);
-      baseName = scratch.copyString(newName);
-      anyChanges = true;
-    }
-
     return lowercaseAcronymsForReturn();
   }
 
@@ -871,7 +840,6 @@ bool swift::omitNeedlessWords(StringRef &baseName,
           break;
 
         case PartOfSpeech::Unknown:
-        case PartOfSpeech::AuxiliaryVerb:
           ++nameWordRevIter;
           break;
         }
