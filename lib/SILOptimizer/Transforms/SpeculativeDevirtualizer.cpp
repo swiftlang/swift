@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "sil-speculative-devirtualizer-pass"
+#define DEBUG_TYPE "sil-speculative-devirtualizer"
 #include "swift/Basic/DemangleWrappers.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILArgument.h"
