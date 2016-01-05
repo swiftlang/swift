@@ -168,20 +168,20 @@ namespace {
 ///
 /// We detect this pattern
 /// %0 = alloc_stack $LogicValue
-/// %1 = init_existential_addr %0#1 : $*LogicValue, $*Bool
+/// %1 = init_existential_addr %0 : $*LogicValue, $*Bool
 /// ...
 /// use of %1
 /// ...
-/// destroy_addr %0#1 : $*LogicValue
-/// dealloc_stack %0#0 : $*@local_storage LogicValue
+/// destroy_addr %0 : $*LogicValue
+/// dealloc_stack %0 : $*LogicValue
 ///
 /// At the same we time also look for dead alloc_stack live ranges that are only
 /// copied into.
 ///
 /// %0 = alloc_stack
 /// copy_addr %src, %0
-/// destroy_addr %0#1 : $*LogicValue
-/// dealloc_stack %0#0 : $*@local_storage LogicValue
+/// destroy_addr %0 : $*LogicValue
+/// dealloc_stack %0 : $*LogicValue
 struct AllocStackAnalyzer : SILInstructionVisitor<AllocStackAnalyzer> {
   /// The alloc_stack that we are analyzing.
   AllocStackInst *ASI;
@@ -784,8 +784,8 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
     // Allowing us to perform the same optimization as for the store.
     //
     //  %alloca = alloc_stack
-    //            apply(%alloca#1,...)
-    //  %load = load %alloca#1
+    //            apply(%alloca,...)
+    //  %load = load %alloca
     //  %1 = enum $EnumType, $EnumType.case, %load
     //  store %1 to %nopayload_addr
     //

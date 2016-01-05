@@ -26,9 +26,9 @@
 // Useless copies of address-only types look like this:
 //
 // %copy = alloc_stack $T
-// copy_addr %arg to [initialization] %copy#1 : $*T
-// %ret = apply %callee<T>(%copy#1) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
-// dealloc_stack %copy#0 : $*@local_storage T
+// copy_addr %arg to [initialization] %copy : $*T
+// %ret = apply %callee<T>(%copy) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+// dealloc_stack %copy : $*T
 // destroy_addr %arg : $*T
 //
 // Eliminating the address-only copies eliminates a very expensive call to
@@ -663,9 +663,9 @@ static void replaceAllUsesExceptDealloc(AllocStackInst *ASI, ValueBase *RHS) {
 /// %copy = alloc_stack $T
 /// ...
 /// CurrentBlock:
-/// copy_addr %arg to [initialization] %copy#1 : $*T
+/// copy_addr %arg to [initialization] %copy : $*T
 /// ...
-/// %ret = apply %callee<T>(%copy#1) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+/// %ret = apply %callee<T>(%copy) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
 /// \endcode
 ///
 /// If the last use (deinit) is a copy, replace it with a destroy+copy[init].
@@ -1090,7 +1090,7 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
 ///   %2 = alloc_stack $T
 /// ... // arbitrary control flow, but no other uses of %0
 /// bbN:
-///   copy_addr [take] %2#1 to [initialization] %0 : $*T
+///   copy_addr [take] %2 to [initialization] %0 : $*T
 ///   ... // no writes
 ///   return
 static bool canNRVO(CopyAddrInst *CopyInst) {

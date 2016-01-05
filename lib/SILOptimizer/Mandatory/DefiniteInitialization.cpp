@@ -1115,7 +1115,7 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
 ///   %6 = enum $Optional<Enum>, #Optional.None!enumelt // user: %7
 ///   br bb2(%6 : $Optional<Enum>)                    // id: %7
 /// bb2(%8 : $Optional<Enum>):                        // Preds: bb0 bb1
-///   dealloc_stack %1#0 : $*@local_storage Enum      // id: %9
+///   dealloc_stack %1 : $*Enum                       // id: %9
 ///   return %8 : $Optional<Enum>                     // id: %10
 ///
 static bool isFailableInitReturnUseOfEnum(EnumInst *EI) {
