@@ -253,7 +253,7 @@ struct AO<T>: Fooable {
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWurGV15guaranteed_self2AOx_S_7FooableS_FS1_3foo{{.*}} : $@convention(witness_method) <T> (Int, @in_guaranteed AO<T>) -> ()
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*AO<T>):
 // TODO: This copy isn't necessary.
-// CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY:%.*]]#1
+// CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY:%.*]] :
 // CHECK:         apply {{.*}} [[SELF_COPY]]
 // CHECK:         destroy_addr [[SELF_COPY]]
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
@@ -263,7 +263,7 @@ struct AO<T>: Fooable {
 // CHECK:       bb0([[SELF_ADDR:%.*]] : $*AO<T>):
 // -- NB: This copy *is* necessary, unless we're willing to assume an inout
 //        parameter is not mutably aliased.
-// CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY:%.*]]#1
+// CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY:%.*]] :
 // CHECK:         apply {{.*}} [[SELF_COPY]]
 // CHECK:         destroy_addr [[SELF_COPY]]
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
@@ -405,15 +405,15 @@ func AO_curryThunk<T>(ao: AO<T>) -> (AO<T> -> Int -> ()/*, Int -> ()*/) {
 // CHECK-LABEL: sil [transparent] [thunk] @_TTWV15guaranteed_self9FakeArrayS_12SequenceTypeS_FS1_17_constrainElement{{.*}} : $@convention(witness_method) (@in FakeElement, @in_guaranteed FakeArray) -> () {
 // CHECK: bb0([[ARG0_PTR:%.*]] : $*FakeElement, [[ARG1_PTR:%.*]] : $*FakeArray):
 // CHECK: [[GUARANTEED_COPY_STACK_SLOT:%.*]] = alloc_stack $FakeArray
-// CHECK: copy_addr [[ARG1_PTR]] to [initialization] [[GUARANTEED_COPY_STACK_SLOT]]#1
+// CHECK: copy_addr [[ARG1_PTR]] to [initialization] [[GUARANTEED_COPY_STACK_SLOT]]
 // CHECK: [[ARG0:%.*]] = load [[ARG0_PTR]]
-// CHECK: [[GUARANTEED_COPY:%.*]] = load [[GUARANTEED_COPY_STACK_SLOT]]#1
+// CHECK: [[GUARANTEED_COPY:%.*]] = load [[GUARANTEED_COPY_STACK_SLOT]]
 // CHECK: function_ref ext.guaranteed_self.guaranteed_self.SequenceDefaultsType._constrainElement
 // CHECK: [[FUN:%.*]] = function_ref @_{{.*}}
 // CHECK: [[TRANSLATION_STACK_SLOT:%.*]] = alloc_stack $FakeArray
-// CHECK: store [[GUARANTEED_COPY]] to [[TRANSLATION_STACK_SLOT:%.*]]#1
-// CHECK: apply [[FUN]]<FakeArray, FakeElement, FakeGenerator, FakeElement>([[ARG0]], [[TRANSLATION_STACK_SLOT]]#1)
-// CHECK: destroy_addr [[TRANSLATION_STACK_SLOT]]#1
+// CHECK: store [[GUARANTEED_COPY]] to [[TRANSLATION_STACK_SLOT]]
+// CHECK: apply [[FUN]]<FakeArray, FakeElement, FakeGenerator, FakeElement>([[ARG0]], [[TRANSLATION_STACK_SLOT]])
+// CHECK: destroy_addr [[TRANSLATION_STACK_SLOT]]
 
 class Z {}
 

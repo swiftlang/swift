@@ -17,7 +17,7 @@ func existentialMetatype(x: P) {
   let type1 = x.dynamicType
   // CHECK: [[INSTANCE1:%.*]] = alloc_stack $P
   // CHECK: [[OPEN_TYPE1:%.*]] = open_existential_metatype [[TYPE1]]
-  // CHECK: [[INSTANCE1_VALUE:%.*]] = init_existential_addr [[INSTANCE1]]#1 : $*P
+  // CHECK: [[INSTANCE1_VALUE:%.*]] = init_existential_addr [[INSTANCE1]] : $*P
   // CHECK: [[INIT:%.*]] = witness_method {{.*}} #P.init!allocator
   // CHECK: apply [[INIT]]<{{.*}}>([[INSTANCE1_VALUE]], [[OPEN_TYPE1]])
   let instance1 = type1.init()
@@ -27,7 +27,7 @@ func existentialMetatype(x: P) {
   let type2: P.Type = S.self
   // CHECK: [[INSTANCE2:%.*]] = alloc_stack $P
   // CHECK: [[OPEN_TYPE2:%.*]] = open_existential_metatype [[TYPE2]]
-  // CHECK: [[INSTANCE2_VALUE:%.*]] = init_existential_addr [[INSTANCE2]]#1 : $*P
+  // CHECK: [[INSTANCE2_VALUE:%.*]] = init_existential_addr [[INSTANCE2]] : $*P
   // CHECK: [[STATIC_METHOD:%.*]] = witness_method {{.*}} #P.staticMethod
   // CHECK: apply [[STATIC_METHOD]]<{{.*}}>([[INSTANCE2_VALUE]], [[OPEN_TYPE2]])
   let instance2 = type2.staticMethod()

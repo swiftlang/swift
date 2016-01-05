@@ -18,7 +18,7 @@ func getDescription(o: NSObject) -> String {
 // CHECK:  [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]])
 // CHECK:  [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[NATIVE]]
 // CHECK:  [[T0:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue
-// CHECK:  apply [[T0]]<String>([[NATIVE_BUF:%.*]]#1,
+// CHECK:  apply [[T0]]<String>([[NATIVE_BUF:%[0-9]*]],
 // CHECK:  [[NATIVE:%.*]] = load [[NATIVE_BUF]]
 // CHECK:  return [[NATIVE]] 
 // CHECK:}
@@ -40,7 +40,7 @@ func getUppercaseString(s: NSString) -> String {
 // CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]])
 // CHECK:   [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[NATIVE]]
 // CHECK:   [[T0:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue
-// CHECK:   apply [[T0]]<String>([[NATIVE_BUF:%.*]]#1,
+// CHECK:   apply [[T0]]<String>([[NATIVE_BUF:%[0-9]*]],
 // CHECK:   [[NATIVE:%.*]] = load [[NATIVE_BUF]]
 // CHECK:   return [[NATIVE]]
 // CHECK: }
@@ -161,7 +161,7 @@ func callBar() -> String {
 // CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]])
 // CHECK:   [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[NATIVE]]
 // CHECK:   [[T0:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue
-// CHECK:   apply [[T0]]<String>([[NATIVE_BUF:%.*]]#1,
+// CHECK:   apply [[T0]]<String>([[NATIVE_BUF:%[0-9]*]],
 // CHECK:   [[NATIVE:%.*]] = load [[NATIVE_BUF]]
 // CHECK:   return [[NATIVE]]
 // CHECK: }

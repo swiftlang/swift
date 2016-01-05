@@ -52,10 +52,10 @@ func setIntPropGeneric<T: ProtocolA>(a: T) {
 // CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime21getIntPropExistentialFPS_9ProtocolB_Si
 // CHECK:         [[PROJECTION:%.*]] = open_existential_addr %0
 // CHECK:         [[STACK:%[0-9]+]] = alloc_stack $@opened({{".*"}}) ProtocolB
-// CHECK:         copy_addr [[PROJECTION]] to [initialization] [[STACK]]#1
-// CHECK:         apply {{%.*}}([[STACK]]#1)
-// CHECK:         destroy_addr [[STACK]]#1
-// CHECK:         dealloc_stack [[STACK]]#0
+// CHECK:         copy_addr [[PROJECTION]] to [initialization] [[STACK]]
+// CHECK:         apply {{%.*}}([[STACK]])
+// CHECK:         destroy_addr [[STACK]]
+// CHECK:         dealloc_stack [[STACK]]
 // CHECK:         destroy_addr %0
 func getIntPropExistential(a: ProtocolB) -> Int {
   return a.intProp
@@ -63,10 +63,10 @@ func getIntPropExistential(a: ProtocolB) -> Int {
 
 // CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime17getIntPropGeneric
 // CHECK:         [[STACK:%[0-9]+]] = alloc_stack $T
-// CHECK:         copy_addr %0 to [initialization] [[STACK]]#1
-// CHECK:         apply {{%.*}}<T>([[STACK]]#1)
-// CHECK:         destroy_addr [[STACK]]#1
-// CHECK:         dealloc_stack [[STACK]]#0
+// CHECK:         copy_addr %0 to [initialization] [[STACK]]
+// CHECK:         apply {{%.*}}<T>([[STACK]])
+// CHECK:         destroy_addr [[STACK]]
+// CHECK:         dealloc_stack [[STACK]]
 // CHECK:         destroy_addr %0
 func getIntPropGeneric<T: ProtocolB>(a: T) -> Int {
   return a.intProp

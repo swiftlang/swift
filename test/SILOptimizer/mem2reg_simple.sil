@@ -21,11 +21,11 @@ import Swift
 sil @place_phi : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_stack $Int64, var, name "v"               // users: %45, %2
-  store %0 to %1#1 : $*Int64                      // id: %2
+  store %0 to %1 : $*Int64                      // id: %2
   %3 = alloc_stack $Int64, var, name "x"               // users: %19, %13, %44, %6, %42
   %4 = integer_literal $Builtin.Int64, 0          // user: %5
   %5 = struct $Int64 (%4 : $Builtin.Int64)        // users: %23, %6
-  store %5 to %3#1 : $*Int64                      // id: %6
+  store %5 to %3 : $*Int64                      // id: %6
   %7 = integer_literal $Builtin.Int64, 3          // users: %12, %10
   %9 = struct_extract %0 : $Int64, #Int64._value   // users: %16, %10
   %10 = builtin "cmp_eq_Int64"(%9 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1 // user: %11
@@ -33,7 +33,7 @@ bb0(%0 : $Int64):
 
 bb1:                                              // Preds: bb0
   %12 = struct $Int64 (%7 : $Builtin.Int64)       // user: %13
-  store %12 to %3#1 : $*Int64                     // id: %13
+  store %12 to %3 : $*Int64                     // id: %13
   br bb5                                          // id: %14
 
 bb2:                                              // Preds: bb0
@@ -43,7 +43,7 @@ bb2:                                              // Preds: bb0
 
 bb3:                                              // Preds: bb2
   %18 = struct $Int64 (%15 : $Builtin.Int64)      // user: %19
-  store %18 to %3#1 : $*Int64                     // id: %19
+  store %18 to %3 : $*Int64                     // id: %19
   br bb4                                          // id: %20
 
 bb4:                                              // Preds: bb3 bb2
@@ -53,13 +53,13 @@ bb4:                                              // Preds: bb3 bb2
 //CHECK-NOT: alloc_stack
 bb5:                                              // Preds: bb4 bb1
   %22 = alloc_stack $Int64, var, name "i"              // users: %31, %25, %40, %43, %23
-  store %5 to %22#1 : $*Int64                     // id: %23
+  store %5 to %22 : $*Int64                     // id: %23
   br bb6                                          // id: %24
 
 //CHECK: bb6([[PHI2:%[0-9]+]] : $Int64):
 bb6:                                              // Preds: bb7 bb5
   //CHECK: struct_extract [[PHI2]]
-  %25 = struct_element_addr %22#1 : $*Int64, #Int64._value // user: %26
+  %25 = struct_element_addr %22 : $*Int64, #Int64._value // user: %26
   %26 = load %25 : $*Builtin.Int64                // user: %29
   %27 = integer_literal $Builtin.Int64, 10        // user: %29
   %29 = builtin "cmp_slt_Int64"(%26 : $Builtin.Int64, %27 : $Builtin.Int64) : $Builtin.Int1 // users: %35, %30
@@ -67,7 +67,7 @@ bb6:                                              // Preds: bb7 bb5
 
 bb7:                                              // Preds: bb6
   //CHECK: struct_extract [[PHI2]]
-  %31 = struct_element_addr %22#1 : $*Int64, #Int64._value // user: %32
+  %31 = struct_element_addr %22 : $*Int64, #Int64._value // user: %32
   %32 = load %31 : $*Builtin.Int64                // user: %35
   %33 = integer_literal $Builtin.Int64, 1         // user: %35
   %35 = builtin "sadd_with_overflow_Int64"(%32 : $Builtin.Int64, %33 : $Builtin.Int64, %29 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // users: %37, %36
@@ -75,14 +75,14 @@ bb7:                                              // Preds: bb6
   %37 = tuple_extract %35 : $(Builtin.Int64, Builtin.Int1), 1 // user: %39
   %38 = struct $Int64 (%36 : $Builtin.Int64)      // user: %40
   cond_fail %37 : $Builtin.Int1                   // id: %39
-  store %38 to %22#1 : $*Int64                    // id: %40
+  store %38 to %22 : $*Int64                    // id: %40
   br bb6                                          // id: %41
 
 bb8:                                              // Preds: bb6
-  %42 = load %3#1 : $*Int64                       // user: %46
-  dealloc_stack %22#0 : $*@local_storage Int64    // id: %43
-  dealloc_stack %3#0 : $*@local_storage Int64     // id: %44
-  dealloc_stack %1#0 : $*@local_storage Int64     // id: %45
+  %42 = load %3 : $*Int64                       // user: %46
+  dealloc_stack %22 : $*Int64    // id: %43
+  dealloc_stack %3 : $*Int64     // id: %44
+  dealloc_stack %1 : $*Int64     // id: %45
 //CHECK: return [[PHI]]
   return %42 : $Int64                             // id: %46
 }
@@ -98,23 +98,23 @@ bb8:                                              // Preds: bb6
 sil @func_loop: $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_stack $Int64, var, name "c"               // users: %28, %2
-  store %0 to %1#1 : $*Int64                      // id: %2
+  store %0 to %1 : $*Int64                      // id: %2
   %3 = alloc_stack $Int64, var, name "x"               // users: %24, %27, %6, %8, %14, %26
   %4 = integer_literal $Builtin.Int64, 0          // user: %5
   %5 = struct $Int64 (%4 : $Builtin.Int64)        // user: %6
-  store %5 to %3#1 : $*Int64                      // id: %6
+  store %5 to %3 : $*Int64                      // id: %6
   br bb1                                          // id: %7
 
 //CHECK: bb1([[VAR:%[0-9]+]] : $Int64):
 bb1:                                              // Preds: bb2 bb0
-  %8 = load %3#1 : $*Int64                        // user: %10
+  %8 = load %3 : $*Int64                        // user: %10
   %10 = struct_extract %8 : $Int64, #Int64._value        // user: %12
   %11 = struct_extract %0 : $Int64, #Int64._value        // user: %12
   %12 = builtin "cmp_slt_Int64"(%10 : $Builtin.Int64, %11 : $Builtin.Int64) : $Builtin.Int1 // user: %13
   cond_br %12, bb2, bb3                           // id: %13
 
 bb2:                                              // Preds: bb1
-  %14 = load %3#1 : $*Int64                       // user: %18
+  %14 = load %3 : $*Int64                       // user: %18
   %15 = integer_literal $Builtin.Int64, 1         // user: %19
   %16 = integer_literal $Builtin.Int1, -1         // user: %19
   %18 = struct_extract %14 : $Int64, #Int64._value       // user: %19
@@ -123,13 +123,13 @@ bb2:                                              // Preds: bb1
   %21 = tuple_extract %19 : $(Builtin.Int64, Builtin.Int1), 1 // user: %23
   %22 = struct $Int64 (%20 : $Builtin.Int64)      // user: %24
   cond_fail %21 : $Builtin.Int1                   // id: %23
-  store %22 to %3#1 : $*Int64                     // id: %24
+  store %22 to %3 : $*Int64                     // id: %24
   br bb1                                          // id: %25
 
 bb3:                                              // Preds: bb1
-  %26 = load %3#1 : $*Int64                       // user: %29
-  dealloc_stack %3#0 : $*@local_storage Int64     // id: %27
-  dealloc_stack %1#0 : $*@local_storage Int64     // id: %28
+  %26 = load %3 : $*Int64                       // user: %29
+  dealloc_stack %3 : $*Int64     // id: %27
+  dealloc_stack %1 : $*Int64     // id: %28
 //CHECK-NOT: dealloc_stack
 //CHECK: return [[VAR]]
   return %26 : $Int64                             // id: %29
@@ -154,11 +154,11 @@ bb3:                                              // Preds: bb1
 sil @high_nest : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64): 
   %1 = alloc_stack $Int64, var, name "c"               // users: %114, %2
-  store %0 to %1#1 : $*Int64                      // id: %2
+  store %0 to %1 : $*Int64                      // id: %2
   %3 = alloc_stack $Int64, var, name "x"               // users: %94, %113, %6, %112
   %4 = integer_literal $Builtin.Int64, 0          // user: %5
   %5 = struct $Int64 (%4 : $Builtin.Int64)        // user: %6
-  store %5 to %3#1 : $*Int64                      // id: %6
+  store %5 to %3 : $*Int64                      // id: %6
   %7 = integer_literal $Builtin.Int64, 1          // user: %10
   %9 = struct_extract %0 : $Int64, #Int64._value         // user: %10
   %10 = builtin "cmp_sgt_Int64"(%9 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1
@@ -264,7 +264,7 @@ bb16:                                             // Preds: bb15
 bb17:                                             // Preds: bb16
   %92 = integer_literal $Builtin.Int64, 7         // user: %93
   %93 = struct $Int64 (%92 : $Builtin.Int64)      // user: %94
-  store %93 to %3#1 : $*Int64                     // id: %94
+  store %93 to %3 : $*Int64                     // id: %94
   br bb18                                         // id: %95
 
 bb18:                                             // Preds: bb17 bb16
@@ -316,9 +316,9 @@ bb33:                                             // Preds: bb32 bb1
   br bb34                                         // id: %111
 
 bb34:                                             // Preds: bb33 bb0
-  %112 = load %3#1 : $*Int64                      // user: %115
-  dealloc_stack %3#0 : $*@local_storage Int64     // id: %113
-  dealloc_stack %1#0 : $*@local_storage Int64     // id: %114
+  %112 = load %3 : $*Int64                      // user: %115
+  dealloc_stack %3 : $*Int64     // id: %113
+  dealloc_stack %1 : $*Int64     // id: %114
   return %112 : $Int64                            // id: %115
 }
 
@@ -327,12 +327,12 @@ bb34:                                             // Preds: bb33 bb0
 sil @simple_if : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_stack $Int64, var, name "c"               // users: %17, %2
-  store %0 to %1#1 : $*Int64                      // id: %2
+  store %0 to %1 : $*Int64                      // id: %2
   %3 = alloc_stack $Int64, var, name "x"               // users: %13, %16, %6, %15
   %4 = integer_literal $Builtin.Int64, 0          // users: %9, %5
 //CHECK: [[INIT:%[0-9]+]] = struct $Int64
   %5 = struct $Int64 (%4 : $Builtin.Int64)        // user: %6
-  store %5 to %3#1 : $*Int64                      // id: %6
+  store %5 to %3 : $*Int64                      // id: %6
   %8 = struct_extract %0 : $Int64, #Int64._value         // user: %9
   %9 = builtin "cmp_sgt_Int64"(%4 : $Builtin.Int64, %8 : $Builtin.Int64) : $Builtin.Int1
 //CHECK: bb2([[INIT]] : $Int64)
@@ -342,14 +342,14 @@ bb1:                                              // Preds: bb0
   %11 = integer_literal $Builtin.Int64, 2         // user: %12
 //CHECK: [[INIT2:%[0-9]+]] = struct $Int64
   %12 = struct $Int64 (%11 : $Builtin.Int64)      // user: %13
-  store %12 to %3#1 : $*Int64                     // id: %13
+  store %12 to %3 : $*Int64                     // id: %13
 //CHECK: bb2([[INIT2]] : $Int64)
   br bb2                                          // id: %14
 
 bb2:                                              // Preds: bb1 bb0
-  %15 = load %3#1 : $*Int64                       // user: %18
-  dealloc_stack %3#0 : $*@local_storage Int64     // id: %16
-  dealloc_stack %1#0 : $*@local_storage Int64     // id: %17
+  %15 = load %3 : $*Int64                       // user: %18
+  dealloc_stack %3 : $*Int64     // id: %16
+  dealloc_stack %1 : $*Int64     // id: %17
 //CHECK: return
   return %15 : $Int64                             // id: %18
 }
@@ -368,10 +368,10 @@ sil @test_switch: $@convention(thin) (Int64, X) -> Int64 {
 bb0(%0 : $Int64, %1 : $X):
   %2 = alloc_stack $Int64, var, name "xi"              // users: %28, %4
   %3 = alloc_stack $X, var, name "c"                   // users: %27, %5
-  store %0 to %2#1 : $*Int64                      // id: %4
-  store %1 to %3#1 : $*X                          // id: %5
+  store %0 to %2 : $*Int64                      // id: %4
+  store %1 to %3 : $*X                          // id: %5
   %6 = alloc_stack $Int64, var, name "x"               // users: %7, %23, %18, %13, %26, %25
-  store %0 to %6#1 : $*Int64                      // id: %7
+  store %0 to %6 : $*Int64                      // id: %7
   %8 = tuple ()
   switch_enum %1 : $X, case #X.One!enumelt: bb1, case #X.Two!enumelt: bb3, case #X.Three!enumelt: bb5 // id: %9
 
@@ -381,7 +381,7 @@ bb1:                                              // Preds: bb0
 bb2:                                              // Preds: bb1
   %11 = integer_literal $Builtin.Int64, 3         // user: %12
   %12 = struct $Int64 (%11 : $Builtin.Int64)      // user: %13
-  store %12 to %6#1 : $*Int64                     // id: %13
+  store %12 to %6 : $*Int64                     // id: %13
   br bb7                                          // id: %14
 
 bb3:                                              // Preds: bb0
@@ -390,7 +390,7 @@ bb3:                                              // Preds: bb0
 bb4:                                              // Preds: bb3
   %16 = integer_literal $Builtin.Int64, 2         // user: %17
   %17 = struct $Int64 (%16 : $Builtin.Int64)      // user: %18
-  store %17 to %6#1 : $*Int64                     // id: %18
+  store %17 to %6 : $*Int64                     // id: %18
   br bb7                                          // id: %19
 
 bb5:                                              // Preds: bb0
@@ -399,14 +399,14 @@ bb5:                                              // Preds: bb0
 bb6:                                              // Preds: bb5
   %21 = integer_literal $Builtin.Int64, 1         // user: %22
   %22 = struct $Int64 (%21 : $Builtin.Int64)      // user: %23
-  store %22 to %6#1 : $*Int64                     // id: %23
+  store %22 to %6 : $*Int64                     // id: %23
   br bb7                                          // id: %24
 
 bb7:                                              // Preds: bb6 bb4 bb2
-  %25 = load %6#1 : $*Int64                       // user: %29
-  dealloc_stack %6#0 : $*@local_storage Int64     // id: %26
-  dealloc_stack %3#0 : $*@local_storage X         // id: %27
-  dealloc_stack %2#0 : $*@local_storage Int64     // id: %28
+  %25 = load %6 : $*Int64                       // user: %29
+  dealloc_stack %6 : $*Int64     // id: %26
+  dealloc_stack %3 : $*X         // id: %27
+  dealloc_stack %2 : $*Int64     // id: %28
 //CHECK: return
   return %25 : $Int64                             // id: %29
 }

@@ -1839,13 +1839,13 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
     auto *Term = BB.getTerminator();
     if (isa<ReturnInst>(Term) || isa<ThrowInst>(Term)) {
       B.setInsertionPoint(Term);
-      B.createDeallocStack(Loc, ControlVariableBox->getContainerResult());
+      B.createDeallocStack(Loc, ControlVariableBox);
     }
   }
   
   // Before the memory allocation, store zero in the control variable.
   B.setInsertionPoint(TheMemory.MemoryInst->getNextNode());
-  SILValue ControlVariableAddr = SILValue(ControlVariableBox, 1);
+  SILValue ControlVariableAddr = ControlVariableBox;
   auto Zero = B.createIntegerLiteral(Loc, IVType, 0);
   B.createStore(Loc, Zero, ControlVariableAddr);
   

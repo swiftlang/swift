@@ -611,21 +611,21 @@ enum MyOpt<T> {
 // CHECK-NEXT: debug_value_addr %1 : $*MyOpt<T>, let, name "a"
 // CHECK-NEXT: %3 = alloc_stack $T, let, name "t"
 // CHECK-NEXT: %4 = alloc_stack $MyOpt<T>
-// CHECK-NEXT: copy_addr %1 to [initialization] %4#1 : $*MyOpt<T>
-// CHECK-NEXT: switch_enum_addr %4#1 : $*MyOpt<T>, case #MyOpt.Some!enumelt.1: bb2, default bb1
+// CHECK-NEXT: copy_addr %1 to [initialization] %4 : $*MyOpt<T>
+// CHECK-NEXT: switch_enum_addr %4 : $*MyOpt<T>, case #MyOpt.Some!enumelt.1: bb2, default bb1
 func testAddressOnlyEnumInRequire<T>(a : MyOpt<T>) -> T {
   // CHECK:  bb1:
-  // CHECK-NEXT:   dealloc_stack %4#0
-  // CHECK-NEXT:   dealloc_stack %3#0
+  // CHECK-NEXT:   dealloc_stack %4
+  // CHECK-NEXT:   dealloc_stack %3
   // CHECK-NEXT:   br bb3
   guard let t = a else { abort() }
 
   // CHECK:    bb2:
-  // CHECK-NEXT:     %10 = unchecked_take_enum_data_addr %4#1 : $*MyOpt<T>, #MyOpt.Some!enumelt.1
-  // CHECK-NEXT:     copy_addr [take] %10 to [initialization] %3#1 : $*T
-  // CHECK-NEXT:     dealloc_stack %4#0
-  // CHECK-NEXT:     copy_addr [take] %3#1 to [initialization] %0 : $*T
-  // CHECK-NEXT:     dealloc_stack %3#0
+  // CHECK-NEXT:     %10 = unchecked_take_enum_data_addr %4 : $*MyOpt<T>, #MyOpt.Some!enumelt.1
+  // CHECK-NEXT:     copy_addr [take] %10 to [initialization] %3 : $*T
+  // CHECK-NEXT:     dealloc_stack %4
+  // CHECK-NEXT:     copy_addr [take] %3 to [initialization] %0 : $*T
+  // CHECK-NEXT:     dealloc_stack %3
   // CHECK-NEXT:     destroy_addr %1 : $*MyOpt<T>
   // CHECK-NEXT:     tuple ()
   // CHECK-NEXT:     return

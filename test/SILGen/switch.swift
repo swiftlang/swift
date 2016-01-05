@@ -316,17 +316,17 @@ struct Z : P { func p() {} }
 // CHECK-LABEL: sil hidden  @_TF6switch10test_isa_1FT1pPS_1P__T_
 func test_isa_1(p p: P) {
   // CHECK: [[PTMPBUF:%[0-9]+]] = alloc_stack $P
-  // CHECK-NEXT: copy_addr %0 to [initialization] [[PTMPBUF]]#1 : $*P
+  // CHECK-NEXT: copy_addr %0 to [initialization] [[PTMPBUF]] : $*P
   switch p {
     // CHECK: [[TMPBUF:%[0-9]+]] = alloc_stack $X
-  // CHECK:   checked_cast_addr_br copy_on_success P in [[P:%.*]] : $*P to X in [[TMPBUF]]#1 : $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
+  // CHECK:   checked_cast_addr_br copy_on_success P in [[P:%.*]] : $*P to X in [[TMPBUF]] : $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
 
   case is X:
   // CHECK: [[IS_X]]:
-  // CHECK-NEXT: load [[TMPBUF]]#1
-  // CHECK-NEXT: dealloc_stack [[TMPBUF]]#0
-  // CHECK-NEXT: destroy_addr [[PTMPBUF]]#1
-  // CHECK-NEXT: dealloc_stack [[PTMPBUF]]#0
+  // CHECK-NEXT: load [[TMPBUF]]
+  // CHECK-NEXT: dealloc_stack [[TMPBUF]]
+  // CHECK-NEXT: destroy_addr [[PTMPBUF]]
+  // CHECK-NEXT: dealloc_stack [[PTMPBUF]]
     a()
     // CHECK:   function_ref @_TF6switch1aFT_T_
     // CHECK:   br [[CONT:bb[0-9]+]]
@@ -939,20 +939,20 @@ func ~=(a: P, b: P) -> Bool { return true }
 // CHECK-LABEL: sil hidden @_TF6switch22test_struct_pattern_aoFT1sVS_19StructPatternTestAO1pPS_1P__T_
 func test_struct_pattern_ao(s s: StructPatternTestAO, p: P) {
   // CHECK:   [[S:%.*]] = alloc_stack $StructPatternTestAO
-  // CHECK:   copy_addr %0 to [initialization] [[S]]#1
-  // CHECK:   [[T0:%.*]] = struct_element_addr [[S]]#1 : $*StructPatternTestAO, #StructPatternTestAO.x
+  // CHECK:   copy_addr %0 to [initialization] [[S]]
+  // CHECK:   [[T0:%.*]] = struct_element_addr [[S]] : $*StructPatternTestAO, #StructPatternTestAO.x
   // CHECK:   [[X:%.*]] = load [[T0]]
-  // CHECK:   [[T0:%.*]] = struct_element_addr [[S]]#1 : $*StructPatternTestAO, #StructPatternTestAO.y
+  // CHECK:   [[T0:%.*]] = struct_element_addr [[S]] : $*StructPatternTestAO, #StructPatternTestAO.y
   // CHECK:   [[Y:%.*]] = alloc_stack $P
-  // CHECK:   copy_addr [[T0]] to [initialization] [[Y]]#1
+  // CHECK:   copy_addr [[T0]] to [initialization] [[Y]]
   
   switch s {
   // CHECK:   cond_br {{%.*}}, [[IS_CASE1:bb[0-9]+]], [[IS_NOT_CASE1:bb[0-9]+]]
   // CHECK: [[IS_CASE1]]:
-  // CHECK:   destroy_addr [[Y]]#1
-  // CHECK:   dealloc_stack [[Y]]#0
-  // CHECK:   destroy_addr [[S]]#1
-  // CHECK:   dealloc_stack [[S]]#0
+  // CHECK:   destroy_addr [[Y]]
+  // CHECK:   dealloc_stack [[Y]]
+  // CHECK:   destroy_addr [[S]]
+  // CHECK:   dealloc_stack [[S]]
   case StructPatternTestAO(x: 0):
   // CHECK:   function_ref @_TF6switch1aFT_T_
   // CHECK:   br [[CONT:bb[0-9]+]]
@@ -960,30 +960,30 @@ func test_struct_pattern_ao(s s: StructPatternTestAO, p: P) {
 
   // CHECK: [[IS_NOT_CASE1]]:
   // CHECK:   [[TEMP:%.*]] = alloc_stack $P
-  // CHECK:   copy_addr [[Y]]#1 to [initialization] [[TEMP]]#1
+  // CHECK:   copy_addr [[Y]] to [initialization] [[TEMP]]
   // CHECK:   cond_br {{%.*}}, [[IS_CASE2:bb[0-9]+]], [[IS_NOT_CASE2:bb[0-9]+]]
 
   // CHECK: [[IS_CASE2]]:
   case StructPatternTestAO(y: p):
-  // CHECK:   destroy_addr [[TEMP]]#1
-  // CHECK:   dealloc_stack [[TEMP]]#0
-  // CHECK:   destroy_addr [[Y]]#1
-  // CHECK:   dealloc_stack [[Y]]#0
-  // CHECK:   destroy_addr [[S]]#1
-  // CHECK:   dealloc_stack [[S]]#0
+  // CHECK:   destroy_addr [[TEMP]]
+  // CHECK:   dealloc_stack [[TEMP]]
+  // CHECK:   destroy_addr [[Y]]
+  // CHECK:   dealloc_stack [[Y]]
+  // CHECK:   destroy_addr [[S]]
+  // CHECK:   dealloc_stack [[S]]
   // CHECK:   function_ref @_TF6switch1bFT_T_
   // CHECK:   br [[CONT]]
     b()
 
   // CHECK: [[IS_NOT_CASE2]]:
-  // CHECK:   destroy_addr [[TEMP]]#1
-  // CHECK:   dealloc_stack [[TEMP]]#0
+  // CHECK:   destroy_addr [[TEMP]]
+  // CHECK:   dealloc_stack [[TEMP]]
   // CHECK:   br [[IS_CASE3:bb[0-9]+]]
   // CHECK: [[IS_CASE3]]:
-  // CHECK:   destroy_addr [[Y]]#1
-  // CHECK:   dealloc_stack [[Y]]#0
-  // CHECK:   destroy_addr [[S]]#1
-  // CHECK:   dealloc_stack [[S]]#0
+  // CHECK:   destroy_addr [[Y]]
+  // CHECK:   dealloc_stack [[Y]]
+  // CHECK:   destroy_addr [[S]]
+  // CHECK:   dealloc_stack [[S]]
   case StructPatternTestAO(x: _):
   // CHECK:   function_ref @_TF6switch1cFT_T_
   // CHECK:   br [[CONT]]

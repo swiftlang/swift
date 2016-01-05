@@ -17,9 +17,9 @@ import Swift
 sil [noinline] @_TF7specgen12take_closureFFTSiSi_T_T_ : $@convention(thin) (@owned @callee_owned (Int, Int) -> ()) -> () {
 bb0(%0 : $@callee_owned (Int, Int) -> ()):
   %1 = alloc_stack $Int
-  %2 = load %1#1 : $*Int
+  %2 = load %1 : $*Int
   %3 = apply %0(%2, %2) : $@callee_owned (Int, Int) -> ()
-  dealloc_stack %1#0 : $*@local_storage Int
+  dealloc_stack %1 : $*Int
   %9999 = tuple()
   return %9999 : $()
 }
@@ -38,9 +38,9 @@ bb0(%0 : $@callee_owned (Int, Int) -> ()):
 sil [noinline] @_TF7specgen13take_closure2FFTSiSi_T_T_ : $@convention(thin) (@owned @callee_owned (Int, Int) -> ()) -> () {
 bb0(%0 : $@callee_owned (Int, Int) -> ()):
   %1 = alloc_stack $Int
-  %2 = load %1#1 : $*Int
+  %2 = load %1 : $*Int
   %3 = apply %0(%2, %2) : $@callee_owned (Int, Int) -> ()
-  dealloc_stack %1#0 : $*@local_storage Int
+  dealloc_stack %1 : $*Int
   %9999 = tuple()
   return %9999 : $()
 }
@@ -254,13 +254,13 @@ bb0:
   %6 = partial_apply %4(%0#0) : $@convention(thin) (Builtin.Int32, @owned @box Builtin.Int32) -> ()
   %7 = alloc_stack $Builtin.Int32
   %9 = integer_literal $Builtin.Int32, 1
-  store %9 to %7#1 : $*Builtin.Int32
+  store %9 to %7 : $*Builtin.Int32
   %12 = function_ref @_TF4main5innerFTRVs5Int32FS0_T__T_: $@convention(thin) (@inout Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> ()) -> ()
   strong_retain %6 : $@callee_owned (Builtin.Int32) -> ()
-  %14 = apply %12(%7#1, %6) : $@convention(thin) (@inout Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> ()) -> ()
+  %14 = apply %12(%7, %6) : $@convention(thin) (@inout Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> ()) -> ()
   strong_release %6 : $@callee_owned (Builtin.Int32) -> ()
   %16 = tuple ()
-  dealloc_stack %7#0 : $*@local_storage Builtin.Int32
+  dealloc_stack %7 : $*Builtin.Int32
   %18 = load %0#1 : $*Builtin.Int32
   strong_release %0#0 : $@box Builtin.Int32
   return %18 : $Builtin.Int32

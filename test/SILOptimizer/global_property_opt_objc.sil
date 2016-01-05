@@ -33,15 +33,15 @@ bb0(%0 : $_ArrayBuffer<X>):
   %1 = alloc_stack $Array<X>
   %3 = function_ref @_array_X_init : $@convention(thin) () -> @owned Array<X>
   %4 = apply %3() : $@convention(thin) () -> @owned Array<X>
-  store %4 to %1#1 : $*Array<X>
+  store %4 to %1 : $*Array<X>
 
-  %b1 = struct_element_addr %1#1 : $*Array<X>, #Array._buffer
+  %b1 = struct_element_addr %1 : $*Array<X>, #Array._buffer
   store %0 to %b1 : $*_ArrayBuffer<X>
 
-  %5 = load %1#1 : $*Array<X>
+  %5 = load %1 : $*Array<X>
   %6 = function_ref @_is_native_X_no_type_check : $@convention(method) (@guaranteed Array<X>) -> Bool
   %10 = apply %6(%5) : $@convention(method) (@guaranteed Array<X>) -> Bool
-  dealloc_stack %1#0 : $*@local_storage Array<X>
+  dealloc_stack %1 : $*Array<X>
   return %10 : $Bool
 }
 

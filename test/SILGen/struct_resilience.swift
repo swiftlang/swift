@@ -14,20 +14,20 @@ func functionWithResilientTypes(s: Size, f: Size -> Size) -> Size {
 // CHECK:         copy_addr %1 to [initialization] [[OTHER_SIZE_BOX:%.*]]#1 : $*Size
   var s2 = s
 
-// CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]]#1 : $*Size
+// CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*Size
 // CHECK:         [[FN:%.*]] = function_ref @_TFV16resilient_struct4Sizeg1wSi : $@convention(method) (@in_guaranteed Size) -> Int
-// CHECK:         [[RESULT:%.*]] = apply [[FN]]([[SIZE_BOX]]#1)
+// CHECK:         [[RESULT:%.*]] = apply [[FN]]([[SIZE_BOX]])
 // CHECK:         [[FN:%.*]] = function_ref @_TFV16resilient_struct4Sizes1wSi : $@convention(method) (Int, @inout Size) -> ()
 // CHECK:         apply [[FN]]([[RESULT]], [[OTHER_SIZE_BOX]]#1)
   s2.w = s.w
 
-// CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]]#1 : $*Size
+// CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*Size
 // CHECK:         [[FN:%.*]] = function_ref @_TFV16resilient_struct4Sizeg1hSi : $@convention(method) (@in_guaranteed Size) -> Int
-// CHECK:         [[RESULT:%.*]] = apply [[FN]]([[SIZE_BOX]]#1)
+// CHECK:         [[RESULT:%.*]] = apply [[FN]]([[SIZE_BOX]])
   _ = s.h
 
-// CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]]#1 : $*Size
-// CHECK:         apply %2(%0, [[SIZE_BOX]]#1)
+// CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*Size
+// CHECK:         apply %2(%0, [[SIZE_BOX]])
 // CHECK:         return
   return f(s)
 }
@@ -95,8 +95,8 @@ public func functionWithMyResilientTypes(s: MySize, f: MySize -> MySize) -> MySi
 // CHECK:         [[RESULT:%.*]] = load [[RESULT_ADDR]] : $*Int
   _ = s.h
 
-// CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]]#1 : $*MySize
-// CHECK:         apply %2(%0, [[SIZE_BOX]]#1)
+// CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*MySize
+// CHECK:         apply %2(%0, [[SIZE_BOX]])
 // CHECK:         return
   return f(s)
 }

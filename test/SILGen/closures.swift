@@ -304,12 +304,12 @@ func closeOverLetLValue() {
 // CHECK-LABEL: sil shared @_TFF8closures18closeOverLetLValueFT_T_U_FT_Si
 // CHECK: bb0(%0 : $ClassWithIntProperty):
 // CHECK-NEXT: [[TMP:%.*]] = alloc_stack $ClassWithIntProperty, let, name "a", argno 1
-// CHECK-NEXT: store %0 to [[TMP]]#1 : $*ClassWithIntProperty
-// CHECK-NEXT: {{.*}} = load [[TMP]]#1 : $*ClassWithIntProperty
+// CHECK-NEXT: store %0 to [[TMP]] : $*ClassWithIntProperty
+// CHECK-NEXT: {{.*}} = load [[TMP]] : $*ClassWithIntProperty
 // CHECK-NEXT: {{.*}} = ref_element_addr {{.*}} : $ClassWithIntProperty, #ClassWithIntProperty.x
 // CHECK-NEXT: {{.*}} = load {{.*}} : $*Int
-// CHECK-NEXT: destroy_addr [[TMP]]#1 : $*ClassWithIntProperty
-// CHECK-NEXT: dealloc_stack %1#0 : $*@local_storage ClassWithIntProperty
+// CHECK-NEXT: destroy_addr [[TMP]] : $*ClassWithIntProperty
+// CHECK-NEXT: dealloc_stack %1 : $*ClassWithIntProperty
 // CHECK-NEXT:  return
 
 

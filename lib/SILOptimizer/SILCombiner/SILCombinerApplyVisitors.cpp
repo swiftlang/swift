@@ -216,7 +216,7 @@ void PartialApplyCombiner::allocateTemporaries() {
                                            {/*Constant*/ true, AI});
       Builder.setInsertionPoint(PAI);
       // Copy argument into this temporary.
-      Builder.createCopyAddr(PAI->getLoc(), Arg, SILValue(Tmp, 1),
+      Builder.createCopyAddr(PAI->getLoc(), Arg, Tmp,
                               IsTake_t::IsNotTake,
                               IsInitialization_t::IsInitialization);
 
@@ -262,12 +262,11 @@ void PartialApplyCombiner::releaseTemporaries() {
       continue;
     for (auto *EndPoint : Lifetime.LastUsers) {
       Builder.setInsertionPoint(next(SILBasicBlock::iterator(EndPoint)));
-      auto TmpAddr = SILValue(Op.getDef(), 1);
       if (!TmpType.isAddressOnly(PAI->getModule())) {
-        auto *Load = Builder.createLoad(PAI->getLoc(), TmpAddr);
+        auto *Load = Builder.createLoad(PAI->getLoc(), Op);
         Builder.createReleaseValue(PAI->getLoc(), Load);
       } else {
-        Builder.createDestroyAddr(PAI->getLoc(), TmpAddr);
+        Builder.createDestroyAddr(PAI->getLoc(), Op);
       }
     }
   }
@@ -300,8 +299,7 @@ void PartialApplyCombiner::processSingleApply(FullApplySite AI) {
     // If there is new temporary for this argument, use it instead.
     if (isa<AllocStackInst>(Arg)) {
       if (ArgToTmp.count(Arg)) {
-        auto Tmp = ArgToTmp.lookup(Arg);
-        Op = SILValue(Tmp.getDef(), 1);
+        Op = ArgToTmp.lookup(Arg);
       }
     }
     Args.push_back(Op);

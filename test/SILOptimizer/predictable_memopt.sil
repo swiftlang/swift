@@ -160,10 +160,10 @@ bb0(%0 : $Int32):
 
   // CHECK-NOT: alloc_stack
 
-  store %18 to %22#1 : $*Int32
-  %24 = struct_element_addr %22#1 : $*Int32, #Int32._value
+  store %18 to %22 : $*Int32
+  %24 = struct_element_addr %22 : $*Int32, #Int32._value
   %25 = load %24 : $*Builtin.Int32
-  dealloc_stack %22#0 : $*@local_storage Int32
+  dealloc_stack %22 : $*Int32
   // CHECK-NEXT: return [[IL]]
   return %25 : $Builtin.Int32
 }
@@ -172,15 +172,15 @@ bb0(%0 : $Int32):
 sil @copy_addr_to_load : $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):               // CHECK: bb0(%0 : $Int):
   %1 = alloc_stack $Int
-  store %0 to %1#1 : $*Int
+  store %0 to %1 : $*Int
   %2 = alloc_stack $Int
   
-  copy_addr %1#1 to [initialization] %2#1 : $*Int
+  copy_addr %1 to [initialization] %2 : $*Int
 
-  %3 = load %2#1 : $*Int
+  %3 = load %2 : $*Int
 
-  dealloc_stack %2#0 : $*@local_storage Int
-  dealloc_stack %1#0 : $*@local_storage Int
+  dealloc_stack %2 : $*Int
+  dealloc_stack %1 : $*Int
   // CHECK-NEXT: return %0
   return %3 : $Int
 }
@@ -190,14 +190,14 @@ bb0(%0 : $Int):               // CHECK: bb0(%0 : $Int):
 sil @store_to_copyaddr : $(Bool) -> Bool {
 bb0(%0 : $Bool):  // CHECK: bb0(%0 :
   %1 = alloc_stack $Bool
-  store %0 to %1#1 : $*Bool
+  store %0 to %1 : $*Bool
   %3 = alloc_stack $Bool
-  copy_addr %1#1 to [initialization] %3#1 : $*Bool
-  %5 = load %3#1 : $*Bool
-  copy_addr %3#1 to %1#1 : $*Bool
-  %12 = load %1#1 : $*Bool
-  dealloc_stack %3#0 : $*@local_storage Bool
-  dealloc_stack %1#0 : $*@local_storage Bool
+  copy_addr %1 to [initialization] %3 : $*Bool
+  %5 = load %3 : $*Bool
+  copy_addr %3 to %1 : $*Bool
+  %12 = load %1 : $*Bool
+  dealloc_stack %3 : $*Bool
+  dealloc_stack %1 : $*Bool
   return %12 : $Bool                              // CHECK-NEXT: return %0
 }
 
@@ -205,7 +205,7 @@ bb0(%0 : $Bool):  // CHECK: bb0(%0 :
 sil @cross_block_load_promotion : $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):
   %1 = alloc_stack $Int
-  store %0 to %1#1 : $*Int
+  store %0 to %1 : $*Int
   %11 = integer_literal $Builtin.Int1, 1
   cond_br %11, bb1, bb2
 
@@ -216,8 +216,8 @@ bb2:
   br bb5
 
 bb5:
-  %15 = load %1#1 : $*Int
-  dealloc_stack %1#0 : $*@local_storage Int
+  %15 = load %1 : $*Int
+  dealloc_stack %1 : $*Int
   return %15 : $Int
 
 // CHECK: return %0 : $Int
@@ -234,16 +234,16 @@ bb0(%0 : $Int, %2 : $Int):
   
   %7 = function_ref @init_xy_struct : $@convention(thin) () -> XYStruct
   %9 = apply %7() : $@convention(thin) () -> XYStruct
-  store %9 to %1#1 : $*XYStruct
+  store %9 to %1 : $*XYStruct
 
-  %11 = struct_element_addr %1#1 : $*XYStruct, #XYStruct.y
+  %11 = struct_element_addr %1 : $*XYStruct, #XYStruct.y
   store %0 to %11 : $*Int
 
   %12 = integer_literal $Builtin.Int1, 1          // user: %3
   cond_br %12, bb1, bb2
 
 bb1:                                              // Preds: bb3
-  %13 = struct_element_addr %1#1 : $*XYStruct, #XYStruct.x
+  %13 = struct_element_addr %1 : $*XYStruct, #XYStruct.x
   store %2 to %13 : $*Int
   br bb5
 
@@ -252,7 +252,7 @@ bb2:                                              // Preds: bb0
 
 bb5:                                              // Preds: bb4
   %15 = load %11 : $*Int
-  dealloc_stack %1#0 : $*@local_storage XYStruct
+  dealloc_stack %1 : $*XYStruct
   return %15 : $Int
 
 // CHECK: return %0 : $Int
@@ -265,16 +265,16 @@ bb0(%0 : $Int, %2 : $Int):
   
   %7 = function_ref @init_xy_struct : $@convention(thin) () -> XYStruct
   %9 = apply %7() : $@convention(thin) () -> XYStruct
-  store %9 to %1#1 : $*XYStruct
+  store %9 to %1 : $*XYStruct
 
-  %11 = struct_element_addr %1#1 : $*XYStruct, #XYStruct.x
+  %11 = struct_element_addr %1 : $*XYStruct, #XYStruct.x
   store %0 to %11 : $*Int
 
   %12 = integer_literal $Builtin.Int1, 1          // user: %3
   cond_br %12, bb1, bb2
 
 bb1:                                              // Preds: bb3
-  %13 = struct_element_addr %1#1 : $*XYStruct, #XYStruct.x
+  %13 = struct_element_addr %1 : $*XYStruct, #XYStruct.x
   store %0 to %13 : $*Int
   br bb5
 
@@ -283,7 +283,7 @@ bb2:                                              // Preds: bb0
 
 bb5:                                              // Preds: bb4
   %15 = load %11 : $*Int
-  dealloc_stack %1#0 : $*@local_storage XYStruct
+  dealloc_stack %1 : $*XYStruct
   return %15 : $Int
 
 // CHECK: return %0 : $Int
@@ -295,14 +295,14 @@ sil @destroy_addr : $@convention(method) (@owned SomeClass) -> @owned SomeClass 
 bb0(%0 : $SomeClass):
   %1 = alloc_stack $SomeClass
   %2 = tuple ()
-  store %0 to %1#1 : $*SomeClass
-  %7 = load %1#1 : $*SomeClass
+  store %0 to %1 : $*SomeClass
+  %7 = load %1 : $*SomeClass
   strong_retain %7 : $SomeClass
   strong_release %7 : $SomeClass
-  %12 = load %1#1 : $*SomeClass                   // users: %16, %13
+  %12 = load %1 : $*SomeClass                   // users: %16, %13
   strong_retain %12 : $SomeClass                  // id: %13
-  destroy_addr %1#1 : $*SomeClass                 // id: %14
-  dealloc_stack %1#0 : $*@local_storage SomeClass // id: %15
+  destroy_addr %1 : $*SomeClass                 // id: %14
+  dealloc_stack %1 : $*SomeClass // id: %15
   return %12 : $SomeClass                         // id: %16
 }
 
@@ -321,9 +321,9 @@ bb0:
   %9 = apply %f() : $@convention(thin) () -> @owned SomeClass
   // CHECK: [[CVAL:%[0-9]+]] = apply
 
-  assign %9 to %3#1 : $*SomeClass
-  destroy_addr %3#1 : $*SomeClass
-  dealloc_stack %3#0 : $*@local_storage SomeClass
+  assign %9 to %3 : $*SomeClass
+  destroy_addr %3 : $*SomeClass
+  dealloc_stack %3 : $*SomeClass
   %15 = tuple ()
   return %15 : $()
 // CHECK-NEXT: strong_release [[CVAL]]
@@ -333,13 +333,13 @@ bb0:
 // CHECK-LABEL: sil @init_existential_crash
 sil @init_existential_crash : $() -> () {
   %99 = alloc_stack $BooleanType
-  %100 = init_existential_addr %99#1 : $*BooleanType, $Bool
+  %100 = init_existential_addr %99 : $*BooleanType, $Bool
   %105 = integer_literal $Builtin.Int1, 0
   %106 = struct $Bool (%105 : $Builtin.Int1)
   store %106 to %100 : $*Bool
   %108 = struct_element_addr %100 : $*Bool, #Bool._value
   %109 = load %108 : $*Builtin.Int1
-  dealloc_stack %99#0 : $*@local_storage BooleanType
+  dealloc_stack %99 : $*BooleanType
   return undef : $()
 }
 
@@ -350,11 +350,11 @@ sil @dead_allocation_1 : $@convention(thin) (Optional<AnyObject>) -> () {
 // CHECK: retain_value %0
   %1 = alloc_stack $Optional<AnyObject>
   %2 = alloc_stack $Optional<AnyObject>
-  store %0 to %2#1 : $*Optional<AnyObject>
+  store %0 to %2 : $*Optional<AnyObject>
 // CHECK-NOT: copy_addr
-  copy_addr %2#1 to [initialization] %1#1 : $*Optional<AnyObject>
-  dealloc_stack %2#0 : $*@local_storage Optional<AnyObject>
-  dealloc_stack %1#0 : $*@local_storage Optional<AnyObject>
+  copy_addr %2 to [initialization] %1 : $*Optional<AnyObject>
+  dealloc_stack %2 : $*Optional<AnyObject>
+  dealloc_stack %1 : $*Optional<AnyObject>
   %3 = tuple ()
   return %3 : $()
 }
@@ -366,11 +366,11 @@ sil @dead_allocation_2 : $@convention(thin) (Optional<AnyObject>) -> () {
 // CHECK-NOT: alloc_stack
   %1 = alloc_stack $Optional<AnyObject>
   %2 = alloc_stack $Optional<AnyObject>
-  store %0 to %1#1 : $*Optional<AnyObject>
+  store %0 to %1 : $*Optional<AnyObject>
 // CHECK-NOT: copy_addr
-  copy_addr %1#1 to [initialization] %2#1 : $*Optional<AnyObject>
-  dealloc_stack %2#0 : $*@local_storage Optional<AnyObject>
-  dealloc_stack %1#0 : $*@local_storage Optional<AnyObject>
+  copy_addr %1 to [initialization] %2 : $*Optional<AnyObject>
+  dealloc_stack %2 : $*Optional<AnyObject>
+  dealloc_stack %1 : $*Optional<AnyObject>
   %3 = tuple ()
   return %3 : $()
 }

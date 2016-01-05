@@ -386,22 +386,6 @@ type. Values of address type thus cannot be allocated, loaded, or stored
 Addresses can be passed as arguments to functions if the corresponding
 parameter is indirect.  They cannot be returned.
 
-Local Storage Types
-```````````````````
-
-The *address of local storage for T* ``$*@local_storage T`` is a
-handle to a stack allocation of a variable of type ``$T``.
-
-For many types, the handle for a stack allocation is simply the
-allocated address itself.  However, if a type is runtime-sized, the
-compiler must emit code to potentially dynamically allocate memory.
-SIL abstracts over such differences by using values of local-storage
-type as the first result of ``alloc_stack`` and the operand of
-``dealloc_stack``.
-
-Local-storage address types are not *first-class* in the same sense
-that address types are not first-class.
-
 Box Types
 `````````
 
@@ -1634,13 +1618,15 @@ alloc_stack
   sil-instruction ::= 'alloc_stack' sil-type (',' debug-var-attr)*
 
   %1 = alloc_stack $T
-  // %1#0 has type $*@local_storage T
-  // %1#1 has type $*T
+  // %1 has type $*T
 
 Allocates uninitialized memory that is sufficiently aligned on the stack
-to contain a value of type ``T``. The first result of the instruction
-is a local-storage handle suitable for passing to ``dealloc_stack``.
-The second result of the instruction is the address of the allocated memory.
+to contain a value of type ``T``. The result of the instruction is the address
+of the allocated memory.
+
+If a type is runtime-sized, the compiler must emit code to potentially
+dynamically allocate memory. So there is no guarantee that the allocated
+memory is really located on the stack. 
 
 ``alloc_stack`` marks the start of the lifetime of the value; the
 allocation must be balanced with a ``dealloc_stack`` instruction to
@@ -1741,16 +1727,16 @@ dealloc_stack
 
   sil-instruction ::= 'dealloc_stack' sil-operand
 
-  dealloc_stack %0 : $*@local_storage T
-  // %0 must be of a local-storage $*@local_storage T type
+  dealloc_stack %0 : $*T
+  // %0 must be of $*T type
 
 Deallocates memory previously allocated by ``alloc_stack``. The
 allocated value in memory must be uninitialized or destroyed prior to
 being deallocated. This instruction marks the end of the lifetime for
 the value created by the corresponding ``alloc_stack`` instruction. The operand
-must be the ``@local_storage`` of the shallowest live ``alloc_stack``
-allocation preceding the deallocation. In other words, deallocations must be
-in last-in, first-out stack order.
+must be the shallowest live ``alloc_stack`` allocation preceding the
+deallocation. In other words, deallocations must be in last-in, first-out
+stack order.
 
 dealloc_box
 ```````````

@@ -81,10 +81,10 @@ bb1(%3 : $Int32):                                 // Preds: bb0
 
 bb2:                                              // Preds: bb0
   %7 = alloc_stack $Optional<Int32>               // users: %8, %10, %11
-  inject_enum_addr %7#1 : $*Optional<Int32>, #Optional.None!enumelt // id: %8
+  inject_enum_addr %7 : $*Optional<Int32>, #Optional.None!enumelt // id: %8
   %9 = tuple ()
-  %10 = load %7#1 : $*Optional<Int32>             // user: %12
-  dealloc_stack %7#0 : $*@local_storage Optional<Int32> // id: %11
+  %10 = load %7 : $*Optional<Int32>             // user: %12
+  dealloc_stack %7 : $*Optional<Int32> // id: %11
   br bb3(%10 : $Optional<Int32>)                  // id: %12
 
 bb3(%13 : $Optional<Int32>):                      // Preds: bb1 bb2

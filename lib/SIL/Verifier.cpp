@@ -618,13 +618,8 @@ public:
   }
 
   void checkAllocStackInst(AllocStackInst *AI) {
-    require(AI->getContainerResult().getType().isLocalStorage(),
-            "first result of alloc_stack must be local storage");
-    require(AI->getAddressResult().getType().isAddress(),
-            "second result of alloc_stack must be an address type");
-    require(AI->getContainerResult().getType().getSwiftRValueType()
-              == AI->getElementType().getSwiftRValueType(),
-            "container storage must be for allocated type");
+    require(AI->getType(0).isAddress(),
+            "result of alloc_stack must be an address type");
 
     // Scan the parent block of AI and check that the users of AI inside this
     // block are inside the lifetime of the allocated memory.
@@ -1335,8 +1330,8 @@ public:
             "unowned_release requires unowned type to be loadable");
   }
   void checkDeallocStackInst(DeallocStackInst *DI) {
-    require(DI->getOperand().getType().isLocalStorage(),
-            "Operand of dealloc_stack must be local storage");
+    require(isa<AllocStackInst>(DI->getOperand()),
+            "Operand of dealloc_stack must be an alloc_stack");
   }
   void checkDeallocRefInst(DeallocRefInst *DI) {
     require(DI->getOperand().getType().isObject(),

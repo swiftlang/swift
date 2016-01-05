@@ -124,12 +124,15 @@ class LoweredValue {
 public:
   enum class Kind {
     /// This LoweredValue corresponds to a SIL address value.
+    /// The LoweredValue of an alloc_stack keeps an owning container in
+    /// addition to the address of the allocated buffer.
+    /// Depending on the allocated type, the container may be equal to the
+    /// buffer itself (for types with known sizes) or it may be the address
+    /// of a fixed-size container which points to the heap-allocated buffer.
+    /// In this case the address-part may be null, which means that the buffer
+    /// is not allocated yet.
     Address,
 
-    /// This LoweredValue corresponds to a SIL address value owned by an
-    /// uninitialized fixed-size buffer.
-    UnallocatedAddressInBuffer,
-    
     /// The following kinds correspond to SIL non-address values.
     Value_First,
       /// A normal value, represented as an exploded array of llvm Values.
@@ -151,7 +154,7 @@ private:
   using ExplosionVector = SmallVector<llvm::Value *, 4>;
   
   union {
-    Address address;
+    ContainedAddress address;
     struct {
       ExplosionVector values;
     } explosion;
@@ -160,14 +163,24 @@ private:
   };
 
 public:
+
+  /// Create an address value without a container (the usual case).
   LoweredValue(const Address &address)
-    : kind(Kind::Address), address(address)
+    : kind(Kind::Address), address(Address(), address)
   {}
   
-  enum UnallocatedAddressInBuffer_t { UnallocatedAddressInBuffer };
+  enum ContainerForUnallocatedAddress_t { ContainerForUnallocatedAddress };
+
+  /// Create an address value for an alloc_stack, consisting of a container and
+  /// a not yet allocated buffer.
+  LoweredValue(const Address &container, ContainerForUnallocatedAddress_t)
+    : kind(Kind::Address), address(container, Address())
+  {}
   
-  LoweredValue(const Address &address, UnallocatedAddressInBuffer_t)
-    : kind(Kind::UnallocatedAddressInBuffer), address(address)
+  /// Create an address value for an alloc_stack, consisting of a container and
+  /// the address of the allocated buffer.
+  LoweredValue(const ContainedAddress &address)
+  : kind(Kind::Address), address(address)
   {}
   
   LoweredValue(StaticFunction &&staticFunction)
@@ -189,8 +202,7 @@ public:
   {    
     switch (kind) {
     case Kind::Address:
-    case Kind::UnallocatedAddressInBuffer:
-      ::new (&address) Address(std::move(lv.address));
+      ::new (&address) ContainedAddress(std::move(lv.address));
       break;
     case Kind::Explosion:
       ::new (&explosion.values) ExplosionVector(std::move(lv.explosion.values));
@@ -212,23 +224,24 @@ public:
   }
   
   bool isAddress() const {
-    return kind == Kind::Address;
+    return kind == Kind::Address && address.getAddress().isValid();
   }
   bool isUnallocatedAddressInBuffer() const {
-    return kind == Kind::UnallocatedAddressInBuffer;
+    return kind == Kind::Address && !address.getAddress().isValid();
   }
   bool isValue() const {
     return kind >= Kind::Value_First && kind <= Kind::Value_Last;
   }
   
   Address getAddress() const {
-    assert(kind == Kind::Address && "not an allocated address");
-    return address;
+    assert(isAddress() && "not an allocated address");
+    return address.getAddress();
   }
   
-  Address getAddressOfUnallocatedBuffer() const {
-    assert(kind == Kind::UnallocatedAddressInBuffer);
-    return address;
+  Address getContainerOfAddress() const {
+    assert(kind == Kind::Address);
+    assert(address.getContainer().isValid() && "address has no container");
+    return address.getContainer();
   }
   
   void getExplosion(IRGenFunction &IGF, Explosion &ex) const;
@@ -254,8 +267,7 @@ public:
   ~LoweredValue() {
     switch (kind) {
     case Kind::Address:
-    case Kind::UnallocatedAddressInBuffer:
-      address.~Address();
+      address.~ContainedAddress();
       break;
     case Kind::Explosion:
       explosion.values.~ExplosionVector();
@@ -345,18 +357,28 @@ public:
     setLoweredValue(v, address);
   }
 
-  void setLoweredUnallocatedAddressInBuffer(SILValue v,
-                                            const Address &buffer) {
+  void setLoweredContainedAddress(SILValue v, const ContainedAddress &address) {
+    assert((v.getType().isAddress() || v.getType().isLocalStorage()) &&
+           "address for non-address value?!");
+    setLoweredValue(v, address);
+  }
+  
+  void setContainerOfUnallocatedAddress(SILValue v,
+                                        const Address &buffer) {
     assert((v.getType().isAddress() || v.getType().isLocalStorage()) &&
            "address for non-address value?!");
     setLoweredValue(v,
-                LoweredValue(buffer, LoweredValue::UnallocatedAddressInBuffer));
+      LoweredValue(buffer, LoweredValue::ContainerForUnallocatedAddress));
   }
   
-  void overwriteLoweredAddress(SILValue v, const Address &address) {
+  void overwriteAllocatedAddress(SILValue v, const Address &address) {
     assert((v.getType().isAddress() || v.getType().isLocalStorage()) &&
            "address for non-address value?!");
-    overwriteLoweredValue(v, address);
+    auto it = LoweredValues.find(v);
+    assert(it != LoweredValues.end() && "no existing entry for overwrite?");
+    assert(it->second.isUnallocatedAddressInBuffer() &&
+           "not an unallocated address");
+    it->second = ContainedAddress(it->second.getContainerOfAddress(), address);
   }
 
   void setAllocatedAddressForBuffer(SILValue v, const Address &allocedAddress);
@@ -465,6 +487,9 @@ public:
   /// lowered.
   Address getLoweredAddress(SILValue v) {
     return getLoweredValue(v).getAddress();
+  }
+  Address getLoweredContainerOfAddress(SILValue v) {
+    return getLoweredValue(v).getContainerOfAddress();
   }
   /// Add the unmanaged LLVM values lowered from a SIL value to an explosion.
   void getLoweredExplosion(SILValue v, Explosion &e) {
@@ -781,7 +806,6 @@ llvm::Value *StaticFunction::getExplosionValue(IRGenFunction &IGF) const {
 void LoweredValue::getExplosion(IRGenFunction &IGF, Explosion &ex) const {
   switch (kind) {
   case Kind::Address:
-  case Kind::UnallocatedAddressInBuffer:
     llvm_unreachable("not a value");
       
   case Kind::Explosion:
@@ -802,7 +826,6 @@ void LoweredValue::getExplosion(IRGenFunction &IGF, Explosion &ex) const {
 llvm::Value *LoweredValue::getSingletonExplosion(IRGenFunction &IGF) const {
   switch (kind) {
   case Kind::Address:
-  case Kind::UnallocatedAddressInBuffer:
     llvm_unreachable("not a value");
 
   case Kind::Explosion:
@@ -1849,7 +1872,6 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
   }
       
   case LoweredValue::Kind::Address:
-  case LoweredValue::Kind::UnallocatedAddressInBuffer:
     llvm_unreachable("sil address isn't a valid callee");
   }
   
@@ -2015,7 +2037,6 @@ getPartialApplicationFunction(IRGenSILFunction &IGF,
 
   switch (lv.kind) {
   case LoweredValue::Kind::Address:
-  case LoweredValue::Kind::UnallocatedAddressInBuffer:
     llvm_unreachable("can't partially apply an address");
   case LoweredValue::Kind::ObjCMethod:
     llvm_unreachable("objc method partial application shouldn't get here");
@@ -3255,7 +3276,6 @@ visitIsUniqueOrPinnedInst(swift::IsUniqueOrPinnedInst *i) {
 static bool tryDeferFixedSizeBufferInitialization(IRGenSILFunction &IGF,
                                                   const SILInstruction *allocInst,
                                                   const TypeInfo &ti,
-                                                  SILValue containerValue,
                                                   SILValue addressValue,
                                                   Address fixedSizeBuffer,
                                                   const llvm::Twine &name) {
@@ -3298,9 +3318,7 @@ static bool tryDeferFixedSizeBufferInitialization(IRGenSILFunction &IGF,
       IGF.Builder.CreateLifetimeStart(fixedSizeBuffer,
                                       getFixedBufferSize(IGF.IGM));
     }
-    if (containerValue)
-      IGF.setLoweredAddress(containerValue, fixedSizeBuffer);
-    IGF.setLoweredUnallocatedAddressInBuffer(addressValue, fixedSizeBuffer);
+    IGF.setContainerOfUnallocatedAddress(addressValue, fixedSizeBuffer);
     return true;
   }
   
@@ -3345,8 +3363,7 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   // operation, we can combine the allocation and initialization using an
   // optimized value witness.
   if (tryDeferFixedSizeBufferInitialization(*this, i, type,
-                                            i->getContainerResult(),
-                                            i->getAddressResult(),
+                                            SILValue(i, 0),
                                             Address(),
                                             dbgname))
     return;
@@ -3356,8 +3373,8 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
                                  dbgname);
 
   emitDebugInfoForAllocStack(i, type, addr.getAddress().getAddress());
-  setLoweredAddress(i->getContainerResult(), addr.getContainer());
-  setLoweredAddress(i->getAddressResult(), addr.getAddress());
+  
+  setLoweredContainedAddress(i, addr);
 }
 
 void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
@@ -3392,8 +3409,8 @@ void IRGenSILFunction::visitAllocRefDynamicInst(swift::AllocRefDynamicInst *i) {
 
 void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
   const TypeInfo &type = getTypeInfo(i->getOperand().getType());
-  Address addr = getLoweredAddress(i->getOperand());
-  type.deallocateStack(*this, addr,
+  Address container = getLoweredContainerOfAddress(i->getOperand());
+  type.deallocateStack(*this, container,
                        i->getOperand().getType());
 }
 
@@ -4204,8 +4221,7 @@ void IRGenSILFunction::visitInitExistentialAddrInst(swift::InitExistentialAddrIn
   auto &srcTI = getTypeInfo(i->getLoweredConcreteType());
 
   // See if we can defer initialization of the buffer to a copy_addr into it.
-  if (tryDeferFixedSizeBufferInitialization(*this, i, srcTI, SILValue(), i,
-                                            buffer, ""))
+  if (tryDeferFixedSizeBufferInitialization(*this, i, srcTI, i, buffer, ""))
     return;
   
   // Compute basic layout information about the type.  If we have a
@@ -4414,11 +4430,8 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
 
 void IRGenSILFunction::setAllocatedAddressForBuffer(SILValue v,
                                                 const Address &allocedAddress) {
-  assert(getLoweredValue(v).kind ==
-             LoweredValue::Kind::UnallocatedAddressInBuffer &&
-         "not an unallocated address");
+  overwriteAllocatedAddress(v, allocedAddress);
 
-  overwriteLoweredAddress(v, allocedAddress);
   // Emit the debug info for the variable if any.
   if (auto allocStack = dyn_cast<AllocStackInst>(v)) {
     emitDebugInfoForAllocStack(allocStack, getTypeInfo(v.getType()),
@@ -4435,7 +4448,7 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
   auto &loweredDest = getLoweredValue(i->getDest());
   if (loweredDest.isUnallocatedAddressInBuffer()) {
     isFixedBufferInitialization = true;
-    dest = loweredDest.getAddressOfUnallocatedBuffer();
+    dest = loweredDest.getContainerOfAddress();
   } else {
     isFixedBufferInitialization = false;
     dest = loweredDest.getAddress();

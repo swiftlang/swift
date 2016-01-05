@@ -658,7 +658,7 @@ namespace {
           if (!source.shouldTake()) {
             sourceTemp = B.createAllocStack(Loc,
                                        sourceAddr.getType().getObjectType());
-            sourceAddr = sourceTemp->getAddressResult();
+            sourceAddr = sourceTemp;
             B.createCopyAddr(Loc, source.Value, sourceAddr, IsNotTake,
                              IsInitialization);
           }
@@ -677,7 +677,7 @@ namespace {
 
         // Deallocate the source temporary if we needed one.
         if (sourceTemp) {
-          B.createDeallocStack(Loc, sourceTemp->getContainerResult());
+          B.createDeallocStack(Loc, sourceTemp);
         }
 
         Source result = emitSome(resultObject, target, state);

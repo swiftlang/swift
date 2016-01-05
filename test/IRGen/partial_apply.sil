@@ -198,10 +198,10 @@ sil public_external @generic_captured_param : $@convention(thin) <T> (Int, @inou
 sil @partial_apply_generic_capture : $@convention(thin) Int -> @callee_owned Int -> Int {
 entry(%x : $Int):
   %a = alloc_stack $Int
-  store %x to %a#1 : $*Int
+  store %x to %a : $*Int
   %f = function_ref @generic_captured_param : $@convention(thin) <T> (Int, @inout T) -> Int
-  %p = partial_apply %f<Int>(%a#1) : $@convention(thin) <T> (Int, @inout T) -> Int
-  dealloc_stack %a#0 : $*@local_storage Int
+  %p = partial_apply %f<Int>(%a) : $@convention(thin) <T> (Int, @inout T) -> Int
+  dealloc_stack %a : $*Int
   return %p : $@callee_owned Int -> Int
 }
 

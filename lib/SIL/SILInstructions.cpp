@@ -35,16 +35,6 @@ using namespace Lowering;
 // SILInstruction Subclasses
 //===----------------------------------------------------------------------===//
 
-// alloc_stack always returns two results: Builtin.RawPointer & LValue[EltTy]
-static SILTypeList *getAllocStackType(SILType eltTy, SILFunction &F) {
-  SILType resTys[] = {
-    eltTy.getLocalStorageType(),
-    eltTy.getAddressType()
-  };
-
-  return F.getModule().getSILTypeList(resTys);
-}
-
 template <typename INST>
 static void *allocateDebugVarCarryingInst(SILModule &M, SILDebugVariable Var) {
   return M.allocateInst(sizeof(INST) + Var.Name.size(), alignof(INST));
@@ -65,7 +55,7 @@ StringRef TailAllocatedDebugVariable::getName(const char *buf) const {
 AllocStackInst::AllocStackInst(SILDebugLocation *Loc, SILType elementType,
                                SILFunction &F, SILDebugVariable Var)
     : AllocationInst(ValueKind::AllocStackInst, Loc,
-                     getAllocStackType(elementType, F)),
+                     elementType.getAddressType()),
       VarInfo(Var, reinterpret_cast<char *>(this + 1)) {}
 
 AllocStackInst *AllocStackInst::create(SILDebugLocation *Loc,

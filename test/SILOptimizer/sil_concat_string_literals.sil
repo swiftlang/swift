@@ -32,8 +32,8 @@ bb0:
   %12 = integer_literal $Builtin.Int1, -1         // user: %13
   %13 = apply %8(%10, %11, %12, %9) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
   %14 = apply %1(%7, %13) : $@convention(thin) (@owned String, @owned String) -> @owned String // users: %15, %17
-  store %14 to %0#1 : $*String                    // id: %15
-  dealloc_stack %0#0 : $*@local_storage String    // id: %16
+  store %14 to %0 : $*String                    // id: %15
+  dealloc_stack %0 : $*String    // id: %16
   return %14 : $String                            // id: %17
 }
 
@@ -62,8 +62,8 @@ bb0:
   %12 = integer_literal $Builtin.Int1, 0
   %13 = apply %8(%10, %11, %9) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %14
   %14 = apply %1(%7, %13) : $@convention(thin) (@owned String, @owned String) -> @owned String // users: %15, %17
-  store %14 to %0#1 : $*String                    // id: %15
-  dealloc_stack %0#0 : $*@local_storage String    // id: %16
+  store %14 to %0 : $*String                    // id: %15
+  dealloc_stack %0 : $*String    // id: %16
   return %14 : $String                            // id: %17
 }
 
@@ -101,8 +101,8 @@ bb0:
   %12 = integer_literal $Builtin.Int1, -1         // user: %13
   %13 = apply %8(%10, %11, %12, %9) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
   %14 = apply %1(%7, %13) : $@convention(thin) (@owned String, @owned String) -> @owned String // users: %15, %17
-  store %14 to %0#1 : $*String                    // id: %15
-  dealloc_stack %0#0 : $*@local_storage String    // id: %16
+  store %14 to %0 : $*String                    // id: %15
+  dealloc_stack %0 : $*String    // id: %16
   return %14 : $String                            // id: %17
 }
 
@@ -131,8 +131,8 @@ bb0:
   %12 = integer_literal $Builtin.Int1, -1         // user: %13
   %13 = apply %8(%10, %11, %12, %9) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
   %14 = apply %1(%7, %13) : $@convention(thin) (@owned String, @owned String) -> @owned String // users: %15, %17
-  store %14 to %0#1 : $*String                    // id: %15
-  dealloc_stack %0#0 : $*@local_storage String    // id: %16
+  store %14 to %0 : $*String                    // id: %15
+  dealloc_stack %0 : $*String    // id: %16
   return %14 : $String                            // id: %17
 }
 
@@ -161,8 +161,8 @@ bb0:
   %12 = integer_literal $Builtin.Int1, 0
   %13 = apply %8(%10, %11, %9) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %14
   %14 = apply %1(%7, %13) : $@convention(thin) (@owned String, @owned String) -> @owned String // users: %15, %17
-  store %14 to %0#1 : $*String                    // id: %15
-  dealloc_stack %0#0 : $*@local_storage String    // id: %16
+  store %14 to %0 : $*String                    // id: %15
+  dealloc_stack %0 : $*String    // id: %16
   return %14 : $String                            // id: %17
 }
 
@@ -191,8 +191,8 @@ bb0:
   %12 = integer_literal $Builtin.Int1, -1         // user: %13
   %13 = apply %8(%10, %11, %12, %9) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
   %14 = apply %1(%7, %13) : $@convention(thin) (@owned String, @owned String) -> @owned String // users: %15, %17
-  store %14 to %0#1 : $*String                    // id: %15
-  dealloc_stack %0#0 : $*@local_storage String    // id: %16
+  store %14 to %0 : $*String                    // id: %15
+  dealloc_stack %0 : $*String    // id: %16
   return %14 : $String                            // id: %17
 }
 
@@ -221,8 +221,8 @@ bb0:
   %12 = integer_literal $Builtin.Int1, -1         // user: %13
   %13 = apply %8(%10, %11, %12, %9) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
   %14 = apply %1(%7, %13) : $@convention(thin) (@owned String, @owned String) -> @owned String // users: %15, %17
-  store %14 to %0#1 : $*String                    // id: %15
-  dealloc_stack %0#0 : $*@local_storage String    // id: %16
+  store %14 to %0 : $*String                    // id: %15
+  dealloc_stack %0 : $*String    // id: %16
   return %14 : $String                            // id: %17
 }
 
@@ -251,8 +251,8 @@ bb0:
   %12 = integer_literal $Builtin.Int1, 0
   %13 = apply %8(%10, %11, %9) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %14
   %14 = apply %1(%7, %13) : $@convention(thin) (@owned String, @owned String) -> @owned String // users: %15, %17
-  store %14 to %0#1 : $*String                    // id: %15
-  dealloc_stack %0#0 : $*@local_storage String    // id: %16
+  store %14 to %0 : $*String                    // id: %15
+  dealloc_stack %0 : $*String    // id: %16
   return %14 : $String                            // id: %17
 }
 
@@ -281,8 +281,8 @@ bb0:
   %12 = integer_literal $Builtin.Int1, -1         // user: %13
   %13 = apply %8(%10, %11, %12, %9) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
   %14 = apply %1(%7, %13) : $@convention(thin) (@owned String, @owned String) -> @owned String // users: %15, %17
-  store %14 to %0#1 : $*String                    // id: %15
-  dealloc_stack %0#0 : $*@local_storage String    // id: %16
+  store %14 to %0 : $*String                    // id: %15
+  dealloc_stack %0 : $*String    // id: %16
   return %14 : $String                            // id: %17
 }
 
@@ -333,8 +333,8 @@ bb0:
   %28 = integer_literal $Builtin.Int1, -1         // user: %29
   %29 = apply %24(%26, %27, %28, %25) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %30
   %30 = apply %1(%23, %29) : $@convention(thin) (@owned String, @owned String) -> @owned String // users: %31, %33
-  store %30 to %0#1 : $*String                    // id: %31
-  dealloc_stack %0#0 : $*@local_storage String    // id: %32
+  store %30 to %0 : $*String                    // id: %31
+  dealloc_stack %0 : $*String    // id: %32
   return %30 : $String                            // id: %33
 }
 
@@ -374,8 +374,8 @@ bb0:
   %20 = integer_literal $Builtin.Int1, 0
   %21 = apply %16(%18, %19, %17) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %22
   %22 = apply %1(%15, %21) : $@convention(thin) (@owned String, @owned String) -> @owned String // users: %23, %25
-  store %22 to %0#1 : $*String                    // id: %23
-  dealloc_stack %0#0 : $*@local_storage String    // id: %24
+  store %22 to %0 : $*String                    // id: %23
+  dealloc_stack %0 : $*String    // id: %24
   return %22 : $String                            // id: %25
 }
 
@@ -416,8 +416,8 @@ bb0:
   %20 = integer_literal $Builtin.Int1, 0
   %21 = apply %16(%18, %19, %17) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %22
   %22 = apply %1(%15, %21) : $@convention(thin) (@owned String, @owned String) -> @owned String // users: %23, %25
-  store %22 to %0#1 : $*String                    // id: %23
-  dealloc_stack %0#0 : $*@local_storage String    // id: %24
+  store %22 to %0 : $*String                    // id: %23
+  dealloc_stack %0 : $*String    // id: %24
   return %22 : $String                            // id: %25
 }
 

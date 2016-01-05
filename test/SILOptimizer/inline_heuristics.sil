@@ -107,13 +107,13 @@ bb0:
   %1 = function_ref @closure : $@convention(thin) (Int32) -> Int32
   %2 = thin_to_thick_function %1 : $@convention(thin) (Int32) -> Int32 to $@callee_owned (Int32) -> Int32
   %3 = struct $Cont (%2 : $@callee_owned (Int32) -> Int32)
-  store %3 to %0#1 : $*Cont
+  store %3 to %0 : $*Cont
   %5 = function_ref @takeStructAddrClosure : $@convention(thin) (@inout Cont) -> Int32
-  %6 = apply %5(%0#1) : $@convention(thin) (@inout Cont) -> Int32
-  %7 = struct_element_addr %0#1 : $*Cont, #Cont.cl
+  %6 = apply %5(%0) : $@convention(thin) (@inout Cont) -> Int32
+  %7 = struct_element_addr %0 : $*Cont, #Cont.cl
   %8 = load %7 : $*@callee_owned (Int32) -> Int32
   strong_release %8 : $@callee_owned (Int32) -> Int32
-  dealloc_stack %0#0 : $*@local_storage Cont
+  dealloc_stack %0 : $*Cont
   return %6 : $Int32
 }
 

@@ -1160,17 +1160,17 @@ bb2(%27 : $Builtin.Int64):
   %33 = alloc_stack $My2dArray<MyInt>
   %35 = apply %9(%32) : $@convention(method) (@guaranteed My2dArray<My2dArray<MyInt>>) -> Bool
   %37 = apply %10(%1, %35, %32) : $@convention(method) (MyInt, Bool, @guaranteed My2dArray<My2dArray<MyInt>>) -> _DependenceToken
-  %39 = apply %11(%33#1, %1, %35, %37, %32) : $@convention(method) (@out My2dArray<MyInt>, MyInt, Bool, _DependenceToken, @guaranteed My2dArray<My2dArray<MyInt>>) -> ()
-  %40 = load %33#1 : $*My2dArray<MyInt>
+  %39 = apply %11(%33, %1, %35, %37, %32) : $@convention(method) (@out My2dArray<MyInt>, MyInt, Bool, _DependenceToken, @guaranteed My2dArray<My2dArray<MyInt>>) -> ()
+  %40 = load %33 : $*My2dArray<MyInt>
   %41 = alloc_stack $MyInt
   %44 = apply %12(%40) : $@convention(method) (@guaranteed My2dArray<MyInt>) -> Bool
   %46 = apply %13(%28, %44, %40) : $@convention(method) (MyInt, Bool, @guaranteed My2dArray<MyInt>) -> _DependenceToken
-  %48 = apply %14(%41#1, %28, %44, %46, %40) : $@convention(method) (@out MyInt, MyInt, Bool, _DependenceToken, @guaranteed My2dArray<MyInt>) -> ()
+  %48 = apply %14(%41, %28, %44, %46, %40) : $@convention(method) (@out MyInt, MyInt, Bool, _DependenceToken, @guaranteed My2dArray<MyInt>) -> ()
   %49 = struct_extract %40 : $My2dArray<MyInt>, #My2dArray._buffer
   %50 = struct_extract %49 : $_My2dArrayBuffer<MyInt>, #_My2dArrayBuffer._storage
   %51 = struct_extract %50 : $_MyBridgeStorage, #_MyBridgeStorage.rawValue
   strong_release %51 : $Builtin.BridgeObject
-  %53 = struct_element_addr %41#1 : $*MyInt, #MyInt._value
+  %53 = struct_element_addr %41 : $*MyInt, #MyInt._value
   %54 = load %53 : $*Builtin.Int64
   %55 = builtin "sadd_with_overflow_Int64"(%54 : $Builtin.Int64, %6 : $Builtin.Int64, %15 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %56 = tuple_extract %55 : $(Builtin.Int64, Builtin.Int1), 0
@@ -1201,8 +1201,8 @@ bb2(%27 : $Builtin.Int64):
   %96 = pointer_to_address %95 : $Builtin.RawPointer to $*MyInt
   %97 = mark_dependence %96 : $*MyInt on %94 : $Optional<Builtin.NativeObject>
   store %59 to %97 : $*MyInt
-  dealloc_stack %41#0 : $*@local_storage MyInt
-  dealloc_stack %33#0 : $*@local_storage My2dArray<MyInt>
+  dealloc_stack %41 : $*MyInt
+  dealloc_stack %33 : $*My2dArray<MyInt>
   %101 = builtin "cmp_eq_Int64"(%30 : $Builtin.Int64, %5 : $Builtin.Int64) : $Builtin.Int1
   cond_br %101, bb1, bb2(%30 : $Builtin.Int64)
 }

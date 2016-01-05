@@ -299,7 +299,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   if (IEI && !OEI) {
     auto *ConcAlloc = Builder.createAllocStack(
         AS->getLoc(), IEI->getLoweredConcreteType(), AS->getVarInfo());
-    SILValue(IEI, 0).replaceAllUsesWith(ConcAlloc->getAddressResult());
+    SILValue(IEI, 0).replaceAllUsesWith(ConcAlloc);
     eraseInstFromFunction(*IEI);
 
     for (auto UI = AS->use_begin(), UE = AS->use_end(); UI != UE;) {
@@ -307,7 +307,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
       ++UI;
       if (auto *DA = dyn_cast<DestroyAddrInst>(Op->getUser())) {
         Builder.setInsertionPoint(DA);
-        Builder.createDestroyAddr(DA->getLoc(), SILValue(ConcAlloc, 1));
+        Builder.createDestroyAddr(DA->getLoc(), ConcAlloc);
         eraseInstFromFunction(*DA);
         continue;
       }
@@ -832,17 +832,15 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
   Builder.setInsertionPoint(AI);
   auto *AllocStack = Builder.createAllocStack(DataAddrInst->getLoc(),
                                               EnumInitOperand->get().getType());
-  EnumInitOperand->set(AllocStack->getAddressResult());
+  EnumInitOperand->set(AllocStack);
   Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(AI)));
-  SILValue Load(Builder.createLoad(DataAddrInst->getLoc(),
-                                   AllocStack->getAddressResult()),
+  SILValue Load(Builder.createLoad(DataAddrInst->getLoc(), AllocStack),
                 0);
   EnumInst *E = Builder.createEnum(
       DataAddrInst->getLoc(), Load, DataAddrInst->getElement(),
       DataAddrInst->getOperand().getType().getObjectType());
   Builder.createStore(DataAddrInst->getLoc(), E, DataAddrInst->getOperand());
-  Builder.createDeallocStack(DataAddrInst->getLoc(),
-                             AllocStack->getContainerResult());
+  Builder.createDeallocStack(DataAddrInst->getLoc(), AllocStack);
   eraseInstFromFunction(*DataAddrInst);
   return eraseInstFromFunction(*IEAI);
 }
@@ -1077,7 +1075,7 @@ SILInstruction *SILCombiner::visitFixLifetimeInst(FixLifetimeInst *FLI) {
   Builder.setCurrentDebugScope(FLI->getDebugScope());
   if (auto *AI = dyn_cast<AllocStackInst>(FLI->getOperand())) {
     if (FLI->getOperand().getType().isLoadable(FLI->getModule())) {
-      auto Load = Builder.createLoad(FLI->getLoc(), SILValue(AI, 1));
+      auto Load = Builder.createLoad(FLI->getLoc(), AI);
       return Builder.createFixLifetime(FLI->getLoc(), SILValue(Load, 0));
     }
   }

@@ -1297,7 +1297,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
     OptionalTy.getAnyOptionalObjectType(OTK);
     Tmp = Builder.createAllocStack(Loc,
                                    SILType::getPrimitiveObjectType(OptionalTy));
-    InOutOptionalParam = SILValue(Tmp, 1);
+    InOutOptionalParam = Tmp;
   } else {
     InOutOptionalParam = Dest;
   }

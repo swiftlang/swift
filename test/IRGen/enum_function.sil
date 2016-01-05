@@ -38,9 +38,9 @@ bb1(%1 : $@callee_owned (@out (), @in ()) -> ()):
 
   // CHECK: [[FNPTR3:%.*]] = bitcast i8* [[FNPTR2]] to void (%swift.opaque*, %swift.opaque*, %swift.refcounted*)*
   // CHECK: call void [[FNPTR3]](%swift.opaque* noalias nocapture sret undef, %swift.opaque* noalias nocapture undef, %swift.refcounted* [[CTX2]])
-  apply %1(%3#1, %2#1) : $@callee_owned (@out (), @in ()) -> ()
-  dealloc_stack %3#0 : $*@local_storage ()
-  dealloc_stack %2#0 : $*@local_storage ()
+  apply %1(%3, %2) : $@callee_owned (@out (), @in ()) -> ()
+  dealloc_stack %3 : $*()
+  dealloc_stack %2 : $*()
   // CHECK: br label [[CONT:%[0-9]+]]
   br bb3
 

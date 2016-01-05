@@ -842,8 +842,8 @@ SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc,
                                                  SILType ty) {
   ty = ty.getObjectType();
   auto alloc = B.createAllocStack(loc, ty);
-  enterDeallocStackCleanup(alloc->getContainerResult());
-  return alloc->getAddressResult();
+  enterDeallocStackCleanup(alloc);
+  return alloc;
 }
 
 // Return an initialization address we can emit directly into.

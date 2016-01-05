@@ -47,8 +47,8 @@ class Base {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $Base):
 // CHECK:   [[T0:%.*]] = ref_element_addr [[SELF]] : $Base, #Base.stored
 // CHECK:   [[T1:%.*]] = address_to_pointer [[T0]] : $*Int to $Builtin.RawPointer
-// CHECK:   inject_enum_addr [[TMP:%.*]]#1 : $*Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Base, @thick Base.Type) -> ()>, #Optional.None
-// CHECK:   [[T2:%.*]] = load [[TMP]]#1
+// CHECK:   inject_enum_addr [[TMP:%.*]] : $*Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Base, @thick Base.Type) -> ()>, #Optional.None
+// CHECK:   [[T2:%.*]] = load [[TMP]]
 // CHECK:   [[T3:%.*]] = tuple ([[T1]] : $Builtin.RawPointer, [[T2]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Base, @thick Base.Type) -> ()>)
 // CHECK:   return [[T3]] : $(Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Base, @thick Base.Type) -> ()>)
 // CHECK: }
@@ -247,17 +247,17 @@ func improveWizard(inout wizard: Wizard) {
 // SILGEN-NEXT:  function_ref
 // SILGEN-NEXT:  [[GETTER:%.*]] = function_ref @_TFE17materializeForSetPS_5Magicg5hocusSi
 // SILGEN-NEXT:  [[WTEMP:%.*]] = alloc_stack $Wizard
-// SILGEN-NEXT:  store [[T0]] to [[WTEMP]]#1
-// SILGEN-NEXT:  [[T0:%.*]] = apply [[GETTER]]<Wizard>([[WTEMP]]#1)
-// SILGEN-NEXT:  store [[T0]] to [[TEMP]]#1
+// SILGEN-NEXT:  store [[T0]] to [[WTEMP]]
+// SILGEN-NEXT:  [[T0:%.*]] = apply [[GETTER]]<Wizard>([[WTEMP]])
+// SILGEN-NEXT:  store [[T0]] to [[TEMP]]
 //   Call improve.
-// SILGEN-NEXT:  apply [[IMPROVE]]([[TEMP]]#1)
-// SILGEN-NEXT:  [[T0:%.*]] = load [[TEMP]]#1
+// SILGEN-NEXT:  apply [[IMPROVE]]([[TEMP]])
+// SILGEN-NEXT:  [[T0:%.*]] = load [[TEMP]]
 // SILGEN-NEXT:  function_ref
 // SILGEN-NEXT:  [[SETTER:%.*]] = function_ref @_TFE17materializeForSetPS_5Magics5hocusSi
 // SILGEN-NEXT:  apply [[SETTER]]<Wizard>([[T0]], [[WIZARD]])
-// SILGEN-NEXT:  dealloc_stack [[WTEMP]]#0
-// SILGEN-NEXT:  dealloc_stack [[TEMP]]#0
+// SILGEN-NEXT:  dealloc_stack [[WTEMP]]
+// SILGEN-NEXT:  dealloc_stack [[TEMP]]
 
 protocol Totalled {
   var total: Int { get set }
@@ -277,8 +277,8 @@ struct Bill : Totalled {
 // SILGEN:   [[INIT:%.*]] = function_ref @_TFSqC
 // SILGEN:   [[META:%.*]] = metatype $@thin Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Bill, @thick Bill.Type) -> ()>.Type
 // SILGEN:   [[T2:%.*]] = alloc_stack $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Bill, @thick Bill.Type) -> ()>
-// SILGEN:   [[OPT:%.*]] = apply [[INIT]]<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Bill, @thick Bill.Type) -> ()>([[T2]]#1, [[META]]) : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>, @thin Optional<τ_0_0>.Type) -> ()
-// SILGEN:   [[T3:%.*]] = load [[T2]]#1
+// SILGEN:   [[OPT:%.*]] = apply [[INIT]]<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Bill, @thick Bill.Type) -> ()>([[T2]], [[META]]) : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>, @thin Optional<τ_0_0>.Type) -> ()
+// SILGEN:   [[T3:%.*]] = load [[T2]]
 // SILGEN:   [[T4:%.*]] = tuple ([[T1]] : $Builtin.RawPointer, [[T3]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Bill, @thick Bill.Type) -> ()>)
 // SILGEN:   return [[T4]] : $(Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Bill, @thick Bill.Type) -> ()>)
 // SILGEN: }

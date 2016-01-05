@@ -22,18 +22,18 @@ bb0(%0 : $Int32, %1 : $Int32):
 bb1:                                              // Preds: bb0
   %12 = integer_literal $Builtin.Int32, 5         // user: %13
   %13 = struct $Int32 (%12 : $Builtin.Int32)      // user: %14
-  store %13 to %4#1 : $*Int32                     // id: %14
+  store %13 to %4 : $*Int32                     // id: %14
   br bb3                                          // id: %15
 
 bb2:                                              // Preds: bb0
   %16 = integer_literal $Builtin.Int32, 4         // user: %17
   %17 = struct $Int32 (%16 : $Builtin.Int32)      // user: %18
-  store %17 to %4#1 : $*Int32                     // id: %18
+  store %17 to %4 : $*Int32                     // id: %18
   br bb3                                          // id: %19
 
 bb3:                                              // Preds: bb1 bb2
-  %20 = load %4#1 : $*Int32                       // user: %22
-  dealloc_stack %4#0 : $*@local_storage Int32     // id: %21
+  %20 = load %4 : $*Int32                       // user: %22
+  dealloc_stack %4 : $*Int32     // id: %21
   return %20 : $Int32                             // id: %22
 }
 

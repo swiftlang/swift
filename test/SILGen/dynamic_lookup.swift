@@ -84,9 +84,9 @@ func opt_to_class(obj: AnyObject) {
 
   // Continuation block
   // CHECK: [[CONTBB]]:
-  // CHECK-NEXT: [[OPT:%.*]] = load [[OPTTEMP]]#1
+  // CHECK-NEXT: [[OPT:%.*]] = load [[OPTTEMP]]
   // CHECK-NEXT: store [[OPT]] to [[OPTBOX]]#1 : $*ImplicitlyUnwrappedOptional<() -> ()>
-  // CHECK-NEXT: dealloc_stack [[OPTTEMP]]#0
+  // CHECK-NEXT: dealloc_stack [[OPTTEMP]]
   var of = obj.f
 
   // Exit

@@ -153,10 +153,10 @@ bb0(%0 : $*SomeProtocol):
   %1 = alloc_box $SomeProtocol
   copy_addr [take] %0 to [initialization] %1#1 : $*SomeProtocol
   %4 = alloc_stack $SomeProtocol
-  copy_addr %1#1 to [initialization] %4#1 : $*SomeProtocol
-  %6 = existential_metatype $@thick SomeProtocol.Type, %4#1 : $*SomeProtocol
-  destroy_addr %4#1 : $*SomeProtocol
-  dealloc_stack %4#0 : $*@local_storage SomeProtocol
+  copy_addr %1#1 to [initialization] %4 : $*SomeProtocol
+  %6 = existential_metatype $@thick SomeProtocol.Type, %4 : $*SomeProtocol
+  destroy_addr %4 : $*SomeProtocol
+  dealloc_stack %4 : $*SomeProtocol
   strong_release %1#0 : $@box SomeProtocol
   return %6 : $@thick SomeProtocol.Type
 }
@@ -167,10 +167,10 @@ sil @inline_test_existential_metatype : $@convention(thin) (@in SomeProtocol) ->
   // CHECK: [[VAL1:%.*]] = alloc_box $SomeProtocol
   // CHECK: copy_addr [take] %0 to [initialization] [[VAL1]]#1
   // CHECK: [[VAL4:%.*]] = alloc_stack $SomeProtocol
-  // CHECK: copy_addr [[VAL1]]#1 to [initialization] [[VAL4]]#1
-  // CHECK: [[VAL6:%.*]] = existential_metatype $@thick SomeProtocol.Type, [[VAL4]]#1
-  // CHECK: destroy_addr [[VAL4]]#1
-  // CHECK: dealloc_stack [[VAL4]]#0
+  // CHECK: copy_addr [[VAL1]]#1 to [initialization] [[VAL4]]
+  // CHECK: [[VAL6:%.*]] = existential_metatype $@thick SomeProtocol.Type, [[VAL4]]
+  // CHECK: destroy_addr [[VAL4]]
+  // CHECK: dealloc_stack [[VAL4]]
   // CHECK: strong_release [[VAL1]]#0
   // CHECK: return [[VAL6]]
 
@@ -207,9 +207,9 @@ bb0(%0 : $Float, %1 : $Float):
   %9 = load %3#1 : $*Float
   %10 = apply %7(%8, %9) : $@convention(thin) (Float, Float) -> Bool
   %11 = alloc_stack $Bool
-  store %10 to %11#1 : $*Bool
-  %13 = apply %6(%11#1) : $@convention(method) (@inout Bool) -> Builtin.Int1
-  dealloc_stack %11#0 : $*@local_storage Bool
+  store %10 to %11 : $*Bool
+  %13 = apply %6(%11) : $@convention(method) (@inout Bool) -> Builtin.Int1
+  dealloc_stack %11 : $*Bool
   cond_br %13, bb1, bb2
 
 bb1:
@@ -225,9 +225,9 @@ bb3:
   %21 = load %3#1 : $*Float
   %22 = apply %20(%21) : $@convention(thin) (Float) -> Bool
   %23 = alloc_stack $Bool
-  store %22 to %23#1 : $*Bool
-  %25 = apply %19(%23#1) : $@convention(method) (@inout Bool) -> Builtin.Int1
-  dealloc_stack %23#0 : $*@local_storage Bool
+  store %22 to %23 : $*Bool
+  %25 = apply %19(%23) : $@convention(method) (@inout Bool) -> Builtin.Int1
+  dealloc_stack %23 : $*Bool
   cond_br %25, bb4, bb5
 
 bb4:
@@ -279,9 +279,9 @@ sil @inline_test_control_flow : $@convention(thin) (Float) -> Float {
   // CHECK: [[VAL22:%.*]] = load [[VAL16]]#1
   // CHECK: [[VAL23:%.*]] = apply [[VAL20]]([[VAL21]], [[VAL22]])
   // CHECK: [[VAL24:%.*]] = alloc_stack $Bool
-  // CHECK: store [[VAL23]] to [[VAL24]]#1
-  // CHECK: [[VAL26:%.*]] = apply [[VAL19]]([[VAL24]]#1)
-  // CHECK: dealloc_stack [[VAL24]]#0
+  // CHECK: store [[VAL23]] to [[VAL24]]
+  // CHECK: [[VAL26:%.*]] = apply [[VAL19]]([[VAL24]])
+  // CHECK: dealloc_stack [[VAL24]]
   // CHECK: cond_br [[VAL26]], [[BB1:bb[0-9]+]], [[BB2:bb[0-9]+]]
 
 // CHECK: [[BB1]]:
@@ -297,9 +297,9 @@ sil @inline_test_control_flow : $@convention(thin) (Float) -> Float {
   // CHECK: [[VAL34:%.*]] = load [[VAL16]]#1
   // CHECK: [[VAL35:%.*]] = apply [[VAL33]]([[VAL34]])
   // CHECK: [[VAL36:%.*]] = alloc_stack $Bool
-  // CHECK: store [[VAL35]] to [[VAL36]]#1
-  // CHECK: [[VAL38:%.*]] = apply [[VAL32]]([[VAL36]]#1)
-  // CHECK: dealloc_stack [[VAL36]]#0
+  // CHECK: store [[VAL35]] to [[VAL36]]
+  // CHECK: [[VAL38:%.*]] = apply [[VAL32]]([[VAL36]])
+  // CHECK: dealloc_stack [[VAL36]]
   // CHECK: cond_br [[VAL38]], [[BB4:bb[0-9]+]], [[BB5:bb[0-9]+]]
 
 // CHECK: [[BB4]]:
@@ -643,13 +643,13 @@ bb0(%0 : $*T, %1 : $Int, %2 : $*T):
   // CHECK-NOT: [[REF:%[a-zA-Z0-9]+]] = function_ref @inner
   %5 = function_ref @inner : $@convention(thin) <τ_0_0, τ_0_1> (@out τ_0_1, @in τ_0_0, @in τ_0_1) -> ()
   %6 = alloc_stack $Int
-  store %1 to %6#1 : $*Int
+  store %1 to %6 : $*Int
   %8 = alloc_stack $T
-  copy_addr %2 to [initialization] %8#1 : $*T
+  copy_addr %2 to [initialization] %8 : $*T
   // CHECK-NOT: apply
-  %10 = apply %5<Int, T>(%0, %6#1, %8#1) : $@convention(thin) <τ_0_0, τ_0_1> (@out τ_0_1, @in τ_0_0, @in τ_0_1) -> ()
-  dealloc_stack %8#0 : $*@local_storage T
-  dealloc_stack %6#0 : $*@local_storage Int
+  %10 = apply %5<Int, T>(%0, %6, %8) : $@convention(thin) <τ_0_0, τ_0_1> (@out τ_0_1, @in τ_0_0, @in τ_0_1) -> ()
+  dealloc_stack %8 : $*T
+  dealloc_stack %6 : $*Int
   destroy_addr %2 : $*T
   %14 = tuple ()
   return %14 : $()
@@ -662,13 +662,13 @@ bb0(%0 : $Int):
   // CHECK-NOT: function_ref @middle
   %2 = function_ref @middle : $@convention(thin) <τ_0_0> (@out τ_0_0, Int, @in τ_0_0) -> ()
   %7 = alloc_stack $Int
-  store %0 to %7#1 : $*Int
+  store %0 to %7 : $*Int
   %9 = alloc_stack $Int
   // CHECK-NOT: apply
-  %10 = apply %2<Int>(%9#1, %0, %7#1) : $@convention(thin) <τ_0_0> (@out τ_0_0, Int, @in τ_0_0) -> ()
-  %11 = load %9#1 : $*Int
-  dealloc_stack %9#0 : $*@local_storage Int
-  dealloc_stack %7#0 : $*@local_storage Int
+  %10 = apply %2<Int>(%9, %0, %7) : $@convention(thin) <τ_0_0> (@out τ_0_0, Int, @in τ_0_0) -> ()
+  %11 = load %9 : $*Int
+  dealloc_stack %9 : $*Int
+  dealloc_stack %7 : $*Int
   return %11 : $Int
 }
 
@@ -719,10 +719,10 @@ bb0(%0 : $*T, %1 : $*T):
   debug_value_addr %1 : $*T
   %3 = function_ref @identity : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
   %4 = alloc_stack $T
-  copy_addr %1 to [initialization] %4#1 : $*T
+  copy_addr %1 to [initialization] %4 : $*T
   // CHECK-NOT: apply
-  %6 = apply %3<T>(%0, %4#1) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
-  dealloc_stack %4#0 : $*@local_storage T
+  %6 = apply %3<T>(%0, %4) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
+  dealloc_stack %4 : $*T
   destroy_addr %1 : $*T
   %9 = tuple ()
   // CHECK: return
@@ -736,10 +736,10 @@ bb0(%0 : $*U, %1 : $*T, %2 : $@callee_owned (@out U, @in T) -> ()):
   debug_value %2 : $@callee_owned (@out U, @in T) -> ()
   strong_retain %2 : $@callee_owned (@out U, @in T) -> ()
   %6 = alloc_stack $T
-  copy_addr %1 to [initialization] %6#1 : $*T
+  copy_addr %1 to [initialization] %6 : $*T
   // CHECK: apply %2
-  %8 = apply %2(%0, %6#1) : $@callee_owned (@out U, @in T) -> ()
-  dealloc_stack %6#0 : $*@local_storage T
+  %8 = apply %2(%0, %6) : $@callee_owned (@out U, @in T) -> ()
+  dealloc_stack %6 : $*T
   strong_release %2 : $@callee_owned (@out U, @in T) -> ()
   destroy_addr %1 : $*T
   %12 = tuple ()
@@ -754,7 +754,7 @@ bb0(%0 : $*U, %1 : $Builtin.Int32, %2 : $@callee_owned (@out U, Builtin.Int32) -
   debug_value %2 : $@callee_owned (@out U, Builtin.Int32) -> ()
   %5 = function_ref @partial : $@convention(thin) <τ_0_0, τ_0_1> (@out τ_0_1, @in τ_0_0, @owned @callee_owned (@out τ_0_1, @in τ_0_0) -> ()) -> ()
   %6 = alloc_stack $Builtin.Int32
-  store %1 to %6#1 : $*Builtin.Int32
+  store %1 to %6 : $*Builtin.Int32
   strong_retain %2 : $@callee_owned (@out U, Builtin.Int32) -> ()
   // CHECK-NOT: function_ref @reabstractionThunk
   %9 = function_ref @reabstractionThunk : $@convention(thin) <τ_0_0> (@out τ_0_0, @in Builtin.Int32, @owned @callee_owned (@out τ_0_0, Builtin.Int32) -> ()) -> ()
@@ -762,8 +762,8 @@ bb0(%0 : $*U, %1 : $Builtin.Int32, %2 : $@callee_owned (@out U, Builtin.Int32) -
   %10 = partial_apply %9<U>(%2) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in Builtin.Int32, @owned @callee_owned (@out τ_0_0, Builtin.Int32) -> ()) -> ()
   // CHECK-NOT: apply
   // CHECK: apply %2
-  %11 = apply %5<Builtin.Int32, U>(%0, %6#1, %10) : $@convention(thin) <τ_0_0, τ_0_1> (@out τ_0_1, @in τ_0_0, @owned @callee_owned (@out τ_0_1, @in τ_0_0) -> ()) -> ()
-  dealloc_stack %6#0 : $*@local_storage Builtin.Int32
+  %11 = apply %5<Builtin.Int32, U>(%0, %6, %10) : $@convention(thin) <τ_0_0, τ_0_1> (@out τ_0_1, @in τ_0_0, @owned @callee_owned (@out τ_0_1, @in τ_0_0) -> ()) -> ()
+  dealloc_stack %6 : $*Builtin.Int32
   strong_release %2 : $@callee_owned (@out U, Builtin.Int32) -> ()
   %14 = tuple ()
   // CHECK: return

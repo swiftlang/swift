@@ -632,14 +632,14 @@ bb3(%12 : $Bool):
 // CHECK-NOT: bb4:
 bb4:
   %21 = alloc_stack $Optional<C>
-  store %0 to %21#1 : $*Optional<C>
+  store %0 to %21 : $*Optional<C>
 // CHECK-NOT: switch_enum
   switch_enum %0 : $Optional<C>, case #Optional.Some!enumelt.1: bb5, case #Optional.None!enumelt: bb6
 
 bb5:
-  %25 = unchecked_take_enum_data_addr %21#1 : $*Optional<C>, #Optional.Some!enumelt.1
+  %25 = unchecked_take_enum_data_addr %21 : $*Optional<C>, #Optional.Some!enumelt.1
   %26 = load %25 : $*C
-  dealloc_stack %21#0 : $*@local_storage Optional<C>
+  dealloc_stack %21 : $*Optional<C>
   %29 = ref_element_addr %26 : $C, #C.value
   %30 = load %29 : $*Int32
   br bb8(%30 : $Int32)
@@ -2414,13 +2414,13 @@ bb0(%0 : $CAB<Element>):
   %6 = function_ref @thunk_helper : $@convention(thin) <τ_0_0> (@out UP<()>, UBP<τ_0_0>, @owned @callee_owned (UBP<τ_0_0>) -> (UP<()>, @error ErrorType)) -> @error ErrorType
   %7 = partial_apply %6<Element>(%5) : $@convention(thin) <τ_0_0> (@out UP<()>, UBP<τ_0_0>, @owned @callee_owned (UBP<τ_0_0>) -> (UP<()>, @error ErrorType)) -> @error ErrorType
   %8 = alloc_stack $UP<()>
-  %9 = unchecked_addr_cast %8#1 : $*UP<()> to $*UP<()>
+  %9 = unchecked_addr_cast %8 : $*UP<()> to $*UP<()>
   %10 = convert_function %7 : $@callee_owned (@out UP<()>, UBP<Element>) -> @error ErrorType to $@callee_owned (@out UP<()>, UBP<Element>) -> @error ErrorType
-  try_apply %2<Element, UP<()>>(%8#1, %7, %0) : $@convention(method) <τ_0_0><τ_1_0> (@out τ_1_0, @owned @callee_owned (@out τ_1_0, UBP<τ_0_0>) -> @error ErrorType, @guaranteed CAB<τ_0_0>) -> @error ErrorType, normal bb1, error bb2
+  try_apply %2<Element, UP<()>>(%8, %7, %0) : $@convention(method) <τ_0_0><τ_1_0> (@out τ_1_0, @owned @callee_owned (@out τ_1_0, UBP<τ_0_0>) -> @error ErrorType, @guaranteed CAB<τ_0_0>) -> @error ErrorType, normal bb1, error bb2
 
 bb1(%12 : $()):
-  %13 = load %8#1 : $*UP<()>
-  dealloc_stack %8#0 : $*@local_storage UP<()>
+  %13 = load %8 : $*UP<()>
+  dealloc_stack %8 : $*UP<()>
   return %13 : $UP<()>
 
 bb2(%16 : $ErrorType):

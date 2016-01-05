@@ -23,18 +23,18 @@ enum MyEnum {
 sil @testit : $@convention(method) (MyEnum) -> Builtin.FPIEEE64 {
 bb0(%0 : $MyEnum):
   %x1 = alloc_stack $MyEnum
-  store %0 to %x1#1 : $*MyEnum
-  %x7 = unchecked_take_enum_data_addr %x1#1 : $*MyEnum, #MyEnum.Some!enumelt.1
+  store %0 to %x1 : $*MyEnum
+  %x7 = unchecked_take_enum_data_addr %x1 : $*MyEnum, #MyEnum.Some!enumelt.1
   %x8 = struct_element_addr %x7 : $*MyStruct, #MyStruct.value
   %x11 = alloc_stack $MyEnum
-  store %0 to %x11#1 : $*MyEnum
-  %x19 = unchecked_take_enum_data_addr %x11#1 : $*MyEnum, #MyEnum.Some!enumelt.1
+  store %0 to %x11 : $*MyEnum
+  %x19 = unchecked_take_enum_data_addr %x11 : $*MyEnum, #MyEnum.Some!enumelt.1
   %x20 = struct_element_addr %x19 : $*MyStruct, #MyStruct.value
   %x24 = load %x20 : $*Builtin.FPIEEE64
   %x27 = load %x8 : $*Builtin.FPIEEE64
   %x28 = builtin "fsub_FPIEEE64"(%x27 : $Builtin.FPIEEE64, %x24 : $Builtin.FPIEEE64) : $Builtin.FPIEEE64
-  dealloc_stack %x11#0 : $*@local_storage MyEnum
-  dealloc_stack %x1#0 : $*@local_storage MyEnum
+  dealloc_stack %x11 : $*MyEnum
+  dealloc_stack %x1 : $*MyEnum
   return %x28 : $Builtin.FPIEEE64
 }
 

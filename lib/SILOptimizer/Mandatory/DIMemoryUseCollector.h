@@ -77,13 +77,15 @@ public:
   }
 
   SILValue getAddress() const {
-    if (isa<MarkUninitializedInst>(MemoryInst))
+    if (isa<MarkUninitializedInst>(MemoryInst) ||
+        isa<AllocStackInst>(MemoryInst))
       return SILValue(MemoryInst, 0);
     return SILValue(MemoryInst, 1);
   }
 
   SILValue getContainer() const {
-    if (isa<MarkUninitializedInst>(MemoryInst))
+    if (isa<MarkUninitializedInst>(MemoryInst) ||
+        isa<AllocStackInst>(MemoryInst))
       return SILValue();
     return SILValue(MemoryInst, 0);
   }

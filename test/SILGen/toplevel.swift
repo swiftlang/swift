@@ -73,7 +73,7 @@ print_y()
 // CHECK: [[SOME_CASE]]([[VALUE:%.+]] : $A):
 // CHECK: [[SINK:%.+]] = function_ref @_TF8toplevel8markUsed
 // CHECK-NOT: release
-// CHECK: store [[VALUE]] to [[BOX:%.+]]#1 : $*A
+// CHECK: store [[VALUE]] to [[BOX:%.+]] : $*A
 // CHECK-NOT: release
 // CHECK: apply [[SINK]]<A>({{%.+}})
 class A {}

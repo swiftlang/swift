@@ -191,9 +191,9 @@ func logical_struct_in_reftype_set(inout value: Val, z1: Int) {
   // -- val.ref.val_prop
   // CHECK: [[STORAGE:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
   // CHECK: [[VAL_REF_VAL_PROP_TEMP:%.*]] = alloc_stack $Val
-  // CHECK: [[T0:%.*]] = address_to_pointer [[VAL_REF_VAL_PROP_TEMP]]#1 : $*Val to $Builtin.RawPointer
+  // CHECK: [[T0:%.*]] = address_to_pointer [[VAL_REF_VAL_PROP_TEMP]] : $*Val to $Builtin.RawPointer
   // CHECK: [[MAT_VAL_PROP_METHOD:%[0-9]+]] = class_method {{.*}} : $Ref, #Ref.val_prop!materializeForSet.1 : (Ref) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, (@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Ref, @thick Ref.Type) -> ())?)
-  // CHECK: [[MAT_RESULT:%[0-9]+]] = apply [[MAT_VAL_PROP_METHOD]]([[T0]], [[STORAGE]]#1, [[VAL_REF]])
+  // CHECK: [[MAT_RESULT:%[0-9]+]] = apply [[MAT_VAL_PROP_METHOD]]([[T0]], [[STORAGE]], [[VAL_REF]])
   // CHECK: [[T0:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Ref, @thick Ref.Type) -> ()>), 0
   // CHECK: [[T1:%[0-9]+]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Val
   // CHECK: [[OPT_CALLBACK:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Ref, @thick Ref.Type) -> ()>), 1  
@@ -204,27 +204,27 @@ func logical_struct_in_reftype_set(inout value: Val, z1: Int) {
   // -- val.ref.val_prop.z_tuple
   // CHECK: [[GET_Z_TUPLE_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Valg7z_tupleT
   // CHECK: [[V_R_VP_Z_TUPLE:%[0-9]+]] = apply [[GET_Z_TUPLE_METHOD]]([[LD]])
-  // CHECK: store [[V_R_VP_Z_TUPLE]] to [[V_R_VP_Z_TUPLE_MAT]]#1
+  // CHECK: store [[V_R_VP_Z_TUPLE]] to [[V_R_VP_Z_TUPLE_MAT]]
   // -- write to val.ref.val_prop.z_tuple.1
-  // CHECK: [[V_R_VP_Z_TUPLE_1:%[0-9]+]] = tuple_element_addr [[V_R_VP_Z_TUPLE_MAT]]#1 : {{.*}}, 1
+  // CHECK: [[V_R_VP_Z_TUPLE_1:%[0-9]+]] = tuple_element_addr [[V_R_VP_Z_TUPLE_MAT]] : {{.*}}, 1
   // CHECK: assign [[Z1]] to [[V_R_VP_Z_TUPLE_1]]
   // -- writeback to val.ref.val_prop.z_tuple
-  // CHECK: [[WB_V_R_VP_Z_TUPLE:%[0-9]+]] = load [[V_R_VP_Z_TUPLE_MAT]]#1
+  // CHECK: [[WB_V_R_VP_Z_TUPLE:%[0-9]+]] = load [[V_R_VP_Z_TUPLE_MAT]]
   // CHECK: [[SET_Z_TUPLE_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Vals7z_tupleT
   // CHECK: apply [[SET_Z_TUPLE_METHOD]]({{%[0-9]+, %[0-9]+}}, [[VAL_REF_VAL_PROP_MAT]])
   // -- writeback to val.ref.val_prop
   // CHECK: switch_enum [[OPT_CALLBACK]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Ref, @thick Ref.Type) -> ()>, case #Optional.Some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.None!enumelt: [[CONT:bb[0-9]+]]
   // CHECK: [[WRITEBACK]]([[CALLBACK:%.*]] : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Ref, @thick Ref.Type) -> ()):
   // CHECK: [[REF_MAT:%.*]] = alloc_stack $Ref
-  // CHECK: store [[VAL_REF]] to [[REF_MAT]]#1
+  // CHECK: store [[VAL_REF]] to [[REF_MAT]]
   // CHECK: [[T0:%.*]] = metatype $@thick Ref.Type
   // CHECK: [[T1:%.*]] = address_to_pointer [[VAL_REF_VAL_PROP_MAT]]
-  // CHECK: apply [[CALLBACK]]([[T1]], [[STORAGE]]#1, [[REF_MAT]]#1, [[T0]])
+  // CHECK: apply [[CALLBACK]]([[T1]], [[STORAGE]], [[REF_MAT]], [[T0]])
   // CHECK: br [[CONT]]
   // CHECK: [[CONT]]:
   // -- cleanup
-  // CHECK: dealloc_stack [[V_R_VP_Z_TUPLE_MAT]]#0
-  // CHECK: dealloc_stack [[VAL_REF_VAL_PROP_TEMP]]#0
+  // CHECK: dealloc_stack [[V_R_VP_Z_TUPLE_MAT]]
+  // CHECK: dealloc_stack [[VAL_REF_VAL_PROP_TEMP]]
   // -- don't need to write back to val.ref because it's a ref type
 }
 
@@ -245,13 +245,13 @@ func tuple_in_logical_struct_set(inout value: Val, z1: Int) {
   // CHECK: retain_value [[VAL1]]
   // CHECK: [[Z_GET_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Valg7z_tupleT
   // CHECK: [[Z_TUPLE:%[0-9]+]] = apply [[Z_GET_METHOD]]([[VAL1]])
-  // CHECK: store [[Z_TUPLE]] to [[Z_TUPLE_MATERIALIZED]]#1
-  // CHECK: [[Z_TUPLE_1:%[0-9]+]] = tuple_element_addr [[Z_TUPLE_MATERIALIZED]]#1 : {{.*}}, 1
+  // CHECK: store [[Z_TUPLE]] to [[Z_TUPLE_MATERIALIZED]]
+  // CHECK: [[Z_TUPLE_1:%[0-9]+]] = tuple_element_addr [[Z_TUPLE_MATERIALIZED]] : {{.*}}, 1
   // CHECK: assign [[Z1]] to [[Z_TUPLE_1]]
-  // CHECK: [[Z_TUPLE_MODIFIED:%[0-9]+]] = load [[Z_TUPLE_MATERIALIZED]]#1
+  // CHECK: [[Z_TUPLE_MODIFIED:%[0-9]+]] = load [[Z_TUPLE_MATERIALIZED]]
   // CHECK: [[Z_SET_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Vals7z_tupleT
   // CHECK: apply [[Z_SET_METHOD]]({{%[0-9]+, %[0-9]+}}, [[VAL_LOCAL]]#1)
-  // CHECK: dealloc_stack [[Z_TUPLE_MATERIALIZED]]#0
+  // CHECK: dealloc_stack [[Z_TUPLE_MATERIALIZED]]
   // CHECK: return
 }
 
@@ -964,11 +964,11 @@ func addressOnlyNonmutatingProperty<T>(x: AddressOnlyNonmutatingSet<T>)
 }
 // CHECK-LABEL: sil hidden @_TF10properties30addressOnlyNonmutatingProperty
 // CHECK:         [[SET:%.*]] = function_ref @_TFV10properties25AddressOnlyNonmutatingSets4propSi
-// CHECK:         apply [[SET]]<T>({{%.*}}, [[TMP:%.*]]#1)
+// CHECK:         apply [[SET]]<T>({{%.*}}, [[TMP:%[0-9]*]])
 // CHECK:         destroy_addr [[TMP]]
 // CHECK:         dealloc_stack [[TMP]]
 // CHECK:         [[GET:%.*]] = function_ref @_TFV10properties25AddressOnlyNonmutatingSetg4propSi
-// CHECK:         apply [[GET]]<T>([[TMP:%.*]]#1)
+// CHECK:         apply [[GET]]<T>([[TMP:%[0-9]*]])
 // CHECK:         destroy_addr [[TMP]]
 // CHECK:         dealloc_stack [[TMP]]
 
@@ -981,9 +981,9 @@ struct AddressOnlyReadOnlySubscript {
 
 // CHECK-LABEL: sil hidden @_TF10properties43addressOnlyReadOnlySubscriptFromMutableBase
 // CHECK:         [[BASE:%.*]] = alloc_box $AddressOnlyReadOnlySubscript
-// CHECK:         copy_addr [[BASE:%.*]]#1 to [initialization] [[COPY:%.*]]#1
+// CHECK:         copy_addr [[BASE:%.*]] to [initialization] [[COPY:%.*]] :
 // CHECK:         [[GETTER:%.*]] = function_ref @_TFV10properties28AddressOnlyReadOnlySubscriptg9subscript
-// CHECK:         apply [[GETTER]]({{%.*}}, [[COPY]]#1)
+// CHECK:         apply [[GETTER]]({{%.*}}, [[COPY]])
 func addressOnlyReadOnlySubscriptFromMutableBase(x: Int) {
   var base = AddressOnlyReadOnlySubscript()
   _ = base[x]

@@ -797,6 +797,10 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
+    if (isa<DeallocStackInst>(User)) {
+      continue;
+    }
+
     // Otherwise, the use is something complicated, it escapes.
     addElementUses(BaseEltNo, PointeeType, User, DIUseKind::Escape);
   }
@@ -1380,6 +1384,9 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
   // The MUI must be used on an alloc_box or alloc_stack instruction.  Chase
   // down the box value to see if there are any releases.
   auto *AI = cast<AllocationInst>(MUI->getOperand());
+  if (isa<AllocStackInst>(AI))
+    return;
+
   for (auto UI : SILValue(AI, 0).getUses()) {
     SILInstruction *User = UI->getUser();
 
@@ -1387,12 +1394,6 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
       Releases.push_back(User);
       continue;
     }
-
-    // Ignore the deallocation of the stack box.  Its contents will be
-    // uninitialized by the point it executes.
-    if (isa<DeallocStackInst>(User))
-      continue;
-
     assert(0 && "Unknown use of box");
   }
 }

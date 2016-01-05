@@ -1064,8 +1064,7 @@ SILGenFunction::emitPatternBindingInitialization(Pattern *P,
 
 /// Enter a cleanup to deallocate the given location.
 CleanupHandle SILGenFunction::enterDeallocStackCleanup(SILValue temp) {
-  assert(temp.getType().isLocalStorage() &&
-         "must deallocate container operand, not address operand!");
+  assert(temp.getType().isAddress() &&  "dealloc must have an address type");
   Cleanups.pushCleanup<DeallocStackCleanup>(temp);
   return Cleanups.getTopCleanup();
 }

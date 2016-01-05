@@ -19,7 +19,7 @@ bb0(%0 : $TrivialDestructor):
   // Alloc/Dealloc stack should not disrupt elimination of the
   // alloc_ref.
   %1 = alloc_stack $Builtin.Int64
-  dealloc_stack %1#0 : $*@local_storage Builtin.Int64
+  dealloc_stack %1 : $*Builtin.Int64
 
   // Storing into the struct should not disrupt elimination of the
   // alloc_ref.
@@ -310,7 +310,7 @@ sil @non_trivial_destructor_objc_destructor : $@convention(thin) () -> () {
 // CHECK: return
 sil @non_trivial_destructor_on_stack : $@convention(thin) () -> () {
   %0 = alloc_stack $NonTrivialDestructor
-  dealloc_stack %0#0 : $*@local_storage NonTrivialDestructor
+  dealloc_stack %0 : $*NonTrivialDestructor
   %1 = tuple()
   return %1 : $()
 }
@@ -321,8 +321,8 @@ sil @non_trivial_destructor_on_stack : $@convention(thin) () -> () {
 // CHECK: return
 sil @trivial_destructor_on_stack : $@convention(thin) () -> () {
   %0 = alloc_stack $Int
-  destroy_addr %0#1 : $*Int
-  dealloc_stack %0#0 : $*@local_storage Int
+  destroy_addr %0 : $*Int
+  dealloc_stack %0 : $*Int
   %1 = tuple()
   return %1 : $()
 }

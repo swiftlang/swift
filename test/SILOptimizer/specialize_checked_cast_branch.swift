@@ -64,12 +64,12 @@ ArchetypeToArchetypeCast(t1: c, t2: b)
 // CHECK:   checked_cast_br [[V]] : $C to $D,
 // CHECK: bb1([[T0:%.*]] : $D):
 // CHECK:   [[T1:%.*]] = enum $Optional<D>, #Optional.Some!enumelt.1, [[T0]] : $D
-// CHECK:   store [[T1]] to [[TMP]]#1 : $*Optional<D>
+// CHECK:   store [[T1]] to [[TMP]] : $*Optional<D>
 // CHECK:   strong_retain [[V]] : $C
 // CHECK:   br bb3
 // CHECK: bb2:
 // CHECK:   [[T0:%.*]] = enum $Optional<D>, #Optional.None
-// CHECK:   store [[T0]] to [[TMP]]#1 : $*Optional<D>
+// CHECK:   store [[T0]] to [[TMP]] : $*Optional<D>
 // CHECK:   br bb3
 ArchetypeToArchetypeCast(t1: c, t2: d)
 

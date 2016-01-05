@@ -21,7 +21,7 @@ entry:
   %b = alloc_stack $NSCloud
   %c = alloc_stack $Butt
 
-  checked_cast_addr_br take_always NSCloud in %b#1 : $*NSCloud to Butt in %c#1 : $*Butt, bb1, bb2
+  checked_cast_addr_br take_always NSCloud in %b : $*NSCloud to Butt in %c : $*Butt, bb1, bb2
 
 bb1:
   br bb3
@@ -30,8 +30,8 @@ bb2:
   br bb3
 
 bb3:
-  dealloc_stack %c#0 : $*@local_storage Butt
-  dealloc_stack %b#0 : $*@local_storage NSCloud
+  dealloc_stack %c : $*Butt
+  dealloc_stack %b : $*NSCloud
   return undef : $()
 }
 
@@ -40,7 +40,7 @@ entry:
   %b = alloc_stack $NSCloud
   %c = alloc_stack $Butt
 
-  checked_cast_addr_br take_always Butt in %c#1 : $*Butt to NSCloud in %b#1 : $*NSCloud, bb1, bb2
+  checked_cast_addr_br take_always Butt in %c : $*Butt to NSCloud in %b : $*NSCloud, bb1, bb2
 
 bb1:
   br bb3
@@ -49,8 +49,8 @@ bb2:
   br bb3
 
 bb3:
-  dealloc_stack %c#0 : $*@local_storage Butt
-  dealloc_stack %b#0 : $*@local_storage NSCloud
+  dealloc_stack %c : $*Butt
+  dealloc_stack %b : $*NSCloud
   return undef : $()
 }
 
