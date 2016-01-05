@@ -2632,13 +2632,8 @@ const WitnessTable *
 swift::swift_conformsToProtocol(const Metadata *type,
                                 const ProtocolDescriptor *protocol) {
   auto &C = Conformances.get();
-  
-  // Install callbacks for tracking when a new dylib is loaded so we can
-  // scan it.
   auto origType = type;
-  
   unsigned numSections = 0;
-
   ConformanceCacheEntry *foundEntry;
 
 recur:
