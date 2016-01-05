@@ -730,12 +730,19 @@ static StringRef toLowercaseWordAndAcronym(StringRef string,
   if (!clang::isUppercase(string[0]))
     return string;
 
-  // Lowercase until we hit the end there is an uppercase letter
-  // followed by a non-uppercase letter.
+  // Lowercase until we hit the an uppercase letter followed by a
+  // non-uppercase letter.
   llvm::SmallString<32> scratchStr;
   for (unsigned i = 0, n = string.size(); i != n; ++i) {
     // If the next character is not uppercase, stop.
     if (i < n - 1 && !clang::isUppercase(string[i+1])) {
+      // If the next non-uppercase character was alphanumeric, we should
+      // still lowercase the character we're on.
+      if (!clang::isLetter(string[i+1])) {
+        scratchStr.push_back(clang::toLowercase(string[i]));
+        ++i;
+      }
+
       scratchStr.append(string.substr(i));
       break;
     }

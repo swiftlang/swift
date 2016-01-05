@@ -147,6 +147,9 @@
 // CHECK-FOUNDATION: var appliesForAJob: Bool { get }
 // CHECK-FOUNDATION: var setShouldBeInfinite: Bool { get }
 
+// "UTF8" initialisms.
+// CHECK-FOUNDATION: init?(utf8String: UnsafePointer<Int8>)
+
 // Note: class method name stripping context type.
 // CHECK-APPKIT: class func red() -> NSColor
 
