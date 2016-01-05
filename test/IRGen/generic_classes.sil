@@ -235,10 +235,9 @@ entry(%c : $RootGeneric<F>):
 
 // RootGeneric.y has dependent layout; load the offset from the metadata
 // CHECK-LABEL: define void @RootGeneric_concrete_fragile_dependent_member_access_y
-// CHECK:   [[TYPE_METADATA_ARRAY:%.*]] = bitcast %swift.type* {{%.*}} to i8***
-// CHECK:   [[Y_OFFSET_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[TYPE_METADATA_ARRAY]], i64 16
-// CHECK:   [[Y_OFFSET_PTR:%.*]] = load i8**, i8*** [[Y_OFFSET_ADDR]], align 8
-// CHECK:   [[Y_OFFSET:%.*]] = ptrtoint i8** [[Y_OFFSET_PTR]] to i64
+// CHECK:   [[TYPE_METADATA_ARRAY:%.*]] = bitcast %swift.type* {{%.*}} to i64*
+// CHECK:   [[Y_OFFSET_ADDR:%.*]] = getelementptr inbounds i64, i64* [[TYPE_METADATA_ARRAY]], i64 16
+// CHECK:   [[Y_OFFSET:%.*]] = load i64, i64* [[Y_OFFSET_ADDR]], align 8
 // CHECK:   [[CLASS_BYTE_ARRAY:%.*]] = bitcast [[ROOTGENERIC]]* {{%.*}} to i8*
 // CHECK:   [[Y_ADDR:%.*]] = getelementptr inbounds i8, i8* [[CLASS_BYTE_ARRAY]], i64 [[Y_OFFSET]]
 // CHECK:   bitcast i8* [[Y_ADDR]] to %swift.opaque*
@@ -251,10 +250,9 @@ entry(%z : $*F, %c : $RootGeneric<F>):
 }
 
 // CHECK-LABEL: define void @RootGeneric_subst_concrete_fragile_dependent_member_access_y
-// CHECK:   [[TYPE_METADATA_ARRAY:%.*]] = bitcast %swift.type* {{%.*}} to i8***
-// CHECK:   [[Y_OFFSET_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[TYPE_METADATA_ARRAY]], i64 16
-// CHECK:   [[Y_OFFSET_PTR:%.*]] = load i8**, i8*** [[Y_OFFSET_ADDR]], align 8
-// CHECK:   [[Y_OFFSET:%.*]] = ptrtoint i8** [[Y_OFFSET_PTR]] to i64
+// CHECK:   [[TYPE_METADATA_ARRAY:%.*]] = bitcast %swift.type* {{%.*}} to i64*
+// CHECK:   [[Y_OFFSET_ADDR:%.*]] = getelementptr inbounds i64, i64* [[TYPE_METADATA_ARRAY]], i64 16
+// CHECK:   [[Y_OFFSET:%.*]] = load i64, i64* [[Y_OFFSET_ADDR]], align 8
 // CHECK:   [[CLASS_BYTE_ARRAY:%.*]] = bitcast [[ROOTGENERIC]]* {{%.*}} to i8*
 // CHECK:   [[Y_ADDR:%.*]] = getelementptr inbounds i8, i8* [[CLASS_BYTE_ARRAY]], i64 [[Y_OFFSET]]
 // CHECK:   bitcast i8* [[Y_ADDR]] to %Si*
@@ -268,10 +266,9 @@ entry(%z : $*Int, %c : $RootGeneric<Int>):
 
 // RootGeneric.z has dependent layout; load the offset from the metadata
 // CHECK-LABEL: define i8 @RootGeneric_concrete_fragile_dependent_member_access_z
-// CHECK:   [[TYPE_METADATA_ARRAY:%.*]] = bitcast %swift.type* {{%.*}} to i8***
-// CHECK:   [[Z_OFFSET_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[TYPE_METADATA_ARRAY]], i64 17
-// CHECK:   [[Z_OFFSET_PTR:%.*]] = load i8**, i8*** [[Z_OFFSET_ADDR]], align 8
-// CHECK:   [[Z_OFFSET:%.*]] = ptrtoint i8** [[Z_OFFSET_PTR]] to i64
+// CHECK:   [[TYPE_METADATA_ARRAY:%.*]] = bitcast %swift.type* {{%.*}} to i64*
+// CHECK:   [[Z_OFFSET_ADDR:%.*]] = getelementptr inbounds i64, i64* [[TYPE_METADATA_ARRAY]], i64 17
+// CHECK:   [[Z_OFFSET:%.*]] = load i64, i64* [[Z_OFFSET_ADDR]], align 8
 // CHECK:   [[CLASS_BYTE_ARRAY:%.*]] = bitcast [[ROOTGENERIC]]* {{%.*}} to i8*
 // CHECK:   [[Z_ADDR:%.*]] = getelementptr inbounds i8, i8* [[CLASS_BYTE_ARRAY]], i64 [[Z_OFFSET]]
 // CHECK:   bitcast i8* [[Z_ADDR]] to %Vs5UInt8*
@@ -283,10 +280,9 @@ entry(%c : $RootGeneric<F>):
 }
 
 // CHECK-LABEL: define i8 @RootGeneric_subst_concrete_fragile_dependent_member_access_z
-// CHECK:   [[TYPE_METADATA_ARRAY:%.*]] = bitcast %swift.type* {{%.*}} to i8***
-// CHECK:   [[Z_OFFSET_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[TYPE_METADATA_ARRAY]], i64 17
-// CHECK:   [[Z_OFFSET_PTR:%.*]] = load i8**, i8*** [[Z_OFFSET_ADDR]], align 8
-// CHECK:   [[Z_OFFSET:%.*]] = ptrtoint i8** [[Z_OFFSET_PTR]] to i64
+// CHECK:   [[TYPE_METADATA_ARRAY:%.*]] = bitcast %swift.type* {{%.*}} to i64*
+// CHECK:   [[Z_OFFSET_ADDR:%.*]] = getelementptr inbounds i64, i64* [[TYPE_METADATA_ARRAY]], i64 17
+// CHECK:   [[Z_OFFSET:%.*]] = load i64, i64* [[Z_OFFSET_ADDR]], align 8
 // CHECK:   [[CLASS_BYTE_ARRAY:%.*]] = bitcast [[ROOTGENERIC]]* {{%.*}} to i8*
 // CHECK:   [[Z_ADDR:%.*]] = getelementptr inbounds i8, i8* [[CLASS_BYTE_ARRAY]], i64 [[Z_OFFSET]]
 // CHECK:   bitcast i8* [[Z_ADDR]] to %Vs5UInt8*

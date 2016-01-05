@@ -3643,13 +3643,10 @@ void IRGenFunction::setDereferenceableLoad(llvm::LoadInst *load,
 }
 
 /// Emit a load from the given metadata at a constant index.
-///
-/// The load is marked invariant. This function should not be called
-/// on metadata objects that are in the process of being initialized.
-static llvm::LoadInst *emitInvariantLoadFromMetadataAtIndex(IRGenFunction &IGF,
-                                                         llvm::Value *metadata,
-                                                         int index,
-                                                llvm::PointerType *objectTy,
+static llvm::LoadInst *emitLoadFromMetadataAtIndex(IRGenFunction &IGF,
+                                                   llvm::Value *metadata,
+                                                   int index,
+                                                   llvm::Type *objectTy,
                                                 const llvm::Twine &suffix = ""){
   // Require the metadata to be some type that we recognize as a
   // metadata pointer.
@@ -3658,6 +3655,8 @@ static llvm::LoadInst *emitInvariantLoadFromMetadataAtIndex(IRGenFunction &IGF,
   // We require objectType to be a pointer type so that the GEP will
   // scale by the right amount.  We could load an arbitrary type using
   // some extra bitcasting.
+  assert(IGF.IGM.DataLayout.getTypeStoreSize(objectTy) ==
+         IGF.IGM.DataLayout.getTypeStoreSize(IGF.IGM.SizeTy));
 
   // Cast to T*.
   auto objectPtrTy = objectTy->getPointerTo();
@@ -3670,8 +3669,21 @@ static llvm::LoadInst *emitInvariantLoadFromMetadataAtIndex(IRGenFunction &IGF,
                IGF.IGM.getPointerAlignment());
 
   // Load.
-  auto result = IGF.Builder.CreateLoad(slot,
-                                       metadata->getName() + suffix);
+  return IGF.Builder.CreateLoad(slot, metadata->getName() + suffix);
+}
+
+/// Emit a load from the given metadata at a constant index.
+///
+/// The load is marked invariant. This function should not be called
+/// on metadata objects that are in the process of being initialized.
+static llvm::LoadInst *emitInvariantLoadFromMetadataAtIndex(IRGenFunction &IGF,
+                                                         llvm::Value *metadata,
+                                                         int index,
+                                                         llvm::Type *objectTy,
+                                                const llvm::Twine &suffix = ""){
+
+  auto result = emitLoadFromMetadataAtIndex(IGF, metadata, index, objectTy,
+                                            suffix);
   IGF.setInvariantLoad(result);
   return result;
 }
@@ -3696,8 +3708,8 @@ IRGenFunction::emitValueWitnessTableRef(CanType type) {
 llvm::Value *
 IRGenFunction::emitValueWitnessTableRefForMetadata(llvm::Value *metadata) {
   auto witness = emitInvariantLoadFromMetadataAtIndex(*this, metadata, -1,
-                                     IGM.WitnessTablePtrTy,
-                                     ".valueWitnesses");
+                                                      IGM.WitnessTablePtrTy,
+                                                      ".valueWitnesses");
   // A value witness table is dereferenceable to the number of value witness
   // pointers.
   
@@ -3733,7 +3745,7 @@ static llvm::Value *emitLoadOfMetadataRefAtIndex(IRGenFunction &IGF,
                                                  llvm::Value *metadata,
                                                  int index) {
   return emitInvariantLoadFromMetadataAtIndex(IGF, metadata, index,
-                                     IGF.IGM.TypeMetadataPtrTy);
+                                              IGF.IGM.TypeMetadataPtrTy);
 }
 
 /// Load the protocol witness table reference at the given index.
@@ -3741,7 +3753,7 @@ static llvm::Value *emitLoadOfWitnessTableRefAtIndex(IRGenFunction &IGF,
                                                      llvm::Value *metadata,
                                                      int index) {
   return emitInvariantLoadFromMetadataAtIndex(IGF, metadata, index,
-                                     IGF.IGM.WitnessTablePtrTy);
+                                              IGF.IGM.WitnessTablePtrTy);
 }
 
 namespace {
@@ -3935,8 +3947,8 @@ llvm::Value *irgen::emitClassFieldOffset(IRGenFunction &IGF,
                                          llvm::Value *metadata) {
   irgen::Size offset = getClassFieldOffset(IGF.IGM, theClass, field);
   int index = getOffsetInWords(IGF.IGM, offset);
-  llvm::Value *val = emitLoadOfWitnessTableRefAtIndex(IGF, metadata, index);
-  return IGF.Builder.CreatePtrToInt(val, IGF.IGM.SizeTy);
+  return emitInvariantLoadFromMetadataAtIndex(IGF, metadata, index,
+                                              IGF.IGM.SizeTy);
 }
 
 /// Given a reference to class metadata of the given type,
@@ -4200,7 +4212,8 @@ llvm::Value *irgen::emitClassHeapMetadataRefForMetatype(IRGenFunction &IGF,
   // a select here instead, which might be profitable.
   IGF.Builder.emitBlock(wrapBB);
   auto classFromWrapper = 
-    emitInvariantLoadFromMetadataAtIndex(IGF, metatype, 1, IGF.IGM.TypeMetadataPtrTy);
+    emitInvariantLoadFromMetadataAtIndex(IGF, metatype, 1,
+                                         IGF.IGM.TypeMetadataPtrTy);
   IGF.Builder.CreateBr(contBB);
 
   // Continuation block.
