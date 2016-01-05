@@ -13,7 +13,7 @@
 // This file defines the database of known methods for various
 // Objective-C classes, along with flags that describe how their
 // import into Swift should be altered.
-// ===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 // INSTANCE_METHOD(ClassName, Selector, Options)
 // CLASS_METHOD(ClassName, Selector, Options)

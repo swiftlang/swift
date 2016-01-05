@@ -13,7 +13,7 @@
 // This file defines the database of macros that should be suppressed during
 // API import.
 //
-// ===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 #ifndef SUPPRESS_MACRO
 /// Describes a macro that should be suppressed.
