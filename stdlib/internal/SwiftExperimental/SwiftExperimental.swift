@@ -118,13 +118,13 @@ public func ⨁= <
   lhs.exclusiveOrInPlace(rhs)
 }
 
-/// - Returns: True if `x` is in the set.
-public func ∈ <T>(x: T, rhs: Set<T>) -> Bool {
+/// - Returns: True if `x` is in the collection.
+public func ∈ <T where T : SequenceType, T.Generator.Element : Equatable>(x: T.Generator.Element, rhs: T) -> Bool {
   return rhs.contains(x)
 }
 
-/// - Returns: True if `x` is not in the set.
-public func ∉ <T>(x: T, rhs: Set<T>) -> Bool {
+/// - Returns: True if `x` is not in the collection.
+public func ∉ <T where T : SequenceType, T.Generator.Element : Equatable>(x: T.Generator.Element, rhs: T) -> Bool {
   return !rhs.contains(x)
 }
 
