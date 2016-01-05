@@ -300,6 +300,8 @@ void Mangler::mangleContext(const DeclContext *ctx, BindGenerics shouldBind) {
   }
 
   case DeclContextKind::SubscriptDecl:
+    // FIXME: We may need to do something here if subscripts contain any symbols
+    // exposed with linkage names.
     return mangleContext(ctx->getParent(), shouldBind);
       
   case DeclContextKind::Initializer:

@@ -1618,7 +1618,6 @@ struct ASTNodeBase {};
       // Make sure that there are no archetypes in the interface type.
       if (VD->getDeclContext()->isTypeContext() &&
           !hasEnclosingFunctionContext(VD->getDeclContext()) &&
-      //    !isa<ParamDecl>(VD) && /* because of subscripts */
           VD->getInterfaceType().findIf([](Type type) {
             return type->is<ArchetypeType>();
           })) {
