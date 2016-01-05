@@ -4336,6 +4336,16 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
     }
     
     if (!foundConformance) {
+      // If the contextual type conforms to DictionaryLiteralConvertible and
+      // this is an empty array, then they meant "[:]".
+      if (E->getNumElements() == 0 &&
+          isDictionaryLiteralCompatible(contextualType, CS, E->getLoc())) {
+        diagnose(E->getStartLoc(), diag::should_use_empty_dictionary_literal)
+          .fixItInsert(E->getEndLoc(), ":");
+        return true;
+      }
+
+
       diagnose(E->getStartLoc(), diag::type_is_not_array, contextualType)
         .highlight(E->getSourceRange());
 
