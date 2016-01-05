@@ -106,7 +106,7 @@ class E3 :C3 {}
 // B has its own implementation.
 @inline(never)
 func foo(a: A3) -> Int {
-// Check that call to A3.f() can be devirualized.
+// Check that call to A3.f() can be devirtualized.
 //
 // CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TF19devirt_default_case3fooFCS_2A3Si
 // CHECK: function_ref @{{.*}}TFC19devirt_default_case2B31f

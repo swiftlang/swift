@@ -2877,7 +2877,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
 
     case AccessorKind::IsMaterializeForSet:
     case AccessorKind::NotAccessor:
-      llvm_unreachable("not parsable accessors");
+      llvm_unreachable("not parseable accessors");
     }
   }
 

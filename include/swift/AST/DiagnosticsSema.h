@@ -23,7 +23,7 @@
 namespace swift {
   namespace diag {
 
-    /// Describes the kind of requirement in a protocl.
+    /// Describes the kind of requirement in a protocol.
     enum class RequirementKind : uint8_t {
       Constructor,
       Func,
