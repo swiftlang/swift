@@ -70,7 +70,7 @@ class GraphemeClusterBreakPropertyTable(UnicodeProperty):
             self.symbolic_values[v] = k
 
         # Load the data file.
-        with codecs.open(grapheme_break_property_file_name, encoding=sys.getfilesystemencoding(), errors='strict') as f:
+        with codecs.open(grapheme_break_property_file_name, encoding='utf-8', errors='strict') as f:
             for line in f:
                 # Strip comments.
                 line = re.sub('#.*', '', line)
