@@ -6881,6 +6881,12 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     } else if (auto ED = dyn_cast<EnumDecl>(D)) {
       if (ED->isGenericContext())
         error = diag::objc_enum_generic;
+    } else if (auto EED = dyn_cast<EnumElementDecl>(D)) {
+      auto ED = EED->getParentEnum();
+      if (!ED->getAttrs().hasAttribute<ObjCAttr>())
+        error = diag::objc_enum_case_req_objc_enum;
+      else if (objcAttr->hasName() && EED->getParentCase()->getElements().size() > 1)
+        error = diag::objc_enum_case_multi;
     } else if (isa<FuncDecl>(D)) {
       auto func = cast<FuncDecl>(D);
       if (!checkObjCDeclContext(D))
@@ -6910,8 +6916,8 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     // If there is a name, check whether the kind of name is
     // appropriate.
     if (auto objcName = objcAttr->getName()) {
-      if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D) || isa<EnumDecl>(D) ||
-          isa<VarDecl>(D)) {
+      if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D) || isa<VarDecl>(D)
+          || isa<EnumDecl>(D) || isa<EnumElementDecl>(D)) {
         // Types and properties can only have nullary
         // names. Complain and recover by chopping off everything
         // after the first name.
@@ -6919,7 +6925,8 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
           int which = isa<ClassDecl>(D)? 0
                     : isa<ProtocolDecl>(D)? 1
                     : isa<EnumDecl>(D)? 2
-                    : 3;
+                    : isa<EnumElementDecl>(D)? 3
+                    : 4;
           SourceLoc firstNameLoc = objcAttr->getNameLocs().front();
           SourceLoc afterFirstNameLoc = 
             Lexer::getLocForEndOfToken(TC.Context.SourceMgr, firstNameLoc);
@@ -6964,6 +6971,11 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
           D->getAttrs().removeAttribute(objcAttr);
         }
       }
+    } else if (isa<EnumElementDecl>(D)) {
+      // Enum elements require names.
+      TC.diagnose(objcAttr->getLocation(), diag::objc_enum_case_req_name)
+        .fixItRemove(objcAttr->getRangeWithAt());
+      objcAttr->setInvalid();
     }
   }
 
