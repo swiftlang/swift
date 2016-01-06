@@ -25,7 +25,7 @@ phase (stands for intermediate representation generation phase) that lowers SIL
 into LLVM IR. The LLVM backend optimizes and emits binary code for the compiled
 program.
 
-Please refer to the document “Swift Intermediate Language (SIL)” for more
+Please refer to the document "Swift Intermediate Language (SIL)" for more
 details about the SIL IR.
 
 The compiler optimizer is responsible for optimizing the program using the
@@ -125,8 +125,8 @@ The mechanism that swift uses to invalidate analysis is broadcast-invalidation.
 Passes ask the pass manager to invalidate specific traits. For example, a pass
 like simplify-cfg will ask the pass manager to announce that it modified some
 branches in the code. The pass manager will send a message to all of the
-available analysis that says “please invalidate yourself if you care about
-branches for function F“. The dominator tree would then invalidate the dominator
+available analysis that says "please invalidate yourself if you care about
+branches for function F". The dominator tree would then invalidate the dominator
 tree for function F because it knows that changes to branches can mean that the
 dominator tree was modified.
 
@@ -189,7 +189,7 @@ functions with the @_semantics attribute until after all of the data-structure
 specific optimizations are done. Unfortunately, this lengthens our optimization
 pipeline.
 
-Please refer to the document “High-Level SIL Optimizations” for more details.
+Please refer to the document "High-Level SIL Optimizations" for more details.
 
 
 ### Instruction Invalidation in SIL
@@ -241,4 +241,4 @@ TODO.
 
 ### List of passes
 
-The updated list of passes is available in the file “Passes.def”.
+The updated list of passes is available in the file "Passes.def".

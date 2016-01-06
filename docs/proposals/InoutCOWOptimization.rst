@@ -25,8 +25,8 @@ The problem is caused as follows:
 
     x[0].mutate()
 
-  we “``subscript get``” ``x[0]`` into a temporary, mutate the
-  temporary, and “``subscript set``” it back into ``x[0]``.
+  we "``subscript get``" ``x[0]`` into a temporary, mutate the
+  temporary, and "``subscript set``" it back into ``x[0]``.
 
 * When the element itself is a COW type, that temporary implies a
   retain count of at least 2 on the element's buffer.

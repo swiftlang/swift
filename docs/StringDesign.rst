@@ -116,9 +116,9 @@ Goals
 ``String`` should:
 
 * honor industry standards such as Unicode
-* when handling non-ASCII text, deliver “reasonably correct”
+* when handling non-ASCII text, deliver "reasonably correct"
   results to users thinking only in terms of ASCII
-* when handling ASCII text, provide “expected behavior” to users
+* when handling ASCII text, provide "expected behavior" to users
   thinking only in terms of ASCII
 * be hard to use incorrectly
 * be easy to use correctly
@@ -165,7 +165,7 @@ optimizations, including:
 - In-place modification of uniquely-owned buffers
 
 As a result, copying_ and slicing__ strings, in particular, can be
-viewed by most programmers as being “almost free.”
+viewed by most programmers as being "almost free."
 
 __ sliceable_
 
@@ -197,7 +197,7 @@ Strings are **Value Types**
 Distinct string variables have independent values: when you pass
 someone a string they get a copy of the value, and when someone
 passes you a string *you own it*.  Nobody can change a string value
-“behind your back.”
+"behind your back."
 
 .. parsed-literal::
   |swift| class Cave {
@@ -231,18 +231,18 @@ Strings are **Unicode-Aware**
    specifies requires careful justification.  So far, we have found two
    possible points of deviation for Swift ``String``:
 
-   1. The `Unicode Text Segmentation Specification`_ says, “`do not
-      break between CR and LF`__.”  However, breaking extended
+   1. The `Unicode Text Segmentation Specification`_ says, "`do not
+      break between CR and LF`__."  However, breaking extended
       grapheme clusters between CR and LF may necessary if we wish
-      ``String`` to “behave normally” for users of pure ASCII.  This
+      ``String`` to "behave normally" for users of pure ASCII.  This
       point is still open for discussion.
 
       __ http://www.unicode.org/reports/tr29/#GB2
 
    2. The `Unicode Text Segmentation Specification`_ says,
-      “`do not break between regional indicator symbols`__.”  However, it also
-      says “(Sequences of more than two RI characters should be separated
-      by other characters, such as U+200B ZWSP).”  Although the
+      "`do not break between regional indicator symbols`__."  However, it also
+      says "(Sequences of more than two RI characters should be separated
+      by other characters, such as U+200B ZWSP)."  Although the
       parenthesized note probably has less official weight than the other
       admonition, breaking pairs of RI characters seems like the right
       thing for us to do given that Cocoa already forms strings with
@@ -278,7 +278,7 @@ Strings are **Locale-Agnostic**
 
 Strings neither carry their own locale information, nor provide
 behaviors that depend on a global locale setting.  Thus, for any pair
-of strings ``s1`` and ``s2``, “``s1 == s2``” yields the same result
+of strings ``s1`` and ``s2``, "``s1 == s2``" yields the same result
 regardless of system state.  Strings *do* provide a suitable
 foundation on which to build locale-aware interfaces.\ [#locales]_ 
 
@@ -316,8 +316,8 @@ Strings are Composed of ``Character``\ s
 cluster**, as specified by a default or tailored Unicode segmentation
 algorithm.  This term is `precisely defined`__ by the Unicode
 specification, but it roughly means `what the user thinks of when she
-hears “character”`__. For example, the pair of code points “LATIN
-SMALL LETTER N, COMBINING TILDE” forms a single grapheme cluster, “ñ”.
+hears "character"`__. For example, the pair of code points "LATIN
+SMALL LETTER N, COMBINING TILDE" forms a single grapheme cluster, "ñ".
 
 __ http://www.unicode.org/glossary/#grapheme_cluster
 __ http://useless-factor.blogspot.com/2007/08/unicode-implementers-guide-part-4.html
@@ -342,8 +342,8 @@ __ http://www.unicode.org/glossary/#extended_grapheme_cluster
 __ http://www.unicode.org/reports/tr29/#Default_Grapheme_Cluster_Table
 
 This segmentation offers naïve users of English, Chinese, French, and
-probably a few other languages what we think of as the “expected
-results.”  However, not every script_ can be segmented uniformly for
+probably a few other languages what we think of as the "expected
+results."  However, not every script_ can be segmented uniformly for
 all purposes.  For example, searching and collation require different
 segmentations in order to handle Indic scripts correctly.  To that
 end, strings support properties for more-specific segmentations:
@@ -386,9 +386,9 @@ Strings are **Sliceable**
 .. parsed-literal::
    |swift| s[r.start...r.end]
    `// r2 : String = "awe"`
-   |swift| s[\ :look1:`r.start...`\ ]\ :aside:`postfix slice operator means “through the end”`
+   |swift| s[\ :look1:`r.start...`\ ]\ :aside:`postfix slice operator means "through the end"`
    `// r3 : String = "awesome"`
-   |swift| s[\ :look1:`...r.start`\ ]\ :aside:`prefix slice operator means “from the beginning”`
+   |swift| s[\ :look1:`...r.start`\ ]\ :aside:`prefix slice operator means "from the beginning"`
    `// r4 : String = "Strings are "`
    |swift| :look1:`s[r]`\ :aside:`indexing with a range is the same as slicing`
    `// r5 : String = "awe"`
@@ -579,7 +579,7 @@ How Would You Design It?
     5. CodePoint substring search is just byte string search
     6. Most programs that handle 8-bit files safely can handle UTF-8 safely
     7. UTF-8 sequences sort in code point order.
-    8. UTF-8 has no “byte order.”
+    8. UTF-8 has no "byte order."
 
     __ http://research.swtch.com/2010/03/utf-8-bits-bytes-and-benefits.html
 
@@ -682,7 +682,7 @@ withRange:subrange]`` becomes ``str[subrange].doFoo(arg)``.
 
   * Deprecated Cocoa APIs are not considered
 
-  * A status of “*Remove*” below indicates a feature whose removal is
+  * A status of "*Remove*" below indicates a feature whose removal is
     anticipated.  Rationale is provided for these cases.
 
 Indexing
@@ -806,18 +806,18 @@ Comparison
      func **<=** (lhs: String, rhs: String) -> Bool
      func **>=** (lhs: String, rhs: String) -> Bool
 
-``NSString`` comparison is “literal” by default.  As the documentation
+``NSString`` comparison is "literal" by default.  As the documentation
 says of ``isEqualToString``,
 
-  “Ö” represented as the composed character sequence “O” and umlaut
-  would not compare equal to “Ö” represented as one Unicode character.
+  "Ö" represented as the composed character sequence "O" and umlaut
+  would not compare equal to "Ö" represented as one Unicode character.
 
 By contrast, Swift string's primary comparison interface uses
 Unicode's default collation_ algorithm, and is thus always
-“Unicode-correct.”  Unlike comparisons that depend on locale, it is
+"Unicode-correct."  Unlike comparisons that depend on locale, it is
 also stable across changes in system state.  However, *just like*
 ``NSString``\ 's ``isEqualToString`` and ``compare`` methods, it
-should not be expected to yield ideal (or even “proper”) results in
+should not be expected to yield ideal (or even "proper") results in
 all contexts.
 
 ---------
@@ -1084,10 +1084,10 @@ Capitalization
 
 .. Note:: ``NSString`` capitalizes the first letter of each substring
           separated by spaces, tabs, or line terminators, which is in
-          no sense “Unicode-correct.”  In most other languages that
+          no sense "Unicode-correct."  In most other languages that
           support a ``capitalize`` method, it operates only on the
           first character of the string, and capitalization-by-word is
-          named something like “``title``.”  If Swift ``String``
+          named something like "``title``."  If Swift ``String``
           supports capitalization by word, it should be
           Unicode-correct, but how we sort this particular area out is
           still **TBD**.
@@ -1712,7 +1712,7 @@ Why YAGNI
 * Derivation
 * ...
 
-.. [#agnostic] Unicode specifies default (“un-tailored”)
+.. [#agnostic] Unicode specifies default ("un-tailored")
    locale-independent collation_ and segmentation_ algorithms that
    make reasonable sense in most contexts.  Using these algorithms
    allows strings to be naturally compared and combined, generating
@@ -1748,6 +1748,6 @@ Why YAGNI
    been normalized, thus speeding up comparison operations.
 
 .. [#elements] Since ``String`` is locale-agnostic_, its elements are
-   determined using Unicode's default, “un-tailored” segmentation_
+   determined using Unicode's default, "un-tailored" segmentation_
    algorithm.
 

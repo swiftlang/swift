@@ -21,9 +21,9 @@ Scope
 Goals
 .....
 
-* The REPL and LLDB (“debuggers”) share formatting logic
-* All types are “debug-printable” automatically
-* Making a type “printable for humans” is super-easy
+* The REPL and LLDB ("debuggers") share formatting logic
+* All types are "debug-printable" automatically
+* Making a type "printable for humans" is super-easy
 * ``toString()``-ability is a consequence of printability.
 * Customizing a type's printed representations is super-easy
 * Format variations such as numeric radix are explicit and readable
@@ -43,11 +43,11 @@ Non-Goals
   that feature.  Therefore, localization and dynamic format strings
   should be designed together, and *under this proposal* the only
   format strings are string literals containing interpolations
-  (“``\(...)``”). Cocoa programmers can still use Cocoa localization
+  ("``\(...)``"). Cocoa programmers can still use Cocoa localization
   APIs for localization jobs.
 
   In Swift, only the most common cases need to be very terse.
-  Anything “fancy” can afford to be a bit more verbose. If and when
+  Anything "fancy" can afford to be a bit more verbose. If and when
   we address localization and design a full-featured dynamic string
   formatter, it may make sense to incorporate features of ``printf``
   into the design.
@@ -68,7 +68,7 @@ printed with ``print(x)``, and can be converted to ``String`` with
 
 The simple extension story for beginners is as follows: 
 
-  “To make your type ``CustomStringConvertible``, simply declare conformance to
+  "To make your type ``CustomStringConvertible``, simply declare conformance to
   ``CustomStringConvertible``::
 
     extension Person : CustomStringConvertible {}
@@ -152,9 +152,9 @@ directly to the ``OutputStream`` for efficiency reasons,
    Producing a representation that can be consumed by the REPL
    and LLDB to produce an equivalent object is strongly encouraged
    where possible!  For example, ``String.debugFormat()`` produces
-   a representation starting and ending with “``"``”, where special
+   a representation starting and ending with "``"``", where special
    characters are escaped, etc. A ``struct Point { var x, y: Int }``
-   might be represented as “``Point(x: 3, y: 5)``”.
+   might be represented as "``Point(x: 3, y: 5)``".
 
 (Non-Debug) Printing
 ....................
@@ -348,7 +348,7 @@ an underlying stream::
 
 However, upcasing is a trivial example: many such transformations—such
 as ``trim()`` or regex replacement—are stateful, which implies some
-way of indicating “end of input” so that buffered state can be
+way of indicating "end of input" so that buffered state can be
 processed and written to the underlying stream:
 
 .. parsed-literal::
@@ -422,10 +422,10 @@ If we were willing to say that only ``class``\ es can conform to
 ``OutputStream``\ s are passed around. Then, we'd simply need a
 ``class StringStream`` for creating ``String`` representations. It
 would also make ``OutputStream`` adapters a *bit* simpler to use
-because you'd never need to “write back” explicitly onto the target
+because you'd never need to "write back" explicitly onto the target
 stream. However, stateful ``OutputStream`` adapters would still need a
 ``close()`` method, which makes a perfect place to return a copy of
-the underlying stream, which can then be “written back”:
+the underlying stream, which can then be "written back":
 
 .. parsed-literal::
 
