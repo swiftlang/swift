@@ -1501,6 +1501,7 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
 
     // Project down to the buffers.
     IGF.Builder.emitBlock(contBB);
+    ConditionalDominanceScope condition(IGF);
     Address destBuffer = layout.projectExistentialBuffer(IGF, dest);
     Address srcBuffer = layout.projectExistentialBuffer(IGF, src);
 

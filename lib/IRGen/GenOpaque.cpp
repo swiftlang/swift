@@ -320,25 +320,26 @@ static llvm::Value *emitLoadOfValueWitnessFromMetadata(IRGenFunction &IGF,
 
 llvm::Value *IRGenFunction::emitValueWitness(CanType type, ValueWitness index) {
   if (auto witness =
-        tryGetLocalTypeData(type, LocalTypeData::forValueWitness(index)))
+        tryGetLocalTypeData(type, LocalTypeDataKind::forValueWitness(index)))
     return witness;
   
   auto vwtable = emitValueWitnessTableRef(type);
   auto witness = emitLoadOfValueWitness(*this, vwtable, index);
-  setScopedLocalTypeData(type, LocalTypeData::forValueWitness(index), witness);
+  setScopedLocalTypeData(type, LocalTypeDataKind::forValueWitness(index),
+                         witness);
   return witness;
 }
 
 llvm::Value *IRGenFunction::emitValueWitnessForLayout(SILType type,
                                                       ValueWitness index) {
   if (auto witness = tryGetLocalTypeDataForLayout(type,
-                                         LocalTypeData::forValueWitness(index)))
+                                    LocalTypeDataKind::forValueWitness(index)))
     return witness;
   
   auto vwtable = emitValueWitnessTableRefForLayout(type);
   auto witness = emitLoadOfValueWitness(*this, vwtable, index);
   setScopedLocalTypeDataForLayout(type,
-                                LocalTypeData::forValueWitness(index), witness);
+                           LocalTypeDataKind::forValueWitness(index), witness);
   return witness;
 }
 

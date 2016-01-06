@@ -71,7 +71,21 @@ public:
     virtual ~InterestingKeysCallback() = default;
   };
 
+  /// An implementaton of InterestingKeysCallback that returns everything
+  /// fulfillable.
+  struct Everything : InterestingKeysCallback {
+    bool isInterestingType(CanType type) const override;
+    bool hasInterestingType(CanType type) const override;
+    bool hasLimitedInterestingConformances(CanType type) const override;
+    GenericSignature::ConformsToArray
+      getInterestingConformances(CanType type) const override;
+  };
+
   FulfillmentMap() = default;
+
+  using iterator = decltype(Fulfillments)::iterator;
+  iterator begin() { return Fulfillments.begin(); }
+  iterator end() { return Fulfillments.end(); }
 
   /// Is it even theoretically possible that we might find a fulfillment
   /// in the given type?

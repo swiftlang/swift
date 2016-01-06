@@ -25,7 +25,9 @@ namespace llvm {
 }
 
 namespace swift {
+  class ProtocolDecl;
   class CanType;
+  class Decl;
 
 namespace irgen {
   class IRGenFunction;

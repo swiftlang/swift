@@ -152,7 +152,9 @@ void TypeInfo::destroyArray(IRGenFunction &IGF, Address array,
   auto elementVal = IGF.Builder.CreatePHI(array.getType(), 2);
   elementVal->addIncoming(array.getAddress(), entry);
   Address element(elementVal, array.getAlignment());
-  
+ 
+  ConditionalDominanceScope condition(IGF);
+
   auto done = IGF.Builder.CreateICmpEQ(counter,
                                      llvm::ConstantInt::get(IGF.IGM.SizeTy, 0));
   IGF.Builder.CreateCondBr(done, exit, loop);
@@ -196,6 +198,8 @@ void irgen::emitInitializeArrayFrontToBack(IRGenFunction &IGF,
   srcVal->addIncoming(srcArray.getAddress(), entry);
   Address dest(destVal, destArray.getAlignment());
   Address src(srcVal, srcArray.getAlignment());
+
+  ConditionalDominanceScope condition(IGF);
   
   auto done = IGF.Builder.CreateICmpEQ(counter,
                                        llvm::ConstantInt::get(IGM.SizeTy, 0));
@@ -250,6 +254,8 @@ void irgen::emitInitializeArrayBackToFront(IRGenFunction &IGF,
   srcVal->addIncoming(srcEnd.getAddress(), entry);
   Address dest(destVal, destArray.getAlignment());
   Address src(srcVal, srcArray.getAlignment());
+
+  ConditionalDominanceScope condition(IGF);
   
   auto done = IGF.Builder.CreateICmpEQ(counter,
                                        llvm::ConstantInt::get(IGM.SizeTy, 0));
@@ -530,6 +536,8 @@ FixedTypeInfo::getSpareBitExtraInhabitantIndex(IRGenFunction &IGF,
   auto isValid = IGF.Builder.CreateICmpEQ(valSpareBits,
                                           llvm::ConstantInt::get(payloadTy, 0));
   
+  ConditionalDominanceScope condition(IGF);
+
   auto *origBB = IGF.Builder.GetInsertBlock();
   auto *endBB = llvm::BasicBlock::Create(C);
   auto *spareBB = llvm::BasicBlock::Create(C);
