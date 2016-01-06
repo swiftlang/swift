@@ -19,7 +19,9 @@
 #ifndef SWIFT_IRGEN_LOCALTYPEDATAKIND_H
 #define SWIFT_IRGEN_LOCALTYPEDATAKIND_H
 
+#include "swift/AST/Type.h"
 #include <stdint.h>
+#include "llvm/ADT/DenseMapInfo.h"
 
 namespace swift {
   class NormalProtocolConformance;
@@ -96,9 +98,42 @@ public:
   RawType getRawValue() const {
     return Value;
   }
+
+  bool operator==(LocalTypeDataKind other) const {
+    return Value == other.Value;
+  }
+};
+
+struct LocalTypeDataKey {
+  CanType Type;
+  LocalTypeDataKind Kind;
+
+  bool operator==(const LocalTypeDataKey &other) const {
+    return Type == other.Type && Kind == other.Kind;
+  }
 };
 
 }
 }
+
+template <> struct llvm::DenseMapInfo<swift::irgen::LocalTypeDataKey> {
+  using LocalTypeDataKey = swift::irgen::LocalTypeDataKey;
+  using CanTypeInfo = DenseMapInfo<swift::CanType>;
+  static inline LocalTypeDataKey getEmptyKey() {
+    return { CanTypeInfo::getEmptyKey(),
+             swift::irgen::LocalTypeDataKind::forMetatype() };
+  }
+  static inline LocalTypeDataKey getTombstoneKey() {
+    return { CanTypeInfo::getTombstoneKey(),
+             swift::irgen::LocalTypeDataKind::forMetatype() };
+  }
+  static unsigned getHashValue(const LocalTypeDataKey &key) {
+    return combineHashValue(CanTypeInfo::getHashValue(key.Type),
+                            key.Kind.getRawValue());
+  }
+  static bool isEqual(const LocalTypeDataKey &a, const LocalTypeDataKey &b) {
+    return a == b;
+  }
+};
 
 #endif

@@ -660,6 +660,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
 
   // If we had conditional ObjC checks, join the failure paths.
   if (contBB) {
+    condition.reset();
     IGF.Builder.CreateBr(contBB);
     IGF.Builder.emitBlock(contBB);
     

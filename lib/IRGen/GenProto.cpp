@@ -976,9 +976,8 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
                                          llvm::ConstantInt::get(IGM.SizeTy, 0));
     IGF.Builder.CreateCondBr(done, exit, loop);
 
-    ConditionalDominanceScope condition(IGF);
-
     IGF.Builder.emitBlock(loop);
+    ConditionalDominanceScope condition(IGF);
     type.destroy(IGF, element, concreteType);
     auto nextCounter = IGF.Builder.CreateSub(counter,
                                      llvm::ConstantInt::get(IGM.SizeTy, 1));

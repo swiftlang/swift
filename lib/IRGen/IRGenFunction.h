@@ -417,9 +417,18 @@ public:
     return DominanceResolver(*this, ActiveDominancePoint, point);
   }
 
-  /// Is it possible to cache at the current dominance point?
-  bool hasCacheableDominancePoint() const {
-    return !ConditionalDominance;
+  /// Is the current dominance point conditional in some way not
+  /// tracked by the active dominance point?
+  ///
+  /// This should only be used by the local type data cache code.
+  bool isConditionalDominancePoint() const {
+    return ConditionalDominance != nullptr;
+  }
+
+  void registerConditionalLocalTypeDataKey(LocalTypeDataKey key) {
+    assert(ConditionalDominance != nullptr &&
+           "not in a conditional dominance scope");
+    ConditionalDominance->registerConditionalLocalTypeDataKey(key);
   }
 
   /// Return the currently-active dominance point.
@@ -452,19 +461,27 @@ public:
   /// that isn't modeled by the dominance system.
   class ConditionalDominanceScope {
     IRGenFunction &IGF;
-    bool OldConditionalDominance;
+    ConditionalDominanceScope *OldScope;
+    SmallVector<LocalTypeDataKey, 2> RegisteredKeys;
   public:
     explicit ConditionalDominanceScope(IRGenFunction &IGF)
-        : IGF(IGF), OldConditionalDominance(IGF.ConditionalDominance) {
-      IGF.ConditionalDominance = true;
+        : IGF(IGF), OldScope(IGF.ConditionalDominance) {
+      IGF.ConditionalDominance = this;
     }
 
     ConditionalDominanceScope(const ConditionalDominanceScope &other) = delete;
     ConditionalDominanceScope &operator=(const ConditionalDominanceScope &other)
       = delete;
 
+    void registerConditionalLocalTypeDataKey(LocalTypeDataKey key) {
+      RegisteredKeys.push_back(key);
+    }
+
     ~ConditionalDominanceScope() {
-      IGF.ConditionalDominance = OldConditionalDominance;
+      IGF.ConditionalDominance = OldScope;
+      if (!RegisteredKeys.empty()) {
+        IGF.unregisterConditionalLocalTypeDataKeys(RegisteredKeys);
+      }
     }
   };
 
@@ -484,6 +501,7 @@ public:
 private:
   LocalTypeDataCache &getOrCreateLocalTypeData();
   void destroyLocalTypeData();
+  void unregisterConditionalLocalTypeDataKeys(ArrayRef<LocalTypeDataKey> keys);
 
   LocalTypeDataCache *LocalTypeData = nullptr;
 
@@ -491,7 +509,7 @@ private:
   /// set, this emission must never have a non-null active definition point.
   DominanceResolverFunction DominanceResolver = nullptr;
   DominancePoint ActiveDominancePoint = DominancePoint::universal();
-  bool ConditionalDominance = false;
+  ConditionalDominanceScope *ConditionalDominance = nullptr;
   
   /// The value that satisfies metadata lookups for dynamic Self.
   llvm::Value *LocalSelf = nullptr;

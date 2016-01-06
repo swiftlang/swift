@@ -34,6 +34,9 @@ namespace llvm {
 }
 
 namespace swift {
+  enum IsTake_t : bool;
+  class SILType;
+
 namespace irgen {
   class Address;
   class ContainedAddress;
@@ -260,6 +263,12 @@ public:
   virtual void deallocateStack(IRGenFunction &IGF, Address addr,
                                SILType T) const = 0;
 
+  /// Copy or take a value out of one address and into another, destroying
+  /// old value in the destination.  Equivalent to either assignWithCopy
+  /// or assignWithTake depending on the value of isTake.
+  void assign(IRGenFunction &IGF, Address dest, Address src, IsTake_t isTake,
+              SILType T) const;
+
   /// Copy a value out of an object and into another, destroying the
   /// old value in the destination.
   virtual void assignWithCopy(IRGenFunction &IGF, Address dest,
@@ -269,6 +278,13 @@ public:
   /// old value there and leaving the source object in an invalid state.
   virtual void assignWithTake(IRGenFunction &IGF, Address dest,
                               Address src, SILType T) const = 0;
+
+  /// Copy-initialize or take-initialize an uninitialized object
+  /// with the value from a different object.  Equivalent to either
+  /// initializeWithCopy or initializeWithTake depending on the value
+  /// of isTake.
+  void initialize(IRGenFunction &IGF, Address dest, Address src,
+                  IsTake_t isTake, SILType T) const;
 
   /// Perform a "take-initialization" from the given object.  A
   /// take-initialization is like a C++ move-initialization, except that

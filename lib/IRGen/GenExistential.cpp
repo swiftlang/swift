@@ -1501,7 +1501,8 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
 
     // Project down to the buffers.
     IGF.Builder.emitBlock(contBB);
-    ConditionalDominanceScope condition(IGF);
+    // We don't need a ConditionalDominanceScope here because (1) there's no
+    // code in the other condition and (2) we immediately return.
     Address destBuffer = layout.projectExistentialBuffer(IGF, dest);
     Address srcBuffer = layout.projectExistentialBuffer(IGF, src);
 
@@ -1517,10 +1518,10 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
       IGF.Builder.CreateICmpEQ(destMetadata, srcMetadata, "sameMetadata");
     IGF.Builder.CreateCondBr(sameMetadata, matchBB, noMatchBB);
 
-    { // (scope to avoid contaminating other branches with these values)
-
-      // If so, do a direct assignment.
-      IGF.Builder.emitBlock(matchBB);
+    // If so, do a direct assignment.
+    IGF.Builder.emitBlock(matchBB);
+    {
+      ConditionalDominanceScope matchCondition(IGF);
 
       llvm::Value *destObject =
         emitProjectBufferCall(IGF, destMetadata, destBuffer);
@@ -1538,29 +1539,32 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
     // the madnesses that boost::variant has to go through, with the
     // advantage of address-invariance.
     IGF.Builder.emitBlock(noMatchBB);
+    {
+      ConditionalDominanceScope noMatchCondition(IGF);
 
-    // Store the metadata ref.
-    IGF.Builder.CreateStore(srcMetadata, destMetadataSlot);
+      // Store the metadata ref.
+      IGF.Builder.CreateStore(srcMetadata, destMetadataSlot);
 
-    // Store the protocol witness tables.
-    unsigned numTables = layout.getNumTables();
-    for (unsigned i = 0, e = numTables; i != e; ++i) {
-      Address destTableSlot = layout.projectWitnessTable(IGF, dest, i);
-      llvm::Value *srcTable = layout.loadWitnessTable(IGF, src, i);
+      // Store the protocol witness tables.
+      unsigned numTables = layout.getNumTables();
+      for (unsigned i = 0, e = numTables; i != e; ++i) {
+        Address destTableSlot = layout.projectWitnessTable(IGF, dest, i);
+        llvm::Value *srcTable = layout.loadWitnessTable(IGF, src, i);
 
-      // Overwrite the old witness table.
-      IGF.Builder.CreateStore(srcTable, destTableSlot);
+        // Overwrite the old witness table.
+        IGF.Builder.CreateStore(srcTable, destTableSlot);
+      }
+
+      // Destroy the old value.
+      emitDestroyBufferCall(IGF, destMetadata, destBuffer);
+
+      // Copy-initialize with the new value.  Again, pull a value
+      // witness table from the source metadata if we can't use a
+      // protocol witness table.
+      emitInitializeBufferWithCopyOfBufferCall(IGF, srcMetadata,
+                                               destBuffer, srcBuffer);
+      IGF.Builder.CreateBr(doneBB);
     }
-
-    // Destroy the old value.
-    emitDestroyBufferCall(IGF, destMetadata, destBuffer);
-
-    // Copy-initialize with the new value.  Again, pull a value
-    // witness table from the source metadata if we can't use a
-    // protocol witness table.
-    emitInitializeBufferWithCopyOfBufferCall(IGF, srcMetadata,
-                                             destBuffer, srcBuffer);
-    IGF.Builder.CreateBr(doneBB);
 
     // All done.
     IGF.Builder.emitBlock(doneBB);

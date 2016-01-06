@@ -51,10 +51,10 @@ namespace irgen {
 ///     ask whether each is acceptable.
 class LocalTypeDataCache {
 public:
-  using Key = std::pair<TypeBase*, LocalTypeDataKind::RawType>;
+  using Key = LocalTypeDataKey;
 
   static Key getKey(CanType type, LocalTypeDataKind index) {
-    return Key(type.getPointer(), index.getRawValue());
+    return { type, index };
   }
 
 private:
@@ -64,11 +64,17 @@ private:
     };
 
     DominancePoint DefinitionPoint;
-    llvm::PointerIntPair<CacheEntry*, 2, Kind> NextAndKind;
 
-    Kind getKind() const { return NextAndKind.getInt(); }
-    CacheEntry *getNext() const { return NextAndKind.getPointer(); }
-    void setNext(CacheEntry *next) { NextAndKind.setPointer(next); }
+  private:
+    enum { KindMask = 0x1, ConditionalMask = 0x2 };
+    llvm::PointerIntPair<CacheEntry*, 2, unsigned> NextAndFlags;
+
+  public:
+    Kind getKind() const {
+      return Kind(NextAndFlags.getInt() & KindMask);
+    }
+    CacheEntry *getNext() const { return NextAndFlags.getPointer(); }
+    void setNext(CacheEntry *next) { NextAndFlags.setPointer(next); }
 
     /// Return the abstract cost of evaluating this cache entry.
     unsigned cost() const;
@@ -76,9 +82,15 @@ private:
     /// Destruct and deallocate this cache entry.
     void erase() const;
 
+    bool isConditional() const {
+      return NextAndFlags.getInt() & ConditionalMask;
+    }
+
   protected:
-    CacheEntry(Kind kind, DominancePoint point)
-        : DefinitionPoint(point), NextAndKind(nullptr, kind) {
+    CacheEntry(Kind kind, DominancePoint point, bool isConditional)
+        : DefinitionPoint(point),
+          NextAndFlags(nullptr,
+                       unsigned(kind) | (isConditional ? ConditionalMask : 0)) {
     }
     ~CacheEntry() = default;
   };
@@ -87,8 +99,9 @@ private:
   struct ConcreteCacheEntry : CacheEntry {
     llvm::Value *Value;
 
-    ConcreteCacheEntry(DominancePoint point, llvm::Value *value)
-      : CacheEntry(Kind::Concrete, point), Value(value) {}
+    ConcreteCacheEntry(DominancePoint point, bool isConditional,
+                       llvm::Value *value)
+      : CacheEntry(Kind::Concrete, point, isConditional), Value(value) {}
 
     unsigned cost() const { return 0; }
   };
@@ -150,10 +163,10 @@ private:
     unsigned SourceIndex;
     MetadataPath Path;
 
-    AbstractCacheEntry(DominancePoint point, unsigned sourceIndex,
-                       MetadataPath &&path)
-      : CacheEntry(Kind::Abstract, point), SourceIndex(sourceIndex),
-        Path(std::move(path)) {}
+    AbstractCacheEntry(DominancePoint point, bool isConditional,
+                       unsigned sourceIndex, MetadataPath &&path)
+      : CacheEntry(Kind::Abstract, point, isConditional),
+        SourceIndex(sourceIndex), Path(std::move(path)) {}
 
     llvm::Value *follow(IRGenFunction &IGF, AbstractSource &source) const;
 
@@ -231,8 +244,9 @@ public:
   }
 
   /// Add a new concrete entry to the cache at the given definition point.
-  void addConcrete(DominancePoint point, Key key, llvm::Value *value) {
-    auto newEntry = new ConcreteCacheEntry(point, value);
+  void addConcrete(DominancePoint point, bool isConditional,
+                   Key key, llvm::Value *value) {
+    auto newEntry = new ConcreteCacheEntry(point, isConditional, value);
     Map[key].push_front(newEntry);
   }
 
@@ -240,6 +254,8 @@ public:
   /// type metadata.
   void addAbstractForTypeMetadata(IRGenFunction &IGF, CanType type,
                                   llvm::Value *metadata);
+
+  void eraseConditional(ArrayRef<LocalTypeDataKey> keys);
 };
 
 }

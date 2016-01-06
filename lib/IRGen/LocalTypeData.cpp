@@ -125,17 +125,15 @@ llvm::Value *LocalTypeDataCache::tryGet(IRGenFunction &IGF, Key key) {
     auto &source = AbstractSources[entry->SourceIndex];
     auto result = entry->follow(IGF, source);
 
-    // If we can't cache at the current insertion point, we're done.
-    if (!IGF.hasCacheableDominancePoint())
-      return result;
-
     // Make a new concrete entry at the active definition point.
     auto newEntry =
-      new ConcreteCacheEntry(IGF.getActiveDominancePoint(), result);
+      new ConcreteCacheEntry(IGF.getActiveDominancePoint(),
+                             IGF.isConditionalDominancePoint(), result);
 
     // If the active definition point is the same as the old entry's
     // definition point, delete the old entry.
-    if (best->DefinitionPoint == IGF.getActiveDominancePoint()) {
+    if (best->DefinitionPoint == IGF.getActiveDominancePoint() &&
+        !best->isConditional()) {
       chain.eraseEntry(bestPrev, best);
     }
 
@@ -166,10 +164,11 @@ LocalTypeDataCache::AbstractCacheEntry::follow(IRGenFunction &IGF,
 
 void IRGenFunction::setScopedLocalTypeData(CanType type, LocalTypeDataKind kind,
                                            llvm::Value *data) {
-  if (!hasCacheableDominancePoint())
+  if (isConditionalDominancePoint())
     return;
 
   getOrCreateLocalTypeData().addConcrete(getActiveDominancePoint(),
+                                         isConditionalDominancePoint(),
                                          LocalTypeDataCache::getKey(type, kind),
                                          data);
 }
@@ -178,15 +177,16 @@ void IRGenFunction::setUnscopedLocalTypeData(CanType type,
                                              LocalTypeDataKind kind,
                                              llvm::Value *data) {
   getOrCreateLocalTypeData()
-    .addConcrete(DominancePoint::universal(),
+    .addConcrete(DominancePoint::universal(), /*conditional*/ false,
                  LocalTypeDataCache::getKey(type, kind), data);
 }
 
 void LocalTypeDataCache::addAbstractForTypeMetadata(IRGenFunction &IGF,
                                                     CanType type,
                                                     llvm::Value *metadata) {
-  // If we shouldn't cache at the current dominance point, short-circuit.
-  if (!IGF.hasCacheableDominancePoint())
+  // Don't bother doing this at a conditional dominance point; we're too
+  // likely to throw it all away.
+  if (IGF.isConditionalDominancePoint())
     return;
 
   // Look for anything at all that's fulfilled by this.  If we don't find
@@ -266,7 +266,8 @@ addAbstractForFullfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
 
       // If the entry is defined at the current point, (1) we know there
       // won't be a better entry and (2) we should remove it.
-      if (cur->DefinitionPoint == IGF.getActiveDominancePoint()) {
+      if (cur->DefinitionPoint == IGF.getActiveDominancePoint() &&
+          !cur->isConditional()) {
         // Splice it out of the chain.
         chain.eraseEntry(last, cur);
         break;
@@ -276,10 +277,27 @@ addAbstractForFullfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
 
     // Okay, make a new entry.
     auto newEntry = new AbstractCacheEntry(IGF.getActiveDominancePoint(),
+                                           IGF.isConditionalDominancePoint(),
                                            getSourceIndex(),
                                            std::move(fulfillment.second.Path));
 
     // Add it to the front of the chain.
     chain.push_front(newEntry);
+  }
+}
+
+void IRGenFunction::unregisterConditionalLocalTypeDataKeys(
+                                             ArrayRef<LocalTypeDataKey> keys) {
+  assert(!keys.empty());
+  assert(LocalTypeData);
+  LocalTypeData->eraseConditional(keys);
+}
+
+void LocalTypeDataCache::eraseConditional(ArrayRef<LocalTypeDataKey> keys) {
+  for (auto &key : keys) {
+    auto &chain = Map[key];
+    assert(chain.Root);
+    assert(chain.Root->isConditional());
+    chain.eraseEntry(nullptr, chain.Root);
   }
 }
