@@ -99,6 +99,11 @@ Latest
 [lexicographical order]: https://en.wikipedia.org/wiki/Lexicographical_order
 [SE-0015]: https://github.com/apple/swift-evolution/blob/master/proposals/0015-tuple-comparison-operators.md
 
+* The `@objc(SomeName)` attribute is now supported on enums and enum cases to
+  rename the generated Objective-C declaration.
+
+  **(rdar://problem/21930334)**
+
 2015-09-17 [Xcode 7.1, Swift 2.1]
 ----------
 
