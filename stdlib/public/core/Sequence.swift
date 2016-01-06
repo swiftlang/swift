@@ -244,6 +244,16 @@ internal class _DropFirstSequence<Base : IteratorProtocol>
     }
     return _iterator.next()
   }
+
+  internal func dropFirst(n: Int) -> AnySequence<Base.Element> {
+    // If this is already a _DropFirstSequence, we need to fold in
+    // the current drop count and drop limit so no data is lost.
+    //
+    // i.e. [1,2,3,4].dropFirst(1).dropFirst(1) should be equivalent to
+    // [1,2,3,4].dropFirst(2).
+    return AnySequence(
+      _DropFirstSequence(_iterator, limit: _limit + n, dropped: _dropped))
+  }
 }
 
 /// A sequence that only consumes up to `n` elements from an underlying
@@ -254,8 +264,7 @@ internal class _DropFirstSequence<Base : IteratorProtocol>
 /// This is a class - we require reference semantics to keep track
 /// of how many elements we've already taken from the underlying sequence.
 internal class _PrefixSequence<Base : IteratorProtocol>
-  : Sequence, IteratorProtocol {
-
+    : Sequence, IteratorProtocol {
   internal let _maxLength: Int
   internal var _iterator: Base
   internal var _taken: Int
@@ -280,6 +289,12 @@ internal class _PrefixSequence<Base : IteratorProtocol>
 
     _taken = _maxLength
     return nil
+  }
+
+  internal func prefix(maxLength: Int) -> AnySequence<Base.Element> {
+    return AnySequence(
+      _PrefixSequence(_iterator,
+        maxLength: Swift.min(maxLength, self._maxLength), taken: _taken))
   }
 }
 
@@ -331,83 +346,6 @@ extension Sequence {
     }
 
     return Array(result)
-  }
-
-  /// Returns a subsequence containing all but the first `n` elements.
-  ///
-  /// - Requires: `n >= 0`
-  /// - Complexity: O(`n`)
-  @warn_unused_result
-  public func dropFirst(n: Int) -> AnySequence<Iterator.Element> {
-    _require(n >= 0, "Can't drop a negative number of elements from a sequence")
-    if n == 0 { return AnySequence(self) }
-    // If this is already a _DropFirstSequence, we need to fold in
-    // the current drop count and drop limit so no data is lost.
-    //
-    // i.e. [1,2,3,4].dropFirst(1).dropFirst(1) should be equivalent to
-    // [1,2,3,4].dropFirst(2).
-    // FIXME: <rdar://problem/21885675> Use method dispatch to fold
-    // _PrefixSequence and _DropFirstSequence counts
-    if let any = self as? AnySequence<Iterator.Element>,
-       let box = any._box as? _SequenceBox<_DropFirstSequence<Iterator>> {
-      let base = box._base
-      let folded = _DropFirstSequence(
-        base._iterator, limit: base._limit + n, dropped: base._dropped)
-      return AnySequence(folded)
-    }
-
-    return AnySequence(_DropFirstSequence(iterator(), limit: n))
-  }
-
-  /// Returns a subsequence containing all but the last `n` elements.
-  ///
-  /// - Requires: `self` is a finite collection.
-  /// - Requires: `n >= 0`
-  /// - Complexity: O(`self.length`)
-  @warn_unused_result
-  public func dropLast(n: Int) -> AnySequence<Iterator.Element> {
-    _require(n >= 0, "Can't drop a negative number of elements from a sequence")
-    if n == 0 { return AnySequence(self) }
-    // FIXME: <rdar://problem/21885650> Create reusable RingBuffer<T>
-    // Put incoming elements from this sequence in a holding tank, a ring buffer
-    // of size <= n. If more elements keep coming in, pull them out of the
-    // holding tank into the result, an `Array`. This saves
-    // `n` * sizeof(Iterator.Element) of memory, because slices keep the entire
-    // memory of an `Array` alive.
-    var result: [Iterator.Element] = []
-    var ringBuffer: [Iterator.Element] = []
-    var i = ringBuffer.startIndex
-
-    for element in self {
-      if ringBuffer.length < n {
-        ringBuffer.append(element)
-      } else {
-        result.append(ringBuffer[i])
-        ringBuffer[i] = element
-        i = i.successor() % n
-      }
-    }
-    return AnySequence(result)
-  }
-
-  @warn_unused_result
-  public func prefix(maxLength: Int) -> AnySequence<Iterator.Element> {
-    _require(maxLength >= 0, "Can't take a prefix of negative length from a sequence")
-    if maxLength == 0 {
-      return AnySequence(EmptyCollection<Iterator.Element>())
-    }
-    // FIXME: <rdar://problem/21885675> Use method dispatch to fold
-    // _PrefixSequence and _DropFirstSequence counts
-    if let any = self as? AnySequence<Iterator.Element>,
-       let box = any._box as? _SequenceBox<_PrefixSequence<Iterator>> {
-      let base = box._base
-      let folded = _PrefixSequence(
-        base._iterator,
-        maxLength: Swift.min(base._maxLength, maxLength),
-        taken: base._taken)
-      return AnySequence(folded)
-    }
-    return AnySequence(_PrefixSequence(iterator(), maxLength: maxLength))
   }
 
   @warn_unused_result
@@ -528,9 +466,7 @@ extension Sequence {
   ) -> Bool? {
     return nil
   }
-}
 
-extension Sequence {
   /// Call `body` on each element in `self` in the same order as a
   /// *for-in loop.*
   ///
@@ -585,6 +521,64 @@ extension Sequence where Iterator.Element : Equatable {
   ) -> [AnySequence<Iterator.Element>] {
     return split(maxSplits, omitEmptySubsequences: omitEmptySubsequences,
       isSeparator: { $0 == separator })
+  }
+}
+
+extension Sequence where
+  SubSequence : Sequence,
+  SubSequence.Iterator.Element == Iterator.Element,
+  SubSequence.SubSequence == SubSequence {
+
+  /// Returns a subsequence containing all but the first `n` elements.
+  ///
+  /// - Requires: `n >= 0`
+  /// - Complexity: O(`n`)
+  @warn_unused_result
+  public func dropFirst(n: Int) -> AnySequence<Iterator.Element> {
+    require(n >= 0, "Can't drop a negative number of elements from a sequence")
+    if n == 0 { return AnySequence(self) }
+    return AnySequence(_DropFirstSequence(iterator(), limit: n))
+  }
+
+  /// Returns a subsequence containing all but the last `n` elements.
+  ///
+  /// - Requires: `self` is a finite collection.
+  /// - Requires: `n >= 0`
+  /// - Complexity: O(`self.count`)
+  @warn_unused_result
+  public func dropLast(n: Int) -> AnySequence<Iterator.Element> {
+    require(n >= 0, "Can't drop a negative number of elements from a sequence")
+    if n == 0 { return AnySequence(self) }
+
+    // FIXME: <rdar://problem/21885650> Create reusable RingBuffer<T>
+    // Put incoming elements from this sequence in a holding tank, a ring buffer
+    // of size <= n. If more elements keep coming in, pull them out of the
+    // holding tank into the result, an `Array`. This saves
+    // `n` * sizeof(Iterator.Element) of memory, because slices keep the entire
+    // memory of an `Array` alive.
+    var result: [Iterator.Element] = []
+    var ringBuffer: [Iterator.Element] = []
+    var i = ringBuffer.startIndex
+
+    for element in self {
+      if ringBuffer.length < n {
+        ringBuffer.append(element)
+      } else {
+        result.append(ringBuffer[i])
+        ringBuffer[i] = element
+        i = i.successor() % n
+      }
+    }
+    return AnySequence(result)
+  }
+
+  @warn_unused_result
+  public func prefix(maxLength: Int) -> AnySequence<Iterator.Element> {
+    require(maxLength >= 0, "Can't take a prefix of negative length from a sequence")
+    if maxLength == 0 {
+      return AnySequence(EmptyCollection<Iterator.Element>())
+    }
+    return AnySequence(_PrefixSequence(iterator(), maxLength: maxLength))
   }
 }
 

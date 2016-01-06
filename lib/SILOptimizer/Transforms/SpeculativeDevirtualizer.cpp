@@ -1,4 +1,4 @@
-//===-- SpeculativeDevirtualizer.cpp -- Speculatively devirtualize calls --===//
+//===--- SpeculativeDevirtualizer.cpp - Speculatively devirtualize calls --===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "sil-speculative-devirtualizer-pass"
+#define DEBUG_TYPE "sil-speculative-devirtualizer"
 #include "swift/Basic/DemangleWrappers.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILArgument.h"

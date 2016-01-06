@@ -14,6 +14,7 @@ add_swift_library(swiftAST
   ConformanceLookupTable.cpp
   Decl.cpp
   DeclContext.cpp
+  DefaultArgumentKind.cpp
   DiagnosticList.cpp
   DiagnosticEngine.cpp
   DocComment.cpp

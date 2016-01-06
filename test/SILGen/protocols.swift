@@ -318,7 +318,7 @@ struct StructWithStoredProperty : PropertyWithGetter {
   // CHECK-NEXT: return %2 : $Int
 }
 
-// Make sure that we generate direct function calls for out struct protocl
+// Make sure that we generate direct function calls for out struct protocol
 // witness since structs don't do virtual calls for methods.
 //
 // *NOTE* Even though at first glance the copy_addr looks like a leak

@@ -296,14 +296,6 @@ static void _swift_release_n_(HeapObject *object, uint32_t n) {
 }
 auto swift::_swift_release_n = _swift_release_n_;
 
-size_t swift::swift_retainCount(HeapObject *object) {
-  return object->refCount.getCount();
-}
-
-size_t swift::swift_unownedRetainCount(HeapObject *object) {
-  return object->weakRefCount.getCount();
-}
-
 void swift::swift_unownedRetain(HeapObject *object) {
   if (!object) return;
 

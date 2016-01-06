@@ -1,4 +1,4 @@
-//===--- ConstraintGraphScope.h - Constraint Graph Scope---------*- C++ -*-===//
+//===--- ConstraintGraphScope.h - Constraint Graph Scope --------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

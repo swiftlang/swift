@@ -783,7 +783,7 @@ for t in ${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS} ; do
             )
             ;;
         *)
-            echo "Unknown deployment target"
+            echo "Unknown deployment target: ${t}"
             exit 1
             ;;
     esac

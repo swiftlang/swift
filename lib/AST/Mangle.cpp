@@ -70,6 +70,21 @@ static Demangle::OperatorKind TranslateOperator(OperatorFixity fixity) {
   llvm_unreachable("invalid operator fixity");
 }
 
+/// Finish the mangling of the symbol and return the mangled name.
+std::string Mangler::finalize() {
+  assert(Storage.size() && "Mangling an empty name");
+  std::string result = std::string(Storage.data(), Storage.size());
+  Storage.clear();
+  return result;
+}
+
+/// Finish the mangling of the symbol and write the mangled name into
+/// \p stream.
+void Mangler::finalize(llvm::raw_ostream &stream) {
+  std::string result = finalize();
+  stream.write(result.data(), result.size());
+}
+
 /// Mangle a StringRef as an identifier into a buffer.
 void Mangler::mangleIdentifier(StringRef str, OperatorFixity fixity,
                                bool isOperator) {
@@ -300,6 +315,8 @@ void Mangler::mangleContext(const DeclContext *ctx, BindGenerics shouldBind) {
   }
 
   case DeclContextKind::SubscriptDecl:
+    // FIXME: We may need to do something here if subscripts contain any symbols
+    // exposed with linkage names.
     return mangleContext(ctx->getParent(), shouldBind);
       
   case DeclContextKind::Initializer:

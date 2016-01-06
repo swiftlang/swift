@@ -1220,7 +1220,7 @@ Type TypeChecker::resolveIdentifierType(
 
   // We allow a type to conform to a protocol that is less available than
   // the type itself. This enables a type to retroactively model or directly
-  // conform to a protocl only available on newer OSes and yet still be used on
+  // conform to a protocol only available on newer OSes and yet still be used on
   // older OSes.
   // To support this, inside inheritance clauses we allow references to
   // protocols that are unavailable in the current type refinement context.

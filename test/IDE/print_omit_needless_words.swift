@@ -64,6 +64,9 @@
 // Note: Typedefs with a "_t" suffix".
 // CHECK-FOUNDATION: func subtract(_: Int32) -> NSNumber
 
+// Note: Respect the getter name for BOOL properties.
+// CHECK-FOUNDATION: var isMakingHoney: Bool
+
 // Note: multi-word enum name matching; "with" splits the first piece.
 // CHECK-FOUNDATION: func someMethod(deprecatedOptions _: NSDeprecatedOptions = [])
 
@@ -138,14 +141,17 @@
 // Collection element types.
 // CHECK-FOUNDATION: func adding(_: AnyObject) -> Set<NSObject>
 
-// Boolean properties get an "is" prefix.
-// CHECK-FOUNDATION: var isEmpty: Bool { get }
+// Boolean properties follow the getter.
+// CHECK-FOUNDATION: var empty: Bool { get }
 // CHECK-FOUNDATION: func nonEmpty() -> Bool
 // CHECK-FOUNDATION: var isStringSet: Bool { get }
 // CHECK-FOUNDATION: var wantsAUnion: Bool { get }
 // CHECK-FOUNDATION: var watchesItsLanguage: Bool { get }
 // CHECK-FOUNDATION: var appliesForAJob: Bool { get }
 // CHECK-FOUNDATION: var setShouldBeInfinite: Bool { get }
+
+// "UTF8" initialisms.
+// CHECK-FOUNDATION: init?(utf8String: UnsafePointer<Int8>)
 
 // Note: class method name stripping context type.
 // CHECK-APPKIT: class func red() -> NSColor
@@ -160,13 +166,17 @@
 // CHECK-APPKIT: func drawInAirAt(_: Point3D)
 
 // Note: with<something> -> <something>
-// CHECK-APPKIT: func drawAt(_: Point3D, withAttributes: [String : AnyObject]?)
+// CHECK-APPKIT: func drawAt(_: Point3D, withAttributes: [String : AnyObject]? = [:])
 
 // Note: Don't strip names that aren't preceded by a verb or preposition.
 // CHECK-APPKIT: func setTextColor(_: NSColor?)
 
 // Note: Splitting with default arguments.
 // CHECK-APPKIT: func drawIn(_: NSView?)
+
+// Note: NSDictionary default arguments for "options"
+// CHECK-APPKIT: func drawAnywhereIn(_: NSView?, options: [NSObject : AnyObject] = [:])
+// CHECK-APPKIT: func drawAnywhere(options _: [NSObject : AnyObject] = [:])
 
 // Note: Skipping over "Ref"
 // CHECK-CORECOOLING: func replace(_: CCPowerSupply!)

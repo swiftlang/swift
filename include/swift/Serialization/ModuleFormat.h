@@ -51,10 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-///
-/// Last change: Added support for multiple @_semantic attributes on
-/// SILFunctions.
-const uint16_t VERSION_MINOR = 226;
+const uint16_t VERSION_MINOR = 227; /// default argument kind expansion
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -269,8 +266,11 @@ enum class DefaultArgumentKind : uint8_t {
   Function,
   Inherited,
   DSOHandle,
+  Nil,
+  EmptyArray,
+  EmptyDictionary,
 };
-using DefaultArgumentField = BCFixed<3>;
+using DefaultArgumentField = BCFixed<4>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -1003,7 +1003,6 @@ namespace decls_block {
     DeclIDField,           // ParamDecl
     BCFixed<1>,            // isVariadic?
     DefaultArgumentField   // default argument
-    // The element pattern trails the record.
     >;
 
   using ParenPatternLayout = BCRecordLayout<

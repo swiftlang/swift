@@ -1815,6 +1815,8 @@ ERROR(type_is_not_array,sema_tce,none,
       "contextual type %0 cannot be used with array literal", (Type))
 NOTE(meant_dictionary_lit, sema_tce,none,
      "did you mean to use a dictionary literal instead?", ())
+ERROR(should_use_empty_dictionary_literal,sema_tce,none,
+      "use [:] to get an empty dictionary literal", ())
 
 // Dictionary literals
 ERROR(dictionary_protocol_broken,sema_tce,none,

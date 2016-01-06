@@ -270,6 +270,12 @@ getActualDefaultArgKind(uint8_t raw) {
     return swift::DefaultArgumentKind::Function;
   case serialization::DefaultArgumentKind::DSOHandle:
     return swift::DefaultArgumentKind::DSOHandle;
+  case serialization::DefaultArgumentKind::Nil:
+    return swift::DefaultArgumentKind::Nil;
+  case serialization::DefaultArgumentKind::EmptyArray:
+    return swift::DefaultArgumentKind::EmptyArray;
+  case serialization::DefaultArgumentKind::EmptyDictionary:
+    return swift::DefaultArgumentKind::EmptyDictionary;
   }
   return None;
 }
@@ -2278,6 +2284,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     }
 
     auto *bodyParams0 = readParameterList();
+    bodyParams0->get(0)->setImplicit();  // self is implicit.
+    
     auto *bodyParams1 = readParameterList();
     assert(bodyParams0 && bodyParams1 && "missing parameters for constructor");
     ctor->setParameterLists(bodyParams0->get(0), bodyParams1);
@@ -2541,6 +2549,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     for (unsigned i = 0, e = numParamPatterns; i != e; ++i)
       paramLists.push_back(readParameterList());
 
+    // If the first parameter list is (self), mark it implicit.
+    if (numParamPatterns && DC->isTypeContext())
+      paramLists[0]->get(0)->setImplicit();
+    
     fn->setDeserializedSignature(paramLists,
                                  TypeLoc::withoutLoc(signature->getResult()));
 
@@ -2967,7 +2979,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                                SourceLoc(), TypeLoc(), DC);
     declOrOffset = subscript;
 
-    subscript->setIndices(readParameterList());    
+    subscript->setIndices(readParameterList());
     subscript->getElementTypeLoc() = TypeLoc::withoutLoc(getType(elemTypeID));
     
     configureStorage(subscript, rawStorageKind,
@@ -3095,6 +3107,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     dtor->setAccessibility(cast<ClassDecl>(DC)->getFormalAccess());
     auto *selfParams = readParameterList();
+    selfParams->get(0)->setImplicit();  // self is implicit.
+
     assert(selfParams && "Didn't get self pattern?");
     dtor->setSelfDecl(selfParams->get(0));
 

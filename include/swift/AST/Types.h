@@ -835,17 +835,6 @@ public:
   /// Retrieve the type declaration directly referenced by this type, if any.
   TypeDecl *getDirectlyReferencedTypeDecl() const;
 
-  /// Retrieve the default argument string that would be inferred for this type,
-  /// assuming that we know it is inferred.
-  ///
-  /// This routine pre-supposes that we know that the given type is the type of
-  /// a parameter that has a default, and all we need to figure out is which
-  /// default argument should be print.
-  ///
-  /// FIXME: This should go away when/if inferred default arguments become
-  /// "real".
-  StringRef getInferredDefaultArgString();
-
 private:
   // Make vanilla new/delete illegal for Types.
   void *operator new(size_t Bytes) throw() = delete;
@@ -1253,9 +1242,11 @@ class TupleTypeElt {
   /// is variadic.
   llvm::PointerIntPair<Identifier, 1, bool> NameAndVariadic;
 
-  /// \brief This is the type of the field, which is mandatory, along with the
-  /// kind of default argument.
-  llvm::PointerIntPair<Type, 3, DefaultArgumentKind> TyAndDefaultArg;
+  /// \brief This is the type of the field.
+  Type ElementType;
+
+  /// The default argument,
+  DefaultArgumentKind DefaultArg;
 
   friend class TupleType;
 
@@ -1269,12 +1260,12 @@ public:
 
   /*implicit*/ TupleTypeElt(TypeBase *Ty)
     : NameAndVariadic(Identifier(), false),
-      TyAndDefaultArg(Ty, DefaultArgumentKind::None) { }
+      ElementType(Ty), DefaultArg(DefaultArgumentKind::None) { }
 
   bool hasName() const { return !NameAndVariadic.getPointer().empty(); }
   Identifier getName() const { return NameAndVariadic.getPointer(); }
 
-  Type getType() const { return TyAndDefaultArg.getPointer(); }
+  Type getType() const { return ElementType.getPointer(); }
 
   /// Determine whether this field is variadic.
   bool isVararg() const {
@@ -1282,9 +1273,7 @@ public:
   }
 
   /// Retrieve the kind of default argument available on this field.
-  DefaultArgumentKind getDefaultArgKind() const {
-    return TyAndDefaultArg.getInt();
-  }
+  DefaultArgumentKind getDefaultArgKind() const { return DefaultArg; }
 
   /// Whether we have a default argument.
   bool hasDefaultArg() const {
@@ -4366,7 +4355,7 @@ inline TupleTypeElt::TupleTypeElt(Type ty,
                                   DefaultArgumentKind defArg,
                                   bool isVariadic)
   : NameAndVariadic(name, isVariadic),
-    TyAndDefaultArg(ty.getPointer(), defArg)
+    ElementType(ty), DefaultArg(defArg)
 {
   assert(!isVariadic ||
          isa<ErrorType>(ty.getPointer()) ||

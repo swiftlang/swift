@@ -1333,7 +1333,7 @@ importFunctionType(const clang::FunctionDecl *clangDecl,
                    ArrayRef<const clang::ParmVarDecl *> params,
                    bool isVariadic, bool isNoReturn,
                    bool isFromSystemModule, bool hasCustomName,
-                   ParameterList **parameterList, DeclName &name) {
+                   ParameterList *&parameterList, DeclName &name) {
 
   bool allowNSUIntegerAsInt = isFromSystemModule;
   if (allowNSUIntegerAsInt) {
@@ -1461,13 +1461,13 @@ importFunctionType(const clang::FunctionDecl *clangDecl,
   }
 
   // Form the parameter list.
-  *parameterList = ParameterList::create(SwiftContext, parameters);
+  parameterList = ParameterList::create(SwiftContext, parameters);
   
   FunctionType::ExtInfo extInfo;
   extInfo = extInfo.withIsNoReturn(isNoReturn);
   
   // Form the function type.
-  auto argTy = (*parameterList)->getType(SwiftContext);
+  auto argTy = parameterList->getType(SwiftContext);
   return FunctionType::get(argTy, swiftResultTy, extInfo);
 }
 
@@ -1804,8 +1804,11 @@ bool ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
 
     // Figure out whether there will be a default argument for this
     // parameter.
+    StringRef argumentName;
+    if (i < argumentNames.size())
+      argumentName = argumentNames[i];
     bool hasDefaultArg
-      = canInferDefaultArgument(
+      = inferDefaultArgument(
           clangSema.PP,
           param->getType(),
           getParamOptionality(param,
@@ -1815,7 +1818,7 @@ bool ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
                                     knownMethod->getParamTypeInfo(i))
                                 : None),
           SwiftContext.getIdentifier(baseName), numParams,
-          isLastParameter);
+          argumentName, isLastParameter) != DefaultArgumentKind::None;
 
     paramTypes.push_back(getClangTypeNameForOmission(clangCtx, param->getType())
                             .withDefaultArgument(hasDefaultArg));
@@ -1859,21 +1862,22 @@ clang::QualType ClangImporter::Implementation::getClangDeclContextType(
   return clang::QualType();
 }
 
-bool ClangImporter::Implementation::canInferDefaultArgument(
-       clang::Preprocessor &pp, clang::QualType type,
-       OptionalTypeKind clangOptionality, Identifier baseName,
-       unsigned numParams, bool isLastParameter) {
+DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
+                      clang::Preprocessor &pp, clang::QualType type,
+                      OptionalTypeKind clangOptionality, Identifier baseName,
+                      unsigned numParams, StringRef argumentLabel,
+                      bool isLastParameter) {
   // Don't introduce a default argument for setters with only a single
   // parameter.
   if (numParams == 1 && camel_case::getFirstWord(baseName.str()) == "set")
-    return false;
+    return DefaultArgumentKind::None;
 
   // Some nullable parameters default to 'nil'.
   if (clangOptionality == OTK_Optional) {
     // Nullable trailing closure parameters default to 'nil'.
     if (isLastParameter &&
         (type->isFunctionPointerType() || type->isBlockPointerType()))
-    return true;
+      return DefaultArgumentKind::Nil;
 
     // NSZone parameters default to 'nil'.
     if (auto ptrType = type->getAs<clang::PointerType>()) {
@@ -1881,7 +1885,7 @@ bool ClangImporter::Implementation::canInferDefaultArgument(
             = ptrType->getPointeeType()->getAs<clang::RecordType>()) {
         if (recType->isStructureOrClassType() &&
             recType->getDecl()->getName() == "_NSZone")
-          return true;
+          return DefaultArgumentKind::Nil;
       }
     }
   }
@@ -1892,11 +1896,46 @@ bool ClangImporter::Implementation::canInferDefaultArgument(
       auto enumName = enumTy->getDecl()->getName();
       for (auto word : reversed(camel_case::getWords(enumName))) {
         if (camel_case::sameWordIgnoreFirstCase(word, "options"))
-          return true;
+          return DefaultArgumentKind::EmptyArray;
       }
     }
 
-  return false;
+  // NSDictionary arguments default to [:] if "options", "attributes",
+  // or "userInfo" occur in the argument label or (if there is no
+  // argument label) at the end of the base name.
+  if (auto objcPtrTy = type->getAs<clang::ObjCObjectPointerType>()) {
+    if (auto objcClass = objcPtrTy->getInterfaceDecl()) {
+      if (objcClass->getName() == "NSDictionary") {
+        StringRef searchStr = argumentLabel;
+        if (searchStr.empty() && !baseName.empty())
+          searchStr = baseName.str();
+
+        bool sawInfo = false;
+        for (auto word : reversed(camel_case::getWords(searchStr))) {
+          if (camel_case::sameWordIgnoreFirstCase(word, "options"))
+            return DefaultArgumentKind::EmptyDictionary;
+
+          if (camel_case::sameWordIgnoreFirstCase(word, "attributes"))
+            return DefaultArgumentKind::EmptyDictionary;
+
+          if (camel_case::sameWordIgnoreFirstCase(word, "info")) {
+            sawInfo = true;
+            continue;
+          }
+
+          if (sawInfo && camel_case::sameWordIgnoreFirstCase(word, "user"))
+            return DefaultArgumentKind::EmptyDictionary;
+
+          if (argumentLabel.empty())
+            break;
+
+          sawInfo = false;
+        }
+      }
+    }
+  }
+
+  return DefaultArgumentKind::None;
 }
 
 /// Adjust the result type of a throwing function based on the
@@ -2207,11 +2246,16 @@ Type ClangImporter::Implementation::importMethodType(
         (paramIndex == params.size() - 2 &&
          errorInfo && errorInfo->ParamIndex == params.size() - 1);
       
-      if (canInferDefaultArgument(getClangPreprocessor(),
-                                  param->getType(), optionalityOfParam,
-                                  methodName.getBaseName(), numEffectiveParams,
-                                  isLastParameter))
-        paramInfo->setDefaultArgumentKind(DefaultArgumentKind::Normal);
+      auto defaultArg = inferDefaultArgument(getClangPreprocessor(),
+                                             param->getType(),
+                                             optionalityOfParam,
+                                             methodName.getBaseName(),
+                                             numEffectiveParams,
+                                             name.empty() ? StringRef()
+                                                          : name.str(),
+                                             isLastParameter);
+      if (defaultArg != DefaultArgumentKind::None)
+        paramInfo->setDefaultArgumentKind(defaultArg);
     }
     swiftParams.push_back(paramInfo);
   }

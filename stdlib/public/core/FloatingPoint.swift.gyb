@@ -181,7 +181,7 @@ public struct ${Self} {
   @_transparent public
   init() {
     let zero: Int64 = 0
-    self._value = Builtin.uitofp_Int64_FPIEEE${bits}(zero._value)
+    self._value = Builtin.sitofp_Int64_FPIEEE${bits}(zero._value)
   }
 
   @_transparent 

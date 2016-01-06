@@ -1,7 +1,3 @@
-public func doFoo(f: () -> ()) {
-  f()
-}
-
 @_fixed_layout
 public class OutsideParent {
   public var property: String = "OutsideParent.property"

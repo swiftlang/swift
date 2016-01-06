@@ -561,6 +561,7 @@ namespace {
       IGF.Builder.CreateCondBr(xiBool, xiBB, noXIBB);
 
       IGF.Builder.emitBlock(xiBB);
+      ConditionalDominanceScope condition(IGF);
       copyWitnessFromElt(ValueWitness::ExtraInhabitantFlags);
       IGF.Builder.CreateBr(noXIBB);
 
@@ -2083,6 +2084,7 @@ namespace {
         llvm::BasicBlock *endBB = testFixedEnumContainsPayload(IGF, payload, extraTag);
 
         if (PayloadBitCount > 0) {
+          ConditionalDominanceScope condition(IGF);
           Explosion payloadValue;
           Explosion payloadCopy;
           auto &loadableTI = getLoadablePayloadTypeInfo();
@@ -2131,6 +2133,7 @@ namespace {
 
         // If we did, consume it.
         if (PayloadBitCount > 0) {
+          ConditionalDominanceScope condition(IGF);
           Explosion payloadValue;
           auto &loadableTI = getLoadablePayloadTypeInfo();
           loadableTI.unpackFromEnumPayload(IGF, payload, payloadValue, 0);
@@ -2173,6 +2176,7 @@ namespace {
 
         // If we did, consume it.
         if (PayloadBitCount > 0) {
+          ConditionalDominanceScope condition(IGF);
           Explosion payloadValue;
           auto &loadableTI = getLoadablePayloadTypeInfo();
           loadableTI.unpackFromEnumPayload(IGF, payload, payloadValue, 0);
@@ -2204,6 +2208,8 @@ namespace {
       case Normal: {
         // Check that there is a payload at the address.
         llvm::BasicBlock *endBB = testEnumContainsPayload(IGF, addr, T);
+
+        ConditionalDominanceScope condition(IGF);
 
         // If there is, project and destroy it.
         Address payloadAddr = projectPayloadData(IGF, addr);
@@ -2288,46 +2294,64 @@ namespace {
         llvm::BasicBlock *noDestPayloadBB
           = testEnumContainsPayload(IGF, dest, T);
 
-        // Here, the destination has a payload. Now see if the source also has
-        // one.
-        llvm::BasicBlock *destNoSrcPayloadBB
-          = testEnumContainsPayload(IGF, src, T);
+        {
+          ConditionalDominanceScope destCondition(IGF);
 
-        // Here, both source and destination have payloads. Do the reassignment
-        // of the payload in-place.
-        if (isTake)
-          getPayloadTypeInfo().assignWithTake(IGF, destData, srcData, PayloadT);
-        else
-          getPayloadTypeInfo().assignWithCopy(IGF, destData, srcData, PayloadT);
-        IGF.Builder.CreateBr(endBB);
+          // Here, the destination has a payload. Now see if the source also
+          // has one.
+          llvm::BasicBlock *destNoSrcPayloadBB
+            = testEnumContainsPayload(IGF, src, T);
 
-        // If the destination has a payload but the source doesn't, we can destroy
-        // the payload and primitive-store the new no-payload value.
-        IGF.Builder.emitBlock(destNoSrcPayloadBB);
-        getPayloadTypeInfo().destroy(IGF, destData, PayloadT);
-        emitPrimitiveCopy(IGF, dest, src, T);
-        IGF.Builder.CreateBr(endBB);
+          {
+            ConditionalDominanceScope destSrcCondition(IGF);
+
+            // Here, both source and destination have payloads. Do the
+            // reassignment of the payload in-place.
+            getPayloadTypeInfo().assign(IGF, destData, srcData,
+                                        isTake, PayloadT);
+            IGF.Builder.CreateBr(endBB);
+          }
+
+          // If the destination has a payload but the source doesn't, we can
+          // destroy the payload and primitive-store the new no-payload value.
+          IGF.Builder.emitBlock(destNoSrcPayloadBB);
+          {
+            ConditionalDominanceScope destNoSrcCondition(IGF);
+            getPayloadTypeInfo().destroy(IGF, destData, PayloadT);
+            emitPrimitiveCopy(IGF, dest, src, T);
+            IGF.Builder.CreateBr(endBB);
+          }
+        }
 
         // Now, if the destination has no payload, check if the source has one.
         IGF.Builder.emitBlock(noDestPayloadBB);
-        llvm::BasicBlock *noDestNoSrcPayloadBB
-          = testEnumContainsPayload(IGF, src, T);
+        {
+          ConditionalDominanceScope noDestCondition(IGF);
+          llvm::BasicBlock *noDestNoSrcPayloadBB
+            = testEnumContainsPayload(IGF, src, T);
 
-        // Here, the source has a payload but the destination doesn't. We can
-        // copy-initialize the source over the destination, then primitive-store
-        // the zero extra tag (if any).
-        if (isTake)
-          getPayloadTypeInfo().initializeWithTake(IGF, destData, srcData, PayloadT);
-        else
-          getPayloadTypeInfo().initializeWithCopy(IGF, destData, srcData, PayloadT);
-        emitInitializeExtraTagBitsForPayload(IGF, dest, T);
-        IGF.Builder.CreateBr(endBB);
+          {
+            ConditionalDominanceScope noDestSrcCondition(IGF);
 
-        // If neither destination nor source have payloads, we can just primitive-
-        // store the new empty-case value.
-        IGF.Builder.emitBlock(noDestNoSrcPayloadBB);
-        emitPrimitiveCopy(IGF, dest, src, T);
-        IGF.Builder.CreateBr(endBB);
+            // Here, the source has a payload but the destination doesn't.
+            // We can copy-initialize the source over the destination, then
+            // primitive-store the zero extra tag (if any).
+
+            getPayloadTypeInfo().initialize(IGF, destData, srcData, isTake,
+                                            PayloadT);
+            emitInitializeExtraTagBitsForPayload(IGF, dest, T);
+            IGF.Builder.CreateBr(endBB);
+          }
+
+          // If neither destination nor source have payloads, we can just
+          // primitive- store the new empty-case value.
+          IGF.Builder.emitBlock(noDestNoSrcPayloadBB);
+          {
+            ConditionalDominanceScope noDestNoSrcCondition(IGF);
+            emitPrimitiveCopy(IGF, dest, src, T);
+            IGF.Builder.CreateBr(endBB);
+          }
+        }
 
         IGF.Builder.emitBlock(endBB);
         return;
@@ -2377,22 +2401,25 @@ namespace {
         llvm::BasicBlock *noSrcPayloadBB
           = testEnumContainsPayload(IGF, src, T);
 
-        // Here, the source value has a payload. Initialize the destination with
-        // it, and set the extra tag if any to zero.
-        if (isTake)
-          getPayloadTypeInfo().initializeWithTake(IGF, destData, srcData,
-                                                  getPayloadType(IGF.IGM, T));
-        else
-          getPayloadTypeInfo().initializeWithCopy(IGF, destData, srcData,
-                                                  getPayloadType(IGF.IGM, T));
-        emitInitializeExtraTagBitsForPayload(IGF, dest, T);
-        IGF.Builder.CreateBr(endBB);
+        {
+          ConditionalDominanceScope condition(IGF);
+
+          // Here, the source value has a payload. Initialize the destination
+          // with it, and set the extra tag if any to zero.
+          getPayloadTypeInfo().initialize(IGF, destData, srcData, isTake,
+                                          getPayloadType(IGF.IGM, T));
+          emitInitializeExtraTagBitsForPayload(IGF, dest, T);
+          IGF.Builder.CreateBr(endBB);
+        }
 
         // If the source value has no payload, we can primitive-store the
         // empty-case value.
         IGF.Builder.emitBlock(noSrcPayloadBB);
-        emitPrimitiveCopy(IGF, dest, src, T);
-        IGF.Builder.CreateBr(endBB);
+        {
+          ConditionalDominanceScope condition(IGF);
+          emitPrimitiveCopy(IGF, dest, src, T);
+          IGF.Builder.CreateBr(endBB);        
+        }
 
         IGF.Builder.emitBlock(endBB);
         return;
@@ -3561,6 +3588,8 @@ namespace {
         auto *caseBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
         swi->addCase(llvm::ConstantInt::get(tagTy, tagIndex), caseBB);
 
+        ConditionalDominanceScope condition(IGF);
+
         IGF.Builder.emitBlock(caseBB);
         f(tagIndex, payloadCasePair);
         IGF.Builder.CreateBr(endBB);
@@ -3765,6 +3794,7 @@ namespace {
         auto *noAliasBB = llvm::BasicBlock::Create(C);
         IGF.Builder.CreateCondBr(alias, endBB, noAliasBB);
         IGF.Builder.emitBlock(noAliasBB);
+        ConditionalDominanceScope condition(IGF);
 
         // Destroy the old value.
         destroy(IGF, dest, T);
@@ -3843,6 +3873,8 @@ namespace {
           swi->addCase(llvm::ConstantInt::get(tagTy, tagIndex), caseBB);
           IGF.Builder.emitBlock(caseBB);
 
+          ConditionalDominanceScope condition(IGF);
+
           // Do the take/copy of the payload.
           Address srcData = IGF.Builder.CreateBitCast(src,
                                   payloadTI.getStorageType()->getPointerTo());
@@ -3869,6 +3901,7 @@ namespace {
         // For trivial payloads (including no-payload cases), we can just
         // primitive-copy to the destination.
         IGF.Builder.emitBlock(trivialBB);
+        ConditionalDominanceScope condition(IGF);
         emitPrimitiveCopy(IGF, dest, src, T);
         IGF.Builder.CreateBr(endBB);
 
@@ -4114,14 +4147,20 @@ namespace {
       IGF.Builder.CreateCondBr(cond, noPayloadBB, payloadBB);
 
       IGF.Builder.emitBlock(noPayloadBB);
-      llvm::Value *noPayloadTag = IGF.Builder.CreateSub(tag, numPayloadCases);
-      storeNoPayloadTag(IGF, enumAddr, noPayloadTag, T);
-      IGF.Builder.CreateBr(endBB);
-      
+      {
+        ConditionalDominanceScope condition(IGF);
+        llvm::Value *noPayloadTag = IGF.Builder.CreateSub(tag, numPayloadCases);
+        storeNoPayloadTag(IGF, enumAddr, noPayloadTag, T);
+        IGF.Builder.CreateBr(endBB);
+      }
+
       IGF.Builder.emitBlock(payloadBB);
-      storePayloadTag(IGF, enumAddr, tag, T);
-      IGF.Builder.CreateBr(endBB);
-      
+      {
+        ConditionalDominanceScope condition(IGF);
+        storePayloadTag(IGF, enumAddr, tag, T);
+        IGF.Builder.CreateBr(endBB);
+      }
+
       IGF.Builder.emitBlock(endBB);
     }
 

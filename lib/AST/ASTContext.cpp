@@ -2343,7 +2343,8 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID,
   ID.AddInteger(Fields.size());
   for (const TupleTypeElt &Elt : Fields) {
     ID.AddPointer(Elt.NameAndVariadic.getOpaqueValue());
-    ID.AddPointer(Elt.TyAndDefaultArg.getOpaqueValue());
+    ID.AddPointer(Elt.getType().getPointer());
+    ID.AddInteger(static_cast<unsigned>(Elt.getDefaultArgKind()));
   }
 }
 

@@ -283,13 +283,13 @@ void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
   switch (Term->getTermKind()) {
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
-  case TermKind::SwitchEnumAddrInst:
-  case TermKind::CheckedCastAddrBranchInst:
   case TermKind::Invalid:
     llvm_unreachable("Unexpected terminator kind!");
 
   case TermKind::UnreachableInst:
   case TermKind::SwitchValueInst:
+  case TermKind::SwitchEnumAddrInst:
+  case TermKind::CheckedCastAddrBranchInst:
     llvm_unreachable("Unexpected argument for terminator kind!");
     break;
 

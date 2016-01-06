@@ -1,4 +1,4 @@
-//===- PerformanceInliner.cpp - Basic cost based inlining for performance -===//
+//===--- PerformanceInliner.cpp - Basic cost based performance inlining ---===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -562,7 +562,7 @@ static bool calleeHasMinimalSelfRecursion(SILFunction *Callee) {
   return false;
 }
 
-// Returns the callee of an apply_inst if it is basically inlinable.
+// Returns the callee of an apply_inst if it is basically inlineable.
 SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
 
   SILFunction *Callee = AI.getCalleeFunction();

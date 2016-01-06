@@ -559,14 +559,18 @@ static void emitDynamicPackingOperation(IRGenFunction &IGF,
   IGF.Builder.CreateCondBr(isInline, directBB, indirectBB);
 
   // Emit the indirect path.
-  IGF.Builder.emitBlock(indirectBB);
-  operation.emitForPacking(IGF, T, type, FixedPacking::Allocate);
-  IGF.Builder.CreateBr(contBB);
+  IGF.Builder.emitBlock(indirectBB); {
+    ConditionalDominanceScope condition(IGF);
+    operation.emitForPacking(IGF, T, type, FixedPacking::Allocate);
+    IGF.Builder.CreateBr(contBB);
+  }
 
   // Emit the direct path.
-  IGF.Builder.emitBlock(directBB);
-  operation.emitForPacking(IGF, T, type, FixedPacking::OffsetZero);
-  IGF.Builder.CreateBr(contBB);
+  IGF.Builder.emitBlock(directBB); {
+    ConditionalDominanceScope condition(IGF);
+    operation.emitForPacking(IGF, T, type, FixedPacking::OffsetZero);
+    IGF.Builder.CreateBr(contBB);
+  }
 
   // Enter the continuation block and add the PHI if required.
   IGF.Builder.emitBlock(contBB);
@@ -973,6 +977,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     IGF.Builder.CreateCondBr(done, exit, loop);
 
     IGF.Builder.emitBlock(loop);
+    ConditionalDominanceScope condition(IGF);
     type.destroy(IGF, element, concreteType);
     auto nextCounter = IGF.Builder.CreateSub(counter,
                                      llvm::ConstantInt::get(IGM.SizeTy, 1));
@@ -2956,7 +2961,7 @@ namespace {
 
         // Mark this as the cached metatype for the l-value's object type.
         CanType argTy = getArgTypeInContext(source.getParamIndex());
-        IGF.setUnscopedLocalTypeData(argTy, LocalTypeData::forMetatype(),
+        IGF.setUnscopedLocalTypeData(argTy, LocalTypeDataKind::forMetatype(),
                                      metatype);
         return metatype;
       }
@@ -2969,7 +2974,7 @@ namespace {
         // Mark this as the cached metatype for Self.
         CanType argTy = getArgTypeInContext(FnType->getParameters().size() - 1);
         IGF.setUnscopedLocalTypeData(argTy,
-                                     LocalTypeData::forMetatype(), metatype);
+                                    LocalTypeDataKind::forMetatype(), metatype);
         return metatype;
       }
           
@@ -3260,7 +3265,7 @@ void irgen::emitPolymorphicParametersForGenericValueWitness(IRGenFunction &IGF,
   EmitPolymorphicParameters(IGF, ntd).emitForGenericValueWitness(selfMeta);
   // Register the 'Self' argument as generic metadata for the type.
   IGF.setUnscopedLocalTypeData(ntd->getDeclaredTypeInContext()->getCanonicalType(),
-                               LocalTypeData::forMetatype(), selfMeta);
+                               LocalTypeDataKind::forMetatype(), selfMeta);
 }
 
 /// Get the next argument and use it as the 'self' type metadata.
@@ -3442,14 +3447,13 @@ void NecessaryBindings::save(IRGenFunction &IGF, Address buffer) const {
 
     // Find the metatype for the appropriate archetype and store it in
     // the slot.
-    llvm::Value *metatype =
-      IGF.getLocalTypeData(CanType(archetype), LocalTypeData::forMetatype());
+    llvm::Value *metatype = IGF.getLocalTypeData(CanType(archetype),
+                                              LocalTypeDataKind::forMetatype());
     IGF.Builder.CreateStore(metatype, slot);
 
     // Find the witness tables for the archetype's protocol constraints and
     // store them in the slot.
-    for (unsigned protocolI : indices(archetype->getConformsTo())) {
-      auto protocol = archetype->getConformsTo()[protocolI];
+    for (auto protocol : archetype->getConformsTo()) {
       if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
         continue;
       Address witnessSlot = IGF.Builder.CreateConstArrayGEP(buffer, metadataI,
@@ -3459,7 +3463,7 @@ void NecessaryBindings::save(IRGenFunction &IGF, Address buffer) const {
       ++metadataI;
       llvm::Value *witness =
         IGF.getLocalTypeData(CanType(archetype),
-                         LocalTypeData::forArchetypeProtocolWitness(protocolI));
+                 LocalTypeDataKind::forArchetypeProtocolWitnessTable(protocol));
       IGF.Builder.CreateStore(witness, witnessSlot);
     }
   }

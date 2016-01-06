@@ -232,7 +232,7 @@ extension String {
   /// Produces a string created by copying the data from a given
   /// C array of UTF8-encoded bytes.
   public init?(utf8String bytes: UnsafePointer<CChar>) {
-    if let ns = NSString(utF8String: bytes) {
+    if let ns = NSString(utf8String: bytes) {
       self = ns as String
     } else {
       return nil

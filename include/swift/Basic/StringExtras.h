@@ -49,7 +49,6 @@ namespace swift {
     Unknown,
     Preposition,
     Verb,
-    AuxiliaryVerb,
     Gerund,
   };
 

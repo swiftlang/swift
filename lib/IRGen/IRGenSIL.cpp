@@ -33,6 +33,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
+#include "swift/SIL/Dominance.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -312,6 +313,9 @@ public:
 
   SILFunction *CurSILFn;
   Address IndirectReturn;
+
+  // A cached dominance analysis.
+  std::unique_ptr<DominanceInfo> Dominance;
   
   IRGenSILFunction(IRGenModule &IGM, SILFunction *f);
   ~IRGenSILFunction();
@@ -1286,6 +1290,20 @@ void IRGenSILFunction::emitSILFunction() {
         CurSILFn->print(llvm::dbgs()));
   
   assert(!CurSILFn->empty() && "function has no basic blocks?!");
+
+  // Configure the dominance resolver.
+  // TODO: consider re-using a dom analysis from the PassManager
+  // TODO: consider using a cheaper analysis at -O0
+  setDominanceResolver([](IRGenFunction &IGF_,
+                          DominancePoint activePoint,
+                          DominancePoint dominatingPoint) -> bool {
+    IRGenSILFunction &IGF = static_cast<IRGenSILFunction&>(IGF_);
+    if (!IGF.Dominance) {
+      IGF.Dominance.reset(new DominanceInfo(IGF.CurSILFn));
+    }
+    return IGF.Dominance->dominates(dominatingPoint.as<SILBasicBlock>(),
+                                    activePoint.as<SILBasicBlock>());
+  });
   
   // FIXME: Or if this is a witness. DebugInfo doesn't have an interface to
   // correctly handle the generic parameters of a witness, which can come from
@@ -1324,7 +1342,7 @@ void IRGenSILFunction::emitSILFunction() {
     break;
   }
   emitLocalSelfMetadata(*this);
-  
+
   assert(params.empty() && "did not map all llvm params to SIL params?!");
 
   // It's really nice to be able to assume that we've already emitted
@@ -1453,6 +1471,11 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
 
   bool InEntryBlock = BB->pred_empty();
   bool ArgsEmitted = false;
+
+  // Set this block as the dominance point.  This implicitly communicates
+  // with the dominance resolver configured in emitSILFunction.
+  DominanceScope dominance(*this, InEntryBlock ? DominancePoint::universal()
+                                               : DominancePoint(BB));
 
   // The basic blocks are visited in a random order. Reset the debug location.
   std::unique_ptr<AutoRestoreLocation> ScopedLoc;

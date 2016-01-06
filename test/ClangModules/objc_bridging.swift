@@ -30,7 +30,7 @@ func foo() {
   _ = DummyClass().nsstringProperty.onlyOnString() as String
 
   _  = BOOLtoBOOL as (Bool) -> Bool
-  _  = DummyClass().isBoolProperty.onlyOnBool() as Bool
+  _  = DummyClass().boolProperty.onlyOnBool() as Bool
 
   _  = arrayToArray as (Array<AnyObject>!) -> (Array<AnyObject>!)
   DummyClass().arrayProperty.onlyOnArray()

@@ -3152,7 +3152,7 @@ SourceRange VarDecl::getSourceRange() const {
 }
 
 SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
-  // For a parameter, map back to it's parameter to get the TypeLoc.
+  // For a parameter, map back to its parameter to get the TypeLoc.
   if (auto *PD = dyn_cast<ParamDecl>(this)) {
     if (auto typeRepr = PD->getTypeLoc().getTypeRepr())
       return typeRepr->getSourceRange();
@@ -3221,7 +3221,10 @@ Pattern *VarDecl::getParentPattern() const {
 }
 
 bool VarDecl::isSelfParameter() const {
-  return isa<ParamDecl>(this) && getName() == getASTContext().Id_self;
+  // Note: we need to check the isImplicit() bit here to make sure that we
+  // don't classify explicit parameters declared with `self` as the self param.
+  return isa<ParamDecl>(this) && getName() == getASTContext().Id_self &&
+         isImplicit();
 }
 
 /// Return true if this stored property needs to be accessed with getters and

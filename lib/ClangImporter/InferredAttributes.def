@@ -22,7 +22,7 @@
 // ClassName is the name of the class, i.e., NSManagedObject
 // AttributeSet is an OR of attribute names, i.e., requires_stored_property_inits
 //
-// ===----------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 #ifndef INFERRED_ATTRIBUTES
 #  define INFERRED_ATTRIBUTES(ModuleName, ClassName, AttributeSet)

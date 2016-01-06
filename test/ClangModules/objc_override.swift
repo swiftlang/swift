@@ -6,7 +6,7 @@ import Foundation
 import ObjCParseExtras
 
 class MyArray : DummyClass {
-  func setBoolProperty(x: Bool) { } // expected-error{{method 'setBoolProperty' with Objective-C selector 'setBoolProperty:' conflicts with setter for 'isBoolProperty' from superclass 'DummyClass' with the same Objective-C selector}}
+  func setBoolProperty(x: Bool) { } // expected-error{{method 'setBoolProperty' with Objective-C selector 'setBoolProperty:' conflicts with setter for 'boolProperty' from superclass 'DummyClass' with the same Objective-C selector}}
 
   @objc(objectAtIndexedSubscript:)
   func getObjectAt(i: Int) { } // expected-error{{method 'getObjectAt' with Objective-C selector 'objectAtIndexedSubscript:' conflicts with method 'objectAtIndexedSubscript' from superclass 'DummyClass' with the same Objective-C selector}}

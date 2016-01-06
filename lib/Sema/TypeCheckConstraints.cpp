@@ -1360,10 +1360,23 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
+  const Type originalType = expr->getType();
+  const bool needClearType = originalType && originalType->is<ErrorType>();
+  const auto recoverOriginalType = [&] () {
+    if (needClearType)
+      expr->setType(originalType);
+  };
+
+  // If the previous checking gives the expr error type, clear the result and
+  // re-check.
+  if (needClearType)
+    expr->setType(Type());
   if (solveForExpression(expr, dc, /*convertType*/Type(),
                          allowFreeTypeVariables, listener, cs, viable,
-                         TypeCheckExprFlags::SuppressDiagnostics))
+                         TypeCheckExprFlags::SuppressDiagnostics)) {
+    recoverOriginalType();
     return None;
+  }
 
   // Get the expression's simplified type.
   auto &solution = viable[0];
@@ -1373,6 +1386,8 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   assert(!exprType->hasTypeVariable() &&
          "free type variable with FreeTypeVariableBinding::GenericParameters?");
 
+  // Recover the original type if needed.
+  recoverOriginalType();
   return exprType;
 }
 

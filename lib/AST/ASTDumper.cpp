@@ -1,4 +1,4 @@
-//===--- ASTDumper.cpp - Swift Language AST Dumper-------------------------===//
+//===--- ASTDumper.cpp - Swift Language AST Dumper ------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -805,6 +805,15 @@ namespace {
         break;
       case DefaultArgumentKind::Line:
         printField("default_arg", "__LINE__");
+        break;
+      case DefaultArgumentKind::Nil:
+        printField("default_arg", "nil");
+        break;
+      case DefaultArgumentKind::EmptyArray:
+        printField("default_arg", "[]");
+        break;
+      case DefaultArgumentKind::EmptyDictionary:
+        printField("default_arg", "[:]");
         break;
       case DefaultArgumentKind::Normal:
         printField("default_arg", "normal");
@@ -2545,6 +2554,18 @@ namespace {
 
         case DefaultArgumentKind::Line:
           printField("default_arg", "__LINE__");
+          break;
+
+        case DefaultArgumentKind::Nil:
+          printField("default_arg", "nil");
+          break;
+
+        case DefaultArgumentKind::EmptyArray:
+          printField("default_arg", "[]");
+          break;
+
+        case DefaultArgumentKind::EmptyDictionary:
+          printField("default_arg", "[:]");
           break;
 
         case DefaultArgumentKind::Normal:

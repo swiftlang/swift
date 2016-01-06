@@ -985,3 +985,7 @@ typedef NS_OPTIONS(NSUInteger, NSEnumerationOptions) {
 int variadicFunc1(int A, ...);
 
 int variadicFunc2(int A, ...);
+
+@interface NSString (UTF8)
+-(nullable instancetype)initWithUTF8String:(const char *)bytes;
+@end

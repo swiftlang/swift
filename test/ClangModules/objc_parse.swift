@@ -473,9 +473,9 @@ func testRepeatedMembers(obj: RepeatedMembers) {
 // rdar://problem/19726164
 class FooDelegateImpl : NSObject, FooDelegate {
   var _started = false
-  var started: Bool {
-    @objc(isStarted) get { return _started }
-    set { _started = newValue }
+  var isStarted: Bool {
+    get { return _started }
+    @objc(setStarted:) set { _started = newValue }
   }
 }
 

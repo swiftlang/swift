@@ -10,8 +10,6 @@
 
 // RUN: %target-run %t/main
 
-// XFAIL: linux
-
 import StdlibUnittest
 import resilient_class
 import resilient_struct

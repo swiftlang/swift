@@ -313,7 +313,7 @@ extension Bool: _ObjectiveCBridgeable {
   }
 
   public init(_ number: NSNumber) {
-    self = number.isBoolValue
+    self = number.boolValue
   }
 
   public static func _getObjectiveCType() -> Any.Type {
@@ -329,7 +329,7 @@ extension Bool: _ObjectiveCBridgeable {
     x: NSNumber,
     inout result: Bool?
   ) {
-    result = x.isBoolValue
+    result = x.boolValue
   }
 
   public static func _conditionallyBridgeFromObjectiveC(

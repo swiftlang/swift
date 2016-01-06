@@ -22,9 +22,9 @@
 #include <tuple>
 using namespace swift;
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Inheritance clause handling
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 static std::tuple<TypeResolutionOptions, DeclContext *,
                   MutableArrayRef<TypeLoc>>
 decomposeInheritedClauseDecl(
@@ -116,9 +116,9 @@ bool IterativeTypeChecker::breakCycleForResolveInheritedClauseEntry(
   return true;
 }
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Superclass handling
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 bool IterativeTypeChecker::isTypeCheckSuperclassSatisfied(ClassDecl *payload) {
   return payload->LazySemanticInfo.Superclass.getInt();
 }
@@ -162,9 +162,9 @@ bool IterativeTypeChecker::breakCycleForTypeCheckSuperclass(
   return true;
 }
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Raw type handling
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 bool IterativeTypeChecker::isTypeCheckRawTypeSatisfied(EnumDecl *payload) {
   return payload->LazySemanticInfo.RawType.getInt();
 }
@@ -205,9 +205,9 @@ bool IterativeTypeChecker::breakCycleForTypeCheckRawType(EnumDecl *enumDecl) {
   return true;
 }
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Inherited protocols
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 bool IterativeTypeChecker::isInheritedProtocolsSatisfied(ProtocolDecl *payload){
   return payload->isInheritedProtocolsValid();
 }
@@ -280,9 +280,9 @@ bool IterativeTypeChecker::breakCycleForInheritedProtocols(
   return true;
 }
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Resolve a type declaration
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 bool IterativeTypeChecker::isResolveTypeDeclSatisfied(TypeDecl *typeDecl) {
   if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
     // If the underlying type was validated, we're done.

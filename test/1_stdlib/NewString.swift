@@ -80,7 +80,7 @@ func nonASCII() {
   // Cocoa stores non-ASCII in a UTF-16 buffer
   // Code units in each character: 2 1 1 1 2 2 2
   // Offset of each character:     0 2 3 4 5 7 9 11
-  var nsUTF16 = NSString(utF8String: "🏂☃❅❆❄︎⛄️❄️")!
+  var nsUTF16 = NSString(utf8String: "🏂☃❅❆❄︎⛄️❄️")!
   // CHECK-NEXT: has UTF-16: true
   print("has UTF-16: \(CFStringGetCharactersPtr(unsafeBitCast(nsUTF16, CFString.self)) != nil)")
 
@@ -126,7 +126,7 @@ func ascii() {
   // Cocoa stores ASCII in a buffer of bytes.  This is an important case
   // because it doesn't provide a contiguous array of UTF-16, so we'll be
   // treating it as an opaque NSString.
-  var nsASCII = NSString(utF8String: "foobar")!
+  var nsASCII = NSString(utf8String: "foobar")!
   // CHECK-NEXT: has UTF-16: false
   print("has UTF-16: \(CFStringGetCharactersPtr(unsafeBitCast(nsASCII, CFString.self)) != nil)")
 

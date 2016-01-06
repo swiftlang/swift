@@ -1,4 +1,4 @@
-//===--- ImporterImpl.h - Import Clang Modules - Implementation------------===//
+//===--- ImporterImpl.h - Import Clang Modules: Implementation ------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -1128,20 +1128,21 @@ public:
                           bool isVariadic, bool isNoReturn,
                           bool isFromSystemModule,
                           bool hasCustomName,
-                          ParameterList **parameterList,
+                          ParameterList *&parameterList,
                           DeclName &name);
 
   Type importPropertyType(const clang::ObjCPropertyDecl *clangDecl,
                           bool isFromSystemModule);
 
-  /// Determine whether we can infer a default argument for a parameter with
-  /// the given \c type and (Clang) optionality.
-  bool canInferDefaultArgument(clang::Preprocessor &pp,
-                               clang::QualType type,
-                               OptionalTypeKind clangOptionality,
-                               Identifier baseName,
-                               unsigned numParams,
-                               bool isLastParameter);
+  /// Attempt to infer a default argument for a parameter with the
+  /// given Clang \c type, \c baseName, and optionality.
+  DefaultArgumentKind inferDefaultArgument(clang::Preprocessor &pp,
+                                           clang::QualType type,
+                                           OptionalTypeKind clangOptionality,
+                                           Identifier baseName,
+                                           unsigned numParams,
+                                           StringRef argumentLabel,
+                                           bool isLastParameter);
 
   /// Retrieve a bit vector containing the non-null argument
   /// annotations for the given declaration.

@@ -1,4 +1,4 @@
-//===--- ASTPrinter.cpp - Swift Language AST Printer-----------------------===//
+//===--- ASTPrinter.cpp - Swift Language AST Printer ----------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -1655,18 +1655,14 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
   
   if (Options.PrintDefaultParameterPlaceholder &&
       param->isDefaultArgument()) {
-    // For Clang declarations, figure out the default we're using.
-    auto AFD = dyn_cast<AbstractFunctionDecl>(param->getDeclContext());
-    if (AFD && AFD->getClangDecl() && param->hasType()) {
-      auto CurrType = param->getType();
-      Printer << " = " << CurrType->getInferredDefaultArgString();
-    } else {
-      // Use placeholder anywhere else.
-      Printer << " = default";
-    }
+    Printer << " = ";
+    auto defaultArgStr
+      = getDefaultArgumentSpelling(param->getDefaultArgumentKind());
+    if (defaultArgStr.empty())
+      Printer << "default";
+    else
+      Printer << defaultArgStr;
   }
-
-  
 }
 
 void PrintAST::printParameterList(ParameterList *PL, bool isCurried,

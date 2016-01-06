@@ -141,7 +141,7 @@ enum OperandRelation {
 /// \brief Find a root value for operand \p In. This function inspects a sil
 /// value and strips trivial conversions such as values that are passed
 /// as arguments to basic blocks with a single predecessor or type casts.
-/// This is a shallow one-spet search and not a deep recursive search.
+/// This is a shallow one-step search and not a deep recursive search.
 ///
 /// For example, in the SIL code below, the root of %10 is %3, because it is
 /// the only possible incoming value.

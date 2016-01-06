@@ -1904,6 +1904,9 @@ public:
 
         case DefaultArgumentKind::Normal:
         case DefaultArgumentKind::Inherited:
+        case DefaultArgumentKind::Nil:
+        case DefaultArgumentKind::EmptyArray:
+        case DefaultArgumentKind::EmptyDictionary:
           if (includeDefaultArgs)
             break;
           continue;

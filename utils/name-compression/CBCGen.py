@@ -15,12 +15,66 @@ def collect_top_entries(val):
   Collect the most frequent substrings and organize them in a table.
   """
   # sort items by hit rate.
-  lst = sorted(hist.items(), key=lambda x: x[1] * len(x[0]) , reverse=True)[0:val]
+  lst = sorted(hist.items(), key=lambda x: x[1] , reverse=True)[0:val]
   # Strip out entries with a small number of hits.
   # These entries are not likely to help the compressor and can extend the compile
   # time of the mangler unnecessarily.
-  lst = filter(lambda p: p[1] > 500, lst)
+  lst = filter(lambda p: p[1] > 15 and len(p[0]) > 3, lst)
   return lst
+
+def getTokens(line):
+  """
+  Split the incoming line into independent parts. The tokenizer has rules for
+  extracting identifiers (strings that start with digits followed by letters),
+  rules for detecting words (strings that start with upper case letters and
+  continue with lower case letters) and rules to glue swift mangling tokens
+  into subsequent words.
+  """
+  # String builder.
+  sb = ""
+  # The last character.
+  Last = ""
+  for ch in line:
+    if Last.isupper():
+      # Uppercase letter to digits -> starts a new token.
+      if ch.isdigit():
+        if len(sb) > 3:
+          yield sb
+          sb = ""
+        sb += ch
+        Last = ch
+        continue
+      # Uppercase letter to lowercase or uppercase -> continue.
+      Last = ch
+      sb += ch
+      continue
+
+    # Digit -> continue.
+    if Last.isdigit():
+      Last = ch
+      sb += ch
+      continue
+
+    # Lowercase letter to digit or uppercase letter -> stop.
+    if Last.islower():
+      if ch.isdigit() or ch.isupper():
+        if len(sb) > 4:
+          yield sb
+          sb = ""
+        sb += ch
+        Last = ch
+        continue
+      Last = ch
+      sb += ch
+      continue
+
+    # Just append unclassified characters to the token.
+    if len(sb) > 3:
+      yield sb
+      sb = ""
+    sb += ch
+    Last = ch
+  yield sb
 
 def addLine(line):
   """
@@ -29,16 +83,12 @@ def addLine(line):
   """
   if not line.startswith("__T"): return
 
-  # strip the "__T" for the prefix calculations
+  # Strip the "__T" for the prefix calculations.
   line = line[3:]
 
-  max_string_length = 9
-  string_len = len(line)
-  for seg_len in xrange(3, max_string_length):
-    for start_idx in xrange(string_len - seg_len):
-      substr = line[start_idx:start_idx+seg_len]
-      hist[substr] += 1
-
+  # Add all of the tokens in the word to the histogram.
+  for tok in getTokens(line):
+      hist[tok] += 1
 
 # Read all of the input files and add the substrings into the table.
 for f in filenames:
@@ -54,7 +104,8 @@ charset = r"0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIKLMNOPQRSTUVWXZ$"
 encoders = [c for c in charset] # alphabet without the escape chars.
 enc_len = len(encoders)
 
-# Take the most frequent entries from the table.
+# Take the most frequent entries from the table that fit into the range of
+# our indices (assuming two characters for indices).
 table = collect_top_entries(enc_len * enc_len)
 
 # Calculate the reverse mapping between the char to its index.
@@ -82,7 +133,7 @@ class Trie:
     first_letter = word[0]
 
     # Create a new entry in the Trie node if needed.
-    if not first_letter in self.children:
+    if first_letter not in self.children:
       self.children[first_letter] = Trie()
 
     # Insert the rest of the string recursively.

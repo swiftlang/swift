@@ -2382,7 +2382,7 @@ class TypeAliasDecl : public TypeDecl {
   /// The type that represents this (sugared) name alias.
   mutable NameAliasType *AliasTy;
 
-  SourceLoc TypeAliasLoc; // The location of the 'typalias' keyword
+  SourceLoc TypeAliasLoc; // The location of the 'typealias' keyword
   TypeLoc UnderlyingTy;
 
 public:

@@ -54,7 +54,7 @@ typedef struct objc_image_info {
 } objc_image_info;
 
 // Class and metaclass construction from a compiler-generated memory image.
-// cls and cls->isa must each be OBJC_MAX_CLASS_SIZE bytes.·
+// cls and cls->isa must each be OBJC_MAX_CLASS_SIZE bytes.
 // Extra bytes not used the metadata must be zero.
 // info is the same objc_image_info that would be emitted by a static compiler.
 // Returns nil if a class with the same name already exists.

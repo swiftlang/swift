@@ -1593,12 +1593,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       // containing a single element if the scalar type is a subtype of
       // the type of that tuple's element.
       //
-      // A scalar type can be converted to a tuple so long as there is at
-      // most one non-defaulted element.
+      // A scalar type can be converted to an argument tuple so long as
+      // there is at most one non-defaulted element.
+      // For non-argument tuples, we can do the same conversion but not
+      // to a tuple with varargs.
       if ((tuple2->getNumElements() == 1 &&
            !tuple2->getElement(0).isVararg()) ||
           (kind >= TypeMatchKind::Conversion &&
-           tuple2->getElementForScalarInit() >= 0)) {
+           tuple2->getElementForScalarInit() >= 0 &&
+           (isArgumentTupleConversion ||
+            !tuple2->getVarArgsBaseType()))) {
         conversionsOrFixes.push_back(
           ConversionRestrictionKind::ScalarToTuple);
 

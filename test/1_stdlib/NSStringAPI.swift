@@ -197,7 +197,7 @@ NSStringAPIs.test("init(cString_:encoding:)") {
           "foo, a basmati bar!", encoding: String.defaultCStringEncoding()))
 }
 
-NSStringAPIs.test("init(utF8String:)") {
+NSStringAPIs.test("init(utf8String:)") {
   var s = "foo あいう"
   var up = UnsafeMutablePointer<UInt8>(allocatingCapacity: 100)
   var i = 0

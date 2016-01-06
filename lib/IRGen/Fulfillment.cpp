@@ -327,3 +327,18 @@ bool FulfillmentMap::addFulfillment(FulfillmentKey key,
     return true;
   }
 }
+
+bool FulfillmentMap::Everything::isInterestingType(CanType type) const {
+  return true;
+}
+bool FulfillmentMap::Everything::hasInterestingType(CanType type) const {
+  return true;
+}
+bool FulfillmentMap::Everything
+                   ::hasLimitedInterestingConformances(CanType type) const {
+  return false;
+}
+GenericSignature::ConformsToArray
+FulfillmentMap::Everything::getInterestingConformances(CanType type) const{
+  return {};
+}
