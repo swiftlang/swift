@@ -1003,7 +1003,6 @@ namespace decls_block {
     DeclIDField,           // ParamDecl
     BCFixed<1>,            // isVariadic?
     DefaultArgumentField   // default argument
-    // The element pattern trails the record.
     >;
 
   using ParenPatternLayout = BCRecordLayout<
