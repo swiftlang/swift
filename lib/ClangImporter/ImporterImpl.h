@@ -1128,7 +1128,7 @@ public:
                           bool isVariadic, bool isNoReturn,
                           bool isFromSystemModule,
                           bool hasCustomName,
-                          ParameterList **parameterList,
+                          ParameterList *&parameterList,
                           DeclName &name);
 
   Type importPropertyType(const clang::ObjCPropertyDecl *clangDecl,

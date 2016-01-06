@@ -2454,9 +2454,7 @@ namespace {
                                           decl->isVariadic(),
                                           decl->isNoReturn(),
                                           isInSystemModule(dc),
-                                          hasCustomName,
-                                          &bodyParams,
-                                          name);
+                                          hasCustomName, bodyParams, name);
       if (!type)
         return nullptr;
 

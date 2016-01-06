@@ -1333,7 +1333,7 @@ importFunctionType(const clang::FunctionDecl *clangDecl,
                    ArrayRef<const clang::ParmVarDecl *> params,
                    bool isVariadic, bool isNoReturn,
                    bool isFromSystemModule, bool hasCustomName,
-                   ParameterList **parameterList, DeclName &name) {
+                   ParameterList *&parameterList, DeclName &name) {
 
   bool allowNSUIntegerAsInt = isFromSystemModule;
   if (allowNSUIntegerAsInt) {
@@ -1461,13 +1461,13 @@ importFunctionType(const clang::FunctionDecl *clangDecl,
   }
 
   // Form the parameter list.
-  *parameterList = ParameterList::create(SwiftContext, parameters);
+  parameterList = ParameterList::create(SwiftContext, parameters);
   
   FunctionType::ExtInfo extInfo;
   extInfo = extInfo.withIsNoReturn(isNoReturn);
   
   // Form the function type.
-  auto argTy = (*parameterList)->getType(SwiftContext);
+  auto argTy = parameterList->getType(SwiftContext);
   return FunctionType::get(argTy, swiftResultTy, extInfo);
 }
 
