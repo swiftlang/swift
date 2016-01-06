@@ -11,7 +11,6 @@
 ##===----------------------------------------------------------------------===##
 
 import re
-import sys
 import codecs
 
 class UnicodeProperty(object):
