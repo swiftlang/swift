@@ -1805,7 +1805,7 @@ bool ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
     // Figure out whether there will be a default argument for this
     // parameter.
     bool hasDefaultArg
-      = canInferDefaultArgument(
+      = inferDefaultArgument(
           clangSema.PP,
           param->getType(),
           getParamOptionality(param,
@@ -1815,7 +1815,7 @@ bool ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
                                     knownMethod->getParamTypeInfo(i))
                                 : None),
           SwiftContext.getIdentifier(baseName), numParams,
-          isLastParameter);
+          isLastParameter) != DefaultArgumentKind::None;
 
     paramTypes.push_back(getClangTypeNameForOmission(clangCtx, param->getType())
                             .withDefaultArgument(hasDefaultArg));
@@ -1859,21 +1859,21 @@ clang::QualType ClangImporter::Implementation::getClangDeclContextType(
   return clang::QualType();
 }
 
-bool ClangImporter::Implementation::canInferDefaultArgument(
-       clang::Preprocessor &pp, clang::QualType type,
-       OptionalTypeKind clangOptionality, Identifier baseName,
-       unsigned numParams, bool isLastParameter) {
+DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
+                      clang::Preprocessor &pp, clang::QualType type,
+                      OptionalTypeKind clangOptionality, Identifier baseName,
+                      unsigned numParams, bool isLastParameter) {
   // Don't introduce a default argument for setters with only a single
   // parameter.
   if (numParams == 1 && camel_case::getFirstWord(baseName.str()) == "set")
-    return false;
+    return DefaultArgumentKind::None;
 
   // Some nullable parameters default to 'nil'.
   if (clangOptionality == OTK_Optional) {
     // Nullable trailing closure parameters default to 'nil'.
     if (isLastParameter &&
         (type->isFunctionPointerType() || type->isBlockPointerType()))
-    return true;
+      return DefaultArgumentKind::Nil;
 
     // NSZone parameters default to 'nil'.
     if (auto ptrType = type->getAs<clang::PointerType>()) {
@@ -1881,7 +1881,7 @@ bool ClangImporter::Implementation::canInferDefaultArgument(
             = ptrType->getPointeeType()->getAs<clang::RecordType>()) {
         if (recType->isStructureOrClassType() &&
             recType->getDecl()->getName() == "_NSZone")
-          return true;
+          return DefaultArgumentKind::Nil;
       }
     }
   }
@@ -1892,11 +1892,11 @@ bool ClangImporter::Implementation::canInferDefaultArgument(
       auto enumName = enumTy->getDecl()->getName();
       for (auto word : reversed(camel_case::getWords(enumName))) {
         if (camel_case::sameWordIgnoreFirstCase(word, "options"))
-          return true;
+          return DefaultArgumentKind::EmptyArray;
       }
     }
 
-  return false;
+  return DefaultArgumentKind::None;
 }
 
 /// Adjust the result type of a throwing function based on the
@@ -2207,11 +2207,14 @@ Type ClangImporter::Implementation::importMethodType(
         (paramIndex == params.size() - 2 &&
          errorInfo && errorInfo->ParamIndex == params.size() - 1);
       
-      if (canInferDefaultArgument(getClangPreprocessor(),
-                                  param->getType(), optionalityOfParam,
-                                  methodName.getBaseName(), numEffectiveParams,
-                                  isLastParameter))
-        paramInfo->setDefaultArgumentKind(DefaultArgumentKind::Normal);
+      auto defaultArg = inferDefaultArgument(getClangPreprocessor(),
+                                             param->getType(),
+                                             optionalityOfParam,
+                                             methodName.getBaseName(),
+                                             numEffectiveParams,
+                                             isLastParameter);
+      if (defaultArg != DefaultArgumentKind::None)
+        paramInfo->setDefaultArgumentKind(defaultArg);
     }
     swiftParams.push_back(paramInfo);
   }

@@ -2182,33 +2182,6 @@ void TypeChecker::checkOmitNeedlessWords(VarDecl *var) {
     .fixItReplace(var->getLoc(), newName->str());
 }
 
-/// Determine the "fake" default argument provided by the given expression.
-static Optional<StringRef> getDefaultArgForExpr(Expr *expr) {
-  // Empty array literals, [].
-  if (auto arrayExpr = dyn_cast<ArrayExpr>(expr)) {
-    if (arrayExpr->getElements().empty())
-      return StringRef("[]");
-
-    return None;
-  }
-
-  // nil.
-  if (auto call = dyn_cast<CallExpr>(expr)) {
-    if (auto ctorRefCall = dyn_cast<ConstructorRefCallExpr>(call->getFn())) {
-      if (auto ctorRef = dyn_cast<DeclRefExpr>(ctorRefCall->getFn())) {
-        if (auto ctor = dyn_cast<ConstructorDecl>(ctorRef->getDecl())) {
-          if (ctor->getFullName().getArgumentNames().size() == 1 &&
-              ctor->getFullName().getArgumentNames()[0]
-                == ctor->getASTContext().Id_nilLiteral)
-            return StringRef("nil");
-        }
-      }
-    }
-  }
-
-  return None;
-}
-
 namespace {
   struct CallEdit {
     enum {
@@ -2264,7 +2237,7 @@ static bool hasExtraneousDefaultArguments(AbstractFunctionDecl *afd,
     if (!param->isDefaultArgument())
       continue;
 
-    auto defaultArg = param->getType()->getInferredDefaultArgString();
+    auto defaultArg = param->getDefaultArgumentKind();
 
     // Never consider removing the first argument for a "set" method
     // with an unnamed first argument.
@@ -2277,9 +2250,9 @@ static bool hasExtraneousDefaultArguments(AbstractFunctionDecl *afd,
 
     SourceRange removalRange;
     if (argTuple && i < argTuple->getNumElements()) {
-      // Check whether we have a default argument.
-      auto exprArg = getDefaultArgForExpr(argTuple->getElement(i));
-      if (!exprArg || defaultArg != *exprArg)
+      // Check whether the supplied argument is the same as the
+      // default argument.
+      if (defaultArg != inferDefaultArgumentKind(argTuple->getElement(i)))
         continue;
 
       // Figure out where to start removing this argument.
@@ -2315,8 +2288,7 @@ static bool hasExtraneousDefaultArguments(AbstractFunctionDecl *afd,
       }
     } else if (argParen) {
       // Check whether we have a default argument.
-      auto exprArg = getDefaultArgForExpr(argParen->getSubExpr());
-      if (!exprArg || defaultArg != *exprArg)
+      if (defaultArg != inferDefaultArgumentKind(argParen->getSubExpr()))
         continue;
 
       removalRange = SourceRange(argParen->getSubExpr()->getStartLoc(),

@@ -924,22 +924,6 @@ TypeDecl *TypeBase::getDirectlyReferencedTypeDecl() const {
   return nullptr;
 }
 
-StringRef TypeBase::getInferredDefaultArgString() {
-  if (auto structDecl = getStructOrBoundGenericStruct()) {
-    if (structDecl->getClangDecl()) {
-      for (auto attr : structDecl->getAttrs()) {
-        if (auto synthesizedProto = dyn_cast<SynthesizedProtocolAttr>(attr)) {
-          if (synthesizedProto->getProtocolKind()
-              == KnownProtocolKind::OptionSetType)
-            return "[]";
-        }
-      }
-    }
-  }
-
-  return "nil";
-}
-
 /// \brief Collect the protocols in the existential type T into the given
 /// vector.
 static void addProtocols(Type T, SmallVectorImpl<ProtocolDecl *> &Protocols) {

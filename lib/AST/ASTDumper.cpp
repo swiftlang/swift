@@ -806,6 +806,15 @@ namespace {
       case DefaultArgumentKind::Line:
         printField("default_arg", "__LINE__");
         break;
+      case DefaultArgumentKind::Nil:
+        printField("default_arg", "nil");
+        break;
+      case DefaultArgumentKind::EmptyArray:
+        printField("default_arg", "[]");
+        break;
+      case DefaultArgumentKind::EmptyDictionary:
+        printField("default_arg", "[:]");
+        break;
       case DefaultArgumentKind::Normal:
         printField("default_arg", "normal");
         break;
@@ -2545,6 +2554,18 @@ namespace {
 
         case DefaultArgumentKind::Line:
           printField("default_arg", "__LINE__");
+          break;
+
+        case DefaultArgumentKind::Nil:
+          printField("default_arg", "nil");
+          break;
+
+        case DefaultArgumentKind::EmptyArray:
+          printField("default_arg", "[]");
+          break;
+
+        case DefaultArgumentKind::EmptyDictionary:
+          printField("default_arg", "[:]");
           break;
 
         case DefaultArgumentKind::Normal:

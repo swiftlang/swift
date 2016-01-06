@@ -752,6 +752,9 @@ static uint8_t getRawStableDefaultArgumentKind(swift::DefaultArgumentKind kind) 
   CASE(Line)
   CASE(Function)
   CASE(DSOHandle)
+  CASE(Nil)
+  CASE(EmptyArray)
+  CASE(EmptyDictionary)
 #undef CASE
   }
 }

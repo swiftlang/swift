@@ -3426,7 +3426,7 @@ getCallerDefaultArg(TypeChecker &tc, DeclContext *dc,
                     unsigned index) {
   auto ownerFn = cast<AbstractFunctionDecl>(owner.getDecl());
   auto defArg = ownerFn->getDefaultArg(index);
-  MagicIdentifierLiteralExpr::Kind magicKind;
+  Expr *init = nullptr;
   switch (defArg.first) {
   case DefaultArgumentKind::None:
     llvm_unreachable("No default argument here?");
@@ -3440,30 +3440,51 @@ getCallerDefaultArg(TypeChecker &tc, DeclContext *dc,
     return getCallerDefaultArg(tc, dc, loc, owner, index);
 
   case DefaultArgumentKind::Column:
-    magicKind = MagicIdentifierLiteralExpr::Column;
+    init = new (tc.Context) MagicIdentifierLiteralExpr(
+                              MagicIdentifierLiteralExpr::Column, loc,
+                              /*Implicit=*/true);
     break;
 
   case DefaultArgumentKind::File:
-    magicKind = MagicIdentifierLiteralExpr::File;
+    init = new (tc.Context) MagicIdentifierLiteralExpr(
+                              MagicIdentifierLiteralExpr::File, loc,
+                              /*Implicit=*/true);
     break;
     
   case DefaultArgumentKind::Line:
-    magicKind = MagicIdentifierLiteralExpr::Line;
+    init = new (tc.Context) MagicIdentifierLiteralExpr(
+                              MagicIdentifierLiteralExpr::Line, loc,
+                              /*Implicit=*/true);
     break;
       
   case DefaultArgumentKind::Function:
-    magicKind = MagicIdentifierLiteralExpr::Function;
+    init = new (tc.Context) MagicIdentifierLiteralExpr(
+                              MagicIdentifierLiteralExpr::Function, loc,
+                              /*Implicit=*/true);
     break;
 
   case DefaultArgumentKind::DSOHandle:
-    magicKind = MagicIdentifierLiteralExpr::DSOHandle;
+    init = new (tc.Context) MagicIdentifierLiteralExpr(
+                              MagicIdentifierLiteralExpr::DSOHandle, loc,
+                              /*Implicit=*/true);
+    break;
+
+  case DefaultArgumentKind::Nil:
+    init = new (tc.Context) NilLiteralExpr(loc, /*Implicit=*/true);
+    break;
+
+  case DefaultArgumentKind::EmptyArray:
+    init = ArrayExpr::create(tc.Context, loc, {}, {}, loc);
+    init->setImplicit();
+    break;
+
+  case DefaultArgumentKind::EmptyDictionary:
+    init = DictionaryExpr::create(tc.Context, loc, {}, loc);
+    init->setImplicit();
     break;
   }
 
-  // Create the default argument, which is a converted magic identifier
-  // literal expression.
-  Expr *init = new (tc.Context) MagicIdentifierLiteralExpr(magicKind, loc,
-                                                           /*Implicit=*/true);
+  // Convert the literal to the appropriate type.
   bool invalid = tc.typeCheckExpression(init, dc, defArg.second,CTP_CannotFail);
   assert(!invalid && "conversion cannot fail");
   (void)invalid;
