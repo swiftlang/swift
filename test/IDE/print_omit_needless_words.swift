@@ -166,13 +166,17 @@
 // CHECK-APPKIT: func drawInAirAt(_: Point3D)
 
 // Note: with<something> -> <something>
-// CHECK-APPKIT: func drawAt(_: Point3D, withAttributes: [String : AnyObject]?)
+// CHECK-APPKIT: func drawAt(_: Point3D, withAttributes: [String : AnyObject]? = [:])
 
 // Note: Don't strip names that aren't preceded by a verb or preposition.
 // CHECK-APPKIT: func setTextColor(_: NSColor?)
 
 // Note: Splitting with default arguments.
 // CHECK-APPKIT: func drawIn(_: NSView?)
+
+// Note: NSDictionary default arguments for "options"
+// CHECK-APPKIT: func drawAnywhereIn(_: NSView?, options: [NSObject : AnyObject] = [:])
+// CHECK-APPKIT: func drawAnywhere(options _: [NSObject : AnyObject] = [:])
 
 // Note: Skipping over "Ref"
 // CHECK-CORECOOLING: func replace(_: CCPowerSupply!)

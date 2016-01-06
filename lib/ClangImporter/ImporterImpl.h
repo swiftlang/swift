@@ -1141,6 +1141,7 @@ public:
                                            OptionalTypeKind clangOptionality,
                                            Identifier baseName,
                                            unsigned numParams,
+                                           StringRef argumentLabel,
                                            bool isLastParameter);
 
   /// Retrieve a bit vector containing the non-null argument

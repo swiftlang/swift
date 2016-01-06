@@ -1804,6 +1804,9 @@ bool ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
 
     // Figure out whether there will be a default argument for this
     // parameter.
+    StringRef argumentName;
+    if (i < argumentNames.size())
+      argumentName = argumentNames[i];
     bool hasDefaultArg
       = inferDefaultArgument(
           clangSema.PP,
@@ -1815,7 +1818,7 @@ bool ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
                                     knownMethod->getParamTypeInfo(i))
                                 : None),
           SwiftContext.getIdentifier(baseName), numParams,
-          isLastParameter) != DefaultArgumentKind::None;
+          argumentName, isLastParameter) != DefaultArgumentKind::None;
 
     paramTypes.push_back(getClangTypeNameForOmission(clangCtx, param->getType())
                             .withDefaultArgument(hasDefaultArg));
@@ -1862,7 +1865,8 @@ clang::QualType ClangImporter::Implementation::getClangDeclContextType(
 DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
                       clang::Preprocessor &pp, clang::QualType type,
                       OptionalTypeKind clangOptionality, Identifier baseName,
-                      unsigned numParams, bool isLastParameter) {
+                      unsigned numParams, StringRef argumentLabel,
+                      bool isLastParameter) {
   // Don't introduce a default argument for setters with only a single
   // parameter.
   if (numParams == 1 && camel_case::getFirstWord(baseName.str()) == "set")
@@ -1895,6 +1899,41 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
           return DefaultArgumentKind::EmptyArray;
       }
     }
+
+  // NSDictionary arguments default to [:] if "options", "attributes",
+  // or "userInfo" occur in the argument label or (if there is no
+  // argument label) at the end of the base name.
+  if (auto objcPtrTy = type->getAs<clang::ObjCObjectPointerType>()) {
+    if (auto objcClass = objcPtrTy->getInterfaceDecl()) {
+      if (objcClass->getName() == "NSDictionary") {
+        StringRef searchStr = argumentLabel;
+        if (searchStr.empty() && !baseName.empty())
+          searchStr = baseName.str();
+
+        bool sawInfo = false;
+        for (auto word : reversed(camel_case::getWords(searchStr))) {
+          if (camel_case::sameWordIgnoreFirstCase(word, "options"))
+            return DefaultArgumentKind::EmptyDictionary;
+
+          if (camel_case::sameWordIgnoreFirstCase(word, "attributes"))
+            return DefaultArgumentKind::EmptyDictionary;
+
+          if (camel_case::sameWordIgnoreFirstCase(word, "info")) {
+            sawInfo = true;
+            continue;
+          }
+
+          if (sawInfo && camel_case::sameWordIgnoreFirstCase(word, "user"))
+            return DefaultArgumentKind::EmptyDictionary;
+
+          if (argumentLabel.empty())
+            break;
+
+          sawInfo = false;
+        }
+      }
+    }
+  }
 
   return DefaultArgumentKind::None;
 }
@@ -2212,6 +2251,8 @@ Type ClangImporter::Implementation::importMethodType(
                                              optionalityOfParam,
                                              methodName.getBaseName(),
                                              numEffectiveParams,
+                                             name.empty() ? StringRef()
+                                                          : name.str(),
                                              isLastParameter);
       if (defaultArg != DefaultArgumentKind::None)
         paramInfo->setDefaultArgumentKind(defaultArg);
