@@ -3398,11 +3398,11 @@ namespace {
       }
     }
 
+    // The Objective-C runtime will copy field offsets from the field offset
+    // vector into field offset globals for us, if present. If there's no
+    // Objective-C runtime, we have to do this ourselves.
     void emitInitializeFieldOffsets(IRGenFunction &IGF,
                                     llvm::Value *metadata) {
-      // The Objective-C runtime will copy field offsets from the field offset
-      // vector into field offset globals for us, if present. If there's no
-      // Objective-C runtime, we have to do this ourselves.
       unsigned index = FieldLayout.InheritedStoredProperties.size();
 
       for (auto prop : Target->getStoredProperties()) {
@@ -3590,7 +3590,8 @@ namespace {
                                                        copyFieldOffsetVectors)});
       }
 
-      emitInitializeFieldOffsets(IGF, metadata);
+      if (!IGF.IGM.ObjCInterop)
+        emitInitializeFieldOffsets(IGF, metadata);
     }
   };
 }

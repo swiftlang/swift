@@ -239,7 +239,7 @@ public class MyResilientChild : MyResilientParent {
 // CHECK-native-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_PTR]], [[INT]] 13
 // CHECK-native-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_PTR]]
 // CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @_TWvdvC16class_resilience26ClassWithResilientProperty5colorVs5Int32
-// CHECK-NEXT:        ret %swift.type* [[METADATA]]
+// CHECK:             ret %swift.type* [[METADATA]]
 
 
 // ClassWithResilientlySizedProperty metadata instantiation function
@@ -256,4 +256,4 @@ public class MyResilientChild : MyResilientParent {
 // CHECK-native-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_PTR]], [[INT]] 12
 // CHECK-native-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_PTR]]
 // CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @_TWvdvC16class_resilience33ClassWithResilientlySizedProperty5colorVs5Int32
-// CHECK-NEXT:        ret %swift.type* [[METADATA]]
+// CHECK:             ret %swift.type* [[METADATA]]
