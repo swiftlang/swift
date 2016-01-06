@@ -89,17 +89,6 @@ Rename with a non-`stdlib` naming scheme.
 
 ## Reference counting
 
-### swift\_retainCount
-
-```
-@convention(c) (@unowned NativeObject) -> UInt
-```
-
-Returns a random number.
-
-**ABI TODO**: Only used by runtime tests and `SwiftObject.mm`. Should be
-internalized.
-
 ### TODO
 
 ```

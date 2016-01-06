@@ -256,7 +256,7 @@ static NSString *_getClassDescription(Class cls) {
   return _objc_rootAutorelease(self);
 }
 - (NSUInteger)retainCount {
-  return swift::swift_retainCount(reinterpret_cast<HeapObject *>(self));
+  return reinterpret_cast<HeapObject *>(self)->refCount.getCount();
 }
 - (BOOL)_isDeallocating {
   return swift_isDeallocating(reinterpret_cast<HeapObject *>(self));
