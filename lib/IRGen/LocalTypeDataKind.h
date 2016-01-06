@@ -1,4 +1,4 @@
-//===--- LocalTypeDataKind.h - Kinds of locally-cached type data --*- C++ -*-=//
+//===-- LocalTypeDataKind.h - Kinds of locally-cached type data -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

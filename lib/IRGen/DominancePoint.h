@@ -1,4 +1,4 @@
-//===--- DominancePoint.h - Dominance points ----------------------*- C++ -*-=//
+//===--- DominancePoint.h - Dominance points --------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
