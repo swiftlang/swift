@@ -118,13 +118,21 @@ public func ⨁= <
   lhs.exclusiveOrInPlace(rhs)
 }
 
-/// - Returns: True if `x` is in the collection.
-public func ∈ <T where T : SequenceType, T.Generator.Element : Equatable>(x: T.Generator.Element, rhs: T) -> Bool {
+/// - Returns: True if `x` is in the sequence.
+public func ∈ <T : SequenceType where T.Generator.Element : Equatable>(x: T.Generator.Element, rhs: T) -> Bool {
+  return rhs.contains(x)
+}
+/// - Returns: True if `x` is in the interval.
+public func ∈ <T : IntervalType>(x: T.Bound, rhs: T) -> Bool {
   return rhs.contains(x)
 }
 
-/// - Returns: True if `x` is not in the collection.
-public func ∉ <T where T : SequenceType, T.Generator.Element : Equatable>(x: T.Generator.Element, rhs: T) -> Bool {
+/// - Returns: True if `x` is not in the sequence.
+public func ∉ <T : SequenceType where T.Generator.Element : Equatable>(x: T.Generator.Element, rhs: T) -> Bool {
+  return !rhs.contains(x)
+}
+/// - Returns: True if `x` is not in the interval.
+public func ∉ <T : IntervalType>(x: T.Bound, rhs: T) -> Bool {
   return !rhs.contains(x)
 }
 
