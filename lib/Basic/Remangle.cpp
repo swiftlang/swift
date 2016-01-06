@@ -72,10 +72,10 @@ static bool isNonAscii(StringRef str) {
 
 static char mangleOperatorKind(OperatorKind operatorKind) {
   switch (operatorKind) {
-    case OperatorKind::NotOperator: unreachable("invalid");
-    case OperatorKind::Infix: return 'i';
-    case OperatorKind::Prefix: return 'p';
-    case OperatorKind::Postfix: return 'P';
+  case OperatorKind::NotOperator: unreachable("invalid");
+  case OperatorKind::Infix: return 'i';
+  case OperatorKind::Prefix: return 'p';
+  case OperatorKind::Postfix: return 'P';
   }
   unreachable("invalid");
 }
