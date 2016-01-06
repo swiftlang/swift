@@ -199,14 +199,14 @@ void LocalTypeDataCache::addAbstractForTypeMetadata(IRGenFunction &IGF,
     return;
   }
 
-  addAbstractForFullfillments(IGF, std::move(fulfillments),
+  addAbstractForFulfillments(IGF, std::move(fulfillments),
                               [&]() -> AbstractSource {
     return AbstractSource(AbstractSource::Kind::TypeMetadata, type, metadata);
   });
 }
 
 void LocalTypeDataCache::
-addAbstractForFullfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
+addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
                             llvm::function_ref<AbstractSource()> createSource) {
   // Add the source lazily.
   Optional<unsigned> sourceIndex;
@@ -241,7 +241,7 @@ addAbstractForFullfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
     auto key = getKey(type, localDataKind);
     auto &chain = Map[key];
 
-    // Check whether there's already an entr that's at least as good as the
+    // Check whether there's already an entry that's at least as good as the
     // fulfillment.
     Optional<unsigned> fulfillmentCost;
     auto getFulfillmentCost = [&]() -> unsigned {

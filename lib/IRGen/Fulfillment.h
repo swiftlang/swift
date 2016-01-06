@@ -71,7 +71,7 @@ public:
     virtual ~InterestingKeysCallback() = default;
   };
 
-  /// An implementaton of InterestingKeysCallback that returns everything
+  /// An implementation of InterestingKeysCallback that returns everything
   /// fulfillable.
   struct Everything : InterestingKeysCallback {
     bool isInterestingType(CanType type) const override;
