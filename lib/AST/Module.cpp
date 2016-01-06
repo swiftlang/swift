@@ -910,6 +910,11 @@ LookupConformanceResult Module::lookupConformance(Type type,
       auto substitutions = type->gatherAllSubstitutions(this, substitutionsVec,
                                                         resolver,
                                                         explicitConformanceDC);
+      
+      for (auto sub : substitutions) {
+        if (sub.getReplacement()->is<ErrorType>())
+          return { nullptr, ConformanceKind::DoesNotConform };
+      }
 
       // Create the specialized conformance entry.
       auto result = ctx.getSpecializedConformance(type, conformance,
