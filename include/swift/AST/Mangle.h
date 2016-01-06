@@ -14,6 +14,7 @@
 #define __SWIFT_AST_MANGLE_H__
 
 #include "llvm/ADT/DenseMap.h"
+#include "swift/ABI/Compression.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
@@ -89,19 +90,11 @@ public:
   };
 
   /// Finish the mangling of the symbol and return the mangled name.
-  std::string finalize() {
-    assert(Storage.size() && "Mangling an empty name");
-    std::string result = std::string(Storage.data(), Storage.size());
-    Storage.clear();
-    return result;
-  }
+  std::string finalize();
 
   /// Finish the mangling of the symbol and write the mangled name into
   /// \p stream.
-  void finalize(llvm::raw_ostream &stream) {
-    std::string result = finalize();
-    stream.write(result.data(), result.size());
-  }
+  void finalize(llvm::raw_ostream &stream);
 
   void setModuleContext(ModuleDecl *M) { Mod = M; }
 
