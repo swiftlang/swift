@@ -1,0 +1,22 @@
+// RUN: %target-sil-opt -enable-sil-verify-all  -sil-verify-without-invalidation %s -stack-promotion
+
+// Check if post-dominator verification does not crash on multiple roots.
+// We run stack promotion because it requests the post-dominator analysis.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil @testit : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb1
+
+bb2:
+  %r = tuple ()
+  return %r : $()
+}
+
