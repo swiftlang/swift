@@ -2,6 +2,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL2 | FileCheck %s -check-prefix=LITERAL2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL3 | FileCheck %s -check-prefix=LITERAL3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL4 | FileCheck %s -check-prefix=LITERAL4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL5 | FileCheck %s -check-prefix=LITERAL5
 
 {
   1.#^LITERAL1^#
@@ -48,3 +49,14 @@
 // LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   insertContentsOf({#(newElements): S#}, {#at: Index#})[#Void#]; name=insertContentsOf(newElements: S, at: Index){{$}}
 // LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   removeAtIndex({#(i): Index#})[#Character#]; name=removeAtIndex(i: Index){{$}}
 // LITERAL4-DAG:     Decl[InstanceVar]/CurrNominal:      lowercaseString[#String#]; name=lowercaseString{{$}}
+
+func giveMeAString() -> Int {
+  // rdar://22637799
+  return "Here's a string".#^LITERAL5^# // try .characters.count here
+}
+
+// LITERAL5-DAG:     Decl[InstanceVar]/CurrNominal:      characters[#String.CharacterView#]{{; name=.+$}}
+// LITERAL5-DAG:     Decl[InstanceVar]/CurrNominal:      endIndex[#Index#]{{; name=.+$}}
+// LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: reserveCapacity({#(n): Int#})[#Void#]{{; name=.+$}}
+// LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: append({#(c): Character#})[#Void#]{{; name=.+$}}
+// LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: appendContentsOf({#(newElements): S#})[#Void#]{{; name=.+$}}
