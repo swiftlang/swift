@@ -1,7 +1,6 @@
-// RUN: %target-sil-opt -enable-sil-verify-all  -sil-verify-without-invalidation %s -stack-promotion
+// RUN: %target-sil-opt -enable-sil-verify-all  -sil-verify-without-invalidation %s -compute-dominance-info
 
 // Check if post-dominator verification does not crash on multiple roots.
-// We run stack promotion because it requests the post-dominator analysis.
 
 sil_stage canonical
 

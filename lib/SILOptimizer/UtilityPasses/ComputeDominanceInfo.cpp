@@ -21,6 +21,7 @@ class ComputeDominanceInfo : public SILFunctionTransform {
 
   void run() override {
     PM->getAnalysis<DominanceAnalysis>()->get(getFunction());
+    PM->getAnalysis<PostDominanceAnalysis>()->get(getFunction());
   }
 
   StringRef getName() override { return "Compute Dominance Info"; }
