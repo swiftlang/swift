@@ -244,6 +244,16 @@ internal class _DropFirstSequence<Base : GeneratorType>
     }
     return generator.next()
   }
+
+  internal func dropFirst(n: Int) -> AnySequence<Base.Element> {
+    // If this is already a _DropFirstSequence, we need to fold in
+    // the current drop count and drop limit so no data is lost.
+    //
+    // i.e. [1,2,3,4].dropFirst(1).dropFirst(1) should be equivalent to
+    // [1,2,3,4].dropFirst(2).
+    return AnySequence(
+      _DropFirstSequence(generator, limit: limit + n, dropped: dropped))
+  }
 }
 
 /// A sequence that only consumes up to `n` elements from an underlying
@@ -253,7 +263,8 @@ internal class _DropFirstSequence<Base : GeneratorType>
 ///
 /// This is a class - we require reference semantics to keep track
 /// of how many elements we've already taken from the underlying sequence.
-internal class _PrefixSequence<Base : GeneratorType> : SequenceType, GeneratorType {
+internal class _PrefixSequence<Base : GeneratorType>
+    : SequenceType, GeneratorType {
   internal let maxLength: Int
   internal var generator: Base
   internal var taken: Int
@@ -278,6 +289,12 @@ internal class _PrefixSequence<Base : GeneratorType> : SequenceType, GeneratorTy
 
     taken = maxLength
     return nil
+  }
+
+  internal func prefix(maxLength: Int) -> AnySequence<Base.Element> {
+    return AnySequence(
+      _PrefixSequence(generator,
+        maxLength: min(maxLength, self.maxLength), taken: taken))
   }
 }
 
@@ -329,83 +346,6 @@ extension SequenceType {
     }
 
     return Array(result)
-  }
-
-  /// Returns a subsequence containing all but the first `n` elements.
-  ///
-  /// - Requires: `n >= 0`
-  /// - Complexity: O(`n`)
-  @warn_unused_result
-  public func dropFirst(n: Int) -> AnySequence<Generator.Element> {
-    _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
-    if n == 0 { return AnySequence(self) }
-    // If this is already a _DropFirstSequence, we need to fold in
-    // the current drop count and drop limit so no data is lost.
-    //
-    // i.e. [1,2,3,4].dropFirst(1).dropFirst(1) should be equivalent to
-    // [1,2,3,4].dropFirst(2).
-    // FIXME: <rdar://problem/21885675> Use method dispatch to fold
-    // _PrefixSequence and _DropFirstSequence counts
-    if let any = self as? AnySequence<Generator.Element>,
-       let box = any._box as? _SequenceBox<_DropFirstSequence<Generator>> {
-      let base = box._base
-      let folded = _DropFirstSequence(base.generator, limit: base.limit + n,
-          dropped: base.dropped)
-      return AnySequence(folded)
-    }
-
-    return AnySequence(_DropFirstSequence(generate(), limit: n))
-  }
-
-  /// Returns a subsequence containing all but the last `n` elements.
-  ///
-  /// - Requires: `self` is a finite collection.
-  /// - Requires: `n >= 0`
-  /// - Complexity: O(`self.count`)
-  @warn_unused_result
-  public func dropLast(n: Int) -> AnySequence<Generator.Element> {
-    _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
-    if n == 0 { return AnySequence(self) }
-    // FIXME: <rdar://problem/21885650> Create reusable RingBuffer<T>
-    // Put incoming elements from this sequence in a holding tank, a ring buffer
-    // of size <= n. If more elements keep coming in, pull them out of the
-    // holding tank into the result, an `Array`. This saves
-    // `n` * sizeof(Generator.Element) of memory, because slices keep the entire
-    // memory of an `Array` alive.
-    var result: [Generator.Element] = []
-    var ringBuffer: [Generator.Element] = []
-    var i = ringBuffer.startIndex
-
-    for element in self {
-      if ringBuffer.count < n {
-        ringBuffer.append(element)
-      } else {
-        result.append(ringBuffer[i])
-        ringBuffer[i] = element
-        i = i.successor() % n
-      }
-    }
-    return AnySequence(result)
-  }
-
-  @warn_unused_result
-  public func prefix(maxLength: Int) -> AnySequence<Generator.Element> {
-    _precondition(maxLength >= 0, "Can't take a prefix of negative length from a sequence")
-    if maxLength == 0 {
-      return AnySequence(EmptyCollection<Generator.Element>())
-    }
-    // FIXME: <rdar://problem/21885675> Use method dispatch to fold
-    // _PrefixSequence and _DropFirstSequence counts
-    if let any = self as? AnySequence<Generator.Element>,
-       let box = any._box as? _SequenceBox<_PrefixSequence<Generator>> {
-      let base = box._base
-      let folded = _PrefixSequence(
-        base.generator,
-        maxLength: min(base.maxLength, maxLength),
-        taken: base.taken)
-      return AnySequence(folded)
-    }
-    return AnySequence(_PrefixSequence(generate(), maxLength: maxLength))
   }
 
   @warn_unused_result
@@ -526,9 +466,7 @@ extension SequenceType {
   ) -> Bool? {
     return nil
   }
-}
 
-extension SequenceType {
   /// Call `body` on each element in `self` in the same order as a
   /// *for-in loop.*
   ///
@@ -582,6 +520,64 @@ extension SequenceType where Generator.Element : Equatable {
   ) -> [AnySequence<Generator.Element>] {
     return split(maxSplit, allowEmptySlices: allowEmptySlices,
       isSeparator: { $0 == separator })
+  }
+}
+
+extension SequenceType where
+  SubSequence : SequenceType,
+  SubSequence.Generator.Element == Generator.Element,
+  SubSequence.SubSequence == SubSequence {
+
+  /// Returns a subsequence containing all but the first `n` elements.
+  ///
+  /// - Requires: `n >= 0`
+  /// - Complexity: O(`n`)
+  @warn_unused_result
+  public func dropFirst(n: Int) -> AnySequence<Generator.Element> {
+    _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
+    if n == 0 { return AnySequence(self) }
+    return AnySequence(_DropFirstSequence(generate(), limit: n))
+  }
+
+  /// Returns a subsequence containing all but the last `n` elements.
+  ///
+  /// - Requires: `self` is a finite collection.
+  /// - Requires: `n >= 0`
+  /// - Complexity: O(`self.count`)
+  @warn_unused_result
+  public func dropLast(n: Int) -> AnySequence<Generator.Element> {
+    _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
+    if n == 0 { return AnySequence(self) }
+
+    // FIXME: <rdar://problem/21885650> Create reusable RingBuffer<T>
+    // Put incoming elements from this sequence in a holding tank, a ring buffer
+    // of size <= n. If more elements keep coming in, pull them out of the
+    // holding tank into the result, an `Array`. This saves
+    // `n` * sizeof(Generator.Element) of memory, because slices keep the entire
+    // memory of an `Array` alive.
+    var result: [Generator.Element] = []
+    var ringBuffer: [Generator.Element] = []
+    var i = ringBuffer.startIndex
+
+    for element in self {
+      if ringBuffer.count < n {
+        ringBuffer.append(element)
+      } else {
+        result.append(ringBuffer[i])
+        ringBuffer[i] = element
+        i = i.successor() % n
+      }
+    }
+    return AnySequence(result)
+  }
+
+  @warn_unused_result
+  public func prefix(maxLength: Int) -> AnySequence<Generator.Element> {
+    _precondition(maxLength >= 0, "Can't take a prefix of negative length from a sequence")
+    if maxLength == 0 {
+      return AnySequence(EmptyCollection<Generator.Element>())
+    }
+    return AnySequence(_PrefixSequence(generate(), maxLength: maxLength))
   }
 }
 
