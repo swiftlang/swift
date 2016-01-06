@@ -224,7 +224,14 @@ public struct AnySequence<Element> : SequenceType {
   public typealias T = Element
 
   /// Wrap and forward operations to `base`.
-  public init<S: SequenceType where S.Generator.Element == Element>(_ base: S) {
+  public init<
+    S: SequenceType
+    where
+      S.Generator.Element == Element,
+      S.SubSequence : SequenceType,
+      S.SubSequence.Generator.Element == Element,
+      S.SubSequence.SubSequence == S.SubSequence
+  >(_ base: S) {
     _box = _SequenceBox(base)
   }
 
