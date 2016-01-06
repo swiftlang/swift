@@ -187,7 +187,9 @@ public:
   /// protocol conformance.
   ///
   /// The function object should accept a \c ValueDecl* for the requirement
-  /// followed by the \c ConcreteDeclRef for the witness.
+  /// followed by the \c ConcreteDeclRef for the witness. Note that a generic
+  /// witness will only be specialized if the conformance came from the current
+  /// file.
   template<typename F>
   void forEachValueWitness(LazyResolver *resolver, F f) const {
     const ProtocolDecl *protocol = getProtocol();
@@ -376,6 +378,9 @@ public:
                       TypeDecl *typeDecl) const;
 
   /// Retrieve the value witness corresponding to the given requirement.
+  ///
+  /// Note that a generic witness will only be specialized if the conformance
+  /// came from the current file.
   ConcreteDeclRef getWitness(ValueDecl *requirement, 
                              LazyResolver *resolver) const;
 

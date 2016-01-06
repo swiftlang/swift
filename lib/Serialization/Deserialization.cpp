@@ -4034,23 +4034,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     auto second = cast_or_null<ValueDecl>(getDecl(*rawIDIter++));
     assert(second || first->getAttrs().hasAttribute<OptionalAttr>() ||
            first->getAttrs().isUnavailable(ctx));
-
-    unsigned substitutionCount = *rawIDIter++;
-
-    SmallVector<Substitution, 8> substitutions;
-    while (substitutionCount--) {
-      auto sub = maybeReadSubstitution(DeclTypeCursor);
-      assert(sub.hasValue());
-      substitutions.push_back(sub.getValue());
-    }
-
-    ConcreteDeclRef witness;
-    if (substitutions.empty())
-      witness = ConcreteDeclRef(second);
-    else
-      witness = ConcreteDeclRef(ctx, second, substitutions);
-
-    witnesses.insert(std::make_pair(first, witness));
+    witnesses.insert(std::make_pair(first, second));
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 

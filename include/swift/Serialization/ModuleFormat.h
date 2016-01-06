@@ -50,8 +50,9 @@ const uint16_t VERSION_MAJOR = 0;
 /// When the format changes IN ANY WAY, this number should be incremented.
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
-/// describe what change you made.
-const uint16_t VERSION_MINOR = 227; /// default argument kind expansion
+/// describe what change you made. The content of this comment isn't important;
+/// it just ensures a conflict if two people change the module format.
+const uint16_t VERSION_MINOR = 228; // no substitutions for value witnesses
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -1129,10 +1130,10 @@ namespace decls_block {
     BCVBR<5>, // inherited conformances count
     BCVBR<5>, // defaulted definitions count
     BCArray<DeclIDField>
-    // The array contains value-value-substitutionCount triplets,
+    // The array contains archetype-value pairs,
     // then type declarations, then defaulted definitions.
     // Inherited conformances follow, then the substitution records for the
-    // values and then types.
+    // associated types.
   >;
 
   using SpecializedProtocolConformanceLayout = BCRecordLayout<
