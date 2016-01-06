@@ -77,7 +77,7 @@ public:
   /// A reference to a protocol witness table for an archetype.
   ///
   /// This only works for non-concrete types because in principle we might
-  /// have multiple concrete conformoances for a concrete type used in the
+  /// have multiple concrete conformances for a concrete type used in the
   /// same function.
   static LocalTypeDataKind
   forArchetypeProtocolWitnessTable(ProtocolDecl *protocol) {

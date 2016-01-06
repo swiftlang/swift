@@ -222,8 +222,8 @@ private:
 
   std::vector<AbstractSource> AbstractSources;
 
-  void addAbstractForFullfillments(IRGenFunction &IGF,
-                                   FulfillmentMap &&fulfillments,
+  void addAbstractForFulfillments(IRGenFunction &IGF,
+                                  FulfillmentMap &&fulfillments,
                             llvm::function_ref<AbstractSource()> createSource);
 
 
