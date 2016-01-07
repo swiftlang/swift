@@ -13,7 +13,7 @@ if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
   list(APPEND swift_stdlib_unittest_framework_depends
     Foundation)
 endif()
-if(SWIFT_HOST_VARIANT STREQUAL "linux")
+if(SWIFT_HOST_VARIANT STREQUAL "linux" OR SWIFT_HOST_VARIANT STREQUAL "FreeBSD")
   list(APPEND swift_stdlib_unittest_module_depends
     Glibc)
 endif()
