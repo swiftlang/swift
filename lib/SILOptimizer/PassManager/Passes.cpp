@@ -251,8 +251,6 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   // Run two iterations of the high-level SSA passes.
   PM.setStageName("HighLevel");
-  PM.addDevirtualizer();
-  PM.addGenericSpecializer();
   AddSSAPasses(PM, OptimizationLevelKind::HighLevel);
   PM.runOneIteration();
   PM.runOneIteration();
