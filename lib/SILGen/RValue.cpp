@@ -310,7 +310,7 @@ static void copyOrInitValuesInto(Initialization *init,
   bool implodeTuple = false;
 
   if (auto Address = init->getAddressOrNull()) {
-    if (isa<AllocGlobalInst>(Address) &&
+    if (isa<GlobalAddrInst>(Address) &&
         gen.getTypeLowering(type).getLoweredType().isTrivial(gen.SGM.M)) {
       // Implode tuples in initialization of globals if they are
       // of trivial types.
