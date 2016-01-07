@@ -136,6 +136,13 @@ enum class ExtraData : unsigned char {
   Last_ExtraData = Block
 };
 
+/// Given that we have metadata for a type, is it for exactly the
+/// specified type, or might it be a subtype?
+enum IsExact_t : bool {
+  IsInexact = false,
+  IsExact = true
+};
+
 /// ResilienceScope - The compiler is often able to pursue
 /// optimizations based on its knowledge of the implementation of some
 /// language structure.  However, optimizations which affect

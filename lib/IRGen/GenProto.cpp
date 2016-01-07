@@ -1843,8 +1843,7 @@ namespace {
           }
         } callback;
         Fulfillments->searchTypeMetadata(*IGM.SILMod->getSwiftModule(),
-                                         ConcreteType,
-                                         FulfillmentMap::IsExact,
+                                         ConcreteType, IsExact,
                                          /*sourceIndex*/ 0, MetadataPath(),
                                          callback);
       }
@@ -2707,7 +2706,7 @@ namespace {
       auto paramType = FnType->getParameters()[0].getType();
       Sources.emplace_back(SourceKind::Metadata, 0, paramType);
 
-      considerType(paramType, FulfillmentMap::IsInexact, 0, MetadataPath());
+      considerType(paramType, IsInexact, 0, MetadataPath());
     }
 
     ArrayRef<Source> getSources() const { return Sources; }
@@ -2746,8 +2745,7 @@ namespace {
     }
 
     void considerNewTypeSource(SourceKind kind, unsigned paramIndex,
-                               CanType type,
-                               FulfillmentMap::IsExact_t isExact) {
+                               CanType type, IsExact_t isExact) {
       if (!Fulfillments.isInterestingTypeForFulfillments(type)) return;
 
       // Prospectively add a source.
@@ -2760,7 +2758,7 @@ namespace {
       }
     }
 
-    bool considerType(CanType type, FulfillmentMap::IsExact_t isExact,
+    bool considerType(CanType type, IsExact_t isExact,
                       unsigned sourceIndex, MetadataPath &&path) {
       struct Callback : FulfillmentMap::InterestingKeysCallback {
         PolymorphicConvention &Self;
@@ -2794,8 +2792,7 @@ namespace {
       if (auto paramTy = dyn_cast<GenericTypeParamType>(selfTy))
         considerWitnessParamType(paramTy);
       else
-        considerType(selfTy, FulfillmentMap::IsInexact,
-                     Sources.size() - 1, MetadataPath());
+        considerType(selfTy, IsInexact, Sources.size() - 1, MetadataPath());
     }
 
     void considerParameter(SILParameterInfo param, unsigned paramIndex,
@@ -2816,8 +2813,7 @@ namespace {
         if (!isSelfParameter) return;
         if (type->getNominalOrBoundGenericNominal()) {
           considerNewTypeSource(SourceKind::GenericLValueMetadata,
-                                paramIndex, type,
-                                FulfillmentMap::IsExact);
+                                paramIndex, type, IsExact);
         }
         return;
 
@@ -2828,7 +2824,7 @@ namespace {
         // Classes are sources of metadata.
         if (type->getClassOrBoundGenericClass()) {
           considerNewTypeSource(SourceKind::ClassPointer, paramIndex, type,
-                                FulfillmentMap::IsInexact);
+                                IsInexact);
           return;
         }
 
@@ -2839,7 +2835,7 @@ namespace {
 
           CanType objTy = metatypeTy.getInstanceType();
           considerNewTypeSource(SourceKind::Metadata, paramIndex, objTy,
-                                FulfillmentMap::IsInexact);
+                                IsInexact);
           return;
         }
 

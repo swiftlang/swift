@@ -396,6 +396,11 @@ public:
     setScopedLocalTypeData(type.getSwiftRValueType(), kind, data);
   }
 
+  /// Given a concrete type metadata node, add all the local type data
+  /// that we can reach from it.
+  void addLocalTypeDataForTypeMetadata(CanType type, IsExact_t isExact,
+                                       llvm::Value *metadata);
+
   void setDominanceResolver(DominanceResolverFunction resolver) {
     assert(DominanceResolver == nullptr);
     DominanceResolver = resolver;

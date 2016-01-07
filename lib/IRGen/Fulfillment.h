@@ -25,6 +25,7 @@
 
 namespace swift {
 namespace irgen {
+  enum IsExact_t : bool;
 
 /// The metadata value can be fulfilled by following the given metadata
 /// path from the given source.
@@ -46,10 +47,6 @@ class FulfillmentMap {
   llvm::DenseMap<FulfillmentKey, Fulfillment> Fulfillments;
 
 public:
-  /// Given that we have metadata for a type, is it exactly of the
-  /// specified type, or might it be a subtype?
-  enum IsExact_t : bool { IsInexact = false, IsExact = true };
-
   struct InterestingKeysCallback {
     /// Is the given type something that we should add fulfillments for?
     virtual bool isInterestingType(CanType type) const = 0;
