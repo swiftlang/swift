@@ -1,4 +1,5 @@
 #include "swift/Basic/PointerIntEnum.h"
+#include "swift/Basic/type_traits.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "gtest/gtest.h"
 
@@ -26,7 +27,7 @@ enum class EnumTy : unsigned {
 using PointerIntEnumTy =
     PointerIntEnum<EnumTy, void *, 3, 4, llvm::PointerLikeTypeTraits<void *>>;
 
-static_assert(std::is_trivially_copyable<PointerIntEnumTy>::value,
+static_assert(IsTriviallyCopyable<PointerIntEnumTy>::value,
               "PointerIntEnum type should be trivially copyable");
 
 static constexpr uintptr_t InvalidStorage = uintptr_t(0) - 1;
