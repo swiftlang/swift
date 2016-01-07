@@ -68,7 +68,7 @@ struct PointerIntEnumIndexKindValue
 /// PointerIntEnum. On 64 bit we have many more bits than that.
 ///
 /// By using this representation, we can make PointerIntEnum a true value type
-/// that is trivially constructable and destructable without needing to malloc
+/// that is trivially constructible and destructible without needing to malloc
 /// memory.
 ///
 /// In order for all of this to work, the user of this needs to construct an
@@ -125,7 +125,7 @@ class PointerIntEnum {
   static constexpr unsigned NumIndexBits =
       sizeof(uintptr_t) * CHAR_BIT - IndexShiftOffset;
 
-  /// The maximum index that can be stored for a index PointerIntEnum caes.
+  /// The maximum index that can be stored for an index PointerIntEnum case.
   static constexpr uintptr_t MaxIndex = (uintptr_t(1) << NumIndexBits) - 2;
 
   /// The bit representation of an Invalid PointerIntEnum's storage.

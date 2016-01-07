@@ -1541,7 +1541,7 @@ A value ``%1`` is said to be *value-dependent* on a value ``%0`` if:
 - ``%1`` is the result of ``mark_dependence`` and ``%0`` is either of
   the operands.
 
-- ``%1`` is the value address of an box allocation instruction of which
+- ``%1`` is the value address of a box allocation instruction of which
   ``%0`` is the box reference.
 
 - ``%1`` is the result of a ``struct``, ``tuple``, or ``enum``

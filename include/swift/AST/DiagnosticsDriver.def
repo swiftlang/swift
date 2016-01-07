@@ -77,7 +77,7 @@ ERROR(error_unknown_target,driver,none,
       "unknown target '%0'", (StringRef))
 
 ERROR(error_framework_bridging_header,driver,none,
-      "using bridging headers with framework targets is unsupported", ())
+      "using bridging headers with framework targets is unsupported", ())
 
 ERROR(error_i_mode,driver,none,
       "the flag '-i' is no longer required and has been removed; "
