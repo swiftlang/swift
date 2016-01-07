@@ -746,7 +746,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       }
     }
 
-    if (!DC->isCascadingContextForLookup(/*excludeFunctions*/true))
+    if (!DC->isCascadingContextForLookup(/*excludeFunctions*/false))
       options |= TR_KnownNonCascadingDependency;
 
     // The remaining lookups will be in the parent context.

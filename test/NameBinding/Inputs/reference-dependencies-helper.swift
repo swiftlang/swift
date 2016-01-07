@@ -133,3 +133,6 @@ struct OtherFileTypeToBeExtended {}
 
 struct TypeReferencedOnlyBySubscript {}
 struct TypeReferencedOnlyByPrivateSubscript {}
+
+protocol ProtoReferencedOnlyInGeneric {}
+protocol ProtoReferencedOnlyInPrivateGeneric {}
