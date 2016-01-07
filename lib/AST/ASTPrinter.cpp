@@ -1268,6 +1268,13 @@ void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
           Printer << ".";
         }
       }
+
+      // Respect alias type.
+      if (extendedType->getKind() == TypeKind::NameAlias) {
+        extendedType.print(Printer, Options);
+        return;
+      }
+
       Printer.printTypeRef(nominal, nominal->getName());
     });
   printInherited(decl);
