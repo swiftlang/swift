@@ -2890,7 +2890,7 @@ SILFunction *MaterializeForSetEmitter::createCallback(GeneratorFn generator) {
     Mangle::Mangler mangler;
     mangler.append("_TTW");
     mangler.mangleProtocolConformance(Conformance);
-    mangler.mangleClosureEntity(&closure, ResilienceExpansion::Minimal, 1);
+    mangler.mangleClosureEntity(&closure, /*uncurryLevel=*/1);
     name = mangler.finalize();
   }
 

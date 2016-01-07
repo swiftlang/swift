@@ -74,18 +74,16 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
   Mangler Mangler;
   if (auto Ctor = dyn_cast<ConstructorDecl>(VD)) {
     Mangler.mangleConstructorEntity(Ctor, /*isAllocating=*/false,
-        ResilienceExpansion::Minimal, /*uncurryingLevel=*/0);
+                                    /*uncurryingLevel=*/0);
   } else if (auto Dtor = dyn_cast<DestructorDecl>(VD)) {
     Mangler.mangleDestructorEntity(Dtor, /*isDeallocating=*/false);
   } else if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
-    Mangler.mangleNominalType(NTD, ResilienceExpansion::Minimal,
-                              Mangler::BindGenerics::None);
+    Mangler.mangleNominalType(NTD, Mangler::BindGenerics::None);
   } else if (isa<TypeAliasDecl>(VD) || isa<AssociatedTypeDecl>(VD)) {
     Mangler.mangleContextOf(VD, Mangler::BindGenerics::None);
     Mangler.mangleDeclName(VD);
   } else {
-    Mangler.mangleEntity(VD, ResilienceExpansion::Minimal,
-                         /*uncurryingLevel=*/0);
+    Mangler.mangleEntity(VD, /*uncurryingLevel=*/0);
   }
 
   Mangler.finalize(OS);
@@ -111,8 +109,7 @@ bool ide::printAccessorUSR(const AbstractStorageDecl *D, AccessorKind AccKind,
   AbstractStorageDecl *SD = const_cast<AbstractStorageDecl*>(D);
   OS << getUSRSpacePrefix();
   Mangler Mangler;
-  Mangler.mangleAccessorEntity(AccKind, AddressorKind::NotAddressor,
-                               SD, ResilienceExpansion::Minimal);
+  Mangler.mangleAccessorEntity(AccKind, AddressorKind::NotAddressor, SD);
   Mangler.finalize(OS);
   return false;
 }

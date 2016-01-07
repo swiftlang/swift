@@ -1725,14 +1725,12 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
 
     if (auto ctor = dyn_cast<ConstructorDecl>(requirement.getDecl())) {
       mangler.mangleConstructorEntity(ctor, /*isAllocating=*/true,
-                                      ResilienceExpansion::Minimal,
                                       requirement.uncurryLevel);
     } else {
       assert(isa<FuncDecl>(requirement.getDecl())
              && "need to handle mangling of non-Func SILDeclRefs here");
       auto requiredDecl = cast<FuncDecl>(requirement.getDecl());
-      mangler.mangleEntity(requiredDecl, ResilienceExpansion::Minimal,
-                           requirement.uncurryLevel);
+      mangler.mangleEntity(requiredDecl, requirement.uncurryLevel);
     }
 
     nameBuffer = mangler.finalize();
@@ -1798,8 +1796,7 @@ getOrCreateReabstractionThunk(GenericParamList *thunkContextParams,
     if (auto generics = thunkType->getGenericSignature()) {
       mangler.append('G');
       mangler.setModuleContext(M.getSwiftModule());
-      mangler.mangleGenericSignature(generics,
-                                     ResilienceExpansion::Minimal);
+      mangler.mangleGenericSignature(generics);
     }
 
     // Substitute context parameters out of the "from" and "to" types.
@@ -1808,10 +1805,8 @@ getOrCreateReabstractionThunk(GenericParamList *thunkContextParams,
     auto toInterfaceType
       = Types.getInterfaceTypeOutOfContext(toType, thunkContextParams);
 
-    mangler.mangleType(fromInterfaceType,
-                       ResilienceExpansion::Minimal, /*uncurry*/ 0);
-    mangler.mangleType(toInterfaceType,
-                       ResilienceExpansion::Minimal, /*uncurry*/ 0);
+    mangler.mangleType(fromInterfaceType, /*uncurry*/ 0);
+    mangler.mangleType(toInterfaceType, /*uncurry*/ 0);
     name = mangler.finalize();
   }
 

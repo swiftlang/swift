@@ -54,9 +54,8 @@ enum class TypeMetadataAddress {
 /// the information necessary to distinguish specific implementations
 /// of the declaration from each other.
 ///
-/// For example, functions may be exploded or uncurried at different
-/// levels, each of which potentially creates a different top-level
-/// function.
+/// For example, functions may be uncurried at different levels, each of
+/// which potentially creates a different top-level function.
 class LinkEntity {
   /// ValueDecl*, SILFunction*, or TypeBase*, depending on Kind.
   void *Pointer;
@@ -71,8 +70,7 @@ class LinkEntity {
     KindShift = 0, KindMask = 0xFF,
 
     // These fields appear in decl kinds.
-    ExplosionLevelShift = 8, ExplosionLevelMask = 0xFF00,
-    UncurryLevelShift = 16, UncurryLevelMask = 0xFF0000,
+    UncurryLevelShift = 8, UncurryLevelMask = 0xFF00,
 
     // This field appears in the ValueWitness kind.
     ValueWitnessShift = 8, ValueWitnessMask = 0xFF00,
@@ -228,14 +226,11 @@ class LinkEntity {
       && k <= Kind::ProtocolWitnessTableLazyCacheVariable;
   }
 
-  void setForDecl(Kind kind, 
-                  ValueDecl *decl, ResilienceExpansion explosionKind,
-                  unsigned uncurryLevel) {
+  void setForDecl(Kind kind, ValueDecl *decl, unsigned uncurryLevel) {
     assert(isDeclKind(kind));
     Pointer = decl;
     SecondaryPointer = nullptr;
     Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind))
-         | LINKENTITY_SET_FIELD(ExplosionLevel, unsigned(explosionKind))
          | LINKENTITY_SET_FIELD(UncurryLevel, uncurryLevel);
   }
 
@@ -305,16 +300,14 @@ public:
     assert(!isFunction(decl));
 
     LinkEntity entity;
-    entity.setForDecl(Kind::Other, decl, ResilienceExpansion(0), 0);
+    entity.setForDecl(Kind::Other, decl, 0);
     return entity;
   }
 
   static LinkEntity forWitnessTableOffset(ValueDecl *decl,
-                                          ResilienceExpansion explosionKind,
                                           unsigned uncurryLevel) {
     LinkEntity entity;
-    entity.setForDecl(Kind::WitnessTableOffset, decl,
-                      explosionKind, uncurryLevel);
+    entity.setForDecl(Kind::WitnessTableOffset, decl, uncurryLevel);
     return entity;
   }
 
@@ -329,20 +322,19 @@ public:
 
   static LinkEntity forObjCClass(ClassDecl *decl) {
     LinkEntity entity;
-    entity.setForDecl(Kind::ObjCClass, decl, ResilienceExpansion::Minimal, 0);
+    entity.setForDecl(Kind::ObjCClass, decl, 0);
     return entity;
   }
 
   static LinkEntity forObjCMetaclass(ClassDecl *decl) {
     LinkEntity entity;
-    entity.setForDecl(Kind::ObjCMetaclass, decl, ResilienceExpansion::Minimal, 0);
+    entity.setForDecl(Kind::ObjCMetaclass, decl, 0);
     return entity;
   }
 
   static LinkEntity forSwiftMetaclassStub(ClassDecl *decl) {
     LinkEntity entity;
-    entity.setForDecl(Kind::SwiftMetaclassStub,
-                      decl, ResilienceExpansion::Minimal, 0);
+    entity.setForDecl(Kind::SwiftMetaclassStub, decl, 0);
     return entity;
   }
 
@@ -378,15 +370,13 @@ public:
   
   static LinkEntity forNominalTypeDescriptor(NominalTypeDecl *decl) {
     LinkEntity entity;
-    entity.setForDecl(Kind::NominalTypeDescriptor,
-                      decl, ResilienceExpansion::Minimal, 0);
+    entity.setForDecl(Kind::NominalTypeDescriptor, decl, 0);
     return entity;
   }
   
   static LinkEntity forProtocolDescriptor(ProtocolDecl *decl) {
     LinkEntity entity;
-    entity.setForDecl(Kind::ProtocolDescriptor,
-                      decl, ResilienceExpansion::Minimal, 0);
+    entity.setForDecl(Kind::ProtocolDescriptor, decl, 0);
     return entity;
   }
 
@@ -537,11 +527,7 @@ public:
     assert(getKind() == Kind::AssociatedTypeWitnessTableAccessFunction);
     return reinterpret_cast<ProtocolDecl*>(Pointer);
   }
-  
-  ResilienceExpansion getResilienceExpansion() const {
-    assert(isDeclKind(getKind()));
-    return ResilienceExpansion(LINKENTITY_GET_FIELD(Data, ExplosionLevel));
-  }
+
   unsigned getUncurryLevel() const {
     return LINKENTITY_GET_FIELD(Data, UncurryLevel);
   }

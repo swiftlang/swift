@@ -90,31 +90,31 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   case Kind::ValueWitness:
     mangler.append("_Tw");
     mangler.append(mangleValueWitness(getValueWitness()));
-    mangler.mangleType(getType(), ResilienceExpansion::Minimal, 0);
+    mangler.mangleType(getType(), 0);
     return mangler.finalize(buffer);
 
   //   global ::= 'WV' type                       // value witness
   case Kind::ValueWitnessTable:
     mangler.append("_TWV");
-    mangler.mangleType(getType(), ResilienceExpansion::Minimal, 0);
+    mangler.mangleType(getType(), 0);
     return mangler.finalize(buffer);
 
   //   global ::= 't' type
   // Abstract type manglings just follow <type>.
   case Kind::TypeMangling:
-    mangler.mangleType(getType(), ResilienceExpansion::Minimal, 0);
+    mangler.mangleType(getType(), 0);
     return mangler.finalize(buffer);
 
   //   global ::= 'Ma' type               // type metadata access function
   case Kind::TypeMetadataAccessFunction:
     mangler.append("_TMa");
-    mangler.mangleType(getType(), ResilienceExpansion::Minimal, 0);
+    mangler.mangleType(getType(), 0);
     return mangler.finalize(buffer);
 
   //   global ::= 'ML' type               // type metadata lazy cache variable
   case Kind::TypeMetadataLazyCacheVariable:
     mangler.append("_TML");
-    mangler.mangleType(getType(), ResilienceExpansion::Minimal, 0);
+    mangler.mangleType(getType(), 0);
     return mangler.finalize(buffer);
 
   //   global ::= 'Mf' type                       // 'full' type metadata
@@ -140,7 +140,6 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   case Kind::SwiftMetaclassStub:
     mangler.append("_TMm");
     mangler.mangleNominalType(cast<ClassDecl>(getDecl()),
-                              ResilienceExpansion::Minimal,
                               Mangler::BindGenerics::None);
     return mangler.finalize(buffer);
 
@@ -148,7 +147,6 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   case Kind::NominalTypeDescriptor:
     mangler.append("_TMn");
     mangler.mangleNominalType(cast<NominalTypeDecl>(getDecl()),
-                              ResilienceExpansion::Minimal,
                               Mangler::BindGenerics::None);
     return mangler.finalize(buffer);
 
@@ -166,11 +164,9 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     // constructor.
     if (auto ctor = dyn_cast<ConstructorDecl>(getDecl()))
       mangler.mangleConstructorEntity(ctor, /*isAllocating=*/true,
-                                      getResilienceExpansion(),
                                       getUncurryLevel());
     else
-      mangler.mangleEntity(getDecl(), getResilienceExpansion(),
-                           getUncurryLevel());
+      mangler.mangleEntity(getDecl(), getUncurryLevel());
     return mangler.finalize(buffer);
 
   //   global ::= 'Wv' directness entity
@@ -205,14 +201,14 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   //   global ::= 'Wl' type protocol-conformance
   case Kind::ProtocolWitnessTableLazyAccessFunction:
     mangler.append("_TWl");
-    mangler.mangleType(getType(), ResilienceExpansion::Minimal, 0);
+    mangler.mangleType(getType(), 0);
     mangler.mangleProtocolConformance(getProtocolConformance());
     return mangler.finalize(buffer);
 
   //   global ::= 'WL' type protocol-conformance
   case Kind::ProtocolWitnessTableLazyCacheVariable:
     mangler.append("_TWL");
-    mangler.mangleType(getType(), ResilienceExpansion::Minimal, 0);
+    mangler.mangleType(getType(), 0);
     mangler.mangleProtocolConformance(getProtocolConformance());
     return mangler.finalize(buffer);
       
@@ -267,16 +263,14 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
 
     mangler.append("_T");
     if (auto type = dyn_cast<NominalTypeDecl>(getDecl())) {
-      mangler.mangleNominalType(type, getResilienceExpansion(),
-                                Mangler::BindGenerics::None);
+      mangler.mangleNominalType(type, Mangler::BindGenerics::None);
     } else if (auto ctor = dyn_cast<ConstructorDecl>(getDecl())) {
       // FIXME: Hack. LinkInfo should be able to refer to the allocating
       // constructor rather than inferring it here.
       mangler.mangleConstructorEntity(ctor, /*isAllocating=*/true,
-                                      getResilienceExpansion(),
                                       getUncurryLevel());
     } else {
-      mangler.mangleEntity(getDecl(), getResilienceExpansion(), getUncurryLevel());
+      mangler.mangleEntity(getDecl(), getUncurryLevel());
     }
       return mangler.finalize(buffer);
 

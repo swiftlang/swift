@@ -46,8 +46,7 @@ using namespace Mangle;
 //===----------------------------------------------------------------------===//
 
 static void mangleSubstitution(Mangler &M, Substitution Sub) {
-  M.mangleType(Sub.getReplacement()->getCanonicalType(),
-               ResilienceExpansion::Minimal, 0);
+  M.mangleType(Sub.getReplacement()->getCanonicalType(), 0);
   for (auto C : Sub.getConformances()) {
     if (!C)
       return;
@@ -202,7 +201,7 @@ mangleClosureProp(PartialApplyInst *PAI) {
   // specializing.
   for (auto &Op : PAI->getArgumentOperands()) {
     SILType Ty = Op.get().getType();
-    M.mangleType(Ty.getSwiftRValueType(), ResilienceExpansion::Minimal, 0);
+    M.mangleType(Ty.getSwiftRValueType(), 0);
   }
 }
 
