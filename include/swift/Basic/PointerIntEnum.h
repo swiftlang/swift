@@ -160,12 +160,7 @@ public:
   bool isValid() const { return Storage != InvalidStorage; }
 
   bool operator==(const PointerIntEnum &Other) const {
-    // If this value is not valid, it can only equal another invalid
-    // PointerIntEnum.
-    if (!isValid())
-      return !Other.isValid();
-
-    // Otherwise just compare the raw storage.
+    // Just compare the raw storage.
     return Other.Storage == Storage;
   }
 

@@ -234,6 +234,16 @@ TEST(PointerIntEnumTest, Comparisons) {
   // Test that pointers and indices compare differently.
   EXPECT_NE(IndexCase1, PtrCase1);
 
+  // Test comparison in between invalid and valid PointerIntEnums.
+  PointerIntEnumTy Invalid1;
+  PointerIntEnumTy Invalid2;
+  EXPECT_EQ(Invalid1, Invalid2);
+  EXPECT_NE(Invalid1, IndexCase1);
+  EXPECT_NE(Invalid1, PtrCase1);
+  EXPECT_NE(IndexCase1, Invalid1);
+  EXPECT_NE(PtrCase1, Invalid1);
+
+
   delete[] data2;
   delete[] data1;
 }
