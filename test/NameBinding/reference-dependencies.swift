@@ -329,7 +329,6 @@ extension PrivateTy6 : PrivateProto3 {}
 // CHECK-DAG: - "ProtoReferencedOnlyInGeneric"
 func genericTest<T: ProtoReferencedOnlyInGeneric>(_: T) {}
 // CHECK-DAG: !private "ProtoReferencedOnlyInPrivateGeneric"
-// FIXME: Should be 
 private func privateGenericTest<T: ProtoReferencedOnlyInPrivateGeneric>(_: T) {}
 
 struct Sentinel1 {}
