@@ -576,7 +576,7 @@ generic constraints:
   * Non-class protocol types
   * @weak types
 
-  Values of address-only type (“address-only values”) must reside in
+  Values of address-only type ("address-only values") must reside in
   memory and can only be referenced in SIL by address. Addresses of
   address-only values cannot be loaded from or stored to. SIL provides
   special instructions for indirectly manipulating address-only

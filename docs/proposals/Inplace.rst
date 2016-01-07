@@ -424,7 +424,7 @@ fine::
   foo.=advanced(10)
 
 The alternative would be to say that explicitly-written assignment methods
-cannot work properly for immutable classes and “work” with reference
+cannot work properly for immutable classes and "work" with reference
 semantics on other classes.  We consider this approach indefensible,
 especially when one considers that operators encourage writing
 algorithms that can only work properly with value semantics and will

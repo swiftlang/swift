@@ -76,7 +76,7 @@ obvious alternative is to use "prior knowledge".  We know what are the common
 sub-strings that are used in Swift names.  Some of the most common substrings in
 Swift mangled names are:
 
- "S_S_S_S", "ollectio”, “Type”, “Index”, “erator”, “7Element", and “able".
+ "S_S_S_S", "ollectio", "Type", "Index", "erator", "7Element", and "able".
 
 We can use this prior knowledge to compress our mangling!
 
@@ -114,20 +114,20 @@ number of occurrences) is encoded with a single escape character and a
 single index character. The table of highly repetitive substrings can only
 contain 61 entries (a-zA-Z0-9_, minus two escape characters).
 
-A reference to the very frequent substrings is encoded as “Yx”, where x is the
+A reference to the very frequent substrings is encoded as "Yx", where x is the
 character that is translated into a numeric index. This is two chars per
 substring.
 
 3. The less frequently used substrings are encoded as three-character sequence.
-“Zxx”, where xx is the numeric index in the large table (that can hold 61*61
+"Zxx", where xx is the numeric index in the large table (that can hold 61*61
 substrings).
 
 It is obvious how to reverse this compression using the same string table used
 to compress the names.
 
 With this encoding scheme the name
-“__TwxxV14StdlibUnittest24MinimalForwardCollection” becomes
-"__TwxxJ1QYrt24J6wJ5KY9on" and the name “__TMPVs15ContiguousArray” becomes
+"__TwxxV14StdlibUnittest24MinimalForwardCollection" becomes
+"__TwxxJ1QYrt24J6wJ5KY9on" and the name "__TMPVs15ContiguousArray" becomes
 "__TMPJOSJ6lJ8G".
 
 Notice that the "_T" prefix is kept and should not be compressed because it

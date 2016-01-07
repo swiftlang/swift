@@ -102,7 +102,7 @@ Subsequent Parameters
 Other Differences
 -----------------
     
-* We don't use namespace prefixes such as “`NS`”, relying instead on
+* We don't use namespace prefixes such as "`NS`", relying instead on
   the language's own facilities.
 
 * Names of types, protocols and enum cases are `UpperCamelCase`.
@@ -156,7 +156,7 @@ library, but are compatible with the Cocoa guidelines.
     }
 
 * Even unlabelled parameter names should be meaningful as they'll be
-  referred to in comments and visible in “generated headers”
+  referred to in comments and visible in "generated headers"
   (cmd-click in Xcode):
 
   .. parsed-literal::
@@ -205,7 +205,7 @@ Acceptable Short or Non-Descriptive Names
 Prefixes and Suffixes
 ---------------------
 
-* `Any` is used as a prefix to denote “type erasure,”
+* `Any` is used as a prefix to denote "type erasure,"
   e.g. `AnySequence<T>` wraps any sequence with element type `T`,
   conforms to `SequenceType` itself, and forwards all operations to the
   wrapped sequence.  When handling the wrapper, the specific type of 
