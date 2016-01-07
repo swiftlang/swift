@@ -61,14 +61,14 @@ public:
                Alignment align)
     : super(storage, size, spareBits, align) {}
 
-  bool isSingleRetainablePointer(ResilienceScope scope,
+  bool isSingleRetainablePointer(ResilienceExpansion expansion,
                                  ReferenceCounting *refcounting) const override {
     if(refcounting)
       *refcounting = asDerived().getReferenceCounting();
     return true;
   }
   
-  IsaEncoding getIsaEncoding(ResilienceScope scope) const {
+  IsaEncoding getIsaEncoding(ResilienceExpansion expansion) const {
     switch (asDerived().getReferenceCounting()) {
     // We can access the isa of pure Swift heap objects directly.
     case ReferenceCounting::Native:

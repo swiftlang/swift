@@ -87,7 +87,7 @@ Address TypeInfo::initializeBufferWithCopy(IRGenFunction &IGF,
 }
 
 
-bool TypeInfo::isSingleRetainablePointer(ResilienceScope scope,
+bool TypeInfo::isSingleRetainablePointer(ResilienceExpansion expansion,
                                          ReferenceCounting *refcounting) const {
   return false;
 }
@@ -155,7 +155,7 @@ Address TypeInfo::indexArray(IRGenFunction &IGF, Address base,
 
 void TypeInfo::destroyArray(IRGenFunction &IGF, Address array,
                             llvm::Value *count, SILType T) const {
-  if (isPOD(ResilienceScope::Component))
+  if (isPOD(ResilienceExpansion::Maximal))
     return;
   
   auto entry = IGF.Builder.GetInsertBlock();
@@ -296,7 +296,7 @@ void irgen::emitInitializeArrayBackToFront(IRGenFunction &IGF,
 void TypeInfo::initializeArrayWithCopy(IRGenFunction &IGF,
                                        Address dest, Address src,
                                        llvm::Value *count, SILType T) const {
-  if (isPOD(ResilienceScope::Component)) {
+  if (isPOD(ResilienceExpansion::Maximal)) {
     llvm::Value *stride = getStride(IGF, T);
     llvm::Value *byteCount = IGF.Builder.CreateNUWMul(stride, count);
     IGF.Builder.CreateMemCpy(dest.getAddress(), src.getAddress(),
@@ -311,7 +311,7 @@ void TypeInfo::initializeArrayWithTakeFrontToBack(IRGenFunction &IGF,
                                                   Address dest, Address src,
                                                   llvm::Value *count, SILType T)
 const {
-  if (isBitwiseTakable(ResilienceScope::Component)) {
+  if (isBitwiseTakable(ResilienceExpansion::Maximal)) {
     llvm::Value *stride = getStride(IGF, T);
     llvm::Value *byteCount = IGF.Builder.CreateNUWMul(stride, count);
     IGF.Builder.CreateMemMove(dest.getAddress(), src.getAddress(),
@@ -326,7 +326,7 @@ void TypeInfo::initializeArrayWithTakeBackToFront(IRGenFunction &IGF,
                                                   Address dest, Address src,
                                                   llvm::Value *count, SILType T)
 const {
-  if (isBitwiseTakable(ResilienceScope::Component)) {
+  if (isBitwiseTakable(ResilienceExpansion::Maximal)) {
     llvm::Value *stride = getStride(IGF, T);
     llvm::Value *byteCount = IGF.Builder.CreateNUWMul(stride, count);
     IGF.Builder.CreateMemMove(dest.getAddress(), src.getAddress(),
@@ -367,7 +367,7 @@ void FixedTypeInfo::initializeWithTake(IRGenFunction &IGF,
                                        Address destAddr,
                                        Address srcAddr,
                                        SILType T) const {
-  assert(isBitwiseTakable(ResilienceScope::Component)
+  assert(isBitwiseTakable(ResilienceExpansion::Maximal)
         && "non-bitwise-takable type must override default initializeWithTake");
   
   // Prefer loads and stores if we won't make a million of them.
@@ -392,7 +392,7 @@ void LoadableTypeInfo::initializeWithCopy(IRGenFunction &IGF,
                                           Address srcAddr,
                                           SILType T) const {
   // Use memcpy if that's legal.
-  if (isPOD(ResilienceScope::Component)) {
+  if (isPOD(ResilienceExpansion::Maximal)) {
     return initializeWithTake(IGF, destAddr, srcAddr, T);
   }
 
@@ -449,7 +449,7 @@ llvm::Value *FixedTypeInfo::getStride(IRGenFunction &IGF, SILType T) const {
 }
 llvm::Value *FixedTypeInfo::getIsPOD(IRGenFunction &IGF, SILType T) const {
   return llvm::ConstantInt::get(IGF.IGM.Int1Ty,
-                                isPOD(ResilienceScope::Component) == IsPOD);
+                                isPOD(ResilienceExpansion::Maximal) == IsPOD);
 }
 llvm::Constant *FixedTypeInfo::getStaticStride(IRGenModule &IGM) const {
   return asSizeConstant(IGM, getFixedStride());
@@ -1656,7 +1656,7 @@ namespace {
       return visitStructDecl(type->getDecl());
     }
     bool visitStructDecl(StructDecl *decl) {
-      if (IGM.isResilient(decl, ResilienceScope::Component))
+      if (IGM.isResilient(decl, ResilienceExpansion::Maximal))
         return true;
 
       for (auto field : decl->getStoredProperties()) {
@@ -1675,7 +1675,7 @@ namespace {
       return visitEnumDecl(type->getDecl());
     }
     bool visitEnumDecl(EnumDecl *decl) {
-      if (IGM.isResilient(decl, ResilienceScope::Component))
+      if (IGM.isResilient(decl, ResilienceExpansion::Maximal))
         return true;
       if (decl->isIndirect())
         return false;
@@ -1928,17 +1928,17 @@ llvm::PointerType *IRGenModule::requiresIndirectResult(SILType type) {
 }
 
 /// Determine whether this type is known to be POD.
-bool IRGenModule::isPOD(SILType type, ResilienceScope scope) {
+bool IRGenModule::isPOD(SILType type, ResilienceExpansion expansion) {
   if (type.is<ArchetypeType>()) return false;
   if (type.is<ClassType>()) return false;
   if (type.is<BoundGenericClassType>()) return false;
   if (auto tuple = type.getAs<TupleType>()) {
     for (auto index : indices(tuple.getElementTypes()))
-      if (!isPOD(type.getTupleElementType(index), scope))
+      if (!isPOD(type.getTupleElementType(index), expansion))
         return false;
     return true;
   }
-  return getTypeInfo(type).isPOD(scope);
+  return getTypeInfo(type).isPOD(expansion);
 }
 
 
@@ -2031,8 +2031,8 @@ bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const {
 }
 #endif
 
-SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM,
-                                              SILType t, ResilienceScope scope){
+SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
+                                              ResilienceExpansion expansion) {
   if (auto tuple = t.getAs<TupleType>())
     if (tuple->getNumElements() == 1)
       return t.getTupleElementType(0);

@@ -243,7 +243,7 @@ namespace {
             // the field offset vector.
             ClassHasFixedSize = false;
           }
-        } else if (IGM.isResilient(superclass, ResilienceScope::Component)) {
+        } else if (IGM.isResilient(superclass, ResilienceExpansion::Maximal)) {
           // If the superclass is resilient, the number of stored properties
           // is not known at compile time.
           ClassHasMetadataPattern = true;

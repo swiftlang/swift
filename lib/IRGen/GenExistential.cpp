@@ -1040,7 +1040,7 @@ class ClassExistentialTypeInfo
 
 public:
 
-  bool isSingleRetainablePointer(ResilienceScope scope,
+  bool isSingleRetainablePointer(ResilienceExpansion expansion,
                                  ReferenceCounting *refcounting) const override{
     if (refcounting) *refcounting = Refcounting;
     return getNumStoredProtocols() == 0;

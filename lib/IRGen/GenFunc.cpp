@@ -724,8 +724,8 @@ const TypeInfo *TypeConverter::convertBlockStorageType(SILBlockStorageType *T) {
     spareBits.extendWithSetBits(captureOffset.getValueInBits());
     size = captureOffset + fixedCapture->getFixedSize();
     spareBits.append(fixedCapture->getSpareBits());
-    pod = fixedCapture->isPOD(ResilienceScope::Component);
-    bt = fixedCapture->isBitwiseTakable(ResilienceScope::Component);
+    pod = fixedCapture->isPOD(ResilienceExpansion::Maximal);
+    bt = fixedCapture->isBitwiseTakable(ResilienceExpansion::Maximal);
   }
   
   llvm::Type *storageElts[] = {
@@ -3553,7 +3553,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       case ParameterConvention::Direct_Unowned:
         // If the type is nontrivial, keep the context alive since the field
         // depends on the context to not be deallocated.
-        if (!fieldTI.isPOD(ResilienceScope::Component))
+        if (!fieldTI.isPOD(ResilienceExpansion::Maximal))
           dependsOnContextLifetime = true;
         SWIFT_FALLTHROUGH;
       case ParameterConvention::Direct_Deallocating:
@@ -3797,7 +3797,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
       continue;
     }
       
-    if (ti.isSingleSwiftRetainablePointer(ResilienceScope::Component)) {
+    if (ti.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
       hasSingleSwiftRefcountedContext = Yes;
       singleRefcountedConvention = param.getConvention();
     } else {
@@ -4071,7 +4071,7 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   uint32_t flags = 0;
   auto &captureTL
     = IGF.getTypeInfoForLowered(blockTy->getCaptureType());
-  bool isPOD = captureTL.isPOD(ResilienceScope::Component);
+  bool isPOD = captureTL.isPOD(ResilienceExpansion::Maximal);
   if (!isPOD)
     flags |= 1 << 25;
   

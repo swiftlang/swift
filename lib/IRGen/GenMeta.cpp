@@ -1508,7 +1508,7 @@ namespace {
       // If the type is a singleton aggregate, the field's layout is equivalent
       // to the aggregate's.
       if (SILType singletonFieldTy = getSingletonAggregateFieldType(IGF.IGM,
-                                             silTy, ResilienceScope::Component))
+                                             silTy, ResilienceExpansion::Maximal))
         return visit(singletonFieldTy.getSwiftRValueType());
 
       // If the type is fixed-layout, emit a copy of its layout.
@@ -4307,7 +4307,7 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
       instanceTy = SILType::getPrimitiveObjectType(metaTy.getInstanceType());
 
     if (IGF.IGM.isResilient(instanceTy.getClassOrBoundGenericClass(),
-                            ResilienceScope::Component)) {
+                            ResilienceExpansion::Maximal)) {
       // The derived type that is making the super call is resilient,
       // for example we may be in an extension of a class outside of our
       // resilience domain. So, we need to load the superclass metadata
@@ -4571,9 +4571,9 @@ public:
     auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
     auto &enumTI = IGM.getTypeInfoForLowered(enumTy);
     (void) enumTI;
-    assert(enumTI.isFixedSize(ResilienceScope::Component) &&
+    assert(enumTI.isFixedSize(ResilienceExpansion::Maximal) &&
            "emitting constant enum metadata for resilient-sized type?");
-    assert(!enumTI.isFixedSize(ResilienceScope::Universal) &&
+    assert(!enumTI.isFixedSize(ResilienceExpansion::Minimal) &&
            "non-generic, non-resilient enums don't need payload size in metadata");
 
     auto &strategy = getEnumImplStrategy(IGM, enumTy);
@@ -4616,7 +4616,7 @@ public:
     auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
     auto &enumTI = IGM.getTypeInfoForLowered(enumTy);
     (void) enumTI;
-    assert(!enumTI.isFixedSize(ResilienceScope::Universal) &&
+    assert(!enumTI.isFixedSize(ResilienceExpansion::Minimal) &&
            "non-generic, non-resilient enums don't need payload size in metadata");
     addConstantWord(0);
   }

@@ -2614,36 +2614,38 @@ StringRef IRGenModule::mangleType(CanType type, SmallVectorImpl<char> &buffer) {
 /// - For enums, new cases can be added
 /// - For classes, the superclass might change the size or number
 ///   of stored properties
-bool IRGenModule::isResilient(Decl *D, ResilienceScope scope) {
+bool IRGenModule::isResilient(Decl *D, ResilienceExpansion expansion) {
   auto NTD = dyn_cast<NominalTypeDecl>(D);
   if (!NTD)
     return false;
 
-  switch (scope) {
-  case ResilienceScope::Component:
+  switch (expansion) {
+  case ResilienceExpansion::Maximal:
     return !NTD->hasFixedLayout(SILMod->getSwiftModule());
-  case ResilienceScope::Universal:
+  case ResilienceExpansion::Minimal:
     return !NTD->hasFixedLayout();
   }
 
   llvm_unreachable("Bad resilience scope");
 }
 
-// The most general resilience scope where the given declaration is visible.
-ResilienceScope IRGenModule::getResilienceScopeForAccess(NominalTypeDecl *decl) {
+// The most general resilience expansion where the given declaration is visible.
+ResilienceExpansion
+IRGenModule::getResilienceExpansionForAccess(NominalTypeDecl *decl) {
   if (decl->getModuleContext() == SILMod->getSwiftModule() &&
       decl->getFormalAccess() != Accessibility::Public)
-    return ResilienceScope::Component;
-  return ResilienceScope::Universal;
+    return ResilienceExpansion::Maximal;
+  return ResilienceExpansion::Minimal;
 }
 
-// The most general resilience scope which has knowledge of the declaration's
+// The most general resilience expansion which has knowledge of the declaration's
 // layout. Calling isResilient() with this scope will always return false.
-ResilienceScope IRGenModule::getResilienceScopeForLayout(NominalTypeDecl *decl) {
-  if (isResilient(decl, ResilienceScope::Universal))
-    return ResilienceScope::Component;
+ResilienceExpansion
+IRGenModule::getResilienceExpansionForLayout(NominalTypeDecl *decl) {
+  if (isResilient(decl, ResilienceExpansion::Minimal))
+    return ResilienceExpansion::Maximal;
 
-  return getResilienceScopeForAccess(decl);
+  return getResilienceExpansionForAccess(decl);
 }
 
 llvm::Constant *IRGenModule::

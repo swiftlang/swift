@@ -3651,8 +3651,8 @@ static void emitUncheckedValueBitCast(IRGenSILFunction &IGF,
                                       const LoadableTypeInfo &outTI) {
   // If the transfer is doable bitwise, and if the elements of the explosion are
   // the same type, then just transfer the elements.
-  if (inTI.isBitwiseTakable(ResilienceScope::Component) &&
-      outTI.isBitwiseTakable(ResilienceScope::Component) &&
+  if (inTI.isBitwiseTakable(ResilienceExpansion::Maximal) &&
+      outTI.isBitwiseTakable(ResilienceExpansion::Maximal) &&
       isStructurallySame(inTI.StorageType, outTI.StorageType)) {
     in.transferInto(out, in.size());
     return;

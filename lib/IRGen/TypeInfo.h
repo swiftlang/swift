@@ -154,11 +154,11 @@ public:
 
   /// Whether this type is known to be POD, i.e. to not require any
   /// particular action on copy or destroy.
-  IsPOD_t isPOD(ResilienceScope scope) const { return IsPOD_t(POD); }
+  IsPOD_t isPOD(ResilienceExpansion expansion) const { return IsPOD_t(POD); }
   
   /// Whether this type is known to be bitwise-takable, i.e. "initializeWithTake"
   /// is equivalent to a memcpy.
-  IsBitwiseTakable_t isBitwiseTakable(ResilienceScope scope) const {
+  IsBitwiseTakable_t isBitwiseTakable(ResilienceExpansion expansion) const {
     return IsBitwiseTakable_t(BitwiseTakable);
   }
   
@@ -191,11 +191,11 @@ public:
 
   /// Whether this type is known to be fixed-size in the given
   /// resilience domain.  If true, spare bits can be used.
-  IsFixedSize_t isFixedSize(ResilienceScope scope) const {
-    switch (scope) {
-    case ResilienceScope::Component:
+  IsFixedSize_t isFixedSize(ResilienceExpansion expansion) const {
+    switch (expansion) {
+    case ResilienceExpansion::Maximal:
       return isFixedSize();
-    case ResilienceScope::Universal:
+    case ResilienceExpansion::Minimal:
       // We can't be universally fixed size if we're not locally
       // fixed size.
       assert((isFixedSize() || AlwaysFixedSize == IsNotFixedSize) &&
@@ -337,7 +337,7 @@ public:
   /// for this type being a single object pointer?
   ///
   /// \return false by default
-  virtual bool isSingleRetainablePointer(ResilienceScope scope,
+  virtual bool isSingleRetainablePointer(ResilienceExpansion expansion,
                                          ReferenceCounting *refcounting
                                              = nullptr) const;
 
@@ -345,9 +345,9 @@ public:
   /// for this type being a single Swift-retainable object pointer?
   ///
   /// \return false by default
-  bool isSingleSwiftRetainablePointer(ResilienceScope scope) const {
+  bool isSingleSwiftRetainablePointer(ResilienceExpansion expansion) const {
     ReferenceCounting refcounting;
-    return (isSingleRetainablePointer(scope, &refcounting) &&
+    return (isSingleRetainablePointer(expansion, &refcounting) &&
             refcounting == ReferenceCounting::Native);
   }
 

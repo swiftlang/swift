@@ -687,7 +687,7 @@ private:
     unsigned explosionEnd = NextExplosionIndex;
 
     ElementLayout layout = ElementLayout::getIncomplete(fieldType);
-    layout.completeFixed(fieldType.isPOD(ResilienceScope::Component),
+    layout.completeFixed(fieldType.isPOD(ResilienceExpansion::Maximal),
                          NextOffset, LLVMFields.size());
 
     FieldInfos.push_back(
@@ -779,7 +779,7 @@ const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
                                                  StructDecl *D) {
   // All resilient structs have the same opaque lowering, since they are
   // indistinguishable as values.
-  if (IGM.isResilient(D, ResilienceScope::Component))
+  if (IGM.isResilient(D, ResilienceExpansion::Maximal))
     return &getResilientStructTypeInfo();
 
   // Create the struct type.

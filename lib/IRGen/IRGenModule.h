@@ -503,7 +503,7 @@ public:
   unsigned getExplosionSize(SILType T);
   llvm::PointerType *isSingleIndirectValue(SILType T);
   llvm::PointerType *requiresIndirectResult(SILType T);
-  bool isPOD(SILType type, ResilienceScope scope);
+  bool isPOD(SILType type, ResilienceExpansion expansion);
   clang::CanQual<clang::Type> getClangType(CanType type);
   clang::CanQual<clang::Type> getClangType(SILType type);
   clang::CanQual<clang::Type> getClangType(SILParameterInfo param);
@@ -514,9 +514,9 @@ public:
     return *ClangASTContext;
   }
 
-  bool isResilient(Decl *decl, ResilienceScope scope);
-  ResilienceScope getResilienceScopeForAccess(NominalTypeDecl *decl);
-  ResilienceScope getResilienceScopeForLayout(NominalTypeDecl *decl);
+  bool isResilient(Decl *decl, ResilienceExpansion expansion);
+  ResilienceExpansion getResilienceExpansionForAccess(NominalTypeDecl *decl);
+  ResilienceExpansion getResilienceExpansionForLayout(NominalTypeDecl *decl);
 
   SpareBitVector getSpareBitsForType(llvm::Type *scalarTy, Size size);
   

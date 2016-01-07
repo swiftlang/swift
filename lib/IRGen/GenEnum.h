@@ -177,8 +177,8 @@ public:
     return cast<llvm::StructType>(getTypeInfo().getStorageType());
   }
   
-  IsPOD_t isPOD(ResilienceScope scope) const {
-    return getTypeInfo().isPOD(scope);
+  IsPOD_t isPOD(ResilienceExpansion expansion) const {
+    return getTypeInfo().isPOD(expansion);
   }
   
   /// \group Query enum layout

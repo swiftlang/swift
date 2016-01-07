@@ -470,7 +470,7 @@ namespace {
     }
 
     void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
-      if (getSingleton() && !getSingleton()->isPOD(ResilienceScope::Component))
+      if (getSingleton() && !getSingleton()->isPOD(ResilienceExpansion::Maximal))
         getSingleton()->destroy(IGF, getSingletonAddress(IGF, addr),
                                 getSingletonType(IGF.IGM, T));
     }
@@ -1193,10 +1193,10 @@ namespace {
     void assign(IRGenFunction &IGF, Explosion &e, Address addr) const override {
       assert(TIK >= Loadable);
       Explosion old;
-      if (!isPOD(ResilienceScope::Component))
+      if (!isPOD(ResilienceExpansion::Maximal))
         loadAsTake(IGF, addr, old);
       initialize(IGF, e, addr);
-      if (!isPOD(ResilienceScope::Component))
+      if (!isPOD(ResilienceExpansion::Maximal))
         consume(IGF, old);
     }
 
@@ -1376,13 +1376,13 @@ namespace {
 
       // If the payload is POD, then we can use POD value semantics.
       auto &payloadTI = *ElementsWithPayload[0].ti;
-      if (payloadTI.isPOD(ResilienceScope::Component)) {
+      if (payloadTI.isPOD(ResilienceExpansion::Maximal)) {
         CopyDestroyKind = POD;
       // If the payload is a single refcounted pointer and we have a single
       // empty case, then the layout will be a nullable pointer, and we can
       // pass enum values directly into swift_retain/swift_release as-is.
       } else if (tik >= TypeInfoKind::Loadable
-          && payloadTI.isSingleRetainablePointer(ResilienceScope::Component,
+          && payloadTI.isSingleRetainablePointer(ResilienceExpansion::Maximal,
                                                  &Refcounting)
           && ElementsWithNoPayload.size() == 1
           // FIXME: All single-retainable-pointer types should eventually have
@@ -2775,14 +2775,14 @@ namespace {
       bool allSingleRefcount = true;
       bool haveRefcounting = false;
       for (auto &elt : ElementsWithPayload) {
-        if (!elt.ti->isPOD(ResilienceScope::Component))
+        if (!elt.ti->isPOD(ResilienceExpansion::Maximal))
           allPOD = false;
-        if (!elt.ti->isBitwiseTakable(ResilienceScope::Component))
+        if (!elt.ti->isBitwiseTakable(ResilienceExpansion::Maximal))
           allBitwiseTakable = false;
 
         // refcounting is only set in the else branches
         ReferenceCounting refcounting;
-        if (!elt.ti->isSingleRetainablePointer(ResilienceScope::Component,
+        if (!elt.ti->isSingleRetainablePointer(ResilienceExpansion::Maximal,
                                                &refcounting)) {
           allSingleRefcount = false;
         } else if (haveRefcounting) {
@@ -3579,7 +3579,7 @@ namespace {
         auto &payloadTI = *payloadCasePair.ti;
 
         // Trivial payloads don't need any work.
-        if (payloadTI.isPOD(ResilienceScope::Component)) {
+        if (payloadTI.isPOD(ResilienceExpansion::Maximal)) {
           ++tagIndex;
           continue;
         }
@@ -3861,8 +3861,8 @@ namespace {
           auto &payloadTI = *payloadCasePair.ti;
           // Trivial and, in the case of a take, bitwise-takable payloads,
           // can all share the default path.
-          if (payloadTI.isPOD(ResilienceScope::Component)
-              || (isTake && payloadTI.isBitwiseTakable(ResilienceScope::Component))) {
+          if (payloadTI.isPOD(ResilienceExpansion::Maximal)
+              || (isTake && payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal))) {
             ++tagIndex;
             continue;
           }
@@ -4646,17 +4646,19 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
   // 1) Physical case indices won't change
   // 2) The indirect-ness of cases won't change
   // 3) Payload types won't change in a non-resilient way
-  bool isResilient = TC.IGM.isResilient(theEnum, ResilienceScope::Component);
+  bool isResilient = TC.IGM.isResilient(theEnum, ResilienceExpansion::Maximal);
   
   // The most general resilience scope where the enum type is visible.
   // Case numbering must not depend on any information that is not static
   // in this resilience scope.
-  ResilienceScope accessScope = TC.IGM.getResilienceScopeForAccess(theEnum);
+  ResilienceExpansion accessScope =
+      TC.IGM.getResilienceExpansionForAccess(theEnum);
 
   // The most general resilience scope where the enum's layout is known.
   // Fixed-size optimizations can be applied if all payload types are
   // fixed-size from this resilience scope.
-  ResilienceScope layoutScope = TC.IGM.getResilienceScopeForLayout(theEnum);
+  ResilienceExpansion layoutScope =
+      TC.IGM.getResilienceExpansionForLayout(theEnum);
 
   for (auto elt : theEnum->getAllElements()) {
     numElements++;
@@ -4711,7 +4713,7 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
       elementsWithPayload.push_back({elt, substArgTI, origArgTI});
 
       if (!isResilient) {
-        if (!substArgTI->isFixedSize(ResilienceScope::Component))
+        if (!substArgTI->isFixedSize(ResilienceExpansion::Maximal))
           tik = Opaque;
         else if (!substArgTI->isLoadable() && tik > Fixed)
           tik = Fixed;
@@ -5034,8 +5036,8 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                             alignment);
       return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
                              alignment,
-                             eltTI.isPOD(ResilienceScope::Component),
-                             eltTI.isBitwiseTakable(ResilienceScope::Component)));
+                             eltTI.isPOD(ResilienceExpansion::Maximal),
+                             eltTI.isBitwiseTakable(ResilienceExpansion::Maximal)));
     } else {
       auto &fixedEltTI = cast<FixedTypeInfo>(eltTI);
       auto alignment = fixedEltTI.getFixedAlignment();
@@ -5046,8 +5048,8 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                         fixedEltTI.getFixedSize(),
                         fixedEltTI.getSpareBits(),
                         alignment,
-                        fixedEltTI.isPOD(ResilienceScope::Component),
-                        fixedEltTI.isBitwiseTakable(ResilienceScope::Component));
+                        fixedEltTI.isPOD(ResilienceExpansion::Maximal),
+                        fixedEltTI.isBitwiseTakable(ResilienceExpansion::Maximal));
     }
   }
 }
@@ -5106,7 +5108,7 @@ CCompatibleEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
   auto &rawTI = TC.getCompleteTypeInfo(
                                    theEnum->getRawType()->getCanonicalType());
   auto &rawFixedTI = cast<FixedTypeInfo>(rawTI);
-  assert(rawFixedTI.isPOD(ResilienceScope::Component)
+  assert(rawFixedTI.isPOD(ResilienceExpansion::Maximal)
          && "c-compatible raw type isn't POD?!");
   ExplosionSchema rawSchema = rawTI.getSchema();
   assert(rawSchema.size() == 1
@@ -5122,7 +5124,7 @@ CCompatibleEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
   applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/true,
                         alignment);
 
-  assert(!TC.IGM.isResilient(theEnum, ResilienceScope::Universal) &&
+  assert(!TC.IGM.isResilient(theEnum, ResilienceExpansion::Minimal) &&
          "C-compatible enums cannot be resilient");
 
   return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this, enumTy,
@@ -5196,8 +5198,8 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
   
   return getFixedEnumTypeInfo(enumTy, Size(sizeWithTag), std::move(spareBits),
                       alignment,
-                      payloadTI.isPOD(ResilienceScope::Component),
-                      payloadTI.isBitwiseTakable(ResilienceScope::Component));
+                      payloadTI.isPOD(ResilienceExpansion::Maximal),
+                      payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal));
 }
 
 TypeInfo *SinglePayloadEnumImplStrategy::completeDynamicLayout(
@@ -5219,8 +5221,8 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeDynamicLayout(
   
   return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
          alignment,
-         payloadTI.isPOD(ResilienceScope::Component),
-         payloadTI.isBitwiseTakable(ResilienceScope::Component)));
+         payloadTI.isPOD(ResilienceExpansion::Maximal),
+         payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal)));
 }
 
 TypeInfo *
@@ -5256,9 +5258,9 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
     auto &fixedPayloadTI = cast<FixedTypeInfo>(*elt.ti);
     if (fixedPayloadTI.getFixedAlignment() > worstAlignment)
       worstAlignment = fixedPayloadTI.getFixedAlignment();
-    if (!fixedPayloadTI.isPOD(ResilienceScope::Component))
+    if (!fixedPayloadTI.isPOD(ResilienceExpansion::Maximal))
       isPOD = IsNotPOD;
-    if (!fixedPayloadTI.isBitwiseTakable(ResilienceScope::Component))
+    if (!fixedPayloadTI.isBitwiseTakable(ResilienceExpansion::Maximal))
       isBT = IsNotBitwiseTakable;
 
     unsigned payloadBytes = fixedPayloadTI.getFixedSize().getValue();
@@ -5401,8 +5403,8 @@ TypeInfo *MultiPayloadEnumImplStrategy::completeDynamicLayout(
   for (auto &element : ElementsWithPayload) {
     auto &payloadTI = *element.ti;
     alignment = std::max(alignment, payloadTI.getBestKnownAlignment());
-    pod &= payloadTI.isPOD(ResilienceScope::Component);
-    bt &= payloadTI.isBitwiseTakable(ResilienceScope::Component);
+    pod &= payloadTI.isPOD(ResilienceExpansion::Maximal);
+    bt &= payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal);
   }
   
   applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/false,
@@ -5436,7 +5438,7 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
   llvm::StructType *storageType;
 
   // Resilient enum types lower down to the same opaque type.
-  if (IGM.isResilient(theEnum, ResilienceScope::Component))
+  if (IGM.isResilient(theEnum, ResilienceExpansion::Maximal))
     storageType = cast<llvm::StructType>(IGM.OpaquePtrTy->getElementType());
   else
     storageType = IGM.createNominalType(theEnum);
