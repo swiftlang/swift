@@ -1603,19 +1603,63 @@ void IRGenSILFunction::visitFunctionRefInst(FunctionRefInst *i) {
 }
 
 void IRGenSILFunction::visitAllocGlobalInst(AllocGlobalInst *i) {
-  // TODO
+  SILGlobalVariable *var = i->getReferencedGlobal();
+  SILType loweredTy = var->getLoweredType();
+  auto &ti = getTypeInfo(loweredTy);
+
+  // If the type is universally fixed-size, we allocated storage for it
+  // statically, and there's nothing to do.
+  if (ti.isFixedSize(ResilienceExpansion::Minimal))
+    return;
+
+  // Otherwise, the static storage for the global consists of a fixed-size
+  // buffer.
+  Address addr = IGM.getAddrOfSILGlobalVariable(var, ti,
+                                                NotForDefinition);
+
+  if (ti.isFixedSize(ResilienceExpansion::Maximal)) {
+    // If the type is fixed-size in this resilience domain, we know
+    // at compile time if it fits in the buffer or not.
+    emitAllocateBuffer(*this, loweredTy, addr);
+  } else {
+    // Otherwise, we call the value witness dynamically.
+    emitAllocateBufferCall(*this, loweredTy, addr);
+  }
 }
 
 void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
-  auto &ti = getTypeInfo(i->getType());
+  SILGlobalVariable *var = i->getReferencedGlobal();
+  SILType loweredTy = var->getLoweredType();
+  assert(loweredTy == i->getType().getObjectType());
+  auto &ti = getTypeInfo(loweredTy);
   
-  Address addr;
   // If the variable is empty, don't actually emit it; just return undef.
   if (ti.isKnownEmpty()) {
-    addr = ti.getUndefAddress();
+    setLoweredAddress(SILValue(i, 0), ti.getUndefAddress());
+    return;
+  }
+
+  Address addr = IGM.getAddrOfSILGlobalVariable(var, ti,
+                                                NotForDefinition);
+
+  // If the type is universally fixed-size, we allocated storage for it
+  // statically, and there's nothing to do.
+  if (ti.isFixedSize(ResilienceExpansion::Minimal)) {
+    setLoweredAddress(SILValue(i, 0), addr);
+    return;
+  }
+
+  // Otherwise, the static storage for the global consists of a fixed-size
+  // buffer.
+  if (ti.isFixedSize(ResilienceExpansion::Maximal)) {
+    // If the type is fixed-size in this resilience domain, we know
+    // at compile time if it fits in the buffer or not.
+    addr = emitProjectBuffer(*this, loweredTy, addr);
   } else {
-    addr = IGM.getAddrOfSILGlobalVariable(i->getReferencedGlobal(),
-                                          NotForDefinition);
+    // Otherwise, we call the value witness dynamically.
+    llvm::Value *metadata = emitTypeMetadataRefForLayout(loweredTy);
+    llvm::Value *value = emitProjectBufferCall(*this, metadata, addr);
+    addr = ti.getAddressForPointer(value);
   }
   
   setLoweredAddress(SILValue(i, 0), addr);

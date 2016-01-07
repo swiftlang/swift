@@ -750,6 +750,7 @@ public:
   llvm::Function *getAddrOfSILFunction(SILFunction *f,
                                        ForDefinition_t forDefinition);
   Address getAddrOfSILGlobalVariable(SILGlobalVariable *var,
+                                     const TypeInfo &ti,
                                      ForDefinition_t forDefinition);
   llvm::Function *getAddrOfWitnessTableAccessFunction(
                                            const NormalProtocolConformance *C,

@@ -1404,12 +1404,28 @@ void IRGenModule::emitExternalDefinition(Decl *D) {
 }
 
 Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
+                                                const TypeInfo &ti,
                                                 ForDefinition_t forDefinition) {
   LinkEntity entity = LinkEntity::forSILGlobalVariable(var);
-  auto &unknownTI = getTypeInfo(var->getLoweredType());
-  assert(isa<FixedTypeInfo>(unknownTI) &&
-         "unsupported global variable of resilient type!");
-  auto &ti = cast<FixedTypeInfo>(unknownTI);
+
+  llvm::Type *storageType;
+  Size fixedSize;
+  Alignment fixedAlignment;
+
+  // If the type has a fixed size, allocate static storage. Otherwise, allocate
+  // a fixed-size buffer and possibly heap-allocate a payload at runtime if the
+  // runtime size of the type does not fit in the buffer.
+  if (ti.isFixedSize(ResilienceExpansion::Minimal)) {
+    auto &fixedTI = cast<FixedTypeInfo>(ti);
+
+    storageType = fixedTI.getStorageType();
+    fixedSize = fixedTI.getFixedSize();
+    fixedAlignment = fixedTI.getFixedAlignment();
+  } else {
+    storageType = getFixedBufferTy();
+    fixedSize = Size(DataLayout.getTypeAllocSize(storageType));
+    fixedAlignment = Alignment(DataLayout.getABITypeAlignment(storageType));
+  }
 
   // Check whether we've created the global variable already.
   // FIXME: We should integrate this into the LinkEntity cache more cleanly.
@@ -1419,8 +1435,8 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
       updateLinkageForDefinition(*this, gvar, entity);
 
     llvm::Constant *addr = gvar;
-    if (ti.getStorageType() != gvar->getType()->getElementType()) {
-      auto *expectedTy = ti.getStorageType()->getPointerTo();
+    if (storageType != gvar->getType()->getElementType()) {
+      auto *expectedTy = storageType->getPointerTo();
       addr = llvm::ConstantExpr::getBitCast(addr, expectedTy);
     }
     return Address(addr, Alignment(gvar->getAlignment()));
@@ -1430,28 +1446,27 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
   if (var->getDecl()) {
     // If we have the VarDecl, use it for more accurate debugging information.
     DebugTypeInfo DbgTy(var->getDecl(),
-                        var->getLoweredType().getSwiftType(), ti);
-    gvar = link.createVariable(*this, ti.getStorageType(),
-                               ti.getFixedAlignment(),
+                        var->getLoweredType().getSwiftType(),
+                        storageType, fixedSize, fixedAlignment);
+    gvar = link.createVariable(*this, storageType, fixedAlignment,
                                DbgTy, SILLocation(var->getDecl()),
                                var->getDecl()->getName().str());
   } else {
     // There is no VarDecl for a SILGlobalVariable, and thus also no context.
     DeclContext *DeclCtx = nullptr;
-    DebugTypeInfo DbgTy(var->getLoweredType().getSwiftRValueType(), ti,
-                        DeclCtx);
+    DebugTypeInfo DbgTy(var->getLoweredType().getSwiftRValueType(),
+                        storageType, fixedSize, fixedAlignment, DeclCtx);
 
     Optional<SILLocation> loc;
     if (var->hasLocation())
       loc = var->getLocation();
-    gvar = link.createVariable(*this, ti.getStorageType(),
-                               ti.getFixedAlignment(),
+    gvar = link.createVariable(*this, storageType, fixedAlignment,
                                DbgTy, loc, var->getName());
   }
   
   // Set the alignment from the TypeInfo.
-  Address gvarAddr = ti.getAddressForPointer(gvar);
-  gvar->setAlignment(gvarAddr.getAlignment().getValue());
+  Address gvarAddr = Address(gvar, fixedAlignment);
+  gvar->setAlignment(fixedAlignment.getValue());
   
   return gvarAddr;
 }

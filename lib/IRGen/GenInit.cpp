@@ -33,22 +33,23 @@ using namespace irgen;
 
 /// Emit a global variable.
 Address IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
-  auto &type = getTypeInfo(var->getLoweredType());
+  auto &ti = getTypeInfo(var->getLoweredType());
   
   // If the variable is empty, don't actually emit it; just return undef.
-  if (type.isKnownEmpty()) {
-    return type.getUndefAddress();
+  if (ti.isKnownEmpty()) {
+    return ti.getUndefAddress();
   }
   
   /// Get the global variable.
-  Address addr = getAddrOfSILGlobalVariable(var,
+  Address addr = getAddrOfSILGlobalVariable(var, ti,
                      var->isDefinition() ? ForDefinition : NotForDefinition);
   
   /// Add a zero initializer.
   if (var->isDefinition()) {
     auto gvar = cast<llvm::GlobalVariable>(addr.getAddress());
-    gvar->setInitializer(llvm::Constant::getNullValue(type.getStorageType()));
+    gvar->setInitializer(llvm::Constant::getNullValue(gvar->getValueType()));
   }
+
   return addr;
 }
 

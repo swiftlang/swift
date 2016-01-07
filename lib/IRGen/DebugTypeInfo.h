@@ -49,6 +49,8 @@ public:
   Size size;
   Alignment align;
 
+  // FIXME: feels like there might be too many constructors here
+
   DebugTypeInfo() : Type(nullptr), StorageType(nullptr), size(0), align(1) {}
   DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy, uint64_t SizeInBytes,
                 uint32_t AlignInBytes, DeclContext *DC);
@@ -59,6 +61,9 @@ public:
   DebugTypeInfo(ValueDecl *Decl, llvm::Type *StorageType, Size size,
                 Alignment align);
   DebugTypeInfo(ValueDecl *Decl, swift::Type Ty, const TypeInfo &Info);
+  DebugTypeInfo(ValueDecl *Decl, swift::Type Ty,
+                llvm::Type *StorageType, Size size,
+                Alignment align);
   TypeBase *getType() const { return Type; }
 
   ValueDecl *getDecl() const { return DeclOrContext.dyn_cast<ValueDecl *>(); }
