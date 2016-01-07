@@ -127,7 +127,7 @@ llvm::Value *LocalTypeDataCache::tryGet(IRGenFunction &IGF, Key key) {
 
     // Make a new concrete entry at the active definition point.
 
-    // Register witih the active ConditionalDominanceScope if necessary.
+    // Register with the active ConditionalDominanceScope if necessary.
     bool isConditional = IGF.isConditionalDominancePoint();
     if (isConditional) {
       IGF.registerConditionalLocalTypeDataKey(key);
