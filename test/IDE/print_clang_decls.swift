@@ -113,8 +113,8 @@
 // CHECK-NULLABILITY: class SomeClass {
 // CHECK-NULLABILITY:   class func methodA(obj: SomeClass?) -> AnyObject{{$}}
 // CHECK-NULLABILITY:   func methodA(obj: SomeClass?) -> AnyObject{{$}}
-// CHECK-NULLABILITY:   class func methodB(block: ((Int32, Int32) -> Int32)?) -> AnyObject{{$}}
-// CHECK-NULLABILITY:   func methodB(block: ((Int32, Int32) -> Int32)?) -> AnyObject{{$}}
+// CHECK-NULLABILITY:   class func methodB(block: ((Int32, Int32) -> Int32)? = nil) -> AnyObject{{$}}
+// CHECK-NULLABILITY:   func methodB(block: ((Int32, Int32) -> Int32)? = nil) -> AnyObject{{$}}
 // CHECK-NULLABILITY:   func methodC() -> AnyObject?
 // CHECK-NULLABILITY:   var property: AnyObject?
 // CHECK-NULLABILITY:   func stringMethod() -> String{{$}}
