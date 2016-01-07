@@ -135,23 +135,20 @@ struct ProjectionIndex {
 /// The NewProjection class contains the logic to use NewProjectionKind in this
 /// manner.
 enum class NewProjectionKind : unsigned {
-  Invalid = 0,
-
   // PointerProjectionKinds
-  Upcast = 1,
-  RefCast = 2,
-  BitwiseCast = 3,
+  Upcast = 0,
+  RefCast = 1,
+  BitwiseCast = 2,
+  FirstPointerKind = Upcast,
   LastPointerKind = BitwiseCast,
 
-  /// Index Projection Kinds
-  // This is an index projection for which we have an index >= 4096, requiring
-  // us to malloc memory. It needs to be able to be stored in at most 3 bits.
-  LargeIndex = 7,
-  Struct = 8,
-  Tuple = 9,
-  Index = 10,
-  Class = 11,
-  Enum = 12,
+  // Index Projection Kinds
+  FirstIndexKind = 7,
+  Struct = PointerIntEnumIndexKindValue<0, NewProjectionKind>::value,
+  Tuple = PointerIntEnumIndexKindValue<1, NewProjectionKind>::value,
+  Index = PointerIntEnumIndexKindValue<2, NewProjectionKind>::value,
+  Class = PointerIntEnumIndexKindValue<3, NewProjectionKind>::value,
+  Enum = PointerIntEnumIndexKindValue<4, NewProjectionKind>::value,
   LastIndexKind = Enum,
 };
 
@@ -168,8 +165,6 @@ static inline bool isCastNewProjectionKind(NewProjectionKind Kind) {
   case NewProjectionKind::RefCast:
   case NewProjectionKind::BitwiseCast:
     return true;
-  case NewProjectionKind::Invalid:
-  case NewProjectionKind::LargeIndex:
   case NewProjectionKind::Struct:
   case NewProjectionKind::Tuple:
   case NewProjectionKind::Index:
@@ -246,6 +241,7 @@ public:
   /// Apply this projection to \p BaseType and return the relevant subfield's
   /// SILType if BaseField has less subtypes than projection's offset.
   SILType getType(SILType BaseType, SILModule &M) const {
+    assert(isValid());
     switch (getKind()) {
     case NewProjectionKind::Struct:
     case NewProjectionKind::Class:
@@ -261,13 +257,11 @@ public:
     case NewProjectionKind::Index:
       // Index types do not change the underlying type.
       return BaseType;
-    case NewProjectionKind::LargeIndex:
-    case NewProjectionKind::Invalid:
-      llvm_unreachable("No type for this projection kind");
     }
   }
 
   VarDecl *getVarDecl(SILType BaseType) const {
+    assert(isValid());
     assert((getKind() == NewProjectionKind::Struct ||
             getKind() == NewProjectionKind::Class));
     assert(BaseType.getNominalOrBoundGenericNominal() &&
@@ -279,6 +273,7 @@ public:
   }
 
   EnumElementDecl *getEnumElementDecl(SILType BaseType) const {
+    assert(isValid());
     assert(getKind() == NewProjectionKind::Enum);
     assert(BaseType.getEnumOrBoundGenericEnum() && "Expected enum type");
     auto Iter = BaseType.getEnumOrBoundGenericEnum()->getAllElements().begin();
@@ -287,17 +282,16 @@ public:
   }
 
   ValueDecl *getValueDecl(SILType BaseType) const {
+    assert(isValid());
     switch (getKind()) {
     case NewProjectionKind::Enum:
       return getEnumElementDecl(BaseType);
     case NewProjectionKind::Struct:
     case NewProjectionKind::Class:
       return getVarDecl(BaseType);
-    case NewProjectionKind::Invalid:
     case NewProjectionKind::Upcast:
     case NewProjectionKind::RefCast:
     case NewProjectionKind::BitwiseCast:
-    case NewProjectionKind::LargeIndex:
     case NewProjectionKind::Index:
     case NewProjectionKind::Tuple:
       llvm_unreachable("NewProjectionKind that does not have a value decl?");
@@ -305,6 +299,7 @@ public:
   }
 
   SILType getCastType(SILType BaseType) const {
+    assert(isValid());
     assert(getKind() == NewProjectionKind::Upcast ||
            getKind() == NewProjectionKind::RefCast ||
            getKind() == NewProjectionKind::BitwiseCast);
@@ -323,9 +318,7 @@ public:
   }
 
   /// Convenience method for getting the raw underlying kind.
-  NewProjectionKind getKind() const {
-    return Value.getKind();
-  }
+  NewProjectionKind getKind() const { return *Value.getKind(); }
 
   static bool isAddressProjection(SILValue V) {
     auto *I = dyn_cast<SILInstruction>(V);
@@ -392,8 +385,6 @@ public:
     case NewProjectionKind::BitwiseCast:
       return true;
     case NewProjectionKind::Upcast:
-    case NewProjectionKind::Invalid:
-    case NewProjectionKind::LargeIndex:
     case NewProjectionKind::Struct:
     case NewProjectionKind::Tuple:
     case NewProjectionKind::Index:
@@ -417,8 +408,6 @@ public:
       return true;
     case NewProjectionKind::BitwiseCast:
     case NewProjectionKind::Index:
-    case NewProjectionKind::Invalid:
-    case NewProjectionKind::LargeIndex:
     case NewProjectionKind::RefCast:
     case NewProjectionKind::Tuple:
     case NewProjectionKind::Upcast:

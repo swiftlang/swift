@@ -188,9 +188,6 @@ NewProjection::createObjectProjection(SILBuilder &B, SILLocation Loc,
   // of this projection match and that this projection can be represented as
   // value. Create the instruction if we can. Otherwise, return nullptr.
   switch (getKind()) {
-  case NewProjectionKind::Invalid:
-  case NewProjectionKind::LargeIndex:
-    llvm_unreachable("Invalid projection");
   case NewProjectionKind::Struct:
     return B.createStructExtract(Loc, Base, getVarDecl(BaseTy));
   case NewProjectionKind::Tuple:
@@ -224,9 +221,6 @@ NewProjection::createAddressProjection(SILBuilder &B, SILLocation Loc,
   // of this projection match and that this projection can be represented as
   // value. Create the instruction if we can. Otherwise, return nullptr.
   switch (getKind()) {
-  case NewProjectionKind::Invalid:
-  case NewProjectionKind::LargeIndex:
-    llvm_unreachable("Invalid projection?!");
   case NewProjectionKind::Struct:
     return B.createStructElementAddr(Loc, Base, getVarDecl(BaseTy));
   case NewProjectionKind::Tuple:
