@@ -663,7 +663,7 @@ members may always be removed from protocol extensions.
 .. admonition:: TODO
 
     We don't have an implementation model hammered out for adding new
-    defaulted requirements, but it is desireable.
+    defaulted requirements, but it is desirable.
 
 
 Classes
