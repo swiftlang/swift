@@ -55,6 +55,13 @@ struct IntWrapper: Comparable {
   var value: Int
 
   struct InnerForNoReason {}
+
+  // CHECK-DAG: - "TypeReferencedOnlyBySubscript"
+  subscript(_: TypeReferencedOnlyBySubscript) -> Void { return () }
+
+  // CHECK-DAG: - "TypeReferencedOnlyByPrivateSubscript"
+  // FIXME: This should be marked "!private".
+  private subscript(_: TypeReferencedOnlyByPrivateSubscript) -> Void { return () }
 }
 
 // CHECK-DAG: "IntWrapper"
