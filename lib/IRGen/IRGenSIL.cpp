@@ -653,6 +653,7 @@ public:
   void visitBuiltinInst(BuiltinInst *i);
 
   void visitFunctionRefInst(FunctionRefInst *i);
+  void visitAllocGlobalInst(AllocGlobalInst *i);
   void visitGlobalAddrInst(GlobalAddrInst *i);
 
   void visitIntegerLiteralInst(IntegerLiteralInst *i);
@@ -1599,6 +1600,10 @@ void IRGenSILFunction::visitFunctionRefInst(FunctionRefInst *i) {
   // we don't need to.
   setLoweredStaticFunction(SILValue(i, 0), fnptr,
                            i->getReferencedFunction()->getRepresentation());
+}
+
+void IRGenSILFunction::visitAllocGlobalInst(AllocGlobalInst *i) {
+  // TODO
 }
 
 void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {

@@ -1032,6 +1032,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                       Args);
     break;
   }
+  case ValueKind::AllocGlobalInst: {
+    // Format: Name and type. Use SILOneOperandLayout.
+    Identifier Name = MF->getIdentifier(ValID);
+
+    // Find the global variable.
+    SILGlobalVariable *g = getGlobalForReference(Name.str());
+    assert(g && "Can't deserialize global variable");
+
+    ResultVal = Builder.createAllocGlobal(Loc, g);
+    break;
+  }
   case ValueKind::GlobalAddrInst: {
     // Format: Name and type. Use SILOneOperandLayout.
     auto Ty = MF->getType(TyID);

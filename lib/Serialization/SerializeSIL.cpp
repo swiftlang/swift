@@ -680,6 +680,17 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     S.writeSubstitutions(PAI->getSubstitutions(), SILAbbrCodes);
     break;
   }
+  case ValueKind::AllocGlobalInst: {
+    // Format: Name and type. Use SILOneOperandLayout.
+    const AllocGlobalInst *AGI = cast<AllocGlobalInst>(&SI);
+    SILOneOperandLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILOneOperandLayout::Code],
+        (unsigned)SI.getKind(), 0, 0, 0,
+        S.addIdentifierRef(
+            Ctx.getIdentifier(AGI->getReferencedGlobal()->getName())),
+        0);
+    break;
+  }
   case ValueKind::GlobalAddrInst: {
     // Format: Name and type. Use SILOneOperandLayout.
     const GlobalAddrInst *GAI = cast<GlobalAddrInst>(&SI);

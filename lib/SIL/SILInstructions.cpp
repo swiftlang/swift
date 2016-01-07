@@ -300,9 +300,18 @@ void FunctionRefInst::dropReferencedFunction() {
   Function = nullptr;
 }
 
-GlobalAddrInst::GlobalAddrInst(SILDebugLocation *Loc, SILGlobalVariable *Global)
+AllocGlobalInst::AllocGlobalInst(SILDebugLocation *Loc,
+                                 SILGlobalVariable *Global)
+    : SILInstruction(ValueKind::AllocGlobalInst, Loc),
+      Global(Global) {}
+
+AllocGlobalInst::AllocGlobalInst(SILDebugLocation *Loc)
+    : SILInstruction(ValueKind::AllocGlobalInst, Loc) {}
+
+GlobalAddrInst::GlobalAddrInst(SILDebugLocation *Loc,
+                               SILGlobalVariable *Global)
     : LiteralInst(ValueKind::GlobalAddrInst, Loc,
-                  Global->getLoweredType().getAddressType()),
+              Global->getLoweredType().getAddressType()),
       Global(Global) {}
 
 GlobalAddrInst::GlobalAddrInst(SILDebugLocation *Loc, SILType Ty)

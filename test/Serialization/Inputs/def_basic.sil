@@ -33,6 +33,8 @@ bb0:
 // CHECK-LABEL: sil public_external [fragile] @_TFV18lazy_global_access4Type10staticPropSia_public : $@convention(thin) () -> Builtin.RawPointer {
 sil [fragile] @_TFV18lazy_global_access4Type10staticPropSia_public : $@convention(thin) () -> Builtin.RawPointer {
 bb0:
+  // CHECK: alloc_global @public_global
+  alloc_global @public_global
   // CHECK: global_addr @public_global : $*Builtin.Word
   %1 = global_addr @public_global : $*Builtin.Word
   // CHECK: unchecked_addr_cast {{%.*}} : $*Builtin.Word to $*Builtin.RawPointer

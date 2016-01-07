@@ -287,6 +287,11 @@ namespace {
       return X->getReferencedFunction() == RHS->getReferencedFunction();
     }
 
+    bool visitAllocGlobalInst(const AllocGlobalInst *RHS) {
+      auto *X = cast<AllocGlobalInst>(LHS);
+      return X->getReferencedGlobal() == RHS->getReferencedGlobal();
+    }
+
     bool visitGlobalAddrInst(const GlobalAddrInst *RHS) {
       auto *X = cast<GlobalAddrInst>(LHS);
       return X->getReferencedGlobal() == RHS->getReferencedGlobal();

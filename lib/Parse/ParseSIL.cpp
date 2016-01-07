@@ -1256,6 +1256,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("ref_to_unmanaged", ValueKind::RefToUnmanagedInst)
     .Case("ref_to_unowned", ValueKind::RefToUnownedInst)
     .Case("retain_value", ValueKind::RetainValueInst)
+    .Case("alloc_global", ValueKind::AllocGlobalInst)
     .Case("global_addr", ValueKind::GlobalAddrInst)
     .Case("strong_pin", ValueKind::StrongPinInst)
     .Case("strong_release", ValueKind::StrongReleaseInst)
@@ -2962,6 +2963,23 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     assert(CurModuleResults.size() == 1);
     VD = CurModuleResults[0];
     ResultVal = B.createObjCProtocol(InstLoc, cast<ProtocolDecl>(VD), Ty);
+    break;
+  }
+  case ValueKind::AllocGlobalInst: {
+    Identifier GlobalName;
+    SourceLoc IdLoc;
+    if (P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
+        parseSILIdentifier(GlobalName, IdLoc, diag::expected_sil_value_name))
+      return true;
+
+    // Go through list of global variables in the SILModule.
+    SILGlobalVariable *global = SILMod.lookUpGlobalVariable(GlobalName.str());
+    if (!global) {
+      P.diagnose(IdLoc, diag::sil_global_variable_not_found, GlobalName);
+      return true;
+    }
+
+    ResultVal = B.createAllocGlobal(InstLoc, global);
     break;
   }
   case ValueKind::GlobalAddrInst: {

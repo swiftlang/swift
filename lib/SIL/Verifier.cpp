@@ -928,6 +928,16 @@ public:
     verifySILFunctionType(fnType);
   }
 
+  void checkAllocGlobalInst(AllocGlobalInst *AGI) {
+    if (F.isFragile()) {
+      SILGlobalVariable *RefG = AGI->getReferencedGlobal();
+      require(RefG->isFragile()
+                || isValidLinkageForFragileRef(RefG->getLinkage()),
+              "alloc_global inside fragile function cannot "
+              "reference a private or hidden symbol");
+    }
+  }
+
   void checkGlobalAddrInst(GlobalAddrInst *GAI) {
     require(GAI->getType().isAddress(),
             "global_addr must have an address result type");

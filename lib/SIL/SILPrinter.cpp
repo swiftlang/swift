@@ -821,6 +821,15 @@ public:
     *this << BI->getType();
   }
   
+  void visitAllocGlobalInst(AllocGlobalInst *AGI) {
+    *this << "alloc_global ";
+    if (AGI->getReferencedGlobal()) {
+      AGI->getReferencedGlobal()->printName(PrintState.OS);
+    } else {
+      *this << "<<placeholder>>";
+    }
+  }
+  
   void visitGlobalAddrInst(GlobalAddrInst *GAI) {
     *this << "global_addr ";
     if (GAI->getReferencedGlobal()) {

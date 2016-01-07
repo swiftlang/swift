@@ -359,6 +359,10 @@ public:
     return insert(new (F.getModule())
                       FunctionRefInst(createSILDebugLocation(Loc), f));
   }
+  AllocGlobalInst *createAllocGlobal(SILLocation Loc, SILGlobalVariable *g) {
+    return insert(new (F.getModule())
+                      AllocGlobalInst(createSILDebugLocation(Loc), g));
+  }
   GlobalAddrInst *createGlobalAddr(SILLocation Loc, SILGlobalVariable *g) {
     return insert(new (F.getModule())
                       GlobalAddrInst(createSILDebugLocation(Loc), g));

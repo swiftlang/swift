@@ -52,7 +52,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 229; // alloc_stack returns a single value
+const uint16_t VERSION_MINOR = 230; // alloc_global instruction added
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;

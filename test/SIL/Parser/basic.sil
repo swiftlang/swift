@@ -531,6 +531,8 @@ sil @global_callee : $@convention(thin) (Builtin.Int128, @thin Int.Type) -> Int
 // CHECK-LABEL: @global_code : $@convention(thin) () -> ()
 sil private @global_code : $() -> () {
 bb0:
+  // CHECK: alloc_global @x
+  alloc_global @x
   // CHECK: global_addr @x : $*Int
   %0 = global_addr @x : $*Int
   %1 = function_ref @global_callee : $@convention(thin) (Builtin.Int128, @thin Int.Type) -> Int

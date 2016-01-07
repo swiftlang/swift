@@ -570,11 +570,20 @@ SILCloner<ImplClass>::visitFunctionRefInst(FunctionRefInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitAllocGlobalInst(AllocGlobalInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+    getBuilder().createAllocGlobal(getOpLocation(Inst->getLoc()),
+                                   Inst->getReferencedGlobal()));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitGlobalAddrInst(GlobalAddrInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
     getBuilder().createGlobalAddr(getOpLocation(Inst->getLoc()),
-                                     Inst->getReferencedGlobal()));
+                                  Inst->getReferencedGlobal()));
 }
 
 template<typename ImplClass>
