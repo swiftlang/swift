@@ -5024,7 +5024,7 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
 
     // Use the singleton element's storage type if fixed-size.
     if (eltTI.isFixedSize()) {
-      llvm::Type *body[] = { eltTI.StorageType };
+      llvm::Type *body[] = { eltTI.getStorageType() };
       enumTy->setBody(body, /*isPacked*/ true);
     } else {
       enumTy->setBody(ArrayRef<llvm::Type*>{}, /*isPacked*/ true);

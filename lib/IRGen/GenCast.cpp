@@ -196,7 +196,7 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
   // FIXME: Eventually, we may want to throw.
   call->setDoesNotThrow();
 
-  llvm::Type *subTy = IGF.getTypeInfo(toType).StorageType;
+  llvm::Type *subTy = IGF.getTypeInfo(toType).getStorageType();
   return IGF.Builder.CreateBitCast(call, subTy);
 }
 

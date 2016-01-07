@@ -110,11 +110,11 @@ public:
     return static_cast<const T &>(*this);
   }
 
+private:
   /// The LLVM representation of a stored value of this type.  For
   /// non-fixed types, this is really useful only for forming pointers to it.
   llvm::Type *StorageType;
 
-private:
   /// The storage alignment of this type in bytes.  This is never zero
   /// for a completely-converted type.
   Alignment StorageAlignment;

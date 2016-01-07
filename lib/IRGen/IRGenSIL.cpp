@@ -968,7 +968,7 @@ static void emitDirectExternalParameter(IRGenSILFunction &IGF,
   // Fast-path a really common case.  This check assumes that either
   // the storage type of a type is an llvm::StructType or it has a
   // single-element explosion.
-  } else if (coercionTy == paramTI.StorageType) {
+  } else if (coercionTy == paramTI.getStorageType()) {
     out.add(in.claimNext());
     return;
   } else {
@@ -3658,7 +3658,7 @@ static void emitUncheckedValueBitCast(IRGenSILFunction &IGF,
   // the same type, then just transfer the elements.
   if (inTI.isBitwiseTakable(ResilienceExpansion::Maximal) &&
       outTI.isBitwiseTakable(ResilienceExpansion::Maximal) &&
-      isStructurallySame(inTI.StorageType, outTI.StorageType)) {
+      isStructurallySame(inTI.getStorageType(), outTI.getStorageType())) {
     in.transferInto(out, in.size());
     return;
   }
@@ -4085,7 +4085,7 @@ void IRGenSILFunction::visitCheckedCastBranchInst(
 
 
   auto &successBB = getLoweredBB(i->getSuccessBB());
-  llvm::Type *toTy = IGM.getTypeInfo(destTy).StorageType;
+  llvm::Type *toTy = IGM.getTypeInfo(destTy).getStorageType();
   if (toTy->isPointerTy())
     castResult.casted = Builder.CreateBitCast(castResult.casted, toTy);
 

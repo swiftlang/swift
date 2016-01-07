@@ -1420,7 +1420,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
 
     llvm::Constant *addr = gvar;
     if (ti.getStorageType() != gvar->getType()->getElementType()) {
-      auto *expectedTy = ti.StorageType->getPointerTo();
+      auto *expectedTy = ti.getStorageType()->getPointerTo();
       addr = llvm::ConstantExpr::getBitCast(addr, expectedTy);
     }
     return Address(addr, Alignment(gvar->getAlignment()));
@@ -1431,7 +1431,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     // If we have the VarDecl, use it for more accurate debugging information.
     DebugTypeInfo DbgTy(var->getDecl(),
                         var->getLoweredType().getSwiftType(), ti);
-    gvar = link.createVariable(*this, ti.StorageType,
+    gvar = link.createVariable(*this, ti.getStorageType(),
                                ti.getFixedAlignment(),
                                DbgTy, SILLocation(var->getDecl()),
                                var->getDecl()->getName().str());
@@ -1444,7 +1444,8 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     Optional<SILLocation> loc;
     if (var->hasLocation())
       loc = var->getLocation();
-    gvar = link.createVariable(*this, ti.StorageType, ti.getFixedAlignment(),
+    gvar = link.createVariable(*this, ti.getStorageType(),
+                               ti.getFixedAlignment(),
                                DbgTy, loc, var->getName());
   }
   
