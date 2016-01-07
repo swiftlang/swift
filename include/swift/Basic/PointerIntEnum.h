@@ -146,19 +146,21 @@ public:
       return;
     }
 
-    Storage = uintptr_t(Kind) | (uintptr_t(NewIndex) << IndexShiftOffset);
+    Storage = uintptr_t(Kind) | (NewIndex << IndexShiftOffset);
   }
 
   /// Initialize this PointerIntEnum with the kind \p Kind and the Pointer \p
   /// Ptr.
   PointerIntEnum(EnumTy Kind, PointerTy Ptr) {
+    void *VoidPtr = PtrTraits::getAsVoidPointer(Ptr);
+
     // Make sure the pointer is at least aligned to NumPointerKindBits.
-    assert((uintptr_t(Ptr) & ((1 << NumPointerKindBits) - 1)) == 0);
+    assert((uintptr_t(VoidPtr) & ((1 << NumPointerKindBits) - 1)) == 0);
     // Make sure that Kind is a PointerKind.
     assert(unsigned(Kind) >= unsigned(EnumTy::FirstPointerKind));
     assert(unsigned(Kind) <= unsigned(EnumTy::LastPointerKind));
 
-    Storage = uintptr_t(Ptr) | uintptr_t(Kind);
+    Storage = uintptr_t(VoidPtr) | uintptr_t(Kind);
   }
 
   PointerIntEnum(PointerIntEnum &&P) = default;
@@ -213,7 +215,7 @@ public:
     assert(isValid());
     assert(unsigned(*getKind()) <= unsigned(EnumTy::LastPointerKind));
     uintptr_t Value = Storage & ~(uintptr_t(EnumTy::FirstIndexKind));
-    return reinterpret_cast<PointerTy>(Value);
+    return PtrTraits::getFromVoidPointer((void *)(Value));
   }
 
   /// Return the raw storage of the type. Used for testing purposes.
