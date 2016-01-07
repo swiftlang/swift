@@ -132,24 +132,34 @@ class PointerIntEnum {
   static constexpr uintptr_t InvalidStorage = uintptr_t(0) - 1;
 
   /// The pointer sized type used for the actual storage.
-  ///
-  /// Never access this directly. Instead use the following methods:
-  ///
-  /// * getKind(): Same as RawKind except if the kind is LargeIndex, will
-  ///   discover the real underlying kind in the malloced memory.
-  /// * getIndex(): Asserts if getKind() is a pointer storing kind.
-  /// * getPointer(): Returns the underlying pointer cast into
-  ///   PointerTy. Asserts if getKind() is an index storing kind.
   uintptr_t Storage;
 
 public:
   PointerIntEnum() : Storage(InvalidStorage) {}
 
+  /// Initialize this PointerIntEnum with the kind \p Kind and the Pointer \p
+  /// Ptr.
   PointerIntEnum(EnumTy Kind, uintptr_t NewIndex) {
-    initWithIndex(Kind, NewIndex);
+    // If we can not represent this index, make the PointerIntEnum invalid.
+    if (NewIndex > MaxIndex) {
+      Storage = InvalidStorage;
+      return;
+    }
+
+    Storage = uintptr_t(Kind) | (uintptr_t(NewIndex) << IndexShiftOffset);
   }
 
-  PointerIntEnum(EnumTy Kind, PointerTy Ptr) { initWithPointer(Kind, Ptr); }
+  /// Initialize this PointerIntEnum with the kind \p Kind and the Pointer \p
+  /// Ptr.
+  PointerIntEnum(EnumTy Kind, PointerTy Ptr) {
+    // Make sure the pointer is at least aligned to NumPointerKindBits.
+    assert((uintptr_t(Ptr) & ((1 << NumPointerKindBits) - 1)) == 0);
+    // Make sure that Kind is a PointerKind.
+    assert(unsigned(Kind) >= unsigned(EnumTy::FirstPointerKind));
+    assert(unsigned(Kind) <= unsigned(EnumTy::LastPointerKind));
+
+    Storage = uintptr_t(Ptr) | uintptr_t(Kind);
+  }
 
   PointerIntEnum(PointerIntEnum &&P) = default;
   PointerIntEnum(const PointerIntEnum &P) = default;
@@ -168,7 +178,7 @@ public:
     return !(*this == Other);
   }
 
-  /// Convenience method for getting the kind of this enum. Returns None if this
+  /// \returns the kind of the enum if the enum is valid. Returns None if the
   /// enum is invalid.
   Optional<EnumTy> getKind() const {
     if (!isValid())
@@ -188,55 +198,26 @@ public:
     return EnumTy(MaskedStorage);
   }
 
-  /// Convenience method for getting the underlying index. Assumes that this
-  /// projection is valid. Otherwise it asserts.
+  /// \returns the index stored in the enum if the enum has an index
+  /// payload. Asserts if the PointerIntEnum is invalid or has a pointer
+  /// payload.
   uintptr_t getIndex() const {
     assert(isValid());
     assert(unsigned(*getKind()) >= unsigned(EnumTy::FirstIndexKind));
     return Storage >> IndexShiftOffset;
   }
 
+  /// \returns the pointer stored in the enum if the enum has a pointer
+  /// payload. Asserts if the PointerIntEnum is invalid or has a index payload.
   PointerTy getPointer() const {
+    assert(isValid());
+    assert(unsigned(*getKind()) <= unsigned(EnumTy::LastPointerKind));
     uintptr_t Value = Storage & ~(uintptr_t(EnumTy::FirstIndexKind));
     return reinterpret_cast<PointerTy>(Value);
   }
 
   /// Return the raw storage of the type. Used for testing purposes.
   uintptr_t getStorage() const { return Storage; }
-
-private:
-  void initInvalid() { Storage = InvalidStorage; }
-
-  /// Initialize this PointerIntEnum with the kind \p Kind and the Pointer \p
-  /// Ptr.
-  ///
-  /// This is an internal helper routine that should not be used directly since
-  /// it does not properly handle freeing memory.
-  void initWithIndex(EnumTy Kind, uintptr_t NewIndex) {
-    // If we can not represent this index, make the PointerIntEnum invalid.
-    if (NewIndex > MaxIndex) {
-      Storage = InvalidStorage;
-      return;
-    }
-
-    Storage = uintptr_t(Kind) | (uintptr_t(NewIndex) << IndexShiftOffset);
-  }
-
-  /// Initialize this PointerIntEnum with the kind \p Kind and the Pointer \p
-  /// Ptr.
-  ///
-  /// This is an internal helper routine that should not be used directly since
-  /// it does not properly handle freeing memory.
-  void initWithPointer(EnumTy Kind, PointerTy Ptr) {
-    // Make sure the pointer is at least aligned to NumPointerKindBits.
-    assert((uintptr_t(Ptr) & ((1 << NumPointerKindBits) - 1)) == 0);
-    // Make sure that Kind is a PointerKind.
-    assert(unsigned(Kind) >= unsigned(EnumTy::FirstPointerKind));
-    assert(unsigned(Kind) <= unsigned(EnumTy::LastPointerKind));
-
-    Storage = uintptr_t(Ptr);
-    Storage |= uintptr_t(Kind);
-  }
 };
 
 } // end swift namespace
