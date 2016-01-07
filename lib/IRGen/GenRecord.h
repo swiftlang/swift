@@ -1,4 +1,4 @@
-//===--- GenSequential.h - IR generation for sequential types ---*- C++ -*-===//
+//===--- GenRecord.h - IR generation for record types -----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,13 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file provides some common code for emitting sequential types.
-//  A sequential type is something like a tuple or a struct.
+//  This file provides some common code for emitting record types.
+//  A record type is something like a tuple or a struct.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_IRGEN_GENSEQUENTIAL_H
-#define SWIFT_IRGEN_GENSEQUENTIAL_H
+#ifndef SWIFT_IRGEN_GENRECORD_H
+#define SWIFT_IRGEN_GENRECORD_H
 
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -29,24 +29,24 @@
 namespace swift {
 namespace irgen {
 
-template <class, class, class> class SequentialTypeBuilder;
+template <class, class, class> class RecordTypeBuilder;
 
-/// A field of a sequential type.
-template <class FieldImpl> class SequentialField {
+/// A field of a record type.
+template <class FieldImpl> class RecordField {
   ElementLayout Layout;
 
-  template <class, class, class> friend class SequentialTypeBuilder;
+  template <class, class, class> friend class RecordTypeBuilder;
 
   /// Begin/End - the range of explosion indexes for this element
   unsigned Begin : 16;
   unsigned End : 16;
 
 protected:
-  explicit SequentialField(const TypeInfo &elementTI)
+  explicit RecordField(const TypeInfo &elementTI)
     : Layout(ElementLayout::getIncomplete(elementTI)) {}
 
-  explicit SequentialField(const ElementLayout &layout,
-                           unsigned begin, unsigned end)
+  explicit RecordField(const ElementLayout &layout,
+                       unsigned begin, unsigned end)
     : Layout(layout), Begin(begin), End(end) {}
 
   const FieldImpl *asImpl() const {
@@ -85,10 +85,10 @@ public:
   }
 };
 
-/// A metaprogrammed TypeInfo implementation for sequential types.
+/// A metaprogrammed TypeInfo implementation for record types.
 template <class Impl, class Base, class FieldImpl_,
           bool IsLoadable = std::is_base_of<LoadableTypeInfo, Base>::value>
-class SequentialTypeInfoImpl : public Base {
+class RecordTypeInfoImpl : public Base {
 public:
   typedef FieldImpl_ FieldImpl;
 
@@ -106,7 +106,7 @@ protected:
   const Impl &asImpl() const { return *static_cast<const Impl*>(this); }
 
   template <class... As> 
-  SequentialTypeInfoImpl(ArrayRef<FieldImpl> fields, As&&...args)
+  RecordTypeInfoImpl(ArrayRef<FieldImpl> fields, As&&...args)
       : Base(std::forward<As>(args)...), NumFields(fields.size()) {
     std::uninitialized_copy(fields.begin(), fields.end(),
                             getFieldsBuffer());
@@ -214,23 +214,23 @@ public:
 
 template <class Impl, class Base, class FieldImpl_,
           bool IsLoadable = std::is_base_of<LoadableTypeInfo, Base>::value>
-class SequentialTypeInfo;
+class RecordTypeInfo;
 
-/// An implementation of SequentialTypeInfo for non-loadable types. 
+/// An implementation of RecordTypeInfo for non-loadable types. 
 template <class Impl, class Base, class FieldImpl>
-class SequentialTypeInfo<Impl, Base, FieldImpl, /*IsLoadable*/ false>
-    : public SequentialTypeInfoImpl<Impl, Base, FieldImpl> {
-  typedef SequentialTypeInfoImpl<Impl, Base, FieldImpl> super;
+class RecordTypeInfo<Impl, Base, FieldImpl, /*IsLoadable*/ false>
+    : public RecordTypeInfoImpl<Impl, Base, FieldImpl> {
+  typedef RecordTypeInfoImpl<Impl, Base, FieldImpl> super;
 protected:
   template <class... As> 
-  SequentialTypeInfo(As&&...args) : super(std::forward<As>(args)...) {}
+  RecordTypeInfo(As&&...args) : super(std::forward<As>(args)...) {}
 };
 
-/// An implementation of SequentialTypeInfo for loadable types. 
+/// An implementation of RecordTypeInfo for loadable types. 
 template <class Impl, class Base, class FieldImpl>
-class SequentialTypeInfo<Impl, Base, FieldImpl, /*IsLoadable*/ true>
-    : public SequentialTypeInfoImpl<Impl, Base, FieldImpl> {
-  typedef SequentialTypeInfoImpl<Impl, Base, FieldImpl> super;
+class RecordTypeInfo<Impl, Base, FieldImpl, /*IsLoadable*/ true>
+    : public RecordTypeInfoImpl<Impl, Base, FieldImpl> {
+  typedef RecordTypeInfoImpl<Impl, Base, FieldImpl> super;
 
   unsigned ExplosionSize : 16;
 
@@ -238,8 +238,8 @@ protected:
   using super::asImpl;
 
   template <class... As> 
-  SequentialTypeInfo(ArrayRef<FieldImpl> fields, unsigned explosionSize,
-                     As &&...args)
+  RecordTypeInfo(ArrayRef<FieldImpl> fields, unsigned explosionSize,
+                 As &&...args)
     : super(fields, std::forward<As>(args)...),
       ExplosionSize(explosionSize) {}
 
@@ -346,7 +346,7 @@ public:
   }
 };
 
-/// A builder of sequential types.
+/// A builder of record types.
 ///
 /// Required for a full implementation:
 ///   TypeInfoImpl *construct(void *buffer, ArrayRef<ASTField> fields);
@@ -355,10 +355,10 @@ public:
 ///   void performLayout(ArrayRef<const TypeInfo *> fieldTypes);
 ///     - should call recordLayout with the layout
 template <class BuilderImpl, class FieldImpl, class ASTField>
-class SequentialTypeBuilder {
+class RecordTypeBuilder {
 protected:
   IRGenModule &IGM;
-  SequentialTypeBuilder(IRGenModule &IGM) : IGM(IGM) {}
+  RecordTypeBuilder(IRGenModule &IGM) : IGM(IGM) {}
 
   BuilderImpl *asImpl() { return static_cast<BuilderImpl*>(this); }
 
