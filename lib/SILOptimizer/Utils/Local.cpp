@@ -1273,8 +1273,9 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
 
   // Add substitutions
   SmallVector<Substitution, 2> Subs;
-  auto Conformances = M.getASTContext().Allocate<ProtocolConformance *>(1);
-  Conformances[0] = Conformance;
+  auto Conformances =
+    M.getASTContext().AllocateUninitialized<ProtocolConformanceRef>(1);
+  Conformances[0] = ProtocolConformanceRef(Conformance);
   Subs.push_back(Substitution(Archetypes[0], Target, Conformances));
   const Substitution *DepTypeSubst = getTypeWitnessByName(
       Conformance, M.getASTContext().getIdentifier("_ObjectiveCType"));

@@ -1559,16 +1559,15 @@ public:
     if (isOpenedArchetype(lookupType))
       require(AMI->hasOperand(), "Must have an opened existential operand");
     if (isa<ArchetypeType>(lookupType) || lookupType->isAnyExistentialType()) {
-      require(AMI->getConformance() == nullptr,
-              "archetype or existential lookup should have null conformance");
+      require(AMI->getConformance().isAbstract(),
+              "archetype or existential lookup should have abstract conformance");
     } else {
-      require(AMI->getConformance(),
-              "concrete type lookup requires conformance");
-      require(AMI->getConformance()->getType()
-                ->isEqual(AMI->getLookupType()),
+      require(AMI->getConformance().isConcrete(),
+              "concrete type lookup requires concrete conformance");
+      auto conformance = AMI->getConformance().getConcrete();
+      require(conformance->getType()->isEqual(AMI->getLookupType()),
               "concrete type lookup requires conformance that matches type");
-      require(AMI->getModule().lookUpWitnessTable(AMI->getConformance(),
-                                                  false).first,
+      require(AMI->getModule().lookUpWitnessTable(conformance, false).first,
               "Could not find witness table for conformance.");
     }
   }
@@ -1837,10 +1836,7 @@ public:
         "alloc_existential_box payload must be a lowering of the formal "
         "concrete type");
 
-    for (ProtocolConformance *C : AEBI->getConformances())
-      // We allow for null conformances.
-      require(!C || AEBI->getModule().lookUpWitnessTable(C, false).first,
-              "Could not find witness table for conformance.");
+    checkExistentialProtocolConformances(exType, AEBI->getConformances());
   }
 
   void checkInitExistentialAddrInst(InitExistentialAddrInst *AEI) {
@@ -1870,10 +1866,7 @@ public:
             "init_existential_addr payload must be a lowering of the formal "
             "concrete type");
     
-    for (ProtocolConformance *C : AEI->getConformances())
-      // We allow for null conformances.
-      require(!C || AEI->getModule().lookUpWitnessTable(C, false).first,
-              "Could not find witness table for conformance.");
+    checkExistentialProtocolConformances(exType, AEI->getConformances());
   }
 
   void checkInitExistentialRefInst(InitExistentialRefInst *IEI) {
@@ -1888,8 +1881,8 @@ public:
             "init_existential_ref result must not be an address");
     
     // The operand must be at the right abstraction level for the existential.
-    auto archetype = ArchetypeType::getOpened(
-                                          IEI->getType().getSwiftRValueType());
+    SILType exType = IEI->getType();
+    auto archetype = ArchetypeType::getOpened(exType.getSwiftRValueType());
     auto loweredTy = F.getModule().Types.getLoweredType(
                                        Lowering::AbstractionPattern(archetype),
                                        IEI->getFormalConcreteType());
@@ -1902,10 +1895,7 @@ public:
             "init_existential_ref operand must be a lowering of the formal "
             "concrete type");
     
-    for (ProtocolConformance *C : IEI->getConformances())
-      // We allow for null conformances.
-      require(!C || IEI->getModule().lookUpWitnessTable(C, false).first,
-              "Could not find witness table for conformance.");
+    checkExistentialProtocolConformances(exType, IEI->getConformances());
   }
 
   void checkDeinitExistentialAddrInst(DeinitExistentialAddrInst *DEI) {
@@ -1948,11 +1938,30 @@ public:
               == operandType.castTo<MetatypeType>()->getRepresentation(),
             "init_existential_metatype result must match representation of "
             "operand");
-    
-    for (ProtocolConformance *C : I->getConformances())
-      // We allow for null conformances.
-      require(!C || I->getModule().lookUpWitnessTable(C, false).first,
-              "Could not find witness table for conformance.");
+
+    checkExistentialProtocolConformances(resultType, I->getConformances());
+  }
+
+  void checkExistentialProtocolConformances(SILType resultType,
+                                ArrayRef<ProtocolConformanceRef> conformances) {
+    SmallVector<ProtocolDecl*, 4> protocols;
+    resultType.getSwiftRValueType().isAnyExistentialType(protocols);
+
+    require(conformances.size() == protocols.size(),
+            "init_existential instruction must have the "
+            "right number of conformances");
+    for (auto i : indices(conformances)) {
+      require(conformances[i].getRequirement() == protocols[i],
+              "init_existential instruction must have conformances in "
+              "proper order");
+
+      if (conformances[i].isConcrete()) {
+        auto conformance = conformances[i].getConcrete();
+        require(F.getModule().lookUpWitnessTable(conformance, false).first,
+                "Could not find witness table for conformance.");
+
+      }
+    }
   }
 
   void verifyCheckedCast(bool isExact, SILType fromTy, SILType toTy) {

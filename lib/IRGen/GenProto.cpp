@@ -1807,7 +1807,7 @@ namespace {
     getAssociatedTypeWitnessTableAccessFunction(AssociatedTypeDecl *requirement,
                                                 CanType associatedType,
                                                 ProtocolDecl *protocol,
-                                        ProtocolConformance *conformance);
+                                        ProtocolConformanceRef conformance);
 
     void emitReturnOfCheckedLoadFromCache(IRGenFunction &IGF,
                                           Address destTable,
@@ -1947,12 +1947,12 @@ llvm::Constant *WitnessTableBuilder::
 getAssociatedTypeWitnessTableAccessFunction(AssociatedTypeDecl *requirement,
                                             CanType associatedType,
                                             ProtocolDecl *associatedProtocol,
-                                  ProtocolConformance *associatedConformance) {
+                                ProtocolConformanceRef associatedConformance) {
   if (!associatedType->hasArchetype()) {
-    assert(associatedConformance &&
+    assert(associatedConformance.isConcrete() &&
            "no concrete conformance for non-dependent type");
     return getOrCreateWitnessTableAccessFunction(IGM, associatedType,
-                                                 associatedConformance);
+                                          associatedConformance.getConcrete());
   }
 
   // Otherwise, emit an access function.
@@ -1977,10 +1977,11 @@ getAssociatedTypeWitnessTableAccessFunction(AssociatedTypeDecl *requirement,
   destTable.getAddress()->setName("wtable");
 
   const ConformanceInfo *conformanceI = nullptr;
-  if (associatedConformance) {
+  if (associatedConformance.isConcrete()) {
     const ProtocolInfo &protocolI = IGM.getProtocolInfo(associatedProtocol);
     conformanceI =
-      &protocolI.getConformance(IGM, associatedProtocol, associatedConformance);
+      &protocolI.getConformance(IGM, associatedProtocol,
+                                associatedConformance.getConcrete());
 
     // If we can emit a constant table, do so.
     // In principle, any time we can do this, we should try to re-use this
@@ -3489,21 +3490,22 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
                                         llvm::Value **srcMetadataCache,
                                         ProtocolDecl *proto,
                                         const ProtocolInfo &protoI,
-                                        ProtocolConformance *conformance) {
+                                        ProtocolConformanceRef conformance) {
   assert(Lowering::TypeConverter::protocolRequiresWitnessTable(proto)
          && "protocol does not have witness tables?!");
 
-  // If the source type is an archetype and we don't have concrete conformance
-  // info, the conformance must be via one of the protocol requirements of the
-  // archetype. Look at what's locally bound.
-  if (!conformance) {
+  // If we don't have concrete conformance information, the type must be
+  // an archetype and the conformance must be via one of the protocol
+  // requirements of the archetype. Look at what's locally bound.
+  if (conformance.isAbstract()) {
     auto archetype = cast<ArchetypeType>(srcType);
     return emitWitnessTableRef(IGF, archetype, proto);
   }
 
   // All other source types should be concrete enough that we have conformance
   // info for them.
-  auto &conformanceI = protoI.getConformance(IGF.IGM, proto, conformance);
+  auto &conformanceI =
+    protoI.getConformance(IGF.IGM, proto, conformance.getConcrete());
   return conformanceI.getTable(IGF, srcType, srcMetadataCache);
 }
 
@@ -3529,10 +3531,9 @@ void irgen::emitWitnessTableRefs(IRGenFunction &IGF,
     if (!Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
       continue;
 
-    auto conformance = conformances.size() ? conformances[j] : nullptr;
     auto wtable = emitWitnessTableRef(IGF, replType, metadataCache,
                                       proto, IGF.IGM.getProtocolInfo(proto),
-                                      conformance);
+                                      conformances[j]);
 
     out.push_back(wtable);
   }
@@ -3670,11 +3671,10 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
       if (Fulfillments.getWitnessTable(depTy, protocol))
         continue;
 
-      auto conformance = conformances.size() ? conformances[i] : nullptr;
       auto wtable = emitWitnessTableRef(IGF, argType, &argMetadata,
                                         protocol,
                                         IGF.IGM.getProtocolInfo(protocol),
-                                        conformance);
+                                        conformances[i]);
       out.add(wtable);
     }
   }
@@ -3793,7 +3793,7 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
                               CanType baseTy,
                               llvm::Value **baseMetadataCache,
                               SILDeclRef member,
-                              ProtocolConformance *conformance,
+                              ProtocolConformanceRef conformance,
                               Explosion &out) {
   auto fn = cast<AbstractFunctionDecl>(member.getDecl());
 

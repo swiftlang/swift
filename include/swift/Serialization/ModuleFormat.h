@@ -52,7 +52,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 230; // alloc_global instruction added
+const uint16_t VERSION_MINOR = 231; // abstract protocol conformances
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -1115,10 +1115,10 @@ namespace decls_block {
     BCVBR<2> // context-scoped discriminator counter
   >;
 
-  /// A placeholder for lack of conformance information. Conformances are
-  /// indexed, so simply omitting one would be incorrect.
-  using NoConformanceLayout = BCRecordLayout<
-    NO_CONFORMANCE
+  /// A placeholder for lack of concrete conformance information.
+  using AbstractProtocolConformanceLayout = BCRecordLayout<
+    ABSTRACT_PROTOCOL_CONFORMANCE,
+    DeclIDField // the protocol
   >;
 
   using NormalProtocolConformanceLayout = BCRecordLayout<

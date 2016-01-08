@@ -75,8 +75,8 @@ protected:
   const SILDebugScope *remapScope(const SILDebugScope *DS) { return DS; }
   SILType remapType(SILType Ty) { return Ty; }
   CanType remapASTType(CanType Ty) { return Ty; }
-  ProtocolConformance *remapConformance(ArchetypeType *archetype,
-                                        CanType Ty, ProtocolConformance *C) {
+  ProtocolConformanceRef remapConformance(ArchetypeType *archetype,
+                                        CanType Ty, ProtocolConformanceRef C) {
     return C;
   }
   SILValue remapValue(SILValue Value);
@@ -160,12 +160,13 @@ protected:
   ///
   /// Returns the passed-in conformances array if none of the elements
   /// changed.
-  ArrayRef<ProtocolConformance*> getOpConformances(ArchetypeType *archetype,
-                                                   CanType type,
-                             ArrayRef<ProtocolConformance*> oldConformances) {
+  ArrayRef<ProtocolConformanceRef> getOpConformances(ArchetypeType *archetype,
+                                                     CanType type,
+                             ArrayRef<ProtocolConformanceRef> oldConformances) {
     Substitution sub(archetype, type, oldConformances);
     Substitution mappedSub = asImpl().remapSubstitution(sub);
-    ArrayRef<ProtocolConformance*> newConformances = mappedSub.getConformances();
+    ArrayRef<ProtocolConformanceRef> newConformances =
+      mappedSub.getConformances();
 
     // Use the existing conformances array if possible.
     if (oldConformances == newConformances)
@@ -191,16 +192,16 @@ protected:
     return ArchetypeType::getOpened(existential);
   }
 
-  ArrayRef<ProtocolConformance*>
+  ArrayRef<ProtocolConformanceRef>
   getOpConformancesForExistential(CanType existential, CanType concreteType,
-                             ArrayRef<ProtocolConformance*> oldConformances) {
+                             ArrayRef<ProtocolConformanceRef> oldConformances) {
     if (oldConformances.empty()) return oldConformances;
     return asImpl().getOpConformances(getArchetypeForExistential(existential),
                                       concreteType, oldConformances);
   }
   
-  ProtocolConformance *getOpConformance(ArchetypeType *archetype, CanType ty,
-                                        ProtocolConformance *conformance) {
+  ProtocolConformanceRef getOpConformance(ArchetypeType *archetype, CanType ty,
+                                          ProtocolConformanceRef conformance) {
     return asImpl().remapConformance(archetype, ty, conformance);
   }
 

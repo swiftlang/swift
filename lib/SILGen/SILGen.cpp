@@ -962,11 +962,12 @@ static void emitTopLevelProlog(SILGenFunction &gen, SILLocation loc) {
   }
 }
 
-void SILGenModule::useConformance(ProtocolConformance *conformance) {
+void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
   // We don't need to emit dependent conformances.
-  if (!conformance)
+  if (conformanceRef.isAbstract())
     return;
 
+  auto conformance = conformanceRef.getConcrete();
   auto root = conformance->getRootNormalConformance();
   // If we already emitted this witness table, we don't need to track the fact
   // we need it.
@@ -988,7 +989,7 @@ void SILGenModule::useConformance(ProtocolConformance *conformance) {
 void
 SILGenModule::useConformancesFromSubstitutions(ArrayRef<Substitution> subs) {
   for (auto &sub : subs) {
-    for (auto *conformance : sub.getConformances())
+    for (auto conformance : sub.getConformances())
       useConformance(conformance);
   }
 }

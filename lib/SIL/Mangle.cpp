@@ -48,9 +48,9 @@ using namespace Mangle;
 static void mangleSubstitution(Mangler &M, Substitution Sub) {
   M.mangleType(Sub.getReplacement()->getCanonicalType(), 0);
   for (auto C : Sub.getConformances()) {
-    if (!C)
+    if (C.isAbstract())
       return;
-    M.mangleProtocolConformance(C);
+    M.mangleProtocolConformance(C.getConcrete());
   }
 }
 

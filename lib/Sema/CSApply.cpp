@@ -107,7 +107,7 @@ Type Solution::computeSubstitutions(
   auto currentModule = getConstraintSystem().DC->getParentModule();
   ArchetypeType *currentArchetype = nullptr;
   Type currentReplacement;
-  SmallVector<ProtocolConformance *, 4> currentConformances;
+  SmallVector<ProtocolConformanceRef, 4> currentConformances;
 
   ArrayRef<Requirement> requirements;
   if (auto genericFn = origType->getAs<GenericFunctionType>()) {
@@ -150,7 +150,8 @@ Type Solution::computeSubstitutions(
         (void)conforms;
 
         assert(conformance || replacement->hasDependentProtocolConformances());
-        currentConformances.push_back(conformance);
+        currentConformances.push_back(
+                    ProtocolConformanceRef(protoType->getDecl(), conformance));
 
         break;
       }
@@ -1371,11 +1372,12 @@ namespace {
       // Form a reference to the function. The bridging operations are generic,
       // so we need to form substitutions and compute the resulting type.
       auto Conformances =
-        tc.Context.Allocate<ProtocolConformance *>(conformance ? 1 : 0);
+        tc.Context.AllocateUninitialized<ProtocolConformanceRef>(
+                                                          conformance ? 1 : 0);
 
-      if (conformsToBridgedToObjectiveC)
-        Conformances[0] = conformance;
-
+      if (conformsToBridgedToObjectiveC) {
+        Conformances[0] = ProtocolConformanceRef(bridgedProto, conformance);
+      }
 
       auto fnGenericParams
         = fn->getGenericSignatureOfContext()->getGenericParams();
@@ -3885,22 +3887,22 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
 /// because most protocols do not conform to themselves -- however we still
 /// allow the conversion here, except the ErasureExpr ends up with trivial
 /// conformances.
-static ArrayRef<ProtocolConformance*>
+static ArrayRef<ProtocolConformanceRef>
 collectExistentialConformances(TypeChecker &tc, Type fromType, Type toType,
                                DeclContext *DC) {
   SmallVector<ProtocolDecl *, 4> protocols;
   toType->getAnyExistentialTypeProtocols(protocols);
 
-  SmallVector<ProtocolConformance *, 4> conformances;
+  SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : protocols) {
-    ProtocolConformance *conformance;
+    ProtocolConformance *concrete;
     bool conforms = tc.containsProtocol(fromType, proto, DC,
                                         (ConformanceCheckFlags::InExpression|
                                          ConformanceCheckFlags::Used),
-                                        &conformance);
+                                        &concrete);
     assert(conforms && "Type does not conform to protocol?");
     (void)conforms;
-    conformances.push_back(conformance);
+    conformances.push_back(ProtocolConformanceRef(proto, concrete));
   }
 
   return tc.Context.AllocateCopy(conformances);

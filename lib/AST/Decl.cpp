@@ -558,11 +558,10 @@ GenericParamList::getForwardingSubstitutions(ASTContext &C) {
   for (auto archetype : getAllNestedArchetypes()) {
     // "Check conformance" on each declared protocol to build a
     // conformance map.
-    SmallVector<ProtocolConformance *, 2> conformances;
+    SmallVector<ProtocolConformanceRef, 2> conformances;
 
-    for (ProtocolDecl *conformsTo : archetype->getConformsTo()) {
-      (void)conformsTo;
-      conformances.push_back(nullptr);
+    for (ProtocolDecl *proto : archetype->getConformsTo()) {
+      conformances.push_back(ProtocolConformanceRef(proto));
     }
 
     // Build an identity mapping with the derived conformances.

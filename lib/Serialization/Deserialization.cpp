@@ -433,7 +433,7 @@ Pattern *ModuleFile::maybeReadPattern() {
   }
 }
 
-ProtocolConformance *ModuleFile::readConformance(llvm::BitstreamCursor &Cursor){
+ProtocolConformanceRef ModuleFile::readConformance(llvm::BitstreamCursor &Cursor){
   using namespace decls_block;
 
   SmallVector<uint64_t, 16> scratch;
@@ -443,9 +443,11 @@ ProtocolConformance *ModuleFile::readConformance(llvm::BitstreamCursor &Cursor){
 
   unsigned kind = Cursor.readRecord(next.ID, scratch);
   switch (kind) {
-  case NO_CONFORMANCE: {
-    // Nothing to read.
-    return nullptr;
+  case ABSTRACT_PROTOCOL_CONFORMANCE: {
+    DeclID protoID;
+    AbstractProtocolConformanceLayout::readRecord(scratch, protoID);
+    auto proto = cast<ProtocolDecl>(getDecl(protoID));
+    return ProtocolConformanceRef(proto);
   }
 
   case SPECIALIZED_PROTOCOL_CONFORMANCE: {
@@ -465,11 +467,14 @@ ProtocolConformance *ModuleFile::readConformance(llvm::BitstreamCursor &Cursor){
       substitutions.push_back(*sub);
     }
 
-    ProtocolConformance *genericConformance = readConformance(Cursor);
+    ProtocolConformanceRef genericConformance = readConformance(Cursor);
 
-    assert(genericConformance && "Missing generic conformance?");
-    return ctx.getSpecializedConformance(conformingType, genericConformance,
+    assert(genericConformance.isConcrete() && "Abstract generic conformance?");
+    auto conformance =
+           ctx.getSpecializedConformance(conformingType,
+                                         genericConformance.getConcrete(),
                                          ctx.AllocateCopy(substitutions));
+    return ProtocolConformanceRef(conformance);
   }
 
   case INHERITED_PROTOCOL_CONFORMANCE: {
@@ -479,16 +484,20 @@ ProtocolConformance *ModuleFile::readConformance(llvm::BitstreamCursor &Cursor){
     ASTContext &ctx = getContext();
     Type conformingType = getType(conformingTypeID);
 
-    ProtocolConformance *inheritedConformance = readConformance(Cursor);
+    ProtocolConformanceRef inheritedConformance = readConformance(Cursor);
 
-    assert(inheritedConformance && "Missing generic conformance?");
-    return ctx.getInheritedConformance(conformingType, inheritedConformance);
+    assert(inheritedConformance.isConcrete() &&
+           "Abstract inherited conformance?");
+    auto conformance =
+      ctx.getInheritedConformance(conformingType,
+                                  inheritedConformance.getConcrete());
+    return ProtocolConformanceRef(conformance);
   }
 
   case NORMAL_PROTOCOL_CONFORMANCE_ID: {
     NormalConformanceID conformanceID;
     NormalProtocolConformanceIdLayout::readRecord(scratch, conformanceID);
-    return readNormalConformance(conformanceID);
+    return ProtocolConformanceRef(readNormalConformance(conformanceID));
   }
 
   case PROTOCOL_CONFORMANCE_XREF: {
@@ -506,13 +515,14 @@ ProtocolConformance *ModuleFile::readConformance(llvm::BitstreamCursor &Cursor){
     nominal->lookupConformance(module, proto,
                                conformances);
     assert(!conformances.empty() && "Could not find conformance");
-    return conformances.front();
+    return ProtocolConformanceRef(conformances.front());
   }
 
   // Not a protocol conformance.
   default:
     error();
-    return nullptr;
+    ProtocolConformance *conformance = nullptr;
+    return ProtocolConformanceRef(conformance); // FIXME: this will assert
   }
 }
 
@@ -571,8 +581,9 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   // Read inherited conformances.
   InheritedConformanceMap inheritedConformances;
   while (inheritedCount--) {
-    auto inherited = readConformance(DeclTypeCursor);
-    assert(inherited);
+    auto inheritedRef = readConformance(DeclTypeCursor);
+    assert(inheritedRef.isConcrete());
+    auto inherited = inheritedRef.getConcrete();
     inheritedConformances[inherited->getProtocol()] = inherited;
   }
 
@@ -619,7 +630,7 @@ ModuleFile::maybeReadSubstitution(llvm::BitstreamCursor &cursor) {
   auto archetypeTy = getType(archetypeID)->castTo<ArchetypeType>();
   auto replacementTy = getType(replacementID);
 
-  SmallVector<ProtocolConformance *, 4> conformanceBuf;
+  SmallVector<ProtocolConformanceRef, 4> conformanceBuf;
   while (numConformances--) {
     conformanceBuf.push_back(readConformance(cursor));
   }
@@ -3974,7 +3985,7 @@ void ModuleFile::loadAllMembers(Decl *D, uint64_t contextData) {
 
 void
 ModuleFile::loadAllConformances(const Decl *D, uint64_t contextData,
-                         SmallVectorImpl<ProtocolConformance *> &conformances) {
+                          SmallVectorImpl<ProtocolConformance*> &conformances) {
   PrettyStackTraceDecl trace("loading conformances for", D);
 
   uint64_t numConformances;
@@ -3985,8 +3996,11 @@ ModuleFile::loadAllConformances(const Decl *D, uint64_t contextData,
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   DeclTypeCursor.JumpToBit(bitPosition);
 
-  while (numConformances--)
-    conformances.push_back(readConformance(DeclTypeCursor));
+  while (numConformances--) {
+    auto conf = readConformance(DeclTypeCursor);
+    if (conf.isConcrete())
+      conformances.push_back(conf.getConcrete());
+  }
 }
 
 TypeLoc

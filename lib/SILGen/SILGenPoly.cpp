@@ -141,18 +141,18 @@ namespace {
   };
 };
 
-static ArrayRef<ProtocolConformance*>
+static ArrayRef<ProtocolConformanceRef>
 collectExistentialConformances(Module *M, Type fromType, Type toType) {
   assert(!fromType->isAnyExistentialType());
   
   SmallVector<ProtocolDecl *, 4> protocols;
   toType->getAnyExistentialTypeProtocols(protocols);
   
-  SmallVector<ProtocolConformance *, 4> conformances;
+  SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : protocols) {
     ProtocolConformance *conformance =
-    M->lookupConformance(fromType, proto, nullptr).getPointer();
-    conformances.push_back(conformance);
+      M->lookupConformance(fromType, proto, nullptr).getPointer();
+    conformances.push_back(ProtocolConformanceRef(proto, conformance));
   }
   
   return M->getASTContext().AllocateCopy(conformances);
@@ -200,7 +200,7 @@ static ManagedValue emitTransformExistential(SILGenFunction &SGF,
         ->getInstanceType();
   }
 
-  ArrayRef<ProtocolConformance *> conformances =
+  ArrayRef<ProtocolConformanceRef> conformances =
       collectExistentialConformances(SGF.SGM.M.getSwiftModule(),
                                      fromInstanceType,
                                      toInstanceType);
@@ -1412,7 +1412,11 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   auto genericSig = F.getLoweredFunctionType()->getGenericSignature();
   if (generics) {
     for (auto archetype : generics->getAllNestedArchetypes()) {
-      subs.push_back({ archetype, archetype, { } });
+      SmallVector<ProtocolConformanceRef, 4> conformances;
+      for (auto proto : archetype->getConformsTo())
+        conformances.push_back(ProtocolConformanceRef(proto));
+      subs.push_back({ archetype, archetype,
+                       getASTContext().AllocateCopy(conformances) });
     }
   }
 

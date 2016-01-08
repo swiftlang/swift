@@ -1507,7 +1507,7 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
   ArchetypeType *resultArchetype = archetype;
   Type resultReplacement = replacement;
   assert(!resultReplacement->isTypeParameter() && "Can't be dependent");
-  SmallVector<ProtocolConformance *, 4> conformances;
+  SmallVector<ProtocolConformanceRef, 4> conformances;
 
   bool isError = replacement->is<ErrorType>();
   for (auto proto : archetype->getConformsTo()) {
@@ -1518,7 +1518,7 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
            "Conformance should already have been verified");
     (void)isError;
     (void)conforms;
-    conformances.push_back(conformance);
+    conformances.push_back(ProtocolConformanceRef(proto, conformance));
   }
 
   return Substitution{

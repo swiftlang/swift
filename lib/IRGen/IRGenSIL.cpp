@@ -4459,7 +4459,7 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
   }
 
   CanType baseTy = i->getLookupType();
-  ProtocolConformance *conformance = i->getConformance();
+  ProtocolConformanceRef conformance = i->getConformance();
   SILDeclRef member = i->getMember();
 
   // It would be nice if this weren't discarded.

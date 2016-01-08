@@ -545,6 +545,8 @@ public:
       }
 
       // Look up the witness for the archetype.
+      auto proto = Constant.getDecl()->getDeclContext()
+                                     ->isProtocolOrProtocolExtensionContext();
       auto selfType = getWitnessMethodSelfType();
       auto archetype = getArchetypeForSelf(selfType);
       // Get the openend existential value if the archetype is an opened
@@ -555,7 +557,7 @@ public:
 
       SILValue fn = gen.B.createWitnessMethod(Loc,
                                   archetype,
-                                  /*conformance*/ nullptr,
+                                  ProtocolConformanceRef(proto),
                                   *constant,
                                   constantInfo.getSILType(),
                                   OpenedExistential,

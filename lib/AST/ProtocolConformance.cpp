@@ -29,6 +29,26 @@
 
 using namespace swift;
 
+ProtocolConformanceRef::ProtocolConformanceRef(ProtocolDecl *protocol,
+                                               ProtocolConformance *conf) {
+  assert(protocol != nullptr &&
+         "cannot construct ProtocolConformanceRef with null protocol");
+  if (conf) {
+    assert(protocol == conf->getProtocol() && "protocol conformance mismatch");
+    Union = conf;
+  } else {
+    Union = protocol;
+  }
+}
+
+ProtocolDecl *ProtocolConformanceRef::getRequirement() const {
+  if (isConcrete()) {
+    return getConcrete()->getProtocol();
+  } else {
+    return getAbstract();
+  }
+}
+
 void *ProtocolConformance::operator new(size_t bytes, ASTContext &context,
                                         AllocationArena arena,
                                         unsigned alignment) {
@@ -328,7 +348,7 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
   }
 
   // Gather the conformances for the type witness. These should never fail.
-  SmallVector<ProtocolConformance *, 4> conformances;
+  SmallVector<ProtocolConformanceRef, 4> conformances;
   auto archetype = genericWitness.getArchetype();
   for (auto proto : archetype->getConformsTo()) {
     auto conforms = conformingModule->lookupConformance(specializedType, proto,
@@ -338,7 +358,7 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
             specializedType->isTypeParameter() ||
             specializedType->is<ErrorType>()) &&
            "Improperly checked substitution");
-    conformances.push_back(conforms.getPointer());
+    conformances.push_back(ProtocolConformanceRef(proto, conforms.getPointer()));
   }
 
   // Form the substitution.

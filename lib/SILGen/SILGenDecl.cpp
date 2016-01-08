@@ -1474,18 +1474,18 @@ public:
     assert(protos.size() == witness.getConformances().size()
            && "number of conformances in assoc type substitution do not match "
               "number of requirements on assoc type");
-    // The conformances should be all null or all nonnull.
+    // The conformances should be all abstract or all concrete.
     assert(witness.getConformances().empty()
-           || (witness.getConformances()[0]
+           || (witness.getConformances()[0].isConcrete()
                  ? std::all_of(witness.getConformances().begin(),
                                witness.getConformances().end(),
-                               [&](const ProtocolConformance *C) -> bool {
-                                 return C;
+                               [&](const ProtocolConformanceRef C) -> bool {
+                                 return C.isConcrete();
                                })
                  : std::all_of(witness.getConformances().begin(),
                                witness.getConformances().end(),
-                               [&](const ProtocolConformance *C) -> bool {
-                                 return !C;
+                               [&](const ProtocolConformanceRef C) -> bool {
+                                 return C.isAbstract();
                                })));
 
     for (auto *protocol : protos) {
@@ -1493,14 +1493,14 @@ public:
       if (!SGM.Types.protocolRequiresWitnessTable(protocol))
         continue;
 
-      ProtocolConformance *conformance = nullptr;
+      ProtocolConformanceRef conformance(protocol);
       // If the associated type requirement is satisfied by an associated type,
       // these will all be null.
-      if (witness.getConformances()[0]) {
+      if (witness.getConformances()[0].isConcrete()) {
         auto foundConformance = std::find_if(witness.getConformances().begin(),
                                         witness.getConformances().end(),
-                                        [&](ProtocolConformance *c) {
-                                          return c->getProtocol() == protocol;
+                                        [&](ProtocolConformanceRef c) {
+                                          return c.getRequirement() == protocol;
                                         });
         assert(foundConformance != witness.getConformances().end());
         conformance = *foundConformance;

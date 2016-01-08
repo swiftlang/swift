@@ -687,7 +687,7 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
                                          SILValue NewSelf,
                                          SILValue Self,
                                          CanType ConcreteType,
-                                         ProtocolConformance *Conformance,
+                                         ProtocolConformanceRef Conformance,
                                          SILType InstanceType) {
   // Create a set of arguments.
   SmallVector<SILValue, 8> Args;
@@ -703,7 +703,7 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
     if (Subst.getReplacement().getCanonicalTypeOrNull() ==
         Self.getType().getSwiftRValueType()) {
       auto Conformances = AI.getModule().getASTContext()
-                            .Allocate<ProtocolConformance*>(1);
+                            .AllocateUninitialized<ProtocolConformanceRef>(1);
       Conformances[0] = Conformance;
       Substitution NewSubst(Subst.getArchetype(),
                             ConcreteType,
@@ -757,12 +757,12 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
 
 /// Derive a concrete type of self and conformance from the init_existential
 /// instruction.
-static std::pair<ProtocolConformance *, CanType>
+static Optional<std::pair<ProtocolConformanceRef, CanType>>
 getConformanceAndConcreteType(FullApplySite AI,
                               SILInstruction *InitExistential,
                               ProtocolDecl *Protocol,
                               SILValue &NewSelf,
-                              ArrayRef<ProtocolConformance*> &Conformances) {
+                              ArrayRef<ProtocolConformanceRef> &Conformances) {
   // Try to derive the concrete type of self from the found init_existential.
   CanType ConcreteType;
   if (auto IE = dyn_cast<InitExistentialAddrInst>(InitExistential)) {
@@ -776,13 +776,13 @@ getConformanceAndConcreteType(FullApplySite AI,
   }
 
   if (Conformances.empty())
-    return std::make_pair(nullptr, CanType());
+    return None;
 
   // If ConcreteType depends on any archetypes, then propagating it does not
   // help resolve witness table lookups. Catch these cases before calling
   // gatherAllSubstitutions, which only works on nominal types.
   if (ConcreteType->hasArchetype())
-    return std::make_pair(nullptr, CanType());
+    return None;
 
   // Check the substitutions.
   auto ConcreteTypeSubsts = ConcreteType->gatherAllSubstitutions(
@@ -790,16 +790,16 @@ getConformanceAndConcreteType(FullApplySite AI,
   if (!ConcreteTypeSubsts.empty()) {
     // Bail if any generic types parameters of the concrete type are unbound.
     if (hasUnboundGenericTypes(ConcreteTypeSubsts))
-      return std::make_pair(nullptr, CanType());
+      return None;
     // At this point we know that all replacements use concrete types
     // and therefore the whole Lookup type is concrete. So, we can
     // propagate it, because we know how to devirtualize it.
   }
 
   // Find the conformance related to witness_method.
-  ProtocolConformance *Conformance = nullptr;
+  ProtocolConformanceRef Conformance(Protocol);
   for (auto Con : Conformances) {
-    if (Con->getProtocol() == Protocol) {
+    if (Con.getRequirement() == Protocol) {
       Conformance = Con;
       break;
     }
@@ -816,7 +816,7 @@ getConformanceAndConcreteType(FullApplySite AI,
 SILInstruction *
 SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
     ProtocolDecl *Protocol,
-    std::function<void(CanType , ProtocolConformance *)> Propagate) {
+    std::function<void(CanType , ProtocolConformanceRef)> Propagate) {
 
   // Get the self argument.
   SILValue Self;
@@ -839,15 +839,16 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
 
   // Try to derive the concrete type of self and a related conformance from
   // the found init_existential.
-  ArrayRef<ProtocolConformance*> Conformances;
+  ArrayRef<ProtocolConformanceRef> Conformances;
   auto NewSelf = SILValue();
   auto ConformanceAndConcreteType =
       getConformanceAndConcreteType(AI, InitExistential,
                                     Protocol, NewSelf, Conformances);
-  auto ConcreteType = ConformanceAndConcreteType.second;
-  auto Conformance = ConformanceAndConcreteType.first;
-  if (!Conformance)
+  if (!ConformanceAndConcreteType)
     return nullptr;
+
+  auto ConcreteType = ConformanceAndConcreteType->second;
+  auto Conformance = ConformanceAndConcreteType->first;
 
   // Propagate the concrete type into the callee-operand if required.
   Propagate(ConcreteType, Conformance);
@@ -862,7 +863,7 @@ SILInstruction *
 SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
                                                     WitnessMethodInst *WMI) {
   // Check if it is legal to perform the propagation.
-  if (WMI->getConformance())
+  if (WMI->getConformance().isConcrete())
     return nullptr;
 
   // Don't specialize Apply instructions that return the Self type.
@@ -887,8 +888,8 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
 
   // Propagate the concrete type into a callee-operand, which is a
   // witness_method instruction.
-  auto PropagateIntoOperand = [this, &WMI] (CanType ConcreteType,
-                                            ProtocolConformance *Conformance) {
+  auto PropagateIntoOperand = [this, &WMI](CanType ConcreteType,
+                                           ProtocolConformanceRef Conformance) {
     SILValue OptionalExistential =
         WMI->hasOperand() ? WMI->getOperand() : SILValue();
     auto *NewWMI = Builder.createWitnessMethod(WMI->getLoc(),
@@ -945,7 +946,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI) {
 
   // No need to propagate anything into the callee operand.
   auto PropagateIntoOperand = [] (CanType ConcreteType,
-                                  ProtocolConformance *Conformance) {};
+                                  ProtocolConformanceRef Conformance) {};
 
   // Try to perform the propagation.
   return propagateConcreteTypeOfInitExistential(AI, PD, PropagateIntoOperand);

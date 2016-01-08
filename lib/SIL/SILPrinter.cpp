@@ -1959,8 +1959,8 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
       OS << "associated_type_protocol ("
          << assocProtoWitness.Requirement->getName() << ": "
          << assocProtoWitness.Protocol->getName() << "): ";
-      if (assocProtoWitness.Witness)
-        assocProtoWitness.Witness->printName(OS, Options);
+      if (assocProtoWitness.Witness.isConcrete())
+        assocProtoWitness.Witness.getConcrete()->printName(OS, Options);
       else
         OS << "dependent";
       break;

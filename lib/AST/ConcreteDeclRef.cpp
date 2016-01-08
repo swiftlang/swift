@@ -56,17 +56,17 @@ void ConcreteDeclRef::dump(raw_ostream &os) {
       if (sub.getConformances().size()) {
         os << '[';
         bool isFirst = true;
-        for (const auto *c : sub.getConformances()) {
+        for (auto &c : sub.getConformances()) {
           if (isFirst) {
             isFirst = false;
           } else {
             os << ", ";
           }
 
-          if (c) {
-            c->printName(os);
+          if (c.isConcrete()) {
+            c.getConcrete()->printName(os);
           } else {
-            os << "nullptr";
+            os << "abstract:" << c.getAbstract()->getName();
           }
         }
         os << ']';

@@ -87,7 +87,7 @@ protected:
 
   ProtocolConformance *remapConformance(ArchetypeType *archetype,
                                         CanType type,
-                                        ProtocolConformance *conf) {
+                                        ProtocolConformanceRef conf) {
     Substitution sub(archetype, type, conf);
     return remapSubstitution(sub).getConformances()[0];
   }
@@ -206,8 +206,8 @@ protected:
     auto Conformance = sub.getConformances()[0];
 
     auto newLookupType = getOpASTType(Inst->getLookupType());
-    if (Conformance) {
-      CanType Ty = Conformance->getType()->getCanonicalType();
+    if (Conformance.isConcrete()) {
+      CanType Ty = Conformance.getConcrete()->getType()->getCanonicalType();
 
       if (Ty != newLookupType) {
         assert(Ty->isSuperclassOf(newLookupType, nullptr) &&

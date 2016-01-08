@@ -3085,7 +3085,9 @@ Substitution SILGenFunction::getPointerSubstitution(Type pointerType,
          && "not a _Pointer type");
 
   // FIXME: Cache this
-  ProtocolConformance *conformances[] = {conformance.getPointer()};
+  ProtocolConformanceRef conformances[] = {
+    ProtocolConformanceRef(conformance.getPointer())
+  };
   auto conformancesCopy = Ctx.AllocateCopy(conformances);
   
   return Substitution{archetype, pointerType, conformancesCopy};

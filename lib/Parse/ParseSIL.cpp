@@ -1416,15 +1416,28 @@ getConformanceOfReplacement(Parser &P, Type subReplacement,
   return conformance.getPointer();
 }
 
-/// Return true if B is derived from A.
-static bool isDerivedFrom(ArchetypeType *A, ArchetypeType *B) {
-  if (A == B)
-    return true;
-  auto *p = B;
-  while ((p = p->getParent())) {
-    if (p == A)
+static bool isImpliedBy(ProtocolDecl *proto, ArrayRef<ProtocolDecl*> derived) {
+  for (auto derivedProto : derived) {
+    if (derivedProto == proto || derivedProto->inheritsFrom(proto))
       return true;
   }
+  return false;
+}
+
+static bool allowAbstractConformance(Parser &P, Type subReplacement,
+                                     ProtocolDecl *proto) {
+  if (!subReplacement->hasDependentProtocolConformances())
+    return false;
+
+  if (auto archetype = subReplacement->getAs<ArchetypeType>()) {
+    return isImpliedBy(proto, archetype->getConformsTo());
+  }
+
+  SmallVector<ProtocolDecl *, 4> existentialProtos;
+  if (subReplacement->isExistentialType(existentialProtos)) {
+    return isImpliedBy(proto, existentialProtos);
+  }
+
   return false;
 }
 
@@ -1433,44 +1446,26 @@ static bool isDerivedFrom(ArchetypeType *A, ArchetypeType *B) {
 static bool getConformancesForSubstitution(Parser &P,
               GenericParamList *gp, ArchetypeType *subArchetype,
               Type subReplacement, SourceLoc loc,
-              SmallVectorImpl<ProtocolConformance*> &conformances) {
-  for (auto params = gp; params; params = params->getOuterParameters()) {
-    for (auto param : *params) {
-      if (param->getInherited().empty())
-        continue;
-
-      auto *pArch = param->getArchetype();
-      if (!pArch || !isDerivedFrom(pArch, subArchetype))
-        continue;
-
-      // If subArchetype is C.Index and we have C inherits from P, we
-      // need to find the protocol conformance to P.Index. For now, we
-      // check if the replacement type conforms to subArchetype->getConformsTo.
-      for (auto *proto : subArchetype->getConformsTo())
-        if (auto *pConform =
-            getConformanceOfReplacement(P, subReplacement, proto))
-          conformances.push_back(pConform);
+              SmallVectorImpl<ProtocolConformanceRef> &conformances) {
+  for (auto proto : subArchetype->getConformsTo()) {
+    // Try looking up a concrete conformance.
+    if (auto conformance =
+          getConformanceOfReplacement(P, subReplacement, proto)) {
+      conformances.push_back(ProtocolConformanceRef(conformance));
+      continue;
     }
 
-    for (const auto &req : params->getRequirements()) {
-      if (req.getKind() != RequirementKind::Conformance)
-        continue;
-
-      if (req.getSubject().getPointer() != subArchetype)
-        continue;
-
-      if (auto *protoTy = req.getConstraint()->getAs<ProtocolType>())
-        if (auto *pConform =
-            getConformanceOfReplacement(P, subReplacement, protoTy->getDecl()))
-          conformances.push_back(pConform);
+    // If the replacement type has dependent conformances, we might be
+    // able to use an abstract conformance.
+    if (allowAbstractConformance(P, subReplacement, proto)) {
+      conformances.push_back(ProtocolConformanceRef(proto));
+      continue;
     }
-  }
 
-  if (subArchetype && !subReplacement->hasDependentProtocolConformances() &&
-      conformances.size() != subArchetype->getConformsTo().size()) {
     P.diagnose(loc, diag::sil_substitution_mismatch);
     return true;
   }
+
   return false;
 }
 
@@ -1490,7 +1485,7 @@ bool getApplySubstitutionsFromParsed(
     auto parsed = parses.front();
     parses = parses.slice(1);
 
-    SmallVector<ProtocolConformance*, 2> conformances;
+    SmallVector<ProtocolConformanceRef, 2> conformances;
     if (getConformancesForSubstitution(SP.P, gp, subArchetype,
                                        parsed.replacement,
                                        parsed.loc, conformances))
@@ -1600,7 +1595,7 @@ static bool checkFunctionType(FunctionType *Ty, FunctionType *Ty2,
                        Ty2->getResult()->getCanonicalType(), Context, 1));
 }
 
-static ArrayRef<ProtocolConformance *>
+static ArrayRef<ProtocolConformanceRef>
 collectExistentialConformances(Parser &P,
                                CanType conformingType, CanType protocolType) {
   SmallVector<ProtocolDecl *, 2> protocols;
@@ -1610,12 +1605,13 @@ collectExistentialConformances(Parser &P,
   if (protocols.empty())
     return {};
   
-  MutableArrayRef<ProtocolConformance *> conformances =
-    P.Context.Allocate<ProtocolConformance*>(protocols.size());
+  MutableArrayRef<ProtocolConformanceRef> conformances =
+    P.Context.AllocateUninitialized<ProtocolConformanceRef>(protocols.size());
   
   for (unsigned i : indices(protocols)) {
-    conformances[i]
-      = getConformanceOfReplacement(P, conformingType, protocols[i]);
+    auto proto = protocols[i];
+    auto conformance = getConformanceOfReplacement(P, conformingType, proto);
+    conformances[i] = ProtocolConformanceRef(proto, conformance);
   }
   
   return conformances;
@@ -2814,7 +2810,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       P.diagnose(TyLoc, diag::sil_witness_method_not_protocol);
       return true;
     }
-    ProtocolConformance *Conformance = nullptr;
+    ProtocolConformanceRef Conformance(proto);
     if (!isa<ArchetypeType>(LookupTy)) {
       auto lookup = P.SF.getParentModule()->lookupConformance(
                                                       LookupTy, proto, nullptr);
@@ -2822,7 +2818,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         P.diagnose(TyLoc, diag::sil_witness_method_type_does_not_conform);
         return true;
       }
-      Conformance = lookup.getPointer();
+      Conformance = ProtocolConformanceRef(lookup.getPointer());
     }
     
     ResultVal = B.createWitnessMethod(InstLoc, LookupTy, Conformance, Member,
@@ -3275,7 +3271,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       .getAddressType();
     
     // Collect conformances for the type.
-    ArrayRef<ProtocolConformance *> conformances
+    ArrayRef<ProtocolConformanceRef> conformances
       = collectExistentialConformances(P, Ty,
                                        Val.getType().getSwiftRValueType());
     
@@ -3303,7 +3299,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       .getAddressType();
     
     // Collect conformances for the type.
-    ArrayRef<ProtocolConformance *> conformances
+    ArrayRef<ProtocolConformanceRef> conformances
       = collectExistentialConformances(P, ConcreteFormalTy,
                                        ExistentialTy.getSwiftRValueType());
     
@@ -3323,7 +3319,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         parseSILType(ExistentialTy))
       return true;
     
-    ArrayRef<ProtocolConformance *> conformances
+    ArrayRef<ProtocolConformanceRef> conformances
       = collectExistentialConformances(P, FormalConcreteTy,
                             ExistentialTy.getSwiftRValueType());
 
@@ -3340,10 +3336,21 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         parseSILType(ExistentialTy))
       return true;
+
+    auto baseExType = ExistentialTy.getSwiftRValueType();
+    auto formalConcreteType = Val.getType().getSwiftRValueType();
+    while (auto instExType = dyn_cast<ExistentialMetatypeType>(baseExType)) {
+      baseExType = instExType.getInstanceType();
+      formalConcreteType =
+        cast<MetatypeType>(formalConcreteType).getInstanceType();
+    }
+
+    ArrayRef<ProtocolConformanceRef> conformances
+      = collectExistentialConformances(P, formalConcreteType,
+                            ExistentialTy.getSwiftRValueType());
     
-    // FIXME: We should be parsing conformances here.
     ResultVal = B.createInitExistentialMetatype(InstLoc, Val, ExistentialTy,
-                                           ArrayRef<ProtocolConformance*>());
+                                                conformances);
     break;
   }
   case ValueKind::DynamicMethodBranchInst: {
@@ -4066,7 +4073,7 @@ static bool getSpecConformanceSubstitutionsFromParsed(
       return true;
     }
     subReplacement = parsed.replacement;
-    SmallVector<ProtocolConformance*, 2> conformances;
+    SmallVector<ProtocolConformanceRef, 2> conformances;
     if (getConformancesForSubstitution(P, gp, subArchetype, subReplacement,
                                        parsed.loc, conformances))
       return true;
@@ -4292,18 +4299,19 @@ bool Parser::parseSILWitnessTable() {
             parseToken(tok::colon, diag::expected_sil_witness_colon))
           return true;
 
-        ProtocolConformance *conform = nullptr;
+        ProtocolConformanceRef conformance(proto);
         if (Tok.getText() != "dependent") {
           ArchetypeBuilder builder(*SF.getParentModule(), Diags);
-          conform = WitnessState.parseProtocolConformance(builder);
-          if (!conform) // Ignore this witness entry for now.
+          auto concrete = WitnessState.parseProtocolConformance(builder);
+          if (!concrete) // Ignore this witness entry for now.
             continue;
+          conformance = ProtocolConformanceRef(concrete);
         } else {
           consumeToken();
         }
 
         witnessEntries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
-          assoc, proto, conform
+          assoc, proto, ProtocolConformanceRef(conformance)
         });
         continue;
       }

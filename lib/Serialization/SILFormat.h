@@ -142,7 +142,7 @@ namespace sil_block {
     // We also share these layouts from the decls block. Their enumerators must
     // not overlap with ours.
     BOUND_GENERIC_SUBSTITUTION = decls_block::BOUND_GENERIC_SUBSTITUTION,
-    NO_CONFORMANCE = decls_block::NO_CONFORMANCE,
+    ABSTRACT_PROTOCOL_CONFORMANCE = decls_block::ABSTRACT_PROTOCOL_CONFORMANCE,
     NORMAL_PROTOCOL_CONFORMANCE = decls_block::NORMAL_PROTOCOL_CONFORMANCE,
     SPECIALIZED_PROTOCOL_CONFORMANCE
       = decls_block::SPECIALIZED_PROTOCOL_CONFORMANCE,

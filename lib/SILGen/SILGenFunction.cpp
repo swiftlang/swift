@@ -458,10 +458,10 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                                                    MetatypeRepresentation::ObjC);
     ProtocolDecl *anyObjectProtocol =
       getASTContext().getProtocol(KnownProtocolKind::AnyObject);
-    auto mainClassAnyObjectConformance =
+    auto mainClassAnyObjectConformance = ProtocolConformanceRef(
       SGM.M.getSwiftModule()->lookupConformance(mainClassTy, anyObjectProtocol,
                                                 nullptr)
-        .getPointer();
+        .getPointer());
     CanType anyObjectTy = anyObjectProtocol
       ->getDeclaredTypeInContext()
       ->getCanonicalType();
@@ -664,7 +664,10 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
     SILValue OpenedExistential;
     if (!cast<ArchetypeType>(thisType)->getOpenedExistentialType().isNull())
       OpenedExistential = thisArg;
-    return gen.B.createWitnessMethod(loc, thisType, nullptr, next,
+    auto protocol =
+      next.getDecl()->getDeclContext()->isProtocolOrProtocolExtensionContext();
+    auto conformance = ProtocolConformanceRef(protocol);
+    return gen.B.createWitnessMethod(loc, thisType, conformance, next,
                                      constantInfo.getSILType(),
                                      OpenedExistential);
   }
@@ -843,8 +846,8 @@ SILGenBuilder::createInitExistentialAddr(SILLocation Loc,
                                    SILValue Existential,
                                    CanType FormalConcreteType,
                                    SILType LoweredConcreteType,
-                                   ArrayRef<ProtocolConformance*> Conformances){
-  for (auto *conformance : Conformances)
+                                ArrayRef<ProtocolConformanceRef> Conformances) {
+  for (auto conformance : Conformances)
     SGM.useConformance(conformance);
 
   return SILBuilder::createInitExistentialAddr(Loc, Existential,
@@ -857,8 +860,8 @@ InitExistentialMetatypeInst *
 SILGenBuilder::createInitExistentialMetatype(SILLocation loc,
                                              SILValue metatype,
                                              SILType existentialType,
-                                   ArrayRef<ProtocolConformance*> conformances){
-  for (auto *conformance : conformances)
+                                ArrayRef<ProtocolConformanceRef> conformances) {
+  for (auto conformance : conformances)
     SGM.useConformance(conformance);
 
   return SILBuilder::createInitExistentialMetatype(loc, metatype,
@@ -871,8 +874,8 @@ SILGenBuilder::createInitExistentialRef(SILLocation Loc,
                                         SILType ExistentialType,
                                         CanType FormalConcreteType,
                                         SILValue Concrete,
-                                  ArrayRef<ProtocolConformance*> Conformances) {
-  for (auto *conformance : Conformances)
+                                ArrayRef<ProtocolConformanceRef> Conformances) {
+  for (auto conformance : Conformances)
     SGM.useConformance(conformance);
 
   return SILBuilder::createInitExistentialRef(Loc, ExistentialType,
@@ -885,8 +888,8 @@ SILGenBuilder::createAllocExistentialBox(SILLocation Loc,
                                          SILType ExistentialType,
                                          CanType ConcreteType,
                                          SILType ConcreteLoweredType,
-                                 ArrayRef<ProtocolConformance *> Conformances) {
-  for (auto *conformance : Conformances)
+                                ArrayRef<ProtocolConformanceRef> Conformances) {
+  for (auto conformance : Conformances)
     SGM.useConformance(conformance);
 
   return SILBuilder::createAllocExistentialBox(Loc, ExistentialType,
