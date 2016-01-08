@@ -17,7 +17,6 @@
 %{
 
 import re
-import sys
 import codecs
 
 prologueLines = ""
