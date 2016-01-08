@@ -1047,6 +1047,18 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     break;
   case LinkKind::DynamicLibrary:
     Arguments.push_back("-shared");
+    switch (getTriple().getArch()) {
+      default:
+        break;
+      case llvm::Triple::arm:
+      case llvm::Triple::armeb:
+      case llvm::Triple::thumb:
+      case llvm::Triple::thumbeb:
+        // Avoid emitting R_ARM_REL32 which is not supported by shared objects
+        // on ELF targets.
+        Arguments.push_back("-Wl,-Bsymbolic");
+        break;
+    }
     break;
   }
 
