@@ -271,7 +271,7 @@ void SILPassManager::runFunctionPasses(PassList FuncTransforms) {
 
   // Pop functions off the worklist, and run all function transforms
   // on each of them.
-  while (!FunctionWorklist.empty()) {
+  while (!FunctionWorklist.empty() && continueTransforming()) {
     auto *F = FunctionWorklist.back();
 
     runPassesOnFunction(FuncTransforms, F);
