@@ -23,7 +23,7 @@ import resilient_struct
 //
 
 public struct SmallResilientStruct {
-  let x: Int64 = 0
+  let x: Int32 = 0
 }
 
 // CHECK: @smallGlobal = global [[BUFFER:\[(12|24) x i8\]]] zeroinitializer
@@ -59,7 +59,7 @@ bb0:
 
   %addr = global_addr @smallGlobal : $*SmallResilientStruct
 
-  // CHECK: [[VALUE:%.*]] = load i64, i64* getelementptr inbounds (%V17global_resilience20SmallResilientStruct, %V17global_resilience20SmallResilientStruct* bitcast ([[BUFFER]]* @smallGlobal to %V17global_resilience20SmallResilientStruct*), i32 0, i32 0, i32 0)
+  // CHECK: [[VALUE:%.*]] = load i32, i32* getelementptr inbounds (%V17global_resilience20SmallResilientStruct, %V17global_resilience20SmallResilientStruct* bitcast ([[BUFFER]]* @smallGlobal to %V17global_resilience20SmallResilientStruct*), i32 0, i32 0, i32 0)
   %value = load %addr : $*SmallResilientStruct
 
   %tuple = tuple ()
@@ -94,7 +94,7 @@ bb0:
   // CHECK: [[WITNESS_PTR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 11
   // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_PTR]]
   // CHECK: [[allocateBuffer:%.*]] = bitcast i8* [[WITNESS]] to %swift.opaque* ([[BUFFER]]*, %swift.type*)*
-  // CHECK: [[VALUE:%.*]] = call %swift.opaque* [[allocateBuffer]]([[BUFFER]]* @otherGlobal, %swift.type* [[METADATA]]) #1
+  // CHECK: [[VALUE:%.*]] = call %swift.opaque* [[allocateBuffer]]([[BUFFER]]* @otherGlobal, %swift.type* [[METADATA]])
   alloc_global @otherGlobal
 
   // CHECK: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
