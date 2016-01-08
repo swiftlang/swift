@@ -793,6 +793,17 @@ are permitted:
 - Changing the body of any methods, initializers, or accessors.
 
 
+Operators
+~~~~~~~~~
+
+Operator declarations are entirely compile-time constructs, so changing them
+does not have any affect on binary compatibility. However, they do affect
+*source* compatibility, so it is recommended that existing operators are not
+changed at all except for the following:
+
+- Making a non-associative operator left- or right-associative.
+
+
 A Unifying Theme
 ~~~~~~~~~~~~~~~~
 
