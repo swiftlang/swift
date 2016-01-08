@@ -1429,6 +1429,12 @@ static bool allowAbstractConformance(Parser &P, Type subReplacement,
   if (!subReplacement->hasDependentProtocolConformances())
     return false;
 
+  // AnyObject is implicitly conformed to by anything with a class bound.
+  if (proto->isSpecificProtocol(KnownProtocolKind::AnyObject) &&
+      subReplacement->isAnyClassReferenceType()) {
+    return true;
+  }
+
   if (auto archetype = subReplacement->getAs<ArchetypeType>()) {
     return isImpliedBy(proto, archetype->getConformsTo());
   }
