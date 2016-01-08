@@ -12,6 +12,17 @@ import SwiftPrivate
 import ObjectiveC
 #endif
 
+class DeinitTester {
+  private let onDeinit: () -> ()
+
+  init(onDeinit: () -> ()) {
+    self.onDeinit = onDeinit
+  }
+  deinit {
+    onDeinit()
+  }
+}
+
 let OptionalTests = TestSuite("Optional")
 
 protocol TestProtocol1 {}
@@ -216,6 +227,14 @@ OptionalTests.test("Casting Optional") {
   expectTrue(anyToAny(ssx, Optional<C>.self)! === x)
   expectTrue(anyToAny(x, Optional<Optional<C>>.self)!! === x)
   expectTrue(anyToAnyOrNil(ni, Int.self) == nil)
+
+  // Test for SR-459: Weakened optionals don't zero.
+  var deinitRan = false
+  do {
+    var t = DeinitTester { deinitRan = true }
+     _ = "\(Optional(t))"
+  }
+  expectTrue(deinitRan)
 }
 
 OptionalTests.test("Casting Optional Traps") {

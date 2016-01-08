@@ -1987,15 +1987,59 @@ static id dynamicCastValueToNSError(OpaqueValue *src,
 }
 #endif
 
-static bool canCastToExistential(OpaqueValue *dest, OpaqueValue *src,
-                                 const Metadata *srcType,
-                                 const Metadata *targetType) {
-  if (targetType->getKind() != MetadataKind::Existential)
-    return false;
+static struct OptionalCastResult {
+  bool success;
+  const Metadata* payloadType;
+};
 
-  return _dynamicCastToExistential(dest, src, srcType,
-                                   cast<ExistentialTypeMetadata>(targetType),
-                                   DynamicCastFlags::Default);
+/// Handle optional unwrapping of the cast source.
+/// \returns {true, nullptr} if the cast succeeds without unwrapping.
+/// \returns {false, nullptr} if the cast fails before unwrapping.
+/// \returns {false, payloadType} if the cast should be attempted using an
+/// equivalent payloadType.
+static OptionalCastResult
+checkDynamicCastFromOptional(OpaqueValue *dest,
+                             OpaqueValue *src,
+                             const Metadata *srcType,
+                             const Metadata *targetType,
+                             DynamicCastFlags flags) {
+  if (srcType->getKind() != MetadataKind::Optional)
+    return {false, srcType};
+
+  // Check if the target is an existential that Optional always conforms to.
+  if (targetType->getKind() == MetadataKind::Existential) {
+    // Attempt a conditional cast without destroying on failure.
+    DynamicCastFlags checkCastFlags
+      = flags - (DynamicCastFlags::Unconditional
+                 | DynamicCastFlags::DestroyOnFailure);
+    assert((checkCastFlags - DynamicCastFlags::TakeOnSuccess)
+           == DynamicCastFlags::Default && "Unhandled DynamicCastFlag");
+    if (_dynamicCastToExistential(dest, src, srcType,
+                                  cast<ExistentialTypeMetadata>(targetType),
+                                  checkCastFlags)) {
+      return {true, nullptr};
+    }
+  }
+  const Metadata *payloadType =
+    cast<EnumMetadata>(srcType)->getGenericArgs()[0];
+  int enumCase =
+    swift_getEnumCaseSinglePayload(src, payloadType, 1 /*emptyCases=*/);
+  if (enumCase != -1) {
+    // Allow Optional<T>.None -> Optional<U>.None
+    if (targetType->getKind() != MetadataKind::Optional) {
+      _fail(src, srcType, targetType, flags);
+      return {false, nullptr};
+    }
+    // Inject the .None tag
+    swift_storeEnumTagSinglePayload(dest, payloadType, enumCase,
+                                    1 /*emptyCases=*/);
+    _succeed(dest, src, srcType, flags);
+    return {true, nullptr};
+  }
+  // .Some
+  // Single payload enums are guaranteed layout compatible with their
+  // payload. Only the source's payload needs to be taken or destroyed.
+  return {false, payloadType};
 }
 
 /// Perform a dynamic cast to an arbitrary type.
@@ -2004,28 +2048,11 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
                               const Metadata *srcType,
                               const Metadata *targetType,
                               DynamicCastFlags flags) {
-  // Check if the cast source is Optional and the target is not an existential
-  // that Optional conforms to. Unwrap one level of Optional and continue.
-  if (srcType->getKind() == MetadataKind::Optional
-      && !canCastToExistential(dest, src, srcType, targetType)) {
-    const Metadata *payloadType =
-      cast<EnumMetadata>(srcType)->getGenericArgs()[0];
-    int enumCase =
-      swift_getEnumCaseSinglePayload(src, payloadType, 1 /*emptyCases=*/);
-    if (enumCase != -1) {
-      // Allow Optional<T>.None -> Optional<U>.None
-      if (targetType->getKind() != MetadataKind::Optional)
-        return _fail(src, srcType, targetType, flags);
-      // Inject the .None tag
-      swift_storeEnumTagSinglePayload(dest, payloadType, enumCase,
-                                      1 /*emptyCases=*/);
-      return _succeed(dest, src, srcType, flags);        
-    }
-    // .Some
-    // Single payload enums are guaranteed layout compatible with their
-    // payload. Only the source's payload needs to be taken or destroyed.
-    srcType = payloadType;
-  }
+  auto unwrapResult = checkDynamicCastFromOptional(dest, src, srcType,
+                                                   targetType, flags);
+  srcType = unwrapResult.payloadType;
+  if (!srcType)
+    return unwrapResult.success;
 
   switch (targetType->getKind()) {
   // Handle wrapping an Optional target.
