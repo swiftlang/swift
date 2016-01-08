@@ -300,16 +300,6 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
     return;
   }
 
-  // Cannot extend a bound generic type.
-  if (extendedType->isSpecialized()) {
-    TC.diagnose(ED->getLoc(), diag::extension_specialization,
-                extendedType->getAnyNominal()->getName())
-      .highlight(ED->getExtendedTypeLoc().getSourceRange());
-    ED->setInvalid();
-    ED->getExtendedTypeLoc().setInvalidType(TC.Context);
-    return;
-  }
-
   // Dig out the nominal type being extended.
   NominalTypeDecl *extendedNominal = extendedType->getAnyNominal();
   if (!extendedNominal) {
@@ -320,6 +310,16 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
     return;
   }
   assert(extendedNominal && "Should have the nominal type being extended");
+  
+  // Cannot extend a bound generic type.
+  if (extendedType->isSpecialized()) {
+    TC.diagnose(ED->getLoc(), diag::extension_specialization,
+                extendedNominal->getName())
+    .highlight(ED->getExtendedTypeLoc().getSourceRange());
+    ED->setInvalid();
+    ED->getExtendedTypeLoc().setInvalidType(TC.Context);
+    return;
+  }
 
   // If the extended type is generic or is a protocol. Clone or create
   // the generic parameters.
