@@ -12,7 +12,12 @@
 // RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb -DWORD_BITS=%target-ptrsize %s -o %t/out.swift
 // RUN: %S/../../utils/line-directive %t/out.swift -- %target-build-swift -parse-stdlib %t/out.swift -o %t/a.out -Onone
 // RUN: %S/../../utils/line-directive %t/out.swift -- %target-run %t/a.out
+
 // REQUIRES: executable_test
+
+// FIXME: this test runs forever on iOS arm64
+// REQUIRES: OS=macosx
+
 import Swift
 
 %{
