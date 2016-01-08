@@ -232,6 +232,8 @@ func _NSGetEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutableP
 internal func _getEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<CChar>> {
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
   return _NSGetEnviron().memory
+#elseif os(FreeBSD)
+  return environ;
 #else
   return __environ
 #endif
