@@ -4048,6 +4048,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     auto second = cast_or_null<ValueDecl>(getDecl(*rawIDIter++));
     assert(second || first->getAttrs().hasAttribute<OptionalAttr>() ||
            first->getAttrs().isUnavailable(ctx));
+    (void) ctx;
     witnesses.insert(std::make_pair(first, second));
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
