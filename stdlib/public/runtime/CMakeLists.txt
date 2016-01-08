@@ -43,6 +43,7 @@ add_swift_library(swiftRuntime IS_STDLIB IS_STDLIB_CORE
   KnownMetadata.cpp
   Metadata.cpp
   Once.cpp
+  ProtocolConformance.cpp
   Reflection.cpp
   SwiftObject.cpp
   ${swift_runtime_objc_sources}
