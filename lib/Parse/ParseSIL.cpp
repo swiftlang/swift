@@ -4099,7 +4099,7 @@ ProtocolConformance *SILParser::parseProtocolConformance(
   if (localScope)
     GenericsScope.emplace(&P, ScopeKind::Generics);
 
-  generics = P.maybeParseGenericParams();
+  generics = P.maybeParseGenericParams().getPtrOrNull();
   if (generics) {
     generics->setBuilder(&builder);
     SmallVector<ArchetypeBuilder *, 1> builders(1, &builder);

@@ -156,7 +156,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   // body.
   GenericParamList *generics = nullptr;
   if (isInSILMode()) {
-    generics = maybeParseGenericParams();
+    generics = maybeParseGenericParams().getPtrOrNull();
   }
 
   ParserResult<TypeRepr> ty = parseTypeSimple(MessageID, HandleCodeCompletion);

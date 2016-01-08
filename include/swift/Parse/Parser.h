@@ -1190,9 +1190,9 @@ public:
   //===--------------------------------------------------------------------===//
   // Generics Parsing
 
-  GenericParamList *parseGenericParameters();
-  GenericParamList *parseGenericParameters(SourceLoc LAngleLoc);
-  GenericParamList *maybeParseGenericParams();
+  ParserResult<GenericParamList> parseGenericParameters();
+  ParserResult<GenericParamList> parseGenericParameters(SourceLoc LAngleLoc);
+  ParserResult<GenericParamList> maybeParseGenericParams();
   bool parseGenericWhereClause(SourceLoc &WhereLoc,
                                SmallVectorImpl<RequirementRepr> &Requirements);
 

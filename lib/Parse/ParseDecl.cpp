@@ -4051,7 +4051,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   Optional<Scope> GenericsScope;
   GenericsScope.emplace(this, ScopeKind::Generics);
   GenericParamList *GenericParams;
-
+  bool GPHasCodeCompletion = false;
   // If the name is an operator token that ends in '<' and the following token
   // is an identifier, split the '<' off as a separate token. This allows things
   // like 'func ==<T>(x:T, y:T) {}' to parse as '==' with generic type variable
@@ -4061,10 +4061,16 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     SimpleName = Context.getIdentifier(SimpleName.str().
                                        slice(0, SimpleName.str().size() - 1));
     SourceLoc LAngleLoc = NameLoc.getAdvancedLoc(SimpleName.str().size());
-    GenericParams = parseGenericParameters(LAngleLoc);
+    auto Result = parseGenericParameters(LAngleLoc);
+    GenericParams = Result.getPtrOrNull();
+    GPHasCodeCompletion |= Result.hasCodeCompletion();
   } else {
-    GenericParams = maybeParseGenericParams();
+    auto Result = maybeParseGenericParams();
+    GenericParams = Result.getPtrOrNull();
+    GPHasCodeCompletion |= Result.hasCodeCompletion();
   }
+  if (GPHasCodeCompletion && !CodeCompletion)
+    return makeParserCodeCompletionStatus();
 
   SmallVector<ParameterList*, 8> BodyParams;
   
@@ -4119,7 +4125,11 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     // Add the attributes here so if we need them while parsing the body
     // they are available.
     FD->getAttrs() = Attributes;
-      
+
+    // Code completion for the generic type params.
+    if (GPHasCodeCompletion)
+      CodeCompletion->setDelayedParsedDecl(FD);
+
     // Pass the function signature to code completion.
     if (SignatureStatus.hasCodeCompletion())
       CodeCompletion->setDelayedParsedDecl(FD);
@@ -4242,7 +4252,10 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   GenericParamList *GenericParams = nullptr;
   {
     Scope S(this, ScopeKind::Generics);
-    GenericParams = maybeParseGenericParams();
+    auto Result = maybeParseGenericParams();
+    GenericParams = Result.getPtrOrNull();
+    if (Result.hasCodeCompletion())
+      return makeParserCodeCompletionStatus();
   }
 
   EnumDecl *UD = new (Context) EnumDecl(EnumLoc, EnumName, EnumNameLoc,
@@ -4508,7 +4521,10 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   GenericParamList *GenericParams = nullptr;
   {
     Scope S(this, ScopeKind::Generics);
-    GenericParams = maybeParseGenericParams();
+    auto Result = maybeParseGenericParams();
+    GenericParams = Result.getPtrOrNull();
+    if (Result.hasCodeCompletion())
+      return makeParserCodeCompletionStatus();
   }
 
   StructDecl *SD = new (Context) StructDecl(StructLoc, StructName,
@@ -4588,7 +4604,10 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
   GenericParamList *GenericParams = nullptr;
   {
     Scope S(this, ScopeKind::Generics);
-    GenericParams = maybeParseGenericParams();
+    auto Result = maybeParseGenericParams();
+    GenericParams = Result.getPtrOrNull();
+    if (Result.hasCodeCompletion())
+      return makeParserCodeCompletionStatus();
   }
 
   // Create the class.
@@ -4865,7 +4884,10 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   // Parse the generic-params, if present.
   Scope S(this, ScopeKind::Generics);
-  GenericParamList *GenericParams = maybeParseGenericParams();
+  auto GPResult = maybeParseGenericParams();
+  GenericParamList *GenericParams = GPResult.getPtrOrNull();
+  if (GPResult.hasCodeCompletion())
+    return makeParserCodeCompletionStatus();
 
   // Parse the parameters.
   // FIXME: handle code completion in Arguments.
