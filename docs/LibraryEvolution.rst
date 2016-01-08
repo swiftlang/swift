@@ -198,6 +198,11 @@ No other changes are permitted; the following are particularly of note:
 - A public function may not add, remove, or reorder parameters, whether or not
   they have default values.
 
+.. admonition:: TODO
+
+    Can a throwing function become non-throwing? It's a "safe" change but
+    it's hard to document how it used to behave for backwards-deployers.
+
 
 Inlineable Functions
 --------------------
@@ -449,6 +454,10 @@ layout.
     accessors of a property are fine, but those that provide new entry points
     are trickier.
 
+Like top-level constants, it is *not* safe to change a ``let`` property into a
+variable or vice versa. Properties declared with ``let`` are assumed not to
+change for the entire lifetime of the program once they have been initialized.
+
 
 New Conformances
 ----------------
@@ -497,17 +506,18 @@ To opt out of this flexibility, a struct may be marked ``@fixed_layout``. This
 promises that no stored properties will be added to or removed from the struct,
 even ``private`` or ``internal`` ones. In effect:
 
-- Reordering stored properties relative to one another is not permitted.
-  Reordering all other members is still permitted.
-- Adding new stored properties (public or non-public) is not permitted.
+- Reordering stored instance properties relative to one another is not
+  permitted. Reordering all other members is still permitted.
+- Adding new stored instance properties (public or non-public) is not permitted.
   Adding any other new members is still permitted.
-- Existing properties may not be changed from stored to computed or vice versa.
+- Existing instance properties may not be changed from stored to computed or
+  vice versa.
 - Changing the body of any *existing* methods, initializers, or accessors is
   permitted.
 - Adding or removing observing accessors from public stored properties is still
   permitted.
-- Removing stored properties is not permitted. Removing any other non-public
-  members is still permitted.
+- Removing stored instance properties is not permitted. Removing any other
+  non-public members is still permitted.
 - Adding a new protocol conformance is still permitted.
 - Removing conformances to non-public protocols is still permitted.
 
@@ -516,11 +526,6 @@ The ``@fixed_layout`` attribute takes a version number, just like
 the library, which may have a different layout for the struct. (In this case
 the client must manipulate the struct as if the ``@fixed_layout`` attribute
 were absent.)
-
-.. admonition:: TODO
-
-    There's a benefit to knowing that a struct was ``@fixed_layout`` since it
-    was first made available. How should that be spelled?
 
 .. admonition:: TODO
 
@@ -567,6 +572,12 @@ stored. The attribute may not be applied to non-final properties in classes.
     of the base class, not any of its subclasses. But this is probably too
     subtle, and makes it look like the attribute is doing something useful when
     it actually isn't.
+
+.. note::
+
+    This is getting into "diminishing returns" territory. Should we just take
+    it out of the document for now? We can probably add it later, although like
+    the other attributes it couldn't be backdated.
 
 Enums
 ~~~~~
@@ -652,7 +663,7 @@ Protocols
 
 There are very few safe changes to make to protocols:
 
-- A new requirement may be added to a protocol, as long as it has an
+- A new non-type requirement may be added to a protocol, as long as it has an
   unconstrained default implementation.
 - A new optional requirement may be added to an ``@objc`` protocol.
 - All members may be reordered, including associated types.
@@ -665,6 +676,11 @@ members may always be removed from protocol extensions.
     We don't have an implementation model hammered out for adding new
     defaulted requirements, but it is desirable.
 
+.. admonition:: TODO
+
+    It would also be nice to be able to add new associated types with default
+    values, but that seems trickier to implement.
+
 
 Classes
 ~~~~~~~
@@ -674,7 +690,6 @@ flexible and can change in many ways between releases. Like structs, classes
 support all of the following changes:
 
 - Reordering any existing members, including stored properties.
-- Adding any new members, including stored properties, **except initializers**.
 - Changing existing properties from stored to computed or vice versa.
 - Changing the body of any methods, initializers, or accessors.
 - Adding or removing an observing accessor (``willSet`` or ``didSet``) to/from
@@ -684,23 +699,53 @@ support all of the following changes:
 - Adding a new protocol conformance (with proper availability annotations).
 - Removing conformances to non-public protocols.
 
-Initializers require special care, because a convenience initializer in a
-publicly-subclassable class depends on the presence of a designated initializer
-in the subclass. Adding a new designated initializer could thus break existing
-subclasses, unless previously-available *convenience* initializers are
-restricted from invoking newer designated initializers.
+Omitted from this list is the free addition of new members. Here classes are a
+little more restrictive than structs; they only allow the following changes:
 
-New convenience initializers can always be added, although they will not be
-present on subclasses. New ``required`` initializers can *never* be added
-unless the class is not publicly subclassable.
+- Adding a new convenience initializer.
+- Adding a new designated initializer, if the class is not publicly
+  subclassable.
+- Adding a deinitializer.
+- Adding new, non-overriding method, subscript, or property.
+- Adding a new overriding member, as long as its type does not change.
+  Changing the type could be incompatible with existing overrides in subclasses.
 
-.. note:: If this sounds confusing, it's because our initializer model is
-  mostly a formalization of Objective-C's with extra safety constraints.
-  We'd like to revisit it at some point.
+Finally, classes allow the following changes that do not apply to structs:
 
-Adding *or* removing ``final`` from a class or any of its members is not an
-ABI-safe change. The presence of ``final`` enables optimization; its absence
-means there may be subclasses/overrides that would be broken by the change.
+- "Moving" a method, subscript, or property up to its superclass. The
+  declaration of the original member must remain along with its original
+  availability, but its body may consist of simply calling the new superclass
+  implementation.
+- Changing a class's superclass ``A`` to another class ``B``, *if* class ``B``
+  is a subclass of ``A`` *and* class ``B``, along with any superclasses between
+  it and class ``A``, were introduced in the latest version of the library.
+
+.. admonition:: TODO
+
+    The latter is very tricky to get right. We've seen it happen a few times in
+    Apple's SDKs, but at least one of them, `NSCollectionViewItem`_ becoming a
+    subclass of NSViewController instead of the root class NSObject, doesn't
+    strictly follow the rules. While NSViewController was introduced in the
+    same version of the OS, its superclass, NSResponder, was already present.
+    If a client app was deploying to an earlier version of the OS, would
+    NSCollectionViewItem be a subclass of NSResponder or not? How would the
+    compiler be able to enforce this?
+
+.. _NSCollectionViewItem: https://developer.apple.com/library/mac/documentation/Cocoa/Reference/NSCollectionViewItem_Class/index.html
+
+Other than those detailed above, no other changes to a class or its members
+are permitted. In particular:
+
+- New designated initializers may not be added to a publicly-subclassable
+  class. This would change the inheritance of convenience initializers, which
+  existing subclasses may depend on.
+- New ``required`` initializers may not be added to a publicly-subclassable
+  class. There is no way to guarantee their presence on existing subclasses.
+- ``final`` may not be added to *or* removed from a class or any of its members.
+  The presence of ``final`` enables optimization; its absence means there may
+  be subclasses/overrides that would be broken by the change.
+- ``dynamic`` may not be added to *or* removed from any members. Existing
+  clients would not know to invoke the member dynamically.
 
 .. note:: This ties in with the ongoing discussions about
   "``final``-by-default" and "non-publicly-subclassable-by-default".
@@ -717,19 +762,35 @@ members in its virtual dispatch table. These annotations have not been designed.
 Extensions
 ~~~~~~~~~~
 
-Extensions largely follow the same rules as the types they extend.
+Non-protocol extensions largely follow the same rules as the types they extend.
+The following changes are permitted:
 
-- Adding new extensions and removing empty extensions is always permitted.
-- Adding or removing members within a non-protocol extension follows the same
-  rules as the base type.
-- Adding members to a protocol extension is always permitted.
-- Removing non-public members from a protocol extension is always permitted.
-- Reordering members in extensions is always permitted.
-- Changing the bodies of any member in an extension is always permitted.
-- Moving a member from one extension to another within a module is always
-  permitted, as long as both extensions have the exact same constraints.
-- Moving a member from a non-protocol extension to the declaration of the base
-  type within the same module is always permitted.
+- Adding new extensions and removing empty extensions.
+- Moving a member from one extension to another within the same module, as long
+  as both extensions have the exact same constraints.
+- Moving a member from an extension to the declaration of the base type,
+  provided that the declaration is in the same module. The reverse is permitted
+  for all members except stored properties, although note that moving all
+  initializers out of a type declaration may cause a new one to be implicitly
+  synthesized.
+
+Adding, removing, reordering, and modifying members follow the same rules as
+the base type; see the sections on structs, enums, and classes above.
+
+
+Protocol Extensions
+-------------------
+
+Protocol extensions follow slightly different rules; the following changes
+are permitted:
+
+- Adding new extensions and removing empty extensions.
+- Moving a member from one extension to another within the same module, as long
+  as both extensions have the exact same constraints.
+- Adding any new member.
+- Reordering members.
+- Removing any non-public member.
+- Changing the body of any methods, initializers, or accessors.
 
 
 A Unifying Theme
@@ -841,6 +902,11 @@ Collectively these features are known as "performance assertions", to
 underscore the fact that they do not affect how a type is used at the source
 level, but do allow for additional optimizations. We may also expose some of
 these qualities to static or dynamic queries for performance-sensitive code.
+
+.. note:: Previous revisions of this document contained a ``no_payload``
+    assertion for enums. However, this doesn't actually offer any additional
+    optimization opportunities over combining ``trivial`` with ``size_in_bits``,
+    and the latter is more flexible.
 
 All of these features need to be versioned, just like the more semantic
 fragility attributes above. The exact spelling is not proposed by this document.
