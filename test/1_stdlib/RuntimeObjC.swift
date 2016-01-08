@@ -877,7 +877,10 @@ ObjCConformsToProtocolTestSuite.test("cast/instance") {
   expectTrue(SomeClass() is SomeObjCProto)
   expectTrue(SomeSubclass() is SomeObjCProto)
 }
+
 ObjCConformsToProtocolTestSuite.test("cast/metatype") {
   expectTrue(SomeClass.self is SomeObjCProto.Type)
   expectTrue(SomeSubclass.self is SomeObjCProto.Type)
 }
+
+runAllTests()
