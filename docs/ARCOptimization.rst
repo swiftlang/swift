@@ -453,7 +453,7 @@ and we completely unroll it. Then we have::
 We want to be able to pair and eliminate (2)/(3) and (4)/(5). In order to do
 that, we need to move (2) from bb0 into bb1 and (4) from bb1 into bb2. In order
 to do this, we need to move a release along all paths into bb4 lest we lose
-dnymaic releases along that path. We also sink (6) in order to not have an extra
+dynamic releases along that path. We also sink (6) in order to not have an extra
 release along that path. This then give us::
 
   bb0:
@@ -695,7 +695,7 @@ IR sequence::
     // refcount(%0) == n+1
 
 If n is not 1, then trivially is_unique will return false. So assume that n is 1
-for our purposes so no copy is occuring here. Thus we have::
+for our purposes so no copy is occurring here. Thus we have::
 
   bb0(%0 : $Builtin.NativeObject):
     // refcount(%0) == 1
