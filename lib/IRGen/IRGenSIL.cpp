@@ -1633,8 +1633,9 @@ void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
   assert(loweredTy == i->getType().getObjectType());
   auto &ti = getTypeInfo(loweredTy);
   
-  // If the variable is empty, don't actually emit it; just return undef.
-  if (ti.isKnownEmpty()) {
+  // If the variable is universally fixed-size and known to be empty, don't
+  // actually emit a symbol for the global at all, just return undef.
+  if (ti.isFixedSize(ResilienceExpansion::Minimal) && ti.isKnownEmpty()) {
     setLoweredAddress(SILValue(i, 0), ti.getUndefAddress());
     return;
   }

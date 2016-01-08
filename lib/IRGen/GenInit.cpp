@@ -36,10 +36,9 @@ Address IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
   auto &ti = getTypeInfo(var->getLoweredType());
   
   // If the variable is empty, don't actually emit it; just return undef.
-  if (ti.isKnownEmpty()) {
+  if (ti.isFixedSize(ResilienceExpansion::Minimal) && ti.isKnownEmpty())
     return ti.getUndefAddress();
-  }
-  
+
   /// Get the global variable.
   Address addr = getAddrOfSILGlobalVariable(var, ti,
                      var->isDefinition() ? ForDefinition : NotForDefinition);

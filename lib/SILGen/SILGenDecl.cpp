@@ -918,6 +918,7 @@ InitializationPtr SILGenFunction::emitInitializationForVarDecl(VarDecl *vd) {
   InitializationPtr Result;
   if (!vd->getDeclContext()->isLocalContext()) {
     auto *silG = SGM.getSILGlobalVariable(vd, NotForDefinition);
+    B.createAllocGlobal(vd, silG);
     SILValue addr = B.createGlobalAddr(vd, silG);
     if (isUninitialized)
       addr = B.createMarkUninitializedVar(vd, addr);

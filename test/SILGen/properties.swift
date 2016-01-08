@@ -566,7 +566,8 @@ func force_global_observing_property_setter() {
 // The property is initialized with "zero".
 // CHECK-LABEL: sil private @globalinit_{{.*}}_func1 : $@convention(thin) () -> () {
 // CHECK: bb0:
-// CHECK-NEXT: %0 = global_addr @_Tv10properties25global_observing_propertySi : $*Int
+// CHECK-NEXT: alloc_global @_Tv10properties25global_observing_propertySi
+// CHECK-NEXT: %1 = global_addr @_Tv10properties25global_observing_propertySi : $*Int
 // CHECK: properties.zero.unsafeMutableAddressor
 // CHECK: return
 
