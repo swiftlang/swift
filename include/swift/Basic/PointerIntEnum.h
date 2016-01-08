@@ -210,7 +210,7 @@ public:
   }
 
   /// \returns the pointer stored in the enum if the enum has a pointer
-  /// payload. Asserts if the PointerIntEnum is invalid or has a index payload.
+  /// payload. Asserts if the PointerIntEnum is invalid or has an index payload.
   PointerTy getPointer() const {
     assert(isValid());
     assert(unsigned(*getKind()) <= unsigned(EnumTy::LastPointerKind));

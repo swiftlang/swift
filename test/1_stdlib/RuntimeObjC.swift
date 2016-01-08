@@ -378,7 +378,7 @@ Runtime.test("isBridgedVerbatimToObjectiveC") {
   expectTrue(_isBridgedVerbatimToObjectiveC(BridgedVerbatimRefType))
 }
 
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 class SomeClass {}
 @objc class SomeObjCClass {}
