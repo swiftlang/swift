@@ -34,7 +34,7 @@
 using namespace swift;
 
 
-#if defined(NDEBUG) && SWIFT_OBJC_INTEROP
+#if !defined(NDEBUG) && SWIFT_OBJC_INTEROP
 #include <objc/runtime.h>
 
 static const char *class_getName(const ClassMetadata* type) {
