@@ -1244,21 +1244,6 @@ public:
     visit(e->getRHS());
   }
 
-  /// Skip over all of the 'Self'-related substitutions within the given set
-  /// of substitutions.
-  ArrayRef<Substitution> getNonSelfSubstitutions(ArrayRef<Substitution> subs) {
-    unsigned innerIdx = 0, n = subs.size();
-    for (; innerIdx != n; ++innerIdx) {
-      auto archetype = subs[innerIdx].getArchetype();
-      while (archetype->getParent())
-        archetype = archetype->getParent();
-      if (!archetype->getSelfProtocol())
-        break;
-    }
-
-    return subs.slice(innerIdx);
-  }
-
   void visitFunctionConversionExpr(FunctionConversionExpr *e) {
     // FIXME: Check whether this function conversion requires us to build a
     // thunk.
@@ -3701,13 +3686,12 @@ SILGenFunction::emitUninitializedArrayAllocation(Type ArrayTy,
                                                  SILLocation Loc) {
   auto &Ctx = getASTContext();
   auto allocate = Ctx.getAllocateUninitializedArray(nullptr);
-  auto allocateArchetypes = allocate->getGenericParams()->getAllArchetypes();
 
   auto arrayElementTy = ArrayTy->castTo<BoundGenericType>()
     ->getGenericArgs()[0];
 
   // Invoke the intrinsic, which returns a tuple.
-  Substitution sub{allocateArchetypes[0], arrayElementTy, {}};
+  Substitution sub{arrayElementTy, {}};
   auto result = emitApplyOfLibraryIntrinsic(Loc, allocate,
                                             sub,
                                             ManagedValue::forUnmanaged(Length),
@@ -3728,13 +3712,12 @@ void SILGenFunction::emitUninitializedArrayDeallocation(SILLocation loc,
                                                         SILValue array) {
   auto &Ctx = getASTContext();
   auto deallocate = Ctx.getDeallocateUninitializedArray(nullptr);
-  auto archetypes = deallocate->getGenericParams()->getAllArchetypes();
 
   CanType arrayElementTy =
     array.getType().castTo<BoundGenericType>().getGenericArgs()[0];
 
   // Invoke the intrinsic.
-  Substitution sub{archetypes[0], arrayElementTy, {}};
+  Substitution sub{arrayElementTy, {}};
   emitApplyOfLibraryIntrinsic(loc, deallocate, sub,
                               ManagedValue::forUnmanaged(array),
                               SGFContext());

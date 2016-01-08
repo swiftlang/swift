@@ -3013,10 +3013,7 @@ public:
   /// Get a representation of the lookup type as a substitution of the
   /// protocol's Self archetype.
   Substitution getSelfSubstitution() const {
-    auto memberDC = getMember().getDecl()->getDeclContext();
-    return Substitution{memberDC->getProtocolSelf()->getArchetype(),
-                        getLookupType(),
-                        Conformance};
+    return Substitution{getLookupType(), Conformance};
   }
 
   bool hasOperand() const { return OptionalOperand.hasValue(); }

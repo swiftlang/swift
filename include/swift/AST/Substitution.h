@@ -35,31 +35,10 @@ using ArchetypeConformanceMap
 
 /// Substitution - A substitution into a generic specialization.
 class Substitution {
-  ArchetypeType * Archetype = nullptr;
   Type Replacement;
   ArrayRef<ProtocolConformanceRef> Conformance;
 
 public:
-  /// FIXME: An archetype that looks like the archetype or dependent generic
-  /// parameter type that should be substituted by this substitution, but
-  /// which is not guaranteed to map to any particular context. All that is
-  /// guaranteed:
-  ///
-  /// - Archetype will conform to the same protocols as the substituted
-  ///   type.
-  /// - Archetype will appear at the same point in the generic parameter
-  ///   hierarchy as the substituted type; that is, if the substituted type
-  ///   is a generic parameter, it will be a primary archetype, or if the
-  ///   substituted type is a dependent member type, it will be a nested
-  ///   archetype with the same name path--if T0.Foo.Bar is being substituted,
-  ///   this will be some archetype X.Foo.Bar.
-  /// - If the substituted type represents a Self or associated type of a
-  ///   protocol requirement, this Archetype will be that archetype from the
-  ///   protocol context.
-  ///
-  /// You really shouldn't use the value of this field for anything new.
-  ArchetypeType *getArchetype() const { return Archetype; }
-  
   /// The replacement type.
   Type getReplacement() const { return Replacement; }
   
@@ -71,9 +50,7 @@ public:
   
   Substitution() {}
   
-  Substitution(ArchetypeType *Archetype,
-               Type Replacement,
-               ArrayRef<ProtocolConformanceRef> Conformance);
+  Substitution(Type Replacement, ArrayRef<ProtocolConformanceRef> Conformance);
 
   bool operator!=(const Substitution &other) const { return !(*this == other); }
   bool operator==(const Substitution &other) const;
@@ -94,6 +71,60 @@ private:
                      ArrayRef<Substitution> subs,
                      TypeSubstitutionMap &subMap,
                      ArchetypeConformanceMap &conformanceMap) const;
+};
+
+/// An iterator over a list of archetypes and the substitutions
+/// applied to them.
+class SubstitutionIterator {
+  // TODO: this should use dependent types when getConformsTo() becomes
+  // efficient there.
+  ArrayRef<ArchetypeType*> Archetypes;
+  ArrayRef<Substitution> Subs;
+
+public:
+  SubstitutionIterator() = default;
+  explicit SubstitutionIterator(GenericParamList *params,
+                                ArrayRef<Substitution> subs);
+
+  struct iterator {
+    ArchetypeType * const *NextArch = nullptr;
+    const Substitution *NextSub = nullptr;
+
+    iterator() = default;
+    iterator(ArchetypeType * const *nextArch, const Substitution *nextSub)
+      : NextArch(nextArch), NextSub(nextSub) {}
+
+    iterator &operator++() {
+      ++NextArch;
+      ++NextSub;
+      return *this;
+    }
+
+    iterator operator++(int) {
+      iterator copy = *this;
+      ++*this;
+      return copy;
+    }
+
+    std::pair<ArchetypeType*,Substitution> operator*() const {
+      return { *NextArch, *NextSub };
+    }
+
+    bool operator==(const iterator &other) const {
+      assert((NextSub == other.NextSub) == (NextArch == other.NextArch));
+      return NextSub == other.NextSub;
+    }
+    bool operator!=(const iterator &other) const {
+      return !(*this == other);
+    }
+  };
+
+  ArrayRef<Substitution> getSubstitutions() const { return Subs; }
+
+  bool empty() const { return Archetypes.empty(); }
+
+  iterator begin() const { return { Archetypes.begin(), Subs.begin() }; }
+  iterator end() const { return { Archetypes.end(), Subs.end() }; }
 };
 
 void dump(const ArrayRef<Substitution> &subs);

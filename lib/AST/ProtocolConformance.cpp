@@ -309,6 +309,13 @@ SpecializedProtocolConformance::SpecializedProtocolConformance(
   assert(genericConformance->getKind() != ProtocolConformanceKind::Specialized);
 }
 
+SubstitutionIterator
+SpecializedProtocolConformance::getGenericSubstitutionIterator() const {
+  return SubstitutionIterator(
+          GenericConformance->getDeclContext()->getGenericParamsOfContext(),
+                              GenericSubstitutions);
+}
+
 bool SpecializedProtocolConformance::hasTypeWitness(
                       AssociatedTypeDecl *assocType, 
                       LazyResolver *resolver) const {
@@ -349,8 +356,7 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
 
   // Gather the conformances for the type witness. These should never fail.
   SmallVector<ProtocolConformanceRef, 4> conformances;
-  auto archetype = genericWitness.getArchetype();
-  for (auto proto : archetype->getConformsTo()) {
+  for (auto proto : assocType->getConformingProtocols(resolver)) {
     auto conforms = conformingModule->lookupConformance(specializedType, proto,
                                                         resolver);
     assert((conforms.getInt() == ConformanceKind::Conforms ||
@@ -364,7 +370,7 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
   // Form the substitution.
   auto &ctx = assocType->getASTContext();
   TypeWitnesses[assocType] = std::make_pair(
-                        Substitution{archetype, specializedType,
+                        Substitution{specializedType,
                                      ctx.AllocateCopy(conformances)},
                         typeDecl);
   return TypeWitnesses[assocType];
@@ -459,12 +465,12 @@ ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
   // Preserve specialization through this operation by peeling off the
   // substitutions from a specialized conformance so we can apply them later.
   const ProtocolConformance *unspecialized;
-  ArrayRef<Substitution> subs;
+  SubstitutionIterator subs;
   switch (getKind()) {
   case ProtocolConformanceKind::Specialized: {
     auto spec = cast<SpecializedProtocolConformance>(this);
     unspecialized = spec->getGenericConformance();
-    subs = spec->getGenericSubstitutions();
+    subs = spec->getGenericSubstitutionIterator();
     break;
   }
     
@@ -504,15 +510,16 @@ found_inherited:
     ArchetypeConformanceMap conformanceMap;
 
     // Fill in the substitution and conformance maps.
-    // FIXME: Unfortunate reliance on Substitution::Archetype here.
-    for (auto sub : subs) {
-      auto arch = sub.getArchetype();
+    for (auto archAndSub : subs) {
+      auto arch = archAndSub.first;
+      auto sub = archAndSub.second;
       conformanceMap[arch] = sub.getConformances();
       if (arch->isPrimary())
         subMap[arch] = sub.getReplacement();
     }
     return foundInherited->subst(getDeclContext()->getParentModule(),
-                                 getType(), subs, subMap, conformanceMap);
+                                 getType(), subs.getSubstitutions(),
+                                 subMap, conformanceMap);
   }
   assert((getType()->isEqual(foundInherited->getType()) ||
           foundInherited->getType()->isSuperclassOf(getType(), nullptr))

@@ -1415,8 +1415,7 @@ CanSILFunctionType SILGenFunction::buildThunkType(
       SmallVector<ProtocolConformanceRef, 4> conformances;
       for (auto proto : archetype->getConformsTo())
         conformances.push_back(ProtocolConformanceRef(proto));
-      subs.push_back({ archetype, archetype,
-                       getASTContext().AllocateCopy(conformances) });
+      subs.push_back({ archetype, getASTContext().AllocateCopy(conformances) });
     }
   }
 

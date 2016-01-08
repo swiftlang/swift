@@ -50,8 +50,7 @@ void ConcreteDeclRef::dump(raw_ostream &os) {
         os << ", ";
       }
 
-      os << sub.getArchetype()->getFullName()
-         << "=" << sub.getReplacement().getString();
+      os << sub.getReplacement().getString();
 
       if (sub.getConformances().size()) {
         os << '[';

@@ -36,6 +36,7 @@ class GenericParamList;
 class NormalProtocolConformance;
 class ProtocolConformance;
 class ModuleDecl;
+class SubstitutionIterator;
 enum class AllocationArena;
   
 /// \brief Type substitution mapping from substitutable types to their
@@ -501,6 +502,8 @@ public:
   ArrayRef<Substitution> getGenericSubstitutions() const {
     return GenericSubstitutions;
   }
+
+  SubstitutionIterator getGenericSubstitutionIterator() const;
 
   /// Get the protocol being conformed to.
   ProtocolDecl *getProtocol() const {

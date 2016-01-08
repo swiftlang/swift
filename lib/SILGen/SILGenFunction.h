@@ -1542,8 +1542,7 @@ public:
   
   /// Produce a substitution for invoking a pointer argument conversion
   /// intrinsic.
-  Substitution getPointerSubstitution(Type pointerType,
-                                      ArchetypeType *archetype);
+  Substitution getPointerSubstitution(Type pointerType);
 };
 
 

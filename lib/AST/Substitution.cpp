@@ -26,7 +26,7 @@ using namespace swift;
 bool Substitution::operator==(const Substitution &other) const {
   // The archetypes may be missing, but we can compare them directly
   // because archetypes are always canonical.
-  return Archetype == other.Archetype &&
+  return
     Replacement->getCanonicalType() == other.Replacement->getCanonicalType() &&
     Conformance.equals(other.Conformance);
 }
@@ -50,20 +50,13 @@ getSubstitutionMaps(GenericParamList *context,
   assert(subs.empty() && "did not use all substitutions?!");
 }
 
-Substitution::Substitution(ArchetypeType *Archetype,
-                           Type Replacement,
+Substitution::Substitution(Type Replacement,
                            ArrayRef<ProtocolConformanceRef> Conformance)
-  : Archetype(Archetype), Replacement(Replacement), Conformance(Conformance)
+  : Replacement(Replacement), Conformance(Conformance)
 {
   // The replacement type must be materializable.
   assert(Replacement->isMaterializable()
          && "cannot substitute with a non-materializable type");
-  
-  assert(Archetype && "missing archetype in substitution");
-  
-  // The conformance list must match the archetype conformances.
-  assert(Conformance.size() == Archetype->getConformsTo().size()
-         && "substitution conformances don't match archetype");
 }
 
 Substitution Substitution::subst(Module *module,
@@ -88,7 +81,7 @@ Substitution Substitution::subst(Module *module,
     return *this;
 
   if (Conformance.empty()) {
-    return {Archetype, substReplacement, Conformance};
+    return {substReplacement, Conformance};
   }
 
   bool conformancesChanged = false;
@@ -164,5 +157,10 @@ Substitution Substitution::subst(Module *module,
   else
     substConfs = Conformance;
 
-  return Substitution{Archetype, substReplacement, substConfs};
+  return Substitution{substReplacement, substConfs};
+}
+
+SubstitutionIterator::SubstitutionIterator(GenericParamList *params,
+                                           ArrayRef<Substitution> subs)
+  : Archetypes(params->getAllArchetypes()), Subs(subs) {
 }

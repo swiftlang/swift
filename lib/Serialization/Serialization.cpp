@@ -1193,7 +1193,6 @@ Serializer::writeSubstitutions(ArrayRef<Substitution> substitutions,
 
     BoundGenericSubstitutionLayout::emitRecord(
       Out, ScratchRecord, abbrCode,
-      addTypeRef(sub.getArchetype()),
       addTypeRef(sub.getReplacement()),
       sub.getConformances().size());
 

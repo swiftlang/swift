@@ -3518,16 +3518,13 @@ void irgen::emitWitnessTableRefs(IRGenFunction &IGF,
   auto conformances = sub.getConformances();
 
   // We don't need to do anything if we have no protocols to conform to.
-  auto archetypeProtos = sub.getArchetype()->getConformsTo();
-  assert(!conformances.size() || archetypeProtos.size() == conformances.size());
-
-  if (archetypeProtos.empty()) return;
+  if (conformances.empty()) return;
 
   // Look at the replacement type.
   CanType replType = sub.getReplacement()->getCanonicalType();
 
-  for (unsigned j = 0, je = archetypeProtos.size(); j != je; ++j) {
-    auto proto = archetypeProtos[j];
+  for (unsigned j : indices(conformances)) {
+    auto proto = conformances[j].getRequirement();
     if (!Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
       continue;
 

@@ -52,7 +52,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 231; // abstract protocol conformances
+const uint16_t VERSION_MINOR = 232; // no archetype in substitutions
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -661,7 +661,6 @@ namespace decls_block {
 
   using BoundGenericSubstitutionLayout = BCRecordLayout<
     BOUND_GENERIC_SUBSTITUTION,
-    TypeIDField, // archetype
     TypeIDField,  // replacement
     BCVBR<5>
     // Trailed by protocol conformance info (if any)
@@ -1138,7 +1137,7 @@ namespace decls_block {
 
   using SpecializedProtocolConformanceLayout = BCRecordLayout<
     SPECIALIZED_PROTOCOL_CONFORMANCE,
-  TypeIDField,         // conforming type
+    TypeIDField,         // conforming type
     BCVBR<5>             // # of substitutions for the conformance
     // followed by substitution records for the conformance
   >;

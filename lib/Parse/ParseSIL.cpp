@@ -71,7 +71,6 @@ SILParserTUState::~SILParserTUState() {
 namespace {
   struct ParsedSubstitution {
     SourceLoc loc;
-    Identifier name;
     Type replacement;
   };
 
@@ -1382,10 +1381,6 @@ bool SILParser::parseApplySubstitutions(
   // Parse a list of Substitutions.
   do {
     SourceLoc Loc = P.Tok.getLoc();
-    Substitution Sub;
-    SILType Replace;
-    Identifier ArcheId;
-    TypeAttributes emptyAttrs;
 
     // Parse substitution as AST type.
     ParserResult<TypeRepr> TyR = P.parseType();
@@ -1394,7 +1389,7 @@ bool SILParser::parseApplySubstitutions(
     TypeLoc Ty = TyR.get();
     if (performTypeLocChecking(Ty, false))
       return true;
-    parsed.push_back({Loc, ArcheId, Ty.getType()});
+    parsed.push_back({Loc, Ty.getType()});
   } while (P.consumeIf(tok::comma));
   
   // Consume the closing '>'.
@@ -1497,7 +1492,7 @@ bool getApplySubstitutionsFromParsed(
                                        parsed.loc, conformances))
       return true;
 
-    subs.push_back({subArchetype, parsed.replacement,
+    subs.push_back({parsed.replacement,
                     SP.P.Context.AllocateCopy(conformances)});
   }
   if (!parses.empty()) {
@@ -4019,25 +4014,6 @@ bool SILParser::parseSpecConformanceSubstitutions(
   // Parse a list of Substitutions: Archetype = Replacement.
   do {
     SourceLoc Loc = P.Tok.getLoc();
-    Substitution Sub;
-    Identifier ArcheId;
-    std::string ArcheStr;
-    bool FirstToken = true;
-
-    // It is possible to have Base.Element as the Archetype name.
-    do {
-      Identifier TmpId;
-      if (parseSILIdentifier(TmpId, diag::expected_sil_type))
-        return true;
-      if (!FirstToken)
-        ArcheStr += ".";
-      ArcheStr += TmpId.str();
-      FirstToken = false;
-    } while (P.consumeIf(tok::period));
-    ArcheId = P.Context.getIdentifier(ArcheStr);
-
-    if (P.parseToken(tok::equal, diag::expected_tok_in_sil_instr, "="))
-      return true;
 
     // Parse substitution as AST type.
     ParserResult<TypeRepr> TyR = P.parseType();
@@ -4046,7 +4022,7 @@ bool SILParser::parseSpecConformanceSubstitutions(
     TypeLoc Ty = TyR.get();
     if (performTypeLocChecking(Ty, false))
       return true;
-    parsed.push_back({Loc, ArcheId, Ty.getType()});
+    parsed.push_back({Loc, Ty.getType()});
   } while (P.consumeIf(tok::comma));
 
   // Consume the closing '>'.
@@ -4055,38 +4031,6 @@ bool SILParser::parseSpecConformanceSubstitutions(
     return true;
   }
   P.consumeToken();
-  return false;
-}
-
-/// Reconstruct AST substitutions from parsed substitutions using archetypes
-/// from a BoundGenericType.
-static bool getSpecConformanceSubstitutionsFromParsed(
-                             Parser &P,
-                             GenericParamList *gp,
-                             ArrayRef<ParsedSubstitution> parses,
-                             SmallVectorImpl<Substitution> &subs) {
-  for (auto &parsed : parses) {
-    ArchetypeType *subArchetype = nullptr;
-    Type subReplacement;
-    // Find the corresponding ArchetypeType.
-    for (auto archetype : gp->getAllNestedArchetypes())
-      if (archetype->getFullName() == parsed.name.str()) {
-        subArchetype = archetype;
-        break;
-      }
-    if (!subArchetype) {
-      P.diagnose(parsed.loc, diag::sil_witness_archetype_not_found);
-      return true;
-    }
-    subReplacement = parsed.replacement;
-    SmallVector<ProtocolConformanceRef, 2> conformances;
-    if (getConformancesForSubstitution(P, gp, subArchetype, subReplacement,
-                                       parsed.loc, conformances))
-      return true;
-
-    subs.push_back({subArchetype, subReplacement,
-                    P.Context.AllocateCopy(conformances)});
-  }
   return false;
 }
 
@@ -4163,7 +4107,7 @@ ProtocolConformance *SILParser::parseProtocolConformanceHelper(
       return nullptr;
 
     SmallVector<Substitution, 4> subs;
-    if (getSpecConformanceSubstitutionsFromParsed(P, gp, parsedSubs, subs))
+    if (getApplySubstitutionsFromParsed(*this, gp, parsedSubs, subs))
       return nullptr;
 
     auto result = P.Context.getSpecializedConformance(

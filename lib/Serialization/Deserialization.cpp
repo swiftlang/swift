@@ -615,19 +615,12 @@ ModuleFile::maybeReadSubstitution(llvm::BitstreamCursor &cursor) {
   if (recordID != decls_block::BOUND_GENERIC_SUBSTITUTION)
     return None;
 
-  TypeID archetypeID, replacementID;
+  TypeID replacementID;
   unsigned numConformances;
   decls_block::BoundGenericSubstitutionLayout::readRecord(scratch,
-                                                          archetypeID,
                                                           replacementID,
                                                           numConformances);
 
-  if (&cursor == &SILCursor) {
-    assert(Types[archetypeID-1].isComplete() &&
-	   "SIL substitutions should always reference existing archetypes");
-  }
-
-  auto archetypeTy = getType(archetypeID)->castTo<ArchetypeType>();
   auto replacementTy = getType(replacementID);
 
   SmallVector<ProtocolConformanceRef, 4> conformanceBuf;
@@ -636,7 +629,7 @@ ModuleFile::maybeReadSubstitution(llvm::BitstreamCursor &cursor) {
   }
 
   lastRecordOffset.reset();
-  return Substitution{archetypeTy, replacementTy,
+  return Substitution{replacementTy,
                       getContext().AllocateCopy(conformanceBuf)};
 }
 

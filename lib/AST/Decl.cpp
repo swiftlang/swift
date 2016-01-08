@@ -566,7 +566,7 @@ GenericParamList::getForwardingSubstitutions(ASTContext &C) {
 
     // Build an identity mapping with the derived conformances.
     auto replacement = SubstitutedType::get(archetype, archetype, C);
-    subs.push_back({archetype, replacement, C.AllocateCopy(conformances)});
+    subs.push_back({replacement, C.AllocateCopy(conformances)});
   }
 
   return C.AllocateCopy(subs);

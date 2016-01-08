@@ -165,7 +165,6 @@ Type Solution::computeSubstitutions(
       // Flush the current conformances.
       if (currentArchetype) {
         substitutions.push_back({
-          currentArchetype,
           currentReplacement,
           ctx.AllocateCopy(currentConformances)
         });
@@ -184,7 +183,6 @@ Type Solution::computeSubstitutions(
   // Flush the final conformances.
   if (currentArchetype) {
     substitutions.push_back({
-      currentArchetype,
       currentReplacement,
       ctx.AllocateCopy(currentConformances),
     });
@@ -1381,12 +1379,9 @@ namespace {
 
       auto fnGenericParams
         = fn->getGenericSignatureOfContext()->getGenericParams();
-      auto firstArchetype
-        = ArchetypeBuilder::mapTypeIntoContext(fn, fnGenericParams[0])
-            ->castTo<ArchetypeType>();
 
       SmallVector<Substitution, 2> Subs;
-      Substitution sub(firstArchetype, valueType, Conformances);
+      Substitution sub(valueType, Conformances);
       Subs.push_back(sub);
 
       // Add substitution for the dependent type T._ObjectiveCType.
@@ -1395,19 +1390,11 @@ namespace {
         auto objcAssocType = cast<AssociatedTypeDecl>(
                                conformance->getProtocol()->lookupDirect(
                                  objcTypeId).front());
-        auto objcDepType = DependentMemberType::get(fnGenericParams[0],
-                                                    objcAssocType,
-                                                    tc.Context);
-        auto objcArchetype
-          = ArchetypeBuilder::mapTypeIntoContext(fn, objcDepType)
-            ->castTo<ArchetypeType>();
-
         const Substitution &objcSubst = conformance->getTypeWitness(
                                           objcAssocType, &tc);
 
         // Create a substitution for the dependent type.
         Substitution newDepTypeSubst(
-                       objcArchetype,
                        objcSubst.getReplacement(),
                        objcSubst.getConformances());
 
@@ -6508,13 +6495,8 @@ Expr *Solution::convertOptionalToBool(Expr *expr,
   // Form a reference to the function. This library intrinsic is generic, so we
   // need to form substitutions and compute the resulting type.
   auto unwrappedOptionalType = expr->getType()->getOptionalObjectType();
-  auto fnGenericParams
-    = fn->getGenericSignatureOfContext()->getGenericParams();
-  auto firstArchetype
-    = ArchetypeBuilder::mapTypeIntoContext(fn, fnGenericParams[0])
-        ->castTo<ArchetypeType>();
 
-  Substitution sub(firstArchetype, unwrappedOptionalType, {});
+  Substitution sub(unwrappedOptionalType, {});
   ConcreteDeclRef fnSpecRef(ctx, fn, sub);
   auto *fnRef =
       new (ctx) DeclRefExpr(fnSpecRef, SourceLoc(), /*Implicit=*/true);

@@ -705,9 +705,7 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
       auto Conformances = AI.getModule().getASTContext()
                             .AllocateUninitialized<ProtocolConformanceRef>(1);
       Conformances[0] = Conformance;
-      Substitution NewSubst(Subst.getArchetype(),
-                            ConcreteType,
-                            Conformances);
+      Substitution NewSubst(ConcreteType, Conformances);
       Substitutions.push_back(NewSubst);
     } else
       Substitutions.push_back(Subst);
@@ -1025,38 +1023,11 @@ static ApplyInst *optimizeCastThroughThinFunctionPointer(
   if (Subs.size() == 0)
     return nullptr;
 
-  // We expect one type variable to be substituted. The substitution might have
-  // recursive substitutions. Recognize and allow the case of one substitution
-  // with recursive substitutions.
-  // Container<T>
-  //   T = ...
-  //   T.A = ...
-  //   T.A.C = ...
-  if (Subs.size() != 1) {
-    SmallPtrSet<ArchetypeType *, 16> Archetypes;
-    bool SawPrimary = false;
-    // Collect all the archetypes and make sure there is only one primary.
-    for (unsigned i = 0, e = Subs.size(); i != e; ++i) {
-      auto *AT = Subs[i].getArchetype();
-      Archetypes.insert(AT);
-      // Two primary arche types. We can't handle this case.
-      if (SawPrimary && AT->isPrimary())
-        return nullptr;
-      else if (AT->isPrimary())
-        SawPrimary = true;
-    }
-
-    // Make sure all the non primary archetypes have a parent archetype in the
-    // set.
-    for (unsigned i = 0, e = Subs.size(); i != e; ++i) {
-      auto *AT = Subs[i].getArchetype();
-      // Ignore the one primary archetype.
-      if (AT->isPrimary())
-        continue;
-      if (!Archetypes.count(AT))
-          return nullptr;
-    }
-  }
+  // If the generic signature of the function doesn't match the generic
+  // signature of the type, don't try to continue.
+  if (BoundGenericInstTy->getDecl()->getGenericSignature()
+        ->getCanonicalSignature() != ConvertCalleeTy->getGenericSignature())
+    return nullptr;
 
   SmallVector<SILValue, 16> Args;
   for (auto Arg : AI->getArguments())

@@ -78,17 +78,15 @@ protected:
                             Original.getContextGenericParams(),
                             ApplySubs);
     // Remap opened archetypes into the cloned context.
-    newSub = Substitution(newSub.getArchetype(),
-                          getASTTypeInClonedContext(newSub.getReplacement()
+    newSub = Substitution(getASTTypeInClonedContext(newSub.getReplacement()
                                                       ->getCanonicalType()),
                           newSub.getConformances());
     return newSub;
   }
 
-  ProtocolConformance *remapConformance(ArchetypeType *archetype,
-                                        CanType type,
-                                        ProtocolConformanceRef conf) {
-    Substitution sub(archetype, type, conf);
+  ProtocolConformanceRef remapConformance(CanType type,
+                                          ProtocolConformanceRef conf) {
+    Substitution sub(type, conf);
     return remapSubstitution(sub).getConformances()[0];
   }
 

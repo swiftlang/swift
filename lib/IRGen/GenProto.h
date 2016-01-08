@@ -154,7 +154,8 @@ namespace irgen {
 
   /// Emit references to the witness tables for the substituted type
   /// in the given substitution.
-  void emitWitnessTableRefs(IRGenFunction &IGF, const Substitution &sub,
+  void emitWitnessTableRefs(IRGenFunction &IGF,
+                            const Substitution &sub,
                             llvm::Value **metadataCache,
                             SmallVectorImpl<llvm::Value *> &out);
 

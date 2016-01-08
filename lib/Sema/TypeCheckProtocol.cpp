@@ -1504,7 +1504,6 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
                                              DeclContext *dc,
                                              ArchetypeType *archetype,
                                              Type replacement) {
-  ArchetypeType *resultArchetype = archetype;
   Type resultReplacement = replacement;
   assert(!resultReplacement->isTypeParameter() && "Can't be dependent");
   SmallVector<ProtocolConformanceRef, 4> conformances;
@@ -1522,7 +1521,6 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
   }
 
   return Substitution{
-    resultArchetype,
     resultReplacement,
     tc.Context.AllocateCopy(conformances),
   };
