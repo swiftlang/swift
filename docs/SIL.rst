@@ -1107,7 +1107,12 @@ Global Variables
 
 SIL representation of a global variable.
 
-FIXME: to be written.
+Global variable access is performed by the ``alloc_global`` and ``global_addr``
+SIL instructions. Prior to performing any access on the global, the
+``alloc_global`` instruction must be performed to initialize the storage.
+
+Once a global's storage has been initialized, ``global_addr`` is used to
+project the value.
 
 Dataflow Errors
 ---------------
@@ -1716,6 +1721,20 @@ alloc_value_buffer
 Given the address of an unallocated value buffer, allocate space in it
 for a value of the given type.  This instruction has undefined
 behavior if the value buffer is currently allocated.
+
+The type operand must be a lowered object type.
+
+alloc_global
+````````````
+
+::
+
+   sil-instruction ::= 'alloc_global' sil-global-name
+
+   alloc_global @foo
+
+Initialize the storage for a global variable. This instruction has
+undefined behavior if the global variable has already been initialized.
 
 The type operand must be a lowered object type.
 
@@ -2384,7 +2403,7 @@ function_ref
 Creates a reference to a SIL function.
 
 global_addr
-```````````````
+```````````
 
 ::
 
@@ -2392,7 +2411,10 @@ global_addr
 
   %1 = global_addr @foo : $*Builtin.Word
 
-Creates a reference to the address of a global variable.
+Creates a reference to the address of a global variable which has been
+previously initialized by ``alloc_global``. It is undefined behavior to
+perform this operation on a global variable which has not been
+initialized.
 
 integer_literal
 ```````````````
