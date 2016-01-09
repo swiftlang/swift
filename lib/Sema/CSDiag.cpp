@@ -2670,7 +2670,7 @@ namespace {
         patternElt.first->setType(patternElt.second);
       
       for (auto paramDeclElt : ParamDeclTypes)
-        paramDeclElt.first->setType(paramDeclElt.second);
+        paramDeclElt.first->overwriteType(paramDeclElt.second);
       
       // Done, don't do redundant work on destruction.
       ExprTypes.clear();
