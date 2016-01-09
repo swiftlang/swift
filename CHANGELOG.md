@@ -1387,7 +1387,7 @@ Latest
   unique elements with full value semantics. It bridges with `NSSet`, providing
   functionality analogous to `Array` and `Dictionary`. **(14661754)**
 
-* The `if–let` construct has been expanded to allow testing multiple optionals
+* The `if-let` construct has been expanded to allow testing multiple optionals
   and guarding conditions in a single `if` (or `while`) statement using syntax
   similar to generic constraints:
 
@@ -1401,7 +1401,7 @@ Latest
   conditions, without introducing undesirable nesting (for instance, to avoid
   the optional unwrapping _"pyramid of doom"_).
 
-  Further, `if–let` now also supports a single leading boolean condition along
+  Further, `if-let` now also supports a single leading boolean condition along
   with optional binding `let` clauses. For example:
 
   ```swift
@@ -1411,7 +1411,7 @@ Latest
 
   **(19797158, 19382942)**
 
-* The `if–let` syntax has been extended to support a single leading boolean
+* The `if-let` syntax has been extended to support a single leading boolean
   condition along with optional binding `let` clauses.
 
   For example:
