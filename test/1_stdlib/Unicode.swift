@@ -44,3 +44,4 @@ UnicodeInternals.test("copy") {
   }
 }
 
+runAllTests()
