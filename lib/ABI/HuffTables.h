@@ -22,51 +22,35 @@ if ((tailbits & 1) == 0) {
     tailbits/=2;
     if ((tailbits & 1) == 0) {
      tailbits/=2;
-     if ((tailbits & 1) == 0) {
-      tailbits/=2;
-      if ((tailbits & 1) == 0) {
-       tailbits/=2;
-       num = num.lshr(7);
-       return 'U';
-      }
-      if ((tailbits & 1) == 1) {
-       tailbits/=2;
-       num = num.lshr(7);
-       return 'B';
-      }
-     }
-     if ((tailbits & 1) == 1) {
-      tailbits/=2;
-      num = num.lshr(6);
-      return '8';
-     }
+     num = num.lshr(5);
+     return 'S';
     }
     if ((tailbits & 1) == 1) {
      tailbits/=2;
      if ((tailbits & 1) == 0) {
       tailbits/=2;
-      num = num.lshr(6);
-      return 'P';
+      if ((tailbits & 1) == 0) {
+       tailbits/=2;
+       num = num.lshr(7);
+       return 'z';
+      }
+      if ((tailbits & 1) == 1) {
+       tailbits/=2;
+       num = num.lshr(7);
+       return 'G';
+      }
      }
      if ((tailbits & 1) == 1) {
       tailbits/=2;
       if ((tailbits & 1) == 0) {
        tailbits/=2;
        num = num.lshr(7);
-       return 'v';
+       return 'L';
       }
       if ((tailbits & 1) == 1) {
        tailbits/=2;
-       if ((tailbits & 1) == 0) {
-        tailbits/=2;
-        num = num.lshr(8);
-        return '$';
-       }
-       if ((tailbits & 1) == 1) {
-        tailbits/=2;
-        num = num.lshr(8);
-        return 'H';
-       }
+       num = num.lshr(7);
+       return 'M';
       }
      }
     }
@@ -76,49 +60,17 @@ if ((tailbits & 1) == 0) {
     if ((tailbits & 1) == 0) {
      tailbits/=2;
      if ((tailbits & 1) == 0) {
+      tailbits/=2;
+      num = num.lshr(6);
+      return 'r';
+     }
+     if ((tailbits & 1) == 1) {
       tailbits/=2;
       num = num.lshr(6);
       return 'b';
      }
-     if ((tailbits & 1) == 1) {
-      tailbits/=2;
-      num = num.lshr(6);
-      return 'p';
-     }
     }
     if ((tailbits & 1) == 1) {
-     tailbits/=2;
-     num = num.lshr(5);
-     return 'a';
-    }
-   }
-  }
-  if ((tailbits & 1) == 1) {
-   tailbits/=2;
-   if ((tailbits & 1) == 0) {
-    tailbits/=2;
-    if ((tailbits & 1) == 0) {
-     tailbits/=2;
-     if ((tailbits & 1) == 0) {
-      tailbits/=2;
-      num = num.lshr(6);
-      return 'c';
-     }
-     if ((tailbits & 1) == 1) {
-      tailbits/=2;
-      num = num.lshr(6);
-      return '4';
-     }
-    }
-    if ((tailbits & 1) == 1) {
-     tailbits/=2;
-     num = num.lshr(5);
-     return 's';
-    }
-   }
-   if ((tailbits & 1) == 1) {
-    tailbits/=2;
-    if ((tailbits & 1) == 0) {
      tailbits/=2;
      if ((tailbits & 1) == 0) {
       tailbits/=2;
@@ -130,91 +82,14 @@ if ((tailbits & 1) == 0) {
       if ((tailbits & 1) == 1) {
        tailbits/=2;
        num = num.lshr(7);
-       return 'L';
-      }
-     }
-     if ((tailbits & 1) == 1) {
-      tailbits/=2;
-      num = num.lshr(6);
-      return '7';
-     }
-    }
-    if ((tailbits & 1) == 1) {
-     tailbits/=2;
-     if ((tailbits & 1) == 0) {
-      tailbits/=2;
-      num = num.lshr(6);
-      return 'u';
-     }
-     if ((tailbits & 1) == 1) {
-      tailbits/=2;
-      num = num.lshr(6);
-      return 'm';
-     }
-    }
-   }
-  }
- }
- if ((tailbits & 1) == 1) {
-  tailbits/=2;
-  if ((tailbits & 1) == 0) {
-   tailbits/=2;
-   if ((tailbits & 1) == 0) {
-    tailbits/=2;
-    if ((tailbits & 1) == 0) {
-     tailbits/=2;
-     if ((tailbits & 1) == 0) {
-      tailbits/=2;
-      num = num.lshr(6);
-      return '3';
-     }
-     if ((tailbits & 1) == 1) {
-      tailbits/=2;
-      num = num.lshr(6);
-      return '5';
-     }
-    }
-    if ((tailbits & 1) == 1) {
-     tailbits/=2;
-     num = num.lshr(5);
-     return 't';
-    }
-   }
-   if ((tailbits & 1) == 1) {
-    tailbits/=2;
-    if ((tailbits & 1) == 0) {
-     tailbits/=2;
-     if ((tailbits & 1) == 0) {
-      tailbits/=2;
-      if ((tailbits & 1) == 0) {
-       tailbits/=2;
-       num = num.lshr(7);
-       return 'W';
-      }
-      if ((tailbits & 1) == 1) {
-       tailbits/=2;
-       num = num.lshr(7);
        return 'I';
       }
      }
      if ((tailbits & 1) == 1) {
       tailbits/=2;
-      if ((tailbits & 1) == 0) {
-       tailbits/=2;
-       num = num.lshr(7);
-       return 'R';
-      }
-      if ((tailbits & 1) == 1) {
-       tailbits/=2;
-       num = num.lshr(7);
-       return 'O';
-      }
+      num = num.lshr(6);
+      return 'l';
      }
-    }
-    if ((tailbits & 1) == 1) {
-     tailbits/=2;
-     num = num.lshr(5);
-     return 'i';
     }
    }
   }
@@ -231,16 +106,8 @@ if ((tailbits & 1) == 0) {
      }
      if ((tailbits & 1) == 1) {
       tailbits/=2;
-      if ((tailbits & 1) == 0) {
-       tailbits/=2;
-       num = num.lshr(7);
-       return 'k';
-      }
-      if ((tailbits & 1) == 1) {
-       tailbits/=2;
-       num = num.lshr(7);
-       return 'N';
-      }
+      num = num.lshr(6);
+      return 'o';
      }
     }
     if ((tailbits & 1) == 1) {
@@ -248,20 +115,52 @@ if ((tailbits & 1) == 0) {
      if ((tailbits & 1) == 0) {
       tailbits/=2;
       num = num.lshr(6);
-      return 'l';
+      return 'c';
      }
      if ((tailbits & 1) == 1) {
+      tailbits/=2;
+      num = num.lshr(6);
+      return '9';
+     }
+    }
+   }
+   if ((tailbits & 1) == 1) {
+    tailbits/=2;
+    num = num.lshr(4);
+    return '1';
+   }
+  }
+ }
+ if ((tailbits & 1) == 1) {
+  tailbits/=2;
+  if ((tailbits & 1) == 0) {
+   tailbits/=2;
+   if ((tailbits & 1) == 0) {
+    tailbits/=2;
+    if ((tailbits & 1) == 0) {
+     tailbits/=2;
+     num = num.lshr(5);
+     return '3';
+    }
+    if ((tailbits & 1) == 1) {
+     tailbits/=2;
+     if ((tailbits & 1) == 0) {
       tailbits/=2;
       if ((tailbits & 1) == 0) {
        tailbits/=2;
        num = num.lshr(7);
-       return 'h';
+       return 'P';
       }
       if ((tailbits & 1) == 1) {
        tailbits/=2;
        num = num.lshr(7);
        return 'y';
       }
+     }
+     if ((tailbits & 1) == 1) {
+      tailbits/=2;
+      num = num.lshr(6);
+      return 'n';
      }
     }
    }
@@ -271,19 +170,120 @@ if ((tailbits & 1) == 0) {
      tailbits/=2;
      if ((tailbits & 1) == 0) {
       tailbits/=2;
-      num = num.lshr(6);
-      return 'Y';
+      if ((tailbits & 1) == 0) {
+       tailbits/=2;
+       num = num.lshr(7);
+       return 'q';
+      }
+      if ((tailbits & 1) == 1) {
+       tailbits/=2;
+       num = num.lshr(7);
+       return '0';
+      }
      }
      if ((tailbits & 1) == 1) {
       tailbits/=2;
       num = num.lshr(6);
-      return '6';
+      return 'f';
      }
     }
     if ((tailbits & 1) == 1) {
      tailbits/=2;
+     if ((tailbits & 1) == 0) {
+      tailbits/=2;
+      if ((tailbits & 1) == 0) {
+       tailbits/=2;
+       num = num.lshr(7);
+       return 'V';
+      }
+      if ((tailbits & 1) == 1) {
+       tailbits/=2;
+       num = num.lshr(7);
+       return 'A';
+      }
+     }
+     if ((tailbits & 1) == 1) {
+      tailbits/=2;
+      if ((tailbits & 1) == 0) {
+       tailbits/=2;
+       if ((tailbits & 1) == 0) {
+        tailbits/=2;
+        num = num.lshr(8);
+        return '$';
+       }
+       if ((tailbits & 1) == 1) {
+        tailbits/=2;
+        num = num.lshr(8);
+        return 'X';
+       }
+      }
+      if ((tailbits & 1) == 1) {
+       tailbits/=2;
+       num = num.lshr(7);
+       return 'j';
+      }
+     }
+    }
+   }
+  }
+  if ((tailbits & 1) == 1) {
+   tailbits/=2;
+   if ((tailbits & 1) == 0) {
+    tailbits/=2;
+    if ((tailbits & 1) == 0) {
+     tailbits/=2;
      num = num.lshr(5);
-     return '1';
+     return 'e';
+    }
+    if ((tailbits & 1) == 1) {
+     tailbits/=2;
+     if ((tailbits & 1) == 0) {
+      tailbits/=2;
+      num = num.lshr(6);
+      return '7';
+     }
+     if ((tailbits & 1) == 1) {
+      tailbits/=2;
+      if ((tailbits & 1) == 0) {
+       tailbits/=2;
+       num = num.lshr(7);
+       return 'k';
+      }
+      if ((tailbits & 1) == 1) {
+       tailbits/=2;
+       num = num.lshr(7);
+       return 'w';
+      }
+     }
+    }
+   }
+   if ((tailbits & 1) == 1) {
+    tailbits/=2;
+    if ((tailbits & 1) == 0) {
+     tailbits/=2;
+     num = num.lshr(5);
+     return 'T';
+    }
+    if ((tailbits & 1) == 1) {
+     tailbits/=2;
+     if ((tailbits & 1) == 0) {
+      tailbits/=2;
+      num = num.lshr(6);
+      return '8';
+     }
+     if ((tailbits & 1) == 1) {
+      tailbits/=2;
+      if ((tailbits & 1) == 0) {
+       tailbits/=2;
+       num = num.lshr(7);
+       return 'B';
+      }
+      if ((tailbits & 1) == 1) {
+       tailbits/=2;
+       num = num.lshr(7);
+       return 'N';
+      }
+     }
     }
    }
   }
@@ -299,8 +299,16 @@ if ((tailbits & 1) == 1) {
     tailbits/=2;
     if ((tailbits & 1) == 0) {
      tailbits/=2;
-     num = num.lshr(5);
-     return 'S';
+     if ((tailbits & 1) == 0) {
+      tailbits/=2;
+      num = num.lshr(6);
+      return 's';
+     }
+     if ((tailbits & 1) == 1) {
+      tailbits/=2;
+      num = num.lshr(6);
+      return '6';
+     }
     }
     if ((tailbits & 1) == 1) {
      tailbits/=2;
@@ -308,27 +316,43 @@ if ((tailbits & 1) == 1) {
       tailbits/=2;
       if ((tailbits & 1) == 0) {
        tailbits/=2;
+       if ((tailbits & 1) == 0) {
+        tailbits/=2;
+        num = num.lshr(8);
+        return 'Q';
+       }
+       if ((tailbits & 1) == 1) {
+        tailbits/=2;
+        num = num.lshr(8);
+        return 'U';
+       }
+      }
+      if ((tailbits & 1) == 1) {
+       tailbits/=2;
        num = num.lshr(7);
-       return 'A';
+       return 'C';
+      }
+     }
+     if ((tailbits & 1) == 1) {
+      tailbits/=2;
+      if ((tailbits & 1) == 0) {
+       tailbits/=2;
+       num = num.lshr(7);
+       return 'h';
       }
       if ((tailbits & 1) == 1) {
        tailbits/=2;
        if ((tailbits & 1) == 0) {
         tailbits/=2;
         num = num.lshr(8);
-        return 'K';
+        return 'Z';
        }
        if ((tailbits & 1) == 1) {
         tailbits/=2;
         num = num.lshr(8);
-        return 'X';
+        return 'K';
        }
       }
-     }
-     if ((tailbits & 1) == 1) {
-      tailbits/=2;
-      num = num.lshr(6);
-      return 'f';
      }
     }
    }
@@ -337,19 +361,91 @@ if ((tailbits & 1) == 1) {
     if ((tailbits & 1) == 0) {
      tailbits/=2;
      num = num.lshr(5);
-     return 'T';
+     return '2';
     }
     if ((tailbits & 1) == 1) {
      tailbits/=2;
-     num = num.lshr(5);
-     return 'e';
+     if ((tailbits & 1) == 0) {
+      tailbits/=2;
+      num = num.lshr(6);
+      return 't';
+     }
+     if ((tailbits & 1) == 1) {
+      tailbits/=2;
+      if ((tailbits & 1) == 0) {
+       tailbits/=2;
+       num = num.lshr(7);
+       return 'p';
+      }
+      if ((tailbits & 1) == 1) {
+       tailbits/=2;
+       if ((tailbits & 1) == 0) {
+        tailbits/=2;
+        num = num.lshr(8);
+        return 'R';
+       }
+       if ((tailbits & 1) == 1) {
+        tailbits/=2;
+        num = num.lshr(8);
+        return 'H';
+       }
+      }
+     }
     }
    }
   }
   if ((tailbits & 1) == 1) {
    tailbits/=2;
-   num = num.lshr(3);
-   return 'J';
+   if ((tailbits & 1) == 0) {
+    tailbits/=2;
+    if ((tailbits & 1) == 0) {
+     tailbits/=2;
+     if ((tailbits & 1) == 0) {
+      tailbits/=2;
+      num = num.lshr(6);
+      return '5';
+     }
+     if ((tailbits & 1) == 1) {
+      tailbits/=2;
+      if ((tailbits & 1) == 0) {
+       tailbits/=2;
+       num = num.lshr(7);
+       return 'x';
+      }
+      if ((tailbits & 1) == 1) {
+       tailbits/=2;
+       num = num.lshr(7);
+       return 'm';
+      }
+     }
+    }
+    if ((tailbits & 1) == 1) {
+     tailbits/=2;
+     if ((tailbits & 1) == 0) {
+      tailbits/=2;
+      num = num.lshr(6);
+      return 'i';
+     }
+     if ((tailbits & 1) == 1) {
+      tailbits/=2;
+      if ((tailbits & 1) == 0) {
+       tailbits/=2;
+       num = num.lshr(7);
+       return 'F';
+      }
+      if ((tailbits & 1) == 1) {
+       tailbits/=2;
+       num = num.lshr(7);
+       return 'g';
+      }
+     }
+    }
+   }
+   if ((tailbits & 1) == 1) {
+    tailbits/=2;
+    num = num.lshr(4);
+    return '_';
+   }
   }
  }
  if ((tailbits & 1) == 1) {
@@ -362,13 +458,29 @@ if ((tailbits & 1) == 1) {
      tailbits/=2;
      if ((tailbits & 1) == 0) {
       tailbits/=2;
-      num = num.lshr(6);
-      return 'F';
+      if ((tailbits & 1) == 0) {
+       tailbits/=2;
+       if ((tailbits & 1) == 0) {
+        tailbits/=2;
+        num = num.lshr(8);
+        return 'W';
+       }
+       if ((tailbits & 1) == 1) {
+        tailbits/=2;
+        num = num.lshr(8);
+        return 'O';
+       }
+      }
+      if ((tailbits & 1) == 1) {
+       tailbits/=2;
+       num = num.lshr(7);
+       return 'u';
+      }
      }
      if ((tailbits & 1) == 1) {
       tailbits/=2;
       num = num.lshr(6);
-      return 'n';
+      return 'a';
      }
     }
     if ((tailbits & 1) == 1) {
@@ -377,16 +489,8 @@ if ((tailbits & 1) == 1) {
       tailbits/=2;
       if ((tailbits & 1) == 0) {
        tailbits/=2;
-       if ((tailbits & 1) == 0) {
-        tailbits/=2;
-        num = num.lshr(8);
-        return 'Z';
-       }
-       if ((tailbits & 1) == 1) {
-        tailbits/=2;
-        num = num.lshr(8);
-        return 'Q';
-       }
+       num = num.lshr(7);
+       return 'v';
       }
       if ((tailbits & 1) == 1) {
        tailbits/=2;
@@ -397,194 +501,90 @@ if ((tailbits & 1) == 1) {
      if ((tailbits & 1) == 1) {
       tailbits/=2;
       num = num.lshr(6);
-      return 'x';
+      return '4';
      }
     }
    }
    if ((tailbits & 1) == 1) {
     tailbits/=2;
     num = num.lshr(4);
-    return '_';
+    return 'Y';
    }
   }
   if ((tailbits & 1) == 1) {
    tailbits/=2;
-   if ((tailbits & 1) == 0) {
-    tailbits/=2;
-    if ((tailbits & 1) == 0) {
-     tailbits/=2;
-     if ((tailbits & 1) == 0) {
-      tailbits/=2;
-      num = num.lshr(6);
-      return 'o';
-     }
-     if ((tailbits & 1) == 1) {
-      tailbits/=2;
-      if ((tailbits & 1) == 0) {
-       tailbits/=2;
-       num = num.lshr(7);
-       return 'q';
-      }
-      if ((tailbits & 1) == 1) {
-       tailbits/=2;
-       num = num.lshr(7);
-       return 'V';
-      }
-     }
-    }
-    if ((tailbits & 1) == 1) {
-     tailbits/=2;
-     if ((tailbits & 1) == 0) {
-      tailbits/=2;
-      if ((tailbits & 1) == 0) {
-       tailbits/=2;
-       if ((tailbits & 1) == 0) {
-        tailbits/=2;
-        num = num.lshr(8);
-        return 'M';
-       }
-       if ((tailbits & 1) == 1) {
-        tailbits/=2;
-        num = num.lshr(8);
-        return 'j';
-       }
-      }
-      if ((tailbits & 1) == 1) {
-       tailbits/=2;
-       num = num.lshr(7);
-       return '9';
-      }
-     }
-     if ((tailbits & 1) == 1) {
-      tailbits/=2;
-      if ((tailbits & 1) == 0) {
-       tailbits/=2;
-       num = num.lshr(7);
-       return 'g';
-      }
-      if ((tailbits & 1) == 1) {
-       tailbits/=2;
-       num = num.lshr(7);
-       return 'z';
-      }
-     }
-    }
-   }
-   if ((tailbits & 1) == 1) {
-    tailbits/=2;
-    if ((tailbits & 1) == 0) {
-     tailbits/=2;
-     if ((tailbits & 1) == 0) {
-      tailbits/=2;
-      num = num.lshr(6);
-      return '2';
-     }
-     if ((tailbits & 1) == 1) {
-      tailbits/=2;
-      if ((tailbits & 1) == 0) {
-       tailbits/=2;
-       num = num.lshr(7);
-       return 'C';
-      }
-      if ((tailbits & 1) == 1) {
-       tailbits/=2;
-       num = num.lshr(7);
-       return 'w';
-      }
-     }
-    }
-    if ((tailbits & 1) == 1) {
-     tailbits/=2;
-     if ((tailbits & 1) == 0) {
-      tailbits/=2;
-      num = num.lshr(6);
-      return 'r';
-     }
-     if ((tailbits & 1) == 1) {
-      tailbits/=2;
-      if ((tailbits & 1) == 0) {
-       tailbits/=2;
-       num = num.lshr(7);
-       return 'G';
-      }
-      if ((tailbits & 1) == 1) {
-       tailbits/=2;
-       num = num.lshr(7);
-       return '0';
-      }
-     }
-    }
-   }
+   num = num.lshr(3);
+   return 'J';
   }
  }
 } 
  assert(false); return 0;
 }
 void variable_encode(uint64_t &bits, uint64_t &num_bits, char ch) {
-if (ch == 'U') {/*0000000*/ bits = 0; num_bits = 7; return; }
-if (ch == 'B') {/*1000000*/ bits = 64; num_bits = 7; return; }
-if (ch == '8') {/*100000*/ bits = 32; num_bits = 6; return; }
-if (ch == 'P') {/*010000*/ bits = 16; num_bits = 6; return; }
-if (ch == 'v') {/*0110000*/ bits = 48; num_bits = 7; return; }
-if (ch == '$') {/*01110000*/ bits = 112; num_bits = 8; return; }
-if (ch == 'H') {/*11110000*/ bits = 240; num_bits = 8; return; }
-if (ch == 'b') {/*001000*/ bits = 8; num_bits = 6; return; }
-if (ch == 'p') {/*101000*/ bits = 40; num_bits = 6; return; }
-if (ch == 'a') {/*11000*/ bits = 24; num_bits = 5; return; }
-if (ch == 'c') {/*000100*/ bits = 4; num_bits = 6; return; }
-if (ch == '4') {/*100100*/ bits = 36; num_bits = 6; return; }
-if (ch == 's') {/*10100*/ bits = 20; num_bits = 5; return; }
-if (ch == 'D') {/*0001100*/ bits = 12; num_bits = 7; return; }
-if (ch == 'L') {/*1001100*/ bits = 76; num_bits = 7; return; }
-if (ch == '7') {/*101100*/ bits = 44; num_bits = 6; return; }
-if (ch == 'u') {/*011100*/ bits = 28; num_bits = 6; return; }
-if (ch == 'm') {/*111100*/ bits = 60; num_bits = 6; return; }
-if (ch == '3') {/*000010*/ bits = 2; num_bits = 6; return; }
-if (ch == '5') {/*100010*/ bits = 34; num_bits = 6; return; }
-if (ch == 't') {/*10010*/ bits = 18; num_bits = 5; return; }
-if (ch == 'W') {/*0001010*/ bits = 10; num_bits = 7; return; }
-if (ch == 'I') {/*1001010*/ bits = 74; num_bits = 7; return; }
-if (ch == 'R') {/*0101010*/ bits = 42; num_bits = 7; return; }
-if (ch == 'O') {/*1101010*/ bits = 106; num_bits = 7; return; }
-if (ch == 'i') {/*11010*/ bits = 26; num_bits = 5; return; }
-if (ch == 'd') {/*000110*/ bits = 6; num_bits = 6; return; }
-if (ch == 'k') {/*0100110*/ bits = 38; num_bits = 7; return; }
-if (ch == 'N') {/*1100110*/ bits = 102; num_bits = 7; return; }
-if (ch == 'l') {/*010110*/ bits = 22; num_bits = 6; return; }
-if (ch == 'h') {/*0110110*/ bits = 54; num_bits = 7; return; }
-if (ch == 'y') {/*1110110*/ bits = 118; num_bits = 7; return; }
-if (ch == 'Y') {/*001110*/ bits = 14; num_bits = 6; return; }
-if (ch == '6') {/*101110*/ bits = 46; num_bits = 6; return; }
-if (ch == '1') {/*11110*/ bits = 30; num_bits = 5; return; }
-if (ch == 'S') {/*00001*/ bits = 1; num_bits = 5; return; }
-if (ch == 'A') {/*0010001*/ bits = 17; num_bits = 7; return; }
-if (ch == 'K') {/*01010001*/ bits = 81; num_bits = 8; return; }
-if (ch == 'X') {/*11010001*/ bits = 209; num_bits = 8; return; }
-if (ch == 'f') {/*110001*/ bits = 49; num_bits = 6; return; }
-if (ch == 'T') {/*01001*/ bits = 9; num_bits = 5; return; }
-if (ch == 'e') {/*11001*/ bits = 25; num_bits = 5; return; }
-if (ch == 'J') {/*101*/ bits = 5; num_bits = 3; return; }
-if (ch == 'F') {/*000011*/ bits = 3; num_bits = 6; return; }
-if (ch == 'n') {/*100011*/ bits = 35; num_bits = 6; return; }
-if (ch == 'Z') {/*00010011*/ bits = 19; num_bits = 8; return; }
-if (ch == 'Q') {/*10010011*/ bits = 147; num_bits = 8; return; }
+if (ch == 'S') {/*00000*/ bits = 0; num_bits = 5; return; }
+if (ch == 'z') {/*0010000*/ bits = 16; num_bits = 7; return; }
+if (ch == 'G') {/*1010000*/ bits = 80; num_bits = 7; return; }
+if (ch == 'L') {/*0110000*/ bits = 48; num_bits = 7; return; }
+if (ch == 'M') {/*1110000*/ bits = 112; num_bits = 7; return; }
+if (ch == 'r') {/*001000*/ bits = 8; num_bits = 6; return; }
+if (ch == 'b') {/*101000*/ bits = 40; num_bits = 6; return; }
+if (ch == 'D') {/*0011000*/ bits = 24; num_bits = 7; return; }
+if (ch == 'I') {/*1011000*/ bits = 88; num_bits = 7; return; }
+if (ch == 'l') {/*111000*/ bits = 56; num_bits = 6; return; }
+if (ch == 'd') {/*000100*/ bits = 4; num_bits = 6; return; }
+if (ch == 'o') {/*100100*/ bits = 36; num_bits = 6; return; }
+if (ch == 'c') {/*010100*/ bits = 20; num_bits = 6; return; }
+if (ch == '9') {/*110100*/ bits = 52; num_bits = 6; return; }
+if (ch == '1') {/*1100*/ bits = 12; num_bits = 4; return; }
+if (ch == '3') {/*00010*/ bits = 2; num_bits = 5; return; }
+if (ch == 'P') {/*0010010*/ bits = 18; num_bits = 7; return; }
+if (ch == 'y') {/*1010010*/ bits = 82; num_bits = 7; return; }
+if (ch == 'n') {/*110010*/ bits = 50; num_bits = 6; return; }
+if (ch == 'q') {/*0001010*/ bits = 10; num_bits = 7; return; }
+if (ch == '0') {/*1001010*/ bits = 74; num_bits = 7; return; }
+if (ch == 'f') {/*101010*/ bits = 42; num_bits = 6; return; }
+if (ch == 'V') {/*0011010*/ bits = 26; num_bits = 7; return; }
+if (ch == 'A') {/*1011010*/ bits = 90; num_bits = 7; return; }
+if (ch == '$') {/*00111010*/ bits = 58; num_bits = 8; return; }
+if (ch == 'X') {/*10111010*/ bits = 186; num_bits = 8; return; }
+if (ch == 'j') {/*1111010*/ bits = 122; num_bits = 7; return; }
+if (ch == 'e') {/*00110*/ bits = 6; num_bits = 5; return; }
+if (ch == '7') {/*010110*/ bits = 22; num_bits = 6; return; }
+if (ch == 'k') {/*0110110*/ bits = 54; num_bits = 7; return; }
+if (ch == 'w') {/*1110110*/ bits = 118; num_bits = 7; return; }
+if (ch == 'T') {/*01110*/ bits = 14; num_bits = 5; return; }
+if (ch == '8') {/*011110*/ bits = 30; num_bits = 6; return; }
+if (ch == 'B') {/*0111110*/ bits = 62; num_bits = 7; return; }
+if (ch == 'N') {/*1111110*/ bits = 126; num_bits = 7; return; }
+if (ch == 's') {/*000001*/ bits = 1; num_bits = 6; return; }
+if (ch == '6') {/*100001*/ bits = 33; num_bits = 6; return; }
+if (ch == 'Q') {/*00010001*/ bits = 17; num_bits = 8; return; }
+if (ch == 'U') {/*10010001*/ bits = 145; num_bits = 8; return; }
+if (ch == 'C') {/*1010001*/ bits = 81; num_bits = 7; return; }
+if (ch == 'h') {/*0110001*/ bits = 49; num_bits = 7; return; }
+if (ch == 'Z') {/*01110001*/ bits = 113; num_bits = 8; return; }
+if (ch == 'K') {/*11110001*/ bits = 241; num_bits = 8; return; }
+if (ch == '2') {/*01001*/ bits = 9; num_bits = 5; return; }
+if (ch == 't') {/*011001*/ bits = 25; num_bits = 6; return; }
+if (ch == 'p') {/*0111001*/ bits = 57; num_bits = 7; return; }
+if (ch == 'R') {/*01111001*/ bits = 121; num_bits = 8; return; }
+if (ch == 'H') {/*11111001*/ bits = 249; num_bits = 8; return; }
+if (ch == '5') {/*000101*/ bits = 5; num_bits = 6; return; }
+if (ch == 'x') {/*0100101*/ bits = 37; num_bits = 7; return; }
+if (ch == 'm') {/*1100101*/ bits = 101; num_bits = 7; return; }
+if (ch == 'i') {/*010101*/ bits = 21; num_bits = 6; return; }
+if (ch == 'F') {/*0110101*/ bits = 53; num_bits = 7; return; }
+if (ch == 'g') {/*1110101*/ bits = 117; num_bits = 7; return; }
+if (ch == '_') {/*1101*/ bits = 13; num_bits = 4; return; }
+if (ch == 'W') {/*00000011*/ bits = 3; num_bits = 8; return; }
+if (ch == 'O') {/*10000011*/ bits = 131; num_bits = 8; return; }
+if (ch == 'u') {/*1000011*/ bits = 67; num_bits = 7; return; }
+if (ch == 'a') {/*100011*/ bits = 35; num_bits = 6; return; }
+if (ch == 'v') {/*0010011*/ bits = 19; num_bits = 7; return; }
 if (ch == 'E') {/*1010011*/ bits = 83; num_bits = 7; return; }
-if (ch == 'x') {/*110011*/ bits = 51; num_bits = 6; return; }
-if (ch == '_') {/*1011*/ bits = 11; num_bits = 4; return; }
-if (ch == 'o') {/*000111*/ bits = 7; num_bits = 6; return; }
-if (ch == 'q') {/*0100111*/ bits = 39; num_bits = 7; return; }
-if (ch == 'V') {/*1100111*/ bits = 103; num_bits = 7; return; }
-if (ch == 'M') {/*00010111*/ bits = 23; num_bits = 8; return; }
-if (ch == 'j') {/*10010111*/ bits = 151; num_bits = 8; return; }
-if (ch == '9') {/*1010111*/ bits = 87; num_bits = 7; return; }
-if (ch == 'g') {/*0110111*/ bits = 55; num_bits = 7; return; }
-if (ch == 'z') {/*1110111*/ bits = 119; num_bits = 7; return; }
-if (ch == '2') {/*001111*/ bits = 15; num_bits = 6; return; }
-if (ch == 'C') {/*0101111*/ bits = 47; num_bits = 7; return; }
-if (ch == 'w') {/*1101111*/ bits = 111; num_bits = 7; return; }
-if (ch == 'r') {/*011111*/ bits = 31; num_bits = 6; return; }
-if (ch == 'G') {/*0111111*/ bits = 63; num_bits = 7; return; }
-if (ch == '0') {/*1111111*/ bits = 127; num_bits = 7; return; }
+if (ch == '4') {/*110011*/ bits = 51; num_bits = 6; return; }
+if (ch == 'Y') {/*1011*/ bits = 11; num_bits = 4; return; }
+if (ch == 'J') {/*111*/ bits = 7; num_bits = 3; return; }
 assert(false);
 }
 } // namespace
