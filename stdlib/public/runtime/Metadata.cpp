@@ -460,7 +460,7 @@ swift::swift_getFunctionTypeMetadata(const void *flagsArgsAndResult[]) {
     // witnesses.
     valueWitnesses = &_TWVBO;
 #else
-    assert(false && "objc block without objc interop?");
+    llvm_unreachable("objc block without objc interop?");
 #endif
     break;
   }

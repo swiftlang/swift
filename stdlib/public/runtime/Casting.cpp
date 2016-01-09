@@ -258,7 +258,7 @@ static void _buildNameForMetadata(const Metadata *type,
     auto objcWrapper = static_cast<const ObjCClassWrapperMetadata *>(type);
     result += class_getName(objcWrapper->Class);
 #else
-    assert(false && "no ObjC interop");
+    llvm_unreachable("no ObjC interop");
 #endif
     return;
   }
@@ -1062,7 +1062,7 @@ _dynamicCastUnknownClassToExistential(const void *object,
         return nullptr;
       break;
 #else
-      assert(false && "ObjC interop disabled?!");
+      llvm_unreachable("ObjC interop disabled?!");
       return nullptr;
 #endif
     case ProtocolDispatchStrategy::Empty:

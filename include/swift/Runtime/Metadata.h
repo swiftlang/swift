@@ -1014,7 +1014,7 @@ public:
     case MetadataKind::ErrorObject:
       return false;
     }
-    assert(false && "not a metadata kind");
+    llvm_unreachable("not a metadata kind");
   }
   
   /// Is this metadata for an existential type?
@@ -1039,7 +1039,7 @@ public:
     case MetadataKind::ErrorObject:
       return false;
     }
-    assert(false && "not a metadata kind");
+    llvm_unreachable("not a metadata kind");
   }
   
   /// Is this either type metadata or a class object for any kind of class?
@@ -2196,7 +2196,7 @@ public:
     case ProtocolConformanceTypeKind::UniqueDirectClass:
     case ProtocolConformanceTypeKind::UniqueIndirectClass:
     case ProtocolConformanceTypeKind::UniqueGenericPattern:
-      assert(false && "not direct type metadata");
+      llvm_unreachable("not direct type metadata");
     }
 
     return DirectType;
@@ -2214,7 +2214,7 @@ public:
     case ProtocolConformanceTypeKind::NonuniqueDirectType:
     case ProtocolConformanceTypeKind::UniqueGenericPattern:
     case ProtocolConformanceTypeKind::UniqueIndirectClass:
-      assert(false && "not direct class object");
+      llvm_unreachable("not direct class object");
     }
 
     const Metadata *metadata = DirectType;
@@ -2234,7 +2234,7 @@ public:
     case ProtocolConformanceTypeKind::UniqueDirectClass:
     case ProtocolConformanceTypeKind::NonuniqueDirectType:
     case ProtocolConformanceTypeKind::UniqueGenericPattern:
-      assert(false && "not indirect class object");
+      llvm_unreachable("not indirect class object");
     }
     
     return IndirectClass;
@@ -2252,7 +2252,7 @@ public:
     case ProtocolConformanceTypeKind::UniqueIndirectClass:
     case ProtocolConformanceTypeKind::UniqueDirectType:
     case ProtocolConformanceTypeKind::NonuniqueDirectType:
-      assert(false && "not generic metadata pattern");
+      llvm_unreachable("not generic metadata pattern");
     }
     
     return GenericPattern;
@@ -2265,7 +2265,7 @@ public:
       break;
         
     case ProtocolConformanceReferenceKind::WitnessTableAccessor:
-      assert(false && "not witness table");
+      llvm_unreachable("not witness table");
     }
     return WitnessTable;
   }
@@ -2276,7 +2276,7 @@ public:
       break;
         
     case ProtocolConformanceReferenceKind::WitnessTable:
-      assert(false && "not witness table accessor");
+      llvm_unreachable("not witness table accessor");
     }
     return WitnessTableAccessor;
   }
