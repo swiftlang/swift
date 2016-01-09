@@ -1438,7 +1438,7 @@ public:
         else if (isa<AbstractTypeParamDecl>(TD))
           llvm_unreachable("should not see type params here");
         else
-          assert(false && "unknown local type decl");
+          llvm_unreachable("unknown local type decl");
       });
     }
 

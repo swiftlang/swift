@@ -72,7 +72,7 @@ Demangle::NodePointer swift::_swift_buildDemanglingForMetadata(const Metadata *t
     
     return node;
 #else
-    assert(false && "no ObjC interop");
+    llvm_unreachable("no ObjC interop");
     return nullptr;
 #endif
   }
