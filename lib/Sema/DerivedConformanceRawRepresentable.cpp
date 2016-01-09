@@ -337,7 +337,7 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   initDecl->setAccessibility(enumDecl->getFormalAccess());
 
   if (enumDecl->hasClangNode())
-    tc.implicitlyDefinedFunctions.push_back(initDecl);
+    tc.Context.addedExternalDecl(initDecl);
 
   cast<IterableDeclContext>(parentDecl)->addMember(initDecl);
   return initDecl;

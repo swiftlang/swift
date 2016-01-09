@@ -388,6 +388,11 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
       auto decl = TC.Context.ExternalDefinitions[currentExternalDef];
       
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(decl)) {
+        // HACK: don't type-check the same function body twice.  This is
+        // supposed to be handled by just not enqueuing things twice,
+        // but that gets tricky with synthesized function bodies.
+        if (AFD->isBodyTypeChecked()) continue;
+
         PrettyStackTraceDecl StackEntry("type-checking", AFD);
         TC.typeCheckAbstractFunctionBody(AFD);
         continue;
@@ -464,11 +469,6 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
     }
     TC.UsedConformances.clear();
 
-    TC.definedFunctions.insert(TC.definedFunctions.end(),
-                               TC.implicitlyDefinedFunctions.begin(),
-                               TC.implicitlyDefinedFunctions.end());
-    TC.implicitlyDefinedFunctions.clear();
-
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
            currentExternalDef < TC.Context.ExternalDefinitions.size() ||
            !TC.UsedConformances.empty());
@@ -524,7 +524,6 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     TypeChecker TC(Ctx);
     SharedTimer timer("Type checking / Semantic analysis");
 
-    auto &DefinedFunctions = TC.definedFunctions;
     if (Options.contains(TypeCheckingFlags::DebugTimeFunctionBodies))
       TC.enableDebugTimeFunctionBodies();
 
@@ -593,11 +592,6 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
       TC.contextualizeTopLevelCode(TLC,
                              llvm::makeArrayRef(SF.Decls).slice(StartElem));
     }
-    
-    DefinedFunctions.insert(DefinedFunctions.end(),
-                            TC.implicitlyDefinedFunctions.begin(),
-                            TC.implicitlyDefinedFunctions.end());
-    TC.implicitlyDefinedFunctions.clear();
 
     // If we're in REPL mode, inject temporary result variables and other stuff
     // that the REPL needs to synthesize.

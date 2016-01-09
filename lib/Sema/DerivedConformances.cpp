@@ -93,9 +93,9 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
   return nullptr;
 }
 
-void DerivedConformance::_insertOperatorDecl(ASTContext &C,
-                                             IterableDeclContext *scope,
-                                             Decl *member) {
+void DerivedConformance::insertOperatorDecl(ASTContext &C,
+                                            IterableDeclContext *scope,
+                                            Decl *member) {
   // Find the module.
   auto mod = member->getModuleContext();
 
@@ -171,7 +171,7 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   getterDecl->setAccessibility(typeDecl->getFormalAccess());
 
   if (typeDecl->hasClangNode())
-    tc.implicitlyDefinedFunctions.push_back(getterDecl);
+    tc.Context.addedExternalDecl(getterDecl);
 
   return getterDecl;
 }

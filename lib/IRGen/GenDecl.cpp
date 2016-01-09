@@ -1376,6 +1376,7 @@ void IRGenModule::emitExternalDefinition(Decl *D) {
   case DeclKind::PostfixOperator:
   case DeclKind::IfConfig:
   case DeclKind::Param:
+  case DeclKind::Module:
     llvm_unreachable("Not a valid external definition for IRgen");
 
   case DeclKind::Var:
@@ -1396,9 +1397,6 @@ void IRGenModule::emitExternalDefinition(Decl *D) {
   case DeclKind::Enum:
   case DeclKind::Class:
   case DeclKind::Protocol:
-    break;
-
-  case DeclKind::Module:
     break;
   }
 }

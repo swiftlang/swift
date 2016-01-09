@@ -2073,7 +2073,7 @@ namespace {
       }
 
       // Add the type decl to ExternalDefinitions so that we can type-check
-      // raw values and IRGen can emit metadata for it.
+      // raw values and SILGen can emit witness tables for derived conformances.
       // FIXME: There might be better ways to do this.
       Impl.registerExternalDecl(result);
       return result;

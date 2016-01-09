@@ -1135,17 +1135,11 @@ void SILGenModule::emitExternalWitnessTable(ProtocolConformance *c) {
 void SILGenModule::emitExternalDefinition(Decl *d) {
   switch (d->getKind()) {
   case DeclKind::Func: {
-    // We'll emit all the members of an enum when we visit the enum.
-    if (isa<EnumDecl>(d->getDeclContext()))
-      break;
     emitFunction(cast<FuncDecl>(d));
     break;
   }
   case DeclKind::Constructor: {
     auto C = cast<ConstructorDecl>(d);
-    // We'll emit all the members of an enum when we visit the enum.
-    if (isa<EnumDecl>(d->getDeclContext()))
-      break;
     // For factories, we don't need to emit a special thunk; the normal
     // foreign-to-native thunk is sufficient.
     if (C->isFactoryInit())
@@ -1154,21 +1148,7 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
     emitConstructor(C);
     break;
   }
-  case DeclKind::Enum: {
-    auto ed = cast<EnumDecl>(d);
-    // Emit derived conformance methods for the type.
-    for (auto member : ed->getMembers()) {
-      if (auto func = dyn_cast<FuncDecl>(member))
-        emitFunction(func);
-      else if (auto ctor = dyn_cast<ConstructorDecl>(member))
-        emitConstructor(ctor);
-    }
-    // Emit derived global decls.
-    for (auto derived : ed->getDerivedGlobalDecls()) {
-      emitFunction(cast<FuncDecl>(derived));
-    }
-    SWIFT_FALLTHROUGH;
-  }
+  case DeclKind::Enum:
   case DeclKind::Struct:
   case DeclKind::Class: {
     // Emit witness tables.
@@ -1190,9 +1170,6 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
     // Imported static vars are handled solely in IRGen.
     break;
 
-  case DeclKind::Module:
-    break;
-
   case DeclKind::IfConfig:
   case DeclKind::Extension:
   case DeclKind::PatternBinding:
@@ -1209,6 +1186,7 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
+  case DeclKind::Module:
     llvm_unreachable("Not a valid external definition for SILGen");
   }
 }
