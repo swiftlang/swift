@@ -1746,9 +1746,9 @@ Type ValueDecl::getInterfaceType() const {
     auto proto = cast<ProtocolDecl>(getDeclContext());
     (void)proto->getType(); // make sure we've computed the type.
     // FIXME: the generic parameter types list should never be empty.
-    auto selfTy = proto->getGenericParamTypes().empty()
+    auto selfTy = proto->getInnermostGenericParamTypes().empty()
                     ? proto->getProtocolSelf()->getType()
-                    : proto->getGenericParamTypes().back();
+                    : proto->getInnermostGenericParamTypes().back();
     auto &ctx = getASTContext();
     InterfaceTy = DependentMemberType::get(
                     selfTy,

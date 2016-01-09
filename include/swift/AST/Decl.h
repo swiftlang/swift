@@ -2827,12 +2827,12 @@ public:
   /// Set the generic signature of this type.
   void setGenericSignature(GenericSignature *sig);
 
-  /// Retrieve the generic parameter types.
-  ArrayRef<GenericTypeParamType *> getGenericParamTypes() const {
+  /// Retrieve the innermost generic parameter types.
+  ArrayRef<GenericTypeParamType *> getInnermostGenericParamTypes() const {
     if (!GenericSig)
       return { };
 
-    return GenericSig->getGenericParams();
+    return GenericSig->getInnermostGenericParams();
   }
 
   /// Retrieve the generic requirements.
