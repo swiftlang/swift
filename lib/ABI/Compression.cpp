@@ -153,7 +153,6 @@ StartMatch:
 static std::pair<uint64_t, uint64_t> get64bitEncodingParams() {
   uint64_t CL = Huffman::CharsetLength;
 
-
   // We encode each letter using Log2(CL) bits, and the number of letters we can
   // encode is a 64bit number is 64/Log2(CL).
   //
@@ -221,14 +220,11 @@ static void DecodeFixedWidth(APInt &Num, std::string &SB) {
   }
 }
 
-static void EncodeFixedWidth(APInt &num, char ch) {
-  APInt C = APInt(num.getBitWidth(), Huffman::CharsetLength);
+static unsigned GetCharIndex(char ch) {
   // TODO: autogenerate a table for the reverse lookup.
   for (unsigned i = 0; i < Huffman::CharsetLength; i++) {
     if (Huffman::Charset[i] == ch) {
-      num *= C;
-      num += APInt(num.getBitWidth(), i);
-      return;
+      return i;
     }
   }
   llvm_unreachable("Can't find the requested character in the alphabet.");
@@ -291,12 +287,44 @@ swift::Compress::EncodeStringAsNumber(StringRef In, EncodingKind Kind) {
   }
 
   // Encode fixed width strings.
+
+  // Try to decode a few numbers at once. First encode characters into a local
+  // variable and then encode that variable. It is much faster to work with
+  // local 64-bit numbers than APInts.
+  uint64_t CL = Huffman::CharsetLength;
+  uint64_t CLX;
+  uint64_t maxNumLetters;
+  std::tie(maxNumLetters, CLX) = get64bitEncodingParams();
+
+  uint64_t numEncodedChars = 0;
+  uint64_t encodedCharsValue = 0;
+
   for (int i = In.size() - 1; i >= 0; i--) {
-    char ch = In[i];
-    // Extend the number and create room for encoding another character.
-    unsigned MinBits = num.getActiveBits() + Huffman::LongestEncodingLength;
-    num = num.zextOrTrunc(std::max(64u, MinBits));
-    EncodeFixedWidth(num, ch);
+    // Encode a single char into the local temporary variable.
+    unsigned charIdx = GetCharIndex(In[i]);
+    encodedCharsValue = encodedCharsValue * CL + charIdx;
+    numEncodedChars++;
+
+    // If we've reached the maximum capacity then push the value into the APInt.
+    if (numEncodedChars == maxNumLetters) {
+      num = num.zextOrSelf(num.getActiveBits() + 64);
+      num *= APInt(num.getBitWidth(), CLX);
+      num += APInt(num.getBitWidth(), encodedCharsValue);
+      numEncodedChars = 0;
+      encodedCharsValue = 0;
+    }
+  }
+
+  // Encode the last few characters.
+  if (numEncodedChars) {
+    // Compute the value that we need to multiply the APInt to make room for the
+    // last few characters that did not make a complete 64-bit value.
+    uint64_t tailCLX = 1;
+    for (unsigned i = 0; i < numEncodedChars; i++) { tailCLX *= CL; }
+
+    num = num.zextOrSelf(num.getActiveBits() + 64);
+    num *= APInt(num.getBitWidth(), tailCLX);
+    num += APInt(num.getBitWidth(), encodedCharsValue);
   }
 
   return num;
