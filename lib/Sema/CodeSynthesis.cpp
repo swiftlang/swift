@@ -354,7 +354,7 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   // If the property came from ObjC, we need to register this as an external
   // definition to be compiled.
   if (needsToBeRegisteredAsExternalDecl(storage))
-    TC.Context.addedExternalDecl(materializeForSet);
+    TC.Context.addExternalDecl(materializeForSet);
   
   return materializeForSet;
 }
@@ -722,7 +722,7 @@ static void synthesizeTrivialGetter(FuncDecl *getter,
  
   // Register the accessor as an external decl if the storage was imported.
   if (needsToBeRegisteredAsExternalDecl(storage))
-    TC.Context.addedExternalDecl(getter);
+    TC.Context.addExternalDecl(getter);
 }
 
 /// Synthesize the body of a trivial setter.
@@ -745,7 +745,7 @@ static void synthesizeTrivialSetter(FuncDecl *setter,
 
   // Register the accessor as an external decl if the storage was imported.
   if (needsToBeRegisteredAsExternalDecl(storage))
-    TC.Context.addedExternalDecl(setter);
+    TC.Context.addExternalDecl(setter);
 }
 
 /// Build the result expression of a materializeForSet accessor.
@@ -800,7 +800,7 @@ static void synthesizeStoredMaterializeForSet(FuncDecl *materializeForSet,
   
   // Register the accessor as an external decl if the storage was imported.
   if (needsToBeRegisteredAsExternalDecl(storage))
-    TC.Context.addedExternalDecl(materializeForSet);
+    TC.Context.addExternalDecl(materializeForSet);
 }
 
 /// Does a storage decl currently lacking accessor functions require a
@@ -1161,7 +1161,7 @@ static void synthesizeComputedMaterializeForSet(FuncDecl *materializeForSet,
   
   // Register the accessor as an external decl if the storage was imported.
   if (needsToBeRegisteredAsExternalDecl(storage))
-    TC.Context.addedExternalDecl(materializeForSet);
+    TC.Context.addExternalDecl(materializeForSet);
 }
 
 /// Build a direct call to an addressor from within a
@@ -1338,10 +1338,10 @@ static void synthesizeAddressedMaterializeForSet(FuncDecl *materializeForSet,
   materializeForSet->getAttrs().add(new (ctx) TransparentAttr(IsImplicit));
 
   TC.typeCheckDecl(materializeForSet, true);
-  
+ 
   // Register the accessor as an external decl if the storage was imported.
   if (needsToBeRegisteredAsExternalDecl(storage))
-    TC.Context.addedExternalDecl(materializeForSet);
+    TC.Context.addExternalDecl(materializeForSet);
 }
 
 void swift::synthesizeMaterializeForSet(FuncDecl *materializeForSet,
@@ -1917,7 +1917,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
   // If the struct in which this constructor is being added was imported,
   // add it as an external definition.
   if (decl->hasClangNode()) {
-    tc.Context.addedExternalDecl(ctor);
+    tc.Context.addExternalDecl(ctor);
   }
 
   return ctor;

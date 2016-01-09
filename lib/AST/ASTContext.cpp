@@ -1181,7 +1181,7 @@ bool ASTContext::hasArrayLiteralIntrinsics(LazyResolver *resolver) const {
     && getDeallocateUninitializedArray(resolver);
 }
 
-void ASTContext::addedExternalDecl(Decl *decl) {
+void ASTContext::addExternalDecl(Decl *decl) {
   ExternalDefinitions.insert(decl);
 }
 

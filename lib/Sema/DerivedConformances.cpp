@@ -170,8 +170,11 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   getterDecl->setInterfaceType(interfaceType);
   getterDecl->setAccessibility(typeDecl->getFormalAccess());
 
+  // If the enum was not imported, the derived conformance is either from the
+  // enum itself or an extension, in which case we will emit the declaration
+  // normally.
   if (typeDecl->hasClangNode())
-    tc.Context.addedExternalDecl(getterDecl);
+    tc.Context.addExternalDecl(getterDecl);
 
   return getterDecl;
 }

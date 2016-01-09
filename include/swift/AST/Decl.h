@@ -3597,9 +3597,9 @@ public:
     ///      to and may be overridden.
     ///   2) When a stored property satisfies a protocol requirement, these
     ///      accessors end up as entries in the witness table.
-    ///   3) Perhaps someday these will be used by accesses outside of this
-    ///      resilience domain, when the owning type is resilient.
-    ///
+    ///   3) When a stored property is accessed outside of the storage
+    ///      declaration's resilience domain, when the owning type or
+    ///      global variable is resilient.
     StoredWithTrivialAccessors,
 
     /// This is a stored property with either a didSet specifier or a
