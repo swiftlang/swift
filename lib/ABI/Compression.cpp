@@ -144,16 +144,40 @@ StartMatch:
   return SB;
 }
 
+/// This function computes the number of characters that we can encode in a
+/// 64bit number without overflowing.
+///
+/// \returns a pair of:
+///  - The number of characters that fit in a 64bit word.
+///  - The value of CharsetLength^NumLetters (CL to the power of NL).
+static std::pair<uint64_t, uint64_t> get64bitEncodingParams() {
+  uint64_t CL = Huffman::CharsetLength;
+
+
+  // We encode each letter using Log2(CL) bits, and the number of letters we can
+  // encode is a 64bit number is 64/Log2(CL).
+  //
+  // Doing this computation in floating-point arithmetic could give a slightly
+  // better (more optimistic) result, but the computation may not be constant
+  //  at compile time.
+  uint64_t NumLetters = 64 / Log2_64_Ceil(CL);
+
+  // Calculate CharsetLength^NumLetters (CL to the power of NL), which is the
+  // highest numeric value that can hold NumLetters characters in a 64bit
+  // number.
+  //
+  // Notice: this loop is optimized away and CLX is computed to a
+  // constant integer at compile time.
+  uint64_t CLX = 1;
+  for (unsigned i = 0; i < NumLetters; i++) { CLX *= CL; }
+
+  return std::make_pair(NumLetters, CLX);
+}
+
 /// Extract all of the characters from the number \p Num one by one and
 /// insert them into the string builder \p SB.
 static void DecodeFixedWidth(APInt &Num, std::string &SB) {
   uint64_t CL = Huffman::CharsetLength;
-
-  // NL is the number of characters that we can hold in a 64bit number.
-  // Each letter takes Log2(CL) bits. Doing this computation in floating-
-  // point arithmetic could give a slightly better (more optimistic) result,
-  // but the computation may not be constant at compile time.
-  uint64_t NumLetters = 64 / Log2_64_Ceil(CL);
 
   assert(Num.getBitWidth() > 8 &&
          "Not enough bits for arithmetic on this alphabet");
@@ -162,13 +186,9 @@ static void DecodeFixedWidth(APInt &Num, std::string &SB) {
   // local 64bit numbers than working with APInt. In this loop we try to
   // extract NL characters at once and process them using a local 64-bit
   // number.
-
-  // Calculate CharsetLength**NumLetters (CL to the power of NL), which is the
-  // highest numeric value that can hold NumLetters characters in a 64bit
-  // number. Notice: this loop is optimized away and CLX is computed to a
-  // constant integer at compile time.
-  uint64_t CLX = 1;
-  for (unsigned  i = 0; i < NumLetters; i++) { CLX *= CL; }
+  uint64_t CLX;
+  uint64_t NumLetters;
+  std::tie(NumLetters, CLX) = get64bitEncodingParams();
 
   while (Num.ugt(CLX)) {
     unsigned BW = Num.getBitWidth();
