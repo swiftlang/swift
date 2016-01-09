@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/ABI/Compression.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "CBCTables.h"
 #include "HuffTables.h"
 #include <assert.h>
@@ -41,7 +42,7 @@ std::string swift::Compress::DecodeCBCString(StringRef In) {
     const char c = In[PI];
     if (c == CBC::EscapeChar0) {
       if ((PI+1) >= EndIndex) {
-        assert(false && "Invalid Encoding");
+        llvm_unreachable("Invalid Encoding.");
         return "";
       }
       const char N = In[PI+1];
@@ -54,7 +55,7 @@ std::string swift::Compress::DecodeCBCString(StringRef In) {
 
       unsigned Idx = CBCindexOfChar(N);
       if (Idx > CBC::CharsetLength || CBC::Charset[Idx] != N) {
-        assert(false && "bad indexOfChar");
+        llvm_unreachable("Decoded invalid character.");
         return "";
       }
       SB += CBC::CodeBook[Idx];
@@ -64,7 +65,7 @@ std::string swift::Compress::DecodeCBCString(StringRef In) {
 
     if (c == CBC::EscapeChar1) {
       if ((PI+2) >= EndIndex) {
-        assert(false && "Invalid Encoding");
+        llvm_unreachable("Decoded invalid index.");
         return "";
       }
 
@@ -73,7 +74,7 @@ std::string swift::Compress::DecodeCBCString(StringRef In) {
       unsigned JointIndex = (CBC::CharsetLength * CBCindexOfChar(N0)) +
                                                   CBCindexOfChar(N1);
       if (JointIndex > CBC::NumFragments) {
-        assert(false && "Read bad index");
+        llvm_unreachable("Decoded invalid index.");
         return "";
       }
       SB += CBC::CodeBook[JointIndex];
@@ -210,7 +211,7 @@ static void EncodeFixedWidth(APInt &num, char ch) {
       return;
     }
   }
-  assert(false);
+  llvm_unreachable("Can't find the requested character in the alphabet.");
 }
 
 APInt
