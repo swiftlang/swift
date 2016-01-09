@@ -864,6 +864,17 @@ void TypeChecker::synthesizeWitnessAccessorsForStorage(
   // by synthesizing the full set of accessors.
   if (!storage->hasAccessorFunctions()) {
     addTrivialAccessorsToStorage(storage, *this);
+
+    // If the storage was not imported from Objective-C, conservatively add
+    // the accessors to the ExternalDefinitions list anyway, in case the witness
+    // is in an external module.
+    if (!needsToBeRegisteredAsExternalDecl(storage)) {
+      Context.addExternalDecl(storage->getGetter());
+      if (storage->getSetter())
+        Context.addExternalDecl(storage->getSetter());
+      if (storage->getMaterializeForSetFunc())
+        Context.addExternalDecl(storage->getMaterializeForSetFunc());
+    }
     return;
   }
   
