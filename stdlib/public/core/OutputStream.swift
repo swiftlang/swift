@@ -89,7 +89,7 @@ func _getEnumCaseName<T>(value: T) -> UnsafePointer<CChar>
 func _opaqueSummary(metadata: Any.Type) -> UnsafePointer<CChar>
 
 /// Do our best to print a value that cannot be printed directly.
-internal func _adHocPrint<T, TargetStream : OutputStreamType>(
+internal func _adHocPrint_unlocked<T, TargetStream : OutputStreamType>(
     value: T, _ mirror: Mirror, inout _ target: TargetStream,
     isDebugPrint: Bool
 ) {
@@ -102,9 +102,9 @@ internal func _adHocPrint<T, TargetStream : OutputStreamType>(
     switch displayStyle {
       case .Optional:
         if let child = mirror.children.first {
-          debugPrint(child.1, terminator: "", toStream: &target)
+          _debugPrint_unlocked(child.1, &target)
         } else {
-          debugPrint("nil", terminator: "", toStream: &target)
+          _debugPrint_unlocked("nil", &target)
         }
       case .Tuple:
         target.write("(")
@@ -115,7 +115,7 @@ internal func _adHocPrint<T, TargetStream : OutputStreamType>(
           } else {
             target.write(", ")
           }
-          debugPrint(value, terminator: "", toStream: &target)
+          _debugPrint_unlocked(value, &target)
         }
         target.write(")")
       case .Struct:
@@ -129,9 +129,9 @@ internal func _adHocPrint<T, TargetStream : OutputStreamType>(
             } else {
               target.write(", ")
             }
-            print(label, terminator: "", toStream: &target)
+            target.write(label)
             target.write(": ")
-            debugPrint(value, terminator: "", toStream: &target)
+            _debugPrint_unlocked(value, &target)
           }
         }
         target.write(")")
@@ -149,10 +149,10 @@ internal func _adHocPrint<T, TargetStream : OutputStreamType>(
         }
         if let (_, value) = mirror.children.first {
           if (Mirror(reflecting: value).displayStyle == .Tuple) {
-            debugPrint(value, terminator: "", toStream: &target)
+            _debugPrint_unlocked(value, &target)
           } else {
             target.write("(")
-            debugPrint(value, terminator: "", toStream: &target)
+            _debugPrint_unlocked(value, &target)
             target.write(")")
           }
         }
@@ -203,7 +203,7 @@ internal func _print_unlocked<T, TargetStream : OutputStreamType>(
   }
 
   let mirror = Mirror(reflecting: value)
-  _adHocPrint(value, mirror, &target, isDebugPrint: false)
+  _adHocPrint_unlocked(value, mirror, &target, isDebugPrint: false)
 }
 
 /// Returns the result of `print`'ing `x` into a `String`.
@@ -249,10 +249,10 @@ public func _debugPrint_unlocked<T, TargetStream : OutputStreamType>(
   }
 
   let mirror = Mirror(reflecting: value)
-  _adHocPrint(value, mirror, &target, isDebugPrint: true)
+  _adHocPrint_unlocked(value, mirror, &target, isDebugPrint: true)
 }
 
-internal func _dumpPrint<T, TargetStream : OutputStreamType>(
+internal func _dumpPrint_unlocked<T, TargetStream : OutputStreamType>(
     value: T, _ mirror: Mirror, inout _ target: TargetStream
 ) {
   if let displayStyle = mirror.displayStyle {
@@ -313,7 +313,7 @@ internal func _dumpPrint<T, TargetStream : OutputStreamType>(
     }
   }
 
-  _adHocPrint(value, mirror, &target, isDebugPrint: true)
+  _adHocPrint_unlocked(value, mirror, &target, isDebugPrint: true)
 }
 
 //===----------------------------------------------------------------------===//
@@ -334,7 +334,7 @@ internal struct _Stdout : OutputStreamType {
     // It is important that we use stdio routines in order to correctly
     // interoperate with stdio buffering.
     for c in string.utf8 {
-      _swift_stdlib_putchar(Int32(c))
+      _swift_stdlib_putchar_unlocked(Int32(c))
     }
   }
 }
