@@ -758,17 +758,58 @@ struct _ParentProcess {
   }
 }
 
-public func runAllTests() {
-  struct PersistentState {
-    static var runAllTestsWasCalled: Bool = false
-  }
+// Track repeated calls to runAllTests() and/or runNoTests().
+// Complain if a file runs no tests without calling runNoTests().
+struct PersistentState {
+  static var runAllTestsWasCalled: Bool = false
+  static var runNoTestsWasCalled: Bool = false
+  static var ranSomething: Bool = false
+  static var complaintInstalled = false
 
+  static func complainIfNothingRuns() {
+    if !complaintInstalled {
+      complaintInstalled = true
+      atexit {
+        if !PersistentState.ranSomething {
+          print("Ran no tests and runNoTests() was not called. Aborting. ")
+          print("Did you forget to call runAllTests()?")
+          _testSuiteFailedCallback()
+        }
+      }
+    }
+  }
+}
+
+
+// Call runNoTests() if you want to deliberately run no tests.
+public func runNoTests() {
   if PersistentState.runAllTestsWasCalled {
-    print("runAllTests() called twice.  It is not allowed, aborting.")
+    print("runNoTests() called after runAllTests(). Aborting.")
+    _testSuiteFailedCallback()
+    return
+  }
+  if PersistentState.runNoTestsWasCalled {
+    print("runNoTests() called twice. Aborting.")
+    _testSuiteFailedCallback()
+    return
+  }
+  PersistentState.runNoTestsWasCalled = true
+  PersistentState.ranSomething = true
+}
+
+public func runAllTests() {
+  if PersistentState.runNoTestsWasCalled {
+    print("runAllTests() called after runNoTests(). Aborting.")
+    _testSuiteFailedCallback()
+    return
+  }
+  if PersistentState.runAllTestsWasCalled {
+    print("runAllTests() called twice. Aborting.")
     _testSuiteFailedCallback()
     return
   }
   PersistentState.runAllTestsWasCalled = true
+  PersistentState.ranSomething = true
 
 #if _runtime(_ObjC)
   autoreleasepool {
@@ -832,6 +873,7 @@ public class TestSuite {
       "test suite with the same name already exists")
     _allTestSuites.append(self)
     _testSuiteNameToIndex[name] = _allTestSuites.count - 1
+    PersistentState.complainIfNothingRuns()
   }
 
   public func test(
@@ -860,6 +902,7 @@ public class TestSuite {
   }
 
   func _runTest(testName: String) {
+    PersistentState.ranSomething = true
     for r in _allResettables {
       r.reset()
     }

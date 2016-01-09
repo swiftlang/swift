@@ -11,20 +11,20 @@ import SwiftPrivate
 import ObjectiveC
 #endif
 
-_setTestSuiteFailedCallback() { print("abort()") }
+_setTestSuiteFailedCallback() { print("hooray") }
 
 //
-// Check that calling runAllTests() twice is an error.
+// Test that harness aborts when no tests are run.
 //
 
-var TestSuitePasses = TestSuite("TestSuitePasses")
+var ForgotToRunTestsTestSuite = TestSuite("ForgotToRunTests")
 
-TestSuitePasses.test("passes") {
-  expectEqual(1, 1)
+ForgotToRunTestsTestSuite.test("Don'tRunThis") {
+  expectUnreachable()
 }
 
-runAllTests()
-runAllTests()
-// CHECK: runAllTests() called twice. Aborting.
-// CHECK: abort()
+// runAllTests() deliberately not called.
+// runNoTests() deliberately not called.
 
+// CHECK: Ran no tests
+// CHECK: hooray
