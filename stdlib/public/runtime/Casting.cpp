@@ -1987,10 +1987,14 @@ static id dynamicCastValueToNSError(OpaqueValue *src,
 }
 #endif
 
-static struct OptionalCastResult {
+namespace {
+
+struct OptionalCastResult {
   bool success;
   const Metadata* payloadType;
 };
+
+}
 
 /// Handle optional unwrapping of the cast source.
 /// \returns {true, nullptr} if the cast succeeds without unwrapping.
