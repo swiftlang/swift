@@ -3656,10 +3656,16 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
     // purely stored.
     if (isa<SubscriptDecl>(storage)) {
       if (!invalid) P.diagnose(LBLoc, diag::subscript_without_get);
+      // Create a getter so we don't break downstream invariants by having a
+      // setter without a getter.
       Get = createImplicitAccessor(AccessorKind::IsGetter,
                                    AddressorKind::NotAddressor, nullptr);
     } else if (Set) {
       if (!invalid) P.diagnose(Set->getLoc(), diag::var_set_without_get);
+      // Create a getter so we don't break downstream invariants by having a
+      // setter without a getter.
+      Get = createImplicitAccessor(AccessorKind::IsGetter,
+                                   AddressorKind::NotAddressor, nullptr);
     }
   }
 
