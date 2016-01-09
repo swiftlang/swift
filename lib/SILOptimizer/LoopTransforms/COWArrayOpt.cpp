@@ -948,7 +948,8 @@ matchSelfParameterSetup(ArraySemanticsCall Call, LoadInst *Self,
   auto *ReleaseArray = dyn_cast_or_null<StrongReleaseInst>(getInstAfter(Call));
   if (!ReleaseArray && MayHaveBridgedObjectElementType)
     return false;
-  if (ReleaseArray && ReleaseArray->getOperand() != RetainArray->getOperand())
+  if (ReleaseArray && RetainArray &&
+      ReleaseArray->getOperand() != RetainArray->getOperand())
     return false;
 
   if (ReleaseArray)
