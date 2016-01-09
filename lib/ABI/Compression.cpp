@@ -229,8 +229,8 @@ swift::Compress::EncodeStringAsNumber(StringRef In, EncodingKind Kind) {
 
   // Encode variable-length strings.
   if (Kind == EncodingKind::Variable) {
-    size_t num_bits = 0;
-    size_t bits = 0;
+    uint64_t num_bits = 0;
+    uint64_t bits = 0;
 
     // Append the characters in the string in reverse. This will allow
     // us to decode by appending to a string and not prepending.
