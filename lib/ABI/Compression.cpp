@@ -220,14 +220,10 @@ static void DecodeFixedWidth(APInt &Num, std::string &SB) {
   }
 }
 
-static unsigned GetCharIndex(char ch) {
-  // TODO: autogenerate a table for the reverse lookup.
-  for (unsigned i = 0; i < Huffman::CharsetLength; i++) {
-    if (Huffman::Charset[i] == ch) {
-      return i;
-    }
-  }
-  llvm_unreachable("Can't find the requested character in the alphabet.");
+static unsigned HuffIndexOfChar(char c) {
+  int idx = Huffman::IndexOfChar[int(c)];
+  assert(idx >= 0 && "Invalid char");
+  return (unsigned) idx;
 }
 
 APInt
@@ -301,7 +297,7 @@ swift::Compress::EncodeStringAsNumber(StringRef In, EncodingKind Kind) {
 
   for (int i = In.size() - 1; i >= 0; i--) {
     // Encode a single char into the local temporary variable.
-    unsigned charIdx = GetCharIndex(In[i]);
+    unsigned charIdx = HuffIndexOfChar(In[i]);
     encodedCharsValue = encodedCharsValue * CL + charIdx;
     numEncodedChars++;
 

@@ -107,6 +107,14 @@ while len(nodes) > 1:
   nv = Node.merge(v1, v2)
   heappush(nodes, nv)
 
+# Calculate the reverse mapping between the char to its index.
+index_of_char = ["-1"] * 256
+idx = 0
+for c in charset:
+  index_of_char[ord(c)] = str(idx)
+  idx+=1
+
+
 print "#ifndef SWIFT_MANGLER_HUFFMAN_H"
 print "#define SWIFT_MANGLER_HUFFMAN_H"
 print "#include <assert.h>"
@@ -119,6 +127,7 @@ print "// The charset that the fragment indices can use:"
 print "const unsigned CharsetLength = %d;" % len(charset)
 print "const unsigned LongestEncodingLength = %d;" % (nodes[0].getMaxEncodingLength())
 print "const char *Charset = \"%s\";" % charset
+print "const int IndexOfChar[] =  {", ",".join(index_of_char),"};"
 print "char variable_decode(APInt &num) {\n uint64_t tailbits = *num.getRawData();\n", nodes[0].generate_decoder(0), "\n assert(false); return 0;\n}"
 print "void variable_encode(uint64_t &bits, uint64_t &num_bits, char ch) {\n", nodes[0].generate_encoder([]),"assert(false);\n}"
 print "} // namespace"
