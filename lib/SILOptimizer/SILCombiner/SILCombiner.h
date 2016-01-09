@@ -266,11 +266,11 @@ private:
                                                SILValue Self,
                                                CanType ConcreteType,
                                                ProtocolConformanceRef Conformance,
-                                               SILType InstanceType);
+                                               CanType OpenedArchetype);
   SILInstruction *
   propagateConcreteTypeOfInitExistential(FullApplySite AI,
       ProtocolDecl *Protocol,
-      std::function<void(CanType, ProtocolConformanceRef)> Propagate);
+      llvm::function_ref<void(CanType, ProtocolConformanceRef)> Propagate);
 
   SILInstruction *propagateConcreteTypeOfInitExistential(FullApplySite AI,
                                                          WitnessMethodInst *WMI);

@@ -2440,12 +2440,11 @@ protocol someProtocol {
 
 // CHECK-LABEL: sil @witness_archetype
 // CHECK: bb0
-// CHECK-NEXT: alloc_stack
-// CHECK-NEXT: init_existential_addr
+// CHECK-NEXT: alloc_stack $T
 // CHECK-NEXT: copy_addr
 // CHECK-NEXT: destroy_addr
-// CHECK-NEXT: open_existential_addr
-// CHECK-NEXT: witness_method
+// CHECK-NEXT: [[T0:%.*]] = witness_method $T
+// CHECK_NEXT: apply [[T0]]<T>
 // CHECK: return
 sil @witness_archetype : $@convention(thin) <T where T : someProtocol> (@in T) -> () {
 bb0(%0 : $*T):
