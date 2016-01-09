@@ -158,12 +158,6 @@ def getMinFloat(floatBits, intBits):
     minFloat = negativePrefix(floatBits) + negativeExponent(floatBits, intBits)
     return "0x%0.x" % minFloat
 
-def incIfSigned(bits, signed):
-    if not(signed):
-        return bits + 1
-    else:
-        return bits
-
 }%
 
 % for bits in allFloatBits:
@@ -649,6 +643,7 @@ public func ${op}= (inout lhs: ${Self}, rhs: ${Self}) { lhs = lhs ${op} rhs }
 %   sign = 's' if signed else 'u'
 %   Self = intName(bits, signed)
 %   BuiltinName = builtinIntName(bits)
+%   intBits = intFormatFix(bits)
 @_transparent
 extension ${Self} {
 %   for srcBits in allFloatBits:
@@ -670,19 +665,24 @@ extension ${Self} {
 %      if signed:
     // FIXME: Float80 doesn't have a _fromBitPattern
     // ${That}(roundTowardsZero: ${Self}.min)
-    // > ${getMinFloat(srcBits, incIfSigned(intFormatFix(bits), signed))}
-    _precondition(other >= ${That}._fromBitPattern(${getMinFloat(srcBits,
-      incIfSigned(intFormatFix(bits), signed))}),
+    // > ${getMinFloat(srcBits, intBits)}
+    _precondition(other >= ${That}._fromBitPattern(${getMinFloat(srcBits, intBits)}),
       "floating point value cannot be converted to ${Self} because it is less than ${Self}.min")
+    // ${That}(roundTowardsZero: ${Self}.max)
+    // > ${getMaxFloat(srcBits, intBits)}
+    _precondition(other <= ${That}._fromBitPattern(${getMaxFloat(srcBits, intBits)}),
+      "floating point value cannot be converted to ${Self} because it is greater than ${Self}.max")
 %      else:
     _precondition(other >= (0.0 as ${That}),
       "floating point value cannot be converted to ${Self} because it is less than ${Self}.min")
-%      end
+%          # NOTE: Since unsigned ints effectively have one more bit than signed ints
+%          # for storing positive numbers, we use `intBits + 1` when calculating the
+%          # max acceptable float value in the following lines.
     // ${That}(roundTowardsZero: ${Self}.max)
-    // > ${getMaxFloat(srcBits, incIfSigned(intFormatFix(bits), signed))}
-    _precondition(other <= ${That}._fromBitPattern(${getMaxFloat(srcBits,
-      incIfSigned(intFormatFix(bits), signed))}),
+    // > ${getMaxFloat(srcBits, intBits + 1)}
+    _precondition(other <= ${That}._fromBitPattern(${getMaxFloat(srcBits, intBits + 1)}),
       "floating point value cannot be converted to ${Self} because it is greater than ${Self}.max")
+%      end
 
 %     end
     self._value =
