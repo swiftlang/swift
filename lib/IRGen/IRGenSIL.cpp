@@ -1633,9 +1633,9 @@ void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
   assert(loweredTy == i->getType().getObjectType());
   auto &ti = getTypeInfo(loweredTy);
   
-  // If the variable is universally fixed-size and known to be empty, don't
+  // If the variable is empty in all resilience domains, don't
   // actually emit a symbol for the global at all, just return undef.
-  if (ti.isFixedSize(ResilienceExpansion::Minimal) && ti.isKnownEmpty()) {
+  if (ti.isKnownEmpty(ResilienceExpansion::Minimal)) {
     setLoweredAddress(SILValue(i, 0), ti.getUndefAddress());
     return;
   }
@@ -4287,7 +4287,7 @@ void IRGenSILFunction::visitInitExistentialAddrInst(swift::InitExistentialAddrIn
   // Project down to the destination fixed-size buffer.
   Address address = [&]{
     // If the type is provably empty, we're done.
-    if (srcTI.isKnownEmpty()) {
+    if (srcTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
       assert(packing == FixedPacking::OffsetZero);
       return buffer;
     }

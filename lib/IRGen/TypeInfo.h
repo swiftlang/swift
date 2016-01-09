@@ -150,7 +150,7 @@ public:
   bool isComplete() const { return !StorageAlignment.isZero(); }
 
   /// Whether this type is known to be empty.
-  bool isKnownEmpty() const;
+  bool isKnownEmpty(ResilienceExpansion expansion) const;
 
   /// Whether this type is known to be POD, i.e. to not require any
   /// particular action on copy or destroy.

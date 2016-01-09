@@ -2625,7 +2625,7 @@ namespace {
       auto &payloadTI = getFixedPayloadTypeInfo();
       unsigned totalSize
         = cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits();
-      if (payloadTI.isKnownEmpty())
+      if (payloadTI.isKnownEmpty(ResilienceExpansion::Maximal))
         return APInt::getAllOnesValue(totalSize);
       auto baseMask =
         getFixedPayloadTypeInfo().getFixedExtraInhabitantMask(IGM);
@@ -2666,7 +2666,7 @@ namespace {
       auto &payloadTI = getFixedPayloadTypeInfo();
       ClusteredBitVector extraInhabitantsMask;
       
-      if (!payloadTI.isKnownEmpty())
+      if (!payloadTI.isKnownEmpty(ResilienceExpansion::Maximal))
         extraInhabitantsMask =
           getBitVectorFromAPInt(payloadTI.getFixedExtraInhabitantMask(IGM));
       // Extend to include the extra tag bits, which are always significant.
@@ -4699,9 +4699,7 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
     // If the payload is empty, turn the case into a no-payload case, but
     // only if case numbering remains unchanged from all resilience domains
     // that can see the enum.
-    if (origArgTI->isFixedSize(accessScope) &&
-        isa<LoadableTypeInfo>(origArgTI) &&
-        cast<LoadableTypeInfo>(origArgTI)->isKnownEmpty()) {
+    if (origArgTI->isKnownEmpty(accessScope)) {
       elementsWithNoPayload.push_back({elt, nullptr, nullptr});
     } else {
       // *Now* apply the substitutions and get the type info for the instance's

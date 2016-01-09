@@ -354,9 +354,9 @@ Address TypeInfo::getUndefAddress() const {
 }
 
 /// Whether this type is known to be empty.
-bool TypeInfo::isKnownEmpty() const {
+bool TypeInfo::isKnownEmpty(ResilienceExpansion expansion) const {
   if (auto fixed = dyn_cast<FixedTypeInfo>(this))
-    return fixed->isKnownEmpty();
+    return fixed->isKnownEmpty(expansion);
   return false;
 }
 

@@ -72,7 +72,9 @@ public:
   static bool isFixed() { return true; }
 
   /// Whether this type is known to be empty.
-  bool isKnownEmpty() const { return StorageSize.isZero(); }
+  bool isKnownEmpty(ResilienceExpansion expansion) const {
+    return (isFixedSize(expansion) && StorageSize.isZero());
+  }
 
   ContainedAddress allocateStack(IRGenFunction &IGF, SILType T,
                                  const llvm::Twine &name) const override;

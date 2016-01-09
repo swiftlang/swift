@@ -144,7 +144,7 @@ static void addDereferenceableAttributeToBuilder(IRGenModule &IGM,
                                                  const TypeInfo &ti) {
   // The addresses of empty values are undefined, so we can't safely mark them
   // dereferenceable.
-  if (ti.isKnownEmpty())
+  if (ti.isKnownEmpty(ResilienceExpansion::Maximal))
     return;
   
   // If we know the type to have a fixed nonempty size, then the pointer is

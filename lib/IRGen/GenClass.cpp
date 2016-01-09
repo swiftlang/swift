@@ -402,7 +402,7 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
                                                       VarDecl *field) {
   // If the field is empty, its address doesn't matter.
   auto &fieldTI = IGF.getTypeInfo(fieldType);
-  if (fieldTI.isKnownEmpty()) {
+  if (fieldTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
     return OwnedAddress(fieldTI.getUndefAddress(), base);
   }
   

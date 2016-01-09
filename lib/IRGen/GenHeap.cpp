@@ -1482,7 +1482,7 @@ const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   auto &fixedTI = cast<FixedTypeInfo>(eltTI);
 
   // For empty types, we don't really need to allocate anything.
-  if (fixedTI.isKnownEmpty()) {
+  if (fixedTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
     if (!EmptyBoxTI)
       EmptyBoxTI = new EmptyBoxTypeInfo(IGM);
     return EmptyBoxTI;

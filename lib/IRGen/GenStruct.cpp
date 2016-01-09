@@ -200,7 +200,7 @@ namespace {
         = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
       auto targetSize = asImpl().getFixedSize().getValueInBits();
       
-      if (fieldTI.isKnownEmpty())
+      if (fieldTI.isKnownEmpty(ResilienceExpansion::Maximal))
         return APInt(targetSize, 0);
       
       APInt fieldMask = fieldTI.getFixedExtraInhabitantMask(IGM);

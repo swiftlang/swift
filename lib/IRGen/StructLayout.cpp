@@ -213,7 +213,7 @@ bool StructLayoutBuilder::addFields(llvm::MutableArrayRef<ElementLayout> elts,
     IsKnownAlwaysFixedSize &= eltTI.isFixedSize(ResilienceExpansion::Minimal);
     
     // If the element type is empty, it adds nothing.
-    if (eltTI.isKnownEmpty()) {
+    if (eltTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
       addEmptyElement(elt);
     } else {
       // Anything else we do at least potentially adds storage requirements.
