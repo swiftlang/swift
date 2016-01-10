@@ -4707,10 +4707,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       if (tc.typeCheckExpressionShallow(call, dc))
         return nullptr;
       
-      // The return type of _bridgeErrorTypeToNSError is formally 'AnyObject' to avoid
-      // stdlib-to-Foundation dependencies, but it's really NSError.
+      // The return type of _bridgeErrorTypeToNSError is formally 'AnyObject' to
+      // avoid stdlib-to-Foundation dependencies, but it's really NSError.
       // Abuse CovariantReturnConversionExpr to fix this.
-      
       return new (tc.Context) CovariantReturnConversionExpr(call, toType);
     }
 
