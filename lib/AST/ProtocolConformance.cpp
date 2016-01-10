@@ -261,7 +261,7 @@ void NormalProtocolConformance::setTypeWitness(
   assert(getProtocol() == cast<ProtocolDecl>(assocType->getDeclContext()) &&
          "associated type in wrong protocol");
   assert(TypeWitnesses.count(assocType) == 0 && "Type witness already known");
-  assert(!isComplete() && "Conformance already complete?");
+  assert((!isComplete() || isInvalid()) && "Conformance already complete?");
   TypeWitnesses[assocType] = std::make_pair(substitution, typeDecl);
 }
 

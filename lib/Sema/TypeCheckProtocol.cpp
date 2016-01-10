@@ -3881,6 +3881,12 @@ checkConformsToProtocol(TypeChecker &TC,
   conformance->setState(ProtocolConformanceState::Checking);
   defer { conformance->setState(ProtocolConformanceState::Complete); };
 
+  // If the protocol itself is invalid, there's nothing we can do.
+  if (Proto->isInvalid()) {
+    conformance->setInvalid();
+    return conformance;
+  }
+  
   // If the protocol requires a class, non-classes are a non-starter.
   if (Proto->requiresClass() && !canT->getClassOrBoundGenericClass()) {
     TC.diagnose(ComplainLoc, diag::non_class_cannot_conform_to_class_protocol,
