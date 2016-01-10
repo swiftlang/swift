@@ -217,12 +217,13 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         param.SecondNameLoc = consumeToken();
       }
 
-      // Operators cannot have API names.
-      if (paramContext == ParameterContextKind::Operator &&
+      // Operators and closures cannot have API names.
+      if ((paramContext == ParameterContextKind::Operator ||
+           paramContext == ParameterContextKind::Closure) &&
           !param.FirstName.empty() &&
           param.SecondNameLoc.isValid()) {
-        diagnose(param.FirstNameLoc, 
-                 diag::parameter_operator_keyword_argument)
+        diagnose(param.FirstNameLoc, diag::parameter_operator_keyword_argument,
+                 isClosure)
           .fixItRemoveChars(param.FirstNameLoc, param.SecondNameLoc);
         param.FirstName = param.SecondName;
         param.FirstNameLoc = param.SecondNameLoc;
