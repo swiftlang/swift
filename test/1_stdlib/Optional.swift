@@ -232,7 +232,7 @@ OptionalTests.test("Casting Optional") {
   var deinitRan = false
   do {
     var t = DeinitTester { deinitRan = true }
-     _ = "\(Optional(t))"
+    _ = anyToAny(Optional(t), CustomDebugStringConvertible.self)
   }
   expectTrue(deinitRan)
 }
