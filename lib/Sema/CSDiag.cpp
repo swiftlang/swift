@@ -3153,6 +3153,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
   // probably meant to call the value.
   if (auto srcFT = exprType->getAs<AnyFunctionType>()) {
     if (srcFT->getInput()->isVoid() &&
+        !isUnresolvedOrTypeVarType(srcFT->getResult()) &&
         CS->TC.isConvertibleTo(srcFT->getResult(), contextualType, CS->DC)) {
       diagnose(expr->getLoc(), diag::missing_nullary_call, srcFT->getResult())
         .highlight(expr->getSourceRange())
