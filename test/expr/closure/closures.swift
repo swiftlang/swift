@@ -315,3 +315,8 @@ func r21375863() {
     [UInt8](count: width*height, repeatedValue: 0)
   }
 }
+
+// SR-510 `case Foo = {!@#$!@#$}` compiles and drops the case
+enum SR510 {
+  case Foo = {} // expected-error {{closures cannot appear here}}
+}

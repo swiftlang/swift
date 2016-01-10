@@ -917,11 +917,13 @@ ERROR(cannot_capture_fields,attribute_parsing,none,
 ERROR(expected_closure_result_type,expr_parsing,none,
       "expected closure result type after '->'", ())
 ERROR(expected_closure_in,expr_parsing,none,
-   "expected 'in' after the closure signature", ())
+      "expected 'in' after the closure signature", ())
 ERROR(unexpected_tokens_before_closure_in,expr_parsing,none,
-   "unexpected tokens prior to 'in'", ())
+      "unexpected tokens prior to 'in'", ())
 ERROR(expected_closure_rbrace,expr_parsing,none,
       "expected '}' at end of closure", ())
+ERROR(closure_not_permitted,expr_parsing,none,
+      "closures cannot appear here", ())
 
 WARNING(trailing_closure_excess_newlines,expr_parsing,none,
         "trailing closure is separated from call site by multiple newlines", ())
