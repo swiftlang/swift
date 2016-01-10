@@ -67,6 +67,14 @@ func functionWithFixedLayoutOfResilientTypes(r: Rectangle, f: Rectangle -> Recta
 
 public struct MySize {
 
+// CHECK-LABEL: sil @_TFV17struct_resilience6MySizeg1dSi : $@convention(method) (@in_guaranteed MySize) -> Int
+// CHECK-LABEL: sil @_TFV17struct_resilience6MySizes1dSi : $@convention(method) (Int, @inout MySize) -> ()
+// CHECK-LABEL: sil @_TFV17struct_resilience6MySizem1dSi : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout MySize) -> (Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout MySize, @thick MySize.Type) -> ()>)
+  public var d: Int {
+    get { return 0 }
+    set { }
+  }
+
 // CHECK-LABEL: sil @_TFV17struct_resilience6MySizeg1wSi : $@convention(method) (@in_guaranteed MySize) -> Int
 // CHECK-LABEL: sil @_TFV17struct_resilience6MySizes1wSi : $@convention(method) (Int, @inout MySize) -> ()
 // CHECK-LABEL: sil @_TFV17struct_resilience6MySizem1wSi : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout MySize) -> (Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout MySize, @thick MySize.Type) -> ()>)

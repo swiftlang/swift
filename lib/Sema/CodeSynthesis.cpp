@@ -699,7 +699,9 @@ static void maybeMarkTransparent(FuncDecl *accessor,
       ->isNominalTypeOrNominalTypeExtensionContext();
 
   // FIXME: resilient global variables
-  if (!NTD || NTD->hasFixedLayout())
+  if (!NTD ||
+      NTD->hasFixedLayout() ||
+      (isa<ClassDecl>(NTD) && NTD->getClangDecl()))
     accessor->getAttrs().add(new (TC.Context) TransparentAttr(IsImplicit));
 }
 
@@ -793,14 +795,6 @@ static void synthesizeStoredMaterializeForSet(FuncDecl *materializeForSet,
 
   SourceLoc loc = storage->getLoc();
   materializeForSet->setBody(BraceStmt::create(ctx, loc, returnStmt, loc,true));
-
-  maybeMarkTransparent(materializeForSet, storage, TC);
-
-  TC.typeCheckDecl(materializeForSet, true);
-  
-  // Register the accessor as an external decl if the storage was imported.
-  if (needsToBeRegisteredAsExternalDecl(storage))
-    TC.Context.addExternalDecl(materializeForSet);
 }
 
 /// Does a storage decl currently lacking accessor functions require a
@@ -896,7 +890,6 @@ void swift::addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
   if (setter) {
     FuncDecl *materializeForSet = addMaterializeForSet(storage, TC);
     synthesizeMaterializeForSet(materializeForSet, storage, TC);
-    TC.typeCheckDecl(materializeForSet, true);
     TC.typeCheckDecl(materializeForSet, false);
   }
 }
@@ -941,7 +934,6 @@ void TypeChecker::synthesizeWitnessAccessorsForStorage(
       requirement->getSetter() && !storage->getMaterializeForSetFunc()) {
     FuncDecl *materializeForSet = addMaterializeForSet(storage, *this);
     synthesizeMaterializeForSet(materializeForSet, storage, *this);
-    typeCheckDecl(materializeForSet, true);
     typeCheckDecl(materializeForSet, false);
   }
   return;
@@ -1153,15 +1145,6 @@ static void synthesizeComputedMaterializeForSet(FuncDecl *materializeForSet,
 
   SourceLoc loc = storage->getLoc();
   materializeForSet->setBody(BraceStmt::create(ctx, loc, body, loc, true));
-
-  // Mark it transparent, there is no user benefit to this actually existing.
-  materializeForSet->getAttrs().add(new (ctx) TransparentAttr(IsImplicit));
-
-  TC.typeCheckDecl(materializeForSet, true);
-  
-  // Register the accessor as an external decl if the storage was imported.
-  if (needsToBeRegisteredAsExternalDecl(storage))
-    TC.Context.addExternalDecl(materializeForSet);
 }
 
 /// Build a direct call to an addressor from within a
@@ -1333,15 +1316,6 @@ static void synthesizeAddressedMaterializeForSet(FuncDecl *materializeForSet,
 
   SourceLoc loc = storage->getLoc();
   materializeForSet->setBody(BraceStmt::create(ctx, loc, body, loc));
-
-  // Mark it transparent, there is no user benefit to this actually existing.
-  materializeForSet->getAttrs().add(new (ctx) TransparentAttr(IsImplicit));
-
-  TC.typeCheckDecl(materializeForSet, true);
- 
-  // Register the accessor as an external decl if the storage was imported.
-  if (needsToBeRegisteredAsExternalDecl(storage))
-    TC.Context.addExternalDecl(materializeForSet);
 }
 
 void swift::synthesizeMaterializeForSet(FuncDecl *materializeForSet,
@@ -1363,12 +1337,11 @@ void swift::synthesizeMaterializeForSet(FuncDecl *materializeForSet,
         || needsDynamicMaterializeForSet(var)) {
       synthesizeComputedMaterializeForSet(materializeForSet, storage,
                                           bufferDecl, TC);
-      return;
+    } else {
+      synthesizeStoredMaterializeForSet(materializeForSet, storage,
+                                        bufferDecl, TC);
     }
-
-    synthesizeStoredMaterializeForSet(materializeForSet, storage,
-                                      bufferDecl, TC);
-    return;
+    break;
   }
 
   // We should access these by calling mutableAddress.
@@ -1376,7 +1349,7 @@ void swift::synthesizeMaterializeForSet(FuncDecl *materializeForSet,
   case AbstractStorageDecl::ComputedWithMutableAddress:
     synthesizeAddressedMaterializeForSet(materializeForSet, storage,
                                          bufferDecl, TC);
-    return;
+    break;
 
   // These must be accessed with a getter/setter pair.
   // TODO: StoredWithObservers and AddressedWithObservers could be
@@ -1387,9 +1360,16 @@ void swift::synthesizeMaterializeForSet(FuncDecl *materializeForSet,
   case AbstractStorageDecl::Computed:
     synthesizeComputedMaterializeForSet(materializeForSet, storage,
                                         bufferDecl, TC);
-    return;
+    break;
   }
-  llvm_unreachable("bad abstract storage kind");
+
+  maybeMarkTransparent(materializeForSet, storage, TC);
+
+  TC.typeCheckDecl(materializeForSet, true);
+  
+  // Register the accessor as an external decl if the storage was imported.
+  if (needsToBeRegisteredAsExternalDecl(storage))
+    TC.Context.addExternalDecl(materializeForSet);
 }
 
 /// Given a VarDecl with a willSet: and/or didSet: specifier, synthesize the
@@ -1761,10 +1741,17 @@ void swift::maybeAddMaterializeForSet(AbstractStorageDecl *storage,
         return;
     }
 
-  // Structs and enums don't need this.
-  } else {
-    assert(isa<StructDecl>(container) || isa<EnumDecl>(container));
+  // Enums don't need this.
+  } else if (isa<EnumDecl>(container)) {
     return;
+
+  // Computed properties of @_fixed_layout structs don't need this, but
+  // resilient structs do, since stored properties can resiliently become
+  // computed or vice versa.
+  } else {
+    auto *structDecl = cast<StructDecl>(container);
+    if (structDecl->hasFixedLayout())
+      return;
   }
 
   addMaterializeForSet(storage, TC);
