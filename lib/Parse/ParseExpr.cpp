@@ -1408,10 +1408,12 @@ Expr *Parser::parseExprIdentifier() {
   ///     period_following comma semicolon
   ///
   if (canParseAsGenericArgumentList()) {
-    hasGenericArgumentList = true;
     if (parseGenericArguments(args, LAngleLoc, RAngleLoc)) {
       diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
     }
+    
+    // The result can be empty in error cases.
+    hasGenericArgumentList = !args.empty();
   }
   
   ValueDecl *D = lookupInScope(name);

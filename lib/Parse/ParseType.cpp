@@ -260,9 +260,7 @@ bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
     ParserResult<TypeRepr> Ty = parseType(diag::expected_type);
     if (Ty.isNull() || Ty.hasCodeCompletion()) {
       // Skip until we hit the '>'.
-      skipUntilGreaterInTypeList();
-      if (startsWithGreater(Tok))
-        consumeStartingGreater();
+      RAngleLoc = skipUntilGreaterInTypeList();
       return true;
     }
 
@@ -276,9 +274,7 @@ bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
     diagnose(LAngleLoc, diag::opening_angle);
 
     // Skip until we hit the '>'.
-    skipUntilGreaterInTypeList();
-    if (startsWithGreater(Tok))
-      RAngleLoc = consumeStartingGreater();
+    RAngleLoc = skipUntilGreaterInTypeList();
     return true;
   } else {
     RAngleLoc = consumeStartingGreater();
@@ -427,7 +423,9 @@ ParserResult<ProtocolCompositionTypeRepr> Parser::parseTypeComposition() {
   
   // Check for the terminating '>'.
   SourceLoc EndLoc = PreviousLoc;
-  if (!startsWithGreater(Tok)) {
+  if (startsWithGreater(Tok)) {
+    EndLoc = consumeStartingGreater();
+  } else {
     if (Status.isSuccess()) {
       diagnose(Tok, diag::expected_rangle_protocol);
       diagnose(LAngleLoc, diag::opening_angle);
@@ -435,11 +433,7 @@ ParserResult<ProtocolCompositionTypeRepr> Parser::parseTypeComposition() {
     }
 
     // Skip until we hit the '>'.
-    skipUntilGreaterInTypeList(/*protocolComposition=*/true);
-    if (startsWithGreater(Tok))
-      EndLoc = consumeStartingGreater();    
-  } else {
-    EndLoc = consumeStartingGreater();
+    EndLoc = skipUntilGreaterInTypeList(/*protocolComposition=*/true);
   }
 
   return makeParserResult(Status, ProtocolCompositionTypeRepr::create(

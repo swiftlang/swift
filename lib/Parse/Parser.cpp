@@ -400,13 +400,18 @@ void Parser::skipUntilAnyOperator() {
     skipSingle();
 }
 
-void Parser::skipUntilGreaterInTypeList(bool protocolComposition) {
+/// \brief Skip until a token that starts with '>', and consume it if found.
+/// Applies heuristics that are suitable when trying to find the end of a list
+/// of generic parameters, generic arguments, or list of types in a protocol
+/// composition.
+SourceLoc Parser::skipUntilGreaterInTypeList(bool protocolComposition) {
+  SourceLoc lastLoc = Tok.getLoc();
   while (true) {
     switch (Tok.getKind()) {
     case tok::eof:
     case tok::l_brace:
     case tok::r_brace:
-      return;
+      return lastLoc;
 
 #define KEYWORD(X) case tok::kw_##X:
 #include "swift/Parse/Tokens.def"
@@ -414,7 +419,7 @@ void Parser::skipUntilGreaterInTypeList(bool protocolComposition) {
     if (Tok.is(tok::kw_Self))
       break;
     if (isStartOfStmt() || isStartOfDecl())
-      return;
+      return lastLoc;
     break;
 
     case tok::l_paren:
@@ -424,14 +429,16 @@ void Parser::skipUntilGreaterInTypeList(bool protocolComposition) {
       // In generic type parameter list, skip '[' ']' '(' ')', because they
       // can appear in types.
       if (protocolComposition)
-        return;
+        return lastLoc;
       break;
 
     default:
       if (Tok.isAnyOperator() && startsWithGreater(Tok))
-        return;
+        return consumeStartingGreater();
+      
       break;
     }
+    lastLoc = Tok.getLoc();
     skipSingle();
   }
 }
