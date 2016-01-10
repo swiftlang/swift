@@ -435,21 +435,29 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   }
 }
 
+static bool hasSILBody(FuncDecl *fd) {
+  if (fd->getAccessorKind() == AccessorKind::IsMaterializeForSet)
+    return !isa<ProtocolDecl>(fd->getDeclContext());
+
+  return fd->getBody(/*canSynthesize=*/false);
+}
+
 void SILGenModule::emitFunction(FuncDecl *fd) {
   SILDeclRef::Loc decl = fd;
 
   emitAbstractFuncDecl(fd);
 
-  // Emit the actual body of the function to a new SILFunction.  Ignore
-  // prototypes and methods whose bodies weren't synthesized by now.
-  if (fd->getBody(/*canSynthesize=*/false)) {
+  if (hasSILBody(fd)) {
     PrettyStackTraceDecl stackTrace("emitting SIL for", fd);
 
     SILDeclRef constant(decl);
 
     emitOrDelayFunction(*this, constant, [this,constant,fd](SILFunction *f){
       preEmitFunction(constant, fd, f, fd);
-      SILGenFunction(*this, *f).emitFunction(fd);
+      if (fd->getAccessorKind() == AccessorKind::IsMaterializeForSet)
+        SILGenFunction(*this, *f).emitMaterializeForSet(fd);
+      else
+        SILGenFunction(*this, *f).emitFunction(fd);
       postEmitFunction(constant, f);
     });
   }

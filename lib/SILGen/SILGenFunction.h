@@ -1083,6 +1083,7 @@ public:
                                        FuncDecl *witness,
                                        ArrayRef<Substitution> witnessSubs,
                                        ArrayRef<ManagedValue> params);
+  void emitMaterializeForSet(FuncDecl *decl);
 
   SILDeclRef getAddressorDeclRef(AbstractStorageDecl *decl,
                                  AccessKind accessKind,
