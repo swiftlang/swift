@@ -1258,7 +1258,7 @@ ArchetypeTransformer::ArchetypeTransformer(DeclContext *DC, Type Ty) :
   if (!D)
     return;
   SmallVector<Type, 3> Scrach;
-  auto Params = D->getGenericParamTypes();
+  auto Params = D->getInnermostGenericParamTypes();
   auto Args = BaseTy->getAllGenericArgs(Scrach);
   assert(Params.size() == Args.size());
   for (unsigned I = 0, N = Params.size(); I < N; I ++) {
