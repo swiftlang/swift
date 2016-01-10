@@ -648,14 +648,45 @@ void Lexer::lexOperatorIdentifier() {
       if (leftBound == rightBound || leftBound)
         break;
       return formToken(tok::amp_prefix, TokStart);
-    case '.':
+    case '.': {
       if (leftBound == rightBound)
         return formToken(tok::period, TokStart);
       if (rightBound)
         return formToken(tok::period_prefix, TokStart);
-      diagnose(TokStart, diag::lex_unary_postfix_dot_is_reserved);
-      // always emit 'tok::period' to avoid trickle down parse errors
-      return formToken(tok::period, TokStart);
+      
+      // If left bound but not right bound, handle some likely situations.
+      
+      // If there is just some horizontal whitespace before the next token, its
+      // addition is probably incorrect.
+      const char *AfterHorzWhitespace = CurPtr;
+      while (*AfterHorzWhitespace == ' ' || *AfterHorzWhitespace == '\t')
+        ++AfterHorzWhitespace;
+      
+      // First, when we are code completing "x.<ESC>", then make sure to return
+      // a tok::period, since that is what the user is wanting to know about.
+      // FIXME: isRightBound should consider this to be right bound.
+      if (*AfterHorzWhitespace == '\0' &&
+          AfterHorzWhitespace == CodeCompletionPtr) {
+        diagnose(TokStart, diag::expected_member_name);
+        return formToken(tok::period, TokStart);
+      }
+      
+      if (isRightBound(AfterHorzWhitespace, leftBound) &&
+          // Don't consider comments to be this.  A leading slash is probably
+          // either // or /* and most likely occurs just in our testsuite for
+          // expected-error lines.
+          *AfterHorzWhitespace != '/') {
+        diagnose(TokStart, diag::extra_whitespace_period)
+          .fixItRemoveChars(getSourceLoc(CurPtr),
+                            getSourceLoc(AfterHorzWhitespace));
+        return formToken(tok::period, TokStart);
+      }
+
+      // Otherwise, it is probably a missing member.
+      diagnose(TokStart, diag::expected_member_name);
+      //return formToken(tok::unknown, TokStart);
+      return lexImpl();
+    }
     case '?':
       if (leftBound)
         return formToken(tok::question_postfix, TokStart);

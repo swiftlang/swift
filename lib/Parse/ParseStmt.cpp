@@ -258,6 +258,10 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         skipExtraTopLevelRBraces())
       continue;
 
+    // Eat invalid tokens instead of allowing them to produce downstream errors.
+    if (consumeIf(tok::unknown))
+      continue;
+           
     bool NeedParseErrorRecovery = false;
     ASTNode Result;
 
