@@ -1094,7 +1094,9 @@ static bool tryTypeVariableBindings(
 
     // Enumerate the supertypes of each of the types we tried.
     for (auto binding : bindings) {
-      auto type = binding.BindingType;
+      const auto type = binding.BindingType;
+      if (type->is<ErrorType>())
+        continue;
 
       // After our first pass, note that we've explored these
       // types.
