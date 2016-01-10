@@ -139,9 +139,6 @@ private:
       for (auto &O : cast<TryApplyInst>(Term)->getAllOperands())
         Operands.push_back(O.get().getDef());
       return;
-
-    case TermKind::Invalid:
-      llvm_unreachable("Unhandled terminator kind!");
     }
   }
 

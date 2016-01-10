@@ -2129,8 +2129,6 @@ bool SimplifyCFG::simplifyBlocks() {
     case TermKind::DynamicMethodBranchInst:
     case TermKind::ReturnInst:
       break;
-    case TermKind::Invalid:
-      llvm_unreachable("Invalid Term Inst?!");
     }
     // If the block has a cond_fail, try to move it to the predecessors.
     Changed |= tryMoveCondFailToPreds(BB);
