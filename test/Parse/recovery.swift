@@ -371,7 +371,7 @@ struct ErrorTypeInVarDeclArrayType4 {
 }
 
 struct ErrorInFunctionSignatureResultArrayType1 {
-  // expected-error@+1{{closures cannot appear here}}
+  // expected-error@+1{{closures are only allowed inside a function or initializer}}
   func foo() -> Int[ { // expected-error {{expected '{' in body of function declaration}}
     return [0]
   }
@@ -522,7 +522,7 @@ case let (jeb):
 }
 
 // rdar://19605164
-// expected-error@+4{{closures cannot appear here}}
+// expected-error@+4{{closures are only allowed inside a function or initializer}}
 // expected-note@+3{{to match this opening '('}}
 // expected-error@+2{{use of undeclared type 'S'}}
 struct Foo19605164 {

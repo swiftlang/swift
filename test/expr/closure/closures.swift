@@ -318,5 +318,5 @@ func r21375863() {
 
 // SR-510 `case Foo = {!@#$!@#$}` compiles and drops the case
 enum SR510 {
-  case Foo = {} // expected-error {{closures cannot appear here}}
+  case Foo = {} // expected-error {{closures are only allowed inside a function or initializer}}
 }
