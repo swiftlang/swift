@@ -1338,7 +1338,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       if (typeVar1 &&
           !typeVar1->getImpl().literalConformanceProto &&
           (flags & TMF_GenerateConstraints) &&
-          dyn_cast<ParenType>(type1.getPointer())) {
+          isa<ParenType>(type1.getPointer())) {
         
         if (auto tupleTy = type2->getAs<TupleType>()) {
           if (auto tupleEltTy = getTupleElementTypeForSingleArgument(tupleTy)) {
