@@ -330,12 +330,49 @@ std::string swift::Compress::DecodeStringFromNumber(const APInt &In,
                                                     EncodingKind Kind) {
   APInt num = In;
   std::string sb;
+  // This is the max number of bits that we can hold in a 64bit number without
+  // overflowing in the next round of character decoding.
+  unsigned MaxBitsPerWord = 64 - Huffman::LongestEncodingLength;
 
   if (Kind == EncodingKind::Variable) {
     // Keep decoding until we reach our sentinel value.
     // See the encoder implementation for more details.
     while (num.ugt(1)) {
-      sb += Huffman::variable_decode(num);
+      // Try to decode a bunch of characters together without modifying the
+      // big number.
+      if (num.getActiveBits() > 64) {
+        // Collect the bottom 64-bit.
+        uint64_t tailbits = *num.getRawData();
+        // This variable is used to record the number of bits that were
+        // extracted from the lowest 64 bit of the big number.
+        unsigned bits = 0;
+
+        // Keep extracting bits from the tail of the APInt until you reach
+        // the end of the word (64 bits minus the size of the largest
+        // character possible).
+        while (bits < MaxBitsPerWord) {
+          char ch;
+          unsigned local_bits;
+          std::tie(ch, local_bits) = Huffman::variable_decode(tailbits);
+          sb += ch;
+          tailbits >>= local_bits;
+          bits += local_bits;
+        }
+        // Now that we've extracted a few characters from the tail of the APInt
+        // we need to shift the APInt and prepare for the next round. We shift
+        // the APInt by the number of bits that we extracted in the loop above.
+        num = num.lshr(bits);
+        bits = 0;
+      } else {
+        // We don't have enough bits in the big num in order to extract a few
+        // numbers at once, so just extract a single character.
+        uint64_t tailbits = *num.getRawData();
+        char ch;
+        unsigned bits;
+        std::tie(ch, bits) = Huffman::variable_decode(tailbits);
+        sb += ch;
+        num = num.lshr(bits);
+      }
     }
   } else {
     // Decode this number as a regular fixed-width sequence of characters.
