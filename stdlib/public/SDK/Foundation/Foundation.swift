@@ -859,7 +859,7 @@ public func _convertNSSetToSet<T : Hashable>(s: NSSet?) -> Set<T> {
   return result!
 }
 
-// Set<T> is conditionally bridged to NSSet
+// Set<Element> is conditionally bridged to NSSet
 extension Set : _ObjectiveCBridgeable {
   public static func _getObjectiveCType() -> Any.Type {
     return NSSet.self
