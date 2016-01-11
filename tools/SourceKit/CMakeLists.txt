@@ -387,18 +387,6 @@ macro(add_sourcekit_xpc_service name framework_target)
 endmacro()
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-  # Choose an SDK if none was set.
-  set(MODULES_SDK "" CACHE PATH
-      "Path to the modules-enabled SDK to use")
-  if (NOT MODULES_SDK)
-    execute_process(COMMAND xcrun --sdk macosx --show-sdk-path
-      OUTPUT_VARIABLE MODULES_SDK
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
-  endif()
-  if(NOT EXISTS "${MODULES_SDK}/System/Library/Frameworks/module.map")
-    message(FATAL_ERROR "A modules-enabled SDK is required for SourceKit on OS X.")
-  endif()
-
   # Choose a deployment target if none was set.
   set(SOURCEKIT_DEPLOYMENT_TARGET "" CACHE STRING 
       "Deployment target for SourceKit.")
