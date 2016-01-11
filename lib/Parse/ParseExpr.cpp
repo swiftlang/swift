@@ -1811,13 +1811,14 @@ ParserResult<Expr> Parser::parseExprClosure() {
   parseClosureSignatureIfPresent(captureList, params, throwsLoc, arrowLoc,
                                  explicitResultType, inLoc);
 
-  // If the closure was created in the context of an array type signature's
-  // size expression, there will not be a local context. A parse error will
-  // be reported at the signature's declaration site.
+  // If we get a closure expression without a local context, this is somewhere
+  // a closure cannot appear, such as when trying to parse raw values
+  // for enum cases.
   if (!CurLocalContext) {
     skipUntil(tok::r_brace);
     if (Tok.is(tok::r_brace))
       consumeToken();
+    diagnose(leftBrace, diag::closure_not_permitted);
     return makeParserError();
   }
   
