@@ -180,7 +180,7 @@ bool DiagnosticEngine::isDiagnosticPointsToFirstBadToken(DiagID ID) const {
   return StoredInfo.Options == DiagnosticOptions::PointsToFirstBadToken;
 }
 
-bool DiagnosticEngine::isDiagnosticFatal(DiagID ID) const {
+bool DiagnosticState::isDiagnosticFatal(DiagID ID) const {
   const StoredDiagnosticInfo &StoredInfo =
       StoredDiagnosticInfos[(unsigned) ID];
   return StoredInfo.Options == DiagnosticOptions::Fatal;
@@ -449,6 +449,48 @@ static void formatDiagnosticText(StringRef InText,
   }
 }
 
+DiagnosticState::Behavior DiagnosticState::getBehavior(const Diagnostic &diag) {
+  auto set = [this](DiagnosticState::Behavior lvl) {
+    if (lvl == Behavior::Fatal) {
+      fatalErrorOccurred = true;
+      anyErrorOccurred = true;
+    } else if (lvl == Behavior::Err) {
+      anyErrorOccurred = true;
+    }
+
+    previousBehavior = lvl;
+    return lvl;
+  };
+
+  auto diagKind = StoredDiagnosticInfos[(unsigned)diag.getID()].Kind;
+
+  // Notes relating to ignored diagnostics should also be ignored
+  if (previousBehavior == Behavior::Ignore && diagKind == DiagnosticKind::Note)
+    return set(Behavior::Ignore);
+
+  // Suppress diagnostics when in a fatal state, except for follow-on notes
+  // about the original fatal diag
+  if (fatalErrorOccurred) {
+    bool emitAnyways = showDiagnosticsAfterFatalError ||
+                       (diagKind == DiagnosticKind::Note &&
+                        previousBehavior != Behavior::Ignore);
+    if (!emitAnyways)
+      return set(Behavior::Ignore);
+  } else if (isDiagnosticFatal(diag.getID())) {
+    return set(Behavior::Fatal);
+  }
+
+  // Re-map as appropriate
+  switch (diagKind) {
+  case DiagnosticKind::Error:
+    return set(Behavior::Err);
+  case DiagnosticKind::Warning:
+    return set(ignoreAllWarnings ? Behavior::Ignore : Behavior::Warn);
+  case DiagnosticKind::Note:
+    return set(Behavior::Note);
+  }
+}
+
 void DiagnosticEngine::flushActiveDiagnostic() {
   assert(ActiveDiagnostic && "No active diagnostic to flush");
   if (TransactionCount == 0) {
@@ -467,33 +509,12 @@ void DiagnosticEngine::emitTentativeDiagnostics() {
 }
 
 void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
+  auto behavior = state.getBehavior(diagnostic);
+  if (behavior == DiagnosticState::Behavior::Ignore)
+    return;
+
   const StoredDiagnosticInfo &StoredInfo
     = StoredDiagnosticInfos[(unsigned)diagnostic.getID()];
-
-  if (FatalState != FatalErrorState::None) {
-    bool shouldIgnore = true;
-    if (StoredInfo.Kind == DiagnosticKind::Note)
-      shouldIgnore = (FatalState == FatalErrorState::Fatal);
-    else
-      FatalState = FatalErrorState::Fatal;
-
-    if (shouldIgnore && !ShowDiagnosticsAfterFatalError) {
-      return;
-    }
-  }
-
-  // Check whether this is an error.
-  switch (StoredInfo.Kind) {
-  case DiagnosticKind::Error:
-    HadAnyError = true;
-    if (isDiagnosticFatal(diagnostic.getID()))
-      FatalState = FatalErrorState::JustEmitted;
-    break;
-    
-  case DiagnosticKind::Note:
-  case DiagnosticKind::Warning:
-    break;
-  }
 
   // Figure out the source location.
   SourceLoc loc = diagnostic.getLoc();
