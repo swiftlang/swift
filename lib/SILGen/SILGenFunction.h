@@ -1425,6 +1425,12 @@ public:
                                     CanType outputSubstType,
                                     SGFContext ctx = SGFContext());
 
+  /// Used for emitting SILArguments of bare functions, such as thunks and
+  /// open-coded materializeForSet.
+  void collectThunkParams(SILLocation loc,
+                          SmallVectorImpl<ManagedValue> &params,
+                          bool allowPlusZero);
+
   /// Build the type of a function transformation thunk.
   CanSILFunctionType buildThunkType(ManagedValue fn,
                                     CanSILFunctionType expectedType,
