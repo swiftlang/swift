@@ -3,19 +3,6 @@
 
 import Swift
 
-func test_callback() {
-  let callback = Builtin.makeMaterializeForSetCallback
-    {(value, storage, inout selfV: Int, type) -> () in ()}
-}
-// CHECK: sil hidden @_TF17materializeForSet13test_callbackFT_T_ : $@convention(thin) () -> ()
-// CHECK:   [[T0:%.*]] = function_ref @_TFF17materializeForSet13test_callbackFT_T_U_FTBpRBBRSiMSi_T_ : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Int, @thick Int.Type) -> ()
-
-// CHECK: sil shared @_TFF17materializeForSet13test_callbackFT_T_U_FTBpRBBRSiMSi_T_ : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Int, @thick Int.Type) -> () {
-// CHECK:  bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*Int, %3 : $@thick Int.Type):
-// CHECK-NOT: alloc_box $Builtin.UnsafeValueBuffer
-// CHECK:    [[T0:%.*]] = metatype $@thin Int.Type
-// CHECK:    debug_value [[T0]] : $@thin Int.Type
-
 class Base {
   var stored: Int = 0
 
