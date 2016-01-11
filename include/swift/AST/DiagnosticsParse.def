@@ -132,8 +132,8 @@ ERROR(lex_unexpected_block_comment_end,lexing,none,
       "unexpected end of block comment", ())
 ERROR(lex_unary_equal,lexing,none,
       "'=' must have consistent whitespace on both sides", ())
-ERROR(lex_unary_postfix_dot_is_reserved,lexing,none,
-      "postfix '.' is reserved", ())
+ERROR(extra_whitespace_period,lexing,none,
+      "extraneous whitespace after '.' is not permitted", ())
 ERROR(lex_editor_placeholder,lexing,none,
       "editor placeholder in source file", ())
 WARNING(lex_editor_placeholder_in_playground,lexing,none,
