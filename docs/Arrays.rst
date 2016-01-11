@@ -53,34 +53,34 @@ Swift provides three generic array types, all of which have amortized
 O(1) growth.  In this document, statements about **ArrayType** apply
 to all three of the components.
 
-* ``ContiguousArray<T>`` is the fastest and simplest of the three—use this
+* ``ContiguousArray<Element>`` is the fastest and simplest of the three—use this
   when you need "C array" performance.  The elements of a
   ``ContiguousArray`` are always stored contiguously in memory.
 
   .. image:: ContiguousArray.png
 
-* ``Array<T>`` is like ``ContiguousArray<T>``, but optimized for efficient
-  conversions from Cocoa and back—when ``T`` can be a class type,
-  ``Array<T>`` can be backed by the (potentially non-contiguous)
+* ``Array<Element>`` is like ``ContiguousArray<Element>``, but optimized for efficient
+  conversions from Cocoa and back—when ``Element`` can be a class type,
+  ``Array<Element>`` can be backed by the (potentially non-contiguous)
   storage of an arbitrary ``NSArray`` rather than by a Swift
-  ``ContiguousArray``.  ``Array<T>`` also supports up- and down- casts
-  between arrays of related class types.  When ``T`` is known to be a
-  non-class type, the performance of ``Array<T>`` is identical to that
-  of ``ContiguousArray<T>``.
+  ``ContiguousArray``.  ``Array<Element>`` also supports up- and down- casts
+  between arrays of related class types.  When ``Element`` is known to be a
+  non-class type, the performance of ``Array<Element>`` is identical to that
+  of ``ContiguousArray<Element>``.
 
   .. image:: ArrayImplementation.png
 
-* ``Slice<T>`` is a subrange of some ``Array<T>`` or
-  ``ContiguousArray<T>``; it's the result of using slice notation,
+* ``ArraySlice<Element>`` is a subrange of some ``Array<Element>`` or
+  ``ContiguousArray<Element>``; it's the result of using slice notation,
   e.g. ``a[7...21]`` on any Swift array ``a``.  A slice always has
   contiguous storage and "C array" performance.  Slicing an
-  *ArrayType* is O(1) unless the source is an ``Array<T>`` backed by
+  *ArrayType* is O(1) unless the source is an ``Array<Element>`` backed by
   an ``NSArray`` that doesn't supply contiguous storage.
 
-  ``Slice`` is recommended for transient computations but not for
+  ``ArraySlice`` is recommended for transient computations but not for
   long-term storage.  Since it references a sub-range of some shared
-  backing buffer, a ``Slice`` may artificially prolong the lifetime of
-  elements outside the ``Slice`` itself.
+  backing buffer, a ``ArraySlice`` may artificially prolong the lifetime of
+  elements outside the ``ArraySlice`` itself.
 
   .. image:: Slice.png
 
