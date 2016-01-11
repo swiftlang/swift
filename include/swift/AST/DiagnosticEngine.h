@@ -398,18 +398,14 @@ namespace swift {
     /// fatal error
     bool showDiagnosticsAfterFatalError = false;
 
+    /// \brief Whether a fatal error has occurred
+    bool fatalErrorOccurred = false;
+
     /// \brief Whether any error diagnostics have been emitted.
     bool anyErrorOccurred = false;
 
-    /// Fatal error tracking
-    enum class FatalErrorState {
-      None,
-      JustEmitted,
-      Fatal
-    };
-
-    /// Sticky flag set to \c true when a fatal error is emitted.
-    FatalErrorState fatalState = FatalErrorState::None;
+    /// \brief Track the previous emitted Behavior, useful for notes
+    Behavior previousBehavior = Behavior::Unspecified;
 
   public:
     DiagnosticState() {}
@@ -418,9 +414,7 @@ namespace swift {
     Behavior getBehavior(const Diagnostic &);
 
     bool hadAnyError() const { return anyErrorOccurred; }
-    bool hasFatalErrorOccurred() const {
-      return fatalState != FatalErrorState::None;
-    }
+    bool hasFatalErrorOccurred() const { return fatalErrorOccurred; }
 
     void setShowDiagnosticsAfterFatalError(bool val = true) {
       showDiagnosticsAfterFatalError = val;
@@ -428,7 +422,7 @@ namespace swift {
 
     void resetHadAnyError() {
       anyErrorOccurred = false;
-      fatalState = FatalErrorState::None;
+      fatalErrorOccurred = false;
     }
 
   private:

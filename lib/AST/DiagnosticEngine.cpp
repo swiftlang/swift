@@ -452,30 +452,33 @@ static void formatDiagnosticText(StringRef InText,
 DiagnosticState::Behavior DiagnosticState::getBehavior(const Diagnostic &diag) {
   auto set = [this](DiagnosticState::Behavior lvl) {
     if (lvl == Behavior::Fatal) {
-      fatalState = FatalErrorState::JustEmitted;
+      fatalErrorOccurred = true;
       anyErrorOccurred = true;
     } else if (lvl == Behavior::Err) {
       anyErrorOccurred = true;
     }
+
+    previousBehavior = lvl;
     return lvl;
   };
 
   auto diagKind = StoredDiagnosticInfos[(unsigned)diag.getID()].Kind;
 
-  if (fatalState != FatalErrorState::None) {
-    bool shouldIgnore = true;
-    if (diagKind == DiagnosticKind::Note)
-      shouldIgnore = (fatalState == FatalErrorState::Fatal);
-    else
-      fatalState = FatalErrorState::Fatal;
+  // Notes relating to ignored diagnostics should also be ignored
+  if (previousBehavior == Behavior::Ignore && diagKind == DiagnosticKind::Note)
+    return set(Behavior::Ignore);
 
-    if (shouldIgnore && !showDiagnosticsAfterFatalError) {
+  // Suppress diagnostics when in a fatal state, except for follow-on notes
+  // about the original fatal diag
+  if (fatalErrorOccurred) {
+    bool emitAnyways = showDiagnosticsAfterFatalError ||
+                       (diagKind == DiagnosticKind::Note &&
+                        previousBehavior != Behavior::Ignore);
+    if (!emitAnyways)
       return set(Behavior::Ignore);
-    }
-  }
-
-  if (isDiagnosticFatal(diag.getID()))
+  } else if (isDiagnosticFatal(diag.getID())) {
     return set(Behavior::Fatal);
+  }
 
   // Re-map as appropriate
   switch (diagKind) {
