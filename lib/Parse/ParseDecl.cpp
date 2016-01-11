@@ -2004,10 +2004,6 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       }
       diagnose(Tok, diag::expected_decl);
       return makeParserErrorResult<Decl>();
-  
-    case tok::unknown:
-      consumeToken(tok::unknown);
-      continue;
         
     // Unambiguous top level decls.
     case tok::kw_import:
@@ -4477,7 +4473,7 @@ bool Parser::parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
             /*AllowSepAfterLast=*/false, ErrorDiag, [&]() -> ParserStatus {
     // If the previous declaration didn't have a semicolon and this new
     // declaration doesn't start a line, complain.
-    if (!previousHadSemi && !Tok.isAtStartOfLine() && !Tok.is(tok::unknown)) {
+    if (!previousHadSemi && !Tok.isAtStartOfLine()) {
       SourceLoc endOfPrevious = getEndOfPreviousLoc();
       diagnose(endOfPrevious, diag::declaration_same_line_without_semi)
         .fixItInsert(endOfPrevious, ";");

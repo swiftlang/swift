@@ -405,13 +405,13 @@ var st_u11 = " \u{00110000} "  // expected-error {{invalid unicode scalar}}
 func stringliterals(d: [String: Int]) {
 
   // rdar://11385385
-  let x = 4
+  var x = 4
   "Hello \(x+1) world"
   
   "Error: \(x+1"; // expected-error {{unterminated string literal}}
   
   "Error: \(x+1   // expected-error {{unterminated string literal}}
-  ;    // expected-error {{';' statements are not allowed}}
+  ;
 
   // rdar://14050788 [DF] String Interpolations can't contain quotes
   "test \("nested")"
@@ -432,7 +432,6 @@ func stringliterals(d: [String: Int]) {
   // expected-error @-2 {{unterminated string literal}} expected-error @-1 {{unterminated string literal}}
 
   // FIXME: bad diagnostics.
-  // expected-warning @+1 {{initialization of variable 'x2' was never used; consider replacing with assignment to '_' or removing it}}
   /* expected-error {{unterminated string literal}} expected-error {{expected ',' separator}} expected-error {{expected ',' separator}} expected-note {{to match this opening '('}}  */ var x2 : () = ("hello" + "
   ; // expected-error {{expected expression in list of expressions}}
 } // expected-error {{expected ')' in expression list}}
