@@ -398,6 +398,9 @@ namespace swift {
     /// fatal error
     bool showDiagnosticsAfterFatalError = false;
 
+    /// \brief Don't emit any warnings
+    bool ignoreAllWarnings = false;
+
     /// \brief Whether a fatal error has occurred
     bool fatalErrorOccurred = false;
 
@@ -419,6 +422,10 @@ namespace swift {
     void setShowDiagnosticsAfterFatalError(bool val = true) {
       showDiagnosticsAfterFatalError = val;
     }
+
+    /// \brief Whether to skip emitting warnings
+    void setIgnoreAllWarnings(bool val) { ignoreAllWarnings = val; }
+    bool getIgnoreAllWarnings() const { return ignoreAllWarnings; }
 
     void resetHadAnyError() {
       anyErrorOccurred = false;
@@ -482,6 +489,12 @@ namespace swift {
 
     void setShowDiagnosticsAfterFatalError(bool val = true) {
       state.setShowDiagnosticsAfterFatalError(val);
+    }
+
+    /// \brief Whether to skip emitting warnings
+    void setIgnoreAllWarnings(bool val) { state.setIgnoreAllWarnings(val); }
+    bool getIgnoreAllWarnings() const {
+      return state.getIgnoreAllWarnings();
     }
 
     void resetHadAnyError() {

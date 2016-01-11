@@ -485,7 +485,7 @@ DiagnosticState::Behavior DiagnosticState::getBehavior(const Diagnostic &diag) {
   case DiagnosticKind::Error:
     return set(Behavior::Err);
   case DiagnosticKind::Warning:
-    return set(Behavior::Warn);
+    return set(ignoreAllWarnings ? Behavior::Ignore : Behavior::Warn);
   case DiagnosticKind::Note:
     return set(Behavior::Note);
   }
