@@ -2,7 +2,7 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See http://swift.org/LICENSE.txt for license information
@@ -21,6 +21,8 @@
 #   && dot -Tsvg /tmp/protocols.dot > /tmp/protocols.svg \
 #   && open /tmp/protocols.svg
 #===----------------------------------------------------------------------===#
+
+from __future__ import print_function
 
 import re
 import sys
@@ -74,7 +76,8 @@ genericOperators = {}
 comments = r'//.* | /[*] (.|\n)*? [*]/'  # FIXME: doesn't respect strings or comment nesting)
 
 # read source, stripping all comments
-sourceSansComments = re.sub(comments, '', open(args[1]).read(), flags=reFlags)
+with open(args[1]) as src:
+    sourceSansComments = re.sub(comments, '', src.read(), flags=reFlags)
 
 genericParameterConstraint = interpolate(r' (%(identifier)s) \s* : \s* (%(identifier)s) ')
 
@@ -139,17 +142,17 @@ clusterEdges = set(
     for s in elements 
     for t in graph[s] if t in elements)
 
-print 'digraph ProtocolHierarchies {'
-print '  mclimit = 100; ranksep=1.5; ' # ; packmode="array1"
-print '  edge [dir="back"];'
-print '  node [shape = box, fontname = Helvetica, fontsize = 10];'
+print('digraph ProtocolHierarchies {')
+print('  mclimit = 100; ranksep=1.5; ') # ; packmode="array1"
+print('  edge [dir="back"];')
+print('  node [shape = box, fontname = Helvetica, fontsize = 10];')
 
 for c in sorted(clusters):
-    print '  subgraph "cluster_%s" {' % c
+    print('  subgraph "cluster_%s" {' % c)
     for (s, t) in sorted(clusterEdges):
         if s in clusters[c]:
-            print '%s -> %s [weight=100];' % (s, t)
-    print '}'
+            print('%s -> %s [weight=100];' % (s, t))
+    print('}')
 
 for node in sorted(graph.keys()):
     requirements = body.get(node, [])
@@ -164,12 +167,12 @@ for node in sorted(graph.keys()):
         divider,
         '\n'.join('<TR><TD>%s</TD></TR>' % g for g in generics)))
     
-    print interpolate('    %(node)s [style = %(style)s, label=<%(label)s>]')
     
+    print(interpolate('    %(node)s [style = %(style)s, label=<%(label)s>]'))
 for (parent, children) in sorted(graph.items()):
-    print '    %s -> {' % parent,
-    print '; '.join(
-        sorted(child for child in children if not (parent, child) in clusterEdges)),
-    print '}'
+    print('    %s -> {' % parent, end=' ')
+    print('; '.join(
+        sorted(child for child in children if not (parent, child) in clusterEdges)), end=' ')
+    print('}')
 
-print '}'    
+print('}')

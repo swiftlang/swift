@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -47,79 +47,6 @@ protocol BridgeStorage {
 
 extension _BridgeStorage : BridgeStorage {}
 
-
-struct BridgeObject<NativeType : AnyObject, ObjCType : AnyObject>
-  : BridgeStorage {
-  
-  typealias Native = NativeType
-  typealias ObjC = ObjCType
-
-  init(native: Native, bits: Int) {
-    _sanityCheck(
-      bits >= 0 && bits < 2,
-      "BridgeObject can't store bits outside the range 0-1")
-    
-    self.object = native
-    self.bits = UInt8(truncatingBitPattern: bits)
-  }
-  
-  init(native: Native) {
-    self.object = native
-    self.bits = 0
-  }
-  
-  init(objC: ObjC) {
-    self.object = objC
-    self.bits = 0
-  }
-
-  mutating func isUniquelyReferencedNative() -> Bool {
-    return _getBool(Builtin.isUnique(&object))
-  }
-
-  var isNative: Bool {
-    return _swift_usesNativeSwiftReferenceCounting_nonNull(
-      UnsafePointer(rawObject))
-  }
-
-  var isObjC: Bool {
-    return !isNative
-  }
-  
-  var nativeInstance: Native {
-    precondition(isNative)
-    return Builtin.bridgeFromRawPointer(rawObject)
-  }
-    
-  var nativeInstance_noSpareBits: Native {
-    precondition(isNative)
-    precondition(spareBits == 0)
-    return Builtin.bridgeFromRawPointer(rawObject)
-  }
-    
-  mutating func isUniquelyReferenced_native_noSpareBits() -> Bool {
-    precondition(isNative)
-    precondition(spareBits == 0)
-    return _isUnique_native(&object)
-  }
-
-  var objCInstance: ObjC {
-    precondition(isObjC)
-    return Builtin.bridgeFromRawPointer(rawObject)
-  }
-    
-  var spareBits: Int {
-    return Int(bits)
-  }
-  
-  var rawObject: Builtin.RawPointer {
-    return Builtin.bridgeToRawPointer(object)
-  }
-
-  // object declared mutable to be passed to isUnique.
-  var object: AnyObject
-  let bits: UInt8
-}
 
 //===----------------------------------------------------------------------===//
 //===--- Testing code -----------------------------------------------------===//
@@ -192,7 +119,7 @@ var unTaggedNSString : NSString {
   return expectTagged("fûtbōl" as NSString, false)
 }
 
-% for Self in '_BridgeStorage', 'BridgeObject':
+% for Self in ['_BridgeStorage']:
 allTests.test("${Self}") {
   typealias B = ${Self}<C,NSString>
   

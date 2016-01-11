@@ -1,8 +1,8 @@
-//===--- GenClass.cpp - Swift IR Generation For 'class' Types -----------===//
+//===--- GenClass.cpp - Swift IR Generation For 'class' Types -------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -91,50 +91,12 @@ IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
   return IsaEncoding::Pointer;
 }
 
-/// Different policies for accessing a physical field.
-enum class FieldAccess : uint8_t {
-  /// Instance variable offsets are constant.
-  ConstantDirect,
-
-  /// Instance variable offsets must be loaded from "direct offset"
-  /// global variables.
-  NonConstantDirect,
-
-  /// Instance variable offsets are kept in fields in metadata, but
-  /// the offsets of those fields within the metadata are constant.
-  ConstantIndirect,
-
-  /// Instance variable offsets are kept in fields in metadata, and
-  /// the offsets of those fields within the metadata must be loaded
-  /// from "indirect offset" global variables.
-  NonConstantIndirect
-};
-
 namespace {
-  class FieldEntry {
-    llvm::PointerIntPair<VarDecl*, 2, FieldAccess> VarAndAccess;
-  public:
-    FieldEntry(VarDecl *var, FieldAccess access)
-      : VarAndAccess(var, access) {}
-
-    VarDecl *getVar() const {
-      return VarAndAccess.getPointer();
-    }
-    FieldAccess getAccess() const {
-      return VarAndAccess.getInt();
-    }
-  };
-
   /// Layout information for class types.
   class ClassTypeInfo : public HeapTypeInfo<ClassTypeInfo> {
     ClassDecl *TheClass;
     mutable StructLayout *Layout;
-    /// Lazily-initialized array of all fragile stored properties in the class
-    /// (including superclass stored properties).
-    mutable ArrayRef<VarDecl*> AllStoredProperties;
-    /// Lazily-initialized array of all fragile stored properties inherited from
-    /// superclasses.
-    mutable ArrayRef<VarDecl*> InheritedStoredProperties;
+    mutable ClassLayout FieldLayout;
 
     /// Can we use swift reference-counting, or do we have to use
     /// objc_retain/release?
@@ -160,136 +122,13 @@ namespace {
     ClassDecl *getClass() const { return TheClass; }
 
     const StructLayout &getLayout(IRGenModule &IGM) const;
-    ArrayRef<VarDecl*> getAllStoredProperties(IRGenModule &IGM) const;
-    ArrayRef<VarDecl*> getInheritedStoredProperties(IRGenModule &IGM) const;
+    const struct ClassLayout &getClassLayout(IRGenModule &IGM) const;
 
     Alignment getHeapAlignment(IRGenModule &IGM) const {
       return getLayout(IGM).getAlignment();
     }
     ArrayRef<ElementLayout> getElements(IRGenModule &IGM) const {
       return getLayout(IGM).getElements();
-    }
-  };
-
-  /// A class for computing properties of the instance-variable layout
-  /// of a class.  TODO: cache the results!
-  class LayoutClass {
-    IRGenModule &IGM;
-
-    ClassDecl *Root;
-    SmallVector<FieldEntry, 8> Fields;
-
-    bool IsMetadataResilient = false;
-    bool IsObjectResilient = false;
-    bool IsObjectGenericallyArranged = false;
-
-    ResilienceScope Resilience;
-
-  public:
-    LayoutClass(IRGenModule &IGM, ResilienceScope resilience,
-                ClassDecl *theClass, SILType type)
-        : IGM(IGM), Resilience(resilience) {
-      layout(theClass, type);
-    }
-
-    /// The root class for purposes of metaclass objects.
-    ClassDecl *getRootClassForMetaclass() const {
-      // If the formal root class is imported from Objective-C, then
-      // we should use that.  For a class that's really implemented in
-      // Objective-C, this is obviously right.  For a class that's
-      // really implemented in Swift, but that we're importing via an
-      // Objective-C interface, this would be wrong --- except such a
-      // class can never be a formal root class, because a Swift class
-      // without a formal superclass will actually be parented by
-      // SwiftObject (or maybe eventually something else like it),
-      // which will be visible in the Objective-C type system.
-      if (Root->hasClangNode()) return Root;
-
-      // FIXME: If the root class specifies its own runtime ObjC base class,
-      // assume that that base class ultimately inherits NSObject.
-      if (Root->getAttrs().hasAttribute<SwiftNativeObjCRuntimeBaseAttr>())
-        return IGM.getObjCRuntimeBaseClass(IGM.Context.Id_NSObject);
-      
-      return IGM.getObjCRuntimeBaseClass(IGM.Context.Id_SwiftObject);
-    }
-
-    const FieldEntry &getFieldEntry(VarDecl *field) const {
-      for (auto &entry : Fields)
-        if (entry.getVar() == field)
-          return entry;
-      llvm_unreachable("no entry for field!");
-    }
-
-  private:
-    void layout(ClassDecl *theClass, SILType type) {
-      // First, collect information about the superclass.
-      if (theClass->hasSuperclass()) {
-        SILType superclassType = type.getSuperclass(nullptr);
-        auto superclass = superclassType.getClassOrBoundGenericClass();
-        assert(superclass);
-        layout(superclass, superclassType);
-      } else {
-        Root = theClass;
-      }
-
-      // If the class is resilient (which includes classes imported
-      // from Objective-C), then it may have fields we can't see,
-      // and all subsequent fields are *at least* resilient.
-      bool isClassResilient = IGM.isResilient(theClass, Resilience);
-      if (isClassResilient) {
-        IsMetadataResilient = true;
-        IsObjectResilient = true;
-      }
-
-      // Okay, make entries for all the physical fields we know about.
-      for (auto member : theClass->getMembers()) {
-        auto var = dyn_cast<VarDecl>(member);
-        if (!var) continue;
-
-        // Skip properties that we have to access logically.
-        if (!var->hasStorage())
-          continue;
-
-        // Adjust based on the type of this field.
-        // FIXME: this algorithm is assuming that fields are laid out
-        // in declaration order.
-        adjustAccessAfterField(var, type);
-
-        Fields.push_back(FieldEntry(var, getCurFieldAccess()));
-      }
-    }
-
-    FieldAccess getCurFieldAccess() const {
-      if (IsObjectGenericallyArranged) {
-        if (IsMetadataResilient) {
-          return FieldAccess::NonConstantIndirect;
-        } else {
-          return FieldAccess::ConstantIndirect;
-        }
-      } else {
-        if (IsObjectResilient) {
-          return FieldAccess::NonConstantDirect;
-        } else {
-          return FieldAccess::ConstantDirect;
-        }
-      }
-    }
-
-    void adjustAccessAfterField(VarDecl *var, SILType classType) {
-      if (!var->hasStorage()) return;
-
-      SILType fieldType = classType.getFieldType(var, *IGM.SILMod);
-      auto &fieldTI = IGM.getTypeInfo(fieldType);
-      if (fieldTI.isFixedSize())
-        return;
-
-      // If the field type is not fixed-size, the size either depends
-      // on generic parameters, or resilient types. In the former case,
-      // we store field offsets in type metadata.
-      if (fieldType.hasArchetype())
-        IsObjectGenericallyArranged = true;
-
-      IsObjectResilient = true;
     }
   };
 }  // end anonymous namespace.
@@ -305,23 +144,52 @@ static const ClassTypeInfo &getSelfTypeInfo(IRGenModule &IGM, ClassDecl *base) {
   return IGM.getTypeInfo(getSelfType(base)).as<ClassTypeInfo>();
 }
 
-/// Return the index of the given field within the class.
-static unsigned getFieldIndex(IRGenModule &IGM,
-                              ClassDecl *base, VarDecl *target) {
-  // FIXME: This is algorithmically terrible.
-  auto &ti = getSelfTypeInfo(IGM, base);
-  
-  auto props = ti.getAllStoredProperties(IGM);
-  auto found = std::find(props.begin(), props.end(), target);
-  assert(found != props.end() && "didn't find field in type?!");
-  return found - props.begin();
-}
-
 namespace {
   class ClassLayoutBuilder : public StructLayoutBuilder {
     SmallVector<ElementLayout, 8> Elements;
     SmallVector<VarDecl*, 8> AllStoredProperties;
+    SmallVector<FieldAccess, 8> AllFieldAccesses;
+
+    // The manner in which this class embeds the field offset vector of
+    // the superclass.
+    //
+    // - ConstantDirect - size and content of superclass metadata is known
+    //   at compile time.
+    // - NonConstantDirect - size of superclass metadata is known, however
+    //   some field offsets depend on the sizes of resilient types, or the
+    //   size of an imported Objective-C base class.
+    // - ConstantIndirect - size of superclass metadata is known, however
+    //   some field offsets depend on generic parameters, sizes of
+    //   resilient types, or the size of an imported Objective-C base class.
+    // - NonConstantIndirect - size of superclass metadata is unknown,
+    //   so all class metadata entries for members of this class must be
+    //   accessed indirectly.
+    FieldAccess MetadataAccess = FieldAccess::ConstantDirect;
+
     unsigned NumInherited = 0;
+
+    // Does the class require a metadata template? This will be true if
+    // the class or any of its ancestors have generic parameters, or if
+    // any of the below conditions are false.
+    bool ClassHasMetadataPattern = false;
+
+    // Does the superclass have a fixed number of stored properties?
+    // If not, and the class has generally-dependent layout, we have to
+    // access stored properties through an indirect offset into the field
+    // offset vector.
+    bool ClassHasFixedFieldCount = true;
+
+    // Does the class have a fixed size up until the current point?
+    // If not, we have to access stored properties either ivar offset globals,
+    // or through the field offset vector, based on whether the layout has
+    // dependent layout.
+    bool ClassHasFixedSize = true;
+
+    // Does the class have identical layout under all generic substitutions?
+    // If not, we can have to access stored properties through the field
+    // offset vector in the instantiated type metadata.
+    bool ClassHasConcreteLayout = true;
+
   public:
     ClassLayoutBuilder(IRGenModule &IGM, ClassDecl *theClass)
       : StructLayoutBuilder(IGM)
@@ -340,30 +208,66 @@ namespace {
     ArrayRef<ElementLayout> getElements() const {
       return Elements;
     }
-    
-    /// Return the full list of stored properties.
-    ArrayRef<VarDecl *> getAllStoredProperties() const {
-      return AllStoredProperties;
+
+    ClassLayout getClassLayout() const {
+      ClassLayout fieldLayout;
+      auto allStoredProps = IGM.Context.AllocateCopy(AllStoredProperties);
+      auto inheritedStoredProps = allStoredProps.slice(0, NumInherited);
+      fieldLayout.AllStoredProperties = allStoredProps;
+      fieldLayout.InheritedStoredProperties = inheritedStoredProps;
+      fieldLayout.AllFieldAccesses = IGM.Context.AllocateCopy(AllFieldAccesses);
+      fieldLayout.MetadataAccess = MetadataAccess;
+      fieldLayout.HasMetadataPattern = ClassHasMetadataPattern;
+      return fieldLayout;
     }
 
-    /// Return the inherited stored property count.
-    unsigned getNumInherited() const {
-      return NumInherited;
-    }
   private:
     void addFieldsForClass(ClassDecl *theClass,
                            SILType classType) {
+      if (theClass->isGenericContext())
+        ClassHasMetadataPattern = true;
+
       if (theClass->hasSuperclass()) {
         // TODO: apply substitutions when computing base-class layouts!
         SILType superclassType = classType.getSuperclass(nullptr);
         auto superclass = superclassType.getClassOrBoundGenericClass();
         assert(superclass);
 
-        // Recur.
-        addFieldsForClass(superclass, superclassType);
-        // Count the fields we got from the superclass.
-        NumInherited = Elements.size();
+        if (superclass->hasClangNode()) {
+          // As a special case, assume NSObject has a fixed layout.
+          if (superclass->getName() != IGM.Context.Id_NSObject) {
+            // If the superclass was imported from Objective-C, its size is
+            // not known at compile time. However, since the field offset
+            // vector only stores offsets of stored properties defined in
+            // Swift, we don't have to worry about indirect indexing of
+            // the field offset vector.
+            ClassHasFixedSize = false;
+          }
+        } else if (IGM.isResilient(superclass, ResilienceExpansion::Maximal)) {
+          // If the superclass is resilient, the number of stored properties
+          // is not known at compile time.
+          ClassHasMetadataPattern = true;
+
+          ClassHasFixedFieldCount = false;
+          ClassHasFixedSize = false;
+
+          // If the superclass is in a generic context, conservatively
+          // assume the layout depends on generic parameters, since we
+          // can't look at stored properties.
+          if (superclassType.hasArchetype())
+            ClassHasConcreteLayout = false;
+        } else {
+          // Otherwise, we have total knowledge of the class and its
+          // fields, so walk them to compute the layout.
+          addFieldsForClass(superclass, superclassType);
+          // Count the fields we got from the superclass.
+          NumInherited = Elements.size();
+        }
       }
+
+      // The final value is field access for the superclass of the class we're
+      // building.
+      MetadataAccess = getCurFieldAccess();
 
       // Collect fields from this class and add them to the layout as a chunk.
       addDirectFieldsFromClass(theClass, classType);
@@ -374,15 +278,55 @@ namespace {
       for (VarDecl *var : theClass->getStoredProperties()) {
         SILType type = classType.getFieldType(var, *IGM.SILMod);
         auto &eltType = IGM.getTypeInfo(type);
+
+        if (!eltType.isFixedSize()) {
+          ClassHasMetadataPattern = true;
+          ClassHasFixedSize = false;
+
+          if (type.hasArchetype())
+            ClassHasConcreteLayout = false;
+        }
+
         Elements.push_back(ElementLayout::getIncomplete(eltType));
         AllStoredProperties.push_back(var);
+        AllFieldAccesses.push_back(getCurFieldAccess());
+      }
+    }
+
+    FieldAccess getCurFieldAccess() const {
+      if (ClassHasConcreteLayout) {
+        if (ClassHasFixedSize) {
+          // No generic parameter dependencies, fixed size. The field offset
+          // is known at compile time.
+          return FieldAccess::ConstantDirect;
+        } else {
+          // No generic parameter dependencies, but some stored properties
+          // have unknown size. The field offset is stored in a global constant
+          // and set up by the Objective-C or Swift runtime, depending on the
+          // class's heritage.
+          return FieldAccess::NonConstantDirect;
+        }
+      } else {
+        if (ClassHasFixedFieldCount) {
+          // Layout depends on generic parameters, but the number of fields
+          // is known. The field offset is loaded from a fixed offset in the
+          // field offset vector in type metadata.
+          return FieldAccess::ConstantIndirect;
+        } else {
+          // Layout depends on generic parameters, and the number of fields
+          // is not known at compile time either. The field index is loaded
+          // from a global variable set up by the runtime, and then this
+          // index is used to load the offset from the field offset vector.
+          return FieldAccess::NonConstantIndirect;
+        }
       }
     }
   };
 }
 
 void ClassTypeInfo::generateLayout(IRGenModule &IGM) const {
-  assert(!Layout && AllStoredProperties.empty() && "already generated layout");
+  assert(!Layout && FieldLayout.AllStoredProperties.empty() &&
+         "already generated layout");
 
   // Add the heap header.
   ClassLayoutBuilder builder(IGM, getClass());
@@ -396,10 +340,7 @@ void ClassTypeInfo::generateLayout(IRGenModule &IGM) const {
   Layout = new StructLayout(builder,
                             TheClass->getDeclaredTypeInContext()->getCanonicalType(),
                             classTy, builder.getElements());
-  AllStoredProperties
-    = IGM.Context.AllocateCopy(builder.getAllStoredProperties());
-  InheritedStoredProperties
-    = AllStoredProperties.slice(0, builder.getNumInherited());
+  FieldLayout = builder.getClassLayout();
 }
 
 const StructLayout &ClassTypeInfo::getLayout(IRGenModule &IGM) const {
@@ -410,24 +351,13 @@ const StructLayout &ClassTypeInfo::getLayout(IRGenModule &IGM) const {
   return *Layout;
 }
 
-ArrayRef<VarDecl*>
-ClassTypeInfo::getAllStoredProperties(IRGenModule &IGM) const {
+const ClassLayout &ClassTypeInfo::getClassLayout(IRGenModule &IGM) const {
   // Return the cached layout if available.
   if (Layout)
-    return AllStoredProperties;
+    return FieldLayout;
   
   generateLayout(IGM);
-  return AllStoredProperties;
-}
-
-ArrayRef<VarDecl*>
-ClassTypeInfo::getInheritedStoredProperties(IRGenModule &IGM) const {
-  // Return the cached layout if available.
-  if (Layout)
-    return InheritedStoredProperties;
-  
-  generateLayout(IGM);
-  return InheritedStoredProperties;
+  return FieldLayout;
 }
 
 /// Cast the base to i8*, apply the given inbounds offset (in bytes,
@@ -465,20 +395,6 @@ static OwnedAddress emitAddressAtOffset(IRGenFunction &IGF,
   return OwnedAddress(addr, base);
 }
 
-llvm::Constant *irgen::tryEmitClassConstantFragileFieldOffset(IRGenModule &IGM,
-                                                            ClassDecl *theClass,
-                                                            VarDecl *field) {
-  assert(field->hasStorage());
-  // FIXME: This field index computation is an ugly hack.
-  auto &ti = getSelfTypeInfo(IGM, theClass);
-
-  unsigned fieldIndex = getFieldIndex(IGM, theClass, field);
-  auto &element = ti.getElements(IGM)[fieldIndex];
-  if (element.getKind() == ElementLayout::Kind::Fixed)
-    return IGM.getSize(element.getByteOffset());
-  return nullptr;
-}
-
 OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
                                                       llvm::Value *base,
                                                       SILType baseType,
@@ -486,25 +402,22 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
                                                       VarDecl *field) {
   // If the field is empty, its address doesn't matter.
   auto &fieldTI = IGF.getTypeInfo(fieldType);
-  if (fieldTI.isKnownEmpty()) {
+  if (fieldTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
     return OwnedAddress(fieldTI.getUndefAddress(), base);
   }
   
   auto &baseClassTI = IGF.getTypeInfo(baseType).as<ClassTypeInfo>();
   ClassDecl *baseClass = baseType.getClassOrBoundGenericClass();
-  
+
   // TODO: Lay out the class based on the substituted baseType rather than
   // the generic type. Doing this requires that we also handle
   // specialized layout in ClassTypeInfo.
-  LayoutClass layout(IGF.IGM, ResilienceScope::Component, baseClass,
-                     getSelfType(baseClass) /* TODO: should be baseType */);
-  
-  auto &entry = layout.getFieldEntry(field);
-  switch (entry.getAccess()) {
-  case FieldAccess::ConstantDirect: {
-    // FIXME: This field index computation is an ugly hack.
-    unsigned fieldIndex = getFieldIndex(IGF.IGM, baseClass, field);
 
+  auto &classLayout = baseClassTI.getClassLayout(IGF.IGM);
+  unsigned fieldIndex = classLayout.getFieldIndex(field);
+
+  switch (classLayout.AllFieldAccesses[fieldIndex]) {
+  case FieldAccess::ConstantDirect: {
     Address baseAddr(base, baseClassTI.getHeapAlignment(IGF.IGM));
     auto &element = baseClassTI.getElements(IGF.IGM)[fieldIndex];
     Address memberAddr = element.project(IGF, baseAddr, None);
@@ -777,10 +690,11 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
   PrettyStackTraceDecl prettyStackTrace("emitting class metadata for", D);
 
   auto &classTI = Types.getTypeInfo(D).as<ClassTypeInfo>();
-  auto &layout = classTI.getLayout(*this);
 
   // Emit the class metadata.
-  emitClassMetadata(*this, D, layout);
+  emitClassMetadata(*this, D,
+                    classTI.getLayout(*this),
+                    classTI.getClassLayout(*this));
   emitNestedTypeDecls(D->getMembers());
 }
 
@@ -804,8 +718,8 @@ namespace {
     IRGenModule &IGM;
     PointerUnion<ClassDecl *, ProtocolDecl *> TheEntity;
     ExtensionDecl *TheExtension;
-    const LayoutClass *Layout;
-    const StructLayout *FieldLayout;
+    const StructLayout *Layout;
+    const ClassLayout *FieldLayout;
     
     ClassDecl *getClass() const {
       return TheEntity.get<ClassDecl*>();
@@ -824,7 +738,6 @@ namespace {
       return TheEntity.is<ProtocolDecl*>();
     }
 
-    bool Generic = false;
     bool HasNonTrivialDestructor = false;
     bool HasNonTrivialConstructor = false;
     llvm::SmallString<16> CategoryName;
@@ -846,15 +759,15 @@ namespace {
     unsigned NextFieldIndex;
   public:
     ClassDataBuilder(IRGenModule &IGM, ClassDecl *theClass,
-                     const LayoutClass &layout,
-                     const StructLayout &fieldLayout,
-                     unsigned firstField)
+                     const StructLayout &layout,
+                     const ClassLayout &fieldLayout)
         : IGM(IGM), TheEntity(theClass), TheExtension(nullptr),
-          Layout(&layout), FieldLayout(&fieldLayout),
-          Generic(theClass->isGenericContext()),
-          FirstFieldIndex(firstField),
-          NextFieldIndex(firstField)
+          Layout(&layout),
+          FieldLayout(&fieldLayout)
     {
+      FirstFieldIndex = fieldLayout.InheritedStoredProperties.size();
+      NextFieldIndex = FirstFieldIndex;
+
       visitConformances(theClass);
       visitMembers(theClass);
 
@@ -867,9 +780,11 @@ namespace {
     ClassDataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                      ExtensionDecl *theExtension)
       : IGM(IGM), TheEntity(theClass), TheExtension(theExtension),
-        Layout(nullptr), FieldLayout(nullptr),
-        Generic(theClass->isGenericContext())
+        Layout(nullptr), FieldLayout(nullptr)
     {
+      FirstFieldIndex = -1;
+      NextFieldIndex = -1;
+
       buildCategoryName(CategoryName);
 
       visitConformances(theExtension);
@@ -920,7 +835,7 @@ namespace {
     void buildMetaclassStub() {
       assert(Layout && "can't build a metaclass from a category");
       // The isa is the metaclass pointer for the root class.
-      auto rootClass = Layout->getRootClassForMetaclass();
+      auto rootClass = getRootClassForMetaclass(IGM, TheEntity.get<ClassDecl *>());
       auto rootPtr = IGM.getAddrOfMetaclassObject(rootClass, NotForDefinition);
 
       // The superclass of the metaclass is the metaclass of the
@@ -932,11 +847,7 @@ namespace {
       llvm::Constant *superPtr;
       if (getClass()->hasSuperclass()) {
         auto base = getClass()->getSuperclass()->getClassOrBoundGenericClass();
-        // If the base is generic, we'll need to instantiate it at runtime.
-        if (base->isGenericContext())
-          superPtr = llvm::ConstantPointerNull::get(IGM.ObjCClassPtrTy);
-        else
-          superPtr = IGM.getAddrOfMetaclassObject(base, NotForDefinition);
+        superPtr = IGM.getAddrOfMetaclassObject(base, NotForDefinition);
       } else {
         superPtr = IGM.getAddrOfMetaclassObject(
           IGM.getObjCRuntimeBaseForSwiftRootClass(getClass()),
@@ -1050,7 +961,7 @@ namespace {
     }
 
     llvm::Constant *emitRODataFields(ForMetaClass_t forMeta) {
-      assert(Layout && FieldLayout && "can't emit rodata for a category");
+      assert(Layout && "can't emit rodata for a category");
       SmallVector<llvm::Constant*, 11> fields;
       // struct _class_ro_t {
       //   uint32_t flags;
@@ -1071,14 +982,14 @@ namespace {
         // historical nonsense
         instanceStart = instanceSize;
       } else {
-        instanceSize = FieldLayout->getSize();
-        if (FieldLayout->getElements().empty()
-            || FieldLayout->getElements().size() == FirstFieldIndex) {
+        instanceSize = Layout->getSize();
+        if (Layout->getElements().empty()
+            || Layout->getElements().size() == FirstFieldIndex) {
           instanceStart = instanceSize;
-        } else if (FieldLayout->getElement(FirstFieldIndex).getKind()
+        } else if (Layout->getElement(FirstFieldIndex).getKind()
                      == ElementLayout::Kind::Fixed) {
           // FIXME: assumes layout is always sequential!
-          instanceStart = FieldLayout->getElement(FirstFieldIndex).getByteOffset();
+          instanceStart = Layout->getElement(FirstFieldIndex).getByteOffset();
         } else {
           instanceStart = Size(0);
         }
@@ -1396,7 +1307,7 @@ namespace {
     /// affect flags.
     void visitStoredVar(VarDecl *var) {
       // FIXME: how to handle ivar extensions in categories?
-      if (!Layout && !FieldLayout)
+      if (!Layout)
         return;
 
       // For now, we never try to emit specialized versions of the
@@ -1419,38 +1330,31 @@ namespace {
     ///   uint32_t size;
     /// };
     llvm::Constant *buildIvar(VarDecl *ivar, SILType loweredType) {
-      assert(Layout && FieldLayout && "can't build ivar for category");
+      assert(Layout && "can't build ivar for category");
       // FIXME: this is not always the right thing to do!
-      auto &elt = FieldLayout->getElement(NextFieldIndex++);
+      //auto &elt = Layout->getElement(NextFieldIndex++);
       auto &ivarTI = IGM.getTypeInfo(loweredType);
-      
-      llvm::Constant *offsetPtr;
-      if (elt.getKind() == ElementLayout::Kind::Fixed) {
-        // Emit a field offset variable for the fixed field statically.
-        auto offsetAddr = IGM.getAddrOfFieldOffset(ivar, /*indirect*/ false,
-                                                   ForDefinition);
-        auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
-        offsetVar->setConstant(false);
-        auto offsetVal =
-          llvm::ConstantInt::get(IGM.IntPtrTy, elt.getByteOffset().getValue());
-        offsetVar->setInitializer(offsetVal);
-        
-        offsetPtr = offsetVar;
-      } else {
-        // Emit an indirect field offset variable with the field index.
-        auto offsetAddr = IGM.getAddrOfFieldOffset(ivar, /*indirect*/ true,
-                                                   ForDefinition);
-        auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
-        offsetVar->setConstant(false);
-        auto offset =
-          getClassFieldOffset(IGM, getClass(), ivar).getValue();
-        auto offsetVal =
-          llvm::ConstantInt::get(IGM.IntPtrTy, offset);
-        offsetVar->setInitializer(offsetVal);
 
-        // We need to set this up when the metadata is instantiated.
+      llvm::Constant *offsetPtr;
+      switch (FieldLayout->AllFieldAccesses[NextFieldIndex++]) {
+      case FieldAccess::ConstantDirect:
+      case FieldAccess::NonConstantDirect: {
+        // If the field offset is fixed relative to the start of the superclass,
+        // reference the global from the ivar metadata so that the Objective-C
+        // runtime will slide it down.
+        auto offsetAddr = IGM.getAddrOfFieldOffset(ivar, /*indirect*/ false,
+                                                   NotForDefinition);
+        offsetPtr = cast<llvm::Constant>(offsetAddr.getAddress());
+        break;
+      }
+      case FieldAccess::ConstantIndirect:
+      case FieldAccess::NonConstantIndirect:
+        // Otherwise, swift_initClassMetadata_UniversalStrategy() will point
+        // the Objective-C runtime into the field offset vector of the
+        // instantiated metadata.
         offsetPtr
           = llvm::ConstantPointerNull::get(IGM.IntPtrTy->getPointerTo());
+        break;
       }
 
       // TODO: clang puts this in __TEXT,__objc_methname,cstring_literals
@@ -1777,10 +1681,9 @@ llvm::Constant *irgen::emitClassPrivateData(IRGenModule &IGM,
   assert(IGM.ObjCInterop && "emitting RO-data outside of interop mode");
   SILType selfType = getSelfType(cls);
   auto &classTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
-  auto &fieldLayout = classTI.getLayout(IGM);
-  LayoutClass layout(IGM, ResilienceScope::Universal, cls, selfType);
-  ClassDataBuilder builder(IGM, cls, layout, fieldLayout,
-                           classTI.getInheritedStoredProperties(IGM).size());
+  auto &layout = classTI.getLayout(IGM);
+  auto &fieldLayout = classTI.getClassLayout(IGM);
+  ClassDataBuilder builder(IGM, cls, layout, fieldLayout);
 
   // First, build the metaclass object.
   builder.buildMetaclassStub();
@@ -1796,10 +1699,9 @@ irgen::emitClassPrivateDataFields(IRGenModule &IGM, ClassDecl *cls) {
   assert(IGM.ObjCInterop && "emitting RO-data outside of interop mode");
   SILType selfType = getSelfType(cls);
   auto &classTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
-  auto &fieldLayout = classTI.getLayout(IGM);
-  LayoutClass layout(IGM, ResilienceScope::Universal, cls, selfType);
-  ClassDataBuilder builder(IGM, cls, layout, fieldLayout,
-                           classTI.getInheritedStoredProperties(IGM).size());
+  auto &layout = classTI.getLayout(IGM);
+  auto &fieldLayout = classTI.getClassLayout(IGM);
+  ClassDataBuilder builder(IGM, cls, layout, fieldLayout);
 
   auto classFields = builder.emitRODataFields(ForClass);
   auto metaclassFields = builder.emitRODataFields(ForMetaClass);
@@ -1889,7 +1791,32 @@ IRGenModule::getObjCRuntimeBaseForSwiftRootClass(ClassDecl *theClass) {
 }
 
 ClassDecl *irgen::getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *C) {
-  LayoutClass layout(IGM, ResilienceScope::Component, C, getSelfType(C));
+  while (auto superclass = C->getSuperclass())
+    C = superclass->getClassOrBoundGenericClass();
 
-  return layout.getRootClassForMetaclass();
+  // If the formal root class is imported from Objective-C, then
+  // we should use that.  For a class that's really implemented in
+  // Objective-C, this is obviously right.  For a class that's
+  // really implemented in Swift, but that we're importing via an
+  // Objective-C interface, this would be wrong --- except such a
+  // class can never be a formal root class, because a Swift class
+  // without a formal superclass will actually be parented by
+  // SwiftObject (or maybe eventually something else like it),
+  // which will be visible in the Objective-C type system.
+  if (C->hasClangNode()) return C;
+  
+  // FIXME: If the root class specifies its own runtime ObjC base class,
+  // assume that that base class ultimately inherits NSObject.
+  if (C->getAttrs().hasAttribute<SwiftNativeObjCRuntimeBaseAttr>())
+    return IGM.getObjCRuntimeBaseClass(IGM.Context.Id_NSObject);
+  
+  return IGM.getObjCRuntimeBaseClass(IGM.Context.Id_SwiftObject);
+}
+
+bool irgen::getClassHasMetadataPattern(IRGenModule &IGM, ClassDecl *theClass) {
+  // Classes imported from Objective-C never have a metadata pattern.
+  if (theClass->hasClangNode())
+    return false;
+  
+  return getSelfTypeInfo(IGM, theClass).getClassLayout(IGM).HasMetadataPattern;
 }

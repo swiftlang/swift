@@ -106,12 +106,12 @@ func while_loop() {
 // CHECK:         [[OPTBUF:%[0-9]+]] = alloc_stack $Optional<T>
 // CHECK:         switch_enum_addr {{.*}}, case #Optional.Some!enumelt.1: [[LOOPBODY:bb.*]], default [[OUT:bb[0-9]+]]
 // CHECK:       [[OUT]]:
-// CHECK:         dealloc_stack [[OPTBUF]]#0
+// CHECK:         dealloc_stack [[OPTBUF]]
 // CHECK:         dealloc_stack [[X]]
 // CHECK:         br [[DONE:bb[0-9]+]]
 // CHECK:       [[LOOPBODY]]:
 // CHECK:         [[ENUMVAL:%.*]] = unchecked_take_enum_data_addr
-// CHECK:         copy_addr [take] [[ENUMVAL]] to [initialization] [[X]]#1
+// CHECK:         copy_addr [take] [[ENUMVAL]] to [initialization] [[X]]
 // CHECK:         destroy_addr [[X]]
 // CHECK:         dealloc_stack [[X]]
 // CHECK:         br [[COND]]

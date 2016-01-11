@@ -1,8 +1,8 @@
-//===- DiagnosticsSema.def - Diagnostics Text -------------------*- C++ -*-===//
+//===--- DiagnosticsSema.def - Diagnostics Text -----------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -397,9 +397,6 @@ ERROR(serialization_target_too_new_repl,sema,none,
       "module file's minimum deployment target is %0 v%1.%2%select{|.%3}3: %4",
       (StringRef, unsigned, unsigned, unsigned, StringRef))
 
-ERROR(unknown_name_in_type,sema_nb,none,
-      "use of unknown scope %0 in type reference", (Identifier))
-
 ERROR(invalid_redecl,sema_nb,none,"invalid redeclaration of %0", (DeclName))
 NOTE(invalid_redecl_prev,sema_nb,none,
      "%0 previously declared here", (DeclName))
@@ -564,9 +561,6 @@ ERROR(downcast_same_type,sema_tcc,none,
       (Type, Type, StringRef))
 WARNING(downcast_to_unrelated,sema_tcc,none,
         "cast from %0 to unrelated type %1 always fails", (Type, Type))
-ERROR(downcast_from_existential_to_unrelated,sema_tcc,none,
-      "cannot cast from protocol type %0 to non-conforming type %1",
-      (Type, Type))
 ERROR(downcast_to_more_optional,sema_tcc,none,
       "cannot downcast from %0 to a more optional type %1",
       (Type, Type))
@@ -661,6 +655,12 @@ ERROR(unbound_generic_parameter,sema_tcc,none,
 ERROR(cannot_bind_generic_parameter_to_type,sema_tcc,none,
       "cannot bind generic parameter to type %0",
       (Type))
+ERROR(string_index_not_integer,sema_tcc,none,
+      "String may not be indexed with %0, it has variable size elements",
+      (Type))
+NOTE(string_index_not_integer_note,sema_tcc,none,
+     "consider using an existing high level algorithm, "
+     "str.startIndex.advancedBy(n), or a projection like str.utf8", ())
 
 ERROR(invalid_c_function_pointer_conversion_expr,sema_tcc,none,
       "a C function pointer can only be formed from a reference to a 'func' or "
@@ -1235,9 +1235,6 @@ ERROR(override_multiple_decls_base,sema_tcd,none,
 ERROR(override_multiple_decls_arg_mismatch,sema_tcd,none,
       "declaration %0 has different argument names from any potential "
       "overrides", (DeclName))
-ERROR(override_multiple_decls_derived,sema_tcd,none,
-      "declaration cannot be overridden by more than one subclass "
-      "declaration", ())
 NOTE(overridden_near_match_here,sema_tcd,none,
      "potential overridden %select{method|initializer}0 %1 here",
       (bool, DeclName))
@@ -1349,10 +1346,6 @@ ERROR(override_mutable_covariant_subscript,sema_tcd,none,
       (Type, Type))
 ERROR(decl_already_final,sema_tcd,none,
       "static declarations are already final", ())
-ERROR(decl_no_default_init,sema_tcd,none,
-      "cannot default-initialize variable of type %0", (Type))
-ERROR(decl_no_default_init_ivar_hole,sema_tcd,none,
-      "cannot use initial value when one of the variables is '_'", ())
 NOTE(decl_init_here,sema_tcd,none,
      "initial value is here", ())
 
@@ -1498,8 +1491,6 @@ ERROR(override_rethrows_with_non_rethrows,sema_tcd,none,
 ERROR(rethrows_without_throwing_parameter,sema_tcd,none,
       "'rethrows' function must take a throwing function argument", ())
 
-ERROR(inconsistent_attribute_override,sema_tcd,none,
-      "@%0 must be consistent between a method and its override", (StringRef))
 ERROR(autoclosure_function_type,attribute_parsing,none,
       "@autoclosure may only be applied to values of function type",
       ())
@@ -1719,18 +1710,13 @@ ERROR(try_assign_rhs_noncovering,sema_tce,none,
       "everything to its right", (unsigned))
 
 ERROR(reference_non_inout,sema_tce,none,
-      "reference to %0 not used to initialize a inout parameter", (Type))
+      "reference to %0 not used to initialize an inout parameter", (Type))
 NOTE(subscript_decl_here,sema_tca,none,
      "subscript operator declared here", ())
 ERROR(condition_broken_proto,sema_tce,none,
       "protocol 'BooleanType' is broken", ())
-ERROR(option_type_broken,sema_tce,none,
-      "type 'Optional' is broken", ())
 
 ERROR(broken_bool,sema_tce,none, "type 'Bool' is broken", ())
-ERROR(binding_explicit_downcast,sema_tce,none,
-      "operand of postfix '?' is a forced downcast to type %0; use 'as?' to "
-      "perform a conditional downcast", (Type))
 
 WARNING(inject_forced_downcast,sema_tce,none,
         "treating a forced downcast to %0 as optional will never produce 'nil'",
@@ -1760,11 +1746,6 @@ ERROR(migrate_from_allZeros,sema_tce,none,
 
 ERROR(migrate_to_raw_to_raw_value,sema_tce,none,
       "method 'fromRaw' has been replaced with a property 'rawValue'", ())
-
-ERROR(new_array_bound_zero,sema_tce,none,
-      "array type cannot have zero length", ())
-ERROR(non_constant_array,type_parsing,none,
-      "array has non-constant size", ())
 
 ERROR(interpolation_missing_proto,sema_tce,none,
       "string interpolation requires the protocol 'StringInterpolationConvertible' to be defined",
@@ -1834,6 +1815,8 @@ ERROR(type_is_not_array,sema_tce,none,
       "contextual type %0 cannot be used with array literal", (Type))
 NOTE(meant_dictionary_lit, sema_tce,none,
      "did you mean to use a dictionary literal instead?", ())
+ERROR(should_use_empty_dictionary_literal,sema_tce,none,
+      "use [:] to get an empty dictionary literal", ())
 
 // Dictionary literals
 ERROR(dictionary_protocol_broken,sema_tce,none,
@@ -1896,11 +1879,6 @@ ERROR(transitive_capture_before_declaration,tce_sema,none,
 NOTE(transitive_capture_through_here,tce_sema,none,
      "%0, declared here, captures %1",
      (Identifier, Identifier))
-ERROR(unsupported_local_function_reference,tce_sema,none,
-      "cannot reference a local function with captures from another local "
-      "function", ())
-ERROR(unsupported_recursive_local_function,tce_sema,none,
-      "local functions cannot reference themselves", ())
 
 WARNING(recursive_accessor_reference,tce_sema,none,
         "attempting to %select{access|modify}1 %0 within its own "
@@ -2014,6 +1992,12 @@ NOTE(change_to_mutating,sema_tcs,none,
      "mark %select{method|accessor}0 'mutating' to make 'self' mutable",
      (bool))
 
+// For Stmt
+WARNING(deprecated_c_style_for_stmt,sema_tcs,none,
+"C-style for statement is deprecated and will be removed in a future version of Swift", ())
+NOTE(cant_fix_c_style_for_stmt,sema_tcs,none,
+"C-style for statement can't be automatically fixed to for-in, because the loop variable is modified inside the loop", ())
+
 // ForEach Stmt
 ERROR(sequence_protocol_broken,sema_tcs,none,
       "SequenceType protocol definition is broken", ())
@@ -2070,12 +2054,6 @@ ERROR(type_pattern_missing_is,sema_tcp,none,
 
 ERROR(pattern_type_mismatch_context,sema_tcp,none,
       "type annotation does not match contextual type %0", (Type))
-ERROR(label_single_entry_tuple,sema_tcp,none,
-      "label is not allowed on single element tuple pattern", ())
-NOTE(remove_parens_for_type_annotation,sema_tcp,none,
-     "remove the parentheses to make this a type annotation", ())
-NOTE(remove_label_for_tuple_pattern,sema_tcp,none,
-     "remove the label to make this a tuple pattern", ())
 
 ERROR(tuple_pattern_in_non_tuple_context,sema_tcp,none,
       "tuple pattern cannot match values of the non-tuple type %0", (Type))
@@ -2092,8 +2070,6 @@ ERROR(tuple_pattern_label_mismatch,sema_tcp,none,
       "tuple pattern element label %0 must be %1", (Identifier, Identifier))
 ERROR(enum_element_pattern_member_not_found,sema_tcp,none,
       "enum case '%0' not found in type %1", (StringRef, Type))
-ERROR(enum_element_pattern_not_enum,sema_tcp,none,
-      "enum case pattern cannot match values of the non-enum type %0", (Type))
 ERROR(optional_element_pattern_not_valid_type,sema_tcp,none,
       "'?' pattern cannot match values of type %0", (Type))
 ERROR(condition_optional_element_pattern_not_valid_type,sema_tcp,none,
@@ -2271,8 +2247,6 @@ NOTE(overridden_required_initializer_here,sema_tcd,none,
 // Functions
 ERROR(attribute_requires_function_type,attribute_parsing,none,
       "attribute only applies to syntactic function types", ())
-ERROR(first_class_generic_function,type_parsing,PointsToFirstBadToken,
-      "generic types cannot be used as first-class types", ())
 ERROR(objc_block_cannot_be_thin,attribute_parsing,none,
       "@objc_block function type cannot be @thin", ())
 ERROR(attribute_not_supported,attribute_parsing,none,
@@ -2289,8 +2263,6 @@ WARNING(deprecated_convention_attribute,type_parsing,none,
         "instead", (StringRef, StringRef))
 
 // SIL
-ERROR(sil_local_storage_nested, decl_parsing,none,
-      "local storage types cannot be in nested positions", ())
 ERROR(opened_non_protocol, decl_parsing,none,
       "@opened cannot be applied to non-protocol type %0", (Type))
 ERROR(sil_function_ellipsis,type_parsing,PointsToFirstBadToken,
@@ -2304,8 +2276,6 @@ ERROR(sil_function_multiple_results,type_parsing,PointsToFirstBadToken,
       "SIL function types cannot have multiple results", ())
 ERROR(sil_function_multiple_error_results,type_parsing,PointsToFirstBadToken,
       "SIL function types cannot have multiple @error results", ())
-ERROR(unsupported_cc_representation_combo,type_parsing,none,
-      "cc unsupported with this sil representation", ())
 ERROR(unsupported_sil_convention,type_parsing,none,
       "convention '%0' not supported in SIL", (StringRef))
 ERROR(sil_deprecated_convention_attribute,type_parsing,none,
@@ -2357,9 +2327,7 @@ ERROR(objc_setter_for_nonobjc_subscript,sema_tcd,none,
 ERROR(objc_enum_generic,sema_tcd,none,
       "'@objc' enum cannot be generic", ())
 ERROR(objc_name_req_nullary,sema_objc,none,
-      "'@objc' %select{class|protocol|property}0 must have a simple name", (int))
-ERROR(objc_name_enum,sema_objc,none,
-      "'@objc' enum cannot have a name", ())
+      "'@objc' %select{class|protocol|enum|enum case|property}0 must have a simple name", (int))
 ERROR(objc_name_subscript,sema_objc,none,
       "'@objc' subscript cannot have a name; did you mean to put "
       "the name on the getter or setter?", ())
@@ -2369,6 +2337,13 @@ ERROR(objc_name_func_mismatch,sema_objc,none,
       "%select{initializer|method}0 has %select{one parameter|%3 parameters}4"
       "%select{| (%select{|including }4the error parameter)}5",
       (bool, unsigned, bool, unsigned, bool, bool))
+ERROR(objc_enum_case_req_name,sema_objc,none,
+      "attribute has no effect; cases within an '@objc' enum are already "
+      "exposed to Objective-C", ())
+ERROR(objc_enum_case_req_objc_enum,sema_objc,none,
+      "'@objc' enum case is not allowed outside of an '@objc' enum", ())
+ERROR(objc_enum_case_multi,sema_objc,none,
+      "'@objc' enum case declaration defines multiple enum cases with the same Objective-C name", ())
 
 // If you change this, also change enum ObjCReason
 #define OBJC_ATTR_SELECT "select{marked dynamic|marked @objc|marked @IBOutlet|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override}"

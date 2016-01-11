@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
 protocol AProtocol {
-  func f() -> String;
+  func f() -> String
 }
 class AClass : AProtocol {
   func f() -> String { return "A" }

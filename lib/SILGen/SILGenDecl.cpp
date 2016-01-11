@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -918,6 +918,7 @@ InitializationPtr SILGenFunction::emitInitializationForVarDecl(VarDecl *vd) {
   InitializationPtr Result;
   if (!vd->getDeclContext()->isLocalContext()) {
     auto *silG = SGM.getSILGlobalVariable(vd, NotForDefinition);
+    B.createAllocGlobal(vd, silG);
     SILValue addr = B.createGlobalAddr(vd, silG);
     if (isUninitialized)
       addr = B.createMarkUninitializedVar(vd, addr);
@@ -1064,8 +1065,7 @@ SILGenFunction::emitPatternBindingInitialization(Pattern *P,
 
 /// Enter a cleanup to deallocate the given location.
 CleanupHandle SILGenFunction::enterDeallocStackCleanup(SILValue temp) {
-  assert(temp.getType().isLocalStorage() &&
-         "must deallocate container operand, not address operand!");
+  assert(temp.getType().isAddress() &&  "dealloc must have an address type");
   Cleanups.pushCleanup<DeallocStackCleanup>(temp);
   return Cleanups.getTopCleanup();
 }
@@ -1135,17 +1135,11 @@ void SILGenModule::emitExternalWitnessTable(ProtocolConformance *c) {
 void SILGenModule::emitExternalDefinition(Decl *d) {
   switch (d->getKind()) {
   case DeclKind::Func: {
-    // We'll emit all the members of an enum when we visit the enum.
-    if (isa<EnumDecl>(d->getDeclContext()))
-      break;
     emitFunction(cast<FuncDecl>(d));
     break;
   }
   case DeclKind::Constructor: {
     auto C = cast<ConstructorDecl>(d);
-    // We'll emit all the members of an enum when we visit the enum.
-    if (isa<EnumDecl>(d->getDeclContext()))
-      break;
     // For factories, we don't need to emit a special thunk; the normal
     // foreign-to-native thunk is sufficient.
     if (C->isFactoryInit())
@@ -1154,21 +1148,7 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
     emitConstructor(C);
     break;
   }
-  case DeclKind::Enum: {
-    auto ed = cast<EnumDecl>(d);
-    // Emit derived conformance methods for the type.
-    for (auto member : ed->getMembers()) {
-      if (auto func = dyn_cast<FuncDecl>(member))
-        emitFunction(func);
-      else if (auto ctor = dyn_cast<ConstructorDecl>(member))
-        emitConstructor(ctor);
-    }
-    // Emit derived global decls.
-    for (auto derived : ed->getDerivedGlobalDecls()) {
-      emitFunction(cast<FuncDecl>(derived));
-    }
-    SWIFT_FALLTHROUGH;
-  }
+  case DeclKind::Enum:
   case DeclKind::Struct:
   case DeclKind::Class: {
     // Emit witness tables.
@@ -1190,9 +1170,6 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
     // Imported static vars are handled solely in IRGen.
     break;
 
-  case DeclKind::Module:
-    break;
-
   case DeclKind::IfConfig:
   case DeclKind::Extension:
   case DeclKind::PatternBinding:
@@ -1209,6 +1186,7 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
+  case DeclKind::Module:
     llvm_unreachable("Not a valid external definition for SILGen");
   }
 }
@@ -1475,18 +1453,18 @@ public:
     assert(protos.size() == witness.getConformances().size()
            && "number of conformances in assoc type substitution do not match "
               "number of requirements on assoc type");
-    // The conformances should be all null or all nonnull.
+    // The conformances should be all abstract or all concrete.
     assert(witness.getConformances().empty()
-           || (witness.getConformances()[0]
+           || (witness.getConformances()[0].isConcrete()
                  ? std::all_of(witness.getConformances().begin(),
                                witness.getConformances().end(),
-                               [&](const ProtocolConformance *C) -> bool {
-                                 return C;
+                               [&](const ProtocolConformanceRef C) -> bool {
+                                 return C.isConcrete();
                                })
                  : std::all_of(witness.getConformances().begin(),
                                witness.getConformances().end(),
-                               [&](const ProtocolConformance *C) -> bool {
-                                 return !C;
+                               [&](const ProtocolConformanceRef C) -> bool {
+                                 return C.isAbstract();
                                })));
 
     for (auto *protocol : protos) {
@@ -1494,14 +1472,14 @@ public:
       if (!SGM.Types.protocolRequiresWitnessTable(protocol))
         continue;
 
-      ProtocolConformance *conformance = nullptr;
+      ProtocolConformanceRef conformance(protocol);
       // If the associated type requirement is satisfied by an associated type,
       // these will all be null.
-      if (witness.getConformances()[0]) {
+      if (witness.getConformances()[0].isConcrete()) {
         auto foundConformance = std::find_if(witness.getConformances().begin(),
                                         witness.getConformances().end(),
-                                        [&](ProtocolConformance *c) {
-                                          return c->getProtocol() == protocol;
+                                        [&](ProtocolConformanceRef c) {
+                                          return c.getRequirement() == protocol;
                                         });
         assert(foundConformance != witness.getConformances().end());
         conformance = *foundConformance;
@@ -1718,24 +1696,23 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                                               requirement.uncurryLevel);
 
   // Mangle the name of the witness thunk.
-  llvm::SmallString<128> nameBuffer;
+  std::string nameBuffer;
   {
-    llvm::raw_svector_ostream nameStream(nameBuffer);
-    nameStream << "_TTW";
-    Mangler mangler(nameStream);
+    Mangler mangler;
+    mangler.append("_TTW");
     mangler.mangleProtocolConformance(conformance);
 
     if (auto ctor = dyn_cast<ConstructorDecl>(requirement.getDecl())) {
       mangler.mangleConstructorEntity(ctor, /*isAllocating=*/true,
-                                      ResilienceExpansion::Minimal,
                                       requirement.uncurryLevel);
     } else {
       assert(isa<FuncDecl>(requirement.getDecl())
              && "need to handle mangling of non-Func SILDeclRefs here");
       auto requiredDecl = cast<FuncDecl>(requirement.getDecl());
-      mangler.mangleEntity(requiredDecl, ResilienceExpansion::Minimal,
-                           requirement.uncurryLevel);
+      mangler.mangleEntity(requiredDecl, requirement.uncurryLevel);
     }
+
+    nameBuffer = mangler.finalize();
   }
 
   // Collect the context generic parameters for the witness.
@@ -1788,19 +1765,17 @@ getOrCreateReabstractionThunk(GenericParamList *thunkContextParams,
                               CanSILFunctionType toType,
                               IsFragile_t Fragile) {
   // Mangle the reabstraction thunk.
-  llvm::SmallString<256> buffer;
+  std::string name ;
   {
-    llvm::raw_svector_ostream stream(buffer);
-    Mangler mangler(stream);
+    Mangler mangler;
 
     // This is actually the SIL helper function.  For now, IR-gen
     // makes the actual thunk.
-    stream << "_TTR";
+    mangler.append("_TTR");
     if (auto generics = thunkType->getGenericSignature()) {
-      stream << 'G';
+      mangler.append('G');
       mangler.setModuleContext(M.getSwiftModule());
-      mangler.mangleGenericSignature(generics,
-                                     ResilienceExpansion::Minimal);
+      mangler.mangleGenericSignature(generics);
     }
 
     // Substitute context parameters out of the "from" and "to" types.
@@ -1809,16 +1784,13 @@ getOrCreateReabstractionThunk(GenericParamList *thunkContextParams,
     auto toInterfaceType
       = Types.getInterfaceTypeOutOfContext(toType, thunkContextParams);
 
-    mangler.mangleType(fromInterfaceType,
-                       ResilienceExpansion::Minimal, /*uncurry*/ 0);
-    mangler.mangleType(toInterfaceType,
-                       ResilienceExpansion::Minimal, /*uncurry*/ 0);
+    mangler.mangleType(fromInterfaceType, /*uncurry*/ 0);
+    mangler.mangleType(toInterfaceType, /*uncurry*/ 0);
+    name = mangler.finalize();
   }
 
   auto loc = RegularLocation::getAutoGeneratedLocation();
-  return M.getOrCreateSharedFunction(loc,
-                                     buffer.str(),
-                                     thunkType,
-                                     IsBare, IsTransparent,
-                                     Fragile, IsReabstractionThunk);
+  return M.getOrCreateSharedFunction(loc, name, thunkType, IsBare,
+                                     IsTransparent, Fragile,
+                                     IsReabstractionThunk);
 }

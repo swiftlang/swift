@@ -1,27 +1,43 @@
 #!/usr/bin/env python
-#===--- build-script - The ultimate tool for building Swift ----------------===#
+# utils/build-script - The ultimate tool for building Swift -*- python -*-
 #
-## This source file is part of the Swift.org open source project
-##
-## Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
-## Licensed under Apache License v2.0 with Runtime Library Exception
-##
-## See http://swift.org/LICENSE.txt for license information
-## See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+# This source file is part of the Swift.org open source project
 #
-#===------------------------------------------------------------------------===#
+# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See http://swift.org/LICENSE.txt for license information
+# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 from __future__ import print_function
 
 import argparse
+import multiprocessing
 import os
 import shutil
 import sys
 import textwrap
 
+# FIXME: Instead of modifying the system path in order to enable imports from
+#        other directories, all Python modules related to the build script
+#        should be moved to the `swift_build_support` module.
+#        For additional information, see: https://bugs.swift.org/browse/SR-237.
 sys.path.append(os.path.dirname(__file__))
+from SwiftBuildSupport import (
+    HOME,
+    SWIFT_BUILD_ROOT,
+    SWIFT_SOURCE_ROOT,
+    check_call,
+    get_all_preset_names,
+    get_preset_options,
+    print_with_argv0,
+    quote_shell_command,
+)
 
-from SwiftBuildSupport import *
+sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
+import swift_build_support.clang
+import swift_build_support.cmake
+from swift_build_support.migration import migrate_impl_args
 
 
 # Main entry point for the preset mode.
@@ -485,19 +501,30 @@ placed""",
         help="""
 the number of parallel build jobs to use""",
         type=int,
-        dest="build_jobs")
+        dest="build_jobs",
+        default=multiprocessing.cpu_count())
+
+    parser.add_argument("--darwin-xcrun-toolchain",
+                        help="the name of the toolchain to use on Darwin",
+                        default="default")
+    parser.add_argument("--cmake",
+                        help="the path to a CMake executable that will be "
+                             "used to build Swift")
 
     parser.add_argument("--extra-swift-args", help=textwrap.dedent("""
     Pass through extra flags to swift in the form of a cmake list 'module_regexp;flag'. Can
     be called multiple times to add multiple such module_regexp flag pairs. All semicolons
-    in flags must be scaped with a '\'"""),
+    in flags must be escaped with a '\'"""),
                         action="append", dest="extra_swift_args", default=[])
 
     parser.add_argument("build_script_impl_args",
         help="",
         nargs="*")
 
-    args = parser.parse_args()
+    args = parser.parse_args(migrate_impl_args(sys.argv[1:], [
+        '--darwin-xcrun-toolchain',
+        '--cmake',
+    ]))
 
     # Build cmark if any cmark-related options were specified.
     if (args.cmark_build_variant is not None):
@@ -701,9 +728,27 @@ the number of parallel build jobs to use""",
     if args.clean:
         shutil.rmtree(build_dir)
 
+    host_clang = swift_build_support.clang.host_clang(
+        xcrun_toolchain=args.darwin_xcrun_toolchain)
+    if not host_clang:
+        print_with_argv0(
+            "Can't find clang.  Please install clang-3.5 or a later version.")
+        return 1
+
+    host_cmake = args.cmake
+    if not host_cmake:
+        host_cmake = swift_build_support.cmake.host_cmake(
+            args.darwin_xcrun_toolchain)
+    if not host_cmake:
+        print_with_argv0("Can't find CMake. Please install CMake.")
+        return 1
     build_script_impl_args = [
         os.path.join(SWIFT_SOURCE_ROOT, "swift", "utils", "build-script-impl"),
         "--build-dir", build_dir,
+        "--host-cc", host_clang.cc,
+        "--host-cxx", host_clang.cxx,
+        "--darwin-xcrun-toolchain", args.darwin_xcrun_toolchain,
+        "--cmake", host_cmake,
         "--cmark-build-type", args.cmark_build_variant,
         "--llvm-build-type", args.llvm_build_variant,
         "--swift-build-type", args.swift_build_variant,
@@ -713,10 +758,9 @@ the number of parallel build jobs to use""",
         "--swift-enable-assertions", str(args.swift_assertions).lower(),
         "--swift-stdlib-enable-assertions", str(args.swift_stdlib_assertions).lower(),
         "--cmake-generator", args.cmake_generator,
+        "--build-jobs", str(args.build_jobs),
         "--workspace", SWIFT_SOURCE_ROOT
     ]
-    if args.build_jobs:
-        build_script_impl_args += ["--build-jobs", str(args.build_jobs)]
     if args.build_foundation:
         build_script_impl_args += [
             "--foundation-build-type", args.foundation_build_variant

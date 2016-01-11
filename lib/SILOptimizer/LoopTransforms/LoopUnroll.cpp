@@ -1,8 +1,8 @@
-//===--------- LoopUnroll.cpp - Loop unrolling ------------*- C++ -*-------===//
+//===--- LoopUnroll.cpp - Loop unrolling ------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -197,12 +197,12 @@ static void redirectTerminator(SILBasicBlock *Latch, unsigned CurLoopIter,
   // We can either have a split backedge as our latch terminator.
   //   HeaderBlock:
   //     ...
-  //     cond_br %cond, ExitBlock, BackegdeBlock
+  //     cond_br %cond, ExitBlock, BackedgeBlock
   //
-  //   BackegdeBlock:
+  //   BackedgeBlock:
   //     br HeaderBlock:
   //
-  // Or a a conditional branch back to the header.
+  // Or a conditional branch back to the header.
   //   HeaderBlock:
   //     ...
   //     cond_br %cond, ExitBlock, HeaderBlock

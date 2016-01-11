@@ -96,7 +96,7 @@ struct BigStructWithNativeObjects {
   // CHECK:   call void @_TFC17objc_class_export3Foo6boundsfT_VSC6NSRect([[NSRECT]]* noalias nocapture sret {{.*}}, [[FOO]]* [[CAST]])
 
   func convertRectToBacking(r r: NSRect) -> NSRect {
-    return r;
+    return r
   }
   // CHECK: define internal void @_TToFC17objc_class_export3Foo20convertRectToBackingfT1rVSC6NSRect_S1_([[NSRECT]]* noalias nocapture sret, [[OPAQUE5:%.*]]*, i8*, [[NSRECT]]* byval align 8) unnamed_addr {{.*}} {
   // CHECK:   [[CAST:%[a-zA-Z0-9]+]] = bitcast [[OPAQUE5]]* %1 to [[FOO]]*

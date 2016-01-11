@@ -526,7 +526,7 @@ bb2(%5 : $LinkedNode):
 // CHECK-NEXT:    Con %0.2 Esc: A, Succ: (%0.3)
 // CHECK-NEXT:    Con %0.3 Esc: A, Succ: (%0.4)
 // CHECK-NEXT:    Con %0.4 Esc: A, Succ: (%4.1)
-// CHECK-NEXT:    Val %4 Esc: R, Succ: %0.4, %4.2
+// CHECK-NEXT:    Val %4 Esc: R, Succ: %0.4
 // CHECK-NEXT:    Con %4.1 Esc: A, Succ: (%4.2)
 // CHECK-NEXT:    Con %4.2 Esc: A, Succ: (%4.1)
 // CHECK-NEXT:    Ret Esc: R, Succ: %4
@@ -593,7 +593,7 @@ bb2(%5 : $LinkedNode):
   return %5 : $LinkedNode
 }
 
-// Test if a try_apply is repressented correctly in the connection graph.
+// Test if a try_apply is represented correctly in the connection graph.
 
 // CHECK-LABEL: CG of call_throwing_func
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: 
@@ -707,6 +707,26 @@ bb1(%7 : $(Pointer, Pointer)):
   return %9 : $Y
 }
 
+// CHECK-LABEL: CG of defer_edge_cycle
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: A, Succ: %1.1
+// CHECK-NEXT:    Con %0.2 Esc: A, Succ: (%0.3)
+// CHECK-NEXT:    Con %0.3 Esc: A, Succ: 
+// CHECK-NEXT:    Arg %1 Esc: A, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: A, Succ: (%0.2), %0.1
+// CHECK-NEXT:  End
+sil @defer_edge_cycle : $@convention(thin) (@inout Y, @inout Y) -> () {
+entry(%0 : $*Y, %1 : $*Y):
+  %l1 = load %0 : $*Y
+  store %l1 to %1 : $*Y
+  %l2 = load %1 : $*Y
+  store %l2 to %0 : $*Y
+  %x = ref_element_addr %l1 : $Y, #Y.x
+  %l3 = load %x : $*X
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: CG of test_select_enum
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: 
 // CHECK-NEXT:    Arg %1 Esc: A, Succ: 
@@ -759,11 +779,11 @@ bb0(%0 : $Builtin.Int64, %1 : $X, %2 : $X, %3 : $X):
 sil @test_existential_addr : $@convention(thin) (@owned Pointer) -> () {
 bb0(%0 : $Pointer):
   %1 = alloc_stack $P
-  %2 = init_existential_addr %1#1 : $*P, $Pointer
+  %2 = init_existential_addr %1 : $*P, $Pointer
   store %0 to %2 : $*Pointer
-  %4 = open_existential_addr %1#1 : $*P to $*@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83") P
+  %4 = open_existential_addr %1 : $*P to $*@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83") P
   %5 = witness_method $@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83") P, #P.foo!1, %4 : $*@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83") P : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-  dealloc_stack %1#0 : $*@local_storage P
+  dealloc_stack %1 : $*P
   %7 = tuple ()                                   
   return %7 : $()                                 
 }

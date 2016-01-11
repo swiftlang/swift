@@ -1,8 +1,8 @@
-//===----------- EscapeAnalysis.h - SIL Escape Analysis -*- C++ -*---------===//
+//===--- EscapeAnalysis.h - SIL Escape Analysis -----------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -66,7 +66,7 @@ class EscapeAnalysis : public BottomUpIPAnalysis {
     
     /// Represents the "memory content" to which a pointer points to.
     /// The "content" represents all stored properties of the referenced object.
-    /// We also treat the elements of a referece-counted object as a "content"
+    /// We also treat the elements of a reference-counted object as a "content"
     /// of that object. Although ref_element_addr is just a pointer addition, we
     /// treat it as a "pointer" pointing to the elements. Having this additional
     /// indirection in the graph, we avoid letting a reference escape just
@@ -118,7 +118,7 @@ private:
   /// pointer points to (see NodeType).
   class CGNode {
 
-    /// The associated value in the functino. It is only used for debug printing.
+    /// The associated value in the function. It is only used for debug printing.
     /// There may be multiple nodes associated to the same value, e.g. a Content
     /// node has the same V as its points-to predecessor.
     ValueBase *V;
@@ -192,7 +192,7 @@ private:
     }
 
     /// Finds a successor node in the outgoing defer edges.
-    llvm::SmallVectorImpl<CGNode *>::iterator findDefered(CGNode *Def) {
+    llvm::SmallVectorImpl<CGNode *>::iterator findDeferred(CGNode *Def) {
       return std::find(defersTo.begin(), defersTo.end(), Def);
     }
 
@@ -209,7 +209,7 @@ private:
     }
 
     /// Adds a defer-edge to another node \p To. Not done if \p To is this node.
-    bool addDefered(CGNode *To) {
+    bool addDeferred(CGNode *To) {
       assert(!To->isMerged);
       if (To == this)
         return false;
@@ -286,8 +286,16 @@ private:
     /// the node's value.
     /// Note that in the false-case the node's value can still escape via
     /// the return instruction.
-    bool escapesInsideFunction() const {
-      return getEscapeState() > EscapeState::Return;
+    bool escapesInsideFunction(bool isNotAliasingArgument) const {
+      switch (getEscapeState()) {
+        case EscapeState::None:
+        case EscapeState::Return:
+          return false;
+        case EscapeState::Arguments:
+          return !isNotAliasingArgument;
+        case EscapeState::Global:
+          return true;
+      }
     }
   };
 
@@ -333,7 +341,7 @@ public:
   /// 2) A node can only have a single outgoing points-to edge (is enforced by
   ///    CGNode::pointsTo being a single pointer and not a vector).
   /// 3) The target of a points-to edge must be a Content node.
-  /// 4) For any node N, all pathes starting at N which consist of only
+  /// 4) For any node N, all paths starting at N which consist of only
   ///    defer-edges and a single trailing points-to edge must lead to the same
   ///    Content node.
   class ConnectionGraph {
@@ -423,7 +431,12 @@ public:
     /// taken. This means the node is always created for the "outermost" value
     /// where V is contained.
     /// Returns null, if V is not a "pointer".
-    CGNode *getOrCreateNode(ValueBase *V);
+    CGNode *getNode(ValueBase *V, EscapeAnalysis *EA, bool createIfNeeded = true);
+
+    /// Gets or creates a node for a SILValue (same as above).
+   CGNode *getNode(SILValue V, EscapeAnalysis *EA) {
+      return getNode(V.getDef(), EA, true);
+    }
 
     /// Gets or creates a content node to which \a AddrNode points to.
     CGNode *getContentNode(CGNode *AddrNode);
@@ -444,7 +457,7 @@ public:
 
     /// Returns the node of the "exact" value \p V (no projections are skipped)
     /// if one exists.
-    CGNode *getNodeOrNull(ValueBase *V) {
+    CGNode *lookupNode(ValueBase *V) {
       CGNode *Node = Values2Nodes.lookup(V);
       if (Node)
         return Node->getMergeTarget();
@@ -502,6 +515,9 @@ public:
     /// lookup-up with getNode() anymore.
     void removeFromGraph(ValueBase *V) { Values2Nodes.erase(V); }
 
+    /// Returns true if there is a path from \p From to \p To.
+    bool isReachable(CGNode *From, CGNode *To);
+
   public:
 
     /// Gets or creates a node for a value \p V.
@@ -509,11 +525,13 @@ public:
     /// taken. This means the node is always created for the "outermost" value
     /// where V is contained.
     /// Returns null, if V is not a "pointer".
-    CGNode *getNode(ValueBase *V, EscapeAnalysis *EA);
+    CGNode *getNodeOrNull(ValueBase *V, EscapeAnalysis *EA) {
+      return getNode(V, EA, false);
+    }
 
     /// Gets or creates a node for a SILValue (same as above).
-    CGNode *getNode(SILValue V, EscapeAnalysis *EA) {
-      return getNode(V.getDef(), EA);
+    CGNode *getNodeOrNull(SILValue V, EscapeAnalysis *EA) {
+      return getNode(V.getDef(), EA, false);
     }
 
     /// Returns the number of use-points of a node.
@@ -528,9 +546,6 @@ public:
     /// Use-points are only values which are relevant for lifeness computation,
     /// e.g. release or apply instructions.
     bool isUsePoint(ValueBase *V, CGNode *Node);
-
-    /// Returns true if there is a path from \p From to \p To.
-    bool canEscapeTo(CGNode *From, CGNode *To);
 
     /// Computes the use point information.
     void computeUsePoints();
@@ -627,7 +642,7 @@ private:
   bool isPointer(ValueBase *V);
 
   /// If V is a pointer, set it to global escaping.
-  void setEscapesGlobal(ConnectionGraph *ConGraph, SILValue V) {
+  void setEscapesGlobal(ConnectionGraph *ConGraph, ValueBase *V) {
     if (CGNode *Node = ConGraph->getNode(V, this))
       ConGraph->setEscapesGlobal(Node);
   }
@@ -664,7 +679,7 @@ private:
   /// Sets all operands and results of \p I as global escaping.
   void setAllEscaping(SILInstruction *I, ConnectionGraph *ConGraph);
 
-  /// Recomputes the connection grpah for the function \p Initial and
+  /// Recomputes the connection graph for the function \p Initial and
   /// all called functions, up to a recursion depth of MaxRecursionDepth.
   void recompute(FunctionInfo *Initial);
 
@@ -704,19 +719,33 @@ public:
 
   /// Returns true if the value \p V can escape to the function call \p FAS.
   /// This means that the called function may access the value \p V.
-  bool canEscapeTo(SILValue V, FullApplySite FAS, ConnectionGraph *ConGraph) {
-    return canEscapeToUsePoint(V, FAS.getInstruction(), ConGraph);
-  }
+  /// If \p V has reference semantics, this function returns false if only the
+  /// address of a contained property escapes, but not the object itself.
+  bool canEscapeTo(SILValue V, FullApplySite FAS);
+
+  /// Returns true if the value \p V or its content can escape to the
+  /// function call \p FAS.
+  /// This is the same as above, except that it returns true if an address of
+  /// a contained property escapes.
+  bool canObjectOrContentEscapeTo(SILValue V, FullApplySite FAS);
 
   /// Returns true if the value \p V can escape to the release-instruction \p
   /// RI. This means that \p RI may release \p V or any called destructor may
   /// access (or release) \p V.
   /// Note that if \p RI is a retain-instruction always false is returned.
-  bool canEscapeTo(SILValue V, RefCountingInst *RI, ConnectionGraph *ConGraph) {
-    return canEscapeToUsePoint(V, RI, ConGraph);
-  }
+  bool canEscapeTo(SILValue V, RefCountingInst *RI);
 
-  bool canPointToSameMemory(SILValue V1, SILValue V2, ConnectionGraph *ConGraph);
+  /// Returns true if the value \p V can escape to any other pointer \p To.
+  /// This means that either \p To is the same as \p V or contains a reference
+  /// to \p V.
+  bool canEscapeToValue(SILValue V, SILValue To);
+
+  /// Returns true if the pointers \p V1 and \p V2 can possibly point to the
+  /// same memory.
+  /// If at least one of the pointers refers to a local object and the
+  /// connection-graph-nodes of both pointers do not point to the same content
+  /// node, the pointers do not alias.
+  bool canPointToSameMemory(SILValue V1, SILValue V2);
 
   virtual void invalidate(InvalidationKind K) override;
 

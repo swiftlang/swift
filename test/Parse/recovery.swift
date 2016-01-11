@@ -26,9 +26,8 @@ class Container<T> {
 func useContainer() -> () {
   var a : Container<not a type [skip this greater: >] >, b : Int // expected-error{{expected '>' to complete generic argument list}} expected-note{{to match this opening '<'}}
   b = 5 // no-warning
-  a.exists() // expected-warnin
+  a.exists()
 }
-
 
 @xyz class BadAttributes { // expected-error{{unknown attribute 'xyz'}}
   func exists() -> Bool { return true }
@@ -162,16 +161,16 @@ func missingControllingExprInFor() {
   }
 
   // Ensure that we don't do recovery in the following cases.
-  for ; ; {
+  for ; ; { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   }
 
-  for { true }(); ; {
+  for { true }(); ; { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   }
 
-  for ; { true }() ; {
+  for ; { true }() ; { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   }
 
-  for acceptsClosure { 42 }; ; {
+  for acceptsClosure { 42 }; ; { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   }
 
   // A trailing closure is not accepted for the condition.
@@ -185,7 +184,7 @@ func missingControllingExprInFor() {
 #if true  // <rdar://problem/21679557> compiler crashes on "for{{"
   // expected-error @+2 {{missing initialization in a 'for' statement}}
   // expected-note @+1 2 {{to match this opening '{'}}
-for{{
+for{{ // expected-error {{expression resolves to an unused function}}
 #endif  // expected-error 2 {{expected '}' at end of closure}}
   
 #if true
@@ -228,7 +227,7 @@ func missingControllingExprInSwitch() {
   }
 
   switch { // expected-error {{expected expression in 'switch' statement}}
-    case Int: return // expected-error {{'is' keyword required to pattern match against type name}} {{10-10=is }} expected-warning {{cast from '<<error type>>' to unrelated type 'Int' always fails}}
+    case Int: return // expected-error {{'is' keyword required to pattern match against type name}} {{10-10=is }} 
     case _: return
   }
 
@@ -349,125 +348,62 @@ struct ErrorTypeInVarDeclFunctionType1 {
 }
 
 struct ErrorTypeInVarDeclArrayType1 {
-  var v1 : Int[+] // expected-error {{expected expression after unary operator}} expected-error {{expected expression for size of array type}}
+  var v1 : Int[+] // expected-error {{expected declaration}} expected-error {{consecutive declarations on a line must be separated by ';'}}
+  // expected-error @-1 {{expected expression after unary operator}}
+  // expected-error @-2 {{expected expression}}
   var v2 : Int
 }
 
 struct ErrorTypeInVarDeclArrayType2 {
-  var v1 : Int[+ // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}} expected-error {{unary operator cannot be separated from its operand}} {{17-3=}} expected-error {{expected expression for size of array type}}
-  var v2 : Int
+  var v1 : Int[+ // expected-error {{unary operator cannot be separated from its operand}}
+  var v2 : Int // expected-error {{expected expression}}
 }
 
 struct ErrorTypeInVarDeclArrayType3 {
-  var v1 : Int[ // expected-note {{to match this opening '['}}
-      // expected-error @-1{{expected expression for size of array type}}
-      // expected-error @-2{{expected ']' in array type}}
-  ;
-  var v2 : Int 
+  var v1 : Int[
+  ;  // expected-error {{expected expression}}
+  var v2 : Int
 }
 
 struct ErrorTypeInVarDeclArrayType4 {
   var v1 : Int[1 // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}}
-  // expected-error @-1{{fixed-length arrays are not yet supported}}
+
 }
 
 struct ErrorInFunctionSignatureResultArrayType1 {
-  func foo() -> Int[ { // expected-error {{expected '{' in body of function declaration}} expected-note {{to match this opening '['}}
-    return [0]
-  } // expected-error {{expected ']' in array type}}
-}
-
-struct ErrorInFunctionSignatureResultArrayType2 {
-  func foo() -> Int[0 { // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}}
-        // expected-error@-1{{fixed-length arrays are not yet supported}}
+  func foo() -> Int[ { // expected-error {{expected '{' in body of function declaration}}
     return [0]
   }
 }
 
+struct ErrorInFunctionSignatureResultArrayType2 {
+  func foo() -> Int[0 { // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}}
+    return [0]  // expected-error {{contextual type 'Int' cannot be used with array literal}}
+  }
+}
+
 struct ErrorInFunctionSignatureResultArrayType3 {
-  func foo() -> Int[0] { // expected-error {{fixed-length arrays are not yet supported}}
+  func foo() -> Int[0] { // expected-error {{array types are now written with the brackets around the element type}} {{17-17=[}} {{20-21=}}
     return [0]
   }
 }
 
 struct ErrorInFunctionSignatureResultArrayType4 {
-  func foo() -> Int[0_1] { // expected-error {{fixed-length arrays are not yet supported}}
+  func foo() -> Int[0_1] { // expected-error {{array types are now written with the brackets around the element type}} {{17-17=[}} {{20-21=}}
     return [0]
   }
 }
 
 
 struct ErrorInFunctionSignatureResultArrayType5 {
-  func foo() -> Int[0b1] { // expected-error {{fixed-length arrays are not yet supported}}
+  func foo() -> Int[0b1] { // expected-error {{array types are now written with the brackets around the element type}} {{17-17=[}} {{20-21=}}
     return [0]
   }
 }
 
-struct ErrorInFunctionSignatureResultArrayType6 {
-  func foo() -> Int[0o1] { // expected-error {{fixed-length arrays are not yet supported}}
-    return [0]
-  }
-}
-
-struct ErrorInFunctionSignatureResultArrayType7 {
-  func foo() -> Int[0x1] { // expected-error {{fixed-length arrays are not yet supported}}
-    return [0]
-  }
-}
-
-struct ErrorInFunctionSignatureResultArrayType8 {
-  func foo() -> Int[1.0] { // expected-error {{expected expression for size of array type}}
-    return [0]
-  }
-}
-
-struct ErrorInFunctionSignatureResultArrayType9 {
-  func foo() -> Int["1.0"] { // expected-error {{expected expression for size of array type}}
-    return [0]
-  }
-}
-
-struct ErrorInFunctionSignatureResultArrayType10 {
-  func foo() -> Int[true] { // expected-error {{expected expression for size of array type}}
-    return [0]
-  }
-}
 
 struct ErrorInFunctionSignatureResultArrayType11 {
   func foo() -> Int[(a){a++}] { // expected-error {{consecutive declarations on a line must be separated by ';'}} {{29-29=;}} expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}} expected-error {{use of unresolved identifier 'a'}} expected-error {{expected declaration}}
-              // expected-error @-1{{expected expression for size of array type}}
-  }
-}
-
-struct ErrorInFunctionSignatureResultArrayType12 {
-  var x = 0
-  func foo() -> Int[x++] { // expected-error {{expected expression for size of array type}}
-    return [0]
-  }
-}
-
-struct ErrorInFunctionSignatureResultArrayType13 {
-  var x = 0
-  func foo() -> Int[self.x] { // expected-error {{expected expression for size of array type}}
-    return [0]
-  }
-}
-
-struct ErrorInFunctionSignatureResultArrayType14 {
-  func foo() -> Int[true ? 1 : 0] { // expected-error {{expected expression for size of array type}}
-    return [0]
-  }
-}
-
-struct ErrorInFunctionSignatureResultArrayType15 {
-  func foo() -> Int[(1, 2)] { // expected-error {{expected expression for size of array type}}
-  }
-}
-
-// Note: If we decide to support integer constant expressions, this should pass
-struct ErrorInFunctionSignatureResultArrayType16 {
-  func foo() -> Int[1 && 1] { // expected-error {{expected expression for size of array type}}
-    return [0]
   }
 }
 
@@ -585,13 +521,11 @@ case let (jeb):
 }
 
 // rdar://19605164
-// expected-note@+4{{to match this opening '('}}
-// expected-note@+3{{to match this opening '['}}
+// expected-note@+3{{to match this opening '('}}
 // expected-error@+2{{use of undeclared type 'S'}}
 struct Foo19605164 {
 func a(s: S[{{g) -> Int {}
-// expected-error@+5{{expected parameter type following ':'}}
-// expected-error@+4{{expected ']' in array type}}
+// expected-error@+4{{expected parameter type following ':'}}
 // expected-error@+3{{expected ')' in parameter}}
 // expected-error@+2{{expected ',' separator}} {{3-3=,}}
 // expected-error@+1{{expected ',' separator}} {{3-3=,}}
@@ -710,4 +644,10 @@ infix operator · {  // expected-error {{'·' is considered to be an identifier,
   associativity none precedence 150
 }
 
+// <rdar://problem/21712891> Swift Compiler bug: String subscripts with range should require closing bracket.
+func r21712891(s : String) -> String {
+  let a = s.startIndex..<s.startIndex
+  // The specific errors produced don't actually matter, but we need to reject this.
+  return "\(s[a)"  // expected-error 3 {{}}
+}
 

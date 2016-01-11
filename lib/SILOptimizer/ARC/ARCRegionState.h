@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -34,7 +34,7 @@ private:
   /// The region that this ARCRegionState summarizes information for.
   ///
   /// The only time that the pointer is null is during initialization. Using
-  /// NullablePtr is just a convient way to make sure that we assert if we
+  /// NullablePtr is just a convenient way to make sure that we assert if we
   /// attempt to use Region during initialization before the pointer is set.
   NullablePtr<LoopRegion> Region;
 
@@ -192,11 +192,14 @@ public:
       llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo);
 
 private:
+  void processBlockBottomUpPredTerminators(const LoopRegion *R,
+                                           AliasAnalysis *AA,
+                                           LoopRegionFunctionInfo *LRFI);
   bool processBlockBottomUp(
-    SILBasicBlock &BB, AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
-    bool FreezeOwnedArgEpilogueReleases,
-    ConsumedArgToEpilogueReleaseMatcher &ConsumedArgToReleaseMap,
-    BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap);
+      const LoopRegion *R, AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
+      LoopRegionFunctionInfo *LRFI, bool FreezeOwnedArgEpilogueReleases,
+      ConsumedArgToEpilogueReleaseMatcher &ConsumedArgToReleaseMap,
+      BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap);
   bool processLoopBottomUp(
       const LoopRegion *R, AliasAnalysis *AA, LoopRegionFunctionInfo *LRFI,
       llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo);

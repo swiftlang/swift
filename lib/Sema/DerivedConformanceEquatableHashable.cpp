@@ -1,8 +1,8 @@
-//===--- DerivedConformanceEquatableHashable.cpp - Derived Equatable & co. ===//
+//===--- DerivedConformanceEquatableHashable.cpp - Derived Equatable & co -===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -128,15 +128,9 @@ static void deriveBodyEquatable_enum_eq(AbstractFunctionDecl *eqDecl) {
   auto parentDC = eqDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto args = cast<TuplePattern>(eqDecl->getBodyParamPatterns().back());
-  auto aPattern = args->getElement(0).getPattern();
-  auto aParamPattern =
-    cast<NamedPattern>(aPattern->getSemanticsProvidingPattern());
-  auto aParam = aParamPattern->getDecl();
-  auto bPattern = args->getElement(1).getPattern();
-  auto bParamPattern =
-    cast<NamedPattern>(bPattern->getSemanticsProvidingPattern());
-  auto bParam = bParamPattern->getDecl();
+  auto args = eqDecl->getParameterLists().back();
+  auto aParam = args->get(0);
+  auto bParam = args->get(1);
 
   CanType boolTy = C.getBoolDecl()->getDeclaredType().getCanonicalTypeOrNull();
 
@@ -200,48 +194,22 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
   auto parentDC = cast<DeclContext>(parentDecl);
   auto enumTy = parentDC->getDeclaredTypeInContext();
   
-  auto getParamPattern = [&](StringRef s) -> std::pair<VarDecl*, Pattern*> {
-    VarDecl *aDecl = new (C) ParamDecl(/*isLet*/ true,
-                                       SourceLoc(),
-                                       Identifier(),
-                                       SourceLoc(),
-                                       C.getIdentifier(s),
-                                       enumTy,
-                                       parentDC);
-    aDecl->setImplicit();
-    Pattern *aParam = new (C) NamedPattern(aDecl, /*implicit*/ true);
-    aParam->setType(enumTy);
-    aParam = new (C) TypedPattern(aParam, TypeLoc::withoutLoc(enumTy));
-    aParam->setType(enumTy);
-    aParam->setImplicit();
-    return {aDecl, aParam};
+  auto getParamDecl = [&](StringRef s) -> ParamDecl* {
+    return new (C) ParamDecl(/*isLet*/true, SourceLoc(), Identifier(),
+                             SourceLoc(), C.getIdentifier(s), enumTy,
+                             parentDC);
   };
   
-  auto aParam = getParamPattern("a");
-  auto bParam = getParamPattern("b");
-  
-  TupleTypeElt typeElts[] = {
-    TupleTypeElt(enumTy),
-    TupleTypeElt(enumTy)
-  };
-  auto paramsTy = TupleType::get(typeElts, C);
-  
-  TuplePatternElt paramElts[] = {
-    TuplePatternElt(aParam.second),
-    TuplePatternElt(bParam.second),
-  };
-  auto params = TuplePattern::create(C, SourceLoc(),
-                                     paramElts, SourceLoc());
-  params->setImplicit();
-  params->setType(paramsTy);
+  auto params = ParameterList::create(C, {
+    getParamDecl("a"),
+    getParamDecl("b")
+  });
   
   auto genericParams = parentDC->getGenericParamsOfContext();
-  
   auto boolTy = C.getBoolDecl()->getDeclaredType();
-
   auto moduleDC = parentDecl->getModuleContext();
 
-  DeclName name(C, C.Id_EqualsOperator, { Identifier(), Identifier() });
+  DeclName name(C, C.Id_EqualsOperator, params);
   auto eqDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
                            SourceLoc(), name,
                            SourceLoc(), SourceLoc(), SourceLoc(),
@@ -267,6 +235,7 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
   eqDecl->setBodySynthesizer(&deriveBodyEquatable_enum_eq);
 
   // Compute the type.
+  auto paramsTy = params->getType(C);
   Type fnTy;
   if (genericParams)
     fnTy = PolymorphicFunctionType::get(paramsTy, boolTy, genericParams);
@@ -296,11 +265,16 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
   eqDecl->setAccessibility(std::max(enumDecl->getFormalAccess(),
                                     Accessibility::Internal));
 
+  // If the enum was not imported, the derived conformance is either from the
+  // enum itself or an extension, in which case we will emit the declaration
+  // normally.
   if (enumDecl->hasClangNode())
-    tc.implicitlyDefinedFunctions.push_back(eqDecl);
+    tc.Context.addExternalDecl(eqDecl);
   
   // Since it's an operator we insert the decl after the type at global scope.
-  return insertOperatorDecl(C, cast<IterableDeclContext>(parentDecl), eqDecl);
+  insertOperatorDecl(C, cast<IterableDeclContext>(parentDecl), eqDecl);
+
+  return eqDecl;
 }
 
 ValueDecl *DerivedConformance::deriveEquatable(TypeChecker &tc,
@@ -329,13 +303,8 @@ deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
   ASTContext &C = parentDC->getASTContext();
 
   auto enumDecl = parentDC->isEnumOrEnumExtensionContext();
-
   SmallVector<ASTNode, 3> statements;
-  
-  Pattern *curriedArgs = hashValueDecl->getBodyParamPatterns().front();
-  auto selfPattern =
-    cast<NamedPattern>(curriedArgs->getSemanticsProvidingPattern());
-  auto selfDecl = selfPattern->getDecl();
+  auto selfDecl = hashValueDecl->getImplicitSelfDecl();
 
   DeclRefExpr *indexRef = convertEnumToIndex(statements, parentDC, enumDecl,
                                              selfDecl, hashValueDecl, "index");
@@ -373,8 +342,6 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
   ASTContext &C = tc.Context;
   
   auto parentDC = cast<DeclContext>(parentDecl);
-
-  Type enumType = parentDC->getDeclaredTypeInContext();
   Type intType = C.getIntDecl()->getDeclaredType();
   
   // We can't form a Hashable conformance if Int isn't Hashable or
@@ -393,21 +360,12 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
     return nullptr;
   }
   
-  VarDecl *selfDecl = new (C) ParamDecl(/*IsLet*/true,
-                                        SourceLoc(),
-                                        Identifier(),
-                                        SourceLoc(),
-                                        C.Id_self,
-                                        enumType,
-                                        parentDC);
-  selfDecl->setImplicit();
-  Pattern *selfParam = new (C) NamedPattern(selfDecl, /*implicit*/ true);
-  selfParam->setType(enumType);
-  selfParam = new (C) TypedPattern(selfParam, TypeLoc::withoutLoc(enumType));
-  selfParam->setType(enumType);
-  Pattern *methodParam = TuplePattern::create(C, SourceLoc(),{},SourceLoc());
-  methodParam->setType(TupleType::getEmpty(tc.Context));
-  Pattern *params[] = {selfParam, methodParam};
+  auto selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC);
+  
+  ParameterList *params[] = {
+    ParameterList::createWithoutLoc(selfDecl),
+    ParameterList::createEmpty(C)
+  };
   
   FuncDecl *getterDecl =
       FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
@@ -421,6 +379,8 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
   GenericParamList *genericParams = getterDecl->getGenericParamsOfContext();
   Type methodType = FunctionType::get(TupleType::getEmpty(tc.Context), intType);
   Type selfType = getterDecl->computeSelfType();
+  selfDecl->overwriteType(selfType);
+  
   Type type;
   if (genericParams)
     type = PolymorphicFunctionType::get(selfType, methodType, genericParams);
@@ -441,8 +401,11 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
   getterDecl->setInterfaceType(interfaceType);
   getterDecl->setAccessibility(enumDecl->getFormalAccess());
 
+  // If the enum was not imported, the derived conformance is either from the
+  // enum itself or an extension, in which case we will emit the declaration
+  // normally.
   if (enumDecl->hasClangNode())
-    tc.implicitlyDefinedFunctions.push_back(getterDecl);
+    tc.Context.addExternalDecl(getterDecl);
   
   // Create the property.
   VarDecl *hashValueDecl = new (C) VarDecl(/*static*/ false,

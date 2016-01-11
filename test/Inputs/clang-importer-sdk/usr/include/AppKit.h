@@ -126,7 +126,7 @@
 +(instancetype)havingConvenienceFactoryAndLaterConvenienceInitWithFlim:(NSInteger)flim;
 -(instancetype)initWithFlim:(NSInteger)flim __attribute__((availability(macosx,introduced=10.11)));
 
-// Convenience convenience init declaration followed by convenience factory
+// Convenience init declaration followed by convenience factory
 -(instancetype)initWithFlam:(NSInteger)flam __attribute__((availability(macosx,introduced=10.11)));
 +(instancetype)havingConvenienceFactoryAndLaterConvenienceInitWithFlam:(NSInteger)flam;
 @end
@@ -253,6 +253,8 @@ struct Point3D { double x, y, z; };
 -(void)drawAtPoint:(struct Point3D)point withAttributes:(nullable NSDictionary<NSString *, id> *)attributes;
 -(void)setTextColor:(nullable NSColor *)color;
 -(void)drawInView:(nullable NSView *)view;
+-(void)drawAnywhereInView:(nullable NSView *)view options:(nonnull NSDictionary *)options;
+-(void)drawAnywhereWithOptions:(nonnull NSDictionary *)options;
 @end
 
 @interface NSBezierPath : NSObject

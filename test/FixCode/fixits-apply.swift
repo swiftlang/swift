@@ -13,7 +13,7 @@ b as! Base
 var opti : Int?
 // Don't add bang.
 var i : Int = opti
-// But remove unecessary bang.
+// But remove unnecessary bang.
 var i2 : Int = i!
 
 struct MyMask : OptionSetType {
@@ -45,10 +45,6 @@ struct Test1 : RawOptionSetType {
   var rawValue: Int { return 0 }
 }
 
-print("", appendNewline: false)
-Swift.print("", appendNewline: false)
-print("", appendNewline: true)
-print("", false, appendNewline: false)
 print("", false)
 
 func ftest1() {

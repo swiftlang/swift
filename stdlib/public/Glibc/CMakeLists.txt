@@ -17,7 +17,12 @@ if (NOT EXISTS "${GLIBC_ARCH_INCLUDE_PATH}/sys")
 endif()
 
 # Generate module.map
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 configure_file(module.map.in "${CMAKE_CURRENT_BINARY_DIR}/module.map" @ONLY)
+endif()
+if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+configure_file(module.freebsd.map.in "${CMAKE_CURRENT_BINARY_DIR}/module.map" @ONLY)
+endif()
 
 add_custom_command_target(unused_var
     COMMAND

@@ -1,30 +1,20 @@
 
-swift*:::retain
+pid$target:*:swift_retain:entry
 {
-        @counts["num retain calls"] = count();
+        @counts["swift_retain"] = count();
 }
 
-swift*:::release
+pid$target:*:swift_release:entry
 {
-        @counts["num release calls"] = count();
+        @counts["swift_release"] = count();
 }
 
-swift*:::allocateObject
+pid$target:*:objc_retain:entry
 {
-        @counts["num allocated objects"] = count();
+        @counts["objc_retain"] = count();
 }
 
-swift*:::deallocateObject
+pid$target:*:objc_release:entry
 {
-        @counts["num deallocated objects"] = count();
-}
-
-swift*:::isUniquelyReferenced
-{
-        @counts["num calls to isUniquelyReferenced"] = count();
-}
-
-swift*:::isUniquelyReferencedOrPinned
-{
-        @counts["num calls to isUniquelyReferencedOrPinned"] = count();
+        @counts["objc_release"] = count();
 }

@@ -9,6 +9,9 @@ syn keyword swiftImport import skipwhite nextgroup=swiftImportModule
 syn match swiftImportModule /\<[A-Za-z_][A-Za-z_0-9]*\>/ contained nextgroup=swiftImportComponent
 syn match swiftImportComponent /\.\<[A-Za-z_][A-Za-z_0-9]*\>/ contained nextgroup=swiftImportComponent
 
+syn region swiftComment start="/\*" end="\*/" contains=swiftComment,swiftLineComment,swiftTodo
+syn region swiftLineComment start="//" end="$" contains=swiftComment,swiftTodo
+
 syn match swiftLineComment   /^#!.*/
 syn match swiftTypeName  /\<[A-Z][a-zA-Z_0-9]*\>/
 syn match swiftDecimal /\<[-]\?[0-9]\+\>/

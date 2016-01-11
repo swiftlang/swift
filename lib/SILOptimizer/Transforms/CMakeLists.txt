@@ -7,6 +7,8 @@ set(TRANSFORMS_SOURCES
   Transforms/DeadCodeElimination.cpp
   Transforms/DeadObjectElimination.cpp
   Transforms/DeadStoreElimination.cpp
+  Transforms/Devirtualizer.cpp
+  Transforms/GenericSpecializer.cpp
   Transforms/MergeCondFail.cpp
   Transforms/RedundantLoadElimination.cpp
   Transforms/RedundantOverflowCheckRemoval.cpp

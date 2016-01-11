@@ -11,7 +11,7 @@ func f<U: P>(rhs: U) -> X<U.A> { // expected-error {{use of undeclared type 'X'}
 }
 
 struct Zzz<T> {
-  subscript (a: Foo) -> Zzz<T> { // expected-error 2 {{use of undeclared type 'Foo'}}
+  subscript (a: Foo) -> Zzz<T> { // expected-error {{use of undeclared type 'Foo'}}
   get: // expected-error {{expected '{' to start getter definition}}
   set:
     for i in value {}

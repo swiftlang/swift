@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -453,7 +453,7 @@ void Parser::parseTopLevelCodeDeclDelayed() {
   // Ensure that we restore the parser state at exit.
   ParserPositionRAII PPR(*this);
 
-  // Create a lexer that can not go past the end state.
+  // Create a lexer that cannot go past the end state.
   Lexer LocalLex(*L, BeginParserPosition.LS, EndLexerState);
 
   // Temporarily swap out the parser's current lexer with our new one.
@@ -700,7 +700,7 @@ ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
     ParserResult<Expr> Result = parseExpr(diag::expected_expr_return);
     if (Result.isNull()) {
       // Create an ErrorExpr to tell the type checker that this return
-      // statement had an expression argument in the source.  This supresses
+      // statement had an expression argument in the source.  This suppresses
       // the error about missing return value in a non-void function.
       Result = makeParserErrorResult(new (Context) ErrorExpr(ExprLoc));
     }
@@ -780,8 +780,8 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
   //
   // As such, the body of the 'defer' is actually type checked within the
   // closure's DeclContext.
-  auto params = TuplePattern::create(Context, SourceLoc(), {}, SourceLoc());
-  DeclName name(Context, Context.getIdentifier("$defer"), {});
+  auto params = ParameterList::createEmpty(Context);
+  DeclName name(Context, Context.getIdentifier("$defer"), params);
   auto tempDecl
     = FuncDecl::create(Context,
                        /*static*/ SourceLoc(),
@@ -2010,9 +2010,7 @@ static BraceStmt *ConvertClosureToBraceStmt(Expr *E, ASTContext &Ctx) {
   // doesn't "look" like the body of a control flow statement, it looks like a
   // closure.
   if (CE->getInLoc().isValid() || CE->hasExplicitResultType() ||
-      !CE->getParams()->isImplicit() ||
-      !isa<TuplePattern>(CE->getParams()) ||
-      cast<TuplePattern>(CE->getParams())->getNumElements() != 0)
+      CE->getParameters()->size() != 0)
     return nullptr;
 
   // Silence downstream errors by giving it type ()->(), to match up with the

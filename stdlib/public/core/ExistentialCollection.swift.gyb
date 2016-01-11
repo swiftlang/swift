@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -81,14 +81,14 @@ public struct AnyGenerator<Element> : GeneratorType {
 /// traversing the sequence consumes the generator.
 extension AnyGenerator : SequenceType {}
 
-@available(*, unavailable, renamed="AnyGenerator")
+@available(*, deprecated, renamed="AnyGenerator")
 public func anyGenerator<G: GeneratorType>(base: G) -> AnyGenerator<G.Element> {
-  fatalError("unavailable function can't be called")
+  return AnyGenerator(base)
 }
 
-@available(*, unavailable, renamed="AnyGenerator")
-public func anyGenerator<Element>(body: ()->Element?) -> AnyGenerator<Element> {
-  fatalError("unavailable function can't be called")
+@available(*, deprecated, renamed="AnyGenerator")
+public func anyGenerator<Element>(body: () -> Element?) -> AnyGenerator<Element> {
+  return AnyGenerator(body: body)
 }
 
 internal struct _ClosureBasedGenerator<Element> : GeneratorType {
@@ -139,6 +139,11 @@ internal class _AnySequenceBox<Element> {
   internal func _copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {
     _abstract()
   }
+
+  internal func _dropFirst(n: Int) -> _AnySequenceBox<Element> { _abstract() }
+  internal func _prefix(maxLength: Int) -> _AnySequenceBox<Element> {
+    _abstract()
+  }
 }
 
 internal class _AnyCollectionBoxBase<Element> : _AnySequenceBox<Element> {
@@ -154,8 +159,15 @@ internal class _AnyCollectionBoxBase<Element> : _AnySequenceBox<Element> {
 
 % for Kind in ['Sequence', 'Collection']:
 // FIXME: can't make this a protocol due to <rdar://20209031>
-internal class _${Kind}Box<S : ${Kind}Type>
-  : _Any${Kind}Box<S.Generator.Element> {
+internal final class _${Kind}Box<
+  S : ${Kind}Type
+%   if Kind == 'Sequence':
+  where
+    S.SubSequence : ${Kind}Type,
+    S.SubSequence.Generator.Element == S.Generator.Element,
+    S.SubSequence.SubSequence == S.SubSequence
+%   end
+> : _Any${Kind}Box<S.Generator.Element> {
   typealias Element = S.Generator.Element
 
   override func generate() -> AnyGenerator<Element> {
@@ -171,6 +183,15 @@ internal class _${Kind}Box<S : ${Kind}Type>
   override func _copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {
     return _base._copyToNativeArrayBuffer()._storage
   }
+%   if Kind == 'Sequence':
+  internal override func _dropFirst(n: Int) -> _AnySequenceBox<Element> {
+    return _SequenceBox<S.SubSequence>(_base.dropFirst(n))
+  }
+  internal override func _prefix(maxLength: Int) -> _AnySequenceBox<Element> {
+    return _SequenceBox<S.SubSequence>(_base.prefix(maxLength))
+  }
+%   end
+
 %   if Kind == 'Collection':
   override func _count() -> IntMax {
     return numericCast(_base.count)
@@ -223,8 +244,15 @@ public struct AnySequence<Element> : SequenceType {
   @available(*, unavailable, renamed="Element")
   public typealias T = Element
 
-  /// Wrap and forward operations to to `base`.
-  public init<S: SequenceType where S.Generator.Element == Element>(_ base: S) {
+  /// Wrap and forward operations to `base`.
+  public init<
+    S: SequenceType
+    where
+      S.Generator.Element == Element,
+      S.SubSequence : SequenceType,
+      S.SubSequence.Generator.Element == Element,
+      S.SubSequence.SubSequence == S.SubSequence
+  >(_ base: S) {
     _box = _SequenceBox(base)
   }
 
@@ -236,6 +264,10 @@ public struct AnySequence<Element> : SequenceType {
     self.init(_ClosureBasedSequence(makeUnderlyingGenerator))
   }
 
+  internal init(_ box: _AnySequenceBox<Element>) {
+    _box = box
+  }
+
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
@@ -244,6 +276,18 @@ public struct AnySequence<Element> : SequenceType {
   }
 
   internal let _box: _AnySequenceBox<Element>
+}
+
+extension AnySequence {
+  @warn_unused_result
+  public func dropFirst(n: Int) -> AnySequence<Element> {
+    return AnySequence(_box._dropFirst(n))
+  }
+
+  @warn_unused_result
+  public func prefix(maxLength: Int) -> AnySequence<Element> {
+    return AnySequence(_box._prefix(maxLength))
+  }
 }
 
 % for Kind in ['Sequence'] + [t + 'Collection' for t in traversals]:
@@ -378,7 +422,7 @@ internal class _BidirectionalIndexBox<
   }
 }
 
-//===--- RandomAccessIndex -----------------------------------------------===//
+//===--- RandomAccessIndex ------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
 internal protocol _RandomAccessIndexBoxType : _BidirectionalIndexBoxType {}

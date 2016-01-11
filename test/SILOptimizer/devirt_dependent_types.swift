@@ -33,7 +33,7 @@ struct BarImpl : BarType {
 // CHECK-NOT: bb1
 // CHECK: return
 public func zzz() {
-  var xs = BarImpl()
+  let xs = BarImpl()
   var source: FooImplBase<Int> = FooImplDerived(xs)
   source = source.virtualMethod()
   source = source.virtualMethod()

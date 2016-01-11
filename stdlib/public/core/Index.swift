@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -73,6 +73,7 @@ public struct _DisabledRangeIndex_ {
 /// Replace `i` with its `successor()` and return the updated value of
 /// `i`.
 @_transparent
+@available(*, deprecated, message="it will be removed in Swift 3")
 public prefix func ++ <T : _Incrementable> (inout i: T) -> T {
   i._successorInPlace()
   return i
@@ -81,6 +82,7 @@ public prefix func ++ <T : _Incrementable> (inout i: T) -> T {
 /// Replace `i` with its `successor()` and return the original
 /// value of `i`.
 @_transparent
+@available(*, deprecated, message="it will be removed in Swift 3")
 public postfix func ++ <T : _Incrementable> (inout i: T) -> T {
   let ret = i
   i._successorInPlace()
@@ -319,6 +321,7 @@ extension BidirectionalIndexType {
 /// Replace `i` with its `predecessor()` and return the updated value
 /// of `i`.
 @_transparent
+@available(*, deprecated, message="it will be removed in Swift 3")
 public prefix func -- <T : BidirectionalIndexType> (inout i: T) -> T {
   i._predecessorInPlace()
   return i
@@ -328,6 +331,7 @@ public prefix func -- <T : BidirectionalIndexType> (inout i: T) -> T {
 /// Replace `i` with its `predecessor()` and return the original
 /// value of `i`.
 @_transparent
+@available(*, deprecated, message="it will be removed in Swift 3")
 public postfix func -- <T : BidirectionalIndexType> (inout i: T) -> T {
   let ret = i
   i._predecessorInPlace()
@@ -346,7 +350,7 @@ public protocol _RandomAccessAmbiguity {
 extension _RandomAccessAmbiguity {
   @warn_unused_result
   public func advancedBy(n: Distance) -> Self {
-    fatalError("advancedBy(n) not implememented")
+    fatalError("advancedBy(n) not implemented")
   }
 }
 

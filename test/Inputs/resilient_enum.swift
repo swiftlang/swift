@@ -1,15 +1,43 @@
 import resilient_struct
 
 // Fixed-layout enum with resilient members
+@_fixed_layout public enum SimpleShape {
+  case KleinBottle
+  case Triangle(Size)
+}
+
+// Fixed-layout enum with resilient members
 @_fixed_layout public enum Shape {
+  case Point
   case Rect(Size)
-  case RoundedRect(Size)
+  case RoundedRect(Size, Size)
 }
 
 // Fixed-layout enum with indirect resilient members
 @_fixed_layout public enum FunnyShape {
   indirect case Parallelogram(Size)
   indirect case Trapezoid(Size)
+}
+
+// The enum payload has fixed layout inside this module, but
+// resilient layout outside. Make sure we emit the payload
+// size in the metadata.
+
+public struct Color {
+  public let r: Int, g: Int, b: Int
+
+  public init(r: Int, g: Int, b: Int) {
+    self.r = r
+    self.g = g
+    self.b = b
+  }
+}
+
+@_fixed_layout public enum CustomColor {
+  case Black
+  case White
+  case Custom(Color)
+  case Bespoke(Color, Color)
 }
 
 // Resilient enum
@@ -28,6 +56,21 @@ public enum Medium {
 // Indirect resilient enum
 public indirect enum IndirectApproach {
   case Angle(Double)
+}
+
+// Resilient enum with resilient empty payload case
+public struct EmptyStruct {
+  public init() {}
+}
+
+public enum ResilientEnumWithEmptyCase {
+  case A // should always be case 1
+  case B // should always be case 2
+  case Empty(EmptyStruct) // should always be case 0
+}
+
+public func getResilientEnumWithEmptyCase() -> [ResilientEnumWithEmptyCase] {
+  return [.A, .B, .Empty(EmptyStruct())]
 }
 
 // Specific enum implementations for executable tests

@@ -253,7 +253,7 @@ struct AO<T>: Fooable {
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWurGV15guaranteed_self2AOx_S_7FooableS_FS1_3foo{{.*}} : $@convention(witness_method) <T> (Int, @in_guaranteed AO<T>) -> ()
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*AO<T>):
 // TODO: This copy isn't necessary.
-// CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY:%.*]]#1
+// CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY:%.*]] :
 // CHECK:         apply {{.*}} [[SELF_COPY]]
 // CHECK:         destroy_addr [[SELF_COPY]]
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
@@ -263,7 +263,7 @@ struct AO<T>: Fooable {
 // CHECK:       bb0([[SELF_ADDR:%.*]] : $*AO<T>):
 // -- NB: This copy *is* necessary, unless we're willing to assume an inout
 //        parameter is not mutably aliased.
-// CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY:%.*]]#1
+// CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY:%.*]] :
 // CHECK:         apply {{.*}} [[SELF_COPY]]
 // CHECK:         destroy_addr [[SELF_COPY]]
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
@@ -405,15 +405,15 @@ func AO_curryThunk<T>(ao: AO<T>) -> (AO<T> -> Int -> ()/*, Int -> ()*/) {
 // CHECK-LABEL: sil [transparent] [thunk] @_TTWV15guaranteed_self9FakeArrayS_12SequenceTypeS_FS1_17_constrainElement{{.*}} : $@convention(witness_method) (@in FakeElement, @in_guaranteed FakeArray) -> () {
 // CHECK: bb0([[ARG0_PTR:%.*]] : $*FakeElement, [[ARG1_PTR:%.*]] : $*FakeArray):
 // CHECK: [[GUARANTEED_COPY_STACK_SLOT:%.*]] = alloc_stack $FakeArray
-// CHECK: copy_addr [[ARG1_PTR]] to [initialization] [[GUARANTEED_COPY_STACK_SLOT]]#1
+// CHECK: copy_addr [[ARG1_PTR]] to [initialization] [[GUARANTEED_COPY_STACK_SLOT]]
 // CHECK: [[ARG0:%.*]] = load [[ARG0_PTR]]
-// CHECK: [[GUARANTEED_COPY:%.*]] = load [[GUARANTEED_COPY_STACK_SLOT]]#1
+// CHECK: [[GUARANTEED_COPY:%.*]] = load [[GUARANTEED_COPY_STACK_SLOT]]
 // CHECK: function_ref ext.guaranteed_self.guaranteed_self.SequenceDefaultsType._constrainElement
 // CHECK: [[FUN:%.*]] = function_ref @_{{.*}}
 // CHECK: [[TRANSLATION_STACK_SLOT:%.*]] = alloc_stack $FakeArray
-// CHECK: store [[GUARANTEED_COPY]] to [[TRANSLATION_STACK_SLOT:%.*]]#1
-// CHECK: apply [[FUN]]<FakeArray, FakeElement, FakeGenerator, FakeElement>([[ARG0]], [[TRANSLATION_STACK_SLOT]]#1)
-// CHECK: destroy_addr [[TRANSLATION_STACK_SLOT]]#1
+// CHECK: store [[GUARANTEED_COPY]] to [[TRANSLATION_STACK_SLOT]]
+// CHECK: apply [[FUN]]<FakeArray, FakeElement, FakeGenerator, FakeElement>([[ARG0]], [[TRANSLATION_STACK_SLOT]])
+// CHECK: destroy_addr [[TRANSLATION_STACK_SLOT]]
 
 class Z {}
 
@@ -533,7 +533,7 @@ func curried_test2() {
 // CHECK: [[KRAKEN:%.*]] = apply [[KRAKEN_CONSTRUCTOR]](
 // CHECK: [[CTB_CONSTRUCTOR:%.*]] = function_ref @_TFC15guaranteed_self14CurriedTestBarC{{.*}}
 // CHECK: [[CTB:%.*]] = apply [[CTB_CONSTRUCTOR]](
-// CHECK: [[CLASS_METHOD:%.*]] = class_method [[CTB]] : $CurriedTestBar, #CurriedTestBar.bar!3 : CurriedTestBar -> (Kraken) -> (Kraken) -> (Kraken) -> Kraken , $@convention(method) (@owned Kraken, @owned Kraken, @owned Kraken, @guaranteed CurriedTestBar) -> @owned Kraken
+// CHECK: [[CLASS_METHOD:%.*]] = class_method [[CTB]] : $CurriedTestBar, #CurriedTestBar.bar!3 : (CurriedTestBar) -> (Kraken) -> (Kraken) -> (Kraken) -> Kraken , $@convention(method) (@owned Kraken, @owned Kraken, @owned Kraken, @guaranteed CurriedTestBar) -> @owned Kraken
 // CHECK-NOT: strong_retain [[CTB]]
 // CHECK: strong_retain [[KRAKEN]]
 // CHECK-NEXT: strong_retain [[KRAKEN]]
@@ -597,18 +597,18 @@ class LetFieldClass {
 
   // CHECK-LABEL: sil hidden @_TFC15guaranteed_self13LetFieldClass10varkMethod{{.*}} : $@convention(method) (@guaranteed LetFieldClass) -> () {
   // CHECK: bb0([[CLS:%.*]] : $LetFieldClass):
-  // CHECK: [[KRAKEN_GETTER_FUN:%.*]] = class_method [[CLS]] : $LetFieldClass, #LetFieldClass.vark!getter.1 : LetFieldClass -> () -> Kraken , $@convention(method) (@guaranteed LetFieldClass) -> @owned Kraken
+  // CHECK: [[KRAKEN_GETTER_FUN:%.*]] = class_method [[CLS]] : $LetFieldClass, #LetFieldClass.vark!getter.1 : (LetFieldClass) -> () -> Kraken , $@convention(method) (@guaranteed LetFieldClass) -> @owned Kraken
   // CHECK-NEXT: [[KRAKEN:%.*]] = apply [[KRAKEN_GETTER_FUN]]([[CLS]])
   // CHECK-NEXT: [[KRAKEN_METH:%.*]] = class_method [[KRAKEN]]
   // CHECK-NEXT: apply [[KRAKEN_METH]]([[KRAKEN]])
   // CHECK-NEXT: strong_release [[KRAKEN]]
-  // CHECK-NEXT: [[KRAKEN_GETTER_FUN:%.*]] = class_method [[CLS]] : $LetFieldClass, #LetFieldClass.vark!getter.1 : LetFieldClass -> () -> Kraken , $@convention(method) (@guaranteed LetFieldClass) -> @owned Kraken
+  // CHECK-NEXT: [[KRAKEN_GETTER_FUN:%.*]] = class_method [[CLS]] : $LetFieldClass, #LetFieldClass.vark!getter.1 : (LetFieldClass) -> () -> Kraken , $@convention(method) (@guaranteed LetFieldClass) -> @owned Kraken
   // CHECK-NEXT: [[KRAKEN:%.*]] = apply [[KRAKEN_GETTER_FUN]]([[CLS]])
   // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @_TF15guaranteed_self11destroyShipFCS_6KrakenT_ : $@convention(thin) (@owned Kraken) -> ()
   // CHECK-NEXT: strong_retain [[KRAKEN]]
   // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN]])
   // CHECK-NEXT: [[KRAKEN_BOX:%.*]] = alloc_box $Kraken
-  // CHECK-NEXT: [[KRAKEN_GETTER_FUN:%.*]] = class_method [[CLS]] : $LetFieldClass, #LetFieldClass.vark!getter.1 : LetFieldClass -> () -> Kraken , $@convention(method) (@guaranteed LetFieldClass) -> @owned Kraken
+  // CHECK-NEXT: [[KRAKEN_GETTER_FUN:%.*]] = class_method [[CLS]] : $LetFieldClass, #LetFieldClass.vark!getter.1 : (LetFieldClass) -> () -> Kraken , $@convention(method) (@guaranteed LetFieldClass) -> @owned Kraken
   // CHECK-NEXT: [[KRAKEN2:%.*]] = apply [[KRAKEN_GETTER_FUN]]([[CLS]])
   // CHECK-NEXT: store [[KRAKEN2]] to [[KRAKEN_BOX]]#1
   // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @_TF15guaranteed_self11destroyShipFCS_6KrakenT_ : $@convention(thin) (@owned Kraken) -> ()

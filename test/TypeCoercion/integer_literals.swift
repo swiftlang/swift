@@ -54,9 +54,9 @@ struct supermeters : IntegerLiteralConvertible { // expected-error{{type 'superm
 }
 
 func chaining() {
-  var length : meters = 17;
+  var length : meters = 17
   // FIXME: missing truncation warning <rdar://problem/14070127>.
-  var long_length : meters = 500;
+  var long_length : meters = 500
   var really_long_length : supermeters = 10
 }
 

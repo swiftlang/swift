@@ -1,8 +1,8 @@
-//===- CodeCompletion.cpp - Code completion implementation ----------------===//
+//===--- CodeCompletion.cpp - Code completion implementation --------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -75,7 +75,7 @@ StringRef getCommandName(CodeCompletionCommandKind Kind) {
   CHECK_CASE(recommended)
   CHECK_CASE(recommendedover)
 #undef CHECK_CASE
-  llvm_unreachable("Can not handle this Kind.");
+  llvm_unreachable("Cannot handle this Kind.");
 }
 
 bool containsInterestedWords(StringRef Content, StringRef Splitter,
@@ -326,7 +326,7 @@ static Stmt *findNearestStmt(const AbstractFunctionDecl *AFD, SourceLoc Loc,
   auto &SM = AFD->getASTContext().SourceMgr;
   assert(SM.rangeContainsTokenLoc(AFD->getSourceRange(), Loc));
   StmtFinder Finder(SM, Loc, Kind);
-  // FIXME(thread-safety): the walker is is mutating the AST.
+  // FIXME(thread-safety): the walker is mutating the AST.
   const_cast<AbstractFunctionDecl *>(AFD)->walk(Finder);
   return Finder.getFoundStmt();
 }
@@ -1258,7 +1258,7 @@ ArchetypeTransformer::ArchetypeTransformer(DeclContext *DC, Type Ty) :
   if (!D)
     return;
   SmallVector<Type, 3> Scrach;
-  auto Params = D->getGenericParamTypes();
+  auto Params = D->getInnermostGenericParamTypes();
   auto Args = BaseTy->getAllGenericArgs(Scrach);
   assert(Params.size() == Args.size());
   for (unsigned I = 0, N = Params.size(); I < N; I ++) {
@@ -1326,6 +1326,7 @@ static bool isTopLevelContext(const DeclContext *DC) {
     case DeclContextKind::TopLevelCodeDecl:
       return true;
     case DeclContextKind::AbstractFunctionDecl:
+    case DeclContextKind::SubscriptDecl:
       return false;
     default:
       continue;
@@ -1584,7 +1585,7 @@ public:
   void addImportModuleNames() {
     // FIXME: Add user-defined swift modules
     SmallVector<clang::Module*, 20> Modules;
-    Ctx.getVisibleTopLevelClangeModules(Modules);
+    Ctx.getVisibleTopLevelClangModules(Modules);
     std::sort(Modules.begin(), Modules.end(),
               [](clang::Module* LHS , clang::Module* RHS) {
                 return LHS->getTopLevelModuleName().compare_lower(
@@ -1769,7 +1770,7 @@ public:
     assert(VD->isStatic() ||
            !(InsideStaticMethod &&
             VD->getDeclContext() == CurrentMethod->getDeclContext()) &&
-           "name lookup bug -- can not see an instance variable "
+           "name lookup bug -- cannot see an instance variable "
            "in a static function");
 
     CommandWordsPairs Pairs;
@@ -1796,31 +1797,21 @@ public:
     addTypeAnnotation(Builder, VarType);
   }
 
-  void addPatternParameters(CodeCompletionResultBuilder &Builder,
-                            const Pattern *P) {
-    if (auto *TP = dyn_cast<TuplePattern>(P)) {
-      bool NeedComma = false;
-      for (unsigned i = 0, end = TP->getNumElements(); i < end; ++i) {
-        TuplePatternElt TupleElt = TP->getElement(i);
-        if (NeedComma)
-          Builder.addComma();
-        NeedComma = true;
+  void addParameters(CodeCompletionResultBuilder &Builder,
+                     const ParameterList *params) {
+    bool NeedComma = false;
+    for (auto &param : *params) {
+      if (NeedComma)
+        Builder.addComma();
+      NeedComma = true;
 
-        bool HasEllipsis = TupleElt.hasEllipsis();
-        Type EltT = TupleElt.getPattern()->getType();
-        if (HasEllipsis)
-          EltT = TupleTypeElt::getVarargBaseTy(EltT);
+      Type type = param->getType();
+      if (param->isVariadic())
+        type = ParamDecl::getVarargBaseTy(type);
 
-        Builder.addCallParameter(TupleElt.getPattern()->getBoundName(),
-                                 EltT, HasEllipsis);
-      }
-      return;
+      Builder.addCallParameter(param->getArgumentName(), type,
+                               param->isVariadic());
     }
-
-    Type PType = P->getType();
-    if (auto Parens = dyn_cast<ParenType>(PType.getPointer()))
-      PType = Parens->getUnderlyingType();
-    Builder.addCallParameter(P->getBoundName(), PType, /*IsVarArg*/false);
   }
 
   void addPatternFromTypeImpl(CodeCompletionResultBuilder &Builder, Type T,
@@ -1894,17 +1885,9 @@ public:
                                    const AbstractFunctionDecl *AFD,
                                    bool includeDefaultArgs = true) {
 
-    const TuplePattern *BodyTuple = nullptr;
-    if (AFD) {
-      auto BodyPatterns = AFD->getBodyParamPatterns();
-      // Skip over the implicit 'self'.
-      if (AFD->getImplicitSelfDecl()) {
-        BodyPatterns = BodyPatterns.slice(1);
-      }
-
-      if (!BodyPatterns.empty())
-        BodyTuple = dyn_cast<TuplePattern>(BodyPatterns.front());
-    }
+    const ParameterList *BodyParams = nullptr;
+    if (AFD)
+      BodyParams = AFD->getParameterList(AFD->getImplicitSelfDecl() ? 1 : 0);
 
     bool modifiedBuilder = false;
 
@@ -1921,6 +1904,9 @@ public:
 
         case DefaultArgumentKind::Normal:
         case DefaultArgumentKind::Inherited:
+        case DefaultArgumentKind::Nil:
+        case DefaultArgumentKind::EmptyArray:
+        case DefaultArgumentKind::EmptyDictionary:
           if (includeDefaultArgs)
             break;
           continue;
@@ -1941,11 +1927,10 @@ public:
 
         if (NeedComma)
           Builder.addComma();
-        if (BodyTuple) {
+        if (BodyParams) {
           // If we have a local name for the parameter, pass in that as well.
-          auto ParamPat = BodyTuple->getElement(i).getPattern();
-          Builder.addCallParameter(Name, ParamPat->getBodyName(), ParamType,
-                                   TupleElt.isVararg());
+          auto name = BodyParams->get(i)->getName();
+          Builder.addCallParameter(Name, name, ParamType, TupleElt.isVararg());
         } else {
           Builder.addCallParameter(Name, ParamType, TupleElt.isVararg());
         }
@@ -1961,9 +1946,9 @@ public:
       }
 
       modifiedBuilder = true;
-      if (BodyTuple) {
-        auto ParamPat = BodyTuple->getElement(0).getPattern();
-        Builder.addCallParameter(Identifier(), ParamPat->getBodyName(), T,
+      if (BodyParams) {
+        auto name = BodyParams->get(0)->getName();
+        Builder.addCallParameter(Identifier(), name, T,
                                  /*IsVarArg*/false);
       } else
         Builder.addCallParameter(Identifier(), T, /*IsVarArg*/false);
@@ -2057,7 +2042,7 @@ public:
     case LookupKind::EnumElement:
     case LookupKind::Type:
     case LookupKind::TypeInDeclContext:
-      llvm_unreachable("can not have a method call while doing a "
+      llvm_unreachable("cannot have a method call while doing a "
                        "type completion");
     case LookupKind::ImportFromModule:
       IsImplicitlyCurriedInstanceMethod = false;
@@ -2122,7 +2107,7 @@ public:
       // Build type annotation.
       {
         llvm::raw_svector_ostream OS(TypeStr);
-        for (unsigned i = FirstIndex + 1, e = FD->getBodyParamPatterns().size();
+        for (unsigned i = FirstIndex + 1, e = FD->getParameterLists().size();
              i != e; ++i) {
           ResultType->castTo<AnyFunctionType>()->getInput()->print(OS);
           ResultType = ResultType->castTo<AnyFunctionType>()->getResult();
@@ -2245,7 +2230,7 @@ public:
   }
 
   void addSubscriptCall(const SubscriptDecl *SD, DeclVisibilityKind Reason) {
-    assert(!HaveDot && "can not add a subscript after a dot");
+    assert(!HaveDot && "cannot add a subscript after a dot");
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink,
@@ -2254,7 +2239,7 @@ public:
     Builder.setAssociatedDecl(SD);
     setClangDeclKeywords(SD, Pairs, Builder);
     Builder.addLeftBracket();
-    addPatternParameters(Builder, SD->getIndices());
+    addParameters(Builder, SD->getIndices());
     Builder.addRightBracket();
 
     // Add a type annotation.
@@ -2436,7 +2421,7 @@ public:
           if (HaveDot)
             return;
 
-          // If instance type is type alias, showing users that the contructed
+          // If instance type is type alias, showing users that the constructed
           // type is the typealias instead of the underlying type of the alias.
           Optional<Type> Result = None;
           if (auto AT = MT->getInstanceType()) {
@@ -2463,11 +2448,11 @@ public:
       }
 
       if (auto *FD = dyn_cast<FuncDecl>(D)) {
-        // We can not call operators with a postfix parenthesis syntax.
+        // We cannot call operators with a postfix parenthesis syntax.
         if (FD->isBinaryOperator() || FD->isUnaryOperator())
           return;
 
-        // We can not call accessors.  We use VarDecls and SubscriptDecls to
+        // We cannot call accessors.  We use VarDecls and SubscriptDecls to
         // produce completions that refer to getters and setters.
         if (FD->isAccessor())
           return;
@@ -2525,11 +2510,11 @@ public:
       }
 
       if (auto *FD = dyn_cast<FuncDecl>(D)) {
-        // We can not call operators with a postfix parenthesis syntax.
+        // We cannot call operators with a postfix parenthesis syntax.
         if (FD->isBinaryOperator() || FD->isUnaryOperator())
           return;
 
-        // We can not call accessors.  We use VarDecls and SubscriptDecls to
+        // We cannot call accessors.  We use VarDecls and SubscriptDecls to
         // produce completions that refer to getters and setters.
         if (FD->isAccessor())
           return;
@@ -3265,10 +3250,10 @@ public:
     }
   }
 
-  static void collectArgumentExpection(unsigned Position, bool HasName,
-                                       ArrayRef<Type> Types, SourceLoc Loc,
-                                       std::vector<Type> &ExpectedTypes,
-                                       std::vector<StringRef> &ExpectedNames) {
+  static void collectArgumentExpectation(unsigned Position, bool HasName,
+                                         ArrayRef<Type> Types, SourceLoc Loc,
+                                         std::vector<Type> &ExpectedTypes,
+                                         std::vector<StringRef> &ExpectedNames) {
     SmallPtrSet<TypeBase *, 4> seenTypes;
     SmallPtrSet<const char *, 4> seenNames;
 
@@ -3298,8 +3283,8 @@ public:
                                       ArrayRef<Type> Types, SourceLoc Loc) {
     std::vector<Type> ExpectedTypes;
     std::vector<StringRef> ExpectedNames;
-    collectArgumentExpection(Position, HasName, Types, Loc, ExpectedTypes,
-                             ExpectedNames);
+    collectArgumentExpectation(Position, HasName, Types, Loc, ExpectedTypes,
+                               ExpectedNames);
     addArgNameCompletionResults(ExpectedNames);
     if (!ExpectedTypes.empty()) {
       setExpectedTypes(ExpectedTypes);
@@ -3311,7 +3296,7 @@ public:
   static bool isPotentialSignatureMatch(ArrayRef<Type> TupleEles,
                                         ArrayRef<Type> ExprTypes,
                                         DeclContext *DC) {
-    // Not likely to be a mactch if users provide more arguments than expected.
+    // Not likely to be a match if users provide more arguments than expected.
     if (ExprTypes.size() >= TupleEles.size())
       return false;
     for (unsigned I = 0; I < ExprTypes.size(); ++ I) {
@@ -3376,16 +3361,16 @@ public:
   }
 
   static bool
-  collectArgumentExpectatation(DeclContext &DC, CallExpr *CallE, Expr *CCExpr,
-                               std::vector<Type> &ExpectedTypes,
-                               std::vector<StringRef> &ExpectedNames) {
+  collectArgumentExpectation(DeclContext &DC, CallExpr *CallE, Expr *CCExpr,
+                             std::vector<Type> &ExpectedTypes,
+                             std::vector<StringRef> &ExpectedNames) {
     SmallVector<Type, 2> PossibleTypes;
     unsigned Position;
     bool HasName;
     if (collectPossibleArgTypes(DC, CallE, CCExpr, PossibleTypes, Position,
                                 HasName, true)) {
-      collectArgumentExpection(Position, HasName, PossibleTypes,
-                               CCExpr->getStartLoc(), ExpectedTypes, ExpectedNames);
+      collectArgumentExpectation(Position, HasName, PossibleTypes,
+                                 CCExpr->getStartLoc(), ExpectedTypes, ExpectedNames);
       return !ExpectedTypes.empty() || !ExpectedNames.empty();
     }
     return false;
@@ -3670,7 +3655,7 @@ public:
       if (FD->isBinaryOperator() || FD->isUnaryOperator())
         return;
 
-      // We can not override individual accessors.
+      // We cannot override individual accessors.
       if (FD->isAccessor())
         return;
 
@@ -4209,7 +4194,7 @@ public:
       case ExprKind::Call: {
         std::vector<Type> PotentialTypes;
         std::vector<StringRef> ExpectedNames;
-        CompletionLookup::collectArgumentExpectatation(
+        CompletionLookup::collectArgumentExpectation(
             *DC, cast<CallExpr>(Parent), ParsedExpr, PotentialTypes,
             ExpectedNames);
         for (Type Ty : PotentialTypes)

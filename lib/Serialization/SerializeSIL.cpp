@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -20,6 +20,7 @@
 
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -235,9 +236,10 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
                      << " FnID " << FnID << "\n");
   DEBUG(llvm::dbgs() << "Serialized SIL:\n"; F.dump());
 
-  IdentifierID SemanticsID =
-    F.getSemanticsAttr().empty() ? (IdentifierID)0 :
-    S.addIdentifierRef(Ctx.getIdentifier(F.getSemanticsAttr()));
+  llvm::SmallVector<IdentifierID, 1> SemanticsIDs;
+  for (auto SemanticAttr : F.getSemanticsAttrs()) {
+    SemanticsIDs.push_back(S.addIdentifierRef(Ctx.getIdentifier(SemanticAttr)));
+  }
 
   SILLinkage Linkage = F.getLinkage();
 
@@ -246,7 +248,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   // 1. shared_external linkage is just a hack to tell the optimizer that a
   // shared function was deserialized.
   //
-  // 2. We can not just serialize a declaration to a shared_external function
+  // 2. We cannot just serialize a declaration to a shared_external function
   // since shared_external functions still have linkonce_odr linkage at the LLVM
   // level. This means they must be defined not just declared.
   //
@@ -258,7 +260,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   bool NoBody = DeclOnly || isAvailableExternally(Linkage) ||
                 F.isExternalDeclaration();
 
-  // If we don't emit a function body then make sure to mark the decleration
+  // If we don't emit a function body then make sure to mark the declaration
   // as available externally.
   if (NoBody) {
     Linkage = addExternalToLinkage(Linkage);
@@ -268,8 +270,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       Out, ScratchRecord, abbrCode, toStableSILLinkage(Linkage),
       (unsigned)F.isTransparent(), (unsigned)F.isFragile(),
       (unsigned)F.isThunk(), (unsigned)F.isGlobalInit(),
-      (unsigned)F.getInlineStrategy(), (unsigned)F.getEffectsKind(),
-      FnID, SemanticsID);
+      (unsigned)F.getInlineStrategy(), (unsigned)F.getEffectsKind(), FnID,
+      SemanticsIDs);
 
   if (NoBody)
     return;
@@ -437,7 +439,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILValue operand;
     SILType Ty;
     CanType FormalConcreteType;
-    ArrayRef<ProtocolConformance*> conformances;
+    ArrayRef<ProtocolConformanceRef> conformances;
 
     switch (SI.getKind()) {
     default: llvm_unreachable("out of sync with parent");
@@ -676,6 +678,17 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         addValueRef(PAI->getCallee()), PAI->getCallee().getResultNumber(),
         Args);
     S.writeSubstitutions(PAI->getSubstitutions(), SILAbbrCodes);
+    break;
+  }
+  case ValueKind::AllocGlobalInst: {
+    // Format: Name and type. Use SILOneOperandLayout.
+    const AllocGlobalInst *AGI = cast<AllocGlobalInst>(&SI);
+    SILOneOperandLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILOneOperandLayout::Code],
+        (unsigned)SI.getKind(), 0, 0, 0,
+        S.addIdentifierRef(
+            Ctx.getIdentifier(AGI->getReferencedGlobal()->getName())),
+        0);
     break;
   }
   case ValueKind::GlobalAddrInst: {
@@ -1675,7 +1688,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   // We have to make sure BOUND_GENERIC_SUBSTITUTION does not overlap with
   // SIL-specific records.
   registerSILAbbr<decls_block::BoundGenericSubstitutionLayout>();
-  registerSILAbbr<decls_block::NoConformanceLayout>();
+  registerSILAbbr<decls_block::AbstractProtocolConformanceLayout>();
   registerSILAbbr<decls_block::NormalProtocolConformanceLayout>();
   registerSILAbbr<decls_block::SpecializedProtocolConformanceLayout>();
   registerSILAbbr<decls_block::InheritedProtocolConformanceLayout>();

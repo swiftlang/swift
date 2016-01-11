@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -79,7 +79,7 @@ public struct UTF8 : UnicodeCodecType {
   public init() {}
 
   /// Returns the number of expected trailing bytes for a given first byte: 0,
-  /// 1, 2 or 3.  If the first byte can not start a valid UTF-8 code unit
+  /// 1, 2 or 3.  If the first byte cannot start a valid UTF-8 code unit
   /// sequence, returns 4.
   @warn_unused_result
   public static func _numTrailingBytes(cu0: CodeUnit) -> UInt8 {

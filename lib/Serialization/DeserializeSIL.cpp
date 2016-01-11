@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -335,7 +335,7 @@ SILFunction *SILDeserializer::getFuncForReference(StringRef name) {
 }
 
 /// Helper function to find a SILGlobalVariable given its name. It first checks
-/// in the module. If we can not find it in the module, we attempt to
+/// in the module. If we cannot find it in the module, we attempt to
 /// deserialize it.
 SILGlobalVariable *SILDeserializer::getGlobalForReference(StringRef name) {
   // Check to see if we have a global by this name already.
@@ -383,12 +383,11 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   TypeID funcTyID;
   unsigned rawLinkage, isTransparent, isFragile, isThunk, isGlobal,
            inlineStrategy, effect;
-  IdentifierID SemanticsID;
+  ArrayRef<uint64_t> SemanticsIDs;
   // TODO: read fragile
-  SILFunctionLayout::readRecord(scratch, rawLinkage,
-                                isTransparent, isFragile, isThunk, isGlobal,
-                                inlineStrategy, effect, funcTyID,
-                                SemanticsID);
+  SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isFragile,
+                                isThunk, isGlobal, inlineStrategy, effect,
+                                funcTyID, SemanticsIDs);
 
   if (funcTyID == 0) {
     DEBUG(llvm::dbgs() << "SILFunction typeID is 0.\n");
@@ -441,8 +440,9 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
         SILFunction::NotRelevant, (Inline_t)inlineStrategy);
     fn->setGlobalInit(isGlobal == 1);
     fn->setEffectsKind((EffectsKind)effect);
-    if (SemanticsID)
-      fn->setSemanticsAttr(MF->getIdentifier(SemanticsID).str());
+    for (auto ID : SemanticsIDs) {
+      fn->addSemanticsAttr(MF->getIdentifier(ID).str());
+    }
 
     if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), fn);
   }
@@ -841,7 +841,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       operand = getLocalValue(ValID, ValResNum,
                          getSILType(Ty2, (SILValueCategory)TyCategory2));
 
-    SmallVector<ProtocolConformance*, 2> conformances;
+    SmallVector<ProtocolConformanceRef, 2> conformances;
     while (NumConformances--) {
       auto conformance = MF->readConformance(SILCursor);
       conformances.push_back(conformance);
@@ -1030,6 +1030,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     
     ResultVal = Builder.createBuiltin(Loc, Name, ResultTy, Substitutions,
                                       Args);
+    break;
+  }
+  case ValueKind::AllocGlobalInst: {
+    // Format: Name and type. Use SILOneOperandLayout.
+    Identifier Name = MF->getIdentifier(ValID);
+
+    // Find the global variable.
+    SILGlobalVariable *g = getGlobalForReference(Name.str());
+    assert(g && "Can't deserialize global variable");
+
+    ResultVal = Builder.createAllocGlobal(Loc, g);
     break;
   }
   case ValueKind::GlobalAddrInst: {
@@ -1632,7 +1643,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILType OperandTy = getSILType(MF->getType(TyID2),
                                    (SILValueCategory)TyCategory2);
 
-    auto *Conformance = MF->readConformance(SILCursor);
+    auto Conformance = MF->readConformance(SILCursor);
     // Read the optional opened existential.
     SILValue ExistentialOperand;
     if (TyID3) {
@@ -2004,7 +2015,7 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
 
   // Deserialize Conformance.
   auto theConformance = cast<NormalProtocolConformance>(
-                          MF->readConformance(SILCursor));
+                          MF->readConformance(SILCursor).getConcrete());
 
   if (!existingWt)
     existingWt = SILMod.lookUpWitnessTable(theConformance, false).first;
@@ -2055,7 +2066,7 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
       ProtocolDecl *proto = cast<ProtocolDecl>(MF->getDecl(protoId));
       auto conformance = MF->readConformance(SILCursor);
       witnessEntries.push_back(SILWitnessTable::BaseProtocolWitness{
-        proto, conformance
+        proto, conformance.getConcrete()
       });
     } else if (kind == SIL_WITNESS_ASSOC_PROTOCOL) {
       DeclID assocId, protoId;
@@ -2063,7 +2074,8 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
       ProtocolDecl *proto = cast<ProtocolDecl>(MF->getDecl(protoId));
       auto conformance = MF->readConformance(SILCursor);
       witnessEntries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
-        cast<AssociatedTypeDecl>(MF->getDecl(assocId)), proto, conformance
+        cast<AssociatedTypeDecl>(MF->getDecl(assocId)), proto,
+        conformance
       });
     } else if (kind == SIL_WITNESS_ASSOC_ENTRY) {
       DeclID assocId;
@@ -2117,8 +2129,8 @@ void SILDeserializer::getAllWitnessTables() {
 
 SILWitnessTable *
 SILDeserializer::lookupWitnessTable(SILWitnessTable *existingWt) {
-  assert(existingWt && "Can not deserialize a null witness table declaration.");
-  assert(existingWt->isDeclaration() && "Can not deserialize a witness table "
+  assert(existingWt && "Cannot deserialize a null witness table declaration.");
+  assert(existingWt->isDeclaration() && "Cannot deserialize a witness table "
                                         "definition.");
 
   // If we don't have a witness table list, we can't look anything up.

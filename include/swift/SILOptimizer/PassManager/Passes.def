@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -57,6 +57,12 @@ PASS(ClosureSpecializer, "closure-specialize",
      "Specialize functions passed a closure to call the closure directly")
 PASS(CodeSinking, "code-sinking",
      "Sinks code closer to users")
+PASS(ComputeDominanceInfo, "compute-dominance-info",
+     "Utility pass that computes (post-)dominance info for all functions in "
+     "order to help test dominanceinfo updating")
+PASS(ComputeLoopInfo, "compute-loop-info",
+     "Utility pass that computes loop info for all functions in order to help "
+     "test loop info updating")
 PASS(CopyForwarding, "copy-forwarding",
      "Eliminate redundant copies")
 PASS(RedundantOverflowCheckRemoval, "remove-redundant-overflow-checks",
@@ -69,6 +75,7 @@ PASS(DeadObjectElimination, "deadobject-elim",
      "Eliminate unused objects that do not have destructors with side effects")
 PASS(DefiniteInitialization, "definite-init",
      "Definite Initialization")
+PASS(Devirtualizer, "devirtualizer", "Devirtualize indirect calls")
 PASS(DiagnoseUnreachable, "diagnose-unreachable",
      "Diagnose Unreachable Code")
 PASS(DiagnosticConstantPropagation, "diagnostic-constant-propagation",
@@ -91,13 +98,15 @@ PASS(FunctionSignatureOpts, "function-signature-opts",
      "Optimize Function Signatures")
 PASS(ARCSequenceOpts, "arc-sequence-opts",
      "Optimize sequences of retain/release opts by removing redundant inner "
-     "retain/release sqeuences")
+     "retain/release sequences")
 PASS(ARCLoopOpts, "arc-loop-opts",
      "Run all arc loop passes")
 PASS(RedundantLoadElimination, "redundant-load-elim",
      "Multiple basic block redundant load elimination")
 PASS(DeadStoreElimination, "dead-store-elim",
      "Multiple basic block dead store elimination")
+PASS(GenericSpecializer, "generic-specializer",
+     "Specialization of generic functions by static types")
 PASS(GlobalOpt, "global-opt",
      "Global variable optimizations")
 PASS(GlobalPropertyOpt, "global-property-opt",
@@ -148,6 +157,8 @@ PASS(MergeCondFails, "merge-cond_fails",
      "Remove redundant overflow checks")
 PASS(NoReturnFolding, "noreturn-folding",
      "Add 'unreachable' after noreturn calls")
+PASS(RCIdentityDumper, "rc-id-dumper",
+     "Dump the RCIdentity of all values in a function")
 // TODO: It makes no sense to have early inliner, late inliner, and
 // perf inliner in terms of names.
 PASS(PerfInliner, "inline",

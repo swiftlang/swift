@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -22,6 +22,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/Basic/StringExtras.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -436,7 +437,7 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
 
   case tok::oper_postfix:
     // Postfix operators cannot start a subexpression, but can happen
-    // syntactically because the operator may just follow whatever preceeds this
+    // syntactically because the operator may just follow whatever precedes this
     // expression (and that may not always be an expression).
     diagnose(Tok, diag::invalid_postfix_operator);
     Tok.setKind(tok::oper_prefix);
@@ -466,7 +467,7 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   if (SubExpr.isNull())
     return nullptr;
 
-  // Check if we have an unary '-' with number literal sub-expression, for
+  // Check if we have a unary '-' with number literal sub-expression, for
   // example, "-42" or "-1.25".
   if (auto *LE = dyn_cast<NumberLiteralExpr>(SubExpr.get())) {
     if (Operator->hasName() && Operator->getName().str() == "-") {
@@ -630,14 +631,14 @@ static StringRef copyAndStripUnderscores(ASTContext &C, StringRef orig) {
 /// the start of a trailing closure, or start the variable accessor block.
 ///
 /// Check to see if the '{' is followed by a 'didSet' or a 'willSet' label,
-/// possibly preceeded by attributes.  If so, we disambiguate the parse as the
+/// possibly preceded by attributes.  If so, we disambiguate the parse as the
 /// start of a get-set block in a variable definition (not as a trailing
 /// closure).
 static bool isStartOfGetSetAccessor(Parser &P) {
   assert(P.Tok.is(tok::l_brace) && "not checking a brace?");
   
   // The only case this can happen is if the accessor label is immediately after
-  // a brace (possibly preceeded by attributes).  "get" is implicit, so it can't
+  // a brace (possibly preceded by attributes).  "get" is implicit, so it can't
   // be checked for.  Conveniently however, get/set properties are not allowed
   // to have initializers, so we don't have an ambiguity, we just have to check
   // for observing accessors.
@@ -649,7 +650,7 @@ static bool isStartOfGetSetAccessor(Parser &P) {
       NextToken.isContextualKeyword("willSet"))
     return true;
 
-  // If we don't have attributes, then it can not be an accessor block.
+  // If we don't have attributes, then it cannot be an accessor block.
   if (NextToken.isNot(tok::at_sign))
     return false;
 
@@ -1407,10 +1408,12 @@ Expr *Parser::parseExprIdentifier() {
   ///     period_following comma semicolon
   ///
   if (canParseAsGenericArgumentList()) {
-    hasGenericArgumentList = true;
     if (parseGenericArguments(args, LAngleLoc, RAngleLoc)) {
       diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
     }
+    
+    // The result can be empty in error cases.
+    hasGenericArgumentList = !args.empty();
   }
   
   ValueDecl *D = lookupInScope(name);
@@ -1520,7 +1523,7 @@ Expr *Parser::parseExprEditorPlaceholder(Token PlaceholderTok,
 
 bool Parser::
 parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
-                               Pattern *&params, SourceLoc &throwsLoc,
+                               ParameterList *&params, SourceLoc &throwsLoc,
                                SourceLoc &arrowLoc,
                                TypeRepr *&explicitResultType, SourceLoc &inLoc){
   // Clear out result parameters.
@@ -1707,33 +1710,26 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
         invalid = true;
     } else {
       // Parse identifier (',' identifier)*
-      SmallVector<TuplePatternElt, 4> elements;
+      SmallVector<ParamDecl*, 4> elements;
       do {
-        if (Tok.is(tok::identifier) || Tok.is(tok::kw__)) {
-          Identifier name = Tok.is(tok::identifier) ?
-              Context.getIdentifier(Tok.getText()) : Identifier();
-          auto var = new (Context) ParamDecl(/*IsLet*/ true,
-                                             SourceLoc(), Identifier(),
-                                             Tok.getLoc(),
-                                             name,
-                                             Type(), nullptr);
-          elements.push_back(TuplePatternElt(new (Context) NamedPattern(var)));
-          consumeToken();
-        } else {
+        if (Tok.isNot(tok::identifier, tok::kw__)) {
           diagnose(Tok, diag::expected_closure_parameter_name);
           invalid = true;
           break;
         }
 
+        Identifier name = Tok.is(tok::identifier) ?
+            Context.getIdentifier(Tok.getText()) : Identifier();
+        auto var = new (Context) ParamDecl(/*IsLet*/ true, SourceLoc(),
+                                           Identifier(), Tok.getLoc(), name,
+                                           Type(), nullptr);
+        elements.push_back(var);
+        consumeToken();
+ 
         // Consume a comma to continue.
-        if (consumeIf(tok::comma)) {
-          continue;
-        }
+      } while (consumeIf(tok::comma));
 
-        break;
-      } while (true);
-
-      params = TuplePattern::create(Context, SourceLoc(), elements,SourceLoc());
+      params = ParameterList::create(Context, elements);
     }
     
     if (Tok.is(tok::kw_throws)) {
@@ -1806,7 +1802,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
   SourceLoc leftBrace = consumeToken();
 
   // Parse the closure-signature, if present.
-  Pattern *params = nullptr;
+  ParameterList *params = nullptr;
   SourceLoc throwsLoc;
   SourceLoc arrowLoc;
   TypeRepr *explicitResultType;
@@ -1838,7 +1834,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
   // Handle parameters.
   if (params) {
     // Add the parameters into scope.
-    addPatternVariablesToScope(params);
+    addParametersToScope(params);
   } else {
     // There are no parameters; allow anonymous closure variables.
     // FIXME: We could do this all the time, and then provide Fix-Its
@@ -1866,18 +1862,17 @@ ParserResult<Expr> Parser::parseExprClosure() {
   if (!params) {
     // Create a parameter pattern containing the anonymous variables.
     auto &anonVars = AnonClosureVars.back().second;
-    SmallVector<TuplePatternElt, 4> elements;
-    for (auto anonVar : anonVars) {
-      elements.push_back(TuplePatternElt(new (Context) NamedPattern(anonVar)));
-    }
-    params = TuplePattern::createSimple(Context, leftBrace, elements,
-                                        leftBrace, /*implicit*/true);
+    SmallVector<ParamDecl*, 4> elements;
+    for (auto anonVar : anonVars)
+      elements.push_back(anonVar);
+    
+    params = ParameterList::create(Context, leftBrace, elements, leftBrace);
 
     // Pop out of the anonymous closure variables scope.
     AnonClosureVars.pop_back();
 
     // Attach the parameters to the closure.
-    closure->setParams(params);
+    closure->setParameterList(params);
     closure->setHasAnonymousClosureVars();
   }
 
@@ -1953,7 +1948,7 @@ Expr *Parser::parseExprAnonClosureArg() {
   // generate the anonymous variables we need.
   auto closure = dyn_cast_or_null<ClosureExpr>(
       dyn_cast<AbstractClosureExpr>(CurDeclContext));
-  if (!closure || closure->getParams()) {
+  if (!closure || closure->getParameters()) {
     // FIXME: specialize diagnostic when there were closure parameters.
     // We can be fairly smart here.
     diagnose(Loc, closure ? diag::anon_closure_arg_in_closure_with_args
@@ -1969,9 +1964,9 @@ Expr *Parser::parseExprAnonClosureArg() {
     StringRef varName = ("$" + Twine(nextIdx)).toStringRef(StrBuf);
     Identifier ident = Context.getIdentifier(varName);
     SourceLoc varLoc = leftBraceLoc;
-    VarDecl *var = new (Context) ParamDecl(/*IsLet*/ true,
-                                           SourceLoc(), Identifier(),
-                                           varLoc, ident, Type(), closure);
+    auto *var = new (Context) ParamDecl(/*IsLet*/ true, SourceLoc(),
+                                        Identifier(), varLoc, ident, Type(),
+                                        closure);
     decls.push_back(var);
   }
 
@@ -2009,13 +2004,21 @@ ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
     Identifier FieldName;
     SourceLoc FieldNameLoc;
 
-    // Check to see if there is a field specifier
-    if (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
-      FieldNameLoc = Tok.getLoc();
-      if (parseIdentifier(FieldName,
-                          diag::expected_field_spec_name_tuple_expr)) {
-        return makeParserError();
+    // Check to see if there is an argument label.
+    if (Tok.canBeArgumentLabel() && peekToken().is(tok::colon)) {
+      // If this was an escaped identifier that need not have been escaped,
+      // say so.
+      if (Tok.isEscapedIdentifier() && canBeArgumentLabel(Tok.getText())) {
+        SourceLoc start = Tok.getLoc();
+        SourceLoc end = start.getAdvancedLoc(Tok.getLength());
+        diagnose(Tok, diag::escaped_parameter_name, Tok.getText())
+          .fixItRemoveChars(start, start.getAdvancedLoc(1))
+          .fixItRemoveChars(end.getAdvancedLoc(-1), end);
       }
+
+      if (!Tok.is(tok::kw__))
+        FieldName = Context.getIdentifier(Tok.getText());
+      FieldNameLoc = consumeToken();
       consumeToken(tok::colon);
     }
 
@@ -2341,6 +2344,13 @@ void Parser::addPatternVariablesToScope(ArrayRef<Pattern *> Patterns) {
     });
   }
 }
+
+void Parser::addParametersToScope(ParameterList *PL) {
+  for (auto param : *PL)
+    if (param->hasName())
+      addToScope(param);
+}
+
 
 
 /// Parse availability query specification.

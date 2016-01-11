@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -1040,7 +1040,7 @@ class ClassExistentialTypeInfo
 
 public:
 
-  bool isSingleRetainablePointer(ResilienceScope scope,
+  bool isSingleRetainablePointer(ResilienceExpansion expansion,
                                  ReferenceCounting *refcounting) const override{
     if (refcounting) *refcounting = Refcounting;
     return getNumStoredProtocols() == 0;
@@ -1501,6 +1501,8 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
 
     // Project down to the buffers.
     IGF.Builder.emitBlock(contBB);
+    // We don't need a ConditionalDominanceScope here because (1) there's no
+    // code in the other condition and (2) we immediately return.
     Address destBuffer = layout.projectExistentialBuffer(IGF, dest);
     Address srcBuffer = layout.projectExistentialBuffer(IGF, src);
 
@@ -1516,10 +1518,10 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
       IGF.Builder.CreateICmpEQ(destMetadata, srcMetadata, "sameMetadata");
     IGF.Builder.CreateCondBr(sameMetadata, matchBB, noMatchBB);
 
-    { // (scope to avoid contaminating other branches with these values)
-
-      // If so, do a direct assignment.
-      IGF.Builder.emitBlock(matchBB);
+    // If so, do a direct assignment.
+    IGF.Builder.emitBlock(matchBB);
+    {
+      ConditionalDominanceScope matchCondition(IGF);
 
       llvm::Value *destObject =
         emitProjectBufferCall(IGF, destMetadata, destBuffer);
@@ -1537,29 +1539,32 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
     // the madnesses that boost::variant has to go through, with the
     // advantage of address-invariance.
     IGF.Builder.emitBlock(noMatchBB);
+    {
+      ConditionalDominanceScope noMatchCondition(IGF);
 
-    // Store the metadata ref.
-    IGF.Builder.CreateStore(srcMetadata, destMetadataSlot);
+      // Store the metadata ref.
+      IGF.Builder.CreateStore(srcMetadata, destMetadataSlot);
 
-    // Store the protocol witness tables.
-    unsigned numTables = layout.getNumTables();
-    for (unsigned i = 0, e = numTables; i != e; ++i) {
-      Address destTableSlot = layout.projectWitnessTable(IGF, dest, i);
-      llvm::Value *srcTable = layout.loadWitnessTable(IGF, src, i);
+      // Store the protocol witness tables.
+      unsigned numTables = layout.getNumTables();
+      for (unsigned i = 0, e = numTables; i != e; ++i) {
+        Address destTableSlot = layout.projectWitnessTable(IGF, dest, i);
+        llvm::Value *srcTable = layout.loadWitnessTable(IGF, src, i);
 
-      // Overwrite the old witness table.
-      IGF.Builder.CreateStore(srcTable, destTableSlot);
+        // Overwrite the old witness table.
+        IGF.Builder.CreateStore(srcTable, destTableSlot);
+      }
+
+      // Destroy the old value.
+      emitDestroyBufferCall(IGF, destMetadata, destBuffer);
+
+      // Copy-initialize with the new value.  Again, pull a value
+      // witness table from the source metadata if we can't use a
+      // protocol witness table.
+      emitInitializeBufferWithCopyOfBufferCall(IGF, srcMetadata,
+                                               destBuffer, srcBuffer);
+      IGF.Builder.CreateBr(doneBB);
     }
-
-    // Destroy the old value.
-    emitDestroyBufferCall(IGF, destMetadata, destBuffer);
-
-    // Copy-initialize with the new value.  Again, pull a value
-    // witness table from the source metadata if we can't use a
-    // protocol witness table.
-    emitInitializeBufferWithCopyOfBufferCall(IGF, srcMetadata,
-                                             destBuffer, srcBuffer);
-    IGF.Builder.CreateBr(doneBB);
 
     // All done.
     IGF.Builder.emitBlock(doneBB);
@@ -1567,30 +1572,19 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
   });
 }
 
-/// Retrieve the protocol witness table for a conformance.
-static llvm::Value *getProtocolWitnessTable(IRGenFunction &IGF,
-                                            CanType srcType,
-                                            const TypeInfo &srcTI,
-                                            ProtocolEntry protoEntry,
-                                            ProtocolConformance *conformance) {
-  return emitWitnessTableRef(IGF, srcType, srcTI,
-                             protoEntry.getProtocol(),
-                             protoEntry.getInfo(),
-                             conformance);
-}
-
 /// Emit protocol witness table pointers for the given protocol conformances,
 /// passing each emitted witness table index into the given function body.
 static void forEachProtocolWitnessTable(IRGenFunction &IGF,
-                          CanType srcType, CanType destType,
+                          CanType srcType, llvm::Value **srcMetadataCache,
+                          CanType destType,
                           ArrayRef<ProtocolEntry> protocols,
-                          ArrayRef<ProtocolConformance*> conformances,
+                          ArrayRef<ProtocolConformanceRef> conformances,
                           std::function<void (unsigned, llvm::Value*)> body) {
   // Collect the conformances that need witness tables.
   SmallVector<ProtocolDecl*, 2> destProtocols;
   destType.getAnyExistentialTypeProtocols(destProtocols);
 
-  SmallVector<ProtocolConformance*, 2> witnessConformances;
+  SmallVector<ProtocolConformanceRef, 2> witnessConformances;
   assert(destProtocols.size() == conformances.size() &&
          "mismatched protocol conformances");
   for (unsigned i = 0, size = destProtocols.size(); i < size; ++i)
@@ -1600,10 +1594,11 @@ static void forEachProtocolWitnessTable(IRGenFunction &IGF,
   assert(protocols.size() == witnessConformances.size() &&
          "mismatched protocol conformances");
 
-  auto &srcTI = IGF.getTypeInfoForUnlowered(srcType);
   for (unsigned i = 0, e = protocols.size(); i < e; ++i) {
-    auto table = getProtocolWitnessTable(IGF, srcType, srcTI,
-                                         protocols[i], witnessConformances[i]);
+    auto table = emitWitnessTableRef(IGF, srcType, srcMetadataCache,
+                                     protocols[i].getProtocol(),
+                                     protocols[i].getInfo(),
+                                     witnessConformances[i]);
     body(i, table);
   }
 }
@@ -1665,7 +1660,7 @@ Address irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
                                   SILType destType,
                                   CanType formalSrcType,
                                   SILType loweredSrcType,
-                                  ArrayRef<ProtocolConformance *> conformances){
+                                ArrayRef<ProtocolConformanceRef> conformances) {
   // TODO: Non-ErrorType boxed existentials.
   assert(_isErrorType(destType));
 
@@ -1676,8 +1671,9 @@ Address irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
   // Should only be one conformance, for the ErrorType protocol.
   assert(conformances.size() == 1 && destTI.getStoredProtocols().size() == 1);
   const ProtocolEntry &entry = destTI.getStoredProtocols()[0];
-  auto witness = getProtocolWitnessTable(IGF, formalSrcType, srcTI,
-                                         entry, conformances[0]);
+  auto witness = emitWitnessTableRef(IGF, formalSrcType, &srcMetadata,
+                                     entry.getProtocol(), entry.getInfo(),
+                                     conformances[0]);
   
   // Call the runtime to allocate the box.
   // TODO: When there's a store or copy_addr immediately into the box, peephole
@@ -1735,7 +1731,7 @@ void irgen::emitClassExistentialContainer(IRGenFunction &IGF,
                                llvm::Value *instance,
                                CanType instanceFormalType,
                                SILType instanceLoweredType,
-                               ArrayRef<ProtocolConformance*> conformances) {
+                               ArrayRef<ProtocolConformanceRef> conformances) {
   // As a special case, an ErrorType existential can represented as a reference
   // to an already existing NSError or CFError instance.
   SmallVector<ProtocolDecl*, 4> protocols;
@@ -1771,7 +1767,8 @@ void irgen::emitClassExistentialContainer(IRGenFunction &IGF,
   out.add(opaqueInstance);
 
   // Emit the witness table pointers.
-  forEachProtocolWitnessTable(IGF, instanceFormalType,
+  llvm::Value *instanceMetadata = nullptr;
+  forEachProtocolWitnessTable(IGF, instanceFormalType, &instanceMetadata,
                               outType.getSwiftRValueType(),
                               destTI.getStoredProtocols(),
                               conformances,
@@ -1788,7 +1785,7 @@ Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
                                   SILType destType,
                                   CanType formalSrcType,
                                   SILType loweredSrcType,
-                                  ArrayRef<ProtocolConformance*> conformances) {
+                                  ArrayRef<ProtocolConformanceRef> conformances) {
   assert(!destType.isClassExistentialType() &&
          "initializing a class existential container as opaque");
   auto &destTI = IGF.getTypeInfo(destType).as<OpaqueExistentialTypeInfo>();
@@ -1801,7 +1798,8 @@ Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
 
 
   // Next, write the protocol witness tables.
-  forEachProtocolWitnessTable(IGF, formalSrcType, destType.getSwiftRValueType(),
+  forEachProtocolWitnessTable(IGF, formalSrcType, &metadata,
+                              destType.getSwiftRValueType(),
                               destTI.getStoredProtocols(), conformances,
                               [&](unsigned i, llvm::Value *ptable) {
     Address ptableSlot = destLayout.projectWitnessTable(IGF, dest, i);
@@ -1819,7 +1817,7 @@ Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
 void irgen::emitExistentialMetatypeContainer(IRGenFunction &IGF,
                                Explosion &out, SILType outType,
                                llvm::Value *metatype, SILType metatypeType,
-                               ArrayRef<ProtocolConformance*> conformances) {
+                               ArrayRef<ProtocolConformanceRef> conformances) {
   assert(outType.is<ExistentialMetatypeType>());
   auto &destTI = IGF.getTypeInfo(outType).as<ExistentialMetatypeTypeInfo>();
   out.add(metatype);
@@ -1832,7 +1830,8 @@ void irgen::emitExistentialMetatypeContainer(IRGenFunction &IGF,
   }
 
   // Emit the witness table pointers.
-  forEachProtocolWitnessTable(IGF, srcType, destType,
+  llvm::Value *srcMetadata = nullptr;
+  forEachProtocolWitnessTable(IGF, srcType, &srcMetadata, destType,
                               destTI.getStoredProtocols(),
                               conformances,
                               [&](unsigned i, llvm::Value *ptable) {

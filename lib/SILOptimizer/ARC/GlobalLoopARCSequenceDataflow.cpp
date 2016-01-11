@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -171,7 +171,7 @@ void LoopARCSequenceDataflowEvaluator::mergeSuccessors(const LoopRegion *Region,
     }
 
     // Otherwise, we treat it as unknown control flow.
-    DEBUG(llvm::dbgs() << "        Cleaing state b/c of early exit\n");
+    DEBUG(llvm::dbgs() << "        Clearing state b/c of early exit\n");
     State.clear();
     break;
   }
@@ -188,9 +188,9 @@ void LoopARCSequenceDataflowEvaluator::mergeSuccessors(const LoopRegion *Region,
 /// pointer in a function that implies that the pointer is alive up to that
 /// point. We "freeze" (i.e. do not attempt to remove or move) such releases if
 /// FreezeOwnedArgEpilogueReleases is set. This is useful since in certain cases
-/// due to dataflow issues, we can not properly propagate the last use
+/// due to dataflow issues, we cannot properly propagate the last use
 /// information. Instead we run an extra iteration of the ARC optimizer with
-/// this enabled in a side table so the information gets propgated everywhere in
+/// this enabled in a side table so the information gets propagated everywhere in
 /// the CFG.
 bool LoopARCSequenceDataflowEvaluator::processLoopBottomUp(
     const LoopRegion *R, bool FreezeOwnedArgEpilogueReleases) {

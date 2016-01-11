@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -144,7 +144,7 @@ static void addDereferenceableAttributeToBuilder(IRGenModule &IGM,
                                                  const TypeInfo &ti) {
   // The addresses of empty values are undefined, so we can't safely mark them
   // dereferenceable.
-  if (ti.isKnownEmpty())
+  if (ti.isKnownEmpty(ResilienceExpansion::Maximal))
     return;
   
   // If we know the type to have a fixed nonempty size, then the pointer is
@@ -724,8 +724,8 @@ const TypeInfo *TypeConverter::convertBlockStorageType(SILBlockStorageType *T) {
     spareBits.extendWithSetBits(captureOffset.getValueInBits());
     size = captureOffset + fixedCapture->getFixedSize();
     spareBits.append(fixedCapture->getSpareBits());
-    pod = fixedCapture->isPOD(ResilienceScope::Component);
-    bt = fixedCapture->isBitwiseTakable(ResilienceScope::Component);
+    pod = fixedCapture->isPOD(ResilienceExpansion::Maximal);
+    bt = fixedCapture->isBitwiseTakable(ResilienceExpansion::Maximal);
   }
   
   llvm::Type *storageElts[] = {
@@ -1367,17 +1367,7 @@ void SignatureExpansion::expand(SILParameterInfo param) {
   case ParameterConvention::Direct_Owned:
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Guaranteed:
-    // Go ahead and further decompose tuples.
-    if (auto tuple = dyn_cast<TupleType>(param.getType())) {
-      for (auto elt : tuple.getElementTypes()) {
-        // Propagate the same ownedness down to the element.
-        expand(SILParameterInfo(elt, param.getConvention()));
-      }
-      return;
-    }
-    SWIFT_FALLTHROUGH;
   case ParameterConvention::Direct_Deallocating:
-
     switch (FnType->getLanguage()) {
     case SILFunctionLanguage::C: {
       llvm_unreachable("Unexpected C/ObjC method in parameter expansion!");
@@ -1830,7 +1820,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   return; \
 }
   // FIXME: We could generate the code to dynamically report the overflow if the
-  // thrid argument is true. Now, we just ignore it.
+  // third argument is true. Now, we just ignore it.
 
 #define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload) \
   if (Builtin.ID == BuiltinValueKind::id) \
@@ -3153,21 +3143,27 @@ void IRGenFunction::emitEpilogue() {
   AllocaIP->eraseFromParent();
 }
 
-Address irgen::allocateForCoercion(IRGenFunction &IGF,
-                                   llvm::Type *fromTy,
-                                   llvm::Type *toTy,
-                                   const llvm::Twine &basename) {
+std::pair<Address, Size>
+irgen::allocateForCoercion(IRGenFunction &IGF,
+                           llvm::Type *fromTy,
+                           llvm::Type *toTy,
+                           const llvm::Twine &basename) {
   auto &DL = IGF.IGM.DataLayout;
   
-  auto bufferTy = DL.getTypeSizeInBits(fromTy) >= DL.getTypeSizeInBits(toTy)
+  auto fromSize = DL.getTypeSizeInBits(fromTy);
+  auto toSize = DL.getTypeSizeInBits(toTy);
+  auto bufferTy = fromSize >= toSize
     ? fromTy
     : toTy;
 
   auto alignment = std::max(DL.getABITypeAlignment(fromTy),
                             DL.getABITypeAlignment(toTy));
 
-  return IGF.createAlloca(bufferTy, Alignment(alignment),
-                          basename + ".coerced");
+  auto buffer = IGF.createAlloca(bufferTy, Alignment(alignment),
+                                 basename + ".coerced");
+  
+  Size size(std::max(fromSize, toSize));
+  return {buffer, size};
 }
 
 llvm::Value* IRGenFunction::coerceValue(llvm::Value *value, llvm::Type *toTy,
@@ -3193,12 +3189,16 @@ llvm::Value* IRGenFunction::coerceValue(llvm::Value *value, llvm::Type *toTy,
   }
 
   // Otherwise we need to store, bitcast, and load.
-  auto address = allocateForCoercion(*this, fromTy, toTy,
-                                     value->getName() + ".coercion");
+  Address address; Size size;
+  std::tie(address, size) = allocateForCoercion(*this, fromTy, toTy,
+                                                value->getName() + ".coercion");
+  Builder.CreateLifetimeStart(address, size);
   auto orig = Builder.CreateBitCast(address, fromTy->getPointerTo());
   Builder.CreateStore(value, orig);
   auto coerced = Builder.CreateBitCast(address, toTy->getPointerTo());
-  return Builder.CreateLoad(coerced);
+  auto loaded = Builder.CreateLoad(coerced);
+  Builder.CreateLifetimeEnd(address, size);
+  return loaded;
 }
 
 void IRGenFunction::emitScalarReturn(llvm::Type *resultType,
@@ -3553,7 +3553,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       case ParameterConvention::Direct_Unowned:
         // If the type is nontrivial, keep the context alive since the field
         // depends on the context to not be deallocated.
-        if (!fieldTI.isPOD(ResilienceScope::Component))
+        if (!fieldTI.isPOD(ResilienceExpansion::Maximal))
           dependsOnContextLifetime = true;
         SWIFT_FALLTHROUGH;
       case ParameterConvention::Direct_Deallocating:
@@ -3797,7 +3797,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
       continue;
     }
       
-    if (ti.isSingleSwiftRetainablePointer(ResilienceScope::Component)) {
+    if (ti.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
       hasSingleSwiftRefcountedContext = Yes;
       singleRefcountedConvention = param.getConvention();
     } else {
@@ -4071,7 +4071,7 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   uint32_t flags = 0;
   auto &captureTL
     = IGF.getTypeInfoForLowered(blockTy->getCaptureType());
-  bool isPOD = captureTL.isPOD(ResilienceScope::Component);
+  bool isPOD = captureTL.isPOD(ResilienceExpansion::Maximal);
   if (!isPOD)
     flags |= 1 << 25;
   

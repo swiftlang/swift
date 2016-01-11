@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -270,8 +270,53 @@ getActualDefaultArgKind(uint8_t raw) {
     return swift::DefaultArgumentKind::Function;
   case serialization::DefaultArgumentKind::DSOHandle:
     return swift::DefaultArgumentKind::DSOHandle;
+  case serialization::DefaultArgumentKind::Nil:
+    return swift::DefaultArgumentKind::Nil;
+  case serialization::DefaultArgumentKind::EmptyArray:
+    return swift::DefaultArgumentKind::EmptyArray;
+  case serialization::DefaultArgumentKind::EmptyDictionary:
+    return swift::DefaultArgumentKind::EmptyDictionary;
   }
   return None;
+}
+
+ParameterList *ModuleFile::readParameterList() {
+  using namespace decls_block;
+
+  SmallVector<uint64_t, 8> scratch;
+  auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+  unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch);
+  assert(recordID == PARAMETERLIST);
+  (void) recordID;
+  unsigned numParams;
+  decls_block::ParameterListLayout::readRecord(scratch, numParams);
+
+  SmallVector<ParamDecl*, 8> params;
+  for (unsigned i = 0; i != numParams; ++i) {
+    scratch.clear();
+    auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+    unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch);
+    assert(recordID == PARAMETERLIST_ELT);
+    (void) recordID;
+    
+    DeclID paramID;
+    bool isVariadic;
+    uint8_t rawDefaultArg;
+    decls_block::ParameterListEltLayout::readRecord(scratch, paramID,
+                                                    isVariadic, rawDefaultArg);
+    
+
+    auto decl = cast<ParamDecl>(getDecl(paramID));
+    decl->setVariadic(isVariadic);
+
+    // Decode the default argument kind.
+    // FIXME: Default argument expression, if available.
+    if (auto defaultArg = getActualDefaultArgKind(rawDefaultArg))
+      decl->setDefaultArgumentKind(*defaultArg);
+    params.push_back(decl);
+  }
+  
+  return ParameterList::create(getContext(), params);
 }
 
 Pattern *ModuleFile::maybeReadPattern() {
@@ -319,25 +364,12 @@ Pattern *ModuleFile::maybeReadPattern() {
 
       // FIXME: Add something for this record or remove it.
       IdentifierID labelID;
-      uint8_t rawDefaultArg;
-      bool hasEllipsis;
-      TuplePatternEltLayout::readRecord(scratch, labelID, hasEllipsis,
-                                        rawDefaultArg);
+      TuplePatternEltLayout::readRecord(scratch, labelID);
       Identifier label = getIdentifier(labelID);
 
       Pattern *subPattern = maybeReadPattern();
       assert(subPattern);
-
-      // Decode the default argument kind.
-      // FIXME: Default argument expression, if available.
-      swift::DefaultArgumentKind defaultArgKind
-        = swift::DefaultArgumentKind::None;
-      if (auto defaultArg = getActualDefaultArgKind(rawDefaultArg))
-        defaultArgKind = *defaultArg;
-
-      elements.push_back(TuplePatternElt(label, SourceLoc(), subPattern,
-                                         hasEllipsis, SourceLoc(),
-                                         nullptr, defaultArgKind));
+      elements.push_back(TuplePatternElt(label, SourceLoc(), subPattern));
     }
 
     auto result = TuplePattern::create(getContext(), SourceLoc(),
@@ -401,7 +433,7 @@ Pattern *ModuleFile::maybeReadPattern() {
   }
 }
 
-ProtocolConformance *ModuleFile::readConformance(llvm::BitstreamCursor &Cursor){
+ProtocolConformanceRef ModuleFile::readConformance(llvm::BitstreamCursor &Cursor){
   using namespace decls_block;
 
   SmallVector<uint64_t, 16> scratch;
@@ -411,9 +443,11 @@ ProtocolConformance *ModuleFile::readConformance(llvm::BitstreamCursor &Cursor){
 
   unsigned kind = Cursor.readRecord(next.ID, scratch);
   switch (kind) {
-  case NO_CONFORMANCE: {
-    // Nothing to read.
-    return nullptr;
+  case ABSTRACT_PROTOCOL_CONFORMANCE: {
+    DeclID protoID;
+    AbstractProtocolConformanceLayout::readRecord(scratch, protoID);
+    auto proto = cast<ProtocolDecl>(getDecl(protoID));
+    return ProtocolConformanceRef(proto);
   }
 
   case SPECIALIZED_PROTOCOL_CONFORMANCE: {
@@ -433,11 +467,14 @@ ProtocolConformance *ModuleFile::readConformance(llvm::BitstreamCursor &Cursor){
       substitutions.push_back(*sub);
     }
 
-    ProtocolConformance *genericConformance = readConformance(Cursor);
+    ProtocolConformanceRef genericConformance = readConformance(Cursor);
 
-    assert(genericConformance && "Missing generic conformance?");
-    return ctx.getSpecializedConformance(conformingType, genericConformance,
+    assert(genericConformance.isConcrete() && "Abstract generic conformance?");
+    auto conformance =
+           ctx.getSpecializedConformance(conformingType,
+                                         genericConformance.getConcrete(),
                                          ctx.AllocateCopy(substitutions));
+    return ProtocolConformanceRef(conformance);
   }
 
   case INHERITED_PROTOCOL_CONFORMANCE: {
@@ -447,16 +484,20 @@ ProtocolConformance *ModuleFile::readConformance(llvm::BitstreamCursor &Cursor){
     ASTContext &ctx = getContext();
     Type conformingType = getType(conformingTypeID);
 
-    ProtocolConformance *inheritedConformance = readConformance(Cursor);
+    ProtocolConformanceRef inheritedConformance = readConformance(Cursor);
 
-    assert(inheritedConformance && "Missing generic conformance?");
-    return ctx.getInheritedConformance(conformingType, inheritedConformance);
+    assert(inheritedConformance.isConcrete() &&
+           "Abstract inherited conformance?");
+    auto conformance =
+      ctx.getInheritedConformance(conformingType,
+                                  inheritedConformance.getConcrete());
+    return ProtocolConformanceRef(conformance);
   }
 
   case NORMAL_PROTOCOL_CONFORMANCE_ID: {
     NormalConformanceID conformanceID;
     NormalProtocolConformanceIdLayout::readRecord(scratch, conformanceID);
-    return readNormalConformance(conformanceID);
+    return ProtocolConformanceRef(readNormalConformance(conformanceID));
   }
 
   case PROTOCOL_CONFORMANCE_XREF: {
@@ -474,13 +515,14 @@ ProtocolConformance *ModuleFile::readConformance(llvm::BitstreamCursor &Cursor){
     nominal->lookupConformance(module, proto,
                                conformances);
     assert(!conformances.empty() && "Could not find conformance");
-    return conformances.front();
+    return ProtocolConformanceRef(conformances.front());
   }
 
   // Not a protocol conformance.
   default:
     error();
-    return nullptr;
+    ProtocolConformance *conformance = nullptr;
+    return ProtocolConformanceRef(conformance); // FIXME: this will assert
   }
 }
 
@@ -539,8 +581,9 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   // Read inherited conformances.
   InheritedConformanceMap inheritedConformances;
   while (inheritedCount--) {
-    auto inherited = readConformance(DeclTypeCursor);
-    assert(inherited);
+    auto inheritedRef = readConformance(DeclTypeCursor);
+    assert(inheritedRef.isConcrete());
+    auto inherited = inheritedRef.getConcrete();
     inheritedConformances[inherited->getProtocol()] = inherited;
   }
 
@@ -572,23 +615,21 @@ ModuleFile::maybeReadSubstitution(llvm::BitstreamCursor &cursor) {
   if (recordID != decls_block::BOUND_GENERIC_SUBSTITUTION)
     return None;
 
-  TypeID archetypeID, replacementID;
+  TypeID replacementID;
   unsigned numConformances;
   decls_block::BoundGenericSubstitutionLayout::readRecord(scratch,
-                                                          archetypeID,
                                                           replacementID,
                                                           numConformances);
 
-  auto archetypeTy = getType(archetypeID)->castTo<ArchetypeType>();
   auto replacementTy = getType(replacementID);
 
-  SmallVector<ProtocolConformance *, 4> conformanceBuf;
+  SmallVector<ProtocolConformanceRef, 4> conformanceBuf;
   while (numConformances--) {
     conformanceBuf.push_back(readConformance(cursor));
   }
 
   lastRecordOffset.reset();
-  return Substitution{archetypeTy, replacementTy,
+  return Substitution{replacementTy,
                       getContext().AllocateCopy(conformanceBuf)};
 }
 
@@ -1436,6 +1477,8 @@ DeclContext *ModuleFile::getDeclContext(DeclContextID DCID) {
     declContextOrOffset = ED;
   } else if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
     declContextOrOffset = AFD;
+  } else if (auto SD = dyn_cast<SubscriptDecl>(D)) {
+    declContextOrOffset = SD;
   } else {
     llvm_unreachable("Unknown Decl : DeclContext kind");
   }
@@ -2244,10 +2287,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       return nullptr;
     }
 
-    Pattern *bodyParams0 = maybeReadPattern();
-    Pattern *bodyParams1 = maybeReadPattern();
-    assert(bodyParams0&&bodyParams1 && "missing body patterns for constructor");
-    ctor->setBodyParams(bodyParams0, bodyParams1);
+    auto *bodyParams0 = readParameterList();
+    bodyParams0->get(0)->setImplicit();  // self is implicit.
+    
+    auto *bodyParams1 = readParameterList();
+    assert(bodyParams0 && bodyParams1 && "missing parameters for constructor");
+    ctor->setParameterLists(bodyParams0->get(0), bodyParams1);
 
     // This must be set after recording the constructor in the map.
     // A polymorphic constructor type needs to refer to the constructor to get
@@ -2504,16 +2549,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       fn->setInterfaceType(interfaceType);
     }
 
-    SmallVector<Pattern *, 16> patternBuf;
-    while (Pattern *pattern = maybeReadPattern())
-      patternBuf.push_back(pattern);
+    SmallVector<ParameterList*, 2> paramLists;
+    for (unsigned i = 0, e = numParamPatterns; i != e; ++i)
+      paramLists.push_back(readParameterList());
 
-    assert(!patternBuf.empty());
-    assert((patternBuf.size() == numParamPatterns) &&
-           "incorrect number of parameters");
-
-    ArrayRef<Pattern *> patterns(patternBuf);
-    fn->setDeserializedSignature(patterns,
+    // If the first parameter list is (self), mark it implicit.
+    if (numParamPatterns && DC->isTypeContext())
+      paramLists[0]->get(0)->setImplicit();
+    
+    fn->setDeserializedSignature(paramLists,
                                  TypeLoc::withoutLoc(signature->getResult()));
 
     if (auto errorConvention = maybeReadForeignErrorConvention())
@@ -2929,23 +2973,19 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    Pattern *indices = maybeReadPattern();
-    assert(indices);
-
-    auto elemTy = TypeLoc::withoutLoc(getType(elemTypeID));
-    if (declOrOffset.isComplete())
-      return declOrOffset;
-
     // Resolve the name ids.
     SmallVector<Identifier, 2> argNames;
     for (auto argNameID : argNameIDs)
       argNames.push_back(getIdentifier(argNameID));
 
     DeclName name(ctx, ctx.Id_subscript, argNames);
-    auto subscript = createDecl<SubscriptDecl>(name, SourceLoc(), indices,
-                                               SourceLoc(), elemTy, DC);
+    auto subscript = createDecl<SubscriptDecl>(name, SourceLoc(), nullptr,
+                                               SourceLoc(), TypeLoc(), DC);
     declOrOffset = subscript;
 
+    subscript->setIndices(readParameterList());
+    subscript->getElementTypeLoc() = TypeLoc::withoutLoc(getType(elemTypeID));
+    
     configureStorage(subscript, rawStorageKind,
                      getterID, setterID, materializeForSetID,
                      addressorID, mutableAddressorID, willSetID, didSetID);
@@ -3070,9 +3110,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     declOrOffset = dtor;
 
     dtor->setAccessibility(cast<ClassDecl>(DC)->getFormalAccess());
-    Pattern *selfParams = maybeReadPattern();
+    auto *selfParams = readParameterList();
+    selfParams->get(0)->setImplicit();  // self is implicit.
+
     assert(selfParams && "Didn't get self pattern?");
-    dtor->setSelfPattern(selfParams);
+    dtor->setSelfDecl(selfParams->get(0));
 
     dtor->setType(getType(signatureID));
     dtor->setInterfaceType(getType(interfaceID));
@@ -3914,9 +3956,7 @@ Type ModuleFile::getType(TypeID TID) {
   return typeOrOffset;
 }
 
-void ModuleFile::loadAllMembers(Decl *D,
-                                uint64_t contextData,
-                                bool *) {
+void ModuleFile::loadAllMembers(Decl *D, uint64_t contextData) {
   PrettyStackTraceDecl trace("loading members for", D);
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
@@ -3938,7 +3978,7 @@ void ModuleFile::loadAllMembers(Decl *D,
 
 void
 ModuleFile::loadAllConformances(const Decl *D, uint64_t contextData,
-                         SmallVectorImpl<ProtocolConformance *> &conformances) {
+                          SmallVectorImpl<ProtocolConformance*> &conformances) {
   PrettyStackTraceDecl trace("loading conformances for", D);
 
   uint64_t numConformances;
@@ -3949,8 +3989,11 @@ ModuleFile::loadAllConformances(const Decl *D, uint64_t contextData,
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   DeclTypeCursor.JumpToBit(bitPosition);
 
-  while (numConformances--)
-    conformances.push_back(readConformance(DeclTypeCursor));
+  while (numConformances--) {
+    auto conf = readConformance(DeclTypeCursor);
+    if (conf.isConcrete())
+      conformances.push_back(conf.getConcrete());
+  }
 }
 
 TypeLoc
@@ -3998,23 +4041,8 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     auto second = cast_or_null<ValueDecl>(getDecl(*rawIDIter++));
     assert(second || first->getAttrs().hasAttribute<OptionalAttr>() ||
            first->getAttrs().isUnavailable(ctx));
-
-    unsigned substitutionCount = *rawIDIter++;
-
-    SmallVector<Substitution, 8> substitutions;
-    while (substitutionCount--) {
-      auto sub = maybeReadSubstitution(DeclTypeCursor);
-      assert(sub.hasValue());
-      substitutions.push_back(sub.getValue());
-    }
-
-    ConcreteDeclRef witness;
-    if (substitutions.empty())
-      witness = ConcreteDeclRef(second);
-    else
-      witness = ConcreteDeclRef(ctx, second, substitutions);
-
-    witnesses.insert(std::make_pair(first, witness));
+    (void) ctx;
+    witnesses.insert(std::make_pair(first, second));
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 

@@ -64,5 +64,5 @@ func uncurry (a: Int64) (b: Int64) -> (Int64, Int64) {
 // CHECK: !DILocalVariable(name: "x", arg: 1,{{.*}} line: [[@LINE+2]]
 // CHECK: !DILocalVariable(name: "y", arg: 2,{{.*}} line: [[@LINE+1]]
 func tuple(x: Int64, y: (Int64, Float, String)) -> Int64 {
-  return x+y.0;
+  return x+y.0
 }

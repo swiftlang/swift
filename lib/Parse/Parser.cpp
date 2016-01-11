@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Timer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
@@ -136,6 +137,7 @@ bool swift::parseIntoSourceFile(SourceFile &SF,
                                 SILParserState *SIL,
                                 PersistentParserState *PersistentState,
                                 DelayedParsingCallbacks *DelayedParseCB) {
+  SharedTimer timer("Parsing");
   Parser P(BufferID, SF, SIL, PersistentState);
   PrettyStackTraceParser StackTrace(P);
 
@@ -153,6 +155,7 @@ bool swift::parseIntoSourceFile(SourceFile &SF,
 void swift::performDelayedParsing(
     DeclContext *DC, PersistentParserState &PersistentState,
     CodeCompletionCallbacksFactory *CodeCompletionFactory) {
+  SharedTimer timer("Parsing");
   ParseDelayedFunctionBodies Walker(PersistentState,
                                     CodeCompletionFactory);
   DC->walkContext(Walker);
@@ -397,13 +400,18 @@ void Parser::skipUntilAnyOperator() {
     skipSingle();
 }
 
-void Parser::skipUntilGreaterInTypeList(bool protocolComposition) {
+/// \brief Skip until a token that starts with '>', and consume it if found.
+/// Applies heuristics that are suitable when trying to find the end of a list
+/// of generic parameters, generic arguments, or list of types in a protocol
+/// composition.
+SourceLoc Parser::skipUntilGreaterInTypeList(bool protocolComposition) {
+  SourceLoc lastLoc = Tok.getLoc();
   while (true) {
     switch (Tok.getKind()) {
     case tok::eof:
     case tok::l_brace:
     case tok::r_brace:
-      return;
+      return lastLoc;
 
 #define KEYWORD(X) case tok::kw_##X:
 #include "swift/Parse/Tokens.def"
@@ -411,7 +419,7 @@ void Parser::skipUntilGreaterInTypeList(bool protocolComposition) {
     if (Tok.is(tok::kw_Self))
       break;
     if (isStartOfStmt() || isStartOfDecl())
-      return;
+      return lastLoc;
     break;
 
     case tok::l_paren:
@@ -421,14 +429,16 @@ void Parser::skipUntilGreaterInTypeList(bool protocolComposition) {
       // In generic type parameter list, skip '[' ']' '(' ')', because they
       // can appear in types.
       if (protocolComposition)
-        return;
+        return lastLoc;
       break;
 
     default:
       if (Tok.isAnyOperator() && startsWithGreater(Tok))
-        return;
+        return consumeStartingGreater();
+      
       break;
     }
+    lastLoc = Tok.getLoc();
     skipSingle();
   }
 }
@@ -612,7 +622,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     // If the lexer stopped with an EOF token whose spelling is ")", then this
     // is actually the tuple that is a string literal interpolation context.
     // Just accept the ")" and build the tuple as we usually do.
-    if (Tok.is(tok::eof) && Tok.getText() == ")") {
+    if (Tok.is(tok::eof) && Tok.getText() == ")" && RightK == tok::r_paren) {
       RightLoc = Tok.getLoc();
       return Status;
     }
@@ -623,11 +633,21 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
         continue;
     }
     if (!OptionalSep) {
+      // If we're in a comma-separated list and the next token starts a new
+      // declaration at the beginning of a new line, skip until the end.
+      if (SeparatorK == tok::comma && Tok.isAtStartOfLine() &&
+          isStartOfDecl() && Tok.getLoc() != StartLoc) {
+        skipUntilDeclRBrace(RightK, SeparatorK);
+        break;
+      }
+
       StringRef Separator = (SeparatorK == tok::comma ? "," : ";");
       diagnose(Tok, diag::expected_separator, Separator)
         .fixItInsertAfter(PreviousLoc, Separator);
       Status.setIsParseError();
     }
+
+
     // If we haven't made progress, skip ahead
     if (Tok.getLoc() == StartLoc) {
       skipUntilDeclRBrace(RightK, SeparatorK);

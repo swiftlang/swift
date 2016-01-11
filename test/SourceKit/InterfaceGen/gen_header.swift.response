@@ -160,7 +160,7 @@ public protocol SameNameProtocol {
         key.kind: source.lang.swift.decl.var.parameter,
         key.name: "arg",
         key.offset: 30,
-        key.length: 3,
+        key.length: 10,
         key.typename: "Int32",
         key.nameoffset: 0,
         key.namelength: 0
@@ -192,7 +192,7 @@ public protocol SameNameProtocol {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "arg",
             key.offset: 90,
-            key.length: 3,
+            key.length: 10,
             key.typename: "Int32",
             key.nameoffset: 0,
             key.namelength: 0

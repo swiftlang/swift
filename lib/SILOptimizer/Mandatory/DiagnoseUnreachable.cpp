@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -60,13 +60,13 @@ struct UnreachableInfo {
 /// removal stage of the path.
 ///
 /// To report unreachable user code, we detect the blocks that contain user
-/// code and are not reachable (along any of the preceeding paths). Note that we
+/// code and are not reachable (along any of the preceding paths). Note that we
 /// only want to report the first statement on the unreachable path. Keeping
 /// the info about which branch folding had produced the unreachable block makes
 /// it possible.
 class UnreachableUserCodeReportingState {
 public:
-  /// \brief The set of top-level blocks that became immediately unreachbale due
+  /// \brief The set of top-level blocks that became immediately unreachable due
   /// to conditional branch folding, etc.
   ///
   /// This is a SetVector since several blocks may lead to the same error
@@ -78,7 +78,7 @@ public:
   ///
   /// Note, this set is different from the PossiblyUnreachableBlocks as these
   /// are the blocks that do contain user code and they might not be immediate
-  /// sucessors of a folded branch.
+  /// successors of a folded branch.
   llvm::SmallPtrSet<const SILBasicBlock*, 2> BlocksWithErrors;
 
   /// A map from the PossiblyUnreachableBlocks to the folded conditional
@@ -146,7 +146,7 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
 
   // If we've reached this point, the optimization is valid, so optimize.
   // We know that the incoming arguments from all predecessors are the same,
-  // so just use them directly and remove the basic block paramters.
+  // so just use them directly and remove the basic block parameters.
 
   // Drop the arguments from the branch instructions by creating a new branch
   // instruction and deleting the old one.
@@ -200,7 +200,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
       SILBuilderWithScope B(&BB, CBI);
 
       // Determine which of the successors is unreachable and create a new
-      // terminator that only branches to the reachable sucessor.
+      // terminator that only branches to the reachable successor.
       SILBasicBlock *UnreachableBlock = nullptr;
       bool CondIsTrue = false;
       if (ConstCond->getValue() == APInt(1, /*value*/ 0, false)) {
@@ -267,8 +267,8 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
           }
         }
 
-      // Not fully covered switches will be diagnosed later. SILGen represnets
-      // them with a Default basic block with an unrechable instruction.
+      // Not fully covered switches will be diagnosed later. SILGen represents
+      // them with a Default basic block with an unreachable instruction.
       // We are going to produce an error on all unreachable instructions not
       // eliminated by DCE.
       if (!TheSuccessorBlock)
@@ -636,7 +636,7 @@ static bool diagnoseUnreachableBlock(const SILBasicBlock &B,
     return false;
 
   // If we have not found user code in this block, inspect it's successors.
-  // Check if at least one of the sucessors contains user code.
+  // Check if at least one of the successors contains user code.
   for (auto I = B.succ_begin(), E = B.succ_end(); I != E; ++I) {
     SILBasicBlock *SB = *I;
     bool HasReachablePred = false;
@@ -645,7 +645,7 @@ static bool diagnoseUnreachableBlock(const SILBasicBlock &B,
         HasReachablePred = true;
     }
 
-    // If all of the predecessors of this sucessor are unreachable, check if
+    // If all of the predecessors of this successor are unreachable, check if
     // it contains user code.
     if (!HasReachablePred && diagnoseUnreachableBlock(*SB, M, Reachable,
                                                     State, TopLevelB, Visited))

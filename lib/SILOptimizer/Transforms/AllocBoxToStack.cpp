@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -413,15 +413,15 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
 
   // Replace all uses of the address of the box's contained value with
   // the address of the stack location.
-  ABI->getAddressResult().replaceAllUsesWith(ASI->getAddressResult());
+  ABI->getAddressResult().replaceAllUsesWith(ASI);
 
   // Check to see if the alloc_box was used by a mark_uninitialized instruction.
   // If so, any uses of the pointer result need to keep using the MUI, not the
   // alloc_stack directly.  If we don't do this, DI will miss the uses.
-  SILValue PointerResult = ASI->getAddressResult();
-  for (auto UI : ASI->getAddressResult().getUses())
+  SILValue PointerResult = ASI;
+  for (auto UI : ASI->getUses())
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(UI->getUser())) {
-      assert(ASI->getAddressResult().hasOneUse() &&
+      assert(ASI->hasOneUse() &&
              "alloc_stack used by mark_uninitialized, but not exclusively!");
       PointerResult = MUI;
       break;
@@ -444,7 +444,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
 
   for (auto Return : Returns) {
     SILBuilderWithScope BuildDealloc(Return);
-    BuildDealloc.createDeallocStack(Loc, ASI->getContainerResult());
+    BuildDealloc.createDeallocStack(Loc, ASI);
   }
 
   // Remove any retain and release instructions.  Since all uses of result #1
@@ -505,16 +505,15 @@ PromotedParamCloner::PromotedParamCloner(SILFunction *Orig,
   assert(Orig->getDebugScope()->SILFn != getCloned()->getDebugScope()->SILFn);
 }
 
-static void getClonedName(SILFunction *F,
-                          ParamIndexList &PromotedParamIndices,
-                          llvm::SmallString<64> &Name) {
-  llvm::raw_svector_ostream buffer(Name);
-  Mangle::Mangler M(buffer);
-  auto P = Mangle::SpecializationPass::AllocBoxToStack;
-  Mangle::FunctionSignatureSpecializationMangler FSSM(P, M, F);
+static std::string getClonedName(SILFunction *F,
+                                 ParamIndexList &PromotedParamIndices) {
+  Mangle::Mangler M;
+  auto P = SpecializationPass::AllocBoxToStack;
+  FunctionSignatureSpecializationMangler FSSM(P, M, F);
   for (unsigned i : PromotedParamIndices)
     FSSM.setArgumentBoxToStack(i);
   FSSM.mangle();
+  return M.finalize();
 }
 
 /// \brief Create the function corresponding to the clone of the
@@ -566,7 +565,9 @@ PromotedParamCloner::initCloned(SILFunction *Orig,
       Orig->getLocation(), Orig->isBare(), IsNotTransparent, Orig->isFragile(),
       Orig->isThunk(), Orig->getClassVisibility(), Orig->getInlineStrategy(),
       Orig->getEffectsKind(), Orig, Orig->getDebugScope());
-  Fn->setSemanticsAttr(Orig->getSemanticsAttr());
+  for (auto &Attr : Orig->getSemanticsAttrs()) {
+    Fn->addSemanticsAttr(Attr);
+  }
   Fn->setDeclCtx(Orig->getDeclContext());
   return Fn;
 }
@@ -683,8 +684,7 @@ LifetimeTracker::EndpointRange LifetimeTracker::getEndpoints() {
     if (TheValue->hasOneUse()) {
       Lifetime = ValueLifetime();
       Lifetime->LastUsers.insert(TheValue->use_begin().getUser());
-    }
-    else {
+    } else {
       ValueLifetimeAnalysis VLA(TheValue);
       Lifetime = VLA.computeFromDirectUses();
     }
@@ -703,8 +703,7 @@ specializePartialApply(PartialApplyInst *PartialApply,
   auto *F = FRI->getReferencedFunction();
   assert(F && "Expected a referenced function!");
 
-  llvm::SmallString<64> ClonedName;
-  getClonedName(F, PromotedParamIndices, ClonedName);
+  std::string ClonedName = getClonedName(F, PromotedParamIndices);
 
   auto &M = PartialApply->getModule();
 

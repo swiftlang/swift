@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -22,7 +22,7 @@
 ///
 /// > `a` **subsumes** `b` iff `([a] as Self).isSupersetOf([b])`
 ///
-/// In many models of `SetAlgebraType` such as `Set<T>`, `a`
+/// In many models of `SetAlgebraType` such as `Set<Element>`, `a`
 /// *subsumes* `b` if and only if `a == b`, but that is not always the
 /// case.  For example, option sets typically do not satisfy that
 /// property.

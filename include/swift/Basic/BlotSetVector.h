@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -99,7 +99,7 @@ public:
   /// V1.
   void replace(const ValueT &V1, const ValueT &V2) {
     auto Iter1 = Map.find(V1);
-    assert(Iter1 != Map.end() && "Can not replace value that is not in set");
+    assert(Iter1 != Map.end() && "Cannot replace value that is not in set");
     unsigned V1Index = Iter1->second;
     Map.erase(V1);
 

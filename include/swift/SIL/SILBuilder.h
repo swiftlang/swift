@@ -1,8 +1,8 @@
-//===--- SILBuilder.h - Class for creating SIL Constructs --------*- C++ -*-==//
+//===--- SILBuilder.h - Class for creating SIL Constructs -------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -261,7 +261,7 @@ public:
   AllocExistentialBoxInst *
   createAllocExistentialBox(SILLocation Loc, SILType ExistentialType,
                             CanType ConcreteType, SILType ConcreteLoweredType,
-                            ArrayRef<ProtocolConformance *> Conformances) {
+                            ArrayRef<ProtocolConformanceRef> Conformances) {
     return insert(AllocExistentialBoxInst::create(
         createSILDebugLocation(Loc), ExistentialType, ConcreteType,
         ConcreteLoweredType, Conformances, &F));
@@ -358,6 +358,10 @@ public:
   FunctionRefInst *createFunctionRef(SILLocation Loc, SILFunction *f) {
     return insert(new (F.getModule())
                       FunctionRefInst(createSILDebugLocation(Loc), f));
+  }
+  AllocGlobalInst *createAllocGlobal(SILLocation Loc, SILGlobalVariable *g) {
+    return insert(new (F.getModule())
+                      AllocGlobalInst(createSILDebugLocation(Loc), g));
   }
   GlobalAddrInst *createGlobalAddr(SILLocation Loc, SILGlobalVariable *g) {
     return insert(new (F.getModule())
@@ -873,7 +877,7 @@ public:
   }
 
   WitnessMethodInst *createWitnessMethod(SILLocation Loc, CanType LookupTy,
-                                         ProtocolConformance *Conformance,
+                                         ProtocolConformanceRef Conformance,
                                          SILDeclRef Member, SILType MethodTy,
                                          SILValue OptionalOpenedExistential,
                                          bool Volatile = false) {
@@ -918,7 +922,7 @@ public:
   createInitExistentialAddr(SILLocation Loc, SILValue Existential,
                             CanType FormalConcreteType,
                             SILType LoweredConcreteType,
-                            ArrayRef<ProtocolConformance *> Conformances) {
+                            ArrayRef<ProtocolConformanceRef> Conformances) {
     return insert(InitExistentialAddrInst::create(
         createSILDebugLocation(Loc), Existential, FormalConcreteType,
         LoweredConcreteType, Conformances, &F));
@@ -927,7 +931,7 @@ public:
   InitExistentialMetatypeInst *
   createInitExistentialMetatype(SILLocation Loc, SILValue metatype,
                                 SILType existentialType,
-                                ArrayRef<ProtocolConformance *> conformances) {
+                                ArrayRef<ProtocolConformanceRef> conformances) {
     return insert(InitExistentialMetatypeInst::create(
         createSILDebugLocation(Loc), existentialType, metatype, conformances,
         &F));
@@ -936,7 +940,7 @@ public:
   InitExistentialRefInst *
   createInitExistentialRef(SILLocation Loc, SILType ExistentialType,
                            CanType FormalConcreteType, SILValue Concrete,
-                           ArrayRef<ProtocolConformance *> Conformances) {
+                           ArrayRef<ProtocolConformanceRef> Conformances) {
     return insert(InitExistentialRefInst::create(
         createSILDebugLocation(Loc), ExistentialType, FormalConcreteType,
         Concrete, Conformances, &F));

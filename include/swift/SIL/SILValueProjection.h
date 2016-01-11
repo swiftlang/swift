@@ -1,8 +1,8 @@
-//===------------------------ SILValueProjection.h ---------------------- -===//
+//===--- SILValueProjection.h ---------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -29,6 +29,7 @@
 
 #include "swift/SIL/Projection.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/TypeExpansionAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SILOptimizer/Utils/Local.h"
@@ -127,7 +128,7 @@ public:
     return Path.getValue().hasNonEmptySymmetricDifference(P);
   }
 
-  /// Substract the given path from the ProjectionPath.
+  /// Subtract the given path from the ProjectionPath.
   void subtractPaths(Optional<ProjectionPath> &P) {
     if (!P.hasValue())
       return;
@@ -225,11 +226,11 @@ using ValueTableMap = llvm::SmallMapVector<unsigned, unsigned, 8>;
 ///   %0 = alloc_stack $A  // var x                   // users: %4, %7
 ///   %5 = integer_literal $Builtin.Int64, 19         // user: %6
 ///   %6 = struct $Int (%5 : $Builtin.Int64)          // user: %8
-///   %7 = struct_element_addr %0#1 : $*A, #A.a       // user: %8
+///   %7 = struct_element_addr %0 : $*A, #A.a         // user: %8
 ///   store %6 to %7 : $*Int                          // id: %8
 ///   %9 = integer_literal $Builtin.Int64, 20         // user: %10
 ///   %10 = struct $Int (%9 : $Builtin.Int64)         // user: %12
-///   %11 = struct_element_addr %0#1 : $*A, #A.b      // user: %12
+///   %11 = struct_element_addr %0 : $*A, #A.b        // user: %12
 ///   store %10 to %11 : $*Int                        // id: %12
 /// }
 ///
@@ -242,7 +243,7 @@ using ValueTableMap = llvm::SmallMapVector<unsigned, unsigned, 8>;
 ///   %1 = function_ref @a.A.init : $@convention(thin) (@thin A.Type) -> A
 ///   %2 = metatype $@thin A.Type                     // user: %3
 ///   %3 = apply %1(%2) : $@convention(thin) (@thin A.Type) -> A // user: %4
-///   store %3 to %0#1 : $*A                          // id: %4
+///   store %3 to %0 : $*A                            // id: %4
 /// }
 ///
 /// NOTE: LSValue can take 2 forms.
@@ -363,29 +364,18 @@ public:
   /// location holds. This may involve extracting and aggregating available
   /// values.
   ///
-  /// NOTE: reduce assumes that every component of the location has an concrete
+  /// NOTE: reduce assumes that every component of the location has a concrete
   /// (i.e. not coverings set) available value in LocAndVal.
   ///
   /// TODO: we do not really need the llvm::DenseMap<LSLocation, LSValue> here
   /// we only need a map between the projection tree of a SILType and the value
   /// each leaf node takes. This will be implemented once ProjectionPath memory
   /// cost is reduced and made copyable (its copy constructor is deleted at the
-  /// momemt). 
+  /// moment).
   static SILValue reduce(LSLocation &Base, SILModule *Mod,
                          LSLocationValueMap &LocAndVal,
                          SILInstruction *InsertPt,
                          TypeExpansionAnalysis *TE);
-
-  /// Enumerate the given LSValue.
-  static void enumerateLSValue(SILModule *M, SILValue Val,
-                               std::vector<LSValue> &Vault,
-                               LSValueIndexMap &ValToBit,
-                               TypeExpansionAnalysis *TE);
-
-  /// Enumerate all the LSValues in the function.
-  static void enumerateLSValues(SILFunction &F, std::vector<LSValue> &Vault,
-                                LSValueIndexMap &ValToBit,
-                                TypeExpansionAnalysis *TE);
 };
 
 static inline llvm::hash_code hash_value(const LSValue &V) {
@@ -462,7 +452,7 @@ public:
 
   /// Returns the type of the object the LSLocation represents.
   SILType getType() const {
-    // Base might be a address type, e.g. from alloc_stack of struct,
+    // Base might be an address type, e.g. from alloc_stack of struct,
     // enum or tuples.
     if (Path.getValue().empty())
       return Base.getType().getObjectType();
@@ -477,23 +467,14 @@ public:
   /// projection.
   void getFirstLevelLSLocations(LSLocationList &Locs, SILModule *Mod);
 
-  /// Returns true if the LSLocation is local to this function, i.e.
-  /// does not escape.
-  ///
-  /// TODO: we should look at the projection path as well. i.e. one field
-  /// might escape but the object itself does not.
-  ///
-  bool isNonEscapingLocalLSLocation() {
-    assert(isValid() && "Invalid memory location");
-    // TODO: this does not have to be limited to allocstack.
-    return isa<AllocStackInst>(Base) && isNonEscapingLocalObject(Base);
-  }
-
   /// Check whether the 2 LSLocations may alias each other or not.
   bool isMayAliasLSLocation(const LSLocation &RHS, AliasAnalysis *AA);
 
   /// Check whether the 2 LSLocations must alias each other or not.
   bool isMustAliasLSLocation(const LSLocation &RHS, AliasAnalysis *AA);
+
+  /// Check whether the LSLocation can escape the current function.
+  bool isNonEscapingLocalLSLocation(SILFunction *Fn, EscapeAnalysis *EA);
 
   //============================//
   //       static functions.    //

@@ -1,0 +1,4 @@
+// RUN: not --crash %target-sil-opt %s
+// REQUIRES: asserts
+class C{@NSManaged var S
+var h

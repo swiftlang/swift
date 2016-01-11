@@ -1,8 +1,8 @@
-//===--- RefCountState.h - Represents a Reference Count -----*- C++ -*-----===//
+//===--- RefCountState.h - Represents a Reference Count ---------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -57,7 +57,7 @@ protected:
   /// semantics.
   InstructionSet InsertPts;
 
-  /// Have we performed any partial merges of insertion points? We can not
+  /// Have we performed any partial merges of insertion points? We cannot
   /// perform two partial merges in a row unless we are able to reason about
   /// control dependency (which avoid for now).
   bool Partial = false;
@@ -176,7 +176,7 @@ public:
     MightBeUsed,        ///< The pointer will be used and then at this point
                         ///  be decremented
     MightBeDecremented, ///< The pointer might be decremented again implying
-                        ///  that we can not, without being known safe remove
+                        ///  that we cannot, without being known safe remove
                         ///  this decrement.
   };
 
@@ -219,6 +219,11 @@ public:
                                   ArrayRef<SILInstruction *> InsertPts,
                                   AliasAnalysis *AA);
 
+  // Determine the conservative effect of the given list of predecessor
+  // terminators upon this reference count.
+  void updateForPredTerminators(ArrayRef<SILInstruction *> PredTerms,
+                                SILInstruction *InsertPt, AliasAnalysis *AA);
+
   /// Attempt to merge \p Other into this ref count state. Return true if we
   /// succeed and false otherwise.
   bool merge(const BottomUpRefCountState &Other);
@@ -246,7 +251,7 @@ private:
 
   /// If advance the state's sequence appropriately for a decrement. If we do
   /// advance return true. Otherwise return false.
-  bool handleDecrement(SILInstruction *PotentialDecrement);
+  bool handleDecrement();
 
   /// Check if PotentialDecrement can decrement the reference count associated
   /// with the value we are tracking. If so advance the state's sequence
@@ -261,8 +266,7 @@ private:
   /// lattice state. Return true if we do so and false otherwise. \p InsertPt is
   /// the location where if \p PotentialUser is a user of this ref count, we
   /// would insert a release.
-  bool handleUser(SILInstruction *PotentialUser,
-                  ArrayRef<SILInstruction *> InsertPt, SILValue RCIdentity,
+  bool handleUser(ArrayRef<SILInstruction *> InsertPt, SILValue RCIdentity,
                   AliasAnalysis *AA);
 
   /// Check if PotentialUser could be a use of the reference counted value that
@@ -280,8 +284,7 @@ private:
   /// lattice state. Return true if we do so and false otherwise. \p InsertPt is
   /// the location where if \p PotentialUser is a user of this ref count, we
   /// would insert a release.
-  bool handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser,
-                            ArrayRef<SILInstruction *> InsertPts,
+  bool handleGuaranteedUser(ArrayRef<SILInstruction *> InsertPts,
                             SILValue RCIdentity, AliasAnalysis *AA);
 
   /// Check if PotentialGuaranteedUser can use the reference count associated

@@ -1,8 +1,8 @@
-//===-- CompilerInvocation.cpp - CompilerInvocation methods ---------------===//
+//===--- CompilerInvocation.cpp - CompilerInvocation methods --------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -124,6 +124,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   Opts.PrintStats |= Args.hasArg(OPT_print_stats);
   Opts.PrintClangStats |= Args.hasArg(OPT_print_clang_stats);
   Opts.DebugTimeFunctionBodies |= Args.hasArg(OPT_debug_time_function_bodies);
+  Opts.DebugTimeCompilation |= Args.hasArg(OPT_debug_time_compilation);
 
   Opts.PlaygroundTransform |= Args.hasArg(OPT_playground);
   if (Args.hasArg(OPT_disable_playground_transform))
@@ -1001,6 +1002,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EmitProfileCoverageMapping |= Args.hasArg(OPT_profile_coverage_mapping);
   Opts.UseNativeSuperMethod |=
     Args.hasArg(OPT_use_native_super_method);
+  Opts.EnableGuaranteedClosureContexts |=
+    Args.hasArg(OPT_enable_guaranteed_closure_contexts);
 
   return false;
 }

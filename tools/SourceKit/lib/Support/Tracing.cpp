@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -22,16 +22,16 @@ using namespace llvm;
 
 
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // General
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 
 static std::atomic<bool> tracing_enabled(false);
 static std::atomic<uint64_t> operation_id(0);
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Consumers
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 struct TraceConsumerListNode {
   trace::TraceConsumer *const Consumer;
   TraceConsumerListNode *Next;
@@ -39,9 +39,9 @@ struct TraceConsumerListNode {
 static std::atomic<TraceConsumerListNode *> consumers(nullptr);
 
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Trace commands
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 
 // Is tracing enabled
 bool trace::enabled() {
@@ -57,14 +57,14 @@ void trace::disable() {
 }
 
 // Trace start of perform sema call, returns OpId
-uint64_t trace::startOpertation(trace::OperationKind OpKind,
-                                const trace::SwiftInvocation &Inv,
-                                const trace::StringPairs &OpArgs) {
+uint64_t trace::startOperation(trace::OperationKind OpKind,
+                               const trace::SwiftInvocation &Inv,
+                               const trace::StringPairs &OpArgs) {
   auto OpId = ++operation_id;
   if (trace::enabled()) {
     auto Node = consumers.load(std::memory_order_acquire);
     while (Node) {
-      Node->Consumer->opertationStarted(OpId, OpKind, Inv, OpArgs);
+      Node->Consumer->operationStarted(OpId, OpKind, Inv, OpArgs);
       Node = Node->Next;
     }
   }

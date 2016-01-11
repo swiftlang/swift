@@ -23,20 +23,8 @@ func func8(@autoclosure inout x: () -> Bool) -> Bool {  // expected-error {{@aut
 }
 
 
-// Should have good QoI:
-func migrate1(fp fpx : @autoclosure () -> Int) {}   // expected-error {{@autoclosure is now an attribute of the parameter declaration, not its type}} {{15-15=@autoclosure }} {{24-37=}}
-struct MethodHolder {
-  func migrate2(a : Int, _ fp : @autoclosure () -> Int) {}    // expected-error {{@autoclosure is now an attribute of the parameter declaration, not its type}} {{26-26=@autoclosure }} {{33-46=}}
-}
-func migrate3(fp fp : @autoclosure () -> Int) {}    // expected-error {{@autoclosure is now an attribute of the parameter declaration, not its type}} {{15-15=@autoclosure }} {{23-36=}}
-public func || <T: BooleanType>(
-  lhs: T, rhs: @autoclosure () -> Bool    // expected-error {{@autoclosure is now an attribute of the parameter declaration, not its type}} {{11-11=@autoclosure }} {{16-29=}}
-  ) -> Bool {
-    return lhs.boolValue ? true : rhs().boolValue
-}
-
 // <rdar://problem/19707366> QoI: @autoclosure declaration change fixit
-let migrate4 : @autoclosure() -> ()   // expected-error {{@autoclosure is now an attribute of the parameter declaration, not its type}} {{1-1=@autoclosure }} {{16-28=}}
+let migrate4 : @autoclosure() -> ()   // expected-error {{attribute can only be applied to declarations, not types}} {{1-1=@autoclosure }} {{16-28=}}
 
 
 struct SomeStruct {
@@ -124,7 +112,7 @@ class TestFunc12 {
 
 
 enum AutoclosureFailableOf<T> {
-  case Success(@autoclosure () -> T)  // expected-error {{@autoclosure is only allowed on parameters, not on enum cases}}
+  case Success(@autoclosure () -> T)  // expected-error {{attribute can only be applied to declarations, not types}}
   case Failure()
 }
 

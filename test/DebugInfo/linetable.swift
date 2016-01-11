@@ -12,7 +12,7 @@ class MyClass
     init(input: Int64) { x = input }
     func do_something(input: Int64) -> Int64
     {
-        return x * input;
+        return x * input
     }
 }
 
@@ -35,6 +35,8 @@ func main(x: Int64) -> Void
             markUsed(result)
 // CHECK: call {{.*}} @swift_release {{.*}}
 // CHECK: call {{.*}} @swift_release {{.*}}, !dbg ![[CLOSURE_END:.*]]
+// CHECK-NEXT: bitcast
+// CHECK-NEXT: llvm.lifetime.end
 // CHECK-NEXT: ret void, !dbg ![[CLOSURE_END]]
 // CHECK: ![[CLOSURE_END]] = !DILocation(line: [[@LINE+1]],
         }

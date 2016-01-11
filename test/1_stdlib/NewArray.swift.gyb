@@ -1,9 +1,9 @@
 %# -*- mode: swift -*-
-//===--- Array.swift ------------------------------------------------------===//
+//===--- NewArray.swift ---------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -30,14 +30,15 @@ final class X : ForwardIndexType, Comparable, CustomStringConvertible,
                 IntegerLiteralConvertible 
 {
   required init(_ value: Int) {
-    ++xCount
-    serial = ++xSerial
+    xCount += 1
+    xSerial += 1
+    serial = xSerial
     self.value = value
   }
   
   deinit {
     assert(serial > 0, "double destruction!")
-    --xCount
+    xCount -= 1
     serial = -serial
   }
 
@@ -142,7 +143,7 @@ where T.Generator.Element == T._Buffer.Element,
   checkEqual(x, y, false)
 
   func checkReallocations(
-    a: T, _ growthDescription: String, _ growBy1: (inout _: T)->()
+    a: T, _ growthDescription: String, _ growBy1: (inout _: T) -> ()
   ) {
     var a = a
     var reallocations = 0
@@ -155,7 +156,7 @@ where T.Generator.Element == T._Buffer.Element,
       let oldId = bufferID(a)
       growBy1(&a)
       if oldId != bufferID(a) {
-        ++reallocations
+        reallocations += 1
       }
     }
     
@@ -166,8 +167,8 @@ where T.Generator.Element == T._Buffer.Element,
     }
   }
 
-  checkReallocations(x, "append") { (inout x: T)->() in x.append(42) }
-  checkReallocations(x, "+=") { (inout x: T)->() in x.append(42) }
+  checkReallocations(x, "append") { (inout x: T) -> () in x.append(42) }
+  checkReallocations(x, "+=") { (inout x: T) -> () in x.append(42) }
   print("done.")
 }
 
@@ -269,7 +270,7 @@ func testCocoa() {
 
   // Prove that we create contiguous storage for an opaque NSArray
   a.withUnsafeBufferPointer {
-    (p)->() in
+    (p) -> () in
     print(p[0])
     // CHECK-NEXT: foo
   }
@@ -347,13 +348,13 @@ let testWidth = 11
 %arrayTypes = ['ContiguousArray', 'Array', 'ArraySlice']
 %for A in arrayTypes:
 
-func testReplace(make: ()->${A}<X>) {
+func testReplace(make: () -> ${A}<X>) {
 
   checkRangeReplaceable(make, { X(100)..<X(100 + $0) })
 }
 
 func testReplace${A}(
-  makeOne: ()->${A}<X> = {
+  makeOne: () -> ${A}<X> = {
     var x = ${A}<X>()
     // make sure some - but not all - replacements will have to grow the buffer
     x.reserveCapacity(testWidth * 3 / 2)

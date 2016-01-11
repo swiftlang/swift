@@ -1,8 +1,8 @@
-//===- Tracing.h - Tracing Interface ----------------------------*- C++ -*-===//
+//===--- Tracing.h - Tracing Interface --------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -67,7 +67,7 @@ public:
   virtual ~TraceConsumer() = default;
 
   // Trace start of SourceKit operation
-  virtual void opertationStarted(uint64_t OpId, OperationKind OpKind,
+  virtual void operationStarted(uint64_t OpId, OperationKind OpKind,
                                  const SwiftInvocation &Inv,
                                  const StringPairs &OpArgs) = 0;
   
@@ -85,9 +85,9 @@ void enable();
 void disable();
   
 // Trace start of SourceKit operation, returns OpId
-uint64_t startOpertation(OperationKind OpKind,
-                         const SwiftInvocation &Inv,
-                         const StringPairs &OpArgs = StringPairs());
+uint64_t startOperation(OperationKind OpKind,
+                        const SwiftInvocation &Inv,
+                        const StringPairs &OpArgs = StringPairs());
 
 // Operation previously started with startXXX has finished
 void operationFinished(uint64_t OpId);
@@ -114,7 +114,7 @@ public:
              const SwiftInvocation &Inv,
              const StringPairs &OpArgs = StringPairs()) {
     finish();
-    OpId = startOpertation(OpKind, Inv, OpArgs);
+    OpId = startOperation(OpKind, Inv, OpArgs);
   }
 
   void finish() {

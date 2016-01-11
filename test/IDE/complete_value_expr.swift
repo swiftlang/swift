@@ -188,7 +188,7 @@ struct FooStruct {
   mutating
   func instanceFunc6() -> Int! {}
   mutating
-  func instanceFunc7(#a: Int) {}
+  func instanceFunc7(a a: Int) {}
   mutating
   func instanceFunc8(a: (Int, Int)) {}
   mutating
@@ -271,7 +271,7 @@ struct FooStruct {
   struct NestedStruct {}
   class NestedClass {}
   enum NestedEnum {}
-  // Can not declare a nested protocol.
+  // Cannot declare a nested protocol.
   // protocol NestedProtocol {}
 
   typealias NestedTypealias = Int

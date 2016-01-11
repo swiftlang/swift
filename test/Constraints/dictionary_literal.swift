@@ -59,3 +59,6 @@ var _: Dictionary<String, Int>? = ["foo", 1.0, 2]  // expected-error {{contextua
 var _: Dictionary<String, Int>? = ["foo" : 1.0]  // expected-error {{cannot convert value of type 'Double' to expected dictionary value type 'Int'}}
 
 
+// <rdar://problem/24058895> QoI: Should handle [] in dictionary contexts better
+var _: [Int: Int] = []  // expected-error {{use [:] to get an empty dictionary literal}} {{22-22=:}}
+

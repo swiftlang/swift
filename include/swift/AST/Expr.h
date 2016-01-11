@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -19,15 +19,9 @@
 
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ConcreteDeclRef.h"
-#include "swift/AST/DeclContext.h"
-#include "swift/AST/Identifier.h"
-#include "swift/AST/Substitution.h"
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/Availability.h"
-#include "swift/Basic/SourceLoc.h"
-#include "swift/Config.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/StringRef.h"
 
 namespace llvm {
   struct fltSemantics;
@@ -49,11 +43,11 @@ namespace swift {
   class Initializer;
   class VarDecl;
   class OpaqueValueExpr;
-  class ProtocolConformance;
   class FuncDecl;
   class ConstructorDecl;
   class TypeDecl;
   class PatternBindingDecl;
+  class ParameterList;
   
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
@@ -2561,11 +2555,11 @@ public:
 /// "Appropriate kind" means e.g. a concrete/existential metatype if the
 /// result is an existential metatype.
 class ErasureExpr : public ImplicitConversionExpr {
-  ArrayRef<ProtocolConformance *> Conformances;
+  ArrayRef<ProtocolConformanceRef> Conformances;
 
 public:
   ErasureExpr(Expr *subExpr, Type type,
-              ArrayRef<ProtocolConformance *> conformances)
+              ArrayRef<ProtocolConformanceRef> conformances)
     : ImplicitConversionExpr(ExprKind::Erasure, subExpr, type),
       Conformances(conformances) {}
 
@@ -2579,7 +2573,7 @@ public:
   /// to the corresponding protocol is trivial (because the source
   /// type is either an archetype or an existential type that conforms to
   /// that corresponding protocol).
-  ArrayRef<ProtocolConformance *> getConformances() const {
+  ArrayRef<ProtocolConformanceRef> getConformances() const {
     return Conformances;
   }
   
@@ -2775,14 +2769,14 @@ class AbstractClosureExpr : public Expr, public DeclContext {
   CaptureInfo Captures;
 
   /// \brief The set of parameters.
-  Pattern *ParamPattern;
+  ParameterList *parameterList;
 
 public:
   AbstractClosureExpr(ExprKind Kind, Type FnType, bool Implicit,
                       unsigned Discriminator, DeclContext *Parent)
       : Expr(Kind, Implicit, FnType),
         DeclContext(DeclContextKind::AbstractClosureExpr, Parent),
-        ParamPattern(nullptr) {
+        parameterList(nullptr) {
     AbstractClosureExprBits.Discriminator = Discriminator;
   }
 
@@ -2790,9 +2784,9 @@ public:
   const CaptureInfo &getCaptureInfo() const { return Captures; }
 
   /// \brief Retrieve the parameters of this closure.
-  Pattern *getParams() { return ParamPattern; }
-  const Pattern *getParams() const { return ParamPattern; }
-  void setParams(Pattern *P);
+  ParameterList *getParameters() { return parameterList; }
+  const ParameterList *getParameters() const { return parameterList; }
+  void setParameterList(ParameterList *P);
 
   // Expose this to users.
   using DeclContext::setParent;
@@ -2825,11 +2819,12 @@ public:
       decltype(AbstractClosureExprBits)::InvalidDiscriminator
   };
 
-  ArrayRef<Pattern *> getParamPatterns() {
-    return ParamPattern ? ParamPattern : ArrayRef<Pattern *> ();
+  ArrayRef<ParameterList *> getParameterLists() {
+    return parameterList ? parameterList : ArrayRef<ParameterList *>();
   }
-  ArrayRef<const Pattern *> getParamPatterns() const {
-    return ParamPattern ? ParamPattern : ArrayRef<const Pattern *> ();
+  
+  ArrayRef<const ParameterList *> getParameterLists() const {
+    return parameterList ? parameterList : ArrayRef<const ParameterList *>();
   }
 
   unsigned getNaturalArgumentCount() const { return 1; }
@@ -2921,7 +2916,7 @@ class ClosureExpr : public AbstractClosureExpr {
   llvm::PointerIntPair<BraceStmt *, 1, bool> Body;
   
 public:
-  ClosureExpr(Pattern *params, SourceLoc throwsLoc, SourceLoc arrowLoc,
+  ClosureExpr(ParameterList *params, SourceLoc throwsLoc, SourceLoc arrowLoc,
               SourceLoc inLoc, TypeLoc explicitResultType,
               unsigned discriminator, DeclContext *parent)
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
@@ -2929,7 +2924,7 @@ public:
       ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc), InLoc(inLoc),
       ExplicitResultType(explicitResultType),
       Body(nullptr) {
-    setParams(params);
+    setParameterList(params);
     ClosureExprBits.HasAnonymousClosureVars = false;
     ClosureExprBits.IsVoidConversionClosure = false;
   }
@@ -3048,7 +3043,7 @@ public:
 
 
 /// \brief This is a closure of the contained subexpression that is formed
-/// when an scalar expression is converted to @autoclosure function type.
+/// when a scalar expression is converted to @autoclosure function type.
 /// For example:
 /// \code
 ///   @autoclosure var x : () -> Int = 4
@@ -3094,7 +3089,7 @@ public:
 
 /// DynamicTypeExpr - "base.dynamicType" - Produces a metatype value.
 ///
-/// The metatype value can comes from a evaluating an expression and then
+/// The metatype value can comes from evaluating an expression and then
 /// getting its metatype.
 class DynamicTypeExpr : public Expr {
   Expr *Base;

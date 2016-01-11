@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -21,9 +21,9 @@
 using namespace swift;
 using namespace constraints;
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Statistics
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "Constraint solver overall"
 STATISTIC(NumDiscardedSolutions, "# of solutions discarded");
 
@@ -227,25 +227,6 @@ static Comparison compareWitnessAndRequirement(TypeChecker &tc, DeclContext *dc,
 }
 
 namespace {
-  /// Dependent type opener that maps from a dependent type to its corresponding
-  /// archetype in the given context.
-  class ArchetypeOpener : public constraints::DependentTypeOpener {
-    DeclContext *DC;
-
-  public:
-    explicit ArchetypeOpener(DeclContext *dc) : DC(dc) { }
-
-    virtual Type mapGenericTypeParamType(GenericTypeParamType *param) {
-      return ArchetypeBuilder::mapTypeIntoContext(DC, param);
-    }
-
-    virtual Type mapDependentMemberType(DependentMemberType *memberType) {
-      return ArchetypeBuilder::mapTypeIntoContext(DC, memberType);
-    }
-  };
-}
-
-namespace {
   /// Describes the relationship between the context types for two declarations.
   enum class SelfTypeRelationship {
     /// The types are unrelated; ignore the bases entirely.
@@ -339,9 +320,9 @@ static Type addCurriedSelfType(ASTContext &ctx, Type type, DeclContext *dc) {
   auto nominal = dc->getDeclaredTypeOfContext()->getAnyNominal();
   auto selfTy = nominal->getInterfaceType()->castTo<MetatypeType>()
                   ->getInstanceType();
-  if (nominal->isGenericContext())
-    return GenericFunctionType::get(nominal->getGenericSignature(),
-                                    selfTy, type, AnyFunctionType::ExtInfo());
+  if (auto sig = nominal->getGenericSignatureOfContext())
+    return GenericFunctionType::get(sig, selfTy, type,
+                                    AnyFunctionType::ExtInfo());
   return FunctionType::get(selfTy, type);
 }
 
@@ -388,27 +369,23 @@ static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
   return false;
 }
 
-static TypeBase* getTypeAtIndex(TypeBase* containerType, size_t index) {
+static Type getTypeAtIndex(const ParameterList *params, size_t index) {
+  if (params->size() == 0)
+    return nullptr;
+
+  if (index < params->size()) {
+    auto param = params->get(index);
+    if (param->isVariadic())
+      return param->getVarargBaseTy();
   
-  if (auto parenType = dyn_cast<ParenType>(containerType)) {
-    if (!index) {
-      return parenType->getDesugaredType();
-    }
+    return param->getType();
   }
   
-  if (auto tupleType = containerType->getAs<TupleType>()) {
-    auto elements = tupleType->getElements();
-    
-    if (!elements.empty()) {
-      if (index < elements.size()) {
-        if (elements[index].isVararg()) {
-          return elements[index].getVarargBaseTy().getPointer();
-        }
-        return elements[index].getType().getPointer();
-      } else if (elements.back().isVararg()) {
-        return elements.back().getVarargBaseTy().getPointer();
-      }
-    }
+  /// FIXME: This looks completely wrong for varargs within a parameter list.
+  if (params->size() != 0) {
+    auto lastParam = params->getArray().back();
+    if (lastParam->isVariadic())
+      return lastParam->getVarargBaseTy();
   }
   
   return nullptr;
@@ -419,36 +396,26 @@ static TypeBase* getTypeAtIndex(TypeBase* containerType, size_t index) {
 /// against a non-existential parameter at the same position of the first decl.
 /// This is used to disambiguate function overloads that would otherwise be
 /// identical after opening their parameter types.
-static bool hasEmptyExistenialParameterMismatch(ValueDecl *decl1,
-                                                ValueDecl *decl2) {
-  
+static bool hasEmptyExistentialParameterMismatch(ValueDecl *decl1,
+                                                 ValueDecl *decl2) {
   auto func1 = dyn_cast<FuncDecl>(decl1);
   auto func2 = dyn_cast<FuncDecl>(decl2);
+  if (!func1 || !func2) return false;
+    
+  auto pl1 = func1->getParameterLists();
+  auto pl2 = func2->getParameterLists();
   
-  if (func1 && func2) {
-    
-    auto pp1 = func1->getBodyParamPatterns();
-    auto pp2 = func2->getBodyParamPatterns();
-    
-    if (pp1.empty() || pp2.empty())
+  auto pc = std::min(pl1.size(), pl2.size());
+  
+  for (size_t i = 0; i < pc; i++) {
+    auto t1 = getTypeAtIndex(pl1[i], i);
+    auto t2 = getTypeAtIndex(pl2[i], i);
+    if (!t1 || !t2)
       return false;
     
-    auto pc = std::min(pp1.size(), pp2.size());
-    
-    for (size_t i = 0; i < pc; i++) {
-      
-      auto t1 = getTypeAtIndex(pp1[i]->getType().getPointer(), i);
-      auto t2 = getTypeAtIndex(pp2[i]->getType().getPointer(), i);
-      
-      if (!t1 || !t2)
-        break;
-      
-      if (t2->isAnyExistentialType() && !t1->isAnyExistentialType()) {
-        return t2->isEmptyExistentialComposition();
-      }
-    }
+    if (t2->isAnyExistentialType() && !t1->isAnyExistentialType())
+      return t2->isEmptyExistentialComposition();
   }
-  
   return false;
 }
 
@@ -485,7 +452,7 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
   llvm::DenseMap<CanType, TypeVariableType *> replacements;
   cs.openGeneric(dc2, sig2->getGenericParams(), sig2->getRequirements(),
                  false, dc2->getGenericTypeContextDepth(),
-                 nullptr, ConstraintLocatorBuilder(nullptr),
+                 ConstraintLocatorBuilder(nullptr),
                  replacements);
 
   // Bind the 'Self' type from the first extension to the type parameter from
@@ -504,14 +471,11 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
 
 /// Count the number of default arguments in the primary clause.
 static unsigned countDefaultArguments(AbstractFunctionDecl *func) {
-  auto pattern
-    = func->getBodyParamPatterns()[func->getImplicitSelfDecl() != 0];
-  auto tuple = dyn_cast<TuplePattern>(pattern);
-  if (!tuple) return 0;
+  auto paramList = func->getParameterList(func->getImplicitSelfDecl() != 0);
 
   unsigned count = 0;
-  for (const auto &elt : tuple->getElements()) {
-    if (elt.getDefaultArgKind() != DefaultArgumentKind::None)
+  for (auto elt : *paramList) {
+    if (elt->isDefaultArgument())
       ++count;
   }
 
@@ -613,10 +577,16 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
 
   // Get the type of a reference to the first declaration, swapping in
   // archetypes for the dependent types.
-  ArchetypeOpener opener(decl1->getInnermostDeclContext());
-  Type openedType1 = cs.openType(type1, locator,
-                                 decl1->getInnermostDeclContext(),
-                                 &opener);
+  llvm::DenseMap<CanType, TypeVariableType *> replacements;
+  auto dc1 = decl1->getInnermostDeclContext();
+  Type openedType1 = cs.openType(type1, locator, replacements, dc1);
+  for (const auto &replacement : replacements) {
+    if (auto mapped = ArchetypeBuilder::mapTypeIntoContext(dc1,
+                                                           replacement.first)) {
+      cs.addConstraint(ConstraintKind::Bind, replacement.second, mapped,
+                       locator);
+    }
+  }
 
   // Extract the self types from the declarations, if they have them.
   Type selfTy1;
@@ -922,11 +892,11 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
     // wise comparison between an empty existential collection and a non-
     // existential type.
     if (!(foundRefinement1 && foundRefinement2)) {
-      if (hasEmptyExistenialParameterMismatch(decl1, decl2)) {
+      if (hasEmptyExistentialParameterMismatch(decl1, decl2)) {
         foundRefinement1 = true;
       }
       
-      if (hasEmptyExistenialParameterMismatch(decl2, decl1)) {
+      if (hasEmptyExistentialParameterMismatch(decl2, decl1)) {
         foundRefinement2 = true;
       }
     }

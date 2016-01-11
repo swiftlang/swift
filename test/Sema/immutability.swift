@@ -23,7 +23,7 @@ func foreach_variable() {
   }
 }
 
-func takeClosure(fn : (Int)->Int) {}
+func takeClosure(fn : (Int) -> Int) {}
 
 func passClosure() {
   takeClosure { a in
@@ -317,7 +317,7 @@ func testSubscriptNoGetter(iis: SubscriptNoGetter) {
 func testSelectorStyleArguments1(x: Int, bar y: Int) {
   var x = x
   var y = y
-  ++x; ++y
+  x += 1; y += 1
 }
 
 func testSelectorStyleArguments2(x: Int,

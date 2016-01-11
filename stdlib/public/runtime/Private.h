@@ -1,8 +1,8 @@
-//===--- Private.h - Private runtime declarations --------------*- C++ -*--===//
+//===--- Private.h - Private runtime declarations ---------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -17,6 +17,7 @@
 #ifndef SWIFT_RUNTIME_PRIVATE_H
 #define SWIFT_RUNTIME_PRIVATE_H
 
+#include "swift/Basic/Demangle.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Metadata.h"
 #include "llvm/Support/Compiler.h"
@@ -29,12 +30,10 @@ namespace swift {
 #endif
 
 #if SWIFT_OBJC_INTEROP
-  extern "C" LLVM_LIBRARY_VISIBILITY
-  bool _swift_objectConformsToObjCProtocol(const void *theObject,
+  bool objectConformsToObjCProtocol(const void *theObject,
                                     const ProtocolDescriptor *theProtocol);
   
-  extern "C" LLVM_LIBRARY_VISIBILITY
-  bool _swift_classConformsToObjCProtocol(const void *theClass,
+  bool classConformsToObjCProtocol(const void *theClass,
                                     const ProtocolDescriptor *theProtocol);
 #endif
 
@@ -95,7 +94,13 @@ namespace swift {
   /// Note that this function may return a nullptr on non-objc platforms,
   /// where there is no common root class. rdar://problem/18987058
   const ClassMetadata *getRootSuperclass();
-  
+
+  /// Check if a class has a formal superclass in the AST.
+  static inline
+  bool classHasSuperclass(const ClassMetadata *c) {
+    return (c->SuperClass && c->SuperClass != getRootSuperclass());
+  }
+
   /// Replace entries of a freshly-instantiated value witness table with more
   /// efficient common implementations where applicable.
   ///
@@ -106,6 +111,9 @@ namespace swift {
   /// Returns true if common value witnesses were used, false otherwise.
   void installCommonValueWitnesses(ValueWitnessTable *vwtable);
 
+#if SWIFT_OBJC_INTEROP
+  Demangle::NodePointer _swift_buildDemanglingForMetadata(const Metadata *type);
+#endif
 
 } // end namespace swift
 

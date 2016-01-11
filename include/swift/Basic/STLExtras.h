@@ -1,8 +1,8 @@
-//===- STLExtras.h - additions to the STL -----------------------*- C++ -*-===//
+//===--- STLExtras.h - additions to the STL ---------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -352,7 +352,7 @@ makeTransformRange(Range range, Operation op) {
 }
 
 /// An iterator that filters and transforms the results of an
-/// underlying forward iterator based on an transformation from the underlying
+/// underlying forward iterator based on a transformation from the underlying
 /// value type to an optional result type.
 ///
 /// \tparam Iterator the underlying iterator.
@@ -451,9 +451,9 @@ makeOptionalTransformIterator(Iterator current, Iterator end,
 }
 
 /// A range filtered and transformed by the optional transform.
-template<typename Range, typename OptionalTransform>
+template <typename Range, typename OptionalTransform,
+          typename Iterator = typename Range::iterator>
 class OptionalTransformRange {
-  typedef typename Range::iterator Iterator;
 
   Iterator First, Last;
   OptionalTransform Op;

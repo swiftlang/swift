@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-membehavior"
 
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SIL/SILVisitor.h"
@@ -43,6 +44,8 @@ class MemoryBehaviorVisitor
 
   SideEffectAnalysis *SEA;
 
+  EscapeAnalysis *EA;
+
   /// The value we are attempting to discover memory behavior relative to.
   SILValue V;
 
@@ -54,9 +57,10 @@ class MemoryBehaviorVisitor
   RetainObserveKind InspectionMode;
 
 public:
-  MemoryBehaviorVisitor(AliasAnalysis *AA, SideEffectAnalysis *SEA, SILValue V,
+  MemoryBehaviorVisitor(AliasAnalysis *AA, SideEffectAnalysis *SEA,
+                        EscapeAnalysis *EA, SILValue V,
                         RetainObserveKind IgnoreRefCountIncs)
-      : AA(AA), SEA(SEA), V(V), InspectionMode(IgnoreRefCountIncs) {}
+      : AA(AA), SEA(SEA), EA(EA), V(V), InspectionMode(IgnoreRefCountIncs) {}
 
   SILType getValueTBAAType() {
     if (!TypedAccessTy)
@@ -99,7 +103,7 @@ public:
   MemBehavior visitReleaseValueInst(ReleaseValueInst *BI);
 
   // Instructions which are none if our SILValue does not alias one of its
-  // arguments. If we can not prove such a thing, return the relevant memory
+  // arguments. If we cannot prove such a thing, return the relevant memory
   // behavior.
 #define OPERANDALIAS_MEMBEHAVIOR_INST(Name)                             \
   MemBehavior visit##Name(Name *I) {                                    \
@@ -172,7 +176,7 @@ MemBehavior MemoryBehaviorVisitor::visitStoreInst(StoreInst *SI) {
     return MemBehavior::None;
 
   // If the store dest cannot alias the pointer in question, then the
-  // specified value can not be modified by the store.
+  // specified value cannot be modified by the store.
   if (AA->isNoAlias(SI->getDest(), V, computeTBAAType(SI->getDest()),
                    getValueTBAAType())) {
     DEBUG(llvm::dbgs() << "  Store Dst does not alias inst. Returning "
@@ -219,11 +223,9 @@ MemBehavior MemoryBehaviorVisitor::visitBuiltinInst(BuiltinInst *BI) {
 
 MemBehavior MemoryBehaviorVisitor::visitTryApplyInst(TryApplyInst *AI) {
   MemBehavior Behavior = MemBehavior::MayHaveSideEffects;
-  // If it is an allocstack which does not escape, tryapply instruction can not
-  // read/modify the memory.
-  if (auto *ASI = dyn_cast<AllocStackInst>(getUnderlyingObject(V)))
-    if (isNonEscapingLocalObject(ASI->getAddressResult()))
-      Behavior = MemBehavior::None;
+  // Ask escape analysis.
+  if (!EA->canObjectOrContentEscapeTo(V, AI))
+    Behavior = MemBehavior::None;
 
   // Otherwise be conservative and return that we may have side effects.
   DEBUG(llvm::dbgs() << "  Found tryapply, returning " << Behavior << '\n');
@@ -251,58 +253,46 @@ MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
          Idx < End && Behavior < MemBehavior::MayHaveSideEffects; ++Idx) {
       auto &ArgEffect = ApplyEffects.getParameterEffects()[Idx];
       auto ArgBehavior = ArgEffect.getMemBehavior(InspectionMode);
-      if (ArgBehavior > Behavior) {
+      auto NewBehavior = combineMemoryBehavior(Behavior, ArgBehavior);
+      if (NewBehavior != Behavior) {
         SILValue Arg = AI->getArgument(Idx);
         // We only consider the argument effects if the argument aliases V.
         if (!Arg.getType().isAddress() ||
             !AA->isNoAlias(Arg, V, computeTBAAType(Arg), getValueTBAAType())) {
-          Behavior = ArgBehavior;
+          Behavior = NewBehavior;
         }
       }
     }
   }
-  if (Behavior > MemBehavior::MayRead && isLetPointer(V))
-    Behavior = MemBehavior::MayRead;
+  if (Behavior > MemBehavior::None) {
+    if (Behavior > MemBehavior::MayRead && isLetPointer(V))
+      Behavior = MemBehavior::MayRead;
 
-  // If it is an allocstack which does not escape, apply instruction can not
-  // read/modify the memory.
-  if (auto *ASI = dyn_cast<AllocStackInst>(getUnderlyingObject(V)))
-    if (isNonEscapingLocalObject(ASI->getAddressResult())) {
+    // Ask escape analysis.
+    if (!EA->canObjectOrContentEscapeTo(V, AI))
       Behavior = MemBehavior::None;
-    }
-
+  }
   DEBUG(llvm::dbgs() << "  Found apply, returning " << Behavior << '\n');
   return Behavior;
 }
 
 MemBehavior
 MemoryBehaviorVisitor::visitStrongReleaseInst(StrongReleaseInst *SI) {
-  // Need to make sure that the allocated memory does not escape.
-  // AllocBox to stack does not check for whether the address of promoted
-  // allocstack can escape.
-  //
-  // TODO: come up with a test case which shows isNonEscapingLocalObject is
-  // necessary.
-  if (AllocStackInst *ASI = dyn_cast<AllocStackInst>(getUnderlyingObject(V)))
-    if (isNonEscapingLocalObject(ASI->getAddressResult()))
-      return MemBehavior::None;
+  if (!EA->canEscapeTo(V, SI))
+    return MemBehavior::None;
   return MemBehavior::MayHaveSideEffects;
 }
 
 MemBehavior
 MemoryBehaviorVisitor::visitUnownedReleaseInst(UnownedReleaseInst *SI) {
-  // Need to make sure that the allocated memory does not escape.
-  if (AllocStackInst *ASI = dyn_cast<AllocStackInst>(getUnderlyingObject(V)))
-    if (isNonEscapingLocalObject(ASI->getAddressResult()))
-      return MemBehavior::None;
+  if (!EA->canEscapeTo(V, SI))
+    return MemBehavior::None;
   return MemBehavior::MayHaveSideEffects;
 }
 
 MemBehavior MemoryBehaviorVisitor::visitReleaseValueInst(ReleaseValueInst *SI) {
-  // Need to make sure that the allocated memory does not escape.
-  if (AllocStackInst *ASI = dyn_cast<AllocStackInst>(getUnderlyingObject(V)))
-    if (isNonEscapingLocalObject(ASI->getAddressResult()))
-      return MemBehavior::None;
+  if (!EA->canEscapeTo(V, SI))
+    return MemBehavior::None;
   return MemBehavior::MayHaveSideEffects;
 }
 
@@ -324,7 +314,10 @@ AliasAnalysis::computeMemoryBehavior(SILInstruction *Inst, SILValue V,
   // Flush the cache if the size of the cache is too large.
   if (MemoryBehaviorCache.size() > MemoryBehaviorAnalysisMaxCacheSize) {
     MemoryBehaviorCache.clear();
-    ValueBaseToIndex.clear();
+    MemoryBehaviorValueBaseToIndex.clear();
+
+    // Key is no longer valid as we cleared the MemoryBehaviorValueBaseToIndex.
+    Key = toMemoryBehaviorKey(SILValue(Inst), V, InspectionMode);
   }
 
   // Calculate the aliasing result and store it in the cache.
@@ -339,13 +332,13 @@ AliasAnalysis::computeMemoryBehaviorInner(SILInstruction *Inst, SILValue V,
   DEBUG(llvm::dbgs() << "GET MEMORY BEHAVIOR FOR:\n    " << *Inst << "    "
                      << *V.getDef());
   assert(SEA && "SideEffectsAnalysis must be initialized!");
-  return MemoryBehaviorVisitor(this, SEA, V, InspectionMode).visit(Inst);
+  return MemoryBehaviorVisitor(this, SEA, EA, V, InspectionMode).visit(Inst);
 }
 
 MemBehaviorKeyTy AliasAnalysis::toMemoryBehaviorKey(SILValue V1, SILValue V2,
                                                     RetainObserveKind M) {
-  size_t idx1 = ValueBaseToIndex.getIndex(V1.getDef());
-  size_t idx2 = ValueBaseToIndex.getIndex(V2.getDef());
+  size_t idx1 = MemoryBehaviorValueBaseToIndex.getIndex(V1.getDef());
+  size_t idx2 = MemoryBehaviorValueBaseToIndex.getIndex(V2.getDef());
   unsigned R2 = V2.getResultNumber();
   return {idx1, idx2, R2, M};
 }

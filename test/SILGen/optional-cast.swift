@@ -149,9 +149,9 @@ public struct TestAddressOnlyStruct<T>  {
   // CHECK-LABEL: sil hidden @_TFV4main21TestAddressOnlyStruct8testCall
   // CHECK: bb0(%0 : $*ImplicitlyUnwrappedOptional<T>, %1 : $TestAddressOnlyStruct<T>):
   // CHECK: [[TMPBUF:%.*]] = alloc_stack $Optional<T>
-  // CHECK: [[TMPCAST:%.*]] = unchecked_addr_cast [[TMPBUF]]#1
+  // CHECK: [[TMPCAST:%.*]] = unchecked_addr_cast [[TMPBUF]]
   // CHECK-NEXT: copy_addr %0 to [initialization] [[TMPCAST]]
-  // CHECK-NEXT: apply {{.*}}<T>([[TMPBUF]]#1, %1)
+  // CHECK-NEXT: apply {{.*}}<T>([[TMPBUF]], %1)
   func testCall(a : T!) {
     f(a)
   }

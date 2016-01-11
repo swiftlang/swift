@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -331,7 +331,7 @@ public:
 
   /// Type-check an entire function body.
   bool typeCheckBody(BraceStmt *&S) {
-    if (typeCheckStmt(S)) return true;
+    typeCheckStmt(S);
     setAutoClosureDiscriminators(DC, S);
     return false;
   }
@@ -396,13 +396,12 @@ public:
                                        RS->isImplicit());
     }
 
-    auto failed = TC.typeCheckExpression(E, DC, ResultTy, CTP_ReturnStmt);
+    auto hadTypeError = TC.typeCheckExpression(E, DC, ResultTy, CTP_ReturnStmt);
     RS->setResult(E);
     
-    if (failed) {
+    if (hadTypeError) {
       tryDiagnoseUnnecessaryCastOverOptionSet(TC.Context, E, ResultTy,
                                               DC->getParentModule());
-      return nullptr;
     }
     
     return RS;
@@ -415,10 +414,8 @@ public:
     Type exnType = TC.getExceptionType(DC, TS->getThrowLoc());
     if (!exnType) return TS;
     
-    auto failed = TC.typeCheckExpression(E, DC, exnType, CTP_ThrowStmt);
+    TC.typeCheckExpression(E, DC, exnType, CTP_ThrowStmt);
     TS->setSubExpr(E);
-
-    if (failed) return nullptr;
     
     return TS;
   }
@@ -427,8 +424,7 @@ public:
     TC.typeCheckDecl(DS->getTempDecl(), /*isFirstPass*/false);
 
     Expr *theCall = DS->getCallExpr();
-    if (!TC.typeCheckExpression(theCall, DC))
-      return nullptr;
+    TC.typeCheckExpression(theCall, DC);
     DS->setCallExpr(theCall);
     
     return DS;
@@ -436,18 +432,17 @@ public:
   
   Stmt *visitIfStmt(IfStmt *IS) {
     StmtCondition C = IS->getCond();
-
-    if (TC.typeCheckStmtCondition(C, DC, diag::if_always_true)) return 0;
+    TC.typeCheckStmtCondition(C, DC, diag::if_always_true);
     IS->setCond(C);
 
     AddLabeledStmt ifNest(*this, IS);
 
     Stmt *S = IS->getThenStmt();
-    if (typeCheckStmt(S)) return 0;
+    typeCheckStmt(S);
     IS->setThenStmt(S);
 
     if ((S = IS->getElseStmt())) {
-      if (typeCheckStmt(S)) return 0;
+      typeCheckStmt(S);
       IS->setElseStmt(S);
     }
     
@@ -456,14 +451,13 @@ public:
   
   Stmt *visitGuardStmt(GuardStmt *GS) {
     StmtCondition C = GS->getCond();
-    if (TC.typeCheckStmtCondition(C, DC, diag::guard_always_succeeds))
-      return 0;
+    TC.typeCheckStmtCondition(C, DC, diag::guard_always_succeeds);
     GS->setCond(C);
     
     AddLabeledStmt ifNest(*this, GS);
     
     Stmt *S = GS->getBody();
-    if (typeCheckStmt(S)) return 0;
+    typeCheckStmt(S);
     GS->setBody(S);
     return GS;
   }
@@ -479,19 +473,19 @@ public:
   Stmt *visitDoStmt(DoStmt *DS) {
     AddLabeledStmt loopNest(*this, DS);
     Stmt *S = DS->getBody();
-    if (typeCheckStmt(S)) return 0;
+    typeCheckStmt(S);
     DS->setBody(S);
     return DS;
   }
   
   Stmt *visitWhileStmt(WhileStmt *WS) {
     StmtCondition C = WS->getCond();
-    if (TC.typeCheckStmtCondition(C, DC, diag::while_always_true)) return 0;
+    TC.typeCheckStmtCondition(C, DC, diag::while_always_true);
     WS->setCond(C);
 
     AddLabeledStmt loopNest(*this, WS);
     Stmt *S = WS->getBody();
-    if (typeCheckStmt(S)) return 0;
+    typeCheckStmt(S);
     WS->setBody(S);
     
     return WS;
@@ -500,12 +494,12 @@ public:
     {
       AddLabeledStmt loopNest(*this, RWS);
       Stmt *S = RWS->getBody();
-      if (typeCheckStmt(S)) return nullptr;
+      typeCheckStmt(S);
       RWS->setBody(S);
     }
     
     Expr *E = RWS->getCond();
-    if (TC.typeCheckCondition(E, DC)) return nullptr;
+    TC.typeCheckCondition(E, DC);
     RWS->setCond(E);
     return RWS;
   }
@@ -515,30 +509,27 @@ public:
       TC.typeCheckDecl(D, /*isFirstPass*/false);
 
     if (auto *Initializer = FS->getInitializer().getPtrOrNull()) {
-      if (TC.typeCheckExpression(Initializer, DC, Type(), CTP_Unused,
-                                 TypeCheckExprFlags::IsDiscarded))
-        return nullptr;
+      TC.typeCheckExpression(Initializer, DC, Type(), CTP_Unused,
+                             TypeCheckExprFlags::IsDiscarded);
       FS->setInitializer(Initializer);
       TC.checkIgnoredExpr(Initializer);
     }
 
     if (auto *Cond = FS->getCond().getPtrOrNull()) {
-      if (TC.typeCheckCondition(Cond, DC))
-        return nullptr;
+      TC.typeCheckCondition(Cond, DC);
       FS->setCond(Cond);
     }
 
     if (auto *Increment = FS->getIncrement().getPtrOrNull()) {
-      if (TC.typeCheckExpression(Increment, DC, Type(), CTP_Unused,
-                                 TypeCheckExprFlags::IsDiscarded))
-        return nullptr;
+      TC.typeCheckExpression(Increment, DC, Type(), CTP_Unused,
+                             TypeCheckExprFlags::IsDiscarded);
       FS->setIncrement(Increment);
       TC.checkIgnoredExpr(Increment);
     }
 
     AddLabeledStmt loopNest(*this, FS);
     Stmt *S = FS->getBody();
-    if (typeCheckStmt(S)) return nullptr;
+    typeCheckStmt(S);
     FS->setBody(S);
     
     return FS;
@@ -691,7 +682,7 @@ public:
     // Type-check the body of the loop.
     AddLabeledStmt loopNest(*this, S);
     BraceStmt *Body = S->getBody();
-    if (typeCheckStmt(Body)) return nullptr;
+    typeCheckStmt(Body);
     S->setBody(Body);
     
     return S;
@@ -810,14 +801,11 @@ public:
   Stmt *visitSwitchStmt(SwitchStmt *S) {
     // Type-check the subject expression.
     Expr *subjectExpr = S->getSubjectExpr();
-    bool hadTypeError = TC.typeCheckExpression(subjectExpr, DC);
-    subjectExpr = TC.coerceToMaterializable(subjectExpr);
-    
-    if (!subjectExpr)
-      return nullptr;
-    
+    TC.typeCheckExpression(subjectExpr, DC);
+    if (Expr *newSubjectExpr = TC.coerceToMaterializable(subjectExpr))
+      subjectExpr = newSubjectExpr;
     S->setSubjectExpr(subjectExpr);
-    Type subjectType = subjectExpr->getType();
+    Type subjectType = S->getSubjectExpr()->getType();
 
     // Type-check the case blocks.
     AddSwitchNest switchNest(*this);
@@ -835,40 +823,33 @@ public:
         if (auto *newPattern = TC.resolvePattern(pattern, DC,
                                                  /*isStmtCondition*/false)) {
           pattern = newPattern;
-        } else {
-          hadTypeError = true;
-          continue;
+          // Coerce the pattern to the subject's type.
+          if (TC.coercePatternToType(pattern, DC, subjectType,
+                                     TR_InExpression)) {
+            // If that failed, mark any variables binding pieces of the pattern
+            // as invalid to silence follow-on errors.
+            pattern->forEachVariable([&](VarDecl *VD) {
+              VD->overwriteType(ErrorType::get(TC.Context));
+              VD->setInvalid();
+            });
+          }
+          labelItem.setPattern(pattern);
         }
-
-        // Coerce the pattern to the subject's type.
-        if (TC.coercePatternToType(pattern, DC, subjectType, TR_InExpression)) {
-          // If that failed, mark any variables binding pieces of the pattern
-          // as invalid to silence follow-on errors.
-          pattern->forEachVariable([&](VarDecl *VD) {
-            VD->overwriteType(ErrorType::get(TC.Context));
-            VD->setInvalid();
-          });
-          hadTypeError = true;
-        }
-        labelItem.setPattern(pattern);
 
         // Check the guard expression, if present.
         if (auto *guard = labelItem.getGuardExpr()) {
-          if (TC.typeCheckCondition(guard, DC))
-            hadTypeError = true;
-          else
-            labelItem.setGuardExpr(guard);
+          TC.typeCheckCondition(guard, DC);
+          labelItem.setGuardExpr(guard);
         }
       }
       
       // Type-check the body statements.
       Stmt *body = caseBlock->getBody();
-      if (typeCheckStmt(body))
-        hadTypeError = true;
+      typeCheckStmt(body);
       caseBlock->setBody(body);
     }
     
-    return hadTypeError ? nullptr : S;
+    return S;
   }
 
   Stmt *visitCaseStmt(CaseStmt *S) {
@@ -881,22 +862,20 @@ public:
     llvm_unreachable("catch stmt outside of do-catch?!");
   }
 
-  bool checkCatchStmt(CatchStmt *S) {
+  void checkCatchStmt(CatchStmt *S) {
     // Check the catch pattern.
-    bool hadTypeError = TC.typeCheckCatchPattern(S, DC);
+    TC.typeCheckCatchPattern(S, DC);
 
     // Check the guard expression, if present.
     if (Expr *guard = S->getGuardExpr()) {
-      hadTypeError |= TC.typeCheckCondition(guard, DC);
+      TC.typeCheckCondition(guard, DC);
       S->setGuardExpr(guard);
     }
       
     // Type-check the clause body.
     Stmt *body = S->getBody();
-    hadTypeError |= typeCheckStmt(body);
+    typeCheckStmt(body);
     S->setBody(body);
-
-    return hadTypeError;
   }
 
   Stmt *visitDoCatchStmt(DoCatchStmt *S) {
@@ -905,23 +884,18 @@ public:
     // entire construct.
     AddLabeledStmt loopNest(*this, S);
 
-    bool hadTypeError = false;
-
     // Type-check the 'do' body.  Type failures in here will generally
     // not cause type failures in the 'catch' clauses.
     Stmt *newBody = S->getBody();
-    if (typeCheckStmt(newBody)) {
-      hadTypeError = true;
-    } else {
-      S->setBody(newBody);
-    }
+    typeCheckStmt(newBody);
+    S->setBody(newBody);
 
     // Check all the catch clauses independently.
     for (auto clause : S->getCatches()) {
-      hadTypeError |= checkCatchStmt(clause);
+      checkCatchStmt(clause);
     }
     
-    return hadTypeError ? nullptr : S;
+    return S;
   }
 
   Stmt *visitFailStmt(FailStmt *S) {
@@ -934,8 +908,6 @@ public:
 } // end anonymous namespace
 
 bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
-  bool hadTypeError = false;
-
   // Grab the standard exception type.
   Type exnType = getExceptionType(DC, S->getCatchLoc());
 
@@ -954,15 +926,11 @@ bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
             var->overwriteType(ErrorType::get(Context));
             var->setInvalid();
         });
-      hadTypeError = true;
     }
 
     S->setErrorPattern(pattern);
-  } else {
-    hadTypeError = true;
   }
-
-  return hadTypeError;
+  return false;
 }
   
 void TypeChecker::checkIgnoredExpr(Expr *E) {
@@ -1082,14 +1050,10 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
       if (isDiscarded)
         options |= TypeCheckExprFlags::IsDiscarded;
 
-      if (TC.typeCheckExpression(SubExpr, DC, Type(), CTP_Unused, options)) {
-        elem = SubExpr;
-        continue;
-      }
-      
-      if (isDiscarded)
+      bool hadTypeError = TC.typeCheckExpression(SubExpr, DC, Type(),
+                                                 CTP_Unused, options);
+      if (isDiscarded && !hadTypeError)
         TC.checkIgnoredExpr(SubExpr);
-      
       elem = SubExpr;
       continue;
     }
@@ -1100,8 +1064,8 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
           (Loc == EndTypeCheckLoc || SM.isBeforeInBuffer(EndTypeCheckLoc, Loc)))
         break;
 
-      if (!typeCheckStmt(SubStmt))
-        elem = SubStmt;
+      typeCheckStmt(SubStmt);
+      elem = SubStmt;
       continue;
     }
 
@@ -1118,75 +1082,51 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
 }
 
 /// Check the default arguments that occur within this pattern.
-static void checkDefaultArguments(TypeChecker &tc, Pattern *pattern,
-                                  unsigned &nextArgIndex,
-                                  DeclContext *dc) {
+static void checkDefaultArguments(TypeChecker &tc, ParameterList *params,
+                                  unsigned &nextArgIndex, DeclContext *dc) {
   assert(dc->isLocalContext());
 
-  switch (pattern->getKind()) {
-  case PatternKind::Tuple:
-    for (auto &field : cast<TuplePattern>(pattern)->getElements()) {
-      unsigned curArgIndex = nextArgIndex++;
-      if (field.getInit() &&
-          field.getPattern()->hasType() &&
-          !field.getPattern()->getType()->is<ErrorType>()) {
+  for (auto &param : *params) {
+    unsigned curArgIndex = nextArgIndex++;
+    if (!param->getDefaultValue() || !param->hasType() ||
+        param->getType()->is<ErrorType>())
+      continue;
+    
+    auto defaultValueHandle = param->getDefaultValue();
+    Expr *e = defaultValueHandle->getExpr();
 
-        Expr *e = field.getInit()->getExpr();
+    // Re-use an existing initializer context if possible.
+    auto existingContext = e->findExistingInitializerContext();
+    DefaultArgumentInitializer *initContext;
+    if (existingContext) {
+      initContext = cast<DefaultArgumentInitializer>(existingContext);
+      assert(initContext->getIndex() == curArgIndex);
+      assert(initContext->getParent() == dc);
 
-        // Re-use an existing initializer context if possible.
-        auto existingContext = e->findExistingInitializerContext();
-        DefaultArgumentInitializer *initContext;
-        if (existingContext) {
-          initContext = cast<DefaultArgumentInitializer>(existingContext);
-          assert(initContext->getIndex() == curArgIndex);
-          assert(initContext->getParent() == dc);
-
-        // Otherwise, allocate one temporarily.
-        } else {
-          initContext =
-            tc.Context.createDefaultArgumentContext(dc, curArgIndex);
-        }
-
-        // Type-check the initializer, then flag that we did so.
-        if (tc.typeCheckExpression(e, initContext,field.getPattern()->getType(),
-                                   CTP_DefaultParameter))
-          field.getInit()->setExpr(field.getInit()->getExpr(), true);
-        else
-          field.getInit()->setExpr(e, true);
-
-        tc.checkInitializerErrorHandling(initContext, e);
-
-        // Walk the checked initializer and contextualize any closures
-        // we saw there.
-        bool hasClosures = tc.contextualizeInitializer(initContext, e);
-
-        // If we created a new context and didn't run into any autoclosures
-        // during the walk, give the context back to the ASTContext.
-        if (!hasClosures && !existingContext)
-          tc.Context.destroyDefaultArgumentContext(initContext);
-      }
+    // Otherwise, allocate one temporarily.
+    } else {
+      initContext =
+        tc.Context.createDefaultArgumentContext(dc, curArgIndex);
     }
-    return;
-  case PatternKind::Paren:
-    return checkDefaultArguments(tc,
-                                 cast<ParenPattern>(pattern)->getSubPattern(),
-                                 nextArgIndex,
-                                 dc);
-  case PatternKind::Var:
-    return checkDefaultArguments(tc, cast<VarPattern>(pattern)->getSubPattern(),
-                                 nextArgIndex,
-                                 dc);
-  case PatternKind::Typed:
-  case PatternKind::Named:
-  case PatternKind::Any:
-    return;
 
-#define PATTERN(Id, Parent)
-#define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
-#include "swift/AST/PatternNodes.def"
-    llvm_unreachable("pattern can't appear in argument list!");
+    // Type-check the initializer, then flag that we did so.
+    if (tc.typeCheckExpression(e, initContext, param->getType(),
+                               CTP_DefaultParameter))
+      defaultValueHandle->setExpr(defaultValueHandle->getExpr(), true);
+    else
+      defaultValueHandle->setExpr(e, true);
+
+    tc.checkInitializerErrorHandling(initContext, e);
+
+    // Walk the checked initializer and contextualize any closures
+    // we saw there.
+    bool hasClosures = tc.contextualizeInitializer(initContext, e);
+
+    // If we created a new context and didn't run into any autoclosures
+    // during the walk, give the context back to the ASTContext.
+    if (!hasClosures && !existingContext)
+      tc.Context.destroyDefaultArgumentContext(initContext);
   }
-  llvm_unreachable("bad pattern kind!");
 }
 
 bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
@@ -1222,9 +1162,8 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
                                              SourceLoc EndTypeCheckLoc) {
   // Check the default argument definitions.
   unsigned nextArgIndex = 0;
-  for (auto pattern : FD->getBodyParamPatterns()) {
-    checkDefaultArguments(*this, pattern, nextArgIndex, FD);
-  }
+  for (auto paramList : FD->getParameterLists())
+    checkDefaultArguments(*this, paramList, nextArgIndex, FD);
 
   // Clang imported inline functions do not have a Swift body to
   // typecheck.
@@ -1323,8 +1262,8 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
                                                 SourceLoc EndTypeCheckLoc) {
   // Check the default argument definitions.
   unsigned nextArgIndex = 0;
-  for (auto pattern : ctor->getBodyParamPatterns())
-    checkDefaultArguments(*this, pattern, nextArgIndex, ctor);
+  for (auto paramList : ctor->getParameterLists())
+    checkDefaultArguments(*this, paramList, nextArgIndex, ctor);
 
   BraceStmt *body = ctor->getBody();
   if (!body)

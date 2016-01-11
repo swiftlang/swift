@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -459,7 +459,7 @@ public func +<
     where S.Generator.Element == C.Generator.Element
 >(lhs: S, rhs: C) -> C {
   var result = C()
-  result.reserveCapacity(rhs.count + numericCast(rhs.underestimateCount()))
+  result.reserveCapacity(rhs.count + numericCast(lhs.underestimateCount()))
   result.appendContentsOf(lhs)
   result.appendContentsOf(rhs)
   return result

@@ -1,10 +1,6 @@
-// RUN: %target-swift-frontend -emit-sil -sdk %S/../SILGen/Inputs %s -I %S/../SILGen/Inputs -enable-source-import -parse-stdlib -o /dev/null -verify
-
-// FIXME: rdar://problem/19648117 Needs splitting objc parts out
-// XFAIL: linux
+// RUN: %target-swift-frontend -emit-sil %s -parse-stdlib -o /dev/null -verify
 
 import Swift
-import gizmo
 
 func markUsed<T>(t: T) {}
 
@@ -145,7 +141,7 @@ func test4() {
   markUsed(t3.2)
 
 
-  // Partially set, wholey read.
+  // Partially set, wholly read.
   var t4 : (Int, Int, Int)   // expected-note 1 {{variable defined here}}
   t4.0 = 1; t4.2 = 42
   _ = t4            // expected-error {{variable 't4.1' used before being initialized}}
@@ -290,7 +286,7 @@ func emptyStructTest() {
 
 func takesTuplePair(inout a : (SomeClass, SomeClass)) {}
 
-// This tests cases where an store might be an init or assign based on control
+// This tests cases where a store might be an init or assign based on control
 // flow path reaching it.
 func conditionalInitOrAssign(c : Bool, x : Int) {
   var t : Int  // Test trivial types.
@@ -578,38 +574,6 @@ enum TrivialEnum : TriviallyConstructible {
     self.init(up: y * y)
   }
 }
-
-@requires_stored_property_inits
-class RequiresInitsDerived : Gizmo {
-  var a = 1
-  var b = 2
-  var c = 3
-
-  override init() {
-    super.init()
-  }
-
-  init(i: Int) {
-    if i > 0 {
-      super.init()
-    }
-  } // expected-error{{super.init isn't called on all paths before returning from initializer}}
-
-  init(d: Double) {
-    f() // expected-error {{use of 'self' in method call 'f' before super.init initializes self}}
-    super.init()
-  }
-
-  init(t: ()) {
-    a = 5 // expected-error {{use of 'self' in property access 'a' before super.init initializes self}}
-    b = 10 // expected-error {{use of 'self' in property access 'b' before super.init initializes self}}
-    super.init()
-    c = 15
-  }
-
-  func f() { }
-}
-
 
 // rdar://16119509 - Dataflow problem where we reject valid code.
 class rdar16119509_Buffer {
@@ -1046,7 +1010,7 @@ struct StructMutatingMethodTest {
   let y : Int
   init() {
     x = 42
-    ++x     // expected-error {{mutating operator '++' may not be used on immutable value 'self.x'}}
+    x += 1     // expected-error {{mutating operator '+=' may not be used on immutable value 'self.x'}}
 
     y = 12
     myTransparentFunction(&y)  // expected-error {{immutable value 'self.y' may not be passed inout}}

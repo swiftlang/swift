@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -46,22 +46,20 @@ using namespace Mangle;
 //===----------------------------------------------------------------------===//
 
 static void mangleSubstitution(Mangler &M, Substitution Sub) {
-  M.mangleType(Sub.getReplacement()->getCanonicalType(),
-               ResilienceExpansion::Minimal, 0);
+  M.mangleType(Sub.getReplacement()->getCanonicalType(), 0);
   for (auto C : Sub.getConformances()) {
-    if (!C)
+    if (C.isAbstract())
       return;
-    M.mangleProtocolConformance(C);
+    M.mangleProtocolConformance(C.getConcrete());
   }
 }
 
 void GenericSpecializationMangler::mangleSpecialization() {
   Mangler &M = getMangler();
-  llvm::raw_ostream &Buf = getBuffer();
 
   for (auto &Sub : Subs) {
     mangleSubstitution(M, Sub);
-    Buf << '_';
+    M.append('_');
   }
 }
 
@@ -136,10 +134,9 @@ setArgumentBoxToStack(unsigned ArgNo) {
 void
 FunctionSignatureSpecializationMangler::mangleConstantProp(LiteralInst *LI) {
   Mangler &M = getMangler();
-  llvm::raw_ostream &os = getBuffer();
 
   // Append the prefix for constant propagation 'cp'.
-  os << "cp";
+  M.append("cp");
 
   // Then append the unique identifier of our literal.
   switch (LI->getKind()) {
@@ -147,36 +144,40 @@ FunctionSignatureSpecializationMangler::mangleConstantProp(LiteralInst *LI) {
     llvm_unreachable("unknown literal");
   case ValueKind::FunctionRefInst: {
     SILFunction *F = cast<FunctionRefInst>(LI)->getReferencedFunction();
-    os << "fr";
-    M.mangleIdentifier(F->getName());
+    M.append("fr");
+    M.mangleIdentifierSymbol(F->getName());
     break;
   }
   case ValueKind::GlobalAddrInst: {
     SILGlobalVariable *G = cast<GlobalAddrInst>(LI)->getReferencedGlobal();
-    os << "g";
-    M.mangleIdentifier(G->getName());
+    M.append("g");
+    M.mangleIdentifierSymbol(G->getName());
     break;
   }
   case ValueKind::IntegerLiteralInst: {
     APInt apint = cast<IntegerLiteralInst>(LI)->getValue();
-    os << "i" << apint;
+    M.append("i");
+    M.mangleNatural(apint);
     break;
   }
   case ValueKind::FloatLiteralInst: {
     APInt apint = cast<FloatLiteralInst>(LI)->getBits();
-    os << "fl" << apint;
+    M.append("fl");
+    M.mangleNatural(apint);
     break;
   }
   case ValueKind::StringLiteralInst: {
     StringLiteralInst *SLI = cast<StringLiteralInst>(LI);
     StringRef V = SLI->getValue();
 
-    assert(V.size() <= 32 && "Can not encode string of length > 32");
+    assert(V.size() <= 32 && "Cannot encode string of length > 32");
 
     llvm::SmallString<33> Str;
     Str += "u";
     Str += V;
-    os << "se" << unsigned(SLI->getEncoding()) << "v";
+    M.append("se");
+    M.mangleNatural(APInt(32, unsigned(SLI->getEncoding())));
+    M.append("v");
     M.mangleIdentifier(Str);
     break;
   }
@@ -187,38 +188,34 @@ void
 FunctionSignatureSpecializationMangler::
 mangleClosureProp(PartialApplyInst *PAI) {
   Mangler &M = getMangler();
-  llvm::raw_ostream &os = getBuffer();
-
-  os << "cl";
+  M.append("cl");
 
   // Add in the partial applies function name if we can find one. Assert
   // otherwise. The reason why this is ok to do is currently we only perform
   // closure specialization if we know the function_ref in question. When this
   // restriction is removed, the assert here will fire.
   auto *FRI = cast<FunctionRefInst>(PAI->getCallee());
-  M.mangleIdentifier(FRI->getReferencedFunction()->getName());
+  M.mangleIdentifierSymbol(FRI->getReferencedFunction()->getName());
 
   // Then we mangle the types of the arguments that the partial apply is
   // specializing.
   for (auto &Op : PAI->getArgumentOperands()) {
     SILType Ty = Op.get().getType();
-    M.mangleType(Ty.getSwiftRValueType(), ResilienceExpansion::Minimal, 0);
+    M.mangleType(Ty.getSwiftRValueType(), 0);
   }
 }
 
 void FunctionSignatureSpecializationMangler::mangleClosureProp(
     ThinToThickFunctionInst *TTTFI) {
   Mangler &M = getMangler();
-  llvm::raw_ostream &os = getBuffer();
-
-  os << "cl";
+  M.append("cl");
 
   // Add in the partial applies function name if we can find one. Assert
   // otherwise. The reason why this is ok to do is currently we only perform
   // closure specialization if we know the function_ref in question. When this
   // restriction is removed, the assert here will fire.
   auto *FRI = cast<FunctionRefInst>(TTTFI->getCallee());
-  M.mangleIdentifier(FRI->getReferencedFunction()->getName());
+  M.mangleIdentifierSymbol(FRI->getReferencedFunction()->getName());
 }
 
 void FunctionSignatureSpecializationMangler::mangleArgument(
@@ -239,35 +236,33 @@ void FunctionSignatureSpecializationMangler::mangleArgument(
     return;
   }
 
-  llvm::raw_ostream &os = getBuffer();
-
   if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::Unmodified)) {
-    os << "n";
+    M.append("n");
     return;
   }
 
   if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::BoxToValue)) {
-    os << "i";
+    M.append("i");
     return;
   }
 
   if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::BoxToStack)) {
-    os << "k";
+    M.append("k");
     return;
   }
 
   bool hasSomeMod = false;
   if (ArgMod & ArgumentModifierIntBase(ArgumentModifier::Dead)) {
-    os << "d";
+    M.append("d");
     hasSomeMod = true;
   }
 
   if (ArgMod & ArgumentModifierIntBase(ArgumentModifier::OwnedToGuaranteed)) {
-    os << "g";
+    M.append("g");
     hasSomeMod = true;
   }
   if (ArgMod & ArgumentModifierIntBase(ArgumentModifier::SROA)) {
-    os << "s";
+    M.append("s");
     hasSomeMod = true;
   }
 
@@ -275,13 +270,12 @@ void FunctionSignatureSpecializationMangler::mangleArgument(
 }
 
 void FunctionSignatureSpecializationMangler::mangleSpecialization() {
-  llvm::raw_ostream &os = getBuffer();
 
   for (unsigned i : indices(Args)) {
     ArgumentModifierIntBase ArgMod;
     NullablePtr<SILInstruction> Inst;
     std::tie(ArgMod, Inst) = Args[i];
     mangleArgument(ArgMod, Inst);
-    os << "_";
+    M.append("_");
   }
 }

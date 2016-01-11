@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -162,7 +162,7 @@ static llvm::Optional<bool> proveNonPayloadedEnumCase(SILBasicBlock *BB,
 bool RCIdentityFunctionInfo::
 findDominatingNonPayloadedEdge(SILBasicBlock *IncomingEdgeBB,
                                SILValue RCIdentity) {
-  // First grab the NonPayloadedEnumBB and RCIdentityBB. If we can not find
+  // First grab the NonPayloadedEnumBB and RCIdentityBB. If we cannot find
   // either of them, return false.
   SILBasicBlock *RCIdentityBB = RCIdentity->getParentBB();
   if (!RCIdentityBB)
@@ -226,7 +226,7 @@ findDominatingNonPayloadedEdge(SILBasicBlock *IncomingEdgeBB,
   return false;
 }
 
-/// Return the underlying SILValue after stripping off SILArguments that can not
+/// Return the underlying SILValue after stripping off SILArguments that cannot
 /// affect RC identity.
 ///
 /// This code is meant to enable RCIdentity to be ascertained in the following
@@ -317,7 +317,7 @@ SILValue RCIdentityFunctionInfo::stripRCIdentityPreservingArgs(SILValue V,
       continue;
     }
 
-    // Try to strip off the RCIdentityPresrvingArg for IV. If it matches
+    // Try to strip off the RCIdentityPreservingArg for IV. If it matches
     // FirstIV, we may be able to succeed here.
     if (FirstIV == stripOneRCIdentityIncomingValue(A, IV))
       continue;

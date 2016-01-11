@@ -1,8 +1,8 @@
-//===--------- LICM.cpp - Loop invariant code motion ------*- C++ -*-------===//
+//===--- LICM.cpp - Loop invariant code motion ------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -309,8 +309,8 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT,
   return Changed;
 }
 
-static bool sinkFixLiftime(SILLoop *Loop, DominanceInfo *DomTree,
-                           SILLoopInfo *LI) {
+static bool sinkFixLifetime(SILLoop *Loop, DominanceInfo *DomTree,
+                            SILLoopInfo *LI) {
   DEBUG(llvm::errs() << " Sink fix_lifetime attempt\n");
   auto Preheader = Loop->getLoopPreheader();
   if (!Preheader)
@@ -371,7 +371,7 @@ static bool sinkFixLiftime(SILLoop *Loop, DominanceInfo *DomTree,
 }
 
 namespace {
-/// \brief Summmary of may writes occuring in the loop tree rooted at \p
+/// \brief Summary of may writes occurring in the loop tree rooted at \p
 /// Loop. This includes all writes of the sub loops and the loop itself.
 struct LoopNestSummary {
   SILLoop *Loop;
@@ -520,7 +520,7 @@ void LoopTreeOptimization::optimizeLoop(SILLoop *CurrentLoop,
   Changed |= sinkCondFail(CurrentLoop);
   Changed |= hoistInstructions(CurrentLoop, DomTree, SafeReads,
                                RunsOnHighLevelSil);
-  Changed |= sinkFixLiftime(CurrentLoop, DomTree, LoopInfo);
+  Changed |= sinkFixLifetime(CurrentLoop, DomTree, LoopInfo);
 }
 
 namespace {

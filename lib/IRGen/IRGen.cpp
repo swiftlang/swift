@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -23,6 +23,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Platform.h"
+#include "swift/Basic/Timer.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/LLVMPasses/PassesFwd.h"
 #include "swift/LLVMPasses/Passes.h"
@@ -116,6 +117,8 @@ void setModuleFlags(IRGenModule &IGM) {
 
 void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
                                      llvm::TargetMachine *TargetMachine) {
+  SharedTimer timer("LLVM optimization");
+
   // Set up a pipeline.
   PassManagerBuilder PMBuilder;
 
@@ -124,6 +127,7 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
     PMBuilder.Inliner = llvm::createFunctionInliningPass(200);
     PMBuilder.SLPVectorize = true;
     PMBuilder.LoopVectorize = true;
+    PMBuilder.MergeFunctions = true;
   } else {
     PMBuilder.OptLevel = 0;
     if (!Opts.DisableLLVMOptzns)
@@ -277,7 +281,10 @@ static bool performLLVM(IRGenOptions &Opts, DiagnosticEngine &Diags,
   }
   }
 
-  EmitPasses.run(*Module);
+  {
+    SharedTimer timer("LLVM output");
+    EmitPasses.run(*Module);
+  }
   return false;
 }
 
@@ -408,68 +415,71 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
 
   initLLVMModule(IGM);
   
-  // Emit the module contents.
-  dispatcher.emitGlobalTopLevel();
+  {
+    SharedTimer timer("IRGen");
+    // Emit the module contents.
+    dispatcher.emitGlobalTopLevel();
 
-  if (SF) {
-    IGM.emitSourceFile(*SF, StartElem);
-  } else {
-    assert(StartElem == 0 && "no explicit source file provided");
-    for (auto *File : M->getFiles()) {
-      if (auto *nextSF = dyn_cast<SourceFile>(File)) {
-        if (nextSF->ASTStage >= SourceFile::TypeChecked)
-          IGM.emitSourceFile(*nextSF, 0);
-      } else {
-        File->collectLinkLibraries([&IGM](LinkLibrary LinkLib) {
-          IGM.addLinkLibrary(LinkLib);
-        });
+    if (SF) {
+      IGM.emitSourceFile(*SF, StartElem);
+    } else {
+      assert(StartElem == 0 && "no explicit source file provided");
+      for (auto *File : M->getFiles()) {
+        if (auto *nextSF = dyn_cast<SourceFile>(File)) {
+          if (nextSF->ASTStage >= SourceFile::TypeChecked)
+            IGM.emitSourceFile(*nextSF, 0);
+        } else {
+          File->collectLinkLibraries([&IGM](LinkLibrary LinkLib) {
+            IGM.addLinkLibrary(LinkLib);
+          });
+        }
       }
     }
-  }
 
-  // Register our info with the runtime if needed.
-  if (Opts.UseJIT) {
-    IGM.emitRuntimeRegistration();
-  } else {
-    // Emit protocol conformances into a section we can recognize at runtime.
-    // In JIT mode these are manually registered above.
-    IGM.emitProtocolConformances();
-  }
+    // Register our info with the runtime if needed.
+    if (Opts.UseJIT) {
+      IGM.emitRuntimeRegistration();
+    } else {
+      // Emit protocol conformances into a section we can recognize at runtime.
+      // In JIT mode these are manually registered above.
+      IGM.emitProtocolConformances();
+    }
 
-  // Okay, emit any definitions that we suddenly need.
-  dispatcher.emitLazyDefinitions();
+    // Okay, emit any definitions that we suddenly need.
+    dispatcher.emitLazyDefinitions();
 
-  // Emit symbols for eliminated dead methods.
-  IGM.emitVTableStubs();
+    // Emit symbols for eliminated dead methods.
+    IGM.emitVTableStubs();
 
-  // Verify type layout if we were asked to.
-  if (!Opts.VerifyTypeLayoutNames.empty())
-    IGM.emitTypeVerifier();
+    // Verify type layout if we were asked to.
+    if (!Opts.VerifyTypeLayoutNames.empty())
+      IGM.emitTypeVerifier();
 
-  std::for_each(Opts.LinkLibraries.begin(), Opts.LinkLibraries.end(),
-                [&](LinkLibrary linkLib) {
-    IGM.addLinkLibrary(linkLib);
-  });
-
-  // Hack to handle thunks eagerly synthesized by the Clang importer.
-  swift::Module *prev = nullptr;
-  for (auto external : Ctx.ExternalDefinitions) {
-    swift::Module *next = external->getModuleContext();
-    if (next == prev)
-      continue;
-    prev = next;
-
-    if (next->getName() == M->getName())
-      continue;
-
-    next->collectLinkLibraries([&](LinkLibrary linkLib) {
+    std::for_each(Opts.LinkLibraries.begin(), Opts.LinkLibraries.end(),
+                  [&](LinkLibrary linkLib) {
       IGM.addLinkLibrary(linkLib);
     });
+
+    // Hack to handle thunks eagerly synthesized by the Clang importer.
+    swift::Module *prev = nullptr;
+    for (auto external : Ctx.ExternalDefinitions) {
+      swift::Module *next = external->getModuleContext();
+      if (next == prev)
+        continue;
+      prev = next;
+
+      if (next->getName() == M->getName())
+        continue;
+
+      next->collectLinkLibraries([&](LinkLibrary linkLib) {
+        IGM.addLinkLibrary(linkLib);
+      });
+    }
+
+    IGM.finalize();
+
+    setModuleFlags(IGM);
   }
-
-  IGM.finalize();
-
-  setModuleFlags(IGM);
 
   // Bail out if there are any errors.
   if (Ctx.hadError()) return nullptr;
@@ -655,7 +665,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   std::vector<std::thread> Threads;
   llvm::sys::Mutex DiagMutex;
 
-  // Start all the threads an do the LLVM compilation.
+  // Start all the threads and do the LLVM compilation.
   for (int ThreadIdx = 1; ThreadIdx < numThreads; ++ThreadIdx) {
     Threads.push_back(std::thread(ThreadEntryPoint, &dispatcher, &DiagMutex,
                                   ThreadIdx));

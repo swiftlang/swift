@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -16,7 +16,6 @@
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
-#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 #include <functional>
 
@@ -34,7 +33,7 @@ STATISTIC(NumFuncLinked, "Number of SIL functions linked");
 static bool shouldImportFunction(SILFunction *F) {
   // Skip functions that are marked with the 'no import' tag. These
   // are functions that we don't want to copy from the module.
-  if (F->hasSemanticsString("stdlib_binary_only")) {
+  if (F->hasSemanticsAttr("stdlib_binary_only")) {
     // If we are importing a function declaration mark it as external since we
     // are not importing the body.
     if (F->isExternalDeclaration())
@@ -225,12 +224,13 @@ bool SILLinkerVisitor::visitFunctionRefInst(FunctionRefInst *FRI) {
 }
 
 bool SILLinkerVisitor::visitProtocolConformance(
-    ProtocolConformance *C, const Optional<SILDeclRef> &Member) {
-  // If a null protocol conformance was passed in, just return false.
-  if (!C)
+    ProtocolConformanceRef ref, const Optional<SILDeclRef> &Member) {
+  // If an abstract protocol conformance was passed in, just return false.
+  if (ref.isAbstract())
     return false;
 
   // Otherwise try and lookup a witness table for C.
+  auto C = ref.getConcrete();
   SILWitnessTable *WT = Mod.lookUpWitnessTable(C).first;
 
   // If we don't find any witness table for the conformance, bail and return
@@ -283,7 +283,7 @@ bool SILLinkerVisitor::visitInitExistentialAddrInst(
   // visiting the open_existential_addr/witness_method before the
   // init_existential_inst.
   bool performFuncDeserialization = false;
-  for (ProtocolConformance *C : IEI->getConformances()) {
+  for (ProtocolConformanceRef C : IEI->getConformances()) {
     performFuncDeserialization |=
         visitProtocolConformance(C, Optional<SILDeclRef>());
   }
@@ -300,7 +300,7 @@ bool SILLinkerVisitor::visitInitExistentialRefInst(
   // not going to be smart about this to enable avoiding any issues with
   // visiting the protocol_method before the init_existential_inst.
   bool performFuncDeserialization = false;
-  for (ProtocolConformance *C : IERI->getConformances()) {
+  for (ProtocolConformanceRef C : IERI->getConformances()) {
     performFuncDeserialization |=
         visitProtocolConformance(C, Optional<SILDeclRef>());
   }
@@ -351,21 +351,6 @@ bool SILLinkerVisitor::process() {
 
             if (!shouldImportFunction(F))
               continue;
-
-            // The ExternalSource may wish to rewrite non-empty bodies.
-            if (!F->isExternalDeclaration() && ExternalSource) {
-              if (auto *NewFn = ExternalSource->lookupSILFunction(F)) {
-                if (NewFn->isExternalDeclaration())
-                  continue;
-
-                NewFn->verify();
-                Worklist.push_back(NewFn);
-
-                ++NumFuncLinked;
-                Result = true;
-                continue;
-              }
-            }
 
             DEBUG(llvm::dbgs() << "Imported function: "
                                << F->getName() << "\n");

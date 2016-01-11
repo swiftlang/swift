@@ -256,7 +256,7 @@
               key.kind: source.lang.swift.decl.var.parameter,
               key.name: "arg1",
               key.offset: 445,
-              key.length: 4,
+              key.length: 9,
               key.typename: "Int",
               key.nameoffset: 0,
               key.namelength: 0
@@ -265,7 +265,7 @@
               key.kind: source.lang.swift.decl.var.parameter,
               key.name: "name",
               key.offset: 456,
-              key.length: 4,
+              key.length: 12,
               key.typename: "String",
               key.nameoffset: 456,
               key.namelength: 4
@@ -345,7 +345,7 @@
               key.kind: source.lang.swift.decl.var.parameter,
               key.name: "arg1",
               key.offset: 576,
-              key.length: 4,
+              key.length: 9,
               key.typename: "Int",
               key.nameoffset: 0,
               key.namelength: 0
@@ -354,7 +354,7 @@
               key.kind: source.lang.swift.decl.var.parameter,
               key.name: "par",
               key.offset: 587,
-              key.length: 9,
+              key.length: 14,
               key.typename: "Int",
               key.nameoffset: 587,
               key.namelength: 5
@@ -414,7 +414,7 @@
               key.kind: source.lang.swift.decl.var.parameter,
               key.name: "arg1",
               key.offset: 693,
-              key.length: 4,
+              key.length: 10,
               key.typename: "Bool",
               key.nameoffset: 0,
               key.namelength: 0
@@ -479,7 +479,7 @@
           key.kind: source.lang.swift.decl.var.parameter,
           key.name: "arg1",
           key.offset: 854,
-          key.length: 4,
+          key.length: 10,
           key.typename: "Bool",
           key.nameoffset: 0,
           key.namelength: 0

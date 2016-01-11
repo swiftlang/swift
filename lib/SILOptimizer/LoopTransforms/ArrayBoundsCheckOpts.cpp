@@ -1,8 +1,8 @@
-//===----- ArrayBoundsCheckOpts.cpp - Bounds check elim ---*- C++ -*-------===//
+//===--- ArrayBoundsCheckOpts.cpp - Bounds check elim -----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -192,7 +192,7 @@ mayChangeArraySize(SILInstruction *I, ArrayCallKind &Kind, SILValue &Array,
   return ArrayBoundsEffect::kMayChangeAny;
 }
 
-/// Two allocations of a mutable array struct can not reference the same
+/// Two allocations of a mutable array struct cannot reference the same
 /// storage after modification. So we can treat them as not aliasing for the
 /// purpose of bound checking. The change would only be tracked through one of
 /// the allocations.
@@ -250,7 +250,7 @@ public:
   ABCAnalysis(const ABCAnalysis &) = delete;
   ABCAnalysis &operator=(const ABCAnalysis &) = delete;
 
-  /// Find safe array bounds check in a loop. An bounds_check is safe if no size
+  /// Find safe array bounds check in a loop. A bounds_check is safe if no size
   /// modifying instruction to the same array has been seen so far.
   ///
   /// The code relies on isIdentifiedUnderlyingArrayObject' to make sure that a
@@ -792,7 +792,7 @@ public:
       // Look for induction variables.
       IVInfo::IVDesc IV;
       if (!(IV = IVs.getInductionDesc(Arg))) {
-        DEBUG(llvm::dbgs() << " not a induction variable: " << *Arg);
+        DEBUG(llvm::dbgs() << " not an induction variable: " << *Arg);
         continue;
       }
 
@@ -935,7 +935,7 @@ public:
     // Set the new start index to the first value of the induction.
     Start->setOperand(0, FirstVal);
 
-      // Clone and fixup the load, retain sequenence to the header.
+      // Clone and fixup the load, retain sequence to the header.
     auto NewCheck = CheckToHoist.copyTo(Preheader->getTerminator(), DT);
     NewCheck->setOperand(1, Start);
 

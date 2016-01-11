@@ -1,13 +1,14 @@
 // RUN: %target-swift-frontend -O -primary-file %s -emit-ir -g -o - | FileCheck %s
-
+import StdlibUnittest
 // CHECK-LABEL: define{{.*}}2fn
-func fn() {
-  print("two")
-// CHECK-DAG: ![[LOC:.*]] = !DILocation(line: [[@LINE+1]], column: 11,
-  print(0 - UInt(Process.arguments.count))
-// CHECK-DAG: ![[LOC2:.*]] = !DILocation(line: [[@LINE+1]], column: 11,
-  print(1 - UInt(Process.arguments.count))
-  print("three")
+public var i : UInt32 = 1
+public func fn() {
+  _blackHole(i)
+// CHECK-DAG: ![[LOC:.*]] = !DILocation(line: [[@LINE+1]], column: 16,
+  _blackHole(0 - i)
+// CHECK-DAG: ![[LOC2:.*]] = !DILocation(line: [[@LINE+1]], column: 16,
+  _blackHole(0 - i)
+  _blackHole(i)
 }
 
 // CHECK-DAG: call void @llvm.trap(), !dbg ![[LOC]]

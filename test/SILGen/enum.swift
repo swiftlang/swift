@@ -68,30 +68,30 @@ func AddressOnly_cases(s: S) {
 
   // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin AddressOnly.Type
   // CHECK-NEXT:  [[NOUGHT:%.*]] = alloc_stack $AddressOnly
-  // CHECK-NEXT:  inject_enum_addr [[NOUGHT]]#1
-  // CHECK-NEXT:  destroy_addr [[NOUGHT]]#1
-  // CHECK-NEXT:  dealloc_stack [[NOUGHT]]#0
+  // CHECK-NEXT:  inject_enum_addr [[NOUGHT]]
+  // CHECK-NEXT:  destroy_addr [[NOUGHT]]
+  // CHECK-NEXT:  dealloc_stack [[NOUGHT]]
   _ = AddressOnly.nought
 
   // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin AddressOnly.Type
   // CHECK-NEXT:  [[MERE:%.*]] = alloc_stack $AddressOnly
-  // CHECK-NEXT:  [[PAYLOAD:%.*]] = init_enum_data_addr [[MERE]]#1
+  // CHECK-NEXT:  [[PAYLOAD:%.*]] = init_enum_data_addr [[MERE]]
   // CHECK-NEXT:  [[PAYLOAD_ADDR:%.*]] = init_existential_addr [[PAYLOAD]]
   // CHECK-NEXT:  store %0 to [[PAYLOAD_ADDR]]
-  // CHECK-NEXT:  inject_enum_addr [[MERE]]#1
-  // CHECK-NEXT:  destroy_addr [[MERE]]#1
-  // CHECK-NEXT:  dealloc_stack [[MERE]]#0
+  // CHECK-NEXT:  inject_enum_addr [[MERE]]
+  // CHECK-NEXT:  destroy_addr [[MERE]]
+  // CHECK-NEXT:  dealloc_stack [[MERE]]
   _ = AddressOnly.mere(s)
 
   // Address-only enum vs loadable payload
 
   // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin AddressOnly.Type
   // CHECK-NEXT:  [[PHANTOM:%.*]] = alloc_stack $AddressOnly
-  // CHECK-NEXT:  [[PAYLOAD:%.*]] = init_enum_data_addr [[PHANTOM]]#1 : $*AddressOnly, #AddressOnly.phantom!enumelt.1
+  // CHECK-NEXT:  [[PAYLOAD:%.*]] = init_enum_data_addr [[PHANTOM]] : $*AddressOnly, #AddressOnly.phantom!enumelt.1
   // CHECK-NEXT:  store %0 to [[PAYLOAD]]
-  // CHECK-NEXT:  inject_enum_addr [[PHANTOM]]#1 : $*AddressOnly, #AddressOnly.phantom!enumelt.1
-  // CHECK-NEXT:  destroy_addr [[PHANTOM]]#1
-  // CHECK-NEXT:  dealloc_stack [[PHANTOM]]#0
+  // CHECK-NEXT:  inject_enum_addr [[PHANTOM]] : $*AddressOnly, #AddressOnly.phantom!enumelt.1
+  // CHECK-NEXT:  destroy_addr [[PHANTOM]]
+  // CHECK-NEXT:  dealloc_stack [[PHANTOM]]
 
   _ = AddressOnly.phantom(s)
   // CHECK:       return
@@ -120,18 +120,18 @@ func PolyOptionable_cases<T>(t: T) {
 
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin PolyOptionable<T>.Type
 // CHECK-NEXT:    [[NOUGHT:%.*]] = alloc_stack $PolyOptionable<T>
-// CHECK-NEXT:    inject_enum_addr [[NOUGHT]]#1
-// CHECK-NEXT:    destroy_addr [[NOUGHT]]#1
-// CHECK-NEXT:    dealloc_stack [[NOUGHT]]#0
+// CHECK-NEXT:    inject_enum_addr [[NOUGHT]]
+// CHECK-NEXT:    destroy_addr [[NOUGHT]]
+// CHECK-NEXT:    dealloc_stack [[NOUGHT]]
   _ = PolyOptionable<T>.nought
 
 // CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thin PolyOptionable<T>.Type
 // CHECK-NEXT:    [[MERE:%.*]] = alloc_stack $PolyOptionable<T>
-// CHECK-NEXT:    [[PAYLOAD:%.*]] = init_enum_data_addr [[MERE]]#1
+// CHECK-NEXT:    [[PAYLOAD:%.*]] = init_enum_data_addr [[MERE]]
 // CHECK-NEXT:    copy_addr %0 to [initialization] [[PAYLOAD]]
-// CHECK-NEXT:    inject_enum_addr [[MERE]]#1
-// CHECK-NEXT:    destroy_addr [[MERE]]#1
-// CHECK-NEXT:    dealloc_stack [[MERE]]#0
+// CHECK-NEXT:    inject_enum_addr [[MERE]]
+// CHECK-NEXT:    destroy_addr [[MERE]]
+// CHECK-NEXT:    dealloc_stack [[MERE]]
 
   _ = PolyOptionable<T>.mere(t)
 

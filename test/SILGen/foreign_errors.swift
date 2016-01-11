@@ -13,22 +13,22 @@ func test0() throws {
 
   //   Create a strong temporary holding nil.
   // CHECK: [[ERR_TEMP0:%.*]] = alloc_stack $Optional<NSError>
-  // CHECK: inject_enum_addr [[ERR_TEMP0]]#1 : $*Optional<NSError>, #Optional.None!enumelt
+  // CHECK: inject_enum_addr [[ERR_TEMP0]] : $*Optional<NSError>, #Optional.None!enumelt
   //   Create an unmanaged temporary, copy into it, and make a AutoreleasingUnsafeMutablePointer.
   // CHECK: [[ERR_TEMP1:%.*]] = alloc_stack $@sil_unmanaged Optional<NSError>
-  // CHECK: [[T0:%.*]] = load [[ERR_TEMP0:%.*]]#1
+  // CHECK: [[T0:%.*]] = load [[ERR_TEMP0]]
   // CHECK: [[T1:%.*]] = ref_to_unmanaged [[T0]]
-  // CHECK: store [[T1]] to [[ERR_TEMP1]]#1
-  // CHECK: address_to_pointer [[ERR_TEMP1]]#1
+  // CHECK: store [[T1]] to [[ERR_TEMP1]]
+  // CHECK: address_to_pointer [[ERR_TEMP1]]
 
   //   Call the method.
   // CHECK: [[RESULT:%.*]] = apply [[METHOD]]({{.*}}, [[OBJC_SELF]])
 
   //   Writeback to the first temporary.
-  // CHECK: [[T0:%.*]] = load [[ERR_TEMP1]]#1
+  // CHECK: [[T0:%.*]] = load [[ERR_TEMP1]]
   // CHECK: [[T1:%.*]] = unmanaged_to_ref [[T0]]
   // CHECK: retain_value [[T1]]
-  // CHECK: assign [[T1]] to [[ERR_TEMP0]]#1
+  // CHECK: assign [[T1]] to [[ERR_TEMP0]]
 
   //   Pull out the boolean value and compare it to zero.
   // CHECK: [[T0:%.*]] = struct_extract [[RESULT]]
@@ -43,7 +43,7 @@ func test0() throws {
   
   //   Error path: fall out and rethrow.
   // CHECK: [[ERROR_BB]]:
-  // CHECK: [[T0:%.*]] = load [[ERR_TEMP0]]#1
+  // CHECK: [[T0:%.*]] = load [[ERR_TEMP0]]
   // CHECK: [[T1:%.*]] = function_ref @swift_convertNSErrorToErrorType : $@convention(thin) (@owned Optional<NSError>) -> @owned ErrorType
   // CHECK: [[T2:%.*]] = apply [[T1]]([[T0]])
   // CHECK: throw [[T2]] : $ErrorType
@@ -66,9 +66,9 @@ extension NSObject {
 // CHECK:   [[OBJCERR:%.*]] = enum $Optional<NSError>, #Optional.Some!enumelt.1, [[T1]] : $NSError
 // CHECK:   [[SETTER:%.*]] = function_ref @_TFVs33AutoreleasingUnsafeMutablePointers6memoryx :
 // CHECK:   [[TEMP:%.*]] = alloc_stack $Optional<NSError>
-// CHECK:   store [[OBJCERR]] to [[TEMP]]#1
-// CHECK:   apply [[SETTER]]<Optional<NSError>>([[TEMP]]#1, %0)
-// CHECK:   dealloc_stack [[TEMP]]#0
+// CHECK:   store [[OBJCERR]] to [[TEMP]]
+// CHECK:   apply [[SETTER]]<Optional<NSError>>([[TEMP]], %0)
+// CHECK:   dealloc_stack [[TEMP]]
 // CHECK:   [[T0:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK:   [[T1:%.*]] = struct $Bool ([[T0]] : $Builtin.Int1)
 // CHECK:   br bb3([[T1]] : $Bool)
@@ -92,9 +92,9 @@ extension NSObject {
 // CHECK:   [[OBJCERR:%.*]] = enum $Optional<NSError>, #Optional.Some!enumelt.1, [[T1]] : $NSError
 // CHECK:   [[SETTER:%.*]] = function_ref @_TFVs33AutoreleasingUnsafeMutablePointers6memoryx :
 // CHECK:   [[TEMP:%.*]] = alloc_stack $Optional<NSError>
-// CHECK:   store [[OBJCERR]] to [[TEMP]]#1
-// CHECK:   apply [[SETTER]]<Optional<NSError>>([[TEMP]]#1, %0)
-// CHECK:   dealloc_stack [[TEMP]]#0
+// CHECK:   store [[OBJCERR]] to [[TEMP]]
+// CHECK:   apply [[SETTER]]<Optional<NSError>>([[TEMP]], %0)
+// CHECK:   dealloc_stack [[TEMP]]
 // CHECK:   [[T0:%.*]] = enum $Optional<NSString>, #Optional.None!enumelt
 // CHECK:   br bb3([[T0]] : $Optional<NSString>)
 // CHECK: bb3([[T0:%.*]] : $Optional<NSString>):
@@ -124,7 +124,7 @@ let fn = ErrorProne.fail
 // CHECK:      [[RESULT:%.*]] = apply [[METHOD]]({{%.*}}, [[SELF]])
 // CHECK:      cond_br
 // CHECK:      return
-// CHECK:      [[T0:%.*]] = load [[TEMP]]#1
+// CHECK:      [[T0:%.*]] = load [[TEMP]]
 // CHECK:      [[T1:%.*]] = apply {{%.*}}([[T0]])
 // CHECK:      throw [[T1]]
 
@@ -188,8 +188,8 @@ func testNonNilError() throws -> Float {
 // CHECK:   [[T1:%.*]] = class_method [volatile] [[T0]] : $@thick ErrorProne.Type, #ErrorProne.bounce!1.foreign : ErrorProne.Type -> () throws -> Float , $@convention(objc_method) (AutoreleasingUnsafeMutablePointer<Optional<NSError>>, @objc_metatype ErrorProne.Type) -> Float
 // CHECK:   [[OPTERR:%.*]] = alloc_stack $Optional<NSError>
 // CHECK:   [[RESULT:%.*]] = apply [[T1]](
-// CHECK:   assign {{%.*}} to [[OPTERR]]#1
-// CHECK:   [[T0:%.*]] = load [[OPTERR]]#1
+// CHECK:   assign {{%.*}} to [[OPTERR]]
+// CHECK:   [[T0:%.*]] = load [[OPTERR]]
 // CHECK:   switch_enum [[T0]] : $Optional<NSError>, case #Optional.Some!enumelt.1: [[ERROR_BB:bb[0-9]+]], case #Optional.None!enumelt: [[NORMAL_BB:bb[0-9]+]]
 // CHECK: [[NORMAL_BB]]:
 // CHECK-NOT: release

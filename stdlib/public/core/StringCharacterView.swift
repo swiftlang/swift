@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -46,7 +46,7 @@ extension String {
   ///   that is the target of this method) during the execution of
   ///   `body`: it may not appear to have its correct value.  Instead,
   ///   use only the `String.CharacterView` argument to `body`.
-  public mutating func withMutableCharacters<R>(body: (inout CharacterView)->R) -> R {
+  public mutating func withMutableCharacters<R>(body: (inout CharacterView) -> R) -> R {
     // Naively mutating self.characters forces multiple references to
     // exist at the point of mutation. Instead, temporarily move the
     // core of this string into a CharacterView.
@@ -88,7 +88,7 @@ extension String.CharacterView : CollectionType {
     ///
     /// - Requires: The next value is representable.
     public func successor() -> Index {
-      _precondition(_base != _base._viewEndIndex, "can not increment endIndex")
+      _precondition(_base != _base._viewEndIndex, "cannot increment endIndex")
       return Index(_base: _endBase)
     }
 
@@ -97,7 +97,7 @@ extension String.CharacterView : CollectionType {
     /// - Requires: The previous value is representable.
     public func predecessor() -> Index {
       _precondition(_base != _base._viewStartIndex,
-          "can not decrement startIndex")
+          "cannot decrement startIndex")
       let predecessorLengthUTF16 =
           Index._measureExtendedGraphemeClusterBackward(_base)
       return Index(
@@ -182,14 +182,14 @@ extension String.CharacterView : CollectionType {
 
       var graphemeClusterStart = end
 
-      --graphemeClusterStart
+      graphemeClusterStart._predecessorInPlace()
       var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
           unicodeScalars[graphemeClusterStart].value)
 
       var graphemeClusterStartUTF16 = graphemeClusterStart._position
 
       while graphemeClusterStart != start {
-        --graphemeClusterStart
+        graphemeClusterStart._predecessorInPlace()
         let gcb1 = graphemeClusterBreakProperty.getPropertyRawValue(
             unicodeScalars[graphemeClusterStart].value)
         if segmenter.isBoundary(gcb1, gcb0) {

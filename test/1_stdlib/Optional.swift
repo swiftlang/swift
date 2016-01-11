@@ -12,6 +12,17 @@ import SwiftPrivate
 import ObjectiveC
 #endif
 
+class DeinitTester {
+  private let onDeinit: () -> ()
+
+  init(onDeinit: () -> ()) {
+    self.onDeinit = onDeinit
+  }
+  deinit {
+    onDeinit()
+  }
+}
+
 let OptionalTests = TestSuite("Optional")
 
 protocol TestProtocol1 {}
@@ -140,7 +151,7 @@ OptionalTests.test("nil comparison") {
 
 OptionalTests.test("??") {
   var counter = 0
-  func nextCounter() -> Int { return counter++ }
+  func nextCounter() -> Int { counter += 1; return counter-1 }
   func nextCounter2() -> Int? { return nextCounter() }
 
   let a: Int? = 123
@@ -216,6 +227,14 @@ OptionalTests.test("Casting Optional") {
   expectTrue(anyToAny(ssx, Optional<C>.self)! === x)
   expectTrue(anyToAny(x, Optional<Optional<C>>.self)!! === x)
   expectTrue(anyToAnyOrNil(ni, Int.self) == nil)
+
+  // Test for SR-459: Weakened optionals don't zero.
+  var deinitRan = false
+  do {
+    var t = DeinitTester { deinitRan = true }
+    _ = anyToAny(Optional(t), CustomDebugStringConvertible.self)
+  }
+  expectTrue(deinitRan)
 }
 
 OptionalTests.test("Casting Optional Traps") {

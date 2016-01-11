@@ -1,14 +1,14 @@
-//===--- Local.cpp - Functions that perform local SIL transformations. ---===//
+//===--- Local.cpp - Functions that perform local SIL transformations. ----===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
@@ -270,7 +270,7 @@ bool swift::computeMayBindDynamicSelf(SILFunction *F) {
 }
 
 /// Find a new position for an ApplyInst's FuncRef so that it dominates its
-/// use. Not that FuncionRefInsts may be shared by multiple ApplyInsts.
+/// use. Not that FunctionRefInsts may be shared by multiple ApplyInsts.
 void swift::placeFuncRef(ApplyInst *AI, DominanceInfo *DT) {
   FunctionRefInst *FuncRef = cast<FunctionRefInst>(AI->getCallee());
   SILBasicBlock *DomBB =
@@ -341,8 +341,8 @@ SILLinkage swift::getSpecializedLinkage(SILFunction *F, SILLinkage L) {
     // Treat stdlib_binary_only specially. We don't serialize the body of
     // stdlib_binary_only functions so we can't mark them as Shared (making
     // their visibility in the dylib hidden).
-    return F->hasSemanticsString("stdlib_binary_only") ? SILLinkage::Public
-                                                       : SILLinkage::Shared;
+    return F->hasSemanticsAttr("stdlib_binary_only") ? SILLinkage::Public
+                                                     : SILLinkage::Shared;
 
   case SILLinkage::Private:
   case SILLinkage::PrivateExternal:
@@ -684,8 +684,7 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
   if (!Fn)
     return false;
 
-  if (AI->getNumOperands() != 3 ||
-      !Fn->hasSemanticsString("string.concat"))
+  if (AI->getNumOperands() != 3 || !Fn->hasSemanticsAttr("string.concat"))
     return false;
 
   // Left and right operands of a string concatenation operation.
@@ -708,12 +707,9 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
       FRIRightFun->getEffectsKind() >= EffectsKind::ReadWrite)
     return false;
 
-  if (!FRILeftFun->hasDefinedSemantics() ||
-      !FRIRightFun->hasDefinedSemantics())
+  if (!FRILeftFun->hasSemanticsAttrs() || !FRIRightFun->hasSemanticsAttrs())
     return false;
 
-  auto SemanticsLeft = FRILeftFun->getSemanticsString();
-  auto SemanticsRight = FRIRightFun->getSemanticsString();
   auto AILeftOperandsNum = AILeft->getNumOperands();
   auto AIRightOperandsNum = AIRight->getNumOperands();
 
@@ -721,10 +717,14 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
   // (start: RawPointer, numberOfCodeUnits: Word)
   // makeUTF8 should have following parameters:
   // (start: RawPointer, byteSize: Word, isASCII: Int1)
-  if (!((SemanticsLeft == "string.makeUTF16" && AILeftOperandsNum == 4) ||
-        (SemanticsLeft == "string.makeUTF8" && AILeftOperandsNum == 5) ||
-        (SemanticsRight == "string.makeUTF16" && AIRightOperandsNum == 4) ||
-        (SemanticsRight == "string.makeUTF8" && AIRightOperandsNum == 5)))
+  if (!((FRILeftFun->hasSemanticsAttr("string.makeUTF16") &&
+         AILeftOperandsNum == 4) ||
+        (FRILeftFun->hasSemanticsAttr("string.makeUTF8") &&
+         AILeftOperandsNum == 5) ||
+        (FRIRightFun->hasSemanticsAttr("string.makeUTF16") &&
+         AIRightOperandsNum == 4) ||
+        (FRIRightFun->hasSemanticsAttr("string.makeUTF8") &&
+         AIRightOperandsNum == 5)))
     return false;
 
   SLILeft = dyn_cast<StringLiteralInst>(AILeft->getOperand(1));
@@ -1154,7 +1154,7 @@ static Type getCastFromObjC(SILModule &M, CanType source, CanType target) {
 }
 
 /// Create a call of _forceBridgeFromObjectiveC_bridgeable or
-/// _conditionallyBridgeFromObjectiveC_bridgeable  which converts an an ObjC
+/// _conditionallyBridgeFromObjectiveC_bridgeable which converts an ObjC
 /// instance into a corresponding Swift type, conforming to
 /// _ObjectiveCBridgeable.
 SILInstruction *
@@ -1267,19 +1267,15 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   auto *MetaTyVal = Builder.createMetatype(Loc, SILMetaTy);
   SmallVector<SILValue, 1> Args;
 
-  auto PolyFuncTy = BridgeFuncDecl->getType()->getAs<PolymorphicFunctionType>();
-  ArrayRef<ArchetypeType *> Archetypes =
-      PolyFuncTy->getGenericParams().getAllArchetypes();
-
   // Add substitutions
   SmallVector<Substitution, 2> Subs;
-  auto Conformances = M.getASTContext().Allocate<ProtocolConformance *>(1);
-  Conformances[0] = Conformance;
-  Subs.push_back(Substitution(Archetypes[0], Target, Conformances));
+  auto Conformances =
+    M.getASTContext().AllocateUninitialized<ProtocolConformanceRef>(1);
+  Conformances[0] = ProtocolConformanceRef(Conformance);
+  Subs.push_back(Substitution(Target, Conformances));
   const Substitution *DepTypeSubst = getTypeWitnessByName(
       Conformance, M.getASTContext().getIdentifier("_ObjectiveCType"));
-  Subs.push_back(Substitution(Archetypes[1], DepTypeSubst->getReplacement(),
-                              DepTypeSubst->getConformances()));
+  Subs.push_back(*DepTypeSubst);
   auto SILFnTy = FuncRef->getType();
   SILType SubstFnTy = SILFnTy.substGenericArgs(M, Subs);
   SILType ResultTy = SubstFnTy.castTo<SILFunctionType>()->getSILResult();
@@ -1297,7 +1293,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
     OptionalTy.getAnyOptionalObjectType(OTK);
     Tmp = Builder.createAllocStack(Loc,
                                    SILType::getPrimitiveObjectType(OptionalTy));
-    InOutOptionalParam = SILValue(Tmp, 1);
+    InOutOptionalParam = Tmp;
   } else {
     InOutOptionalParam = Dest;
   }
@@ -1921,7 +1917,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       // Should be in the same BB.
       if (ASI->getParent() != EMI->getParent())
         return nullptr;
-      // Check if this alloc_stac is is only initialized once by means of
+      // Check if this alloc_stack is only initialized once by means of
       // single init_existential_addr.
       bool isLegal = true;
       // init_existential instruction used to initialize this alloc_stack.
@@ -1982,8 +1978,8 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       // Should be in the same BB.
       if (ASRI->getParent() != EMI->getParent())
         return nullptr;
-      // Check if this alloc_stac is is only initialized once by means of
-      // a single initt_existential_ref.
+      // Check if this alloc_stack is only initialized once by means of
+      // a single init_existential_ref.
       bool isLegal = true;
       for (auto Use: getNonDebugUses(*ASRI)) {
         auto *User = Use->getUser();
@@ -2299,9 +2295,9 @@ swift::analyzeStaticInitializer(SILValue V,
   return false;
 }
 
-/// Replace load sequence which may contian
+/// Replace load sequence which may contain
 /// a chain of struct_element_addr followed by a load.
-/// The sequence is travered inside out, i.e.
+/// The sequence is traversed inside out, i.e.
 /// starting with the innermost struct_element_addr
 /// Move into utils.
 void swift::replaceLoadSequence(SILInstruction *I,

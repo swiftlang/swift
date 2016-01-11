@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -emit-ir %s
 
 // This is a compile-only test. It checks if IRGen does not crash when packing
-// and unpacking enums (e.g. optionas) which contain empty structs as payloads.
+// and unpacking enums (e.g. optionals) which contain empty structs as payloads.
 
 sil_stage canonical
 

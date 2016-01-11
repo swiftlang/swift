@@ -1,8 +1,8 @@
-//===-- Devirtualize.cpp - Helper for devirtualizing apply ------*- C++ -*-===//
+//===--- Devirtualize.cpp - Helper for devirtualizing apply -----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -71,7 +71,7 @@ static void getAllSubclasses(ClassHierarchyAnalysis *CHA,
           // bound generic class in a general case.
           if (isa<UnboundGenericType>(SubCanTy))
             return false;
-          // Handle the ususal case here: the class in question
+          // Handle the usual case here: the class in question
           // should be a real subclass of a bound generic class.
           return !ClassType.isSuperclassOf(
               SILType::getPrimitiveObjectType(SubCanTy));
@@ -187,7 +187,7 @@ static bool isKnownFinalClass(ClassDecl *CD, SILModule &M,
     break;
   }
 
-  // Take the ClassHieararchyAnalysis into account.
+  // Take the ClassHierarchyAnalysis into account.
   // If a given class has no subclasses and
   // - private
   // - or internal and it is a WMO compilation
@@ -698,14 +698,31 @@ static ApplySite devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   // witness thunk F may have been created by a  specialization pass and have
   // additional generic parameters.
   SmallVector<Substitution, 16> NewSubstList(Subs.begin(), Subs.end());
+  if (auto generics = AI.getOrigCalleeType()->getGenericSignature()) {
+    ArrayRef<Substitution> origSubs = AI.getSubstitutions();
+    for (auto genericParam : generics->getAllDependentTypes()) {
+      auto origSub = origSubs.front();
+      origSubs = origSubs.slice(1);
 
-  // Add the non-self-derived substitutions from the original application.
-  ArrayRef<Substitution>  SubstList;
-  SubstList = AI.getSubstitutionsWithoutSelfSubstitution();
+      // Ignore generic parameters derived from 'self', the generic
+      // parameter at depth 0, index 0.
+      auto type = genericParam->getCanonicalType();
+      while (auto memberType = dyn_cast<DependentMemberType>(type)) {
+        type = memberType.getBase();
+      }
+      auto paramType = cast<GenericTypeParamType>(type);
+      if (paramType->getDepth() == 0) {
+        // There shouldn't be any other parameters at this depth.
+        assert(paramType->getIndex() == 0);
+        continue;
+      }
 
-  for (auto &origSub : SubstList)
-    if (!origSub.getArchetype()->isSelfDerived())
+      // Okay, remember this substitution.
       NewSubstList.push_back(origSub);
+    }
+
+    assert(origSubs.empty() && "subs not parallel to dependent types");
+  }
 
   // Figure out the exact bound type of the function to be called by
   // applying all substitutions.

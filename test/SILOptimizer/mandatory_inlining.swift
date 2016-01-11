@@ -23,7 +23,7 @@ func foo(x: Float) -> Float {
   // CHECK: return
 
 @_transparent func baz(x: Float) -> Float {
-  return x;
+  return x
 }
 
 // CHECK-LABEL: sil hidden [transparent] @_TF18mandatory_inlining3baz
@@ -112,7 +112,7 @@ infix operator ||| {
   precedence 110
 }
 
-@_transparent func &&& (lhs: Bool, @autoclosure rhs: ()->Bool) -> Bool {
+@_transparent func &&& (lhs: Bool, @autoclosure rhs: () -> Bool) -> Bool {
   if lhs {
     return rhs()
   }
@@ -120,7 +120,7 @@ infix operator ||| {
   return false
 }
 
-@_transparent func ||| (lhs: Bool, @autoclosure rhs: ()->Bool) -> Bool {
+@_transparent func ||| (lhs: Bool, @autoclosure rhs: () -> Bool) -> Bool {
   if lhs {
     return true
   }
@@ -148,7 +148,7 @@ enum X {
 }
 
 func testInlineUnionElement() -> X {
-  return X.onetransp;
+  return X.onetransp
   // CHECK-LABEL: sil hidden @_TF18mandatory_inlining22testInlineUnionElementFT_OS_1X
   // CHECK: enum $X, #X.onetransp!enumelt
   // CHECK-NOT = apply

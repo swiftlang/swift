@@ -25,10 +25,10 @@ func test_conv() {
   a8 = a9
   a9 = a7
 
-  var _ : ((X)->X) -> ((Y) -> Y) = f2;
-  var _ : ((x2 : X)-> (X)) -> (((y2 : Y) -> (Y))) = f2;
+  var _ : ((X) -> X) -> ((Y) -> Y) = f2
+  var _ : ((x2 : X) -> (X)) -> (((y2 : Y) -> (Y))) = f2
 
-  typealias fp = ((X)->X) -> ((Y) -> Y)
+  typealias fp = ((X) -> X) -> ((Y) -> Y)
   var _ = f2
 }
 
@@ -43,7 +43,7 @@ func accept_XY(inout y: Y) -> Y { }
 func accept_Z(inout z: Z) -> Z { }
 
 func test_inout() {
-  var x : X;
+  var x : X
   accept_X(&x);
   accept_X(xy); // expected-error{{passing value of type 'X' to an inout parameter requires explicit '&'}} {{12-12=&}}
   accept_X(&xy);
@@ -51,7 +51,7 @@ func test_inout() {
   accept_XY(&x);
   x = accept_XY(&xy);
 
-  x = xy;
+  x = xy
   x = &xy; // expected-error{{'&' used with non-inout argument of type 'X'}}
   accept_Z(&xy); // expected-error{{cannot convert value of type 'X' to expected argument type 'Z'}}
 }
@@ -60,8 +60,8 @@ func lvalue_or_rvalue(inout x: X) -> X { }
 func lvalue_or_rvalue(x: X) -> Y { }
 
 func test_lvalue_or_rvalue() {
-  var x : X;
-  var y : Y;
+  var x : X
+  var y : Y
   let x1 = lvalue_or_rvalue(&x)
   x = x1
   let y1 = lvalue_or_rvalue(x)

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -60,7 +60,7 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
     // Otherwise, we need to replace the assignment with the full
     // load/store/release dance.  Note that the new value is already
     // considered to be retained (by the semantics of the storage type),
-    // and we're transfering that ownership count into the destination.
+    // and we're transferring that ownership count into the destination.
 
     // This is basically TypeLowering::emitStoreOfCopy, except that if we have
     // a known incoming value, we can avoid the load.
@@ -629,7 +629,7 @@ bool LifetimeChecker::shouldEmitError(SILInstruction *Inst) {
 /// initializer.
 void LifetimeChecker::noteUninitializedMembers(const DIMemoryUse &Use) {
   assert(TheMemory.isAnyInitSelf() && !TheMemory.isDelegatingInit() &&
-         "Not an designated initializer");
+         "Not a designated initializer");
 
   // Root protocol initializers (ones that reassign to self, not delegating to
   // self.init) have no members to initialize and self itself has already been
@@ -1115,7 +1115,7 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
 ///   %6 = enum $Optional<Enum>, #Optional.None!enumelt // user: %7
 ///   br bb2(%6 : $Optional<Enum>)                    // id: %7
 /// bb2(%8 : $Optional<Enum>):                        // Preds: bb0 bb1
-///   dealloc_stack %1#0 : $*@local_storage Enum      // id: %9
+///   dealloc_stack %1 : $*Enum                       // id: %9
 ///   return %8 : $Optional<Enum>                     // id: %10
 ///
 static bool isFailableInitReturnUseOfEnum(EnumInst *EI) {
@@ -1215,7 +1215,7 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
     // the generic error that we would emit before.
     //
     // That is the only case where we support pattern matching a release.
-    if (Release &&
+    if (Release && AI &&
         !AI->getSubstCalleeType()->getExtInfo().hasGuaranteedSelfParam())
       CMI = nullptr;
 
@@ -1226,7 +1226,7 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
     }
   }
 
-  // If this is an apply instruction and we're in an class initializer, we're
+  // If this is an apply instruction and we're in a class initializer, we're
   // calling a method on self.
   if (isa<ApplyInst>(Inst) && TheMemory.isClassInitSelf()) {
     // If this is a method application, produce a nice, specific, error.
@@ -1839,13 +1839,13 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
     auto *Term = BB.getTerminator();
     if (isa<ReturnInst>(Term) || isa<ThrowInst>(Term)) {
       B.setInsertionPoint(Term);
-      B.createDeallocStack(Loc, ControlVariableBox->getContainerResult());
+      B.createDeallocStack(Loc, ControlVariableBox);
     }
   }
   
   // Before the memory allocation, store zero in the control variable.
   B.setInsertionPoint(TheMemory.MemoryInst->getNextNode());
-  SILValue ControlVariableAddr = SILValue(ControlVariableBox, 1);
+  SILValue ControlVariableAddr = ControlVariableBox;
   auto Zero = B.createIntegerLiteral(Loc, IVType, 0);
   B.createStore(Loc, Zero, ControlVariableAddr);
   
@@ -2161,7 +2161,7 @@ computePredsLiveOut(SILBasicBlock *BB) {
   DEBUG(llvm::dbgs() << "  Get liveness for block " << BB->getDebugID() << "\n");
   
   // Collect blocks for which we have to calculate the out-availability.
-  // These are the pathes from blocks with known out-availability to the BB.
+  // These are the paths from blocks with known out-availability to the BB.
   WorkListType WorkList;
   for (auto Pred : BB->getPreds()) {
     putIntoWorkList(Pred, WorkList);
@@ -2289,7 +2289,7 @@ getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
     return Result;
   }
 
-  // Check locally to see if any elements are satified within the block, and
+  // Check locally to see if any elements are satisfied within the block, and
   // keep track of which ones are still needed in the NeededElements set.
   llvm::SmallBitVector NeededElements(TheMemory.NumElements);
   NeededElements.set(FirstElt, FirstElt+NumElts);

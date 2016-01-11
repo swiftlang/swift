@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -87,7 +87,7 @@ protected:
 
   /// Gets or creates the MethodInfo for a vtable or witness table method.
   /// \p decl The method declaration. In case of a vtable method this is always
-  ///         the most overriden method.
+  ///         the most overridden method.
   MethodInfo *getMethodInfo(AbstractFunctionDecl *decl) {
     MethodInfo *&entry = MethodInfos[decl];
     if (entry == nullptr) {
@@ -389,7 +389,6 @@ public:
         F.dropAllReferences();
 
     // Next step: delete all dead functions.
-    bool NeedUpdate = false;
     for (auto FI = Module->begin(), EI = Module->end(); FI != EI;) {
       SILFunction *F = &*FI;
       ++FI;
@@ -397,7 +396,6 @@ public:
         DEBUG(llvm::dbgs() << "  erase dead function " << F->getName() << "\n");
         NumDeadFunc++;
         Module->eraseFunction(F);
-        NeedUpdate = true;
         DFEPass->invalidateAnalysis(F, SILAnalysis::InvalidationKind::Everything);
       }
     }
@@ -446,7 +444,7 @@ class ExternalFunctionDefinitionsElimination : FunctionLivenessComputation {
   bool findAliveFunctions() {
     /// TODO: Once there is a proper support for IPO,
     /// bodies of all external functions can be removed.
-    /// Therefore there is no need for a livesness computation.
+    /// Therefore there is no need for a liveness computation.
     /// The next line can be just replaced by:
     /// return false;
     return FunctionLivenessComputation::findAliveFunctions();

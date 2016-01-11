@@ -1,8 +1,8 @@
-//===-- SpeculativeDevirtualizer.cpp -- Speculatively devirtualize calls --===//
+//===--- SpeculativeDevirtualizer.cpp - Speculatively devirtualize calls --===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "sil-speculative-devirtualizer-pass"
+#define DEBUG_TYPE "sil-speculative-devirtualizer"
 #include "swift/Basic/DemangleWrappers.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILArgument.h"
@@ -369,7 +369,7 @@ static bool tryToSpeculateTarget(FullApplySite AI,
           // bound generic class in a general case.
           if (isa<UnboundGenericType>(SubCanTy))
             return false;
-          // Handle the ususal case here: the class in question
+          // Handle the usual case here: the class in question
           // should be a real subclass of a bound generic class.
           return !ClassType.isSuperclassOf(
               SILType::getPrimitiveObjectType(SubCanTy));

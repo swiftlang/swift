@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -25,6 +25,7 @@
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Timer.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Serialization/SerializationOptions.h"
@@ -163,7 +164,8 @@ static ASTContext &getContext(ModuleOrSourceFile DC) {
 }
 
 static bool shouldSerializeAsLocalContext(const DeclContext *DC) {
-  return DC->isLocalContext() && !isa<AbstractFunctionDecl>(DC);
+  return DC->isLocalContext() && !isa<AbstractFunctionDecl>(DC) &&
+        !isa<SubscriptDecl>(DC);
 }
 
 static const Decl *getDeclForContext(const DeclContext *DC) {
@@ -187,6 +189,8 @@ static const Decl *getDeclForContext(const DeclContext *DC) {
     llvm_unreachable("shouldn't serialize the main module");
   case DeclContextKind::AbstractFunctionDecl:
     return cast<AbstractFunctionDecl>(DC);
+  case DeclContextKind::SubscriptDecl:
+    return cast<SubscriptDecl>(DC);
   }
 }
 
@@ -486,7 +490,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::BOUND_GENERIC_SUBSTITUTION);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
-                              decls_block::NO_CONFORMANCE);
+                              decls_block::ABSTRACT_PROTOCOL_CONFORMANCE);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::NORMAL_PROTOCOL_CONFORMANCE);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
@@ -748,6 +752,9 @@ static uint8_t getRawStableDefaultArgumentKind(swift::DefaultArgumentKind kind) 
   CASE(Line)
   CASE(Function)
   CASE(DSOHandle)
+  CASE(Nil)
+  CASE(EmptyArray)
+  CASE(EmptyDictionary)
 #undef CASE
   }
 }
@@ -784,6 +791,27 @@ static uint8_t getRawStableAddressorKind(swift::AddressorKind kind) {
   llvm_unreachable("bad addressor kind");
 }
 
+void Serializer::writeParameterList(const ParameterList *PL) {
+  using namespace decls_block;
+
+  unsigned abbrCode = DeclTypeAbbrCodes[ParameterListLayout::Code];
+  ParameterListLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                  PL->size());
+
+  abbrCode = DeclTypeAbbrCodes[ParameterListEltLayout::Code];
+  for (auto &param : *PL) {
+    // FIXME: Default argument expressions?
+    
+    auto defaultArg =
+      getRawStableDefaultArgumentKind(param->getDefaultArgumentKind());
+    ParameterListEltLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                       addDeclRef(param),
+                                       param->isVariadic(),
+                                       defaultArg);
+  }
+}
+
+
 void Serializer::writePattern(const Pattern *pattern) {
   using namespace decls_block;
 
@@ -809,9 +837,7 @@ void Serializer::writePattern(const Pattern *pattern) {
     for (auto &elt : tuple->getElements()) {
       // FIXME: Default argument expressions?
       TuplePatternEltLayout::emitRecord(
-        Out, ScratchRecord, abbrCode, addIdentifierRef(elt.getLabel()),
-        elt.hasEllipsis(),
-        getRawStableDefaultArgumentKind(elt.getDefaultArgKind()));
+        Out, ScratchRecord, abbrCode, addIdentifierRef(elt.getLabel()));
       writePattern(elt.getPattern());
     }
     break;
@@ -1013,8 +1039,6 @@ void Serializer::writeNormalConformance(
     data.push_back(addDeclRef(witness.getDecl()));
     assert(witness.getDecl() || req->getAttrs().hasAttribute<OptionalAttr>()
            || req->getAttrs().isUnavailable(req->getASTContext()));
-    // The substitution records are serialized later.
-    data.push_back(witness.getSubstitutions().size());
     ++numValueWitnesses;
   });
 
@@ -1061,11 +1085,6 @@ void Serializer::writeNormalConformance(
                      DeclTypeAbbrCodes);
   }
 
-  conformance->forEachValueWitness(nullptr,
-                                   [&](ValueDecl *req,
-                                       ConcreteDeclRef witness) {
-    writeSubstitutions(witness.getSubstitutions(), DeclTypeAbbrCodes);
-  });
   conformance->forEachTypeWitness(/*resolver=*/nullptr,
                                   [&](AssociatedTypeDecl *assocType,
                                       const Substitution &witness,
@@ -1076,16 +1095,24 @@ void Serializer::writeNormalConformance(
 }
 
 void
-Serializer::writeConformance(const ProtocolConformance *conformance,
+Serializer::writeConformance(ProtocolConformance *conformance,
+                             const std::array<unsigned, 256> &abbrCodes) {
+  writeConformance(ProtocolConformanceRef(conformance), abbrCodes);
+}
+
+void
+Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
                              const std::array<unsigned, 256> &abbrCodes) {
   using namespace decls_block;
 
-  if (!conformance) {
-    unsigned abbrCode = abbrCodes[NoConformanceLayout::Code];
-    NoConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode);
+  if (conformanceRef.isAbstract()) {
+    unsigned abbrCode = abbrCodes[AbstractProtocolConformanceLayout::Code];
+    AbstractProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                      addDeclRef(conformanceRef.getAbstract()));
     return;
   }
 
+  auto conformance = conformanceRef.getConcrete();
   switch (conformance->getKind()) {
   case ProtocolConformanceKind::Normal: {
     auto normal = cast<NormalProtocolConformance>(conformance);
@@ -1138,7 +1165,16 @@ Serializer::writeConformance(const ProtocolConformance *conformance,
 }
 
 void
-Serializer::writeConformances(ArrayRef<ProtocolConformance *> conformances,
+Serializer::writeConformances(ArrayRef<ProtocolConformanceRef> conformances,
+                              const std::array<unsigned, 256> &abbrCodes) {
+  using namespace decls_block;
+
+  for (auto conformance : conformances)
+    writeConformance(conformance, abbrCodes);
+}
+
+void
+Serializer::writeConformances(ArrayRef<ProtocolConformance*> conformances,
                               const std::array<unsigned, 256> &abbrCodes) {
   using namespace decls_block;
 
@@ -1157,7 +1193,6 @@ Serializer::writeSubstitutions(ArrayRef<Substitution> substitutions,
 
     BoundGenericSubstitutionLayout::emitRecord(
       Out, ScratchRecord, abbrCode,
-      addTypeRef(sub.getArchetype()),
       addTypeRef(sub.getReplacement()),
       sub.getConformances().size());
 
@@ -1325,6 +1360,21 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
     break;
   }
 
+  case DeclContextKind::SubscriptDecl: {
+    auto SD = cast<SubscriptDecl>(DC);
+    writeCrossReference(DC->getParent(), pathLen + 1);
+    
+    Type ty = SD->getInterfaceType()->getCanonicalType();
+
+    abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
+    bool isProtocolExt = SD->getDeclContext()->isProtocolExtensionContext();
+    XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                         addTypeRef(ty),
+                                         addIdentifierRef(SD->getName()),
+                                         isProtocolExt);
+    break;
+  }
+      
   case DeclContextKind::AbstractFunctionDecl: {
     if (auto fn = dyn_cast<FuncDecl>(DC)) {
       if (auto storage = fn->getAccessorStorageDecl()) {
@@ -1739,6 +1789,7 @@ void Serializer::writeDeclContext(const DeclContext *DC) {
 
   switch (DC->getContextKind()) {
   case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::SubscriptDecl:
   case DeclContextKind::NominalTypeDecl:
   case DeclContextKind::ExtensionDecl:
     declOrDeclContextID = addDeclRef(getDeclForContext(DC));
@@ -2374,7 +2425,7 @@ void Serializer::writeDecl(const Decl *D) {
                            fn->isObjC(),
                            fn->isMutating(),
                            fn->hasDynamicSelf(),
-                           fn->getBodyParamPatterns().size(),
+                           fn->getParameterLists().size(),
                            addTypeRef(fn->getType()),
                            addTypeRef(fn->getInterfaceType()),
                            addDeclRef(fn->getOperatorDecl()),
@@ -2388,8 +2439,8 @@ void Serializer::writeDecl(const Decl *D) {
     writeGenericParams(fn->getGenericParams(), DeclTypeAbbrCodes);
 
     // Write the body parameters.
-    for (auto pattern : fn->getBodyParamPatterns())
-      writePattern(pattern);
+    for (auto pattern : fn->getParameterLists())
+      writeParameterList(pattern);
 
     if (auto errorConvention = fn->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
@@ -2467,7 +2518,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 rawSetterAccessLevel,
                                 nameComponents);
 
-    writePattern(subscript->getIndices());
+    writeParameterList(subscript->getIndices());
     break;
   }
 
@@ -2502,9 +2553,10 @@ void Serializer::writeDecl(const Decl *D) {
                                   nameComponents);
 
     writeGenericParams(ctor->getGenericParams(), DeclTypeAbbrCodes);
-    assert(ctor->getBodyParamPatterns().size() == 2);
-    for (auto pattern : ctor->getBodyParamPatterns())
-      writePattern(pattern);
+    assert(ctor->getParameterLists().size() == 2);
+    // Why is this writing out the param list for self?
+    for (auto paramList : ctor->getParameterLists())
+      writeParameterList(paramList);
     if (auto errorConvention = ctor->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
     break;
@@ -2523,9 +2575,9 @@ void Serializer::writeDecl(const Decl *D) {
                                  dtor->isObjC(),
                                  addTypeRef(dtor->getType()),
                                  addTypeRef(dtor->getInterfaceType()));
-    assert(dtor->getBodyParamPatterns().size() == 1);
-    for (auto pattern : dtor->getBodyParamPatterns())
-      writePattern(pattern);
+    assert(dtor->getParameterLists().size() == 1);
+    // Why is this writing out the param list for self?
+    writeParameterList(dtor->getParameterLists()[0]);
     break;
   }
 
@@ -3079,7 +3131,7 @@ void Serializer::writeType(Type ty) {
     auto generic = cast<BoundGenericType>(ty.getPointer());
 
     // We don't want two copies of Archetype being serialized, one by
-    // serializing genericArgs, the other by serializaing the Decl. The reason
+    // serializing genericArgs, the other by serializing the Decl. The reason
     // is that it is likely the Decl's Archetype can be serialized in
     // a different module, causing two copies being constructed at
     // deserialization, one in the other module, one in this module as
@@ -3201,6 +3253,9 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<ExtensionLayout>();
   registerDeclTypeAbbr<DestructorLayout>();
 
+  registerDeclTypeAbbr<ParameterListLayout>();
+  registerDeclTypeAbbr<ParameterListEltLayout>();
+
   registerDeclTypeAbbr<ParenPatternLayout>();
   registerDeclTypeAbbr<TuplePatternLayout>();
   registerDeclTypeAbbr<TuplePatternEltLayout>();
@@ -3227,7 +3282,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<XRefGenericParamPathPieceLayout>();
   registerDeclTypeAbbr<XRefInitializerPathPieceLayout>();
 
-  registerDeclTypeAbbr<NoConformanceLayout>();
+  registerDeclTypeAbbr<AbstractProtocolConformanceLayout>();
   registerDeclTypeAbbr<NormalProtocolConformanceLayout>();
   registerDeclTypeAbbr<SpecializedProtocolConformanceLayout>();
   registerDeclTypeAbbr<InheritedProtocolConformanceLayout>();
@@ -3647,11 +3702,9 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     for (auto TD : localTypeDecls) {
       hasLocalTypes = true;
 
-      SmallString<32> MangledName;
-      llvm::raw_svector_ostream Stream(MangledName);
-      Mangle::Mangler DebugMangler(Stream, false);
-      DebugMangler.mangleType(TD->getDeclaredType(),
-                              ResilienceExpansion::Minimal, 0);
+      Mangle::Mangler DebugMangler(false);
+      DebugMangler.mangleType(TD->getDeclaredType(), 0);
+      auto MangledName = DebugMangler.finalize();
       assert(!MangledName.empty() && "Mangled type came back empty!");
       localTypeGenerator.insert(MangledName, {
         addDeclRef(TD), TD->getLocalDiscriminator()
@@ -3814,6 +3867,7 @@ void swift::serialize(ModuleOrSourceFile DC,
 
   bool hadError = withOutputFile(getContext(DC), options.OutputPath,
                                  [&](raw_ostream &out) {
+    SharedTimer timer("Serialization (swiftmodule)");
     Serializer::writeToStream(out, DC, M, options);
   });
   if (hadError)
@@ -3822,6 +3876,7 @@ void swift::serialize(ModuleOrSourceFile DC,
   if (options.DocOutputPath && options.DocOutputPath[0] != '\0') {
     (void)withOutputFile(getContext(DC), options.DocOutputPath,
                          [&](raw_ostream &out) {
+      SharedTimer timer("Serialization (swiftdoc)");
       Serializer::writeDocToStream(out, DC);
     });
   }

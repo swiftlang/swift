@@ -95,11 +95,8 @@ class ArgParamSep {
   init(_ b: Int, _: Int, forInt int: Int, c _: Int, d: Int) { }
 }
 
-//===---
-//===--- Tests for crashes.
-//===---
-
-//===--- rdar://14082378
+// Tests for crashes.
+// rdar://14082378
 
 struct NoCrash1a {
   init(_: NoCrash1b) {} // expected-error {{use of undeclared type 'NoCrash1b'}}

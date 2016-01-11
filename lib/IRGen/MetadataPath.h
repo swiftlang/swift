@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 //  This file defines the MetadataPath type, which efficiently records the
-//  path to an metadata object.
+//  path to a metadata object.
 //
 //===----------------------------------------------------------------------===//
 
@@ -25,7 +25,9 @@ namespace llvm {
 }
 
 namespace swift {
+  class ProtocolDecl;
   class CanType;
+  class Decl;
 
 namespace irgen {
   class IRGenFunction;
@@ -45,6 +47,9 @@ class MetadataPath {
       LastWithSecondaryIndex = NominalTypeArgumentConformance,
 
       // Everything past this point has at most one index.
+
+      /// Base protocol P of a protocol.
+      InheritedProtocol,
 
       /// Type argument P of a generic nominal type.
       NominalTypeArgument,
@@ -166,6 +171,14 @@ public:
                                                   unsigned conformanceIndex) {
     Path.push_back(Component(Component::Kind::NominalTypeArgumentConformance,
                              argIndex, conformanceIndex));
+  }
+
+  /// Add a step to this path which gets the kth inherited protocol from a
+  /// witness table.
+  ///
+  /// k is computed including protocols which do not have witness tables.
+  void addInheritedProtocolComponent(unsigned index) {
+    Path.push_back(Component(Component::Kind::InheritedProtocol, index));
   }
 
   /// Return an abstract measurement of the cost of this path.

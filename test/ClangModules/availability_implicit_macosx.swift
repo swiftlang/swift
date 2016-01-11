@@ -60,7 +60,7 @@ class DeprecatedSuperClass {
 class NotDeprecatedSubClassOfDeprecatedSuperClass : DeprecatedSuperClass { // expected-warning {{'DeprecatedSuperClass' was deprecated in OS X 10.10}}
 }
 
-func callImplicitInitalizerOnNotDeprecatedSubClassOfDeprecatedSuperClass() {
+func callImplicitInitializerOnNotDeprecatedSubClassOfDeprecatedSuperClass() {
   // We do not expect a warning here because the synthesized initializer
   // in NotDeprecatedSubClassOfDeprecatedSuperClass is not itself marked
   // deprecated.

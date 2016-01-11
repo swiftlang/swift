@@ -1,8 +1,8 @@
-//===- CodeCompletion.h - Routines for code completion --------------------===//
+//===--- CodeCompletion.h - Routines for code completion ------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -266,13 +266,13 @@ public:
     }
 
     static Chunk createWithText(ChunkKind Kind, unsigned NestingLevel,
-                                StringRef Text, bool isAnnoation = false) {
-      return Chunk(Kind, NestingLevel, Text, isAnnoation);
+                                StringRef Text, bool isAnnotation = false) {
+      return Chunk(Kind, NestingLevel, Text, isAnnotation);
     }
 
     static Chunk createSimple(ChunkKind Kind, unsigned NestingLevel,
-                              bool isAnnoation = false) {
-      return Chunk(Kind, NestingLevel, isAnnoation);
+                              bool isAnnotation = false) {
+      return Chunk(Kind, NestingLevel, isAnnotation);
     }
   };
 
@@ -732,7 +732,7 @@ struct SimpleCachingCodeCompletionConsumer : public CodeCompletionConsumer {
                                ArrayRef<RequestedCachedModule> requestedModules,
                                DeclContext *DCForModules) override;
 
-  /// Clients should overrride this method to receive \p Results.
+  /// Clients should override this method to receive \p Results.
   virtual void handleResults(
       MutableArrayRef<CodeCompletionResult *> Results) = 0;
 };

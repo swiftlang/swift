@@ -410,7 +410,7 @@ contain the following fields:
   not factored into tuple metadata uniquing.
 
 - The **element vector** begins at **offset 3** and consists of a vector of
-  type–offset pairs. The metadata for the *n*\ th element's type is a pointer
+  type-offset pairs. The metadata for the *n*\ th element's type is a pointer
   at **offset 3+2*n**. The offset in bytes from the beginning of the tuple to
   the beginning of the *n*\ th element is at **offset 3+2*n+1**.
 
@@ -743,15 +743,17 @@ Globals
   global ::= 'PA' .*                     // partial application forwarder
   global ::= 'PAo' .*                    // ObjC partial application forwarder
   global ::= 'w' value-witness-kind type // value witness
-  global ::= 'WV' type                   // value witness table
-  global ::= 'Wo' entity                 // witness table offset
-  global ::= 'Wv' directness entity      // field offset
-  global ::= 'WP' protocol-conformance   // protocol witness table
   global ::= 'Wa' protocol-conformance   // protocol witness table accessor
+  global ::= 'WG' protocol-conformance   // generic protocol witness table
+  global ::= 'WI' protocol-conformance   // generic protocol witness table instantiation function
   global ::= 'Wl' type protocol-conformance // lazy protocol witness table accessor
   global ::= 'WL' protocol-conformance   // lazy protocol witness table cache variable
-  global ::= 'WD' protocol-conformance   // dependent proto witness table generator
-  global ::= 'Wd' protocol-conformance   // dependent proto witness table template
+  global ::= 'Wo' entity                 // witness table offset
+  global ::= 'WP' protocol-conformance   // protocol witness table
+  global ::= 'Wt' protocol-conformance identifier // associated type metadata accessor
+  global ::= 'WT' protocol-conformance identifier nominal-type // associated type witness table accessor
+  global ::= 'Wv' directness entity      // field offset
+  global ::= 'WV' type                   // value witness table
   global ::= entity                      // some identifiable thing
   global ::= 'TO' global                 // ObjC-as-swift thunk
   global ::= 'To' global                 // swift-as-ObjC thunk
@@ -1176,12 +1178,12 @@ for the first time. The first argument type will mangle in long form,
 ``CC3zim4zang4zung``, and in doing so, ``zim`` will acquire substitution ``S_``,
 ``zim.zang`` will acquire substitution ``S0_``, and ``zim.zang.zung`` will
 acquire ``S1_``. The second argument is the same as the first and will mangle
-using its substitution, ``CS1_``. The
+using its substitution, ``S1_``. The
 third argument type will mangle using the substitution for ``zim``,
 ``CS_7zippity``. (It also acquires substitution ``S2_`` which would be used
 if it mangled again.) The result type will mangle using the substitution for
 ``zim.zang``, ``CS0_3zoo`` (and acquire substitution ``S3_``). The full
-function type thus mangles as ``fTCC3zim4zang4zungCS1_CS_7zippity_CS0_3zoo``.
+function type thus mangles as ``fTCC3zim4zang4zungS1_CS_7zippity_CS0_3zoo``.
 
 ::
 

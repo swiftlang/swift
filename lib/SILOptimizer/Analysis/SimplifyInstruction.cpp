@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -191,7 +191,7 @@ static SILValue simplifyEnumFromUncheckedEnumData(EnumInst *EI) {
   
   SILValue EnumOp = UEDI->getOperand();
   
-  // Same enum elements don't necesserily imply same enum types.
+  // Same enum elements don't necessarily imply same enum types.
   // Enum types may be different if the enum is generic, e.g.
   // E<Int>.Case and E<Double>.Case.
   SILType OriginalEnum = EnumOp.getType();
@@ -207,7 +207,7 @@ SILValue InstSimplifier::visitSelectEnumInst(SelectEnumInst *SEI) {
 
   auto *EI = dyn_cast<EnumInst>(SEI->getEnumOperand());
   if (EI && EI->getType() == SEI->getEnumOperand().getType()) {
-    // Simplify a select_enum on a enum instruction.
+    // Simplify a select_enum on an enum instruction.
     //   %27 = enum $Optional<Int>, #Optional.Some!enumelt.1, %20 : $Int
     //   %28 = integer_literal $Builtin.Int1, -1
     //   %29 = integer_literal $Builtin.Int1, 0

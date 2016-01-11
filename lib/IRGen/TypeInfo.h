@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -34,6 +34,9 @@ namespace llvm {
 }
 
 namespace swift {
+  enum IsTake_t : bool;
+  class SILType;
+
 namespace irgen {
   class Address;
   class ContainedAddress;
@@ -107,11 +110,11 @@ public:
     return static_cast<const T &>(*this);
   }
 
+private:
   /// The LLVM representation of a stored value of this type.  For
   /// non-fixed types, this is really useful only for forming pointers to it.
   llvm::Type *StorageType;
 
-private:
   /// The storage alignment of this type in bytes.  This is never zero
   /// for a completely-converted type.
   Alignment StorageAlignment;
@@ -147,15 +150,15 @@ public:
   bool isComplete() const { return !StorageAlignment.isZero(); }
 
   /// Whether this type is known to be empty.
-  bool isKnownEmpty() const;
+  bool isKnownEmpty(ResilienceExpansion expansion) const;
 
   /// Whether this type is known to be POD, i.e. to not require any
   /// particular action on copy or destroy.
-  IsPOD_t isPOD(ResilienceScope scope) const { return IsPOD_t(POD); }
+  IsPOD_t isPOD(ResilienceExpansion expansion) const { return IsPOD_t(POD); }
   
   /// Whether this type is known to be bitwise-takable, i.e. "initializeWithTake"
   /// is equivalent to a memcpy.
-  IsBitwiseTakable_t isBitwiseTakable(ResilienceScope scope) const {
+  IsBitwiseTakable_t isBitwiseTakable(ResilienceExpansion expansion) const {
     return IsBitwiseTakable_t(BitwiseTakable);
   }
   
@@ -188,11 +191,11 @@ public:
 
   /// Whether this type is known to be fixed-size in the given
   /// resilience domain.  If true, spare bits can be used.
-  IsFixedSize_t isFixedSize(ResilienceScope scope) const {
-    switch (scope) {
-    case ResilienceScope::Component:
+  IsFixedSize_t isFixedSize(ResilienceExpansion expansion) const {
+    switch (expansion) {
+    case ResilienceExpansion::Maximal:
       return isFixedSize();
-    case ResilienceScope::Universal:
+    case ResilienceExpansion::Minimal:
       // We can't be universally fixed size if we're not locally
       // fixed size.
       assert((isFixedSize() || AlwaysFixedSize == IsNotFixedSize) &&
@@ -260,6 +263,12 @@ public:
   virtual void deallocateStack(IRGenFunction &IGF, Address addr,
                                SILType T) const = 0;
 
+  /// Copy or take a value out of one address and into another, destroying
+  /// old value in the destination.  Equivalent to either assignWithCopy
+  /// or assignWithTake depending on the value of isTake.
+  void assign(IRGenFunction &IGF, Address dest, Address src, IsTake_t isTake,
+              SILType T) const;
+
   /// Copy a value out of an object and into another, destroying the
   /// old value in the destination.
   virtual void assignWithCopy(IRGenFunction &IGF, Address dest,
@@ -269,6 +278,13 @@ public:
   /// old value there and leaving the source object in an invalid state.
   virtual void assignWithTake(IRGenFunction &IGF, Address dest,
                               Address src, SILType T) const = 0;
+
+  /// Copy-initialize or take-initialize an uninitialized object
+  /// with the value from a different object.  Equivalent to either
+  /// initializeWithCopy or initializeWithTake depending on the value
+  /// of isTake.
+  void initialize(IRGenFunction &IGF, Address dest, Address src,
+                  IsTake_t isTake, SILType T) const;
 
   /// Perform a "take-initialization" from the given object.  A
   /// take-initialization is like a C++ move-initialization, except that
@@ -321,7 +337,7 @@ public:
   /// for this type being a single object pointer?
   ///
   /// \return false by default
-  virtual bool isSingleRetainablePointer(ResilienceScope scope,
+  virtual bool isSingleRetainablePointer(ResilienceExpansion expansion,
                                          ReferenceCounting *refcounting
                                              = nullptr) const;
 
@@ -329,9 +345,9 @@ public:
   /// for this type being a single Swift-retainable object pointer?
   ///
   /// \return false by default
-  bool isSingleSwiftRetainablePointer(ResilienceScope scope) const {
+  bool isSingleSwiftRetainablePointer(ResilienceExpansion expansion) const {
     ReferenceCounting refcounting;
-    return (isSingleRetainablePointer(scope, &refcounting) &&
+    return (isSingleRetainablePointer(expansion, &refcounting) &&
             refcounting == ReferenceCounting::Native);
   }
 

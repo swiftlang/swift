@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -61,7 +61,7 @@
 ///
 /// Then we perform a postorder DFS of the loop nest. The postorder provides the
 /// inductive rule that all loops will be visited after all of their subloops
-/// hae been visited. If a Loop has no subloops (i.e. all subregions are
+/// have been visited. If a Loop has no subloops (i.e. all subregions are
 /// blocks), we do nothing. Otherwise, if the loop does have subloops, we visit
 /// each subloop and do the following:
 ///
@@ -129,8 +129,6 @@
 #include "llvm/Support/raw_ostream.h"
 
 namespace swift {
-
-class LoopRegionFunctionInfo;
 
 /// A loop region is a data structure which represents one of a basic block,
 /// loop, or function. In the case of a loop, function, it contains an internal
@@ -245,7 +243,7 @@ public:
     /// a basic block. The iterator can only be compared against another invalid
     /// iterator. Any other use causes an unreachable being hit.
     ///
-    /// The reason this is needed is because basic blocks can not have
+    /// The reason this is needed is because basic blocks cannot have
     /// subregions, yet many graph algorithms want to be able to iterate over
     /// the subregions of a region regardless of whether it is a basic block,
     /// loop, or function. By allowing for invalid iterators for basic blocks,
@@ -346,7 +344,7 @@ private:
   /// this BB, we can represent each jump as individual non-local edges in
   /// between loops.
   ///
-  /// *NOTE* This list is not sorted, but can not have any duplicate
+  /// *NOTE* This list is not sorted, but cannot have any duplicate
   /// elements. We have a check in LoopRegionFunctionInfo::verify to make sure
   /// that this stays true. The reason why this is necessary is that subregions
   /// of a loop, may have a non-local successor edge pointed at this region's
@@ -600,20 +598,20 @@ private:
         IsUnknownControlFlowEdgeTail(false) {}
 
   void setParent(LoopRegion *PR) {
-    assert(!isFunction() && "Functions can not be subregions");
-    assert(!PR->isBlock() && "BB regions can not be parents of a region");
+    assert(!isFunction() && "Functions cannot be subregions");
+    assert(!PR->isBlock() && "BB regions cannot be parents of a region");
     ParentID = PR->getID();
   }
 
   void addPred(LoopRegion *LNR) {
-    assert(!isFunction() && "Functions can not have predecessors");
+    assert(!isFunction() && "Functions cannot have predecessors");
     if (std::count(pred_begin(), pred_end(), LNR->getID()))
       return;
     Preds.push_back(LNR->ID);
   }
 
   unsigned addSucc(LoopRegion *Successor) {
-    assert(!isFunction() && "Functions can not have successors");
+    assert(!isFunction() && "Functions cannot have successors");
     return Succs.insert(SuccessorID(Successor->getID(), false));
   }
 
@@ -644,14 +642,14 @@ private:
   void removeLocalSucc(unsigned ID) { Succs.erase(SuccessorID(ID, false)); }
 
   void addBlockSubregion(LoopRegion *R) {
-    assert(!isBlock() && "Blocks can not have subregions");
+    assert(!isBlock() && "Blocks cannot have subregions");
     assert(R->isBlock() && "Assumed R was a basic block");
     R->setParent(this);
     getSubregionData().addBlockSubregion(R);
   }
 
   void addLoopSubregion(LoopRegion *L, LoopRegion *Header) {
-    assert(!isBlock() && "Blocks can not have subregions");
+    assert(!isBlock() && "Blocks cannot have subregions");
     assert(L->isLoop() && "Assumed L was a loop");
     assert(Header->isBlock() && "Assumed Header was a loop");
     L->setParent(this);

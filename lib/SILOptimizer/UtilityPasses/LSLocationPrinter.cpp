@@ -1,19 +1,19 @@
-///===--- LSLocationPrinter.cpp - Dump all memory locations in program ---===//
-///
-/// This source file is part of the Swift.org open source project
-///
-/// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
-/// Licensed under Apache License v2.0 with Runtime Library Exception
-///
-/// See http://swift.org/LICENSE.txt for license information
-/// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-///
-///===---------------------------------------------------------------------===//
-///
-/// This pass tests type expansion, memlocation expansion and memlocation
-/// reduction.
-///
-///===---------------------------------------------------------------------===//
+//===--- LSLocationPrinter.cpp - Dump all memory locations in program -----===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This pass tests type expansion, memlocation expansion and memlocation
+// reduction.
+//
+//===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-memlocation-dumper"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -52,6 +52,9 @@ static llvm::cl::opt<MLKind> LSLocationKinds(
                    "only-type-expansion"),
         clEnumValN(MLKind::All, "all", "all"), clEnumValEnd));
 
+static llvm::cl::opt<bool> UseNewProjection("lslocation-dump-use-new-projection",
+                                            llvm::cl::init(false));
+
 namespace {
 
 class LSLocationPrinter : public SILModuleTransform {
@@ -89,6 +92,41 @@ public:
         llvm::outs() << "#" << Counter++ << II;
         for (auto &T : PPList) {
           llvm::outs() << T.getValue();
+        }
+        PPList.clear();
+      }
+    }
+    llvm::outs() << "\n";
+  }
+
+  void printTypeExpansionWithNewProjection(SILFunction &Fn) {
+    SILModule *M = &Fn.getModule();
+    llvm::SmallVector<NewProjectionPath, 8> PPList;
+    unsigned Counter = 0;
+    for (auto &BB : Fn) {
+      for (auto &II : BB) {
+        SILValue V;
+        SILType Ty;
+        if (auto *LI = dyn_cast<LoadInst>(&II)) {
+          V = LI->getOperand();
+          // This is an address type, take it object type.
+          Ty = V.getType().getObjectType();
+          NewProjectionPath::expandTypeIntoLeafProjectionPaths(Ty, M, PPList,
+                                                               true);
+        } else if (auto *SI = dyn_cast<StoreInst>(&II)) {
+          V = SI->getDest();
+          // This is an address type, take it object type.
+          Ty = V.getType().getObjectType();
+          NewProjectionPath::expandTypeIntoLeafProjectionPaths(Ty, M, PPList,
+                                                               true);
+        } else {
+          // Not interested in these instructions yet.
+          continue;
+        }
+
+        llvm::outs() << "#" << Counter++ << II;
+        for (auto &T : PPList) {
+          T.print(llvm::outs(), *M);
         }
         PPList.clear();
       }
@@ -195,7 +233,11 @@ public:
       llvm::outs() << "@" << Fn.getName() << "\n";
       switch (LSLocationKinds) {
         case MLKind::OnlyTypeExpansion:
-          printTypeExpansion(Fn);
+          if (UseNewProjection) {
+            printTypeExpansionWithNewProjection(Fn);
+          } else {
+            printTypeExpansion(Fn);
+          }
           break;
         case MLKind::OnlyExpansion:
           printMemExpansion(Fn);

@@ -1,8 +1,8 @@
-//===------- StackPromotion.cpp - Promotes allocations to the stack -------===//
+//===--- StackPromotion.cpp - Promotes allocations to the stack -----------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -290,7 +290,7 @@ bool StackPromoter::canPromoteAlloc(SILInstruction *AI,
                                     SILInstruction *&DeallocInsertionPoint) {
   AllocInsertionPoint = nullptr;
   DeallocInsertionPoint = nullptr;
-  auto *Node = ConGraph->getNode(AI, EA);
+  auto *Node = ConGraph->getNodeOrNull(AI, EA);
   if (!Node)
     return false;
 
@@ -306,7 +306,7 @@ bool StackPromoter::canPromoteAlloc(SILInstruction *AI,
   int NumUsePointsToFind = ConGraph->getNumUsePoints(Node);
   if (NumUsePointsToFind == 0) {
     // There should always be at least one release for an allocated object.
-    // But in case all pathes from this block end in unreachable then the
+    // But in case all paths from this block end in unreachable then the
     // final release of the object may be optimized away. We bail out in this
     // case.
     return false;
@@ -409,7 +409,7 @@ bool StackPromoter::canPromoteAlloc(SILInstruction *AI,
     if (WorkList.empty()) {
       if (EndBlock == BB) {
         // We reached the EndBlock but didn't find a place for the deallocation
-        // so far (because we didn't find all uses yet or we entered a another
+        // so far (because we didn't find all uses yet or we entered another
         // stack alloc-dealloc region). Let's extend our lifetime region.
         // E.g.:
         //     %obj = alloc_ref // the allocation

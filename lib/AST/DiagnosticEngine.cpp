@@ -1,8 +1,8 @@
-//===- DiagnosticEngine.h - Diagnostic Display Engine -----------*- C++ -*-===//
+//===--- DiagnosticEngine.cpp - Diagnostic Display Engine -------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -502,12 +502,6 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     // If a declaration was provided instead of a location, and that declaration
     // has a location we can point to, use that location.
     loc = decl->getLoc();
-    // With an implicit parameter try to point to its type.
-    if (loc.isInvalid() && isa<ParamDecl>(decl)) {
-      if (auto Pat =
-            cast<ParamDecl>(decl)->getParamParentPattern())
-        loc = Pat->getLoc();
-    }
 
     if (loc.isInvalid()) {
       // There is no location we can point to. Pretty-print the declaration
@@ -564,6 +558,7 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
             case DeclContextKind::Initializer:
             case DeclContextKind::AbstractClosureExpr:
             case DeclContextKind::AbstractFunctionDecl:
+            case DeclContextKind::SubscriptDecl:
               break;
             }
 

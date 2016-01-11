@@ -5,7 +5,7 @@
 // This is safe, because once assigned, these variables cannot change their value.
 
 // Helper function, which models an external functions with unknown side-effects.
-// It is calle just to trigger flushing of all known stored in LoadStore optimizations.
+// It is called just to trigger flushing of all known stored in LoadStore optimizations.
 @inline(never)
 func action() {
     print("")
@@ -295,7 +295,7 @@ final public class S3 {
 // DISABLECHECK: load %[[X]]
 // DISABLECHECK-NOT: load %[[X]]
 // DISABLECHECK: return
-public func testLetTuple(s: S3) ->Int32 {
+public func testLetTuple(s: S3) -> Int32 {
   var counter: Int32 = 0
   counter += s.x.0
   action()
@@ -318,7 +318,7 @@ public func testLetTuple(s: S3) ->Int32 {
 // CHECK: load %[[X]]
 // CHECK: load %[[X]]
 // CHECK: return
-public func testVarTuple(s: S3) ->Int32 {
+public func testVarTuple(s: S3) -> Int32 {
   var counter: Int32 = 0
   counter += s.y.0
   action()

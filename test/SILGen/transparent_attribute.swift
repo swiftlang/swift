@@ -6,7 +6,7 @@
 @_transparent func transparentFuncWithDefaultArgument (x: Int = 1) -> Int {
   return x
 }
-func useTransparentFuncWithDefaultArgument() ->Int {
+func useTransparentFuncWithDefaultArgument() -> Int {
   return transparentFuncWithDefaultArgument();
 
   // CHECK-LABEL: sil hidden @_TF21transparent_attribute37useTransparentFuncWithDefaultArgumentFT_Si
@@ -71,8 +71,8 @@ var x2 : MySt {
 func testProperty(z: MySt) {
   x1 = z
   x2 = z
-  var m1 : MySt = x1;
-  var m2 : MySt = x2;
+  var m1 : MySt = x1
+  var m2 : MySt = x2
   // CHECK-APPLY: sil hidden @_TF21transparent_attribute12testPropertyFT1zVS_4MySt_T_
   // CHECK: function_ref @_TF21transparent_attributes2x1VS_4MySt
   // CHECK-NEXT: apply

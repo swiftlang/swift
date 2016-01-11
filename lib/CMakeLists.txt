@@ -1,3 +1,4 @@
+add_subdirectory(ABI)
 add_subdirectory(AST)
 add_subdirectory(ASTSectionImporter)
 add_subdirectory(Basic)

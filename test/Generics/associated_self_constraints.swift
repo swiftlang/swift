@@ -50,7 +50,7 @@ class Subject<T>: Observer, Observable {
             observer.onError(error)
         }
         
-        return self;
+        return self
     }
 }
 
@@ -78,5 +78,5 @@ struct IP<T> : P {
 
     func onNext(item: A) { _onNext(item) }
 
-    var _onNext: (A)->()
+    var _onNext: (A) -> ()
 }

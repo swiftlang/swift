@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -O -module-name devirt_default_case -emit-sil -enable-testing %s | FileCheck -check-prefix=CHECK -check-prefix=CHECK-TESTABLE %s
 
 @_silgen_name("action")
-func action(n:Int)->()
+func action(n:Int) -> ()
 
 // public class
 public class Base1 {
@@ -106,7 +106,7 @@ class E3 :C3 {}
 // B has its own implementation.
 @inline(never)
 func foo(a: A3) -> Int {
-// Check that call to A3.f() can be devirualized.
+// Check that call to A3.f() can be devirtualized.
 //
 // CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TF19devirt_default_case3fooFCS_2A3Si
 // CHECK: function_ref @{{.*}}TFC19devirt_default_case2B31f
@@ -206,7 +206,7 @@ public class M {
 
 public class M1: M {
   @inline(never)
-  override func foo()->Int32 {
+  override func foo() -> Int32 {
     return 1
   }
 }

@@ -1,8 +1,8 @@
-//===--- ExistentialMetadataImpl.h - Existential metadata ------*- C++ -*--===//
+//===--- ExistentialMetadataImpl.h - Existential metadata -------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -325,7 +325,7 @@ struct LLVM_LIBRARY_VISIBILITY ClassExistentialBox
   static constexpr size_t isBitwiseTakable = true;
 };
 
-/// A non-fixed box implementation class for an class existential
+/// A non-fixed box implementation class for a class existential
 /// type with a dynamic number of witness tables.
 struct LLVM_LIBRARY_VISIBILITY NonFixedClassExistentialBox
     : ClassExistentialBoxBase {

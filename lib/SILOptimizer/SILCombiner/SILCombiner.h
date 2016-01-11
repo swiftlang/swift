@@ -1,8 +1,8 @@
-//===-------------------------- SILCombiner.h -----------------*- C++ -*---===//
+//===--- SILCombiner.h ------------------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -130,17 +130,13 @@ class SILCombiner :
   /// Builder used to insert instructions.
   SILBuilder &Builder;
 
-  /// A set of instructions which have been deleted during this iteration. It is
-  /// used to make sure that we do not
-  llvm::DenseSet<SILInstruction *> DeletedInstSet;
-
   /// Cast optimizer
   CastOptimizer CastOpt;
 
 public:
   SILCombiner(SILBuilder &B, AliasAnalysis *AA, bool removeCondFails)
       : AA(AA), Worklist(), MadeChange(false), RemoveCondFails(removeCondFails),
-        Iteration(0), Builder(B), DeletedInstSet(128),
+        Iteration(0), Builder(B),
         CastOpt(/* ReplaceInstUsesAction */
                 [&](SILInstruction *I, ValueBase * V) {
                   replaceInstUsesWith(*I, V);
@@ -161,7 +157,7 @@ public:
   SILInstruction *insertNewInstBefore(SILInstruction *New, SILInstruction &Old);
 
   // This method is to be used when an instruction is found to be dead,
-  // replacable with another preexisting expression. Here we add all uses of I
+  // replaceable with another preexisting expression. Here we add all uses of I
   // to the worklist, replace all uses of I with the new value, then return I,
   // so that the combiner will know that I was modified.
   SILInstruction *replaceInstUsesWith(SILInstruction &I, ValueBase *V);
@@ -172,7 +168,7 @@ public:
                                       unsigned IIndex, unsigned VIndex=0);
 
   // Some instructions can never be "trivially dead" due to side effects or
-  // producing a void value. In those cases, since we can not rely on
+  // producing a void value. In those cases, since we cannot rely on
   // SILCombines trivially dead instruction DCE in order to delete the
   // instruction, visit methods should use this method to delete the given
   // instruction and upon completion of their peephole return the value returned
@@ -269,12 +265,12 @@ private:
                                                SILValue NewSelf,
                                                SILValue Self,
                                                CanType ConcreteType,
-                                               ProtocolConformance *Conformance,
-                                               SILType InstanceType);
+                                               ProtocolConformanceRef Conformance,
+                                               CanType OpenedArchetype);
   SILInstruction *
   propagateConcreteTypeOfInitExistential(FullApplySite AI,
       ProtocolDecl *Protocol,
-      std::function<void(CanType, ProtocolConformance *)> Propagate);
+      llvm::function_ref<void(CanType, ProtocolConformanceRef)> Propagate);
 
   SILInstruction *propagateConcreteTypeOfInitExistential(FullApplySite AI,
                                                          WitnessMethodInst *WMI);
@@ -298,7 +294,7 @@ private:
   /// Inserts release/destroy instructions for all owner and in-parameters.
   void eraseApply(FullApplySite FAS, const UserListTy &Users);
 
-  /// Returns true if the results of an try_apply are not used.
+  /// Returns true if the results of a try_apply are not used.
   static bool isTryApplyResultNotUsed(UserListTy &AcceptedUses,
                                       TryApplyInst *TAI);
 };

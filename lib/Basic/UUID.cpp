@@ -1,8 +1,8 @@
-//===--- UUID.h - UUID generation -----------------------------------------===//
+//===--- UUID.cpp - UUID generation ---------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -41,7 +41,7 @@ Optional<UUID> UUID::fromString(const char *s) {
 
 void UUID::toString(llvm::SmallVectorImpl<char> &out) const {
   out.resize(UUID::StringBufferSize);
-  uuid_unparse(Value, out.data());
+  uuid_unparse_upper(Value, out.data());
   // Pop off the null terminator.
   assert(out.back() == '\0' && "did not null-terminate?!");
   out.pop_back();

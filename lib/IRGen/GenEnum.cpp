@@ -1,8 +1,8 @@
-//===--- GenEnum.cpp - Swift IR Generation For 'enum' Types -------------===//
+//===--- GenEnum.cpp - Swift IR Generation For 'enum' Types ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -159,6 +159,10 @@ llvm::Constant *EnumImplStrategy::emitCaseNames() const {
   }
   // The final null terminator is provided by getAddrOfGlobalString.
   return IGM.getAddrOfGlobalString(fieldNames);
+}
+
+unsigned EnumImplStrategy::getPayloadSizeForMetadata() const {
+  llvm_unreachable("don't need payload size for this enum kind");
 }
 
 llvm::Value *irgen::EnumImplStrategy::
@@ -466,7 +470,7 @@ namespace {
     }
 
     void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
-      if (getSingleton() && !getSingleton()->isPOD(ResilienceScope::Component))
+      if (getSingleton() && !getSingleton()->isPOD(ResilienceExpansion::Maximal))
         getSingleton()->destroy(IGF, getSingletonAddress(IGF, addr),
                                 getSingletonType(IGF.IGM, T));
     }
@@ -557,6 +561,7 @@ namespace {
       IGF.Builder.CreateCondBr(xiBool, xiBB, noXIBB);
 
       IGF.Builder.emitBlock(xiBB);
+      ConditionalDominanceScope condition(IGF);
       copyWitnessFromElt(ValueWitness::ExtraInhabitantFlags);
       IGF.Builder.CreateBr(noXIBB);
 
@@ -1188,10 +1193,10 @@ namespace {
     void assign(IRGenFunction &IGF, Explosion &e, Address addr) const override {
       assert(TIK >= Loadable);
       Explosion old;
-      if (!isPOD(ResilienceScope::Component))
+      if (!isPOD(ResilienceExpansion::Maximal))
         loadAsTake(IGF, addr, old);
       initialize(IGF, e, addr);
-      if (!isPOD(ResilienceScope::Component))
+      if (!isPOD(ResilienceExpansion::Maximal))
         consume(IGF, old);
     }
 
@@ -1371,13 +1376,13 @@ namespace {
 
       // If the payload is POD, then we can use POD value semantics.
       auto &payloadTI = *ElementsWithPayload[0].ti;
-      if (payloadTI.isPOD(ResilienceScope::Component)) {
+      if (payloadTI.isPOD(ResilienceExpansion::Maximal)) {
         CopyDestroyKind = POD;
       // If the payload is a single refcounted pointer and we have a single
       // empty case, then the layout will be a nullable pointer, and we can
       // pass enum values directly into swift_retain/swift_release as-is.
       } else if (tik >= TypeInfoKind::Loadable
-          && payloadTI.isSingleRetainablePointer(ResilienceScope::Component,
+          && payloadTI.isSingleRetainablePointer(ResilienceExpansion::Maximal,
                                                  &Refcounting)
           && ElementsWithNoPayload.size() == 1
           // FIXME: All single-retainable-pointer types should eventually have
@@ -2079,6 +2084,7 @@ namespace {
         llvm::BasicBlock *endBB = testFixedEnumContainsPayload(IGF, payload, extraTag);
 
         if (PayloadBitCount > 0) {
+          ConditionalDominanceScope condition(IGF);
           Explosion payloadValue;
           Explosion payloadCopy;
           auto &loadableTI = getLoadablePayloadTypeInfo();
@@ -2127,6 +2133,7 @@ namespace {
 
         // If we did, consume it.
         if (PayloadBitCount > 0) {
+          ConditionalDominanceScope condition(IGF);
           Explosion payloadValue;
           auto &loadableTI = getLoadablePayloadTypeInfo();
           loadableTI.unpackFromEnumPayload(IGF, payload, payloadValue, 0);
@@ -2169,6 +2176,7 @@ namespace {
 
         // If we did, consume it.
         if (PayloadBitCount > 0) {
+          ConditionalDominanceScope condition(IGF);
           Explosion payloadValue;
           auto &loadableTI = getLoadablePayloadTypeInfo();
           loadableTI.unpackFromEnumPayload(IGF, payload, payloadValue, 0);
@@ -2200,6 +2208,8 @@ namespace {
       case Normal: {
         // Check that there is a payload at the address.
         llvm::BasicBlock *endBB = testEnumContainsPayload(IGF, addr, T);
+
+        ConditionalDominanceScope condition(IGF);
 
         // If there is, project and destroy it.
         Address payloadAddr = projectPayloadData(IGF, addr);
@@ -2262,7 +2272,7 @@ namespace {
                                                  ElementsWithNoPayload.size())});
     }
 
-    /// Emit an reassignment sequence from an enum at one address to another.
+    /// Emit a reassignment sequence from an enum at one address to another.
     void emitIndirectAssign(IRGenFunction &IGF,
        Address dest, Address src, SILType T,
        IsTake_t isTake)
@@ -2284,46 +2294,64 @@ namespace {
         llvm::BasicBlock *noDestPayloadBB
           = testEnumContainsPayload(IGF, dest, T);
 
-        // Here, the destination has a payload. Now see if the source also has
-        // one.
-        llvm::BasicBlock *destNoSrcPayloadBB
-          = testEnumContainsPayload(IGF, src, T);
+        {
+          ConditionalDominanceScope destCondition(IGF);
 
-        // Here, both source and destination have payloads. Do the reassignment
-        // of the payload in-place.
-        if (isTake)
-          getPayloadTypeInfo().assignWithTake(IGF, destData, srcData, PayloadT);
-        else
-          getPayloadTypeInfo().assignWithCopy(IGF, destData, srcData, PayloadT);
-        IGF.Builder.CreateBr(endBB);
+          // Here, the destination has a payload. Now see if the source also
+          // has one.
+          llvm::BasicBlock *destNoSrcPayloadBB
+            = testEnumContainsPayload(IGF, src, T);
 
-        // If the destination has a payload but the source doesn't, we can destroy
-        // the payload and primitive-store the new no-payload value.
-        IGF.Builder.emitBlock(destNoSrcPayloadBB);
-        getPayloadTypeInfo().destroy(IGF, destData, PayloadT);
-        emitPrimitiveCopy(IGF, dest, src, T);
-        IGF.Builder.CreateBr(endBB);
+          {
+            ConditionalDominanceScope destSrcCondition(IGF);
+
+            // Here, both source and destination have payloads. Do the
+            // reassignment of the payload in-place.
+            getPayloadTypeInfo().assign(IGF, destData, srcData,
+                                        isTake, PayloadT);
+            IGF.Builder.CreateBr(endBB);
+          }
+
+          // If the destination has a payload but the source doesn't, we can
+          // destroy the payload and primitive-store the new no-payload value.
+          IGF.Builder.emitBlock(destNoSrcPayloadBB);
+          {
+            ConditionalDominanceScope destNoSrcCondition(IGF);
+            getPayloadTypeInfo().destroy(IGF, destData, PayloadT);
+            emitPrimitiveCopy(IGF, dest, src, T);
+            IGF.Builder.CreateBr(endBB);
+          }
+        }
 
         // Now, if the destination has no payload, check if the source has one.
         IGF.Builder.emitBlock(noDestPayloadBB);
-        llvm::BasicBlock *noDestNoSrcPayloadBB
-          = testEnumContainsPayload(IGF, src, T);
+        {
+          ConditionalDominanceScope noDestCondition(IGF);
+          llvm::BasicBlock *noDestNoSrcPayloadBB
+            = testEnumContainsPayload(IGF, src, T);
 
-        // Here, the source has a payload but the destination doesn't. We can
-        // copy-initialize the source over the destination, then primitive-store
-        // the zero extra tag (if any).
-        if (isTake)
-          getPayloadTypeInfo().initializeWithTake(IGF, destData, srcData, PayloadT);
-        else
-          getPayloadTypeInfo().initializeWithCopy(IGF, destData, srcData, PayloadT);
-        emitInitializeExtraTagBitsForPayload(IGF, dest, T);
-        IGF.Builder.CreateBr(endBB);
+          {
+            ConditionalDominanceScope noDestSrcCondition(IGF);
 
-        // If neither destination nor source have payloads, we can just primitive-
-        // store the new empty-case value.
-        IGF.Builder.emitBlock(noDestNoSrcPayloadBB);
-        emitPrimitiveCopy(IGF, dest, src, T);
-        IGF.Builder.CreateBr(endBB);
+            // Here, the source has a payload but the destination doesn't.
+            // We can copy-initialize the source over the destination, then
+            // primitive-store the zero extra tag (if any).
+
+            getPayloadTypeInfo().initialize(IGF, destData, srcData, isTake,
+                                            PayloadT);
+            emitInitializeExtraTagBitsForPayload(IGF, dest, T);
+            IGF.Builder.CreateBr(endBB);
+          }
+
+          // If neither destination nor source have payloads, we can just
+          // primitive- store the new empty-case value.
+          IGF.Builder.emitBlock(noDestNoSrcPayloadBB);
+          {
+            ConditionalDominanceScope noDestNoSrcCondition(IGF);
+            emitPrimitiveCopy(IGF, dest, src, T);
+            IGF.Builder.CreateBr(endBB);
+          }
+        }
 
         IGF.Builder.emitBlock(endBB);
         return;
@@ -2373,22 +2401,25 @@ namespace {
         llvm::BasicBlock *noSrcPayloadBB
           = testEnumContainsPayload(IGF, src, T);
 
-        // Here, the source value has a payload. Initialize the destination with
-        // it, and set the extra tag if any to zero.
-        if (isTake)
-          getPayloadTypeInfo().initializeWithTake(IGF, destData, srcData,
-                                                  getPayloadType(IGF.IGM, T));
-        else
-          getPayloadTypeInfo().initializeWithCopy(IGF, destData, srcData,
-                                                  getPayloadType(IGF.IGM, T));
-        emitInitializeExtraTagBitsForPayload(IGF, dest, T);
-        IGF.Builder.CreateBr(endBB);
+        {
+          ConditionalDominanceScope condition(IGF);
+
+          // Here, the source value has a payload. Initialize the destination
+          // with it, and set the extra tag if any to zero.
+          getPayloadTypeInfo().initialize(IGF, destData, srcData, isTake,
+                                          getPayloadType(IGF.IGM, T));
+          emitInitializeExtraTagBitsForPayload(IGF, dest, T);
+          IGF.Builder.CreateBr(endBB);
+        }
 
         // If the source value has no payload, we can primitive-store the
         // empty-case value.
         IGF.Builder.emitBlock(noSrcPayloadBB);
-        emitPrimitiveCopy(IGF, dest, src, T);
-        IGF.Builder.CreateBr(endBB);
+        {
+          ConditionalDominanceScope condition(IGF);
+          emitPrimitiveCopy(IGF, dest, src, T);
+          IGF.Builder.CreateBr(endBB);        
+        }
 
         IGF.Builder.emitBlock(endBB);
         return;
@@ -2594,7 +2625,7 @@ namespace {
       auto &payloadTI = getFixedPayloadTypeInfo();
       unsigned totalSize
         = cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits();
-      if (payloadTI.isKnownEmpty())
+      if (payloadTI.isKnownEmpty(ResilienceExpansion::Maximal))
         return APInt::getAllOnesValue(totalSize);
       auto baseMask =
         getFixedPayloadTypeInfo().getFixedExtraInhabitantMask(IGM);
@@ -2635,7 +2666,7 @@ namespace {
       auto &payloadTI = getFixedPayloadTypeInfo();
       ClusteredBitVector extraInhabitantsMask;
       
-      if (!payloadTI.isKnownEmpty())
+      if (!payloadTI.isKnownEmpty(ResilienceExpansion::Maximal))
         extraInhabitantsMask =
           getBitVectorFromAPInt(payloadTI.getFixedExtraInhabitantMask(IGM));
       // Extend to include the extra tag bits, which are always significant.
@@ -2679,6 +2710,10 @@ namespace {
     // The number of tag values used for no-payload cases.
     unsigned NumEmptyElementTags = ~0u;
 
+    // The payload size in bytes. This might need to be written to metadata
+    // if it depends on resilient types.
+    unsigned PayloadSize;
+
     /// More efficient value semantics implementations for certain enum layouts.
     enum CopyDestroyStrategy {
       /// No special behavior.
@@ -2699,6 +2734,7 @@ namespace {
 
     CopyDestroyStrategy CopyDestroyKind;
     ReferenceCounting Refcounting;
+    bool AllowFixedLayoutOptimizations;
 
     static EnumPayloadSchema getPayloadSchema(ArrayRef<Element> payloads) {
       // TODO: We might be able to form a nicer schema if the payload elements
@@ -2718,6 +2754,7 @@ namespace {
     MultiPayloadEnumImplStrategy(IRGenModule &IGM,
                                  TypeInfoKind tik,
                                  IsFixedSize_t alwaysFixedSize,
+                                 bool allowFixedLayoutOptimizations,
                                  unsigned NumElements,
                                  std::vector<Element> &&WithPayload,
                                  std::vector<Element> &&WithNoPayload)
@@ -2726,7 +2763,8 @@ namespace {
                                     std::move(WithPayload),
                                     std::move(WithNoPayload),
                                     getPayloadSchema(WithPayload)),
-                                    CopyDestroyKind(Normal)
+        CopyDestroyKind(Normal),
+        AllowFixedLayoutOptimizations(allowFixedLayoutOptimizations)
     {
       assert(ElementsWithPayload.size() > 1);
 
@@ -2737,14 +2775,14 @@ namespace {
       bool allSingleRefcount = true;
       bool haveRefcounting = false;
       for (auto &elt : ElementsWithPayload) {
-        if (!elt.ti->isPOD(ResilienceScope::Component))
+        if (!elt.ti->isPOD(ResilienceExpansion::Maximal))
           allPOD = false;
-        if (!elt.ti->isBitwiseTakable(ResilienceScope::Component))
+        if (!elt.ti->isBitwiseTakable(ResilienceExpansion::Maximal))
           allBitwiseTakable = false;
 
         // refcounting is only set in the else branches
         ReferenceCounting refcounting;
-        if (!elt.ti->isSingleRetainablePointer(ResilienceScope::Component,
+        if (!elt.ti->isSingleRetainablePointer(ResilienceExpansion::Maximal,
                                                &refcounting)) {
           allSingleRefcount = false;
         } else if (haveRefcounting) {
@@ -2781,7 +2819,17 @@ namespace {
       // the payload area size from all of the cases, so cache it in the
       // metadata. For fixed-layout cases this isn't necessary (except for
       // reflection, but it's OK if reflection is a little slow).
-      return TIK < Fixed;
+      //
+      // Note that even if from within our module the enum has a fixed layout,
+      // we might need the payload size if from another module the enum has
+      // a dynamic size, which can happen if the enum contains a resilient
+      // payload.
+      return !AllowFixedLayoutOptimizations;
+    }
+
+    unsigned getPayloadSizeForMetadata() const override {
+      assert(TIK >= Fixed);
+      return PayloadSize;
     }
 
     TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
@@ -3531,7 +3579,7 @@ namespace {
         auto &payloadTI = *payloadCasePair.ti;
 
         // Trivial payloads don't need any work.
-        if (payloadTI.isPOD(ResilienceScope::Component)) {
+        if (payloadTI.isPOD(ResilienceExpansion::Maximal)) {
           ++tagIndex;
           continue;
         }
@@ -3539,6 +3587,8 @@ namespace {
         // Unpack and handle nontrivial payloads.
         auto *caseBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
         swi->addCase(llvm::ConstantInt::get(tagTy, tagIndex), caseBB);
+
+        ConditionalDominanceScope condition(IGF);
 
         IGF.Builder.emitBlock(caseBB);
         f(tagIndex, payloadCasePair);
@@ -3744,6 +3794,7 @@ namespace {
         auto *noAliasBB = llvm::BasicBlock::Create(C);
         IGF.Builder.CreateCondBr(alias, endBB, noAliasBB);
         IGF.Builder.emitBlock(noAliasBB);
+        ConditionalDominanceScope condition(IGF);
 
         // Destroy the old value.
         destroy(IGF, dest, T);
@@ -3810,8 +3861,8 @@ namespace {
           auto &payloadTI = *payloadCasePair.ti;
           // Trivial and, in the case of a take, bitwise-takable payloads,
           // can all share the default path.
-          if (payloadTI.isPOD(ResilienceScope::Component)
-              || (isTake && payloadTI.isBitwiseTakable(ResilienceScope::Component))) {
+          if (payloadTI.isPOD(ResilienceExpansion::Maximal)
+              || (isTake && payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal))) {
             ++tagIndex;
             continue;
           }
@@ -3821,6 +3872,8 @@ namespace {
           auto *caseBB = llvm::BasicBlock::Create(C);
           swi->addCase(llvm::ConstantInt::get(tagTy, tagIndex), caseBB);
           IGF.Builder.emitBlock(caseBB);
+
+          ConditionalDominanceScope condition(IGF);
 
           // Do the take/copy of the payload.
           Address srcData = IGF.Builder.CreateBitCast(src,
@@ -3848,6 +3901,7 @@ namespace {
         // For trivial payloads (including no-payload cases), we can just
         // primitive-copy to the destination.
         IGF.Builder.emitBlock(trivialBB);
+        ConditionalDominanceScope condition(IGF);
         emitPrimitiveCopy(IGF, dest, src, T);
         IGF.Builder.CreateBr(endBB);
 
@@ -4093,14 +4147,20 @@ namespace {
       IGF.Builder.CreateCondBr(cond, noPayloadBB, payloadBB);
 
       IGF.Builder.emitBlock(noPayloadBB);
-      llvm::Value *noPayloadTag = IGF.Builder.CreateSub(tag, numPayloadCases);
-      storeNoPayloadTag(IGF, enumAddr, noPayloadTag, T);
-      IGF.Builder.CreateBr(endBB);
-      
+      {
+        ConditionalDominanceScope condition(IGF);
+        llvm::Value *noPayloadTag = IGF.Builder.CreateSub(tag, numPayloadCases);
+        storeNoPayloadTag(IGF, enumAddr, noPayloadTag, T);
+        IGF.Builder.CreateBr(endBB);
+      }
+
       IGF.Builder.emitBlock(payloadBB);
-      storePayloadTag(IGF, enumAddr, tag, T);
-      IGF.Builder.CreateBr(endBB);
-      
+      {
+        ConditionalDominanceScope condition(IGF);
+        storePayloadTag(IGF, enumAddr, tag, T);
+        IGF.Builder.CreateBr(endBB);
+      }
+
       IGF.Builder.emitBlock(endBB);
     }
 
@@ -4577,8 +4637,28 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
   unsigned numElements = 0;
   TypeInfoKind tik = Loadable;
   IsFixedSize_t alwaysFixedSize = IsFixedSize;
+  bool allowFixedLayoutOptimizations = true;
   std::vector<Element> elementsWithPayload;
   std::vector<Element> elementsWithNoPayload;
+
+  // Resilient enums are manipulated as opaque values, except we still
+  // make the following assumptions:
+  // 1) Physical case indices won't change
+  // 2) The indirect-ness of cases won't change
+  // 3) Payload types won't change in a non-resilient way
+  bool isResilient = TC.IGM.isResilient(theEnum, ResilienceExpansion::Maximal);
+  
+  // The most general resilience scope where the enum type is visible.
+  // Case numbering must not depend on any information that is not static
+  // in this resilience scope.
+  ResilienceExpansion accessScope =
+      TC.IGM.getResilienceExpansionForAccess(theEnum);
+
+  // The most general resilience scope where the enum's layout is known.
+  // Fixed-size optimizations can be applied if all payload types are
+  // fixed-size from this resilience scope.
+  ResilienceExpansion layoutScope =
+      TC.IGM.getResilienceExpansionForLayout(theEnum);
 
   for (auto elt : theEnum->getAllElements()) {
     numElements++;
@@ -4608,14 +4688,18 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
       = TC.tryGetCompleteTypeInfo(origArgLoweredTy.getSwiftRValueType());
     assert(origArgTI && "didn't complete type info?!");
 
-    // If the unsubstituted argument contains a generic parameter type, or if
-    // the substituted argument is not universally fixed-size, we need to
-    // constrain our layout optimizations to what the runtime can reproduce.
-    if (!origArgTI->isFixedSize(ResilienceScope::Universal))
-      alwaysFixedSize = IsNotFixedSize;
+    // If the unsubstituted argument contains a generic parameter type, or
+    // is not fixed-size in all resilience domains that have knowledge of
+    // this enum's layout, we need to constrain our layout optimizations to
+    // what the runtime can reproduce.
+    if (!isResilient &&
+        !origArgTI->isFixedSize(layoutScope))
+      allowFixedLayoutOptimizations = false;
 
-    auto loadableOrigArgTI = dyn_cast<LoadableTypeInfo>(origArgTI);
-    if (loadableOrigArgTI && loadableOrigArgTI->isKnownEmpty()) {
+    // If the payload is empty, turn the case into a no-payload case, but
+    // only if case numbering remains unchanged from all resilience domains
+    // that can see the enum.
+    if (origArgTI->isKnownEmpty(accessScope)) {
       elementsWithNoPayload.push_back({elt, nullptr, nullptr});
     } else {
       // *Now* apply the substitutions and get the type info for the instance's
@@ -4625,16 +4709,22 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
       auto *substArgTI = &TC.IGM.getTypeInfo(fieldTy);
 
       elementsWithPayload.push_back({elt, substArgTI, origArgTI});
-      if (!substArgTI->isFixedSize())
-        tik = Opaque;
-      else if (!substArgTI->isLoadable() && tik > Fixed)
-        tik = Fixed;
 
-      // If the substituted argument contains a type that is not universally
-      // fixed-size, we need to constrain our layout optimizations to what
-      // the runtime can reproduce.
-      if (!substArgTI->isFixedSize(ResilienceScope::Universal))
-        alwaysFixedSize = IsNotFixedSize;
+      if (!isResilient) {
+        if (!substArgTI->isFixedSize(ResilienceExpansion::Maximal))
+          tik = Opaque;
+        else if (!substArgTI->isLoadable() && tik > Fixed)
+          tik = Fixed;
+
+        // If the substituted argument contains a type that is not fixed-size
+        // in all resilience domains that have knowledge of this enum's layout,
+        // we need to constrain our layout optimizations to what the runtime
+        // can reproduce.
+        if (!substArgTI->isFixedSize(layoutScope)) {
+          alwaysFixedSize = IsNotFixedSize;
+          allowFixedLayoutOptimizations = false;
+        }
+      }
     }
   }
 
@@ -4643,12 +4733,7 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
            + elementsWithNoPayload.size()
          && "not all elements accounted for");
 
-  // Resilient enums are manipulated as opaque values, except we still
-  // make the following assumptions:
-  // 1) Physical case indices won't change
-  // 2) The indirect-ness of cases won't change
-  // 3) Payload types won't change in a non-resilient way
-  if (TC.IGM.isResilient(theEnum, ResilienceScope::Component)) {
+  if (isResilient) {
     return new ResilientEnumImplStrategy(TC.IGM,
                                          numElements,
                                          std::move(elementsWithPayload),
@@ -4672,6 +4757,7 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
                                          std::move(elementsWithNoPayload));
   if (elementsWithPayload.size() > 1)
     return new MultiPayloadEnumImplStrategy(TC.IGM, tik, alwaysFixedSize,
+                                            allowFixedLayoutOptimizations,
                                             numElements,
                                             std::move(elementsWithPayload),
                                             std::move(elementsWithNoPayload));
@@ -4936,7 +5022,7 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
 
     // Use the singleton element's storage type if fixed-size.
     if (eltTI.isFixedSize()) {
-      llvm::Type *body[] = { eltTI.StorageType };
+      llvm::Type *body[] = { eltTI.getStorageType() };
       enumTy->setBody(body, /*isPacked*/ true);
     } else {
       enumTy->setBody(ArrayRef<llvm::Type*>{}, /*isPacked*/ true);
@@ -4948,8 +5034,8 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                             alignment);
       return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
                              alignment,
-                             eltTI.isPOD(ResilienceScope::Component),
-                             eltTI.isBitwiseTakable(ResilienceScope::Component)));
+                             eltTI.isPOD(ResilienceExpansion::Maximal),
+                             eltTI.isBitwiseTakable(ResilienceExpansion::Maximal)));
     } else {
       auto &fixedEltTI = cast<FixedTypeInfo>(eltTI);
       auto alignment = fixedEltTI.getFixedAlignment();
@@ -4960,8 +5046,8 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                         fixedEltTI.getFixedSize(),
                         fixedEltTI.getSpareBits(),
                         alignment,
-                        fixedEltTI.isPOD(ResilienceScope::Component),
-                        fixedEltTI.isBitwiseTakable(ResilienceScope::Component));
+                        fixedEltTI.isPOD(ResilienceExpansion::Maximal),
+                        fixedEltTI.isBitwiseTakable(ResilienceExpansion::Maximal));
     }
   }
 }
@@ -5020,7 +5106,7 @@ CCompatibleEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
   auto &rawTI = TC.getCompleteTypeInfo(
                                    theEnum->getRawType()->getCanonicalType());
   auto &rawFixedTI = cast<FixedTypeInfo>(rawTI);
-  assert(rawFixedTI.isPOD(ResilienceScope::Component)
+  assert(rawFixedTI.isPOD(ResilienceExpansion::Maximal)
          && "c-compatible raw type isn't POD?!");
   ExplosionSchema rawSchema = rawTI.getSchema();
   assert(rawSchema.size() == 1
@@ -5036,7 +5122,7 @@ CCompatibleEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
   applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/true,
                         alignment);
 
-  assert(!TC.IGM.isResilient(theEnum, ResilienceScope::Universal) &&
+  assert(!TC.IGM.isResilient(theEnum, ResilienceExpansion::Minimal) &&
          "C-compatible enums cannot be resilient");
 
   return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this, enumTy,
@@ -5110,8 +5196,8 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
   
   return getFixedEnumTypeInfo(enumTy, Size(sizeWithTag), std::move(spareBits),
                       alignment,
-                      payloadTI.isPOD(ResilienceScope::Component),
-                      payloadTI.isBitwiseTakable(ResilienceScope::Component));
+                      payloadTI.isPOD(ResilienceExpansion::Maximal),
+                      payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal));
 }
 
 TypeInfo *SinglePayloadEnumImplStrategy::completeDynamicLayout(
@@ -5133,8 +5219,8 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeDynamicLayout(
   
   return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
          alignment,
-         payloadTI.isPOD(ResilienceScope::Component),
-         payloadTI.isBitwiseTakable(ResilienceScope::Component)));
+         payloadTI.isPOD(ResilienceExpansion::Maximal),
+         payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal)));
 }
 
 TypeInfo *
@@ -5165,23 +5251,28 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
   Alignment worstAlignment(1);
   IsPOD_t isPOD = IsPOD;
   IsBitwiseTakable_t isBT = IsBitwiseTakable;
+  PayloadSize = 0;
   for (auto &elt : ElementsWithPayload) {
     auto &fixedPayloadTI = cast<FixedTypeInfo>(*elt.ti);
     if (fixedPayloadTI.getFixedAlignment() > worstAlignment)
       worstAlignment = fixedPayloadTI.getFixedAlignment();
-    if (!fixedPayloadTI.isPOD(ResilienceScope::Component))
+    if (!fixedPayloadTI.isPOD(ResilienceExpansion::Maximal))
       isPOD = IsNotPOD;
-    if (!fixedPayloadTI.isBitwiseTakable(ResilienceScope::Component))
+    if (!fixedPayloadTI.isBitwiseTakable(ResilienceExpansion::Maximal))
       isBT = IsNotBitwiseTakable;
 
+    unsigned payloadBytes = fixedPayloadTI.getFixedSize().getValue();
     unsigned payloadBits = fixedPayloadTI.getFixedSize().getValueInBits();
-    
+
+    if (payloadBytes > PayloadSize)
+      PayloadSize = payloadBytes;
+
     // See what spare bits from the payload we can use for layout optimization.
 
     // The runtime currently does not track spare bits, so we can't use them
     // if the type is layout-dependent. (Even when the runtime does, it will
     // likely only track a subset of the spare bits.)
-    if (!AlwaysFixedSize || TIK < Loadable) {
+    if (!AllowFixedLayoutOptimizations || TIK < Loadable) {
       if (CommonSpareBits.size() < payloadBits)
         CommonSpareBits.extendWithClearBits(payloadBits);
       continue;
@@ -5310,8 +5401,8 @@ TypeInfo *MultiPayloadEnumImplStrategy::completeDynamicLayout(
   for (auto &element : ElementsWithPayload) {
     auto &payloadTI = *element.ti;
     alignment = std::max(alignment, payloadTI.getBestKnownAlignment());
-    pod &= payloadTI.isPOD(ResilienceScope::Component);
-    bt &= payloadTI.isBitwiseTakable(ResilienceScope::Component);
+    pod &= payloadTI.isPOD(ResilienceExpansion::Maximal);
+    bt &= payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal);
   }
   
   applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/false,
@@ -5345,7 +5436,7 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
   llvm::StructType *storageType;
 
   // Resilient enum types lower down to the same opaque type.
-  if (IGM.isResilient(theEnum, ResilienceScope::Component))
+  if (IGM.isResilient(theEnum, ResilienceExpansion::Maximal))
     storageType = cast<llvm::StructType>(IGM.OpaquePtrTy->getElementType());
   else
     storageType = IGM.createNominalType(theEnum);

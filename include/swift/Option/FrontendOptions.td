@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -124,6 +124,8 @@ def debug_forbid_typecheck_prefix : Separate<["-"], "debug-forbid-typecheck-pref
   HelpText<"Triggers llvm fatal_error if typechecker tries to typecheck a decl "
            "with the provided prefix name">;
 
+def debug_time_compilation : Flag<["-"], "debug-time-compilation">,
+  HelpText<"Prints the time taken by each compilation phase">;
 def debug_time_function_bodies : Flag<["-"], "debug-time-function-bodies">,
   HelpText<"Dumps the time it takes to type-check each function body">;
 
@@ -141,6 +143,9 @@ def debugger_support : Flag<["-"], "debugger-support">,
 
 def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
   HelpText<"Don't run SIL ARC optimization passes.">;
+
+def enable_guaranteed_closure_contexts : Flag<["-"], "enable-guaranteed-closure-contexts">,
+  HelpText<"Use @guaranteed convention for closure context">;
 
 def remove_runtime_asserts : Flag<["-"], "remove-runtime-asserts">,
 HelpText<"Remove runtime asserts.">;

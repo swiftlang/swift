@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -86,14 +86,14 @@ extension Optional : CustomDebugStringConvertible {
 //
 /// Haskell's fmap for Optionals.
 @available(*, unavailable, message="call the 'map()' method on the optional value")
-public func map<T, U>(x: T?, @noescape _ f: (T)->U) -> U? {
+public func map<T, U>(x: T?, @noescape _ f: (T) -> U) -> U? {
   fatalError("unavailable function can't be called")
 }
 
 
 /// Returns `f(self)!` iff `self` and `f(self)` are not `nil`.
 @available(*, unavailable, message="call the 'flatMap()' method on the optional value")
-public func flatMap<T, U>(x: T?, @noescape _ f: (T)->U?) -> U? {
+public func flatMap<T, U>(x: T?, @noescape _ f: (T) -> U?) -> U? {
   fatalError("unavailable function can't be called")
 }
 

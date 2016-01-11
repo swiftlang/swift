@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -227,7 +227,7 @@ public:
   void emitFunction(FuncDecl *fd);
   
   /// \brief Generates code for the given closure expression and adds the
-  /// SILFunction to the current SILModule under the nane SILDeclRef(ce).
+  /// SILFunction to the current SILModule under the name SILDeclRef(ce).
   SILFunction *emitClosure(AbstractClosureExpr *ce);
   /// Generates code for the given ConstructorDecl and adds
   /// the SILFunction to the current SILModule under the name SILDeclRef(decl).
@@ -247,7 +247,7 @@ public:
   
   /// Emits the default argument generator for the given function.
   void emitDefaultArgGenerators(SILDeclRef::Loc decl,
-                                ArrayRef<Pattern*> patterns);
+                                ArrayRef<ParameterList*> paramLists);
 
   /// Emits the curry thunk between two uncurry levels of a function.
   void emitCurryThunk(ValueDecl *fd,
@@ -363,7 +363,7 @@ public:
 
   /// Mark a protocol conformance as used, so we know we need to emit it if
   /// it's in our TU.
-  void useConformance(ProtocolConformance *conformance);
+  void useConformance(ProtocolConformanceRef conformance);
 
   /// Mark protocol conformances from the given set of substitutions as used.
   void useConformancesFromSubstitutions(ArrayRef<Substitution> subs);

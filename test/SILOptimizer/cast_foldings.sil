@@ -16,9 +16,9 @@ struct S {}
 sil @dont_fold_unconditional_checked_cast_to_existentials : $@convention(thin) () -> AnyObject {
 entry:
   %0 = alloc_stack $NSCloud
-  %1 = load %0#1 : $*NSCloud
+  %1 = load %0 : $*NSCloud
   %2 = unconditional_checked_cast %1 : $NSCloud to $AnyObject
-  dealloc_stack %0#0 : $*@local_storage NSCloud
+  dealloc_stack %0 : $*NSCloud
   return %2 : $AnyObject
 }
 
@@ -96,11 +96,11 @@ sil @function_ref_cast_struct : $@convention(thin) () -> @owned AnyObject {
 bb0:
   %0 = struct $S ()
   %1 = alloc_stack $S
-  store %0 to %1#1 : $*S
+  store %0 to %1 : $*S
   %4 = alloc_stack $AnyObject
-  unchecked_ref_cast_addr  S in %1#1 : $*S to AnyObject in %4#1 : $*AnyObject
-  %6 = load %4#1 : $*AnyObject
-  dealloc_stack %4#0 : $*@local_storage AnyObject
-  dealloc_stack %1#0 : $*@local_storage S
+  unchecked_ref_cast_addr  S in %1 : $*S to AnyObject in %4 : $*AnyObject
+  %6 = load %4 : $*AnyObject
+  dealloc_stack %4 : $*AnyObject
+  dealloc_stack %1 : $*S
   return %6 : $AnyObject
 }

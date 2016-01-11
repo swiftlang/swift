@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -32,13 +32,13 @@ using namespace swift;
 ///
 /// When parsing the generic parameters, this routine establishes a new scope
 /// and adds those parameters to the scope.
-GenericParamList *Parser::parseGenericParameters() {
+ParserResult<GenericParamList> Parser::parseGenericParameters() {
   // Parse the opening '<'.
   assert(startsWithLess(Tok) && "Generic parameter list must start with '<'");
   return parseGenericParameters(consumeStartingLess());
 }
 
-GenericParamList *Parser::parseGenericParameters(SourceLoc LAngleLoc) {
+ParserResult<GenericParamList> Parser::parseGenericParameters(SourceLoc LAngleLoc) {
   // Parse the generic parameter list.
   SmallVector<GenericTypeParamDecl *, 4> GenericParams;
   bool Invalid = false;
@@ -56,7 +56,8 @@ GenericParamList *Parser::parseGenericParameters(SourceLoc LAngleLoc) {
     if (Tok.is(tok::colon)) {
       (void)consumeToken();
       ParserResult<TypeRepr> Ty;
-      if (Tok.getKind() == tok::identifier) {
+      if (Tok.getKind() == tok::identifier ||
+          Tok.getKind() == tok::code_complete) {
         Ty = parseTypeIdentifier();
       } else if (Tok.getKind() == tok::kw_protocol) {
         Ty = parseTypeComposition();
@@ -65,7 +66,9 @@ GenericParamList *Parser::parseGenericParameters(SourceLoc LAngleLoc) {
         Invalid = true;
       }
 
-      // FIXME: code completion not handled.
+      if (Ty.hasCodeCompletion())
+        return makeParserCodeCompletionStatus();
+
       if (Ty.isNonNull())
         Inherited.push_back(Ty.get());
     }
@@ -117,11 +120,12 @@ GenericParamList *Parser::parseGenericParameters(SourceLoc LAngleLoc) {
   if (GenericParams.empty())
     return nullptr;
 
-  return GenericParamList::create(Context, LAngleLoc, GenericParams,
-                                  WhereLoc, Requirements, RAngleLoc);
+  return makeParserResult(GenericParamList::create(Context, LAngleLoc,
+                                                   GenericParams, WhereLoc,
+                                                   Requirements, RAngleLoc));
 }
 
-GenericParamList *Parser::maybeParseGenericParams() {
+ParserResult<GenericParamList> Parser::maybeParseGenericParams() {
   if (!startsWithLess(Tok))
     return nullptr;
 
@@ -132,7 +136,7 @@ GenericParamList *Parser::maybeParseGenericParams() {
   // first one being the outmost generic parameter list.
   GenericParamList *gpl = nullptr, *outer_gpl = nullptr;
   do {
-    gpl = parseGenericParameters();
+    gpl = parseGenericParameters().getPtrOrNull();
     if (!gpl)
       return nullptr;
 
@@ -140,7 +144,7 @@ GenericParamList *Parser::maybeParseGenericParams() {
       gpl->setOuterParameters(outer_gpl);
     outer_gpl = gpl;
   } while(startsWithLess(Tok));
-  return gpl;
+  return makeParserResult(gpl);
 }
 
 /// parseGenericWhereClause - Parse a 'where' clause, which places additional

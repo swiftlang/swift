@@ -19,42 +19,42 @@ struct Bas {}
 
 // CHECK-LABEL: sil @ref_foo_1 : $@convention(thin) () -> () {
 // CHECK:   %2 = function_ref @foo : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
-// CHECK:   %3 = apply %2<Bar>(%1#1, %0#1) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
+// CHECK:   %3 = apply %2<Bar>(%1, %0) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
 sil @ref_foo_1 : $@convention(thin) () -> () {
 entry:
   %i = alloc_stack $Bar
   %o = alloc_stack $Bar
   %f = function_ref @foo : $@convention(thin) <XYZ> (@out XYZ, @in XYZ) -> ()
-  %z = apply %f<Bar>(%o#1, %i#1) : $@convention(thin) <ZYX> (@out ZYX, @in ZYX) -> ()
-  dealloc_stack %o#0 : $*@local_storage Bar
-  dealloc_stack %i#0 : $*@local_storage Bar
+  %z = apply %f<Bar>(%o, %i) : $@convention(thin) <ZYX> (@out ZYX, @in ZYX) -> ()
+  dealloc_stack %o : $*Bar
+  dealloc_stack %i : $*Bar
   return %z : $()
 }
 
 // CHECK-LABEL: sil @ref_foo_2 : $@convention(thin) () -> () {
 // CHECK:  %2 = function_ref @foo : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
-// CHECK:  %3 = apply %2<Bas>(%1#1, %0#1) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
+// CHECK:  %3 = apply %2<Bas>(%1, %0) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
 sil @ref_foo_2 : $@convention(thin) () -> () {
 entry:
   %i = alloc_stack $Bas
   %o = alloc_stack $Bas
   %f = function_ref @foo : $@convention(thin) <ABC> (@out ABC, @in ABC) -> ()
-  %z = apply %f<Bas>(%o#1, %i#1) : $@convention(thin) <CBA> (@out CBA, @in CBA) -> ()
-  dealloc_stack %o#0 : $*@local_storage Bas
-  dealloc_stack %i#0 : $*@local_storage Bas
+  %z = apply %f<Bas>(%o, %i) : $@convention(thin) <CBA> (@out CBA, @in CBA) -> ()
+  dealloc_stack %o : $*Bas
+  dealloc_stack %i : $*Bas
   return %z : $()
 }
 
 // CHECK-LABEL: sil @ref_foo_partial_apply : $@convention(thin) () -> @owned @callee_owned (@out Bas) -> () {
 // CHECK:  %1 = function_ref @foo : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
-// CHECK:  %2 = partial_apply %1<Bas>(%0#1) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
+// CHECK:  %2 = partial_apply %1<Bas>(%0) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
 // CHECK:  return %2 : $@callee_owned (@out Bas) -> ()
 sil @ref_foo_partial_apply : $@convention(thin) () -> @owned @callee_owned (@out Bas) -> () {
 entry:
   %i = alloc_stack $Bas
   %f = function_ref @foo : $@convention(thin) <Z> (@out Z, @in Z) -> ()
-  %g = partial_apply %f<Bas>(%i#1) : $@convention(thin) <Y> (@out Y, @in Y) -> ()
-  dealloc_stack %i#0 : $*@local_storage Bas
+  %g = partial_apply %f<Bas>(%i) : $@convention(thin) <Y> (@out Y, @in Y) -> ()
+  dealloc_stack %i : $*Bas
   return %g : $@callee_owned (@out Bas) -> ()
 }
 
@@ -70,14 +70,14 @@ bb0:
   %3 = function_ref @_TF16generic_closures24generic_curried_functionU___FT1xQ__FT1yQ0__T_ : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0) -> @owned @callee_owned (@in τ_0_1) -> ()
   %4 = load %1 : $*Builtin.Int64
   %5 = alloc_stack $Builtin.Int64
-  store %4 to %5#1 : $*Builtin.Int64
+  store %4 to %5 : $*Builtin.Int64
   // CHECK: apply %{{[0-9]+}}<{{.*}}Int64, {{.*}}Int32>(%{{.*}}) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0) -> @owned @callee_owned (@in τ_0_1) -> ()
-  %7 = apply %3<Builtin.Int64, Builtin.Int32>(%5#1) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0) -> @owned @callee_owned (@in τ_0_1) -> ()
+  %7 = apply %3<Builtin.Int64, Builtin.Int32>(%5) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0) -> @owned @callee_owned (@in τ_0_1) -> ()
   %8 = function_ref @_TTRXFo_iBi32__dT__XFo_dBi32__dT__ : $@convention(thin) (Builtin.Int32, @owned @callee_owned (@in Builtin.Int32) -> ()) -> ()
   // CHECK: partial_apply %{{[0-9]+}}(%{{[0-9]+}}) : $@convention(thin) (Builtin.Int32, @owned @callee_owned (@in Builtin.Int32) -> ()) -> ()
   %9 = partial_apply %8(%7) : $@convention(thin) (Builtin.Int32, @owned @callee_owned (@in Builtin.Int32) -> ()) -> ()
   store %9 to %2 : $*@callee_owned (Builtin.Int32) -> ()
-  dealloc_stack %5#0 : $*@local_storage Builtin.Int64
+  dealloc_stack %5 : $*Builtin.Int64
   %12 = tuple ()
   return %12 : $()
 }
@@ -99,13 +99,13 @@ protocol FooProto {
 sil @protocol_extension_with_constrained_associated_type : $@convention(method) <Self where Self : FooProto, Self.Assoc : FooProtoHelper><I where I : FooProto, I.Assoc == Self.Assoc> (@in I, @in_guaranteed Self) -> () {
 bb0(%0 : $*I, %1 : $*Self):
   %2 = alloc_stack $I                             // users: %3, %6, %7, %9
-  copy_addr %0 to [initialization] %2#1 : $*I     // id: %3
+  copy_addr %0 to [initialization] %2 : $*I     // id: %3
   %4 = witness_method $I, #FooProto.value!getter.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : FooProto, τ_0_0.Assoc : FooProtoHelper> (@out τ_0_0.Assoc, @in_guaranteed τ_0_0) -> () // user: %6
   %5 = alloc_stack $Self.Assoc                    // users: %6, %8
-  %6 = apply %4<I, Self.Assoc>(%5#1, %2#1) : $@convention(witness_method) <τ_0_0 where τ_0_0 : FooProto, τ_0_0.Assoc : FooProtoHelper> (@out τ_0_0.Assoc, @in_guaranteed τ_0_0) -> ()
-  destroy_addr %2#1 : $*I                         // id: %7
-  dealloc_stack %5#0 : $*@local_storage Self.Assoc // id: %8
-  dealloc_stack %2#0 : $*@local_storage I         // id: %9
+  %6 = apply %4<I, Self.Assoc>(%5, %2) : $@convention(witness_method) <τ_0_0 where τ_0_0 : FooProto, τ_0_0.Assoc : FooProtoHelper> (@out τ_0_0.Assoc, @in_guaranteed τ_0_0) -> ()
+  destroy_addr %2 : $*I                         // id: %7
+  dealloc_stack %5 : $*Self.Assoc // id: %8
+  dealloc_stack %2 : $*I         // id: %9
   destroy_addr %0 : $*I                           // id: %10
   %11 = tuple ()                                  // user: %12
   return %11 : $()                                // id: %12

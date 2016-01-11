@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -I %S/Inputs/custom-modules %s -verify
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -enable-swift-name-lookup-tables -I %S/Inputs/custom-modules %s -verify
 
 // REQUIRES: objc_interop
 
@@ -58,7 +57,7 @@ func instanceMethods(b: B) {
   var obj = NSObject()
   var prot = NSObjectProtocol.self
   b.`protocol`(prot, hasThing:obj)
-  b.doThing(obj, `protocol`: prot)
+  b.doThing(obj, protocol: prot)
 }
 
 // Class method invocation

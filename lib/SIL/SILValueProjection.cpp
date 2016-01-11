@@ -1,8 +1,8 @@
-//===------------------------- SILValueProjection.cpp ---------------------===//
+//===--- SILValueProjection.cpp -------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -152,7 +152,7 @@ SILValue LSValue::reduce(LSLocation &Base, SILModule *M,
 
     // In 3 cases do we need aggregation.
     //
-    // 1. If there is only 1 child and we can not strip off any projections,
+    // 1. If there is only 1 child and we cannot strip off any projections,
     // that means we need to create an aggregation.
     // 
     // 2. There are multiple children and they have the same base, but empty
@@ -189,45 +189,6 @@ SILValue LSValue::reduce(LSLocation &Base, SILModule *M,
   return Values.begin()->second.materialize(InsertPt);
 }
 
-
-void LSValue::enumerateLSValue(SILModule *M, SILValue Val,
-                               std::vector<LSValue> &Vault,
-                               LSValueIndexMap &ValToBit,
-                               TypeExpansionAnalysis *TE) {
-  // Expand the given Mem into individual fields and add them to the
-  // locationvault.
-  LSValueList Vals;
-  LSValue::expand(Val, M, Vals, TE);
-  for (auto &Val : Vals) {
-    ValToBit[Val] = Vault.size();
-    Vault.push_back(Val);
-  }
-}
-
-void LSValue::enumerateLSValues(SILFunction &F, std::vector<LSValue> &Vault,
-                                LSValueIndexMap &ValToBit,
-                                TypeExpansionAnalysis *TE) {
-  // Enumerate all LSValues created or used by the loads or stores.
-  //
-  // TODO: process more instructions as we process more instructions in
-  // processInstruction.
-  //
-  SILValue Op;
-  for (auto &B : F) {
-    for (auto &I : B) {
-      if (auto *LI = dyn_cast<LoadInst>(&I)) {
-        enumerateLSValue(&I.getModule(), SILValue(LI), Vault, ValToBit, TE);
-      } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
-        enumerateLSValue(&I.getModule(), SI->getSrc(), Vault, ValToBit, TE);
-      }
-    }
-  }
-
-  // Lastly, push in the covering value LSValue.
-  ValToBit[LSValue(true)] = Vault.size();
-  Vault.push_back(LSValue(true));
-}
-
 //===----------------------------------------------------------------------===//
 //                                  Memory Location
 //===----------------------------------------------------------------------===//
@@ -242,7 +203,7 @@ bool LSLocation::isMustAliasLSLocation(const LSLocation &RHS,
   // If the bases are not must-alias, the locations may not alias.
   if (!AA->isMustAlias(Base, RHS.getBase()))
     return false;
-  // If projection paths are different, then the locations can not alias.
+  // If projection paths are different, then the locations cannot alias.
   if (!hasIdenticalProjectionPath(RHS))
     return false;
   return true;
@@ -250,7 +211,7 @@ bool LSLocation::isMustAliasLSLocation(const LSLocation &RHS,
 
 bool LSLocation::isMayAliasLSLocation(const LSLocation &RHS,
                                       AliasAnalysis *AA) {
-  // If the bases do not alias, then the locations can not alias.
+  // If the bases do not alias, then the locations cannot alias.
   if (AA->isNoAlias(Base, RHS.getBase()))
     return false;
   // If one projection path is a prefix of another, then the locations
@@ -258,6 +219,23 @@ bool LSLocation::isMayAliasLSLocation(const LSLocation &RHS,
   if (hasNonEmptySymmetricPathDifference(RHS))
     return false;
   return true;
+}
+
+
+bool LSLocation::isNonEscapingLocalLSLocation(SILFunction *Fn,
+                                              EscapeAnalysis *EA) {
+  // An alloc_stack is definitely dead at the end of the function.
+  if (isa<AllocStackInst>(Base))
+    return true;
+  // For other allocations we ask escape analysis.		
+  auto *ConGraph = EA->getConnectionGraph(Fn);
+  if (isa<AllocationInst>(Base)) {
+    auto *Node = ConGraph->getNodeOrNull(Base, EA);
+    if (Node && !Node->escapes()) {
+      return true;
+    }
+  }
+  return false;
 }
 
 void LSLocation::getFirstLevelLSLocations(LSLocationList &Locs,

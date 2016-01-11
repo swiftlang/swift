@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -516,6 +516,7 @@ struct ASTNodeBase {};
       case DeclContextKind::Initializer:
       case DeclContextKind::AbstractClosureExpr:
       case DeclContextKind::SerializedLocal:
+      case DeclContextKind::SubscriptDecl:
         return nullptr;
 
       case DeclContextKind::AbstractFunctionDecl:
@@ -674,8 +675,8 @@ struct ASTNodeBase {};
 
       if (auto Overridden = D->getOverriddenDecl()) {
         if (D->getDeclContext() == Overridden->getDeclContext()) {
-          PrettyStackTraceDecl debugStack("verifying overriden", D);
-          Out << "can not override a decl in the same DeclContext";
+          PrettyStackTraceDecl debugStack("verifying overridden", D);
+          Out << "cannot override a decl in the same DeclContext";
           D->dump(Out);
           Overridden->dump(Out);
           abort();
@@ -1601,6 +1602,7 @@ struct ASTNodeBase {};
       case DeclContextKind::Initializer:
       case DeclContextKind::NominalTypeDecl:
       case DeclContextKind::ExtensionDecl:
+      case DeclContextKind::SubscriptDecl:
         return hasEnclosingFunctionContext(dc->getParent());
       }
     }
@@ -1616,7 +1618,6 @@ struct ASTNodeBase {};
       // Make sure that there are no archetypes in the interface type.
       if (VD->getDeclContext()->isTypeContext() &&
           !hasEnclosingFunctionContext(VD->getDeclContext()) &&
-          !isa<ParamDecl>(VD) && /* because of subscripts */
           VD->getInterfaceType().findIf([](Type type) {
             return type->is<ArchetypeType>();
           })) {
@@ -1841,11 +1842,6 @@ struct ASTNodeBase {};
     void verifyParsed(ConstructorDecl *CD) {
       PrettyStackTraceDecl debugStack("verifying ConstructorDecl", CD);
 
-      if (CD->getBodyParamPatterns().size() != 2) {
-        Out << "ConstructorDecl should have exactly two parameter patterns";
-        abort();
-      }
-
       auto *DC = CD->getDeclContext();
       if (!isa<NominalTypeDecl>(DC) && !isa<ExtensionDecl>(DC) &&
           !CD->isInvalid()) {
@@ -1914,11 +1910,7 @@ struct ASTNodeBase {};
       PrettyStackTraceDecl debugStack("verifying DestructorDecl", DD);
 
       if (DD->isGeneric()) {
-        Out << "DestructorDecl can not be generic";
-        abort();
-      }
-      if (DD->getBodyParamPatterns().size() != 1) {
-        Out << "DestructorDecl should have 'self' parameter pattern only";
+        Out << "DestructorDecl cannot be generic";
         abort();
       }
 
@@ -2125,82 +2117,31 @@ struct ASTNodeBase {};
       PrettyStackTraceDecl debugStack("verifying AbstractFunctionDecl", AFD);
 
       // All of the parameter names should match.
-      if (!isa<DestructorDecl>(AFD)) {
+      if (!isa<DestructorDecl>(AFD)) { // Destructor has no non-self params.
         auto paramNames = AFD->getFullName().getArgumentNames();
         bool checkParamNames = (bool)AFD->getFullName();
         bool hasSelf = AFD->getDeclContext()->isTypeContext();
-        const Pattern *firstParams =
-            AFD->getBodyParamPatterns()[hasSelf ? 1 : 0];
+        auto *firstParams = AFD->getParameterList(hasSelf ? 1 : 0);
 
-        if (auto *paramTuple = dyn_cast<TuplePattern>(firstParams)) {
+        if (checkParamNames &&
+            paramNames.size() != firstParams->size()) {
+          Out << "Function name does not match its argument pattern ("
+              << paramNames.size() << " elements instead of "
+              << firstParams->size() << ")\n";
+          AFD->dump(Out);
+          abort();
+        }
+
+        // This doesn't use for_each because paramNames shouldn't be checked
+        // when the function is anonymous.
+        for (size_t i = 0, e = firstParams->size(); i < e; ++i) {
+          auto &param = firstParams->get(i);
+
           if (checkParamNames &&
-              paramNames.size() != paramTuple->getNumElements()) {
-            Out << "Function name does not match its argument pattern ("
-                << paramNames.size() << " elements instead of "
-                << paramTuple->getNumElements() << ")\n";
+              param->getArgumentName() != paramNames[i]) {
+            Out << "Function full name doesn't match variable name\n";
             AFD->dump(Out);
             abort();
-          }
-
-          // This doesn't use for_each because paramNames shouldn't be checked
-          // when the function is anonymous.
-          for (size_t i = 0, e = paramTuple->getNumElements(); i < e; ++i) {
-            TuplePatternElt elt = paramTuple->getElement(i);
-            Pattern *param = elt.getPattern()->getSemanticsProvidingPattern();
-            if (auto *namedParam = dyn_cast<NamedPattern>(param)) {
-              if (namedParam->getBoundName() != elt.getLabel()) {
-                Out << "Function body param tuple label "
-                       "doesn't match variable's public name\n";
-                AFD->dump(Out);
-                abort();
-              }
-
-              if (checkParamNames &&
-                  namedParam->getBoundName() != paramNames[i]) {
-                Out << "Function full name doesn't match variable name\n";
-                AFD->dump(Out);
-                abort();
-              }
-            } else {
-              assert(isa<AnyPattern>(param));
-              if (!elt.getLabel().empty()) {
-                Out << "Function body param tuple has a label, "
-                       "but there's no variable\n";
-                AFD->dump(Out);
-                abort();
-              }
-
-              if (checkParamNames && !paramNames[i].empty()) {
-                Out << "Function full name doesn't match variable name\n";
-                AFD->dump(Out);
-                abort();
-              }
-            }
-          }
-        } else {
-          if (checkParamNames && paramNames.size() != 1) {
-            Out << "Function name does not match its non-tuple argument pattern ("
-                << paramNames.size() << " elements instead of 1)\n";
-            AFD->dump(Out);
-            abort();
-          }
-
-          firstParams = firstParams->getSemanticsProvidingPattern();
-          if (auto *namedParam = dyn_cast<NamedPattern>(firstParams)) {
-            if (checkParamNames &&
-                namedParam->getBoundName() != paramNames.front()) {
-              Out << "Function full name doesn't match variable name\n";
-              AFD->dump(Out);
-              abort();
-            }
-          } else {
-            assert(isa<AnyPattern>(firstParams));
-            if (checkParamNames && !paramNames.front().empty()) {
-              Out << "Function full name has an argument name, "
-                     "but there's no variable\n";
-              AFD->dump(Out);
-              abort();
-            }
           }
         }
       }
@@ -2334,7 +2275,7 @@ struct ASTNodeBase {};
       PrettyStackTraceDecl debugStack("verifying FuncDecl", FD);
 
       unsigned MinParamPatterns = FD->getImplicitSelfDecl() ? 2 : 1;
-      if (FD->getBodyParamPatterns().size() < MinParamPatterns) {
+      if (FD->getParameterLists().size() < MinParamPatterns) {
         Out << "should have at least " << MinParamPatterns
             << " parameter patterns";
         abort();
@@ -2344,7 +2285,7 @@ struct ASTNodeBase {};
         unsigned NumExpectedParamPatterns = 1;
         if (FD->getImplicitSelfDecl())
           NumExpectedParamPatterns++;
-        if (FD->getBodyParamPatterns().size() != NumExpectedParamPatterns) {
+        if (FD->getParameterLists().size() != NumExpectedParamPatterns) {
           Out << "accessors should not be curried";
           abort();
         }
@@ -2400,36 +2341,11 @@ struct ASTNodeBase {};
 
     void verifyParsed(TuplePattern *TP) {
       PrettyStackTracePattern debugStack(Ctx, "verifying TuplePattern", TP);
-
-      for (const auto &elt : TP->getElements()) {
-        if (elt.hasEllipsis()) {
-          if (!isa<TypedPattern>(elt.getPattern())) {
-            Out << "a vararg subpattern of a TuplePattern should be "
-            "a TypedPattern\n";
-            abort();
-          }
-        }
-      }
-
       verifyParsedBase(TP);
     }
 
     void verifyChecked(TuplePattern *TP) {
       PrettyStackTracePattern debugStack(Ctx, "verifying TuplePattern", TP);
-
-      for (const auto &elt : TP->getElements()) {
-        if (elt.hasEllipsis()) {
-          Type T = cast<TypedPattern>(elt.getPattern())->getType()
-                     ->getCanonicalType();
-          if (auto *BGT = T->getAs<BoundGenericType>()) {
-            if (BGT->getDecl() == Ctx.getArrayDecl())
-              continue;
-          }
-          Out << "a vararg subpattern of a TuplePattern has wrong type";
-          abort();
-        }
-      }
-
       verifyCheckedBase(TP);
     }
 
@@ -2603,11 +2519,9 @@ struct ASTNodeBase {};
     }
 
     void checkMangling(ValueDecl *D) {
-      llvm::SmallString<32> Buf;
-      llvm::raw_svector_ostream OS(Buf);
-      Mangle::Mangler Mangler(OS);
+      Mangle::Mangler Mangler;
       Mangler.mangleDeclName(D);
-      if (OS.str().empty()) {
+      if (Mangler.finalize().empty()) {
         Out << "Mangler gave empty string for a ValueDecl";
         abort();
       }

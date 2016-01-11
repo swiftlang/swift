@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -27,7 +27,7 @@
 #include "llvm/IR/DerivedTypes.h"
 
 #include "GenHeap.h"
-#include "GenSequential.h"
+#include "GenRecord.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -43,10 +43,10 @@ using namespace swift;
 using namespace irgen;
 
 namespace {
-  class TupleFieldInfo : public SequentialField<TupleFieldInfo> {
+  class TupleFieldInfo : public RecordField<TupleFieldInfo> {
   public:
     TupleFieldInfo(unsigned index, StringRef name, const TypeInfo &type)
-      : SequentialField(type), Index(index), Name(name)
+      : RecordField(type), Index(index), Name(name)
     {}
 
     /// The field index.
@@ -71,8 +71,8 @@ namespace {
   /// Adapter for tuple types.
   template <class Impl, class Base>
   class TupleTypeInfoBase
-      : public SequentialTypeInfo<Impl, Base, TupleFieldInfo> {
-    typedef SequentialTypeInfo<Impl, Base, TupleFieldInfo> super;
+      : public RecordTypeInfo<Impl, Base, TupleFieldInfo> {
+    typedef RecordTypeInfo<Impl, Base, TupleFieldInfo> super;
 
   protected:
     template <class... As>
@@ -149,7 +149,7 @@ namespace {
         = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
       auto size = asImpl().getFixedSize().getValueInBits();
       
-      if (fieldTI.isKnownEmpty())
+      if (fieldTI.isKnownEmpty(ResilienceExpansion::Maximal))
         return APInt(size, 0);
       
       APInt firstMask = fieldTI.getFixedExtraInhabitantMask(IGM);
@@ -283,13 +283,13 @@ namespace {
   };
 
   class TupleTypeBuilder :
-      public SequentialTypeBuilder<TupleTypeBuilder, TupleFieldInfo,
-                                   TupleTypeElt> {
+      public RecordTypeBuilder<TupleTypeBuilder, TupleFieldInfo,
+                               TupleTypeElt> {
     SILType TheTuple;
 
   public:
     TupleTypeBuilder(IRGenModule &IGM, SILType theTuple)
-      : SequentialTypeBuilder(IGM), TheTuple(theTuple) {}
+      : RecordTypeBuilder(IGM), TheTuple(theTuple) {}
 
     FixedTupleTypeInfo *createFixed(ArrayRef<TupleFieldInfo> fields,
                                     StructLayout &&layout) {

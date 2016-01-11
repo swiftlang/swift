@@ -461,11 +461,11 @@ zero-argument selector with no trailing colon, e.g.,::
 
 maps to the selector ``initToMemory``.
 
-This mapping is reversible: given a selector in the “init” family,
-i.e., where the first word is “init”, we split the selector into its
+This mapping is reversible: given a selector in the "init" family,
+i.e., where the first word is "init", we split the selector into its
 various pieces at the colons:
 
-* For the first piece, we remove the “init” and then lowercase the
+* For the first piece, we remove the "init" and then lowercase the
   next character *unless* the second character is also uppercase. This
   becomes the name of the first parameter to the constructor. If this
   string is non-empty and the selector is a zero-argument selector

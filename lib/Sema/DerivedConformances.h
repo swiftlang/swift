@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -109,25 +109,14 @@ ValueDecl *deriveBridgedNSError(TypeChecker &tc,
 
 /// Insert an operator declaration associated with a declaration
 /// context. The operator declaration is added at global scope.
-void _insertOperatorDecl(ASTContext &C,
-                         IterableDeclContext *scope,
-                         Decl *member);
-  
-/// Insert an operator declaration associated with a declaration
-/// context. The operator declaration is added at global scope.
-template<typename SomeDecl>
-inline SomeDecl *insertOperatorDecl(ASTContext &C,
-                                    IterableDeclContext *scope,
-                                    SomeDecl *member) {
-  ::swift::DerivedConformance::_insertOperatorDecl(C, scope, member);
-  return member;
-}
+void insertOperatorDecl(ASTContext &C,
+                        IterableDeclContext *scope,
+                        Decl *member);
 
 /// Declare a getter for a derived property.
 FuncDecl *declareDerivedPropertyGetter(TypeChecker &tc,
                                        Decl *parentDecl,
                                        NominalTypeDecl *typeDecl,
-                                       Type contextType,
                                        Type propertyInterfaceType,
                                        Type propertyContextType,
                                        bool isStatic = false);

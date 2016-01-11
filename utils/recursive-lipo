@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 import argparse
 import os.path
 import filecmp
 import os
 import shutil
 
-from SwiftBuildSupport import *
+from SwiftBuildSupport import check_call
 
 def merge_file_lists(src_root_dirs, skip_files, skip_subpaths):
     """Merges the file lists recursively from all src_root_dirs supplied,
@@ -47,7 +49,7 @@ def merge_lipo_files(src_root_dirs, file_list, copy_verbatim_subpaths,
         file_paths = [os.path.join(dir, file) for dir in src_root_dirs
                      if os.path.exists(os.path.join(dir, file))]
         if len(file_paths) == 0:
-            print "-- Warning: Can't locate source file %s" % file
+            print("-- Warning: Can't locate source file %s" % file)
             continue
 
         destPath = os.path.join(dest_root_dir, os.path.relpath(file_paths[0],
@@ -55,39 +57,39 @@ def merge_lipo_files(src_root_dirs, file_list, copy_verbatim_subpaths,
 
         if all([os.path.islink(item) for item in file_paths]):
             #It's a symlink in all found instances, copy the link.
-            print "-- Creating symlink %s" % destPath
+            print("-- Creating symlink %s" % destPath)
             os.symlink(os.readlink(file_paths[0]), destPath)
         elif all([os.path.isdir(item) for item in file_paths]):
             # It's a subdir in all found instances.
             # See if we should copy verbatim or create the destination subdir.
             if file in copy_verbatim_subpaths:
-                print "-- Copying subdir verbatim %s" % destPath
+                print("-- Copying subdir verbatim %s" % destPath)
                 if os.path.isdir(destPath):
                     shutil.rmtree(destPath)
                 shutil.copytree(file_paths[0], destPath, symlinks=True)
             else:
-                print "-- Creating subdir %s" % destPath
+                print("-- Creating subdir %s" % destPath)
                 if not os.path.isdir(destPath):
                     os.makedirs(destPath)
         elif all([os.path.isfile(item) for item in file_paths]):
             # It's a regular file in all found instances, see if they're identical.
             if all([filecmp.cmp(item, file_paths[0]) for item in file_paths]):
                 # All instances are identical, just copy the unique file.
-                print "-- Copying file %s" % destPath
+                print("-- Copying file %s" % destPath)
                 shutil.copy2(file_paths[0], destPath)
             elif all([os.access(item, os.X_OK) for item in file_paths]):
                 # Multiple instances are different and executable, try lipo.
                 if verbose:
-                    print "-- Running lipo %s to %s" % (file_paths, destPath)
+                    print("-- Running lipo %s to %s" % (file_paths, destPath))
                 else:
-                    print "-- Running lipo %s" % destPath
+                    print("-- Running lipo %s" % destPath)
                 check_call(lipo_cmd + ["-output", destPath] + file_paths,
                            print_command=verbose, verbose=verbose)
             else:
                 # Multiple instances are different, and they're not executable.
-                print "-- Warning: non-executable source files are different, skipping: %s" % file_paths
+                print("-- Warning: non-executable source files are different, skipping: %s" % file_paths)
         else:
-            print "-- Warning: Unsupport file type, skipping: %s" % file_paths
+            print("-- Warning: Unsupport file type, skipping: %s" % file_paths)
 
 
 def main():
@@ -116,7 +118,7 @@ verbatim. This is useful if some subdirectories already contain fat binaries.
                         help="Files to ignore and skip merge/copy, default is \".DS_Store\"")
     parser.add_argument("--copy-subdirs", metavar="<subdirs-to-copy-verbatim>",
                         default="",
-                        help="Optional list of subdirecory paths that should be copied verbatim")
+                        help="Optional list of subdirectory paths that should be copied verbatim")
 
     required_group = parser.add_argument_group("required arguments")
     required_group.add_argument("--destination", metavar="<dest-path>",
@@ -135,7 +137,7 @@ verbatim. This is useful if some subdirectories already contain fat binaries.
                                  copy_verbatim_subpaths)
 
     if args.verbose:
-        print "Discovered files and dirs: %s" % file_list
+        print("Discovered files and dirs: %s" % file_list)
 
     merge_lipo_files(args.src_root_dirs, file_list, copy_verbatim_subpaths,
                    args.destination, args.verbose, args.lipo)

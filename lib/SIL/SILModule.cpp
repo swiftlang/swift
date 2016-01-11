@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -14,7 +14,6 @@
 #include "swift/SIL/SILModule.h"
 #include "Linker.h"
 #include "swift/SIL/SILDebugScope.h"
-#include "swift/SIL/SILExternalSource.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/SIL/SILValue.h"
@@ -43,9 +42,6 @@ namespace swift {
     }
   };
 } // end namespace swift.
-
-void SILExternalSource::anchor() {
-}
 
 /// SILTypeListUniquingType - This is the type of the folding set maintained by
 /// SILModule that these things are uniqued into.
@@ -143,7 +139,7 @@ SILWitnessTable *
 SILModule::createWitnessTableDeclaration(ProtocolConformance *C,
                                          SILLinkage linkage) {
   // If we are passed in a null conformance (a valid value), just return nullptr
-  // since we can not map a witness table to it.
+  // since we cannot map a witness table to it.
   if (!C)
     return nullptr;
 
@@ -158,14 +154,22 @@ SILModule::createWitnessTableDeclaration(ProtocolConformance *C,
 
 std::pair<SILWitnessTable *, ArrayRef<Substitution>>
 SILModule::
-lookUpWitnessTable(const ProtocolConformance *C, bool deserializeLazily) {
-  // If we have a null conformance passed in (a legal value), just return
+lookUpWitnessTable(ProtocolConformanceRef C, bool deserializeLazily) {
+  // If we have an abstract conformance passed in (a legal value), just return
   // nullptr.
-  ArrayRef<Substitution> Subs;
-  if (!C)
-    return {nullptr, Subs};
+  if (!C.isConcrete())
+    return {nullptr, {}};
+
+  return lookUpWitnessTable(C.getConcrete());
+}
+
+std::pair<SILWitnessTable *, ArrayRef<Substitution>>
+SILModule::
+lookUpWitnessTable(const ProtocolConformance *C, bool deserializeLazily) {
+  assert(C && "null conformance passed to lookUpWitnessTable");
 
   // Walk down to the base NormalProtocolConformance.
+  ArrayRef<Substitution> Subs;
   const ProtocolConformance *ParentC = C;
   while (!isa<NormalProtocolConformance>(ParentC)) {
     switch (ParentC->getKind()) {
@@ -328,8 +332,7 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
                                             SILDeclRef constant,
                                             ForDefinition_t forDefinition) {
 
-  SmallVector<char, 128> buffer;
-  auto name = constant.mangle(buffer);
+  auto name = constant.mangle();
   auto constantType = Types.getConstantType(constant).castTo<SILFunctionType>();
   SILLinkage linkage = constant.getLinkage(forDefinition);
 
@@ -378,15 +381,15 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
     if (constant.isForeign && constant.isClangGenerated())
       F->setForeignBody(HasForeignBody);
 
-    if (auto SemanticsA =
-        constant.getDecl()->getAttrs().getAttribute<SemanticsAttr>())
-      F->setSemanticsAttr(SemanticsA->Value);
+    auto Attrs = constant.getDecl()->getAttrs();
+    for (auto A : Attrs.getAttributes<SemanticsAttr, false /*AllowInvalid*/>())
+      F->addSemanticsAttr(cast<SemanticsAttr>(A)->Value);
   }
 
   F->setDeclContext(constant.hasDecl() ? constant.getDecl() : nullptr);
 
   // If this function has a self parameter, make sure that it has a +0 calling
-  // convention. This can not be done for general function types, since
+  // convention. This cannot be done for general function types, since
   // function_ref's SILFunctionTypes do not have archetypes associated with
   // it.
   CanSILFunctionType FTy = F->getLoweredFunctionType();
@@ -521,24 +524,20 @@ const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
 }
 
 SILFunction *SILModule::lookUpFunction(SILDeclRef fnRef) {
-  llvm::SmallString<32> name;
-  fnRef.mangle(name);
+  auto name = fnRef.mangle();
   return lookUpFunction(name);
 }
 
 bool SILModule::linkFunction(SILFunction *Fun, SILModule::LinkingMode Mode) {
-  return SILLinkerVisitor(*this, getSILLoader(), Mode, ExternalSource)
-      .processFunction(Fun);
+  return SILLinkerVisitor(*this, getSILLoader(), Mode).processFunction(Fun);
 }
 
 bool SILModule::linkFunction(SILDeclRef Decl, SILModule::LinkingMode Mode) {
-  return SILLinkerVisitor(*this, getSILLoader(), Mode, ExternalSource)
-      .processDeclRef(Decl);
+  return SILLinkerVisitor(*this, getSILLoader(), Mode).processDeclRef(Decl);
 }
 
 bool SILModule::linkFunction(StringRef Name, SILModule::LinkingMode Mode) {
-  return SILLinkerVisitor(*this, getSILLoader(), Mode, ExternalSource)
-      .processFunction(Name);
+  return SILLinkerVisitor(*this, getSILLoader(), Mode).processFunction(Name);
 }
 
 void SILModule::linkAllWitnessTables() {
@@ -598,8 +597,7 @@ SILVTable *SILModule::lookUpVTable(const ClassDecl *C) {
 
   // If that fails, try to deserialize it. If that fails, return nullptr.
   SILVTable *Vtbl =
-      SILLinkerVisitor(*this, getSILLoader(), SILModule::LinkingMode::LinkAll,
-                       ExternalSource)
+      SILLinkerVisitor(*this, getSILLoader(), SILModule::LinkingMode::LinkAll)
           .processClassDecl(C);
   if (!Vtbl)
     return nullptr;
@@ -625,7 +623,7 @@ SerializedSILLoader *SILModule::getSILLoader() {
 /// required. Notice that we do not scan the class hierarchy, just the concrete
 /// class type.
 std::tuple<SILFunction *, SILWitnessTable *, ArrayRef<Substitution>>
-SILModule::lookUpFunctionInWitnessTable(const ProtocolConformance *C,
+SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
                                         SILDeclRef Member) {
   // Look up the witness table associated with our protocol conformance from the
   // SILModule.
@@ -634,7 +632,7 @@ SILModule::lookUpFunctionInWitnessTable(const ProtocolConformance *C,
   // If no witness table was found, bail.
   if (!Ret.first) {
     DEBUG(llvm::dbgs() << "        Failed speculative lookup of witness for: ";
-          if (C) C->dump(); else Member.dump());
+          C.dump(); Member.dump());
     return std::make_tuple(nullptr, nullptr, ArrayRef<Substitution>());
   }
 

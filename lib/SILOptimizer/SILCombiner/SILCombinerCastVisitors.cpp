@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -86,7 +86,7 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
                                            PTAI->getType());
   }
 
-  // Turn this also into a index_addr. We generate this pattern after switching
+  // Turn this also into an index_addr. We generate this pattern after switching
   // the Word type to an explicit Int32 or Int64 in the stdlib.
   //
   // %101 = builtin "strideof_nonzero"<Int>(%84 : $@thick Int.Type) :

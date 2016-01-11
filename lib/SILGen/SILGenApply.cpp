@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -28,44 +28,6 @@
 
 using namespace swift;
 using namespace Lowering;
-
-static SILDeclRef::Loc getLocForFunctionRef(AnyFunctionRef fn) {
-  if (auto afd = fn.getAbstractFunctionDecl()) {
-    return afd;
-  } else {
-    auto closure = fn.getAbstractClosureExpr();
-    assert(closure);
-    return closure;
-  }
-}
-
-/// Collect the captures necessary to invoke a local function into an
-/// ArgumentSource.
-static std::pair<ArgumentSource, CanFunctionType>
-emitCapturesAsArgumentSource(SILGenFunction &gen,
-                             SILLocation loc,
-                             AnyFunctionRef fn) {
-  SmallVector<ManagedValue, 4> captures;
-  gen.emitCaptures(loc, fn, captures);
-  
-  // The capture array should match the explosion schema of the closure's
-  // first formal argument type.
-  auto info = gen.SGM.Types.getConstantInfo(SILDeclRef(getLocForFunctionRef(fn)));
-  auto subs = info.getForwardingSubstitutions(gen.getASTContext());
-  auto origFormalTy = info.FormalInterfaceType;
-  CanFunctionType formalTy;
-  if (!subs.empty()) {
-    auto genericOrigFormalTy = cast<GenericFunctionType>(origFormalTy);
-    auto substTy = genericOrigFormalTy
-      ->substGenericArgs(gen.SGM.SwiftModule, subs)
-      ->getCanonicalType();
-    formalTy = cast<FunctionType>(substTy);
-  } else {
-    formalTy = cast<FunctionType>(origFormalTy);
-  }
-  RValue rv(captures, formalTy.getInput());
-  return {ArgumentSource(loc, std::move(rv)), formalTy};
-}
 
 /// Retrieve the type to use for a method found via dynamic lookup.
 static CanAnyFunctionType getDynamicMethodFormalType(SILGenModule &SGM,
@@ -195,10 +157,10 @@ private:
   CanAnyFunctionType SubstFormalType;
   Optional<SILLocation> SpecializeLoc;
   bool HasSubstitutions = false;
+  Optional<SmallVector<ManagedValue, 2>> Captures;
 
   // The pointer back to the AST node that produced the callee.
   SILLocation Loc;
-
 
 private:
 
@@ -304,27 +266,11 @@ private:
   }
 
   CanSILFunctionType getSubstFunctionType(SILGenModule &SGM,
-                                          CanSILFunctionType origFnType,
-                                          CanAnyFunctionType origLoweredType,
-                                          unsigned uncurryLevel,
-                                          Optional<SILDeclRef> constant,
-                 const Optional<ForeignErrorConvention> &foreignError) const {
+                                          CanSILFunctionType origFnType) const {
     if (!HasSubstitutions) return origFnType;
-
-    assert(origLoweredType);
-    auto substLoweredType =
-      SGM.Types.getLoweredASTFunctionType(SubstFormalType, uncurryLevel,
-                                          origLoweredType->getExtInfo(),
-                                          constant);
-    auto substLoweredInterfaceType =
-      SGM.Types.getLoweredASTFunctionType(SubstFormalType, uncurryLevel,
-                                          origLoweredType->getExtInfo(),
-                                          constant);
-
-    return SGM.Types.substFunctionType(origFnType, origLoweredType,
-                                       substLoweredType,
-                                       substLoweredInterfaceType,
-                                       foreignError);
+    
+    return origFnType->substGenericArgs(SGM.M, SGM.SwiftModule,
+                                        Substitutions);
   }
 
   /// Add the 'self' clause back to the substituted formal type of
@@ -451,6 +397,20 @@ public:
            && "specializations below uncurry level?!");
     SpecializeLoc = loc;
     HasSubstitutions = true;
+  }
+  
+  void setCaptures(SmallVectorImpl<ManagedValue> &&captures) {
+    Captures = std::move(captures);
+  }
+  
+  ArrayRef<ManagedValue> getCaptures() const {
+    if (Captures)
+      return *Captures;
+    return {};
+  }
+  
+  bool hasCaptures() const {
+    return Captures.hasValue();
   }
 
   CanType getOrigFormalType() const {
@@ -585,6 +545,8 @@ public:
       }
 
       // Look up the witness for the archetype.
+      auto proto = Constant.getDecl()->getDeclContext()
+                                     ->isProtocolOrProtocolExtensionContext();
       auto selfType = getWitnessMethodSelfType();
       auto archetype = getArchetypeForSelf(selfType);
       // Get the openend existential value if the archetype is an opened
@@ -595,7 +557,7 @@ public:
 
       SILValue fn = gen.B.createWitnessMethod(Loc,
                                   archetype,
-                                  /*conformance*/ nullptr,
+                                  ProtocolConformanceRef(proto),
                                   *constant,
                                   constantInfo.getSILType(),
                                   OpenedExistential,
@@ -635,9 +597,7 @@ public:
     }
 
     CanSILFunctionType substFnType =
-      getSubstFunctionType(gen.SGM, mv.getType().castTo<SILFunctionType>(),
-                           constantInfo.LoweredType, level, constant,
-                           foreignError);
+      getSubstFunctionType(gen.SGM, mv.getType().castTo<SILFunctionType>());
 
     return std::make_tuple(mv, substFnType, foreignError, options);
   }
@@ -789,7 +749,7 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
                               constant, substFnType, loc);
 }
 
-/// An ASTVisitor for decomposing a a nesting of ApplyExprs into an initial
+/// An ASTVisitor for decomposing a nesting of ApplyExprs into an initial
 /// Callee and a list of CallSites. The CallEmission class below uses these
 /// to generate the actual SIL call.
 ///
@@ -1175,29 +1135,20 @@ public:
     CanFunctionType substFnType = getSubstFnType();
     ArrayRef<Substitution> subs;
     
-    // If the decl ref requires captures, emit the capture params.
-    // The capture params behave like a "self" parameter as the first curry
-    // level of the function implementation.
     auto afd = dyn_cast<AbstractFunctionDecl>(e->getDecl());
     if (afd) {
-      if (afd->getCaptureInfo().hasLocalCaptures()) {
-        assert(!e->getDeclRef().isSpecialized()
-               && "generic local fns not implemented");
-        
-        auto captures = emitCapturesAsArgumentSource(SGF, e, afd);
-        substFnType = captures.second;
-        setSelfParam(std::move(captures.first), captures.second.getInput());
-      }
-
-      // FIXME: We should be checking hasLocalCaptures() on the lowered
-      // captures in the constant info too, to generate more efficient
-      // code for mutually recursive local functions which otherwise
-      // capture no state.
       auto constantInfo = SGF.getConstantInfo(constant);
 
       // Forward local substitutions to a non-generic local function.
       if (afd->getParent()->isLocalContext() && !afd->getGenericParams())
         subs = constantInfo.getForwardingSubstitutions(SGF.getASTContext());
+
+      // If there are captures, put the placeholder curry level in the formal
+      // type.
+      // TODO: Eliminate the need for this.
+      if (afd->getCaptureInfo().hasLocalCaptures())
+        substFnType = CanFunctionType::get(
+          SGF.getASTContext().TheEmptyTupleType, substFnType);
     }
     
     if (e->getDeclRef().isSpecialized()) {
@@ -1205,11 +1156,31 @@ public:
       subs = e->getDeclRef().getSubstitutions();
     }
     
+    
     // Enum case constructor references are open-coded.
     if (isa<EnumElementDecl>(e->getDecl()))
       setCallee(Callee::forEnumElement(SGF, constant, substFnType, e));
     else
       setCallee(Callee::forDirect(SGF, constant, substFnType, e));
+    
+    // If the decl ref requires captures, emit the capture params.
+    if (afd) {
+      if (afd->getCaptureInfo().hasLocalCaptures()) {
+        assert(!e->getDeclRef().isSpecialized()
+               && "generic local fns not implemented");
+        
+        SmallVector<ManagedValue, 4> captures;
+        SGF.emitCaptures(e, afd, CaptureEmission::ImmediateApplication,
+                         captures);
+        ApplyCallee->setCaptures(std::move(captures));
+      }
+      
+      // FIXME: We should be checking hasLocalCaptures() on the lowered
+      // captures in the constant info too, to generate more efficient
+      // code for mutually recursive local functions which otherwise
+      // capture no state.
+      
+    }
 
     // If there are substitutions, add them, always at depth 0.
     if (!subs.empty())
@@ -1224,16 +1195,8 @@ public:
     if (!SGF.SGM.hasFunction(constant))
       SGF.SGM.emitClosure(e);
     
-    // If the closure requires captures, emit them.
-    // The capture params behave like a "self" parameter as the first curry
-    // level of the function implementation.
     ArrayRef<Substitution> subs;
     CanFunctionType substFnType = getSubstFnType();
-    if (e->getCaptureInfo().hasLocalCaptures()) {
-      auto captures = emitCapturesAsArgumentSource(SGF, e, e);
-      substFnType = captures.second;
-      setSelfParam(std::move(captures.first), captures.second.getInput());
-    }
     
     // FIXME: We should be checking hasLocalCaptures() on the lowered
     // captures in the constant info above, to generate more efficient
@@ -1242,7 +1205,22 @@ public:
     auto constantInfo = SGF.getConstantInfo(constant);
     subs = constantInfo.getForwardingSubstitutions(SGF.getASTContext());
 
+    // If there are captures, put the placeholder curry level in the formal
+    // type.
+    // TODO: Eliminate the need for this.
+    if (e->getCaptureInfo().hasLocalCaptures())
+      substFnType = CanFunctionType::get(
+                         SGF.getASTContext().TheEmptyTupleType, substFnType);
+
     setCallee(Callee::forDirect(SGF, constant, substFnType, e));
+    
+    // If the closure requires captures, emit them.
+    if (e->getCaptureInfo().hasLocalCaptures()) {
+      SmallVector<ManagedValue, 4> captures;
+      SGF.emitCaptures(e, e, CaptureEmission::ImmediateApplication,
+                       captures);
+      ApplyCallee->setCaptures(std::move(captures));
+    }
     // If there are substitutions, add them, always at depth 0.
     if (!subs.empty())
       ApplyCallee->setSubstitutions(SGF, e, subs, 0);
@@ -1264,21 +1242,6 @@ public:
   void visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e) {
     setSideEffect(e->getLHS());
     visit(e->getRHS());
-  }
-
-  /// Skip over all of the 'Self'-related substitutions within the given set
-  /// of substitutions.
-  ArrayRef<Substitution> getNonSelfSubstitutions(ArrayRef<Substitution> subs) {
-    unsigned innerIdx = 0, n = subs.size();
-    for (; innerIdx != n; ++innerIdx) {
-      auto archetype = subs[innerIdx].getArchetype();
-      while (archetype->getParent())
-        archetype = archetype->getParent();
-      if (!archetype->getSelfProtocol())
-        break;
-    }
-
-    return subs.slice(innerIdx);
   }
 
   void visitFunctionConversionExpr(FunctionConversionExpr *e) {
@@ -1960,7 +1923,7 @@ ManagedValue SILGenFunction::emitApply(
     }
   }
 
-  // If there's an foreign error parameter, fill it in.
+  // If there's a foreign error parameter, fill it in.
   Optional<WritebackScope> errorTempWriteback;
   ManagedValue errorTemp;
   if (foreignError) {
@@ -3111,6 +3074,24 @@ namespace {
       Params = Params.slice(0, Params.size() - count);
       return result;
     }
+    
+    ArrayRef<SILParameterInfo>
+    claimCaptureParams(ArrayRef<ManagedValue> captures) {
+      auto firstCapture = Params.size() - captures.size();
+#ifndef NDEBUG
+      assert(Params.size() >= captures.size()
+             && "more captures than params?!");
+      for (unsigned i = 0; i < captures.size(); ++i) {
+        assert(Params[i + firstCapture].getSILType()
+               == captures[i].getType()
+               && "capture doesn't match param type");
+      }
+#endif
+      
+      auto result = Params.slice(firstCapture, captures.size());
+      Params = Params.slice(0, firstCapture);
+      return result;
+    }
 
     ~ParamLowering() {
       assert(Params.empty() && "didn't consume all the parameters");
@@ -3246,7 +3227,14 @@ namespace {
         uncurries(callee.getNaturalUncurryLevel() + 1),
         applied(false),
         AssumedPlusZeroSelf(assumedPlusZeroSelf)
-    {}
+    {
+      // Subtract an uncurry level for captures, if any.
+      // TODO: Encapsulate this better in Callee.
+      if (this->callee.hasCaptures()) {
+        assert(uncurries > 0 && "captures w/o uncurry level?");
+        --uncurries;
+      }
+    }
 
     /// Add a level of function application by passing in its possibly
     /// unevaluated arguments and their formal type.
@@ -3431,6 +3419,19 @@ namespace {
           if (!uncurriedSites.back().throws()) {
             initialOptions |= ApplyOptions::DoesNotThrow;
           }
+          
+          // Collect the captures, if any.
+          if (callee.hasCaptures()) {
+            // The captures are represented as a placeholder curry level in the
+            // formal type.
+            // TODO: Remove this hack.
+            paramLowering.claimCaptureParams(callee.getCaptures());
+            claimNextParamClause(origFormalType);
+            claimNextParamClause(formalType);
+            args.push_back({});
+            args.back().append(callee.getCaptures().begin(),
+                               callee.getCaptures().end());
+          }
 
           // Collect the arguments to the uncurried call.
           for (auto &site : uncurriedSites) {
@@ -3461,13 +3462,13 @@ namespace {
         for (auto &argSet : reversed(args))
           uncurriedArgs.append(argSet.begin(), argSet.end());
         args = {};
-
+        
         // Emit the uncurried call.
         
         // Special case for superclass method calls.
         if (isPartiallyAppliedSuperMethod(uncurryLevel)) {
           assert(uncurriedArgs.size() == 1 &&
-                 "Can only partially apply the self parameater of a super method call");
+                 "Can only partially apply the self parameter of a super method call");
 
           auto constant = callee.getMethodName();
           auto loc = uncurriedLoc.getValue();
@@ -3685,13 +3686,12 @@ SILGenFunction::emitUninitializedArrayAllocation(Type ArrayTy,
                                                  SILLocation Loc) {
   auto &Ctx = getASTContext();
   auto allocate = Ctx.getAllocateUninitializedArray(nullptr);
-  auto allocateArchetypes = allocate->getGenericParams()->getAllArchetypes();
 
   auto arrayElementTy = ArrayTy->castTo<BoundGenericType>()
     ->getGenericArgs()[0];
 
   // Invoke the intrinsic, which returns a tuple.
-  Substitution sub{allocateArchetypes[0], arrayElementTy, {}};
+  Substitution sub{arrayElementTy, {}};
   auto result = emitApplyOfLibraryIntrinsic(Loc, allocate,
                                             sub,
                                             ManagedValue::forUnmanaged(Length),
@@ -3712,13 +3712,12 @@ void SILGenFunction::emitUninitializedArrayDeallocation(SILLocation loc,
                                                         SILValue array) {
   auto &Ctx = getASTContext();
   auto deallocate = Ctx.getDeallocateUninitializedArray(nullptr);
-  auto archetypes = deallocate->getGenericParams()->getAllArchetypes();
 
   CanType arrayElementTy =
     array.getType().castTo<BoundGenericType>().getGenericArgs()[0];
 
   // Invoke the intrinsic.
-  Substitution sub{archetypes[0], arrayElementTy, {}};
+  Substitution sub{arrayElementTy, {}};
   emitApplyOfLibraryIntrinsic(loc, deallocate, sub,
                               ManagedValue::forUnmanaged(array),
                               SGFContext());
@@ -3775,7 +3774,7 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
     }
   }
 
-  // Dispatch in a struct/enum or to an final method is always direct.
+  // Dispatch in a struct/enum or to a final method is always direct.
   if (!isClassDispatch || decl->isFinal())
     return Callee::forDirect(gen, constant, substAccessorType, loc);
 
@@ -3809,13 +3808,6 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
 {
   SILConstantInfo constantInfo = gen.getConstantInfo(constant);
 
-  // Collect captures if the accessor has them.
-  auto accessorFn = cast<AbstractFunctionDecl>(constant.getDecl());
-  if (accessorFn->getCaptureInfo().hasLocalCaptures()) {
-    assert(!selfValue && "local property has self param?!");
-    selfValue = emitCapturesAsArgumentSource(gen, loc, accessorFn).first;
-  }
-
   // Apply substitutions to the callee type.
   CanAnyFunctionType substAccessorType = constantInfo.FormalType;
   if (!substitutions.empty()) {
@@ -3829,6 +3821,16 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
   Callee callee = getBaseAccessorFunctionRef(gen, loc, constant, selfValue,
                                              isSuper, isDirectUse,
                                              substAccessorType, substitutions);
+  
+  // Collect captures if the accessor has them.
+  auto accessorFn = cast<AbstractFunctionDecl>(constant.getDecl());
+  if (accessorFn->getCaptureInfo().hasLocalCaptures()) {
+    assert(!selfValue && "local property has self param?!");
+    SmallVector<ManagedValue, 4> captures;
+    gen.emitCaptures(loc, accessorFn, CaptureEmission::ImmediateApplication,
+                     captures);
+    callee.setCaptures(std::move(captures));
+  }
 
   // If there are substitutions, specialize the generic accessor.
   // FIXME: Generic subscript operator could add another layer of
@@ -3981,12 +3983,17 @@ emitGetAccessor(SILLocation loc, SILDeclRef get,
   Callee getter = emitSpecializedAccessorFunctionRef(*this, loc, get,
                                                      substitutions, selfValue,
                                                      isSuper, isDirectUse);
+  bool hasCaptures = getter.hasCaptures();
+  bool hasSelf = (bool)selfValue;
   CanAnyFunctionType accessType = getter.getSubstFormalType();
 
   CallEmission emission(*this, std::move(getter), std::move(writebackScope));
   // Self ->
-  if (selfValue) {
+  if (hasSelf) {
     emission.addCallSite(loc, std::move(selfValue), accessType);
+  }
+  // TODO: Have Callee encapsulate the captures better.
+  if (hasSelf || hasCaptures) {
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
   // Index or () if none.
@@ -4019,12 +4026,17 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
   Callee setter = emitSpecializedAccessorFunctionRef(*this, loc, set,
                                                      substitutions, selfValue,
                                                      isSuper, isDirectUse);
+  bool hasCaptures = setter.hasCaptures();
+  bool hasSelf = (bool)selfValue;
   CanAnyFunctionType accessType = setter.getSubstFormalType();
 
   CallEmission emission(*this, std::move(setter), std::move(writebackScope));
   // Self ->
-  if (selfValue) {
+  if (hasSelf) {
     emission.addCallSite(loc, std::move(selfValue), accessType);
+  }
+  // TODO: Have Callee encapsulate the captures better.
+  if (hasSelf || hasCaptures) {
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
 
@@ -4074,12 +4086,17 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
                                                      materializeForSet,
                                                      substitutions, selfValue,
                                                      isSuper, isDirectUse);
+  bool hasCaptures = callee.hasCaptures();
+  bool hasSelf = (bool)selfValue;
   CanAnyFunctionType accessType = callee.getSubstFormalType();
 
   CallEmission emission(*this, std::move(callee), std::move(writebackScope));
   // Self ->
-  if (selfValue) {
+  if (hasSelf) {
     emission.addCallSite(loc, std::move(selfValue), accessType);
+  }
+  // TODO: Have Callee encapsulate the captures better.
+  if (hasSelf || hasCaptures) {
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
 
@@ -4143,12 +4160,17 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
     emitSpecializedAccessorFunctionRef(*this, loc, addressor,
                                        substitutions, selfValue,
                                        isSuper, isDirectUse);
+  bool hasCaptures = callee.hasCaptures();
+  bool hasSelf = (bool)selfValue;
   CanAnyFunctionType accessType = callee.getSubstFormalType();
 
   CallEmission emission(*this, std::move(callee), std::move(writebackScope));
   // Self ->
-  if (selfValue) {
+  if (hasSelf) {
     emission.addCallSite(loc, std::move(selfValue), accessType);
+  }
+  // TODO: Have Callee encapsulate the captures better.
+  if (hasSelf || hasCaptures) {
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
   // Index or () if none.

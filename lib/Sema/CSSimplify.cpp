@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -582,7 +582,7 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
   case TypeMatchKind::SameType:
   case TypeMatchKind::ConformsTo:
   case TypeMatchKind::Subtype:
-    llvm_unreachable("Not an call argument constraint");
+    llvm_unreachable("Not a call argument constraint");
   }
   
   auto haveOneNonUserConversion =
@@ -1145,17 +1145,22 @@ static bool isArrayDictionarySetOrString(const ASTContext &ctx, Type type) {
   return false;
 }
 
-/// Return the number of elements of parameter tuple type 'tupleTy' that must
-/// be matched to arguments, as opposed to being varargs or having default
-/// values.
-static unsigned tupleTypeRequiredArgCount(TupleType *tupleTy) {
-  auto argIsRequired = [&](const TupleTypeElt &elt) {
-    return !elt.isVararg() &&
-           elt.getDefaultArgKind() == DefaultArgumentKind::None;
-  };
-  return std::count_if(
-    tupleTy->getElements().begin(), tupleTy->getElements().end(),
-    argIsRequired);
+/// Given that 'tupleTy' is the argument type of a function that's being
+/// invoked with a single unlabeled argument, return the type of the parameter
+/// that matches that argument, or the null type if such a match is impossible.
+static Type getTupleElementTypeForSingleArgument(TupleType *tupleTy) {
+  Type result;
+  for (auto &param : tupleTy->getElements()) {
+    bool mustClaimArg = !param.isVararg() &&
+                        param.getDefaultArgKind() == DefaultArgumentKind::None;
+    bool canClaimArg = !param.hasName();
+    if (!result && canClaimArg) {
+      result = param.isVararg() ? param.getVarargBaseTy() : param.getType();
+    } else if (mustClaimArg) {
+      return Type();
+    }
+  }
+  return result;
 }
 
 ConstraintSystem::SolutionKind
@@ -1332,30 +1337,19 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     case TypeMatchKind::ArgumentTupleConversion:
       if (typeVar1 &&
           !typeVar1->getImpl().literalConformanceProto &&
-          kind == TypeMatchKind::ArgumentTupleConversion &&
           (flags & TMF_GenerateConstraints) &&
-          dyn_cast<ParenType>(type1.getPointer())) {
+          isa<ParenType>(type1.getPointer())) {
         
-        auto tupleTy = type2->getAs<TupleType>();
-        
-        if (tupleTy &&
-            !tupleTy->getElements().empty() &&
-            (tupleTy->hasAnyDefaultValues() ||
-             tupleTy->getElement(0).isVararg()) &&
-            !tupleTy->getElement(0).hasName() &&
-            tupleTypeRequiredArgCount(tupleTy) <= 1) {
-              
-          // Look through vararg types, if necessary.
-          auto tupleElt = tupleTy->getElement(0);
-          auto tupleEltTy = tupleElt.isVararg() ?
-                              tupleElt.getVarargBaseTy() : tupleElt.getType();
-          
-          addConstraint(getConstraintKind(kind),
-                        typeVar1,
-                        tupleEltTy,
-                        getConstraintLocator(locator));
-          return SolutionKind::Solved;
+        if (auto tupleTy = type2->getAs<TupleType>()) {
+          if (auto tupleEltTy = getTupleElementTypeForSingleArgument(tupleTy)) {
+            addConstraint(getConstraintKind(kind),
+                          typeVar1,
+                          tupleEltTy,
+                          getConstraintLocator(locator));
+            return SolutionKind::Solved;
+          }
         }
+
       }
       SWIFT_FALLTHROUGH;
 
@@ -1599,12 +1593,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       // containing a single element if the scalar type is a subtype of
       // the type of that tuple's element.
       //
-      // A scalar type can be converted to a tuple so long as there is at
-      // most one non-defaulted element.
+      // A scalar type can be converted to an argument tuple so long as
+      // there is at most one non-defaulted element.
+      // For non-argument tuples, we can do the same conversion but not
+      // to a tuple with varargs.
       if ((tuple2->getNumElements() == 1 &&
            !tuple2->getElement(0).isVararg()) ||
           (kind >= TypeMatchKind::Conversion &&
-           tuple2->getElementForScalarInit() >= 0)) {
+           tuple2->getElementForScalarInit() >= 0 &&
+           (isArgumentTupleConversion ||
+            !tuple2->getVarArgsBaseType()))) {
         conversionsOrFixes.push_back(
           ConversionRestrictionKind::ScalarToTuple);
 
@@ -2568,7 +2566,7 @@ static bool isUnavailableInExistential(TypeChecker &tc, ValueDecl *decl) {
 
     // Allow functions to return Self, but not have Self anywhere in
     // their argument types.
-    for (unsigned i = 1, n = afd->getNumParamPatterns(); i != n; ++i) {
+    for (unsigned i = 1, n = afd->getNumParameterLists(); i != n; ++i) {
       // Check whether the input type contains Self anywhere.
       auto fnType = type->castTo<AnyFunctionType>();
       if (containsProtocolSelf(fnType->getInput()))

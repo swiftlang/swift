@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -165,7 +165,7 @@ TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
       !dynamicType->getClassOrBoundGenericClass())
     return Type();
 
-  // If the value type canot be bridged, we're done.
+  // If the value type cannot be bridged, we're done.
   if (!valueType->isPotentiallyBridgedValueType())
     return Type();
 
@@ -211,7 +211,7 @@ Type TypeChecker::resolveTypeInContext(
   // type within the context.
   if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
     
-    this->forceExternalDeclMembers(nominal);
+    forceExternalDeclMembers(nominal);
     
     if (!nominal->getGenericParams() || !isSpecialized) {
       for (DeclContext *dc = fromDC; dc; dc = dc->getParent()) {
@@ -240,6 +240,7 @@ Type TypeChecker::resolveTypeInContext(
 
         case DeclContextKind::AbstractClosureExpr:
         case DeclContextKind::AbstractFunctionDecl:
+        case DeclContextKind::SubscriptDecl:
           continue;
         case DeclContextKind::SerializedLocal:
           llvm_unreachable("should not be typechecking deserialized things");
@@ -304,9 +305,11 @@ Type TypeChecker::resolveTypeInContext(
       continue;
 
     // Search the type of this context and its supertypes.
+    Type superClassOfFromType;
+    int traversedClassHierarchyDepth = 0;
     for (auto fromType = resolver->resolveTypeOfContext(parentDC);
          fromType;
-         fromType = getSuperClassOf(fromType)) {
+         fromType = superClassOfFromType) {
       // If the nominal type declaration of the context type we're looking at
       // matches the owner's nominal type declaration, this is how we found
       // the member type declaration. Substitute the type we're coming from as
@@ -335,6 +338,14 @@ Type TypeChecker::resolveTypeInContext(
           conformance) {
         return conformance->getTypeWitness(assocType, this).getReplacement();
       }
+      superClassOfFromType = getSuperClassOf(fromType);
+      /// FIXME: Avoid the possibility of an infinite loop by fixing the root
+      ///        cause instead (incomplete circularity detection).
+      assert(fromType.getPointer() != superClassOfFromType.getPointer() &&
+             "Infinite loop due to circular class inheritance.");
+      assert(traversedClassHierarchyDepth++ <= 16384 &&
+             "Infinite loop due to circular class inheritance?");
+      (void) traversedClassHierarchyDepth;
     }
   }
 
@@ -367,8 +378,10 @@ Type TypeChecker::applyGenericArguments(Type type,
   if (!unbound) {
     // FIXME: Highlight generic arguments and introduce a Fix-It to remove
     // them.
-    diagnose(loc, diag::not_a_generic_type, type);
-
+    if (!type->is<ErrorType>()) {
+      diagnose(loc, diag::not_a_generic_type, type);
+    }
+    
     // Just return the type; this provides better recovery anyway.
     return type;
   }
@@ -733,7 +746,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       }
     }
 
-    if (!DC->isCascadingContextForLookup(/*excludeFunctions*/true))
+    if (!DC->isCascadingContextForLookup(/*excludeFunctions*/false))
       options |= TR_KnownNonCascadingDependency;
 
     // The remaining lookups will be in the parent context.
@@ -1207,7 +1220,7 @@ Type TypeChecker::resolveIdentifierType(
 
   // We allow a type to conform to a protocol that is less available than
   // the type itself. This enables a type to retroactively model or directly
-  // conform to a protocl only available on newer OSes and yet still be used on
+  // conform to a protocol only available on newer OSes and yet still be used on
   // older OSes.
   // To support this, inside inheritance clauses we allow references to
   // protocols that are unavailable in the current type refinement context.
@@ -1339,7 +1352,13 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
     resolver = &defaultResolver;
 
   TypeResolver typeResolver(*this, DC, resolver, unsatisfiedDependency);
-  return typeResolver.resolveType(TyR, options);
+  auto result = typeResolver.resolveType(TyR, options);
+  
+  // If we resolved down to an error, make sure to mark the typeRepr as invalid
+  // so we don't produce a redundant diagnostic.
+  if (result && result->is<ErrorType>())
+    TyR->setInvalid();
+  return result;
 }
 
 Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
@@ -1739,13 +1758,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     attrs.clearAttribute(TAK_box);
   }
   
-  // Diagnose @local_storage in nested positions.
-  if (attrs.has(TAK_local_storage)) {
-    assert(DC->getParentSourceFile()->Kind == SourceFileKind::SIL);
-    TC.diagnose(attrs.getLoc(TAK_local_storage),diag::sil_local_storage_nested);
-    attrs.clearAttribute(TAK_local_storage);
-  }
-
   for (unsigned i = 0; i != TypeAttrKind::TAK_Count; ++i)
     if (attrs.has((TypeAttrKind)i))
       TC.diagnose(attrs.getLoc((TypeAttrKind)i),
@@ -1761,8 +1773,7 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
                              options | TR_ImmediateFunctionInput);
   if (!inputTy || inputTy->is<ErrorType>()) return inputTy;
 
-  Type outputTy = resolveType(repr->getResultTypeRepr(),
-                              options | TR_FunctionResult);
+  Type outputTy = resolveType(repr->getResultTypeRepr(), options);
   if (!outputTy || outputTy->is<ErrorType>()) return outputTy;
 
   extInfo = extInfo.withThrows(repr->throws());
@@ -1839,8 +1850,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     // For now, resolveSILResults only returns a single ordinary result.
     // FIXME: Deal with unsatisfied dependencies.
     SmallVector<SILResultInfo, 1> ordinaryResults;
-    if (resolveSILResults(repr->getResultTypeRepr(),
-                          options | TR_FunctionResult,
+    if (resolveSILResults(repr->getResultTypeRepr(), options,
                           ordinaryResults, errorResult)) {
       hasError = true;
     } else {
@@ -2050,7 +2060,6 @@ bool TypeResolver::resolveSILResults(TypeRepr *repr,
                                      TypeResolutionOptions options,
                                 SmallVectorImpl<SILResultInfo> &ordinaryResults,
                                 Optional<SILResultInfo> &errorResult) {
-  assert(options & TR_FunctionResult && "Should be marked as a result");
 
   // When we generalize SIL to handle multiple normal results, we
   // should always split up a tuple (a single level deep only).  Until
@@ -2078,6 +2087,7 @@ Type TypeResolver::resolveInOutType(InOutTypeRepr *repr,
   if (!(options & TR_FunctionInput) &&
       !(options & TR_ImmediateFunctionInput)) {
     TC.diagnose(repr->getInOutLoc(), diag::inout_only_parameter);
+    repr->setInvalid();
     return ErrorType::get(Context);
   }
   
@@ -2090,14 +2100,6 @@ Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
   // FIXME: diagnose non-materializability of element type!
   Type baseTy = resolveType(repr->getBase(), withoutContext(options));
   if (!baseTy || baseTy->is<ErrorType>()) return baseTy;
-  
-  if (ExprHandle *sizeEx = repr->getSize()) {
-    // FIXME: We don't support fixed-length arrays yet.
-    // FIXME: We need to check Size! (It also has to be convertible to int).
-    TC.diagnose(repr->getBrackets().Start, diag::unsupported_fixed_length_array)
-      .highlight(sizeEx->getExpr()->getSourceRange());
-    return ErrorType::get(Context);
-  }
 
   auto sliceTy = TC.getArraySliceType(repr->getBrackets().Start, baseTy);
   if (!sliceTy)
@@ -2406,37 +2408,9 @@ static void describeObjCReason(TypeChecker &TC, const ValueDecl *VD,
   }
 }
 
-static Type getFunctionParamType(const Pattern *P) {
-  if (auto *TP = dyn_cast<TypedPattern>(P))
-    return TP->getType();
-  return {};
-}
-
-static SourceRange getFunctionParamTypeSourceRange(const Pattern *P) {
-  if (auto *TP = dyn_cast<TypedPattern>(P))
-    return TP->getTypeLoc().getTypeRepr()->getSourceRange();
-  return {};
-}
-
-static bool isParamRepresentableInObjC(TypeChecker &TC,
-                                       const DeclContext *DC,
-                                       const Pattern *P) {
-  // Look through 'var' pattern.
-  if (auto VP = dyn_cast<VarPattern>(P))
-    P = VP->getSubPattern();
-
-  auto *TP = dyn_cast<TypedPattern>(P);
-  if (!TP)
-    return false;
-  if (!TC.isRepresentableInObjC(DC, TP->getType()))
-    return false;
-  auto *SubPattern = TP->getSubPattern();
-  return isa<NamedPattern>(SubPattern) || isa<AnyPattern>(SubPattern);
-}
-
 static void diagnoseFunctionParamNotRepresentable(
     TypeChecker &TC, const AbstractFunctionDecl *AFD, unsigned NumParams,
-    unsigned ParamIndex, const Pattern *P, ObjCReason Reason) {
+    unsigned ParamIndex, const ParamDecl *P, ObjCReason Reason) {
   if (Reason == ObjCReason::DoNotDiagnose)
     return;
 
@@ -2447,77 +2421,68 @@ static void diagnoseFunctionParamNotRepresentable(
     TC.diagnose(AFD->getLoc(), diag::objc_invalid_on_func_param_type,
                 ParamIndex + 1, getObjCDiagnosticAttrKind(Reason));
   }
-  if (Type ParamTy = getFunctionParamType(P)) {
-    SourceRange SR = getFunctionParamTypeSourceRange(P);
+  if (P->hasType()) {
+    Type ParamTy = P->getType();
+    SourceRange SR;
+    if (auto typeRepr = P->getTypeLoc().getTypeRepr())
+      SR = typeRepr->getSourceRange();
     TC.diagnoseTypeNotRepresentableInObjC(AFD, ParamTy, SR);
   }
   describeObjCReason(TC, AFD, Reason);
 }
 
-static bool isParamPatternRepresentableInObjC(TypeChecker &TC,
-                                              const AbstractFunctionDecl *AFD,
-                                              const Pattern *P,
-                                              ObjCReason Reason) {
+static bool isParamListRepresentableInObjC(TypeChecker &TC,
+                                           const AbstractFunctionDecl *AFD,
+                                           const ParameterList *PL,
+                                           ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsObjC.
 
   bool Diagnose = (Reason != ObjCReason::DoNotDiagnose);
-  if (auto *TP = dyn_cast<TuplePattern>(P)) {
-    auto Fields = TP->getElements();
-    unsigned NumParams = Fields.size();
 
-    // Varargs are not representable in Objective-C.
-    if (TP->hasAnyEllipsis()) {
+  bool IsObjC = true;
+  unsigned NumParams = PL->size();
+  for (unsigned ParamIndex = 0; ParamIndex != NumParams; ParamIndex++) {
+    auto param = PL->get(ParamIndex);
+    
+    // Swift Varargs are not representable in Objective-C.
+    if (param->isVariadic()) {
       if (Diagnose && Reason != ObjCReason::DoNotDiagnose) {
-        TC.diagnose(TP->getAnyEllipsisLoc(),
-                    diag::objc_invalid_on_func_variadic,
-                    getObjCDiagnosticAttrKind(Reason));
+        TC.diagnose(param->getStartLoc(), diag::objc_invalid_on_func_variadic,
+                    getObjCDiagnosticAttrKind(Reason))
+          .highlight(param->getSourceRange());
         describeObjCReason(TC, AFD, Reason);
       }
-
+      
       return false;
     }
-
-    if (NumParams == 0)
-      return true;
-
-    bool IsObjC = true;
-    for (unsigned ParamIndex = 0; ParamIndex != NumParams; ParamIndex++) {
-      auto &TupleElt = Fields[ParamIndex];
-      if (!isParamRepresentableInObjC(TC, AFD, TupleElt.getPattern())) {
-        // Permit '()' when this method overrides a method with a
-        // foreign error convention that replaces NSErrorPointer with ()
-        // and this is the replaced parameter.
-        AbstractFunctionDecl *overridden;
-        if (TupleElt.getPattern()->getType()->isVoid() &&
-            AFD->isBodyThrowing() &&
-            (overridden = AFD->getOverriddenDecl())) {
-          auto foreignError = overridden->getForeignErrorConvention();
-          if (foreignError &&
-              foreignError->isErrorParameterReplacedWithVoid() &&
-              foreignError->getErrorParameterIndex() == ParamIndex) {
-            continue;
-          }
-        }
-
-        IsObjC = false;
-        if (!Diagnose) {
-          // Save some work and return as soon as possible if we are not
-          // producing diagnostics.
-          return IsObjC;
-        }
-        diagnoseFunctionParamNotRepresentable(TC, AFD, NumParams, ParamIndex,
-                                              TupleElt.getPattern(), Reason);
+    
+    if (TC.isRepresentableInObjC(AFD, param->getType()))
+      continue;
+    
+    // Permit '()' when this method overrides a method with a
+    // foreign error convention that replaces NSErrorPointer with ()
+    // and this is the replaced parameter.
+    AbstractFunctionDecl *overridden;
+    if (param->getType()->isVoid() && AFD->isBodyThrowing() &&
+        (overridden = AFD->getOverriddenDecl())) {
+      auto foreignError = overridden->getForeignErrorConvention();
+      if (foreignError &&
+          foreignError->isErrorParameterReplacedWithVoid() &&
+          foreignError->getErrorParameterIndex() == ParamIndex) {
+        continue;
       }
     }
-    return IsObjC;
+
+    IsObjC = false;
+    if (!Diagnose) {
+      // Save some work and return as soon as possible if we are not
+      // producing diagnostics.
+      return IsObjC;
+    }
+    diagnoseFunctionParamNotRepresentable(TC, AFD, NumParams, ParamIndex,
+                                          param, Reason);
   }
-  auto *PP = cast<ParenPattern>(P);
-  if (!isParamRepresentableInObjC(TC, AFD, PP->getSubPattern())) {
-    diagnoseFunctionParamNotRepresentable(TC, AFD, 1, 1, PP->getSubPattern(),
-                                          Reason);
-    return false;
-  }
-  return true;
+  return IsObjC;
 }
 
 /// Check whether the given declaration occurs within a constrained
@@ -2640,19 +2605,6 @@ static bool isBridgedToObjectiveCClass(DeclContext *dc, Type type) {
   return classDecl->getName().str() != "NSNumber";
 }
 
-/// Determine whether this is a trailing closure type.
-static AnyFunctionType *isTrailingClosure(Type type) {
-  // Only consider the rvalue type.
-  type = type->getRValueType();
-
-  // Look through one level of optionality.
-  if (auto objectType = type->getAnyOptionalObjectType())
-    type = objectType;
-
-  // Is it a function type?
-  return type->getAs<AnyFunctionType>();
-}
-
 bool TypeChecker::isRepresentableInObjC(
        const AbstractFunctionDecl *AFD,
        ObjCReason Reason,
@@ -2695,7 +2647,7 @@ bool TypeChecker::isRepresentableInObjC(
       unsigned ExpectedParamPatterns = 1;
       if (FD->getImplicitSelfDecl())
         ExpectedParamPatterns++;
-      if (FD->getBodyParamPatterns().size() != ExpectedParamPatterns) {
+      if (FD->getParameterLists().size() != ExpectedParamPatterns) {
         if (Diagnose) {
           diagnose(AFD->getLoc(), diag::objc_invalid_on_func_curried,
                    getObjCDiagnosticAttrKind(Reason));
@@ -2731,9 +2683,8 @@ bool TypeChecker::isRepresentableInObjC(
     isSpecialInit = init->isObjCZeroParameterWithLongSelector();
 
   if (!isSpecialInit &&
-      !isParamPatternRepresentableInObjC(*this, AFD,
-                                         AFD->getBodyParamPatterns()[1],
-                                         Reason)) {
+      !isParamListRepresentableInObjC(*this, AFD, AFD->getParameterList(1),
+                                      Reason)) {
     if (!Diagnose) {
       // Return as soon as possible if we are not producing diagnostics.
       return false;
@@ -2868,18 +2819,23 @@ bool TypeChecker::isRepresentableInObjC(
     // If the selector did not provide an index for the error, find
     // the last parameter that is not a trailing closure.
     if (!foundErrorParameterIndex) {
-      const Pattern *paramPattern = AFD->getBodyParamPatterns()[1];
-      if (auto *tuple = dyn_cast<TuplePattern>(paramPattern)) {
-        errorParameterIndex = tuple->getNumElements();
-        while (errorParameterIndex > 0 &&
-               isTrailingClosure(
-                 tuple->getElement(errorParameterIndex - 1).getPattern()
-                   ->getType()))
-          --errorParameterIndex;
-      } else {
-        auto paren = cast<ParenPattern>(paramPattern);
-        errorParameterIndex
-          = isTrailingClosure(paren->getSubPattern()->getType()) ? 0 : 1;
+      auto *paramList = AFD->getParameterList(1);
+      errorParameterIndex = paramList->size();
+      while (errorParameterIndex > 0) {
+        // Skip over trailing closures.
+        auto type = paramList->get(errorParameterIndex - 1)->getType();
+
+        // It can't be a trailing closure unless it has a specific form.
+        // Only consider the rvalue type.
+        type = type->getRValueType();
+        
+        // Look through one level of optionality.
+        if (auto objectType = type->getAnyOptionalObjectType())
+          type = objectType;
+        
+        // Is it a function type?
+        if (!type->is<AnyFunctionType>()) break;
+        --errorParameterIndex;
       }
     }
 
@@ -2987,6 +2943,9 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
     if (TupleTy->getNumElements() == 1 && !TupleTy->getElement(0).isVararg())
       IndicesType = TupleTy->getElementType(0);
   }
+  
+  if (IndicesType->is<ErrorType>())
+    return false;
 
   bool IndicesResult = isRepresentableInObjC(SD->getDeclContext(), IndicesType);
   bool ElementResult = isRepresentableInObjC(SD->getDeclContext(),

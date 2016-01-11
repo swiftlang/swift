@@ -1,8 +1,8 @@
-//===--------- LoopSimplify.cpp - Loop structure simplify -*- C++ -*-------===//
+//===--- LoopRotate.cpp - Loop structure simplify ---------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -51,7 +51,7 @@ static bool hasLoopInvariantOperands(SILInstruction *I, SILLoop *L,
   });
 }
 
-/// We can not duplicate blocks with AllocStack instructions (they need to be
+/// We cannot duplicate blocks with AllocStack instructions (they need to be
 /// FIFO). Other instructions can be moved to the preheader.
 static bool
 canDuplicateOrMoveToPreheader(SILLoop *L, SILBasicBlock *Preheader,
@@ -298,7 +298,7 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
 
   // The header needs to exit the loop.
   if (!L->isLoopExiting(Header)) {
-    DEBUG(llvm::dbgs() << *L << " not a exiting header\n");
+    DEBUG(llvm::dbgs() << *L << " not an exiting header\n");
     DEBUG(L->getHeader()->getParent()->dump());
     return false;
   }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -91,7 +91,7 @@ class DCE : public SILFunctionTransform {
 
   /// Tracks if the pass changed branches.
   bool BranchesChanged;
-  /// Trackes if the pass changed ApplyInsts.
+  /// Tracks if the pass changed ApplyInsts.
   bool CallsChanged;
 
   /// The entry point to the transformation.
@@ -197,7 +197,7 @@ void DCE::markValueLive(ValueBase *V) {
 }
 
 /// Gets the producing instruction of a cond_fail condition. Currently these
-/// are overflow builtints but may be extended to other instructions in the
+/// are overflow builtins but may be extended to other instructions in the
 /// future.
 static SILInstruction *getProducer(CondFailInst *CFI) {
   // Check for the pattern:
@@ -280,18 +280,22 @@ void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
   // delivers those arguments.
   markValueLive(Term);
 
-  switch (Term->getKind()) {
-  default:
+  switch (Term->getTermKind()) {
+  case TermKind::ReturnInst:
+  case TermKind::ThrowInst:
+  case TermKind::Invalid:
     llvm_unreachable("Unexpected terminator kind!");
 
-  case ValueKind::UnreachableInst:
-  case ValueKind::SwitchValueInst:
+  case TermKind::UnreachableInst:
+  case TermKind::SwitchValueInst:
+  case TermKind::SwitchEnumAddrInst:
+  case TermKind::CheckedCastAddrBranchInst:
     llvm_unreachable("Unexpected argument for terminator kind!");
     break;
 
-  case ValueKind::DynamicMethodBranchInst:
-  case ValueKind::SwitchEnumInst:
-  case ValueKind::CheckedCastBranchInst:
+  case TermKind::DynamicMethodBranchInst:
+  case TermKind::SwitchEnumInst:
+  case TermKind::CheckedCastBranchInst:
     assert(ArgIndex == 0 && "Expected a single argument!");
 
     // We do not need to do anything with these. If the resulting
@@ -300,11 +304,11 @@ void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
     // single operand of these instructions as live.
     break;
 
-  case ValueKind::BranchInst:
+  case TermKind::BranchInst:
     markValueLive(cast<BranchInst>(Term)->getArg(ArgIndex).getDef());
     break;
 
-  case ValueKind::CondBranchInst: {
+  case TermKind::CondBranchInst: {
     auto *CondBr = cast<CondBranchInst>(Term);
 
     if (CondBr->getTrueBB() == Succ) {
@@ -319,7 +323,7 @@ void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
 
     break;
   }
-  case ValueKind::TryApplyInst: {
+  case TermKind::TryApplyInst: {
     assert(ArgIndex == 0 && "Expect a single argument!");
     break;
   }
@@ -366,33 +370,31 @@ void DCE::propagateLiveness(SILInstruction *I) {
     return;
   }
 
-  switch (I->getKind()) {
-#define TERMINATOR(ID, PARENT, MEM, RELEASE)
-#define VALUE(ID, PARENT) case ValueKind::ID:
-#include "swift/SIL/SILNodes.def"
+  switch (ValueKindAsTermKind(I->getKind())) {
+  case TermKind::Invalid:
     llvm_unreachable("Unexpected terminator instruction!");
 
-  case ValueKind::BranchInst:
-  case ValueKind::UnreachableInst:
+  case TermKind::BranchInst:
+  case TermKind::UnreachableInst:
     return;
 
-  case ValueKind::ReturnInst:
-  case ValueKind::ThrowInst:
-  case ValueKind::CondBranchInst:
-  case ValueKind::SwitchEnumInst:
-  case ValueKind::SwitchEnumAddrInst:
-  case ValueKind::DynamicMethodBranchInst:
-  case ValueKind::CheckedCastBranchInst:
+  case TermKind::ReturnInst:
+  case TermKind::ThrowInst:
+  case TermKind::CondBranchInst:
+  case TermKind::SwitchEnumInst:
+  case TermKind::SwitchEnumAddrInst:
+  case TermKind::DynamicMethodBranchInst:
+  case TermKind::CheckedCastBranchInst:
     markValueLive(I->getOperand(0).getDef());
     return;
 
-  case ValueKind::TryApplyInst:
-  case ValueKind::SwitchValueInst:
+  case TermKind::TryApplyInst:
+  case TermKind::SwitchValueInst:
     for (auto &O : I->getAllOperands())
       markValueLive(O.get().getDef());
     return;
 
-  case ValueKind::CheckedCastAddrBranchInst:
+  case TermKind::CheckedCastAddrBranchInst:
     markValueLive(I->getOperand(0).getDef());
     markValueLive(I->getOperand(1).getDef());
     return;

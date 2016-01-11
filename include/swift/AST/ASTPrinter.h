@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -30,10 +30,13 @@ namespace swift {
 /// Describes the context in which a name is being printed, which
 /// affects the keywords that need to be escaped.
 enum class PrintNameContext {
-  // Normal context
+  /// Normal context
   Normal,
-  // Generic parameter context, where 'Self' is not escaped.
+  /// Generic parameter context, where 'Self' is not escaped.
   GenericParameter,
+  /// Function parameter context, where keywords other than let/var/inout are
+  /// not escaped.
+  FunctionParameter,
 };
 
 /// An abstract class used to print an AST.
@@ -102,7 +105,7 @@ public:
     PendingDeclLocCallback = D;
   }
 
-  /// To sanitize a malformatted utf8 string to a well-formatted one.
+  /// To sanitize a malformed utf8 string to a well-formed one.
   static std::string sanitizeUtf8(StringRef Text);
   static bool printTypeInterface(Type Ty, DeclContext *DC, std::string &Result);
   static bool printTypeInterface(Type Ty, DeclContext *DC, llvm::raw_ostream &Out);

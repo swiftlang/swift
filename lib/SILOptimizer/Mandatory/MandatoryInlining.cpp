@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -348,7 +348,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
         // trace back the failure if we have more information.
         // FIXME: possibly it could be worth recovering and attempting other
         // inlines within this same recursive call rather than simply
-        // propogating the failure.
+        // propagating the failure.
         if (AI) {
           SILLocation L = AI.getLoc();
           assert(L && "Must have location for transparent inline apply");

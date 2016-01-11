@@ -429,9 +429,13 @@ func emptyDocBlockComment3() {}
 
 
 /**/
-func malformedBlockComment(f : ()throws->()) rethrows {}
+func malformedBlockComment(f : () throws -> ()) rethrows {}
 // CHECK: <doc-comment-block>/**/</doc-comment-block>
-// CHECK: <kw>func</kw> malformedBlockComment(f : ()<kw>throws</kw>->()) <attr-builtin>rethrows</attr-builtin> {}
+// CHECK: <kw>func</kw> malformedBlockComment(f : () <kw>throws</kw> -> ()) <attr-builtin>rethrows</attr-builtin> {}
+
+//: playground doc comment line
+func playgroundCommentLine(f : () throws -> ()) rethrows {}
+// CHECK: <comment-line>//: playground doc comment line</comment-line>
 
 
 "--\"\(x) --"

@@ -142,12 +142,12 @@ func test16078944 <T: ForwardIndexType>(lhs: T, args: T) -> Int {
 class r22409190ManagedBuffer<Value, Element> {
   final var value: Value { get {} set {}}
   func withUnsafeMutablePointerToElements<R>(
-    body: (UnsafeMutablePointer<Element>)->R) -> R {
+    body: (UnsafeMutablePointer<Element>) -> R) -> R {
   }
 }
 class MyArrayBuffer<Element>: r22409190ManagedBuffer<UInt, Element> {
   deinit {
-    self.withUnsafeMutablePointerToElements { elems->Void in
+    self.withUnsafeMutablePointerToElements { elems -> Void in
       elems.destroy(self.value)  // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Int'}}
     }
   }

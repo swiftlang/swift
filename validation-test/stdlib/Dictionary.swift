@@ -696,7 +696,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     assert(d[10]! == 1010)
 
     d.removeAll()
-    // We can not assert that identity changed, since the new buffer of smaller
+    // We cannot assert that identity changed, since the new buffer of smaller
     // size can be allocated at the same address as the old one.
     var identity1 = unsafeBitCast(d, Int.self)
     assert(d._variantStorage.native.capacity < originalCapacity)
@@ -782,7 +782,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     assert(d[TestKeyTy(10)]!.value == 1010)
 
     d.removeAll()
-    // We can not assert that identity changed, since the new buffer of smaller
+    // We cannot assert that identity changed, since the new buffer of smaller
     // size can be allocated at the same address as the old one.
     var identity1 = unsafeBitCast(d, Int.self)
     assert(d._variantStorage.native.capacity < originalCapacity)
@@ -2199,7 +2199,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_Empty") {
   assert(isCocoaDictionary(d))
 
   var gen = d.generate()
-  // Can not write code below because of
+  // Cannot write code below because of
   // <rdar://problem/16811736> Optional tuples are broken as optionals regarding == comparison
   // assert(gen.next() == .None)
   assert(gen.next() == nil)
@@ -2217,7 +2217,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
   assert(isNativeDictionary(d))
 
   var gen = d.generate()
-  // Can not write code below because of
+  // Cannot write code below because of
   // <rdar://problem/16811736> Optional tuples are broken as optionals regarding == comparison
   // assert(gen.next() == .None)
   assert(gen.next() == nil)
@@ -2876,7 +2876,7 @@ DictionaryTestSuite.test("BridgingRoundtrip") {
 // NSDictionary -> Dictionary implicit conversion.
 //===---
 
-DictionaryTestSuite.test("NSDictionaryToDictionaryCoversion") {
+DictionaryTestSuite.test("NSDictionaryToDictionaryConversion") {
   let keys = [ 10, 20, 30 ].map { TestObjCKeyTy($0) }
   let values = [ 1010, 1020, 1030 ].map { TestObjCValueTy($0) }
 
@@ -2892,7 +2892,7 @@ DictionaryTestSuite.test("NSDictionaryToDictionaryCoversion") {
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
 }
 
-DictionaryTestSuite.test("DictionaryToNSDictionaryCoversion") {
+DictionaryTestSuite.test("DictionaryToNSDictionaryConversion") {
   var d = Dictionary<TestObjCKeyTy, TestObjCValueTy>(minimumCapacity: 32)
   d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
   d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
@@ -3540,7 +3540,7 @@ class ObjCThunksHelper : NSObject {
   }
 
   dynamic func acceptArrayBridgedNonverbatim(array: [TestBridgedValueTy]) {
-    // Can not check elements because doing so would bridge them.
+    // Cannot check elements because doing so would bridge them.
     expectEqual(3, array.count)
   }
 
@@ -3565,7 +3565,7 @@ class ObjCThunksHelper : NSObject {
   dynamic func acceptDictionaryBridgedNonverbatim(
       d: [TestBridgedKeyTy : TestBridgedValueTy]) {
     expectEqual(3, d.count)
-    // Can not check elements because doing so would bridge them.
+    // Cannot check elements because doing so would bridge them.
   }
 
   dynamic func returnDictionaryBridgedVerbatim() ->

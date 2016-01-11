@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -18,12 +18,8 @@
 #define SWIFT_AST_IDENTIFIER_H
 
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerUnion.h"
-#include "llvm/ADT/StringRef.h"
-#include <cstring>
 
 namespace llvm {
   class raw_ostream;
@@ -31,6 +27,7 @@ namespace llvm {
 
 namespace swift {
   class ASTContext;
+  class ParameterList;
 
 /// DeclRefKind - The kind of reference to an identifier.
 enum class DeclRefKind {
@@ -243,6 +240,9 @@ class DeclName {
     : SimpleOrCompound(decltype(SimpleOrCompound)::getFromOpaqueValue(Opaque))
   {}
 
+  void initialize(ASTContext &C, Identifier baseName,
+                  ArrayRef<Identifier> argumentNames);
+  
 public:
   /// Build a null name.
   DeclName() : SimpleOrCompound(IdentifierAndCompound()) {}
@@ -253,9 +253,15 @@ public:
   
   /// Build a compound value name given a base name and a set of argument names.
   DeclName(ASTContext &C, Identifier baseName,
-           ArrayRef<Identifier> argumentNames);
+           ArrayRef<Identifier> argumentNames) {
+    initialize(C, baseName, argumentNames);
+  }
+
+  /// Build a compound value name given a base name and a set of argument names
+  /// extracted from a parameter list.
+  DeclName(ASTContext &C, Identifier baseName, ParameterList *paramList);
   
-  /// Retrive the 'base' name, i.e., the name that follows the introducer,
+  /// Retrieve the 'base' name, i.e., the name that follows the introducer,
   /// such as the 'foo' in 'func foo(x:Int, y:Int)' or the 'bar' in
   /// 'var bar: Int'.
   Identifier getBaseName() const {

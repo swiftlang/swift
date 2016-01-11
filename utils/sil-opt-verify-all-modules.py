@@ -1,15 +1,13 @@
 #!/usr/bin/env python
-#===------------------------------------------------------------------------===#
+# utils/sil-opt-verify-all-modules.py - Verifies Swift modules -*- python -*-
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-#
-#===------------------------------------------------------------------------===#
 
 from __future__ import print_function
 
@@ -17,7 +15,6 @@ import argparse
 import glob
 import multiprocessing
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -76,11 +73,6 @@ def get_verify_resource_dir_modules_commands(
     commands = []
     module_cache_dir = tempfile.mkdtemp(prefix="swift-testsuite-clang-module-cache")
     for (subdir, arch, triple) in known_platforms:
-        platform_frameworks_dir = os.path.join(
-            subprocess.check_output([
-              'xcrun', '--toolchain', toolchain_name, '--show-sdk-platform-path'
-            ]).strip(),
-            'Developer', 'Library', 'Frameworks')
         modules_dir = os.path.join(resource_dir, subdir, arch)
         print(modules_dir)
         modules = glob.glob(os.path.join(modules_dir, '*.swiftmodule'))
@@ -119,9 +111,8 @@ def run_commands_in_parallel(commands):
     makefile += "all: " + " ".join(targets) + "\n"
 
     temp_dir = tempfile.mkdtemp(prefix="swift-testsuite-main")
-    makefile_file = open(os.path.join(temp_dir, 'Makefile'), 'w')
-    makefile_file.write(makefile)
-    makefile_file.close()
+    with open(os.path.join(temp_dir, 'Makefile'), 'w') as makefile_file:
+        makefile_file.write(makefile)
 
     max_processes = multiprocessing.cpu_count()
     subprocess.check_call([

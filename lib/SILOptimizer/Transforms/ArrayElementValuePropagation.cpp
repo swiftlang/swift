@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -125,7 +125,7 @@ bool ArrayAllocation::mapInitializationStores() {
     } else if (SI)
       return false;
 
-    // Store a index_addr projection.
+    // Store an index_addr projection.
     auto *IndexAddr = dyn_cast<IndexAddrInst>(Inst);
     if (!IndexAddr)
       return false;
@@ -148,7 +148,7 @@ bool ArrayAllocation::mapInitializationStores() {
   return !ElementValueMap.empty();
 }
 
-/// Check that we have a array initialization call with known elements.
+/// Check that we have an array initialization call with known elements.
 ///
 /// The returned array value is known not to be aliased since it was just
 /// allocated.
@@ -165,7 +165,7 @@ bool ArrayAllocation::isInitializationWithKnownElements() {
 /// Propagate the elements of an array literal to get_element method calls on
 /// the same array.
 ///
-/// We have to prove that the the array value is not changed in between the
+/// We have to prove that the array value is not changed in between the
 /// creation and the method call to get_element.
 bool ArrayAllocation::findValueReplacements() {
   if (!isInitializationWithKnownElements())

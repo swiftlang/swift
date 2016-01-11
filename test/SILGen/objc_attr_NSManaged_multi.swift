@@ -6,11 +6,11 @@ import Foundation
 
 // CHECK-LABEL: sil hidden @_TF25objc_attr_NSManaged_multi9testMultiFCS_10SwiftGizmoPs9AnyObject_ : $@convention(thin) (@owned SwiftGizmo) -> @owned AnyObject {
 func testMulti(obj: SwiftGizmo) -> AnyObject {
-  // CHECK: = class_method [volatile] %0 : $SwiftGizmo, #SwiftGizmo.kvc!1.foreign : SwiftGizmo -> () -> () , $@convention(objc_method) (SwiftGizmo) -> ()
+  // CHECK: = class_method [volatile] %0 : $SwiftGizmo, #SwiftGizmo.kvc!1.foreign : (SwiftGizmo) -> () -> () , $@convention(objc_method) (SwiftGizmo) -> ()
   // CHECK-NOT: return
-  // CHECK: = class_method [volatile] %0 : $SwiftGizmo, #SwiftGizmo.extKVC!1.foreign : SwiftGizmo -> () -> () , $@convention(objc_method) (SwiftGizmo) -> ()
+  // CHECK: = class_method [volatile] %0 : $SwiftGizmo, #SwiftGizmo.extKVC!1.foreign : (SwiftGizmo) -> () -> () , $@convention(objc_method) (SwiftGizmo) -> ()
   // CHECK-NOT: return
-  // CHECK: class_method [volatile] %0 : $SwiftGizmo, #SwiftGizmo.x!getter.1.foreign : SwiftGizmo -> () -> X , $@convention(objc_method) (SwiftGizmo) -> @autoreleased X
+  // CHECK: class_method [volatile] %0 : $SwiftGizmo, #SwiftGizmo.x!getter.1.foreign : (SwiftGizmo) -> () -> X , $@convention(objc_method) (SwiftGizmo) -> @autoreleased X
   // CHECK: return
   obj.kvc()
   obj.extKVC()
@@ -19,11 +19,11 @@ func testMulti(obj: SwiftGizmo) -> AnyObject {
 
 // CHECK-LABEL: sil hidden @_TF25objc_attr_NSManaged_multi14testFinalMultiFCS_10FinalGizmoSS : $@convention(thin) (@owned FinalGizmo) -> @owned String {
 func testFinalMulti(obj: FinalGizmo) -> String {
-  // CHECK: class_method [volatile] %0 : $FinalGizmo, #FinalGizmo.kvc2!1.foreign : FinalGizmo -> () -> () , $@convention(objc_method) (FinalGizmo) -> ()
+  // CHECK: class_method [volatile] %0 : $FinalGizmo, #FinalGizmo.kvc2!1.foreign : (FinalGizmo) -> () -> () , $@convention(objc_method) (FinalGizmo) -> ()
   // CHECK-NOT: return
-  // CHECK: class_method [volatile] %0 : $FinalGizmo, #FinalGizmo.extKVC2!1.foreign : FinalGizmo -> () -> () , $@convention(objc_method) (FinalGizmo) -> ()
+  // CHECK: class_method [volatile] %0 : $FinalGizmo, #FinalGizmo.extKVC2!1.foreign : (FinalGizmo) -> () -> () , $@convention(objc_method) (FinalGizmo) -> ()
   // CHECK-NOT: return
-  // CHECK: class_method [volatile] %0 : $FinalGizmo, #FinalGizmo.y!getter.1.foreign : FinalGizmo -> () -> String , $@convention(objc_method) (FinalGizmo) -> @autoreleased NSString
+  // CHECK: class_method [volatile] %0 : $FinalGizmo, #FinalGizmo.y!getter.1.foreign : (FinalGizmo) -> () -> String , $@convention(objc_method) (FinalGizmo) -> @autoreleased NSString
   // CHECK: return
   obj.kvc2()
   obj.extKVC2()

@@ -380,7 +380,7 @@ bb4(%6 : $Int64):
 // CHECK: return
 // CHECK: }
 
-sil @external_f : $@convention(thin) ()->()
+sil @external_f : $@convention(thin) () -> ()
 
 sil @elim_trampoline4 : $@convention(thin) (Builtin.Int1, Int64, Int64) -> Int64 {
 bb0(%0 : $Builtin.Int1, %1 : $Int64, %2 : $Int64):
@@ -393,8 +393,8 @@ bb2:
   br bb4(%2 : $Int64)
   
 bb4(%4 : $Int64):
-  %55 = function_ref @external_f : $@convention(thin) ()->()
-  apply %55() : $@convention(thin) ()->()
+  %55 = function_ref @external_f : $@convention(thin) () -> ()
+  apply %55() : $@convention(thin) () -> ()
   br bb5(%4: $Int64)
 
 bb3(%5 : $Int64):
@@ -473,15 +473,15 @@ bb4(%6 : $Int64):
 // CHECK-NEXT: return %1
 sil @elim_common_arg : $@convention(thin) (Builtin.Int1, Int64) -> Int64 {
 bb0(%0 : $Builtin.Int1, %1 : $Int64):
-  %f1 = function_ref @external_f : $@convention(thin) ()->()
+  %f1 = function_ref @external_f : $@convention(thin) () -> ()
   cond_br %0, bb1, bb2
 
 bb1:
-  apply %f1() : $@convention(thin) ()->()
+  apply %f1() : $@convention(thin) () -> ()
   br bb3(%1 : $Int64)
 
 bb2:
-  apply %f1() : $@convention(thin) ()->()
+  apply %f1() : $@convention(thin) () -> ()
   br bb3(%1 : $Int64)
   
 bb3(%a1 : $Int64):
@@ -632,14 +632,14 @@ bb3(%12 : $Bool):
 // CHECK-NOT: bb4:
 bb4:
   %21 = alloc_stack $Optional<C>
-  store %0 to %21#1 : $*Optional<C>
+  store %0 to %21 : $*Optional<C>
 // CHECK-NOT: switch_enum
   switch_enum %0 : $Optional<C>, case #Optional.Some!enumelt.1: bb5, case #Optional.None!enumelt: bb6
 
 bb5:
-  %25 = unchecked_take_enum_data_addr %21#1 : $*Optional<C>, #Optional.Some!enumelt.1
+  %25 = unchecked_take_enum_data_addr %21 : $*Optional<C>, #Optional.Some!enumelt.1
   %26 = load %25 : $*C
-  dealloc_stack %21#0 : $*@local_storage Optional<C>
+  dealloc_stack %21 : $*Optional<C>
   %29 = ref_element_addr %26 : $C, #C.value
   %30 = load %29 : $*Int32
   br bb8(%30 : $Int32)
@@ -668,11 +668,11 @@ sil @cannot_optimize_switch_enum : $@convention(thin) (A) -> () {
 bb0(%0 : $A):
 // CHECK: %1 = function_ref
 // CHECK-NEXT: switch_enum %0 : $A, case #A.B!enumelt: bb1, default [[BB:bb[0-9a-zA-Z]+]]
-  %f1 = function_ref @external_f : $@convention(thin) ()->()
+  %f1 = function_ref @external_f : $@convention(thin) () -> ()
   switch_enum %0 : $A, case #A.B!enumelt: bb1, default bb2
 
 bb1:
-  apply %f1() : $@convention(thin) ()->()
+  apply %f1() : $@convention(thin) () -> ()
   br bb5
 
 // CHECK: [[BB]]
@@ -681,11 +681,11 @@ bb2:
   switch_enum %0 : $A, case #A.C!enumelt: bb3, default bb4
 
 bb3:
-  apply %f1() : $@convention(thin) ()->()
+  apply %f1() : $@convention(thin) () -> ()
   br bb5
 
 bb4:
-  apply %f1() : $@convention(thin) ()->()
+  apply %f1() : $@convention(thin) () -> ()
   br bb5
 
 bb5:
@@ -993,7 +993,7 @@ sil @_TFC3ccb4Base6middlefS0_FT_T_ : $@convention(method) (@guaranteed Base) -> 
 // CHECK-LABEL: sil @redundant_checked_cast_br
 sil @redundant_checked_cast_br : $@convention(method) (@guaranteed Base) -> () {
 bb0(%0 : $Base):
-// CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle!1 : Base -> () -> () , $@convention(method) (@guaranteed Base) -> ()
+// CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle!1 : (Base) -> () -> () , $@convention(method) (@guaranteed Base) -> ()
   %1 = class_method %0 : $Base, #Base.middle!1 : Base -> () -> () , $@convention(method) (@guaranteed Base) -> ()
 // CHECK: checked_cast_br [exact] %0 : $Base to $Base, [[SUCCESS:bb[0-9]+]], [[FAIL:bb[0-9]+]]
   checked_cast_br [exact] %0 : $Base to $Base, bb2, bb7
@@ -1041,7 +1041,7 @@ bb7:
 // CHECK-LABEL: sil @not_redundant_checked_cast_br : $@convention(method) (@guaranteed Base) -> () {
 sil @not_redundant_checked_cast_br : $@convention(method) (@guaranteed Base) -> () {
 bb0(%0 : $Base):
-// CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle!1 : Base -> () -> () , $@convention(method) (@guaranteed Base) -> ()
+// CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle!1 : (Base) -> () -> () , $@convention(method) (@guaranteed Base) -> ()
   %1 = class_method %0 : $Base, #Base.middle!1 : Base -> () -> () , $@convention(method) (@guaranteed Base) -> ()
 // CHECK: checked_cast_br [exact] %0 : $Base to $Base, [[SUCCESS:bb[0-9]+]], [[FAIL:bb[0-9]+]]
   checked_cast_br [exact] %0 : $Base to $Base, bb2, bb7
@@ -1052,7 +1052,7 @@ bb1:
 
 bb2(%5 : $Base):
 // CHECK: [[SUCCESS]]
-// CHECK: [[METHOD2:%.*]] = class_method %0 : $Base, #Base.inner!1 : Base -> () -> () , $@convention(method) (@guaranteed Base) -> ()
+// CHECK: [[METHOD2:%.*]] = class_method %0 : $Base, #Base.inner!1 : (Base) -> () -> () , $@convention(method) (@guaranteed Base) -> ()
   %7 = class_method %0 : $Base, #Base.inner!1 : Base -> () -> () , $@convention(method) (@guaranteed Base) -> ()
   %8 = apply %7(%0) : $@convention(method) (@guaranteed Base) -> ()
   br bb4
@@ -1067,7 +1067,7 @@ bb4:
   br bb6(%13 : $())
 
 bb5:
-  %14 = class_method %0 : $Base, #Base.inner!1 : Base -> () -> () , $@convention(method) (@guaranteed Base) -> ()
+  %14 = class_method %0 : $Base, #Base.inner!1 : (Base) -> () -> () , $@convention(method) (@guaranteed Base) -> ()
   %15 = apply %14(%0) : $@convention(method) (@guaranteed Base) -> ()
   br bb4
 
@@ -1086,7 +1086,7 @@ bb7:
 // CHECK-LABEL: sil @failing_checked_cast_br
 sil @failing_checked_cast_br : $@convention(method) (@guaranteed Base) -> () {
 bb0(%0 : $Base):
-// CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle!1 : Base -> () -> () , $@convention(method) (@guaranteed Base) -> ()
+// CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle!1 : (Base) -> () -> () , $@convention(method) (@guaranteed Base) -> ()
   %1 = class_method %0 : $Base, #Base.middle!1 : Base -> () -> () , $@convention(method) (@guaranteed Base) -> ()
 // CHECK: checked_cast_br [exact] %0 : $Base to $Base, [[SUCCESS:bb[0-9]+]], [[FAIL:bb[0-9]+]]
   checked_cast_br [exact] %0 : $Base to $Base, bb2, bb7
@@ -1098,7 +1098,7 @@ bb1:
 
 bb2(%5 : $Base):
 // CHECK: [[SUCCESS]]
-// CHECK: [[METHOD2:%.*]] = class_method %0 : $Base, #Base.inner!1 : Base -> () -> () , $@convention(method) (@guaranteed Base) -> ()
+// CHECK: [[METHOD2:%.*]] = class_method %0 : $Base, #Base.inner!1 : (Base) -> () -> () , $@convention(method) (@guaranteed Base) -> ()
   %7 = class_method %0 : $Base, #Base.inner!1 : Base -> () -> () , $@convention(method) (@guaranteed Base) -> ()
 // CHECK-NOT: checked_cast_br [exact] %0 : $Base to $Derived
 // CHECK: apply [[METHOD2]]
@@ -1546,8 +1546,8 @@ bb1:
 bb2:
   // Make bb1 not dominated from bb0 to prevent that dominator based
   // simplification does the same thing.
-  %55 = function_ref @external_f : $@convention(thin) ()->()
-  apply %55() : $@convention(thin) ()->()
+  %55 = function_ref @external_f : $@convention(thin) () -> ()
+  apply %55() : $@convention(thin) () -> ()
   cond_br %1, bb1, bb3
 bb3:
   %2 = tuple()
@@ -1573,8 +1573,8 @@ bb1:
 bb2:
   // Make bb1 not dominated from bb0 to prevent that dominator based
   // simplification does the same thing.
-  %55 = function_ref @external_f : $@convention(thin) ()->()
-  apply %55() : $@convention(thin) ()->()
+  %55 = function_ref @external_f : $@convention(thin) () -> ()
+  apply %55() : $@convention(thin) () -> ()
   cond_br %1, bb1, bb3
 bb3:
   %2 = tuple()
@@ -1598,8 +1598,8 @@ bb1:
 bb2:
   // Make bb1 not dominated from bb0 to prevent that dominator based
   // simplification does the same thing.
-  %55 = function_ref @external_f : $@convention(thin) ()->()
-  apply %55() : $@convention(thin) ()->()
+  %55 = function_ref @external_f : $@convention(thin) () -> ()
+  apply %55() : $@convention(thin) () -> ()
   cond_br %1, bb1, bb3
 bb3:
   %2 = tuple()
@@ -1620,8 +1620,8 @@ bb1:
   unreachable
 bb2:
   // Make bb1 not dominated from bb0.
-  %55 = function_ref @external_f : $@convention(thin) ()->()
-  apply %55() : $@convention(thin) ()->()
+  %55 = function_ref @external_f : $@convention(thin) () -> ()
+  apply %55() : $@convention(thin) () -> ()
   cond_br %1, bb1, bb3
 bb3:
   %2 = tuple()
@@ -1643,16 +1643,16 @@ bb3:
 // CHECK:        return
 sil @move_cond_fail : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
-  %f1 = function_ref @external_f : $@convention(thin) ()->()
+  %f1 = function_ref @external_f : $@convention(thin) () -> ()
   cond_br %0, bb2, bb1
 
 bb1:
-  apply %f1() : $@convention(thin) ()->() // prevent other CFG optimizations
+  apply %f1() : $@convention(thin) () -> () // prevent other CFG optimizations
   %i1 = integer_literal $Builtin.Int1, -1
   br bb3(%i1 : $Builtin.Int1)
 
 bb2:
-  apply %f1() : $@convention(thin) ()->() // prevent other CFG optimizations
+  apply %f1() : $@convention(thin) () -> () // prevent other CFG optimizations
   br bb3(%1 : $Builtin.Int1)
 
 bb3(%a3 : $Builtin.Int1):
@@ -1680,15 +1680,15 @@ bb3(%a3 : $Builtin.Int1):
 sil @move_cond_fail_inverted : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
   %2 = integer_literal $Builtin.Int1, -1
-  %f1 = function_ref @external_f : $@convention(thin) ()->()
+  %f1 = function_ref @external_f : $@convention(thin) () -> ()
   cond_br %0, bb2, bb1
 
 bb1:
-  apply %f1() : $@convention(thin) ()->() // prevent other CFG optimizations
+  apply %f1() : $@convention(thin) () -> () // prevent other CFG optimizations
   br bb3(%2 : $Builtin.Int1)
 
 bb2:
-  apply %f1() : $@convention(thin) ()->() // prevent other CFG optimizations
+  apply %f1() : $@convention(thin) () -> () // prevent other CFG optimizations
   br bb3(%1 : $Builtin.Int1)
 
 bb3(%a3 : $Builtin.Int1):
@@ -1709,15 +1709,15 @@ bb3(%a3 : $Builtin.Int1):
 // CHECK-NEXT:   cond_fail
 sil @dont_move_cond_fail_no_const : $@convention(thin) (Builtin.Int1, Builtin.Int1, Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1, %2 : $Builtin.Int1):
-  %f1 = function_ref @external_f : $@convention(thin) ()->()
+  %f1 = function_ref @external_f : $@convention(thin) () -> ()
   cond_br %0, bb2, bb1
 
 bb1:
-  apply %f1() : $@convention(thin) ()->() // prevent other CFG optimizations
+  apply %f1() : $@convention(thin) () -> () // prevent other CFG optimizations
   br bb3(%1 : $Builtin.Int1)
 
 bb2:
-  apply %f1() : $@convention(thin) ()->() // prevent other CFG optimizations
+  apply %f1() : $@convention(thin) () -> () // prevent other CFG optimizations
   br bb3(%2 : $Builtin.Int1)
 
 bb3(%a3 : $Builtin.Int1):
@@ -1741,20 +1741,20 @@ bb3(%a3 : $Builtin.Int1):
 // CHECK-NEXT:   cond_fail
 sil @dont_move_cond_fail_no_postdom : $@convention(thin) (Builtin.Int1, Builtin.Int1, Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1, %2 : $Builtin.Int1):
-  %f1 = function_ref @external_f : $@convention(thin) ()->()
+  %f1 = function_ref @external_f : $@convention(thin) () -> ()
   cond_br %0, bb2, bb1
 
 bb1:
-  apply %f1() : $@convention(thin) ()->() // prevent other CFG optimizations
+  apply %f1() : $@convention(thin) () -> () // prevent other CFG optimizations
   %i1 = integer_literal $Builtin.Int1, -1
   br bb3(%i1 : $Builtin.Int1)
 
 bb2:
-  apply %f1() : $@convention(thin) ()->() // prevent other CFG optimizations
+  apply %f1() : $@convention(thin) () -> () // prevent other CFG optimizations
   cond_br %2, bb3(%1 : $Builtin.Int1), bb4
 
 bb3(%a3 : $Builtin.Int1):
-  apply %f1() : $@convention(thin) ()->() // prevent other CFG optimizations
+  apply %f1() : $@convention(thin) () -> () // prevent other CFG optimizations
   cond_fail %a3 : $Builtin.Int1
   br bb4
 
@@ -1775,16 +1775,16 @@ bb4:
 // CHECK-NEXT:   cond_fail
 sil @dont_move_cond_fail_multiple_uses : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
-  %f1 = function_ref @external_f : $@convention(thin) ()->()
+  %f1 = function_ref @external_f : $@convention(thin) () -> ()
   cond_br %0, bb2, bb1
 
 bb1:
-  apply %f1() : $@convention(thin) ()->() // prevent other CFG optimizations
+  apply %f1() : $@convention(thin) () -> () // prevent other CFG optimizations
   %i1 = integer_literal $Builtin.Int1, -1
   br bb3(%i1 : $Builtin.Int1)
 
 bb2:
-  apply %f1() : $@convention(thin) ()->() // prevent other CFG optimizations
+  apply %f1() : $@convention(thin) () -> () // prevent other CFG optimizations
   br bb3(%1 : $Builtin.Int1)
 
 bb3(%a3 : $Builtin.Int1):
@@ -1805,16 +1805,16 @@ bb3(%a3 : $Builtin.Int1):
 // CHECK-NEXT:   return
 sil @dont_move_cond_fail_multiple_uses2 : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
-  %f1 = function_ref @external_f : $@convention(thin) ()->()
+  %f1 = function_ref @external_f : $@convention(thin) () -> ()
   %i1 = integer_literal $Builtin.Int1, -1
   cond_br %0, bb2, bb1
 
 bb1:
-  apply %f1() : $@convention(thin) ()->() // prevent other CFG optimizations
+  apply %f1() : $@convention(thin) () -> () // prevent other CFG optimizations
   br bb3(%i1 : $Builtin.Int1)
 
 bb2:
-  apply %f1() : $@convention(thin) ()->() // prevent other CFG optimizations
+  apply %f1() : $@convention(thin) () -> () // prevent other CFG optimizations
   br bb3(%1 : $Builtin.Int1)
 
 bb3(%a3 : $Builtin.Int1):
@@ -1921,7 +1921,7 @@ bb4:
   return %41 : $()
 }
 
-sil @f_use : $@convention(thin) (Builtin.Int32)->()
+sil @f_use : $@convention(thin) (Builtin.Int32) -> ()
 
 // CHECK-LABEL: sil @switch_enum_jumpthreading_bug
 // CHECK: bb1:
@@ -1962,8 +1962,8 @@ bb4:
  unreachable
 
 bb5(%9 : $Builtin.Int32):
-  %f = function_ref @f_use : $@convention(thin) (Builtin.Int32)->()
-  %a = apply %f(%10) : $@convention(thin) (Builtin.Int32)->()
+  %f = function_ref @f_use : $@convention(thin) (Builtin.Int32) -> ()
+  %a = apply %f(%10) : $@convention(thin) (Builtin.Int32) -> ()
   cond_br %3, bb6, bb10
 
 bb6:
@@ -1977,10 +1977,10 @@ bb11(%100 : $Builtin.Int32):
   return %100 : $Builtin.Int32
 }
 
-sil @a : $@convention(thin) ()->()
-sil @b : $@convention(thin) ()->()
-sil @c : $@convention(thin) ()->()
-sil @d : $@convention(thin) ()->()
+sil @a : $@convention(thin) () -> ()
+sil @b : $@convention(thin) () -> ()
+sil @c : $@convention(thin) () -> ()
+sil @d : $@convention(thin) () -> ()
 
 // CHECK-LABEL: sil @jump_thread_diamond
 // CHECK: bb1:
@@ -2105,8 +2105,8 @@ bb10:
   return %21 : $()
 }
 
-sil @fB : $@convention(thin) ()->()
-sil @fC : $@convention(thin) ()->()
+sil @fB : $@convention(thin) () -> ()
+sil @fC : $@convention(thin) () -> ()
 
 
 // Make sure that we correctly thread such that we end up calling @fB on the
@@ -2258,17 +2258,17 @@ sil [noinline] @initCC : $@convention(thin) (@thick CC.Type) -> @owned @callee_o
 sil [noinline] @takeBB : $@convention(thin) (@owned BB) -> @owned BB
 
 // Check that we don't crash on this.
-// The compiler should be able to cast between the labled and unlabled return tuple types.
-// CHECK-LABEL: @try_apply_with_convert_function_returning_casted_unlabled_tuple
+// The compiler should be able to cast between the labeled and unlabeled return tuple types.
+// CHECK-LABEL: @try_apply_with_convert_function_returning_casted_unlabeled_tuple
 // CHECK: apply {{%[0-9]+}}
 // Proper tuple is created by deconstructing the old one and creating a new one using its elements.
 // CHECK: tuple_extract
 // CHECK: tuple_extract
 // CHECK: tuple
 // CHECK: return
-sil @try_apply_with_convert_function_returning_casted_unlabled_tuple: $@convention(thin) () -> (Int32, Int32) {
+sil @try_apply_with_convert_function_returning_casted_unlabeled_tuple: $@convention(thin) () -> (Int32, Int32) {
 bb0:
-  %3 = function_ref @returnLabledTuple : $@convention(thin) () -> (first: Int32, second: Int32)
+  %3 = function_ref @returnLabeledTuple : $@convention(thin) () -> (first: Int32, second: Int32)
   %6 = convert_function %3 : $@convention(thin) () -> (first: Int32, second: Int32) to $@convention(thin) () -> ((Int32, Int32), @error ErrorType)
   try_apply %6() : $@convention(thin) () -> ((Int32, Int32), @error ErrorType), normal bb1, error bb2
  
@@ -2283,17 +2283,17 @@ bb2(%10 : $ErrorType):
 }
 
 // Check that we don't crash on this.
-// The compiler should be able to cast between the labled and unlabled return tuple types.
-// CHECK-LABEL: @try_apply_with_convert_function_returning_casted_labled_tuple
+// The compiler should be able to cast between the labeled and unlabeled return tuple types.
+// CHECK-LABEL: @try_apply_with_convert_function_returning_casted_labeled_tuple
 // CHECK: apply {{%[0-9]+}}
 // Proper tuple is created by deconstructing the old one and creating a new one using its elements.
 // CHECK: tuple_extract
 // CHECK: tuple_extract
 // CHECK: tuple
 // CHECK: return
-sil @try_apply_with_convert_function_returning_casted_labled_tuple: $@convention(thin) () -> (first: Int32, second: Int32) {
+sil @try_apply_with_convert_function_returning_casted_labeled_tuple: $@convention(thin) () -> (first: Int32, second: Int32) {
 bb0:
-  %3 = function_ref @returnUnlabledTuple : $@convention(thin) () -> (Int32, Int32)
+  %3 = function_ref @returnUnlabeledTuple : $@convention(thin) () -> (Int32, Int32)
   %6 = convert_function %3 : $@convention(thin) () -> (Int32, Int32) to $@convention(thin) () -> ((first: Int32, second: Int32), @error ErrorType)
   try_apply %6() : $@convention(thin) () -> ((first: Int32, second: Int32), @error ErrorType), normal bb1, error bb2
  
@@ -2307,8 +2307,8 @@ bb2(%10 : $ErrorType):
   unreachable
 }
 
-sil [noinline] @returnLabledTuple: $@convention(thin) () -> (first: Int32, second: Int32)
-sil [noinline] @returnUnlabledTuple : $@convention(thin) () -> (Int32, Int32)
+sil [noinline] @returnLabeledTuple: $@convention(thin) () -> (first: Int32, second: Int32)
+sil [noinline] @returnUnlabeledTuple : $@convention(thin) () -> (Int32, Int32)
 
 public class AAA {
 }
@@ -2316,13 +2316,13 @@ public class AAA {
 public class BBB : AAA {
 }
 
-@inline(never) func returnUnlabledTuple(b: BBB) -> (BBB, BBB)
+@inline(never) func returnUnlabeledTuple(b: BBB) -> (BBB, BBB)
 
 func testit(f: (BBB) throws -> (AAA, AAA), _ b: BBB) throws -> (AAA, AAA)
 
 func callit(b: BBB) throws -> (AAA, AAA)
 
-sil [noinline] @returnUnlabledTupleOfClasses : $@convention(thin) (@owned BBB) -> @owned (BBB, BBB) {
+sil [noinline] @returnUnlabeledTupleOfClasses : $@convention(thin) (@owned BBB) -> @owned (BBB, BBB) {
 bb0(%0 : $BBB):
   debug_value %0 : $BBB
   strong_retain %0 : $BBB
@@ -2365,7 +2365,7 @@ bb0(%0 : $BBB):
 
   %2 = function_ref @testFunctorReturningUnlabeledTuple : $@convention(thin) (@owned @callee_owned (@owned BBB) -> (@owned (AAA, AAA), @error ErrorType), @owned BBB) -> (@owned (AAA, AAA), @error ErrorType)
 
-  %3 = function_ref @returnUnlabledTupleOfClasses : $@convention(thin) (@owned BBB) -> @owned (BBB, BBB)
+  %3 = function_ref @returnUnlabeledTupleOfClasses : $@convention(thin) (@owned BBB) -> @owned (BBB, BBB)
   %4 = thin_to_thick_function %3 : $@convention(thin) (@owned BBB) -> @owned (BBB, BBB) to $@callee_owned (@owned BBB) -> @owned (BBB, BBB)
   %5 = convert_function %4 : $@callee_owned (@owned BBB) -> @owned (BBB, BBB) to $@callee_owned (@owned BBB) -> (@owned (AAA, AAA), @error ErrorType)
   strong_retain %0 : $BBB
@@ -2414,15 +2414,39 @@ bb0(%0 : $CAB<Element>):
   %6 = function_ref @thunk_helper : $@convention(thin) <τ_0_0> (@out UP<()>, UBP<τ_0_0>, @owned @callee_owned (UBP<τ_0_0>) -> (UP<()>, @error ErrorType)) -> @error ErrorType
   %7 = partial_apply %6<Element>(%5) : $@convention(thin) <τ_0_0> (@out UP<()>, UBP<τ_0_0>, @owned @callee_owned (UBP<τ_0_0>) -> (UP<()>, @error ErrorType)) -> @error ErrorType
   %8 = alloc_stack $UP<()>
-  %9 = unchecked_addr_cast %8#1 : $*UP<()> to $*UP<()>
+  %9 = unchecked_addr_cast %8 : $*UP<()> to $*UP<()>
   %10 = convert_function %7 : $@callee_owned (@out UP<()>, UBP<Element>) -> @error ErrorType to $@callee_owned (@out UP<()>, UBP<Element>) -> @error ErrorType
-  try_apply %2<Element, UP<()>>(%8#1, %7, %0) : $@convention(method) <τ_0_0><τ_1_0> (@out τ_1_0, @owned @callee_owned (@out τ_1_0, UBP<τ_0_0>) -> @error ErrorType, @guaranteed CAB<τ_0_0>) -> @error ErrorType, normal bb1, error bb2
+  try_apply %2<Element, UP<()>>(%8, %7, %0) : $@convention(method) <τ_0_0><τ_1_0> (@out τ_1_0, @owned @callee_owned (@out τ_1_0, UBP<τ_0_0>) -> @error ErrorType, @guaranteed CAB<τ_0_0>) -> @error ErrorType, normal bb1, error bb2
 
 bb1(%12 : $()):
-  %13 = load %8#1 : $*UP<()>
-  dealloc_stack %8#0 : $*@local_storage UP<()>
+  %13 = load %8 : $*UP<()>
+  dealloc_stack %8 : $*UP<()>
   return %13 : $UP<()>
 
 bb2(%16 : $ErrorType):
   unreachable
 }
+
+
+// Check that we don't crash on this.
+
+// CHECK-LABEL: @simplified_branch_arg_has_result_value_1
+// CHECK: [[B:%[0-9]+]] = alloc_box
+// CHECK: br bb1([[B]]#1 : $*Builtin.Int32)
+sil @simplified_branch_arg_has_result_value_1 : $@convention(thin) (@in Builtin.Int32) -> Builtin.Int32 {
+entry(%0 : $*Builtin.Int32):
+  %b = alloc_box $Builtin.Int32
+  %i = integer_literal $Builtin.Int32, 0
+  store %i to %b#1 : $*Builtin.Int32
+  %p = project_box %b#0 : $@box Builtin.Int32
+  br bb1(%p : $*Builtin.Int32)
+
+bb1(%a : $*Builtin.Int32):
+  %r = load %a : $*Builtin.Int32
+  cond_br undef, bb1(%0 : $*Builtin.Int32), bb2
+
+bb2:
+  return %r : $Builtin.Int32
+}
+
+

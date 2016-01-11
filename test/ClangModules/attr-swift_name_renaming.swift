@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -Xcc -w -parse -verify -enable-swift-name-lookup-tables %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -Xcc -w -parse -verify %s
 
 import SwiftName
 
@@ -11,7 +11,7 @@ func test() {
   var color: ColorKind = CT_red
   var colo2: ColorType = CT_Red // FIXME: should provide Fix-It expected-error{{use of undeclared type 'ColorType'}}
 
-  // Typedef-of-anonymous-type-name renamming
+  // Typedef-of-anonymous-type-name renaming
   var p = Point()
   var p2 = PointType() // FIXME: should provide Fix-It expected-error{{use of unresolved identifier 'PointType'}}
 

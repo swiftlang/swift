@@ -1,8 +1,8 @@
-//===- BottomUpIPAnalysis.h - Bottom-up IP analysis base-class -*- C++ -*--===//
+//===- BottomUpIPAnalysis.h - Bottom-up IP analysis base-class --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -71,7 +71,7 @@ protected:
   private:
 
     /// The list of callers which must be invalidated if this function gets
-    /// invalidated. Note that the list may contain invlid entries for already
+    /// invalidated. Note that the list may contain invalid entries for already
     /// invalidated callers. Those entries are removed lazily in
     /// removeInvalidCallers().
     /// The lazy removal of invalid entries avoids that we additionally need to
@@ -232,7 +232,7 @@ protected:
     /// Should be called after visiting \p FInfo during recomputation.
     void tryToSchedule(FunctionInfo *FInfo) {
       assert(FInfo->isVisited() &&
-             "tryied to schedule function which was not visited");
+             "tried to schedule function which was not visited");
       assert(!FInfo->isScheduled() &&
              "function scheduled multiple times");
       if (FInfo->numUnscheduledCallees == 0) {

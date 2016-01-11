@@ -261,9 +261,9 @@ func rdar21784170() {
 }
 
 // <rdar://problem/21829141> BOGUS: unexpected trailing closure
-func expect<T, U>(_: T)(_: U.Type) {} // expected-note {{found this candidate}} expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-func expect<T, U>(_: T, _: Int = 1)(_: U.Type) {} // expected-note {{found this candidate}} expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-expect(Optional(3))(Optional<Int>.self)  // expected-error {{ambiguous use of 'expect'}}
+func expect<T, U>(_: T)(_: U.Type) {}  //  expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
+func expect<T, U>(_: T, _: Int = 1)(_: U.Type) {} //  expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
+expect(Optional(3))(Optional<Int>.self)
 
 // <rdar://problem/19804707> Swift Enum Scoping Oddity
 func rdar19804707() {
@@ -675,4 +675,13 @@ func r23272739(contentType: String) {
   return actualAcceptableContentTypes.contains(contentType)  // expected-error {{unexpected non-void return value in void function}}
 }
 
+// <rdar://problem/23641896> QoI: Strings in Swift cannot be indexed directly with integer offsets
+func r23641896() {
+  var g = "Hello World"
+  g.replaceRange(0...2, with: "ce")  // expected-error {{String may not be indexed with 'Int', it has variable size elements}}
+  // expected-note @-1 {{consider using an existing high level algorithm, str.startIndex.advancedBy(n), or a projection like str.utf8}}
+
+  _ = g[12]  // expected-error {{'subscript' is unavailable: cannot subscript String with an Int, see the documentation comment for discussion}}
+
+}
 

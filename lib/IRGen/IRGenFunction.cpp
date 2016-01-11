@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -52,8 +52,12 @@ IRGenFunction::IRGenFunction(IRGenModule &IGM,
 
 IRGenFunction::~IRGenFunction() {
   emitEpilogue();
+
   // Restore the debug location.
   if (IGM.DebugInfo) IGM.DebugInfo->popLoc();
+
+  // Tear down any side-table data structures.
+  if (LocalTypeData) destroyLocalTypeData();
 }
 
 /// Call the llvm.memcpy intrinsic.  The arguments need not already
@@ -187,7 +191,7 @@ static void emitDeallocatingCall(IRGenFunction &IGF, llvm::Constant *fn,
 void IRGenFunction::emitDeallocRawCall(llvm::Value *pointer,
                                        llvm::Value *size,
                                        llvm::Value *alignMask) {
-  // For now, all we have is swift_slowDelloc.
+  // For now, all we have is swift_slowDealloc.
   return emitDeallocatingCall(*this, IGM.getSlowDeallocFn(),
                               {pointer, size, alignMask});
 }
@@ -210,40 +214,6 @@ void IRGenFunction::emitFakeExplosion(const TypeInfo &type,
     
     explosion.add(llvm::UndefValue::get(elementType));
   }
-}
-
-llvm::Value *IRGenFunction::lookupTypeDataMap(CanType type, LocalTypeData index,
-                                              const TypeDataMap &scopedMap) {
-  
-  // First try to lookup in the unscoped cache (= definitions in the entry block
-  // of the function).
-  auto key = getLocalTypeDataKey(type, index);
-  auto it = LocalTypeDataMap.find(key);
-  if (it != LocalTypeDataMap.end())
-    return it->second;
-  
-  // Now try to lookup in the scoped cache.
-  auto it2 = scopedMap.find(key);
-  if (it2 == scopedMap.end())
-    return nullptr;
-  
-  if (auto *I = dyn_cast<llvm::Instruction>(it2->second)) {
-    // This is a very very simple dominance check: either the definition is in the
-    // entry block or in the current block.
-    // TODO: do a better dominance check.
-    if (I->getParent() == &CurFn->getEntryBlock() ||
-        I->getParent() == Builder.GetInsertBlock()) {
-      return I;
-    }
-    return nullptr;
-  }
-  
-  if (isa<llvm::Constant>(it2->second)) {
-    return it2->second;
-  }
-  
-  // TODO: other kinds of value?
-  return nullptr;
 }
 
 void IRGenFunction::unimplemented(SourceLoc Loc, StringRef Message) {

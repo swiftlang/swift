@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -56,7 +56,7 @@ struct ARCMatchingSet {
   /// reference counted value could be used.
   llvm::SetVector<SILInstruction *> DecrementInsertPts;
 
-  // This is a data structure that can not be moved or copied.
+  // This is a data structure that cannot be moved or copied.
   ARCMatchingSet() = default;
   ARCMatchingSet(const ARCMatchingSet &) = delete;
   ARCMatchingSet(ARCMatchingSet &&) = delete;
@@ -95,7 +95,7 @@ public:
   bool madeChange() const { return Changed; }
 };
 
-/// A wrapper around the results of the bottomup/topdown dataflow that knows how
+/// A wrapper around the results of the bottom-up/top-down dataflow that knows how
 /// to pair the retains/releases in those results.
 struct ARCPairingContext {
   SILFunction &F;

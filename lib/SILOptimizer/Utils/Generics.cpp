@@ -1,8 +1,8 @@
-//===- Generics.cpp ---- Utilities for transforming generics ----*- C++ -*-===//
+//===--- Generics.cpp ---- Utilities for transforming generics --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -53,7 +53,7 @@ ApplySite swift::replaceWithSpecializedFunction(ApplySite AI,
 
 
 /// Try to convert definition into declaration.
-static bool convertExtenralDefinitionIntoDeclaration(SILFunction *F) {
+static bool convertExternalDefinitionIntoDeclaration(SILFunction *F) {
   // Bail if it is a declaration already.
   if (!F->isDefinition())
     return false;
@@ -207,9 +207,9 @@ SILFunction *swift::getExistingSpecialization(SILModule &M,
     Specialization->setLinkage(SILLinkage::PublicExternal);
     // Ignore body for -Onone and -Odebug.
     assert((Specialization->isExternalDeclaration() ||
-            convertExtenralDefinitionIntoDeclaration(Specialization)) &&
+            convertExternalDefinitionIntoDeclaration(Specialization)) &&
            "Could not remove body of the found specialization");
-    if (!convertExtenralDefinitionIntoDeclaration(Specialization)) {
+    if (!convertExternalDefinitionIntoDeclaration(Specialization)) {
       DEBUG(
           llvm::dbgs() << "Could not remove body of specialization: "
                        << FunctionName << '\n');
@@ -264,7 +264,7 @@ ApplySite swift::trySpecializeApplyOfGeneric(ApplySite Apply,
 
   // We do not support partial specialization.
   if (hasUnboundGenericTypes(InterfaceSubs)) {
-    DEBUG(llvm::dbgs() << "    Can not specialize with interface subs.\n");
+    DEBUG(llvm::dbgs() << "    Cannot specialize with interface subs.\n");
     return ApplySite();
   }
   if (hasDynamicSelfTypes(InterfaceSubs)) {
@@ -272,13 +272,13 @@ ApplySite swift::trySpecializeApplyOfGeneric(ApplySite Apply,
     return ApplySite();
   }
 
-  llvm::SmallString<64> ClonedName;
+  std::string ClonedName;
   {
-    llvm::raw_svector_ostream buffer(ClonedName);
     ArrayRef<Substitution> Subs = Apply.getSubstitutions();
-    Mangle::Mangler M(buffer);
-    Mangle::GenericSpecializationMangler Mangler(M, F, Subs);
+    Mangle::Mangler M;
+    GenericSpecializationMangler Mangler(M, F, Subs);
     Mangler.mangle();
+    ClonedName = M.finalize();
   }
   DEBUG(llvm::dbgs() << "    Specialized function " << ClonedName << '\n');
 

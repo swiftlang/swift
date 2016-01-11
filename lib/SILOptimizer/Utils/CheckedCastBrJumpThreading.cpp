@@ -147,7 +147,7 @@ static unsigned basicBlockInlineCost(SILBasicBlock *BB, unsigned Cutoff) {
   return Cost;
 }
 
-/// We can not duplicate blocks with AllocStack instructions (they need to be
+/// We cannot duplicate blocks with AllocStack instructions (they need to be
 /// FIFO). Other instructions can be duplicated.
 static bool canDuplicateBlock(SILBasicBlock *BB) {
   for (auto &I : *BB) {
@@ -654,7 +654,7 @@ bool CheckedCastBrJumpThreading::trySimplify(TermInst *Term) {
     if (!areEquivalentConditionsAlongPaths())
       continue;
 
-    // Check if any jump-threding is required and possible.
+    // Check if any jump-threading is required and possible.
     if (SuccessPreds.empty() && FailurePreds.empty())
       return false;
 

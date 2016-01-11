@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -210,7 +210,7 @@ void Operand::hoistAddressProjections(SILInstruction *InsertBefore,
   while (true) {
     SILValue Incoming = stripSinglePredecessorArgs(V);
 
-    // Forward the incoming arg from a single predeccessor.
+    // Forward the incoming arg from a single predecessor.
     if (V != Incoming) {
       if (V == get()) {
         // If we are the operand itself set the operand to the incoming

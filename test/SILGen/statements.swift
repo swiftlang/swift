@@ -93,13 +93,13 @@ func nested_if_merge_ret(x: Int, y: Bool, z: Bool) -> Int {
     if (z) {
       bar(x);
     }
-    return 1;
+    return 1
   } else {
     if (z) {
       foo(x, y);
     }
   }
-  return 2;
+  return 2
 }
 
 // CHECK-LABEL: sil hidden  @_TF10statements19nested_if_merge_ret
@@ -119,7 +119,7 @@ func loop_with_break(x: Int, _ y: Bool, _ z: Bool) -> Int {
   while (x > 2) {
    if (y) {
      bar(x);
-     break;
+     break
    }
   }
 }
@@ -130,7 +130,7 @@ func loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
   while (x > 2) {
     if (y) {
      bar(x);
-     continue;
+     continue
     }
     loop_with_break(x, y, z);
   }
@@ -143,7 +143,7 @@ func do_loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
   repeat {
     if (x < 42) {
      bar(x);
-     continue;
+     continue
     }
     loop_with_break(x, y, z);
   }
@@ -161,15 +161,15 @@ func for_loops1(x: Int, c: Bool) {
     markUsed(i)
   }
   
-  for ; x < 40;  {
+  for ; x < 40;  { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
    markUsed(x)
    x += 1
   }
   
-  for var i = 0; i < 100; ++i {
+  for var i = 0; i < 100; i += 1 { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   }
   
-  for let i = 0; i < 100; i {
+  for let i = 0; i < 100; i { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   }
 }
 
@@ -611,21 +611,21 @@ enum MyOpt<T> {
 // CHECK-NEXT: debug_value_addr %1 : $*MyOpt<T>, let, name "a"
 // CHECK-NEXT: %3 = alloc_stack $T, let, name "t"
 // CHECK-NEXT: %4 = alloc_stack $MyOpt<T>
-// CHECK-NEXT: copy_addr %1 to [initialization] %4#1 : $*MyOpt<T>
-// CHECK-NEXT: switch_enum_addr %4#1 : $*MyOpt<T>, case #MyOpt.Some!enumelt.1: bb2, default bb1
+// CHECK-NEXT: copy_addr %1 to [initialization] %4 : $*MyOpt<T>
+// CHECK-NEXT: switch_enum_addr %4 : $*MyOpt<T>, case #MyOpt.Some!enumelt.1: bb2, default bb1
 func testAddressOnlyEnumInRequire<T>(a : MyOpt<T>) -> T {
   // CHECK:  bb1:
-  // CHECK-NEXT:   dealloc_stack %4#0
-  // CHECK-NEXT:   dealloc_stack %3#0
+  // CHECK-NEXT:   dealloc_stack %4
+  // CHECK-NEXT:   dealloc_stack %3
   // CHECK-NEXT:   br bb3
   guard let t = a else { abort() }
 
   // CHECK:    bb2:
-  // CHECK-NEXT:     %10 = unchecked_take_enum_data_addr %4#1 : $*MyOpt<T>, #MyOpt.Some!enumelt.1
-  // CHECK-NEXT:     copy_addr [take] %10 to [initialization] %3#1 : $*T
-  // CHECK-NEXT:     dealloc_stack %4#0
-  // CHECK-NEXT:     copy_addr [take] %3#1 to [initialization] %0 : $*T
-  // CHECK-NEXT:     dealloc_stack %3#0
+  // CHECK-NEXT:     %10 = unchecked_take_enum_data_addr %4 : $*MyOpt<T>, #MyOpt.Some!enumelt.1
+  // CHECK-NEXT:     copy_addr [take] %10 to [initialization] %3 : $*T
+  // CHECK-NEXT:     dealloc_stack %4
+  // CHECK-NEXT:     copy_addr [take] %3 to [initialization] %0 : $*T
+  // CHECK-NEXT:     dealloc_stack %3
   // CHECK-NEXT:     destroy_addr %1 : $*MyOpt<T>
   // CHECK-NEXT:     tuple ()
   // CHECK-NEXT:     return

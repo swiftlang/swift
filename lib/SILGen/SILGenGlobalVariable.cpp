@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -25,10 +25,11 @@ using namespace Lowering;
 SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
                                                       ForDefinition_t forDef) {
   // First, get a mangled name for the declaration.
-  llvm::SmallString<32> mangledName; {
-    llvm::raw_svector_ostream buffer(mangledName);
-    Mangler mangler(buffer);
+  std::string mangledName;
+  {
+    Mangler mangler;
     mangler.mangleGlobalVariableFull(gDecl);
+    mangledName = mangler.finalize();
   }
 
   // Check if it is already created, and update linkage if necessary.
@@ -210,10 +211,11 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
   });
   assert(varDecl);
 
-  llvm::SmallString<20> onceTokenBuffer; {
-    llvm::raw_svector_ostream onceTokenStream(onceTokenBuffer);
-    Mangler tokenMangler(onceTokenStream);
+  std::string onceTokenBuffer;
+  {
+    Mangler tokenMangler;
     tokenMangler.mangleGlobalInit(varDecl, counter, false);
+    onceTokenBuffer = tokenMangler.finalize();
   }
 
   auto onceTy = BuiltinIntegerType::getWordType(M.getASTContext());
@@ -228,12 +230,14 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
   onceToken->setDeclaration(false);
 
   // Emit the initialization code into a function.
-  llvm::SmallString<20> onceFuncBuffer;
-  llvm::raw_svector_ostream onceFuncStream(onceFuncBuffer);
-  Mangler funcMangler(onceFuncStream);
-  funcMangler.mangleGlobalInit(varDecl, counter, true);
+  std::string onceFuncBuffer;
+  {
+    Mangler funcMangler;
+    funcMangler.mangleGlobalInit(varDecl, counter, true);
+    onceFuncBuffer = funcMangler.finalize();
+  }
 
-  SILFunction *onceFunc = emitLazyGlobalInitializer(onceFuncStream.str(), pd,
+  SILFunction *onceFunc = emitLazyGlobalInitializer(onceFuncBuffer, pd,
                                                     pbdEntry);
 
   // Generate accessor functions for all of the declared variables, which

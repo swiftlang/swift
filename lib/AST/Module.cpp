@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -458,6 +458,7 @@ void Module::lookupMember(SmallVectorImpl<ValueDecl*> &results,
   case DeclContextKind::Initializer:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::SubscriptDecl:
     llvm_unreachable("This context does not support lookup.");
 
   case DeclContextKind::FileUnit:
@@ -703,33 +704,31 @@ ArrayRef<Substitution> BoundGenericType::getSubstitutions(
     if (!type)
       type = ErrorType::get(module->getASTContext());
 
-    SmallVector<ProtocolConformance *, 4> conformances;
-    if (type->is<TypeVariableType>() || type->isTypeParameter()) {
+    SmallVector<ProtocolConformanceRef, 4> conformances;
+    for (auto proto : archetype->getConformsTo()) {
       // If the type is a type variable or is dependent, just fill in null
-      // conformances. FIXME: It seems like we should record these as
-      // requirements (?).
-      conformances.assign(archetype->getConformsTo().size(), nullptr);
-    } else {
-      // Find the conformances.
-      for (auto proto : archetype->getConformsTo()) {
+      // conformances.
+      if (type->is<TypeVariableType>() || type->isTypeParameter()) {
+        conformances.push_back(ProtocolConformanceRef(proto));
+
+      // Otherwise, find the conformances.
+      } else {
         auto conforms = module->lookupConformance(type, proto, resolver);
         switch (conforms.getInt()) {
         case ConformanceKind::Conforms:
-          conformances.push_back(conforms.getPointer());
+          conformances.push_back(
+                         ProtocolConformanceRef(proto, conforms.getPointer()));
           break;
         case ConformanceKind::UncheckedConforms:
-          conformances.push_back(nullptr);
-          break;
         case ConformanceKind::DoesNotConform:
-          conformances.push_back(nullptr);
+          conformances.push_back(ProtocolConformanceRef(proto));
           break;
         }
       }
     }
 
     // Record this substitution.
-    resultSubstitutions[index] = {archetype, type,
-                                  ctx.AllocateCopy(conformances)};
+    resultSubstitutions[index] = {type, ctx.AllocateCopy(conformances)};
     ++index;
   }
 

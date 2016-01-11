@@ -14,7 +14,7 @@ func f3(f: UndeclaredFunctionType) rethrows { f() } // expected-error {{use of u
 func cf1(f: () throws -> ())() rethrows { try f() } // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
 func cf2(f: () -> ())() rethrows { f() } // expected-error {{'rethrows' function must take a throwing function argument}} expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
 func cf3(f: UndeclaredFunctionType)() rethrows { f() } // expected-error {{use of undeclared type 'UndeclaredFunctionType'}} expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-func cf4(f: () ->())(g: () throws -> ()) rethrows {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
+func cf4(f: () -> ())(g: () throws -> ()) rethrows {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
 func cf5() rethrows -> () throws -> () {} // expected-error {{'rethrows' function must take a throwing function argument}}
 
 /** Protocol conformance checking ********************************************/

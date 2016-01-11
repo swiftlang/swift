@@ -1,8 +1,8 @@
-//===- DiagnosticsFrontend.def - Diagnostics Text ---------------*- C++ -*-===//
+//===--- DiagnosticsFrontend.def - Diagnostics Text -------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -58,8 +58,6 @@ ERROR(cannot_open_serialized_file,frontend,none,
   "cannot open file '%0' for diagnostics emission (%1)", (StringRef, StringRef))
 ERROR(error_open_input_file,frontend,none,
   "error opening input file '%0' (%1)", (StringRef, StringRef))
-ERROR(error_clang_importer_not_linked_in,frontend,none,
-  "clang importer not available", ())
 ERROR(error_clang_importer_create_fail,frontend,none,
   "clang importer creation failed", ())
 ERROR(error_missing_arg_value,frontend,none,

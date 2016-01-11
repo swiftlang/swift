@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -23,33 +23,67 @@
 
 using namespace swift;
 
-static SILBasicBlock *getSingleOutsideLoopPredecessor(SILLoop *L,
-                                                      SILBasicBlock *BB) {
-  SmallVector<SILBasicBlock *, 8> Preds;
-  for (auto *Pred : BB->getPreds())
-    if (!L->contains(Pred))
-      Preds.push_back(Pred);
-  if (Preds.size() != 1)
-    return nullptr;
-  return Preds[0];
+static SILBasicBlock *createInitialPreheader(SILBasicBlock *Header) {
+  auto *Preheader = new (Header->getModule())
+      SILBasicBlock(Header->getParent(), &*std::prev(Header->getIterator()));
+
+  // Clone the arguments from header into the pre-header.
+  llvm::SmallVector<SILValue, 8> Args;
+  for (auto *HeaderArg : Header->getBBArgs()) {
+    Args.push_back(Preheader->createBBArg(HeaderArg->getType(), nullptr));
+  }
+
+  // Create the branch to the header.
+  SILBuilder(Preheader)
+      .createBranch(SILFileLocation(SourceLoc()), Header, Args);
+
+  return Preheader;
 }
 
-/// \brief Try to create a unique loop preheader.
-///
-/// FIXME: We should handle merging multiple loop predecessors.
-static SILBasicBlock* insertPreheader(SILLoop *L, DominanceInfo *DT,
+/// \brief Create a unique loop preheader.
+static SILBasicBlock *insertPreheader(SILLoop *L, DominanceInfo *DT,
                                       SILLoopInfo *LI) {
   assert(!L->getLoopPreheader() && "Expect multiple preheaders");
-
   SILBasicBlock *Header = L->getHeader();
-  SILBasicBlock *Preheader = nullptr;
-  if (auto LoopPred = getSingleOutsideLoopPredecessor(L, Header)) {
-    if (isa<CondBranchInst>(LoopPred->getTerminator())) {
-      Preheader = splitIfCriticalEdge(LoopPred, Header, DT, LI);
-      DEBUG(llvm::dbgs() << "Created preheader for loop: " << *L);
-      assert(Preheader && "Must have a preheader now");
+
+  // Before we create the preheader, gather all of the original preds of header.
+  llvm::SmallVector<SILBasicBlock *, 8> Preds;
+  for (auto *Pred : Header->getPreds()) {
+    if (!L->contains(Pred)) {
+      Preds.push_back(Pred);
     }
   }
+
+  // Then create the pre-header and connect it to header.
+  SILBasicBlock *Preheader = createInitialPreheader(Header);
+
+  // Then change all of the original predecessors to target Preheader instead of
+  // header.
+  for (auto *Pred : Preds) {
+    replaceBranchTarget(Pred->getTerminator(), Header, Preheader,
+                        true /*PreserveArgs*/);
+  }
+
+  // Update dominance info.
+  if (DT) {
+    // Get the dominance node of the header.
+    auto *HeaderBBDTNode = DT->getNode(Header);
+    if (HeaderBBDTNode) {
+      // Make a DTNode for the preheader and make the header's immediate
+      // dominator, the immediate dominator of the pre-header.
+      auto *PreheaderDTNode =
+          DT->addNewBlock(Preheader, HeaderBBDTNode->getIDom()->getBlock());
+      // Then change the immediate dominator of the header to be the pre-header.
+      HeaderBBDTNode->setIDom(PreheaderDTNode);
+    }
+  }
+
+  // Make the pre-header a part of the parent loop of L if L has a parent loop.
+  if (LI) {
+    if (auto *PLoop = L->getParentLoop())
+      PLoop->addBasicBlockToLoop(Preheader, LI->getBase());
+  }
+
   return Preheader;
 }
 
@@ -197,9 +231,8 @@ static bool canonicalizeLoopExitBlocks(SILLoop *L, DominanceInfo *DT,
 bool swift::canonicalizeLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI) {
   bool ChangedCFG = false;
   if (!L->getLoopPreheader()) {
-    if (!insertPreheader(L, DT, LI))
-      // Skip further simplification with no preheader.
-      return ChangedCFG;
+    insertPreheader(L, DT, LI);
+    assert(L->getLoopPreheader() && "L should have a pre-header now");
     ChangedCFG = true;
   }
 

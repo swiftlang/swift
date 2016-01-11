@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -19,6 +19,7 @@
 #include "GenericTypeResolver.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/ExprHandle.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/NameLookup.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -368,8 +369,7 @@ public:
       Pattern *pattern = getSubExprPattern(E->getElement(i));
       patternElts.push_back(TuplePatternElt(E->getElementName(i),
                                             E->getElementNameLoc(i),
-                                            pattern,
-                                            false));
+                                            pattern));
     }
     
     return TuplePattern::create(TC.Context, E->getLoc(),
@@ -692,36 +692,92 @@ static bool validateTypedPattern(TypeChecker &TC, DeclContext *DC,
                                  TypedPattern *TP,
                                  TypeResolutionOptions options,
                                  GenericTypeResolver *resolver) {
-  if (TP->hasType()) {
+  if (TP->hasType())
     return TP->getType()->is<ErrorType>();
-  }
 
-  bool hadError = false;
   TypeLoc &TL = TP->getTypeLoc();
-  if (TC.validateType(TL, DC, options, resolver))
-    hadError = true;
-  Type Ty = TL.getType();
+  bool hadError = TC.validateType(TL, DC, options, resolver);
 
-  if ((options & TR_Variadic) && !hadError) {
-    // If isn't legal to declare something both inout and variadic.
-    if (Ty->is<InOutType>()) {
-      TC.diagnose(TP->getLoc(), diag::inout_cant_be_variadic);
-      hadError = true;
-    } else {
-      // FIXME: Use ellipsis loc for diagnostic.
-      Ty = TC.getArraySliceType(TP->getLoc(), Ty);
-      if (Ty.isNull())
-        hadError = true;
-    }
-  }
-
-  if (hadError) {
+  if (hadError)
     TP->setType(ErrorType::get(TC.Context));
-  } else {
-    TP->setType(Ty);
-  }
+  else
+    TP->setType(TL.getType());
   return hadError;
 }
+
+
+static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
+                                  TypeResolutionOptions options,
+                                  GenericTypeResolver *resolver,
+                                  TypeChecker &TC) {
+  if (auto ty = decl->getTypeLoc().getType())
+    return ty->is<ErrorType>();
+  
+  bool hadError = TC.validateType(decl->getTypeLoc(), DC,
+                                  options|TR_FunctionInput, resolver);
+  
+  Type Ty = decl->getTypeLoc().getType();
+  if (decl->isVariadic() && !hadError) {
+    // If isn't legal to declare something both inout and variadic.
+    if (Ty->is<InOutType>()) {
+      TC.diagnose(decl->getStartLoc(), diag::inout_cant_be_variadic);
+      hadError = true;
+    } else {
+      Ty = TC.getArraySliceType(decl->getStartLoc(), Ty);
+      if (Ty.isNull()) {
+        hadError = true;
+      }
+    }
+    decl->getTypeLoc().setType(Ty);
+  }
+
+  if (hadError)
+    decl->getTypeLoc().setType(ErrorType::get(TC.Context), /*validated*/true);
+  
+  return hadError;
+}
+
+/// Type check a parameter list.
+bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
+                                         TypeResolutionOptions options,
+                                         GenericTypeResolver *resolver) {
+  bool hadError = false;
+  
+  for (auto param : *PL) {
+    if (param->getTypeLoc().getTypeRepr())
+      hadError |= validateParameterType(param, DC, options, resolver, *this);
+    
+    auto type = param->getTypeLoc().getType();
+    if (!type && param->hasType()) {
+      type = param->getType();
+      param->getTypeLoc().setType(type);
+    }
+    
+    // If there was no type specified, and if we're not looking at a
+    // ClosureExpr, then we have a parse error (no type was specified).  The
+    // parser will have already diagnosed this, but treat this as a type error
+    // as well to get the ParamDecl marked invalid and to get an ErrorType.
+    if (!type) {
+      // Closure argument lists are allowed to be missing types.
+      if (options & TR_InExpression)
+        continue;
+      param->setInvalid();
+    }
+    
+    if (param->isInvalid()) {
+      param->overwriteType(ErrorType::get(Context));
+      hadError = true;
+    } else
+      param->overwriteType(type);
+    
+    checkTypeModifyingDeclAttributes(param);
+    if (param->getType()->is<InOutType>())
+      param->setLet(false);
+  }
+  
+  return hadError;
+}
+
 
 bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
                                    TypeResolutionOptions options,
@@ -731,7 +787,6 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
   if (!resolver)
     resolver = &defaultResolver;
   
-  TypeResolutionOptions subOptions = options - TR_Variadic;
   switch (P->getKind()) {
   // Type-check paren patterns by checking the sub-pattern and
   // propagating that type out.
@@ -742,7 +797,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
       SP = PP->getSubPattern();
     else
       SP = cast<VarPattern>(P)->getSubPattern();
-    if (typeCheckPattern(SP, dc, subOptions, resolver)) {
+    if (typeCheckPattern(SP, dc, options, resolver)) {
       P->setType(ErrorType::get(Context));
       return true;
     }
@@ -798,19 +853,15 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
 
     // If this is the top level of a function input list, peel off the
     // ImmediateFunctionInput marker and install a FunctionInput one instead.
-    auto elementOptions = withoutContext(subOptions);
-    if (subOptions & TR_ImmediateFunctionInput)
+    auto elementOptions = withoutContext(options);
+    if (options & TR_ImmediateFunctionInput)
       elementOptions |= TR_FunctionInput;
 
     bool missingType = false;
     for (unsigned i = 0, e = tuplePat->getNumElements(); i != e; ++i) {
       TuplePatternElt &elt = tuplePat->getElement(i);
       Pattern *pattern = elt.getPattern();
-      bool hasEllipsis = elt.hasEllipsis();
-      TypeResolutionOptions eltOptions = elementOptions;
-      if (hasEllipsis)
-        eltOptions |= TR_Variadic;
-      if (typeCheckPattern(pattern, dc, eltOptions, resolver)){
+      if (typeCheckPattern(pattern, dc, elementOptions, resolver)){
         hadError = true;
         continue;
       }
@@ -819,10 +870,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
         continue;
       }
 
-      typeElts.push_back(TupleTypeElt(pattern->getType(),
-                                      elt.getLabel(),
-                                      elt.getDefaultArgKind(),
-                                      hasEllipsis));
+      typeElts.push_back(TupleTypeElt(pattern->getType(), elt.getLabel()));
     }
 
     if (hadError) {
@@ -909,8 +957,7 @@ static bool coercePatternViaConditionalDowncast(TypeChecker &tc,
 bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                                       TypeResolutionOptions options,
                                       GenericTypeResolver *resolver) {
-  TypeResolutionOptions subOptions
-    = options - TR_Variadic - TR_EnumPatternPayload;
+  TypeResolutionOptions subOptions = options - TR_EnumPatternPayload;
   switch (P->getKind()) {
   // For parens and vars, just set the type annotation and propagate inwards.
   case PatternKind::Paren: {
@@ -1043,10 +1090,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
   // TODO: permit implicit conversions?
   case PatternKind::Tuple: {
     TuplePattern *TP = cast<TuplePattern>(P);
-    bool hadError = false;
-
-    if (type->is<ErrorType>())
-      hadError = true;
+    bool hadError = type->is<ErrorType>();
     
     // Sometimes a paren is just a paren. If the tuple pattern has a single
     // element, we can reduce it to a paren pattern.
@@ -1079,7 +1123,6 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     }
 
     // The number of elements must match exactly.
-    // TODO: incomplete tuple patterns, with some syntax.
     if (!hadError && tupleTy->getNumElements() != TP->getNumElements()) {
       if (canDecayToParen)
         return decayToParen();
@@ -1094,7 +1137,6 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     for (unsigned i = 0, e = TP->getNumElements(); i != e; ++i) {
       TuplePatternElt &elt = TP->getElement(i);
       Pattern *pattern = elt.getPattern();
-      bool hasEllipsis = elt.hasEllipsis();
 
       Type CoercionType;
       if (hadError)
@@ -1104,52 +1146,17 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       
       // If the tuple pattern had a label for the tuple element, it must match
       // the label for the tuple type being matched.
-      // TODO: detect and diagnose shuffling
-      // TODO: permit shuffling
       if (!hadError && !elt.getLabel().empty() &&
-          i < tupleTy->getNumElements() &&
           elt.getLabel() != tupleTy->getElement(i).getName()) {
         diagnose(elt.getLabelLoc(), diag::tuple_pattern_label_mismatch,
                  elt.getLabel(), tupleTy->getElement(i).getName());
         hadError = true;
       }
       
-      TypeResolutionOptions subOptions = options - TR_Variadic;
-      if (hasEllipsis)
-        subOptions |= TR_Variadic;
-      hadError |= coercePatternToType(pattern, dc, CoercionType, subOptions, 
-                                      resolver);
+      hadError |= coercePatternToType(pattern, dc, CoercionType,
+                                      options, resolver);
       if (!hadError)
         elt.setPattern(pattern);
-
-      // Type-check the initialization expression.
-      assert(!elt.getInit() &&
-             "Tuples cannot have default values, only parameters");
-    }
-
-    // For Swift 2.0, we ban single-element tuple patterns that have labels.
-    // They are too confusingly similar to parenthesized typed patterns that
-    // were allowed in Swift 1.x, and it is always safe to just remove the tuple
-    // label if it was desired. We can relax this limitation later if necessary.
-    //
-    // Note that we allow these in enum contexts and in function/closure
-    // argument lists, since being able to name the first argument of a function
-    // is still considered to be important.
-    if (!hadError && TP->getNumElements() == 1 &&
-        !TP->getElement(0).getLabel().empty() &&
-        !(options & TR_EnumPatternPayload) &&
-        !(options & TR_FunctionInput) &&
-        !(options & TR_ImmediateFunctionInput)) {
-      SourceLoc LabelLoc = TP->getElement(0).getLabelLoc();
-      diagnose(LabelLoc, diag::label_single_entry_tuple);
-      // Emit two notes with fixits offering help to resolve this ambiguity.
-      diagnose(TP->getLParenLoc(), diag::remove_parens_for_type_annotation)
-        .fixItRemove(TP->getLParenLoc()).fixItRemove(TP->getRParenLoc());
-      unsigned LabelLen = TP->getElement(0).getLabel().getLength();
-      diagnose(LabelLoc, diag::remove_label_for_tuple_pattern)
-        .fixItRemove(SourceRange(LabelLoc,
-                                 LabelLoc.getAdvancedLocOrInvalid(LabelLen)));
-      hadError = true;
     }
 
     return hadError;
@@ -1229,7 +1236,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                              IP->getLoc(),
                              IP->getLoc(),IP->getCastTypeLoc().getSourceRange(),
                              [](Type) { return false; },
-                             /*suppressDiagnostics=*/ false);
+                             /*suppressDiagnostics=*/ type->is<ErrorType>());
     switch (castKind) {
     case CheckedCastKind::Unresolved:
       return false;
@@ -1288,8 +1295,9 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       if (type->getAnyNominal())
         elt = lookupEnumMemberElement(*this, dc, type, EEP->getName());
       if (!elt) {
-        diagnose(EEP->getLoc(), diag::enum_element_pattern_member_not_found,
-                 EEP->getName().str(), type);
+        if (!type->is<ErrorType>())
+          diagnose(EEP->getLoc(), diag::enum_element_pattern_member_not_found,
+                   EEP->getName().str(), type);
         return true;
       }
       enumTy = type;
@@ -1532,4 +1540,86 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
   }
   }
   llvm_unreachable("bad pattern kind!");
+}
+
+
+/// Coerce the specified parameter list of a ClosureExpr to the specified
+/// contextual type.
+///
+/// \returns true if an error occurred, false otherwise.
+///
+/// TODO: These diagnostics should be a lot better now that we know this is
+/// all specific to closures.
+///
+bool TypeChecker::coerceParameterListToType(ParameterList *P, DeclContext *DC,
+                                            Type paramListType) {
+  bool hadError = paramListType->is<ErrorType>();
+
+  // Sometimes a scalar type gets applied to a single-argument parameter list.
+  auto handleParameter = [&](ParamDecl *param, Type ty) -> bool {
+    bool hadError = false;
+    
+    // Check that the type, if explicitly spelled, is ok.
+    if (param->getTypeLoc().getTypeRepr()) {
+      hadError |= validateParameterType(param, DC, TypeResolutionOptions(),
+                                        nullptr, *this);
+      
+      // Now that we've type checked the explicit argument type, see if it
+      // agrees with the contextual type.
+      if (!hadError && !ty->isEqual(param->getTypeLoc().getType()) &&
+          !ty->is<ErrorType>())
+        param->overwriteType(ty);
+    }
+    
+    if (param->isInvalid())
+      param->overwriteType(ErrorType::get(Context));
+    else
+      param->overwriteType(ty);
+    
+    checkTypeModifyingDeclAttributes(param);
+    if (ty->is<InOutType>())
+      param->setLet(false);
+    return hadError;
+  };
+
+  
+  // The context type must be a tuple.
+  TupleType *tupleTy = paramListType->getAs<TupleType>();
+  if (!tupleTy && !hadError) {
+    if (P->size() == 1)
+      return handleParameter(P->get(0), paramListType);
+    diagnose(P->getStartLoc(), diag::tuple_pattern_in_non_tuple_context,
+             paramListType);
+    hadError = true;
+  }
+  
+  // The number of elements must match exactly.
+  // TODO: incomplete tuple patterns, with some syntax.
+  if (!hadError && tupleTy->getNumElements() != P->size()) {
+    if (P->size() == 1)
+      return handleParameter(P->get(0), paramListType);
+    
+    diagnose(P->getStartLoc(), diag::tuple_pattern_length_mismatch,
+             paramListType);
+    hadError = true;
+  }
+
+  // Coerce each parameter to the respective type.
+  for (unsigned i = 0, e = P->size(); i != e; ++i) {
+    auto &param = P->get(i);
+    
+    Type CoercionType;
+    if (hadError)
+      CoercionType = ErrorType::get(Context);
+    else
+      CoercionType = tupleTy->getElement(i).getType();
+    
+    assert(param->getArgumentName().empty() &&
+           "Closures cannot have API names");
+    
+    hadError |= handleParameter(param, CoercionType);
+    assert(!param->isDefaultArgument() && "Closures cannot have default args");
+  }
+  
+  return hadError;
 }

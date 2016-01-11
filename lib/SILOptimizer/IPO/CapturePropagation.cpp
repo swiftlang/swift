@@ -1,8 +1,8 @@
-//===---- CapturePropagation.cpp - Propagate closure capture constants ----===//
+//===--- CapturePropagation.cpp - Propagate closure capture constants -----===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -65,14 +65,11 @@ static bool isConstant(SILValue V) {
   return V && isOptimizableConstant(V);
 }
 
-static llvm::SmallString<64> getClonedName(PartialApplyInst *PAI,
-                                           SILFunction *F) {
-  llvm::SmallString<64> ClonedName;
+static std::string getClonedName(PartialApplyInst *PAI, SILFunction *F) {
 
-  llvm::raw_svector_ostream buffer(ClonedName);
-  Mangle::Mangler M(buffer);
-  auto P = Mangle::SpecializationPass::CapturePropagation;
-  Mangle::FunctionSignatureSpecializationMangler Mangler(P, M, F);
+  Mangle::Mangler M;
+  auto P = SpecializationPass::CapturePropagation;
+  FunctionSignatureSpecializationMangler Mangler(P, M, F);
 
   // We know that all arguments are literal insts.
   auto Args = PAI->getArguments();
@@ -80,7 +77,7 @@ static llvm::SmallString<64> getClonedName(PartialApplyInst *PAI,
     Mangler.setArgumentConstantProp(i, getConstant(Args[i]));
   Mangler.mangle();
 
-  return ClonedName;
+  return M.finalize();
 }
 
 namespace {
@@ -217,11 +214,11 @@ void CapturePropagationCloner::cloneBlocks(
 /// function body.
 SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
                                                         SILFunction *OrigF) {
-  llvm::SmallString<64> Name = getClonedName(PAI, OrigF);
+  std::string Name = getClonedName(PAI, OrigF);
 
   // See if we already have a version of this function in the module. If so,
   // just return it.
-  if (auto *NewF = OrigF->getModule().lookUpFunction(Name.str())) {
+  if (auto *NewF = OrigF->getModule().lookUpFunction(Name)) {
     DEBUG(llvm::dbgs()
               << "  Found an already specialized version of the callee: ";
           NewF->printName(llvm::dbgs()); llvm::dbgs() << "\n");

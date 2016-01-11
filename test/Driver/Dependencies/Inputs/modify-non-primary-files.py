@@ -1,10 +1,24 @@
 #!/usr/bin/env python
-
+# modify-non-primary-files.py - Fake build while modifying files -*- python -*-
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See http://swift.org/LICENSE.txt for license information
+# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+#
+# ----------------------------------------------------------------------------
+#
 # modify-non-primary-files.py simulates a build where the user is modifying the
 # source files during compilation.
+#
+# ----------------------------------------------------------------------------
+
+from __future__ import print_function
 
 import os
-import shutil
 import sys
 
 assert sys.argv[1] == '-frontend'
@@ -32,6 +46,6 @@ with open(outputFile, 'a'):
     os.utime(outputFile, None)
 
 if primaryFile:
-  print "Handled", os.path.basename(primaryFile)
+  print("Handled", os.path.basename(primaryFile))
 else:
-  print "Produced", os.path.basename(outputFile)
+  print("Produced", os.path.basename(outputFile))

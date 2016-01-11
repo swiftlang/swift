@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -64,7 +64,7 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
   }
   CanType t = *cacheSlot;
 
-  // It is possible that we won't find a briding type (e.g. String) when we're
+  // It is possible that we won't find a bridging type (e.g. String) when we're
   // parsing the stdlib itself.
   if (t) {
     DEBUG(llvm::dbgs() << "Bridging type " << moduleName << '.' << typeName
@@ -122,6 +122,7 @@ enum class ConventionsKind : uint8_t {
   CFunction = 4,
   SelectorFamily = 5,
   Deallocator = 6,
+  Capture = 7,
 };
 
   class Conventions {
@@ -359,9 +360,6 @@ enum class ConventionsKind : uint8_t {
       if (isa<InOutType>(substType)) {
         assert(origType.isOpaque() || origType.getAs<InOutType>());
         convention = ParameterConvention::Indirect_Inout;
-      } else if (isa<LValueType>(substType)) {
-        assert(origType.isOpaque() || origType.getAs<LValueType>());
-        convention = ParameterConvention::Indirect_InoutAliasable;
       } else if (isPassedIndirectly(origType, substType, substTL)) {
         convention = Convs.getIndirectParameter(origParamIndex, origType);
         assert(isIndirectParameter(convention));
@@ -430,7 +428,8 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
                         CanAnyFunctionType substFnInterfaceType,
                         AnyFunctionType::ExtInfo extInfo,
                         const Conventions &conventions,
-                        const Optional<ForeignErrorConvention> &foreignError) {
+                        const Optional<ForeignErrorConvention> &foreignError,
+                        Optional<SILDeclRef> constant) {
   SmallVector<SILParameterInfo, 8> inputs;
 
   // Per above, only fully honor opaqueness in the abstraction pattern
@@ -564,7 +563,67 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
                                   substFnInterfaceType.getInput(),
                                   extInfo);
   }
-
+  
+  // Lower the capture context parameters, if any.
+  if (constant)
+  if (auto function = constant->getAnyFunctionRef()) {
+    auto &Types = M.Types;
+    auto loweredCaptures = Types.getLoweredLocalCaptures(*function);
+    
+    for (auto capture : loweredCaptures.getCaptures()) {
+      auto *VD = capture.getDecl();
+      auto type = VD->getType()->getCanonicalType();
+      
+      type = Types.getInterfaceTypeOutOfContext(type,
+                                                function->getAsDeclContext());
+      
+      auto &loweredTL = Types.getTypeLowering(
+                                    AbstractionPattern(genericSig, type), type);
+      auto loweredTy = loweredTL.getLoweredType();
+      switch (Types.getDeclCaptureKind(capture)) {
+      case CaptureKind::None:
+        break;
+      case CaptureKind::Constant: {
+        // Constants are captured by value.
+        ParameterConvention convention;
+        if (loweredTL.isAddressOnly()) {
+          convention = M.getOptions().EnableGuaranteedClosureContexts
+            ? ParameterConvention::Indirect_In_Guaranteed
+            : ParameterConvention::Indirect_In;
+        } else if (loweredTL.isTrivial()) {
+          convention = ParameterConvention::Direct_Unowned;
+        } else {
+          convention = M.getOptions().EnableGuaranteedClosureContexts
+            ? ParameterConvention::Direct_Guaranteed
+            : ParameterConvention::Direct_Owned;
+        }
+        SILParameterInfo param(loweredTy.getSwiftRValueType(), convention);
+        inputs.push_back(param);
+        break;
+      }
+      case CaptureKind::Box: {
+        // Lvalues are captured as a box that owns the captured value.
+        SILType ty = loweredTy.getAddressType();
+        CanType boxTy = SILBoxType::get(ty.getSwiftRValueType());
+        auto convention = M.getOptions().EnableGuaranteedClosureContexts
+          ? ParameterConvention::Direct_Guaranteed
+          : ParameterConvention::Direct_Owned;
+        auto param = SILParameterInfo(boxTy, convention);
+        inputs.push_back(param);
+        break;
+      }
+      case CaptureKind::StorageAddress: {
+        // Non-escaping lvalues are captured as the address of the value.
+        SILType ty = loweredTy.getAddressType();
+        auto param = SILParameterInfo(ty.getSwiftRValueType(),
+                                  ParameterConvention::Indirect_InoutAliasable);
+        inputs.push_back(param);
+        break;
+      }
+      }
+    }
+  }
+  
   auto calleeConvention = ParameterConvention::Direct_Unowned;
   if (extInfo.hasContext())
     calleeConvention = conventions.getCallee();
@@ -730,17 +789,19 @@ namespace {
 }
 
 static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
-                                           AbstractionPattern origType,
-                                           CanAnyFunctionType substType,
-                                           CanAnyFunctionType substInterfaceType,
-                                           AnyFunctionType::ExtInfo extInfo,
-                                           SILDeclRef::Kind kind) {
+                                         AbstractionPattern origType,
+                                         CanAnyFunctionType substType,
+                                         CanAnyFunctionType substInterfaceType,
+                                         AnyFunctionType::ExtInfo extInfo,
+                                         Optional<SILDeclRef> constant,
+                                         SILDeclRef::Kind kind) {
   switch (extInfo.getSILRepresentation()) {
   case SILFunctionType::Representation::Block:
   case SILFunctionType::Representation::CFunctionPointer:
+    // TODO: Ought to support captures in block funcs.
     return getSILFunctionType(M, origType, substType, substInterfaceType,
                               extInfo, DefaultBlockConventions(),
-                              None);
+                              None, constant);
 
   case SILFunctionType::Representation::Thin:
   case SILFunctionType::Representation::ObjCMethod:
@@ -751,7 +812,7 @@ static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
     case SILDeclRef::Kind::Initializer:
       return getSILFunctionType(M, origType, substType, substInterfaceType,
                                 extInfo, DefaultInitializerConventions(),
-                                None);
+                                None, constant);
     
     case SILDeclRef::Kind::Func:
     case SILDeclRef::Kind::Allocator:
@@ -764,10 +825,11 @@ static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
     case SILDeclRef::Kind::EnumElement:
       return getSILFunctionType(M, origType, substType, substInterfaceType,
                                 extInfo, DefaultConventions(),
-                                None);
+                                None, constant);
     case SILDeclRef::Kind::Deallocator:
       return getSILFunctionType(M, origType, substType, substInterfaceType,
-                                extInfo, DeallocatorConventions(), None);
+                                extInfo, DeallocatorConventions(), None,
+                                constant);
     }
   }
   }
@@ -789,7 +851,7 @@ CanSILFunctionType swift::getNativeSILFunctionType(SILModule &M,
     extInfo = substType->getExtInfo();
   }
   return ::getNativeSILFunctionType(M, origType, substType, substInterfaceType,
-                                    extInfo, kind);
+                                    extInfo, None, kind);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1101,7 +1163,7 @@ getSILFunctionTypeForClangDecl(SILModule &M, const clang::Decl *clangDecl,
       AbstractionPattern::getObjCMethod(origType, method, foreignError);
     return getSILFunctionType(M, origPattern, substType, substInterfaceType,
                               extInfo, ObjCMethodConventions(method),
-                              foreignError);
+                              foreignError, None);
   }
 
   if (auto func = dyn_cast<clang::FunctionDecl>(clangDecl)) {
@@ -1109,7 +1171,7 @@ getSILFunctionTypeForClangDecl(SILModule &M, const clang::Decl *clangDecl,
                                    func->getType().getTypePtr());
     return getSILFunctionType(M, origPattern, substType, substInterfaceType,
                               extInfo, CFunctionConventions(func),
-                              foreignError);
+                              foreignError, None);
   }
 
   llvm_unreachable("call to unknown kind of C function");
@@ -1297,7 +1359,7 @@ getSILFunctionTypeForSelectorFamily(SILModule &M, SelectorFamily family,
                             substType, substInterfaceType,
                             extInfo,
                             SelectorFamilyConventions(family),
-                            foreignError);
+                            foreignError, None);
 }
 
 static CanSILFunctionType
@@ -1334,10 +1396,11 @@ getUncachedSILFunctionTypeForConstant(SILModule &M, SILDeclRef constant,
 
   if (!constant.isForeign) {
     return getNativeSILFunctionType(M, AbstractionPattern(origLoweredType),
-                                    substLoweredType,
-                                    substLoweredInterfaceType,
-                                    extInfo,
-                                    constant.kind);
+                  substLoweredType,
+                  substLoweredInterfaceType,
+                  extInfo,
+                  constant,
+                  constant.kind);
   }
 
   Optional<ForeignErrorConvention> foreignError;

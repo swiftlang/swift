@@ -1,8 +1,8 @@
-//===--- ManagedBuffer.swift - variable-sized buffer of aligned memory ---===//
+//===--- ManagedBuffer.swift - variable-sized buffer of aligned memory ----===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -45,7 +45,7 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   /// - Note: This pointer is only valid for the duration of the
   ///   call to `body`.
   public final func withUnsafeMutablePointerToValue<R>(
-    body: (UnsafeMutablePointer<Value>)->R
+    body: (UnsafeMutablePointer<Value>) -> R
   ) -> R {
     return withUnsafeMutablePointers { (v, e) in return body(v) }
   }
@@ -56,7 +56,7 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   /// - Note: This pointer is only valid for the duration of the
   ///   call to `body`.
   public final func withUnsafeMutablePointerToElements<R>(
-    body: (UnsafeMutablePointer<Element>)->R
+    body: (UnsafeMutablePointer<Element>) -> R
   ) -> R {
     return withUnsafeMutablePointers { return body($0.1) }
   }
@@ -67,7 +67,7 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   /// - Note: These pointers are only valid for the duration of the
   ///   call to `body`.
   public final func withUnsafeMutablePointers<R>(
-    body: (_: UnsafeMutablePointer<Value>, _: UnsafeMutablePointer<Element>)->R
+    body: (_: UnsafeMutablePointer<Value>, _: UnsafeMutablePointer<Element>) -> R
   ) -> R {
     return ManagedBufferPointer(self).withUnsafeMutablePointers(body)
   }
@@ -99,7 +99,7 @@ public class ManagedBuffer<Value, Element>
   /// generate an initial `Value`.
   public final class func create(
     minimumCapacity: Int,
-    initialValue: (ManagedProtoBuffer<Value,Element>)->Value
+    initialValue: (ManagedProtoBuffer<Value,Element>) -> Value
   ) -> ManagedBuffer<Value,Element> {
 
     let p = ManagedBufferPointer<Value,Element>(
@@ -146,7 +146,7 @@ public class ManagedBuffer<Value, Element>
 ///        typealias Manager = ManagedBufferPointer<(Int,String), Element>
 ///        deinit {
 ///          Manager(unsafeBufferObject: self).withUnsafeMutablePointers {
-///            (pointerToValue, pointerToElements)->Void in
+///            (pointerToValue, pointerToElements) -> Void in
 ///            pointerToElements.destroy(self.count)
 ///            pointerToValue.destroy()
 ///          }
@@ -181,7 +181,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   public init(
     bufferClass: AnyClass,
     minimumCapacity: Int,
-    initialValue: (buffer: AnyObject, allocatedCount: (AnyObject)->Int)->Value
+    initialValue: (buffer: AnyObject, allocatedCount: (AnyObject) -> Int) -> Value
   ) {
     self = ManagedBufferPointer(bufferClass: bufferClass, minimumCapacity: minimumCapacity)
 
@@ -253,7 +253,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// - Note: This pointer is only valid
   ///   for the duration of the call to `body`.
   public func withUnsafeMutablePointerToValue<R>(
-    body: (UnsafeMutablePointer<Value>)->R
+    body: (UnsafeMutablePointer<Value>) -> R
   ) -> R {
     return withUnsafeMutablePointers { (v, e) in return body(v) }
   }
@@ -264,7 +264,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// - Note: This pointer is only valid for the duration of the
   ///   call to `body`.
   public func withUnsafeMutablePointerToElements<R>(
-    body: (UnsafeMutablePointer<Element>)->R
+    body: (UnsafeMutablePointer<Element>) -> R
   ) -> R {
     return withUnsafeMutablePointers { return body($0.1) }
   }
@@ -275,7 +275,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// - Note: These pointers are only valid for the duration of the
   ///   call to `body`.
   public func withUnsafeMutablePointers<R>(
-    body: (_: UnsafeMutablePointer<Value>, _: UnsafeMutablePointer<Element>)->R
+    body: (_: UnsafeMutablePointer<Value>, _: UnsafeMutablePointer<Element>) -> R
   ) -> R {
     let result = body(_valuePointer, _elementPointer)
     _fixLifetime(_nativeBuffer)

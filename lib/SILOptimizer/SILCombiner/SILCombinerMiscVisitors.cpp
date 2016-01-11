@@ -1,8 +1,8 @@
-//===---- SILCombinerMiscVisitors.cpp -------------------------------------===//
+//===--- SILCombinerMiscVisitors.cpp --------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -168,20 +168,20 @@ namespace {
 ///
 /// We detect this pattern
 /// %0 = alloc_stack $LogicValue
-/// %1 = init_existential_addr %0#1 : $*LogicValue, $*Bool
+/// %1 = init_existential_addr %0 : $*LogicValue, $*Bool
 /// ...
 /// use of %1
 /// ...
-/// destroy_addr %0#1 : $*LogicValue
-/// dealloc_stack %0#0 : $*@local_storage LogicValue
+/// destroy_addr %0 : $*LogicValue
+/// dealloc_stack %0 : $*LogicValue
 ///
 /// At the same we time also look for dead alloc_stack live ranges that are only
 /// copied into.
 ///
 /// %0 = alloc_stack
 /// copy_addr %src, %0
-/// destroy_addr %0#1 : $*LogicValue
-/// dealloc_stack %0#0 : $*@local_storage LogicValue
+/// destroy_addr %0 : $*LogicValue
+/// dealloc_stack %0 : $*LogicValue
 struct AllocStackAnalyzer : SILInstructionVisitor<AllocStackAnalyzer> {
   /// The alloc_stack that we are analyzing.
   AllocStackInst *ASI;
@@ -232,7 +232,7 @@ public:
   void visitDeallocStackInst(DeallocStackInst *I) {}
 
   void visitInitExistentialAddrInst(InitExistentialAddrInst *I) {
-    // If we have already seen an init_existential_addr, we can not
+    // If we have already seen an init_existential_addr, we cannot
     // optimize. This is because we only handle the single init_existential_addr
     // case.
     if (IEI || HaveSeenCopyInto) {
@@ -243,7 +243,7 @@ public:
   }
 
   void visitOpenExistentialAddrInst(OpenExistentialAddrInst *I) {
-    // If we have already seen an open_existential_addr, we can not
+    // If we have already seen an open_existential_addr, we cannot
     // optimize. This is because we only handle the single open_existential_addr
     // case.
     if (OEI) {
@@ -251,7 +251,7 @@ public:
       return;
     }
 
-    // Make sure tht the open_existential does not have any uses except
+    // Make sure that the open_existential does not have any uses except
     // destroy_addr.
     for (auto *Use : getNonDebugUses(*I)) {
       if (!isa<DestroyAddrInst>(Use->getUser())) {
@@ -299,7 +299,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   if (IEI && !OEI) {
     auto *ConcAlloc = Builder.createAllocStack(
         AS->getLoc(), IEI->getLoweredConcreteType(), AS->getVarInfo());
-    SILValue(IEI, 0).replaceAllUsesWith(ConcAlloc->getAddressResult());
+    SILValue(IEI, 0).replaceAllUsesWith(ConcAlloc);
     eraseInstFromFunction(*IEI);
 
     for (auto UI = AS->use_begin(), UE = AS->use_end(); UI != UE;) {
@@ -307,7 +307,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
       ++UI;
       if (auto *DA = dyn_cast<DestroyAddrInst>(Op->getUser())) {
         Builder.setInsertionPoint(DA);
-        Builder.createDestroyAddr(DA->getLoc(), SILValue(ConcAlloc, 1));
+        Builder.createDestroyAddr(DA->getLoc(), ConcAlloc);
         eraseInstFromFunction(*DA);
         continue;
       }
@@ -492,7 +492,7 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
     return Builder.createStrongRetain(RVI->getLoc(), Operand);
   }
 
-  // RetainValueInst of a trivial type is a no-op + use propogation.
+  // RetainValueInst of a trivial type is a no-op + use propagation.
   if (OperandTy.isTrivial(RVI->getModule())) {
     return eraseInstFromFunction(*RVI);
   }
@@ -508,7 +508,7 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
   //
   // Due to the matching pairs being in different basic blocks, the ARC
   // Optimizer (which is currently local to one basic block does not handle
-  // it). But that does not mean that we can not eliminate this pair with a
+  // it). But that does not mean that we cannot eliminate this pair with a
   // peephole.
 
   // If we are not the first instruction in this basic block...
@@ -586,7 +586,7 @@ SILInstruction *SILCombiner::visitStrongRetainInst(StrongRetainInst *SRI) {
   //
   // Due to the matching pairs being in different basic blocks, the ARC
   // Optimizer (which is currently local to one basic block does not handle
-  // it). But that does not mean that we can not eliminate this pair with a
+  // it). But that does not mean that we cannot eliminate this pair with a
   // peephole.
 
   // If we are not the first instruction in this basic block...
@@ -666,7 +666,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
           if (SI->getDest() == IEAI->getOperand())
             return nullptr;
         }
-        // Allow all instructions inbetween, which don't have any dependency to
+        // Allow all instructions in between, which don't have any dependency to
         // the store.
         if (AA->mayWriteToMemory(&*II, IEAI->getOperand()))
           return nullptr;
@@ -705,7 +705,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
           if (SI->getDest() == IEAI->getOperand())
             return nullptr;
         }
-        // Allow all instructions inbetween, which don't have any dependency to
+        // Allow all instructions in between, which don't have any dependency to
         // the store.
         if (AA->mayWriteToMemory(&*II, IEAI->getOperand()))
           return nullptr;
@@ -784,8 +784,8 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
     // Allowing us to perform the same optimization as for the store.
     //
     //  %alloca = alloc_stack
-    //            apply(%alloca#1,...)
-    //  %load = load %alloca#1
+    //            apply(%alloca,...)
+    //  %load = load %alloca
     //  %1 = enum $EnumType, $EnumType.case, %load
     //  store %1 to %nopayload_addr
     //
@@ -832,17 +832,15 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
   Builder.setInsertionPoint(AI);
   auto *AllocStack = Builder.createAllocStack(DataAddrInst->getLoc(),
                                               EnumInitOperand->get().getType());
-  EnumInitOperand->set(AllocStack->getAddressResult());
+  EnumInitOperand->set(AllocStack);
   Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(AI)));
-  SILValue Load(Builder.createLoad(DataAddrInst->getLoc(),
-                                   AllocStack->getAddressResult()),
+  SILValue Load(Builder.createLoad(DataAddrInst->getLoc(), AllocStack),
                 0);
   EnumInst *E = Builder.createEnum(
       DataAddrInst->getLoc(), Load, DataAddrInst->getElement(),
       DataAddrInst->getOperand().getType().getObjectType());
   Builder.createStore(DataAddrInst->getLoc(), E, DataAddrInst->getOperand());
-  Builder.createDeallocStack(DataAddrInst->getLoc(),
-                             AllocStack->getContainerResult());
+  Builder.createDeallocStack(DataAddrInst->getLoc(), AllocStack);
   eraseInstFromFunction(*DataAddrInst);
   return eraseInstFromFunction(*IEAI);
 }
@@ -883,7 +881,7 @@ visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI) {
   if (TEDAI->use_empty())
     return nullptr;
 
-  // If our enum type is address only, we can not do anything here. The key
+  // If our enum type is address only, we cannot do anything here. The key
   // thing to remember is that an enum is address only if any of its cases are
   // address only. So we *could* have a loadable payload resulting from the
   // TEDAI without the TEDAI being loadable itself.
@@ -964,7 +962,7 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
     if (!EnumOperandTy.isLoadable(SEI->getModule()))
       return nullptr;
 
-    // Result of the selec_enum should be a boolean.
+    // Result of the select_enum should be a boolean.
     if (SEI->getType() != CBI->getCondition().getType())
       return nullptr;
 
@@ -1077,7 +1075,7 @@ SILInstruction *SILCombiner::visitFixLifetimeInst(FixLifetimeInst *FLI) {
   Builder.setCurrentDebugScope(FLI->getDebugScope());
   if (auto *AI = dyn_cast<AllocStackInst>(FLI->getOperand())) {
     if (FLI->getOperand().getType().isLoadable(FLI->getModule())) {
-      auto Load = Builder.createLoad(FLI->getLoc(), SILValue(AI, 1));
+      auto Load = Builder.createLoad(FLI->getLoc(), AI);
       return Builder.createFixLifetime(FLI->getLoc(), SILValue(Load, 0));
     }
   }

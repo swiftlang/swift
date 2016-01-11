@@ -1,8 +1,8 @@
-//===-------------- AliasAnalysis.h - SIL Alias Analysis -*- C++ -*--------===//
+//===--- AliasAnalysis.h - SIL Alias Analysis -------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -56,6 +56,7 @@ class SILValue;
 class SILInstruction;
 class ValueBase;
 class SideEffectAnalysis;
+class EscapeAnalysis;
 
 /// This class is a simple wrapper around an alias analysis cache. This is
 /// needed since we do not have an "analysis" infrastructure.
@@ -82,7 +83,7 @@ public:
   enum class AliasResult : unsigned {
     NoAlias=0,      ///< The two values have no dependencies on each
                     ///  other.
-    MayAlias,       ///< The two values can not be proven to alias or
+    MayAlias,       ///< The two values cannot be proven to alias or
                     ///  not alias. Anything could happen.
     PartialAlias,   ///< The two values overlap in a partial manner.
     MustAlias,      ///< The two values are equal.
@@ -91,6 +92,7 @@ public:
 private:
   SILModule *Mod;
   SideEffectAnalysis *SEA;
+  EscapeAnalysis *EA;
 
   using TBAACacheKey = std::pair<SILType, SILType>;
 
@@ -110,12 +112,19 @@ private:
   /// The computeMemoryBehavior() method uses this map to cache queries.
   llvm::DenseMap<MemBehaviorKeyTy, MemoryBehavior> MemoryBehaviorCache;
 
-  /// The AliasAnalysis/MemoryBehavior cache can't directly map a pair of
-  /// ValueBase pointers to alias/memorybehavior results because we'd like to
-  /// be able to remove deleted pointers without having to scan the whole map.
-  /// So, instead of storing pointers we map pointers to indices and store the
-  /// indices.
-  ValueEnumerator<ValueBase*> ValueBaseToIndex;
+  /// The AliasAnalysis cache can't directly map a pair of ValueBase pointers
+  /// to alias results because we'd like to be able to remove deleted pointers
+  /// without having to scan the whole map. So, instead of storing pointers we
+  /// map pointers to indices and store the indices.
+  ValueEnumerator<ValueBase*> AliasValueBaseToIndex;
+  
+  /// Same as AliasValueBaseToIndex, map a pointer to the indices for
+  /// MemoryBehaviorCache.
+  ///
+  /// NOTE: we do not use the same ValueEnumerator for the alias cache, 
+  /// as when either cache is cleared, we can not clear the ValueEnumerator
+  /// because doing so could give rise to collisions in the other cache.
+  ValueEnumerator<ValueBase*> MemoryBehaviorValueBaseToIndex;
 
   AliasResult aliasAddressProjection(SILValue V1, SILValue V2,
                                      SILValue O1, SILValue O2);
@@ -132,7 +141,8 @@ private:
     // The pointer I is going away.  We can't scan the whole cache and remove
     // all of the occurrences of the pointer. Instead we remove the pointer
     // from the cache the translates pointers to indices.
-    ValueBaseToIndex.invalidateValue(I);
+    AliasValueBaseToIndex.invalidateValue(I);
+    MemoryBehaviorValueBaseToIndex.invalidateValue(I);
   }
 
   virtual bool needsNotifications() override { return true; }
@@ -140,7 +150,7 @@ private:
 
 public:
   AliasAnalysis(SILModule *M) :
-    SILAnalysis(AnalysisKind::Alias), Mod(M), SEA(nullptr) {}
+    SILAnalysis(AnalysisKind::Alias), Mod(M), SEA(nullptr), EA(nullptr) {}
 
   static bool classof(const SILAnalysis *S) {
     return S->getKind() == AnalysisKind::Alias;
@@ -164,7 +174,7 @@ public:
     return alias(V1, V2, TBAAType1, TBAAType2) == AliasResult::PartialAlias;
   }
 
-  /// Convenience method that returns true if V1, V2 can not alias.
+  /// Convenience method that returns true if V1, V2 cannot alias.
   bool isNoAlias(SILValue V1, SILValue V2, SILType TBAAType1 = SILType(),
                  SILType TBAAType2 = SILType()) {
     return alias(V1, V2, TBAAType1, TBAAType2) == AliasResult::NoAlias;
@@ -232,6 +242,12 @@ public:
     auto B = computeMemoryBehavior(Inst, V, RetainObserveKind::ObserveRetains);
     return MemoryBehavior::MayHaveSideEffects == B;
   }
+
+  /// Returns true if \p Ptr may be released in the function call \p FAS.
+  bool canApplyDecrementRefCount(FullApplySite FAS, SILValue Ptr);
+
+  /// Returns true if \p Ptr may be released by the builtin \p BI.
+  bool canBuiltinDecrementRefCount(BuiltinInst *BI, SILValue Ptr);
 
   /// Encodes the alias query as a AliasKeyTy.
   /// The parameters to this function are identical to the parameters of alias()

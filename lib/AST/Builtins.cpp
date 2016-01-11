@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -22,7 +22,6 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/LLVMContext.h"
-#include <cstring>
 #include <tuple>
 using namespace swift;
 
@@ -132,43 +131,38 @@ StringRef swift::getBuiltinBaseName(ASTContext &C, StringRef Name,
 
 /// Build a builtin function declaration.
 static FuncDecl *
-getBuiltinFunction(Identifier Id,
-                   ArrayRef<TupleTypeElt> ArgTypes,
-                   Type ResType,
+getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
                    FunctionType::ExtInfo Info = FunctionType::ExtInfo()) {
   auto &Context = ResType->getASTContext();
-  Type ArgType = TupleType::get(ArgTypes, Context);
+  
+  SmallVector<TupleTypeElt, 4> tupleElts;
+  for (Type argType : argTypes)
+    tupleElts.push_back(argType);
+  
+  Type ArgType = TupleType::get(tupleElts, Context);
   Type FnType;
   FnType = FunctionType::get(ArgType, ResType, Info);
 
   Module *M = Context.TheBuiltinModule;
   DeclContext *DC = &M->getMainFile(FileUnitKind::Builtin);
 
-  SmallVector<TuplePatternElt, 4> ParamPatternElts;
-  for (auto &ArgTupleElt : ArgTypes) {
+  SmallVector<ParamDecl*, 4> params;
+  for (Type argType : argTypes) {
     auto PD = new (Context) ParamDecl(/*IsLet*/true, SourceLoc(),
                                       Identifier(), SourceLoc(),
-                                      Identifier(), ArgTupleElt.getType(),
+                                      Identifier(), argType,
                                       DC);
     PD->setImplicit();
-    Pattern *Pat = new (Context) NamedPattern(PD, /*implicit=*/true);
-    Pat = new (Context) TypedPattern(Pat,
-            TypeLoc::withoutLoc(ArgTupleElt.getType()), /*implicit=*/true);
-    PD->setParamParentPattern(Pat);
-
-    ParamPatternElts.push_back(TuplePatternElt(Pat));
+    params.push_back(PD);
   }
 
-  Pattern *ParamPattern = TuplePattern::createSimple(
-      Context, SourceLoc(), ParamPatternElts, SourceLoc());
-
-  llvm::SmallVector<Identifier, 2> ArgNames(ParamPattern->numTopLevelVariables(),
-                                            Identifier());
-  DeclName Name(Context, Id, ArgNames);
+  auto *paramList = ParameterList::create(Context, params);
+  
+  DeclName Name(Context, Id, paramList);
   auto FD = FuncDecl::create(Context, SourceLoc(), StaticSpellingKind::None,
                           SourceLoc(), Name, SourceLoc(), SourceLoc(),
                           SourceLoc(), /*GenericParams=*/nullptr, FnType,
-                          ParamPattern, TypeLoc::withoutLoc(ResType), DC);
+                          paramList, TypeLoc::withoutLoc(ResType), DC);
   FD->setImplicit();
   FD->setAccessibility(Accessibility::Public);
   return FD;
@@ -178,20 +172,15 @@ getBuiltinFunction(Identifier Id,
 static FuncDecl *
 getBuiltinGenericFunction(Identifier Id,
                           ArrayRef<TupleTypeElt> ArgParamTypes,
-                          ArrayRef<TupleTypeElt> ArgBodyTypes,
+                          ArrayRef<Type> ArgBodyTypes,
                           Type ResType,
                           Type ResBodyType,
                           GenericParamList *GenericParams,
-                          FunctionType::ExtInfo Info = FunctionType::ExtInfo()) {
+                          FunctionType::ExtInfo Info = FunctionType::ExtInfo()){
   assert(GenericParams && "Missing generic parameters");
   auto &Context = ResType->getASTContext();
 
   Type ArgParamType = TupleType::get(ArgParamTypes, Context);
-  Type ArgBodyType = TupleType::get(ArgBodyTypes, Context);
-
-  // Compute the function type.
-  Type FnType = PolymorphicFunctionType::get(ArgBodyType, ResBodyType,
-                                             GenericParams, Info);
 
   // Compute the interface type.
   SmallVector<GenericTypeParamType *, 1> GenericParamTypes;
@@ -215,31 +204,27 @@ getBuiltinGenericFunction(Identifier Id,
   Module *M = Context.TheBuiltinModule;
   DeclContext *DC = &M->getMainFile(FileUnitKind::Builtin);
 
-  SmallVector<TuplePatternElt, 4> ParamPatternElts;
-  for (auto &ArgTupleElt : ArgBodyTypes) {
+  SmallVector<ParamDecl*, 4> params;
+  for (auto paramType : ArgBodyTypes) {
     auto PD = new (Context) ParamDecl(/*IsLet*/true, SourceLoc(),
                                       Identifier(), SourceLoc(),
-                                      Identifier(), ArgTupleElt.getType(),
-                                      DC);
+                                      Identifier(), paramType, DC);
     PD->setImplicit();
-    Pattern *Pat = new (Context) NamedPattern(PD, /*implicit=*/true);
-    Pat = new (Context) TypedPattern(Pat,
-            TypeLoc::withoutLoc(ArgTupleElt.getType()), /*implicit=*/true);
-    PD->setParamParentPattern(Pat);
-
-    ParamPatternElts.push_back(TuplePatternElt(Pat));
+    params.push_back(PD);
   }
 
-  Pattern *ParamPattern = TuplePattern::createSimple(
-                          Context, SourceLoc(), ParamPatternElts, SourceLoc());
-  llvm::SmallVector<Identifier, 2> ArgNames(
-                                     ParamPattern->numTopLevelVariables(),
-                                     Identifier());
-  DeclName Name(Context, Id, ArgNames);
+  
+  auto *paramList = ParameterList::create(Context, params);
+  
+  // Compute the function type.
+  Type FnType = PolymorphicFunctionType::get(paramList->getType(Context),
+                                             ResBodyType, GenericParams, Info);
+  
+  DeclName Name(Context, Id, paramList);
   auto func = FuncDecl::create(Context, SourceLoc(), StaticSpellingKind::None,
                                SourceLoc(), Name,
                                SourceLoc(), SourceLoc(), SourceLoc(),
-                               GenericParams, FnType, ParamPattern,
+                               GenericParams, FnType, paramList,
                                TypeLoc::withoutLoc(ResBodyType), DC);
     
   func->setInterfaceType(InterfaceType);
@@ -254,16 +239,14 @@ static ValueDecl *getGepOperation(Identifier Id, Type ArgType) {
   auto &Context = ArgType->getASTContext();
   
   // This is always "(i8*, IntTy) -> i8*"
-  TupleTypeElt ArgElts[] = { Context.TheRawPointerType, ArgType };
+  Type ArgElts[] = { Context.TheRawPointerType, ArgType };
   Type ResultTy = Context.TheRawPointerType;
   return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
 /// Build a binary operation declaration.
 static ValueDecl *getBinaryOperation(Identifier Id, Type ArgType) {
-  TupleTypeElt ArgElts[] = { ArgType, ArgType };
-  Type ResultTy = ArgType;
-  return getBuiltinFunction(Id, ArgElts, ResultTy);
+  return getBuiltinFunction(Id, { ArgType, ArgType }, ArgType);
 }
 
 /// Build a declaration for a binary operation with overflow.
@@ -271,7 +254,7 @@ static ValueDecl *getBinaryOperationWithOverflow(Identifier Id,
                                                  Type ArgType) {
   auto &Context = ArgType->getASTContext();
   Type ShouldCheckForOverflowTy = BuiltinIntegerType::get(1, Context);
-  TupleTypeElt ArgElts[] = { ArgType, ArgType, ShouldCheckForOverflowTy };
+  Type ArgElts[] = { ArgType, ArgType, ShouldCheckForOverflowTy };
   Type OverflowBitTy = BuiltinIntegerType::get(1, Context);
   TupleTypeElt ResultElts[] = { ArgType, OverflowBitTy };
   Type ResultTy = TupleType::get(ResultElts, Context);
@@ -279,16 +262,14 @@ static ValueDecl *getBinaryOperationWithOverflow(Identifier Id,
 }
 
 static ValueDecl *getUnaryOperation(Identifier Id, Type ArgType) {
-  TupleTypeElt ArgElts[] = { ArgType };
-  Type ResultTy = ArgType;
-  return getBuiltinFunction(Id, ArgElts, ResultTy);
+  return getBuiltinFunction(Id, { ArgType }, ArgType);
 }
 
 /// Build a binary predicate declaration.
 static ValueDecl *getBinaryPredicate(Identifier Id, Type ArgType) {
   auto &Context = ArgType->getASTContext();
 
-  TupleTypeElt ArgElts[] = { ArgType, ArgType };
+  Type ArgElts[] = { ArgType, ArgType };
   Type ResultTy = BuiltinIntegerType::get(1, Context);
   if (auto VecTy = ArgType->getAs<BuiltinVectorType>()) {
     ResultTy = BuiltinVectorType::get(Context, ResultTy,
@@ -425,8 +406,7 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
     return nullptr;
   }
 
-  TupleTypeElt ArgElts[] = { Input };
-  return getBuiltinFunction(Id, ArgElts, Output);
+  return getBuiltinFunction(Id, { Input }, Output);
 }
 
 static const char * const GenericParamNames[] = {
@@ -481,7 +461,7 @@ namespace {
     SmallVector<ArchetypeType*, 2> Archetypes;
 
     SmallVector<TupleTypeElt, 4> InterfaceParams;
-    SmallVector<TupleTypeElt, 4> BodyParams;
+    SmallVector<Type, 4> BodyParams;
 
     Type InterfaceResult;
     Type BodyResult;
@@ -692,14 +672,13 @@ static ValueDecl *getIsOptionalOperation(ASTContext &Context, Identifier Id) {
 
 static ValueDecl *getAllocOperation(ASTContext &Context, Identifier Id) {
   Type PtrSizeTy = BuiltinIntegerType::getWordType(Context);
-  TupleTypeElt ArgElts[] = { PtrSizeTy, PtrSizeTy };
   Type ResultTy = Context.TheRawPointerType;
-  return getBuiltinFunction(Id, ArgElts, ResultTy);
+  return getBuiltinFunction(Id, { PtrSizeTy, PtrSizeTy }, ResultTy);
 }
 
 static ValueDecl *getDeallocOperation(ASTContext &Context, Identifier Id) {
   auto PtrSizeTy = BuiltinIntegerType::getWordType(Context);
-  TupleTypeElt ArgElts[] = { Context.TheRawPointerType, PtrSizeTy, PtrSizeTy };
+  Type ArgElts[] = { Context.TheRawPointerType, PtrSizeTy, PtrSizeTy };
   Type ResultTy = TupleType::getEmpty(Context);
   return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
@@ -722,32 +701,26 @@ static ValueDecl *getUnexpectedErrorOperation(ASTContext &Context,
 
 static ValueDecl *getCmpXChgOperation(ASTContext &Context, Identifier Id,
                                       Type T) {
-  TupleTypeElt ArgElts[] = { Context.TheRawPointerType, T, T };
+  Type ArgElts[] = { Context.TheRawPointerType, T, T };
   Type BoolTy = BuiltinIntegerType::get(1, Context);
-  TupleTypeElt ResultElts[] = { T, BoolTy };
-  Type ResultTy = TupleType::get(ResultElts, Context);
+  Type ResultTy = TupleType::get({ T, BoolTy }, Context);
   return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
 static ValueDecl *getAtomicRMWOperation(ASTContext &Context, Identifier Id,
                                         Type T) {
-  TupleTypeElt ArgElts[] = { Context.TheRawPointerType, T };
-  Type ResultTy = T;
-  return getBuiltinFunction(Id, ArgElts, ResultTy);
+  return getBuiltinFunction(Id, { Context.TheRawPointerType, T }, T);
 }
 
 static ValueDecl *getAtomicLoadOperation(ASTContext &Context, Identifier Id,
                                          Type T) {
-  TupleTypeElt ArgElts[] = { Context.TheRawPointerType };
-  Type ResultTy = T;
-  return getBuiltinFunction(Id, ArgElts, ResultTy);
+  return getBuiltinFunction(Id, { Type(Context.TheRawPointerType) }, T);
 }
 
 static ValueDecl *getAtomicStoreOperation(ASTContext &Context, Identifier Id,
                                           Type T) {
-  TupleTypeElt ArgElts[] = { Context.TheRawPointerType, T };
-  Type ResultTy = Context.TheEmptyTupleType;
-  return getBuiltinFunction(Id, ArgElts, ResultTy);
+  return getBuiltinFunction(Id, { Context.TheRawPointerType, T },
+                            Context.TheEmptyTupleType);
 }
 
 static ValueDecl *getNativeObjectCast(ASTContext &Context, Identifier Id,
@@ -790,8 +763,6 @@ static ValueDecl *getCastFromBridgeObjectOperation(ASTContext &C,
                                                    Identifier Id,
                                                    BuiltinValueKind BV) {
   Type BridgeTy = C.TheBridgeObjectType;
-  TupleTypeElt ArgElts[] = { BridgeTy };
-  
   switch (BV) {
   case BuiltinValueKind::CastReferenceFromBridgeObject: {
     GenericSignatureBuilder builder(C);
@@ -802,7 +773,7 @@ static ValueDecl *getCastFromBridgeObjectOperation(ASTContext &C,
 
   case BuiltinValueKind::CastBitPatternFromBridgeObject: {
     Type WordTy = BuiltinIntegerType::get(BuiltinIntegerWidth::pointer(), C);
-    return getBuiltinFunction(Id, ArgElts, WordTy);
+    return getBuiltinFunction(Id, { BridgeTy }, WordTy);
   }
       
   default:
@@ -868,16 +839,13 @@ static ValueDecl *getCondFailOperation(ASTContext &C, Identifier Id) {
   // Int1 -> ()
   auto CondTy = BuiltinIntegerType::get(1, C);
   auto VoidTy = TupleType::getEmpty(C);
-  TupleTypeElt CondElt(CondTy);
-  return getBuiltinFunction(Id, CondElt, VoidTy);
+  return getBuiltinFunction(Id, {CondTy}, VoidTy);
 }
 
 static ValueDecl *getAssertConfOperation(ASTContext &C, Identifier Id) {
   // () -> Int32
   auto Int32Ty = BuiltinIntegerType::get(32, C);
-  auto VoidTy = TupleType::getEmpty(C);
-  TupleTypeElt EmptyElt(VoidTy);
-  return getBuiltinFunction(Id, EmptyElt, Int32Ty);
+  return getBuiltinFunction(Id, {}, Int32Ty);
 }
 
 static ValueDecl *getFixLifetimeOperation(ASTContext &C, Identifier Id) {
@@ -899,9 +867,8 @@ static ValueDecl *getExtractElementOperation(ASTContext &Context, Identifier Id,
   if (!IndexTy || !IndexTy->isFixedWidth() || IndexTy->getFixedWidth() != 32)
     return nullptr;
 
-  TupleTypeElt ArgElts[] = { VecTy, IndexTy };
   Type ResultTy = VecTy->getElementType();
-  return getBuiltinFunction(Id, ArgElts, ResultTy);
+  return getBuiltinFunction(Id, { VecTy, IndexTy }, ResultTy);
 }
 
 static ValueDecl *getInsertElementOperation(ASTContext &Context, Identifier Id,
@@ -920,16 +887,15 @@ static ValueDecl *getInsertElementOperation(ASTContext &Context, Identifier Id,
   if (!IndexTy || !IndexTy->isFixedWidth() || IndexTy->getFixedWidth() != 32)
     return nullptr;
 
-  TupleTypeElt ArgElts[] = { VecTy, ElementTy, IndexTy };
-  Type ResultTy = VecTy;
-  return getBuiltinFunction(Id, ArgElts, ResultTy);
+  Type ArgElts[] = { VecTy, ElementTy, IndexTy };
+  return getBuiltinFunction(Id, ArgElts, VecTy);
 }
 
 static ValueDecl *getStaticReportOperation(ASTContext &Context, Identifier Id) {
   auto BoolTy = BuiltinIntegerType::get(1, Context);
   auto MessageTy = Context.TheRawPointerType;
 
-  TupleTypeElt ArgElts[] = { BoolTy, BoolTy, MessageTy };
+  Type ArgElts[] = { BoolTy, BoolTy, MessageTy };
   Type ResultTy = TupleType::getEmpty(Context);
   
   return getBuiltinFunction(Id, ArgElts, ResultTy);
@@ -946,12 +912,10 @@ static ValueDecl *getCheckedTruncOperation(ASTContext &Context,
   if (InTy->getLeastWidth() < OutTy->getGreatestWidth())
     return nullptr;
 
-  TupleTypeElt ArgElts[] = { InTy };
   Type OverflowBitTy = BuiltinIntegerType::get(1, Context);
   TupleTypeElt ResultElts[] = { OutTy, OverflowBitTy };
   Type ResultTy = TupleType::get(ResultElts, Context);
-
-  return getBuiltinFunction(Id, ArgElts, ResultTy);
+  return getBuiltinFunction(Id, { InTy }, ResultTy);
 }
 
 static ValueDecl *getCheckedConversionOperation(ASTContext &Context,
@@ -961,12 +925,10 @@ static ValueDecl *getCheckedConversionOperation(ASTContext &Context,
   if (!BuiltinTy)
     return nullptr;
 
-  TupleTypeElt ArgElts[] = { BuiltinTy };
   Type SignErrorBitTy = BuiltinIntegerType::get(1, Context);
   TupleTypeElt ResultElts[] = { BuiltinTy, SignErrorBitTy };
   Type ResultTy = TupleType::get(ResultElts, Context);
-
-  return getBuiltinFunction(Id, ArgElts, ResultTy);
+  return getBuiltinFunction(Id, { BuiltinTy }, ResultTy);
 }
 
 static ValueDecl *getIntToFPWithOverflowOperation(ASTContext &Context,
@@ -977,10 +939,7 @@ static ValueDecl *getIntToFPWithOverflowOperation(ASTContext &Context,
   if (!InTy || !OutTy)
     return nullptr;
 
-  TupleTypeElt ArgElts[] = { InTy };
-  Type ResultTy = OutTy;
-
-  return getBuiltinFunction(Id, ArgElts, ResultTy);
+  return getBuiltinFunction(Id, { InTy }, OutTy);
 }
 
 static ValueDecl *getUnreachableOperation(ASTContext &Context,
@@ -1001,11 +960,7 @@ static ValueDecl *getOnceOperation(ASTContext &Context,
                                     /*noreturn*/ false, /*throws*/ false);
   
   auto BlockTy = FunctionType::get(VoidTy, VoidTy, Thin);
-  
-  TupleTypeElt InFields[] = {HandleTy, BlockTy};
-  auto OutTy = VoidTy;
-  
-  return getBuiltinFunction(Id, InFields, OutTy);
+  return getBuiltinFunction(Id, {HandleTy, BlockTy}, VoidTy);
 }
 
 static ValueDecl *getTryPinOperation(ASTContext &ctx, Identifier name) {
@@ -1232,7 +1187,7 @@ static Type DecodeIntrinsicType(ArrayRef<llvm::Intrinsic::IITDescriptor> &Table,
 static bool
 getSwiftFunctionTypeForIntrinsic(unsigned iid, ArrayRef<Type> TypeArgs,
                                  ASTContext &Context,
-                                 SmallVectorImpl<TupleTypeElt> &ArgElts,
+                                 SmallVectorImpl<Type> &ArgElts,
                                  Type &ResultTy, FunctionType::ExtInfo &Info) {
   llvm::Intrinsic::ID ID = (llvm::Intrinsic::ID)iid;
   
@@ -1327,7 +1282,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   // If this is the name of an LLVM intrinsic, cons up a swift function with a
   // type that matches the IR types.
   if (unsigned ID = getLLVMIntrinsicID(OperationName, !Types.empty())) {
-    SmallVector<TupleTypeElt, 8> ArgElts;
+    SmallVector<Type, 8> ArgElts;
     Type ResultTy;
     FunctionType::ExtInfo Info;
     if (getSwiftFunctionTypeForIntrinsic(ID, Types, Context, ArgElts, ResultTy,

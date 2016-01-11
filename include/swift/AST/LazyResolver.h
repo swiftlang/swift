@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -129,12 +129,8 @@ public:
   /// Populates the given vector with all member decls for \p D.
   ///
   /// The implementation should add the members to D.
-  ///
-  /// \param[out] hasMissingRequiredMembers If present, set to true if any
-  /// members failed to import and were non-optional protocol requirements.
   virtual void
-  loadAllMembers(Decl *D, uint64_t contextData,
-                 bool *hasMissingRequiredMembers = nullptr) {
+  loadAllMembers(Decl *D, uint64_t contextData) {
     llvm_unreachable("unimplemented");
   }
 

@@ -1,8 +1,8 @@
-//===--- sourcekitd.h - ------------------------------------------*- C++ -*-==//
+//===--- sourcekitd.h - -----------------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -122,7 +122,7 @@ typedef void(^sourcekitd_interrupted_connection_handler_t)(void);
 
 /**
  * \brief Sets the handler which should be called whenever the connection to
- * SourceKit is interupted.
+ * SourceKit is interrupted.
  *
  * The handler should reestablish any necessary state, such as re-opening any
  * documents which were open before the connection was interrupted.

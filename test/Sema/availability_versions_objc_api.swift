@@ -204,7 +204,7 @@ class SubclassOfFrameworkClassConformingToUnannotatedFrameworkProtocol : Framewo
 }
 
 @available(OSX 10.11, *)
-class SubclassOfLaterFameworkClassConformingToUnannotatedFrameworkProtocol : LaterFrameworkClassConformingToUnannotatedFrameworkProtocol {
+class SubclassOfLaterFrameworkClassConformingToUnannotatedFrameworkProtocol : LaterFrameworkClassConformingToUnannotatedFrameworkProtocol {
   @available(OSX 10.11, *)
   override func doSomethingWithNonNullableClass(k: AnnotatedFrameworkClass) {
   }

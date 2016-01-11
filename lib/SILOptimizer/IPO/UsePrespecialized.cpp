@@ -1,8 +1,8 @@
-//===------- UsePrespecialized.cpp - use pre-specialized functions -------===//
+//===--- UsePrespecialized.cpp - use pre-specialized functions ------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -99,12 +99,12 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
       continue;
 
     // Create a name of the specialization.
-    llvm::SmallString<64> ClonedName;
+    std::string ClonedName;
     {
-      llvm::raw_svector_ostream buffer(ClonedName);
-      Mangle::Mangler M(buffer);
-      Mangle::GenericSpecializationMangler Mangler(M, ReferencedF, Subs);
+      Mangle::Mangler M;
+      GenericSpecializationMangler Mangler(M, ReferencedF, Subs);
       Mangler.mangle();
+      ClonedName = M.finalize();
     }
 
     SILFunction *NewF = nullptr;
@@ -123,7 +123,7 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     if (!NewF)
       continue;
 
-    // An existing specializaiton was found.
+    // An existing specialization was found.
     DEBUG(
         llvm::dbgs() << "Found a specialization of " << ReferencedF->getName()
         << " : " << NewF->getName() << "\n");

@@ -14,7 +14,7 @@ struct SpuriousSemi {
 }
 
 class C {
-  var a : Int = 10;
+  var a : Int = 10
   func b () {};
   class func c () {};
 }

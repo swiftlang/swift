@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -21,6 +21,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
+#include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
@@ -106,7 +107,7 @@ Type Solution::computeSubstitutions(
   auto currentModule = getConstraintSystem().DC->getParentModule();
   ArchetypeType *currentArchetype = nullptr;
   Type currentReplacement;
-  SmallVector<ProtocolConformance *, 4> currentConformances;
+  SmallVector<ProtocolConformanceRef, 4> currentConformances;
 
   ArrayRef<Requirement> requirements;
   if (auto genericFn = origType->getAs<GenericFunctionType>()) {
@@ -149,7 +150,8 @@ Type Solution::computeSubstitutions(
         (void)conforms;
 
         assert(conformance || replacement->hasDependentProtocolConformances());
-        currentConformances.push_back(conformance);
+        currentConformances.push_back(
+                    ProtocolConformanceRef(protoType->getDecl(), conformance));
 
         break;
       }
@@ -163,7 +165,6 @@ Type Solution::computeSubstitutions(
       // Flush the current conformances.
       if (currentArchetype) {
         substitutions.push_back({
-          currentArchetype,
           currentReplacement,
           ctx.AllocateCopy(currentConformances)
         });
@@ -182,7 +183,6 @@ Type Solution::computeSubstitutions(
   // Flush the final conformances.
   if (currentArchetype) {
     substitutions.push_back({
-      currentArchetype,
       currentReplacement,
       ctx.AllocateCopy(currentConformances),
     });
@@ -239,7 +239,7 @@ static DeclTy *findNamedWitnessImpl(TypeChecker &tc, DeclContext *dc, Type type,
   if (!conforms)
     return nullptr;
 
-  // For an type with dependent conformance, just return the requirement from
+  // For a type with dependent conformance, just return the requirement from
   // the protocol. There are no protocol conformance tables.
   if (type->hasDependentProtocolConformances()) {
     return requirement;
@@ -787,12 +787,11 @@ namespace {
              (cast<FuncDecl>(func)->hasDynamicSelf() ||
               (openedExistential && cast<FuncDecl>(func)->hasArchetypeSelf()))) ||
             isPolymorphicConstructor(func)) {
-          refTy = refTy->replaceCovariantResultType(
-                    containerTy,
-                    func->getNumParamPatterns());
+          refTy = refTy->replaceCovariantResultType(containerTy,
+                    func->getNumParameterLists());
           dynamicSelfFnType = refTy->replaceCovariantResultType(
                                 baseTy,
-                                func->getNumParamPatterns());
+                                func->getNumParameterLists());
 
           if (openedExistential) {
             // Replace the covariant result type in the opened type. We need to
@@ -803,7 +802,7 @@ namespace {
               openedType = optObject;
             openedType = openedType->replaceCovariantResultType(
                            baseTy,
-                           func->getNumParamPatterns()-1);
+                           func->getNumParameterLists()-1);
             if (optKind != OptionalTypeKind::OTK_None)
               openedType = OptionalType::get(optKind, openedType);
           }
@@ -1371,20 +1370,18 @@ namespace {
       // Form a reference to the function. The bridging operations are generic,
       // so we need to form substitutions and compute the resulting type.
       auto Conformances =
-        tc.Context.Allocate<ProtocolConformance *>(conformance ? 1 : 0);
+        tc.Context.AllocateUninitialized<ProtocolConformanceRef>(
+                                                          conformance ? 1 : 0);
 
-      if (conformsToBridgedToObjectiveC)
-        Conformances[0] = conformance;
-
+      if (conformsToBridgedToObjectiveC) {
+        Conformances[0] = ProtocolConformanceRef(bridgedProto, conformance);
+      }
 
       auto fnGenericParams
         = fn->getGenericSignatureOfContext()->getGenericParams();
-      auto firstArchetype
-        = ArchetypeBuilder::mapTypeIntoContext(fn, fnGenericParams[0])
-            ->castTo<ArchetypeType>();
 
       SmallVector<Substitution, 2> Subs;
-      Substitution sub(firstArchetype, valueType, Conformances);
+      Substitution sub(valueType, Conformances);
       Subs.push_back(sub);
 
       // Add substitution for the dependent type T._ObjectiveCType.
@@ -1393,19 +1390,11 @@ namespace {
         auto objcAssocType = cast<AssociatedTypeDecl>(
                                conformance->getProtocol()->lookupDirect(
                                  objcTypeId).front());
-        auto objcDepType = DependentMemberType::get(fnGenericParams[0],
-                                                    objcAssocType,
-                                                    tc.Context);
-        auto objcArchetype
-          = ArchetypeBuilder::mapTypeIntoContext(fn, objcDepType)
-            ->castTo<ArchetypeType>();
-
         const Substitution &objcSubst = conformance->getTypeWitness(
                                           objcAssocType, &tc);
 
         // Create a substitution for the dependent type.
         Substitution newDepTypeSubst(
-                       objcArchetype,
                        objcSubst.getReplacement(),
                        objcSubst.getConformances());
 
@@ -3426,7 +3415,7 @@ getCallerDefaultArg(TypeChecker &tc, DeclContext *dc,
                     unsigned index) {
   auto ownerFn = cast<AbstractFunctionDecl>(owner.getDecl());
   auto defArg = ownerFn->getDefaultArg(index);
-  MagicIdentifierLiteralExpr::Kind magicKind;
+  Expr *init = nullptr;
   switch (defArg.first) {
   case DefaultArgumentKind::None:
     llvm_unreachable("No default argument here?");
@@ -3440,30 +3429,51 @@ getCallerDefaultArg(TypeChecker &tc, DeclContext *dc,
     return getCallerDefaultArg(tc, dc, loc, owner, index);
 
   case DefaultArgumentKind::Column:
-    magicKind = MagicIdentifierLiteralExpr::Column;
+    init = new (tc.Context) MagicIdentifierLiteralExpr(
+                              MagicIdentifierLiteralExpr::Column, loc,
+                              /*Implicit=*/true);
     break;
 
   case DefaultArgumentKind::File:
-    magicKind = MagicIdentifierLiteralExpr::File;
+    init = new (tc.Context) MagicIdentifierLiteralExpr(
+                              MagicIdentifierLiteralExpr::File, loc,
+                              /*Implicit=*/true);
     break;
     
   case DefaultArgumentKind::Line:
-    magicKind = MagicIdentifierLiteralExpr::Line;
+    init = new (tc.Context) MagicIdentifierLiteralExpr(
+                              MagicIdentifierLiteralExpr::Line, loc,
+                              /*Implicit=*/true);
     break;
       
   case DefaultArgumentKind::Function:
-    magicKind = MagicIdentifierLiteralExpr::Function;
+    init = new (tc.Context) MagicIdentifierLiteralExpr(
+                              MagicIdentifierLiteralExpr::Function, loc,
+                              /*Implicit=*/true);
     break;
 
   case DefaultArgumentKind::DSOHandle:
-    magicKind = MagicIdentifierLiteralExpr::DSOHandle;
+    init = new (tc.Context) MagicIdentifierLiteralExpr(
+                              MagicIdentifierLiteralExpr::DSOHandle, loc,
+                              /*Implicit=*/true);
+    break;
+
+  case DefaultArgumentKind::Nil:
+    init = new (tc.Context) NilLiteralExpr(loc, /*Implicit=*/true);
+    break;
+
+  case DefaultArgumentKind::EmptyArray:
+    init = ArrayExpr::create(tc.Context, loc, {}, {}, loc);
+    init->setImplicit();
+    break;
+
+  case DefaultArgumentKind::EmptyDictionary:
+    init = DictionaryExpr::create(tc.Context, loc, {}, loc);
+    init->setImplicit();
     break;
   }
 
-  // Create the default argument, which is a converted magic identifier
-  // literal expression.
-  Expr *init = new (tc.Context) MagicIdentifierLiteralExpr(magicKind, loc,
-                                                           /*Implicit=*/true);
+  // Convert the literal to the appropriate type.
   bool invalid = tc.typeCheckExpression(init, dc, defArg.second,CTP_CannotFail);
   assert(!invalid && "conversion cannot fail");
   (void)invalid;
@@ -3600,7 +3610,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
                                            toElt.getDefaultArgKind(),
                                            toElt.isVararg()));
       fromTupleExprFields[sources[i]] = fromElt;
-      hasInits |= toElt.hasInit();
+      hasInits |= toElt.hasDefaultArg();
       continue;
     }
 
@@ -3632,7 +3642,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
                                                    fromElt.getName(),
                                                    fromElt.getDefaultArgKind(),
                                                    fromElt.isVararg());
-    hasInits |= toElt.hasInit();
+    hasInits |= toElt.hasDefaultArg();
   }
 
   // Convert all of the variadic arguments to the destination type.
@@ -3761,7 +3771,7 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
   bool hasInit = false;
   int i = 0;
   for (auto &field : toTuple->getElements()) {
-    if (field.hasInit()) {
+    if (field.hasDefaultArg()) {
       hasInit = true;
       break;
     }
@@ -3813,7 +3823,7 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
       continue;
     }
 
-    assert(field.hasInit() && "Expected a default argument");
+    assert(field.hasDefaultArg() && "Expected a default argument");
 
     ConcreteDeclRef argOwner;
     // Dig out the owner of the default arguments.
@@ -3864,22 +3874,22 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
 /// because most protocols do not conform to themselves -- however we still
 /// allow the conversion here, except the ErasureExpr ends up with trivial
 /// conformances.
-static ArrayRef<ProtocolConformance*>
+static ArrayRef<ProtocolConformanceRef>
 collectExistentialConformances(TypeChecker &tc, Type fromType, Type toType,
                                DeclContext *DC) {
   SmallVector<ProtocolDecl *, 4> protocols;
   toType->getAnyExistentialTypeProtocols(protocols);
 
-  SmallVector<ProtocolConformance *, 4> conformances;
+  SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : protocols) {
-    ProtocolConformance *conformance;
+    ProtocolConformance *concrete;
     bool conforms = tc.containsProtocol(fromType, proto, DC,
                                         (ConformanceCheckFlags::InExpression|
                                          ConformanceCheckFlags::Used),
-                                        &conformance);
+                                        &concrete);
     assert(conforms && "Type does not conform to protocol?");
     (void)conforms;
-    conformances.push_back(conformance);
+    conformances.push_back(ProtocolConformanceRef(proto, concrete));
   }
 
   return tc.Context.AllocateCopy(conformances);
@@ -4697,10 +4707,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       if (tc.typeCheckExpressionShallow(call, dc))
         return nullptr;
       
-      // The return type of _bridgeErrorTypeToNSError is formally 'AnyObject' to avoid
-      // stdlib-to-Foundation dependencies, but it's really NSError.
+      // The return type of _bridgeErrorTypeToNSError is formally 'AnyObject' to
+      // avoid stdlib-to-Foundation dependencies, but it's really NSError.
       // Abuse CovariantReturnConversionExpr to fix this.
-      
       return new (tc.Context) CovariantReturnConversionExpr(call, toType);
     }
 
@@ -4837,11 +4846,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       auto discriminator = AutoClosureExpr::InvalidDiscriminator;
       auto closure = new (tc.Context) AutoClosureExpr(expr, toType,
                                                       discriminator, dc);
-      Pattern *pattern = TuplePattern::create(tc.Context, expr->getLoc(),
-                                              ArrayRef<TuplePatternElt>(),
-                                              expr->getLoc());
-      pattern->setType(TupleType::getEmpty(tc.Context));
-      closure->setParams(pattern);
+      closure->setParameterList(ParameterList::createEmpty(tc.Context));
 
       // Compute the capture list, now that we have analyzed the expression.
       tc.ClosuresWithUncomputedCaptures.push_back(closure);
@@ -5460,9 +5465,7 @@ diagnoseArgumentLabelError(Expr *expr, ArrayRef<Identifier> newNames,
       continue;
     }
 
-    tok newNameKind =
-      Lexer::kindOfIdentifier(newName.str(), /*inSILMode=*/false);
-    bool newNameIsReserved = newNameKind != tok::identifier;
+    bool newNameIsReserved = !canBeArgumentLabel(newName.str());
     llvm::SmallString<16> newStr;
     if (newNameIsReserved)
       newStr += "`";
@@ -5673,16 +5676,9 @@ namespace {
 
         // Coerce the pattern, in case we resolved something.
         auto fnType = closure->getType()->castTo<FunctionType>();
-        Pattern *params = closure->getParams();
-        TypeResolutionOptions TROptions;
-        TROptions |= TR_OverrideType;
-        TROptions |= TR_FromNonInferredPattern;
-        TROptions |= TR_InExpression;
-        TROptions |= TR_ImmediateFunctionInput;
-        if (tc.coercePatternToType(params, closure, fnType->getInput(),
-                                   TROptions))
+        auto *params = closure->getParameters();
+        if (tc.coerceParameterListToType(params, closure, fnType->getInput()))
           return { false, nullptr };
-        closure->setParams(params);
 
         // If this is a single-expression closure, convert the expression
         // in the body to the result type of the closure.
@@ -6219,10 +6215,9 @@ static bool isVariadicWitness(AbstractFunctionDecl *afd) {
   if (afd->getExtensionType())
     ++index;
 
-  auto params = afd->getBodyParamPatterns()[index];
-  if (auto *tuple = dyn_cast<TuplePattern>(params)) {
-    return tuple->hasAnyEllipsis();
-  }
+  for (auto param : *afd->getParameterList(index))
+    if (param->isVariadic())
+      return true;
 
   return false;
 }
@@ -6499,13 +6494,8 @@ Expr *Solution::convertOptionalToBool(Expr *expr,
   // Form a reference to the function. This library intrinsic is generic, so we
   // need to form substitutions and compute the resulting type.
   auto unwrappedOptionalType = expr->getType()->getOptionalObjectType();
-  auto fnGenericParams
-    = fn->getGenericSignatureOfContext()->getGenericParams();
-  auto firstArchetype
-    = ArchetypeBuilder::mapTypeIntoContext(fn, fnGenericParams[0])
-        ->castTo<ArchetypeType>();
 
-  Substitution sub(firstArchetype, unwrappedOptionalType, {});
+  Substitution sub(unwrappedOptionalType, {});
   ConcreteDeclRef fnSpecRef(ctx, fn, sub);
   auto *fnRef =
       new (ctx) DeclRefExpr(fnSpecRef, SourceLoc(), /*Implicit=*/true);

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -135,9 +135,9 @@ public struct StrideToGenerator<Element : Strideable> : GeneratorType {
     if stride > 0 ? current >= end : current <= end {
       return nil
     }
-    let ret = current
+    let result = current
     current += stride
-    return ret
+    return result
   }
 }
 
@@ -209,9 +209,9 @@ public struct StrideThroughGenerator<Element : Strideable> : GeneratorType {
       }
       return nil
     }
-    let ret = current
+    let result = current
     current += stride
-    return ret
+    return result
   }
 }
 

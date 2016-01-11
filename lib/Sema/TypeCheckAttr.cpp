@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -685,8 +685,8 @@ public:
 
 
 static bool checkObjectOrOptionalObjectType(TypeChecker &TC, Decl *D,
-                                            const Pattern *argPattern) {
-  Type ty = argPattern->getType();
+                                            ParamDecl *param) {
+  Type ty = param->getType();
   if (auto unwrapped = ty->getAnyOptionalObjectType())
     ty = unwrapped;
 
@@ -694,8 +694,8 @@ static bool checkObjectOrOptionalObjectType(TypeChecker &TC, Decl *D,
     // @objc class types are okay.
     if (!classDecl->isObjC()) {
       TC.diagnose(D, diag::ibaction_nonobjc_class_argument,
-                  argPattern->getType())
-        .highlight(argPattern->getSourceRange());
+                  param->getType())
+        .highlight(param->getSourceRange());
       return true;
     }
   } else if (ty->isObjCExistentialType()) {
@@ -704,8 +704,8 @@ static bool checkObjectOrOptionalObjectType(TypeChecker &TC, Decl *D,
   } else {
     // No other types are permitted.
     TC.diagnose(D, diag::ibaction_nonobject_argument,
-                argPattern->getSemanticsProvidingPattern()->getType())
-      .highlight(argPattern->getSourceRange());
+                param->getType())
+      .highlight(param->getSourceRange());
     return true;
   }
 
@@ -735,64 +735,50 @@ void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
     return;
   }
 
-  auto Arguments = FD->getBodyParamPatterns()[1];
-  auto ArgTuple = dyn_cast<TuplePattern>(Arguments);
-
-  auto checkSingleArgument = [this](const Pattern *argPattern) -> bool {
+  auto paramList = FD->getParameterList(1);
+  bool relaxedIBActionUsedOnOSX = false;
+  bool Valid = true;
+  switch (paramList->size()) {
+  case 0:
+    // (iOS only) No arguments.
+    if (!isRelaxedIBAction(TC)) {
+      relaxedIBActionUsedOnOSX = true;
+      break;
+    }
+    break;
+  case 1:
     // One argument. May be a scalar on iOS/watchOS (because of WatchKit).
     if (isRelaxedIBAction(TC)) {
       // Do a rough check to allow any ObjC-representable struct or enum type
       // on iOS.
-      Type ty = argPattern->getType();
+      Type ty = paramList->get(0)->getType();
       if (auto nominal = ty->getAnyNominal())
         if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))
           if (nominal->classifyAsOptionalType() == OTK_None)
             if (TC.isTriviallyRepresentableInObjC(cast<FuncDecl>(D), ty))
-              return false;
+              break;  // Looks ok.
     }
-    return checkObjectOrOptionalObjectType(TC, D, argPattern);
-  };
-
-  bool relaxedIBActionUsedOnOSX = false;
-  bool Valid = true;
-  if (ArgTuple) {
-    auto fields = ArgTuple->getElements();
-    switch (ArgTuple->getNumElements()) {
-    case 0:
-      // (iOS only) No arguments.
-      if (!isRelaxedIBAction(TC)) {
-        relaxedIBActionUsedOnOSX = true;
-        break;
-      }
-      break;
-    case 1:
-      // One argument, see above.
-      if (checkSingleArgument(fields[0].getPattern()))
-        Valid = false;
-      break;
-    case 2:
-      // (iOS/watchOS only) Two arguments, the second of which is a UIEvent.
-      // We don't currently enforce the UIEvent part.
-      if (!isRelaxedIBAction(TC)) {
-        relaxedIBActionUsedOnOSX = true;
-        break;
-      }
-      if (checkObjectOrOptionalObjectType(TC, D, fields[0].getPattern()))
-        Valid = false;
-      if (checkObjectOrOptionalObjectType(TC, D, fields[1].getPattern()))
-        Valid = false;
-      break;
-    default:
-      // No platform allows an action signature with more than two arguments.
-      TC.diagnose(D, diag::invalid_ibaction_argument_count,
-                  isRelaxedIBAction(TC));
+    if (checkObjectOrOptionalObjectType(TC, D, paramList->get(0)))
       Valid = false;
+    break;
+  case 2:
+    // (iOS/watchOS only) Two arguments, the second of which is a UIEvent.
+    // We don't currently enforce the UIEvent part.
+    if (!isRelaxedIBAction(TC)) {
+      relaxedIBActionUsedOnOSX = true;
       break;
     }
-  } else {
-    // One argument without a name.
-    if (checkSingleArgument(Arguments))
+    if (checkObjectOrOptionalObjectType(TC, D, paramList->get(0)))
       Valid = false;
+    if (checkObjectOrOptionalObjectType(TC, D, paramList->get(1)))
+      Valid = false;
+    break;
+  default:
+    // No platform allows an action signature with more than two arguments.
+    TC.diagnose(D, diag::invalid_ibaction_argument_count,
+                isRelaxedIBAction(TC));
+    Valid = false;
+    break;
   }
 
   if (relaxedIBActionUsedOnOSX) {
@@ -1231,9 +1217,10 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
   // 'rethrows' only applies to functions that take throwing functions
   // as parameters.
   auto fn = cast<AbstractFunctionDecl>(D);
-  for (auto param : fn->getBodyParamPatterns()) {
-    if (hasThrowingFunctionParameter(param->getType()->getCanonicalType()))
-      return;
+  for (auto paramList : fn->getParameterLists()) {
+    for (auto param : *paramList)
+      if (hasThrowingFunctionParameter(param->getType()->getCanonicalType()))
+        return;
   }
 
   TC.diagnose(attr->getLocation(), diag::rethrows_without_throwing_parameter);

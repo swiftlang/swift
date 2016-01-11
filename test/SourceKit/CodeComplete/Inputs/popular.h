@@ -7,7 +7,7 @@
 @end
 @interface DDModuleColor
 @end
-@interface ModuleColaborate
+@interface ModuleCollaborate
 @end
 
 @interface BY_NAME_BAD1

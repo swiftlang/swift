@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -35,7 +35,7 @@ namespace {
 /// The GlobalPropertyOpt performs an analysis on the whole module to determine
 /// the values of high-level properties.
 ///
-/// Currently only one property is handled and thats the isNativeTypeChecked
+/// Currently only one property is handled and that's the isNativeTypeChecked
 /// property for arrays. If the property can be proved to be true, the
 /// corresponding semantics-call is replaced by a true-literal.
 class GlobalPropertyOpt {
@@ -174,7 +174,7 @@ class GlobalPropertyOpt {
     if (auto *SEI = dyn_cast<StructElementAddrInst>(def)) {
       return getFieldEntry(SEI->getField());
     }
-    if (isa<AllocStackInst>(def) && value.getResultNumber() == 1) {
+    if (isa<AllocStackInst>(def)) {
       Entry * &entry = ValueEntries[value];
       if (!entry) {
         entry = new (EntryAllocator.Allocate()) Entry(value, nullptr);

@@ -92,8 +92,8 @@ func rethrowsDispatchError(handleError: ((ErrorType) throws -> ()), body: () thr
 
 // <rdar://problem/21432429> Calling rethrows from rethrows crashes Swift compiler
 struct r21432429 {
-  func x(f: () throws ->()) rethrows {}
-  func y(f: () throws ->()) rethrows {
+  func x(f: () throws -> ()) rethrows {}
+  func y(f: () throws -> ()) rethrows {
     x(f)  // expected-error {{call can throw but is not marked with 'try'}} expected-note {{call is to 'rethrows' function, but argument function can throw}}
   }
 }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -83,7 +83,7 @@ public:
   DeclContext *CurDeclContext;
   ASTContext &Context;
   CodeCompletionCallbacks *CodeCompletion = nullptr;
-  std::vector<std::pair<SourceLoc, std::vector<VarDecl*>>> AnonClosureVars;
+  std::vector<std::pair<SourceLoc, std::vector<ParamDecl*>>> AnonClosureVars;
 
   bool IsParsingInterfaceTokens = false;
   
@@ -448,10 +448,11 @@ public:
   void skipUntil(tok T1, tok T2 = tok::unknown);
   void skipUntilAnyOperator();
 
-  /// \brief Skip until a token that starts with '>'.  Applies heuristics that
-  /// are suitable when trying to find the end of a list of generic parameters,
-  /// generic arguments, or list of types in a protocol composition.
-  void skipUntilGreaterInTypeList(bool protocolComposition=false);
+  /// \brief Skip until a token that starts with '>', and consume it if found.
+  /// Applies heuristics that are suitable when trying to find the end of a list
+  /// of generic parameters, generic arguments, or list of types in a protocol
+  /// composition.
+  SourceLoc skipUntilGreaterInTypeList(bool protocolComposition = false);
 
   /// skipUntilDeclStmtRBrace - Skip to the next decl or '}'.
   void skipUntilDeclRBrace();
@@ -760,18 +761,18 @@ public:
     void record(Parser &P, AbstractStorageDecl *storage, bool invalid,
                 ParseDeclOptions flags, SourceLoc staticLoc,
                 const DeclAttributes &attrs,
-                TypeLoc elementTy, Pattern *indices,
+                TypeLoc elementTy, ParameterList *indices,
                 SmallVectorImpl<Decl *> &decls);
   };
 
   bool parseGetSetImpl(ParseDeclOptions Flags,
-                       Pattern *Indices, TypeLoc ElementTy,
+                       ParameterList *Indices, TypeLoc ElementTy,
                        ParsedAccessors &accessors,
                        SourceLoc &LastValidLoc,
                        SourceLoc StaticLoc, SourceLoc VarLBLoc,
                        SmallVectorImpl<Decl *> &Decls);
   bool parseGetSet(ParseDeclOptions Flags,
-                   Pattern *Indices, TypeLoc ElementTy,
+                   ParameterList *Indices, TypeLoc ElementTy,
                    ParsedAccessors &accessors,
                    SourceLoc StaticLoc, SmallVectorImpl<Decl *> &Decls);
   void recordAccessors(AbstractStorageDecl *storage, ParseDeclOptions flags,
@@ -803,6 +804,7 @@ public:
   parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes);
 
   void addPatternVariablesToScope(ArrayRef<Pattern *> Patterns);
+  void addParametersToScope(ParameterList *PL);
 
   ParserResult<OperatorDecl> parseDeclOperator(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
@@ -859,7 +861,7 @@ public:
 
   ParserResult<ProtocolCompositionTypeRepr> parseTypeComposition();
   ParserResult<TupleTypeRepr> parseTypeTupleBody();
-  ParserResult<ArrayTypeRepr> parseTypeArray(TypeRepr *Base);
+  ParserResult<TypeRepr> parseTypeArray(TypeRepr *Base);
 
   /// Parse a collection type.
   ///   type-simple:
@@ -900,8 +902,8 @@ public:
     /// function.
     void setFunctionContext(DeclContext *DC);
     
-    DefaultArgumentInfo() {
-      NextIndex = 0;
+    DefaultArgumentInfo(bool inTypeContext) {
+      NextIndex = inTypeContext ? 1 : 0;
       HasDefaultArgument = false;
     }
   };
@@ -921,10 +923,6 @@ public:
       InOut
     };
     SpecifierKindTy SpecifierKind = Let; // Defaults to let.
-
-    
-    /// The location of the back-tick preceding the first name, if any.
-    SourceLoc PoundLoc;
 
     /// The location of the first name.
     ///
@@ -997,23 +995,23 @@ public:
                                     DefaultArgumentInfo *defaultArgs,
                                     ParameterContextKind paramContext);
 
-  ParserResult<Pattern> parseSingleParameterClause(
+  ParserResult<ParameterList> parseSingleParameterClause(
                           ParameterContextKind paramContext,
                           SmallVectorImpl<Identifier> *namePieces = nullptr);
 
   ParserStatus parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
-                                      SmallVectorImpl<Pattern*> &BodyPatterns,
+                                    SmallVectorImpl<ParameterList*> &BodyParams,
                                       ParameterContextKind paramContext,
                                       DefaultArgumentInfo &defaultArgs);
   ParserStatus parseFunctionSignature(Identifier functionName,
                                       DeclName &fullName,
-                                      SmallVectorImpl<Pattern *> &bodyPatterns,
+                              SmallVectorImpl<ParameterList *> &bodyParams,
                                       DefaultArgumentInfo &defaultArgs,
                                       SourceLoc &throws,
                                       bool &rethrows,
                                       TypeRepr *&retType);
   ParserStatus parseConstructorArguments(DeclName &FullName,
-                                         Pattern *&BodyPattern,
+                                         ParameterList *&BodyParams,
                                          DefaultArgumentInfo &defaultArgs);
 
   //===--------------------------------------------------------------------===//
@@ -1137,7 +1135,7 @@ public:
   /// \returns true if an error occurred, false otherwise.
   bool parseClosureSignatureIfPresent(
                                 SmallVectorImpl<CaptureListEntry> &captureList,
-                                      Pattern *&params,
+                                      ParameterList *&params,
                                       SourceLoc &throwsLoc,
                                       SourceLoc &arrowLoc,
                                       TypeRepr *&explicitResultType,
@@ -1193,9 +1191,9 @@ public:
   //===--------------------------------------------------------------------===//
   // Generics Parsing
 
-  GenericParamList *parseGenericParameters();
-  GenericParamList *parseGenericParameters(SourceLoc LAngleLoc);
-  GenericParamList *maybeParseGenericParams();
+  ParserResult<GenericParamList> parseGenericParameters();
+  ParserResult<GenericParamList> parseGenericParameters(SourceLoc LAngleLoc);
+  ParserResult<GenericParamList> maybeParseGenericParams();
   bool parseGenericWhereClause(SourceLoc &WhereLoc,
                                SmallVectorImpl<RequirementRepr> &Requirements);
 

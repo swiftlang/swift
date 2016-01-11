@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -111,9 +111,8 @@ swift::ArraySemanticsCall::ArraySemanticsCall(ValueBase *V,
   if (auto *AI = dyn_cast<ApplyInst>(V))
     if (auto *Fn = AI->getCalleeFunction())
       if ((MatchPartialName &&
-           (Fn->hasDefinedSemantics() &&
-            Fn->getSemanticsString().startswith(SemanticStr))) ||
-          (!MatchPartialName && Fn->hasSemanticsString(SemanticStr))) {
+           Fn->hasSemanticsAttrsThatStartsWith(SemanticStr)) ||
+          (!MatchPartialName && Fn->hasSemanticsAttr(SemanticStr))) {
         SemanticsCall = AI;
         // Need a 'self' argument otherwise this is not a semantic call that
         // we recognize.
@@ -137,22 +136,32 @@ ArrayCallKind swift::ArraySemanticsCall::getKind() const {
   auto F = cast<FunctionRefInst>(SemanticsCall->getCallee())
                ->getReferencedFunction();
 
-  auto Kind =
-      llvm::StringSwitch<ArrayCallKind>(F->getSemanticsString())
-          .Case("array.props.isNativeTypeChecked",
-                ArrayCallKind::kArrayPropsIsNativeTypeChecked)
-          .Case("array.init", ArrayCallKind::kArrayInit)
-          .Case("array.uninitialized", ArrayCallKind::kArrayUninitialized)
-          .Case("array.check_subscript", ArrayCallKind::kCheckSubscript)
-          .Case("array.check_index", ArrayCallKind::kCheckIndex)
-          .Case("array.get_count", ArrayCallKind::kGetCount)
-          .Case("array.get_capacity", ArrayCallKind::kGetCapacity)
-          .Case("array.get_element", ArrayCallKind::kGetElement)
-          .Case("array.owner", ArrayCallKind::kGetArrayOwner)
-          .Case("array.make_mutable", ArrayCallKind::kMakeMutable)
-          .Case("array.get_element_address", ArrayCallKind::kGetElementAddress)
-          .Case("array.mutate_unknown", ArrayCallKind::kMutateUnknown)
-          .Default(ArrayCallKind::kNone);
+  ArrayCallKind Kind = ArrayCallKind::kNone;
+
+  for (auto &Attrs : F->getSemanticsAttrs()) {
+    auto Tmp =
+        llvm::StringSwitch<ArrayCallKind>(Attrs)
+            .Case("array.props.isNativeTypeChecked",
+                  ArrayCallKind::kArrayPropsIsNativeTypeChecked)
+            .Case("array.init", ArrayCallKind::kArrayInit)
+            .Case("array.uninitialized", ArrayCallKind::kArrayUninitialized)
+            .Case("array.check_subscript", ArrayCallKind::kCheckSubscript)
+            .Case("array.check_index", ArrayCallKind::kCheckIndex)
+            .Case("array.get_count", ArrayCallKind::kGetCount)
+            .Case("array.get_capacity", ArrayCallKind::kGetCapacity)
+            .Case("array.get_element", ArrayCallKind::kGetElement)
+            .Case("array.owner", ArrayCallKind::kGetArrayOwner)
+            .Case("array.make_mutable", ArrayCallKind::kMakeMutable)
+            .Case("array.get_element_address",
+                  ArrayCallKind::kGetElementAddress)
+            .Case("array.mutate_unknown", ArrayCallKind::kMutateUnknown)
+            .Default(ArrayCallKind::kNone);
+    if (Tmp != ArrayCallKind::kNone) {
+      assert(Kind == ArrayCallKind::kNone && "Multiple array semantic "
+                                             "strings?!");
+      Kind = Tmp;
+    }
+  }
 
   return Kind;
 }
@@ -506,11 +515,11 @@ bool swift::ArraySemanticsCall::mayHaveBridgedObjectElementType() const {
   assert(hasSelf() && "Need self parameter");
 
   auto Ty = getSelf().getType().getSwiftRValueType();
-  auto Cannonical = Ty.getCanonicalTypeOrNull();
-  if (Cannonical.isNull())
+  auto Canonical = Ty.getCanonicalTypeOrNull();
+  if (Canonical.isNull())
     return true;
 
-  auto *Struct = Cannonical->getStructOrBoundGenericStruct();
+  auto *Struct = Canonical->getStructOrBoundGenericStruct();
   assert(Struct && "Array must be a struct !?");
   if (Struct) {
     auto BGT = dyn_cast<BoundGenericType>(Ty);
@@ -622,7 +631,7 @@ bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
   if (!ASI)
     return false;
 
-  // Expect a check_subscript call or the empty dependence dependence.
+  // Expect a check_subscript call or the empty dependence.
   auto SubscriptCheck = SemanticsCall->getArgument(3);
   ArraySemanticsCall Check(SubscriptCheck.getDef(), "array.check_subscript");
   auto *EmptyDep = dyn_cast<StructInst>(SubscriptCheck);

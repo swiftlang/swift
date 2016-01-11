@@ -1,6 +1,21 @@
 #!/usr/bin/env python
-#convert line numbers in error messages according to "line directive" comments
-import os
+# line-directive.py - Transform line numbers in error messages -*- python -*-
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See http://swift.org/LICENSE.txt for license information
+# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+#
+# ----------------------------------------------------------------------------
+#
+# Converts line numbers in error messages according to "line directive"
+# comments.
+#
+# ----------------------------------------------------------------------------
+
 import sys
 import re
 import bisect
@@ -56,7 +71,10 @@ def run():
         sources = sys.argv[1:dashes]
 
         command = subprocess.Popen(
-            sys.argv[dashes + 1:], stderr = subprocess.STDOUT, stdout = subprocess.PIPE
+            sys.argv[dashes + 1:],
+            stderr = subprocess.STDOUT,
+            stdout = subprocess.PIPE,
+            universal_newlines = True
         )
         
         error_pattern = re.compile(

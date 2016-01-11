@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -216,7 +216,7 @@ void PartialApplyCombiner::allocateTemporaries() {
                                            {/*Constant*/ true, AI});
       Builder.setInsertionPoint(PAI);
       // Copy argument into this temporary.
-      Builder.createCopyAddr(PAI->getLoc(), Arg, SILValue(Tmp, 1),
+      Builder.createCopyAddr(PAI->getLoc(), Arg, Tmp,
                               IsTake_t::IsNotTake,
                               IsInitialization_t::IsInitialization);
 
@@ -262,12 +262,11 @@ void PartialApplyCombiner::releaseTemporaries() {
       continue;
     for (auto *EndPoint : Lifetime.LastUsers) {
       Builder.setInsertionPoint(next(SILBasicBlock::iterator(EndPoint)));
-      auto TmpAddr = SILValue(Op.getDef(), 1);
       if (!TmpType.isAddressOnly(PAI->getModule())) {
-        auto *Load = Builder.createLoad(PAI->getLoc(), TmpAddr);
+        auto *Load = Builder.createLoad(PAI->getLoc(), Op);
         Builder.createReleaseValue(PAI->getLoc(), Load);
       } else {
-        Builder.createDestroyAddr(PAI->getLoc(), TmpAddr);
+        Builder.createDestroyAddr(PAI->getLoc(), Op);
       }
     }
   }
@@ -300,8 +299,7 @@ void PartialApplyCombiner::processSingleApply(FullApplySite AI) {
     // If there is new temporary for this argument, use it instead.
     if (isa<AllocStackInst>(Arg)) {
       if (ArgToTmp.count(Arg)) {
-        auto Tmp = ArgToTmp.lookup(Arg);
-        Op = SILValue(Tmp.getDef(), 1);
+        Op = ArgToTmp.lookup(Arg);
       }
     }
     Args.push_back(Op);
@@ -629,7 +627,7 @@ static SILValue getInitOrOpenExistential(AllocStackInst *ASI, SILValue &Src) {
 /// find the init_existential, which could be used to  determine a concrete
 /// type of the \p Self.
 static SILInstruction *findInitExistential(FullApplySite AI, SILValue Self,
-                                           SILType &InstanceType) {
+                                           CanType &OpenedArchetype) {
   SILInstruction *InitExistential = nullptr;
 
   if (auto *Instance = dyn_cast<AllocStackInst>(Self)) {
@@ -639,8 +637,8 @@ static SILInstruction *findInitExistential(FullApplySite AI, SILValue Self,
       Self = Existential;
   }
 
-  if (auto *Instance = dyn_cast<OpenExistentialAddrInst>(Self)) {
-    auto Op = Instance->getOperand();
+  if (auto *Open = dyn_cast<OpenExistentialAddrInst>(Self)) {
+    auto Op = Open->getOperand();
     if (auto *ASI = dyn_cast<AllocStackInst>(Op)) {
       SILValue Src;
       if (getInitOrOpenExistential(ASI, Src)) {
@@ -660,21 +658,37 @@ static SILInstruction *findInitExistential(FullApplySite AI, SILValue Self,
         if (IE->getParent() != AI.getParent())
           continue;
 
-        InstanceType = Instance->getType();
+        OpenedArchetype = Open->getType().getSwiftRValueType();
         InitExistential = IE;
       }
     }
   }
 
-  if (auto *Instance = dyn_cast<OpenExistentialRefInst>(Self)) {
-    if (auto *IE = dyn_cast<InitExistentialRefInst>(Instance->getOperand())) {
+  if (auto *Open = dyn_cast<OpenExistentialRefInst>(Self)) {
+    if (auto *IE = dyn_cast<InitExistentialRefInst>(Open->getOperand())) {
       // IE should dominate Instance.
       // Without a DomTree we want to be very defensive
       // and only allow this optimization when it is used
       // inside the same BB.
       if (IE->getParent() != AI.getParent())
         return nullptr;
-      InstanceType = Instance->getType();
+      OpenedArchetype = Open->getType().getSwiftRValueType();
+      InitExistential = IE;
+    }
+  }
+
+  if (auto *Open = dyn_cast<OpenExistentialMetatypeInst>(Self)) {
+    if (auto *IE =
+          dyn_cast<InitExistentialMetatypeInst>(Open->getOperand())) {
+      // IE should dominate Instance.
+      // Without a DomTree we want to be very defensive
+      // and only allow this optimization when it is used
+      // inside the same BB.
+      if (IE->getParent() != AI.getParent())
+        return nullptr;
+      OpenedArchetype = Open->getType().getSwiftRValueType();
+      while (auto Metatype = dyn_cast<MetatypeType>(OpenedArchetype))
+        OpenedArchetype = Metatype.getInstanceType();
       InitExistential = IE;
     }
   }
@@ -689,8 +703,8 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
                                          SILValue NewSelf,
                                          SILValue Self,
                                          CanType ConcreteType,
-                                         ProtocolConformance *Conformance,
-                                         SILType InstanceType) {
+                                         ProtocolConformanceRef Conformance,
+                                         CanType OpenedArchetype) {
   // Create a set of arguments.
   SmallVector<SILValue, 8> Args;
   for (auto Arg : AI.getArgumentsWithoutSelf()) {
@@ -705,11 +719,9 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
     if (Subst.getReplacement().getCanonicalTypeOrNull() ==
         Self.getType().getSwiftRValueType()) {
       auto Conformances = AI.getModule().getASTContext()
-                            .Allocate<ProtocolConformance*>(1);
+                            .AllocateUninitialized<ProtocolConformanceRef>(1);
       Conformances[0] = Conformance;
-      Substitution NewSubst(Subst.getArchetype(),
-                            ConcreteType,
-                            Conformances);
+      Substitution NewSubst(ConcreteType, Conformances);
       Substitutions.push_back(NewSubst);
     } else
       Substitutions.push_back(Subst);
@@ -730,7 +742,7 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
     NewSubstCalleeType = SILType::getPrimitiveObjectType(SFT);
   } else {
     TypeSubstitutionMap TypeSubstitutions;
-    TypeSubstitutions[InstanceType.getSwiftType().getPointer()] = ConcreteType;
+    TypeSubstitutions[OpenedArchetype.getPointer()] = ConcreteType;
     NewSubstCalleeType = SubstCalleeType.subst(AI.getModule(),
                                                AI.getModule().getSwiftModule(),
                                                TypeSubstitutions);
@@ -759,12 +771,12 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
 
 /// Derive a concrete type of self and conformance from the init_existential
 /// instruction.
-static std::pair<ProtocolConformance *, CanType>
+static Optional<std::pair<ProtocolConformanceRef, CanType>>
 getConformanceAndConcreteType(FullApplySite AI,
                               SILInstruction *InitExistential,
                               ProtocolDecl *Protocol,
                               SILValue &NewSelf,
-                              ArrayRef<ProtocolConformance*> &Conformances) {
+                              ArrayRef<ProtocolConformanceRef> &Conformances) {
   // Try to derive the concrete type of self from the found init_existential.
   CanType ConcreteType;
   if (auto IE = dyn_cast<InitExistentialAddrInst>(InitExistential)) {
@@ -775,39 +787,29 @@ getConformanceAndConcreteType(FullApplySite AI,
     Conformances = IER->getConformances();
     ConcreteType = IER->getFormalConcreteType();
     NewSelf = IER->getOperand();
+  } else if (auto IEM = dyn_cast<InitExistentialMetatypeInst>(InitExistential)){
+    Conformances = IEM->getConformances();
+    NewSelf = IEM->getOperand();
+    ConcreteType = NewSelf.getType().getSwiftRValueType();
+
+    auto ExType = IEM->getType().getSwiftRValueType();
+    while (auto ExMetatype = dyn_cast<ExistentialMetatypeType>(ExType)) {
+      ExType = ExMetatype.getInstanceType();
+      ConcreteType = cast<MetatypeType>(ConcreteType).getInstanceType();
+    }
+  } else {
+    return None;
   }
 
-  if (Conformances.empty())
-    return std::make_pair(nullptr, CanType());
-
-  // If ConcreteType depends on any archetypes, then propagating it does not
-  // help resolve witness table lookups. Catch these cases before calling
-  // gatherAllSubstitutions, which only works on nominal types.
-  if (ConcreteType->hasArchetype())
-    return std::make_pair(nullptr, CanType());
-
-  // Check the substitutions.
-  auto ConcreteTypeSubsts = ConcreteType->gatherAllSubstitutions(
-      AI.getModule().getSwiftModule(), nullptr);
-  if (!ConcreteTypeSubsts.empty()) {
-    // Bail if any generic types parameters of the concrete type are unbound.
-    if (hasUnboundGenericTypes(ConcreteTypeSubsts))
-      return std::make_pair(nullptr, CanType());
-    // At this point we know that all replacements use concrete types
-    // and therefore the whole Lookup type is concrete. So, we can
-    // propagate it, because we know how to devirtualize it.
-  }
-
-  // Find the conformance related to witness_method.
-  ProtocolConformance *Conformance = nullptr;
-  for (auto Con : Conformances) {
-    if (Con->getProtocol() == Protocol) {
-      Conformance = Con;
-      break;
+  // Find the conformance for the protocol we're interested in.
+  for (auto Conformance : Conformances) {
+    auto Requirement = Conformance.getRequirement();
+    if (Requirement == Protocol || Requirement->inheritsFrom(Protocol)) {
+      return std::make_pair(Conformance, ConcreteType);
     }
   }
 
-  return std::make_pair(Conformance, ConcreteType);
+  llvm_unreachable("couldn't find matching conformance in substitution?");
 }
 
 /// Propagate information about a concrete type from init_existential_addr
@@ -818,7 +820,7 @@ getConformanceAndConcreteType(FullApplySite AI,
 SILInstruction *
 SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
     ProtocolDecl *Protocol,
-    std::function<void(CanType , ProtocolConformance *)> Propagate) {
+    llvm::function_ref<void(CanType , ProtocolConformanceRef)> Propagate) {
 
   // Get the self argument.
   SILValue Self;
@@ -830,57 +832,58 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
       Self = Apply->getSelfArgument();
   }
 
-  assert (Self && "Self argument should be present");
+  assert(Self && "Self argument should be present");
 
   // Try to find the init_existential, which could be used to
   // determine a concrete type of the self.
-  SILType InstanceType;
-  SILInstruction *InitExistential = findInitExistential(AI, Self, InstanceType);
+  CanType OpenedArchetype;
+  SILInstruction *InitExistential =
+    findInitExistential(AI, Self, OpenedArchetype);
   if (!InitExistential)
     return nullptr;
 
   // Try to derive the concrete type of self and a related conformance from
   // the found init_existential.
-  ArrayRef<ProtocolConformance*> Conformances;
+  ArrayRef<ProtocolConformanceRef> Conformances;
   auto NewSelf = SILValue();
   auto ConformanceAndConcreteType =
       getConformanceAndConcreteType(AI, InitExistential,
                                     Protocol, NewSelf, Conformances);
-  auto ConcreteType = ConformanceAndConcreteType.second;
-  auto Conformance = ConformanceAndConcreteType.first;
-  if (!Conformance)
+  if (!ConformanceAndConcreteType)
     return nullptr;
+
+  auto ConcreteType = ConformanceAndConcreteType->second;
+  auto Conformance = ConformanceAndConcreteType->first;
 
   // Propagate the concrete type into the callee-operand if required.
   Propagate(ConcreteType, Conformance);
 
-  // Create a new apply instructions that uses the concrete type instead
+  // Create a new apply instruction that uses the concrete type instead
   // of the existential type.
   return createApplyWithConcreteType(AI, NewSelf, Self,
-                                     ConcreteType, Conformance, InstanceType);
+                                     ConcreteType, Conformance,
+                                     OpenedArchetype);
 }
 
 SILInstruction *
 SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
                                                     WitnessMethodInst *WMI) {
   // Check if it is legal to perform the propagation.
-  if (WMI->getConformance())
+  if (WMI->getConformance().isConcrete())
     return nullptr;
 
   // Don't specialize Apply instructions that return the Self type.
   // Notice that it is sufficient to compare the return type to the
   // substituted type because types that depend on the Self type are
   // not allowed (for example [Self] is not allowed).
-  if (AI.getType().getSwiftType().getLValueOrInOutObjectType() ==
-      WMI->getLookupType())
+  if (AI.getType().getSwiftRValueType() == WMI->getLookupType())
     return nullptr;
 
   // We need to handle the Self return type.
   // In we find arguments that are not the 'self' argument and if
   // they are of the Self type then we abort the optimization.
   for (auto Arg : AI.getArgumentsWithoutSelf()) {
-    if (Arg.getType().getSwiftType().getLValueOrInOutObjectType() ==
-        WMI->getLookupType())
+    if (Arg.getType().getSwiftRValueType() == WMI->getLookupType())
       return nullptr;
   }
 
@@ -889,10 +892,14 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
 
   // Propagate the concrete type into a callee-operand, which is a
   // witness_method instruction.
-  auto PropagateIntoOperand = [this, &WMI] (CanType ConcreteType,
-                                            ProtocolConformance *Conformance) {
-    SILValue OptionalExistential =
-        WMI->hasOperand() ? WMI->getOperand() : SILValue();
+  auto PropagateIntoOperand = [this, &WMI](CanType ConcreteType,
+                                           ProtocolConformanceRef Conformance) {
+    // Keep around the dependence on the open instruction unless we've
+    // actually eliminated the use.
+    SILValue OptionalExistential;
+    if (WMI->hasOperand() && ConcreteType->isOpenedExistential())
+      OptionalExistential = WMI->getOperand();
+
     auto *NewWMI = Builder.createWitnessMethod(WMI->getLoc(),
                                                 ConcreteType,
                                                 Conformance, WMI->getMember(),
@@ -947,7 +954,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI) {
 
   // No need to propagate anything into the callee operand.
   auto PropagateIntoOperand = [] (CanType ConcreteType,
-                                  ProtocolConformance *Conformance) {};
+                                  ProtocolConformanceRef Conformance) {};
 
   // Try to perform the propagation.
   return propagateConcreteTypeOfInitExistential(AI, PD, PropagateIntoOperand);
@@ -1026,38 +1033,11 @@ static ApplyInst *optimizeCastThroughThinFunctionPointer(
   if (Subs.size() == 0)
     return nullptr;
 
-  // We expect one type variable to be substituted. The substitution might have
-  // recursive substitutions. Recognize and allow the case of one substitution
-  // with recursive substitutions.
-  // Container<T>
-  //   T = ...
-  //   T.A = ...
-  //   T.A.C = ...
-  if (Subs.size() != 1) {
-    SmallPtrSet<ArchetypeType *, 16> Archetypes;
-    bool SawPrimary = false;
-    // Collect all the archetypes and make sure there is only one primary.
-    for (unsigned i = 0, e = Subs.size(); i != e; ++i) {
-      auto *AT = Subs[i].getArchetype();
-      Archetypes.insert(AT);
-      // Two primary arche types. We can't handle this case.
-      if (SawPrimary && AT->isPrimary())
-        return nullptr;
-      else if (AT->isPrimary())
-        SawPrimary = true;
-    }
-
-    // Make sure all the non primary archetypes have a parent archetype in the
-    // set.
-    for (unsigned i = 0, e = Subs.size(); i != e; ++i) {
-      auto *AT = Subs[i].getArchetype();
-      // Ignore the one primary archetype.
-      if (AT->isPrimary())
-        continue;
-      if (!Archetypes.count(AT))
-          return nullptr;
-    }
-  }
+  // If the generic signature of the function doesn't match the generic
+  // signature of the type, don't try to continue.
+  if (BoundGenericInstTy->getDecl()->getGenericSignature()
+        ->getCanonicalSignature() != ConvertCalleeTy->getGenericSignature())
+    return nullptr;
 
   SmallVector<SILValue, 16> Args;
   for (auto Arg : AI->getArguments())
@@ -1169,7 +1149,7 @@ bool SILCombiner::optimizeIdentityCastComposition(ApplyInst *FInverse,
   if (!knowHowToEmitReferenceCountInsts(FInverse))
     return false;
 
-  // We need to know that the cast will succeeed.
+  // We need to know that the cast will succeed.
   if (!isCastTypeKnownToSucceed(FInverse->getArgument(0).getType(),
                                 FInverse->getModule()) ||
       !isCastTypeKnownToSucceed(FInverse->getType(), FInverse->getModule()))
@@ -1268,7 +1248,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
         return I;
       }
     }
-    if (SF->hasSemanticsString("array.uninitialized")) {
+    if (SF->hasSemanticsAttr("array.uninitialized")) {
       UserListTy Users;
       // If the uninitialized array is only written into then it can be removed.
       if (recursivelyCollectARCUsers(Users, AI)) {
@@ -1288,7 +1268,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
     for (auto &Op : AI->getArgumentOperands()) {
       Arguments.push_back(Op.get());
     }
-    // The type of the substition is the source type of the thin to thick
+    // The type of the substitution is the source type of the thin to thick
     // instruction.
     SILType substTy = TTTFI->getOperand().getType();
     auto *NewAI = Builder.createApply(AI->getLoc(), TTTFI->getOperand(),

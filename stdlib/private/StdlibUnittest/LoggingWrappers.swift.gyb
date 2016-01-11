@@ -1,8 +1,8 @@
-//===--- LoggingWrappers.swift ---------------------------------------===//
+//===--- LoggingWrappers.swift --------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -49,7 +49,7 @@ public struct LoggingGenerator<Base: GeneratorType>
   }
   
   public mutating func next() -> Base.Element? {
-    ++Log.next[selfType]
+    Log.next[selfType] += 1
     return base.next()
   }
   
@@ -99,14 +99,14 @@ public struct LoggingRangeReplaceableCollection<
 
   public init() {
     self.base = Base()
-    ++Log.init_[selfType]
+    Log.init_[selfType] += 1
   }
 
   public init<
     S : SequenceType where S.Generator.Element == Generator.Element
   >(_ elements: S) {
     self.base = Base(elements)
-    ++Log.initWithSequence[selfType]
+    Log.initWithSequence[selfType] += 1
   }
 
   public init(_ base: Base) {
@@ -142,73 +142,73 @@ public struct LoggingRangeReplaceableCollection<
   >(
     subRange: Range<Base.Index>, with newElements: C
   ) {
-    ++Log.replaceRange[selfType]
+    Log.replaceRange[selfType] += 1
     base.replaceRange(subRange, with: newElements)
   }
 
   public mutating func append(newElement: Base.Generator.Element) {
-    ++Log.append[selfType]
+    Log.append[selfType] += 1
     base.append(newElement)
   }
 
   public mutating func appendContentsOf<
     S : SequenceType where S.Generator.Element == Base.Generator.Element
   >(newElements: S) {
-    ++Log.appendContentsOf[selfType]
+    Log.appendContentsOf[selfType] += 1
     base.appendContentsOf(newElements)
   }
 
   public mutating func insert(
     newElement: Base.Generator.Element, atIndex i: Base.Index
   ) {
-    ++Log.insert[selfType]
+    Log.insert[selfType] += 1
     base.insert(newElement, atIndex: i)
   }
 
   public mutating func removeAtIndex(index: Base.Index) -> Base.Generator.Element {
-    ++Log.removeAtIndex[selfType]
+    Log.removeAtIndex[selfType] += 1
     return base.removeAtIndex(index)
   }
 
   public mutating func _customRemoveLast() -> Base.Generator.Element? {
-    ++Log._customRemoveLast[selfType]
+    Log._customRemoveLast[selfType] += 1
     return base._customRemoveLast()
   }
 
   public mutating func _customRemoveLast(n: Int) -> Bool {
-    ++Log._customRemoveLastN[selfType]
+    Log._customRemoveLastN[selfType] += 1
     return base._customRemoveLast(n)
   }
 
   public mutating func removeFirst() -> Base.Generator.Element {
-    ++Log.removeFirst[selfType]
+    Log.removeFirst[selfType] += 1
     return base.removeFirst()
   }
 
   public mutating func removeFirst(n: Int) {
-    ++Log.removeFirstN[selfType]
+    Log.removeFirstN[selfType] += 1
     base.removeFirst(n)
   }
 
   public mutating func removeRange(subRange: Range<Base.Index>) {
-    ++Log.removeRange[selfType]
+    Log.removeRange[selfType] += 1
     base.removeRange(subRange)
   }
 
   public mutating func removeAll(keepCapacity keepCapacity: Bool) {
-    ++Log.removeAll[selfType]
+    Log.removeAll[selfType] += 1
     base.removeAll(keepCapacity: keepCapacity)
   }
 
   public mutating func reserveCapacity(n: Base.Index.Distance) {
-    ++Log.reserveCapacity[selfType]
+    Log.reserveCapacity[selfType] += 1
     base.reserveCapacity(n)
   }
 
   public mutating func insertContentsOf<
     C : CollectionType where C.Generator.Element == Base.Generator.Element
   >(newElements: C, at i: Base.Index) {
-    ++Log.insertContentsOf[selfType]
+    Log.insertContentsOf[selfType] += 1
     base.insertContentsOf(newElements, at: i)
   }
 
@@ -331,30 +331,30 @@ public struct Logging${Kind}<
   }
 
   public func successor() -> Logging${Kind} {
-    ++Log.successor[selfType]
+    Log.successor[selfType] += 1
     return Logging${Kind}(base.successor())
   }
 
 %   if Kind == 'BidirectionalIndex' or Kind == 'RandomAccessIndex':
   public func predecessor() -> Logging${Kind}<Base> {
-    ++Log.predecessor[selfType]
+    Log.predecessor[selfType] += 1
     return Logging${Kind}(base.predecessor())
   }
 %   end
 
   public func distanceTo(end: Logging${Kind}<Base>) -> Base.Distance {
-    ++Log.distanceTo[selfType]
+    Log.distanceTo[selfType] += 1
     return base.distanceTo(end.base)
   }
 
   public func advancedBy(n: Base.Distance) -> Logging${Kind}<Base> {
-    ++Log.advancedBy[selfType]
+    Log.advancedBy[selfType] += 1
     return Logging${Kind}(base.advancedBy(n))
   }
 
   public func advancedBy(n: Base.Distance, limit: Logging${Kind}<Base>)
     -> Logging${Kind} {
-    ++Log.advancedByWithLimit[selfType]
+    Log.advancedByWithLimit[selfType] += 1
     return Logging${Kind}(base.advancedBy(n, limit: limit.base))
   }
 }
@@ -376,23 +376,23 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
 
 %   if Kind == 'Collection' or Kind == 'MutableCollection':
   public var startIndex: Base.Index {
-    ++Log.startIndex[selfType]
+    Log.startIndex[selfType] += 1
     return base.startIndex
   }
 
   public var endIndex: Base.Index {
-    ++Log.endIndex[selfType]
+    Log.endIndex[selfType] += 1
     return base.endIndex
   }
 
   public subscript(position: Base.Index) -> Base.Generator.Element {
     get {
-      ++Log.subscriptIndex[selfType]
+      Log.subscriptIndex[selfType] += 1
       return base[position]
     }
 %     if Kind == 'MutableCollection':
     set {
-      ++Log.subscriptIndexSet[selfType]
+      Log.subscriptIndexSet[selfType] += 1
       base[position] = newValue
     }
 %     end
@@ -400,36 +400,36 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
 
   public subscript(bounds: Range<Base.Index>) -> Base.SubSequence {
     get {
-      ++Log.subscriptRange[selfType]
+      Log.subscriptRange[selfType] += 1
       return base[bounds]
     }
 %     if Kind == 'MutableCollection':
     set {
-      ++Log.subscriptRangeSet[selfType]
+      Log.subscriptRangeSet[selfType] += 1
       base[bounds] = newValue
     }
 %     end
   }
 
   public var isEmpty: Bool {
-    ++Log.isEmpty[selfType]
+    Log.isEmpty[selfType] += 1
     return base.isEmpty
   }
 
   public var count: Base.Index.Distance {
-    ++Log.count[selfType]
+    Log.count[selfType] += 1
     return base.count
   }
 
   public func _customIndexOfEquatableElement(
     element: Base.Generator.Element
   ) -> Base.Index?? {
-    ++Log._customIndexOfEquatableElement[selfType]
+    Log._customIndexOfEquatableElement[selfType] += 1
     return base._customIndexOfEquatableElement(element)
   }
 
   public var first: Base.Generator.Element? {
-    ++Log.first[selfType]
+    Log.first[selfType] += 1
     return base.first
   }
 %   end
@@ -438,29 +438,29 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     @noescape body: (UnsafeMutablePointer<Generator.Element>, Int) throws -> R
   ) rethrows -> R? {
-    ++Log._withUnsafeMutableBufferPointerIfSupported[selfType]
+    Log._withUnsafeMutableBufferPointerIfSupported[selfType] += 1
     let result = try base._withUnsafeMutableBufferPointerIfSupported(body)
     if result != nil {
-      ++Log._withUnsafeMutableBufferPointerIfSupportedNonNilReturns[selfType]
+      Log._withUnsafeMutableBufferPointerIfSupportedNonNilReturns[selfType] += 1
     }
     return result
   }
 %   end
 
   public func generate() -> LoggingGenerator<Base.Generator> {
-    ++Log.generate[selfType]
+    Log.generate[selfType] += 1
     return LoggingGenerator(base.generate())
   }
 
   public func underestimateCount() -> Int {
-    ++Log.underestimateCount[selfType]
+    Log.underestimateCount[selfType] += 1
     return base.underestimateCount()
   }
 
   public func forEach(
     @noescape body: (Base.Generator.Element) throws -> Void
   ) rethrows {
-    ++Log.forEach[selfType]
+    Log.forEach[selfType] += 1
     try base.forEach(body)
   }
 
@@ -468,7 +468,7 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
   public func map<T>(
     @noescape transform: (Base.Generator.Element) throws -> T
   ) rethrows -> [T] {
-    ++Log.map[selfType]
+    Log.map[selfType] += 1
     return try base.map(transform)
   }
 
@@ -476,27 +476,27 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
   public func filter(
     @noescape includeElement: (Base.Generator.Element) throws -> Bool
   ) rethrows -> [Base.Generator.Element] {
-    ++Log.filter[selfType]
+    Log.filter[selfType] += 1
     return try base.filter(includeElement)
   }
 
   public func dropFirst(n: Int) -> Base.SubSequence {
-    ++Log.dropFirst[selfType]
+    Log.dropFirst[selfType] += 1
     return base.dropFirst(n)
   }
 
   public func dropLast(n: Int) -> Base.SubSequence {
-    ++Log.dropLast[selfType]
+    Log.dropLast[selfType] += 1
     return base.dropLast(n)
   }
 
   public func prefix(maxLength: Int) -> Base.SubSequence {
-    ++Log.prefix[selfType]
+    Log.prefix[selfType] += 1
     return base.prefix(maxLength)
   }
 
   public func suffix(maxLength: Int) -> Base.SubSequence {
-    ++Log.suffix[selfType]
+    Log.suffix[selfType] += 1
     return base.suffix(maxLength)
   }
 
@@ -505,7 +505,7 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
     allowEmptySlices: Bool = false,
     @noescape isSeparator: (Base.Generator.Element) throws -> Bool
   ) rethrows -> [Base.SubSequence] {
-    ++Log.split[selfType]
+    Log.split[selfType] += 1
     return try base.split(maxSplit, allowEmptySlices: allowEmptySlices,
         isSeparator: isSeparator)
   }
@@ -513,17 +513,17 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
 %   if Kind == 'Collection' or Kind == 'MutableCollection':
 
   public func prefixUpTo(end: Index) -> Base.SubSequence {
-    ++Log.prefixUpTo[selfType]
+    Log.prefixUpTo[selfType] += 1
     return base.prefixUpTo(end)
   }
 
   public func suffixFrom(start: Index) -> Base.SubSequence {
-    ++Log.suffixFrom[selfType]
+    Log.suffixFrom[selfType] += 1
     return base.suffixFrom(start)
   }
 
   public func prefixThrough(position: Index) -> Base.SubSequence {
-    ++Log.prefixThrough[selfType]
+    Log.prefixThrough[selfType] += 1
     return base.prefixThrough(position)
   }
 
@@ -532,7 +532,7 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
   public func _customContainsEquatableElement(
     element: Base.Generator.Element
   ) -> Bool? {
-    ++Log._customContainsEquatableElement[selfType]
+    Log._customContainsEquatableElement[selfType] += 1
     return base._customContainsEquatableElement(element)
   }
 
@@ -540,9 +540,9 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
   public func _preprocessingPass<R>(
-    preprocess: (Logging${Kind})->R
+    @noescape preprocess: (Logging${Kind}) -> R
   ) -> R? {
-    ++Log._preprocessingPass[selfType]
+    Log._preprocessingPass[selfType] += 1
     return base._preprocessingPass { _ in preprocess(self) }
   }
 
@@ -550,14 +550,14 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
   /// in the same order.
   public func _copyToNativeArrayBuffer()
     -> _ContiguousArrayBuffer<Base.Generator.Element> {
-    ++Log._copyToNativeArrayBuffer[selfType]
+    Log._copyToNativeArrayBuffer[selfType] += 1
     return base._copyToNativeArrayBuffer()
   }
 
   /// Copy a Sequence into an array.
   public func _initializeTo(ptr: UnsafeMutablePointer<Base.Generator.Element>)
     -> UnsafeMutablePointer<Base.Generator.Element> {
-    ++Log._initializeTo[selfType]
+    Log._initializeTo[selfType] += 1
     return base._initializeTo(ptr)
   }
   
@@ -572,7 +572,7 @@ public func expectCustomizable<
   T.Log == T.Base.Log
 >(_: T, _ counters: TypeIndexed<Int>,
   //===--- TRACE boilerplate ----------------------------------------------===//
-  @autoclosure _ message: ()->String = "",
+  @autoclosure _ message: () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
   file: String = __FILE__, line: UInt = __LINE__
@@ -590,7 +590,7 @@ public func expectNotCustomizable<
   T.Log == T.Base.Log
 >(_: T, _ counters: TypeIndexed<Int>,
   //===--- TRACE boilerplate ----------------------------------------------===//
-  @autoclosure _ message: ()->String = "",
+  @autoclosure _ message: () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
   file: String = __FILE__, line: UInt = __LINE__

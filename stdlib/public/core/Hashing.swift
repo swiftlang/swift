@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -166,7 +166,7 @@ func _squeezeHashValue(hashValue: Int, _ resultRange: Range<Int>) -> Int {
   // We perform the unchecked arithmetic on `UInt` (instead of doing
   // straightforward computations on `Int`) in order to handle the following
   // tricky case: `startIndex` is negative, and `resultCardinality >= Int.max`.
-  // We can not convert the latter to `Int`.
+  // We cannot convert the latter to `Int`.
   return
     Int(bitPattern:
       UInt(bitPattern: resultRange.startIndex) &+ unsignedResult)

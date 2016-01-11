@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -193,7 +193,7 @@ public:
   /// Return the lowering for the semantic type.
   inline const TypeLowering &getSemanticTypeLowering(TypeConverter &TC) const;
 
-  /// Produce a exact copy of the value in the given address as a
+  /// Produce an exact copy of the value in the given address as a
   /// scalar.  The caller is responsible for destroying this value,
   /// e.g. by releasing it.
   ///
@@ -232,7 +232,7 @@ public:
   virtual void emitDestroyAddress(SILBuilder &B, SILLocation loc,
                                   SILValue value) const = 0;
 
-  /// Given a +1 r-value which are are claiming ownership of, destroy it.
+  /// Given a +1 r-value which we are claiming ownership of, destroy it.
   ///
   /// Note that an r-value might be an address.
   virtual void emitDestroyRValue(SILBuilder &B, SILLocation loc,
@@ -420,7 +420,7 @@ enum class CaptureKind {
   /// A local value captured as a single pointer to storage (formed with
   /// @noescape closures).
   StorageAddress,
-  // A local value captures as a constant.
+  /// A local value captured as a constant.
   Constant,
 };
 
@@ -511,7 +511,7 @@ class TypeConverter {
   
   friend struct llvm::DenseMapInfo<OverrideKey>;
 
-  /// Find an cached TypeLowering by TypeKey, or return null if one doesn't
+  /// Find a cached TypeLowering by TypeKey, or return null if one doesn't
   /// exist.
   const TypeLowering *find(TypeKey k);
   /// Insert a mapping into the cache.
@@ -769,9 +769,6 @@ public:
   /// \return - always an address type
   SILType getSubstitutedStorageType(AbstractStorageDecl *value,
                                     Type lvalueType);
-
-  /// Retrieve the set of archetypes open in the given context.
-  GenericParamList *getEffectiveGenericParamsForContext(DeclContext *dc);
 
   /// Retrieve the set of archetypes closed over by the given function.
   GenericParamList *getEffectiveGenericParams(AnyFunctionRef fn,

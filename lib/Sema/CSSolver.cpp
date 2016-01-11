@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -23,9 +23,9 @@
 using namespace swift;
 using namespace constraints;
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Constraint solver statistics
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "Constraint solver overall"
 #define JOIN(X,Y) JOIN2(X,Y)
 #define JOIN2(X,Y) X##Y
@@ -336,6 +336,8 @@ bool ConstraintSystem::simplify(bool ContinueAfterFailures) {
 
       if (solverState)
         solverState->retiredConstraints.push_front(constraint);
+      else
+        CG.removeConstraint(constraint);
 
       break;
 
@@ -1092,9 +1094,11 @@ static bool tryTypeVariableBindings(
 
     // Enumerate the supertypes of each of the types we tried.
     for (auto binding : bindings) {
-      auto type = binding.BindingType;
+      const auto type = binding.BindingType;
+      if (type->is<ErrorType>())
+        continue;
 
-      // After our first pass, note that that we've explored these
+      // After our first pass, note that we've explored these
       // types.
       if (tryCount == 0)
         exploredTypes.insert(type->getCanonicalType());
@@ -1370,7 +1374,7 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
     // ready for the next component.
     TypeVariables = std::move(allTypeVariables);
 
-    // For each of the partial solutions, substract off the current score.
+    // For each of the partial solutions, subtract off the current score.
     // It doesn't contribute.
     for (auto &solution : partialSolutions[component])
       solution.getFixedScore() -= CurrentScore;

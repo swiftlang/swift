@@ -13,11 +13,11 @@ func testSwitchOnExistential(value: Any) {
 
 // CHECK-LABEL: sil hidden @_TF10switch_isa23testSwitchOnExistentialFP_T_ :
 // CHECK:   [[ANY:%.*]] = alloc_stack $protocol<>
-// CHECK:   copy_addr %0 to [initialization] [[ANY]]#1
+// CHECK:   copy_addr %0 to [initialization] [[ANY]]
 // CHECK:   [[BOOL:%.*]] = alloc_stack $Bool
-// CHECK:   checked_cast_addr_br copy_on_success protocol<> in [[ANY]]#1 : $*protocol<> to Bool in [[BOOL]]#1 : $*Bool, [[IS_BOOL:bb[0-9]+]], [[IS_NOT_BOOL:bb[0-9]+]]
+// CHECK:   checked_cast_addr_br copy_on_success protocol<> in [[ANY]] : $*protocol<> to Bool in [[BOOL]] : $*Bool, [[IS_BOOL:bb[0-9]+]], [[IS_NOT_BOOL:bb[0-9]+]]
 // CHECK: [[IS_BOOL]]:
-// CHECK:   [[T0:%.*]] = load [[BOOL]]#1
+// CHECK:   [[T0:%.*]] = load [[BOOL]]
 
 enum Foo {
   case A

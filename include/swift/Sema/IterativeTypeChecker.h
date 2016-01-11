@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -33,7 +33,7 @@ class TypeChecker;
 /// An iterative type checker that processes type check requests to
 /// ensure that the AST has the information needed by the client.
 class IterativeTypeChecker {
-  /// The underyling (non-iterative) type checker on which this iterative
+  /// The underlying (non-iterative) type checker on which this iterative
   /// type checker depends.
   ///
   /// Each dependency on the non-iterative type checker potentially

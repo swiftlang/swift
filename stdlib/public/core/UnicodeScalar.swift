@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -20,11 +20,7 @@ public struct UnicodeScalar :
   var _value: UInt32
 
   /// A numeric representation of `self`.
-  public var value: UInt32 {
-    get {
-      return _value
-    }
-  }
+  public var value: UInt32 { return _value }
 
   @_transparent
   public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
@@ -159,7 +155,7 @@ public struct UnicodeScalar :
     return (self >= "A" && self <= "Z") || (self >= "a" && self <= "z")
   }
 
-  // FIXME: Is there an similar term of art in Unicode?
+  // FIXME: Is there a similar term of art in Unicode?
   @warn_unused_result
   public func _isASCIIDigit() -> Bool {
     return self >= "0" && self <= "9"

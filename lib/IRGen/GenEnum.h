@@ -1,8 +1,8 @@
-//===--- GenEnum.h - Swift IR Generation For 'enum' Types -------* C++ *-===//
+//===--- GenEnum.h - Swift IR Generation For 'enum' Types -------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -177,8 +177,8 @@ public:
     return cast<llvm::StructType>(getTypeInfo().getStorageType());
   }
   
-  IsPOD_t isPOD(ResilienceScope scope) const {
-    return getTypeInfo().isPOD(scope);
+  IsPOD_t isPOD(ResilienceExpansion expansion) const {
+    return getTypeInfo().isPOD(expansion);
   }
   
   /// \group Query enum layout
@@ -407,6 +407,7 @@ public:
                                      unsigned offset) const = 0;
   
   virtual bool needsPayloadSizeInMetadata() const = 0;
+  virtual unsigned getPayloadSizeForMetadata() const;
   
   virtual llvm::Value *loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc,
                                          Address addr) const;

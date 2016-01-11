@@ -64,14 +64,14 @@ sil @_TFC4test3Food : $@convention(method) (@guaranteed Foo) -> @owned Builtin.N
 sil hidden @_TFC4test4Foo2cfMS0_FT_S0_ : $@convention(method) (@owned Foo2) -> @owned Foo2 {
 bb0(%0 : $Foo2):
   %1 = alloc_stack $Foo2                          // users: %2, %6, %9, %10
-  store %0 to %1#1 : $*Foo2                       // id: %2
+  store %0 to %1 : $*Foo2                       // id: %2
   %3 = upcast %0 : $Foo2 to $Foo                  // user: %7
   // function_ref test.Foo.init (test.Foo.Type)() -> test.Foo
   %4 = function_ref @_TFC4test3FoocfMS0_FT_S0_ : $@convention(method) (@owned Foo) -> @owned Foo // user: %7
   %7 = apply %4(%3) : $@convention(method) (@owned Foo) -> @owned Foo // user: %8
   %8 = unchecked_ref_cast %7 : $Foo to $Foo2      // users: %9, %11
-  store %8 to %1#1 : $*Foo2                       // id: %9
-  dealloc_stack %1#0 : $*@local_storage Foo2      // id: %10
+  store %8 to %1 : $*Foo2                       // id: %9
+  dealloc_stack %1 : $*Foo2      // id: %10
   return %8 : $Foo2                               // id: %11
 }
 
@@ -80,14 +80,14 @@ sil hidden @_TFC4test4Foo2CfMS0_FT_S0_ : $@convention(thin) (@thick Foo2.Type) -
 bb0(%0 : $@thick Foo2.Type):
   %1 = alloc_ref $Foo2                            // users: %3, %4
   %2 = alloc_stack $Foo2                          // users: %3, %7, %10, %11
-  store %1 to %2#1 : $*Foo2                       // id: %3
+  store %1 to %2 : $*Foo2                       // id: %3
   %4 = upcast %1 : $Foo2 to $Foo                  // user: %8
   // function_ref test.Foo.init (test.Foo.Type)() -> test.Foo
   %5 = function_ref @_TFC4test3FoocfMS0_FT_S0_ : $@convention(method) (@owned Foo) -> @owned Foo // user: %8
   %8 = apply %5(%4) : $@convention(method) (@owned Foo) -> @owned Foo // user: %9
   %9 = unchecked_ref_cast %8 : $Foo to $Foo2      // users: %10, %12
-  store %9 to %2#1 : $*Foo2                       // id: %10
-  dealloc_stack %2#0 : $*@local_storage Foo2      // id: %11
+  store %9 to %2 : $*Foo2                       // id: %10
+  dealloc_stack %2 : $*Foo2      // id: %11
   return %9 : $Foo2                               // id: %12
 }
 

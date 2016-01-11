@@ -62,26 +62,26 @@ func recover_missing_body_2() // expected-error {{expected '{' in body of functi
 // should produce the error about missing right paren.
 //
 // FIXME: The errors are awful.  We should produce just the error about paren.
-func f_recover_missing_tuple_paren(a: Int // expected-error {{expected parameter type following ':'}} expected-note {{to match this opening '('}} expected-error{{expected '{' in body of function declaration}} expected-error {{expected ')' in parameter}} expected-error 2{{expected ',' separator}} {{42-42=,}} {{42-42=,}}
+func f_recover_missing_tuple_paren(a: Int // expected-note {{to match this opening '('}} expected-error{{expected '{' in body of function declaration}} expected-error {{expected ')' in parameter}} 
 func g_recover_missing_tuple_paren(b: Int) {
 }
 
 //===--- Parse errors.
 
-func parseError1a(a: ) {} // expected-error {{type annotation missing in pattern}} expected-error {{expected parameter type following ':'}}
+func parseError1a(a: ) {} // expected-error {{expected parameter type following ':'}}
 
-func parseError1b(a: // expected-error {{type annotation missing in pattern}} expected-error {{expected parameter type following ':'}}
+func parseError1b(a: // expected-error {{expected parameter type following ':'}}
                   ) {}
 
-func parseError2(a: Int, b: ) {} // expected-error {{type annotation missing in pattern}} expected-error {{expected parameter type following ':'}}
+func parseError2(a: Int, b: ) {} // expected-error {{expected parameter type following ':'}}
 
-func parseError3(a: unknown_type, b: ) {} // expected-error {{use of undeclared type 'unknown_type'}} expected-error {{type annotation missing in pattern}} expected-error {{expected parameter type following ':'}}
+func parseError3(a: unknown_type, b: ) {} // expected-error {{use of undeclared type 'unknown_type'}}  expected-error {{expected parameter type following ':'}}
 
-func parseError4(a: , b: ) {} // expected-error 2{{type annotation missing in pattern}} expected-error 2{{expected parameter type following ':'}}
+func parseError4(a: , b: ) {} // expected-error 2{{expected parameter type following ':'}}
 
 func parseError5(a: b: ) {} // expected-error {{use of undeclared type 'b'}} expected-error 2{{expected ',' separator}} {{22-22=,}} {{22-22=,}} expected-error {{expected parameter type following ':'}}
 
-func parseError6(a: unknown_type, b: ) {} // expected-error {{use of undeclared type 'unknown_type'}} expected-error {{type annotation missing in pattern}} expected-error {{expected parameter type following ':'}}
+func parseError6(a: unknown_type, b: ) {} // expected-error {{use of undeclared type 'unknown_type'}}  expected-error {{expected parameter type following ':'}}
 
 func parseError7(a: Int, goo b: unknown_type) {} // expected-error {{use of undeclared type 'unknown_type'}}
 

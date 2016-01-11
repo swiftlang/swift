@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -31,28 +31,6 @@ public enum FloatingPointClassification {
   case PositiveSubnormal
   case PositiveNormal
   case PositiveInfinity
-}
-
-extension FloatingPointClassification : Equatable {}
-
-public 
-func ==(lhs: FloatingPointClassification, rhs: FloatingPointClassification) -> Bool {
-  switch (lhs, rhs) {
-  case (.SignalingNaN, .SignalingNaN),
-       (.QuietNaN, .QuietNaN),
-       (.NegativeInfinity, .NegativeInfinity),
-       (.NegativeNormal, .NegativeNormal),
-       (.NegativeSubnormal, .NegativeSubnormal),
-       (.NegativeZero, .NegativeZero),
-       (.PositiveZero, .PositiveZero),
-       (.PositiveSubnormal, .PositiveSubnormal),
-       (.PositiveNormal, .PositiveNormal),
-       (.PositiveInfinity, .PositiveInfinity):
-    return true
-
-  default:
-    return false
-  }
 }
 
 /// A set of common requirements for Swift's floating point types.

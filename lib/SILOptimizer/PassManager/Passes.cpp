@@ -1,8 +1,8 @@
-//===-------- Passes.cpp - Swift Compiler SIL Pass Entrypoints ------------===//
+//===--- Passes.cpp - Swift Compiler SIL Pass Entrypoints -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -40,13 +40,13 @@ llvm::cl::opt<bool>
     SILViewCFG("sil-view-cfg", llvm::cl::init(false),
                llvm::cl::desc("Enable the sil cfg viewer pass"));
 
-llvm::cl::opt<bool>
-    SILViewGuaranteedCFG("sil-view-guaranteed-cfg", llvm::cl::init(false),
-               llvm::cl::desc("Enable the sil cfg viewer pass after diagnostics"));
+llvm::cl::opt<bool> SILViewGuaranteedCFG(
+    "sil-view-guaranteed-cfg", llvm::cl::init(false),
+    llvm::cl::desc("Enable the sil cfg viewer pass after diagnostics"));
 
-llvm::cl::opt<bool>
-    SILViewSILGenCFG("sil-view-silgen-cfg", llvm::cl::init(false),
-               llvm::cl::desc("Enable the sil cfg viewer pass before diagnostics"));
+llvm::cl::opt<bool> SILViewSILGenCFG(
+    "sil-view-silgen-cfg", llvm::cl::init(false),
+    llvm::cl::desc("Enable the sil cfg viewer pass before diagnostics"));
 
 using namespace swift;
 
@@ -251,6 +251,8 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   // Run two iterations of the high-level SSA passes.
   PM.setStageName("HighLevel");
+  PM.addDevirtualizer();
+  PM.addGenericSpecializer();
   AddSSAPasses(PM, OptimizationLevelKind::HighLevel);
   PM.runOneIteration();
   PM.runOneIteration();
@@ -450,7 +452,8 @@ descriptorsForFile(StringRef Filename,
 
   auto *RootList = cast<yaml::SequenceNode>(N);
 
-  for (auto &PMDescriptorIter : make_range(RootList->begin(), RootList->end())) {
+  for (auto &PMDescriptorIter :
+       make_range(RootList->begin(), RootList->end())) {
     PMDescriptor PM(cast<yaml::SequenceNode>(&PMDescriptorIter));
     Descriptors.push_back(std::move(PM));
   }

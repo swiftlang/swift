@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -235,6 +235,8 @@ private:
   /// modules and its source files.
   void writeInputBlock(const SerializationOptions &options);
 
+  void writeParameterList(const ParameterList *PL);
+
   /// Writes the given pattern, recursively.
   void writePattern(const Pattern *pattern);
 
@@ -242,7 +244,11 @@ private:
   void writeRequirements(ArrayRef<Requirement> requirements);
 
   /// Writes a list of protocol conformances.
-  void writeConformances(ArrayRef<ProtocolConformance *> conformances,
+  void writeConformances(ArrayRef<ProtocolConformanceRef> conformances,
+                         const std::array<unsigned, 256> &abbrCodes);
+
+  /// Writes a list of protocol conformances.
+  void writeConformances(ArrayRef<ProtocolConformance*> conformances,
                          const std::array<unsigned, 256> &abbrCodes);
 
   /// Writes an array of members for a decl context.
@@ -390,7 +396,11 @@ public:
   void writeNormalConformance(const NormalProtocolConformance *conformance);
 
   /// Writes a protocol conformance.
-  void writeConformance(const ProtocolConformance *conformance,
+  void writeConformance(ProtocolConformanceRef conformance,
+                        const std::array<unsigned, 256> &abbrCodes);
+
+  /// Writes a protocol conformance.
+  void writeConformance(ProtocolConformance *conformance,
                         const std::array<unsigned, 256> &abbrCodes);
 
   /// Writes a generic parameter list.

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -32,7 +32,7 @@ public struct LazyMapGenerator<
   public var base: Base { return _base }
   
   internal var _base: Base
-  internal var _transform: (Base.Element)->Element
+  internal var _transform: (Base.Element) -> Element
 }
 
 /// A `SequenceType` whose elements consist of those in a `Base`
@@ -61,13 +61,13 @@ public struct LazyMapSequence<Base : SequenceType, Element>
 
   /// Create an instance with elements `transform(x)` for each element
   /// `x` of base.
-  public init(_ base: Base, transform: (Base.Generator.Element)->Element) {
+  public init(_ base: Base, transform: (Base.Generator.Element) -> Element) {
     self._base = base
     self._transform = transform
   }
   
   public var _base: Base
-  internal var _transform: (Base.Generator.Element)->Element
+  internal var _transform: (Base.Generator.Element) -> Element
 
   @available(*, unavailable, renamed="Element")
   public typealias T = Element
@@ -123,19 +123,19 @@ public struct LazyMapCollection<Base : CollectionType, Element>
 
   /// Create an instance with elements `transform(x)` for each element
   /// `x` of base.
-  public init(_ base: Base, transform: (Base.Generator.Element)->Element) {
+  public init(_ base: Base, transform: (Base.Generator.Element) -> Element) {
     self._base = base
     self._transform = transform
   }
   
   public var _base: Base
-  var _transform: (Base.Generator.Element)->Element
+  var _transform: (Base.Generator.Element) -> Element
 
   @available(*, unavailable, renamed="Element")
   public typealias T = Element
 }
 
-//===--- Support for s.lazy ----------------------------------------------===//
+//===--- Support for s.lazy -----------------------------------------------===//
 
 extension LazySequenceType {
   /// Return a `LazyMapSequence` over this `Sequence`.  The elements of

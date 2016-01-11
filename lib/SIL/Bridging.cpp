@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -30,9 +30,8 @@ using namespace swift::Lowering;
 
 SILType TypeConverter::getLoweredTypeOfGlobal(VarDecl *var) {
   AbstractionPattern origType = getAbstractionPattern(var);
-  CanType swiftType = (origType.isOpaque() ? var->getType()->getCanonicalType()
-                                           : origType.getType());
-  return getLoweredType(origType, swiftType).getObjectType();
+  assert(!origType.isOpaque());
+  return getLoweredType(origType, origType.getType()).getObjectType();
 }
 
 CanType TypeConverter::getBridgedInputType(SILFunctionTypeRepresentation rep,

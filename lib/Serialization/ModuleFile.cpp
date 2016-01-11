@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -1220,7 +1220,7 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
 
         if (!M) {
           // The dependency module could not be loaded.  Just make a guess
-          // about the import kind, we can not do better.
+          // about the import kind, we cannot do better.
           Kind = ImportKind::Func;
         } else {
           SmallVector<ValueDecl *, 8> Decls;
@@ -1466,7 +1466,7 @@ Optional<BriefAndRawComment> ModuleFile::getCommentForDecl(const Decl *D) {
   // Keep these as assertions instead of early exits to ensure that we are not
   // doing extra work.  These cases should be handled by clients of this API.
   assert(!D->hasClangNode() &&
-         "can not find comments for Clang decls in Swift modules");
+         "cannot find comments for Clang decls in Swift modules");
   assert(D->getDeclContext()->getModuleScopeContext() == FileContext &&
          "Decl is from a different serialized file");
 

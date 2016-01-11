@@ -1,8 +1,8 @@
-//===- ClassHierarchyAnalysis.cpp - Analysis of class hierarchy -*- C++ -*-===//
+//===--- ClassHierarchyAnalysis.cpp - Class hierarchy analysis --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -12,6 +12,7 @@
 
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Module.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
@@ -77,7 +78,7 @@ void ClassHierarchyAnalysis::init() {
 /// \brief Get all subclasses of a given class.
 /// Does not include any direct subclasses of given base class.
 ///
-/// \p Base base class, whose direct subclasses are to be excluded
+/// \p Base class, whose direct subclasses are to be excluded
 /// \p Current class, whose direct and indirect subclasses are
 ///    to be collected.
 /// \p IndirectSubs placeholder for collected results

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -93,9 +93,9 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
   return nullptr;
 }
 
-void DerivedConformance::_insertOperatorDecl(ASTContext &C,
-                                             IterableDeclContext *scope,
-                                             Decl *member) {
+void DerivedConformance::insertOperatorDecl(ASTContext &C,
+                                            IterableDeclContext *scope,
+                                            Decl *member) {
   // Find the module.
   auto mod = member->getModuleContext();
 
@@ -117,45 +117,24 @@ DeclRefExpr *
 DerivedConformance::createSelfDeclRef(AbstractFunctionDecl *fn) {
   ASTContext &C = fn->getASTContext();
 
-  Pattern *curriedArgs = fn->getBodyParamPatterns().front();
-  auto selfPattern =
-    cast<NamedPattern>(curriedArgs->getSemanticsProvidingPattern());
-  auto selfDecl = selfPattern->getDecl();
+  auto selfDecl = fn->getImplicitSelfDecl();
   return new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true);
 }
 
 FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
                                                  Decl *parentDecl,
                                                  NominalTypeDecl *typeDecl,
-                                                 Type contextType,
                                                  Type propertyInterfaceType,
                                                  Type propertyContextType,
                                                  bool isStatic) {
   auto &C = tc.Context;
-
-  Type selfType = contextType;
-  if (isStatic)
-    selfType = MetatypeType::get(selfType);
-
   auto parentDC = cast<DeclContext>(parentDecl);
-
-  VarDecl *selfDecl = new (C) ParamDecl(/*IsLet*/true,
-                                        SourceLoc(),
-                                        Identifier(),
-                                        SourceLoc(),
-                                        C.Id_self,
-                                        selfType,
-                                        parentDC);
-  selfDecl->setImplicit();
-  Pattern *selfParam = new (C) NamedPattern(selfDecl, /*implicit*/ true);
-  selfParam->setType(selfType);
-  selfParam = new (C) TypedPattern(selfParam,
-                                   TypeLoc::withoutLoc(selfType));
-  selfParam->setType(selfType);
-  Pattern *methodParam = TuplePattern::create(C, SourceLoc(),{},SourceLoc());
-  methodParam->setType(TupleType::getEmpty(C));
-  Pattern *params[] = {selfParam, methodParam};
-
+  auto selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC, isStatic);
+  ParameterList *params[] = {
+    ParameterList::createWithoutLoc(selfDecl),
+    ParameterList::createEmpty(C)
+  };
+  
   FuncDecl *getterDecl =
     FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
                      DeclName(), SourceLoc(), SourceLoc(), SourceLoc(),
@@ -168,7 +147,9 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   GenericParamList *genericParams = getterDecl->getGenericParamsOfContext();
   Type type = FunctionType::get(TupleType::getEmpty(C),
                                 propertyContextType);
-  selfType = getterDecl->computeSelfType();
+  Type selfType = getterDecl->computeSelfType();
+  selfDecl->overwriteType(selfType);
+  
   if (genericParams)
     type = PolymorphicFunctionType::get(selfType, type, genericParams);
   else
@@ -189,8 +170,11 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   getterDecl->setInterfaceType(interfaceType);
   getterDecl->setAccessibility(typeDecl->getFormalAccess());
 
+  // If the enum was not imported, the derived conformance is either from the
+  // enum itself or an extension, in which case we will emit the declaration
+  // normally.
   if (typeDecl->hasClangNode())
-    tc.implicitlyDefinedFunctions.push_back(getterDecl);
+    tc.Context.addExternalDecl(getterDecl);
 
   return getterDecl;
 }
@@ -207,8 +191,7 @@ DerivedConformance::declareDerivedReadOnlyProperty(TypeChecker &tc,
   auto &C = tc.Context;
   auto parentDC = cast<DeclContext>(parentDecl);
 
-  VarDecl *propDecl = new (C) VarDecl(isStatic,
-                                      /*let*/ false,
+  VarDecl *propDecl = new (C) VarDecl(isStatic, /*let*/ false,
                                       SourceLoc(), name,
                                       propertyContextType,
                                       parentDC);

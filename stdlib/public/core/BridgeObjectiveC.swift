@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -29,7 +29,7 @@ public protocol _ObjectiveCBridgeable {
   static func _isBridgedToObjectiveC() -> Bool
 
   // _getObjectiveCType is a workaround: right now protocol witness
-  // tables don't include associated types, so we can not find
+  // tables don't include associated types, so we cannot find
   // '_ObjectiveCType.self' from them.
 
   /// Must return `_ObjectiveCType.self`.
@@ -81,7 +81,7 @@ public protocol _ObjectiveCBridgeable {
 ///
 /// The language and runtime do not yet support protocol conformances for
 /// structural types like metatypes. However, we can use a struct that contains
-/// a metatype, make it conform to to _ObjectiveCBridgeable, and its witness table
+/// a metatype, make it conform to _ObjectiveCBridgeable, and its witness table
 /// will be ABI-compatible with one that directly provided conformance to the
 /// metatype type itself.
 public struct _BridgeableMetatype: _ObjectiveCBridgeable {

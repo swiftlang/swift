@@ -149,7 +149,7 @@ struct decl_struct_1 {
   /// NestedEnum Aaa.
   enum NestedEnum {}
 
-  // Can not declare a nested protocol.
+  // Cannot declare a nested protocol.
   // protocol NestedProtocol {}
 
   /// NestedTypealias Aaa.
@@ -277,7 +277,7 @@ func unterminatedBlockDocComment() {}
 // CHECK-NEXT: comment_attach.swift:135:8: Func/decl_struct_1.instanceFunc4 RawComment=[/// instanceFunc4 Aaa.\n]
 // CHECK-NEXT: comment_attach.swift:138:3: Constructor/decl_struct_1.init RawComment=[/// init().  Aaa.\n] BriefComment=[init().  Aaa.]
 // CHECK-NEXT: comment_attach.swift:141:3: Subscript/decl_struct_1.subscript RawComment=[/// subscript Aaa.\n]
-// CHECK-NEXT: comment_attach.swift:141:13: Param/decl_struct_1.i RawComment=none
+// CHECK-NEXT: comment_attach.swift:141:13: Param/i RawComment=none
 // CHECK-NEXT: comment_attach.swift:141:31: Func/decl_struct_1.<getter for decl_struct_1.subscript> RawComment=none
 // CHECK-NEXT: comment_attach.swift:144:10: Struct/decl_struct_1.NestedStruct RawComment=[/// NestedStruct Aaa.\n]
 // CHECK-NEXT: comment_attach.swift:147:9: Class/decl_struct_1.NestedClass RawComment=[/// NestedClass Aaa.\n]

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -425,7 +425,7 @@ public:
     return getRecursiveProperties().hasOpenedExistential();
   }
 
-  /// Determine whether the type involves the given opend existential
+  /// Determine whether the type involves the given opened existential
   /// archetype.
   bool hasOpenedExistential(ArchetypeType *opened);
 
@@ -672,10 +672,6 @@ public:
   /// the result would be the (parenthesized) type ((int, int)).
   Type getUnlabeledType(ASTContext &Context);
 
-  /// Relabel the elements of the given type with the given new
-  /// (top-level) labels.
-  Type getRelabeledType(ASTContext &Context, ArrayRef<Identifier> labels);
-
   /// \brief Retrieve the type without any default arguments.
   Type getWithoutDefaultArgs(const ASTContext &Context);
 
@@ -838,17 +834,6 @@ public:
 
   /// Retrieve the type declaration directly referenced by this type, if any.
   TypeDecl *getDirectlyReferencedTypeDecl() const;
-
-  /// Retrieve the default argument string that would be inferred for this type,
-  /// assuming that we know it is inferred.
-  ///
-  /// This routine pre-supposes that we know that the given type is the type of
-  /// a parameter that has a default, and all we need to figure out is which
-  /// default argument should be print.
-  ///
-  /// FIXME: This should go away when/if inferred default arguments become
-  /// "real".
-  StringRef getInferredDefaultArgString();
 
 private:
   // Make vanilla new/delete illegal for Types.
@@ -1257,9 +1242,11 @@ class TupleTypeElt {
   /// is variadic.
   llvm::PointerIntPair<Identifier, 1, bool> NameAndVariadic;
 
-  /// \brief This is the type of the field, which is mandatory, along with the
-  /// kind of default argument.
-  llvm::PointerIntPair<Type, 3, DefaultArgumentKind> TyAndDefaultArg;
+  /// \brief This is the type of the field.
+  Type ElementType;
+
+  /// The default argument,
+  DefaultArgumentKind DefaultArg;
 
   friend class TupleType;
 
@@ -1273,12 +1260,12 @@ public:
 
   /*implicit*/ TupleTypeElt(TypeBase *Ty)
     : NameAndVariadic(Identifier(), false),
-      TyAndDefaultArg(Ty, DefaultArgumentKind::None) { }
+      ElementType(Ty), DefaultArg(DefaultArgumentKind::None) { }
 
   bool hasName() const { return !NameAndVariadic.getPointer().empty(); }
   Identifier getName() const { return NameAndVariadic.getPointer(); }
 
-  Type getType() const { return TyAndDefaultArg.getPointer(); }
+  Type getType() const { return ElementType.getPointer(); }
 
   /// Determine whether this field is variadic.
   bool isVararg() const {
@@ -1286,9 +1273,7 @@ public:
   }
 
   /// Retrieve the kind of default argument available on this field.
-  DefaultArgumentKind getDefaultArgKind() const {
-    return TyAndDefaultArg.getInt();
-  }
+  DefaultArgumentKind getDefaultArgKind() const { return DefaultArg; }
 
   /// Whether we have a default argument.
   bool hasDefaultArg() const {
@@ -1307,11 +1292,6 @@ public:
   /// Retrieve a copy of this tuple type element with the type replaced.
   TupleTypeElt getWithType(Type T) const {
     return TupleTypeElt(T, getName(), getDefaultArgKind(), isVararg());
-  }
-
-  /// Determine whether this tuple element has an initializer.
-  bool hasInit() const {
-    return getDefaultArgKind() != DefaultArgumentKind::None;
   }
 };
 
@@ -1358,7 +1338,7 @@ public:
     return TupleEltTypeArrayRef(getElements());
   }
   
-  /// getNamedElementId - If this tuple has a element with the specified name,
+  /// getNamedElementId - If this tuple has an element with the specified name,
   /// return the element index, otherwise return -1.
   int getNamedElementId(Identifier I) const;
   
@@ -2573,6 +2553,42 @@ inline bool isConsumedParameter(ParameterConvention conv) {
     return false;
   }
   llvm_unreachable("bad convention kind");
+}
+
+enum class InoutAliasingAssumption {
+  /// Assume that an inout indirect parameter may alias other objects.
+  /// This is the safe assumption an optimizations should make if it may break
+  /// memory safety in case the inout aliasing rule is violation.
+  Aliasing,
+
+  /// Assume that an inout indirect parameter cannot alias other objects.
+  /// Optimizations should only use this if they can guarantee that they will
+  /// not break memory safety even if the inout aliasing rule is violated.
+  NotAliasing
+};
+
+/// Returns true if \p conv is a not-aliasing indirect parameter.
+/// The \p isInoutAliasing specifies what to assume about the inout convention.
+/// See InoutAliasingAssumption.
+inline bool isNotAliasedIndirectParameter(ParameterConvention conv,
+                                     InoutAliasingAssumption isInoutAliasing) {
+  switch (conv) {
+  case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_Out:
+  case ParameterConvention::Indirect_In_Guaranteed:
+    return true;
+
+  case ParameterConvention::Indirect_Inout:
+    return isInoutAliasing == InoutAliasingAssumption::NotAliasing;
+
+  case ParameterConvention::Indirect_InoutAliasable:
+  case ParameterConvention::Direct_Unowned:
+  case ParameterConvention::Direct_Guaranteed:
+  case ParameterConvention::Direct_Owned:
+  case ParameterConvention::Direct_Deallocating:
+    return false;
+  }
+  llvm_unreachable("covered switch isn't covered?!");
 }
 
 /// Returns true if conv is a guaranteed parameter. This may look unnecessary
@@ -4339,7 +4355,7 @@ inline TupleTypeElt::TupleTypeElt(Type ty,
                                   DefaultArgumentKind defArg,
                                   bool isVariadic)
   : NameAndVariadic(name, isVariadic),
-    TyAndDefaultArg(ty.getPointer(), defArg)
+    ElementType(ty), DefaultArg(defArg)
 {
   assert(!isVariadic ||
          isa<ErrorType>(ty.getPointer()) ||

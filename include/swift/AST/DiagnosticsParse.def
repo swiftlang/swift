@@ -1,8 +1,8 @@
-//===- DiagnosticsParse.def - Diagnostics Text ------------------*- C++ -*-===//
+//===--- DiagnosticsParse.def - Diagnostics Text ----------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -70,6 +70,10 @@ ERROR(extra_tokens_line_directive,parsing,none,
       "extra tokens at the end of #line directive", ())
 ERROR(line_directive_line_zero,parsing,none,
       "the line number needs to be greater than zero", ())
+
+WARNING(escaped_parameter_name,parsing,none,
+        "keyword '%0' does not need to be escaped in argument list",
+        (StringRef))
 
 //------------------------------------------------------------------------------
 // Lexer diagnostics
@@ -175,24 +179,11 @@ ERROR(decl_inner_scope,decl_parsing,none,
 ERROR(decl_not_static,decl_parsing,none,
       "declaration cannot be marked %0", (StaticSpellingKind))
 
-ERROR(ownership_not_attribute,decl_parsing,none,
-      "'@%0' is not an attribute, use the '%0' keyword instead",
-      (StringRef))
- 
 ERROR(cskeyword_not_attribute,decl_parsing,none,
       "'%0' is a declaration modifier, not an attribute", (StringRef))
 
-ERROR(convenience_invalid,sema_tcd,none,
-      "'convenience' is not valid on this declaration", ())
-
 ERROR(decl_already_static,decl_parsing,none,
       "%0 specified twice", (StaticSpellingKind))
-
-ERROR(autoclosure_is_decl_attribute,attribute_parsing,none,
-      "@autoclosure is now an attribute of the parameter "
-      "declaration, not its type", ())
-ERROR(autoclosure_not_on_enums,attribute_parsing,none,
-      "@autoclosure is only allowed on parameters, not on enum cases", ())
 
 ERROR(enum_case_dot_prefix,decl_parsing,none,
       "extraneous '.' in enum 'case' declaration", ())
@@ -288,11 +279,6 @@ ERROR(static_func_decl_global_scope,decl_parsing,none,
       (StaticSpellingKind))
 ERROR(func_decl_expected_arrow,decl_parsing,none,
       "expected '->' after function parameter tuple", ())
-ERROR(func_static_not_allowed,decl_parsing,none,
-      "static functions are not allowed in this context, "
-      "use 'class' to declare a class method", ())
-ERROR(func_conversion,decl_parsing,none,
-      "'__conversion' functions are no longer allowed", ())
 
 // Enum
 ERROR(expected_lbrace_enum,decl_parsing,PointsToFirstBadToken,
@@ -337,7 +323,11 @@ ERROR(expected_arrow_subscript,decl_parsing,PointsToFirstBadToken,
 ERROR(expected_type_subscript,type_parsing,PointsToFirstBadToken,
       "expected subscripting element type", ())
 ERROR(expected_lbrace_subscript,decl_parsing,PointsToFirstBadToken,
-      "expected '{' for subscripting", ())
+      "expected '{' in subscript to specify getter and setter implementation",
+      ())
+ERROR(expected_lbrace_subscript_protocol,decl_parsing,PointsToFirstBadToken,
+      "subscript in protocol must have explicit { get } or "
+      "{ get set } specifier", ())
 ERROR(subscript_without_get,decl_parsing,none,
       "subscript declarations must have a getter", ())
 ERROR(subscript_static,decl_parsing,none,
@@ -415,8 +405,6 @@ ERROR(expected_sil_constant, decl_parsing,none,
       "expected constant in SIL code", ())
 ERROR(referenced_value_no_accessor, decl_parsing,none,
       "referenced declaration has no %select{getter|setter}0", (unsigned))
-ERROR(sil_local_storage_non_address, decl_parsing,none,
-      "can only work with the address of local storage", ())
 
 // SIL Values
 ERROR(sil_value_redefinition, decl_parsing,none,
@@ -468,16 +456,12 @@ ERROR(sil_integer_literal_not_integer_type,decl_parsing,none,
       "integer_literal instruction requires a 'Builtin.Int<n>' type", ())
 ERROR(sil_float_literal_not_float_type,decl_parsing,none,
       "float_literal instruction requires a 'Builtin.FP<n>' type", ())
-ERROR(sil_apply_archetype_not_found,decl_parsing,none,
-      "archetype name not found in polymorphic function type of apply instruction", ())
 ERROR(sil_substitutions_on_non_polymorphic_type,decl_parsing,none,
       "apply of non-polymorphic function cannot have substitutions", ())
 ERROR(sil_witness_method_not_protocol,decl_parsing,none,
       "witness_method is not a protocol method", ())
 ERROR(sil_witness_method_type_does_not_conform,decl_parsing,none,
       "witness_method type does not conform to protocol", ())
-ERROR(sil_witness_archetype_not_found,decl_parsing,none,
-      "archetype name not found in specialized protocol conformance", ())
 ERROR(sil_member_decl_not_found,decl_parsing,none,
       "member not found in method instructions", ())
 ERROR(sil_member_decl_type_mismatch, decl_parsing,none,
@@ -504,8 +488,6 @@ ERROR(sil_basicblock_arg_rparen, decl_parsing,none,
       "expected ')' in basic block argument list", ())
 
 // SIL Functions
-ERROR(expected_sil_linkage_or_function, decl_parsing,none,
-      "expected SIL linkage type or function name", ())
 ERROR(expected_sil_function_name, decl_parsing,none,
       "expected SIL function name", ())
 ERROR(expected_sil_rbrace, decl_parsing,none,
@@ -590,8 +572,6 @@ ERROR(expected_type_function_result,type_parsing,PointsToFirstBadToken,
       "expected type for function result", ())
 ERROR(generic_non_function,type_parsing,PointsToFirstBadToken,
       "only syntactic function types can be generic", ())
-ERROR(throwing_non_function,type_parsing,PointsToFirstBadToken,
-      "only function types may throw", ())
 ERROR(rethrowing_function_type,type_parsing,PointsToFirstBadToken,
       "only function declarations may be marked 'rethrows'", ())
 ERROR(throws_after_function_result,type_parsing,none,
@@ -608,8 +588,9 @@ ERROR(nonliteral_enum_case_raw_value,type_parsing,PointsToFirstBadToken,
       "raw value for enum case must be a literal", ())
 
 // Collection Types
-ERROR(expected_expr_array_type,expr_parsing,PointsToFirstBadToken,
-      "expected expression for size of array type", ())
+ERROR(new_array_syntax,type_parsing,none,
+      "array types are now written with the brackets around the element type",
+      ())
 ERROR(expected_rbracket_array_type,type_parsing,PointsToFirstBadToken,
       "expected ']' in array type", ())
 ERROR(expected_element_type,type_parsing,PointsToFirstBadToken,
@@ -670,31 +651,18 @@ ERROR(multiple_parameter_ellipsis,decl_parsing,none,
       "only a single variadic parameter '...' is permitted", ())
 ERROR(parameter_vararg_default,decl_parsing,none,
       "variadic parameter cannot have a default value", ())
-ERROR(parameter_backtick_missing_name,decl_parsing,PointsToFirstBadToken,
-      "expected parameter name after '#'", ())
-ERROR(parameter_backtick_empty_name,decl_parsing,none,
-      "expected non-empty parameter name after '#'", ())
 ERROR(parameter_inout_var_let,decl_parsing,none,
       "parameter may not have multiple 'inout', 'var', or 'let' specifiers",
       ())
 
-WARNING(parameter_backtick_two_names,decl_parsing,none,
-      "extraneous '#' in parameter; keyword argument and parameter name "
-      "already specified separately", ())
 WARNING(parameter_extraneous_double_up,decl_parsing,none,
         "extraneous duplicate parameter name; %0 already has an argument "
         "label", (Identifier))
-ERROR(parameter_extraneous_pound,decl_parsing,none,
-        "'#' has been removed from Swift; %0 already has an argument label",
-        (Identifier))
-ERROR(parameter_pound_double_up,decl_parsing,none,
-        "'#' has been removed from Swift; double up '%0 %0' to make the "
-        "argument label the same as the parameter name", (StringRef))
 WARNING(parameter_extraneous_empty_name,decl_parsing,none,
         "extraneous '_' in parameter: %0 has no keyword argument name",
         (Identifier))
 ERROR(parameter_operator_keyword_argument,decl_parsing,none,
-      "operator cannot have keyword arguments", ())
+      "%select{operator|closure}0 cannot have keyword arguments", (bool))
 
 ERROR(parameter_unnamed,decl_parsing,none,
       "unnamed parameters must be written with the empty name '_'", ())
@@ -762,8 +730,6 @@ ERROR(expected_expr_conditional_letbinding,stmt_parsing,none,
 ERROR(expected_expr_conditional_letbinding_bool_conditions,stmt_parsing,none,
       "expected 'let' or 'var' in conditional; "
       "use '&&' to join boolean conditions", ())
-ERROR(expected_simple_identifier_pattern,stmt_parsing,none,
-      "expected simple identifier pattern in optional binding condition", ())
 ERROR(expected_expr_conditional_var,stmt_parsing,PointsToFirstBadToken,
       "expected expression after '=' in conditional binding", ())
 ERROR(expected_expr_conditional_where,stmt_parsing,PointsToFirstBadToken,
@@ -817,8 +783,6 @@ ERROR(expected_while_after_repeat_body,stmt_parsing,PointsToFirstBadToken,
       "expected 'while' after body of 'repeat' statement", ())
 ERROR(expected_expr_repeat_while,stmt_parsing,PointsToFirstBadToken,
       "expected expression in 'repeat-while' condition", ())
-ERROR(missing_condition_after_repeat_while,stmt_parsing,none,
-      "missing condition in a 'repeat-while' statement", ())
 
 ERROR(do_while_now_repeat_while,stmt_parsing,none,
       "'do-while' statement is not allowed; use 'repeat-while' instead", ())
@@ -976,8 +940,6 @@ ERROR(availability_query_outside_if_stmt_guard, expr_parsing, none,
 
 ERROR(expected_identifier_after_dot_expr,expr_parsing,none,
       "expected identifier after '.' expression", ())
-ERROR(expected_field_spec_name_tuple_expr,expr_parsing,none,
-      "expected field specifier name in tuple expression", ())
 
 ERROR(expected_identifier_after_super_dot_expr,expr_parsing,
       PointsToFirstBadToken,
@@ -1113,14 +1075,6 @@ ERROR(attr_availability_renamed, attribute_parsing, none,
 ERROR(attr_autoclosure_expected_r_paren,attribute_parsing,PointsToFirstBadToken,
       "expected ')' in @autoclosure", ())
 
-// cc
-ERROR(cc_attribute_expected_lparen,attribute_parsing,none,
-      "expected '(' after 'cc' attribute", ())
-ERROR(cc_attribute_expected_name,attribute_parsing,none,
-      "expected calling convention name identifier in 'cc' attribute", ())
-ERROR(cc_attribute_expected_rparen,attribute_parsing,none,
-      "expected ')' after calling convention name for 'cc' attribute", ())
-
 // convention
 ERROR(convention_attribute_expected_lparen,attribute_parsing,none,
       "expected '(' after 'convention' attribute", ())
@@ -1255,9 +1209,6 @@ WARNING(unknown_build_config,parsing,none,
 //------------------------------------------------------------------------------
 // Availability query parsing diagnostics
 //------------------------------------------------------------------------------
-ERROR(avail_query_not_enabled,parsing,Fatal,
-      "experimental availability checking not enabled", ())
-
 ERROR(avail_query_expected_condition,parsing,PointsToFirstBadToken,
       "expected availability condition", ())
 ERROR(avail_query_expected_platform_name,parsing,PointsToFirstBadToken,

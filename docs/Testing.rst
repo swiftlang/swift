@@ -313,6 +313,8 @@ Other substitutions:
 * ``%platform-sdk-overlay-dir``: absolute path of the directory where the SDK
   overlay module files for the target platform are stored.
 
+* ``%{python}``: run the same Python interpreter that's being used to run the
+  current ``lit`` test.
 
 When writing a test where output (or IR, SIL) depends on the bitness of the
 target CPU, use this pattern::
@@ -355,7 +357,7 @@ CPU=i386_or_x86_64`` to ``REQUIRES: CPU=x86_64``.
 ``swift_test_mode_optimize[_unchecked|none]_<CPUNAME>`` to specify a test mode
 plus cpu configuration.
 
-``optimized_stdlib_<CPUNAME>``` to specify a optimized stdlib plus cpu
+``optimized_stdlib_<CPUNAME>``` to specify an optimized stdlib plus cpu
 configuration.
 
 Feature ``REQUIRES: executable_test``

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -28,7 +28,7 @@
 #include "clang/AST/RecordLayout.h"
 
 #include "GenMeta.h"
-#include "GenSequential.h"
+#include "GenRecord.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -57,10 +57,10 @@ static StructTypeInfoKind getStructTypeInfoKind(const TypeInfo &type) {
 }
 
 namespace {
-  class StructFieldInfo : public SequentialField<StructFieldInfo> {
+  class StructFieldInfo : public RecordField<StructFieldInfo> {
   public:
     StructFieldInfo(VarDecl *field, const TypeInfo &type)
-      : SequentialField(type), Field(field) {}
+      : RecordField(type), Field(field) {}
 
     /// The field.
     VarDecl * const Field;
@@ -75,11 +75,11 @@ namespace {
   };
 
   /// A field-info implementation for fields of Clang types.
-  class ClangFieldInfo : public SequentialField<ClangFieldInfo> {
+  class ClangFieldInfo : public RecordField<ClangFieldInfo> {
   public:
     ClangFieldInfo(VarDecl *swiftField, const ElementLayout &layout,
                    unsigned explosionBegin, unsigned explosionEnd)
-      : SequentialField(layout, explosionBegin, explosionEnd),
+      : RecordField(layout, explosionBegin, explosionEnd),
         Field(swiftField) {}
 
     VarDecl * const Field;
@@ -102,8 +102,8 @@ namespace {
   /// A common base class for structs.
   template <class Impl, class Base, class FieldInfoType = StructFieldInfo>
   class StructTypeInfoBase :
-     public SequentialTypeInfo<Impl, Base, FieldInfoType> {
-    typedef SequentialTypeInfo<Impl, Base, FieldInfoType> super;
+     public RecordTypeInfo<Impl, Base, FieldInfoType> {
+    typedef RecordTypeInfo<Impl, Base, FieldInfoType> super;
 
   protected:
     template <class... As>
@@ -200,7 +200,7 @@ namespace {
         = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
       auto targetSize = asImpl().getFixedSize().getValueInBits();
       
-      if (fieldTI.isKnownEmpty())
+      if (fieldTI.isKnownEmpty(ResilienceExpansion::Maximal))
         return APInt(targetSize, 0);
       
       APInt fieldMask = fieldTI.getFixedExtraInhabitantMask(IGM);
@@ -415,6 +415,8 @@ namespace {
                        llvm::ArrayType::get(IGF.IGM.Int8PtrPtrTy,
                                             storedProperties.size()),
                        IGF.IGM.getPointerAlignment(), "structFields");
+      IGF.Builder.CreateLifetimeStart(fields,
+                            IGF.IGM.getPointerSize() * storedProperties.size());
 
       fields = IGF.Builder.CreateStructGEP(fields, 0, Size(0));
       unsigned index = 0;
@@ -433,18 +435,20 @@ namespace {
       IGF.Builder.CreateCall(IGF.IGM.getInitStructMetadataUniversalFn(),
                              {numFields, fields.getAddress(),
                               fieldVector, vwtable});
+      IGF.Builder.CreateLifetimeEnd(fields,
+                            IGF.IGM.getPointerSize() * storedProperties.size());
     }
   };
 
   class StructTypeBuilder :
-    public SequentialTypeBuilder<StructTypeBuilder, StructFieldInfo, VarDecl*> {
+    public RecordTypeBuilder<StructTypeBuilder, StructFieldInfo, VarDecl*> {
 
     llvm::StructType *StructTy;
     CanType TheStruct;
   public:
     StructTypeBuilder(IRGenModule &IGM, llvm::StructType *structTy,
                       CanType type) :
-      SequentialTypeBuilder(IGM), StructTy(structTy), TheStruct(type) {
+      RecordTypeBuilder(IGM), StructTy(structTy), TheStruct(type) {
     }
 
     LoadableStructTypeInfo *createLoadable(ArrayRef<StructFieldInfo> fields,
@@ -683,7 +687,7 @@ private:
     unsigned explosionEnd = NextExplosionIndex;
 
     ElementLayout layout = ElementLayout::getIncomplete(fieldType);
-    layout.completeFixed(fieldType.isPOD(ResilienceScope::Component),
+    layout.completeFixed(fieldType.isPOD(ResilienceExpansion::Maximal),
                          NextOffset, LLVMFields.size());
 
     FieldInfos.push_back(
@@ -775,7 +779,7 @@ const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
                                                  StructDecl *D) {
   // All resilient structs have the same opaque lowering, since they are
   // indistinguishable as values.
-  if (IGM.isResilient(D, ResilienceScope::Component))
+  if (IGM.isResilient(D, ResilienceExpansion::Maximal))
     return &getResilientStructTypeInfo();
 
   // Create the struct type.

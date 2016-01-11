@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -34,7 +34,7 @@ public struct _stdlib_ShardedAtomicCounter {
     let hardwareConcurrency = _stdlib_getHardwareConcurrency()
     let count = max(8, hardwareConcurrency * hardwareConcurrency)
     let shards = UnsafeMutablePointer<Int>.alloc(count)
-    for var i = 0; i != count; i++ {
+    for i in 0..<count {
       (shards + i).initialize(0)
     }
     self._shardsPtr = shards
@@ -57,7 +57,7 @@ public struct _stdlib_ShardedAtomicCounter {
     var result = 0
     let shards = self._shardsPtr
     let count = self._shardsCount
-    for var i = 0; i != count; i++ {
+    for i in 0..<count {
       result += _swift_stdlib_atomicLoadInt(object: shards + i)
     }
     return result
@@ -72,7 +72,7 @@ public struct _stdlib_ShardedAtomicCounter {
 
     public mutating func randomInt() -> Int {
       var result = 0
-      for var i = 0; i != Int._sizeInBits; ++i {
+      for _ in 0..<Int._sizeInBits {
         result = (result << 1) | (_state & 1)
         _state = (_state >> 1) ^ (-(_state & 1) & Int(bitPattern: 0xD0000001))
       }

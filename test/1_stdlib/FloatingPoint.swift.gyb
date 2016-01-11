@@ -223,7 +223,7 @@ func checkFloatingPointComparison_${FloatSelf}(
   expected: ExpectedComparisonResult,
   _ lhs: ${FloatSelf}, _ rhs: ${FloatSelf},
   //===--- TRACE boilerplate ----------------------------------------------===//
-  // @autoclosure _ message: ()->String = "",
+  // @autoclosure _ message: () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
   file: String = __FILE__, line: UInt = __LINE__
@@ -646,6 +646,25 @@ FloatingPoint.test("Float80/Literals") {
 }
 
 #endif
+
+var FloatingPointClassification = TestSuite("NumericParsing")
+
+FloatingPointClassification.test("FloatingPointClassification/Equatable") {
+  let values: [FloatingPointClassification] = [
+    .SignalingNaN,
+    .QuietNaN,
+    .NegativeInfinity,
+    .NegativeNormal,
+    .NegativeSubnormal,
+    .NegativeZero,
+    .PositiveZero,
+    .PositiveSubnormal,
+    .PositiveNormal,
+    .PositiveInfinity
+  ]
+  // Values should be equal iff indices equal
+  checkEquatable(values, oracle: { $0 == $1 }) 
+}
 
 runAllTests()
 

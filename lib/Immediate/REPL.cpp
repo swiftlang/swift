@@ -1,8 +1,8 @@
-//===-- REPL.cpp - the integrated REPL ------------------------------------===//
+//===--- REPL.cpp - the integrated REPL -----------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -33,7 +33,7 @@
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Process.h"
 
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(__FreeBSD__)
 // FIXME: Support REPL on non-Apple platforms. Ubuntu 14.10's editline does not
 // include the wide character entry points needed by the REPL yet.
 #include <histedit.h>
@@ -130,7 +130,7 @@ public:
 
 using Convert = ConvertForWcharSize<sizeof(wchar_t)>;
   
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(__FreeBSD__)
 static void convertFromUTF8(llvm::StringRef utf8,
                             llvm::SmallVectorImpl<wchar_t> &out) {
   size_t reserve = out.size() + utf8.size();
@@ -162,7 +162,7 @@ static void convertToUTF8(llvm::ArrayRef<wchar_t> wide,
 
 } // end anonymous namespace
 
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(__FreeBSD__)
 
 static bool appendToREPLFile(SourceFile &SF,
                              PersistentParserState &PersistentState,
@@ -950,8 +950,7 @@ public:
     }
     tryLoadLibraries(CI.getLinkLibraries(), Ctx.SearchPathOpts, CI.getDiags());
 
-    llvm::EngineBuilder builder(
-        std::move(std::unique_ptr<llvm::Module>(Module)));
+    llvm::EngineBuilder builder{std::unique_ptr<llvm::Module>{Module}};
     std::string ErrorMsg;
     llvm::TargetOptions TargetOpt;
     std::string CPU;

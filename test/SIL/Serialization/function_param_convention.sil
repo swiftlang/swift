@@ -14,10 +14,10 @@ sil @foo : $@convention(thin) (@out X, @in X, @inout X, @in_guaranteed X, @owned
 sil @foo_caller : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $X
-  %1 = load %0#1 : $*X
+  %1 = load %0 : $*X
   %2 = function_ref @foo : $@convention(thin) (@out X, @in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X, @deallocating X) -> ()
-  apply %2(%0#1, %0#1, %0#1, %0#1, %1, %1, %1, %1) : $@convention(thin) (@out X, @in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X, @deallocating X) -> ()
-  dealloc_stack %0#0 : $*@local_storage X
+  apply %2(%0, %0, %0, %0, %1, %1, %1, %1) : $@convention(thin) (@out X, @in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X, @deallocating X) -> ()
+  dealloc_stack %0 : $*X
   %9999 = tuple()
   return %9999 : $()
 }

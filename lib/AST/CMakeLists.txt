@@ -14,6 +14,7 @@ add_swift_library(swiftAST
   ConformanceLookupTable.cpp
   Decl.cpp
   DeclContext.cpp
+  DefaultArgumentKind.cpp
   DiagnosticList.cpp
   DiagnosticEngine.cpp
   DocComment.cpp
@@ -25,6 +26,7 @@ add_swift_library(swiftAST
   Module.cpp
   ModuleNameLookup.cpp
   NameLookup.cpp
+  Parameter.cpp
   Pattern.cpp
   PlatformKind.cpp
   PrettyStackTrace.cpp

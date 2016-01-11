@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-ir | FileCheck %s
 
 // REQUIRES: CPU=x86_64
-// XFAIL: linux
 
 import Swift
 
@@ -37,7 +36,7 @@ struct Bas<T, U> {
 // CHECK-LABEL: @_TMPC18field_type_vectors3Zim = global
 // -- There should be 14 words between the address point and the field type
 //    vector slot, with type %swift.type**
-// CHECK:         i64, %objc_class*, %swift.opaque*, %swift.opaque*, i64, i32, i32, i32, i16, i16, i32, i32, { {{[^}]*}} }*, i8*, %swift.type*, %swift.type*, i8*, i64, i64, i64, %swift.type**
+// CHECK:         i64, %swift.type*, %swift.opaque*, %swift.opaque*, i64, i32, i32, i32, i16, i16, i32, i32, { {{[^}]*}} }*, i8*, %swift.type*, %swift.type*, i8*, i64, i64, i64, %swift.type**
 class Zim<T, U> {
   var foo: Foo? = nil
   var bar: Bar<T>? = nil

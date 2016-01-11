@@ -98,7 +98,7 @@ bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
   // Not redundant same index and array but append in between.
   %17 = function_ref @append : $@convention(method) (@in Int32, @inout ArrayInt) -> ()
   %18 = alloc_stack $Int32
-  %19 = apply %17(%18#1, %0) : $@convention(method) (@in Int32, @inout ArrayInt) -> ()
+  %19 = apply %17(%18, %0) : $@convention(method) (@in Int32, @inout ArrayInt) -> ()
   retain_value %5 : $Builtin.NativeObject
   %l2 = load %0 : $*ArrayInt
   %20 = apply %2(%i1, %102, %l2) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
@@ -140,7 +140,7 @@ bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
   // CHECK: [[LD4:%[0-9]+]] = load %0
   // CHECK: apply [[CHECKBOUNDS]]([[IDX4]], {{.*}}[[LD4]]
 
-  %98 = dealloc_stack %18#0 : $*@local_storage Int32
+  %98 = dealloc_stack %18 : $*Int32
   %99 = tuple ()
   return %99 : $()
 // CHECK: return
@@ -351,10 +351,10 @@ bb2:
   %21 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 0
   %117 = function_ref @append : $@convention(method) (@in Int32, @inout ArrayInt) -> ()
   %118 = alloc_stack $Int32
-  %119 = apply %117(%118#1, %24) : $@convention(method) (@in Int32, @inout ArrayInt) -> ()
+  %119 = apply %117(%118, %24) : $@convention(method) (@in Int32, @inout ArrayInt) -> ()
   retain_value %55 : $Builtin.NativeObject
   %120 = apply %52(%37, %101, %53) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
-  dealloc_stack %118#0 : $*@local_storage Int32
+  dealloc_stack %118 : $*Int32
   // CHECK: [[APPEND:%[0-9]+]] = function_ref @append
   // CHECK: apply [[APPEND]]
   // CHECK: apply [[CHECKBOUNDS3]]
@@ -853,7 +853,7 @@ bb4:
   %36 = alloc_stack $ArrayInt
   %37 = struct $Int32(%4 : $Builtin.Int32)
   %52 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
-  %53 = load %36#1 : $*ArrayInt
+  %53 = load %36 : $*ArrayInt
   %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
   %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %55 : $Builtin.NativeObject
@@ -862,7 +862,7 @@ bb4:
   %19 = integer_literal $Builtin.Int1, -1
   %20 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %10 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
   %21 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 0
-  dealloc_stack %36 :  $*@local_storage ArrayInt
+  dealloc_stack %36 :  $*ArrayInt
   br bb1(%21 : $Builtin.Int32)
 
 bb3:

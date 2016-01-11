@@ -19,13 +19,13 @@ import ObjectiveC
 #endif
 
 // Note: in this file, we need to go through opaque functions to load
-// constants.  This is to to check runtime behaviour and ensure the constant is
+// constants.  This is to check runtime behaviour and ensure the constant is
 // not folded.
 
 func expectOverflow<T>(
   res: (T, overflow: Bool),
   //===--- TRACE boilerplate ----------------------------------------------===//
-  @autoclosure _ message: ()->String = "",
+  @autoclosure _ message: () -> String = "",
     showFrame: Bool = true,
     stackTrace: SourceLocStack = SourceLocStack(),  
     file: String = __FILE__, line: UInt = __LINE__
@@ -38,7 +38,7 @@ func expectOverflow<T>(
 func expectNoOverflow<T>(
   res: (T, overflow: Bool),
   //===--- TRACE boilerplate ----------------------------------------------===//
-  @autoclosure _ message: ()->String = "",
+  @autoclosure _ message: () -> String = "",
     showFrame: Bool = true,
     stackTrace: SourceLocStack = SourceLocStack(),  
     file: String = __FILE__, line: UInt = __LINE__
@@ -151,7 +151,7 @@ FixedPointArithmeticTraps.test("Subtraction/${IntTy}") {
 // Test multiplication for ${IntTy}
 //
 
-FixedPointArithmeticTraps.test("Multplication/${IntTy}") {
+FixedPointArithmeticTraps.test("Multiplication/${IntTy}") {
   var a = get${IntTy}(${IntTy}.max / 3)
 
   expectNoOverflow(${IntTy}.multiplyWithOverflow(a, get${IntTy}(2)))
@@ -325,7 +325,7 @@ FixedPointTruncationTraps.test("SignedToUnsignedTruncation/src=-1") {
   _blackHole(result)
 }
 
-FixedPointTruncationTraps.test("SignedToUnignedSameSize/src=min") {
+FixedPointTruncationTraps.test("SignedToUnsignedSameSize/src=min") {
   var x = getInt8(-128)
   expectCrashLater()
   var result = UInt16(x)

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -32,7 +32,7 @@ enum class PlatformKind {
 #include "swift/AST/PlatformKinds.def"
 };
 
-/// Returns the short string representating the platform, suitable for
+/// Returns the short string representing the platform, suitable for
 /// use in availability specifications (e.g., "OSX").
 StringRef platformString(PlatformKind platform);
   
@@ -40,7 +40,7 @@ StringRef platformString(PlatformKind platform);
 /// or None if such a platform kind does not exist.
 Optional<PlatformKind> platformFromString(StringRef Name);
 
-/// Returns a human-readiable version of the platform name as a string, suitable
+/// Returns a human-readable version of the platform name as a string, suitable
 /// for emission in diagnostics (e.g., "OS X").
 StringRef prettyPlatformString(PlatformKind platform);
 

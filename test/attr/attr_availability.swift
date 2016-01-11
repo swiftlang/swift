@@ -56,7 +56,7 @@ func useWithEscapedMessage() {
 
 // More complicated parsing.
 @available(OSX, message="x", unavailable)
-let _: Int;
+let _: Int
 
 @available(OSX, introduced=1, deprecated=2.0, obsoleted=3.0.0)
 let _: Int
@@ -66,7 +66,7 @@ let _: Int
 
 // Meaningless but accepted.
 @available(OSX, message="x")
-let _: Int;
+let _: Int
 
 
 // Parse errors.

@@ -272,3 +272,14 @@ class Foo {
     }
 }
 
+// <rdar://problem/23952125> QoI: Subscript in protocol with missing {}, better diagnostic please
+protocol r23952125 {
+  typealias ItemType
+  var count: Int { get }
+  subscript(index: Int) -> ItemType  // expected-error {{subscript in protocol must have explicit { get } or { get set } specifier}} {{36-36= { get set \}}}
+  
+  var c : Int // expected-error {{property in protocol must have explicit { get } or { get set } specifier}}
+}
+
+
+

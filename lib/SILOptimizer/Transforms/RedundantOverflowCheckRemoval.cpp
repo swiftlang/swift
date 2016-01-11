@@ -1,8 +1,8 @@
-//===-- RedundantOverflowCheckRemoval.cpp ----------------------*- C++ -*-===//
+//===--- RedundantOverflowCheckRemoval.cpp ----------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -130,7 +130,7 @@ public:
     // Perform a forward scan and use control flow and previously detected
     // overflow checks to remove the overflow checks.
 
-    // For each block in a Reverse Post Prder scan:
+    // For each block in a Reverse Post Order scan:
     for (auto &BB : ReversePostOrder) {
       // For each instruction:
       for (auto Inst = BB->begin(), End = BB->end(); Inst != End; Inst++) {
