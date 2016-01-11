@@ -3499,7 +3499,7 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   // requirements of the archetype. Look at what's locally bound.
   if (conformance.isAbstract()) {
     auto archetype = cast<ArchetypeType>(srcType);
-    return emitWitnessTableRef(IGF, archetype, proto);
+    return emitArchetypeWitnessTableRef(IGF, archetype, proto);
   }
 
   // All other source types should be concrete enough that we have conformance

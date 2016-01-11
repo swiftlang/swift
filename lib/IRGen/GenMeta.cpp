@@ -2723,7 +2723,8 @@ namespace {
       for (auto &fillOp : FillOps) {
         llvm::Value *value;
         if (fillOp.Protocol) {
-          value = emitWitnessTableRef(IGF, fillOp.Archetype, fillOp.Protocol);
+          value = emitArchetypeWitnessTableRef(IGF, fillOp.Archetype,
+                                               fillOp.Protocol);
         } else {
           value = IGF.getLocalTypeData(fillOp.Archetype,
                                        LocalTypeDataKind::forMetatype());

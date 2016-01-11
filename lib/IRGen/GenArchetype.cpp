@@ -169,9 +169,9 @@ getArchetypeInfo(IRGenFunction &IGF, CanArchetypeType t, const TypeInfo &ti) {
 }
 
 /// Emit a single protocol witness table reference.
-llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
-                                        CanArchetypeType archetype,
-                                        ProtocolDecl *proto) {
+llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
+                                                 CanArchetypeType archetype,
+                                                 ProtocolDecl *proto) {
   assert(Lowering::TypeConverter::protocolRequiresWitnessTable(proto) &&
          "looking up witness table for protocol that doesn't have one");
 
@@ -189,8 +189,8 @@ llvm::Value *irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
                                                   CanArchetypeType origin,
                                                AssociatedTypeDecl *associate) {
   // Find the conformance of the origin to the associated type's protocol.
-  llvm::Value *wtable = emitWitnessTableRef(IGF, origin,
-                                            associate->getProtocol());
+  llvm::Value *wtable = emitArchetypeWitnessTableRef(IGF, origin,
+                                                     associate->getProtocol());
 
   // Find the origin's type metadata.
   llvm::Value *originMetadata = emitArchetypeTypeMetadataRef(IGF, origin);
@@ -205,8 +205,8 @@ irgen::emitAssociatedTypeWitnessTableRef(IRGenFunction &IGF,
                                          llvm::Value *associateMetadata,
                                          ProtocolDecl *associateProtocol) {
   // Find the conformance of the origin to the associated type's protocol.
-  llvm::Value *wtable = emitWitnessTableRef(IGF, origin,
-                                            associate->getProtocol());
+  llvm::Value *wtable = emitArchetypeWitnessTableRef(IGF, origin,
+                                                     associate->getProtocol());
 
   // Find the origin's type metadata.
   llvm::Value *originMetadata = emitArchetypeTypeMetadataRef(IGF, origin);
