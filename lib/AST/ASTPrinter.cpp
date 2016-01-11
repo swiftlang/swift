@@ -137,8 +137,12 @@ bool ASTPrinter::printTypeInterface(Type Ty, DeclContext *DC,
   Ty = Ty->getRValueType();
   PrintOptions Options = PrintOptions::printTypeInterface(Ty.getPointer(), DC);
    if (auto ND = Ty->getNominalOrBoundGenericNominal()) {
+     llvm::SmallPtrSet<const ExtensionDecl*, 4> AllExts;
+     for (auto Ext : ND->getExtensions()) {
+       AllExts.insert(Ext);
+     }
      Options.printExtensionContentAsMembers = [&](const ExtensionDecl *ED) {
-       return isExtensionApplied(*ND->getDeclContext(), Ty, ED);
+       return AllExts.count(ED) == 1 && isExtensionApplied(*ND->getDeclContext(), Ty, ED);
      };
      ND->print(OS, Options);
      return true;
