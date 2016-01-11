@@ -725,7 +725,7 @@ the number of parallel build jobs to use""",
 
     build_dir = os.path.join(SWIFT_BUILD_ROOT, args.build_subdir)
 
-    if args.clean:
+    if args.clean and os.path.isdir(build_dir):
         shutil.rmtree(build_dir)
 
     host_clang = swift_build_support.clang.host_clang(
