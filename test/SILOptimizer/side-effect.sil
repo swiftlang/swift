@@ -3,7 +3,26 @@
 // REQUIRES: asserts
 
 import Builtin
-import Swift
+
+//////////////////
+// Declarations //
+//////////////////
+
+struct Int32 {
+  var _value : Builtin.Int32
+}
+
+struct Array<T> {
+  var _value : Builtin.NativeObject
+}
+
+struct Bool {
+  var _value: Builtin.Int1
+}
+
+struct UnsafeMutablePointer<T> {
+  var _value: Builtin.RawPointer
+}
 
 class X {
   @sil_stored var a: Int32
@@ -12,7 +31,36 @@ class X {
   init()
 }
 
+sil @exitfunc : $@convention(thin) @noreturn () -> ()
+sil [readnone] @pure_func : $@convention(thin) () -> ()
+sil [readonly] @readonly_owned : $@convention(thin) (@owned X) -> ()
+sil [readonly] @readonly_guaranteed : $@convention(thin) (@guaranteed X) -> ()
+
 sil @unknown_func : $@convention(thin) () -> ()
+
+
+struct SP {
+  var value: Builtin.BridgeObject
+}
+
+enum EP {
+  case None
+  case Data(SP, Builtin.Int1)
+}
+
+sil [_semantics "array.props.isNativeTypeChecked"] @isNativeTypeChecked_Int : $@convention(method) (@guaranteed Array<Int32>) -> Bool
+sil [_semantics "array.check_subscript"] @check_subscript_Int : $@convention(method) (Int32, Bool, @guaranteed Array<Int32>) -> ()
+sil [_semantics "array.check_index"] @check_index_Int : $@convention(method) (Int32, @guaranteed Array<Int32>) -> ()
+sil [_semantics "array.get_element"] @get_element_Int : $@convention(method) (@out Int32, Int32, Bool, @guaranteed Array<Int32>) -> ()
+sil [_semantics "array.make_mutable"] @make_mutable_Int : $@convention(method) (@inout Array<Int32>) -> ()
+sil [_semantics "array.get_element_address"] @get_element_address_Int : $@convention(method) (Int32, @guaranteed Array<Int32>) -> UnsafeMutablePointer<Int32>
+sil [_semantics "array.get_count"] @get_count_Int : $@convention(method) (@guaranteed Array<Int32>) -> Int32
+sil [_semantics "array.get_capacity"] @get_capacity_Int : $@convention(method) (@guaranteed Array<Int32>) -> Int32
+sil [_semantics "array.get_count"] @get_count_X : $@convention(method) (@guaranteed Array<X>) -> Int32
+
+///////////
+// Tests //
+///////////
 
 // CHECK-LABEL: sil @load_store_to_args
 // CHECK: <func=,param0=r,param1=w,param2=w>
@@ -224,15 +272,6 @@ bb0(%0 : $Int32):
   return %r : $Int32
 }
 
-struct SP {
-  var value: Builtin.BridgeObject
-}
-
-enum EP {
-  case None
-  case Data(SP, Builtin.Int1)
-}
-
 // CHECK-LABEL: sil @projections
 // CHECK: <func=,param0=r>
 sil @projections : $@convention(thin) (EP) -> Builtin.Int32 {
@@ -369,16 +408,6 @@ bb0(%0 : $Array<Int32>):
   return %r : $()
 }
 
-sil [_semantics "array.props.isNativeTypeChecked"] @isNativeTypeChecked_Int : $@convention(method) (@guaranteed Array<Int32>) -> Bool
-sil [_semantics "array.check_subscript"] @check_subscript_Int : $@convention(method) (Int32, Bool, @guaranteed Array<Int32>) -> ()
-sil [_semantics "array.check_index"] @check_index_Int : $@convention(method) (Int32, @guaranteed Array<Int32>) -> ()
-sil [_semantics "array.get_element"] @get_element_Int : $@convention(method) (@out Int32, Int32, Bool, @guaranteed Array<Int32>) -> ()
-sil [_semantics "array.make_mutable"] @make_mutable_Int : $@convention(method) (@inout Array<Int32>) -> ()
-sil [_semantics "array.get_element_address"] @get_element_address_Int : $@convention(method) (Int32, @guaranteed Array<Int32>) -> UnsafeMutablePointer<Int32>
-sil [_semantics "array.get_count"] @get_count_Int : $@convention(method) (@guaranteed Array<Int32>) -> Int32
-sil [_semantics "array.get_capacity"] @get_capacity_Int : $@convention(method) (@guaranteed Array<Int32>) -> Int32
-sil [_semantics "array.get_count"] @get_count_X : $@convention(method) (@guaranteed Array<X>) -> Int32
-
 // CHECK-LABEL: sil @call_noreturn
 // CHECK: <func=;trap>
 sil @call_noreturn : $@convention(thin) () -> () {
@@ -424,9 +453,3 @@ bb0(%0 : $X):
   %r = tuple ()
   return %r : $()
 }
-
-sil @exitfunc : $@convention(thin) @noreturn () -> ()
-sil [readnone] @pure_func : $@convention(thin) () -> ()
-sil [readonly] @readonly_owned : $@convention(thin) (@owned X) -> ()
-sil [readonly] @readonly_guaranteed : $@convention(thin) (@guaranteed X) -> ()
-
