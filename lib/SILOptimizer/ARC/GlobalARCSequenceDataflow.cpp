@@ -202,8 +202,6 @@ bool ARCSequenceDataflowEvaluator::processTopDown() {
 // finished and Block ARC is removed.
 static bool isARCSignificantTerminator(TermInst *TI) {
   switch (TI->getTermKind()) {
-  case TermKind::Invalid:
-    llvm_unreachable("Expected a TermInst");
   case TermKind::UnreachableInst:
   // br is a forwarding use for its arguments. It cannot in of itself extend
   // the lifetime of an object (just like a phi-node) cannot.

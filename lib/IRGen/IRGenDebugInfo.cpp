@@ -553,10 +553,15 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
   if (!DC)
     return TheCU;
 
+  if (isa<FuncDecl>(DC))
+    if (auto *Decl = IGM.SILMod->lookUpFunction(
+          SILDeclRef(cast<AbstractFunctionDecl>(DC), SILDeclRef::Kind::Func)))
+      return getOrCreateScope(Decl->getDebugScope());
+
   switch (DC->getContextKind()) {
-  // TODO: Create a cache for functions.
-  case DeclContextKind::AbstractClosureExpr:
+  // The interesting cases are already handled above.
   case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::AbstractClosureExpr:
 
   // We don't model these in DWARF.
   case DeclContextKind::SerializedLocal:
@@ -645,7 +650,6 @@ static bool isAllocatingConstructor(SILFunctionTypeRepresentation Rep,
 llvm::DISubprogram *IRGenDebugInfo::emitFunction(
     SILModule &SILMod, const SILDebugScope *DS, llvm::Function *Fn,
     SILFunctionTypeRepresentation Rep, SILType SILTy, DeclContext *DeclCtx) {
-  // Returned a previously cached entry for an abstract (inlined) function.
   auto cached = ScopeCache.find(DS);
   if (cached != ScopeCache.end())
     return cast<llvm::DISubprogram>(cached->second);
@@ -678,9 +682,11 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(
     ScopeLine = FL.LocForLinetable.Line;
   }
 
-  auto File = getOrCreateFile(L.Filename);
-  auto Scope = MainModule;
   auto Line = L.Line;
+  auto File = getOrCreateFile(L.Filename);
+  llvm::DIScope *Scope = MainModule;
+  if (DS->SILFn && DS->SILFn->getDeclContext())
+    Scope = getOrCreateContext(DS->SILFn->getDeclContext()->getParent());
 
   // We know that main always comes from MainFile.
   if (LinkageName == SWIFT_ENTRY_POINT_FUNCTION) {
@@ -871,12 +877,9 @@ llvm::DIFile *IRGenDebugInfo::getFile(llvm::DIScope *Scope) {
     case llvm::dwarf::DW_TAG_lexical_block:
       Scope = cast<llvm::DILexicalBlock>(Scope)->getScope();
       break;
-    case llvm::dwarf::DW_TAG_subprogram: {
-      // Scopes are not indexed by UID.
-      llvm::DITypeIdentifierMap EmptyMap;
-      Scope = cast<llvm::DISubprogram>(Scope)->getScope().resolve(EmptyMap);
+    case llvm::dwarf::DW_TAG_subprogram:
+      Scope = cast<llvm::DISubprogram>(Scope)->getFile();
       break;
-    }
     default:
       return MainFile;
     }

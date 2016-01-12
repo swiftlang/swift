@@ -282,7 +282,7 @@ bool TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
       continue;
 
     switch (req.getKind()) {
-    case RequirementKind::Conformance: {
+    case RequirementReprKind::TypeConstraint: {
       // Validate the types.
       if (validateType(req.getSubjectLoc(), lookupDC, options, resolver)) {
         invalid = true;
@@ -312,7 +312,7 @@ bool TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
       break;
     }
 
-    case RequirementKind::SameType:
+    case RequirementReprKind::SameType:
       if (validateType(req.getFirstTypeLoc(), lookupDC, options,
                        resolver)) {
         invalid = true;
@@ -328,9 +328,6 @@ bool TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
       }
       
       break;
-
-    case RequirementKind::WitnessMarker:
-      llvm_unreachable("value witness markers in syntactic requirement?");
     }
     
     if (builder && builder->addRequirement(req)) {
@@ -860,18 +857,20 @@ bool TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
     switch (req.getKind()) {
     case RequirementKind::Conformance: {
       // Protocol conformance requirements.
-      if (auto proto = secondType->getAs<ProtocolType>()) {
-        // FIXME: This should track whether this should result in a private
-        // or non-private dependency.
-        // FIXME: Do we really need "used" at this point?
-        // FIXME: Poor location information. How much better can we do here?
-        if (!conformsToProtocol(firstType, proto->getDecl(), dc,
-                                ConformanceCheckFlags::Used, nullptr, loc))
-          return true;
-
-        continue;
+      auto proto = secondType->castTo<ProtocolType>();
+      // FIXME: This should track whether this should result in a private
+      // or non-private dependency.
+      // FIXME: Do we really need "used" at this point?
+      // FIXME: Poor location information. How much better can we do here?
+      if (!conformsToProtocol(firstType, proto->getDecl(), dc,
+                              ConformanceCheckFlags::Used, nullptr, loc)) {
+        return true;
       }
 
+      continue;
+    }
+
+    case RequirementKind::Superclass:
       // Superclass requirements.
       if (!isSubtypeOf(firstType, secondType, dc)) {
         // FIXME: Poor source-location information.
@@ -885,9 +884,7 @@ bool TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
                    genericParams, substitutions));
         return true;
       }
-
       continue;
-    }
 
     case RequirementKind::SameType:
       if (!firstType->isEqual(secondType)) {

@@ -204,7 +204,7 @@ protocol Prot2 : Prot {}
 // CHECK: <kw>class</kw> SubCls : <type>MyCls</type>, <type>Prot</type> {}
 class SubCls : MyCls, Prot {}
 
-// CHECK: <kw>func</kw> genFn<T : <type>Prot</type> <kw>where</kw> <type>T</type>.<type>Blarg</type> : Prot2>(<kw>_</kw>: <type>T</type>) -> <type>Int</type> {}{{$}}
+// CHECK: <kw>func</kw> genFn<T : <type>Prot</type> <kw>where</kw> <type>T</type>.<type>Blarg</type> : <type>Prot2</type>>(<kw>_</kw>: <type>T</type>) -> <type>Int</type> {}{{$}}
 func genFn<T : Prot where T.Blarg : Prot2>(_: T) -> Int {}
 
 func f(x: Int) -> Int {

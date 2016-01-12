@@ -255,6 +255,21 @@ GenericSignature::getCanonicalManglingSignature(ModuleDecl &M) const {
       depTypes.push_back(depTy);
       return;
     }
+
+    case RequirementKind::Superclass: {
+      assert(std::find(depTypes.begin(), depTypes.end(),
+                       depTy) != depTypes.end()
+             && "didn't see witness marker first?");
+      // Organize conformance constraints, sifting out the base class
+      // requirement.
+      auto &depConstraints = constraints[depTy];
+
+      auto constraintType = type.get<Type>()->getCanonicalType();
+      assert(depConstraints.baseClass.isNull()
+              && "multiple base class constraints?!");
+      depConstraints.baseClass = constraintType;
+      return;
+    }
       
     case RequirementKind::Conformance: {
       assert(std::find(depTypes.begin(), depTypes.end(),
@@ -265,14 +280,8 @@ GenericSignature::getCanonicalManglingSignature(ModuleDecl &M) const {
       auto &depConstraints = constraints[depTy];
       
       auto constraintType = type.get<Type>()->getCanonicalType();
-      if (constraintType->isExistentialType()) {
-        depConstraints.protocols.push_back(constraintType);
-      } else {
-        assert(depConstraints.baseClass.isNull()
-               && "multiple base class constraints?!");
-        depConstraints.baseClass = constraintType;
-      }
-        
+      assert(constraintType->isExistentialType());
+      depConstraints.protocols.push_back(constraintType);
       return;
     }
     
@@ -315,7 +324,7 @@ GenericSignature::getCanonicalManglingSignature(ModuleDecl &M) const {
       const auto &depConstraints = foundConstraints->second;
       
       if (depConstraints.baseClass)
-        minimalRequirements.push_back(Requirement(RequirementKind::Conformance,
+        minimalRequirements.push_back(Requirement(RequirementKind::Superclass,
                                                   depTy,
                                                   depConstraints.baseClass));
       

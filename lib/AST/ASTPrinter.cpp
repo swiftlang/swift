@@ -680,8 +680,7 @@ void PrintAST::printWhereClause(ArrayRef<RequirementRepr> requirements) {
 
   bool isFirst = true;
   for (auto &req : requirements) {
-    if (req.isInvalid() ||
-        req.getKind() == RequirementKind::WitnessMarker)
+    if (req.isInvalid())
       continue;
 
     if (isFirst) {
@@ -698,18 +697,16 @@ void PrintAST::printWhereClause(ArrayRef<RequirementRepr> requirements) {
     }
 
     switch (req.getKind()) {
-    case RequirementKind::Conformance:
+    case RequirementReprKind::TypeConstraint:
       printTypeLoc(req.getSubjectLoc());
       Printer << " : ";
       printTypeLoc(req.getConstraintLoc());
       break;
-    case RequirementKind::SameType:
+    case RequirementReprKind::SameType:
       printTypeLoc(req.getFirstTypeLoc());
       Printer << " == ";
       printTypeLoc(req.getSecondTypeLoc());
       break;
-    case RequirementKind::WitnessMarker:
-      llvm_unreachable("Handled above");
     }
   }
 }
@@ -2833,6 +2830,7 @@ public:
   unsigned getDepthOfRequirement(const Requirement &req) {
     switch (req.getKind()) {
     case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
     case RequirementKind::WitnessMarker:
       return getDepthOfType(req.getFirstType());
 
@@ -2928,6 +2926,7 @@ public:
       visit(req.getFirstType());
       switch (req.getKind()) {
       case RequirementKind::Conformance:
+      case RequirementKind::Superclass:
         Printer << " : ";
         break;
 

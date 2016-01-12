@@ -610,6 +610,10 @@ ParserResult<Expr> Parser::parseExprSuper() {
     consumeToken(tok::code_complete);
     return makeParserCodeCompletionResult(superRef);
   }
+  
+  if (consumeIf(tok::unknown))
+    return nullptr;
+  
   diagnose(Tok, diag::expected_dot_or_subscript_after_super);
   return nullptr;
 }

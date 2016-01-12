@@ -1970,9 +1970,10 @@ struct ASTNodeBase {};
           switch (requirements.front().getKind()) {
           case RequirementKind::Conformance:
             // If the second type is a protocol type, we're done.
-            if (requirements.front().getSecondType()->is<ProtocolType>())
-              done = true;
+            done = true;
+            break;
 
+          case RequirementKind::Superclass:
             break;
 
           case RequirementKind::SameType:

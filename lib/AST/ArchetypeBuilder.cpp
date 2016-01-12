@@ -1159,7 +1159,7 @@ bool ArchetypeBuilder::visitInherited(
 
 bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {
   switch (Req.getKind()) {
-  case RequirementKind::Conformance: {
+  case RequirementReprKind::TypeConstraint: {
     PotentialArchetype *PA = resolveArchetype(Req.getSubject());
     if (!PA) {
       // FIXME: Poor location information.
@@ -1199,14 +1199,11 @@ bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {
     return false;
   }
 
-  case RequirementKind::SameType:
+  case RequirementReprKind::SameType:
     return addSameTypeRequirement(Req.getFirstType(), 
                                   Req.getSecondType(),
                                   RequirementSource(RequirementSource::Explicit,
                                                     Req.getEqualLoc()));
-
-  case RequirementKind::WitnessMarker:
-    llvm_unreachable("Value witness marker in requirement");
   }
 
   llvm_unreachable("Unhandled requirement?");
@@ -1215,14 +1212,18 @@ bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {
 void ArchetypeBuilder::addRequirement(const Requirement &req, 
                                       RequirementSource source) {
   switch (req.getKind()) {
-  case RequirementKind::Conformance: {
+  case RequirementKind::Superclass: {
     PotentialArchetype *pa = resolveArchetype(req.getFirstType());
     assert(pa && "Re-introducing invalid requirement");
 
-    if (req.getSecondType()->getClassOrBoundGenericClass()) {
-      addSuperclassRequirement(pa, req.getSecondType(), source);
-      return;
-    }
+    assert(req.getSecondType()->getClassOrBoundGenericClass());
+    addSuperclassRequirement(pa, req.getSecondType(), source);
+    return;
+  }
+
+  case RequirementKind::Conformance: {
+    PotentialArchetype *pa = resolveArchetype(req.getFirstType());
+    assert(pa && "Re-introducing invalid requirement");
 
     SmallVector<ProtocolDecl *, 4> conformsTo;
     bool existential = req.getSecondType()->isExistentialType(conformsTo);
@@ -1338,6 +1339,7 @@ public:
         break;
       }
 
+      case RequirementKind::Superclass:
       case RequirementKind::Conformance: {
         auto subjectType = req.getFirstType().subst(
                              &Builder.getModule(),
@@ -1354,17 +1356,19 @@ public:
         if (isOuterArchetype(subjectPA))
           return Action::Continue;
 
-        if (auto proto = req.getSecondType()->getAs<ProtocolType>()) {
+        if (req.getKind() == RequirementKind::Conformance) {
+          auto proto = req.getSecondType()->castTo<ProtocolType>();
           if (Builder.addConformanceRequirement(subjectPA, proto->getDecl(),
                                                 source)) {
             HadError = true;
             return Action::Stop;
           }
-        } else if (Builder.addSuperclassRequirement(subjectPA, 
-                                                    req.getSecondType(),
-                                                    source)) {
-          HadError = true;
-          return Action::Stop;
+        } else {
+          if (Builder.addSuperclassRequirement(subjectPA, req.getSecondType(),
+                                               source)) {
+            HadError = true;
+            return Action::Stop;
+          }
         }
         break;
       }
@@ -1623,9 +1627,8 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
       RequirementSource(RequirementSource::Protocol, SourceLoc()));
 
     // If we have a superclass, produce a superclass requirement
-    // (FIXME: Currently described as a conformance requirement)
     if (Type superclass = archetype->getSuperclass()) {
-      f(RequirementKind::Conformance, archetype, superclass,
+      f(RequirementKind::Superclass, archetype, superclass,
         archetype->getSuperclassSource());
     }
 
@@ -1710,6 +1713,7 @@ void ArchetypeBuilder::dump(llvm::raw_ostream &out) {
                             RequirementSource source) {
     switch (kind) {
     case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
       out << "\n  ";
       out << archetype->getDebugName() << " : " 
           << type.get<Type>().getString() << " [";
@@ -1863,9 +1867,8 @@ addRequirements(
 
   // Add superclass requirement, if needed.
   if (auto superclass = pa->getSuperclass()) {
-    // FIXME: Distinguish superclass from conformance?
     // FIXME: What if the superclass type involves a type parameter?
-    requirements.push_back(Requirement(RequirementKind::Conformance,
+    requirements.push_back(Requirement(RequirementKind::Superclass,
                                        type, superclass));
   }
 

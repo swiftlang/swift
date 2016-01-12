@@ -917,23 +917,26 @@ void ConstraintSystem::openGeneric(
   switch (req.getKind()) {
     case RequirementKind::Conformance: {
       auto subjectTy = req.getFirstType().transform(replaceDependentTypes);
-      if (auto proto = req.getSecondType()->getAs<ProtocolType>()) {
-        // Determine whether this is the protocol 'Self' constraint we should
-        // skip.
-        if (skipProtocolSelfConstraint &&
-            (proto->getDecl() == dc->isProtocolOrProtocolExtensionContext() ||
-             proto->getDecl()
-               == dc->getParent()->isProtocolOrProtocolExtensionContext())&&
-            isProtocolSelfType(req.getFirstType())) {
-          break;
-        }
-
-        addConstraint(ConstraintKind::ConformsTo, subjectTy, proto,
-                      locatorPtr);
-      } else {
-        auto boundTy = req.getSecondType().transform(replaceDependentTypes);
-        addConstraint(ConstraintKind::Subtype, subjectTy, boundTy, locatorPtr);
+      auto proto = req.getSecondType()->castTo<ProtocolType>();
+      // Determine whether this is the protocol 'Self' constraint we should
+      // skip.
+      if (skipProtocolSelfConstraint &&
+          (proto->getDecl() == dc->isProtocolOrProtocolExtensionContext() ||
+           proto->getDecl()
+             == dc->getParent()->isProtocolOrProtocolExtensionContext())&&
+          isProtocolSelfType(req.getFirstType())) {
+        break;
       }
+
+      addConstraint(ConstraintKind::ConformsTo, subjectTy, proto,
+                    locatorPtr);
+      break;
+    }
+
+    case RequirementKind::Superclass: {
+      auto subjectTy = req.getFirstType().transform(replaceDependentTypes);
+      auto boundTy = req.getSecondType().transform(replaceDependentTypes);
+      addConstraint(ConstraintKind::Subtype, subjectTy, boundTy, locatorPtr);
       break;
     }
 

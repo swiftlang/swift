@@ -3683,7 +3683,6 @@ public:
 //===----------------------------------------------------------------------===//
 
 enum class TermKind {
-  Invalid = 0,
 #define TERMINATOR(Id, Parent, MemBehavior, MayRelease) Id,
 #include "SILNodes.def"
 };
@@ -3693,15 +3692,13 @@ struct ValueKindAsTermKind {
 
   ValueKindAsTermKind(ValueKind V) {
     switch (V) {
-#define TERMINATOR(Id, Parent, MemBehavior, MayRelease)                        \
-  case ValueKind::Id:                                                          \
-    K = TermKind::Id;                                                          \
-    break;
-#define VALUE(Id, Parent)                                                      \
-  case ValueKind::Id:                                                          \
-    K = TermKind::Invalid;                                                     \
-    break;
+#define TERMINATOR(Id, Parent, MemBehavior, MayRelease)                 \
+      case ValueKind::Id:                                               \
+        K = TermKind::Id;                                               \
+        break;
 #include "SILNodes.def"
+    default:
+      llvm_unreachable("Not a terminator kind?!");
     }
   }
 

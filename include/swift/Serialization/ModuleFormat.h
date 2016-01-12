@@ -52,7 +52,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 232; // no archetype in substitutions
+const uint16_t VERSION_MINOR = 233; // superclass requirement kind
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -233,7 +233,8 @@ static inline OperatorKind getStableFixity(DeclKind kind) {
 enum GenericRequirementKind : uint8_t {
   Conformance = 0,
   SameType,
-  WitnessMarker
+  WitnessMarker,
+  Superclass
 };
 using GenericRequirementKindField = BCFixed<2>;
 

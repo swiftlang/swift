@@ -68,23 +68,8 @@
       key.diagnostic_stage: source.diagnostic.stage.swift.parse
     },
     {
-      key.line: 3,
-      key.column: 19,
-      key.filepath: syntaxmap-edit-del.swift,
-      key.severity: source.diagnostic.severity.error,
-      key.description: "consecutive declarations on a line must be separated by ';'",
-      key.diagnostic_stage: source.diagnostic.stage.swift.parse,
-      key.fixits: [
-        {
-          key.offset: 32,
-          key.length: 0,
-          key.sourcetext: ";"
-        }
-      ]
-    },
-    {
-      key.line: 3,
-      key.column: 19,
+      key.line: 4,
+      key.column: 1,
       key.filepath: syntaxmap-edit-del.swift,
       key.severity: source.diagnostic.severity.error,
       key.description: "expected declaration",

@@ -640,7 +640,7 @@ GenericParamList::getAsGenericSignatureElements(ASTContext &C,
     
     // Collect conformance requirements declared on the archetype.
     if (auto super = archetype->getSuperclass()) {
-      requirements.push_back(Requirement(RequirementKind::Conformance,
+      requirements.push_back(Requirement(RequirementKind::Superclass,
                                          typeParamTy, super));
     }
     for (auto proto : archetype->getConformsTo()) {
@@ -658,8 +658,8 @@ GenericParamList::getAsGenericSignatureElements(ASTContext &C,
 
     // Add conformance requirements for this associated archetype.
     for (const auto &repr : getRequirements()) {
-      // Handle same-type requirements at last.
-      if (repr.getKind() != RequirementKind::Conformance)
+      // Handle same-type requirements later.
+      if (repr.getKind() != RequirementReprKind::TypeConstraint)
         continue;
 
       // Primary conformance declarations would have already been gathered as
@@ -668,13 +668,21 @@ GenericParamList::getAsGenericSignatureElements(ASTContext &C,
         if (!arch->getParent())
           continue;
 
-      auto depTyOfReqt = getAsDependentType(repr.getSubject(), archetypeMap);
-      if (depTyOfReqt.getPointer() != depTy.getPointer())
+      Type subject = getAsDependentType(repr.getSubject(), archetypeMap);
+      if (subject.getPointer() != depTy.getPointer())
         continue;
 
-      Requirement reqt(RequirementKind::Conformance,
-                       getAsDependentType(repr.getSubject(), archetypeMap),
-                       getAsDependentType(repr.getConstraint(), archetypeMap));
+      Type constraint =
+        getAsDependentType(repr.getConstraint(), archetypeMap);
+
+      RequirementKind kind;
+      if (constraint->getClassOrBoundGenericClass()) {
+        kind = RequirementKind::Superclass;
+      } else {
+        kind = RequirementKind::Conformance;
+      }
+
+      Requirement reqt(kind, subject, constraint);
       requirements.push_back(reqt);
     }
   }

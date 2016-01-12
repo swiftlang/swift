@@ -34,8 +34,6 @@ static bool isSafeNonExitTerminator(TermInst *TI) {
   case TermKind::ThrowInst:
   case TermKind::TryApplyInst:
     return false;
-  case TermKind::Invalid:
-    llvm_unreachable("Invalid Term Inst?!");
   }
 }
 

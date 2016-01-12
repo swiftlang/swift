@@ -2872,10 +2872,10 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     assert((pointer->getNumChildren() == 2 || pointer->getNumChildren() == 3)
            && "Extension expects 2 or 3 children.");
     if (Options.QualifyEntities && Options.DisplayExtensionContexts) {
-      Printer << "ext.";
+      Printer << "(extension in ";
       // Print the module where extension is defined.
       print(pointer->getChild(0), true);
-      Printer << ".";
+      Printer << "):";
     }
     print(pointer->getChild(1), asContext);
     if (pointer->getNumChildren() == 3)

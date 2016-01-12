@@ -81,7 +81,7 @@ class SubCls : MyCls, Prot {
   var protocolProperty2 = 0
 }
 
-// CHECK: func <Func>genFn</Func><<GenericTypeParam>T</GenericTypeParam> : <Protocol@64:10>Prot</Protocol> where <GenericTypeParam@85:12>T</GenericTypeParam>.<AssociatedType@65:13>Blarg</AssociatedType> : Prot2>(<Param>p</Param> : <GenericTypeParam@85:12>T</GenericTypeParam>) -> <iStruct@>Int</iStruct> {}{{$}}
+// CHECK: func <Func>genFn</Func><<GenericTypeParam>T</GenericTypeParam> : <Protocol@64:10>Prot</Protocol> where <GenericTypeParam@85:12>T</GenericTypeParam>.<AssociatedType@65:13>Blarg</AssociatedType> : <Protocol@71:10>Prot2</Protocol>>(<Param>p</Param> : <GenericTypeParam@85:12>T</GenericTypeParam>) -> <iStruct@>Int</iStruct> {}{{$}}
 func genFn<T : Prot where T.Blarg : Prot2>(p : T) -> Int {}
 
 func test(x: Int) {
