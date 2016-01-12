@@ -5286,10 +5286,22 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     return result;
   }
 
+  // If this is an UnresolvedType in the system, preserve it.
+  if (fn->getType()->is<UnresolvedType>()) {
+    apply->setType(fn->getType());
+    return apply;
+  }
+
   // We have a type constructor.
   auto metaTy = fn->getType()->castTo<AnyMetatypeType>();
   auto ty = metaTy->getInstanceType();
-  
+
+  // If this is an UnresolvedType in the system, preserve it.
+  if (ty->is<UnresolvedType>()) {
+    apply->setType(ty);
+    return apply;
+  }
+
   // If the metatype value isn't a type expression, the user should reference
   // '.init' explicitly, for clarity.
   if (!fn->isTypeReference()) {
