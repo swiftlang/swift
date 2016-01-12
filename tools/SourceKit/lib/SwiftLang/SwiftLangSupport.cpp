@@ -156,9 +156,6 @@ class UIdentVisitor : public ASTVisitor<UIdentVisitor,
 public:
   explicit UIdentVisitor(bool IsRef) : IsRef(IsRef) { }
 
-  /// TODO: reconsider whether having a default case is a good idea.
-  UIdent visitDecl(const Decl *D) { return UIdent(); }
-
   UIdent visitFuncDecl(const FuncDecl *D);
   UIdent visitVarDecl(const VarDecl *D);
   UIdent visitExtensionDecl(const ExtensionDecl *D);
