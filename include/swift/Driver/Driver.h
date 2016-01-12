@@ -233,7 +233,7 @@ public:
   /// \param[out] Actions The list in which to store the resulting Actions.
   void buildActions(const ToolChain &TC, const llvm::opt::DerivedArgList &Args,
                     const InputList &Inputs, const OutputInfo &OI,
-                    const OutputFileMap *OFM, InputInfoMap *OutOfDateMap,
+                    const OutputFileMap *OFM, const InputInfoMap *OutOfDateMap,
                     ActionList &Actions) const;
 
   /// Construct the OutputFileMap for the driver from the given arguments.

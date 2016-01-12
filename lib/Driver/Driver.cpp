@@ -1099,7 +1099,7 @@ void Driver::buildActions(const ToolChain &TC,
                           const InputList &Inputs,
                           const OutputInfo &OI,
                           const OutputFileMap *OFM,
-                          InputInfoMap *OutOfDateMap,
+                          const InputInfoMap *OutOfDateMap,
                           ActionList &Actions) const {
   if (!SuppressNoInputFilesError && Inputs.empty()) {
     Diags.diagnose(SourceLoc(), diag::error_no_input_files);
