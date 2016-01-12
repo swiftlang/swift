@@ -171,3 +171,7 @@ func r22459135() {
     }
   }
 }
+
+
+// <rdar://problem/19710848> QoI: Friendlier error message for "[] as Set"
+_ = [] as Set  // expected-error {{generic parameter 'Element' could not be inferred}}

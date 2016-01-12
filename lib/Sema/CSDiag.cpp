@@ -2447,7 +2447,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   // If the second type is a type variable, the expression itself is
   // ambiguous.  Bail out so the general ambiguity diagnosing logic can handle
   // it.
-  if (isUnresolvedOrTypeVarType(fromType) ||
+  if (fromType->hasUnresolvedType() || fromType->hasTypeVariable() ||
       isUnresolvedOrTypeVarType(toType) ||
       // FIXME: Why reject unbound generic types here?
       fromType->is<UnboundGenericType>())
