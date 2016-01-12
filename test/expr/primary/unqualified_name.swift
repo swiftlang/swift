@@ -35,12 +35,22 @@ struct S0 {
 let s0_static: S0 = .f3(_:y:z:)(0, y: 0, z: 0)
 
 class C0 {
+  init(x: Int, y: Int, z: Int) { }
+
+  convenience init(all: Int) {
+    self.init(x:y:z:)(x: all, y: all, z: all)
+  }
+
   func f0(x: Int, y: Int, z: Int) { }
   func f1(x: Int, while: Int) { }
   func f2(x: Int, `let` _: Int) { }
 }
 
 class C1 : C0 {
+  init(all: Int) {
+    super.init(x:y:z:)(x: all, y: all, z: all)
+  }
+
   func testC0() {
     _ = f0(_:y:z:)
     _ = f0(:y:z:) // expected-error{{an empty argument label is spelled with '_'}}{{12-12=_}}

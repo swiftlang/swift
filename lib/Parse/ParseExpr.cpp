@@ -558,44 +558,38 @@ ParserResult<Expr> Parser::parseExprSuper() {
 
     SourceLoc dotLoc = consumeToken(tok::period);
     
-    // FIXME: This code is copy-paste from the general handling for kw_init.
-    if (Tok.is(tok::kw_init)) {
-
-      if (ErrorOccurred)
-        return makeParserError();
-
-      // super.init
-      SourceLoc ctorLoc = consumeToken();
-      
-      // The constructor decl will be resolved by sema.
-      // FIXME: Extend representation with DeclName!
-      Expr *result = new (Context) UnresolvedConstructorExpr(superRef,
-                                     dotLoc, ctorLoc,
-                                     /*Implicit=*/false);
-      return makeParserResult(result);
-    } else if (Tok.is(tok::code_complete)) {
+    if (Tok.is(tok::code_complete)) {
       if (CodeCompletion) {
         if (auto *SRE = dyn_cast<SuperRefExpr>(superRef))
           CodeCompletion->completeExprSuperDot(SRE);
       }
+
       // Eat the code completion token because we handled it.
       consumeToken(tok::code_complete);
       return makeParserCodeCompletionResult(superRef);
-    } else {
-      // super.foo
-      SourceLoc nameLoc;
-      DeclName name = parseUnqualifiedIdentifier(
-                        /*allowInit=*/false,
-                        nameLoc, 
-                        diag::expected_identifier_after_super_dot_expr);
-      if (!name)
-        return nullptr;
-
-      return makeParserResult(new (Context) UnresolvedDotExpr(superRef, dotLoc,
-                                                              name, nameLoc,
-                                                           /*Implicit=*/false));
     }
-  } else if (Tok.isFollowingLSquare()) {
+
+    SourceLoc nameLoc;
+    DeclName name = parseUnqualifiedIdentifier(
+                      /*allowInit=*/true,
+                      nameLoc,
+                      diag::expected_identifier_after_super_dot_expr);
+    if (!name)
+      return nullptr;
+
+    if (name.getBaseName() == Context.Id_init) {
+      Expr *result = new (Context) UnresolvedConstructorExpr(superRef,
+                                     dotLoc, nameLoc, name,
+                                     /*Implicit=*/false);
+      return makeParserResult(result);
+    }
+
+    return makeParserResult(
+             new (Context) UnresolvedDotExpr(superRef, dotLoc, name, nameLoc,
+                                             /*Implicit=*/false));
+  }
+
+  if (Tok.isFollowingLSquare()) {
     // super[expr]
     ParserResult<Expr> idx = parseExprList(tok::l_square, tok::r_square);
     if (idx.hasCodeCompletion())
@@ -604,6 +598,7 @@ ParserResult<Expr> Parser::parseExprSuper() {
       return nullptr;
     return makeParserResult(new (Context) SubscriptExpr(superRef, idx.get()));
   }
+
   if (Tok.is(tok::code_complete)) {
     if (CodeCompletion) {
       if (auto *SRE = dyn_cast<SuperRefExpr>(superRef))
@@ -1014,7 +1009,8 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     SourceLoc TokLoc = Tok.getLoc();
     if (consumeIf(tok::period) || consumeIf(tok::period_prefix)) {
       // Non-identifier cases.
-      if (Tok.isNot(tok::identifier) && Tok.isNot(tok::integer_literal)) {
+      if (Tok.isNot(tok::identifier) && Tok.isNot(tok::integer_literal) &&
+          Tok.isNot(tok::kw_init)) {
         // A metatype expr.
         if (Tok.is(tok::kw_dynamicType)) {
           Result = makeParserResult(
@@ -1039,20 +1035,6 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
                                               Name, Tok.getLoc(),
                                               /*Implicit=*/false));
           consumeToken();
-        }
-
-        // expr-init ::= expr-postfix '.' 'init'.
-        if (Tok.is(tok::kw_init)) {
-          // Form the reference to the constructor.
-          // FIXME: Handle a full DeclName.
-          Expr *initRef = new (Context) UnresolvedConstructorExpr(
-                                          Result.get(),
-                                          TokLoc,
-                                          Tok.getLoc(),
-                                          /*Implicit=*/false);
-          consumeToken(tok::kw_init);
-          Result = makeParserResult(initRef);
-          continue;
         }
 
         if (Tok.is(tok::code_complete)) {
@@ -1082,18 +1064,26 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       if (Result.isParseError())
         continue;
 
-
-      if (Tok.is(tok::identifier)) {
+      if (Tok.isAny(tok::identifier, tok::kw_init)) {
         SourceLoc NameLoc;
-        DeclName Name;
-        Name = parseUnqualifiedIdentifier(/*allowInit=*/false,
-                                          NameLoc,
-                                          diag::expected_member_name);
+        DeclName Name = parseUnqualifiedIdentifier(/*allowInit=*/true,
+                                                   NameLoc,
+                                                   diag::expected_member_name);
         if (!Name) return nullptr;
       
+        // Handle initializers.
+        if (Name.getBaseName() == Context.Id_init) {
+          Expr *initRef = new (Context) UnresolvedConstructorExpr(
+                                          Result.get(), TokLoc, NameLoc, Name,
+                                          /*Implicit=*/false);
+          Result = makeParserResult(initRef);
+          continue;
+        }
+
         Result = makeParserResult(
                    new (Context) UnresolvedDotExpr(Result.get(), TokLoc, Name,
-                                                   NameLoc, /*Implicit=*/false));
+                                                   NameLoc,
+                                                   /*Implicit=*/false));
           
         if (canParseAsGenericArgumentList()) {
           SmallVector<TypeRepr*, 8> args;

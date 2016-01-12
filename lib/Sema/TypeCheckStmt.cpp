@@ -1187,8 +1187,9 @@ Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
                                               SourceLoc(), /*Implicit=*/true);
   Expr *r = new (Context) UnresolvedConstructorExpr(superRef,
                                                     SourceLoc(),
-                                                         SourceLoc(),
-                                                         /*Implicit=*/true);
+                                                    SourceLoc(),
+                                                    Context.Id_init,
+                                                    /*Implicit=*/true);
   Expr *args = TupleExpr::createEmpty(Context, SourceLoc(), SourceLoc(),
                                       /*Implicit=*/true);
   r = new (Context) CallExpr(r, args, /*Implicit=*/true);

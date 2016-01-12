@@ -1206,8 +1206,6 @@ namespace {
     }
 
     Type visitUnresolvedConstructorExpr(UnresolvedConstructorExpr *expr) {
-      ASTContext &C = CS.getASTContext();
-      
       // Open a member constraint for constructor delegations on the subexpr
       // type.
       if (CS.TC.getSelfForInitDelegationInConstructor(CS.DC, expr)){
@@ -1228,7 +1226,7 @@ namespace {
         auto resultTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                               /*options=*/0);
         auto methodTy = FunctionType::get(argsTy, resultTy);
-        CS.addValueMemberConstraint(baseTy, C.Id_init,
+        CS.addValueMemberConstraint(baseTy, expr->getName(),
           methodTy,
           CS.getConstraintLocator(expr, ConstraintLocator::ConstructorMember));
         
@@ -1240,7 +1238,7 @@ namespace {
       // If we aren't delegating from within an initializer, then 'x.init' is
       // just a reference to the constructor as a member of the metatype value
       // 'x'.
-      return addMemberRefConstraints(expr, expr->getSubExpr(), C.Id_init);
+      return addMemberRefConstraints(expr, expr->getSubExpr(), expr->getName());
     }
     
     Type visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
