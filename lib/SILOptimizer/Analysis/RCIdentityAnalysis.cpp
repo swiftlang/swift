@@ -51,18 +51,8 @@ static bool isRCIdentityPreservingCast(ValueKind Kind) {
 }
 
 //===----------------------------------------------------------------------===//
-//                          RCIdentityRoot Analysis
+//                    RC Identity Root Instruction Casting
 //===----------------------------------------------------------------------===//
-
-/// Returns true if FirstIV is a SILArgument or SILInstruction in a BB that
-/// dominates the BB of A.
-static bool dominatesArgument(DominanceInfo *DI, SILArgument *A,
-                              SILValue FirstIV) {
-  SILBasicBlock *OtherBB = FirstIV->getParentBB();
-  if (!OtherBB || OtherBB == A->getParent())
-    return false;
-  return DI->dominates(OtherBB, A->getParent());
-}
 
 static SILValue stripRCIdentityPreservingInsts(SILValue V) {
   // First strip off RC identity preserving casts.
@@ -109,6 +99,20 @@ static SILValue stripRCIdentityPreservingInsts(SILValue V) {
       return NewValue;
 
   return SILValue();
+}
+
+//===----------------------------------------------------------------------===//
+//                  RC Identity Dominance Argument Analysis
+//===----------------------------------------------------------------------===//
+
+/// Returns true if FirstIV is a SILArgument or SILInstruction in a BB that
+/// dominates the BB of A.
+static bool dominatesArgument(DominanceInfo *DI, SILArgument *A,
+                              SILValue FirstIV) {
+  SILBasicBlock *OtherBB = FirstIV->getParentBB();
+  if (!OtherBB || OtherBB == A->getParent())
+    return false;
+  return DI->dominates(OtherBB, A->getParent());
 }
 
 /// V is the incoming value for the SILArgument A on at least one path.  Find a
@@ -357,6 +361,10 @@ SILValue RCIdentityFunctionInfo::stripRCIdentityPreservingArgs(SILValue V,
 llvm::cl::opt<bool> StripOffArgs(
     "enable-rc-identity-arg-strip", llvm::cl::init(true),
     llvm::cl::desc("Should RC identity try to strip off arguments"));
+
+//===----------------------------------------------------------------------===//
+//                   Top Level RC Identity Root Entrypoints
+//===----------------------------------------------------------------------===//
 
 SILValue RCIdentityFunctionInfo::stripRCIdentityPreservingOps(SILValue V,
                                                       unsigned RecursionDepth) {
