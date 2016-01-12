@@ -44,6 +44,7 @@ namespace swift {
 namespace driver {
   class Compilation;
   class Job;
+  class JobAction;
   class OutputFileMap;
   class ToolChain;
 
@@ -257,7 +258,7 @@ public:
   /// input Jobs.
   ///
   /// \param C The Compilation which this Job will eventually be part of
-  /// \param A The Action for which a Job should be created
+  /// \param JA The Action for which a Job should be created
   /// \param OI The OutputInfo for which a Job should be created
   /// \param OFM The OutputFileMap for which a Job should be created
   /// \param TC The tool chain which should be used to create the Job
@@ -265,7 +266,7 @@ public:
   /// \param JobCache maps existing Action/ToolChain pairs to Jobs
   ///
   /// \returns a Job for the given Action/ToolChain pair
-  Job *buildJobsForAction(Compilation &C, const Action *A,
+  Job *buildJobsForAction(Compilation &C, const JobAction *JA,
                           const OutputInfo &OI, const OutputFileMap *OFM,
                           const ToolChain &TC, bool AtTopLevel,
                           JobCacheMap &JobCache) const;

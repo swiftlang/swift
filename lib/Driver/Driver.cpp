@@ -1202,7 +1202,7 @@ void Driver::buildActions(const ToolChain &TC,
       }
       if (HandledHere) {
         // Create a single CompileJobAction and a single BackendJobAction.
-        std::unique_ptr<Action> CA(new CompileJobAction(types::TY_LLVM_BC));
+        std::unique_ptr<JobAction> CA(new CompileJobAction(types::TY_LLVM_BC));
         AllModuleInputs.push_back(CA.get());
 
         int InputIndex = 0;
@@ -1236,7 +1236,7 @@ void Driver::buildActions(const ToolChain &TC,
     }
 
     // Create a single CompileJobAction for all of the driver's inputs.
-    std::unique_ptr<Action> CA(new CompileJobAction(OI.CompilerOutputType));
+    std::unique_ptr<JobAction> CA(new CompileJobAction(OI.CompilerOutputType));
     for (const InputPair &Input : Inputs) {
       types::ID InputType = Input.first;
       const Arg *InputArg = Input.second;
@@ -1252,7 +1252,7 @@ void Driver::buildActions(const ToolChain &TC,
       return;
 
     assert(OI.CompilerOutputType == types::TY_Nothing);
-    std::unique_ptr<Action> CA(new InterpretJobAction());
+    std::unique_ptr<JobAction> CA(new InterpretJobAction());
     for (const InputPair &Input : Inputs) {
       types::ID InputType = Input.first;
       const Arg *InputArg = Input.second;
@@ -1283,7 +1283,7 @@ void Driver::buildActions(const ToolChain &TC,
   }
   }
 
-  std::unique_ptr<Action> MergeModuleAction;
+  std::unique_ptr<JobAction> MergeModuleAction;
   if (OI.ShouldGenerateModule &&
       OI.CompilerMode != OutputInfo::Mode::SingleCompile &&
       !AllModuleInputs.empty()) {
@@ -1294,13 +1294,13 @@ void Driver::buildActions(const ToolChain &TC,
   }
 
   if (OI.shouldLink() && !AllLinkerInputs.empty()) {
-    Action *LinkAction = new LinkJobAction(AllLinkerInputs, OI.LinkAction);
+    auto *LinkAction = new LinkJobAction(AllLinkerInputs, OI.LinkAction);
 
     if (TC.getTriple().getObjectFormat() == llvm::Triple::ELF) {
       // On ELF platforms there's no built in autolinking mechanism, so we
       // pull the info we need from the .o files directly and pass them as an
       // argument input file to the linker.
-      Action *AutolinkExtractAction =
+      auto *AutolinkExtractAction =
           new AutolinkExtractJobAction(AllLinkerInputs);
       // Takes the same inputs as the linker, but doesn't own them.
       AutolinkExtractAction->setOwnsInputs(false);
@@ -1311,7 +1311,7 @@ void Driver::buildActions(const ToolChain &TC,
     if (MergeModuleAction) {
       if (OI.DebugInfoKind == IRGenDebugInfoKind::Normal) {
         if (TC.getTriple().getObjectFormat() == llvm::Triple::ELF) {
-          Action *ModuleWrapAction =
+          auto *ModuleWrapAction =
               new ModuleWrapJobAction(MergeModuleAction.release());
           LinkAction->addInput(ModuleWrapAction);
         } else
@@ -1322,7 +1322,7 @@ void Driver::buildActions(const ToolChain &TC,
     Actions.push_back(LinkAction);
     if (TC.getTriple().isOSDarwin() &&
         OI.DebugInfoKind > IRGenDebugInfoKind::None) {
-      Action *dSYMAction = new GenerateDSYMJobAction(LinkAction);
+      auto *dSYMAction = new GenerateDSYMJobAction(LinkAction);
       dSYMAction->setOwnsInputs(false);
       Actions.push_back(dSYMAction);
     }
@@ -1403,7 +1403,7 @@ void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,
         // outputs which are produced before the llvm passes (e.g. emit-sil).
         if (OI.isMultiThreading() && isa<CompileJobAction>(A) &&
             types::isAfterLLVM(A->getType())) {
-          NumOutputs += A->size();
+          NumOutputs += cast<CompileJobAction>(A)->size();
         } else {
           ++NumOutputs;
         }
@@ -1418,8 +1418,8 @@ void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,
   }
 
   for (const Action *A : Actions) {
-    (void)buildJobsForAction(C, A, OI, OFM, C.getDefaultToolChain(), true,
-                             JobCache);
+    (void)buildJobsForAction(C, cast<JobAction>(A), OI, OFM, 
+                             C.getDefaultToolChain(), true, JobCache);
   }
 }
 
@@ -1616,16 +1616,13 @@ handleCompileJobCondition(Job *J, CompileJobAction::InputInfo inputInfo,
   J->setCondition(condition);
 }
 
-Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
+Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
                                 const OutputInfo &OI,
                                 const OutputFileMap *OFM,
                                 const ToolChain &TC, bool AtTopLevel,
                                 JobCacheMap &JobCache) const {
-  assert(!isa<InputAction>(A) && "unexpected unprocessed input");
-  const auto *JA = cast<JobAction>(A);
-
   // 1. See if we've already got this cached.
-  std::pair<const Action *, const ToolChain *> Key(A, &TC);
+  std::pair<const Action *, const ToolChain *> Key(JA, &TC);
   {
     auto CacheIter = JobCache.find(Key);
     if (CacheIter != JobCache.end()) {
@@ -1636,13 +1633,13 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
   // 2. Build up the list of input jobs.
   ActionList InputActions;
   SmallVector<const Job *, 4> InputJobs;
-  for (Action *Input : *A) {
-    if (isa<InputAction>(Input)) {
-      InputActions.push_back(Input);
-    } else {
-      InputJobs.push_back(buildJobsForAction(C, Input, OI, OFM,
+  for (Action *Input : *JA) {
+    if (auto *InputJobAction = dyn_cast<JobAction>(Input)) {
+      InputJobs.push_back(buildJobsForAction(C, InputJobAction, OI, OFM,
                                              C.getDefaultToolChain(), false,
                                              JobCache));
+    } else {
+      InputActions.push_back(Input);
     }
   }
 
@@ -1864,7 +1861,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
   // If we track dependencies for this job, we may be able to avoid running it.
   if (!J->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps).empty()) {
     if (InputActions.size() == 1) {
-      auto compileJob = cast<CompileJobAction>(A);
+      auto compileJob = cast<CompileJobAction>(JA);
       bool alwaysRebuildDependents =
           C.getArgs().hasArg(options::OPT_driver_always_rebuild_dependents);
       handleCompileJobCondition(J, compileJob->getInputInfo(), BaseInput,
@@ -1952,12 +1949,9 @@ static unsigned printActions(const Action *A,
     os << "\"" << IA->getInputArg().getValue() << "\"";
   } else {
     os << "{";
-    for (auto it = A->begin(), ie = A->end(); it != ie;) {
-      os << printActions(*it, Ids);
-      ++it;
-      if (it != ie)
-        os << ", ";
-    }
+    interleave(*cast<JobAction>(A),
+               [&](const Action *Input) { os << printActions(Input, Ids); },
+               [&] { os << ", "; });
     os << "}";
   }
 
