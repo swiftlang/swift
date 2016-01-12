@@ -789,15 +789,6 @@ for t in ${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS} ; do
     esac
 done
 
-function is_native_tools_deployment_target() {
-    local deployment_target="$1"
-    for t in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" ; do
-        if [ "${deployment_target}" == "${t}" ] ; then
-            echo 1
-        fi
-    done
-}
-
 function is_cross_tools_deployment_target() {
     local deployment_target="$1"
     for t in "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}" ; do
