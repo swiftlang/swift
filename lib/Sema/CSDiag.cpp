@@ -211,16 +211,6 @@ void constraints::simplifyLocator(Expr *&anchor,
         path = path.slice(1);
         continue;
       }
-      if (auto USE = dyn_cast<UnresolvedSelectorExpr>(anchor)) {
-        // No additional target locator information.
-        targetAnchor = nullptr;
-        targetPath.clear();
-        
-        range = USE->getNameRange();
-        anchor = USE->getBase();
-        path = path.slice(1);
-        continue;
-      }
       break;
 
     case ConstraintLocator::InterpolationArgument:

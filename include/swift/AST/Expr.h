@@ -1923,65 +1923,6 @@ public:
     return E->getKind() == ExprKind::UnresolvedDot;
   }
 };
-  
-/// A selector-style member access (foo.bar:bas:) on an expression with
-/// unresolved type.
-class UnresolvedSelectorExpr : public Expr {
-public:
-  // A selector component.
-  struct ComponentLoc {
-    SourceLoc NameLoc;
-    SourceLoc ColonLoc;
-  };
-  
-private:
-  Expr *SubExpr;
-  SourceLoc DotLoc;
-  DeclName Name;
-  
-  MutableArrayRef<ComponentLoc> getComponentsBuf() {
-    return {reinterpret_cast<ComponentLoc*>(this+1),
-            Name.getArgumentNames().size() + 1};
-  }
-  
-  UnresolvedSelectorExpr(Expr *subExpr, SourceLoc dotLoc,
-                         DeclName name,
-                         ArrayRef<ComponentLoc> components);
-  
-public:
-  static UnresolvedSelectorExpr *create(ASTContext &C,
-                                        Expr *subExpr,
-                                        SourceLoc dotLoc,
-                                        DeclName name,
-                                        ArrayRef<ComponentLoc> components);
-  
-  ArrayRef<ComponentLoc> getComponentLocs() const {
-    return {reinterpret_cast<const ComponentLoc*>(this+1),
-            Name.getArgumentNames().size() + 1};
-  }
-  
-  SourceLoc getLoc() const {
-    return getComponentLocs().front().NameLoc;
-  }
-
-  SourceLoc getStartLoc() const { return SubExpr->getStartLoc(); }
-  SourceLoc getEndLoc() const { return getComponentLocs().back().ColonLoc; }
-  
-  SourceLoc getDotLoc() const { return DotLoc; }
-  Expr *getBase() const { return SubExpr; }
-  void setBase(Expr *e) { SubExpr = e; }
-  
-  SourceRange getNameRange() const {
-    return {getComponentLocs().front().NameLoc,
-            getComponentLocs().back().ColonLoc};
-  }
-  
-  DeclName getName() const { return Name; }
-  
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::UnresolvedSelector;
-  }
-};
 
 /// TupleElementExpr - Refer to an element of a tuple,
 /// e.g. "(1,field:2).field".

@@ -2444,13 +2444,6 @@ namespace {
     }
     
   public:
-    Expr *visitUnresolvedSelectorExpr(UnresolvedSelectorExpr *expr) {
-      return applyMemberRefExpr(expr, expr->getBase(), expr->getDotLoc(),
-                                expr->getNameRange().Start,
-                                expr->isImplicit());
-    }
-    
-    
     Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
       return applyMemberRefExpr(expr, expr->getBase(), expr->getDotLoc(),
                                 expr->getNameLoc(), expr->isImplicit());

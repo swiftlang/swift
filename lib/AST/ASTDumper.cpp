@@ -1810,15 +1810,6 @@ public:
     }
     OS << ')';
   }
-  void visitUnresolvedSelectorExpr(UnresolvedSelectorExpr *E) {
-    printCommon(E, "unresolved_selector_expr")
-      << " selector '" << E->getName() << "'";
-    if (E->getBase()) {
-      OS << '\n';
-      printRec(E->getBase());
-    }
-    OS << ')';
-  }
   void visitTupleElementExpr(TupleElementExpr *E) {
     printCommon(E, "tuple_element_expr")
       << " field #" << E->getFieldNumber() << '\n';

@@ -453,7 +453,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
             isa<UnresolvedDotExpr>(ParentExpr) ||
             isa<DotSyntaxBaseIgnoredExpr>(ParentExpr) ||
             isa<UnresolvedConstructorExpr>(ParentExpr) ||
-            isa<UnresolvedSelectorExpr>(ParentExpr) ||
             isa<UnresolvedSpecializeExpr>(ParentExpr) ||
             isa<OpenExistentialExpr>(ParentExpr)) {
           return;
