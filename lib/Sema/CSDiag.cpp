@@ -3989,7 +3989,7 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
                                              CTP_AssignSource);
   if (!srcExpr) return true;
 
-  // If we are assigning to _ and have unresolvedtypes on the RHS, then we have
+  // If we are assigning to _ and have unresolved types on the RHS, then we have
   // an ambiguity problem.
   if (isa<DiscardAssignmentExpr>(destExpr->getSemanticsProvidingExpr()) &&
       srcExpr->getType()->hasUnresolvedType()) {

@@ -408,7 +408,7 @@ Type TypeChecker::applyUnboundGenericArguments(
 
   assert(unbound &&
          genericArgs.size() == unbound->getDecl()->getGenericParams()->size() &&
-         "invalid arguments, use applyGenricArguments for diagnostic emitting");
+         "invalid arguments, use applyGenericArguments for diagnostic emitting");
 
   // Make sure we always have a resolver to use.
   PartialGenericTypeToArchetypeResolver defaultResolver(*this);
