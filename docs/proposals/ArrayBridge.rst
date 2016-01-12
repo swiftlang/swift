@@ -92,7 +92,7 @@ fold this to "0" iff ``T`` is known to be a protocol other than
 AnyObject, if it is known to be a non-\ ``@objc`` class, or if it is
 known to be any struct, enum or tuple.  Otherwise, the builtin is left
 alone, and if it reaches IRGen, IRGen should conservatively fold it to
-"1".  In the common case where ``Array<T>`` is inlined and
+"1".  In the common case where ``Array<Element>`` is inlined and
 specialized, this will allow us to eliminate all of the overhead in
 the important C cases.
 
