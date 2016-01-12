@@ -384,7 +384,7 @@ namespace swift {
   class DiagnosticState {
   public:
     /// \brief Describes the current behavior to take with a diagnostic
-    enum class Behavior {
+    enum class Behavior : uint8_t {
       Unspecified,
       Ignore,
       Note,
@@ -410,11 +410,15 @@ namespace swift {
     /// \brief Track the previous emitted Behavior, useful for notes
     Behavior previousBehavior = Behavior::Unspecified;
 
-  public:
-    DiagnosticState() {}
+    /// \brief Track settable, per-diagnostic state that we store
+    std::vector<Behavior> perDiagnosticState;
 
-    /// \brief Figure out the Behavior for the given diagnostic
-    Behavior getBehavior(const Diagnostic &);
+  public:
+    DiagnosticState();
+
+    /// \brief Figure out the Behavior for the given diagnostic, taking current
+    /// state such as fatality into account.
+    Behavior determineBehavior(DiagID);
 
     bool hadAnyError() const { return anyErrorOccurred; }
     bool hasFatalErrorOccurred() const { return fatalErrorOccurred; }
@@ -432,10 +436,12 @@ namespace swift {
       fatalErrorOccurred = false;
     }
 
-  private:
-    /// \returns true if diagnostic is marked as fatal.
-    bool isDiagnosticFatal(DiagID ID) const;
+    /// Set per-diagnostic behavior
+    void setDiagnosticBehavior(DiagID id, Behavior behavior) {
+      perDiagnosticState[(unsigned)id] = behavior;
+    }
 
+  private:
     // Make the state movable only
     DiagnosticState(const DiagnosticState &) = delete;
     const DiagnosticState &operator=(const DiagnosticState &) = delete;
@@ -495,6 +501,10 @@ namespace swift {
     void setIgnoreAllWarnings(bool val) { state.setIgnoreAllWarnings(val); }
     bool getIgnoreAllWarnings() const {
       return state.getIgnoreAllWarnings();
+    }
+
+    void ignoreDiagnostic(DiagID id) {
+      state.setDiagnosticBehavior(id, DiagnosticState::Behavior::Ignore);
     }
 
     void resetHadAnyError() {
