@@ -84,7 +84,7 @@ func tuplePatternDestructuring(x : Int, y : Int) {
   _ = i+j
 
   // FIXME: This diagnostic isn't right: rdar://20395243
-  let (x: g1, a: h1) = (b: x, a: y)  // expected-error {{expression type '(b: Int, a: Int)' is ambiguous without more context}}
+  let (x: g1, a: h1) = (b: x, a: y)  // expected-error {{tuple type '(b: Int, a: Int)' is not convertible to tuple '(x: (b: Int, a: Int), a: (b: Int, a: Int))'}}
 }
 
 // <rdar://problem/21057425> Crash while compiling attached test-app.

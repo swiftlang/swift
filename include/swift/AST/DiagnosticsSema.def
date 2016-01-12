@@ -516,9 +516,12 @@ NOTE(in_cast_expr_types,sema_tcc,none,
       "in cast from type %0 to %1",
       (Type, Type))
 
-ERROR(tuple_types_not_convertible,sema_tcc,none,
+ERROR(tuple_types_not_convertible_nelts,sema_tcc,none,
       "%0 is not convertible to %1, "
       "tuples have a different number of elements", (Type, Type))
+
+ERROR(tuple_types_not_convertible,sema_tcc,none,
+      "tuple type %0 is not convertible to tuple %1", (Type, Type))
 
 ERROR(invalid_force_unwrap,sema_tcc,none,
       "cannot force unwrap value of non-optional type %0", (Type))

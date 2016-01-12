@@ -2502,13 +2502,34 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   // If we have two tuples with mismatching types, produce a tailored
   // diagnostic.
   if (auto fromTT = fromType->getAs<TupleType>())
-    if (auto toTT = toType->getAs<TupleType>())
+    if (auto toTT = toType->getAs<TupleType>()) {
       if (fromTT->getNumElements() != toTT->getNumElements()) {
+        diagnose(anchor->getLoc(), diag::tuple_types_not_convertible_nelts,
+                 fromTT, toTT)
+        .highlight(anchor->getSourceRange());
+        return true;
+      }
+     
+      SmallVector<TupleTypeElt, 4> FromElts;
+      auto voidTy = CS->getASTContext().TheUnresolvedType;
+      
+      for (unsigned i = 0, e = fromTT->getNumElements(); i != e; ++i)
+        FromElts.push_back({ voidTy, fromTT->getElement(i).getName() });
+      auto TEType = TupleType::get(FromElts, CS->getASTContext());
+      
+      SmallVector<int, 4> sources;
+      SmallVector<unsigned, 4> variadicArgs;
+      
+      // If the shuffle conversion is invalid (e.g. incorrect element labels),
+      // then we have a type error.
+      if (computeTupleShuffle(TEType->castTo<TupleType>()->getElements(),
+                              toTT->getElements(), sources, variadicArgs)) {
         diagnose(anchor->getLoc(), diag::tuple_types_not_convertible,
                  fromTT, toTT)
         .highlight(anchor->getSourceRange());
         return true;
       }
+    }
   
   
   // If the second type is a type variable, the expression itself is
