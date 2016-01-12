@@ -137,7 +137,7 @@ lower directly to is_unique instructions in SIL.
 The is_unique instruction takes the address of a reference, and
 although it does not actually change the reference, the reference must
 appear mutable to the optimizer. This forces the optimizer to preserve
-a retain distinct from what’s required to maintain lifetime for any of
+a retain distinct from what's required to maintain lifetime for any of
 the reference's source-level copies, because the called function is
 allowed to replace the reference, thereby releasing the
 referent. Consider the following sequence of rules:
@@ -225,7 +225,7 @@ these cases:
 - isUniqueOrPinned_native : <T> (inout T[?]) -> Int1
 
 These builtins perform an implicit cast to NativeObject before
-checking uniqueness. There’s no way at SIL level to cast the address
+checking uniqueness. There's no way at SIL level to cast the address
 of a reference, so we need to encapsulate this operation as part of
 the builtin.
 

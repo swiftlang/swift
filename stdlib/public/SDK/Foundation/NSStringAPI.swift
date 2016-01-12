@@ -134,7 +134,7 @@ extension String {
   // + (const NSStringEncoding *)availableStringEncodings
 
   /// Returns an Array of the encodings string objects support
-  /// in the application’s environment.
+  /// in the application's environment.
   @warn_unused_result
   public static func availableStringEncodings() -> [NSStringEncoding] {
     var result = [NSStringEncoding]()
@@ -302,7 +302,7 @@ extension String {
 
   /// Returns a string containing characters the `String` and a
   /// given string have in common, starting from the beginning of each
-  /// up to the first characters that aren’t equivalent.
+  /// up to the first characters that aren't equivalent.
   @warn_unused_result
   public func commonPrefixWithString(
     aString: String, options: NSStringCompareOptions) -> String {
@@ -452,7 +452,7 @@ extension String {
 
   // @property NSString* decomposedStringWithCanonicalMapping;
 
-  /// Returns a string made by normalizing the `String`’s
+  /// Returns a string made by normalizing the `String`'s
   /// contents using Form D.
   public var decomposedStringWithCanonicalMapping: String {
     return _ns.decomposedStringWithCanonicalMapping
@@ -460,7 +460,7 @@ extension String {
 
   // @property NSString* decomposedStringWithCompatibilityMapping;
 
-  /// Returns a string made by normalizing the `String`’s
+  /// Returns a string made by normalizing the `String`'s
   /// contents using Form KD.
   public var decomposedStringWithCompatibilityMapping: String {
     return _ns.decomposedStringWithCompatibilityMapping
@@ -605,7 +605,7 @@ extension String {
   /// - Parameter encoding: The encoding to use for the returned bytes.
   ///
   /// - Parameter options: A mask to specify options to use for
-  ///   converting the receiver’s contents to `encoding` (if conversion
+  ///   converting the receiver's contents to `encoding` (if conversion
   ///   is necessary).
   ///
   /// - Parameter range: The range of characters in the receiver to get.
@@ -645,7 +645,7 @@ extension String {
   //     maxLength:(NSUInteger)maxBufferCount
   //     encoding:(NSStringEncoding)encoding
 
-  /// Converts the `String`’s content to a given encoding and
+  /// Converts the `String`'s content to a given encoding and
   /// stores them in a buffer.
   /// - Note: will store a maximum of `min(buffer.count, maxLength)` bytes.
   public func getCString(
@@ -923,7 +923,7 @@ extension String {
 
   /// Returns a `String` object initialized by using a given
   /// format string as a template into which the remaining argument
-  /// values are substituted according to the user’s default locale.
+  /// values are substituted according to the user's default locale.
   public init(format: String, arguments: [CVarArgType]) {
     self = String(format: format, locale: nil, arguments: arguments)
   }
@@ -1120,7 +1120,7 @@ extension String {
   // @property NSString* pathExtension;
 
   /// Interprets the `String` as a path and returns the
-  /// `String`’s extension, if any.
+  /// `String`'s extension, if any.
   @available(*, unavailable, message="Use pathExtension on NSURL instead.")
   public var pathExtension: String {
     return _ns.pathExtension
@@ -1128,7 +1128,7 @@ extension String {
 
   // @property NSString* precomposedStringWithCanonicalMapping;
 
-  /// Returns a string made by normalizing the `String`’s
+  /// Returns a string made by normalizing the `String`'s
   /// contents using Form C.
   public var precomposedStringWithCanonicalMapping: String {
     return _ns.precomposedStringWithCanonicalMapping
@@ -1136,7 +1136,7 @@ extension String {
 
   // @property NSString * precomposedStringWithCompatibilityMapping;
 
-  /// Returns a string made by normalizing the `String`’s
+  /// Returns a string made by normalizing the `String`'s
   /// contents using Form KC.
   public var precomposedStringWithCompatibilityMapping: String {
     return _ns.precomposedStringWithCompatibilityMapping

@@ -1227,7 +1227,7 @@ function cmark_c_flags() {
 }
 
 function swift_c_flags() {
-    # Don’t pass common_cross_c_flags to Swift because CMake code in the Swift
+    # Don't pass common_cross_c_flags to Swift because CMake code in the Swift
     # project is itself aware of cross-compilation for the host tools and
     # standard library.
     echo -n "${COMMON_C_FLAGS}"

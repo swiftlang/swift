@@ -1359,7 +1359,7 @@ declaration or type::
     return try stream.readInt()
   }
 
-  // ‘throws’ is written before the arrow to give a sensible and
+  // 'throws' is written before the arrow to give a sensible and
   // consistent grammar for function types and implicit () result types.
   func baz() throws {
     if let byte = try stream.getOOB() where byte == PROTO_RESET {
@@ -1367,7 +1367,7 @@ declaration or type::
     }
   }
 
-  // ‘throws’ appears in a consistent position in function types.
+  // 'throws' appears in a consistent position in function types.
   func fred(callback: (UInt8) throws -> ()) throws {
      while true {
        let code = try stream.readByte()
@@ -1380,7 +1380,7 @@ declaration or type::
   // this function has type:
   //   (Int) -> (Int) throws -> Int
   func jerry(i: Int)(j: Int) throws -> Int {
-    // It’s not an error to use ‘throws’ on a function that can’t throw.
+    // It's not an error to use 'throws' on a function that can't throw.
     return i + j
   }
 

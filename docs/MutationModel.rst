@@ -40,7 +40,7 @@ Consider::
   w.title += " (parenthesized remark)"
 
 What do we do with this?  Since ``+=`` has an ``inout`` first
-argument, we detect this situation statically (hopefully one day we’ll
+argument, we detect this situation statically (hopefully one day we'll
 have a better error message): 
 
 ::
@@ -53,7 +53,7 @@ Great.  Now what about this? [#append]_ ::
 
   w.title.append(" (fool the compiler)")
 
-Today, we allow it, but since there’s no way to implement the
+Today, we allow it, but since there's no way to implement the
 write-back onto ``w.title``, the changes are silently dropped.
 
 Unsatisfying Approaches

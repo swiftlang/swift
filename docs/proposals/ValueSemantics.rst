@@ -175,7 +175,7 @@ pseudo-random number generator).  It needs to make one copy and do
 in-place mutation of the state, rather than wholesale value
 replacement via assignment, which might be expensive.
 
-Here’s a version of cycle_length that works when state is a mutable
+Here's a version of cycle_length that works when state is a mutable
 value type::
 
  func cycle_length<State>(
