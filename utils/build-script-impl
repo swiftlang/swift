@@ -170,6 +170,7 @@ KNOWN_SETTINGS=(
     install-foundation          ""               "whether to install foundation"
     install-libdispatch         ""               "whether to install libdispatch"
     darwin-install-extract-symbols ""            "whether to extract symbols with dsymutil during installations"
+    host-target                 ""               "The host target. LLVM, Clang, and Swift will be built for this target. The built LLVM and Clang will be used to compile Swift for the cross-compilation targets. **This argument is required**"
     cross-compile-tools-deployment-targets ""    "space-separated list of targets to cross-compile host Swift tools for"
     skip-merge-lipo-cross-compile-tools ""       "set to skip running merge-lipo after installing cross-compiled host Swift tools"
     darwin-deployment-version-osx     "10.9"     "minimum deployment target version for OS X"
@@ -739,59 +740,10 @@ if [[ "$(uname -s)" == "Darwin" ]] ; then
     TOOLCHAIN_PREFIX=$(echo ${INSTALL_PREFIX} | sed -E 's/\/usr$//')
 fi
 
-# A list of deployment targets to compile the Swift host tools for, in cases
-# where we can run the resulting binaries natively on the build machine.
-NATIVE_TOOLS_DEPLOYMENT_TARGETS=()
 
 # A list of deployment targets to cross-compile the Swift host tools for.
 # We can't run the resulting binaries on the build machine.
 CROSS_TOOLS_DEPLOYMENT_TARGETS=()
-
-# Determine the native deployment target for the build machine, that will be
-# used to jumpstart the standard library build when cross-compiling.
-case "$(uname -s -m)" in
-    Linux\ x86_64)
-        NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
-            "linux-x86_64"
-        )
-        ;;
-    Linux\ armv7*)
-        NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
-            "linux-armv7"
-        )
-        ;;
-    Linux\ aarch64)
-        NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
-            "linux-aarch64"
-        )
-        ;;
-    Linux\ ppc64)
-        NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
-            "linux-powerpc64"
-        )
-        ;;
-    Linux\ ppc64le)
-        NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
-            "linux-powerpc64le"
-        )
-        ;;
-    Darwin\ x86_64)
-        NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
-            "macosx-x86_64"
-        )
-        ;;
-
-    FreeBSD\ amd64)
-        NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
-            "freebsd-x86_64"
-        )
-        ;;
-
-    *)
-        echo "Unknown operating system"
-        exit 1
-        ;;
-esac
 
 # Sanitize the list of cross-compilation targets.
 for t in ${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS} ; do
@@ -1376,7 +1328,7 @@ fi
 # Configure and build each product
 #
 # Start with native deployment targets because the resulting tools are used during cross-compilation.
-for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"; do
+for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"; do
     set_deployment_target_based_options
 
     case "${COMPILER_VENDOR}" in
@@ -1561,11 +1513,10 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                     "${LLVM_SOURCE_DIR}"
                 )
                 if [[ $(is_cross_tools_deployment_target ${deployment_target}) ]] ; then
-                    # FIXME: don't hardcode macosx-x86_64.
                     cmake_options=(
                         "${cmake_options[@]}"
-                        -DLLVM_TABLEGEN=$(build_directory macosx-x86_64 llvm)/bin/llvm-tblgen
-                        -DCLANG_TABLEGEN=$(build_directory macosx-x86_64 llvm)/bin/clang-tblgen
+                        -DLLVM_TABLEGEN=$(build_directory "${HOST_TARGET}" llvm)/bin/llvm-tblgen
+                        -DCLANG_TABLEGEN=$(build_directory "${HOST_TARGET}" llvm)/bin/clang-tblgen
                     )
                 fi
 
@@ -1592,10 +1543,9 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                     build_perf_testsuite_this_time=false
                     build_tests_this_time=false
 
-                    # FIXME: don't hardcode macosx-x86_64.
-                    native_llvm_tools_path="$(build_directory macosx-x86_64 llvm)/bin"
-                    native_clang_tools_path="$(build_directory macosx-x86_64 llvm)/bin"
-                    native_swift_tools_path="$(build_directory macosx-x86_64 swift)/bin"
+                    native_llvm_tools_path="$(build_directory "${HOST_TARGET}" llvm)/bin"
+                    native_clang_tools_path="$(build_directory "${HOST_TARGET}" llvm)/bin"
+                    native_swift_tools_path="$(build_directory "${HOST_TARGET}" swift)/bin"
 
                     cmake_options=(
                         "${cmake_options[@]}"
@@ -2111,7 +2061,7 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
     done
 done
 
-for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"; do
+for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"; do
     set_deployment_target_based_options
 
     for product in "${PRODUCTS[@]}"; do

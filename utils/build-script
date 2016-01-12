@@ -37,6 +37,7 @@ from SwiftBuildSupport import (
 sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
 import swift_build_support.clang
 import swift_build_support.cmake
+import swift_build_support.targets
 from swift_build_support.migration import migrate_impl_args
 
 
@@ -287,6 +288,15 @@ to build Swift.  This is not a technical limitation of the Swift build system.
 It is a policy decision aimed at making the builds uniform across all
 environments and easily reproducible by engineers who are not familiar with the
 details of the setups of other systems or automated environments.""")
+
+    targets_group = parser.add_argument_group(
+        title="Host and cross-compilation targets.")
+    targets_group.add_argument(
+        "--host-target",
+        help="The host target. LLVM, Clang, and Swift will be built for this "
+             "target. The built LLVM and Clang will be used to compile Swift "
+             "for the cross-compilation targets.",
+        default=swift_build_support.targets.host_target())
 
     projects_group = parser.add_argument_group(
         title="Options to select projects")
@@ -541,7 +551,12 @@ the number of parallel build jobs to use""",
     args = parser.parse_args(migrate_impl_args(sys.argv[1:], [
         '--darwin-xcrun-toolchain',
         '--cmake',
+        '--host-target',
     ]))
+
+    if args.host_target is None:
+        print_with_argv0("Unknown operating system.")
+        return 1
 
     # Build cmark if any cmark-related options were specified.
     if (args.cmark_build_variant is not None):
@@ -772,6 +787,7 @@ the number of parallel build jobs to use""",
     build_script_impl_args = [
         os.path.join(SWIFT_SOURCE_ROOT, "swift", "utils", "build-script-impl"),
         "--build-dir", build_dir,
+        "--host-target", args.host_target,
         "--host-cc", host_clang.cc,
         "--host-cxx", host_clang.cxx,
         "--darwin-xcrun-toolchain", args.darwin_xcrun_toolchain,
