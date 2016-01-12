@@ -1849,19 +1849,8 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
       // Put the header next to the primary output file.
       // FIXME: That's not correct if the user /just/ passed -emit-header
       // and not -emit-module.
-      llvm::SmallString<128> Path;
-      if (Output->getPrimaryOutputType() != types::TY_Nothing)
-        Path = Output->getPrimaryOutputFilenames()[0];
-      else if (!Output->getBaseInput(0).empty())
-        Path = llvm::sys::path::stem(Output->getBaseInput(0));
-      else
-        Path = OI.ModuleName;
-
-      bool isTempFile = C.isTemporaryFile(Path);
-      llvm::sys::path::replace_extension(Path, "h");
-      Output->setAdditionalOutputForType(types::TY_ObjCHeader, Path);
-      if (isTempFile)
-        C.addTemporaryFile(Path);
+      addAuxiliaryOutput(C, *Output, types::TY_ObjCHeader, OI,
+                         /*output file map*/nullptr);
     }
   }
 
