@@ -159,9 +159,6 @@ private:
   mutable llvm::StringMap<ToolChain *> ToolChains;
 
 public:
-  typedef std::pair<types::ID, const llvm::opt::Arg *> InputPair;
-  typedef SmallVector<InputPair, 16> InputList;
-
   Driver(StringRef DriverExecutable, StringRef Name,
          ArrayRef<const char *> Args, DiagnosticEngine &Diags);
   ~Driver();
@@ -206,7 +203,7 @@ public:
   /// \param[out] Inputs The list in which to store the resulting compilation
   /// inputs.
   void buildInputs(const ToolChain &TC, const llvm::opt::DerivedArgList &Args,
-                   InputList &Inputs) const;
+                   InputFileList &Inputs) const;
 
   /// Construct the OutputInfo for the driver from the given arguments.
   ///
@@ -217,7 +214,7 @@ public:
   /// information.
   void buildOutputInfo(const ToolChain &TC,
                        const llvm::opt::DerivedArgList &Args,
-                       const InputList &Inputs, OutputInfo &OI) const;
+                       const InputFileList &Inputs, OutputInfo &OI) const;
 
   /// Construct the list of Actions to perform for the given arguments,
   /// which are only done for a single architecture.
@@ -232,7 +229,7 @@ public:
   /// need to be rebuilt.
   /// \param[out] Actions The list in which to store the resulting Actions.
   void buildActions(const ToolChain &TC, const llvm::opt::DerivedArgList &Args,
-                    const InputList &Inputs, const OutputInfo &OI,
+                    const InputFileList &Inputs, const OutputInfo &OI,
                     const OutputFileMap *OFM, const InputInfoMap *OutOfDateMap,
                     ActionList &Actions) const;
 

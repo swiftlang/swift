@@ -55,6 +55,7 @@ protected:
     const CommandOutput &Output;
     ArrayRef<const Action *> InputActions;
     const llvm::opt::ArgList &Args;
+    ArrayRef<InputPair> TopLevelInputFiles;
     const OutputInfo &OI;
   };
 
@@ -129,6 +130,7 @@ public:
                                     std::unique_ptr<CommandOutput> output,
                                     const ActionList &inputActions,
                                     const llvm::opt::ArgList &args,
+                                    ArrayRef<InputPair> topLevelInputFiles,
                                     const OutputInfo &OI) const;
 
   /// Return the default language type to use for the given extension.

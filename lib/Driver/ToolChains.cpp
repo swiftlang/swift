@@ -244,15 +244,17 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     const Arg &PrimaryInputArg = IA->getInputArg();
     bool FoundPrimaryInput = false;
 
-    for (auto *A : make_range(context.Args.filtered_begin(options::OPT_INPUT),
-                              context.Args.filtered_end())) {
+    for (auto inputPair : context.TopLevelInputFiles) {
+      if (!types::isPartOfSwiftCompilation(inputPair.first))
+        continue;
+
       // See if this input should be passed with -primary-file.
-      // FIXME: This will pick up non-source inputs too, like .o files.
-      if (!FoundPrimaryInput && PrimaryInputArg.getIndex() == A->getIndex()) {
+      if (!FoundPrimaryInput &&
+          PrimaryInputArg.getIndex() == inputPair.second->getIndex()) {
         Arguments.push_back("-primary-file");
         FoundPrimaryInput = true;
       }
-      Arguments.push_back(A->getValue());
+      Arguments.push_back(inputPair.second->getValue());
     }
     break;
   }

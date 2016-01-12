@@ -39,8 +39,10 @@ ToolChain::constructJob(const JobAction &JA,
                         std::unique_ptr<CommandOutput> output,
                         const ActionList &inputActions,
                         const llvm::opt::ArgList &args,
+                        ArrayRef<InputPair> topLevelInputFiles,
                         const OutputInfo &OI) const {
-  JobContext context{inputs, *output, inputActions, args, OI};
+  JobContext context{inputs, *output, inputActions, args, topLevelInputFiles, 
+                     OI};
 
   auto invocationInfo = [&]() -> InvocationInfo {
     switch (JA.getKind()) {

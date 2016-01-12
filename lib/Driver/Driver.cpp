@@ -184,7 +184,7 @@ class Driver::InputInfoMap
 using InputInfoMap = Driver::InputInfoMap;
 
 static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
-                                 const Driver::InputList &inputs,
+                                 const InputFileList &inputs,
                                  StringRef buildRecordPath) {
   // Treat a missing file as "no previous build".
   auto buffer = llvm::MemoryBuffer::getFile(buildRecordPath);
@@ -384,7 +384,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   }
 
   // Construct the list of inputs.
-  InputList Inputs;
+  InputFileList Inputs;
   buildInputs(*TC, *TranslatedArgList, Inputs);
 
   if (Diags.hadAnyError())
@@ -489,6 +489,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   std::unique_ptr<Compilation> C(new Compilation(*this, *TC, Diags, Level,
                                                  std::move(ArgList),
                                                  std::move(TranslatedArgList),
+                                                 std::move(Inputs),
                                                  ArgsHash, StartTime,
                                                  NumberOfParallelCommands,
                                                  Incremental,
@@ -710,7 +711,7 @@ static bool checkInputExistence(const Driver &D, const DerivedArgList &Args,
 
 void Driver::buildInputs(const ToolChain &TC,
                          const DerivedArgList &Args,
-                         InputList &Inputs) const {
+                         InputFileList &Inputs) const {
   types::ID InputType = types::TY_Nothing;
   Arg *InputTypeArg = nullptr;
 
@@ -765,7 +766,7 @@ void Driver::buildInputs(const ToolChain &TC,
 
 static bool maybeBuildingExecutable(const OutputInfo &OI,
                                     const DerivedArgList &Args,
-                                    const Driver::InputList &Inputs) {
+                                    const InputFileList &Inputs) {
   switch (OI.LinkAction) {
   case LinkKind::Executable:
     return true;
@@ -850,7 +851,8 @@ static bool isSDKTooOld(StringRef sdkPath, const llvm::Triple &target) {
 }
 
 void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
-                             const InputList &Inputs, OutputInfo &OI) const {
+                             const InputFileList &Inputs,
+                             OutputInfo &OI) const {
   // By default, the driver does not link its output; this will be updated
   // appropriately below if linking is required.
 
@@ -1096,7 +1098,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
 void Driver::buildActions(const ToolChain &TC,
                           const DerivedArgList &Args,
-                          const InputList &Inputs,
+                          const InputFileList &Inputs,
                           const OutputInfo &OI,
                           const OutputFileMap *OFM,
                           const InputInfoMap *OutOfDateMap,
@@ -1122,6 +1124,8 @@ void Driver::buildActions(const ToolChain &TC,
       case types::TY_SIL:
       case types::TY_SIB: {
         // Source inputs always need to be compiled.
+        assert(types::isPartOfSwiftCompilation(InputType));
+
         CompileJobAction::InputInfo previousBuildState = {
           CompileJobAction::InputInfo::NeedsCascadingBuild,
           llvm::sys::TimeValue::MinTime()
@@ -1194,8 +1198,7 @@ void Driver::buildActions(const ToolChain &TC,
       bool HandledHere = true;
       for (const InputPair &Input : Inputs) {
         types::ID InputType = Input.first;
-        if (InputType != types::TY_Swift && InputType != types::TY_SIL &&
-            InputType != types::TY_SIB) {
+        if (!types::isPartOfSwiftCompilation(InputType)) {
           HandledHere = false;
           break;
         }
@@ -1855,7 +1858,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
   std::unique_ptr<Job> ownedJob = TC.constructJob(*JA, std::move(InputJobs),
                                                   std::move(Output),
                                                   InputActions, C.getArgs(),
-                                                  OI);
+                                                  C.getInputFiles(), OI);
   Job *J = C.addJob(std::move(ownedJob));
 
   // If we track dependencies for this job, we may be able to avoid running it.

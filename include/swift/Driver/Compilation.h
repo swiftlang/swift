@@ -18,6 +18,7 @@
 #define SWIFT_DRIVER_COMPILATION_H
 
 #include "swift/Driver/Job.h"
+#include "swift/Driver/Util.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseSet.h"
@@ -76,6 +77,9 @@ private:
 
   /// The translated input arg list.
   std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs;
+
+  /// A list of input files and their associated types.
+  InputFileList InputFilesWithTypes;
 
   /// Temporary files that should be cleaned up after the compilation finishes.
   ///
@@ -136,6 +140,7 @@ public:
               DiagnosticEngine &Diags, OutputLevel Level,
               std::unique_ptr<llvm::opt::InputArgList> InputArgs,
               std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs,
+              InputFileList InputsWithTypes,
               StringRef ArgsHash, llvm::sys::TimeValue StartTime,
               unsigned NumberOfParallelCommands = 1,
               bool EnableIncrementalBuild = false,
@@ -164,8 +169,8 @@ public:
   }
 
   const llvm::opt::InputArgList &getInputArgs() const { return *InputArgs; }
-
   const llvm::opt::DerivedArgList &getArgs() const { return *TranslatedArgs; }
+  ArrayRef<InputPair> getInputFiles() const { return InputFilesWithTypes; }
 
   unsigned getNumberOfParallelCommands() const {
     return NumberOfParallelCommands;
