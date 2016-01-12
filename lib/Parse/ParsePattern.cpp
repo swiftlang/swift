@@ -241,7 +241,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
           // Check if attribute is invalid type attribute
           // and actually a declaration attribute
           if (TypeAttributes::getAttrKindFromString(nextToken.getText()) == TAK_Count 
-              && DeclAttribute::getAttrKindFromString(nextToken.getText()) != TAK_Count) { 
+              && DeclAttribute::getAttrKindFromString(nextToken.getText()) != DAK_Count) { 
             SourceLoc AtLoc = consumeToken(tok::at_sign);
             SourceLoc AttrLoc = consumeToken(tok::identifier);
             diagnose(AtLoc, diag::decl_attribute_applied_to_type)
