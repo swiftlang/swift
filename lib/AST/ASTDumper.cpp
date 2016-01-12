@@ -1650,7 +1650,8 @@ public:
     OS << ')';
   }
   void visitUnresolvedConstructorExpr(UnresolvedConstructorExpr *E) {
-    printCommon(E, "unresolved_constructor") << '\n';
+    printCommon(E, "unresolved_constructor")
+      << "  name=" << E->getName() << '\n';
     printRec(E->getSubExpr());
     OS << ')';
   }

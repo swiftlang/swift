@@ -1051,11 +1051,15 @@ class UnresolvedConstructorExpr : public Expr {
   Expr *SubExpr;
   SourceLoc DotLoc;
   SourceLoc ConstructorLoc;
+  DeclName Name;
+
 public:
   UnresolvedConstructorExpr(Expr *SubExpr, SourceLoc DotLoc,
-                            SourceLoc ConstructorLoc, bool Implicit)
+                            SourceLoc ConstructorLoc, DeclName Name,
+                            bool Implicit)
     : Expr(ExprKind::UnresolvedConstructor, Implicit),
-      SubExpr(SubExpr), DotLoc(DotLoc), ConstructorLoc(ConstructorLoc)
+      SubExpr(SubExpr), DotLoc(DotLoc), ConstructorLoc(ConstructorLoc),
+      Name(Name)
   {}
   
   Expr *getSubExpr() const { return SubExpr; }
@@ -1065,6 +1069,8 @@ public:
   SourceLoc getConstructorLoc() const { return ConstructorLoc; }
   SourceLoc getDotLoc() const { return DotLoc; }
   
+  DeclName getName() const { return Name; }
+
   SourceLoc getStartLoc() const { return SubExpr->getStartLoc(); }
   SourceLoc getEndLoc() const { return ConstructorLoc; }
   

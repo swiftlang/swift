@@ -1573,10 +1573,12 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   // Reference to super.init.
   Expr *superRef = new (ctx) SuperRefExpr(selfDecl, SourceLoc(),
                                           /*Implicit=*/true);
-  Expr *ctorRef  = new (ctx) UnresolvedConstructorExpr(superRef,
-                                                       SourceLoc(),
-                                                       SourceLoc(),
-                                                       /*Implicit=*/true);
+  Expr *ctorRef  = new (ctx) UnresolvedConstructorExpr(
+                               superRef,
+                               SourceLoc(),
+                               SourceLoc(),
+                               superclassCtor->getFullName(),
+                               /*Implicit=*/true);
 
   auto ctorArgs = buildArgumentForwardingExpr(bodyParams->getArray(), ctx);
 
