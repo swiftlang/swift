@@ -12,7 +12,7 @@
 
 %{
 
-from SwiftIntTypes import *
+from SwiftIntTypes import all_integer_types, int_max_bits
 
 # Number of bits in the Builtin.Word type
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
