@@ -4956,6 +4956,13 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
     return;
   }
   
+  if (auto UME = dyn_cast<UnresolvedMemberExpr>(E)) {
+    if (!CS->getContextualType()) {
+      diagnose(E->getLoc(), diag::unresolved_member_no_inference,UME->getName())
+        .highlight(SourceRange(UME->getDotLoc(), UME->getNameLoc()));
+      return;
+    }
+  }
 
   // Attempt to re-type-check the entire expression, allowing ambiguity, but
   // ignoring a contextual type.

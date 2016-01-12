@@ -91,13 +91,13 @@ func test3a(a: ZeroOneTwoThree) {
   var e : ZeroOneTwoThree = (.Three(1, 2, 3))
   var f = ZeroOneTwoThree.Unknown(.None, .Some(4), .Some(32))
 
-  var g = .None  // expected-error {{type of expression is ambiguous without more context}}
+  var g = .None  // expected-error {{reference to member 'None' cannot be resolved without a contextual type}}
 
   // Overload resolution can resolve this to the right constructor.
   var h = ZeroOneTwoThree(1)
 
   test3a;  // expected-error {{unused function}}
-  .Zero   // expected-error {{type of expression is ambiguous without more context}}
+  .Zero   // expected-error {{reference to member 'Zero' cannot be resolved without a contextual type}}
   test3a   // expected-error {{unused function}}
   (.Zero) // expected-error {{type of expression is ambiguous without more context}}
   test3a(.Zero)
