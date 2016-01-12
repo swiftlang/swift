@@ -292,7 +292,11 @@ void SideEffectAnalysis::analyzeInstruction(FunctionInfo *FInfo,
 
     if (RecursionDepth < MaxRecursionDepth) {
       CalleeList Callees = BCA->getCalleeList(FAS);
-      if (Callees.allCalleesVisible()) {
+      if (Callees.allCalleesVisible() &&
+          // @callee_owned function calls implicitly release the context, which
+          // may call deinits of boxed values.
+          // TODO: be less conservative about what destructors might be called.
+          !FAS.getOrigCalleeType()->isCalleeConsumed()) {
         // Derive the effects of the apply from the known callees.
         for (SILFunction *Callee : Callees) {
           FunctionInfo *CalleeInfo = getFunctionInfo(Callee);
@@ -461,7 +465,11 @@ void SideEffectAnalysis::getEffects(FunctionEffects &ApplyEffects, FullApplySite
   }
 
   auto Callees = BCA->getCalleeList(FAS);
-  if (!Callees.allCalleesVisible()) {
+  if (!Callees.allCalleesVisible() ||
+      // @callee_owned function calls implicitly release the context, which
+      // may call deinits of boxed values.
+      // TODO: be less conservative about what destructors might be called.
+      FAS.getOrigCalleeType()->isCalleeConsumed()) {
     ApplyEffects.setWorstEffects();
     return;
   }

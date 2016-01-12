@@ -57,11 +57,14 @@ bb0(%0 : $X, %1 : $*Int32):
 }
 
 // CHECK-LABEL: sil @partial_apply_load_store_to_args
-// CHECK: <func=w,param0=r,param1=,param2=;alloc>
+// The apply may call deinit of the callee_owned thick function. Therefore the
+// function effects are conservative.
+// CHECK: <func=rw+-,param0=,param1=,param2=;alloc;trap;readrc>
 sil @partial_apply_load_store_to_args : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> () {
 bb0(%0 : $*Int32, %1 : $*Int32, %2 : $X):
   %f = function_ref @load_store_to_args : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
   %c = partial_apply %f(%1, %2) : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
+  // %c is implicitly released which may call deinit of the boxed X.
   %ap = apply %c(%0) : $@callee_owned (@inout Int32) -> ()
 
   %r = tuple ()
