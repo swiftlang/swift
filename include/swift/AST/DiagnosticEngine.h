@@ -388,8 +388,8 @@ namespace swift {
       Unspecified,
       Ignore,
       Note,
-      Warn,
-      Err,
+      Warning,
+      Error,
       Fatal,
     };
 
@@ -483,7 +483,7 @@ namespace swift {
     
   public:
     explicit DiagnosticEngine(SourceManager &SourceMgr)
-      : SourceMgr(SourceMgr), state(), ActiveDiagnostic() {
+      : SourceMgr(SourceMgr), ActiveDiagnostic() {
     }
 
     /// hadAnyError - return true if any *error* diagnostics have been emitted.

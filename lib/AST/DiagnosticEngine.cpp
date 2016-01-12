@@ -82,9 +82,9 @@ DiagnosticState::DiagnosticState() {
 #define ERROR(ID, Category, Options, Text, Signature)                          \
   perDiagnosticState[LocalDiagID::ID] =                                        \
       DiagnosticOptions::Options == DiagnosticOptions::Fatal ? Behavior::Fatal \
-                                                             : Behavior::Err;
+                                                             : Behavior::Error;
 #define WARNING(ID, Category, Options, Text, Signature)                        \
-  perDiagnosticState[LocalDiagID::ID] = Behavior::Warn;
+  perDiagnosticState[LocalDiagID::ID] = Behavior::Warning;
 #define NOTE(ID, Category, Options, Text, Signature)                           \
   perDiagnosticState[LocalDiagID::ID] = Behavior::Note;
 #include "swift/AST/DiagnosticsAll.def"
@@ -468,12 +468,12 @@ static DiagnosticKind toDiagnosticKind(DiagnosticState::Behavior behavior) {
     llvm_unreachable("unspecified behavior");
   case DiagnosticState::Behavior::Ignore:
     llvm_unreachable("trying to map an ignored diagnostic");
-  case DiagnosticState::Behavior::Err:
+  case DiagnosticState::Behavior::Error:
   case DiagnosticState::Behavior::Fatal:
     return DiagnosticKind::Error;
   case DiagnosticState::Behavior::Note:
     return DiagnosticKind::Note;
-  case DiagnosticState::Behavior::Warn:
+  case DiagnosticState::Behavior::Warning:
     return DiagnosticKind::Warning;
   }
 }
@@ -483,7 +483,7 @@ DiagnosticState::Behavior DiagnosticState::determineBehavior(DiagID id) {
     if (lvl == Behavior::Fatal) {
       fatalErrorOccurred = true;
       anyErrorOccurred = true;
-    } else if (lvl == Behavior::Err) {
+    } else if (lvl == Behavior::Error) {
       anyErrorOccurred = true;
     }
 
@@ -507,7 +507,7 @@ DiagnosticState::Behavior DiagnosticState::determineBehavior(DiagID id) {
       return set(Behavior::Ignore);
   }
 
-  if (behavior == Behavior::Warn && ignoreAllWarnings)
+  if (behavior == Behavior::Warning && ignoreAllWarnings)
     return set(Behavior::Ignore);
 
   return set(behavior);
