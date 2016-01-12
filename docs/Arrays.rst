@@ -169,43 +169,43 @@ conforms to ``_BridgedToObjectiveC``:
 
 .. _trivial bridging:
 
-* **Trivial bridging** implicitly converts ``Base[]`` to
+* **Trivial bridging** implicitly converts ``[Base]`` to
   ``NSArray`` in O(1). This is simply a matter of returning the
   Array's internal buffer, which is-a ``NSArray``.
 
 .. _trivial bridging back:
 
 * **Trivial bridging back** implicitly converts ``NSArray`` to
-  ``AnyObject[]`` in O(1) plus the cost of calling ``copy()`` on
+  ``[AnyObject]`` in O(1) plus the cost of calling ``copy()`` on
   the ``NSArray``. [#nocopy]_
 
 * **Implicit conversions** between ``Array`` types
 
-  - **Implicit upcasting** implicitly converts ``Derived[]`` to
-    ``Base[]`` in O(1).
-  - **Implicit bridging** implicitly converts ``X[]`` to
-    ``X._ObjectiveCType[]`` in O(N).
+  - **Implicit upcasting** implicitly converts ``[Derived]`` to
+    ``[Base]`` in O(1).
+  - **Implicit bridging** implicitly converts ``[X]`` to
+    ``[X._ObjectiveCType]`` in O(N).
 
   .. Note:: Either type of implicit conversion may be combined with
      `trivial bridging`_ in an implicit conversion to ``NSArray``.
 
-* **Checked conversions** convert ``T[]`` to ``U[]?`` in O(N)
-  via ``a as U[]``.
+* **Checked conversions** convert ``[T]`` to ``[U]?`` in O(N)
+  via ``a as [U]``.
 
-  - **Checked downcasting** converts ``Base[]`` to ``Derived[]?``.
-  - **Checked bridging back** converts ``T[]`` to ``X[]?`` where
+  - **Checked downcasting** converts ``[Base]`` to ``[Derived]?``.
+  - **Checked bridging back** converts ``[T]`` to ``[X]?`` where
     ``X._ObjectiveCType`` is ``T`` or a trivial subtype thereof.
 
-* **Forced conversions** convert ``AnyObject[]`` or ``NSArray`` to
-  ``T[]`` implicitly, in bridging thunks between Swift and Objective-C.
+* **Forced conversions** convert ``[AnyObject]`` or ``NSArray`` to
+  ``[T]`` implicitly, in bridging thunks between Swift and Objective-C.
 
-  For example, when a user writes a Swift method taking ``NSView[]``,
+  For example, when a user writes a Swift method taking ``[NSView]``,
   it is exposed to Objective-C as a method taking ``NSArray``, which
-  is force-converted to ``NSView[]`` when called from Objective-C.
+  is force-converted to ``[NSView]`` when called from Objective-C.
 
-  - **Forced downcasting** converts ``AnyObject[]`` to ``Derived[]`` in
+  - **Forced downcasting** converts ``[AnyObject]`` to ``[Derived]`` in
     O(1)
-  - **Forced bridging back** converts ``AnyObject[]`` to ``X[]`` in O(N).
+  - **Forced bridging back** converts ``[AnyObject]`` to ``[X]`` in O(N).
 
   A forced conversion where any element fails to convert is considered
   a user programming error that may trap.  In the case of forced
@@ -225,7 +225,7 @@ Upcasts
 
 TODO: this section is outdated.
 
-When up-casting an ``Derived[]`` to ``Base[]``, a buffer of
+When up-casting an ``[Derived]`` to ``[Base]``, a buffer of
 ``Derived`` object can simply be ``unsafeBitCast``\ 'ed to a buffer
 of elements of type ``Base``—as long as the resulting buffer is never
 mutated.  For example, we cannot allow a ``Base`` element to be
@@ -234,11 +234,11 @@ the elements with the (incorrect) static presumption that they have
 ``Derived`` type.
 
 Furthermore, we can't (logically) copy the buffer just prior to
-mutation, since the ``Base[]`` may be copied prior to mutation,
+mutation, since the ``[Base]`` may be copied prior to mutation,
 and our shared subscript assignment semantics imply that all copies
 must observe its subscript assignments.
 
-Therefore, converting ``T[]`` to ``U[]`` is akin to
+Therefore, converting ``[T]`` to ``[U]`` is akin to
 resizing: the new ``Array`` becomes logically independent.  To avoid
 an immediate O(N) conversion cost, and preserve shared subscript
 assignment semantics, we use a layer of indirection in the data

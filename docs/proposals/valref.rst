@@ -290,7 +290,7 @@ type parameter, as follows::
 parameters::
 
   // Fill an array with independent copies of x
-  func fill<T:val>(array:T[], x:T) {
+  func fill<T:val>(array:[T], x:T) {
     for i in 0...array.length {
       array[i] = x
     }

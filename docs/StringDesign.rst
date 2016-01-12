@@ -219,7 +219,7 @@ passes you a string *you own it*.  Nobody can change a string value
   `// s: String =` :look:`"Hey"`\ :aside:`…and it doesn't.`
   |swift| :look1:`t.addEcho()`\ :aside:`this call can't change c.lastSound…`
   |swift| [s, c.lastSound, t]
-  `// r0: String[] = ["Hey",` :look:`"HeyHey"`\ :aside:`…and it doesn't.`\ `, "HeyHeyHeyHey"]`
+  `// r0: [String] = ["Hey",` :look:`"HeyHey"`\ :aside:`…and it doesn't.`\ `, "HeyHeyHeyHey"]`
 
 Strings are **Unicode-Aware**
 -----------------------------
@@ -1021,8 +1021,8 @@ Splitting
 
 :Swift:
   .. parsed-literal::
-     func split(maxSplit: Int = Int.max()) -> String[]
-     func split(separator: Character, maxSplit: Int = Int.max()) -> String[]
+     func split(maxSplit: Int = Int.max()) -> [String]
+     func split(separator: Character, maxSplit: Int = Int.max()) -> [String]
 
   The semantics of these functions were taken from Python, which seems
   to be a fairly good representative of what modern languages are
@@ -1038,7 +1038,7 @@ Splitting
     func **split**\ <Seq: Sliceable, IsSeparator: Predicate 
         where IsSeparator.Arguments == Seq.Element
     >(seq: Seq, isSeparator: IsSeparator, maxSplit: Int = Int.max(),
-      allowEmptySlices: Bool = false  ) -> Seq[]
+      allowEmptySlices: Bool = false  ) -> [Seq]
 
 Splitting
 ~~~~~~~~~
