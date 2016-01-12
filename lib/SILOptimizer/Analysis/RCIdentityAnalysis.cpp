@@ -385,6 +385,37 @@ SILValue RCIdentityFunctionInfo::stripRCIdentityPreservingOps(SILValue V,
   return V;
 }
 
+
+SILValue RCIdentityFunctionInfo::getRCIdentityRootInner(SILValue V,
+                                                    unsigned RecursionDepth) {
+  // Only allow this method to be recursed on for a limited number of times to
+  // make sure we don't explode compile time.
+  if (RecursionDepth >= MaxRecursionDepth)
+    return SILValue();
+
+  SILValue NewValue = stripRCIdentityPreservingOps(V, RecursionDepth);
+  if (!NewValue)
+    return SILValue();
+
+  // We can get back V if our analysis completely fails. There is no point in
+  // storing this value into the cache so just return it.
+  if (NewValue == V)
+    return V;
+
+  return NewValue;
+}
+
+SILValue RCIdentityFunctionInfo::getRCIdentityRoot(SILValue V) {
+  SILValue Root = getRCIdentityRootInner(V, 0);
+  VisitedArgs.clear();
+
+  // If we fail to find a root, return V.
+  if (!Root)
+    return V;
+
+  return Root;
+}
+
 //===----------------------------------------------------------------------===//
 //                              RCUser Analysis
 //===----------------------------------------------------------------------===//
@@ -465,36 +496,6 @@ void RCIdentityFunctionInfo::getRCUsers(
 //===----------------------------------------------------------------------===//
 //                              Main Entry Point
 //===----------------------------------------------------------------------===//
-
-SILValue RCIdentityFunctionInfo::getRCIdentityRootInner(SILValue V,
-                                                    unsigned RecursionDepth) {
-  // Only allow this method to be recursed on for a limited number of times to
-  // make sure we don't explode compile time.
-  if (RecursionDepth >= MaxRecursionDepth)
-    return SILValue();
-
-  SILValue NewValue = stripRCIdentityPreservingOps(V, RecursionDepth);
-  if (!NewValue)
-    return SILValue();
-
-  // We can get back V if our analysis completely fails. There is no point in
-  // storing this value into the cache so just return it.
-  if (NewValue == V)
-    return V;
-
-  return NewValue;
-}
-
-SILValue RCIdentityFunctionInfo::getRCIdentityRoot(SILValue V) {
-  SILValue Root = getRCIdentityRootInner(V, 0);
-  VisitedArgs.clear();
-
-  // If we fail to find a root, return V.
-  if (!Root)
-    return V;
-
-  return Root;
-}
 
 void RCIdentityAnalysis::initialize(SILPassManager *PM) {
   DA = PM->getAnalysis<DominanceAnalysis>();
