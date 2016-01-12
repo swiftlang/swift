@@ -114,8 +114,7 @@ i ***~ i // expected-error{{cannot convert value of type 'Int' to expected argum
 // FIXME: poor diagnostic, to be fixed in 20142462. For now, we just want to
 // make sure that it doesn't crash.
 func rdar20142523() {
-  map(0..<10, { x in // expected-error{{cannot invoke 'map' with an argument list of type '(Range<Int>, (_) -> _)'}}
-    // expected-note @-1 {{overloads for 'map' exist with these partially matching parameter lists: (C, (C.Generator.Element) -> T), (T?, @noescape (T) -> U)}}
+  map(0..<10, { x in // expected-error{{ambiguous reference to member '..<'}}
     ()
     return x
   })
@@ -424,8 +423,7 @@ func f20371273() {
 // <rdar://problem/20921068> Swift fails to compile: [0].map() { _ in let r = (1,2).0; return r }
 // FIXME: Should complain about not having a return type annotation in the closure.
 [0].map { _ in let r =  (1,2).0;  return r }
-// expected-error @-1 {{cannot invoke 'map' with an argument list of type '(@noescape (Int) throws -> _)'}}
-// expected-note @-2 {{expected an argument list of type '(@noescape Int throws -> T)'}}
+// expected-error @-1 {{expression type '[_]' is ambiguous without more context}}
 
 // <rdar://problem/21078316> Less than useful error message when using map on optional dictionary type
 func rdar21078316() {
@@ -615,7 +613,8 @@ extension Array {
 }
 
 // <rdar://problem/22519983> QoI: Weird error when failing to infer archetype
-func safeAssign<T: RawRepresentable>(inout lhs: T) -> Bool {}  // expected-note {{in call to function 'safeAssign'}}
+func safeAssign<T: RawRepresentable>(inout lhs: T) -> Bool {}
+// expected-note @-1 {{in call to function 'safeAssign'}}
 let a = safeAssign // expected-error {{generic parameter 'T' could not be inferred}}
 
 

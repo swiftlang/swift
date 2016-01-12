@@ -2443,15 +2443,6 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
 
   fromType = fromType->getRValueType();
   auto toType = CS->simplifyType(constraint->getSecondType());
-
-  // If the second type is a type variable, the expression itself is
-  // ambiguous.  Bail out so the general ambiguity diagnosing logic can handle
-  // it.
-  if (fromType->hasUnresolvedType() || fromType->hasTypeVariable() ||
-      isUnresolvedOrTypeVarType(toType) ||
-      // FIXME: Why reject unbound generic types here?
-      fromType->is<UnboundGenericType>())
-    return false;
   
   // Try to simplify irrelevant details of function types.  For example, if
   // someone passes a "() -> Float" function to a "() throws -> Int"
@@ -2489,19 +2480,49 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   // a failed conversion constraint of "A -> B" to "_ -> C", where the error is
   // that B isn't convertible to C.
   if (CS->getContextualTypePurpose() == CTP_CalleeResult) {
-    if (auto destFT = toType->getAs<FunctionType>()) {
-      auto srcFT = fromType->getAs<FunctionType>();
-      if (!isUnresolvedOrTypeVarType(srcFT->getResult())) {
-        // Otherwise, the error is that the result types mismatch.
-        diagnose(expr->getLoc(), diag::invalid_callee_result_type,
-                 srcFT->getResult(), destFT->getResult())
-          .highlight(expr->getSourceRange());
-        return true;
-      }
+    auto destFT = toType->getAs<FunctionType>();
+    auto srcFT = fromType->getAs<FunctionType>();
+    if (destFT && srcFT && !isUnresolvedOrTypeVarType(srcFT->getResult())) {
+      // Otherwise, the error is that the result types mismatch.
+      diagnose(expr->getLoc(), diag::invalid_callee_result_type,
+               srcFT->getResult(), destFT->getResult())
+        .highlight(expr->getSourceRange());
+      return true;
     }
   }
   
+  
+  // If simplification has turned this into the same types, then this isn't the
+  // broken constraint that we're looking for.
+  if (fromType->isEqual(toType) &&
+      constraint->getKind() != ConstraintKind::ConformsTo)
+    return false;
+  
+  
+  // If we have two tuples with mismatching types, produce a tailored
+  // diagnostic.
+  if (auto fromTT = fromType->getAs<TupleType>())
+    if (auto toTT = toType->getAs<TupleType>())
+      if (fromTT->getNumElements() != toTT->getNumElements()) {
+        diagnose(anchor->getLoc(), diag::tuple_types_not_convertible,
+                 fromTT, toTT)
+        .highlight(anchor->getSourceRange());
+        return true;
+      }
+  
+  
+  // If the second type is a type variable, the expression itself is
+  // ambiguous.  Bail out so the general ambiguity diagnosing logic can handle
+  // it.
+  if (fromType->hasUnresolvedType() || fromType->hasTypeVariable() ||
+      toType->hasUnresolvedType() || toType->hasTypeVariable() ||
+      // FIXME: Why reject unbound generic types here?
+      fromType->is<UnboundGenericType>())
+    return false;
+
+  
   if (auto PT = toType->getAs<ProtocolType>()) {
+    
     // Check for "=" converting to BooleanType.  The user probably meant ==.
     if (auto *AE = dyn_cast<AssignExpr>(expr->getValueProvidingExpr()))
       if (PT->getDecl()->isSpecificProtocol(KnownProtocolKind::BooleanType)) {
@@ -2530,23 +2551,6 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
     }
     return true;
   }
-
-  // If simplification has turned this into the same types, then this isn't the
-  // broken constraint that we're looking for.
-  if (fromType->isEqual(toType))
-    return false;
-
-  
-  // If we have two tuples with mismatching types, produce a tailored
-  // diagnostic.
-  if (auto fromTT = fromType->getAs<TupleType>())
-    if (auto toTT = toType->getAs<TupleType>())
-      if (fromTT->getNumElements() != toTT->getNumElements()) {
-        diagnose(anchor->getLoc(), diag::tuple_types_not_convertible,
-                 fromTT, toTT)
-          .highlight(anchor->getSourceRange());
-        return true;
-      }
   
   diagnose(anchor->getLoc(), diag::types_not_convertible,
            constraint->getKind() == ConstraintKind::Subtype,
@@ -3871,6 +3875,10 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     return true;
   }
 
+  if (argExpr->getType()->hasUnresolvedType())
+    return false;
+  
+  
   std::string argString = getTypeListString(argExpr->getType());
 
   // If we couldn't get the name of the callee, then it must be something of a
