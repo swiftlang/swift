@@ -940,6 +940,9 @@ ERROR(availability_query_outside_if_stmt_guard, none,
       "#available may only be used as condition of an 'if', 'guard'"
       " or 'while' statement", ())
 
+ERROR(empty_arg_label_underscore, none,
+      "an empty argument label is spelled with '_'", ())
+
 ERROR(expected_identifier_after_dot_expr,none,
       "expected identifier after '.' expression", ())
 

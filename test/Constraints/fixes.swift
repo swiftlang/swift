@@ -37,7 +37,7 @@ func forgotCall() {
   f6(f4, f2) // expected-error{{function produces expected type 'B'; did you mean to call it with '()'?}}{{8-8=()}}
 
   // With overloading: only one succeeds.
-  a = createB // expected-error{{ambiguous reference to member 'createB'}}
+  a = createB // expected-error{{ambiguous reference to member 'createB()'}}
 
   // With overloading, pick the fewest number of fixes.
   var b = f7(f4, f1) // expected-error{{function produces expected type 'B'; did you mean to call it with '()'?}}

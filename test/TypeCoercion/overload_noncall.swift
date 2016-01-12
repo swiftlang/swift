@@ -16,7 +16,7 @@ func f2(g: (x: X) -> X) -> ((y: Y) -> Y) { }
 func test_conv() {
   var _ : (x1 : X, x2 : X) -> X = f0
   var _ : (X, X) -> X = f0
-  var _ : (Y, X) -> X = f0 // expected-error{{ambiguous reference to member 'f0'}}
+  var _ : (Y, X) -> X = f0 // expected-error{{ambiguous reference to member 'f0(_:x2:)'}}
   var _ : (X) -> X = f1
   var a7 : (X) -> (X) = f1
   var a8 : (x2 : X) -> (X) = f1

@@ -1459,7 +1459,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
   // base uncurried by one level, and we refer to the name of the member, not to
   // the name of any base.
   if (auto UDE = dyn_cast<UnresolvedDotExpr>(fn)) {
-    declName = UDE->getName().str().str();
+    declName = UDE->getName().getBaseName().str().str();
     uncurryLevel = 1;
 
     // If we actually resolved the member to use, return it.
@@ -2363,11 +2363,7 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure(Constraint *constraint) {
     bindOverload = constraint->getNestedConstraints().front();
 
   auto overloadChoice = bindOverload->getOverloadChoice();
-  std::string overloadName = overloadChoice.getDecl()->getNameStr();
-
-  if (auto *CD = dyn_cast<ConstructorDecl>(overloadChoice.getDecl()))
-    if (auto *SD = CD->getImplicitSelfDecl())
-      overloadName = SD->getType()->getInOutObjectType().getString() + ".init";
+  auto overloadName = overloadChoice.getDecl()->getFullName();
 
   // Get the referenced expression from the failed constraint.
   auto anchor = expr;
@@ -4648,7 +4644,7 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     SourceRange argRange;
     if (auto arg = E->getArgument()) argRange = arg->getSourceRange();
     diagnose(E->getNameLoc(), diag::ambiguous_member_overload_set,
-             E->getName().str())
+             E->getName())
       .highlight(argRange);
     candidateInfo.suggestPotentialOverloads(E->getNameLoc());
     return true;

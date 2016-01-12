@@ -1170,26 +1170,26 @@ public:
   return E->getKind() == ExprKind::OverloadedMemberRef;
   }
 };
-  
+
 /// UnresolvedDeclRefExpr - This represents use of an undeclared identifier,
 /// which may ultimately be a use of something that hasn't been defined yet, it
 /// may be a use of something that got imported (which will be resolved during
 /// sema), or may just be a use of an unknown identifier.
 ///
 class UnresolvedDeclRefExpr : public Expr {
-  Identifier Name;
+  DeclName Name;
   SourceLoc Loc;
   DeclRefKind RefKind;
   bool IsSpecialized = false;
 
 public:
-  UnresolvedDeclRefExpr(Identifier name, DeclRefKind refKind, SourceLoc loc)
+  UnresolvedDeclRefExpr(DeclName name, DeclRefKind refKind, SourceLoc loc)
     : Expr(ExprKind::UnresolvedDeclRef, /*Implicit=*/loc.isInvalid()),
       Name(name), Loc(loc), RefKind(refKind) {
   }
   
-  bool hasName() const { return !Name.empty(); }
-  Identifier getName() const { return Name; }
+  bool hasName() const { return static_cast<bool>(Name); }
+  DeclName getName() const { return Name; }
   DeclRefKind getRefKind() const { return RefKind; }
 
   void setSpecialized(bool specialized) { IsSpecialized = specialized; }
@@ -1396,17 +1396,17 @@ public:
 class UnresolvedMemberExpr : public Expr {
   SourceLoc DotLoc;
   SourceLoc NameLoc;
-  Identifier Name;
+  DeclName Name;
   Expr *Argument;
 
 public:  
   UnresolvedMemberExpr(SourceLoc dotLoc, SourceLoc nameLoc,
-                       Identifier name, Expr *argument)
+                       DeclName name, Expr *argument)
     : Expr(ExprKind::UnresolvedMember, /*Implicit=*/false),
       DotLoc(dotLoc), NameLoc(nameLoc), Name(name), Argument(argument) {
   }
 
-  Identifier getName() const { return Name; }
+  DeclName getName() const { return Name; }
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getDotLoc() const { return DotLoc; }
   Expr *getArgument() const { return Argument; }
@@ -1893,9 +1893,9 @@ class UnresolvedDotExpr : public Expr {
   Expr *SubExpr;
   SourceLoc DotLoc;
   SourceLoc NameLoc;
-  Identifier Name;
+  DeclName Name;
 public:
-  UnresolvedDotExpr(Expr *subexpr, SourceLoc dotloc, Identifier name,
+  UnresolvedDotExpr(Expr *subexpr, SourceLoc dotloc, DeclName name,
                     SourceLoc nameloc, bool Implicit)
   : Expr(ExprKind::UnresolvedDot, Implicit), SubExpr(subexpr), DotLoc(dotloc),
     NameLoc(nameloc), Name(name) {}
@@ -1911,7 +1911,7 @@ public:
   Expr *getBase() const { return SubExpr; }
   void setBase(Expr *e) { SubExpr = e; }
 
-  Identifier getName() const { return Name; }
+  DeclName getName() const { return Name; }
   SourceLoc getNameLoc() const { return NameLoc; }
 
   static bool classof(const Expr *E) {

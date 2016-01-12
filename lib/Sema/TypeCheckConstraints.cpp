@@ -302,7 +302,7 @@ static void diagnoseBinOpSplit(UnresolvedDeclRefExpr *UDRE,
 
   unsigned splitLoc = splitCandidate.first;
   bool isBinOpFirst = splitCandidate.second;
-  StringRef nameStr = UDRE->getName().str();
+  StringRef nameStr = UDRE->getName().getBaseName().str();
   auto startStr = nameStr.substr(0, splitLoc);
   auto endStr = nameStr.drop_front(splitLoc);
 
@@ -330,7 +330,7 @@ static void diagnoseBinOpSplit(UnresolvedDeclRefExpr *UDRE,
 static bool diagnoseOperatorJuxtaposition(UnresolvedDeclRefExpr *UDRE,
                                     DeclContext *DC,
                                     TypeChecker &TC) {
-  Identifier name = UDRE->getName();
+  Identifier name = UDRE->getName().getBaseName();
   StringRef nameStr = name.str();
   if (!name.isOperator() || nameStr.size() < 2)
     return false;
@@ -434,7 +434,7 @@ static bool diagnoseOperatorJuxtaposition(UnresolvedDeclRefExpr *UDRE,
 Expr *TypeChecker::
 resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
-  Identifier Name = UDRE->getName();
+  DeclName Name = UDRE->getName();
   SourceLoc Loc = UDRE->getLoc();
 
   // Perform standard value name lookup.
@@ -500,7 +500,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     // Diagnose uses of operators that found no matching candidates.
     if (ResultValues.empty()) {
       assert(UDRE->getRefKind() != DeclRefKind::Ordinary);
-      diagnose(Loc, diag::use_nonmatching_operator, Name,
+      diagnose(Loc, diag::use_nonmatching_operator, Name.getBaseName(),
                UDRE->getRefKind() == DeclRefKind::BinaryOperator ? 0 :
                UDRE->getRefKind() == DeclRefKind::PrefixOperator ? 1 : 2);
       return new (Context) ErrorExpr(Loc);

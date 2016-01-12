@@ -470,7 +470,7 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   // Check if we have a unary '-' with number literal sub-expression, for
   // example, "-42" or "-1.25".
   if (auto *LE = dyn_cast<NumberLiteralExpr>(SubExpr.get())) {
-    if (Operator->hasName() && Operator->getName().str() == "-") {
+    if (Operator->hasName() && Operator->getName().getBaseName().str() == "-") {
       LE->setNegative(Operator->getLoc());
       return makeParserResult(LE);
     }
@@ -568,6 +568,7 @@ ParserResult<Expr> Parser::parseExprSuper() {
       SourceLoc ctorLoc = consumeToken();
       
       // The constructor decl will be resolved by sema.
+      // FIXME: Extend representation with DeclName!
       Expr *result = new (Context) UnresolvedConstructorExpr(superRef,
                                      dotLoc, ctorLoc,
                                      /*Implicit=*/false);
@@ -583,9 +584,11 @@ ParserResult<Expr> Parser::parseExprSuper() {
     } else {
       // super.foo
       SourceLoc nameLoc;
-      Identifier name;
-      if (parseIdentifier(name, nameLoc,
-                          diag::expected_identifier_after_super_dot_expr))
+      DeclName name = parseUnqualifiedIdentifier(
+                        /*allowInit=*/false,
+                        nameLoc, 
+                        diag::expected_identifier_after_super_dot_expr);
+      if (!name)
         return nullptr;
 
       return makeParserResult(new (Context) UnresolvedDotExpr(superRef, dotLoc,
@@ -886,7 +889,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       break;
     }
     
-    Identifier Name;
+    DeclName Name;
     SourceLoc NameLoc;
 
     if (Tok.is(tok::code_complete)) {
@@ -918,13 +921,9 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       return Result;
     }
 
-    if (Tok.is(tok::kw_init)) {
-      Name = Context.Id_init;
-      NameLoc = consumeToken(tok::kw_init);
-    } else if (parseIdentifier(Name, NameLoc,
-                               diag::expected_identifier_after_dot_expr)) {
-      return nullptr;
-    }
+    Name = parseUnqualifiedIdentifier(/*allowInit=*/true, NameLoc, 
+                                      diag::expected_identifier_after_dot_expr);
+    if (!Name) return nullptr;
 
     ParserResult<Expr> Arg;
 
@@ -1045,6 +1044,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         // expr-init ::= expr-postfix '.' 'init'.
         if (Tok.is(tok::kw_init)) {
           // Form the reference to the constructor.
+          // FIXME: Handle a full DeclName.
           Expr *initRef = new (Context) UnresolvedConstructorExpr(
                                           Result.get(),
                                           TokLoc,
@@ -1082,50 +1082,19 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       if (Result.isParseError())
         continue;
 
-      Identifier Name = Context.getIdentifier(Tok.getText());
-      SourceLoc NameLoc = Tok.getLoc();
+
       if (Tok.is(tok::identifier)) {
-        consumeToken(tok::identifier);
-        
-        // If this is a selector reference, collect the selector pieces.
-        bool IsSelector = false;
-        if (Tok.is(tok::colon) && peekToken().isIdentifierOrUnderscore()) {
-          BacktrackingScope BS(*this);
-
-          consumeToken(); // ':'
-          consumeToken(); // identifier or '_'
-          IsSelector = consumeIf(tok::colon);
-        }
-        
-        if (IsSelector) {
-          // Collect the selector pieces.
-          SmallVector<UnresolvedSelectorExpr::ComponentLoc, 2> Locs;
-          SmallVector<Identifier, 2> ArgumentNames;
+        SourceLoc NameLoc;
+        DeclName Name;
+        Name = parseUnqualifiedIdentifier(/*allowInit=*/false,
+                                          NameLoc,
+                                          diag::expected_member_name);
+        if (!Name) return nullptr;
+      
+        Result = makeParserResult(
+                   new (Context) UnresolvedDotExpr(Result.get(), TokLoc, Name,
+                                                   NameLoc, /*Implicit=*/false));
           
-          Locs.push_back({NameLoc, consumeToken(tok::colon)});
-
-          // Add entry for the unwritten first argument name.
-          Locs.push_back({SourceLoc(), SourceLoc()});
-          ArgumentNames.push_back(Identifier());
-          while (Tok.isIdentifierOrUnderscore() && peekToken().is(tok::colon)) {
-            Identifier SelName;
-            if (Tok.is(tok::identifier))
-              SelName = Context.getIdentifier(Tok.getText());
-            SourceLoc SelLoc = consumeToken();
-            SourceLoc ColonLoc = consumeToken(tok::colon);
-            Locs.push_back({SelLoc, ColonLoc});
-            ArgumentNames.push_back(SelName);
-          }
-          auto FullName = DeclName(Context, Name, ArgumentNames);
-          Result = makeParserResult(
-            UnresolvedSelectorExpr::create(Context, Result.get(), TokLoc,
-                                           FullName, Locs));
-        } else {
-          Result = makeParserResult(
-            new (Context) UnresolvedDotExpr(Result.get(), TokLoc, Name, NameLoc,
-                                            /*Implicit=*/false));
-        }
-        
         if (canParseAsGenericArgumentList()) {
           SmallVector<TypeRepr*, 8> args;
           SourceLoc LAngleLoc, RAngleLoc;
@@ -1137,21 +1106,20 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
           for (auto ty : args)
             locArgs.push_back(ty);
           Result = makeParserResult(new (Context) UnresolvedSpecializeExpr(
-              Result.get(), LAngleLoc, Context.AllocateCopy(locArgs),
-              RAngleLoc));
-        }
-
-        // If there is an expr-call-suffix, parse it and form a call.
-        if (Tok.isFollowingLParen()) {
-          Result = parseExprCallSuffix(Result);
-          continue;
+                     Result.get(), LAngleLoc, Context.AllocateCopy(locArgs),
+                     RAngleLoc));
         }
       } else {
+        DeclName name = Context.getIdentifier(Tok.getText());
+        SourceLoc nameLoc = consumeToken(tok::integer_literal);
         Result = makeParserResult(
-            new (Context) UnresolvedDotExpr(Result.get(), TokLoc, Name, NameLoc,
+            new (Context) UnresolvedDotExpr(Result.get(), TokLoc, name, nameLoc,
                                             /*Implicit=*/false));
-        consumeToken(tok::integer_literal);
       }
+
+      // If there is an expr-call-suffix, parse it and form a call.
+      if (Tok.isFollowingLParen())
+        Result = parseExprCallSuffix(Result);
 
       continue;
     }
@@ -1390,16 +1358,111 @@ Expr *Parser::parseExprStringLiteral() {
   return new (Context) InterpolatedStringLiteralExpr(Loc,
                                         Context.AllocateCopy(Exprs));
 }
-  
+
+void Parser::diagnoseEscapedArgumentLabel(const Token &tok) {
+  assert(tok.isEscapedIdentifier() && "Only for escaped identifiers");
+  if (!canBeArgumentLabel(tok.getText())) return;
+
+  SourceLoc start = tok.getLoc();
+  SourceLoc end = start.getAdvancedLoc(tok.getLength());
+  diagnose(tok, diag::escaped_parameter_name, tok.getText())
+    .fixItRemoveChars(start, start.getAdvancedLoc(1))
+    .fixItRemoveChars(end.getAdvancedLoc(-1), end);
+}
+
+DeclName Parser::parseUnqualifiedIdentifier(bool allowInit,
+                                            SourceLoc &loc,
+                                            const Diagnostic &diag) {
+  // Consume the base name.
+  Identifier baseName;
+
+  if (Tok.is(tok::kw_init) && allowInit) {
+    baseName = Context.Id_init;
+    loc = consumeToken(tok::kw_init);
+  } else if (Tok.is(tok::identifier) || Tok.is(tok::kw_Self) ||
+             Tok.is(tok::kw_self)) {
+    loc = consumeIdentifier(&baseName);
+  } else {
+    checkForInputIncomplete();
+    diagnose(Tok, diag);
+    return DeclName();
+  }
+
+  // If the next token isn't a following '(', we don't have a compound name.
+  if (!Tok.isFollowingLParen()) return baseName;
+
+  // If the token after that isn't an argument label or ':', we don't have a
+  // compound name.
+  if ((!peekToken().canBeArgumentLabel() && !peekToken().is(tok::colon)) ||
+      Identifier::isEditorPlaceholder(peekToken().getText()))
+    return baseName;
+
+  // Try to parse a compound name.
+  BacktrackingScope backtrack(*this);
+
+  SmallVector<Identifier, 2> argumentLabels;
+  SourceLoc lparenLoc = consumeToken(tok::l_paren);
+  SourceLoc rparenLoc;
+  while (true) {
+    // Terminate at ')'.
+    if (Tok.is(tok::r_paren)) {
+      rparenLoc = consumeToken(tok::r_paren);
+      break;
+    }
+
+    // If we see a ':', the user forgot the '_';
+    if (Tok.is(tok::colon)) {
+      diagnose(Tok, diag::empty_arg_label_underscore)
+        .fixItInsert(Tok.getLoc(), "_");
+      argumentLabels.push_back(Identifier());
+      (void)consumeToken(tok::colon);
+    }
+
+    // If we see a potential argument label followed by a ':', consume
+    // it.
+    if (Tok.canBeArgumentLabel() && peekToken().is(tok::colon)) {
+      // If this was an escaped identifier that need not have been escaped,
+      // say so.
+      if (Tok.isEscapedIdentifier())
+        diagnoseEscapedArgumentLabel(Tok);
+
+      if (Tok.is(tok::kw__))
+        argumentLabels.push_back(Identifier());
+      else
+        argumentLabels.push_back(Context.getIdentifier(Tok.getText()));
+      (void)consumeToken();
+      (void)consumeToken(tok::colon);
+      continue;
+    }
+
+    // This is not a compound name.
+    // FIXME: Could recover better if we "know" it's a compound name.
+    return baseName;
+  }
+
+  assert(!argumentLabels.empty() && "Logic above should prevent this");
+
+  // FIXME: Actually store 
+  (void)lparenLoc;
+
+  // We have a compound name. Cancel backtracking and build that name.
+  backtrack.cancelBacktrack();
+  return DeclName(Context, baseName, argumentLabels);
+}
+
 ///   expr-identifier:
-///     identifier generic-args?
+///     unqualified-identifier generic-args?
 Expr *Parser::parseExprIdentifier() {
   assert(Tok.is(tok::identifier) || Tok.is(tok::kw_self) ||
          Tok.is(tok::kw_Self));
 
   Token IdentTok = Tok;
-  Identifier name;
-  SourceLoc loc = consumeIdentifier(&name);
+
+  // Pase the unqualified-identifier.
+  SourceLoc loc;
+  DeclName name = parseUnqualifiedIdentifier(/*allowInit=*/false, loc,
+                                             diag::expected_expr);
+
   SmallVector<TypeRepr*, 8> args;
   SourceLoc LAngleLoc, RAngleLoc;
   bool hasGenericArgumentList = false;
@@ -1420,7 +1483,7 @@ Expr *Parser::parseExprIdentifier() {
     hasGenericArgumentList = !args.empty();
   }
   
-  ValueDecl *D = lookupInScope(name);
+  ValueDecl *D = lookupInScope(name.getBaseName());
   // FIXME: We want this to work: "var x = { x() }", but for now it's better
   // to disallow it than to crash.
   if (D) {
@@ -1432,7 +1495,7 @@ Expr *Parser::parseExprIdentifier() {
     }
   } else {
     for (auto activeVar : DisabledVars) {
-      if (activeVar->getName() == name) {
+      if (activeVar->getFullName() == name) {
         diagnose(loc, DisabledVarReason);
         return new (Context) ErrorExpr(loc);
       }
@@ -1441,8 +1504,8 @@ Expr *Parser::parseExprIdentifier() {
   
   Expr *E;
   if (D == 0) {
-    if (name.isEditorPlaceholder())
-      return parseExprEditorPlaceholder(IdentTok, name);
+    if (name.getBaseName().isEditorPlaceholder())
+      return parseExprEditorPlaceholder(IdentTok, name.getBaseName());
 
     auto refKind = DeclRefKind::Ordinary;
     auto unresolved = new (Context) UnresolvedDeclRefExpr(name, refKind, loc);
@@ -2012,13 +2075,8 @@ ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
     if (Tok.canBeArgumentLabel() && peekToken().is(tok::colon)) {
       // If this was an escaped identifier that need not have been escaped,
       // say so.
-      if (Tok.isEscapedIdentifier() && canBeArgumentLabel(Tok.getText())) {
-        SourceLoc start = Tok.getLoc();
-        SourceLoc end = start.getAdvancedLoc(Tok.getLength());
-        diagnose(Tok, diag::escaped_parameter_name, Tok.getText())
-          .fixItRemoveChars(start, start.getAdvancedLoc(1))
-          .fixItRemoveChars(end.getAdvancedLoc(-1), end);
-      }
+      if (Tok.isEscapedIdentifier())
+        diagnoseEscapedArgumentLabel(Tok);
 
       if (!Tok.is(tok::kw__))
         FieldName = Context.getIdentifier(Tok.getText());

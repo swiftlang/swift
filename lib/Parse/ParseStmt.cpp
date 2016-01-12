@@ -1529,7 +1529,7 @@ ConfigParserState Parser::evaluateConfigConditionExpr(Expr *configExpr) {
     while (iOperand < numElements) {
       
       if (auto *UDREOp = dyn_cast<UnresolvedDeclRefExpr>(elements[iOperator])) {
-        auto name = UDREOp->getName().str();
+        auto name = UDREOp->getName().getBaseName().str();
 
         if (name.equals("||") || name.equals("&&")) {
           auto rhs = evaluateConfigConditionExpr(elements[iOperand]);
@@ -1567,7 +1567,7 @@ ConfigParserState Parser::evaluateConfigConditionExpr(Expr *configExpr) {
   
   // Evaluate a named reference expression.
   if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(configExpr)) {
-    auto name = UDRE->getName().str();
+    auto name = UDRE->getName().getBaseName().str();
     return ConfigParserState(Context.LangOpts.hasBuildConfigOption(name),
                              ConfigExprKind::DeclRef);
   }
@@ -1580,7 +1580,8 @@ ConfigParserState Parser::evaluateConfigConditionExpr(Expr *configExpr) {
   // Evaluate a negation (unary "!") expression.
   if (auto *PUE = dyn_cast<PrefixUnaryExpr>(configExpr)) {
     // If the PUE is not a negation expression, return false
-    auto name = cast<UnresolvedDeclRefExpr>(PUE->getFn())->getName().str();
+    auto name =
+      cast<UnresolvedDeclRefExpr>(PUE->getFn())->getName().getBaseName().str();
     if (name != "!") {
       diagnose(PUE->getLoc(), diag::unsupported_build_config_unary_expression);
       return ConfigParserState::error();
@@ -1601,7 +1602,7 @@ ConfigParserState Parser::evaluateConfigConditionExpr(Expr *configExpr) {
       return ConfigParserState::error();
     }
 
-    auto fnName = fnNameExpr->getName().str();
+    auto fnName = fnNameExpr->getName().getBaseName().str();
 
     if (!fnName.equals("arch") && !fnName.equals("os") &&
         !fnName.equals("_runtime") &&
@@ -1633,7 +1634,7 @@ ConfigParserState Parser::evaluateConfigConditionExpr(Expr *configExpr) {
       if (auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(PE->getSubExpr())) {
         // The sub expression should be an UnresolvedDeclRefExpr (we won't
         // tolerate extra parens).
-        auto argument = UDRE->getName().str();
+        auto argument = UDRE->getName().getBaseName().str();
 
         // Error for values that don't make sense if there's a clear definition
         // of the possible values (as there is for _runtime).

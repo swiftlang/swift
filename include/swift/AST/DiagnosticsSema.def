@@ -55,7 +55,7 @@ NOTE(while_converting_subscript_index,none,
 //------------------------------------------------------------------------------
 
 ERROR(ambiguous_member_overload_set,none,
-      "ambiguous reference to member '%0'", (StringRef))
+      "ambiguous reference to member %0", (DeclName))
 
 ERROR(ambiguous_subscript,none,
       "ambiguous subscript with base type %0 and index type %1",
@@ -73,9 +73,9 @@ ERROR(could_not_find_type_member,none,
       "type %0 has no member %1", (Type, DeclName))
 
 ERROR(expected_argument_in_contextual_member,none,
-      "contextual member %0 expects argument of type %1", (Identifier, Type))
+      "contextual member %0 expects argument of type %1", (DeclName, Type))
 ERROR(unexpected_argument_in_contextual_member,none,
-      "contextual member %0 has no associated value", (Identifier))
+      "contextual member %0 has no associated value", (DeclName))
 
 ERROR(could_not_use_value_member,none,
       "member %1 cannot be used on value of type %0", (Type, DeclName))
@@ -432,7 +432,7 @@ ERROR(unspaced_unary_operator,none,
 
 
 ERROR(use_unresolved_identifier,none,
-      "use of unresolved %select{identifier|operator}1 %0", (Identifier, bool))
+      "use of unresolved %select{identifier|operator}1 %0", (DeclName, bool))
 ERROR(use_undeclared_type,none,
       "use of undeclared type %0", (Identifier))
 ERROR(use_undeclared_type_did_you_mean,none,
@@ -459,7 +459,7 @@ ERROR(use_non_type_value,none,
 NOTE(use_non_type_value_prev,none,
      "%0 declared here", (Identifier))
 ERROR(use_local_before_declaration,none,
-      "use of local variable %0 before its declaration", (Identifier))
+      "use of local variable %0 before its declaration", (DeclName))
 ERROR(unsupported_existential_type,none,
       "protocol %0 can only be used as a generic constraint because it has "
       "Self or associated type requirements", (Identifier))
@@ -636,7 +636,10 @@ ERROR(argument_out_of_order_named_unnamed,none,
 
 ERROR(instance_member_use_on_type,none,
       "use of instance member %1 on type %0; "
-      "did you mean to use a value of type %0 instead?", (Type, Identifier))
+      "did you mean to use a value of type %0 instead?", (Type, DeclName))
+ERROR(instance_member_in_initializer,none,
+      "cannot use instance member %0 within property initializer; "
+      "property initializers run before 'self' is available", (DeclName))
 
 ERROR(missing_argument_named,none,
       "missing argument for parameter %0 in call", (Identifier))
@@ -1769,7 +1772,7 @@ ERROR(inout_expr_outside_of_call,none,
 
 ERROR(unresolved_member_no_inference,none,
       "reference to member %0 cannot be resolved without a contextual type",
-      (Identifier))
+      (DeclName))
 
 ERROR(type_of_expression_is_ambiguous,none,
       "type of expression is ambiguous without more context", ())
