@@ -120,7 +120,7 @@ public struct Character :
   @warn_unused_result
   static func _smallSize(value: UInt64) -> Int {
     var mask: UInt64 = 0xFF
-    for var i = 0; i < 8; i += 1 {
+    for i in 0..<8 {
       if (value & mask) == mask {
         return i
       }
