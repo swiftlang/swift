@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend %s -parse
+// RUN: not --crash %target-swift-frontend %s -parse
 
 /// Abstraction of numeric types that approximate real numbers
 protocol ApproximateRealType {
