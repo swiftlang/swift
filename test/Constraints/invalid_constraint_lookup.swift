@@ -7,7 +7,7 @@ protocol P {
 func f<U: P>(rhs: U) -> X<U.A> { // expected-error {{use of undeclared type 'X'}}
   // FIXME: This diagnostic isn't great, it happens because the generic constraint
   // 'U' from the invalid type signature never gets resolved.
-  let g = rhs.generate() // expected-error {{type of expression is ambiguous without more context}}
+  let g = rhs.generate() // expected-error {{cannot invoke 'generate' with no arguments}}
 }
 
 struct Zzz<T> {

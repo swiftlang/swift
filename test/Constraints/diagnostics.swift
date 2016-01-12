@@ -242,7 +242,7 @@ func r18800223(i : Int) {
 
   
   var buttonTextColor: String?
-  _ = (buttonTextColor != nil) ? 42 : {$0}; // expected-error {{unable to infer closure return type in current context}}
+  _ = (buttonTextColor != nil) ? 42 : {$0}; // expected-error {{result values in '? :' expression have mismatching types 'Int' and '(_) -> _'}}
 }
 
 // <rdar://problem/21883806> Bogus "'_' can only appear in a pattern or on the left side of an assignment" is back
@@ -609,7 +609,8 @@ extension Array {
   }
   
   func h() -> String {
-    return "foo".unavail([0])  // expected-error {{value of type 'String' has no member 'Element'}}
+    return "foo".unavail([0])  // expected-error {{cannot invoke 'unavail' with an argument list of type '([Int])'}}
+    // expected-note @-1 {{expected an argument list of type '(T)'}}
   }
 }
 

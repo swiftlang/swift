@@ -2778,9 +2778,9 @@ static Type replaceArchetypesAndTypeVarsWithUnresolved(Type ty) {
  auto &ctx = ty->getASTContext();
 
   return ty.transform([&](Type type) -> Type {
-    if (type->is<TypeVariableType>())
-      return ctx.TheUnresolvedType;
-    if (type->is<ArchetypeType>())
+    if (type->is<TypeVariableType>() ||
+        type->is<ArchetypeType>() ||
+        type->isTypeParameter())
       return ctx.TheUnresolvedType;
     return type;
   });
@@ -2818,7 +2818,8 @@ typeCheckChildIndependently(Expr *subExpr, Type convertType,
       if (FT->isAutoClosure())
         convertType = FT->getResult();
 
-    if (convertType->hasTypeVariable() || convertType->hasArchetype())
+    if (convertType->hasTypeVariable() || convertType->hasArchetype() ||
+        convertType->isTypeParameter())
       convertType = replaceArchetypesAndTypeVarsWithUnresolved(convertType);
     
     // If the conversion type contains no info, drop it.
@@ -3958,6 +3959,15 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
                                              destType->getRValueType(),
                                              CTP_AssignSource);
   if (!srcExpr) return true;
+
+  // If we are assigning to _ and have unresolvedtypes on the RHS, then we have
+  // an ambiguity problem.
+  if (isa<DiscardAssignmentExpr>(destExpr->getSemanticsProvidingExpr()) &&
+      srcExpr->getType()->hasUnresolvedType()) {
+    diagnoseAmbiguity(srcExpr);
+    return true;
+  }
+
   return false;
 }
 
@@ -4947,21 +4957,24 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
   }
   
 
-  // Attempt to re-type-check the entire expression, while allowing ambiguity.
-  auto exprType = getTypeOfTypeCheckedChildIndependently(expr);
-  // If it failed and diagnosed something, then we're done.
-  if (!exprType) return;
+  // Attempt to re-type-check the entire expression, allowing ambiguity, but
+  // ignoring a contextual type.
+  if (expr == E) {
+    auto exprType = getTypeOfTypeCheckedChildIndependently(expr);
+    // If it failed and diagnosed something, then we're done.
+    if (!exprType) return;
 
-  // If we were able to find something more specific than "unknown" (perhaps
-  // something like "[_:_]" for a dictionary literal), include it in the
-  // diagnostic.
-  if (!isUnresolvedOrTypeVarType(exprType)) {
-    diagnose(E->getLoc(), diag::specific_type_of_expression_is_ambiguous,
-             exprType)
-      .highlight(E->getSourceRange());
-    return;
+    // If we were able to find something more specific than "unknown" (perhaps
+    // something like "[_:_]" for a dictionary literal), include it in the
+    // diagnostic.
+    if (!isUnresolvedOrTypeVarType(exprType)) {
+      diagnose(E->getLoc(), diag::specific_type_of_expression_is_ambiguous,
+               exprType)
+        .highlight(E->getSourceRange());
+      return;
+    }
   }
-  
+
   // If there are no posted constraints or failures, then there was
   // not enough contextual information available to infer a type for the
   // expression.
