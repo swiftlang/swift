@@ -486,7 +486,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
       llvm_unreachable("Unknown OutputLevel argument!");
   }
 
-  std::unique_ptr<Compilation> C(new Compilation(*this, *TC, Diags, Level,
+  std::unique_ptr<Compilation> C(new Compilation(Diags, Level,
                                                  std::move(ArgList),
                                                  std::move(TranslatedArgList),
                                                  std::move(Inputs),
@@ -496,7 +496,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
                                                  DriverSkipExecution,
                                                  SaveTemps));
 
-  buildJobs(Actions, OI, OFM.get(), *C);
+  buildJobs(Actions, OI, OFM.get(), *TC, *C);
 
   // For updating code we need to go through all the files and pick up changes,
   // even if they have compiler errors.
@@ -1384,7 +1384,8 @@ Driver::buildOutputFileMap(const llvm::opt::DerivedArgList &Args) const {
 }
 
 void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,
-                       const OutputFileMap *OFM, Compilation &C) const {
+                       const OutputFileMap *OFM, const ToolChain &TC,
+                       Compilation &C) const {
   llvm::PrettyStackTraceString CrashInfo("Building compilation jobs");
 
   const DerivedArgList &Args = C.getArgs();
@@ -1421,8 +1422,8 @@ void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,
   }
 
   for (const Action *A : Actions) {
-    (void)buildJobsForAction(C, cast<JobAction>(A), OI, OFM, 
-                             C.getDefaultToolChain(), true, JobCache);
+    (void)buildJobsForAction(C, cast<JobAction>(A), OI, OFM, TC,
+                             /*TopLevel*/true, JobCache);
   }
 }
 
@@ -1639,8 +1640,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
   for (Action *Input : *JA) {
     if (auto *InputJobAction = dyn_cast<JobAction>(Input)) {
       InputJobs.push_back(buildJobsForAction(C, InputJobAction, OI, OFM,
-                                             C.getDefaultToolChain(), false,
-                                             JobCache));
+                                             TC, false, JobCache));
     } else {
       InputActions.push_back(Input);
     }

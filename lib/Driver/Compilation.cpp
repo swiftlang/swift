@@ -40,8 +40,7 @@ using namespace swift::sys;
 using namespace swift::driver;
 using namespace llvm::opt;
 
-Compilation::Compilation(const Driver &D, const ToolChain &DefaultToolChain,
-                         DiagnosticEngine &Diags, OutputLevel Level,
+Compilation::Compilation(DiagnosticEngine &Diags, OutputLevel Level,
                          std::unique_ptr<InputArgList> InputArgs,
                          std::unique_ptr<DerivedArgList> TranslatedArgs,
                          InputFileList InputsWithTypes,
@@ -50,8 +49,7 @@ Compilation::Compilation(const Driver &D, const ToolChain &DefaultToolChain,
                          bool EnableIncrementalBuild,
                          bool SkipTaskExecution,
                          bool SaveTemps)
-  : TheDriver(D), DefaultToolChain(DefaultToolChain), Diags(Diags),
-    Level(Level), InputArgs(std::move(InputArgs)),
+  : Diags(Diags), Level(Level), InputArgs(std::move(InputArgs)),
     TranslatedArgs(std::move(TranslatedArgs)), 
     InputFilesWithTypes(std::move(InputsWithTypes)), ArgsHash(ArgsHash),
     BuildStartTime(StartTime),

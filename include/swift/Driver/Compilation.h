@@ -57,12 +57,6 @@ enum class OutputLevel {
 
 class Compilation {
 private:
-  /// The driver we were created by.
-  const Driver &TheDriver;
-
-  /// The default tool chain.
-  const ToolChain &DefaultToolChain;
-
   /// The DiagnosticEngine to which this Compilation should emit diagnostics.
   DiagnosticEngine &Diags;
 
@@ -136,8 +130,7 @@ private:
   }
   
 public:
-  Compilation(const Driver &D, const ToolChain &DefaultToolChain,
-              DiagnosticEngine &Diags, OutputLevel Level,
+  Compilation(DiagnosticEngine &Diags, OutputLevel Level,
               std::unique_ptr<llvm::opt::InputArgList> InputArgs,
               std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs,
               InputFileList InputsWithTypes,
@@ -147,10 +140,6 @@ public:
               bool SkipTaskExecution = false,
               bool SaveTemps = false);
   ~Compilation();
-
-  const Driver &getDriver() const { return TheDriver; }
-
-  const ToolChain &getDefaultToolChain() const { return DefaultToolChain; }
 
   ArrayRefView<std::unique_ptr<const Job>, const Job *, Compilation::unwrap>
   getJobs() const {

@@ -241,11 +241,13 @@ public:
   /// OutputInfo.
   ///
   /// \param Actions The Actions for which Jobs should be generated.
-  /// \param OI The OutputInfo for which Jobs should be generated
-  /// \param OFM The OutputFileMap for which Jobs should be generated
-  /// \param[out] C The Compilation to which Jobs should be added
+  /// \param OI The OutputInfo for which Jobs should be generated.
+  /// \param OFM The OutputFileMap for which Jobs should be generated.
+  /// \param TC The ToolChain to build Jobs with.
+  /// \param[out] C The Compilation to which Jobs should be added.
   void buildJobs(const ActionList &Actions, const OutputInfo &OI,
-                 const OutputFileMap *OFM, Compilation &C) const;
+                 const OutputFileMap *OFM, const ToolChain &TC,
+                 Compilation &C) const;
 
   /// A map for caching Jobs for a given Action/ToolChain pair
   using JobCacheMap =
