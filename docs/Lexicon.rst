@@ -10,6 +10,12 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
 
 .. _LLVM lexicon: http://llvm.org/docs/Lexicon.html
 
+.. note::
+
+    This document uses Sphinx-specific features. If you are viewing this on
+    GitHub, you'll have to use raw mode, or download and build the docs 
+    yourself.
+
 .. glossary::
 
   archetype
