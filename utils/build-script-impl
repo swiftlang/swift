@@ -1327,7 +1327,11 @@ if [[ "${BUILD_NINJA}" ]] ; then
           { set +x; } 2>/dev/null
         fi
     fi
-    export PATH="${build_dir}:${PATH}"
+    NINJA_BIN="${build_dir}/ninja"
+    COMMON_CMAKE_OPTIONS=(
+        "${COMMON_CMAKE_OPTIONS[@]}"
+        -DCMAKE_MAKE_PROGRAM=${NINJA_BIN}
+    )
 fi
 
 #
