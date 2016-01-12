@@ -2912,10 +2912,13 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
       case RequirementKind::Conformance:
         createMemberConstraint(Req, ConstraintKind::ConformsTo);
         break;
+      case RequirementKind::Superclass:
+        createMemberConstraint(Req, ConstraintKind::Subtype);
+        break;
       case RequirementKind::SameType:
         createMemberConstraint(Req, ConstraintKind::Equal);
         break;
-      default:
+      case RequirementKind::WitnessMarker:
         break;
     }
   }

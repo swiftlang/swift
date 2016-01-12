@@ -921,6 +921,7 @@ static uint8_t getRawStableRequirementKind(RequirementKind kind) {
 
   switch (kind) {
   CASE(Conformance)
+  CASE(Superclass)
   CASE(SameType)
   CASE(WitnessMarker)
   }
@@ -973,7 +974,7 @@ bool Serializer::writeGenericParams(const GenericParamList *genericParams,
     llvm::raw_svector_ostream ReqOS(ReqStr);
     next.printAsWritten(ReqOS);
     switch (next.getKind()) {
-    case RequirementKind::Conformance:
+    case RequirementReprKind::TypeConstraint:
       GenericRequirementLayout::emitRecord(
                                       Out, ScratchRecord, abbrCode,
                                       GenericRequirementKind::Conformance,
@@ -981,16 +982,13 @@ bool Serializer::writeGenericParams(const GenericParamList *genericParams,
                                       addTypeRef(next.getConstraint()),
                                       ReqOS.str());
       break;
-    case RequirementKind::SameType:
+    case RequirementReprKind::SameType:
       GenericRequirementLayout::emitRecord(
                                       Out, ScratchRecord, abbrCode,
                                       GenericRequirementKind::SameType,
                                       addTypeRef(next.getFirstType()),
                                       addTypeRef(next.getSecondType()),
                                       ReqOS.str());
-      break;
-    case RequirementKind::WitnessMarker:
-      llvm_unreachable("Can't show up in requirement representations");
       break;
     }
   }

@@ -126,35 +126,36 @@ Type Solution::computeSubstitutions(
       continue;
     
     switch (req.getKind()) {
-    case RequirementKind::Conformance:
-      // If this is a protocol conformance requirement, get the conformance
-      // and record it.
-      if (auto protoType = req.getSecondType()->getAs<ProtocolType>()) {
-        assert(firstArchetype == currentArchetype
-               && "Archetype out-of-sync");
-        ProtocolConformance *conformance = nullptr;
-        Type replacement = currentReplacement;
-        bool conforms = tc.conformsToProtocol(
-                          replacement,
-                          protoType->getDecl(),
-                          getConstraintSystem().DC,
-                          (ConformanceCheckFlags::InExpression|
-                           ConformanceCheckFlags::Used),
-                          &conformance);
-        (void)isOpenedAnyObject;
-        assert((conforms ||
-                firstArchetype->getIsRecursive() ||
-                isOpenedAnyObject(replacement) ||
-                replacement->is<GenericTypeParamType>()) &&
-               "Constraint system missed a conformance?");
-        (void)conforms;
+    case RequirementKind::Conformance: {
+      // Get the conformance and record it.
+      auto protoType = req.getSecondType()->castTo<ProtocolType>();
+      assert(firstArchetype == currentArchetype
+             && "Archetype out-of-sync");
+      ProtocolConformance *conformance = nullptr;
+      Type replacement = currentReplacement;
+      bool conforms = tc.conformsToProtocol(
+                        replacement,
+                        protoType->getDecl(),
+                        getConstraintSystem().DC,
+                        (ConformanceCheckFlags::InExpression|
+                         ConformanceCheckFlags::Used),
+                        &conformance);
+      (void)isOpenedAnyObject;
+      assert((conforms ||
+              firstArchetype->getIsRecursive() ||
+              isOpenedAnyObject(replacement) ||
+              replacement->is<GenericTypeParamType>()) &&
+             "Constraint system missed a conformance?");
+      (void)conforms;
 
-        assert(conformance || replacement->hasDependentProtocolConformances());
-        currentConformances.push_back(
-                    ProtocolConformanceRef(protoType->getDecl(), conformance));
+      assert(conformance || replacement->hasDependentProtocolConformances());
+      currentConformances.push_back(
+                  ProtocolConformanceRef(protoType->getDecl(), conformance));
+      break;
+    }
 
-        break;
-      }
+    case RequirementKind::Superclass:
+      // Superclass requirements aren't recorded in substitutions.
       break;
 
     case RequirementKind::SameType:

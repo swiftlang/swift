@@ -754,6 +754,7 @@ public:
     }
     for (auto &Req : GS->getRequirements()) {
       switch (Req.getKind()) {
+      case RequirementKind::Superclass:
       case RequirementKind::Conformance:
         ResultGS.ConformanceRequirements.emplace_back(
             sma::ConformanceRequirement{

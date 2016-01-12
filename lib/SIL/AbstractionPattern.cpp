@@ -54,10 +54,22 @@ bool AbstractionPattern::isOpaqueType(CanGenericSignature signature,
   // Enormous hack!  We need to be asking the signature about this
   // in a more principled way.
   for (auto &reqt : signature->getRequirements()) {
-    if (reqt.getKind() != RequirementKind::Conformance) continue;
-    if (CanType(reqt.getFirstType()) != type) continue;
-    if (reqt.getSecondType()->isClassExistentialType())
+    switch (reqt.getKind()) {
+    case RequirementKind::Superclass:
+      if (CanType(reqt.getFirstType()) != type) continue;
       return false;
+
+    case RequirementKind::Conformance:
+      if (CanType(reqt.getFirstType()) != type) continue;
+      if (cast<ProtocolType>(CanType(reqt.getSecondType()))->requiresClass())
+        return false;
+      continue;
+
+    case RequirementKind::SameType:
+    case RequirementKind::WitnessMarker:
+      continue;
+    }
+    llvm_unreachable("bad requirement kind");
   }
   return true;
 }

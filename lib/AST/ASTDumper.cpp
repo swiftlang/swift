@@ -99,21 +99,16 @@ void RequirementRepr::printImpl(raw_ostream &out, bool AsWritten) const {
   };
 
   switch (getKind()) {
-  case RequirementKind::Conformance:
+  case RequirementReprKind::TypeConstraint:
     printTy(getSubjectLoc());
     out << " : ";
     printTy(getConstraintLoc());
     break;
 
-  case RequirementKind::SameType:
+  case RequirementReprKind::SameType:
     printTy(getFirstTypeLoc());
     out << " == ";
     printTy(getSecondTypeLoc());
-    break;
-
-  case RequirementKind::WitnessMarker:
-    out << "witness marker for ";
-    printTy(getFirstTypeLoc());
     break;
   }
 }

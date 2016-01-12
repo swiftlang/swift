@@ -194,9 +194,8 @@ bool Parser::parseGenericWhereClause(
       }
 
       // Add the requirement.
-      Requirements.push_back(RequirementRepr::getConformance(FirstType.get(),
-                                                         ColonLoc,
-                                                         Protocol.get()));
+      Requirements.push_back(RequirementRepr::getTypeConstraint(FirstType.get(),
+                                                     ColonLoc, Protocol.get()));
     } else if ((Tok.isAnyOperator() && Tok.getText() == "==") ||
                Tok.is(tok::equal)) {
       // A same-type-requirement

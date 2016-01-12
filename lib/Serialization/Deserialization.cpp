@@ -769,7 +769,7 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
         auto subject = TypeLoc::withoutLoc(getType(rawTypeIDs[0]));
         auto constraint = TypeLoc::withoutLoc(getType(rawTypeIDs[1]));
 
-        requirements.push_back(RequirementRepr::getConformance(subject,
+        requirements.push_back(RequirementRepr::getTypeConstraint(subject,
                                                            SourceLoc(),
                                                            constraint));
         break;
@@ -784,6 +784,7 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
         break;
       }
 
+      case GenericRequirementKind::Superclass:
       case WitnessMarker: {
         // Shouldn't happen where we have requirement representations.
         error();
@@ -863,6 +864,14 @@ void ModuleFile::readGenericRequirements(
         auto constraint = getType(rawTypeIDs[1]);
 
         requirements.push_back(Requirement(RequirementKind::Conformance,
+                                           subject, constraint));
+        break;
+      }
+      case GenericRequirementKind::Superclass: {
+        auto subject = getType(rawTypeIDs[0]);
+        auto constraint = getType(rawTypeIDs[1]);
+
+        requirements.push_back(Requirement(RequirementKind::Superclass,
                                            subject, constraint));
         break;
       }

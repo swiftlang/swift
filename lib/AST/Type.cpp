@@ -2205,6 +2205,7 @@ const {
   for (auto &reqt : getRequirements()) {
     switch (reqt.getKind()) {
     case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
     case RequirementKind::WitnessMarker:
       // Substituting the parameter eliminates conformance constraints rooted
       // in the parameter.
