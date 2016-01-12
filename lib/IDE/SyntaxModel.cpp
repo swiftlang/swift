@@ -996,7 +996,7 @@ public:
       if (DRE->getRefKind() != DeclRefKind::Ordinary)
         return { true, E };
       if (!Fn(CharSourceRange(DRE->getSourceRange().Start,
-                              DRE->getName().getLength())))
+                              DRE->getName().getBaseName().getLength())))
         return { false, nullptr };
     }
     return { true, E };

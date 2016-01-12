@@ -2290,7 +2290,7 @@ void TypeChecker::checkForForbiddenPrefix(const Decl *D) {
 void TypeChecker::checkForForbiddenPrefix(const UnresolvedDeclRefExpr *E) {
   if (!hasEnabledForbiddenTypecheckPrefix())
     return;
-  checkForForbiddenPrefix(E->getName());
+  checkForForbiddenPrefix(E->getName().getBaseName());
 }
 
 void TypeChecker::checkForForbiddenPrefix(Identifier Ident) {

@@ -373,13 +373,17 @@ public:
   class BacktrackingScope {
     Parser &P;
     ParserPosition PP;
+    bool Backtrack = true;
 
   public:
     BacktrackingScope(Parser &P) : P(P), PP(P.getParserPosition()) {}
 
     ~BacktrackingScope() {
-      P.backtrackToPosition(PP);
+      if (Backtrack)
+        P.backtrackToPosition(PP);
     }
+
+    void cancelBacktrack() { Backtrack = false; }
   };
 
   /// RAII object that, when it is destructed, restores the parser and lexer to
@@ -1096,7 +1100,24 @@ public:
   ParserResult<Expr> parseExprSuper();
   ParserResult<Expr> parseExprConfiguration();
   Expr *parseExprStringLiteral();
-  
+
+  /// If the token is an escaped identifier being used as an argument
+  /// label, but doesn't need to be, diagnose it.
+  void diagnoseEscapedArgumentLabel(const Token &tok);
+
+  /// Parse an unqualified-identifier.
+  ///
+  ///   unqualified-identifier:
+  ///     identifier
+  ///     identifier '(' ((identifier | '_') ':') + ')'
+  ///
+  ///
+  /// \param allowInit Whether to allow 'init' for initializers.
+  /// \param loc Will be populated with the location of the name.
+  /// \param diag The diagnostic to emit if this is not a name.
+  DeclName parseUnqualifiedIdentifier(bool allowInit, SourceLoc &loc,
+                                      const Diagnostic &diag);
+
   Expr *parseExprIdentifier();
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
                                    Identifier PlaceholderId);
