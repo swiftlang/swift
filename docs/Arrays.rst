@@ -53,15 +53,15 @@ Swift provides three generic array types, all of which have amortized
 O(1) growth.  In this document, statements about **ArrayType** apply
 to all three of the components.
 
-* ``ContiguousArray<Element>`` is the fastest and simplest of the three—use this
-  when you need "C array" performance.  The elements of a
+* ``ContiguousArray<Element>`` is the fastest and simplest of the three—use
+  this when you need "C array" performance.  The elements of a
   ``ContiguousArray`` are always stored contiguously in memory.
 
   .. image:: ContiguousArray.png
 
-* ``Array<Element>`` is like ``ContiguousArray<Element>``, but optimized for efficient
-  conversions from Cocoa and back—when ``Element`` can be a class type,
-  ``Array<Element>`` can be backed by the (potentially non-contiguous)
+* ``Array<Element>`` is like ``ContiguousArray<Element>``, but optimized for
+  efficient conversions from Cocoa and back—when ``Element`` can be a class
+  type, ``Array<Element>`` can be backed by the (potentially non-contiguous)
   storage of an arbitrary ``NSArray`` rather than by a Swift
   ``ContiguousArray``.  ``Array<Element>`` also supports up- and down- casts
   between arrays of related class types.  When ``Element`` is known to be a
