@@ -49,7 +49,7 @@ Compilation::Compilation(DiagnosticEngine &Diags, OutputLevel Level,
                          bool EnableIncrementalBuild,
                          bool SkipTaskExecution,
                          bool SaveTemps)
-  : Diags(Diags), Level(Level), InputArgs(std::move(InputArgs)),
+  : Diags(Diags), Level(Level), RawInputArgs(std::move(InputArgs)),
     TranslatedArgs(std::move(TranslatedArgs)), 
     InputFilesWithTypes(std::move(InputsWithTypes)), ArgsHash(ArgsHash),
     BuildStartTime(StartTime),

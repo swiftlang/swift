@@ -67,7 +67,10 @@ private:
   SmallVector<std::unique_ptr<const Job>, 32> Jobs;
 
   /// The original (untranslated) input argument list.
-  std::unique_ptr<llvm::opt::InputArgList> InputArgs;
+  ///
+  /// This is only here for lifetime management. Any inspection of
+  /// command-line arguments should use #getArgs().
+  std::unique_ptr<llvm::opt::InputArgList> RawInputArgs;
 
   /// The translated input arg list.
   std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs;
@@ -157,7 +160,6 @@ public:
              TempFilePaths.end();
   }
 
-  const llvm::opt::InputArgList &getInputArgs() const { return *InputArgs; }
   const llvm::opt::DerivedArgList &getArgs() const { return *TranslatedArgs; }
   ArrayRef<InputPair> getInputFiles() const { return InputFilesWithTypes; }
 
