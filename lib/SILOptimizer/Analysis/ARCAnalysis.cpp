@@ -108,8 +108,7 @@ bool swift::canNeverUseValues(SILInstruction *Inst) {
   case ValueKind::WitnessMethodInst:
     return true;
 
-  // DeallocStackInst do not use reference counted values, only local storage
-  // handles.
+  // DeallocStackInst do not use reference counted values.
   case ValueKind::DeallocStackInst:
     return true;
 

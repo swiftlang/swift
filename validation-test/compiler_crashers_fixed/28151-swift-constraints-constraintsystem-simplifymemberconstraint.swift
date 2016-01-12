@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-class k:CollectionType
+class k:Collection
 let a{
 enum B{struct d{
 struct S{let a=0.g

@@ -5,5 +5,5 @@
 
 class B<T where H:a{class a{class B<e
 {struct c{protocol a
-struct c<T where T:CollectionType
+struct c<T where T:Collection
 func n{a{

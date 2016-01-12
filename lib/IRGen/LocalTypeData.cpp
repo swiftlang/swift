@@ -17,6 +17,7 @@
 
 #include "LocalTypeData.h"
 #include "Fulfillment.h"
+#include "GenMeta.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "swift/SIL/SILModule.h"
@@ -78,8 +79,7 @@ llvm::Value *LocalTypeDataCache::tryGet(IRGenFunction &IGF, Key key) {
   Optional<unsigned> bestCost;
 
   CacheEntry *next = chain.Root, *nextPrev = nullptr;
-  do {
-    assert(next);
+  while (next) {
     CacheEntry *cur = next, *curPrev = nextPrev;
     nextPrev = cur;
     next = cur->getNext();
@@ -105,7 +105,7 @@ llvm::Value *LocalTypeDataCache::tryGet(IRGenFunction &IGF, Key key) {
     }
     best = cur;
     bestPrev = curPrev;
-  } while (next);
+  }
 
   // If we didn't find anything, we're done.
   if (!best) return nullptr;
@@ -126,9 +126,17 @@ llvm::Value *LocalTypeDataCache::tryGet(IRGenFunction &IGF, Key key) {
     auto result = entry->follow(IGF, source);
 
     // Make a new concrete entry at the active definition point.
+
+    // Register with the active ConditionalDominanceScope if necessary.
+    bool isConditional = IGF.isConditionalDominancePoint();
+    if (isConditional) {
+      IGF.registerConditionalLocalTypeDataKey(key);
+    }
+
+    // Allocate the new entry.
     auto newEntry =
       new ConcreteCacheEntry(IGF.getActiveDominancePoint(),
-                             IGF.isConditionalDominancePoint(), result);
+                             isConditional, result);
 
     // If the active definition point is the same as the old entry's
     // definition point, delete the old entry.
@@ -164,13 +172,16 @@ LocalTypeDataCache::AbstractCacheEntry::follow(IRGenFunction &IGF,
 
 void IRGenFunction::setScopedLocalTypeData(CanType type, LocalTypeDataKind kind,
                                            llvm::Value *data) {
-  if (isConditionalDominancePoint())
-    return;
+  auto key = LocalTypeDataCache::getKey(type, kind);
+
+  // Register with the active ConditionalDominanceScope if necessary.
+  bool isConditional = isConditionalDominancePoint();
+  if (isConditional) {
+    registerConditionalLocalTypeDataKey(key);
+  }
 
   getOrCreateLocalTypeData().addConcrete(getActiveDominancePoint(),
-                                         isConditionalDominancePoint(),
-                                         LocalTypeDataCache::getKey(type, kind),
-                                         data);
+                                         isConditional, key, data);
 }
 
 void IRGenFunction::setUnscopedLocalTypeData(CanType type,
@@ -181,33 +192,46 @@ void IRGenFunction::setUnscopedLocalTypeData(CanType type,
                  LocalTypeDataCache::getKey(type, kind), data);
 }
 
-void LocalTypeDataCache::addAbstractForTypeMetadata(IRGenFunction &IGF,
-                                                    CanType type,
+void IRGenFunction::addLocalTypeDataForTypeMetadata(CanType type,
+                                                    IsExact_t isExact,
                                                     llvm::Value *metadata) {
-  // Don't bother doing this at a conditional dominance point; we're too
-  // likely to throw it all away.
-  if (IGF.isConditionalDominancePoint())
+  // Remember that we have this type metadata concretely.
+  if (isExact) {
+    setScopedLocalTypeData(type, LocalTypeDataKind::forMetatype(), metadata);
+  }
+
+  // Don't bother adding abstract fulfillments at a conditional dominance
+  // point; we're too likely to throw them all away.
+  if (isConditionalDominancePoint())
     return;
 
+  getOrCreateLocalTypeData()
+    .addAbstractForTypeMetadata(*this, type, isExact, metadata);
+}
+
+void LocalTypeDataCache::addAbstractForTypeMetadata(IRGenFunction &IGF,
+                                                    CanType type,
+                                                    IsExact_t isExact,
+                                                    llvm::Value *metadata) {
   // Look for anything at all that's fulfilled by this.  If we don't find
   // anything, stop.
   FulfillmentMap fulfillments;
   if (!fulfillments.searchTypeMetadata(*IGF.IGM.SILMod->getSwiftModule(),
-                                       type, FulfillmentMap::IsExact,
+                                       type, isExact,
                                        /*source*/ 0, MetadataPath(),
                                        FulfillmentMap::Everything())) {
     return;
   }
 
   addAbstractForFulfillments(IGF, std::move(fulfillments),
-                              [&]() -> AbstractSource {
+                             [&]() -> AbstractSource {
     return AbstractSource(AbstractSource::Kind::TypeMetadata, type, metadata);
   });
 }
 
 void LocalTypeDataCache::
 addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
-                            llvm::function_ref<AbstractSource()> createSource) {
+                           llvm::function_ref<AbstractSource()> createSource) {
   // Add the source lazily.
   Optional<unsigned> sourceIndex;
   auto getSourceIndex = [&]() -> unsigned {
@@ -233,7 +257,18 @@ addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
       } else {
         continue;
       }
+
     } else {
+      // Ignore type metadata fulfillments for non-dependent types that
+      // we can produce very cheaply.  We don't want to end up emitting
+      // the type metadata for Int by chasing through N layers of metadata
+      // just because that path happens to be in the cache.
+      if (!type->hasArchetype() &&
+          getTypeMetadataAccessStrategy(IGF.IGM, type, /*preferDirect*/ true)
+            == MetadataAccessStrategy::Direct) {
+        continue;
+      }
+
       localDataKind = LocalTypeDataKind::forMetatype();
     }
 
@@ -276,8 +311,16 @@ addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
     if (foundBetter) continue;
 
     // Okay, make a new entry.
+
+    // Register with the conditional dominance scope if necessary.
+    bool isConditional = IGF.isConditionalDominancePoint();
+    if (isConditional) {
+      IGF.registerConditionalLocalTypeDataKey(key);
+    }
+
+    // Allocate the new entry.
     auto newEntry = new AbstractCacheEntry(IGF.getActiveDominancePoint(),
-                                           IGF.isConditionalDominancePoint(),
+                                           isConditional,
                                            getSourceIndex(),
                                            std::move(fulfillment.second.Path));
 

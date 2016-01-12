@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 {
-class k:CollectionType
+class k:Collection
 struct c{
 struct d<T where j:P{
 enum a{struct B{struct B<g{class B{class d{var _=B

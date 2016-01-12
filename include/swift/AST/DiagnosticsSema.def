@@ -2263,8 +2263,6 @@ WARNING(deprecated_convention_attribute,type_parsing,none,
         "instead", (StringRef, StringRef))
 
 // SIL
-ERROR(sil_local_storage_nested, decl_parsing,none,
-      "local storage types cannot be in nested positions", ())
 ERROR(opened_non_protocol, decl_parsing,none,
       "@opened cannot be applied to non-protocol type %0", (Type))
 ERROR(sil_function_ellipsis,type_parsing,PointsToFirstBadToken,
@@ -2329,7 +2327,7 @@ ERROR(objc_setter_for_nonobjc_subscript,sema_tcd,none,
 ERROR(objc_enum_generic,sema_tcd,none,
       "'@objc' enum cannot be generic", ())
 ERROR(objc_name_req_nullary,sema_objc,none,
-      "'@objc' %select{class|protocol|enum|property}0 must have a simple name", (int))
+      "'@objc' %select{class|protocol|enum|enum case|property}0 must have a simple name", (int))
 ERROR(objc_name_subscript,sema_objc,none,
       "'@objc' subscript cannot have a name; did you mean to put "
       "the name on the getter or setter?", ())
@@ -2339,6 +2337,13 @@ ERROR(objc_name_func_mismatch,sema_objc,none,
       "%select{initializer|method}0 has %select{one parameter|%3 parameters}4"
       "%select{| (%select{|including }4the error parameter)}5",
       (bool, unsigned, bool, unsigned, bool, bool))
+ERROR(objc_enum_case_req_name,sema_objc,none,
+      "attribute has no effect; cases within an '@objc' enum are already "
+      "exposed to Objective-C", ())
+ERROR(objc_enum_case_req_objc_enum,sema_objc,none,
+      "'@objc' enum case is not allowed outside of an '@objc' enum", ())
+ERROR(objc_enum_case_multi,sema_objc,none,
+      "'@objc' enum case declaration defines multiple enum cases with the same Objective-C name", ())
 
 // If you change this, also change enum ObjCReason
 #define OBJC_ATTR_SELECT "select{marked dynamic|marked @objc|marked @IBOutlet|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override}"

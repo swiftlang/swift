@@ -22,6 +22,7 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "swift/AST/Builtins.h"
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILLocation.h"
@@ -460,14 +461,14 @@ public:
   };
   void setArgNo(unsigned N) { VarInfo.setArgNo(N); }
 
+  /// getType() is ok since this is known to only have one type.
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
+  
   /// getElementType - Get the type of the allocated memory (as opposed to the
-  /// (second) type of the instruction itself, which will be an address type).
+  /// type of the instruction itself, which will be an address type).
   SILType getElementType() const {
-    return getType(1).getObjectType();
+    return getType().getObjectType();
   }
-
-  SILValue getContainerResult() const { return SILValue(this, 0); }
-  SILValue getAddressResult() const { return SILValue(this, 1); }
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }
@@ -588,17 +589,17 @@ class AllocExistentialBoxInst : public AllocationInst {
   friend class SILBuilder;
 
   CanType ConcreteType;
-  ArrayRef<ProtocolConformance*> Conformances;
+  ArrayRef<ProtocolConformanceRef> Conformances;
 
   AllocExistentialBoxInst(SILDebugLocation *DebugLoc, SILType ExistentialType,
                           CanType ConcreteType, SILType ConcreteLoweredType,
-                          ArrayRef<ProtocolConformance *> Conformances,
+                          ArrayRef<ProtocolConformanceRef> Conformances,
                           SILFunction *Parent);
 
   static AllocExistentialBoxInst *
   create(SILDebugLocation *DebugLoc, SILType ExistentialType,
          CanType ConcreteType, SILType ConcreteLoweredType,
-         ArrayRef<ProtocolConformance *> Conformances, SILFunction *Parent);
+         ArrayRef<ProtocolConformanceRef> Conformances, SILFunction *Parent);
 
 public:
   CanType getFormalConcreteType() const {
@@ -613,7 +614,7 @@ public:
     return getType(1);
   }
 
-  ArrayRef<ProtocolConformance*> getConformances() const {
+  ArrayRef<ProtocolConformanceRef> getConformances() const {
     return Conformances;
   }
   
@@ -1120,10 +1121,40 @@ public:
   }
 };
   
-/// Gives the address of a SIL global variable.
-class GlobalAddrInst : public LiteralInst {
+/// Initializes a SIL global variable. Only valid once, before any
+/// usages of the global via GlobalAddrInst.
+class AllocGlobalInst : public SILInstruction {
   friend class SILBuilder;
 
+  SILGlobalVariable *Global;
+
+  AllocGlobalInst(SILDebugLocation *DebugLoc, SILGlobalVariable *Global);
+
+public:
+  // FIXME: This constructor should be private but is currently used
+  //        in the SILParser.
+
+  /// Create a placeholder instruction with an unset global reference.
+  AllocGlobalInst(SILDebugLocation *DebugLoc);
+
+  /// Return the referenced global variable.
+  SILGlobalVariable *getReferencedGlobal() const { return Global; }
+  
+  void setReferencedGlobal(SILGlobalVariable *v) { Global = v; }
+
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::AllocGlobalInst;
+  }
+};
+
+/// Gives the address of a SIL global variable. Only valid after an
+/// AllocGlobalInst.
+class GlobalAddrInst : public LiteralInst {
+  friend class SILBuilder;
+  
   SILGlobalVariable *Global;
 
   GlobalAddrInst(SILDebugLocation *DebugLoc, SILGlobalVariable *Global);
@@ -1134,7 +1165,7 @@ public:
 
   /// Create a placeholder instruction with an unset global reference.
   GlobalAddrInst(SILDebugLocation *DebugLoc, SILType Ty);
-
+  
   /// Return the referenced global variable.
   SILGlobalVariable *getReferencedGlobal() const { return Global; }
   
@@ -2950,11 +2981,11 @@ class WitnessMethodInst : public MethodInst {
   friend class SILBuilder;
 
   CanType LookupType;
-  ProtocolConformance *Conformance;
+  ProtocolConformanceRef Conformance;
   Optional<FixedOperandList<1>> OptionalOperand;
 
   WitnessMethodInst(SILDebugLocation *DebugLoc, CanType LookupType,
-                    ProtocolConformance *Conformance, SILDeclRef Member,
+                    ProtocolConformanceRef Conformance, SILDeclRef Member,
                     SILType Ty, SILValue OpenedExistential,
                     bool Volatile = false)
       : MethodInst(ValueKind::WitnessMethodInst, DebugLoc, Ty, Member,
@@ -2966,7 +2997,7 @@ class WitnessMethodInst : public MethodInst {
 
   static WitnessMethodInst *
   create(SILDebugLocation *DebugLoc, CanType LookupType,
-         ProtocolConformance *Conformance, SILDeclRef Member, SILType Ty,
+         ProtocolConformanceRef Conformance, SILDeclRef Member, SILType Ty,
          SILFunction *Parent, SILValue OpenedExistential,
          bool Volatile = false);
 
@@ -2977,15 +3008,12 @@ public:
     return getMember().getDecl()->getDeclContext()
              ->isProtocolOrProtocolExtensionContext();
   }
-  ProtocolConformance *getConformance() const { return Conformance; }
+  ProtocolConformanceRef getConformance() const { return Conformance; }
 
   /// Get a representation of the lookup type as a substitution of the
   /// protocol's Self archetype.
   Substitution getSelfSubstitution() const {
-    auto memberDC = getMember().getDecl()->getDeclContext();
-    return Substitution{memberDC->getProtocolSelf()->getArchetype(),
-                        getLookupType(),
-                        Conformance};
+    return Substitution{getLookupType(), Conformance};
   }
 
   bool hasOperand() const { return OptionalOperand.hasValue(); }
@@ -3085,11 +3113,11 @@ class InitExistentialAddrInst
   friend class SILBuilder;
 
   CanType ConcreteType;
-  ArrayRef<ProtocolConformance*> Conformances;
+  ArrayRef<ProtocolConformanceRef> Conformances;
 
   InitExistentialAddrInst(SILDebugLocation *DebugLoc, SILValue Existential,
                           CanType ConcreteType, SILType ConcreteLoweredType,
-                          ArrayRef<ProtocolConformance *> Conformances)
+                          ArrayRef<ProtocolConformanceRef> Conformances)
       : UnaryInstructionBase(DebugLoc, Existential,
                              ConcreteLoweredType.getAddressType()),
         ConcreteType(ConcreteType), Conformances(Conformances) {}
@@ -3097,10 +3125,10 @@ class InitExistentialAddrInst
   static InitExistentialAddrInst *
   create(SILDebugLocation *DebugLoc, SILValue Existential, CanType ConcreteType,
          SILType ConcreteLoweredType,
-         ArrayRef<ProtocolConformance *> Conformances, SILFunction *Parent);
+         ArrayRef<ProtocolConformanceRef> Conformances, SILFunction *Parent);
 
 public:
-  ArrayRef<ProtocolConformance*> getConformances() const {
+  ArrayRef<ProtocolConformanceRef> getConformances() const {
     return Conformances;
   }
   
@@ -3122,25 +3150,25 @@ class InitExistentialRefInst
   friend class SILBuilder;
 
   CanType ConcreteType;
-  ArrayRef<ProtocolConformance*> Conformances;
+  ArrayRef<ProtocolConformanceRef> Conformances;
 
   InitExistentialRefInst(SILDebugLocation *DebugLoc, SILType ExistentialType,
                          CanType FormalConcreteType, SILValue Instance,
-                         ArrayRef<ProtocolConformance *> Conformances)
+                         ArrayRef<ProtocolConformanceRef> Conformances)
       : UnaryInstructionBase(DebugLoc, Instance, ExistentialType),
         ConcreteType(FormalConcreteType), Conformances(Conformances) {}
 
   static InitExistentialRefInst *
   create(SILDebugLocation *DebugLoc, SILType ExistentialType,
          CanType ConcreteType, SILValue Instance,
-         ArrayRef<ProtocolConformance *> Conformances, SILFunction *Parent);
+         ArrayRef<ProtocolConformanceRef> Conformances, SILFunction *Parent);
 
 public:
   CanType getFormalConcreteType() const {
     return ConcreteType;
   }
 
-  ArrayRef<ProtocolConformance*> getConformances() const {
+  ArrayRef<ProtocolConformanceRef> getConformances() const {
     return Conformances;
   }
 };
@@ -3153,18 +3181,16 @@ class InitExistentialMetatypeInst
 {
   friend class SILBuilder;
 
-  /// Pointer to the last of our tail allocated conformances. Null if this
-  /// existential metatype does not have any conformances.
-  NullablePtr<ProtocolConformance *> LastConformance;
+  unsigned NumConformances;
 
   InitExistentialMetatypeInst(SILDebugLocation *DebugLoc,
                               SILType existentialMetatypeType,
                               SILValue metatype,
-                              ArrayRef<ProtocolConformance *> conformances);
+                              ArrayRef<ProtocolConformanceRef> conformances);
 
   static InitExistentialMetatypeInst *
   create(SILDebugLocation *DebugLoc, SILType existentialMetatypeType,
-         SILValue metatype, ArrayRef<ProtocolConformance *> conformances,
+         SILValue metatype, ArrayRef<ProtocolConformanceRef> conformances,
          SILFunction *parent);
 
 public:
@@ -3182,7 +3208,7 @@ public:
     return concreteType;
   }
 
-  ArrayRef<ProtocolConformance *> getConformances() const;
+  ArrayRef<ProtocolConformanceRef> getConformances() const;
 };
 
 /// DeinitExistentialAddrInst - Given an address of an existential that has been

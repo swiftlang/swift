@@ -413,15 +413,15 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
 
   // Replace all uses of the address of the box's contained value with
   // the address of the stack location.
-  ABI->getAddressResult().replaceAllUsesWith(ASI->getAddressResult());
+  ABI->getAddressResult().replaceAllUsesWith(ASI);
 
   // Check to see if the alloc_box was used by a mark_uninitialized instruction.
   // If so, any uses of the pointer result need to keep using the MUI, not the
   // alloc_stack directly.  If we don't do this, DI will miss the uses.
-  SILValue PointerResult = ASI->getAddressResult();
-  for (auto UI : ASI->getAddressResult().getUses())
+  SILValue PointerResult = ASI;
+  for (auto UI : ASI->getUses())
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(UI->getUser())) {
-      assert(ASI->getAddressResult().hasOneUse() &&
+      assert(ASI->hasOneUse() &&
              "alloc_stack used by mark_uninitialized, but not exclusively!");
       PointerResult = MUI;
       break;
@@ -444,7 +444,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
 
   for (auto Return : Returns) {
     SILBuilderWithScope BuildDealloc(Return);
-    BuildDealloc.createDeallocStack(Loc, ASI->getContainerResult());
+    BuildDealloc.createDeallocStack(Loc, ASI);
   }
 
   // Remove any retain and release instructions.  Since all uses of result #1

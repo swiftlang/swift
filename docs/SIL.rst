@@ -341,8 +341,6 @@ The type of a value in SIL shall be:
 
 - the address of a legal SIL type, ``$*T``, or
 
-- the address of local storage of a legal SIL type, ``$*@local_storage T``.
-
 A type ``T`` is a *legal SIL type* if:
 
 - it is a function type which satisfies the constraints (below) on
@@ -385,22 +383,6 @@ type. Values of address type thus cannot be allocated, loaded, or stored
 
 Addresses can be passed as arguments to functions if the corresponding
 parameter is indirect.  They cannot be returned.
-
-Local Storage Types
-```````````````````
-
-The *address of local storage for T* ``$*@local_storage T`` is a
-handle to a stack allocation of a variable of type ``$T``.
-
-For many types, the handle for a stack allocation is simply the
-allocated address itself.  However, if a type is runtime-sized, the
-compiler must emit code to potentially dynamically allocate memory.
-SIL abstracts over such differences by using values of local-storage
-type as the first result of ``alloc_stack`` and the operand of
-``dealloc_stack``.
-
-Local-storage address types are not *first-class* in the same sense
-that address types are not first-class.
 
 Box Types
 `````````
@@ -594,7 +576,7 @@ generic constraints:
   * Non-class protocol types
   * @weak types
 
-  Values of address-only type (“address-only values”) must reside in
+  Values of address-only type ("address-only values") must reside in
   memory and can only be referenced in SIL by address. Addresses of
   address-only values cannot be loaded from or stored to. SIL provides
   special instructions for indirectly manipulating address-only
@@ -1125,7 +1107,12 @@ Global Variables
 
 SIL representation of a global variable.
 
-FIXME: to be written.
+Global variable access is performed by the ``alloc_global`` and ``global_addr``
+SIL instructions. Prior to performing any access on the global, the
+``alloc_global`` instruction must be performed to initialize the storage.
+
+Once a global's storage has been initialized, ``global_addr`` is used to
+project the value.
 
 Dataflow Errors
 ---------------
@@ -1559,8 +1546,8 @@ A value ``%1`` is said to be *value-dependent* on a value ``%0`` if:
 - ``%1`` is the result of ``mark_dependence`` and ``%0`` is either of
   the operands.
 
-- ``%1`` is the value address of an allocation instruction of which
-  ``%0`` is the local storage token or box reference.
+- ``%1`` is the value address of a box allocation instruction of which
+  ``%0`` is the box reference.
 
 - ``%1`` is the result of a ``struct``, ``tuple``, or ``enum``
   instruction and ``%0`` is an operand.
@@ -1634,13 +1621,15 @@ alloc_stack
   sil-instruction ::= 'alloc_stack' sil-type (',' debug-var-attr)*
 
   %1 = alloc_stack $T
-  // %1#0 has type $*@local_storage T
-  // %1#1 has type $*T
+  // %1 has type $*T
 
 Allocates uninitialized memory that is sufficiently aligned on the stack
-to contain a value of type ``T``. The first result of the instruction
-is a local-storage handle suitable for passing to ``dealloc_stack``.
-The second result of the instruction is the address of the allocated memory.
+to contain a value of type ``T``. The result of the instruction is the address
+of the allocated memory.
+
+If a type is runtime-sized, the compiler must emit code to potentially
+dynamically allocate memory. So there is no guarantee that the allocated
+memory is really located on the stack. 
 
 ``alloc_stack`` marks the start of the lifetime of the value; the
 allocation must be balanced with a ``dealloc_stack`` instruction to
@@ -1735,22 +1724,36 @@ behavior if the value buffer is currently allocated.
 
 The type operand must be a lowered object type.
 
+alloc_global
+````````````
+
+::
+
+   sil-instruction ::= 'alloc_global' sil-global-name
+
+   alloc_global @foo
+
+Initialize the storage for a global variable. This instruction has
+undefined behavior if the global variable has already been initialized.
+
+The type operand must be a lowered object type.
+
 dealloc_stack
 `````````````
 ::
 
   sil-instruction ::= 'dealloc_stack' sil-operand
 
-  dealloc_stack %0 : $*@local_storage T
-  // %0 must be of a local-storage $*@local_storage T type
+  dealloc_stack %0 : $*T
+  // %0 must be of $*T type
 
 Deallocates memory previously allocated by ``alloc_stack``. The
 allocated value in memory must be uninitialized or destroyed prior to
 being deallocated. This instruction marks the end of the lifetime for
 the value created by the corresponding ``alloc_stack`` instruction. The operand
-must be the ``@local_storage`` of the shallowest live ``alloc_stack``
-allocation preceding the deallocation. In other words, deallocations must be
-in last-in, first-out stack order.
+must be the shallowest live ``alloc_stack`` allocation preceding the
+deallocation. In other words, deallocations must be in last-in, first-out
+stack order.
 
 dealloc_box
 ```````````
@@ -2400,7 +2403,7 @@ function_ref
 Creates a reference to a SIL function.
 
 global_addr
-```````````````
+```````````
 
 ::
 
@@ -2408,7 +2411,10 @@ global_addr
 
   %1 = global_addr @foo : $*Builtin.Word
 
-Creates a reference to the address of a global variable.
+Creates a reference to the address of a global variable which has been
+previously initialized by ``alloc_global``. It is undefined behavior to
+perform this operation on a global variable which has not been
+initialized.
 
 integer_literal
 ```````````````

@@ -50,9 +50,8 @@ static void promoteShadow(AllocStackInst *Alloc, SILArgument *InOutArg) {
     auto Use = *Alloc->use_begin();
     auto *User = Use->getUser();
 
-    // If this is a use of the 0th result, not the address result, just zap the
-    // instruction.  It is a dealloc_stack or something similar.
-    if (Use->get().getResultNumber() == 0) {
+    // If this is the dealloc_stack, just zap the instruction.
+    if (isa<DeallocStackInst>(User)) {
       User->eraseFromParent();
       continue;
     }

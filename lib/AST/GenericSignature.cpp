@@ -389,10 +389,6 @@ GenericSignature::getSubstitutionMap(ArrayRef<Substitution> args) const {
   }
   
   // Seed the type map with pre-existing substitutions.
-  for (auto sub : args) {
-    subs[sub.getArchetype()] = sub.getReplacement();
-  }
-  
   for (auto depTy : getAllDependentTypes()) {
     auto replacement = args.front().getReplacement();
     args = args.slice(1);

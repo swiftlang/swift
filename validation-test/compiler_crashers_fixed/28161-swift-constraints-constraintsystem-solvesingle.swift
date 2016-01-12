@@ -12,6 +12,6 @@ class p{
 enum S{
 var d=a{
 }
-struct B:CollectionType}}}
+struct B:Collection}}}
 enum E<T where B:a{struct B{{}struct B<g{class B{class d{var _=B
 a

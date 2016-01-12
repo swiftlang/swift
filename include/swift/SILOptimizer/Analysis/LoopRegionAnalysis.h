@@ -130,8 +130,6 @@
 
 namespace swift {
 
-class LoopRegionFunctionInfo;
-
 /// A loop region is a data structure which represents one of a basic block,
 /// loop, or function. In the case of a loop, function, it contains an internal
 /// data structure that represents the subregions of the loop/function. This

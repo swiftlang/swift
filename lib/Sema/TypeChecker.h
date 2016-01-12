@@ -432,10 +432,6 @@ public:
   ASTContext &Context;
   DiagnosticEngine &Diags;
 
-  /// \brief The list of implicitly-defined functions created by the
-  /// type checker.
-  std::vector<AbstractFunctionDecl *> implicitlyDefinedFunctions;
-
   /// \brief The list of function definitions we've encountered.
   std::vector<AbstractFunctionDecl *> definedFunctions;
 

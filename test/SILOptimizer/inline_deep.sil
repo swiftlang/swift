@@ -39,10 +39,10 @@ bb0(%0 : $*T, %1 : $*T, %2 : $S<T>):
   strong_retain %2 : $S<T>
   %6 = class_method %2 : $S<T>, #S.l0!1 : <T> S<T> -> (T) -> T , $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
   %7 = alloc_stack $T
-  copy_addr %1 to [initialization] %7#1 : $*T
-  %9 = apply %6<T>(%0, %7#1, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  copy_addr %1 to [initialization] %7 : $*T
+  %9 = apply %6<T>(%0, %7, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
   strong_release %2 : $S<T>
-  dealloc_stack %7#0 : $*@local_storage T
+  dealloc_stack %7 : $*T
   destroy_addr %1 : $*T
   %13 = tuple ()
 // CHECK: return
@@ -57,10 +57,10 @@ bb0(%0 : $*T, %1 : $*T, %2 : $S<T>):
   strong_retain %2 : $S<T>
   %6 = class_method %2 : $S<T>, #S.l1!1 : <T> S<T> -> (T) -> T , $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
   %7 = alloc_stack $T
-  copy_addr %1 to [initialization] %7#1 : $*T
-  %9 = apply %6<T>(%0, %7#1, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  copy_addr %1 to [initialization] %7 : $*T
+  %9 = apply %6<T>(%0, %7, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
   strong_release %2 : $S<T>
-  dealloc_stack %7#0 : $*@local_storage T
+  dealloc_stack %7 : $*T
   destroy_addr %1 : $*T
   %13 = tuple ()
 // CHECK: return
@@ -75,10 +75,10 @@ bb0(%0 : $*T, %1 : $*T, %2 : $S<T>):
   strong_retain %2 : $S<T>
   %6 = class_method %2 : $S<T>, #S.l2!1 : <T> S<T> -> (T) -> T , $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
   %7 = alloc_stack $T
-  copy_addr %1 to [initialization] %7#1 : $*T
-  %9 = apply %6<T>(%0, %7#1, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  copy_addr %1 to [initialization] %7 : $*T
+  %9 = apply %6<T>(%0, %7, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
   strong_release %2 : $S<T>
-  dealloc_stack %7#0 : $*@local_storage T
+  dealloc_stack %7 : $*T
   destroy_addr %1 : $*T
   %13 = tuple ()
 // CHECK: return
@@ -93,10 +93,10 @@ bb0(%0 : $*T, %1 : $*T, %2 : $S<T>):
   strong_retain %2 : $S<T>
   %6 = class_method %2 : $S<T>, #S.l3!1 : <T> S<T> -> (T) -> T , $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
   %7 = alloc_stack $T
-  copy_addr %1 to [initialization] %7#1 : $*T
-  %9 = apply %6<T>(%0, %7#1, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  copy_addr %1 to [initialization] %7 : $*T
+  %9 = apply %6<T>(%0, %7, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
   strong_release %2 : $S<T>
-  dealloc_stack %7#0 : $*@local_storage T
+  dealloc_stack %7 : $*T
   destroy_addr %1 : $*T
   %13 = tuple ()
 // CHECK: return
@@ -111,10 +111,10 @@ bb0(%0 : $*T, %1 : $*T, %2 : $S<T>):
   strong_retain %2 : $S<T>
   %6 = class_method %2 : $S<T>, #S.l4!1 : <T> S<T> -> (T) -> T , $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
   %7 = alloc_stack $T
-  copy_addr %1 to [initialization] %7#1 : $*T
-  %9 = apply %6<T>(%0, %7#1, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  copy_addr %1 to [initialization] %7 : $*T
+  %9 = apply %6<T>(%0, %7, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
   strong_release %2 : $S<T>
-  dealloc_stack %7#0 : $*@local_storage T
+  dealloc_stack %7 : $*T
   destroy_addr %1 : $*T
   %13 = tuple ()
 // CHECK: return
@@ -129,10 +129,10 @@ bb0(%0 : $*T, %1 : $*T, %2 : $S<T>):
   strong_retain %2 : $S<T>
   %6 = class_method %2 : $S<T>, #S.l5!1 : <T> S<T> -> (T) -> T , $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
   %7 = alloc_stack $T
-  copy_addr %1 to [initialization] %7#1 : $*T
-  %9 = apply %6<T>(%0, %7#1, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  copy_addr %1 to [initialization] %7 : $*T
+  %9 = apply %6<T>(%0, %7, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
   strong_release %2 : $S<T>
-  dealloc_stack %7#0 : $*@local_storage T
+  dealloc_stack %7 : $*T
   destroy_addr %1 : $*T
   %13 = tuple ()
 // CHECK: return
@@ -147,10 +147,10 @@ bb0(%0 : $*T, %1 : $*T, %2 : $S<T>):
   strong_retain %2 : $S<T>
   %6 = class_method %2 : $S<T>, #S.l6!1 : <T> S<T> -> (T) -> T , $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
   %7 = alloc_stack $T
-  copy_addr %1 to [initialization] %7#1 : $*T
-  %9 = apply %6<T>(%0, %7#1, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  copy_addr %1 to [initialization] %7 : $*T
+  %9 = apply %6<T>(%0, %7, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
   strong_release %2 : $S<T>
-  dealloc_stack %7#0 : $*@local_storage T
+  dealloc_stack %7 : $*T
   destroy_addr %1 : $*T
   %13 = tuple ()
 // CHECK: return
@@ -165,10 +165,10 @@ bb0(%0 : $*T, %1 : $*T, %2 : $S<T>):
   strong_retain %2 : $S<T>
   %6 = class_method %2 : $S<T>, #S.l7!1 : <T> S<T> -> (T) -> T , $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
   %7 = alloc_stack $T
-  copy_addr %1 to [initialization] %7#1 : $*T
-  %9 = apply %6<T>(%0, %7#1, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  copy_addr %1 to [initialization] %7 : $*T
+  %9 = apply %6<T>(%0, %7, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
   strong_release %2 : $S<T>
-  dealloc_stack %7#0 : $*@local_storage T
+  dealloc_stack %7 : $*T
   destroy_addr %1 : $*T
   %13 = tuple ()
 // CHECK: return
@@ -183,10 +183,10 @@ bb0(%0 : $*T, %1 : $*T, %2 : $S<T>):
   strong_retain %2 : $S<T>
   %6 = class_method %2 : $S<T>, #S.l8!1 : <T> S<T> -> (T) -> T , $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
   %7 = alloc_stack $T
-  copy_addr %1 to [initialization] %7#1 : $*T
-  %9 = apply %6<T>(%0, %7#1, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  copy_addr %1 to [initialization] %7 : $*T
+  %9 = apply %6<T>(%0, %7, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
   strong_release %2 : $S<T>
-  dealloc_stack %7#0 : $*@local_storage T
+  dealloc_stack %7 : $*T
   destroy_addr %1 : $*T
   %13 = tuple ()
 // CHECK: return
@@ -222,14 +222,14 @@ bb0:
   %3 = integer_literal $Builtin.Int32, 709
   %4 = struct $Int32 (%3 : $Builtin.Int32)
   %5 = alloc_stack $Int32
-  store %4 to %5#1 : $*Int32
+  store %4 to %5 : $*Int32
   %7 = alloc_stack $Int32
   %8 = function_ref @_TFC5depth1S2l9U__fGS0_Q__FQ_Q_ : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
-  %9 = apply %8<Int32>(%7#1, %5#1, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  %9 = apply %8<Int32>(%7, %5, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
   strong_release %2 : $S<Int32>
-  %11 = load %7#1 : $*Int32
-  dealloc_stack %7#0 : $*@local_storage Int32
-  dealloc_stack %5#0 : $*@local_storage Int32
+  %11 = load %7 : $*Int32
+  dealloc_stack %7 : $*Int32
+  dealloc_stack %5 : $*Int32
 // CHECK: return
   return %11 : $Int32
 }

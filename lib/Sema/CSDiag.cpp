@@ -2669,7 +2669,7 @@ namespace {
         patternElt.first->setType(patternElt.second);
       
       for (auto paramDeclElt : ParamDeclTypes)
-        paramDeclElt.first->setType(paramDeclElt.second);
+        paramDeclElt.first->overwriteType(paramDeclElt.second);
       
       // Done, don't do redundant work on destruction.
       ExprTypes.clear();
@@ -3152,6 +3152,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
   // probably meant to call the value.
   if (auto srcFT = exprType->getAs<AnyFunctionType>()) {
     if (srcFT->getInput()->isVoid() &&
+        !isUnresolvedOrTypeVarType(srcFT->getResult()) &&
         CS->TC.isConvertibleTo(srcFT->getResult(), contextualType, CS->DC)) {
       diagnose(expr->getLoc(), diag::missing_nullary_call, srcFT->getResult())
         .highlight(expr->getSourceRange())

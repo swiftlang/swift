@@ -2379,15 +2379,25 @@ void Substitution::dump() const {
   if (!Conformance.size()) return;
 
   os << '[';
-  for (const auto *c : Conformance) {
-    os << ' ';
-    if (c) {
-      c->printName(os);
+  bool first = true;
+  for (auto &c : Conformance) {
+    if (first) {
+      first = false;
     } else {
-      os << "nullptr";
+      os << ' ';
     }
+    c.dump();
   }
   os << " ]";
+}
+
+void ProtocolConformanceRef::dump() const {
+  llvm::raw_ostream &os = llvm::errs();
+  if (isConcrete()) {
+    getConcrete()->printName(os);
+  } else {
+    os << "abstract:" << getAbstract()->getName();
+  }
 }
 
 void swift::dump(const ArrayRef<Substitution> &subs) {

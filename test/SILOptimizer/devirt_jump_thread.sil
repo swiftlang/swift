@@ -247,7 +247,7 @@ bb2(%4 : $Int32):                                   // Preds: bb5 bb6
   %9 = tuple_extract %8 : $(Builtin.Int32, Builtin.Int1), 0 // user: %12
   %10 = tuple_extract %8 : $(Builtin.Int32, Builtin.Int1), 1 // user: %11
   cond_fail %10 : $Builtin.Int1                   // id: %11
-  dealloc_stack %60#0 : $*@local_storage Int32
+  dealloc_stack %60 : $*Int32
   %12 = struct $Int32 (%9 : $Builtin.Int32)          // user: %13
   return %12 : $Int32                               // id: %13
 

@@ -1018,8 +1018,7 @@ bool EscapeAnalysis::isPointer(ValueBase *V) {
   if (Iter != isPointerCache.end())
     return Iter->second;
 
-  bool IP = (Ty.isAddress() || Ty.isLocalStorage() ||
-             isOrContainsReference(Ty, M));
+  bool IP = (Ty.isAddress() || isOrContainsReference(Ty, M));
   isPointerCache[Ty] = IP;
   return IP;
 }
@@ -1564,14 +1563,8 @@ bool EscapeAnalysis::canEscapeTo(SILValue V, FullApplySite FAS) {
   return canEscapeToUsePoint(V, FAS.getInstruction(), ConGraph);
 }
 
-static bool isAddress(SILType T) {
-  // We include local storage, too. This makes it more tolerant for checking
-  // the #0 result of alloc_stack.
-  return T.isAddress() || T.isLocalStorage();
-}
-
 static bool hasReferenceSemantics(SILType T) {
-  // Exclude address and local storage types.
+  // Exclude address types.
   return T.isObject() && T.hasReferenceSemantics();
 }
 
@@ -1681,7 +1674,7 @@ bool EscapeAnalysis::canPointToSameMemory(SILValue V1, SILValue V2) {
 
   SILType T1 = V1.getType();
   SILType T2 = V2.getType();
-  if (isAddress(T1) && isAddress(T2)) {
+  if (T1.isAddress() && T2.isAddress()) {
     return Content1 == Content2;
   }
   if (hasReferenceSemantics(T1) && hasReferenceSemantics(T2)) {
@@ -1690,11 +1683,11 @@ bool EscapeAnalysis::canPointToSameMemory(SILValue V1, SILValue V2) {
   // As we model the ref_element_addr instruction as a content-relationship, we
   // have to go down one content level if just one of the values is a
   // ref-counted object.
-  if (isAddress(T1) && hasReferenceSemantics(T2)) {
+  if (T1.isAddress() && hasReferenceSemantics(T2)) {
     Content2 = ConGraph->getContentNode(Content2);
     return Content1 == Content2;
   }
-  if (isAddress(T2) && hasReferenceSemantics(T1)) {
+  if (T2.isAddress() && hasReferenceSemantics(T1)) {
     Content1 = ConGraph->getContentNode(Content1);
     return Content1 == Content2;
   }

@@ -490,7 +490,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::BOUND_GENERIC_SUBSTITUTION);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
-                              decls_block::NO_CONFORMANCE);
+                              decls_block::ABSTRACT_PROTOCOL_CONFORMANCE);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::NORMAL_PROTOCOL_CONFORMANCE);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
@@ -1039,8 +1039,6 @@ void Serializer::writeNormalConformance(
     data.push_back(addDeclRef(witness.getDecl()));
     assert(witness.getDecl() || req->getAttrs().hasAttribute<OptionalAttr>()
            || req->getAttrs().isUnavailable(req->getASTContext()));
-    // The substitution records are serialized later.
-    data.push_back(witness.getSubstitutions().size());
     ++numValueWitnesses;
   });
 
@@ -1087,11 +1085,6 @@ void Serializer::writeNormalConformance(
                      DeclTypeAbbrCodes);
   }
 
-  conformance->forEachValueWitness(nullptr,
-                                   [&](ValueDecl *req,
-                                       ConcreteDeclRef witness) {
-    writeSubstitutions(witness.getSubstitutions(), DeclTypeAbbrCodes);
-  });
   conformance->forEachTypeWitness(/*resolver=*/nullptr,
                                   [&](AssociatedTypeDecl *assocType,
                                       const Substitution &witness,
@@ -1102,16 +1095,24 @@ void Serializer::writeNormalConformance(
 }
 
 void
-Serializer::writeConformance(const ProtocolConformance *conformance,
+Serializer::writeConformance(ProtocolConformance *conformance,
+                             const std::array<unsigned, 256> &abbrCodes) {
+  writeConformance(ProtocolConformanceRef(conformance), abbrCodes);
+}
+
+void
+Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
                              const std::array<unsigned, 256> &abbrCodes) {
   using namespace decls_block;
 
-  if (!conformance) {
-    unsigned abbrCode = abbrCodes[NoConformanceLayout::Code];
-    NoConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode);
+  if (conformanceRef.isAbstract()) {
+    unsigned abbrCode = abbrCodes[AbstractProtocolConformanceLayout::Code];
+    AbstractProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                      addDeclRef(conformanceRef.getAbstract()));
     return;
   }
 
+  auto conformance = conformanceRef.getConcrete();
   switch (conformance->getKind()) {
   case ProtocolConformanceKind::Normal: {
     auto normal = cast<NormalProtocolConformance>(conformance);
@@ -1164,7 +1165,16 @@ Serializer::writeConformance(const ProtocolConformance *conformance,
 }
 
 void
-Serializer::writeConformances(ArrayRef<ProtocolConformance *> conformances,
+Serializer::writeConformances(ArrayRef<ProtocolConformanceRef> conformances,
+                              const std::array<unsigned, 256> &abbrCodes) {
+  using namespace decls_block;
+
+  for (auto conformance : conformances)
+    writeConformance(conformance, abbrCodes);
+}
+
+void
+Serializer::writeConformances(ArrayRef<ProtocolConformance*> conformances,
                               const std::array<unsigned, 256> &abbrCodes) {
   using namespace decls_block;
 
@@ -1183,7 +1193,6 @@ Serializer::writeSubstitutions(ArrayRef<Substitution> substitutions,
 
     BoundGenericSubstitutionLayout::emitRecord(
       Out, ScratchRecord, abbrCode,
-      addTypeRef(sub.getArchetype()),
       addTypeRef(sub.getReplacement()),
       sub.getConformances().size());
 
@@ -3273,7 +3282,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<XRefGenericParamPathPieceLayout>();
   registerDeclTypeAbbr<XRefInitializerPathPieceLayout>();
 
-  registerDeclTypeAbbr<NoConformanceLayout>();
+  registerDeclTypeAbbr<AbstractProtocolConformanceLayout>();
   registerDeclTypeAbbr<NormalProtocolConformanceLayout>();
   registerDeclTypeAbbr<SpecializedProtocolConformanceLayout>();
   registerDeclTypeAbbr<InheritedProtocolConformanceLayout>();
@@ -3694,8 +3703,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       hasLocalTypes = true;
 
       Mangle::Mangler DebugMangler(false);
-      DebugMangler.mangleType(TD->getDeclaredType(),
-                              ResilienceExpansion::Minimal, 0);
+      DebugMangler.mangleType(TD->getDeclaredType(), 0);
       auto MangledName = DebugMangler.finalize();
       assert(!MangledName.empty() && "Mangled type came back empty!");
       localTypeGenerator.insert(MangledName, {

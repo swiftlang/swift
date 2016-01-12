@@ -410,7 +410,7 @@ contain the following fields:
   not factored into tuple metadata uniquing.
 
 - The **element vector** begins at **offset 3** and consists of a vector of
-  type–offset pairs. The metadata for the *n*\ th element's type is a pointer
+  type-offset pairs. The metadata for the *n*\ th element's type is a pointer
   at **offset 3+2*n**. The offset in bytes from the beginning of the tuple to
   the beginning of the *n*\ th element is at **offset 3+2*n+1**.
 

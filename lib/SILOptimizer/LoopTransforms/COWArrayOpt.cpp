@@ -214,7 +214,7 @@ protected:
         continue;
       }
 
-      // An alloc_stack returns its address as the second value.
+      // An alloc_box returns its address as the second value.
       assert((PI.Aggregate == V || PI.Aggregate == SILValue(V, 1)) &&
              "Expected unary element addr inst.");
 
@@ -948,7 +948,8 @@ matchSelfParameterSetup(ArraySemanticsCall Call, LoadInst *Self,
   auto *ReleaseArray = dyn_cast_or_null<StrongReleaseInst>(getInstAfter(Call));
   if (!ReleaseArray && MayHaveBridgedObjectElementType)
     return false;
-  if (ReleaseArray && ReleaseArray->getOperand() != RetainArray->getOperand())
+  if (ReleaseArray && RetainArray &&
+      ReleaseArray->getOperand() != RetainArray->getOperand())
     return false;
 
   if (ReleaseArray)

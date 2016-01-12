@@ -88,7 +88,7 @@ private:
       // Skip superclass fields if superclass is resilient.
       // FIXME: Needs runtime support to ensure the field offset vector is
       // populated correctly.
-      if (!IGM.isResilient(superclassDecl, ResilienceScope::Component)) {
+      if (!IGM.isResilient(superclassDecl, ResilienceExpansion::Maximal)) {
         addClassMembers(superclass->getClassOrBoundGenericClass());
       }
     }

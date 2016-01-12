@@ -265,11 +265,16 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
   eqDecl->setAccessibility(std::max(enumDecl->getFormalAccess(),
                                     Accessibility::Internal));
 
+  // If the enum was not imported, the derived conformance is either from the
+  // enum itself or an extension, in which case we will emit the declaration
+  // normally.
   if (enumDecl->hasClangNode())
-    tc.implicitlyDefinedFunctions.push_back(eqDecl);
+    tc.Context.addExternalDecl(eqDecl);
   
   // Since it's an operator we insert the decl after the type at global scope.
-  return insertOperatorDecl(C, cast<IterableDeclContext>(parentDecl), eqDecl);
+  insertOperatorDecl(C, cast<IterableDeclContext>(parentDecl), eqDecl);
+
+  return eqDecl;
 }
 
 ValueDecl *DerivedConformance::deriveEquatable(TypeChecker &tc,
@@ -396,8 +401,11 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
   getterDecl->setInterfaceType(interfaceType);
   getterDecl->setAccessibility(enumDecl->getFormalAccess());
 
+  // If the enum was not imported, the derived conformance is either from the
+  // enum itself or an extension, in which case we will emit the declaration
+  // normally.
   if (enumDecl->hasClangNode())
-    tc.implicitlyDefinedFunctions.push_back(getterDecl);
+    tc.Context.addExternalDecl(getterDecl);
   
   // Create the property.
   VarDecl *hashValueDecl = new (C) VarDecl(/*static*/ false,

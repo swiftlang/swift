@@ -1614,16 +1614,8 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, DeclContext *DC,
     else
       CoercionType = tupleTy->getElement(i).getType();
     
-    // If the tuple pattern had a label for the tuple element, it must match
-    // the label for the tuple type being matched.
-    auto argName = param->getArgumentName();
-    if (!hadError && !argName.empty() &&
-        argName != tupleTy->getElement(i).getName()) {
-      diagnose(param->getArgumentNameLoc(),
-               diag::tuple_pattern_label_mismatch,
-               argName, tupleTy->getElement(i).getName());
-      hadError = true;
-    }
+    assert(param->getArgumentName().empty() &&
+           "Closures cannot have API names");
     
     hadError |= handleParameter(param, CoercionType);
     assert(!param->isDefaultArgument() && "Closures cannot have default args");

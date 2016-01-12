@@ -35,16 +35,6 @@ using namespace Lowering;
 // SILInstruction Subclasses
 //===----------------------------------------------------------------------===//
 
-// alloc_stack always returns two results: Builtin.RawPointer & LValue[EltTy]
-static SILTypeList *getAllocStackType(SILType eltTy, SILFunction &F) {
-  SILType resTys[] = {
-    eltTy.getLocalStorageType(),
-    eltTy.getAddressType()
-  };
-
-  return F.getModule().getSILTypeList(resTys);
-}
-
 template <typename INST>
 static void *allocateDebugVarCarryingInst(SILModule &M, SILDebugVariable Var) {
   return M.allocateInst(sizeof(INST) + Var.Name.size(), alignof(INST));
@@ -65,7 +55,7 @@ StringRef TailAllocatedDebugVariable::getName(const char *buf) const {
 AllocStackInst::AllocStackInst(SILDebugLocation *Loc, SILType elementType,
                                SILFunction &F, SILDebugVariable Var)
     : AllocationInst(ValueKind::AllocStackInst, Loc,
-                     getAllocStackType(elementType, F)),
+                     elementType.getAddressType()),
       VarInfo(Var, reinterpret_cast<char *>(this + 1)) {}
 
 AllocStackInst *AllocStackInst::create(SILDebugLocation *Loc,
@@ -161,7 +151,7 @@ static SILTypeList *getAllocExistentialBoxType(SILType ExistTy,
 
 AllocExistentialBoxInst::AllocExistentialBoxInst(
     SILDebugLocation *Loc, SILType ExistentialType, CanType ConcreteType,
-    SILType ConcreteLoweredType, ArrayRef<ProtocolConformance *> Conformances,
+    SILType ConcreteLoweredType, ArrayRef<ProtocolConformanceRef> Conformances,
     SILFunction *Parent)
     : AllocationInst(ValueKind::AllocExistentialBoxInst, Loc,
                      getAllocExistentialBoxType(ExistentialType,
@@ -169,8 +159,9 @@ AllocExistentialBoxInst::AllocExistentialBoxInst(
       ConcreteType(ConcreteType), Conformances(Conformances) {}
 
 static void declareWitnessTable(SILModule &Mod,
-                                ProtocolConformance *C) {
-  if (!C) return;
+                                ProtocolConformanceRef conformanceRef) {
+  if (conformanceRef.isAbstract()) return;
+  auto C = conformanceRef.getConcrete();
   if (!Mod.lookUpWitnessTable(C, false).first)
     Mod.createWitnessTableDeclaration(C,
         TypeConverter::getLinkageForProtocolConformance(
@@ -180,12 +171,12 @@ static void declareWitnessTable(SILModule &Mod,
 
 AllocExistentialBoxInst *AllocExistentialBoxInst::create(
     SILDebugLocation *Loc, SILType ExistentialType, CanType ConcreteType,
-    SILType ConcreteLoweredType, ArrayRef<ProtocolConformance *> Conformances,
+    SILType ConcreteLoweredType, ArrayRef<ProtocolConformanceRef> Conformances,
     SILFunction *F) {
   SILModule &Mod = F->getModule();
   void *Buffer = Mod.allocateInst(sizeof(AllocExistentialBoxInst),
                                   alignof(AllocExistentialBoxInst));
-  for (ProtocolConformance *C : Conformances)
+  for (ProtocolConformanceRef C : Conformances)
     declareWitnessTable(Mod, C);
   return ::new (Buffer) AllocExistentialBoxInst(Loc,
                                                 ExistentialType,
@@ -310,9 +301,18 @@ void FunctionRefInst::dropReferencedFunction() {
   Function = nullptr;
 }
 
-GlobalAddrInst::GlobalAddrInst(SILDebugLocation *Loc, SILGlobalVariable *Global)
+AllocGlobalInst::AllocGlobalInst(SILDebugLocation *Loc,
+                                 SILGlobalVariable *Global)
+    : SILInstruction(ValueKind::AllocGlobalInst, Loc),
+      Global(Global) {}
+
+AllocGlobalInst::AllocGlobalInst(SILDebugLocation *Loc)
+    : SILInstruction(ValueKind::AllocGlobalInst, Loc) {}
+
+GlobalAddrInst::GlobalAddrInst(SILDebugLocation *Loc,
+                               SILGlobalVariable *Global)
     : LiteralInst(ValueKind::GlobalAddrInst, Loc,
-                  Global->getLoweredType().getAddressType()),
+              Global->getLoweredType().getAddressType()),
       Global(Global) {}
 
 GlobalAddrInst::GlobalAddrInst(SILDebugLocation *Loc, SILType Ty)
@@ -1229,7 +1229,7 @@ TypeConverter::getLinkageForProtocolConformance(const NormalProtocolConformance 
 /// deserialize the actual function definition if we need to.
 WitnessMethodInst *
 WitnessMethodInst::create(SILDebugLocation *Loc, CanType LookupType,
-                          ProtocolConformance *Conformance, SILDeclRef Member,
+                          ProtocolConformanceRef Conformance, SILDeclRef Member,
                           SILType Ty, SILFunction *F,
                           SILValue OpenedExistential, bool Volatile) {
   SILModule &Mod = F->getModule();
@@ -1243,12 +1243,12 @@ WitnessMethodInst::create(SILDebugLocation *Loc, CanType LookupType,
 
 InitExistentialAddrInst *InitExistentialAddrInst::create(
     SILDebugLocation *Loc, SILValue Existential, CanType ConcreteType,
-    SILType ConcreteLoweredType, ArrayRef<ProtocolConformance *> Conformances,
+    SILType ConcreteLoweredType, ArrayRef<ProtocolConformanceRef> Conformances,
     SILFunction *F) {
   SILModule &Mod = F->getModule();
   void *Buffer = Mod.allocateInst(sizeof(InitExistentialAddrInst),
                                   alignof(InitExistentialAddrInst));
-  for (ProtocolConformance *C : Conformances)
+  for (ProtocolConformanceRef C : Conformances)
     declareWitnessTable(Mod, C);
   return ::new (Buffer) InitExistentialAddrInst(Loc, Existential,
                                             ConcreteType,
@@ -1259,17 +1259,13 @@ InitExistentialAddrInst *InitExistentialAddrInst::create(
 InitExistentialRefInst *
 InitExistentialRefInst::create(SILDebugLocation *Loc, SILType ExistentialType,
                                CanType ConcreteType, SILValue Instance,
-                               ArrayRef<ProtocolConformance *> Conformances,
+                               ArrayRef<ProtocolConformanceRef> Conformances,
                                SILFunction *F) {
   SILModule &Mod = F->getModule();
   void *Buffer = Mod.allocateInst(sizeof(InitExistentialRefInst),
                                   alignof(InitExistentialRefInst));
-  for (ProtocolConformance *C : Conformances) {
-    if (!C)
-      continue;
-    if (!Mod.lookUpWitnessTable(C, false).first)
-      declareWitnessTable(Mod, C);
-  }
+  for (ProtocolConformanceRef C : Conformances)
+    declareWitnessTable(Mod, C);
 
   return ::new (Buffer) InitExistentialRefInst(Loc, ExistentialType,
                                                ConcreteType,
@@ -1279,41 +1275,36 @@ InitExistentialRefInst::create(SILDebugLocation *Loc, SILType ExistentialType,
 
 InitExistentialMetatypeInst::InitExistentialMetatypeInst(
     SILDebugLocation *Loc, SILType existentialMetatypeType, SILValue metatype,
-    ArrayRef<ProtocolConformance *> conformances)
+    ArrayRef<ProtocolConformanceRef> conformances)
     : UnaryInstructionBase(Loc, metatype, existentialMetatypeType),
-      LastConformance(nullptr) {
+      NumConformances(conformances.size()) {
   if (conformances.empty())
     return;
-  auto **offset = reinterpret_cast<ProtocolConformance **>(this + 1);
+  auto offset = reinterpret_cast<ProtocolConformanceRef*>(this + 1);
   memcpy(offset, &conformances[0],
-         conformances.size() * sizeof(ProtocolConformance *));
-  LastConformance = &offset[conformances.size() - 1];
+         conformances.size() * sizeof(ProtocolConformanceRef));
 }
 
 InitExistentialMetatypeInst *InitExistentialMetatypeInst::create(
     SILDebugLocation *Loc, SILType existentialMetatypeType, SILValue metatype,
-    ArrayRef<ProtocolConformance *> conformances, SILFunction *F) {
+    ArrayRef<ProtocolConformanceRef> conformances, SILFunction *F) {
   SILModule &M = F->getModule();
   unsigned size = sizeof(InitExistentialMetatypeInst);
-  size += conformances.size() * sizeof(ProtocolConformance *);
+  size += conformances.size() * sizeof(ProtocolConformanceRef);
 
   void *buffer = M.allocateInst(size, alignof(InitExistentialMetatypeInst));
-  for (ProtocolConformance *conformance : conformances)
-    if (!M.lookUpWitnessTable(conformance, false).first)
-      declareWitnessTable(M, conformance);
+  for (ProtocolConformanceRef conformance : conformances)
+    declareWitnessTable(M, conformance);
 
   return ::new (buffer) InitExistentialMetatypeInst(
       Loc, existentialMetatypeType, metatype, conformances);
 }
 
-ArrayRef<ProtocolConformance *>
+ArrayRef<ProtocolConformanceRef>
 InitExistentialMetatypeInst::getConformances() const {
-  if (!LastConformance)
-    return ArrayRef<ProtocolConformance *>();
   // The first conformance is going to be at *this[1];
-  auto **FirstConformance = reinterpret_cast<ProtocolConformance **>(
-      const_cast<InitExistentialMetatypeInst *>(this) + 1);
+  auto *FirstConformance =
+    reinterpret_cast<ProtocolConformanceRef const *>(this + 1);
   // Construct the protocol conformance list from the range of our conformances.
-  return ArrayRef<ProtocolConformance *>(FirstConformance,
-                                         LastConformance.get() + 1);
+  return ArrayRef<ProtocolConformanceRef>(FirstConformance, NumConformances);
 }

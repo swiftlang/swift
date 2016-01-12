@@ -479,7 +479,6 @@ static std::string mangleConstant(SILDeclRef c, StringRef prefix) {
     if (!c.hasDecl()) {
       mangler.append(introducer);
       mangler.mangleClosureEntity(c.getAbstractClosureExpr(),
-                                  c.getResilienceExpansion(),
                                   c.uncurryLevel);
       return mangler.finalize();
     }
@@ -522,7 +521,7 @@ static std::string mangleConstant(SILDeclRef c, StringRef prefix) {
     }
 
     mangler.append(introducer);
-    mangler.mangleEntity(c.getDecl(), c.getResilienceExpansion(), c.uncurryLevel);
+    mangler.mangleEntity(c.getDecl(), c.uncurryLevel);
     return mangler.finalize();
 
   //   entity ::= context 'D'                     // deallocating destructor
@@ -544,7 +543,6 @@ static std::string mangleConstant(SILDeclRef c, StringRef prefix) {
     mangler.append(introducer);
     mangler.mangleConstructorEntity(cast<ConstructorDecl>(c.getDecl()),
                                     /*allocating*/ true,
-                                    c.getResilienceExpansion(),
                                     c.uncurryLevel);
     return mangler.finalize();
 
@@ -553,7 +551,6 @@ static std::string mangleConstant(SILDeclRef c, StringRef prefix) {
     mangler.append(introducer);
     mangler.mangleConstructorEntity(cast<ConstructorDecl>(c.getDecl()),
                                     /*allocating*/ false,
-                                    c.getResilienceExpansion(),
                                     c.uncurryLevel);
     return mangler.finalize();
 

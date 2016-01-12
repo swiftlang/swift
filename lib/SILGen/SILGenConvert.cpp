@@ -158,8 +158,7 @@ getOptionalSomeValue(SILLocation loc, ManagedValue value,
 static Substitution getSimpleSubstitution(GenericParamList &generics,
                                           CanType typeArg) {
   assert(generics.getParams().size() == 1);
-  auto typeParamDecl = generics.getParams().front();
-  return Substitution{typeParamDecl->getArchetype(), typeArg, {}};
+  return Substitution{typeArg, {}};
 }
 
 /// Create the correct substitution for calling the given function at
@@ -418,11 +417,11 @@ ManagedValue SILGenFunction::emitExistentialErasure(
                             CanType concreteFormalType,
                             const TypeLowering &concreteTL,
                             const TypeLowering &existentialTL,
-                            const ArrayRef<ProtocolConformance *> &conformances,
+                            ArrayRef<ProtocolConformanceRef> conformances,
                             SGFContext C,
                             llvm::function_ref<ManagedValue (SGFContext)> F) {
   // Mark the needed conformances as used.
-  for (auto *conformance : conformances)
+  for (auto conformance : conformances)
     SGM.useConformance(conformance);
 
   switch (existentialTL.getLoweredType().getObjectType()

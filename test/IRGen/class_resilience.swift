@@ -37,6 +37,7 @@ public class ClassWithResilientProperty {
   }
 }
 
+
 // Concrete class with non-fixed size stored property
 
 public class ClassWithResilientlySizedProperty {

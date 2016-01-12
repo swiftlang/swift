@@ -1,3 +1,0 @@
-// RUN: not --crash %target-sil-opt %s
-// REQUIRES: asserts
-enum n{func p<p{p<@convention()>

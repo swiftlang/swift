@@ -407,13 +407,13 @@ sil @release_not_constructed : $@convention(thin) () -> () {
 bb0:  // CHECK: bb0:
   %3 = alloc_stack $SomeClass
   // CHECK-NEXT: alloc_stack
-  %c = mark_uninitialized [var] %3#1 : $*SomeClass
+  %c = mark_uninitialized [var] %3 : $*SomeClass
 
 
   // This should get removed.
   destroy_addr %c : $*SomeClass
 
-  dealloc_stack %3#0 : $*@local_storage SomeClass
+  dealloc_stack %3 : $*SomeClass
   // CHECK-NEXT: dealloc_stack
 
    // CHECK-NEXT: tuple ()
@@ -426,7 +426,7 @@ sil @release_some_constructed : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   %b = alloc_stack $(SomeClass, SomeClass)
-  %1 = mark_uninitialized [var] %b#1 : $*(SomeClass, SomeClass)
+  %1 = mark_uninitialized [var] %b : $*(SomeClass, SomeClass)
 
   %2 = function_ref @getSomeClass : $@convention(thin) () -> @owned SomeClass
   %3 = apply %2() : $@convention(thin) () -> @owned SomeClass
@@ -441,7 +441,7 @@ bb0:
   destroy_addr %1 : $*(SomeClass, SomeClass)
   
   // CHECK-NEXT: dealloc_stack
-  dealloc_stack %b#0 : $*@local_storage (SomeClass, SomeClass)
+  dealloc_stack %b : $*(SomeClass, SomeClass)
   %8 = tuple ()
   return %8 : $()
 }
@@ -453,7 +453,7 @@ bb0:
 sil @init_existential_with_class : $@convention(thin) (@inout C) -> () {
 entry(%a : $*C):
   %p = alloc_stack $P
-  %b = mark_uninitialized [var] %p#1 : $*P
+  %b = mark_uninitialized [var] %p : $*P
 
   %q = init_existential_addr %b : $*P, $C
   
@@ -461,7 +461,7 @@ entry(%a : $*C):
   copy_addr %a to [initialization] %q : $*C
   %u = function_ref @use : $@convention(thin) (@in P) -> ()
   %v = apply %u(%b) : $@convention(thin) (@in P) -> ()
-  dealloc_stack %p#0 : $*@local_storage P
+  dealloc_stack %p : $*P
   %z = tuple ()
   return %z : $()
 }
@@ -474,11 +474,11 @@ entry(%a : $*C):
 sil @conditional_init : $@convention(thin) (Bool) -> () {
 bb0(%0 : $Bool):
   %2 = alloc_stack $SomeClass
-  %3 = mark_uninitialized [var] %2#1 : $*SomeClass
+  %3 = mark_uninitialized [var] %2 : $*SomeClass
 
 // CHECK: [[CONTROL:%[0-9]+]] = alloc_stack $Builtin.Int1
 // CHECK: [[ZERO:%[0-9]+]] = integer_literal $Builtin.Int1, 0
-// CHECK: store [[ZERO]] to [[CONTROL]]#1 : $*Builtin.Int1
+// CHECK: store [[ZERO]] to [[CONTROL]] : $*Builtin.Int1
   %5 = integer_literal $Builtin.Int1, 1
   cond_br %5, bb1, bb2
 
@@ -486,7 +486,7 @@ bb1:
 // CHECK: bb1:
 // CHECK: function_ref @getSomeClass
 // CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
-// CHECK: store [[ONE]] to [[CONTROL]]#1 : $*Builtin.Int1
+// CHECK: store [[ONE]] to [[CONTROL]] : $*Builtin.Int1
   %f = function_ref @getSomeClass : $@convention(thin) () -> @owned SomeClass
   %6 = apply %f() : $@convention(thin) () -> @owned SomeClass
   assign %6 to %3 : $*SomeClass
@@ -494,7 +494,7 @@ bb1:
 
 bb2:
   destroy_addr %3 : $*SomeClass
-  dealloc_stack %2#0 : $*@local_storage SomeClass
+  dealloc_stack %2 : $*SomeClass
   %14 = tuple ()
   return %14 : $()
 }
@@ -507,7 +507,7 @@ bb0(%0 : $Builtin.Int1):
   // CHECK: integer_literal $Builtin.Int1, 0
   // CHECK: store
   %5 = alloc_stack $SomeClass
-  %6 = mark_uninitialized [var] %5#1 : $*SomeClass
+  %6 = mark_uninitialized [var] %5 : $*SomeClass
   cond_br %0, bb1, bb2
 
 bb1:
@@ -542,7 +542,7 @@ bb2:
 
   assign %17 to %6 : $*SomeClass                // id: %18
   destroy_addr %6 : $*SomeClass                 // id: %19
-  dealloc_stack %5#0 : $*@local_storage SomeClass // id: %20
+  dealloc_stack %5 : $*SomeClass // id: %20
   %23 = tuple ()                                  // user: %24
   return %23 : $()                                // id: %24
 }
@@ -672,14 +672,14 @@ struct MyStruct : P {}
 sil @self_init_assert_instruction : $@convention(thin) (Int, @thin MyStruct.Type) -> MyStruct {
   bb0(%0 : $Int, %1 : $@thin MyStruct.Type):
     %2 = alloc_stack $MyStruct, var, name "sf"         // users: %3, %10
-     %3 = mark_uninitialized [delegatingself] %2#1 : $*MyStruct // users: %8, %9
+     %3 = mark_uninitialized [delegatingself] %2 : $*MyStruct // users: %8, %9
      debug_value %0 : $Int, let, name "i" // id: %4
 
      %6 = function_ref @selfinit : $@convention(thin) () -> MyStruct
        %7 = apply %6() : $@convention(thin) () -> MyStruct
                          assign %7 to %3 : $*MyStruct
                          %9 = load %3 : $*MyStruct
-                         dealloc_stack %2#0 : $*@local_storage MyStruct
+                         dealloc_stack %2 : $*MyStruct
                          return %9 : $MyStruct
 }
 
@@ -699,23 +699,23 @@ sil @selfinit_delegate : $@convention(thin) (@out MyStruct2, @thin MyStruct2.Typ
     bb0(%0 : $*MyStruct2, %1 : $@thin MyStruct2.Type):
       // CHECK: [[SELF:%[0-9]+]] = alloc_stack $MyStruct2
       %2 = alloc_stack $MyStruct2, var, name "sf"
-       %3 = mark_uninitialized [delegatingself] %2#1 : $*MyStruct2
+       %3 = mark_uninitialized [delegatingself] %2 : $*MyStruct2
        %6 = metatype $@thin MyStruct2.Type
        %7 = function_ref @selfinit_delegate : $@convention(thin) (@out MyStruct2, @thin MyStruct2.Type) -> ()
        %8 = alloc_stack $MyStruct2
 
        // Make sure this copy_addr ends up being an initialization.
-       apply %7(%8#1, %6) : $@convention(thin) (@out MyStruct2, @thin MyStruct2.Type) -> ()
-  copy_addr [take] %8#1 to %3 : $*MyStruct2
-  dealloc_stack %8#0 : $*@local_storage MyStruct2
+       apply %7(%8, %6) : $@convention(thin) (@out MyStruct2, @thin MyStruct2.Type) -> ()
+  copy_addr [take] %8 to %3 : $*MyStruct2
+  dealloc_stack %8 : $*MyStruct2
 
   // CHECK: apply
-  // CHECK-NEXT: copy_addr [take] {{.*}} to [initialization] [[SELF]]#1 : $*MyStruct2
+  // CHECK-NEXT: copy_addr [take] {{.*}} to [initialization] [[SELF]] : $*MyStruct2
   // CHECK-NEXT: dealloc_stack
 
   copy_addr [take] %3 to [initialization] %0 : $*MyStruct2
   %13 = tuple ()
-  dealloc_stack %2#0 : $*@local_storage MyStruct2
+  dealloc_stack %2 : $*MyStruct2
   return %13 : $()
 }
 
@@ -770,7 +770,7 @@ bb0(%0 : $RootClassWithNontrivialStoredProperties):
 // CHECK: bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
 // CHECK-NEXT: [[SELFBOX:%[0-9]+]] = alloc_stack
 // CHECK-NEXT: store
-// CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELFBOX]]#1
+// CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELFBOX]]
 // CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thick DerivedClassWithNontrivialStoredProperties.Type
 // CHECK-NEXT: dealloc_partial_ref [[SELF]] : $DerivedClassWithNontrivialStoredProperties, [[METATYPE]] : $@thick DerivedClassWithNontrivialStoredProperties.Type
 // CHECK-NEXT: dealloc_stack [[SELFBOX]]
@@ -778,11 +778,11 @@ bb0(%0 : $RootClassWithNontrivialStoredProperties):
 sil @test_derived_release : $@convention(method) (@owned DerivedClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
   %1 = alloc_stack $DerivedClassWithNontrivialStoredProperties
-  %4 = mark_uninitialized [derivedself] %1#1 : $*DerivedClassWithNontrivialStoredProperties
+  %4 = mark_uninitialized [derivedself] %1 : $*DerivedClassWithNontrivialStoredProperties
   store %0 to %4 : $*DerivedClassWithNontrivialStoredProperties
 
   destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties
-  dealloc_stack %1#0 : $*@local_storage DerivedClassWithNontrivialStoredProperties
+  dealloc_stack %1 : $*DerivedClassWithNontrivialStoredProperties
 
   %13 = tuple ()
   return %13 : $()
@@ -794,13 +794,13 @@ bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
 // CHECK-NEXT: [[SELFBOX:%[0-9]+]] = alloc_stack
 // CHECK-NEXT: store
 // CHECK-NEXT: alloc_ref
-// CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELFBOX]]#1
+// CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELFBOX]]
 // CHECK-NEXT: ref_element_addr [[SELF]]
 // CHECK-NEXT: store
-// CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELFBOX]]#1
+// CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELFBOX]]
 // CHECK-NEXT: ref_element_addr [[SELF]]
 // CHECK-NEXT: destroy_addr
-// CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELFBOX]]#1
+// CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELFBOX]]
 // CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thick DerivedClassWithNontrivialStoredProperties.Type
 // CHECK-NEXT: dealloc_partial_ref [[SELF]] : $DerivedClassWithNontrivialStoredProperties, [[METATYPE]] : $@thick DerivedClassWithNontrivialStoredProperties.Type
 // CHECK-NEXT: dealloc_stack [[SELFBOX]]
@@ -808,7 +808,7 @@ bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
 sil @test_derived_partial_release : $@convention(method) (@owned DerivedClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
   %1 = alloc_stack $DerivedClassWithNontrivialStoredProperties
-  %4 = mark_uninitialized [derivedself] %1#1 : $*DerivedClassWithNontrivialStoredProperties
+  %4 = mark_uninitialized [derivedself] %1 : $*DerivedClassWithNontrivialStoredProperties
   store %0 to %4 : $*DerivedClassWithNontrivialStoredProperties
 
   %8 = alloc_ref $SomeClass
@@ -817,7 +817,7 @@ bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
   assign %8 to %10 : $*SomeClass
 
   destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties
-  dealloc_stack %1#0 : $*@local_storage DerivedClassWithNontrivialStoredProperties
+  dealloc_stack %1 : $*DerivedClassWithNontrivialStoredProperties
 
   %13 = tuple ()
   return %13 : $()
@@ -869,19 +869,19 @@ bb0(%0 : $RootClassWithNontrivialStoredProperties):
 // CHECK-LABEL: sil @test_delegating_derived_release
 // CHECK: bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
 // CHECK-NEXT: [[SELFBOX:%[0-9]+]] = alloc_stack $DerivedClassWithNontrivialStoredProperties
-// CHECK-NEXT: store %0 to [[SELFBOX]]#1
-// CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELFBOX]]#1
+// CHECK-NEXT: store %0 to [[SELFBOX]]
+// CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELFBOX]]
 // CHECK-NEXT: [[METATYPE:%[0-9]+]] = value_metatype $@thick DerivedClassWithNontrivialStoredProperties.Type, [[SELF]] : $DerivedClassWithNontrivialStoredProperties
 // CHECK-NEXT: dealloc_partial_ref [[SELF]] : $DerivedClassWithNontrivialStoredProperties, [[METATYPE]] : $@thick DerivedClassWithNontrivialStoredProperties.Type
-// CHECK-NEXT: dealloc_stack [[SELFBOX]]#0
+// CHECK-NEXT: dealloc_stack [[SELFBOX]]
 sil @test_delegating_derived_release : $@convention(method) (@owned DerivedClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
   %2 = alloc_stack $DerivedClassWithNontrivialStoredProperties
-  %4 = mark_uninitialized [delegatingself] %2#1 : $*DerivedClassWithNontrivialStoredProperties
+  %4 = mark_uninitialized [delegatingself] %2 : $*DerivedClassWithNontrivialStoredProperties
   store %0 to %4 : $*DerivedClassWithNontrivialStoredProperties
 
   destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties 
-  dealloc_stack %2#0 : $*@local_storage DerivedClassWithNontrivialStoredProperties
+  dealloc_stack %2 : $*DerivedClassWithNontrivialStoredProperties
 
   %13 = tuple ()
   return %13 : $()
@@ -937,7 +937,7 @@ bb0(%0 : $Builtin.Int1):
 // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_stack $MyStruct3
 
   %2 = alloc_stack $MyStruct3
-  %3 = mark_uninitialized [delegatingself] %2#1 : $*MyStruct3
+  %3 = mark_uninitialized [delegatingself] %2 : $*MyStruct3
 
 // CHECK:  cond_br %0, [[SUCCESS:bb[0-9]+]], [[EXIT:bb[0-9]+]]
   cond_br %0, bb1, bb2
@@ -950,8 +950,8 @@ bb1:
 
 // CHECK: [[NEW_SELF:%[0-9]+]] = apply {{.*}}()  : $@convention(thin) () -> @owned MyStruct3
 // CHECK-NEXT:  [[SET:%[0-9]+]] = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT:  store [[SET]] to [[CONTROL]]#1 : $*Builtin.Int1
-// CHECK-NEXT:  store [[NEW_SELF]] to [[SELF_BOX]]#1 : $*MyStruct3
+// CHECK-NEXT:  store [[SET]] to [[CONTROL]] : $*Builtin.Int1
+// CHECK-NEXT:  store [[NEW_SELF]] to [[SELF_BOX]] : $*MyStruct3
 
 // CHECK-NEXT:  br [[CHECK:bb[0-9]+]]
   br bb2
@@ -959,11 +959,11 @@ bb1:
 // CHECK: [[CHECK]]:
 bb2:
 
-// CHECK-NEXT:  [[BIT:%[0-9]+]] = load [[CONTROL]]#1 : $*Builtin.Int1
+// CHECK-NEXT:  [[BIT:%[0-9]+]] = load [[CONTROL]] : $*Builtin.Int1
 // CHECK-NEXT:  cond_br [[BIT]], [[INITIALIZED:bb[0-9]+]], [[UNINITIALIZED:bb[0-9]+]]
 
 // CHECK: [[INITIALIZED]]:
-// CHECK-NEXT:  destroy_addr [[SELF_BOX]]#1 : $*MyStruct3
+// CHECK-NEXT:  destroy_addr [[SELF_BOX]] : $*MyStruct3
 // CHECK-NEXT:  br [[EXIT:bb[0-9]+]]
 
 // CHECK: [[UNINITIALIZED]]:
@@ -972,7 +972,7 @@ bb2:
 // CHECK: [[EXIT]]:
 
   destroy_addr %3 : $*MyStruct3
-  dealloc_stack %2#0 : $*@local_storage MyStruct3
+  dealloc_stack %2 : $*MyStruct3
   %15 = tuple ()
   return %15 : $()
 }
@@ -990,7 +990,7 @@ bb0(%0 : $Builtin.Int1):
 // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_stack $MyClass3
 
   %2 = alloc_stack $MyClass3
-  %3 = mark_uninitialized [delegatingself] %2#1 : $*MyClass3
+  %3 = mark_uninitialized [delegatingself] %2 : $*MyClass3
 
 // CHECK:  cond_br %0, [[SUCCESS:bb[0-9]+]], [[EXIT:bb[0-9]+]]
   cond_br %0, bb1, bb2
@@ -1003,9 +1003,9 @@ bb1:
   store %6 to %3 : $*MyClass3
 
 // CHECK:  [[SET:%[0-9]+]] = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT:  store [[SET]] to [[CONTROL]]#1 : $*Builtin.Int1
+// CHECK-NEXT:  store [[SET]] to [[CONTROL]] : $*Builtin.Int1
 // CHECK: [[NEW_SELF:%[0-9]+]] = apply {{.*}}({{.*}})  : $@convention(thin) (@owned MyClass3) -> @owned MyClass3
-// CHECK-NEXT:  store [[NEW_SELF]] to [[SELF_BOX]]#1 : $*MyClass3
+// CHECK-NEXT:  store [[NEW_SELF]] to [[SELF_BOX]] : $*MyClass3
 
 // CHECK-NEXT:  br [[CHECK:bb[0-9]+]]
   br bb2
@@ -1013,15 +1013,15 @@ bb1:
 // CHECK: [[CHECK]]:
 bb2:
 
-// CHECK-NEXT:  [[BIT:%[0-9]+]] = load [[CONTROL]]#1 : $*Builtin.Int1
+// CHECK-NEXT:  [[BIT:%[0-9]+]] = load [[CONTROL]] : $*Builtin.Int1
 // CHECK-NEXT:  cond_br [[BIT]], [[INITIALIZED:bb[0-9]+]], [[UNINITIALIZED:bb[0-9]+]]
 
 // CHECK: [[INITIALIZED]]:
-// CHECK-NEXT:  destroy_addr [[SELF_BOX]]#1 : $*MyClass3
+// CHECK-NEXT:  destroy_addr [[SELF_BOX]] : $*MyClass3
 // CHECK-NEXT:  br [[EXIT:bb[0-9]+]]
 
 // CHECK: [[UNINITIALIZED]]:
-// CHECK-NEXT:  [[OLD_SELF:%[0-9]+]] = load [[SELF_BOX]]#1 : $*MyClass3
+// CHECK-NEXT:  [[OLD_SELF:%[0-9]+]] = load [[SELF_BOX]] : $*MyClass3
 // CHECK-NEXT:  [[METATYPE:%[0-9]+]] = value_metatype $@thick MyClass3.Type, [[OLD_SELF]] : $MyClass3
 // CHECK-NEXT:  dealloc_partial_ref [[OLD_SELF]] : $MyClass3, [[METATYPE]] : $@thick MyClass3.Type
 // CHECK-NEXT:  br [[EXIT]]
@@ -1029,7 +1029,7 @@ bb2:
 // CHECK: [[EXIT]]:
 
   destroy_addr %3 : $*MyClass3
-  dealloc_stack %2#0 : $*@local_storage MyClass3
+  dealloc_stack %2 : $*MyClass3
   %7 = tuple ()
   return %7 : $()
 }

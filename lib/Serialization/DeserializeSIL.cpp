@@ -841,7 +841,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       operand = getLocalValue(ValID, ValResNum,
                          getSILType(Ty2, (SILValueCategory)TyCategory2));
 
-    SmallVector<ProtocolConformance*, 2> conformances;
+    SmallVector<ProtocolConformanceRef, 2> conformances;
     while (NumConformances--) {
       auto conformance = MF->readConformance(SILCursor);
       conformances.push_back(conformance);
@@ -1030,6 +1030,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     
     ResultVal = Builder.createBuiltin(Loc, Name, ResultTy, Substitutions,
                                       Args);
+    break;
+  }
+  case ValueKind::AllocGlobalInst: {
+    // Format: Name and type. Use SILOneOperandLayout.
+    Identifier Name = MF->getIdentifier(ValID);
+
+    // Find the global variable.
+    SILGlobalVariable *g = getGlobalForReference(Name.str());
+    assert(g && "Can't deserialize global variable");
+
+    ResultVal = Builder.createAllocGlobal(Loc, g);
     break;
   }
   case ValueKind::GlobalAddrInst: {
@@ -1632,7 +1643,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILType OperandTy = getSILType(MF->getType(TyID2),
                                    (SILValueCategory)TyCategory2);
 
-    auto *Conformance = MF->readConformance(SILCursor);
+    auto Conformance = MF->readConformance(SILCursor);
     // Read the optional opened existential.
     SILValue ExistentialOperand;
     if (TyID3) {
@@ -2004,7 +2015,7 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
 
   // Deserialize Conformance.
   auto theConformance = cast<NormalProtocolConformance>(
-                          MF->readConformance(SILCursor));
+                          MF->readConformance(SILCursor).getConcrete());
 
   if (!existingWt)
     existingWt = SILMod.lookUpWitnessTable(theConformance, false).first;
@@ -2055,7 +2066,7 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
       ProtocolDecl *proto = cast<ProtocolDecl>(MF->getDecl(protoId));
       auto conformance = MF->readConformance(SILCursor);
       witnessEntries.push_back(SILWitnessTable::BaseProtocolWitness{
-        proto, conformance
+        proto, conformance.getConcrete()
       });
     } else if (kind == SIL_WITNESS_ASSOC_PROTOCOL) {
       DeclID assocId, protoId;
@@ -2063,7 +2074,8 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
       ProtocolDecl *proto = cast<ProtocolDecl>(MF->getDecl(protoId));
       auto conformance = MF->readConformance(SILCursor);
       witnessEntries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
-        cast<AssociatedTypeDecl>(MF->getDecl(assocId)), proto, conformance
+        cast<AssociatedTypeDecl>(MF->getDecl(assocId)), proto,
+        conformance
       });
     } else if (kind == SIL_WITNESS_ASSOC_ENTRY) {
       DeclID assocId;

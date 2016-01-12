@@ -71,7 +71,7 @@ entry(%s : $CP):
   // CHECK: [[U1:%.*]] = alloca [[UREF:{ %swift.unowned, i8.. }]], align 8
   // CHECK: [[U2:%.*]] = alloca [[UREF]], align 8
 
-  store_unowned %s to [initialization] %u1#1 : $*@sil_unowned CP
+  store_unowned %s to [initialization] %u1 : $*@sil_unowned CP
   // CHECK: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[U1]], i32 0, i32 1
   // CHECK: store i8** %1, i8*** [[T0]], align 8
   // CHECK: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[U1]], i32 0, i32 0
@@ -79,12 +79,12 @@ entry(%s : $CP):
 
   // CHECK: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[U1]], i32 0, i32 0
   // CHECK: [[T1:%.*]] = call %objc_object* @swift_unknownUnownedLoadStrong(%swift.unowned* [[T0]])
-  %t = load_unowned %u1#1 : $*@sil_unowned CP
+  %t = load_unowned %u1 : $*@sil_unowned CP
   // CHECK: call void @swift_unknownRelease(%objc_object* [[T1]])
   strong_release %t : $CP
 
-  dealloc_stack %u2#0 : $*@local_storage @sil_unowned CP
-  dealloc_stack %u1#0 : $*@local_storage @sil_unowned CP
+  dealloc_stack %u2 : $*@sil_unowned CP
+  dealloc_stack %u1 : $*@sil_unowned CP
 
   %v = ref_to_unmanaged %s : $CP to $@sil_unmanaged CP
   %z = unmanaged_to_ref %v : $@sil_unmanaged CP to $CP
@@ -137,7 +137,7 @@ entry(%w : $*@sil_weak CP?, %a : $CP?):
   // CHECK: [[WITNESS:%.*]] = load i8**, i8*** [[SRC_WITNESS_ADDR]], align 8
   // CHECK: [[DEST_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 1
   // CHECK: store i8** [[WITNESS]], i8*** [[DEST_WITNESS_ADDR]], align 8
-  copy_addr [take] %w to [initialization] %v#1 : $*@sil_weak CP?
+  copy_addr [take] %w to [initialization] %v : $*@sil_weak CP?
 
   // CHECK: [[DEST_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 0
   // CHECK: [[SRC_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 0
@@ -146,7 +146,7 @@ entry(%w : $*@sil_weak CP?, %a : $CP?):
   // CHECK: [[WITNESS:%.*]] = load i8**, i8*** [[SRC_WITNESS_ADDR]], align 8
   // CHECK: [[DEST_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 1
   // CHECK: store i8** [[WITNESS]], i8*** [[DEST_WITNESS_ADDR]], align 8
-  copy_addr [take] %w to                  %v#1 : $*@sil_weak CP?
+  copy_addr [take] %w to                  %v : $*@sil_weak CP?
 
   // CHECK: [[DEST_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 0
   // CHECK: [[SRC_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 0
@@ -155,7 +155,7 @@ entry(%w : $*@sil_weak CP?, %a : $CP?):
   // CHECK: [[WITNESS:%.*]] = load i8**, i8*** [[SRC_WITNESS_ADDR]], align 8
   // CHECK: [[DEST_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 1
   // CHECK: store i8** [[WITNESS]], i8*** [[DEST_WITNESS_ADDR]], align 8
-  copy_addr        %w to [initialization] %v#1 : $*@sil_weak CP?
+  copy_addr        %w to [initialization] %v : $*@sil_weak CP?
 
   // CHECK: [[DEST_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 0
   // CHECK: [[SRC_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 0
@@ -164,13 +164,13 @@ entry(%w : $*@sil_weak CP?, %a : $CP?):
   // CHECK: [[WITNESS:%.*]] = load i8**, i8*** [[SRC_WITNESS_ADDR]], align 8
   // CHECK: [[DEST_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 1
   // CHECK: store i8** [[WITNESS]], i8*** [[DEST_WITNESS_ADDR]], align 8
-  copy_addr        %w to                  %v#1 : $*@sil_weak CP?
+  copy_addr        %w to                  %v : $*@sil_weak CP?
 
   // CHECK: [[REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 0
   // CHECK: call void @swift_unknownWeakDestroy(%swift.weak* [[REF_ADDR]])
-  destroy_addr %v#1 : $*@sil_weak CP?
+  destroy_addr %v : $*@sil_weak CP?
 
-  dealloc_stack %v#0 : $*@local_storage @sil_weak CP?
+  dealloc_stack %v : $*@sil_weak CP?
 
   return undef : $()
 }

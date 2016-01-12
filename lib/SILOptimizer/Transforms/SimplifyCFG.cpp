@@ -2758,7 +2758,6 @@ getSwitchEnumPred(SILBasicBlock *BB, SwitchEnumInst *SEI, SILBasicBlock *PostBB,
 
   // Check that this block only produces the value, but does not
   // have any side effects.
-  bool BBHasIntegerLiteral = false;
   auto First = BB->begin();
   auto *BI = dyn_cast<BranchInst>(BB->getTerminator());
   if (!BI)
@@ -2783,7 +2782,6 @@ getSwitchEnumPred(SILBasicBlock *BB, SwitchEnumInst *SEI, SILBasicBlock *PostBB,
     // The branch can pass arguments only to the PostBB.
     if (BI->getDestBB() != PostBB)
       return nullptr;
-    BBHasIntegerLiteral = true;
   }
 
   // Each BB on the path should have only a single branch instruction.

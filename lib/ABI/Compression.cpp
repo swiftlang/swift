@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/ABI/Compression.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "CBCTables.h"
 #include "HuffTables.h"
 #include <assert.h>
@@ -41,7 +42,7 @@ std::string swift::Compress::DecodeCBCString(StringRef In) {
     const char c = In[PI];
     if (c == CBC::EscapeChar0) {
       if ((PI+1) >= EndIndex) {
-        assert(false && "Invalid Encoding");
+        llvm_unreachable("Invalid Encoding.");
         return "";
       }
       const char N = In[PI+1];
@@ -54,7 +55,7 @@ std::string swift::Compress::DecodeCBCString(StringRef In) {
 
       unsigned Idx = CBCindexOfChar(N);
       if (Idx > CBC::CharsetLength || CBC::Charset[Idx] != N) {
-        assert(false && "bad indexOfChar");
+        llvm_unreachable("Decoded invalid character.");
         return "";
       }
       SB += CBC::CodeBook[Idx];
@@ -64,7 +65,7 @@ std::string swift::Compress::DecodeCBCString(StringRef In) {
 
     if (c == CBC::EscapeChar1) {
       if ((PI+2) >= EndIndex) {
-        assert(false && "Invalid Encoding");
+        llvm_unreachable("Decoded invalid index.");
         return "";
       }
 
@@ -73,7 +74,7 @@ std::string swift::Compress::DecodeCBCString(StringRef In) {
       unsigned JointIndex = (CBC::CharsetLength * CBCindexOfChar(N0)) +
                                                   CBCindexOfChar(N1);
       if (JointIndex > CBC::NumFragments) {
-        assert(false && "Read bad index");
+        llvm_unreachable("Decoded invalid index.");
         return "";
       }
       SB += CBC::CodeBook[JointIndex];
@@ -143,16 +144,39 @@ StartMatch:
   return SB;
 }
 
+/// This function computes the number of characters that we can encode in a
+/// 64bit number without overflowing.
+///
+/// \returns a pair of:
+///  - The number of characters that fit in a 64bit word.
+///  - The value of CharsetLength^NumLetters (CL to the power of NL).
+static std::pair<uint64_t, uint64_t> get64bitEncodingParams() {
+  uint64_t CL = Huffman::CharsetLength;
+
+  // We encode each letter using Log2(CL) bits, and the number of letters we can
+  // encode is a 64bit number is 64/Log2(CL).
+  //
+  // Doing this computation in floating-point arithmetic could give a slightly
+  // better (more optimistic) result, but the computation may not be constant
+  //  at compile time.
+  uint64_t NumLetters = 64 / Log2_64_Ceil(CL);
+
+  // Calculate CharsetLength^NumLetters (CL to the power of NL), which is the
+  // highest numeric value that can hold NumLetters characters in a 64bit
+  // number.
+  //
+  // Notice: this loop is optimized away and CLX is computed to a
+  // constant integer at compile time.
+  uint64_t CLX = 1;
+  for (unsigned i = 0; i < NumLetters; i++) { CLX *= CL; }
+
+  return std::make_pair(NumLetters, CLX);
+}
+
 /// Extract all of the characters from the number \p Num one by one and
 /// insert them into the string builder \p SB.
 static void DecodeFixedWidth(APInt &Num, std::string &SB) {
   uint64_t CL = Huffman::CharsetLength;
-
-  // NL is the number of characters that we can hold in a 64bit number.
-  // Each letter takes Log2(CL) bits. Doing this computation in floating-
-  // point arithmetic could give a slightly better (more optimistic) result,
-  // but the computation may not be constant at compile time.
-  uint64_t NumLetters = 64 / Log2_64_Ceil(CL);
 
   assert(Num.getBitWidth() > 8 &&
          "Not enough bits for arithmetic on this alphabet");
@@ -161,13 +185,9 @@ static void DecodeFixedWidth(APInt &Num, std::string &SB) {
   // local 64bit numbers than working with APInt. In this loop we try to
   // extract NL characters at once and process them using a local 64-bit
   // number.
-
-  // Calculate CharsetLength**NumLetters (CL to the power of NL), which is the
-  // highest numeric value that can hold NumLetters characters in a 64bit
-  // number. Notice: this loop is optimized away and CLX is computed to a
-  // constant integer at compile time.
-  uint64_t CLX = 1;
-  for (unsigned  i = 0; i < NumLetters; i++) { CLX *= CL; }
+  uint64_t CLX;
+  uint64_t NumLetters;
+  std::tie(NumLetters, CLX) = get64bitEncodingParams();
 
   while (Num.ugt(CLX)) {
     unsigned BW = Num.getBitWidth();
@@ -200,17 +220,10 @@ static void DecodeFixedWidth(APInt &Num, std::string &SB) {
   }
 }
 
-static void EncodeFixedWidth(APInt &num, char ch) {
-  APInt C = APInt(num.getBitWidth(), Huffman::CharsetLength);
-  // TODO: autogenerate a table for the reverse lookup.
-  for (unsigned i = 0; i < Huffman::CharsetLength; i++) {
-    if (Huffman::Charset[i] == ch) {
-      num *= C;
-      num += APInt(num.getBitWidth(), i);
-      return;
-    }
-  }
-  assert(false);
+static unsigned HuffIndexOfChar(char c) {
+  int idx = Huffman::IndexOfChar[int(c)];
+  assert(idx >= 0 && "Invalid char");
+  return (unsigned) idx;
 }
 
 APInt
@@ -228,8 +241,8 @@ swift::Compress::EncodeStringAsNumber(StringRef In, EncodingKind Kind) {
 
   // Encode variable-length strings.
   if (Kind == EncodingKind::Variable) {
-    size_t num_bits = 0;
-    size_t bits = 0;
+    uint64_t num_bits = 0;
+    uint64_t bits = 0;
 
     // Append the characters in the string in reverse. This will allow
     // us to decode by appending to a string and not prepending.
@@ -270,12 +283,44 @@ swift::Compress::EncodeStringAsNumber(StringRef In, EncodingKind Kind) {
   }
 
   // Encode fixed width strings.
+
+  // Try to decode a few numbers at once. First encode characters into a local
+  // variable and then encode that variable. It is much faster to work with
+  // local 64-bit numbers than APInts.
+  uint64_t CL = Huffman::CharsetLength;
+  uint64_t CLX;
+  uint64_t maxNumLetters;
+  std::tie(maxNumLetters, CLX) = get64bitEncodingParams();
+
+  uint64_t numEncodedChars = 0;
+  uint64_t encodedCharsValue = 0;
+
   for (int i = In.size() - 1; i >= 0; i--) {
-    char ch = In[i];
-    // Extend the number and create room for encoding another character.
-    unsigned MinBits = num.getActiveBits() + Huffman::LongestEncodingLength;
-    num = num.zextOrTrunc(std::max(64u, MinBits));
-    EncodeFixedWidth(num, ch);
+    // Encode a single char into the local temporary variable.
+    unsigned charIdx = HuffIndexOfChar(In[i]);
+    encodedCharsValue = encodedCharsValue * CL + charIdx;
+    numEncodedChars++;
+
+    // If we've reached the maximum capacity then push the value into the APInt.
+    if (numEncodedChars == maxNumLetters) {
+      num = num.zextOrSelf(num.getActiveBits() + 64);
+      num *= APInt(num.getBitWidth(), CLX);
+      num += APInt(num.getBitWidth(), encodedCharsValue);
+      numEncodedChars = 0;
+      encodedCharsValue = 0;
+    }
+  }
+
+  // Encode the last few characters.
+  if (numEncodedChars) {
+    // Compute the value that we need to multiply the APInt to make room for the
+    // last few characters that did not make a complete 64-bit value.
+    uint64_t tailCLX = 1;
+    for (unsigned i = 0; i < numEncodedChars; i++) { tailCLX *= CL; }
+
+    num = num.zextOrSelf(num.getActiveBits() + 64);
+    num *= APInt(num.getBitWidth(), tailCLX);
+    num += APInt(num.getBitWidth(), encodedCharsValue);
   }
 
   return num;
@@ -285,12 +330,49 @@ std::string swift::Compress::DecodeStringFromNumber(const APInt &In,
                                                     EncodingKind Kind) {
   APInt num = In;
   std::string sb;
+  // This is the max number of bits that we can hold in a 64bit number without
+  // overflowing in the next round of character decoding.
+  unsigned MaxBitsPerWord = 64 - Huffman::LongestEncodingLength;
 
   if (Kind == EncodingKind::Variable) {
     // Keep decoding until we reach our sentinel value.
     // See the encoder implementation for more details.
     while (num.ugt(1)) {
-      sb += Huffman::variable_decode(num);
+      // Try to decode a bunch of characters together without modifying the
+      // big number.
+      if (num.getActiveBits() > 64) {
+        // Collect the bottom 64-bit.
+        uint64_t tailbits = *num.getRawData();
+        // This variable is used to record the number of bits that were
+        // extracted from the lowest 64 bit of the big number.
+        unsigned bits = 0;
+
+        // Keep extracting bits from the tail of the APInt until you reach
+        // the end of the word (64 bits minus the size of the largest
+        // character possible).
+        while (bits < MaxBitsPerWord) {
+          char ch;
+          unsigned local_bits;
+          std::tie(ch, local_bits) = Huffman::variable_decode(tailbits);
+          sb += ch;
+          tailbits >>= local_bits;
+          bits += local_bits;
+        }
+        // Now that we've extracted a few characters from the tail of the APInt
+        // we need to shift the APInt and prepare for the next round. We shift
+        // the APInt by the number of bits that we extracted in the loop above.
+        num = num.lshr(bits);
+        bits = 0;
+      } else {
+        // We don't have enough bits in the big num in order to extract a few
+        // numbers at once, so just extract a single character.
+        uint64_t tailbits = *num.getRawData();
+        char ch;
+        unsigned bits;
+        std::tie(ch, bits) = Huffman::variable_decode(tailbits);
+        sb += ch;
+        num = num.lshr(bits);
+      }
     }
   } else {
     // Decode this number as a regular fixed-width sequence of characters.

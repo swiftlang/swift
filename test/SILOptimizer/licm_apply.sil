@@ -21,7 +21,7 @@ bb0(%0 : $*Int64, %1 : $Int64):
 sil @licm_readonly_apply : $@convention(thin) (Int64, @inout Int64) -> () {
 bb0(%0 : $Int64, %1 : $*Int64):
   %2 = alloc_stack $Int64
-  store %0 to %2#1 : $*Int64
+  store %0 to %2 : $*Int64
   %9 = function_ref @read_from_param : $@convention(thin) (@inout Int64, Int64) -> Int64
   %10 = integer_literal $Builtin.Int64, 3
   %11 = struct $Int64 (%10 : $Builtin.Int64)
@@ -30,7 +30,7 @@ bb0(%0 : $Int64, %1 : $*Int64):
   br bb1
 
 bb1:
-  %21 = apply %9(%2#1, %11) : $@convention(thin) (@inout Int64, Int64) -> Int64
+  %21 = apply %9(%2, %11) : $@convention(thin) (@inout Int64, Int64) -> Int64
   %22 = load %12 : $*Builtin.Int64
   %23 = struct_extract %21 : $Int64, #Int64._value
   %24 = builtin "sadd_with_overflow_Int64"(%22 : $Builtin.Int64, %23 : $Builtin.Int64, %13 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
@@ -43,7 +43,7 @@ bb1:
 
 bb2:
   %15 = tuple ()
-  dealloc_stack %2#0 : $*@local_storage Int64
+  dealloc_stack %2 : $*Int64
   return %15 : $()
 }
 
@@ -54,7 +54,7 @@ bb2:
 sil @dont_licm_readonly_apply : $@convention(thin) (Int64, @inout Int64) -> () {
 bb0(%0 : $Int64, %1 : $*Int64):
   %2 = alloc_stack $Int64
-  store %0 to %2#1 : $*Int64
+  store %0 to %2 : $*Int64
   %9 = function_ref @read_from_param : $@convention(thin) (@inout Int64, Int64) -> Int64
   %10 = integer_literal $Builtin.Int64, 3
   %11 = struct $Int64 (%10 : $Builtin.Int64)
@@ -63,7 +63,7 @@ bb0(%0 : $Int64, %1 : $*Int64):
   br bb1
 
 bb1:
-  %21 = apply %9(%2#1, %11) : $@convention(thin) (@inout Int64, Int64) -> Int64
+  %21 = apply %9(%2, %11) : $@convention(thin) (@inout Int64, Int64) -> Int64
   %22 = load %12 : $*Builtin.Int64
   %23 = struct_extract %21 : $Int64, #Int64._value
   %24 = builtin "sadd_with_overflow_Int64"(%22 : $Builtin.Int64, %23 : $Builtin.Int64, %13 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
@@ -71,12 +71,12 @@ bb1:
   %28 = struct $Int64 (%25 : $Builtin.Int64)
 
   // This store does alias with the read in @read_from_param
-  store %28 to %2#1 : $*Int64
+  store %28 to %2 : $*Int64
   cond_br undef, bb1, bb2
 
 bb2:
   %15 = tuple ()
-  dealloc_stack %2#0 : $*@local_storage Int64
+  dealloc_stack %2 : $*Int64
   return %15 : $()
 }
 

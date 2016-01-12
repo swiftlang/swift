@@ -231,7 +231,7 @@ void Mangler::mangleContext(const DeclContext *ctx, BindGenerics shouldBind) {
     switch (local->getLocalDeclContextKind()) {
     case LocalDeclContextKind::AbstractClosure:
       mangleClosureEntity(cast<SerializedAbstractClosureExpr>(local),
-                          ResilienceExpansion::Minimal, /*uncurry*/ 0);
+                          /*uncurry*/ 0);
       return;
     case LocalDeclContextKind::DefaultArgumentInitializer: {
       auto argInit = cast<SerializedDefaultArgumentInitializer>(local);
@@ -250,8 +250,7 @@ void Mangler::mangleContext(const DeclContext *ctx, BindGenerics shouldBind) {
   }
 
   case DeclContextKind::NominalTypeDecl:
-    mangleNominalType(cast<NominalTypeDecl>(ctx), ResilienceExpansion::Minimal,
-                      shouldBind);
+    mangleNominalType(cast<NominalTypeDecl>(ctx), shouldBind);
     return;
 
   case DeclContextKind::ExtensionDecl: {
@@ -283,10 +282,10 @@ void Mangler::mangleContext(const DeclContext *ctx, BindGenerics shouldBind) {
       mangleModule(ExtD->getParentModule());
       if (mangleSignature) {
         Mod = ExtD->getModuleContext();
-        mangleGenericSignature(sig, ResilienceExpansion::Minimal);
+        mangleGenericSignature(sig);
       }
     }
-    mangleNominalType(decl, ResilienceExpansion::Minimal, shouldBind,
+    mangleNominalType(decl, shouldBind,
                     getCanonicalSignatureOrNull(ExtD->getGenericSignature(),
                                                 *ExtD->getParentModule()),
                     ExtD->getGenericParams());
@@ -295,7 +294,7 @@ void Mangler::mangleContext(const DeclContext *ctx, BindGenerics shouldBind) {
 
   case DeclContextKind::AbstractClosureExpr:
     return mangleClosureEntity(cast<AbstractClosureExpr>(ctx),
-                               ResilienceExpansion::Minimal, /*uncurry*/ 0);
+                               /*uncurry*/ 0);
 
   case DeclContextKind::AbstractFunctionDecl: {
     auto fn = cast<AbstractFunctionDecl>(ctx);
@@ -304,14 +303,13 @@ void Mangler::mangleContext(const DeclContext *ctx, BindGenerics shouldBind) {
     // using the non-(de)allocating variants.
     if (auto ctor = dyn_cast<ConstructorDecl>(fn)) {
       return mangleConstructorEntity(ctor, /*allocating*/ false,
-                                     ResilienceExpansion::Minimal,
                                      /*uncurry*/ 0);
     }
     
     if (auto dtor = dyn_cast<DestructorDecl>(fn))
       return mangleDestructorEntity(dtor, /*deallocating*/ false);
     
-    return mangleEntity(fn, ResilienceExpansion::Minimal, /*uncurry*/ 0);
+    return mangleEntity(fn, /*uncurry*/ 0);
   }
 
   case DeclContextKind::SubscriptDecl:
@@ -487,7 +485,7 @@ void Mangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
                              DC->getGenericParamsOfContext());
   DeclCtx = DC;
 
-  mangleType(Ty, ResilienceExpansion::Minimal, /*uncurry*/ 0);
+  mangleType(Ty, /*uncurry*/ 0);
 }
 
 void Mangler::mangleDeclTypeForDebugger(const ValueDecl *decl) {
@@ -572,7 +570,7 @@ void Mangler::mangleDeclTypeForDebugger(const ValueDecl *decl) {
                              DC->getGenericParamsOfContext());
   }
 
-  mangleDeclType(decl, ResilienceExpansion::Minimal, /*uncurry*/ 0);
+  mangleDeclType(decl, /*uncurry*/ 0);
 }
 
 /// Is this declaration a method for mangling purposes? If so, we'll leave the
@@ -677,7 +675,6 @@ Type Mangler::getDeclTypeForMangling(const ValueDecl *decl,
 }
 
 void Mangler::mangleDeclType(const ValueDecl *decl,
-                             ResilienceExpansion explosion,
                              unsigned uncurryLevel) {
   ArrayRef<GenericTypeParamType *> genericParams;
   unsigned initialParamDepth;
@@ -692,10 +689,10 @@ void Mangler::mangleDeclType(const ValueDecl *decl,
   if (!genericParams.empty() || !requirements.empty()) {
     Buffer << 'u';
     mangleGenericSignatureParts(genericParams, initialParamDepth,
-                                requirements, explosion);
+                                requirements);
   }
 
-  mangleType(type->getCanonicalType(), explosion, uncurryLevel);
+  mangleType(type->getCanonicalType(), uncurryLevel);
 
   // Bind the declaration's generic context for nested decls.
   if (decl->getInterfaceType()
@@ -708,8 +705,7 @@ void Mangler::mangleDeclType(const ValueDecl *decl,
   }
 }
 
-void Mangler::mangleConstrainedType(CanType type,
-                                    ResilienceExpansion expansion) {
+void Mangler::mangleConstrainedType(CanType type) {
   // The type constrained by a generic requirement should always be a
   // generic parameter or associated type thereof. Assuming this lets us save
   // an introducer character in the common case when a generic parameter is
@@ -720,14 +716,13 @@ void Mangler::mangleConstrainedType(CanType type,
     mangleGenericParamIndex(gp);
     return;
   }
-  mangleType(type, expansion, 0);
+  mangleType(type, 0);
 }
 
 void Mangler::mangleGenericSignatureParts(
                                         ArrayRef<GenericTypeParamType*> params,
                                         unsigned initialParamDepth,
-                                        ArrayRef<Requirement> requirements,
-                                        ResilienceExpansion expansion) {
+                                        ArrayRef<Requirement> requirements) {
   // Mangle the number of parameters.
   unsigned depth = 0;
   unsigned count = 0;
@@ -783,13 +778,12 @@ mangle_requirements:
         // efficiently.
         // TODO: We could golf this a little more by assuming the first type
         // is a dependent type.
-        mangleConstrainedType(reqt.getFirstType()->getCanonicalType(),
-                              expansion);
+        mangleConstrainedType(reqt.getFirstType()->getCanonicalType());
         mangleProtocolName(protocols[0]);
         break;
       }
-      mangleConstrainedType(reqt.getFirstType()->getCanonicalType(), expansion);
-      mangleType(reqt.getSecondType()->getCanonicalType(), expansion, 0);
+      mangleConstrainedType(reqt.getFirstType()->getCanonicalType());
+      mangleType(reqt.getSecondType()->getCanonicalType(), 0);
       break;
     }
 
@@ -798,9 +792,9 @@ mangle_requirements:
         Buffer << 'R';
         didMangleRequirement = true;
       }
-      mangleConstrainedType(reqt.getFirstType()->getCanonicalType(), expansion);
+      mangleConstrainedType(reqt.getFirstType()->getCanonicalType());
       Buffer << 'z';
-      mangleType(reqt.getSecondType()->getCanonicalType(), expansion, 0);
+      mangleType(reqt.getSecondType()->getCanonicalType(), 0);
       break;
     }
   }
@@ -808,14 +802,12 @@ mangle_requirements:
   Buffer << 'r';
 }
 
-void Mangler::mangleGenericSignature(const GenericSignature *sig,
-                                     ResilienceExpansion expansion) {
+void Mangler::mangleGenericSignature(const GenericSignature *sig) {
   assert(Mod);
   auto canSig = sig->getCanonicalManglingSignature(*Mod);
   CurGenericSignature = canSig;
   mangleGenericSignatureParts(canSig->getGenericParams(), 0,
-                              canSig->getRequirements(),
-                              expansion);
+                              canSig->getRequirements());
 }
 
 static void mangleMetatypeRepresentation(raw_ostream &Buffer,
@@ -910,8 +902,7 @@ void Mangler::mangleAssociatedTypeName(DependentMemberType *dmt,
 /// <index> ::= <natural> _          # N+1
 ///
 /// <tuple-element> ::= <identifier>? <type>
-void Mangler::mangleType(Type type, ResilienceExpansion explosion,
-                         unsigned uncurryLevel) {
+void Mangler::mangleType(Type type, unsigned uncurryLevel) {
   assert((DWARFMangling || type->isCanonical()) &&
          "expecting canonical types when not mangling for the debugger");
   TypeBase *tybase = type.getPointer();
@@ -966,8 +957,7 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
     return;
   case TypeKind::BuiltinVector:
     Buffer << "Bv" << cast<BuiltinVectorType>(tybase)->getNumElements();
-    mangleType(cast<BuiltinVectorType>(tybase)->getElementType(), explosion,
-               uncurryLevel);
+    mangleType(cast<BuiltinVectorType>(tybase)->getElementType(), uncurryLevel);
     return;
 
   case TypeKind::NameAlias: {
@@ -976,7 +966,7 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
     TypeAliasDecl *decl = NameAliasTy->getDecl();
     if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule)
       // It's not possible to mangle the context of the builtin module.
-      return mangleType(decl->getUnderlyingType(), explosion, uncurryLevel);
+      return mangleType(decl->getUnderlyingType(), uncurryLevel);
     
     Buffer << "a";
     // For the DWARF output we want to mangle the type alias + context,
@@ -1006,7 +996,7 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
     auto *IUO = cast<ImplicitlyUnwrappedOptionalType>(tybase);
     auto implDecl = tybase->getASTContext().getImplicitlyUnwrappedOptionalDecl();
     auto GenTy = BoundGenericType::get(implDecl, Type(), IUO->getBaseType());
-    return mangleType(GenTy, ResilienceExpansion::Minimal, 0);
+    return mangleType(GenTy, 0);
   }
 
   case TypeKind::ExistentialMetatype: {
@@ -1017,8 +1007,7 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
     } else {
       Buffer << 'P' << 'M';
     }
-    return mangleType(EMT->getInstanceType(),
-                      ResilienceExpansion::Minimal, 0);
+    return mangleType(EMT->getInstanceType(), 0);
   }
   case TypeKind::Metatype: {
     MetatypeType *MT = cast<MetatypeType>(tybase);
@@ -1028,30 +1017,25 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
     } else {
       Buffer << 'M';
     }
-    return mangleType(MT->getInstanceType(),
-                      ResilienceExpansion::Minimal, 0);
+    return mangleType(MT->getInstanceType(), 0);
   }
   case TypeKind::LValue:
     llvm_unreachable("@lvalue types should not occur in function interfaces");
   case TypeKind::InOut:
     Buffer << 'R';
-    return mangleType(cast<InOutType>(tybase)->getObjectType(),
-                      ResilienceExpansion::Minimal, 0);
+    return mangleType(cast<InOutType>(tybase)->getObjectType(), 0);
 
   case TypeKind::UnmanagedStorage:
     Buffer << "Xu";
-    return mangleType(cast<UnmanagedStorageType>(tybase)->getReferentType(),
-                      ResilienceExpansion::Minimal, 0);
+    return mangleType(cast<UnmanagedStorageType>(tybase)->getReferentType(), 0);
 
   case TypeKind::UnownedStorage:
     Buffer << "Xo";
-    return mangleType(cast<UnownedStorageType>(tybase)->getReferentType(),
-                      ResilienceExpansion::Minimal, 0);
+    return mangleType(cast<UnownedStorageType>(tybase)->getReferentType(), 0);
 
   case TypeKind::WeakStorage:
     Buffer << "Xw";
-    return mangleType(cast<WeakStorageType>(tybase)->getReferentType(),
-                      ResilienceExpansion::Minimal, 0);
+    return mangleType(cast<WeakStorageType>(tybase)->getReferentType(), 0);
 
   case TypeKind::Tuple: {
     auto tuple = cast<TupleType>(tybase);
@@ -1066,7 +1050,7 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
     for (auto &field : tuple->getElements()) {
       if (field.hasName())
         mangleIdentifier(field.getName());
-      mangleType(field.getType(), explosion, 0);
+      mangleType(field.getType(), 0);
     }
     Buffer << '_';
     return;
@@ -1086,7 +1070,7 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
     // are several occasions in which we'd like to mangle them in the
     // abstract.
     ContextStack context(*this);
-    mangleNominalType(cast<UnboundGenericType>(tybase)->getDecl(), explosion,
+    mangleNominalType(cast<UnboundGenericType>(tybase)->getDecl(),
                       BindGenerics::None);
     return;
   }
@@ -1095,7 +1079,7 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
   case TypeKind::Enum:
   case TypeKind::Struct: {
     ContextStack context(*this);
-    return mangleNominalType(cast<NominalType>(tybase)->getDecl(), explosion,
+    return mangleNominalType(cast<NominalType>(tybase)->getDecl(),
                              BindGenerics::None);
   }
 
@@ -1107,10 +1091,10 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
     Buffer << 'G';
     {
       ContextStack context(*this);
-      mangleNominalType(boundType->getDecl(), explosion, BindGenerics::None);
+      mangleNominalType(boundType->getDecl(), BindGenerics::None);
     }
     for (auto arg : boundType->getGenericArgs()) {
-      mangleType(arg, ResilienceExpansion::Minimal, /*uncurry*/ 0);
+      mangleType(arg, /*uncurry*/ 0);
     }
     Buffer << '_';
     return;
@@ -1205,13 +1189,13 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
     if (fn->isNoReturn()) Buffer << 'N';
     if (fn->isPolymorphic()) {
       Buffer << 'G';
-      mangleGenericSignature(fn->getGenericSignature(), explosion);
+      mangleGenericSignature(fn->getGenericSignature());
     }
     Buffer << '_';
 
     auto mangleParameter = [&](SILParameterInfo param) {
       Buffer << mangleParameterConvention(param.getConvention());
-      mangleType(param.getType(), ResilienceExpansion::Minimal, 0);
+      mangleType(param.getType(), 0);
     };
 
     for (auto param : fn->getParametersWithoutIndirectResult()) {
@@ -1224,13 +1208,13 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
     } else {
       auto result = fn->getResult();
       Buffer << mangleResultConvention(result.getConvention());
-      mangleType(result.getType(), ResilienceExpansion::Minimal, 0);
+      mangleType(result.getType(), 0);
     }
     
     if (fn->hasErrorResult()) {
       auto error = fn->getErrorResult();
       Buffer << 'z' << mangleResultConvention(error.getConvention());
-      mangleType(error.getType(), ResilienceExpansion::Minimal, 0);
+      mangleType(error.getType(), 0);
     }
     
     Buffer << '_';
@@ -1255,7 +1239,7 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
       assert(archetype->getAssocType()
              && "child archetype has no associated type?!");
 
-      mangleType(parent, explosion, 0);
+      mangleType(parent, 0);
       mangleIdentifier(archetype->getName());
       addSubstitution(archetype);
       return;
@@ -1333,10 +1317,10 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
     auto dynamicSelf = cast<DynamicSelfType>(tybase);
     if (dynamicSelf->getSelfType()->getAnyNominal()) {
       Buffer << 'D';
-      mangleType(dynamicSelf->getSelfType(), explosion, uncurryLevel);
+      mangleType(dynamicSelf->getSelfType(), uncurryLevel);
     } else {
       // Mangle DynamicSelf as Self within a protocol.
-      mangleType(dynamicSelf->getSelfType(), explosion, uncurryLevel);
+      mangleType(dynamicSelf->getSelfType(), uncurryLevel);
     }
     return;
   }
@@ -1344,8 +1328,8 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
   case TypeKind::GenericFunction: {
     auto genFunc = cast<GenericFunctionType>(tybase);
     Buffer << 'u';
-    mangleGenericSignature(genFunc->getGenericSignature(), explosion);
-    mangleFunctionType(genFunc, explosion, uncurryLevel);
+    mangleGenericSignature(genFunc->getGenericSignature());
+    mangleFunctionType(genFunc, uncurryLevel);
     return;
   }
 
@@ -1401,13 +1385,13 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
     // Dependent members of non-generic-param types are not canonical, but
     // we may still want to mangle them for debugging or indexing purposes.
     Buffer << 'q';
-    mangleType(memTy->getBase(), explosion, 0);
+    mangleType(memTy->getBase(), 0);
     mangleAssociatedTypeName(memTy, /*canAbbreviate*/false);
     return;
   }
 
   case TypeKind::Function:
-    mangleFunctionType(cast<FunctionType>(tybase), explosion, uncurryLevel);
+    mangleFunctionType(cast<FunctionType>(tybase), uncurryLevel);
     return;
 
   case TypeKind::ProtocolComposition: {
@@ -1424,7 +1408,7 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
 
   case TypeKind::SILBox:
     Buffer << 'X' << 'b';
-    mangleType(cast<SILBoxType>(tybase)->getBoxedType(), explosion,
+    mangleType(cast<SILBoxType>(tybase)->getBoxedType(),
                uncurryLevel);
     return;
 
@@ -1481,7 +1465,6 @@ static char getSpecifierForNominalType(const NominalTypeDecl *decl) {
 }
 
 void Mangler::mangleNominalType(const NominalTypeDecl *decl,
-                                ResilienceExpansion explosion,
                                 BindGenerics shouldBind,
                                 CanGenericSignature extGenericSig,
                                 const GenericParamList *extGenericParams) {
@@ -1588,7 +1571,6 @@ bool Mangler::tryMangleStandardSubstitution(const NominalTypeDecl *decl) {
 }
 
 void Mangler::mangleFunctionType(AnyFunctionType *fn,
-                                 ResilienceExpansion explosion,
                                  unsigned uncurryLevel) {
   assert((DWARFMangling || fn->isCanonical()) &&
          "expecting canonical types when not mangling for the debugger");
@@ -1631,9 +1613,8 @@ void Mangler::mangleFunctionType(AnyFunctionType *fn,
   if (fn->throws())
     Buffer << 'z';
   
-  mangleType(fn->getInput(), explosion, 0);
-  mangleType(fn->getResult(), explosion,
-             (uncurryLevel > 0 ? uncurryLevel - 1 : 0));
+  mangleType(fn->getInput(), 0);
+  mangleType(fn->getResult(), (uncurryLevel > 0 ? uncurryLevel - 1 : 0));
 }
 
 void Mangler::mangleClosureComponents(Type Ty, unsigned discriminator,
@@ -1654,12 +1635,10 @@ void Mangler::mangleClosureComponents(Type Ty, unsigned discriminator,
     Ty = ErrorType::get(localContext->getASTContext());
 
   if (!DeclCtx) DeclCtx = localContext;
-  mangleType(Ty->getCanonicalType(), ResilienceExpansion::Minimal,
-             /*uncurry*/ 0);
+  mangleType(Ty->getCanonicalType(), /*uncurry*/ 0);
 }
 
 void Mangler::mangleClosureEntity(const SerializedAbstractClosureExpr *closure,
-                                  ResilienceExpansion explosion,
                                   unsigned uncurryingLevel) {
   mangleClosureComponents(closure->getType(), closure->getDiscriminator(),
                           closure->isImplicit(), closure->getParent(),
@@ -1667,7 +1646,6 @@ void Mangler::mangleClosureEntity(const SerializedAbstractClosureExpr *closure,
 }
 
 void Mangler::mangleClosureEntity(const AbstractClosureExpr *closure,
-                                  ResilienceExpansion explosion,
                                   unsigned uncurryLevel) {
   mangleClosureComponents(closure->getType(), closure->getDiscriminator(),
                           isa<AutoClosureExpr>(closure), closure->getParent(),
@@ -1676,12 +1654,11 @@ void Mangler::mangleClosureEntity(const AbstractClosureExpr *closure,
 
 void Mangler::mangleConstructorEntity(const ConstructorDecl *ctor,
                                       bool isAllocating,
-                                      ResilienceExpansion explosion,
                                       unsigned uncurryLevel) {
   Buffer << 'F';
   mangleContextOf(ctor, BindGenerics::Enclosing);
   Buffer << (isAllocating ? 'C' : 'c');
-  mangleDeclType(ctor, explosion, uncurryLevel);
+  mangleDeclType(ctor, uncurryLevel);
 }
 
 void Mangler::mangleDestructorEntity(const DestructorDecl *dtor,
@@ -1732,14 +1709,13 @@ static StringRef getCodeForAccessorKind(AccessorKind kind,
 
 void Mangler::mangleAccessorEntity(AccessorKind kind,
                                    AddressorKind addressorKind,
-                                   const AbstractStorageDecl *decl,
-                                   ResilienceExpansion explosion) {
+                                   const AbstractStorageDecl *decl) {
   assert(kind != AccessorKind::NotAccessor);
   Buffer << 'F';
   mangleContextOf(decl, BindGenerics::All);
   Buffer << getCodeForAccessorKind(kind, addressorKind);
   mangleDeclName(decl);
-  mangleDeclType(decl, explosion, 0);
+  mangleDeclType(decl, 0);
 }
 
 void Mangler::mangleAddressorEntity(const ValueDecl *decl) {
@@ -1747,7 +1723,7 @@ void Mangler::mangleAddressorEntity(const ValueDecl *decl) {
   mangleContextOf(decl, BindGenerics::All);
   Buffer << "au";
   mangleDeclName(decl);
-  mangleDeclType(decl, ResilienceExpansion::Minimal, 0);
+  mangleDeclType(decl, 0);
 }
 
 void Mangler::mangleGlobalGetterEntity(ValueDecl *decl) {
@@ -1755,7 +1731,7 @@ void Mangler::mangleGlobalGetterEntity(ValueDecl *decl) {
   mangleContextOf(decl, BindGenerics::All);
   Buffer << 'G';
   mangleDeclName(decl);
-  mangleDeclType(decl, ResilienceExpansion::Minimal, 0);
+  mangleDeclType(decl, 0);
 }
 
 void Mangler::mangleDefaultArgumentEntity(const DeclContext *func,
@@ -1768,12 +1744,11 @@ void Mangler::mangleDefaultArgumentEntity(const DeclContext *func,
 void Mangler::mangleInitializerEntity(const VarDecl *var) {
   // The initializer is its own entity whose context is the variable.
   Buffer << 'I';
-  mangleEntity(var, ResilienceExpansion::Minimal, /*uncurry*/ 0);
+  mangleEntity(var, /*uncurry*/ 0);
   Buffer << 'i';
 }
 
 void Mangler::mangleEntity(const ValueDecl *decl,
-                           ResilienceExpansion explosion,
                            unsigned uncurryLevel) {
   assert(!isa<ConstructorDecl>(decl));
   assert(!isa<DestructorDecl>(decl));
@@ -1788,8 +1763,7 @@ void Mangler::mangleEntity(const ValueDecl *decl,
     auto accessorKind = func->getAccessorKind();
     if (accessorKind != AccessorKind::NotAccessor)
       return mangleAccessorEntity(accessorKind, func->getAddressorKind(),
-                                  func->getAccessorStorageDecl(),
-                                  explosion);
+                                  func->getAccessorStorageDecl());
   }
   
   BindGenerics shouldBindParent = BindGenerics::All;
@@ -1815,7 +1789,7 @@ void Mangler::mangleEntity(const ValueDecl *decl,
   if (!DeclCtx) DeclCtx = decl->getDeclContext();
   mangleContextOf(decl, shouldBindParent);
   mangleDeclName(decl);
-  mangleDeclType(decl, explosion, uncurryLevel);
+  mangleDeclType(decl, uncurryLevel);
 }
 
 void Mangler::mangleDirectness(bool isIndirect) {
@@ -1832,10 +1806,9 @@ void Mangler::mangleProtocolConformance(const ProtocolConformance *conformance){
   Mod = conformance->getDeclContext()->getParentModule();
   if (auto sig = conformance->getGenericSignature()) {
     Buffer << 'u';
-    mangleGenericSignature(sig, ResilienceExpansion::Minimal);
+    mangleGenericSignature(sig);
   }
-  mangleType(conformance->getInterfaceType()->getCanonicalType(),
-             ResilienceExpansion::Minimal, 0);
+  mangleType(conformance->getInterfaceType()->getCanonicalType(), 0);
   mangleProtocolName(conformance->getProtocol());
   mangleModule(conformance->getDeclContext()->getParentModule());
 }
@@ -1843,19 +1816,19 @@ void Mangler::mangleProtocolConformance(const ProtocolConformance *conformance){
 void Mangler::mangleFieldOffsetFull(const ValueDecl *decl, bool isIndirect) {
   Buffer << "_TWv";
   mangleDirectness(isIndirect);
-  mangleEntity(decl, ResilienceExpansion::Minimal, 0);
+  mangleEntity(decl, 0);
 }
 
 void Mangler::mangleTypeFullMetadataFull(CanType ty) {
   Buffer << "_TMf";
-  mangleType(ty, ResilienceExpansion::Minimal, 0);
+  mangleType(ty, 0);
 }
 
 void Mangler::mangleTypeMetadataFull(CanType ty, bool isPattern) {
   Buffer << "_TM";
   if (isPattern)
     Buffer << 'P';
-  mangleType(ty, ResilienceExpansion::Minimal, 0);
+  mangleType(ty, 0);
 }
 
 void Mangler::append(StringRef S) {
@@ -1896,7 +1869,7 @@ void Mangler::mangleGlobalVariableFull(const VarDecl *decl) {
   }
 
   Buffer << "_T";
-  mangleEntity(decl, ResilienceExpansion(0), 0);
+  mangleEntity(decl, 0);
 }
 
 void Mangler::mangleGlobalInit(const VarDecl *decl, int counter,

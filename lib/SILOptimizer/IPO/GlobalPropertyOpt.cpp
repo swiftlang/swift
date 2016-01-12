@@ -174,7 +174,7 @@ class GlobalPropertyOpt {
     if (auto *SEI = dyn_cast<StructElementAddrInst>(def)) {
       return getFieldEntry(SEI->getField());
     }
-    if (isa<AllocStackInst>(def) && value.getResultNumber() == 1) {
+    if (isa<AllocStackInst>(def)) {
       Entry * &entry = ValueEntries[value];
       if (!entry) {
         entry = new (EntryAllocator.Allocate()) Entry(value, nullptr);

@@ -279,7 +279,7 @@ bb0:
   %p1 = partial_apply %f1(%i1) : $@convention(thin) (Builtin.Int32) -> ()
   %f2 = function_ref @thunk : $@convention(thin) (@out (), @owned @callee_owned () -> ()) -> ()
   %s1 = alloc_stack $()
-  %a1 = apply %f2(%s1#1, %p1) : $@convention(thin) (@out (), @owned @callee_owned () -> ()) -> ()
-  dealloc_stack %s1#0 : $*@local_storage ()
+  %a1 = apply %f2(%s1, %p1) : $@convention(thin) (@out (), @owned @callee_owned () -> ()) -> ()
+  dealloc_stack %s1 : $*()
   unreachable
 }

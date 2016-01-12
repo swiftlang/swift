@@ -332,8 +332,7 @@ static FuncDecl *makeRawValueTrivialGetter(ClangImporter::Implementation &Impl,
                                 /*implicit*/ true);
   getterDecl->setBody(body);
   
-  // Add as an external definition.
-  C.addedExternalDecl(getterDecl);
+  C.addExternalDecl(getterDecl);
 
   return getterDecl;
 }
@@ -394,8 +393,7 @@ static FuncDecl *makeRawValueTrivialSetter(ClangImporter::Implementation &Impl,
                                 /*implicit*/ true);
   setterDecl->setBody(body);
 
-  // Add as an external definition.
-  C.addedExternalDecl(setterDecl);
+  C.addExternalDecl(setterDecl);
 
   return setterDecl;
 }
@@ -461,7 +459,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   
   ctorDecl->setBody(body);
   
-  C.addedExternalDecl(ctorDecl);
+  C.addExternalDecl(ctorDecl);
   
   return ctorDecl;
 }
@@ -516,7 +514,7 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
                                 /*implicit*/ true);
   
   getterDecl->setBody(body);
-  C.addedExternalDecl(getterDecl);
+  C.addExternalDecl(getterDecl);
   return getterDecl;
 }
 
@@ -631,7 +629,7 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
                                   /*implicit*/ true);
     getterDecl->setBody(body);
-    C.addedExternalDecl(getterDecl);
+    C.addExternalDecl(getterDecl);
   }
 
   // Synthesize the setter body
@@ -665,7 +663,7 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
     auto body = BraceStmt::create(C, SourceLoc(), { initialize }, SourceLoc(),
                                   /*implicit*/ true);
     setterDecl->setBody(body);
-    C.addedExternalDecl(setterDecl);
+    C.addExternalDecl(setterDecl);
   }
 
   return { getterDecl, setterDecl };
@@ -2073,7 +2071,7 @@ namespace {
       }
 
       // Add the type decl to ExternalDefinitions so that we can type-check
-      // raw values and IRGen can emit metadata for it.
+      // raw values and SILGen can emit witness tables for derived conformances.
       // FIXME: There might be better ways to do this.
       Impl.registerExternalDecl(result);
       return result;
@@ -5396,7 +5394,7 @@ void ClangImporter::Implementation::finishPendingActions() {
         RegisteredExternalDecls.clear();
       } else {
         Decl *D = RegisteredExternalDecls.pop_back_val();
-        SwiftContext.addedExternalDecl(D);
+        SwiftContext.addExternalDecl(D);
         if (auto typeResolver = getTypeResolver())
           if (auto *nominal = dyn_cast<NominalTypeDecl>(D))
             if (!nominal->hasDelayedMembers())

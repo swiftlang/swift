@@ -2883,7 +2883,8 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
   SmallVector<Type, 3> Scratch;
   auto genericArgs = BaseTy->getAllGenericArgs(Scratch);
   TypeSubstitutionMap substitutions;
-  auto genericParams = BaseTy->getNominalOrBoundGenericNominal()->getGenericParamTypes();
+  auto genericParams = BaseTy->getNominalOrBoundGenericNominal()
+                         ->getInnermostGenericParamTypes();
   assert(genericParams.size() == genericArgs.size());
   for (unsigned i = 0, n = genericParams.size(); i != n; ++i) {
     auto gp = genericParams[i]->getCanonicalType()->castTo<GenericTypeParamType>();

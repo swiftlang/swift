@@ -37,6 +37,8 @@ namespace swift {
 
 namespace irgen {
   class FulfillmentMap;
+  enum IsExact_t : bool;
+
 
 /// A cache of local type data.
 ///
@@ -250,10 +252,9 @@ public:
     Map[key].push_front(newEntry);
   }
 
-  /// Add abstract entries based on what can be fulfilled from the given
-  /// type metadata.
+  /// Add entries based on what can be fulfilled from the given type metadata.
   void addAbstractForTypeMetadata(IRGenFunction &IGF, CanType type,
-                                  llvm::Value *metadata);
+                                  IsExact_t isExact, llvm::Value *metadata);
 
   void eraseConditional(ArrayRef<LocalTypeDataKey> keys);
 };

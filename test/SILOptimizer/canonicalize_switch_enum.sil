@@ -47,9 +47,9 @@ bb4(%8 : $Builtin.Int32):
 sil @test_switch_enum_addr : $@convention(thin) <T> (@in GenE<T>) -> Int32 {
 bb0(%0 : $*GenE<T>):
   %1 = alloc_stack $GenE<T>
-  copy_addr %0 to [initialization] %1#1 : $*GenE<T>
-  // CHECK: switch_enum_addr %1#1 : $*GenE<T>, case #GenE.A!enumelt: bb1, case #GenE.B!enumelt: bb2, case #GenE.C!enumelt.1: bb3
-  switch_enum_addr %1#1 : $*GenE<T>, case #GenE.A!enumelt: bb1, case #GenE.B!enumelt: bb2, default bb3
+  copy_addr %0 to [initialization] %1 : $*GenE<T>
+  // CHECK: switch_enum_addr %1 : $*GenE<T>, case #GenE.A!enumelt: bb1, case #GenE.B!enumelt: bb2, case #GenE.C!enumelt.1: bb3
+  switch_enum_addr %1 : $*GenE<T>, case #GenE.A!enumelt: bb1, case #GenE.B!enumelt: bb2, default bb3
 
 bb1:
   %4 = integer_literal $Builtin.Int32, 10
@@ -60,13 +60,13 @@ bb2:
   br bb4(%6 : $Builtin.Int32)
 
 bb3:
-  destroy_addr %1#1 : $*GenE<T>
+  destroy_addr %1 : $*GenE<T>
   %9 = integer_literal $Builtin.Int32, 30
   br bb4(%9 : $Builtin.Int32)
 
 bb4(%11 : $Builtin.Int32):
   %12 = struct $Int32 (%11 : $Builtin.Int32)
-  dealloc_stack %1#0 : $*@local_storage GenE<T>
+  dealloc_stack %1 : $*GenE<T>
   destroy_addr %0 : $*GenE<T>
   return %12 : $Int32
 }

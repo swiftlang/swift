@@ -332,16 +332,9 @@ static RValue emitCollectionDowncastExpr(SILGenFunction &SGF,
          "wrong number of generic collection parameters");
 
   // Form type parameter substitutions.
-  int aIdx = 0;
   SmallVector<Substitution, 4> subs;
-  for (auto sub: fromSubsts){
-    subs.push_back(Substitution{fnArcheTypes[aIdx++], sub.getReplacement(),
-                                sub.getConformances()});
-  }
-  for (auto sub: toSubsts){
-    subs.push_back(Substitution{fnArcheTypes[aIdx++], sub.getReplacement(),
-                                sub.getConformances()});
-  }
+  subs.append(fromSubsts.begin(), fromSubsts.end());
+  subs.append(toSubsts.begin(), toSubsts.end());
 
   auto emitApply = SGF.emitApplyOfLibraryIntrinsic(loc, fn, subs, {source}, C);
 

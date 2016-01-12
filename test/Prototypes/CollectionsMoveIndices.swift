@@ -176,7 +176,7 @@ extension MyForwardCollectionType {
   @inline(__always)
   @warn_unused_result
   internal func _advanceForward(i: Index, by n: Index.Distance) -> Index {
-    _precondition(n >= 0,
+    _require(n >= 0,
       "Only BidirectionalIndexType can be advanced by a negative amount")
 
     var i = i
@@ -192,7 +192,7 @@ extension MyForwardCollectionType {
   internal func _advanceForward(
     i: Index, by n: Index.Distance, limit: Index
   ) -> Index {
-    _precondition(n >= 0,
+    _require(n >= 0,
       "Only BidirectionalIndexType can be advanced by a negative amount")
 
     var i = i
@@ -298,17 +298,17 @@ extension MyForwardCollectionType
 
   @warn_unused_result
   public func advance(i: Index, by n: Index.Distance) -> Index {
-    _precondition(n >= 0,
+    _require(n >= 0,
       "Can't advance an Index of MyForwardCollectionType by a negative amount")
     return i.advancedBy(n)
   }
 
   @warn_unused_result
   public func advance(i: Index, by n: Index.Distance, limit: Index) -> Index {
-    _precondition(n >= 0,
+    _require(n >= 0,
       "Can't advance an Index of MyForwardCollectionType by a negative amount")
     let d = i.distanceTo(limit)
-    _precondition(d >= 0,
+    _require(d >= 0,
       "The specified limit is behind the index")
     if d <= n {
       return limit
@@ -738,10 +738,10 @@ public protocol MyRandomAccessIndexType : MyBidirectionalIndexType, MyStrideable
 
 extension MyRandomAccessIndexType {
   public func _failEarlyRangeCheck(index: Self, bounds: MyRange<Self>) {
-    _precondition(
+    _require(
       bounds.startIndex <= index,
       "index is out of bounds: index designates a position before bounds.startIndex")
-    _precondition(
+    _require(
       index < bounds.endIndex,
       "index is out of bounds: index designates the bounds.endIndex position or a position after it")
   }
@@ -751,17 +751,17 @@ extension MyRandomAccessIndexType {
   ) {
     let range = MyRange(startIndex: rangeStart, endIndex: rangeEnd)
     let bounds = MyRange(startIndex: boundsStart, endIndex: boundsEnd)
-    _precondition(
+    _require(
       bounds.startIndex <= range.startIndex,
       "range.startIndex is out of bounds: index designates a position before bounds.startIndex")
-    _precondition(
+    _require(
       bounds.startIndex <= range.endIndex,
       "range.endIndex is out of bounds: index designates a position before bounds.startIndex")
 
-    _precondition(
+    _require(
       range.startIndex <= bounds.endIndex,
       "range.startIndex is out of bounds: index designates a position after bounds.endIndex")
-    _precondition(
+    _require(
       range.endIndex <= bounds.endIndex,
       "range.startIndex is out of bounds: index designates a position after bounds.endIndex")
   }

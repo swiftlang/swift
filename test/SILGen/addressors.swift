@@ -35,7 +35,7 @@ func test0() {
 // CHECK: [[T0:%.*]] = function_ref @_TFV10addressors1AC
 // CHECK: [[T1:%.*]] = metatype $@thin A.Type
 // CHECK: [[AVAL:%.*]] = apply [[T0]]([[T1]]) 
-// CHECK: store [[AVAL]] to [[A]]#1
+// CHECK: store [[AVAL]] to [[A]]
   var a = A()
 
 // CHECK: [[T0:%.*]] = function_ref @_TFV10addressors1Alu9subscriptFVs5Int32S1_ :
@@ -46,7 +46,7 @@ func test0() {
   let z = a[10]
 
 // CHECK: [[T0:%.*]] = function_ref @_TFV10addressors1Aau9subscriptFVs5Int32S1_ :
-// CHECK: [[T1:%.*]] = apply [[T0]]({{%.*}}, [[A]]#1)
+// CHECK: [[T1:%.*]] = apply [[T0]]({{%.*}}, [[A]])
 // CHECK: [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int32>, #UnsafeMutablePointer._rawValue
 // CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to $*Int32
 // CHECK: load
@@ -55,7 +55,7 @@ func test0() {
   a[5] += z
 
 // CHECK: [[T0:%.*]] = function_ref @_TFV10addressors1Aau9subscriptFVs5Int32S1_ :
-// CHECK: [[T1:%.*]] = apply [[T0]]({{%.*}}, [[A]]#1)
+// CHECK: [[T1:%.*]] = apply [[T0]]({{%.*}}, [[A]])
 // CHECK: [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int32>, #UnsafeMutablePointer._rawValue
 // CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to $*Int32
 // CHECK: store {{%.*}} to [[T3]]
@@ -194,10 +194,10 @@ struct D : Subscriptable {
 // SILGEN:   [[INIT:%.*]] = function_ref @_TFSqC
 // SILGEN:   [[META:%.*]] = metatype $@thin Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>.Type
 // SILGEN:   [[T0:%.*]] = alloc_stack $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>
-// SILGEN:   [[OPT:%.*]] = apply [[INIT]]<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>([[T0]]#1, [[META]])
-// SILGEN:   [[T1:%.*]] = load [[T0]]#1
+// SILGEN:   [[OPT:%.*]] = apply [[INIT]]<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>([[T0]], [[META]])
+// SILGEN:   [[T1:%.*]] = load [[T0]]
 // SILGEN:   [[T2:%.*]] = tuple ([[ADDR]] : $Builtin.RawPointer, [[T1]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>)
-// SILGEN:   dealloc_stack [[T0]]#0
+// SILGEN:   dealloc_stack [[T0]]
 // SILGEN:   copy_addr [[BOX]]#1 to [[SELF]]
 // SILGEN:   strong_release [[BOX]]#0
 // SILGEN:   return [[T2]] :

@@ -1267,19 +1267,15 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   auto *MetaTyVal = Builder.createMetatype(Loc, SILMetaTy);
   SmallVector<SILValue, 1> Args;
 
-  auto PolyFuncTy = BridgeFuncDecl->getType()->getAs<PolymorphicFunctionType>();
-  ArrayRef<ArchetypeType *> Archetypes =
-      PolyFuncTy->getGenericParams().getAllArchetypes();
-
   // Add substitutions
   SmallVector<Substitution, 2> Subs;
-  auto Conformances = M.getASTContext().Allocate<ProtocolConformance *>(1);
-  Conformances[0] = Conformance;
-  Subs.push_back(Substitution(Archetypes[0], Target, Conformances));
+  auto Conformances =
+    M.getASTContext().AllocateUninitialized<ProtocolConformanceRef>(1);
+  Conformances[0] = ProtocolConformanceRef(Conformance);
+  Subs.push_back(Substitution(Target, Conformances));
   const Substitution *DepTypeSubst = getTypeWitnessByName(
       Conformance, M.getASTContext().getIdentifier("_ObjectiveCType"));
-  Subs.push_back(Substitution(Archetypes[1], DepTypeSubst->getReplacement(),
-                              DepTypeSubst->getConformances()));
+  Subs.push_back(*DepTypeSubst);
   auto SILFnTy = FuncRef->getType();
   SILType SubstFnTy = SILFnTy.substGenericArgs(M, Subs);
   SILType ResultTy = SubstFnTy.castTo<SILFunctionType>()->getSILResult();
@@ -1297,7 +1293,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
     OptionalTy.getAnyOptionalObjectType(OTK);
     Tmp = Builder.createAllocStack(Loc,
                                    SILType::getPrimitiveObjectType(OptionalTy));
-    InOutOptionalParam = SILValue(Tmp, 1);
+    InOutOptionalParam = Tmp;
   } else {
     InOutOptionalParam = Dest;
   }

@@ -336,8 +336,11 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   initDecl->setInitializerInterfaceType(initIfaceType);
   initDecl->setAccessibility(enumDecl->getFormalAccess());
 
+  // If the enum was not imported, the derived conformance is either from the
+  // enum itself or an extension, in which case we will emit the declaration
+  // normally.
   if (enumDecl->hasClangNode())
-    tc.implicitlyDefinedFunctions.push_back(initDecl);
+    tc.Context.addExternalDecl(initDecl);
 
   cast<IterableDeclContext>(parentDecl)->addMember(initDecl);
   return initDecl;

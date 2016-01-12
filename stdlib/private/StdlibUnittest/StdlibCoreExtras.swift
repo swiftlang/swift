@@ -14,7 +14,7 @@ import SwiftPrivate
 import SwiftPrivateDarwinExtras
 #if os(OSX) || os(iOS)
 import Darwin
-#elseif os(Linux)
+#elseif os(Linux) || os(FreeBSD)
 import Glibc
 #endif
 

@@ -63,10 +63,8 @@ TermInst *swift::addNewEdgeValueToBranch(TermInst *Branch, SILBasicBlock *Dest,
     assert(Args.size() == Dest->getNumBBArg());
     NewBr = Builder.createBranch(BI->getLoc(), BI->getDestBB(), Args);
   } else {
-    NewBr->dump();
     // At the moment we can only add arguments to br and cond_br.
     llvm_unreachable("Can't add argument to terminator");
-    return NewBr;
   }
 
   Branch->dropAllReferences();

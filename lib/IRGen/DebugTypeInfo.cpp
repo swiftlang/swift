@@ -114,6 +114,21 @@ DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, swift::Type Ty,
   initFromTypeInfo(size, align, StorageType, Info);
 }
 
+DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, swift::Type Ty,
+                             llvm::Type *StorageTy,
+                             Size size, Alignment align)
+  : DeclOrContext(Decl),
+    StorageType(StorageTy),
+    size(size),
+    align(align) {
+  // Prefer the original, potentially sugared version of the type if
+  // the type hasn't been mucked with by an optimization pass.
+  if (Decl->getType().getCanonicalTypeOrNull() == Ty.getCanonicalTypeOrNull())
+    Type = Decl->getType().getPointer();
+  else
+    Type = Ty.getPointer();
+}
+
 static bool typesEqual(Type A, Type B) {
   if (A.getPointer() == B.getPointer())
     return true;

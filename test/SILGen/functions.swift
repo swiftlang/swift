@@ -353,14 +353,14 @@ func calls(i: Int, j: Int, k: Int) {
   var p : SomeProtocol = ConformsToSomeProtocol()
 
   // CHECK: [[TEMP:%.*]] = alloc_stack $SomeProtocol
-  // CHECK: copy_addr [[PADDR]]#1 to [initialization] [[TEMP]]#1
-  // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr [[TEMP]]#1 : $*SomeProtocol to $*[[OPENED:@opened(.*) SomeProtocol]]
+  // CHECK: copy_addr [[PADDR]]#1 to [initialization] [[TEMP]]
+  // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr [[TEMP]] : $*SomeProtocol to $*[[OPENED:@opened(.*) SomeProtocol]]
   // CHECK: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED]], #SomeProtocol.method!1
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: apply [[PMETHOD]]<[[OPENED]]>([[I]], [[PVALUE]])
   // CHECK: destroy_addr [[PVALUE]]
-  // CHECK: deinit_existential_addr [[TEMP]]#1
-  // CHECK: dealloc_stack [[TEMP]]#0
+  // CHECK: deinit_existential_addr [[TEMP]]
+  // CHECK: dealloc_stack [[TEMP]]
   p.method(i)
 
   // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr [[PADDR:%.*]] : $*SomeProtocol to $*[[OPENED:@opened(.*) SomeProtocol]]
@@ -388,21 +388,21 @@ func calls(i: Int, j: Int, k: Int) {
   // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[G]] : {{.*}}, #SomeGeneric.method!1
   // CHECK: [[TMPI:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
-  // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]]#1, [[TMPI]]#1, [[G]])
+  // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]], [[TMPI]], [[G]])
   g.method(i)
 
   // CHECK: [[G:%[0-9]+]] = load [[GADDR]]
   // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[G]] : {{.*}}, #SomeGeneric.generic!1
   // CHECK: [[TMPJ:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
-  // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]]#1, [[TMPJ]]#1, [[G]])
+  // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]], [[TMPJ]], [[G]])
   g.generic(j)
 
   // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
   // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[C]] : {{.*}}, #SomeClass.generic!1
   // CHECK: [[TMPK:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
-  // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]]#1, [[TMPK]]#1, [[C]])
+  // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]], [[TMPK]], [[C]])
   c.generic(k)
 
   // FIXME: curried generic entry points

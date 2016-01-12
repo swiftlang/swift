@@ -74,13 +74,6 @@ enum class SILValueCategory {
   /// An address is a pointer to an allocated variable of the type
   /// (possibly uninitialized).
   Address,
-
-  /// Local storage is the container for a local allocation.  For
-  /// statically-sized types, this is just the allocation itself.
-  /// However, for dynamically-sized types (like archetypes or
-  /// resilient structs), it may be some sort of fixed-size buffer,
-  /// stack depth, or the like.
-  LocalStorage
 };
 
 /// SILType - A Swift type that has been lowered to a SIL representation type.
@@ -133,13 +126,6 @@ public:
     return SILType(T, SILValueCategory::Address);
   }
 
-  /// Form the type for the backing storage of a locally-allocated
-  /// object, given a Swift type that either does not require any
-  /// special handling or has already been appropriately lowered.
-  static SILType getPrimitiveLocalStorageType(CanType T) {
-    return SILType(T, SILValueCategory::LocalStorage);
-  }
-
   ///  Apply a substitution to the type to produce another lowered SIL type.
   static SILType substType(SILModule &silModule, ModuleDecl *astModule,
                            TypeSubstitutionMap &subs, SILType SrcTy);
@@ -178,13 +164,6 @@ public:
   /// types are not legal to manipulate directly as objects in SIL.
   SILType getObjectType() const {
     return SILType(getSwiftRValueType(), SILValueCategory::Object);
-  }
-
-  /// Returns the local storage variant of this type.  Local
-  /// allocations of dynamically-sized types generally require some
-  /// sort of buffer.
-  SILType getLocalStorageType() const {
-    return SILType(getSwiftRValueType(), SILValueCategory::LocalStorage);
   }
 
   /// Returns the Swift type referenced by this SIL type.
@@ -267,11 +246,6 @@ public:
 
   /// True if the type is an object type.
   bool isObject() const { return getCategory() == SILValueCategory::Object; }
-
-  /// True if the type is a local-storage type.
-  bool isLocalStorage() const {
-    return getCategory() == SILValueCategory::LocalStorage;
-  }
 
   /// isAddressOnly - True if the type, or the referenced type of an address
   /// type, is address-only.  For example, it could be a resilient struct or

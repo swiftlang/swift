@@ -308,9 +308,9 @@ func archetype_member_ref<T : Runcible>(x: T) {
   x.free_method()
   // CHECK: witness_method $T, #Runcible.free_method!1
   // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $T
-  // CHECK-NEXT: copy_addr [[X:%.*]] to [initialization] [[TEMP]]#1
+  // CHECK-NEXT: copy_addr [[X:%.*]] to [initialization] [[TEMP]]
   // CHECK-NEXT: apply
-  // CHECK-NEXT: destroy_addr [[TEMP]]#1
+  // CHECK-NEXT: destroy_addr [[TEMP]]
   var u = x.associated_method()
   // CHECK: witness_method $T, #Runcible.associated_method!1
   // CHECK-NEXT: apply

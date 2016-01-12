@@ -17,7 +17,7 @@ func bar(x: Runcible) {
   var x = x
   // CHECK: [[BOX:%.*]] = alloc_box $Runcible
   // CHECK: [[TEMP:%.*]] = alloc_stack $Runcible
-  // CHECK: [[EXIST:%.*]] = open_existential_addr [[TEMP]]#1 : $*Runcible to $*[[OPENED:@opened(.*) Runcible]]
+  // CHECK: [[EXIST:%.*]] = open_existential_addr [[TEMP]] : $*Runcible to $*[[OPENED:@opened(.*) Runcible]]
   // CHECK: [[METHOD:%.*]] = witness_method $[[OPENED]], #Runcible.runce!1
   // CHECK: apply [[METHOD]]<[[OPENED]], Int>
   x.runce(5)

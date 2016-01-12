@@ -130,3 +130,9 @@ protocol PrivateProto3 {}
 struct OtherFileElementType {}
 
 struct OtherFileTypeToBeExtended {}
+
+struct TypeReferencedOnlyBySubscript {}
+struct TypeReferencedOnlyByPrivateSubscript {}
+
+protocol ProtoReferencedOnlyInGeneric {}
+protocol ProtoReferencedOnlyInPrivateGeneric {}

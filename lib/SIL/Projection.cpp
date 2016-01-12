@@ -188,9 +188,6 @@ NewProjection::createObjectProjection(SILBuilder &B, SILLocation Loc,
   // of this projection match and that this projection can be represented as
   // value. Create the instruction if we can. Otherwise, return nullptr.
   switch (getKind()) {
-  case NewProjectionKind::Invalid:
-  case NewProjectionKind::LargeIndex:
-    llvm_unreachable("Invalid projection");
   case NewProjectionKind::Struct:
     return B.createStructExtract(Loc, Base, getVarDecl(BaseTy));
   case NewProjectionKind::Tuple:
@@ -224,9 +221,6 @@ NewProjection::createAddressProjection(SILBuilder &B, SILLocation Loc,
   // of this projection match and that this projection can be represented as
   // value. Create the instruction if we can. Otherwise, return nullptr.
   switch (getKind()) {
-  case NewProjectionKind::Invalid:
-  case NewProjectionKind::LargeIndex:
-    llvm_unreachable("Invalid projection?!");
   case NewProjectionKind::Struct:
     return B.createStructElementAddr(Loc, Base, getVarDecl(BaseTy));
   case NewProjectionKind::Tuple:
@@ -888,16 +882,6 @@ createValueProjection(SILBuilder &B, SILLocation Loc, SILValue Base) const {
   if (!BaseTy.isObject())
     return nullptr;
 
-  // If this projection is associated with an address type, convert its type to
-  // an object type.
-  //
-  // We explicitly do not convert Type to be an object if it is a local storage
-  // type since we want it to fail.
-  SILType Ty = Type.isAddress()? Type.getObjectType() : Type;
-
-  if (!Ty.isObject())
-    return nullptr;
-
   // Ok, we now know that the type of Base and the type represented by the base
   // of this projection match and that this projection can be represented as
   // value. Create the instruction if we can. Otherwise, return nullptr.
@@ -924,17 +908,6 @@ createAddrProjection(SILBuilder &B, SILLocation Loc, SILValue Base) const {
 
   // If BaseTy is not an address type, bail.
   if (!BaseTy.isAddress())
-    return nullptr;
-
-  // If this projection is associated with an object type, convert its type to
-  // an address type.
-  //
-  // *NOTE* We purposely do not handle local storage types here since we want to
-  // always fail in such a case. That is handled by checking that Ty is an
-  // address.
-  SILType Ty = Type.isObject()? Type.getAddressType() : Type;
-
-  if (!Ty.isAddress())
     return nullptr;
 
   // Ok, we now know that the type of Base and the type represented by the base

@@ -363,17 +363,17 @@ func logical_lvalue_lifetime(r: RefWithProp, _ i: Int, _ v: Val) {
   // CHECK: strong_retain [[R2]]
   // CHECK: [[STORAGE:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
   // CHECK: [[ALEPH_PROP_TEMP:%[0-9]+]] = alloc_stack $Aleph
-  // CHECK: [[T0:%.*]] = address_to_pointer [[ALEPH_PROP_TEMP]]#1
+  // CHECK: [[T0:%.*]] = address_to_pointer [[ALEPH_PROP_TEMP]]
   // CHECK: [[MATERIALIZE_METHOD:%[0-9]+]] = class_method {{.*}} : $RefWithProp, #RefWithProp.aleph_prop!materializeForSet.1 :
-  // CHECK: [[MATERIALIZE:%.*]] = apply [[MATERIALIZE_METHOD]]([[T0]], [[STORAGE]]#1, [[R2]])
+  // CHECK: [[MATERIALIZE:%.*]] = apply [[MATERIALIZE_METHOD]]([[T0]], [[STORAGE]], [[R2]])
   // CHECK: [[PTR:%.*]] = tuple_extract [[MATERIALIZE]] : {{.*}}, 0
   // CHECK: [[ADDR:%.*]] = pointer_to_address [[PTR]]
   // CHECK: [[OPTCALLBACK:%.*]] = tuple_extract [[MATERIALIZE]] : {{.*}}, 1
   // CHECK: [[MARKED_ADDR:%.*]] = mark_dependence [[ADDR]] : $*Aleph on [[R2]]
   // CHECK: {{.*}}([[CALLBACK:%.*]] : 
   // CHECK: [[TEMP:%.*]] = alloc_stack $RefWithProp
-  // CHECK: store [[R2]] to [[TEMP]]#1
-  // CHECK: apply [[CALLBACK]]({{.*}}, [[STORAGE]]#1, [[TEMP]]#1, {{%.*}})
+  // CHECK: store [[R2]] to [[TEMP]]
+  // CHECK: apply [[CALLBACK]]({{.*}}, [[STORAGE]], [[TEMP]], {{%.*}})
 }
 
 func bar() -> Int {}

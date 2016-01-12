@@ -51,7 +51,7 @@ func test0(c c: C) {
 // CHECK-NEXT:  debug_value_addr %1 : $*@sil_weak Optional<C>, var, name "bC", argno 1
 // CHECK-NEXT:  %3 = alloc_stack $Optional<C>
 // CHECK-NEXT:  %4 = load_weak %1 : $*@sil_weak Optional<C>
-// CHECK-NEXT:  store %4 to %3#1 : $*Optional<C>
+// CHECK-NEXT:  store %4 to %3 : $*Optional<C>
 func testClosureOverWeak() {
   weak var bC = C()
   takeClosure { bC!.f() }

@@ -136,9 +136,9 @@ bb0:
   %0 = alloc_stack $Int, var, name "a"                 // users: %3, %5
   %1 = integer_literal $Builtin.Int64, 1          // user: %2
   %2 = struct $Int (%1 : $Builtin.Int64)          // user: %3
-  store %2 to %0#1 : $*Int                        // id: %3
+  store %2 to %0 : $*Int                        // id: %3
   %4 = tuple ()                                   // user: %6
-  dealloc_stack %0#0 : $*@local_storage Int       // id: %5
+  dealloc_stack %0 : $*Int       // id: %5
   return %4 : $()                                 // id: %6
 }
 
@@ -153,10 +153,10 @@ bb0:
   %0 = alloc_stack $Int, var, name "a"                 // users: %3, %5
   %1 = integer_literal $Builtin.Int64, 1          // user: %2
   %2 = struct $Int (%1 : $Builtin.Int64)          // user: %3
-  store %2 to %0#1 : $*Int                        // id: %3
+  store %2 to %0 : $*Int                        // id: %3
   %4 = tuple ()                                   // user: %6
-  %99 = load %0#1 : $*Int
-  dealloc_stack %0#0 : $*@local_storage Int       // id: %5
+  %99 = load %0 : $*Int
+  dealloc_stack %0 : $*Int       // id: %5
   return %4 : $()                                 // id: %6
 }
 
@@ -283,10 +283,10 @@ bb0:
   %0 = alloc_stack $Int, var, name "a"                 // users: %3, %5
   %1 = integer_literal $Builtin.Int64, 1          // user: %2
   %2 = struct $Int (%1 : $Builtin.Int64)          // user: %3
-  store %2 to %0#1 : $*Int                        // id: %3
-  debug_value_addr %0#1 : $*Int  
+  store %2 to %0 : $*Int                        // id: %3
+  debug_value_addr %0 : $*Int  
   %4 = tuple ()                                   // user: %6
-  dealloc_stack %0#0 : $*@local_storage Int       // id: %5
+  dealloc_stack %0 : $*Int       // id: %5
   return %4 : $()                                 // id: %6
 }
 
@@ -384,8 +384,8 @@ sil hidden @DeadStoreWithAliasingBasesSimpleClass : $@convention(thin) (Bool) ->
 bb0(%0 : $Bool):
   %1 = alloc_ref $foo                             // users: %3, %6
   %2 = alloc_stack $foo                           // users: %3, %8, %15
-  store %1 to %2#1 : $*foo                        // id: %3
-  %8 = load %2#1 : $*foo                          // user: %11
+  store %1 to %2 : $*foo                        // id: %3
+  %8 = load %2 : $*foo                          // user: %11
   %4 = integer_literal $Builtin.Int64, 12         // user: %5
   %5 = struct $Int (%4 : $Builtin.Int64)          // user: %7
   %6 = ref_element_addr %1 : $foo, #foo.a         // user: %7
@@ -393,7 +393,7 @@ bb0(%0 : $Bool):
   %9 = ref_element_addr %8 : $foo, #foo.a        // user: %12
   store %5 to %9 : $*Int                        // id: %12
   %14 = tuple ()                                  // user: %16
-  dealloc_stack %2#0 : $*@local_storage foo       // id: %15
+  dealloc_stack %2 : $*foo       // id: %15
   return %14 : $()                                // id: %16
 }
 
@@ -413,31 +413,31 @@ bb0(%0 : $Bool, %1 : $Int):
   %3 = function_ref @S1_init : $@convention(thin) (@thin S1.Type) -> S1 // user: %5
   %4 = metatype $@thin S1.Type                    // user: %5
   %5 = apply %3(%4) : $@convention(thin) (@thin S1.Type) -> S1 // user: %6
-  store %5 to %2#1 : $*S1                         // id: %6
+  store %5 to %2 : $*S1                         // id: %6
   %7 = struct_extract %0 : $Bool, #Bool.value     // user: %8
   cond_br %7, bb1, bb2                            // id: %8
 
 bb1:                                              // Preds: bb0
   %9 = integer_literal $Builtin.Int64, 0          // user: %10
   %10 = struct $Int (%9 : $Builtin.Int64)         // user: %12
-  %11 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %12
+  %11 = struct_element_addr %2 : $*S1, #S1.a    // user: %12
   store %10 to %11 : $*Int                        // id: %12
   br bb3                                          // id: %13
 
 bb2:                                              // Preds: bb0
   %14 = integer_literal $Builtin.Int64, 1         // user: %15
   %15 = struct $Int (%14 : $Builtin.Int64)        // user: %17
-  %16 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %17
+  %16 = struct_element_addr %2 : $*S1, #S1.a    // user: %17
   store %15 to %16 : $*Int                        // id: %17
   br bb3                                          // id: %18
 
 bb3:                                              // Preds: bb1 bb2
   %19 = integer_literal $Builtin.Int64, 2         // user: %20
   %20 = struct $Int (%19 : $Builtin.Int64)        // user: %22
-  %21 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %22
+  %21 = struct_element_addr %2 : $*S1, #S1.a    // user: %22
   store %20 to %21 : $*Int                        // id: %22
   %23 = tuple ()                                  // user: %25
-  dealloc_stack %2#0 : $*@local_storage S1        // id: %24
+  dealloc_stack %2 : $*S1        // id: %24
   return %23 : $()                                // id: %25
 }
 
@@ -455,34 +455,34 @@ bb0(%0 : $Bool, %1 : $Int):
   %3 = function_ref @S1_init : $@convention(thin) (@thin S1.Type) -> S1 // user: %5
   %4 = metatype $@thin S1.Type                    // user: %5
   %5 = apply %3(%4) : $@convention(thin) (@thin S1.Type) -> S1 // user: %6
-  store %5 to %2#1 : $*S1                         // id: %6
+  store %5 to %2 : $*S1                         // id: %6
   br bb1                                          // id: %7
 
 bb1:                                              // Preds: bb0
   %8 = struct_extract %0 : $Bool, #Bool.value     // user: %13
   %9 = integer_literal $Builtin.Int64, 0          // user: %10
   %10 = struct $Int (%9 : $Builtin.Int64)         // user: %12
-  %11 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %12
+  %11 = struct_element_addr %2 : $*S1, #S1.a    // user: %12
   store %10 to %11 : $*Int                        // id: %12
   cond_br %8, bb2, bb3                            // id: %13
 
 bb2:                                              // Preds: bb1
   %14 = integer_literal $Builtin.Int64, 0         // user: %15
   %15 = struct $Int (%14 : $Builtin.Int64)        // user: %17
-  %16 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %17
+  %16 = struct_element_addr %2 : $*S1, #S1.a    // user: %17
   store %15 to %16 : $*Int                        // id: %17
   br bb4                                          // id: %18
 
 bb3:                                              // Preds: bb1
   %19 = integer_literal $Builtin.Int64, 1         // user: %20
   %20 = struct $Int (%19 : $Builtin.Int64)        // user: %22
-  %21 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %22
+  %21 = struct_element_addr %2 : $*S1, #S1.a    // user: %22
   store %20 to %21 : $*Int                        // id: %22
   br bb4                                          // id: %23
 
 bb4:                                              // Preds: bb2 bb3
   %24 = tuple ()                                  // user: %26
-  dealloc_stack %2#0 : $*@local_storage S1        // id: %25
+  dealloc_stack %2 : $*S1        // id: %25
   return %24 : $()                                // id: %26
 }
 
@@ -499,14 +499,14 @@ bb0(%0 : $Bool, %1 : $Int):
   %3 = function_ref @S1_init : $@convention(thin) (@thin S1.Type) -> S1 // user: %5
   %4 = metatype $@thin S1.Type                    // user: %5
   %5 = apply %3(%4) : $@convention(thin) (@thin S1.Type) -> S1 // user: %6
-  store %5 to %2#1 : $*S1                         // id: %6
+  store %5 to %2 : $*S1                         // id: %6
   br bb1                                          // id: %7
 
 bb1:                                              // Preds: bb0
   %8 = struct_extract %0 : $Bool, #Bool.value     // user: %13
   %9 = integer_literal $Builtin.Int64, 0          // user: %10
   %10 = struct $Int (%9 : $Builtin.Int64)         // user: %12
-  %11 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %12
+  %11 = struct_element_addr %2 : $*S1, #S1.a    // user: %12
   store %10 to %11 : $*Int                        // id: %12
   cond_br %8, bb2, bb3                            // id: %13
 
@@ -516,17 +516,17 @@ bb2:                                              // Preds: bb1
 bb3:                                              // Preds: bb1
   %15 = integer_literal $Builtin.Int64, 1         // user: %16
   %16 = struct $Int (%15 : $Builtin.Int64)        // user: %18
-  %17 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %18
+  %17 = struct_element_addr %2 : $*S1, #S1.a    // user: %18
   store %16 to %17 : $*Int                        // id: %18
   br bb4                                          // id: %19
 
 bb4:                                              // Preds: bb2 bb3
   %20 = integer_literal $Builtin.Int64, 0         // user: %21
   %21 = struct $Int (%20 : $Builtin.Int64)        // user: %23
-  %22 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %23
+  %22 = struct_element_addr %2 : $*S1, #S1.a    // user: %23
   store %21 to %22 : $*Int                        // id: %23
   %24 = tuple ()                                  // user: %26
-  dealloc_stack %2#0 : $*@local_storage S1        // id: %25
+  dealloc_stack %2 : $*S1        // id: %25
   return %24 : $()                                // id: %26
 }
 
@@ -544,14 +544,14 @@ bb0(%0 : $Bool, %1 : $Int):
   %3 = function_ref @S1_init : $@convention(thin) (@thin S1.Type) -> S1 // user: %5
   %4 = metatype $@thin S1.Type                    // user: %5
   %5 = apply %3(%4) : $@convention(thin) (@thin S1.Type) -> S1 // user: %6
-  store %5 to %2#1 : $*S1                         // id: %6
+  store %5 to %2 : $*S1                         // id: %6
   br bb1                                          // id: %7
 
 bb1:                                              // Preds: bb0
   %8 = struct_extract %0 : $Bool, #Bool.value     // user: %14
   %9 = integer_literal $Builtin.Int64, 0          // user: %10
   %10 = struct $Int (%9 : $Builtin.Int64)         // user: %13
-  %11 = struct_element_addr %2#1 : $*S1, #S1.a    // users: %12, %13
+  %11 = struct_element_addr %2 : $*S1, #S1.a    // users: %12, %13
   %12 = load %11 : $*Int
   store %10 to %11 : $*Int                        // id: %13
   cond_br %8, bb2, bb3                            // id: %14
@@ -562,17 +562,17 @@ bb2:                                              // Preds: bb1
 bb3:                                              // Preds: bb1
   %16 = integer_literal $Builtin.Int64, 1         // user: %17
   %17 = struct $Int (%16 : $Builtin.Int64)        // user: %19
-  %18 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %19
+  %18 = struct_element_addr %2 : $*S1, #S1.a    // user: %19
   store %17 to %18 : $*Int                        // id: %19
   br bb4                                          // id: %20
 
 bb4:                                              // Preds: bb2 bb3
   %21 = integer_literal $Builtin.Int64, 0         // user: %22
   %22 = struct $Int (%21 : $Builtin.Int64)        // user: %24
-  %23 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %24
+  %23 = struct_element_addr %2 : $*S1, #S1.a    // user: %24
   store %22 to %23 : $*Int                        // id: %24
   %25 = tuple ()                                  // user: %27
-  dealloc_stack %2#0 : $*@local_storage S1        // id: %26
+  dealloc_stack %2 : $*S1        // id: %26
   return %25 : $()                                // id: %27
 }
 
@@ -596,34 +596,34 @@ bb0(%0 : $Bool, %1 : $Int):
   %3 = function_ref @S1_init : $@convention(thin) (@thin S1.Type) -> S1 // user: %5
   %4 = metatype $@thin S1.Type                    // user: %5
   %5 = apply %3(%4) : $@convention(thin) (@thin S1.Type) -> S1 // user: %6
-  store %5 to %2#1 : $*S1                         // id: %6
+  store %5 to %2 : $*S1                         // id: %6
   br bb1                                          // id: %7
 
 bb1:                                              // Preds: bb0
   %8 = struct_extract %0 : $Bool, #Bool.value
   %9 = integer_literal $Builtin.Int64, 0          // user: %10
   %10 = struct $Int (%9 : $Builtin.Int64)         // user: %12
-  %11 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %12
+  %11 = struct_element_addr %2 : $*S1, #S1.a    // user: %12
   store %10 to %11 : $*Int                        // id: %12
   br bb3                                          // id: %13
 
 bb2:
   %14 = integer_literal $Builtin.Int64, 0         // user: %15
   %15 = struct $Int (%14 : $Builtin.Int64)        // user: %17
-  %16 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %17
+  %16 = struct_element_addr %2 : $*S1, #S1.a    // user: %17
   store %15 to %16 : $*Int                        // id: %17
   br bb3                                          // id: %18
 
 bb3:                                              // Preds: bb1 bb2
   %19 = integer_literal $Builtin.Int64, 1         // user: %20
   %20 = struct $Int (%19 : $Builtin.Int64)        // user: %22
-  %21 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %22
+  %21 = struct_element_addr %2 : $*S1, #S1.a    // user: %22
   store %20 to %21 : $*Int                        // id: %22
   br bb4                                          // id: %23
 
 bb4:                                              // Preds: bb3
   %24 = tuple ()                                  // user: %26
-  dealloc_stack %2#0 : $*@local_storage S1        // id: %25
+  dealloc_stack %2 : $*S1        // id: %25
   return %24 : $()                                // id: %26
 }
 
@@ -641,14 +641,14 @@ bb0(%0 : $Bool):
   %2 = function_ref @S2_init : $@convention(thin) (@thin S2.Type) -> S2 // user: %4
   %3 = metatype $@thin S2.Type                    // user: %4
   %4 = apply %2(%3) : $@convention(thin) (@thin S2.Type) -> S2 // user: %5
-  store %4 to %1#1 : $*S2                         // id: %5
+  store %4 to %1 : $*S2                         // id: %5
   %6 = struct_extract %0 : $Bool, #Bool.value     // user: %7
   cond_br %6, bb1, bb2                            // id: %7
 
 bb1:                                              // Preds: bb0
   %8 = integer_literal $Builtin.Int64, 0          // user: %9
   %9 = struct $Int (%8 : $Builtin.Int64)          // user: %12
-  %10 = struct_element_addr %1#1 : $*S2, #S2.x    // user: %11
+  %10 = struct_element_addr %1 : $*S2, #S2.x    // user: %11
   %11 = struct_element_addr %10 : $*S1, #S1.a     // user: %12
   store %9 to %11 : $*Int                         // id: %12
   br bb3                                          // id: %13
@@ -656,7 +656,7 @@ bb1:                                              // Preds: bb0
 bb2:                                              // Preds: bb0
   %14 = integer_literal $Builtin.Int64, 1         // user: %15
   %15 = struct $Int (%14 : $Builtin.Int64)        // user: %18
-  %16 = struct_element_addr %1#1 : $*S2, #S2.x    // user: %17
+  %16 = struct_element_addr %1 : $*S2, #S2.x    // user: %17
   %17 = struct_element_addr %16 : $*S1, #S1.a     // user: %18
   store %15 to %17 : $*Int                        // id: %18
   br bb3                                          // id: %19
@@ -664,11 +664,11 @@ bb2:                                              // Preds: bb0
 bb3:                                              // Preds: bb1 bb2
   %20 = integer_literal $Builtin.Int64, 2         // user: %21
   %21 = struct $Int (%20 : $Builtin.Int64)        // user: %24
-  %22 = struct_element_addr %1#1 : $*S2, #S2.x    // user: %23
+  %22 = struct_element_addr %1 : $*S2, #S2.x    // user: %23
   %23 = struct_element_addr %22 : $*S1, #S1.a     // user: %24
   store %21 to %23 : $*Int                        // id: %24
   %25 = tuple ()                                  // user: %27
-  dealloc_stack %1#0 : $*@local_storage S2        // id: %26
+  dealloc_stack %1 : $*S2        // id: %26
   return %25 : $()                                // id: %27
 }
 
@@ -688,13 +688,13 @@ bb0(%0 : $Bool):
   %2 = function_ref @S2_init : $@convention(thin) (@thin S2.Type) -> S2 // user: %4
   %3 = metatype $@thin S2.Type                    // user: %4
   %4 = apply %2(%3) : $@convention(thin) (@thin S2.Type) -> S2 // user: %5
-  store %4 to %1#1 : $*S2                         // id: %5
+  store %4 to %1 : $*S2                         // id: %5
   br bb1                                          // id: %6
 
 bb1:                                              // Preds: bb0
   %7 = integer_literal $Builtin.Int64, 0          // user: %8
   %8 = struct $Int (%7 : $Builtin.Int64)          // user: %11
-  %9 = struct_element_addr %1#1 : $*S2, #S2.x     // user: %10
+  %9 = struct_element_addr %1 : $*S2, #S2.x     // user: %10
   %10 = struct_element_addr %9 : $*S1, #S1.a      // user: %11
   store %8 to %10 : $*Int                         // id: %11
   %12 = struct_extract %0 : $Bool, #Bool.value    // user: %13
@@ -706,7 +706,7 @@ bb2:                                              // Preds: bb1
 bb3:                                              // Preds: bb1
   %15 = integer_literal $Builtin.Int64, 1         // user: %16
   %16 = struct $Int (%15 : $Builtin.Int64)        // user: %19
-  %17 = struct_element_addr %1#1 : $*S2, #S2.x    // user: %18
+  %17 = struct_element_addr %1 : $*S2, #S2.x    // user: %18
   %18 = struct_element_addr %17 : $*S1, #S1.a     // user: %19
   store %16 to %18 : $*Int                        // id: %19
   br bb4                                          // id: %20
@@ -714,11 +714,11 @@ bb3:                                              // Preds: bb1
 bb4:                                              // Preds: bb2 bb3
   %21 = integer_literal $Builtin.Int64, 2         // user: %22
   %22 = struct $Int (%21 : $Builtin.Int64)        // user: %25
-  %23 = struct_element_addr %1#1 : $*S2, #S2.x    // user: %24
+  %23 = struct_element_addr %1 : $*S2, #S2.x    // user: %24
   %24 = struct_element_addr %23 : $*S1, #S1.a     // user: %25
   store %22 to %24 : $*Int                        // id: %25
   %26 = tuple ()                                  // user: %28
-  dealloc_stack %1#0 : $*@local_storage S2        // id: %27
+  dealloc_stack %1 : $*S2        // id: %27
   return %26 : $()                                // id: %28
 }
 
@@ -734,20 +734,20 @@ bb0(%0 : $Bool, %1 : $Int):
   %5 = function_ref @S1_init : $@convention(thin) (@thin S1.Type) -> S1 // user: %7
   %6 = metatype $@thin S1.Type                    // user: %7
   %7 = apply %5(%6) : $@convention(thin) (@thin S1.Type) -> S1 // user: %8
-  store %7 to %2#1 : $*S1                         // id: %8
+  store %7 to %2 : $*S1                         // id: %8
   br bb1
 
 bb1:                                              // Preds: bb0
   %11 = integer_literal $Builtin.Int64, 0         // user: %12
   %12 = struct $Int (%11 : $Builtin.Int64)        // user: %14
-  %13 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %14
+  %13 = struct_element_addr %2 : $*S1, #S1.a    // user: %14
   %14 = load %13 : $*Int
   br bb2                                          // id: %15
 
 bb2:                                              // Preds: bb0
   %16 = integer_literal $Builtin.Int64, 1         // user: %17
   %17 = struct $Int (%16 : $Builtin.Int64)        // user: %19
-  %18 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %19
+  %18 = struct_element_addr %2 : $*S1, #S1.a    // user: %19
   store %17 to %18 : $*Int                        // id: %19
   %9 = struct_extract %0 : $Bool, #Bool.value     // user: %10
   cond_br %9, bb1, bb3                            // id: %10
@@ -755,10 +755,10 @@ bb2:                                              // Preds: bb0
 bb3:                                              // Preds: bb1 bb2
   %21 = integer_literal $Builtin.Int64, 2         // user: %22
   %22 = struct $Int (%21 : $Builtin.Int64)        // user: %24
-  %23 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %24
+  %23 = struct_element_addr %2 : $*S1, #S1.a    // user: %24
   store %22 to %23 : $*Int                        // id: %24
   %25 = tuple ()                                  // user: %27
-  dealloc_stack %2#0 : $*@local_storage S1        // id: %26
+  dealloc_stack %2 : $*S1        // id: %26
   return %25 : $()                                // id: %27
 }
 
@@ -777,20 +777,20 @@ bb0(%0 : $Bool, %1 : $Int):
   %5 = function_ref @S1_init : $@convention(thin) (@thin S1.Type) -> S1 // user: %7
   %6 = metatype $@thin S1.Type                    // user: %7
   %7 = apply %5(%6) : $@convention(thin) (@thin S1.Type) -> S1 // user: %8
-  store %7 to %2#1 : $*S1                         // id: %8
+  store %7 to %2 : $*S1                         // id: %8
  br bb1
 
 bb1:                                              // Preds: bb0
   %11 = integer_literal $Builtin.Int64, 0         // user: %12
   %12 = struct $Int (%11 : $Builtin.Int64)        // user: %14
-  %13 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %14
+  %13 = struct_element_addr %2 : $*S1, #S1.a    // user: %14
   store %12 to %13 : $*Int                        // id: %14
   br bb2                                          // id: %15
 
 bb2:                                              // Preds: bb0
   %16 = integer_literal $Builtin.Int64, 1         // user: %17
   %17 = struct $Int (%16 : $Builtin.Int64)        // user: %19
-  %18 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %19
+  %18 = struct_element_addr %2 : $*S1, #S1.a    // user: %19
   store %17 to %18 : $*Int                        // id: %19
   %9 = struct_extract %0 : $Bool, #Bool.value     // user: %10
   cond_br %9, bb1, bb3                            // id: %10
@@ -798,10 +798,10 @@ bb2:                                              // Preds: bb0
 bb3:                                              // Preds: bb1 bb2
   %21 = integer_literal $Builtin.Int64, 2         // user: %22
   %22 = struct $Int (%21 : $Builtin.Int64)        // user: %24
-  %23 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %24
+  %23 = struct_element_addr %2 : $*S1, #S1.a    // user: %24
   store %22 to %23 : $*Int                        // id: %24
   %25 = tuple ()                                  // user: %27
-  dealloc_stack %2#0 : $*@local_storage S1        // id: %26
+  dealloc_stack %2 : $*S1        // id: %26
   return %25 : $()                                // id: %27
 }
 
@@ -816,8 +816,8 @@ bb3:                                              // Preds: bb1 bb2
 sil hidden @DeadStoreInSimpleTuple : $@convention(thin) () -> Int {
 bb0:
   %0 = alloc_stack $(a: Int, b: Int), var, name "x"    // users: %1, %2, %11, %15, %20
-  %1 = tuple_element_addr %0#1 : $*(a: Int, b: Int), 0 // user: %5
-  %2 = tuple_element_addr %0#1 : $*(a: Int, b: Int), 1 // user: %8
+  %1 = tuple_element_addr %0 : $*(a: Int, b: Int), 0 // user: %5
+  %2 = tuple_element_addr %0 : $*(a: Int, b: Int), 1 // user: %8
   %3 = integer_literal $Builtin.Int64, 2          // user: %4
   %4 = struct $Int (%3 : $Builtin.Int64)          // user: %5
   store %4 to %1 : $*Int                          // id: %5
@@ -826,11 +826,11 @@ bb0:
   store %7 to %2 : $*Int                          // id: %8
   %9 = integer_literal $Builtin.Int64, 10         // user: %10
   %10 = struct $Int (%9 : $Builtin.Int64)         // user: %12
-  %11 = tuple_element_addr %0#1 : $*(a: Int, b: Int), 0 // user: %12
+  %11 = tuple_element_addr %0 : $*(a: Int, b: Int), 0 // user: %12
   store %10 to %11 : $*Int                        // id: %12
   %13 = integer_literal $Builtin.Int64, 12        // user: %14
   %14 = struct $Int (%13 : $Builtin.Int64)        // user: %16
-  %15 = tuple_element_addr %0#1 : $*(a: Int, b: Int), 1 // user: %16
+  %15 = tuple_element_addr %0 : $*(a: Int, b: Int), 1 // user: %16
   store %14 to %15 : $*Int                        // id: %16
   %22 = load %15 : $*Int
   %23 = load %11 : $*Int
@@ -839,7 +839,7 @@ bb0:
   %17 = integer_literal $Builtin.Int64, 22        // user: %19
   %18 = tuple ()
   %19 = struct $Int (%17 : $Builtin.Int64)        // user: %21
-  dealloc_stack %0#0 : $*@local_storage (a: Int, b: Int) // id: %20
+  dealloc_stack %0 : $*(a: Int, b: Int) // id: %20
   return %19 : $Int                               // id: %21
 }
 
@@ -860,7 +860,7 @@ bb0(%0 : $Bool):
   %5 = struct $Int (%4 : $Builtin.Int64)          // user: %7
   %6 = ref_element_addr %3 : $foo, #foo.a         // user: %7
   store %5 to %6 : $*Int                          // id: %7
-  store %3 to %1#1 : $*foo                        // id: %8
+  store %3 to %1 : $*foo                        // id: %8
   %9 = struct_extract %0 : $Bool, #Bool.value     // user: %10
   cond_br %9, bb1, bb2                            // id: %10
 
@@ -890,7 +890,7 @@ bb3:                                              // Preds: bb1 bb2
   strong_release %3 : $foo                        // id: %33
   strong_release %3 : $foo                        // id: %34
   %35 = tuple ()                                  // user: %37
-  dealloc_stack %1#0 : $*@local_storage foo       // id: %36
+  dealloc_stack %1 : $*foo       // id: %36
   return %35 : $()                                // id: %37
 }
 
@@ -904,7 +904,7 @@ sil hidden @DeadStoreInSplitSimpleClass : $@convention(thin) (Bool) -> () {
 bb0(%0 : $Bool):
   %1 = alloc_stack $foo                           // users: %3, %25
   %2 = alloc_ref $foo                             // users: %3, %7, %13, %19, %23
-  store %2 to %1#1 : $*foo                        // id: %3
+  store %2 to %1 : $*foo                        // id: %3
   br bb1                                          // id: %4
 
 bb1:                                              // Preds: bb0
@@ -934,7 +934,7 @@ bb3:                                              // Preds: bb1
 bb4:                                              // Preds: bb2 bb3
   strong_release %2 : $foo                        // id: %23
   %24 = tuple ()                                  // user: %26
-  dealloc_stack %1#0 : $*@local_storage foo       // id: %25
+  dealloc_stack %1 : $*foo       // id: %25
   return %24 : $()                                // id: %26
 }
 
@@ -948,7 +948,7 @@ sil hidden @partial_dead_store_simple_class : $@convention(thin) (Bool) -> () {
 bb0(%0 : $Bool):
   %1 = alloc_stack $foo                           // users: %3, %20
   %2 = alloc_ref $foo                             // users: %3, %7, %14, %18
-  store %2 to %1#1 : $*foo                        // id: %3
+  store %2 to %1 : $*foo                        // id: %3
   br bb1                                          // id: %4
 
 bb1:                                              // Preds: bb0
@@ -973,7 +973,7 @@ bb3:                                              // Preds: bb1
 bb4:                                              // Preds: bb2 bb3
   strong_release %2 : $foo                        // id: %18
   %19 = tuple ()                                  // user: %21
-  dealloc_stack %1#0 : $*@local_storage foo       // id: %20
+  dealloc_stack %1 : $*foo       // id: %20
   return %19 : $()                                // id: %21
 }
 
@@ -987,7 +987,7 @@ sil hidden @partial_dead_store_with_function_call : $@convention(thin) (Bool) ->
 bb0(%0 : $Bool):
   %1 = alloc_stack $foo                           // users: %8, %36
   %3 = alloc_ref $foo                             // users: %6, %8, %11, %14, %17, %19, %22, %25, %27, %30, %33, %34
-  store %3 to %1#1 : $*foo                        // id: %8
+  store %3 to %1 : $*foo                        // id: %8
   br bb1
 
 bb1:
@@ -1017,7 +1017,7 @@ bb3:                                              // Preds: bb0
 bb4:                                              // Preds: bb1 bb2
   strong_release %3 : $foo                        // id: %34
   %35 = tuple ()                                  // user: %37
-  dealloc_stack %1#0 : $*@local_storage foo       // id: %36
+  dealloc_stack %1 : $*foo       // id: %36
   return %35 : $()                                // id: %37
 }
 
@@ -1036,10 +1036,10 @@ bb0(%0 : $Bool, %1 : $Int):
   %3 = function_ref @S1_init : $@convention(thin) (@thin S1.Type) -> S1 // user: %5
   %4 = metatype $@thin S1.Type                    // user: %5
   %5 = apply %3(%4) : $@convention(thin) (@thin S1.Type) -> S1 // user: %6
-  store %5 to %2#1 : $*S1                         // id: %6
+  store %5 to %2 : $*S1                         // id: %6
   %7 = integer_literal $Builtin.Int64, 0          // user: %8
   %8 = struct $Int (%7 : $Builtin.Int64)          // users: %12, %15
-  %9 = struct_element_addr %2#1 : $*S1, #S1.a     // users: %12, %15
+  %9 = struct_element_addr %2 : $*S1, #S1.a     // users: %12, %15
   %10 = alloc_ref $foo                            // user: %14
   br bb1                                          // id: %11
 
@@ -1052,7 +1052,7 @@ bb1:                                              // Preds: bb0
 
 bb2:                                              // Preds: bb1
   %17 = tuple ()                                  // user: %19
-  dealloc_stack %2#0 : $*@local_storage S1        // id: %18
+  dealloc_stack %2 : $*S1        // id: %18
   return %17 : $()                                // id: %19
 }
 
@@ -1069,11 +1069,11 @@ bb0(%0 : $*A):
   %1 = alloc_stack $A                             // users: %4, %8
   %2 = integer_literal $Builtin.Int32, 0          // users: %5, %7
   %3 = struct_element_addr %0 : $*A, #A.i         // user: %6
-  %4 = struct_element_addr %1#1 : $*A, #A.i       // users: %5, %7
+  %4 = struct_element_addr %1 : $*A, #A.i       // users: %5, %7
   store %2 to %4 : $*Builtin.Int32                // id: %5
   %6 = load %3 : $*Builtin.Int32
   store %2 to %4 : $*Builtin.Int32                // id: %7
-  dealloc_stack %1#0 : $*@local_storage A         // id: %8
+  dealloc_stack %1 : $*A         // id: %8
   %9 = tuple ()                                   // user: %10
   return %9 : $()                                 // id: %10
 }
@@ -1124,27 +1124,27 @@ bb0(%0 : $Bool, %1 : $Int):
   %3 = function_ref @S3_init : $@convention(thin) (@thin S3.Type) -> S3 // user: %5
   %4 = metatype $@thin S3.Type                    // user: %5
   %5 = apply %3(%4) : $@convention(thin) (@thin S3.Type) -> S3 // user: %6
-  store %5 to %2#1 : $*S3                         // id: %6
+  store %5 to %2 : $*S3                         // id: %6
   %7 = struct_extract %0 : $Bool, #Bool.value     // user: %8
   cond_br %7, bb1, bb2                            // id: %8
 
 bb1:                                              // Preds: bb0
   %9 = integer_literal $Builtin.Int64, 0          // user: %10
   %10 = struct $Int (%9 : $Builtin.Int64)         // user: %12
-  %11 = struct_element_addr %2#1 : $*S3, #S3.a    // user: %12
+  %11 = struct_element_addr %2 : $*S3, #S3.a    // user: %12
   store %10 to %11 : $*Int                        // id: %12
   br bb3                                          // id: %13
 
 bb2:                                              // Preds: bb0
   %14 = integer_literal $Builtin.Int64, 1         // user: %15
   %15 = struct $Int (%14 : $Builtin.Int64)        // user: %17
-  %16 = struct_element_addr %2#1 : $*S3, #S3.a    // user: %17
+  %16 = struct_element_addr %2 : $*S3, #S3.a    // user: %17
   store %15 to %16 : $*Int                        // id: %17
   br bb3                                          // id: %18
 
 bb3:                                              // Preds: bb1 bb2
   %19 = tuple ()                                  // user: %21
-  dealloc_stack %2#0 : $*@local_storage S3        // id: %20
+  dealloc_stack %2 : $*S3        // id: %20
   return %19 : $()                                // id: %21
 }
 
@@ -1222,18 +1222,18 @@ bb0:
   %0 = alloc_stack $S7, var, name "a"                  // users: %4, %7, %10
   %55 = integer_literal $Builtin.Int64, 10         // user: %6
   %56 = struct $Int (%55 : $Builtin.Int64)          // user: %8
-  %57 = struct_element_addr %0#1 : $*S7, #S7.a     // user: %8
+  %57 = struct_element_addr %0 : $*S7, #S7.a     // user: %8
   store %56 to %57 : $*Int                          // id: %8
   %1 = function_ref @S7_init : $@convention(thin) (@thin S7.Type) -> S7 // user: %3
   %2 = metatype $@thin S7.Type                    // user: %3
   %3 = apply %1(%2) : $@convention(thin) (@thin S7.Type) -> S7 // user: %4
-  store %3 to %0#1 : $*S7                         // id: %4
+  store %3 to %0 : $*S7                         // id: %4
   %5 = integer_literal $Builtin.Int64, 10         // user: %6
   %6 = struct $Int (%5 : $Builtin.Int64)          // user: %8
-  %7 = struct_element_addr %0#1 : $*S7, #S7.y     // user: %8
+  %7 = struct_element_addr %0 : $*S7, #S7.y     // user: %8
   store %6 to %7 : $*Int                          // id: %8
   %9 = tuple ()                                   // user: %11
-  dealloc_stack %0#0 : $*@local_storage S7        // id: %10
+  dealloc_stack %0 : $*S7        // id: %10
   return %9 : $()                                 // id: %11
 }
 
@@ -1330,10 +1330,10 @@ bb0(%0 : $Bool, %1 : $Int):
   %3 = function_ref @S1_init : $@convention(thin) (@thin S1.Type) -> S1 // user: %5
   %4 = metatype $@thin S1.Type                    // user: %5
   %5 = apply %3(%4) : $@convention(thin) (@thin S1.Type) -> S1 // user: %6
-  store %5 to %2#1 : $*S1                         // id: %6
+  store %5 to %2 : $*S1                         // id: %6
   %7 = integer_literal $Builtin.Int64, 2          // user: %8
   %8 = struct $Int (%7 : $Builtin.Int64)          // user: %10
-  %9 = struct_element_addr %2#1 : $*S1, #S1.a     // user: %10
+  %9 = struct_element_addr %2 : $*S1, #S1.a     // user: %10
   store %8 to %9 : $*Int                          // id: %10
   br bb1                                          // id: %11
 
@@ -1344,10 +1344,10 @@ bb1:                                              // Preds: bb0 bb1
 bb2:                                              // Preds: bb1
   %14 = integer_literal $Builtin.Int64, 2         // user: %15
   %15 = struct $Int (%14 : $Builtin.Int64)        // user: %17
-  %16 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %17
+  %16 = struct_element_addr %2 : $*S1, #S1.a    // user: %17
   store %15 to %16 : $*Int                        // id: %17
   %18 = tuple ()                                  // user: %20
-  dealloc_stack %2#0 : $*@local_storage S1        // id: %19
+  dealloc_stack %2 : $*S1        // id: %19
   return %18 : $()                                // id: %20
 }
 
@@ -1390,10 +1390,10 @@ bb2:
 sil @tbaa_no_alias_no_dead_store : $@convention(thin) (Optional<protocol<>.Type>) -> Int {
 bb0(%0 : $Optional<protocol<>.Type>):
   %2 = alloc_stack $Optional<protocol<>.Type>     // users: %3, %17, %19, %26
-  store %0 to %2#1 : $*Optional<protocol<>.Type>  // id: %3
-  %17 = unchecked_addr_cast %2#1 : $*Optional<protocol<>.Type> to $*Int // user: %18
+  store %0 to %2 : $*Optional<protocol<>.Type>  // id: %3
+  %17 = unchecked_addr_cast %2 : $*Optional<protocol<>.Type> to $*Int // user: %18
   %18 = load %17 : $*Int                          // user: %27
-  dealloc_stack %2#0 : $*@local_storage Optional<protocol<>.Type> // id: %26
+  dealloc_stack %2 : $*Optional<protocol<>.Type> // id: %26
   return %18 : $Int                               // id: %27
 }
 
@@ -1407,9 +1407,9 @@ bb0(%0 : $Optional<protocol<>.Type>):
 sil @local_dead_store : $@convention(thin) (Optional<protocol<>.Type>) -> Int {
 bb0(%0 : $Optional<protocol<>.Type>):
   %2 = alloc_stack $Optional<protocol<>.Type>     // users: %3, %17, %19, %26
-  %17 = unchecked_addr_cast %2#1 : $*Optional<protocol<>.Type> to $*Int // user: %18
+  %17 = unchecked_addr_cast %2 : $*Optional<protocol<>.Type> to $*Int // user: %18
   %18 = load %17 : $*Int                          // user: %27
-  store %0 to %2#1 : $*Optional<protocol<>.Type>  // id: %3
-  dealloc_stack %2#0 : $*@local_storage Optional<protocol<>.Type> // id: %26
+  store %0 to %2 : $*Optional<protocol<>.Type>  // id: %3
+  dealloc_stack %2 : $*Optional<protocol<>.Type> // id: %26
   return %18 : $Int                               // id: %27
 }

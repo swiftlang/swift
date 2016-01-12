@@ -33,29 +33,30 @@ using namespace irgen;
 
 /// Emit a global variable.
 Address IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
-  auto &type = getTypeInfo(var->getLoweredType());
+  auto &ti = getTypeInfo(var->getLoweredType());
   
-  // If the variable is empty, don't actually emit it; just return undef.
-  if (type.isKnownEmpty()) {
-    return type.getUndefAddress();
-  }
-  
+  // If the variable is empty in all resilience domains, don't actually emit it;
+  // just return undef.
+  if (ti.isKnownEmpty(ResilienceExpansion::Minimal))
+    return ti.getUndefAddress();
+
   /// Get the global variable.
-  Address addr = getAddrOfSILGlobalVariable(var,
+  Address addr = getAddrOfSILGlobalVariable(var, ti,
                      var->isDefinition() ? ForDefinition : NotForDefinition);
   
   /// Add a zero initializer.
   if (var->isDefinition()) {
     auto gvar = cast<llvm::GlobalVariable>(addr.getAddress());
-    gvar->setInitializer(llvm::Constant::getNullValue(type.getStorageType()));
+    gvar->setInitializer(llvm::Constant::getNullValue(gvar->getValueType()));
   }
+
   return addr;
 }
 
 ContainedAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF, SILType T,
                                               const Twine &name) const {
   // If the type is known to be empty, don't actually allocate anything.
-  if (isKnownEmpty()) {
+  if (isKnownEmpty(ResilienceExpansion::Maximal)) {
     auto addr = getUndefAddress();
     return { addr, addr };
   }
@@ -69,7 +70,7 @@ ContainedAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF, SILType T,
 
 void FixedTypeInfo::deallocateStack(IRGenFunction &IGF, Address addr,
                                     SILType T) const {
-  if (isKnownEmpty())
+  if (isKnownEmpty(ResilienceExpansion::Maximal))
     return;
   IGF.Builder.CreateLifetimeEnd(addr, getFixedSize());
 }

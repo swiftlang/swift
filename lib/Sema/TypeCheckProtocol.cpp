@@ -1504,10 +1504,9 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
                                              DeclContext *dc,
                                              ArchetypeType *archetype,
                                              Type replacement) {
-  ArchetypeType *resultArchetype = archetype;
   Type resultReplacement = replacement;
   assert(!resultReplacement->isTypeParameter() && "Can't be dependent");
-  SmallVector<ProtocolConformance *, 4> conformances;
+  SmallVector<ProtocolConformanceRef, 4> conformances;
 
   bool isError = replacement->is<ErrorType>();
   for (auto proto : archetype->getConformsTo()) {
@@ -1518,11 +1517,10 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
            "Conformance should already have been verified");
     (void)isError;
     (void)conforms;
-    conformances.push_back(conformance);
+    conformances.push_back(ProtocolConformanceRef(proto, conformance));
   }
 
   return Substitution{
-    resultArchetype,
     resultReplacement,
     tc.Context.AllocateCopy(conformances),
   };
@@ -3883,6 +3881,12 @@ checkConformsToProtocol(TypeChecker &TC,
   conformance->setState(ProtocolConformanceState::Checking);
   defer { conformance->setState(ProtocolConformanceState::Complete); };
 
+  // If the protocol itself is invalid, there's nothing we can do.
+  if (Proto->isInvalid()) {
+    conformance->setInvalid();
+    return conformance;
+  }
+  
   // If the protocol requires a class, non-classes are a non-starter.
   if (Proto->requiresClass() && !canT->getClassOrBoundGenericClass()) {
     TC.diagnose(ComplainLoc, diag::non_class_cannot_conform_to_class_protocol,

@@ -24,4 +24,3 @@ EnumErrorProtocol.test("default codes") {
 }
 
 runAllTests()
-

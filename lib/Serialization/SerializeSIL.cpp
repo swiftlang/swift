@@ -439,7 +439,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILValue operand;
     SILType Ty;
     CanType FormalConcreteType;
-    ArrayRef<ProtocolConformance*> conformances;
+    ArrayRef<ProtocolConformanceRef> conformances;
 
     switch (SI.getKind()) {
     default: llvm_unreachable("out of sync with parent");
@@ -678,6 +678,17 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         addValueRef(PAI->getCallee()), PAI->getCallee().getResultNumber(),
         Args);
     S.writeSubstitutions(PAI->getSubstitutions(), SILAbbrCodes);
+    break;
+  }
+  case ValueKind::AllocGlobalInst: {
+    // Format: Name and type. Use SILOneOperandLayout.
+    const AllocGlobalInst *AGI = cast<AllocGlobalInst>(&SI);
+    SILOneOperandLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILOneOperandLayout::Code],
+        (unsigned)SI.getKind(), 0, 0, 0,
+        S.addIdentifierRef(
+            Ctx.getIdentifier(AGI->getReferencedGlobal()->getName())),
+        0);
     break;
   }
   case ValueKind::GlobalAddrInst: {
@@ -1677,7 +1688,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   // We have to make sure BOUND_GENERIC_SUBSTITUTION does not overlap with
   // SIL-specific records.
   registerSILAbbr<decls_block::BoundGenericSubstitutionLayout>();
-  registerSILAbbr<decls_block::NoConformanceLayout>();
+  registerSILAbbr<decls_block::AbstractProtocolConformanceLayout>();
   registerSILAbbr<decls_block::NormalProtocolConformanceLayout>();
   registerSILAbbr<decls_block::SpecializedProtocolConformanceLayout>();
   registerSILAbbr<decls_block::InheritedProtocolConformanceLayout>();

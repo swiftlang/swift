@@ -985,7 +985,8 @@ getThunkedForeignFunctionRef(SILGenFunction &gen,
     SILValue OpenedExistential;
     if (!cast<ArchetypeType>(thisType)->getOpenedExistentialType().isNull())
       OpenedExistential = thisArg;
-    return gen.B.createWitnessMethod(loc, thisType, nullptr, foreign,
+    auto conformance = ProtocolConformanceRef(cast<ProtocolDecl>(dc));
+    return gen.B.createWitnessMethod(loc, thisType, conformance, foreign,
                                      foreignCI.getSILType(),
                                      OpenedExistential);
 

@@ -34,9 +34,9 @@ bb0(%0 : $X, %1 : $*Int32, %2 : $*Int32):
   %s = alloc_stack $Int32
 
   %f = function_ref @load_store_to_args : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
-  %ap = apply %f(%1, %s#1, %0) : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
+  %ap = apply %f(%1, %s, %0) : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
 
-  dealloc_stack %s#0 : $*@local_storage Int32
+  dealloc_stack %s : $*Int32
   %r = tuple ()
   return %r : $()
 }
@@ -128,9 +128,9 @@ bb0(%0 : $Int32):
   %l2 = load %b#1 : $*Int32
  
   %s = alloc_stack $Int32
-  store %0 to %s#1 : $*Int32
-  %l3 = load %s#1 : $*Int32
-  dealloc_stack %s#0 : $*@local_storage Int32
+  store %0 to %s : $*Int32
+  %l3 = load %s : $*Int32
+  dealloc_stack %s : $*Int32
 
   %r = tuple ()
   return %r : $()

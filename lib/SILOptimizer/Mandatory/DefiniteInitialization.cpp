@@ -1115,7 +1115,7 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
 ///   %6 = enum $Optional<Enum>, #Optional.None!enumelt // user: %7
 ///   br bb2(%6 : $Optional<Enum>)                    // id: %7
 /// bb2(%8 : $Optional<Enum>):                        // Preds: bb0 bb1
-///   dealloc_stack %1#0 : $*@local_storage Enum      // id: %9
+///   dealloc_stack %1 : $*Enum                       // id: %9
 ///   return %8 : $Optional<Enum>                     // id: %10
 ///
 static bool isFailableInitReturnUseOfEnum(EnumInst *EI) {
@@ -1215,7 +1215,7 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
     // the generic error that we would emit before.
     //
     // That is the only case where we support pattern matching a release.
-    if (Release &&
+    if (Release && AI &&
         !AI->getSubstCalleeType()->getExtInfo().hasGuaranteedSelfParam())
       CMI = nullptr;
 
@@ -1839,13 +1839,13 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
     auto *Term = BB.getTerminator();
     if (isa<ReturnInst>(Term) || isa<ThrowInst>(Term)) {
       B.setInsertionPoint(Term);
-      B.createDeallocStack(Loc, ControlVariableBox->getContainerResult());
+      B.createDeallocStack(Loc, ControlVariableBox);
     }
   }
   
   // Before the memory allocation, store zero in the control variable.
   B.setInsertionPoint(TheMemory.MemoryInst->getNextNode());
-  SILValue ControlVariableAddr = SILValue(ControlVariableBox, 1);
+  SILValue ControlVariableAddr = ControlVariableBox;
   auto Zero = B.createIntegerLiteral(Loc, IVType, 0);
   B.createStore(Loc, Zero, ControlVariableAddr);
   

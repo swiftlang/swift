@@ -140,11 +140,11 @@ sil @cast_of_class_to_int : $@convention(thin) (C) -> Int {
 bb0(%0 : $C):
   %1 = alloc_stack $Int
   %2 = alloc_stack $C
-  store %0 to %2#1 : $*C
-  unconditional_checked_cast_addr take_always C in %2#1 : $*C to Int in %1#1 : $*Int 
-  %4 = load %1#1 : $*Int
-  dealloc_stack %2#0 : $*@local_storage C
-  dealloc_stack %1#0 : $*@local_storage Int
+  store %0 to %2 : $*C
+  unconditional_checked_cast_addr take_always C in %2 : $*C to Int in %1 : $*Int 
+  %4 = load %1 : $*Int
+  dealloc_stack %2 : $*C
+  dealloc_stack %1 : $*Int
   return %4 : $Int
 }
 

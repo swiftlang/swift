@@ -186,7 +186,7 @@ bb0(%0 : $Optional<Builtin.NativeObject>):
   apply %1() : $@convention(thin) () -> ()
   %3 = alloc_stack $Builtin.Int32
   retain_value %0 : $Optional<Builtin.NativeObject>
-  dealloc_stack %3#0 : $*@local_storage Builtin.Int32
+  dealloc_stack %3 : $*Builtin.Int32
   switch_enum %0 : $Optional<Builtin.NativeObject>, case #Optional.Some!enumelt.1: bb1, case #Optional.None!enumelt: bb2
 
 bb1(%2 : $Builtin.NativeObject):
@@ -313,7 +313,7 @@ bb2:
   br bb3
 
 bb3:
-  dealloc_stack %3#0 : $*@local_storage Optional<Builtin.Int32>
+  dealloc_stack %3 : $*Optional<Builtin.Int32>
   return %1 : $Optional<Builtin.NativeObject>
 }
 
@@ -343,7 +343,7 @@ bb10:
   %1 = function_ref @blocker : $@convention(thin) () -> ()
   retain_value %0 : $Optional<Builtin.Int32>
   %3 = alloc_stack $Builtin.Int32
-  dealloc_stack %3#0 : $*@local_storage Builtin.Int32
+  dealloc_stack %3 : $*Builtin.Int32
   release_value %0 : $Optional<Builtin.Int32>
   switch_enum %0 : $Optional<Builtin.Int32>, case #Optional.Some!enumelt.1: bb1, case #Optional.None!enumelt: bb2
 
@@ -390,7 +390,7 @@ bb0(%0 : $Optional<Builtin.NativeObject>):
   apply %1() : $@convention(thin) () -> ()
   %3 = alloc_stack $Builtin.Int32
   retain_value %0 : $Optional<Builtin.NativeObject>
-  dealloc_stack %3#0 : $*@local_storage Builtin.Int32
+  dealloc_stack %3 : $*Builtin.Int32
   %100 = select_enum %0 : $Optional<Builtin.NativeObject>, case #Optional.Some!enumelt.1: %t, case #Optional.None!enumelt: %f : $Builtin.Int1
   cond_br %100, bb1, bb2
 
@@ -556,7 +556,7 @@ bb10:
   %1 = function_ref @blocker : $@convention(thin) () -> ()
   retain_value %0 : $Optional<Builtin.Int32>
   %3 = alloc_stack $Builtin.Int32
-  dealloc_stack %3#0 : $*@local_storage Builtin.Int32
+  dealloc_stack %3 : $*Builtin.Int32
   %100 = select_enum %0 : $Optional<Builtin.Int32>, case #Optional.Some!enumelt.1: %t, case #Optional.None!enumelt: %f : $Builtin.Int1
   release_value %0 : $Optional<Builtin.Int32>
   cond_br %100, bb1, bb2
@@ -1333,11 +1333,11 @@ class G {}
 sil @cast_consumption : $@convention(thin) (@owned F) -> () {
 bb0(%0 : $F):
   %1 = alloc_stack $F
-  store %0 to %1#1 : $*F
+  store %0 to %1 : $*F
   strong_retain %0 : $F
-  unconditional_checked_cast_addr take_always F in %1#1 : $*F to G in %1#1 : $*F
+  unconditional_checked_cast_addr take_always F in %1 : $*F to G in %1 : $*F
   strong_release %0 : $F
-  dealloc_stack %1#0 : $*@local_storage F
+  dealloc_stack %1 : $*F
   %2 = tuple ()
   return %2 : $()
 }
@@ -1649,14 +1649,14 @@ bb0(%0 : $Bool):
   %3 = function_ref @foo_init : $@convention(thin) (@thin foo.Type) -> foo // user: %5
   %4 = metatype $@thin foo.Type                   // user: %5
   %5 = apply %3(%4) : $@convention(thin) (@thin foo.Type) -> foo // user: %6
-  store %5 to %1#1 : $*foo                        // id: %6
+  store %5 to %1 : $*foo                        // id: %6
   %7 = struct_extract %0 : $Bool, #Bool.value     // user: %8
   cond_br %7, bb1, bb2                            // id: %8
 
 bb1:                                              // Preds: bb0
   %9 = integer_literal $Builtin.Int64, 11         // user: %10
   %10 = struct $Int (%9 : $Builtin.Int64)         // user: %13
-  %11 = struct_element_addr %1#1 : $*foo, #foo.a  // users: %12, %13
+  %11 = struct_element_addr %1 : $*foo, #foo.a  // users: %12, %13
   %12 = load %11 : $*Int                          // user: %14
   store %10 to %11 : $*Int                        // id: %13
   br bb3(%12 : $Int)                              // id: %14
@@ -1664,7 +1664,7 @@ bb1:                                              // Preds: bb0
 bb2:                                              // Preds: bb0
   %15 = integer_literal $Builtin.Int64, 12        // user: %16
   %16 = struct $Int (%15 : $Builtin.Int64)
-  %17 = struct_element_addr %1#1 : $*foo, #foo.a  // user: %18
+  %17 = struct_element_addr %1 : $*foo, #foo.a  // user: %18
   %18 = load %17 : $*Int                          // user: %19
   br bb3(%18 : $Int)                              // id: %19
 
@@ -1674,7 +1674,7 @@ bb3(%20 : $Int):                                  // Preds: bb1 bb2
   %21 = function_ref @user_int : $@convention(thin) (Int) -> () // user: %22
   %22 = apply %21(%20) : $@convention(thin) (Int) -> ()
   %23 = tuple ()                                  // user: %25
-  dealloc_stack %1#0 : $*@local_storage foo       // id: %24
+  dealloc_stack %1 : $*foo       // id: %24
   return %23 : $()                                // id: %25
 }
 

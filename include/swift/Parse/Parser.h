@@ -448,10 +448,11 @@ public:
   void skipUntil(tok T1, tok T2 = tok::unknown);
   void skipUntilAnyOperator();
 
-  /// \brief Skip until a token that starts with '>'.  Applies heuristics that
-  /// are suitable when trying to find the end of a list of generic parameters,
-  /// generic arguments, or list of types in a protocol composition.
-  void skipUntilGreaterInTypeList(bool protocolComposition=false);
+  /// \brief Skip until a token that starts with '>', and consume it if found.
+  /// Applies heuristics that are suitable when trying to find the end of a list
+  /// of generic parameters, generic arguments, or list of types in a protocol
+  /// composition.
+  SourceLoc skipUntilGreaterInTypeList(bool protocolComposition = false);
 
   /// skipUntilDeclStmtRBrace - Skip to the next decl or '}'.
   void skipUntilDeclRBrace();
@@ -1190,9 +1191,9 @@ public:
   //===--------------------------------------------------------------------===//
   // Generics Parsing
 
-  GenericParamList *parseGenericParameters();
-  GenericParamList *parseGenericParameters(SourceLoc LAngleLoc);
-  GenericParamList *maybeParseGenericParams();
+  ParserResult<GenericParamList> parseGenericParameters();
+  ParserResult<GenericParamList> parseGenericParameters(SourceLoc LAngleLoc);
+  ParserResult<GenericParamList> maybeParseGenericParams();
   bool parseGenericWhereClause(SourceLoc &WhereLoc,
                                SmallVectorImpl<RequirementRepr> &Requirements);
 

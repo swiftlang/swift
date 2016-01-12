@@ -109,19 +109,9 @@ ValueDecl *deriveBridgedNSError(TypeChecker &tc,
 
 /// Insert an operator declaration associated with a declaration
 /// context. The operator declaration is added at global scope.
-void _insertOperatorDecl(ASTContext &C,
-                         IterableDeclContext *scope,
-                         Decl *member);
-  
-/// Insert an operator declaration associated with a declaration
-/// context. The operator declaration is added at global scope.
-template<typename SomeDecl>
-inline SomeDecl *insertOperatorDecl(ASTContext &C,
-                                    IterableDeclContext *scope,
-                                    SomeDecl *member) {
-  ::swift::DerivedConformance::_insertOperatorDecl(C, scope, member);
-  return member;
-}
+void insertOperatorDecl(ASTContext &C,
+                        IterableDeclContext *scope,
+                        Decl *member);
 
 /// Declare a getter for a derived property.
 FuncDecl *declareDerivedPropertyGetter(TypeChecker &tc,

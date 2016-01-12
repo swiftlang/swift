@@ -698,14 +698,31 @@ static ApplySite devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   // witness thunk F may have been created by a  specialization pass and have
   // additional generic parameters.
   SmallVector<Substitution, 16> NewSubstList(Subs.begin(), Subs.end());
+  if (auto generics = AI.getOrigCalleeType()->getGenericSignature()) {
+    ArrayRef<Substitution> origSubs = AI.getSubstitutions();
+    for (auto genericParam : generics->getAllDependentTypes()) {
+      auto origSub = origSubs.front();
+      origSubs = origSubs.slice(1);
 
-  // Add the non-self-derived substitutions from the original application.
-  ArrayRef<Substitution>  SubstList;
-  SubstList = AI.getSubstitutionsWithoutSelfSubstitution();
+      // Ignore generic parameters derived from 'self', the generic
+      // parameter at depth 0, index 0.
+      auto type = genericParam->getCanonicalType();
+      while (auto memberType = dyn_cast<DependentMemberType>(type)) {
+        type = memberType.getBase();
+      }
+      auto paramType = cast<GenericTypeParamType>(type);
+      if (paramType->getDepth() == 0) {
+        // There shouldn't be any other parameters at this depth.
+        assert(paramType->getIndex() == 0);
+        continue;
+      }
 
-  for (auto &origSub : SubstList)
-    if (!origSub.getArchetype()->isSelfDerived())
+      // Okay, remember this substitution.
       NewSubstList.push_back(origSub);
+    }
+
+    assert(origSubs.empty() && "subs not parallel to dependent types");
+  }
 
   // Figure out the exact bound type of the function to be called by
   // applying all substitutions.

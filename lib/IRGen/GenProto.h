@@ -24,7 +24,7 @@ namespace llvm {
 namespace swift {
   class CanType;
   class FuncDecl;
-  class ProtocolConformance;
+  class ProtocolConformanceRef;
   struct SILDeclRef;
   class SILType;
   class SILFunction;
@@ -45,7 +45,7 @@ namespace irgen {
                               CanType baseTy,
                               llvm::Value **baseMetadataCache,
                               SILDeclRef member,
-                              ProtocolConformance *conformance,
+                              ProtocolConformanceRef conformance,
                               Explosion &out);
 
   /// Given a type T and an associated type X of some protocol P to
@@ -154,7 +154,8 @@ namespace irgen {
 
   /// Emit references to the witness tables for the substituted type
   /// in the given substitution.
-  void emitWitnessTableRefs(IRGenFunction &IGF, const Substitution &sub,
+  void emitWitnessTableRefs(IRGenFunction &IGF,
+                            const Substitution &sub,
                             llvm::Value **metadataCache,
                             SmallVectorImpl<llvm::Value *> &out);
 
@@ -164,7 +165,7 @@ namespace irgen {
                                    llvm::Value **srcMetadataCache,
                                    ProtocolDecl *proto,
                                    const ProtocolInfo &protoI,
-                                   ProtocolConformance *conformance);
+                                   ProtocolConformanceRef conformance);
 
   /// An entry in a list of known protocols.
   class ProtocolEntry {

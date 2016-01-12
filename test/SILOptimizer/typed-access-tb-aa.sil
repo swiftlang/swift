@@ -33,9 +33,9 @@ sil @baz_init : $@convention(thin) (@thick baz.Type) -> @owned baz
 sil @goo_init : $@convention(thin) (@thick goo.Type) -> @owned goo 
 
 // CHECK-LABEL: no_parent_child_relation_reftype_tests
-// CHECK: PAIR #13.
-// CHECK: (1):   %0 = alloc_stack $boo
-// CHECK: (1):   %1 = alloc_stack $baz
+// CHECK: PAIR #1.
+// CHECK: (0):   %0 = alloc_stack $boo
+// CHECK: (0):   %1 = alloc_stack $baz
 // CHECK: NoAlias
 sil hidden @no_parent_child_relation_reftype_tests : $@convention(thin) () -> () {
 bb0:
@@ -44,22 +44,22 @@ bb0:
   %2 = function_ref @boo_init : $@convention(thin) (@thick boo.Type) -> @owned boo // user: %4
   %3 = metatype $@thick boo.Type                  // user: %4
   %4 = apply %2(%3) : $@convention(thin) (@thick boo.Type) -> @owned boo // users: %5, %11 
-  store %4 to %0#1 : $*boo                        // id: %5
+  store %4 to %0 : $*boo                        // id: %5
   %6 = function_ref @baz_init : $@convention(thin) (@thick baz.Type) -> @owned baz // user: %8
   %7 = metatype $@thick baz.Type                  // user: %8
   %8 = apply %6(%7) : $@convention(thin) (@thick baz.Type) -> @owned baz // users: %9, %10 
-  store %8 to %1#1 : $*baz                        // id: %9
+  store %8 to %1 : $*baz                        // id: %9
   strong_release %8 : $baz                        // id: %10 
   strong_release %4 : $boo                        // id: %11 
   %12 = tuple ()                                  // user: %15 
-  dealloc_stack %1#0 : $*@local_storage baz       // id: %13 
-  dealloc_stack %0#0 : $*@local_storage boo       // id: %14 
+  dealloc_stack %1 : $*baz       // id: %13 
+  dealloc_stack %0 : $*boo       // id: %14 
   return %12 : $()                                // id: %15 
 }
 
 // CHECK-LABEL: with_parent_child_relation_reftype_tests
 
-// CHECK: PAIR #54.
+// CHECK: PAIR #33.
 // CHECK: (0):   %4 = apply %2(%3) : $@convention(thin) (@thick boo.Type) -> @owned boo
 // CHECK: (0):   %8 = apply %6(%7) : $@convention(thin) (@thick goo.Type) -> @owned goo
 // CHECK: MayAlias
@@ -70,16 +70,16 @@ bb0:
   %2 = function_ref @boo_init : $@convention(thin) (@thick boo.Type) -> @owned boo // user: %4
   %3 = metatype $@thick boo.Type                  // user: %4
   %4 = apply %2(%3) : $@convention(thin) (@thick boo.Type) -> @owned boo // users: %5, %11 
-  store %4 to %0#1 : $*boo                        // id: %5
+  store %4 to %0 : $*boo                        // id: %5
   %6 = function_ref @goo_init : $@convention(thin) (@thick goo.Type) -> @owned goo // user: %8
   %7 = metatype $@thick goo.Type                  // user: %8
   %8 = apply %6(%7) : $@convention(thin) (@thick goo.Type) -> @owned goo // users: %9, %10 
-  store %8 to %1#1 : $*goo                        // id: %9
+  store %8 to %1 : $*goo                        // id: %9
   strong_release %8 : $goo                        // id: %10 
   strong_release %4 : $boo                        // id: %11 
   %12 = tuple ()                                  // user: %15 
-  dealloc_stack %1#0 : $*@local_storage goo       // id: %13 
-  dealloc_stack %0#0 : $*@local_storage boo       // id: %14 
+  dealloc_stack %1 : $*goo       // id: %13 
+  dealloc_stack %0 : $*boo       // id: %14 
   return %12 : $()                                // id: %15 
 }
 

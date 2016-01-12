@@ -31,7 +31,7 @@ bb0:
 // CHECK-NOT: alloc_box
 // CHECK-NOT: strong_release
 // CHECK-NOT: destroy_addr
-// CHECK: dealloc_stack %0#0 : $*@local_storage Int
+// CHECK: dealloc_stack %0 : $*Int
 // CHECK: return
 }
 
@@ -51,7 +51,7 @@ bb1:
 
 // CHECK: %0 = alloc_stack
 // CHECK: bb1:
-// CHECK: dealloc_stack %0#0 : $*@local_storage Int
+// CHECK: dealloc_stack %0 : $*Int
 // CHECK: return
 }
 
@@ -158,8 +158,8 @@ bb0(%0 : $*LogicValue, %1 : $@thin Bool.Type):
   %7 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") LogicValue, #LogicValue.getLogicValue!1, %6 : $*@opened("01234567-89ab-cdef-0123-000000000000") LogicValue : $@convention(witness_method) @callee_owned <T: LogicValue> (@inout T) -> Bool
   %8 = apply %7<@opened("01234567-89ab-cdef-0123-000000000000") LogicValue>(%6) : $@convention(witness_method) @callee_owned <T: LogicValue> (@inout T) -> Bool
   strong_release %2#0 : $@box LogicValue
-// CHECK:  destroy_addr %2#1 : $*LogicValue
-// CHECK-NEXT:  dealloc_stack %2#0 : $*@local_storage LogicValue
+// CHECK:  destroy_addr %2 : $*LogicValue
+// CHECK-NEXT:  dealloc_stack %2 : $*LogicValue
 // CHECK-NEXT:  return
   return %8 : $Bool
 }
@@ -300,7 +300,7 @@ bb1:
   // CHECK: bb2
 bb2:
   %17 = tuple ()
-  // CHECK: dealloc_stack [[STACK]]#0
+  // CHECK: dealloc_stack [[STACK]]
   // CHECK-NEXT: return
   return %17 : $()
 
@@ -360,9 +360,9 @@ bb0(%0 : $@box Int):
   // function_ref Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A
   %2 = function_ref @_TFsoP2ppUs14_Incrementable__FT1xRQ__Q_ : $@convention(thin) <τ_0_0 where τ_0_0 : My_Incrementable> (@out τ_0_0, @inout τ_0_0) -> () // user: %4
   %3 = alloc_stack $Int                           // users: %4, %5, %6
-  %4 = apply %2<Int>(%3#1, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : My_Incrementable> (@out τ_0_0, @inout τ_0_0) -> ()
-  %5 = load %3#1 : $*Int                          // user: %8
-  dealloc_stack %3#0 : $*@local_storage Int       // id: %6
+  %4 = apply %2<Int>(%3, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : My_Incrementable> (@out τ_0_0, @inout τ_0_0) -> ()
+  %5 = load %3 : $*Int                          // user: %8
+  dealloc_stack %3 : $*Int       // id: %6
   strong_release %0 : $@box Int      // id: %7
   return %5 : $Int                                // id: %8
 }
@@ -399,9 +399,9 @@ bb0(%0 : $@box Int):
   // function_ref Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A
   %2 = function_ref @_TFsoP2ppUs14_Incrementable__FT1xRQ__Q_ : $@convention(thin) <τ_0_0 where τ_0_0 : My_Incrementable> (@out τ_0_0, @inout τ_0_0) -> () // user: %4
   %3 = alloc_stack $Int                           // users: %4, %5, %6
-  %4 = apply %2<Int>(%3#1, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : My_Incrementable> (@out τ_0_0, @inout τ_0_0) -> ()
-  %5 = load %3#1 : $*Int                          // user: %8
-  dealloc_stack %3#0 : $*@local_storage Int       // id: %6
+  %4 = apply %2<Int>(%3, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : My_Incrementable> (@out τ_0_0, @inout τ_0_0) -> ()
+  %5 = load %3 : $*Int                          // user: %8
+  dealloc_stack %3 : $*Int       // id: %6
   strong_release %0 : $@box Int      // id: %7
   return %5 : $Int                                // id: %8
 }
@@ -431,9 +431,9 @@ bb0(%0 : $@callee_owned (@out U) -> ()):
   debug_value %0 : $@callee_owned (@out U) -> ()
   strong_retain %0 : $@callee_owned (@out U) -> ()
   %3 = alloc_stack $U
-  %4 = apply %0(%3#1) : $@callee_owned (@out U) -> ()
-  destroy_addr %3#1 : $*U
-  dealloc_stack %3#0 : $*@local_storage U
+  %4 = apply %0(%3) : $@callee_owned (@out U) -> ()
+  destroy_addr %3 : $*U
+  dealloc_stack %3 : $*U
   strong_release %0 : $@callee_owned (@out U) -> ()
   %8 = tuple ()
 // CHECK: return
@@ -452,16 +452,16 @@ bb0(%0 : $*T):
   %3 = function_ref @closure_to_specialize : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @owned @box τ_0_0) -> ()
   // CHECK-NOT: alloc_box
   %4 = alloc_box $T
-  // CHECK: copy_addr %0 to [initialization] [[STACK]]#1 : $*T
+  // CHECK: copy_addr %0 to [initialization] [[STACK]] : $*T
   copy_addr %0 to [initialization] %4#1 : $*T
   // CHECK: [[CLOSURE:%[0-9a-zA-Z]+]] = function_ref @_TTSf0n_k__closure_to_specialize
-  // CHECK: partial_apply [[CLOSURE]]<T>([[STACK]]#1)
+  // CHECK: partial_apply [[CLOSURE]]<T>([[STACK]])
   %6 = partial_apply %3<T>(%4#0) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @owned @box τ_0_0) -> ()
   %7 = apply %2<T>(%6) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned (@out τ_0_0) -> ()) -> ()
-  // CHECK: destroy_addr [[STACK]]#1 : $*T
+  // CHECK: destroy_addr [[STACK]] : $*T
   destroy_addr %0 : $*T
   %9 = tuple ()
- // CHECK: dealloc_stack [[STACK]]#0 : $*@local_storage T
+ // CHECK: dealloc_stack [[STACK]] : $*T
  // CHECK: return
   return %9 : $()
 }
@@ -585,11 +585,11 @@ bb0(%0 : $Int, %1 : $@box S<T>):
   %2 = project_box %1 : $@box S<T>
   %3 = function_ref @binary : $@convention(thin) (Int, Int) -> Bool
   %4 = alloc_stack $S<T>
-  copy_addr %2 to [initialization] %4#1 : $*S<T>
+  copy_addr %2 to [initialization] %4 : $*S<T>
   %6 = function_ref @get : $@convention(method) <τ_0_0 where τ_0_0 : Count> (@in S<τ_0_0>) -> Int
-  %7 = apply %6<T>(%4#1) : $@convention(method) <τ_0_0 where τ_0_0 : Count> (@in S<τ_0_0>) -> Int
+  %7 = apply %6<T>(%4) : $@convention(method) <τ_0_0 where τ_0_0 : Count> (@in S<τ_0_0>) -> Int
   %8 = apply %3(%0, %7) : $@convention(thin) (Int, Int) -> Bool
-  dealloc_stack %4#0 : $*@local_storage S<T>
+  dealloc_stack %4 : $*S<T>
   strong_release %1 : $@box S<T>
 // CHECK: return
   return %8 : $Bool
@@ -603,12 +603,12 @@ sil @destroy_stack_value_after_closure : $@convention(thin) <T> (@out T, @in T) 
 // CHECK: bb0
 bb0(%0 : $*T, %1 : $*T):
   // CHECK: [[STACK:%.*]] = alloc_stack
-  // CHECK: copy_addr %1 to [initialization] [[STACK]]#1
+  // CHECK: copy_addr %1 to [initialization] [[STACK]]
   // CHECK: [[APPLIED:%.*]] = function_ref
   %3 = function_ref @applied : $@convention(thin) <τ_0_0> (@owned @box τ_0_0) -> ()
   %4 = alloc_box $T
   copy_addr %1 to [initialization] %4#1 : $*T
-  // CHECK: [[PARTIAL:%.*]] = partial_apply [[APPLIED]]<T>([[STACK]]#1)
+  // CHECK: [[PARTIAL:%.*]] = partial_apply [[APPLIED]]<T>([[STACK]])
   %6 = partial_apply %3<T>(%4#0) : $@convention(thin) <τ_0_0> (@owned @box τ_0_0) -> ()
   // CHECK: debug_value [[PARTIAL]]
   debug_value %6 : $@callee_owned () -> ()
@@ -619,7 +619,7 @@ bb0(%0 : $*T, %1 : $*T):
   copy_addr %1 to [initialization] %0 : $*T
   // CHECK: strong_release [[PARTIAL]]
   strong_release %6 : $@callee_owned () -> ()
-  // CHECK: destroy_addr [[STACK]]#1
+  // CHECK: destroy_addr [[STACK]]
   // CHECK: destroy_addr %1
   destroy_addr %1 : $*T
   %13 = tuple ()
@@ -631,9 +631,9 @@ bb0(%0 : $@box T):
   %1 = project_box %0 : $@box T
   %2 = function_ref @consume : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   %3 = alloc_stack $T
-  copy_addr %1 to [initialization] %3#1 : $*T
-  %5 = apply %2<T>(%3#1) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
-  dealloc_stack %3#0 : $*@local_storage T
+  copy_addr %1 to [initialization] %3 : $*T
+  %5 = apply %2<T>(%3) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  dealloc_stack %3 : $*T
   strong_release %0 : $@box T
   %8 = tuple ()
   return %8 : $()

@@ -410,7 +410,7 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy, SILModule &Mod) {
 
   // Typed access based TBAA only occurs on pointers. If we reach this point and
   // do not have a pointer, be conservative and return that the two types may
-  // alias. *NOTE* This ensures we return may alias for local_storage.
+  // alias.
   if(!LTy.isAddress() || !RTy.isAddress())
     return true;
 

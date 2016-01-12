@@ -1307,7 +1307,7 @@ static sourcekitd_response_t codeCompleteOpen(StringRef Name,
   SKGroupedCodeCompletionConsumer CCC(RespBuilder);
   std::unique_ptr<SKOptionsDictionary> options;
   if (optionsDict)
-    options = std::move(llvm::make_unique<SKOptionsDictionary>(*optionsDict));
+    options = llvm::make_unique<SKOptionsDictionary>(*optionsDict);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.codeCompleteOpen(Name, InputBuf, Offset, options.get(), CCC, Args);
   return CCC.createResponse();
@@ -1328,7 +1328,7 @@ codeCompleteUpdate(StringRef name, int64_t offset,
   SKGroupedCodeCompletionConsumer CCC(RespBuilder);
   std::unique_ptr<SKOptionsDictionary> options;
   if (optionsDict)
-    options = std::move(llvm::make_unique<SKOptionsDictionary>(*optionsDict));
+    options = llvm::make_unique<SKOptionsDictionary>(*optionsDict);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.codeCompleteUpdate(name, offset, options.get(), CCC);
   return CCC.createResponse();

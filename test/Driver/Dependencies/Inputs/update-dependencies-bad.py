@@ -27,7 +27,7 @@ primaryFile = sys.argv[sys.argv.index('-primary-file') + 1]
 
 if os.path.basename(primaryFile) == 'bad.swift':
     print("Handled", os.path.basename(primaryFile))
-    exit(1)
+    sys.exit(1)
 
 dir = os.path.dirname(os.path.abspath(__file__))
 execfile(os.path.join(dir, "update-dependencies.py"))

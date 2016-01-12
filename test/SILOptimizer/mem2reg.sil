@@ -10,11 +10,11 @@ import Swift
 sil @store_only_allocas : $@convention(thin) (Int64) -> () {
 bb0(%0 : $Int64):
   %1 = alloc_stack $Int64, var, name "c"               // users: %5, %2
-  store %0 to %1#1 : $*Int64                      // id: %2
+  store %0 to %1 : $*Int64                      // id: %2
   // function_ref Swift.print (val : Swift.Int64) -> ()
   %3 = function_ref @_Ts5printFT3valSi_T_ : $@convention(thin) (Int64) -> () // user: %4
   %4 = apply %3(%0) : $@convention(thin) (Int64) -> ()
-  dealloc_stack %1#0 : $*@local_storage Int64     // id: %5
+  dealloc_stack %1 : $*Int64     // id: %5
   %6 = tuple ()                                   // user: %7
   return %6 : $()                                 // id: %7
 }
@@ -29,19 +29,19 @@ sil @_Ts5printFT3valSi_T_ : $@convention(thin) (Int64) -> ()
 sil @multiple_store_vals : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_stack $Int64, var, name "c"               // users: %14, %2
-  store %0 to %1#1 : $*Int64                      // id: %2
+  store %0 to %1 : $*Int64                      // id: %2
   %3 = alloc_stack $Int64, var, name "x"               // users: %12, %11, %13, %6
   %4 = integer_literal $Builtin.Int64, 2          // user: %5
   %5 = struct $Int64 (%4 : $Builtin.Int64)        // user: %6
-  store %5 to %3#1 : $*Int64                      // id: %6
+  store %5 to %3 : $*Int64                      // id: %6
   %7 = integer_literal $Builtin.Int64, 5          // user: %9
   %8 = integer_literal $Builtin.Int1, 0           // user: %10
   %9 = struct $Int64 (%7 : $Builtin.Int64)        // users: %12, %15, %11
   cond_fail %8 : $Builtin.Int1                    // id: %10
-  store %9 to %3#1 : $*Int64                      // id: %11
-  store %9 to %3#1 : $*Int64                      // id: %12
-  dealloc_stack %3#0 : $*@local_storage Int64     // id: %13
-  dealloc_stack %1#0 : $*@local_storage Int64     // id: %14
+  store %9 to %3 : $*Int64                      // id: %11
+  store %9 to %3 : $*Int64                      // id: %12
+  dealloc_stack %3 : $*Int64     // id: %13
+  dealloc_stack %1 : $*Int64     // id: %14
   return %9 : $Int64                              // id: %15
 }
 
@@ -52,7 +52,7 @@ bb0(%0 : $Int64):
 sil @multiple_store_vals2 : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_stack $Int64, var, name "c"               // users: %19, %2
-  store %0 to %1#1 : $*Int64                      // id: %2
+  store %0 to %1 : $*Int64                      // id: %2
   %3 = alloc_box $Int64, var, name "x"                 // users: %16, %11, %6
   %4 = integer_literal $Builtin.Int64, 2          // users: %9, %5
   %5 = struct $Int64 (%4 : $Builtin.Int64)        // users: %12, %6
@@ -73,7 +73,7 @@ bb2:                                              // Preds: bb0
   br bb3(%14 : $Int64)                            // id: %17
 
 bb3(%18 : $Int64):                                // Preds: bb2 bb1
-  dealloc_stack %1#0 : $*@local_storage Int64     // id: %19
+  dealloc_stack %1 : $*Int64     // id: %19
   return %18 : $Int64                             // id: %20
 }
 
@@ -82,7 +82,7 @@ bb3(%18 : $Int64):                                // Preds: bb2 bb1
 sil @with_loads : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_stack $Int64, var, name "c"               // users: %19, %2, (%20)
-  store %0 to %1#1 : $*Int64                      // id: %2
+  store %0 to %1 : $*Int64                      // id: %2
   %3 = alloc_box $Int64, var, name "x"                 // users: %16, %11, %6
   %4 = integer_literal $Builtin.Int64, 2          // users: %9, %5
   %5 = struct $Int64 (%4 : $Builtin.Int64)        // users: %12, %6
@@ -104,8 +104,8 @@ bb2:                                              // Preds: bb0
 
 //CHECK: bb3([[RET:%[0-9]+]] : $Int64):
 bb3(%18 : $Int64):                                // Preds: bb2 bb1
-  dealloc_stack %1#0 : $*@local_storage Int64     // id: %19
-  %20 = load %1#1 : $*Int64
+  dealloc_stack %1 : $*Int64     // id: %19
+  %20 = load %1 : $*Int64
 //CHECK: return [[RET]]
   return %18 : $Int64                             // id: %20
 }
@@ -117,25 +117,25 @@ bb3(%18 : $Int64):                                // Preds: bb2 bb1
 sil @basic_block_with_loads_and_stores : $@convention(thin) (Int64) -> () {
 bb0(%0 : $Int64):
   %1 = alloc_stack $Int64, var, name "c"               // users: %20, %2
-  store %0 to %1#1 : $*Int64                      // id: %2
+  store %0 to %1 : $*Int64                      // id: %2
   %3 = alloc_stack $Int64, var, name "x"               // users: %14, %19, %6, %17
   %4 = integer_literal $Builtin.Int64, 3          // user: %5
   %5 = struct $Int64 (%4 : $Builtin.Int64)        // user: %6
-  store %5 to %3#1 : $*Int64                      // id: %6
+  store %5 to %3 : $*Int64                      // id: %6
   %7 = integer_literal $Builtin.Int64, 3          // user: %10
   %9 = struct_extract %0 : $Int64, #Int64._value   // user: %10
   %10 = builtin "cmp_sgt_Int64"(%9 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1 // user: %11
 
   %12 = integer_literal $Builtin.Int64, 2         // user: %13
   %13 = struct $Int64 (%12 : $Builtin.Int64)      // user: %14
-  store %13 to %3#1 : $*Int64                     // id: %14
+  store %13 to %3 : $*Int64                     // id: %14
 
   // function_ref Swift.print (val : Swift.Int64) -> ()
   %16 = function_ref @_Ts5printFT3valSi_T_ : $@convention(thin) (Int64) -> () // user: %18
-  %17 = load %3#1 : $*Int64                       // user: %18
+  %17 = load %3 : $*Int64                       // user: %18
   %18 = apply %16(%17) : $@convention(thin) (Int64) -> ()
-  dealloc_stack %3#0 : $*@local_storage Int64     // id: %19
-  dealloc_stack %1#0 : $*@local_storage Int64     // id: %20
+  dealloc_stack %3 : $*Int64     // id: %19
+  dealloc_stack %1 : $*Int64     // id: %20
   %21 = tuple ()                                  // user: %22
   return %21 : $()                                // id: %22
 }
@@ -146,9 +146,9 @@ bb0(%0 : $Int64):
 sil @load_uninitialized_empty : $@convention(thin) (@inout ()) -> () {
 bb0(%0 : $*()):
   %1 = alloc_stack $()
-  %2 = load %1#1 : $*()
+  %2 = load %1 : $*()
   store %2 to %0 : $*()
-  dealloc_stack %1#0 : $*@local_storage ()
+  dealloc_stack %1 : $*()
   %3 = tuple ()
   return %3 : $()
 }
@@ -161,10 +161,10 @@ bb0(%0 : $*()):
 sil @mem2reg_debug_value_addr : $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):
   %1 = alloc_stack $Int
-  store %0 to %1#1 : $*Int
-  debug_value_addr %1#1 : $*Int
-  %2 = load %1#1 : $*Int
-  dealloc_stack %1#0 : $*@local_storage Int
+  store %0 to %1 : $*Int
+  debug_value_addr %1 : $*Int
+  %2 = load %1 : $*Int
+  dealloc_stack %1 : $*Int
   return %2 : $Int
 }
 
@@ -175,10 +175,10 @@ bb0(%0 : $Int):
 sil @mem2reg_struct_addr : $@convention(thin) (Int64) -> Builtin.Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_stack $Int64
-  store %0 to %1#1 : $*Int64
-  %2 = struct_element_addr %1#1 : $*Int64, #Int64._value
+  store %0 to %1 : $*Int64
+  %2 = struct_element_addr %1 : $*Int64, #Int64._value
   %3 = load %2 : $*Builtin.Int64
-  dealloc_stack %1#0 : $*@local_storage Int64
+  dealloc_stack %1 : $*Int64
   return %3 : $Builtin.Int64
 }
 
@@ -190,10 +190,10 @@ sil @mem2reg_tuple_addr : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_stack $(Int64, Int64)
   %2 = tuple (%0 : $Int64, %0 : $Int64)
-  store %2 to %1#1 : $*(Int64, Int64)
-  %4 = tuple_element_addr %1#1 : $*(Int64, Int64), 0
+  store %2 to %1 : $*(Int64, Int64)
+  %4 = tuple_element_addr %1 : $*(Int64, Int64), 0
   %5 = load %4 : $*Int64
-  dealloc_stack %1#0 : $*@local_storage (Int64, Int64)
+  dealloc_stack %1 : $*(Int64, Int64)
   return %5 : $Int64
 }
 
@@ -202,11 +202,11 @@ bb0(%0 : $Int64):
 sil @struct_extract_if_then_else : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_stack $Int64
-  store %0 to %1#1 : $*Int64
+  store %0 to %1 : $*Int64
   %3 = integer_literal $Builtin.Int64, 2
   %4 = struct_extract %0 : $Int64, #Int64._value
   %5 = builtin "cmp_sgt_Int64"(%4 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
-  %6 = struct_element_addr %1#1 : $*Int64, #Int64._value
+  %6 = struct_element_addr %1 : $*Int64, #Int64._value
   cond_br %5, bb1, bb2
 
 // CHECK: bb1:
@@ -231,7 +231,7 @@ bb2:
 
 // CHECK-NOT: dealloc_stack
 bb3(%20 : $Builtin.Int64):
-  dealloc_stack %1#0 : $*@local_storage Int64
+  dealloc_stack %1 : $*Int64
   %22 = struct $Int64 (%20 : $Builtin.Int64)
   return %22 : $Int64
 }
@@ -256,7 +256,7 @@ bb1:
 // CHECK: [[FIRSTTHICK:%.*]] =  thin_to_thick_function [[FIRSTREF]]
   %6 = thin_to_thick_function %5 : $@convention(thin) () -> Int to $@callee_owned () -> Int
 // CHECK-NOT: store
-  store %6 to %1#1 : $*@callee_owned () -> Int
+  store %6 to %1 : $*@callee_owned () -> Int
 // CHECK: br bb3([[FIRSTTHICK]] : $@callee_owned () -> Int
   br bb3
 
@@ -267,14 +267,14 @@ bb2:
 // CHECK: [[SECONDTHICK:%.*]] =  thin_to_thick_function [[SECONDREF]]
   %10 = thin_to_thick_function %9 : $@convention(thin) () -> Int to $@callee_owned () -> Int
 // CHECK-NOT: store
-  store %10 to %1#1 : $*@callee_owned () -> Int
+  store %10 to %1 : $*@callee_owned () -> Int
 // CHECK: br bb3([[SECONDTHICK]] : $@callee_owned () -> Int)
   br bb3
 
 // CHECK: bb3([[ARG:%.*]] : $@callee_owned () -> Int):
 bb3:
-// CHECK-NOT: load [[STACK]]#1
-  %13 = load %1#1 : $*@callee_owned () -> Int
+// CHECK-NOT: load [[STACK]]
+  %13 = load %1 : $*@callee_owned () -> Int
 // CHECK: strong_retain [[ARG]]
   strong_retain %13 : $@callee_owned () -> Int
 // CHECK: [[RESULT:%.*]] = apply [[ARG]]
@@ -282,15 +282,15 @@ bb3:
   br bb4
 
   // NOTE: This block and the branch above exist to ensure that we
-  //       test what happens when %1#1 hasn't already been loaded in this
+  //       test what happens when %1 hasn't already been loaded in this
   //       block.
 // CHECK: bb4
 bb4:
-// CHECK-NOT: destroy_addr [[STACK]]#1
+// CHECK-NOT: destroy_addr [[STACK]]
 // CHECK: strong_release [[ARG]]
-  destroy_addr %1#1 : $*@callee_owned () -> Int
-// CHECK-NOT: dealloc_stack [[STACK]]#1
-  dealloc_stack %1#0 : $*@local_storage @callee_owned () -> Int
+  destroy_addr %1 : $*@callee_owned () -> Int
+// CHECK-NOT: dealloc_stack [[STACK]]
+  dealloc_stack %1 : $*@callee_owned () -> Int
 // CHECK: return [[RESULT]]
   return %15 : $Int
 }

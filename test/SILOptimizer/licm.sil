@@ -195,12 +195,12 @@ bb0(%0 : $Int32):
   br bb1
 
 bb1:
-  store %0 to %313#1 : $*Int32
-  %l1 = load %313#1 : $*Int32
+  store %0 to %313 : $*Int32
+  %l1 = load %313 : $*Int32
   cond_br undef, bb1, bb2
 
 bb2:
-  dealloc_stack %313#0 : $*@local_storage Int32
+  dealloc_stack %313 : $*Int32
   %52 = tuple ()
   return %52 : $()
 }

@@ -6,6 +6,6 @@
 
 class d<T{{}
 var _{
-enum S:CollectionType{
+enum S:Collection{
 class a{var _=a<c
 func a<f:T.a

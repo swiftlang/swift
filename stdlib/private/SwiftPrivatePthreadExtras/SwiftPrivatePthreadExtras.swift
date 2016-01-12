@@ -17,7 +17,7 @@
 
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux)
+#elseif os(Linux) || os(FreeBSD)
 import Glibc
 #endif
 

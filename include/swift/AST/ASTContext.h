@@ -486,7 +486,7 @@ public:
   // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast.
   FuncDecl *getIsOSVersionAtLeastDecl(LazyResolver *resolver) const;
   
-  /// \brief Look for the declaration with the given name within the
+  /// Look for the declaration with the given name within the
   /// swift module.
   void lookupInSwiftModule(StringRef name,
                            SmallVectorImpl<ValueDecl *> &results) const;
@@ -499,9 +499,10 @@ public:
                                   Type type,
                                   LazyResolver *resolver) const;
 
-  /// \brief Notify all of the mutation listeners that the given declaration
-  /// was just added.
-  void addedExternalDecl(Decl *decl);
+  /// Add a declaration to a list of declarations that need to be emitted
+  /// as part of the current module or source file, but are otherwise not
+  /// nested within it.
+  void addExternalDecl(Decl *decl);
 
   /// Add a cleanup function to be called when the ASTContext is deallocated.
   void addCleanup(std::function<void(void)> cleanup);

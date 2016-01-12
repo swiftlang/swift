@@ -491,7 +491,7 @@ struct ConformsWithDependentAssocType2<DD> : AssocTypeWithReqt {
 }
 // TABLE-LABEL: sil_witness_table hidden <DD> ConformsWithDependentAssocType2<DD>: AssocTypeWithReqt module witness_tables {
 // TABLE-NEXT:    associated_type AssocType: GenericAssocType<DD>
-// TABLE-NEXT:    associated_type_protocol (AssocType: AssocReqt): GenericAssocType<DD>: specialize <T = DD> (<T> GenericAssocType<T>: AssocReqt module witness_tables)
+// TABLE-NEXT:    associated_type_protocol (AssocType: AssocReqt): GenericAssocType<DD>: specialize <DD> (<T> GenericAssocType<T>: AssocReqt module witness_tables)
 // TABLE-NEXT:  }
 
 protocol InheritedFromObjC : ObjCProtocol {

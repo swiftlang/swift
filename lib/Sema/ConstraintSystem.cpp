@@ -603,7 +603,7 @@ namespace {
 
         // Open up the generic type.
         cs.openGeneric(unboundDecl,
-                       unboundDecl->getGenericParamTypes(),
+                       unboundDecl->getInnermostGenericParamTypes(),
                        unboundDecl->getGenericRequirements(),
                        /*skipProtocolSelfConstraint=*/false,
                        minOpeningDepth,
@@ -612,7 +612,7 @@ namespace {
 
         // Map the generic parameters to their corresponding type variables.
         llvm::SmallVector<Type, 4> arguments;
-        for (auto gp : unboundDecl->getGenericParamTypes()) {
+        for (auto gp : unboundDecl->getInnermostGenericParamTypes()) {
           assert(replacements.count(gp->getCanonicalType()) && 
                  "Missing generic parameter?");
           arguments.push_back(replacements[gp->getCanonicalType()]);

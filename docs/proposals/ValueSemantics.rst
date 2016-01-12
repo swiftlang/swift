@@ -25,7 +25,7 @@ Value Semantics
 ---------------
 
 For a type with value semantics, variable initialization, assignment,
-and argument-passing (hereafter, “the big three operations”) each
+and argument-passing (hereafter, "the big three operations") each
 create an *independently modifiable copy* of the source value that is
 *interchangeable with the source*. [#interchange]_
 
@@ -151,13 +151,13 @@ The Problem With Generics
 
 The classic Liskov principle says the semantics of operations on
 ``Duck``\ 's subtypes need to be consistent with those on ``Duck`` itself,
-so that functions operating on ``Duck``\ s still “work” when passed a
+so that functions operating on ``Duck``\ s still "work" when passed a
 ``Mallard``.  More generally, for a function to make meaningful
 guarantees, the semantics of its sub-operations need to be consistent
 regardless of the actual argument types passed.
 
 The type of an argument passed by-value to an ordinary function is
-fully constrained, so the “big three” have knowable semantics.  The
+fully constrained, so the "big three" have knowable semantics.  The
 type of an ordinary argument passed by-reference is constrained by
 subtype polymorphism, where a (usually implicit) contract between
 base- and sub-types can dictate consistency.
@@ -196,7 +196,7 @@ value type::
 The reason the above breaks when the state is in a class instance is
 that the intended copy in line 1 instead creates a new reference to
 the same state, and the comparison in line 2 (regardless of whether we
-decide ``!=`` does “identity” or “value” comparison) always succeeds.
+decide ``!=`` does "identity" or "value" comparison) always succeeds.
 
 You can write a different implementation that only works on clonable
 classes:

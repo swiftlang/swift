@@ -154,14 +154,22 @@ SILModule::createWitnessTableDeclaration(ProtocolConformance *C,
 
 std::pair<SILWitnessTable *, ArrayRef<Substitution>>
 SILModule::
-lookUpWitnessTable(const ProtocolConformance *C, bool deserializeLazily) {
-  // If we have a null conformance passed in (a legal value), just return
+lookUpWitnessTable(ProtocolConformanceRef C, bool deserializeLazily) {
+  // If we have an abstract conformance passed in (a legal value), just return
   // nullptr.
-  ArrayRef<Substitution> Subs;
-  if (!C)
-    return {nullptr, Subs};
+  if (!C.isConcrete())
+    return {nullptr, {}};
+
+  return lookUpWitnessTable(C.getConcrete());
+}
+
+std::pair<SILWitnessTable *, ArrayRef<Substitution>>
+SILModule::
+lookUpWitnessTable(const ProtocolConformance *C, bool deserializeLazily) {
+  assert(C && "null conformance passed to lookUpWitnessTable");
 
   // Walk down to the base NormalProtocolConformance.
+  ArrayRef<Substitution> Subs;
   const ProtocolConformance *ParentC = C;
   while (!isa<NormalProtocolConformance>(ParentC)) {
     switch (ParentC->getKind()) {
@@ -615,7 +623,7 @@ SerializedSILLoader *SILModule::getSILLoader() {
 /// required. Notice that we do not scan the class hierarchy, just the concrete
 /// class type.
 std::tuple<SILFunction *, SILWitnessTable *, ArrayRef<Substitution>>
-SILModule::lookUpFunctionInWitnessTable(const ProtocolConformance *C,
+SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
                                         SILDeclRef Member) {
   // Look up the witness table associated with our protocol conformance from the
   // SILModule.
@@ -624,7 +632,7 @@ SILModule::lookUpFunctionInWitnessTable(const ProtocolConformance *C,
   // If no witness table was found, bail.
   if (!Ret.first) {
     DEBUG(llvm::dbgs() << "        Failed speculative lookup of witness for: ";
-          if (C) C->dump(); else Member.dump());
+          C.dump(); Member.dump());
     return std::make_tuple(nullptr, nullptr, ArrayRef<Substitution>());
   }
 

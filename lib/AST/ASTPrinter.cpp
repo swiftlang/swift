@@ -137,8 +137,12 @@ bool ASTPrinter::printTypeInterface(Type Ty, DeclContext *DC,
   Ty = Ty->getRValueType();
   PrintOptions Options = PrintOptions::printTypeInterface(Ty.getPointer(), DC);
    if (auto ND = Ty->getNominalOrBoundGenericNominal()) {
+     llvm::SmallPtrSet<const ExtensionDecl*, 4> AllExts;
+     for (auto Ext : ND->getExtensions()) {
+       AllExts.insert(Ext);
+     }
      Options.printExtensionContentAsMembers = [&](const ExtensionDecl *ED) {
-       return isExtensionApplied(*ND->getDeclContext(), Ty, ED);
+       return AllExts.count(ED) == 1 && isExtensionApplied(*ND->getDeclContext(), Ty, ED);
      };
      ND->print(OS, Options);
      return true;
@@ -1268,6 +1272,13 @@ void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
           Printer << ".";
         }
       }
+
+      // Respect alias type.
+      if (extendedType->getKind() == TypeKind::NameAlias) {
+        extendedType.print(Printer, Options);
+        return;
+      }
+
       Printer.printTypeRef(nominal, nominal->getName());
     });
   printInherited(decl);
@@ -3360,7 +3371,5 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
 
 void Substitution::print(llvm::raw_ostream &os,
                          const PrintOptions &PO) const {
-  Archetype->print(os, PO);
-  os << " = ";
   Replacement->print(os, PO);
 }

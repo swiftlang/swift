@@ -1376,6 +1376,7 @@ void IRGenModule::emitExternalDefinition(Decl *D) {
   case DeclKind::PostfixOperator:
   case DeclKind::IfConfig:
   case DeclKind::Param:
+  case DeclKind::Module:
     llvm_unreachable("Not a valid external definition for IRgen");
 
   case DeclKind::Var:
@@ -1397,19 +1398,32 @@ void IRGenModule::emitExternalDefinition(Decl *D) {
   case DeclKind::Class:
   case DeclKind::Protocol:
     break;
-
-  case DeclKind::Module:
-    break;
   }
 }
 
 Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
+                                                const TypeInfo &ti,
                                                 ForDefinition_t forDefinition) {
   LinkEntity entity = LinkEntity::forSILGlobalVariable(var);
-  auto &unknownTI = getTypeInfo(var->getLoweredType());
-  assert(isa<FixedTypeInfo>(unknownTI) &&
-         "unsupported global variable of resilient type!");
-  auto &ti = cast<FixedTypeInfo>(unknownTI);
+
+  llvm::Type *storageType;
+  Size fixedSize;
+  Alignment fixedAlignment;
+
+  // If the type has a fixed size, allocate static storage. Otherwise, allocate
+  // a fixed-size buffer and possibly heap-allocate a payload at runtime if the
+  // runtime size of the type does not fit in the buffer.
+  if (ti.isFixedSize(ResilienceExpansion::Minimal)) {
+    auto &fixedTI = cast<FixedTypeInfo>(ti);
+
+    storageType = fixedTI.getStorageType();
+    fixedSize = fixedTI.getFixedSize();
+    fixedAlignment = fixedTI.getFixedAlignment();
+  } else {
+    storageType = getFixedBufferTy();
+    fixedSize = Size(DataLayout.getTypeAllocSize(storageType));
+    fixedAlignment = Alignment(DataLayout.getABITypeAlignment(storageType));
+  }
 
   // Check whether we've created the global variable already.
   // FIXME: We should integrate this into the LinkEntity cache more cleanly.
@@ -1419,8 +1433,8 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
       updateLinkageForDefinition(*this, gvar, entity);
 
     llvm::Constant *addr = gvar;
-    if (ti.getStorageType() != gvar->getType()->getElementType()) {
-      auto *expectedTy = ti.StorageType->getPointerTo();
+    if (storageType != gvar->getType()->getElementType()) {
+      auto *expectedTy = storageType->getPointerTo();
       addr = llvm::ConstantExpr::getBitCast(addr, expectedTy);
     }
     return Address(addr, Alignment(gvar->getAlignment()));
@@ -1430,27 +1444,27 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
   if (var->getDecl()) {
     // If we have the VarDecl, use it for more accurate debugging information.
     DebugTypeInfo DbgTy(var->getDecl(),
-                        var->getLoweredType().getSwiftType(), ti);
-    gvar = link.createVariable(*this, ti.StorageType,
-                               ti.getFixedAlignment(),
+                        var->getLoweredType().getSwiftType(),
+                        storageType, fixedSize, fixedAlignment);
+    gvar = link.createVariable(*this, storageType, fixedAlignment,
                                DbgTy, SILLocation(var->getDecl()),
                                var->getDecl()->getName().str());
   } else {
     // There is no VarDecl for a SILGlobalVariable, and thus also no context.
     DeclContext *DeclCtx = nullptr;
-    DebugTypeInfo DbgTy(var->getLoweredType().getSwiftRValueType(), ti,
-                        DeclCtx);
+    DebugTypeInfo DbgTy(var->getLoweredType().getSwiftRValueType(),
+                        storageType, fixedSize, fixedAlignment, DeclCtx);
 
     Optional<SILLocation> loc;
     if (var->hasLocation())
       loc = var->getLocation();
-    gvar = link.createVariable(*this, ti.StorageType, ti.getFixedAlignment(),
+    gvar = link.createVariable(*this, storageType, fixedAlignment,
                                DbgTy, loc, var->getName());
   }
   
   // Set the alignment from the TypeInfo.
-  Address gvarAddr = ti.getAddressForPointer(gvar);
-  gvar->setAlignment(gvarAddr.getAlignment().getValue());
+  Address gvarAddr = Address(gvar, fixedAlignment);
+  gvar->setAlignment(fixedAlignment.getValue());
   
   return gvarAddr;
 }
@@ -2388,7 +2402,6 @@ Address IRGenModule::getAddrOfWitnessTableOffset(SILDeclRef code,
                                                 ForDefinition_t forDefinition) {
   LinkEntity entity =
     LinkEntity::forWitnessTableOffset(code.getDecl(),
-                                      code.getResilienceExpansion(),
                                       code.uncurryLevel);
   return getAddrOfSimpleVariable(*this, GlobalVars, entity,
                                  SizeTy, getPointerAlignment(),
@@ -2401,7 +2414,7 @@ Address IRGenModule::getAddrOfWitnessTableOffset(SILDeclRef code,
 Address IRGenModule::getAddrOfWitnessTableOffset(VarDecl *field,
                                                 ForDefinition_t forDefinition) {
   LinkEntity entity =
-    LinkEntity::forWitnessTableOffset(field, ResilienceExpansion::Minimal, 0);
+    LinkEntity::forWitnessTableOffset(field, 0);
   return ::getAddrOfSimpleVariable(*this, GlobalVars, entity,
                                    SizeTy, getPointerAlignment(),
                                    forDefinition);
@@ -2615,36 +2628,38 @@ StringRef IRGenModule::mangleType(CanType type, SmallVectorImpl<char> &buffer) {
 /// - For enums, new cases can be added
 /// - For classes, the superclass might change the size or number
 ///   of stored properties
-bool IRGenModule::isResilient(Decl *D, ResilienceScope scope) {
+bool IRGenModule::isResilient(Decl *D, ResilienceExpansion expansion) {
   auto NTD = dyn_cast<NominalTypeDecl>(D);
   if (!NTD)
     return false;
 
-  switch (scope) {
-  case ResilienceScope::Component:
+  switch (expansion) {
+  case ResilienceExpansion::Maximal:
     return !NTD->hasFixedLayout(SILMod->getSwiftModule());
-  case ResilienceScope::Universal:
+  case ResilienceExpansion::Minimal:
     return !NTD->hasFixedLayout();
   }
 
   llvm_unreachable("Bad resilience scope");
 }
 
-// The most general resilience scope where the given declaration is visible.
-ResilienceScope IRGenModule::getResilienceScopeForAccess(NominalTypeDecl *decl) {
+// The most general resilience expansion where the given declaration is visible.
+ResilienceExpansion
+IRGenModule::getResilienceExpansionForAccess(NominalTypeDecl *decl) {
   if (decl->getModuleContext() == SILMod->getSwiftModule() &&
       decl->getFormalAccess() != Accessibility::Public)
-    return ResilienceScope::Component;
-  return ResilienceScope::Universal;
+    return ResilienceExpansion::Maximal;
+  return ResilienceExpansion::Minimal;
 }
 
-// The most general resilience scope which has knowledge of the declaration's
+// The most general resilience expansion which has knowledge of the declaration's
 // layout. Calling isResilient() with this scope will always return false.
-ResilienceScope IRGenModule::getResilienceScopeForLayout(NominalTypeDecl *decl) {
-  if (isResilient(decl, ResilienceScope::Universal))
-    return ResilienceScope::Component;
+ResilienceExpansion
+IRGenModule::getResilienceExpansionForLayout(NominalTypeDecl *decl) {
+  if (isResilient(decl, ResilienceExpansion::Minimal))
+    return ResilienceExpansion::Maximal;
 
-  return getResilienceScopeForAccess(decl);
+  return getResilienceExpansionForAccess(decl);
 }
 
 llvm::Constant *IRGenModule::

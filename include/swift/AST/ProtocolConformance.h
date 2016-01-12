@@ -18,6 +18,7 @@
 
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Substitution.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
@@ -35,6 +36,7 @@ class GenericParamList;
 class NormalProtocolConformance;
 class ProtocolConformance;
 class ModuleDecl;
+class SubstitutionIterator;
 enum class AllocationArena;
   
 /// \brief Type substitution mapping from substitutable types to their
@@ -187,7 +189,9 @@ public:
   /// protocol conformance.
   ///
   /// The function object should accept a \c ValueDecl* for the requirement
-  /// followed by the \c ConcreteDeclRef for the witness.
+  /// followed by the \c ConcreteDeclRef for the witness. Note that a generic
+  /// witness will only be specialized if the conformance came from the current
+  /// file.
   template<typename F>
   void forEachValueWitness(LazyResolver *resolver, F f) const {
     const ProtocolDecl *protocol = getProtocol();
@@ -376,6 +380,9 @@ public:
                       TypeDecl *typeDecl) const;
 
   /// Retrieve the value witness corresponding to the given requirement.
+  ///
+  /// Note that a generic witness will only be specialized if the conformance
+  /// came from the current file.
   ConcreteDeclRef getWitness(ValueDecl *requirement, 
                              LazyResolver *resolver) const;
 
@@ -495,6 +502,8 @@ public:
   ArrayRef<Substitution> getGenericSubstitutions() const {
     return GenericSubstitutions;
   }
+
+  SubstitutionIterator getGenericSubstitutionIterator() const;
 
   /// Get the protocol being conformed to.
   ProtocolDecl *getProtocol() const {

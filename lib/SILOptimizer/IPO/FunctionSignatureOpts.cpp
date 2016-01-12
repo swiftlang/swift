@@ -682,18 +682,17 @@ static void rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer,
     SILLocation Loc = AI->getLoc();
 
     // Create the new apply.
-    SILInstruction *NewAI;
     if (ApplyInst *RealAI = dyn_cast<ApplyInst>(AI)) {
-      NewAI = Builder.createApply(Loc, FRI, LoweredType, ResultType,
-                                  ArrayRef<Substitution>(), NewArgs,
-                                  RealAI->isNonThrowing());
+      auto *NewAI = Builder.createApply(Loc, FRI, LoweredType, ResultType,
+                                        ArrayRef<Substitution>(), NewArgs,
+                                        RealAI->isNonThrowing());
       // Replace all uses of the old apply with the new apply.
       AI->replaceAllUsesWith(NewAI);
     } else {
       auto *TAI = cast<TryApplyInst>(AI);
-      NewAI = Builder.createTryApply(Loc, FRI, LoweredType,
-                                     ArrayRef<Substitution>(), NewArgs,
-                                     TAI->getNormalBB(), TAI->getErrorBB());
+      Builder.createTryApply(Loc, FRI, LoweredType,
+                             ArrayRef<Substitution>(), NewArgs,
+                             TAI->getNormalBB(), TAI->getErrorBB());
 
       Builder.setInsertionPoint(TAI->getErrorBB(), TAI->getErrorBB()->begin());
       // If we have any arguments that were consumed but are now guaranteed,

@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Fulfillment.h"
+#include "IRGen.h"
 
 #include "swift/AST/Decl.h"
 #include "swift/SIL/TypeLowering.h"

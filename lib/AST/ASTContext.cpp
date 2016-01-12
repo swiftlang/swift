@@ -1181,7 +1181,7 @@ bool ASTContext::hasArrayLiteralIntrinsics(LazyResolver *resolver) const {
     && getDeallocateUninitializedArray(resolver);
 }
 
-void ASTContext::addedExternalDecl(Decl *decl) {
+void ASTContext::addExternalDecl(Decl *decl) {
   ExternalDefinitions.insert(decl);
 }
 
@@ -1209,7 +1209,7 @@ ASTContext::createTrivialSubstitutions(BoundGenericType *BGT,
   assert(Params.size() == 1);
   auto Param = Params[0];
   assert(Param->getArchetype() && "Not type-checked yet");
-  Substitution Subst(Param->getArchetype(), BGT->getGenericArgs()[0], {});
+  Substitution Subst(BGT->getGenericArgs()[0], {});
   auto Substitutions = AllocateCopy(llvm::makeArrayRef(Subst));
   auto arena = getArena(BGT->getRecursiveProperties());
   Impl.getArena(arena).BoundGenericSubstitutions

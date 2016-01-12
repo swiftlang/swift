@@ -320,7 +320,7 @@ class Bottom<T : Bottom<Top>> {} // expected-error 2{{type may not reference its
 class X6<T> {
   let d: D<T>
   init(_ value: T) {
-    d = D(value) // expected-error{{cannot invoke initializer for type 'X6<T>.D<_, _>' with an argument list of type '(T)'}} expected-note{{expected an argument list of type '(T2)'}}
+    d = D(value)
   }
   class D<T2> { // expected-error{{generic type 'D' nested in type 'X6' is not allowed}}
     init(_ value: T2) {}

@@ -4,6 +4,8 @@
 // Test case found by https://github.com/neilpa (neilpa)
 // http://www.openradar.me/20220559
 
+// ASAN Output: stack-overflow on address 0x7ffe14a39f08 (pc 0x0000008b75dd bp 0x7ffe14a3a770 sp 0x7ffe14a39f10 T0)
+
 let values = [
     0x0000,
     0x0001,

@@ -23,6 +23,8 @@
 namespace llvm {
   template <class T> class ArrayRef;
   class Constant;
+  class Function;
+  class GlobalVariable;
   class Value;
 }
 

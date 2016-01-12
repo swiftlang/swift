@@ -243,8 +243,8 @@ bb2:                                              // Preds: bb1 bb0
 sil @dead_use_of_alloc_stack : $@convention(thin) () -> () {
 bb0:
   %1 = alloc_stack $((), (), ())
-  %2 = tuple_element_addr %1#1 : $*((), (), ()), 0
-  dealloc_stack %1#0 : $*@local_storage ((), (), ())
+  %2 = tuple_element_addr %1 : $*((), (), ()), 0
+  dealloc_stack %1 : $*((), (), ())
   %3 = tuple ()
   return %3 : $()
 }

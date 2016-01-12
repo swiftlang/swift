@@ -6,7 +6,7 @@
 
 import a
 {
-class B:CollectionType
+class B:Collection
 struct B<T where h:a{
 class B<b{struct B{
 class a{struct B{

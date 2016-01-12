@@ -10,7 +10,7 @@ ns-html2rst - Convert Cocoa HTML documentation into ReST
 
 usage: nshtml2rst < NSString.html > NSString.rst
         """)
-        exit(0)
+        sys.exit(0)
 
     html = sys.stdin.read()
 

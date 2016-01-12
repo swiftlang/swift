@@ -226,11 +226,11 @@ using ValueTableMap = llvm::SmallMapVector<unsigned, unsigned, 8>;
 ///   %0 = alloc_stack $A  // var x                   // users: %4, %7
 ///   %5 = integer_literal $Builtin.Int64, 19         // user: %6
 ///   %6 = struct $Int (%5 : $Builtin.Int64)          // user: %8
-///   %7 = struct_element_addr %0#1 : $*A, #A.a       // user: %8
+///   %7 = struct_element_addr %0 : $*A, #A.a         // user: %8
 ///   store %6 to %7 : $*Int                          // id: %8
 ///   %9 = integer_literal $Builtin.Int64, 20         // user: %10
 ///   %10 = struct $Int (%9 : $Builtin.Int64)         // user: %12
-///   %11 = struct_element_addr %0#1 : $*A, #A.b      // user: %12
+///   %11 = struct_element_addr %0 : $*A, #A.b        // user: %12
 ///   store %10 to %11 : $*Int                        // id: %12
 /// }
 ///
@@ -243,7 +243,7 @@ using ValueTableMap = llvm::SmallMapVector<unsigned, unsigned, 8>;
 ///   %1 = function_ref @a.A.init : $@convention(thin) (@thin A.Type) -> A
 ///   %2 = metatype $@thin A.Type                     // user: %3
 ///   %3 = apply %1(%2) : $@convention(thin) (@thin A.Type) -> A // user: %4
-///   store %3 to %0#1 : $*A                          // id: %4
+///   store %3 to %0 : $*A                            // id: %4
 /// }
 ///
 /// NOTE: LSValue can take 2 forms.

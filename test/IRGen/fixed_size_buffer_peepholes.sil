@@ -13,13 +13,13 @@ entry(%x : $*T):
   // CHECK: llvm.lifetime.start(i64 [[BUFFER_SIZE:12|24]], i8* [[BUFFERLIFE]])
   %a = alloc_stack $T
   // CHECK: [[ADDR:%.*]] = call %swift.opaque* %initializeBufferWithCopy([[BUFFER_TYPE]]* [[BUFFER]], %swift.opaque* %0, %swift.type* %T)
-  copy_addr %x to [initialization] %a#1 : $*T
+  copy_addr %x to [initialization] %a : $*T
   // CHECK: call void @consume(%swift.opaque* noalias nocapture [[ADDR]], %swift.type* %T)
   %u = function_ref @consume : $@convention(thin) <T> (@in T) -> ()
-  %z = apply %u<T>(%a#1) : $@convention(thin) <T> (@in T) -> ()
+  %z = apply %u<T>(%a) : $@convention(thin) <T> (@in T) -> ()
   // CHECK: [[BUFFERLIFE:%.*]] = bitcast [[BUFFER_TYPE]]* [[BUFFER]]
   // CHECK: llvm.lifetime.end(i64 [[BUFFER_SIZE]], i8* [[BUFFERLIFE]])
-  dealloc_stack %a#0 : $*@local_storage T
+  dealloc_stack %a : $*T
   return undef : $()
 }
 
@@ -42,14 +42,14 @@ entry(%x : $*T):
   // CHECK: [[ADDR:%.*]] = call %swift.opaque* %allocateBuffer([[BUFFER_TYPE]]* [[BUFFER]], %swift.type* %T)
   %a = alloc_stack $T
   %p = function_ref @produce : $@convention(thin) <T> (@out T) -> ()
-  %y = apply %p<T>(%a#1) : $@convention(thin) <T> (@out T) -> ()
-  destroy_addr %a#1 : $*T
+  %y = apply %p<T>(%a) : $@convention(thin) <T> (@out T) -> ()
+  destroy_addr %a : $*T
 
   // CHECK: call %swift.opaque* %initializeWithCopy(%swift.opaque* [[ADDR]],
-  copy_addr %x to [initialization] %a#1 : $*T
+  copy_addr %x to [initialization] %a : $*T
   %u = function_ref @consume : $@convention(thin) <T> (@in T) -> ()
-  %z = apply %u<T>(%a#1) : $@convention(thin) <T> (@in T) -> ()
-  dealloc_stack %a#0 : $*@local_storage T
+  %z = apply %u<T>(%a) : $@convention(thin) <T> (@in T) -> ()
+  dealloc_stack %a : $*T
   return undef : $()
 }
 
@@ -60,9 +60,9 @@ entry(%x : $*T):
   // CHECK: [[ADDR:%.*]] = call %swift.opaque* %allocateBuffer([[BUFFER_TYPE]]* [[BUFFER]], %swift.type* %T)
   %a = alloc_stack $T
   %p = function_ref @produce : $@convention(thin) <T> (@out T) -> ()
-  %y = apply %p<T>(%a#1) : $@convention(thin) <T> (@out T) -> ()
-  destroy_addr %a#1 : $*T
-  dealloc_stack %a#0 : $*@local_storage T
+  %y = apply %p<T>(%a) : $@convention(thin) <T> (@out T) -> ()
+  destroy_addr %a : $*T
+  dealloc_stack %a : $*T
   return undef : $()
 }
 
@@ -76,11 +76,11 @@ entry(%x : $*T):
 
 next:
   // CHECK: call %swift.opaque* %initializeWithCopy(%swift.opaque* [[ADDR]],
-  copy_addr %x to [initialization] %a#1 : $*T
+  copy_addr %x to [initialization] %a : $*T
   // CHECK: call void @consume(%swift.opaque* noalias nocapture [[ADDR]], %swift.type* %T)
   %u = function_ref @consume : $@convention(thin) <T> (@in T) -> ()
-  %z = apply %u<T>(%a#1) : $@convention(thin) <T> (@in T) -> ()
-  dealloc_stack %a#0 : $*@local_storage T
+  %z = apply %u<T>(%a) : $@convention(thin) <T> (@in T) -> ()
+  dealloc_stack %a : $*T
   return undef : $()
 }
 

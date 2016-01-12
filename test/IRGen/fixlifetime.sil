@@ -49,8 +49,8 @@ bb0(%0 : $C, %1 : $P, %2 : $@callee_owned () -> (), %3 : $Agg):
   fix_lifetime %3 : $Agg
 
   %4 = alloc_stack $C
-  fix_lifetime %4#1 : $*C
-  dealloc_stack %4#0 : $*@local_storage C
+  fix_lifetime %4 : $*C
+  dealloc_stack %4 : $*C
   %9999 = tuple()
   return %9999 : $()
 }

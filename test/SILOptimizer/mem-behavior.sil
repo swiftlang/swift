@@ -97,9 +97,9 @@ bb0(%0 : $X, %1 : $X):
 }
 
 // CHECK-LABEL: @allocstack_apply_no_side_effect
-// CHECK:     PAIR #2
+// CHECK:     PAIR #1
 // CHECK-NEXT:  (0):   %3 = apply %2() : $@convention(thin) () -> ()
-// CHECK-NEXT:  (1):   %1 = alloc_stack $Int32                         // user: %5
+// CHECK-NEXT:  (0):   %1 = alloc_stack $Int32                         // user: %5
 // CHECK-NEXT:  r=0,w=0,se=0
 sil @allocstack_apply_no_side_effect : $@convention(thin) (Int32) -> () {
 bb0(%0 : $Int32):
@@ -107,30 +107,30 @@ bb0(%0 : $Int32):
   %2 = function_ref @nouser_func : $@convention(thin) () -> () // user: %3
   %3 = apply %2() : $@convention(thin) () -> ()
   %4 = tuple ()                                   // user: %6
-  dealloc_stack %1#0 : $*@local_storage Int32     // id: %5
+  dealloc_stack %1 : $*Int32     // id: %5
   return %4 : $()
 }
 
 // CHECK-LABEL: @allocstack_apply_side_effect
-// CHECK: PAIR #2.
-// CHECK-NEXT:  (0):   %3 = apply %2(%0, %1#1) : $@convention(thin) (Int32, @inout Int32) -> ()
-// CHECK-NEXT:  (1):   %1 = alloc_stack $Int32
+// CHECK: PAIR #1.
+// CHECK-NEXT:  (0):   %3 = apply %2(%0, %1) : $@convention(thin) (Int32, @inout Int32) -> ()
+// CHECK-NEXT:  (0):   %1 = alloc_stack $Int32
 // CHECK-NEXT:  r=0,w=1,se=1
 sil @allocstack_apply_side_effect : $@convention(thin) (Int32) -> () {
 bb0(%0 : $Int32):
   %1 = alloc_stack $Int32                         // users: %3, %5
   // function_ref store_to_int
   %2 = function_ref @store_to_int : $@convention(thin) (Int32, @inout Int32) -> () // user: %3
-  %3 = apply %2(%0, %1#1) : $@convention(thin) (Int32, @inout Int32) -> ()
+  %3 = apply %2(%0, %1) : $@convention(thin) (Int32, @inout Int32) -> ()
   %4 = tuple ()                                   // user: %6
-  dealloc_stack %1#0 : $*@local_storage Int32     // id: %5
+  dealloc_stack %1 : $*Int32     // id: %5
   return %4 : $()                                 // id: %6
 }
 
 // CHECK-LABEL: @allocstack_apply_no_escaping
-// CHECK: PAIR #2.
+// CHECK: PAIR #1.
 // CHECK-NEXT:  (0):   %3 = apply %2() : $@convention(thin) () -> ()
-// CHECK-NEXT:  (1):   %1 = alloc_stack $Int32                         // users: %5, %7
+// CHECK-NEXT:  (0):   %1 = alloc_stack $Int32                         // users: %5, %7
 // CHECK-NEXT:  r=0,w=0,se=0
 sil @allocstack_apply_no_escaping : $@convention(thin) (Int32) -> () {
 bb0(%0 : $Int32):
@@ -138,24 +138,24 @@ bb0(%0 : $Int32):
   %2 = function_ref @nouser_func : $@convention(thin) () -> () // user: %3
   %3 = apply %2() : $@convention(thin) () -> ()
   %4 = function_ref @store_to_int: $@convention(thin) (Int32, @inout Int32) -> () // user: %3
-  %5 = apply %4(%0, %1#1) : $@convention(thin) (Int32, @inout Int32) -> ()
+  %5 = apply %4(%0, %1) : $@convention(thin) (Int32, @inout Int32) -> ()
   %6 = tuple ()                                   // user: %6
-  dealloc_stack %1#0 : $*@local_storage Int32     // id: %5
+  dealloc_stack %1 : $*Int32     // id: %5
   return %6 : $()                                 // id: %6
 }
 
 // CHECK-LABEL: @allocstack_apply_read_only
-// CHECK:     PAIR #2.
-// CHECK-NEXT: (0):   %4 = apply %3(%1#1) : $@convention(thin) (@in X) -> ()
-// CHECK-NEXT: (1):   %1 = alloc_stack $X                             // users: %2, %4, %5
+// CHECK:     PAIR #1.
+// CHECK-NEXT: (0):   %4 = apply %3(%1) : $@convention(thin) (@in X) -> ()
+// CHECK-NEXT: (0):   %1 = alloc_stack $X                             // users: %2, %4, %5
 // CHECK-NEXT: r=1,w=0,se=0
 sil @allocstack_apply_read_only : $@convention(thin) (X) -> () {
 bb0(%0 : $X):
   %1 = alloc_stack $X
-  store %0 to %1#1 : $*X
+  store %0 to %1 : $*X
   %3 = function_ref @load_from_in : $@convention(thin) (@in X) -> ()
-  %4 = apply %3(%1#1) : $@convention(thin) (@in X) -> ()
-  dealloc_stack %1#0 : $*@local_storage X
+  %4 = apply %3(%1) : $@convention(thin) (@in X) -> ()
+  dealloc_stack %1 : $*X
   %6 = tuple ()
   return %6 : $()
 }
@@ -173,18 +173,18 @@ struct TwoInts {
 }
 
 // CHECK-LABEL: @combination_of_read_and_write_effects
-// CHECK:     PAIR #1.
+// CHECK:     PAIR #0.
 // CHECK-NEXT: (0):   %4 = apply %3(%1, %2) : $@convention(thin) (@inout Int32, @inout Int32) -> ()
-// CHECK-NEXT: (1):   %0 = alloc_stack $TwoInts                       // users: %1, %2, %5
+// CHECK-NEXT: (0):   %0 = alloc_stack $TwoInts                       // users: %1, %2, %5
 // CHECK-NEXT: r=1,w=1,se=1
 sil @combination_of_read_and_write_effects : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $TwoInts
-  %1 = struct_element_addr %0#1 : $*TwoInts, #TwoInts.i1
-  %2 = struct_element_addr %0#1 : $*TwoInts, #TwoInts.i2
+  %1 = struct_element_addr %0 : $*TwoInts, #TwoInts.i1
+  %2 = struct_element_addr %0 : $*TwoInts, #TwoInts.i2
   %3 = function_ref @copy_ints : $@convention(thin) (@inout Int32, @inout Int32) -> ()
   apply %3 (%1, %2) : $@convention(thin) (@inout Int32, @inout Int32) -> ()
-  dealloc_stack %0#0 : $*@local_storage TwoInts
+  dealloc_stack %0 : $*TwoInts
   %r = tuple()
   return %r : $()
 }

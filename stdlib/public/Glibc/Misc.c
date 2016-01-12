@@ -44,3 +44,8 @@ _swift_Glibc_fcntlPtr(int fd, int cmd, void* ptr) {
   return fcntl(fd, cmd, ptr);
 }
 
+extern char **
+_swift_FreeBSD_getEnv() {
+  extern char **environ;
+  return environ;
+}

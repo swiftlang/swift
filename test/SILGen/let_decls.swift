@@ -94,8 +94,8 @@ func testAddressOnlyStructString<T>(a : T) -> String {
   
   // CHECK: [[PRODFN:%[0-9]+]] = function_ref @{{.*}}produceAddressOnlyStruct
   // CHECK: [[TMPSTRUCT:%[0-9]+]] = alloc_stack $AddressOnlyStruct<T>
-  // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]]#1,
-  // CHECK-NEXT: [[STRADDR:%[0-9]+]] = struct_element_addr [[TMPSTRUCT]]#1 : $*AddressOnlyStruct<T>, #AddressOnlyStruct.str
+  // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]],
+  // CHECK-NEXT: [[STRADDR:%[0-9]+]] = struct_element_addr [[TMPSTRUCT]] : $*AddressOnlyStruct<T>, #AddressOnlyStruct.str
   // CHECK-NEXT: [[STRVAL:%[0-9]+]] = load [[STRADDR]]
   // CHECK-NEXT: retain_value [[STRVAL]]
   // CHECK-NEXT: destroy_addr [[TMPSTRUCT]]
@@ -109,8 +109,8 @@ func testAddressOnlyStructElt<T>(a : T) -> T {
   
   // CHECK: [[PRODFN:%[0-9]+]] = function_ref @{{.*}}produceAddressOnlyStruct
   // CHECK: [[TMPSTRUCT:%[0-9]+]] = alloc_stack $AddressOnlyStruct<T>
-  // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]]#1,
-  // CHECK-NEXT: [[ELTADDR:%[0-9]+]] = struct_element_addr [[TMPSTRUCT]]#1 : $*AddressOnlyStruct<T>, #AddressOnlyStruct.elt
+  // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]],
+  // CHECK-NEXT: [[ELTADDR:%[0-9]+]] = struct_element_addr [[TMPSTRUCT]] : $*AddressOnlyStruct<T>, #AddressOnlyStruct.elt
   // CHECK-NEXT: copy_addr [[ELTADDR]] to [initialization] %0 : $*T
   // CHECK-NEXT: destroy_addr [[TMPSTRUCT]]
 }
@@ -336,13 +336,13 @@ func testDebugValue(a : Int, b : SimpleProtocol) -> Int {
 func testAddressOnlyTupleArgument(bounds: (start: SimpleProtocol, pastEnd: Int)) {
 // CHECK:       bb0(%0 : $*SimpleProtocol, %1 : $Int):
 // CHECK-NEXT:    %2 = alloc_stack $(start: SimpleProtocol, pastEnd: Int), let, name "bounds"
-// CHECK-NEXT:    %3 = tuple_element_addr %2#1 : $*(start: SimpleProtocol, pastEnd: Int), 0
+// CHECK-NEXT:    %3 = tuple_element_addr %2 : $*(start: SimpleProtocol, pastEnd: Int), 0
 // CHECK-NEXT:    copy_addr [take] %0 to [initialization] %3 : $*SimpleProtocol
-// CHECK-NEXT:    %5 = tuple_element_addr %2#1 : $*(start: SimpleProtocol, pastEnd: Int), 1
+// CHECK-NEXT:    %5 = tuple_element_addr %2 : $*(start: SimpleProtocol, pastEnd: Int), 1
 // CHECK-NEXT:    store %1 to %5 : $*Int
 // CHECK-NEXT:    debug_value_addr %2
-// CHECK-NEXT:    destroy_addr %2#1 : $*(start: SimpleProtocol, pastEnd: Int)
-// CHECK-NEXT:    dealloc_stack %2#0 : $*@local_storage (start: SimpleProtocol, pastEnd: Int)
+// CHECK-NEXT:    destroy_addr %2 : $*(start: SimpleProtocol, pastEnd: Int)
+// CHECK-NEXT:    dealloc_stack %2 : $*(start: SimpleProtocol, pastEnd: Int)
 }
 
 
@@ -498,7 +498,7 @@ func test_unassigned_let_constant() {
   let string : String
 }
 // CHECK: [[S:%[0-9]+]] = alloc_stack $String, let, name "string"
-// CHECK-NEXT:  [[MUI:%[0-9]+]] = mark_uninitialized [var] [[S]]#1 : $*String
+// CHECK-NEXT:  [[MUI:%[0-9]+]] = mark_uninitialized [var] [[S]] : $*String
 // CHECK-NEXT:  destroy_addr [[MUI]] : $*String
-// CHECK-NEXT:  dealloc_stack [[S]]#0 : $*@local_storage String
+// CHECK-NEXT:  dealloc_stack [[S]] : $*String
 

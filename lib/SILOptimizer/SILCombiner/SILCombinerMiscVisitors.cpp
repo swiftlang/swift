@@ -168,20 +168,20 @@ namespace {
 ///
 /// We detect this pattern
 /// %0 = alloc_stack $LogicValue
-/// %1 = init_existential_addr %0#1 : $*LogicValue, $*Bool
+/// %1 = init_existential_addr %0 : $*LogicValue, $*Bool
 /// ...
 /// use of %1
 /// ...
-/// destroy_addr %0#1 : $*LogicValue
-/// dealloc_stack %0#0 : $*@local_storage LogicValue
+/// destroy_addr %0 : $*LogicValue
+/// dealloc_stack %0 : $*LogicValue
 ///
 /// At the same we time also look for dead alloc_stack live ranges that are only
 /// copied into.
 ///
 /// %0 = alloc_stack
 /// copy_addr %src, %0
-/// destroy_addr %0#1 : $*LogicValue
-/// dealloc_stack %0#0 : $*@local_storage LogicValue
+/// destroy_addr %0 : $*LogicValue
+/// dealloc_stack %0 : $*LogicValue
 struct AllocStackAnalyzer : SILInstructionVisitor<AllocStackAnalyzer> {
   /// The alloc_stack that we are analyzing.
   AllocStackInst *ASI;
@@ -299,7 +299,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   if (IEI && !OEI) {
     auto *ConcAlloc = Builder.createAllocStack(
         AS->getLoc(), IEI->getLoweredConcreteType(), AS->getVarInfo());
-    SILValue(IEI, 0).replaceAllUsesWith(ConcAlloc->getAddressResult());
+    SILValue(IEI, 0).replaceAllUsesWith(ConcAlloc);
     eraseInstFromFunction(*IEI);
 
     for (auto UI = AS->use_begin(), UE = AS->use_end(); UI != UE;) {
@@ -307,7 +307,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
       ++UI;
       if (auto *DA = dyn_cast<DestroyAddrInst>(Op->getUser())) {
         Builder.setInsertionPoint(DA);
-        Builder.createDestroyAddr(DA->getLoc(), SILValue(ConcAlloc, 1));
+        Builder.createDestroyAddr(DA->getLoc(), ConcAlloc);
         eraseInstFromFunction(*DA);
         continue;
       }
@@ -784,8 +784,8 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
     // Allowing us to perform the same optimization as for the store.
     //
     //  %alloca = alloc_stack
-    //            apply(%alloca#1,...)
-    //  %load = load %alloca#1
+    //            apply(%alloca,...)
+    //  %load = load %alloca
     //  %1 = enum $EnumType, $EnumType.case, %load
     //  store %1 to %nopayload_addr
     //
@@ -832,17 +832,15 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
   Builder.setInsertionPoint(AI);
   auto *AllocStack = Builder.createAllocStack(DataAddrInst->getLoc(),
                                               EnumInitOperand->get().getType());
-  EnumInitOperand->set(AllocStack->getAddressResult());
+  EnumInitOperand->set(AllocStack);
   Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(AI)));
-  SILValue Load(Builder.createLoad(DataAddrInst->getLoc(),
-                                   AllocStack->getAddressResult()),
+  SILValue Load(Builder.createLoad(DataAddrInst->getLoc(), AllocStack),
                 0);
   EnumInst *E = Builder.createEnum(
       DataAddrInst->getLoc(), Load, DataAddrInst->getElement(),
       DataAddrInst->getOperand().getType().getObjectType());
   Builder.createStore(DataAddrInst->getLoc(), E, DataAddrInst->getOperand());
-  Builder.createDeallocStack(DataAddrInst->getLoc(),
-                             AllocStack->getContainerResult());
+  Builder.createDeallocStack(DataAddrInst->getLoc(), AllocStack);
   eraseInstFromFunction(*DataAddrInst);
   return eraseInstFromFunction(*IEAI);
 }
@@ -1077,7 +1075,7 @@ SILInstruction *SILCombiner::visitFixLifetimeInst(FixLifetimeInst *FLI) {
   Builder.setCurrentDebugScope(FLI->getDebugScope());
   if (auto *AI = dyn_cast<AllocStackInst>(FLI->getOperand())) {
     if (FLI->getOperand().getType().isLoadable(FLI->getModule())) {
-      auto Load = Builder.createLoad(FLI->getLoc(), SILValue(AI, 1));
+      auto Load = Builder.createLoad(FLI->getLoc(), AI);
       return Builder.createFixLifetime(FLI->getLoc(), SILValue(Load, 0));
     }
   }

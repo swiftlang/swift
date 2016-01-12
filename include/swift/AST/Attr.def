@@ -37,7 +37,6 @@ TYPE_ATTR(noreturn)
 // SIL-specific attributes
 TYPE_ATTR(block_storage)
 TYPE_ATTR(box)
-TYPE_ATTR(local_storage)
 TYPE_ATTR(sil_unowned)
 TYPE_ATTR(sil_unmanaged)
 TYPE_ATTR(sil_weak)
@@ -92,7 +91,7 @@ SIMPLE_DECL_ATTR(final, Final,
 
 DECL_ATTR(objc, ObjC,
           OnFunc | OnClass | OnProtocol | OnVar | OnSubscript |
-          OnConstructor | OnDestructor | OnEnum, 3)
+          OnConstructor | OnDestructor | OnEnum | OnEnumElement, 3)
 
 SIMPLE_DECL_ATTR(required, Required,
                  OnConstructor|DeclModifier, 4)

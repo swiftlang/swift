@@ -1040,7 +1040,7 @@ class ClassExistentialTypeInfo
 
 public:
 
-  bool isSingleRetainablePointer(ResilienceScope scope,
+  bool isSingleRetainablePointer(ResilienceExpansion expansion,
                                  ReferenceCounting *refcounting) const override{
     if (refcounting) *refcounting = Refcounting;
     return getNumStoredProtocols() == 0;
@@ -1571,31 +1571,19 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
   });
 }
 
-/// Retrieve the protocol witness table for a conformance.
-static llvm::Value *getProtocolWitnessTable(IRGenFunction &IGF,
-                                            CanType srcType,
-                                            llvm::Value **srcMetadataCache,
-                                            ProtocolEntry protoEntry,
-                                            ProtocolConformance *conformance) {
-  return emitWitnessTableRef(IGF, srcType, srcMetadataCache,
-                             protoEntry.getProtocol(),
-                             protoEntry.getInfo(),
-                             conformance);
-}
-
 /// Emit protocol witness table pointers for the given protocol conformances,
 /// passing each emitted witness table index into the given function body.
 static void forEachProtocolWitnessTable(IRGenFunction &IGF,
                           CanType srcType, llvm::Value **srcMetadataCache,
                           CanType destType,
                           ArrayRef<ProtocolEntry> protocols,
-                          ArrayRef<ProtocolConformance*> conformances,
+                          ArrayRef<ProtocolConformanceRef> conformances,
                           std::function<void (unsigned, llvm::Value*)> body) {
   // Collect the conformances that need witness tables.
   SmallVector<ProtocolDecl*, 2> destProtocols;
   destType.getAnyExistentialTypeProtocols(destProtocols);
 
-  SmallVector<ProtocolConformance*, 2> witnessConformances;
+  SmallVector<ProtocolConformanceRef, 2> witnessConformances;
   assert(destProtocols.size() == conformances.size() &&
          "mismatched protocol conformances");
   for (unsigned i = 0, size = destProtocols.size(); i < size; ++i)
@@ -1606,8 +1594,10 @@ static void forEachProtocolWitnessTable(IRGenFunction &IGF,
          "mismatched protocol conformances");
 
   for (unsigned i = 0, e = protocols.size(); i < e; ++i) {
-    auto table = getProtocolWitnessTable(IGF, srcType, srcMetadataCache,
-                                         protocols[i], witnessConformances[i]);
+    auto table = emitWitnessTableRef(IGF, srcType, srcMetadataCache,
+                                     protocols[i].getProtocol(),
+                                     protocols[i].getInfo(),
+                                     witnessConformances[i]);
     body(i, table);
   }
 }
@@ -1669,7 +1659,7 @@ Address irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
                                   SILType destType,
                                   CanType formalSrcType,
                                   SILType loweredSrcType,
-                                  ArrayRef<ProtocolConformance *> conformances){
+                                ArrayRef<ProtocolConformanceRef> conformances) {
   // TODO: Non-ErrorProtocol boxed existentials.
   assert(_isErrorProtocol(destType));
 
@@ -1680,8 +1670,9 @@ Address irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
   // Should only be one conformance, for the ErrorProtocol protocol.
   assert(conformances.size() == 1 && destTI.getStoredProtocols().size() == 1);
   const ProtocolEntry &entry = destTI.getStoredProtocols()[0];
-  auto witness = getProtocolWitnessTable(IGF, formalSrcType, &srcMetadata,
-                                         entry, conformances[0]);
+  auto witness = emitWitnessTableRef(IGF, formalSrcType, &srcMetadata,
+                                     entry.getProtocol(), entry.getInfo(),
+                                     conformances[0]);
   
   // Call the runtime to allocate the box.
   // TODO: When there's a store or copy_addr immediately into the box, peephole
@@ -1739,8 +1730,8 @@ void irgen::emitClassExistentialContainer(IRGenFunction &IGF,
                                llvm::Value *instance,
                                CanType instanceFormalType,
                                SILType instanceLoweredType,
-                               ArrayRef<ProtocolConformance*> conformances) {
-  // As a special case, an ErrorProtocol existential can represented as a
+                               ArrayRef<ProtocolConformanceRef> conformances) {
+  // As a special case, an ErrorProtocol existential can be represented as a
   // reference to an already existing NSError or CFError instance.
   SmallVector<ProtocolDecl*, 4> protocols;
   
@@ -1793,7 +1784,7 @@ Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
                                   SILType destType,
                                   CanType formalSrcType,
                                   SILType loweredSrcType,
-                                  ArrayRef<ProtocolConformance*> conformances) {
+                                  ArrayRef<ProtocolConformanceRef> conformances) {
   assert(!destType.isClassExistentialType() &&
          "initializing a class existential container as opaque");
   auto &destTI = IGF.getTypeInfo(destType).as<OpaqueExistentialTypeInfo>();
@@ -1825,7 +1816,7 @@ Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
 void irgen::emitExistentialMetatypeContainer(IRGenFunction &IGF,
                                Explosion &out, SILType outType,
                                llvm::Value *metatype, SILType metatypeType,
-                               ArrayRef<ProtocolConformance*> conformances) {
+                               ArrayRef<ProtocolConformanceRef> conformances) {
   assert(outType.is<ExistentialMetatypeType>());
   auto &destTI = IGF.getTypeInfo(outType).as<ExistentialMetatypeTypeInfo>();
   out.add(metatype);

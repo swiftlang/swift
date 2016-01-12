@@ -71,17 +71,18 @@ namespace {
   };
 }
 
-static Identifier getNameForObjC(const NominalTypeDecl *NTD,
+static Identifier getNameForObjC(const ValueDecl *VD,
                                  CustomNamesOnly_t customNamesOnly = Normal) {
-  assert(isa<ClassDecl>(NTD) || isa<ProtocolDecl>(NTD) || isa<EnumDecl>(NTD));
-  if (auto objc = NTD->getAttrs().getAttribute<ObjCAttr>()) {
+  assert(isa<ClassDecl>(VD) || isa<ProtocolDecl>(VD)
+      || isa<EnumDecl>(VD) || isa<EnumElementDecl>(VD));
+  if (auto objc = VD->getAttrs().getAttribute<ObjCAttr>()) {
     if (auto name = objc->getName()) {
       assert(name->getNumSelectorPieces() == 1);
       return name->getSelectorPieces().front();
     }
   }
 
-  return customNamesOnly ? Identifier() : NTD->getName();
+  return customNamesOnly ? Identifier() : VD->getName();
 }
 
 
@@ -255,12 +256,18 @@ private:
       // Print the cases as the concatenation of the enum name with the case
       // name.
       os << "  ";
-      if (customName.empty()) {
-        os << ED->getName();
+      Identifier customEltName = getNameForObjC(Elt, CustomNamesOnly);
+      if (customEltName.empty()) {
+        if (customName.empty()) {
+          os << ED->getName();
+        } else {
+          os << customName;
+        }
+        os << Elt->getName();
       } else {
-        os << customName;
+        os << customEltName
+           << " SWIFT_COMPILE_NAME(\"" << Elt->getName() << "\")";
       }
-      os << Elt->getName();
       
       if (auto ILE = cast_or_null<IntegerLiteralExpr>(Elt->getRawValueExpr())) {
         os << " = ";

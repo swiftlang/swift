@@ -33,9 +33,9 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // CHECK: [[X:%.*]] = load [[XBOX]]
   // CHECK: strong_retain [[X]]
   // CHECK: [[X_TMP:%.*]] = alloc_stack
-  // CHECK: store [[X]] to [[X_TMP]]#1
+  // CHECK: store [[X]] to [[X_TMP]]
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
-  // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]]#1)
+  // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
   // CHECK: [[X2:%.*]] = load [[X_TMP]]
   // CHECK: strong_release [[X2]]
   // -- call set x.clsid
@@ -47,9 +47,9 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // CHECK: [[X:%.*]] = load [[XBOX]]
   // CHECK: strong_retain [[X]]
   // CHECK: [[X_TMP:%.*]] = alloc_stack
-  // CHECK: store [[X]] to [[X_TMP]]#1
+  // CHECK: store [[X]] to [[X_TMP]]
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
-  // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]]#1)
+  // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
   // CHECK: [[X2:%.*]] = load [[X_TMP]]
   // CHECK: strong_release [[X2]]
   // -- call nextCLSID from protocol ext
@@ -63,9 +63,9 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // CHECK: [[X:%.*]] = load [[XBOX]]
   // CHECK: strong_retain [[X]]
   // CHECK: [[X_TMP:%.*]] = alloc_stack
-  // CHECK: store [[X]] to [[X_TMP]]#1
+  // CHECK: store [[X]] to [[X_TMP]]
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
-  // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]]#1)
+  // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
   // CHECK: [[X2:%.*]] = load [[X_TMP]]
   // CHECK: strong_release [[X2]]
   // -- call secondNextCLSID from class-constrained protocol ext
@@ -84,9 +84,9 @@ func getBaseObjectUID<T: UID where T: Base>(x: T) -> (Int, Int, Int) {
   // CHECK: [[X:%.*]] = load [[XBOX]]
   // CHECK: strong_retain [[X]]
   // CHECK: [[X_TMP:%.*]] = alloc_stack
-  // CHECK: store [[X]] to [[X_TMP]]#1
+  // CHECK: store [[X]] to [[X_TMP]]
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
-  // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]]#1)
+  // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
   // CHECK: [[X2:%.*]] = load [[X_TMP]]
   // CHECK: strong_release [[X2]]
   // -- call set x.clsid
@@ -98,9 +98,9 @@ func getBaseObjectUID<T: UID where T: Base>(x: T) -> (Int, Int, Int) {
   // CHECK: [[X:%.*]] = load [[XBOX]]
   // CHECK: strong_retain [[X]]
   // CHECK: [[X_TMP:%.*]] = alloc_stack
-  // CHECK: store [[X]] to [[X_TMP]]#1
+  // CHECK: store [[X]] to [[X_TMP]]
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
-  // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]]#1)
+  // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
   // CHECK: [[X2:%.*]] = load [[X_TMP]]
   // CHECK: strong_release [[X2]]
   // -- call nextCLSID from protocol ext

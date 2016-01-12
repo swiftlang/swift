@@ -19,6 +19,7 @@
 
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ConcreteDeclRef.h"
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/Availability.h"
 
@@ -42,7 +43,6 @@ namespace swift {
   class Initializer;
   class VarDecl;
   class OpaqueValueExpr;
-  class ProtocolConformance;
   class FuncDecl;
   class ConstructorDecl;
   class TypeDecl;
@@ -2555,11 +2555,11 @@ public:
 /// "Appropriate kind" means e.g. a concrete/existential metatype if the
 /// result is an existential metatype.
 class ErasureExpr : public ImplicitConversionExpr {
-  ArrayRef<ProtocolConformance *> Conformances;
+  ArrayRef<ProtocolConformanceRef> Conformances;
 
 public:
   ErasureExpr(Expr *subExpr, Type type,
-              ArrayRef<ProtocolConformance *> conformances)
+              ArrayRef<ProtocolConformanceRef> conformances)
     : ImplicitConversionExpr(ExprKind::Erasure, subExpr, type),
       Conformances(conformances) {}
 
@@ -2573,7 +2573,7 @@ public:
   /// to the corresponding protocol is trivial (because the source
   /// type is either an archetype or an existential type that conforms to
   /// that corresponding protocol).
-  ArrayRef<ProtocolConformance *> getConformances() const {
+  ArrayRef<ProtocolConformanceRef> getConformances() const {
     return Conformances;
   }
   

@@ -363,7 +363,7 @@ public:
 
   /// Mark a protocol conformance as used, so we know we need to emit it if
   /// it's in our TU.
-  void useConformance(ProtocolConformance *conformance);
+  void useConformance(ProtocolConformanceRef conformance);
 
   /// Mark protocol conformances from the given set of substitutions as used.
   void useConformancesFromSubstitutions(ArrayRef<Substitution> subs);

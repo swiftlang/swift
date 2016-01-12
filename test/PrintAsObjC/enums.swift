@@ -36,6 +36,18 @@ import Foundation
   case A, B, C
 }
 
+// CHECK-LABEL: typedef SWIFT_ENUM(NSInteger, EnumWithNamedConstants) {
+// CHECK-NEXT:   kEnumA SWIFT_COMPILE_NAME("A") = 0,
+// CHECK-NEXT:   kEnumB SWIFT_COMPILE_NAME("B") = 1,
+// CHECK-NEXT:   kEnumC SWIFT_COMPILE_NAME("C") = 2,
+// CHECK-NEXT: };
+
+@objc enum EnumWithNamedConstants: Int {
+  @objc(kEnumA) case A
+  @objc(kEnumB) case B
+  @objc(kEnumC) case C
+}
+
 // CHECK-LABEL: typedef SWIFT_ENUM(unsigned int, ExplicitValues) {
 // CHECK-NEXT:   ExplicitValuesZim = 0,
 // CHECK-NEXT:   ExplicitValuesZang = 219,

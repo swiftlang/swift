@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-{class B:CollectionType
+{class B:Collection
 a{
 struct S{
 class A{class b{

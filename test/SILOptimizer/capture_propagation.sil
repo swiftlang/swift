@@ -17,7 +17,7 @@ bb0:
   %0 = alloc_stack $Int32                           // users: %3, %9, %10
   %1 = integer_literal $Builtin.Int32, 3           // user: %2
   %2 = struct $Int32 (%1 : $Builtin.Int32)           // user: %3
-  store %2 to %0#1 : $*Int32                        // id: %3
+  store %2 to %0 : $*Int32                        // id: %3
   // function_ref capturep.helper (Swift.Int32) -> ()
   %4 = function_ref @_TF8capturep6helperFSiT_ : $@convention(thin) (Int32) -> () // user: %5
   %5 = thin_to_thick_function %4 : $@convention(thin) (Int32) -> () to $@callee_owned (Int32) -> () // user: %7
@@ -26,14 +26,14 @@ bb0:
   %7 = partial_apply %6(%5) : $@convention(thin) (@in Int32, @owned @callee_owned (Int32) -> ()) -> () // user: %9
   // function_ref specialization <Swift.Int32> of capturep.generic <A>(A, (A) -> ()) -> ()
   %8 = function_ref @_TTSgSi___TF8capturep7genericU__FTQ_FQ_T__T_ : $@convention(thin) (@in Int32, @owned @callee_owned (@in Int32) -> ()) -> () // user: %9
-  %9 = apply %8(%0#1, %7) : $@convention(thin) (@in Int32, @owned @callee_owned (@in Int32) -> ()) -> ()
+  %9 = apply %8(%0, %7) : $@convention(thin) (@in Int32, @owned @callee_owned (@in Int32) -> ()) -> ()
 
   %11 = thin_to_thick_function %4 : $@convention(thin) (Int32) -> () to $@callee_owned (Int32) -> () // user: %7
   %12 = function_ref @bad_thunk : $@convention(thin) (@in Int32, @owned @callee_owned (Int32) -> ()) -> ()
   %13 = partial_apply %12(%11) : $@convention(thin) (@in Int32, @owned @callee_owned (Int32) -> ()) -> () // user: %9
-  %14 = apply %8(%0#1, %13) : $@convention(thin) (@in Int32, @owned @callee_owned (@in Int32) -> ()) -> ()
+  %14 = apply %8(%0, %13) : $@convention(thin) (@in Int32, @owned @callee_owned (@in Int32) -> ()) -> ()
 
-  dealloc_stack %0#0 : $*@local_storage Int32       // id: %10
+  dealloc_stack %0 : $*Int32       // id: %10
   %15 = tuple ()                                  // user: %12
   return %15 : $()                                // id: %12
 }
@@ -60,9 +60,9 @@ sil shared [noinline] @_TTSgSi___TF8capturep7genericU__FTQ_FQ_T__T_ : $@conventi
 bb0(%0 : $*Int32, %1 : $@callee_owned (@in Int32) -> ()):
   %2 = alloc_stack $Int32                           // users: %4, %5, %6
   %3 = load %0 : $*Int32                            // user: %4
-  store %3 to %2#1 : $*Int32                        // id: %4
-  %5 = apply %1(%2#1) : $@callee_owned (@in Int32) -> ()
-  dealloc_stack %2#0 : $*@local_storage Int32       // id: %6
+  store %3 to %2 : $*Int32                        // id: %4
+  %5 = apply %1(%2) : $@callee_owned (@in Int32) -> ()
+  dealloc_stack %2 : $*Int32       // id: %6
   %7 = tuple ()                                   // user: %8
   return %7 : $()                                 // id: %8
 }

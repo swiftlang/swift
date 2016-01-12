@@ -2290,7 +2290,7 @@ public:
   /// type.
   const swift::WitnessTable *getWitnessTable(const Metadata *type) const;
   
-#if defined(NDEBUG) && SWIFT_OBJC_INTEROP
+#if !defined(NDEBUG) && SWIFT_OBJC_INTEROP
   void dump() const;
 #endif
 };

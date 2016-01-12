@@ -259,7 +259,7 @@ void emitInitializeArrayBackToFront(IRGenFunction &IGF,
 /// type of its field, which it is guaranteed to have identical layout to.
 SILType getSingletonAggregateFieldType(IRGenModule &IGM,
                                        SILType t,
-                                       ResilienceScope scope);
+                                       ResilienceExpansion expansion);
 
 } // end namespace irgen
 } // end namespace swift

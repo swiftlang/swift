@@ -311,7 +311,7 @@ static void copyOrInitValuesInto(Initialization *init,
 
   if (auto Address = init->getAddressOrNull()) {
     if (isa<GlobalAddrInst>(Address) &&
-      gen.getTypeLowering(type).getLoweredType().isTrivial(gen.SGM.M)) {
+        gen.getTypeLowering(type).getLoweredType().isTrivial(gen.SGM.M)) {
       // Implode tuples in initialization of globals if they are
       // of trivial types.
       implodeTuple = true;

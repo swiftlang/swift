@@ -107,7 +107,7 @@ Type Solution::computeSubstitutions(
   auto currentModule = getConstraintSystem().DC->getParentModule();
   ArchetypeType *currentArchetype = nullptr;
   Type currentReplacement;
-  SmallVector<ProtocolConformance *, 4> currentConformances;
+  SmallVector<ProtocolConformanceRef, 4> currentConformances;
 
   ArrayRef<Requirement> requirements;
   if (auto genericFn = origType->getAs<GenericFunctionType>()) {
@@ -150,7 +150,8 @@ Type Solution::computeSubstitutions(
         (void)conforms;
 
         assert(conformance || replacement->hasDependentProtocolConformances());
-        currentConformances.push_back(conformance);
+        currentConformances.push_back(
+                    ProtocolConformanceRef(protoType->getDecl(), conformance));
 
         break;
       }
@@ -164,7 +165,6 @@ Type Solution::computeSubstitutions(
       // Flush the current conformances.
       if (currentArchetype) {
         substitutions.push_back({
-          currentArchetype,
           currentReplacement,
           ctx.AllocateCopy(currentConformances)
         });
@@ -183,7 +183,6 @@ Type Solution::computeSubstitutions(
   // Flush the final conformances.
   if (currentArchetype) {
     substitutions.push_back({
-      currentArchetype,
       currentReplacement,
       ctx.AllocateCopy(currentConformances),
     });
@@ -1371,20 +1370,18 @@ namespace {
       // Form a reference to the function. The bridging operations are generic,
       // so we need to form substitutions and compute the resulting type.
       auto Conformances =
-        tc.Context.Allocate<ProtocolConformance *>(conformance ? 1 : 0);
+        tc.Context.AllocateUninitialized<ProtocolConformanceRef>(
+                                                          conformance ? 1 : 0);
 
-      if (conformsToBridgedToObjectiveC)
-        Conformances[0] = conformance;
-
+      if (conformsToBridgedToObjectiveC) {
+        Conformances[0] = ProtocolConformanceRef(bridgedProto, conformance);
+      }
 
       auto fnGenericParams
         = fn->getGenericSignatureOfContext()->getGenericParams();
-      auto firstArchetype
-        = ArchetypeBuilder::mapTypeIntoContext(fn, fnGenericParams[0])
-            ->castTo<ArchetypeType>();
 
       SmallVector<Substitution, 2> Subs;
-      Substitution sub(firstArchetype, valueType, Conformances);
+      Substitution sub(valueType, Conformances);
       Subs.push_back(sub);
 
       // Add substitution for the dependent type T._ObjectiveCType.
@@ -1393,19 +1390,11 @@ namespace {
         auto objcAssocType = cast<AssociatedTypeDecl>(
                                conformance->getProtocol()->lookupDirect(
                                  objcTypeId).front());
-        auto objcDepType = DependentMemberType::get(fnGenericParams[0],
-                                                    objcAssocType,
-                                                    tc.Context);
-        auto objcArchetype
-          = ArchetypeBuilder::mapTypeIntoContext(fn, objcDepType)
-            ->castTo<ArchetypeType>();
-
         const Substitution &objcSubst = conformance->getTypeWitness(
                                           objcAssocType, &tc);
 
         // Create a substitution for the dependent type.
         Substitution newDepTypeSubst(
-                       objcArchetype,
                        objcSubst.getReplacement(),
                        objcSubst.getConformances());
 
@@ -3885,22 +3874,22 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
 /// because most protocols do not conform to themselves -- however we still
 /// allow the conversion here, except the ErasureExpr ends up with trivial
 /// conformances.
-static ArrayRef<ProtocolConformance*>
+static ArrayRef<ProtocolConformanceRef>
 collectExistentialConformances(TypeChecker &tc, Type fromType, Type toType,
                                DeclContext *DC) {
   SmallVector<ProtocolDecl *, 4> protocols;
   toType->getAnyExistentialTypeProtocols(protocols);
 
-  SmallVector<ProtocolConformance *, 4> conformances;
+  SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : protocols) {
-    ProtocolConformance *conformance;
+    ProtocolConformance *concrete;
     bool conforms = tc.containsProtocol(fromType, proto, DC,
                                         (ConformanceCheckFlags::InExpression|
                                          ConformanceCheckFlags::Used),
-                                        &conformance);
+                                        &concrete);
     assert(conforms && "Type does not conform to protocol?");
     (void)conforms;
-    conformances.push_back(conformance);
+    conformances.push_back(ProtocolConformanceRef(proto, concrete));
   }
 
   return tc.Context.AllocateCopy(conformances);
@@ -4720,9 +4709,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         return nullptr;
       
       // The return type of _bridgeErrorProtocolToNSError is formally
-      // 'AnyObject' to avoid stdlib-to-Foundation dependencies, but it's
-      // really NSError.  Abuse CovariantReturnConversionExpr to fix this.
-      
+      // 'AnyObject' to avoid stdlib-to-Foundation dependencies, but it's really
+      // NSError.  Abuse CovariantReturnConversionExpr to fix this.
       return new (tc.Context) CovariantReturnConversionExpr(call, toType);
     }
 
@@ -6507,13 +6495,8 @@ Expr *Solution::convertOptionalToBool(Expr *expr,
   // Form a reference to the function. This library intrinsic is generic, so we
   // need to form substitutions and compute the resulting type.
   auto unwrappedOptionalType = expr->getType()->getOptionalObjectType();
-  auto fnGenericParams
-    = fn->getGenericSignatureOfContext()->getGenericParams();
-  auto firstArchetype
-    = ArchetypeBuilder::mapTypeIntoContext(fn, fnGenericParams[0])
-        ->castTo<ArchetypeType>();
 
-  Substitution sub(firstArchetype, unwrappedOptionalType, {});
+  Substitution sub(unwrappedOptionalType, {});
   ConcreteDeclRef fnSpecRef(ctx, fn, sub);
   auto *fnRef =
       new (ctx) DeclRefExpr(fnSpecRef, SourceLoc(), /*Implicit=*/true);

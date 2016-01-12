@@ -67,6 +67,8 @@ SILGlobalVariable::~SILGlobalVariable() {
   getModule().GlobalVariableTable.erase(Name);
 }
 
+// FIXME
+
 static bool analyzeStaticInitializer(SILFunction *F, SILInstruction *&Val,
                                      SILGlobalVariable *&GVar) {
   Val = nullptr;

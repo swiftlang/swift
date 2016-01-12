@@ -18,9 +18,9 @@ bb0(%0 : $*T):
   // function_ref specialize_recursive_generics.recursive_generics <A>(A) -> ()
   %2 = function_ref @_TF29specialize_recursive_generics18recursive_genericsU__FQ_T_ : $@convention(thin) <τ_0_0> (@in τ_0_0) -> () // user: %5
   %3 = alloc_stack $T                             // users: %4, %5, %6
-  copy_addr %0 to [initialization] %3#1 : $*T     // id: %4
-  %5 = apply %2<T>(%3#1) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
-  dealloc_stack %3#0 : $*@local_storage T         // id: %6
+  copy_addr %0 to [initialization] %3 : $*T     // id: %4
+  %5 = apply %2<T>(%3) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  dealloc_stack %3 : $*T         // id: %6
   destroy_addr %0 : $*T                           // id: %7
   %8 = tuple ()                                   // user: %9
   return %8 : $()                                 // id: %9
@@ -44,12 +44,12 @@ bb0(%0 : $*T, %1 : $*U):
   // function_ref specialize_recursive_generics.recursive_generics_with_different_substitutions <A, B>(A, B) -> ()
   %4 = function_ref @_TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_ : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> () // user: %9
   %5 = alloc_stack $U                             // users: %6, %9, %11
-  copy_addr %1 to [initialization] %5#1 : $*U     // id: %6
+  copy_addr %1 to [initialization] %5 : $*U     // id: %6
   %7 = alloc_stack $T                             // users: %8, %9, %10
-  copy_addr %0 to [initialization] %7#1 : $*T     // id: %8
-  %9 = apply %4<U, T>(%5#1, %7#1) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> ()
-  dealloc_stack %7#0 : $*@local_storage T         // id: %10
-  dealloc_stack %5#0 : $*@local_storage U         // id: %11
+  copy_addr %0 to [initialization] %7 : $*T     // id: %8
+  %9 = apply %4<U, T>(%5, %7) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> ()
+  dealloc_stack %7 : $*T         // id: %10
+  dealloc_stack %5 : $*U         // id: %11
   destroy_addr %1 : $*U                           // id: %12
   destroy_addr %0 : $*T                           // id: %13
   %14 = tuple ()                                  // user: %15
@@ -63,9 +63,9 @@ bb0:
   %1 = integer_literal $Builtin.Int32, 3          // user: %2
   %2 = struct $Int32 (%1 : $Builtin.Int32)        // user: %4
   %3 = alloc_stack $Int32                         // users: %4, %5, %6
-  store %2 to %3#1 : $*Int32                      // id: %4
-  %5 = apply %0<Int32>(%3#1) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
-  dealloc_stack %3#0 : $*@local_storage Int32     // id: %6
+  store %2 to %3 : $*Int32                      // id: %4
+  %5 = apply %0<Int32>(%3) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  dealloc_stack %3 : $*Int32     // id: %6
   %7 = tuple ()                                   // user: %8
   return %7 : $()                                 // id: %8
 }
@@ -78,14 +78,14 @@ bb0:
   %2 = builtin "fptrunc_FPIEEE80_FPIEEE64"(%1 : $Builtin.FPIEEE80) : $Builtin.FPIEEE64 // user: %3
   %3 = struct $Double (%2 : $Builtin.FPIEEE64)    // user: %5
   %4 = alloc_stack $Double                        // users: %5, %10, %12
-  store %3 to %4#1 : $*Double                     // id: %5
+  store %3 to %4 : $*Double                     // id: %5
   %6 = integer_literal $Builtin.Int32, 1          // user: %7
   %7 = struct $Int32 (%6 : $Builtin.Int32)        // user: %9
   %8 = alloc_stack $Int32                         // users: %9, %10, %11
-  store %7 to %8#1 : $*Int32                      // id: %9
-  %10 = apply %0<Double, Int32>(%4#1, %8#1) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> ()
-  dealloc_stack %8#0 : $*@local_storage Int32     // id: %11
-  dealloc_stack %4#0 : $*@local_storage Double    // id: %12
+  store %7 to %8 : $*Int32                      // id: %9
+  %10 = apply %0<Double, Int32>(%4, %8) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> ()
+  dealloc_stack %8 : $*Int32     // id: %11
+  dealloc_stack %4 : $*Double    // id: %12
   %13 = tuple ()                                  // user: %14
   return %13 : $()                                // id: %14
 }

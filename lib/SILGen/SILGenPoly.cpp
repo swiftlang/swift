@@ -141,18 +141,18 @@ namespace {
   };
 };
 
-static ArrayRef<ProtocolConformance*>
+static ArrayRef<ProtocolConformanceRef>
 collectExistentialConformances(Module *M, Type fromType, Type toType) {
   assert(!fromType->isAnyExistentialType());
   
   SmallVector<ProtocolDecl *, 4> protocols;
   toType->getAnyExistentialTypeProtocols(protocols);
   
-  SmallVector<ProtocolConformance *, 4> conformances;
+  SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : protocols) {
     ProtocolConformance *conformance =
-    M->lookupConformance(fromType, proto, nullptr).getPointer();
-    conformances.push_back(conformance);
+      M->lookupConformance(fromType, proto, nullptr).getPointer();
+    conformances.push_back(ProtocolConformanceRef(proto, conformance));
   }
   
   return M->getASTContext().AllocateCopy(conformances);
@@ -200,7 +200,7 @@ static ManagedValue emitTransformExistential(SILGenFunction &SGF,
         ->getInstanceType();
   }
 
-  ArrayRef<ProtocolConformance *> conformances =
+  ArrayRef<ProtocolConformanceRef> conformances =
       collectExistentialConformances(SGF.SGM.M.getSwiftModule(),
                                      fromInstanceType,
                                      toInstanceType);
@@ -650,18 +650,16 @@ static ManagedValue manageParam(SILGenFunction &gen,
   llvm_unreachable("bad parameter convention");
 }
 
-static void collectParams(SILGenFunction &gen,
-                          SILLocation loc,
-                          SmallVectorImpl<ManagedValue> &params,
-                          bool allowPlusZero) {
+void SILGenFunction::collectThunkParams(SILLocation loc,
+                                        SmallVectorImpl<ManagedValue> &params,
+                                        bool allowPlusZero) {
   auto paramTypes =
-    gen.F.getLoweredFunctionType()->getParametersWithoutIndirectResult();
+    F.getLoweredFunctionType()->getParametersWithoutIndirectResult();
   for (auto param : paramTypes) {
-    auto paramTy = gen.F.mapTypeIntoContext(param.getSILType());
-    auto paramValue = new (gen.SGM.M) SILArgument(gen.F.begin(),
-                                                  paramTy);
-                                      
-    params.push_back(manageParam(gen, loc, paramValue, param, allowPlusZero));
+    auto paramTy = F.mapTypeIntoContext(param.getSILType());
+    auto paramValue = new (SGM.M) SILArgument(F.begin(), paramTy);
+    auto paramMV = manageParam(*this, loc, paramValue, param, allowPlusZero);
+    params.push_back(paramMV);
   }
 }
 
@@ -1332,7 +1330,7 @@ static void buildThunkBody(SILGenFunction &gen, SILLocation loc,
   SmallVector<ManagedValue, 8> params;
   // TODO: Could accept +0 arguments here when forwardFunctionArguments/
   // emitApply can.
-  collectParams(gen, loc, params, /*allowPlusZero*/ false);
+  gen.collectThunkParams(loc, params, /*allowPlusZero*/ false);
 
   ManagedValue fnValue = params.pop_back_val();
   auto fnType = fnValue.getType().castTo<SILFunctionType>();
@@ -1412,7 +1410,10 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   auto genericSig = F.getLoweredFunctionType()->getGenericSignature();
   if (generics) {
     for (auto archetype : generics->getAllNestedArchetypes()) {
-      subs.push_back({ archetype, archetype, { } });
+      SmallVector<ProtocolConformanceRef, 4> conformances;
+      for (auto proto : archetype->getConformsTo())
+        conformances.push_back(ProtocolConformanceRef(proto));
+      subs.push_back({ archetype, getASTContext().AllocateCopy(conformances) });
     }
   }
 
@@ -1680,7 +1681,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef derived,
   }
 
   SmallVector<ManagedValue, 8> thunkArgs;
-  collectParams(*this, loc, thunkArgs, /*allowPlusZero*/ true);
+  collectThunkParams(loc, thunkArgs, /*allowPlusZero*/ true);
 
   SmallVector<ManagedValue, 8> substArgs;
   // If the thunk and implementation share an indirect result type, use it
@@ -1823,7 +1824,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   SmallVector<ManagedValue, 8> origParams;
   // TODO: Should be able to accept +0 values here, once
   // forwardFunctionArguments/emitApply are able to.
-  collectParams(*this, loc, origParams, /*allowPlusZero*/ false);
+  collectThunkParams(loc, origParams, /*allowPlusZero*/ false);
   
   // Handle special abstraction differences in "self".
   // If the witness is a free function, drop it completely.

@@ -77,9 +77,9 @@ bb0(%0 : $*S<Int64>):
   %1 = alloc_stack $S<Int64>
   %5 = metatype $@thick S<Int64>.Type
   %6 = witness_method $S<Int64>, #CanAdd."+"!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : CanAdd> (@out τ_0_0, @in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> () 
-  %7 = apply %6<S<Int64>>(%1#1, %0, %0, %5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : CanAdd> (@out τ_0_0, @in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> () 
-  %8 = load %1#1: $*S<Int64>
-  dealloc_stack %1#0 : $*@local_storage S<Int64>
+  %7 = apply %6<S<Int64>>(%1, %0, %0, %5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : CanAdd> (@out τ_0_0, @in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> () 
+  %8 = load %1: $*S<Int64>
+  dealloc_stack %1 : $*S<Int64>
   return %8 : $S<Int64>
 }
 

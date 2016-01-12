@@ -558,16 +558,15 @@ GenericParamList::getForwardingSubstitutions(ASTContext &C) {
   for (auto archetype : getAllNestedArchetypes()) {
     // "Check conformance" on each declared protocol to build a
     // conformance map.
-    SmallVector<ProtocolConformance *, 2> conformances;
+    SmallVector<ProtocolConformanceRef, 2> conformances;
 
-    for (ProtocolDecl *conformsTo : archetype->getConformsTo()) {
-      (void)conformsTo;
-      conformances.push_back(nullptr);
+    for (ProtocolDecl *proto : archetype->getConformsTo()) {
+      conformances.push_back(ProtocolConformanceRef(proto));
     }
 
     // Build an identity mapping with the derived conformances.
     auto replacement = SubstitutedType::get(archetype, archetype, C);
-    subs.push_back({archetype, replacement, C.AllocateCopy(conformances)});
+    subs.push_back({replacement, C.AllocateCopy(conformances)});
   }
 
   return C.AllocateCopy(subs);
@@ -1746,9 +1745,9 @@ Type ValueDecl::getInterfaceType() const {
     auto proto = cast<ProtocolDecl>(getDeclContext());
     (void)proto->getType(); // make sure we've computed the type.
     // FIXME: the generic parameter types list should never be empty.
-    auto selfTy = proto->getGenericParamTypes().empty()
+    auto selfTy = proto->getInnermostGenericParamTypes().empty()
                     ? proto->getProtocolSelf()->getType()
-                    : proto->getGenericParamTypes().back();
+                    : proto->getInnermostGenericParamTypes().back();
     auto &ctx = getASTContext();
     InterfaceTy = DependentMemberType::get(
                     selfTy,
@@ -2323,9 +2322,7 @@ static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
 
     NominalTypeDecl *NTD = const_cast<NominalTypeDecl*>(nominal);
     if (isa<ClassDecl>(nominal)) {
-      mangler.mangleNominalType(NTD,
-                                ResilienceExpansion::Minimal,
-                                Mangle::Mangler::BindGenerics::None);
+      mangler.mangleNominalType(NTD, Mangle::Mangler::BindGenerics::None);
     } else {
       mangler.mangleProtocolDecl(cast<ProtocolDecl>(NTD));
     }

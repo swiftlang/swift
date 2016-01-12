@@ -129,3 +129,40 @@ class PP : CP {
 }
 
 callDynamicSelfClassExistential(PP())
+
+// Make sure we handle indirect conformances.
+// rdar://24114020
+protocol Base {
+  var x: Int { get }
+}
+protocol Derived : Base {
+}
+struct SimpleBase : Derived {
+  var x: Int
+}
+public func test24114020() -> Int {
+  let base: Derived = SimpleBase(x: 1)
+  return base.x
+}
+// It's not obvious why this isn't completely devirtualized.
+// CHECK: sil @_TF34devirt_protocol_method_invocations12test24114020FT_Si
+// CHECK:   [[T0:%.*]] = alloc_stack $SimpleBase
+// CHECK:   [[T1:%.*]] = witness_method $SimpleBase, #Base.x!getter.1 
+// CHECK:   [[T2:%.*]] = apply [[T1]]<SimpleBase>([[T0]])
+// CHECK:   return [[T2]]
+
+protocol StaticP {
+  static var size: Int { get }
+}
+struct HasStatic<T> : StaticP {
+  static var size: Int { return sizeof(T.self) }
+}
+public func testExMetatype() -> Int {
+  let type: StaticP.Type = HasStatic<Int>.self
+  return type.size
+}
+// CHECK: sil @_TF34devirt_protocol_method_invocations14testExMetatypeFT_Si
+// CHECK:   [[T0:%.*]] = builtin "sizeof"<Int>
+// CHECK:   [[T1:%.*]] = builtin {{.*}}([[T0]]
+// CHECK:   [[T2:%.*]] = struct $Int ([[T1]] : {{.*}})
+// CHECK:   return [[T2]] : $Int
