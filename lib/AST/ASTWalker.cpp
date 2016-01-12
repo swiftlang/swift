@@ -502,16 +502,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
     return nullptr;
   }
-  Expr *visitUnresolvedSelectorExpr(UnresolvedSelectorExpr *E) {
-    if (!E->getBase())
-      return E;
-    
-    if (Expr *E2 = doIt(E->getBase())) {
-      E->setBase(E2);
-      return E;
-    }
-    return nullptr;
-  }
   Expr *visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *E) {
     if (!E->getSubExpr())
       return E;

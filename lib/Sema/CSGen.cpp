@@ -1390,10 +1390,6 @@ namespace {
       return addMemberRefConstraints(expr, expr->getBase(), expr->getName());
     }
     
-    Type visitUnresolvedSelectorExpr(UnresolvedSelectorExpr *expr) {
-      return addMemberRefConstraints(expr, expr->getBase(), expr->getName());
-    }
-    
     Type visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *expr) {
       auto baseTy = expr->getSubExpr()->getType();
       
