@@ -2294,14 +2294,37 @@ bool irgen::hasDependentValueWitnessTable(IRGenModule &IGM, CanType ty) {
   return !IGM.getTypeInfoForUnlowered(ty).isFixedSize();
 }
 
+/// Given an abstract type --- a type possibly expressed in terms of
+/// unbound generic types --- return the formal type within the type's
+/// primary defining context.
+static CanType getFormalTypeInContext(CanType abstractType) {
+  // Map the parent of any non-generic nominal type.
+  if (auto nominalType = dyn_cast<NominalType>(abstractType)) {
+    // If it doesn't have a parent, or the parent doesn't need remapping,
+    // do nothing.
+    auto abstractParentType = nominalType.getParent();
+    if (!abstractParentType) return abstractType;
+    auto parentType = getFormalTypeInContext(abstractParentType);
+    if (abstractParentType == parentType) return abstractType;
+
+    // Otherwise, rebuild the type.
+    return CanType(NominalType::get(nominalType->getDecl(), parentType,
+                                    nominalType->getDecl()->getASTContext()));
+
+  // Map unbound types into their defining context.
+  } else if (auto ugt = dyn_cast<UnboundGenericType>(abstractType)) {
+    return ugt->getDecl()->getDeclaredTypeInContext()->getCanonicalType();
+
+  // Everything else stays the same.
+  } else {
+    return abstractType;
+  }
+}
+
 static void addValueWitnessesForAbstractType(IRGenModule &IGM,
                                  CanType abstractType,
                                  SmallVectorImpl<llvm::Constant*> &witnesses) {
-  // Instantiate unbound generic types on their context archetypes.
-  CanType concreteFormalType = abstractType;
-  if (auto ugt = dyn_cast<UnboundGenericType>(abstractType)) {
-    concreteFormalType = ugt->getDecl()->getDeclaredTypeInContext()->getCanonicalType();
-  }
+  CanType concreteFormalType = getFormalTypeInContext(abstractType);
 
   auto concreteLoweredType = IGM.SILMod->Types.getLoweredType(concreteFormalType);
   auto &concreteTI = IGM.getTypeInfo(concreteLoweredType);
@@ -2961,7 +2984,7 @@ namespace {
 
         // Mark this as the cached metatype for the l-value's object type.
         CanType argTy = getArgTypeInContext(source.getParamIndex());
-        IGF.setUnscopedLocalTypeData(argTy, LocalTypeDataKind::forMetatype(),
+        IGF.setUnscopedLocalTypeData(argTy, LocalTypeDataKind::forTypeMetadata(),
                                      metatype);
         return metatype;
       }
@@ -2974,7 +2997,7 @@ namespace {
         // Mark this as the cached metatype for Self.
         CanType argTy = getArgTypeInContext(FnType->getParameters().size() - 1);
         IGF.setUnscopedLocalTypeData(argTy,
-                                    LocalTypeDataKind::forMetatype(), metatype);
+                                    LocalTypeDataKind::forTypeMetadata(), metatype);
         return metatype;
       }
           
@@ -3086,44 +3109,87 @@ MetadataPath::followFromTypeMetadata(IRGenFunction &IGF,
                                      CanType sourceType,
                                      llvm::Value *source,
                                      Map<llvm::Value*> *cache) const {
-  return follow(IGF, sourceType, nullptr, source,
-                Path.begin(), Path.end(), cache);
+  LocalTypeDataKey key = {
+    sourceType,
+    LocalTypeDataKind::forTypeMetadata()
+  };
+  return follow(IGF, key, source, Path.begin(), Path.end(), cache);
 }
 
 llvm::Value *
 MetadataPath::followFromWitnessTable(IRGenFunction &IGF,
-                                     ProtocolDecl *sourceDecl,
+                                     CanType conformingType,
+                                     ProtocolConformanceRef conformance,
                                      llvm::Value *source,
                                      Map<llvm::Value*> *cache) const {
-  return follow(IGF, CanType(), sourceDecl, source,
-                Path.begin(), Path.end(), cache);
+  LocalTypeDataKey key = {
+    conformingType,
+    LocalTypeDataKind::forProtocolWitnessTable(conformance)
+  };
+  return follow(IGF, key, source, Path.begin(), Path.end(), cache);
 }
 
+/// Follow this metadata path.
+///
+/// \param sourceKey - A description of the source value.  Not necessarily
+///   an appropriate caching key.
+/// \param cache - If given, this cache will be used to short-circuit
+///   the lookup; otherwise, the global (but dominance-sensitive) cache
+///   in the IRGenFunction will be used.  This caching system is somewhat
+///   more efficient than what IGF provides, but it's less general, and it
+///   should probably be removed.
 llvm::Value *MetadataPath::follow(IRGenFunction &IGF,
-                                  CanType sourceType, Decl *sourceDecl,
+                                  LocalTypeDataKey sourceKey,
                                   llvm::Value *source,
                                   iterator begin, iterator end,
                                   Map<llvm::Value*> *cache) {
   assert(source && "no source metadata value!");
+
+  // The invariant is that this iterator starts a path from source and
+  // that sourceKey is correctly describes it.
   iterator i = begin;
 
-  // If there's a cache, look for the entry matching the longest prefix
-  // of this path.
+  // Before we begin emitting code to generate the actual path, try to find
+  // the latest point in the path that we've cached a value for.
+
+  // If the caller gave us a cache to use, check that.  This lookup is very
+  // efficient and doesn't even require us to parse the prefix.
   if (cache) {
     auto result = cache->findPrefix(begin, end);
     if (result.first) {
       source = *result.first;
 
       // If that was the end, there's no more work to do; don't bother
-      // adjusting the source decl/type.
+      // adjusting the source key.
       if (result.second == end)
         return source;
 
-      // Advance sourceDecl/sourceType past the cached prefix.
+      // Advance the source key past the cached prefix.
       while (i != result.second) {
         Component component = *i++;
-        (void)followComponent(IGF, sourceType, sourceDecl,
-                              /*source*/ nullptr, component);
+        (void) followComponent(IGF, sourceKey, /*source*/ nullptr, component);
+      }
+    }
+
+  // Otherwise, make a pass over the path looking for available concrete
+  // entries in the IGF's local type data cache.
+  } else {
+    auto skipI = i;
+    LocalTypeDataKey skipKey = sourceKey;
+    while (skipI != end) {
+      Component component = *skipI++;
+      (void) followComponent(IGF, skipKey, /*source*/ nullptr, component);
+
+      // Check the cache for a concrete value.  We don't want an abstract
+      // entry because, if one exists, we'll just end up here again
+      // recursively.
+      if (auto skipSource =
+            IGF.tryGetConcreteLocalTypeData(skipKey.getCachingKey())) {
+        // If we found one, advance the info for the source to the current
+        // point in the path, then continue the search.
+        sourceKey = skipKey;
+        source = skipSource;
+        i = skipI;
       }
     }
   }
@@ -3131,11 +3197,15 @@ llvm::Value *MetadataPath::follow(IRGenFunction &IGF,
   // Drill in on the actual source value.
   while (i != end) {
     auto component = *i++;
-    source = followComponent(IGF, sourceType, sourceDecl, source, component);
+    source = followComponent(IGF, sourceKey, source, component);
 
-    // Remember this in the cache at the next position.
+    // If we have a cache, remember this in the cache at the next position.
     if (cache) {
       cache->insertNew(begin, i, source);
+
+    // Otherwise, insert it into the global cache.
+    } else {
+      IGF.setScopedLocalTypeData(sourceKey, source);
     }
   }
 
@@ -3148,53 +3218,56 @@ llvm::Value *MetadataPath::follow(IRGenFunction &IGF,
 /// component.  Source can be null, in which case this will be the only
 /// thing done.
 llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
-                                           CanType &sourceType,
-                                           Decl *&sourceDecl,
+                                           LocalTypeDataKey &sourceKey,
                                            llvm::Value *source,
                                            Component component) {
   switch (component.getKind()) {
   case Component::Kind::NominalTypeArgument: {
-    auto generic = cast<BoundGenericType>(sourceType);
+    assert(sourceKey.Kind == LocalTypeDataKind::forTypeMetadata());
+    auto generic = cast<BoundGenericType>(sourceKey.Type);
     auto index = component.getPrimaryIndex();
-    if (source) {
-      source = emitArgumentMetadataRef(IGF, generic->getDecl(), index, source);
-    }
 
     auto subs = generic->getSubstitutions(IGF.IGM.SILMod->getSwiftModule(),
                                           nullptr);
-    sourceType = subs[index].getReplacement()->getCanonicalType();
+    sourceKey.Type = subs[index].getReplacement()->getCanonicalType();
+
+    if (source) {
+      source = emitArgumentMetadataRef(IGF, generic->getDecl(), index, source);
+    }
     return source;
   }
 
   /// Generic type argument protocol conformance.
   case Component::Kind::NominalTypeArgumentConformance: {
-    auto generic = cast<BoundGenericType>(sourceType);
+    assert(sourceKey.Kind == LocalTypeDataKind::forTypeMetadata());
+    auto generic = cast<BoundGenericType>(sourceKey.Type);
     auto argIndex = component.getPrimaryIndex();
     auto confIndex = component.getSecondaryIndex();
 
-    ProtocolDecl *protocol =
-      generic->getDecl()->getGenericParams()->getAllArchetypes()[argIndex]
-                                            ->getConformsTo()[confIndex];
+    auto subs = generic->getSubstitutions(IGF.IGM.SILMod->getSwiftModule(),
+                                          nullptr);
+    auto conformance = subs[argIndex].getConformances()[confIndex];
+    sourceKey.Type = subs[argIndex].getReplacement()->getCanonicalType();
+    sourceKey.Kind = LocalTypeDataKind::forProtocolWitnessTable(conformance);
 
     if (source) {
       source = emitArgumentWitnessTableRef(IGF, generic->getDecl(), argIndex,
-                                           protocol, source);
+                                           conformance.getRequirement(),
+                                           source);
     }
-
-    sourceType = CanType();
-    sourceDecl = protocol;
     return source;
   }
 
   case Component::Kind::NominalParent: {
+    assert(sourceKey.Kind == LocalTypeDataKind::forTypeMetadata());
     NominalTypeDecl *nominalDecl;
-    if (auto nominal = dyn_cast<NominalType>(sourceType)) {
+    if (auto nominal = dyn_cast<NominalType>(sourceKey.Type)) {
       nominalDecl = nominal->getDecl();
-      sourceType = nominal.getParent();
+      sourceKey.Type = nominal.getParent();
     } else {
-      auto generic = cast<BoundGenericType>(sourceType);
+      auto generic = cast<BoundGenericType>(sourceKey.Type);
       nominalDecl = generic->getDecl();
-      sourceType = generic.getParent();
+      sourceKey.Type = generic.getParent();
     }
 
     if (source) {
@@ -3204,10 +3277,21 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
   }
 
   case Component::Kind::InheritedProtocol: {
-    auto protocol = cast<ProtocolDecl>(sourceDecl);
+    auto conformance = sourceKey.Kind.getProtocolConformance();
+    auto protocol = conformance.getRequirement();
     auto inheritedProtocol =
       protocol->getInheritedProtocols(nullptr)[component.getPrimaryIndex()];
-    sourceDecl = inheritedProtocol;
+
+    sourceKey.Kind =
+      LocalTypeDataKind::forAbstractProtocolWitnessTable(inheritedProtocol);
+    if (conformance.isConcrete()) {
+      auto inheritedConformance =
+        conformance.getConcrete()->getInheritedConformance(inheritedProtocol);
+      if (inheritedConformance) {
+        sourceKey.Kind = LocalTypeDataKind::forConcreteProtocolWitnessTable(
+                                                          inheritedConformance);
+      }
+    }
 
     if (source) {
       auto &pi = IGF.IGM.getProtocolInfo(protocol);
@@ -3217,7 +3301,6 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
                                                 entry.getOutOfLineBaseIndex());
       source = IGF.Builder.CreateBitCast(source, IGF.IGM.WitnessTablePtrTy);
     }
-
     return source;
   }
 
@@ -3265,7 +3348,7 @@ void irgen::emitPolymorphicParametersForGenericValueWitness(IRGenFunction &IGF,
   EmitPolymorphicParameters(IGF, ntd).emitForGenericValueWitness(selfMeta);
   // Register the 'Self' argument as generic metadata for the type.
   IGF.setUnscopedLocalTypeData(ntd->getDeclaredTypeInContext()->getCanonicalType(),
-                               LocalTypeDataKind::forMetatype(), selfMeta);
+                               LocalTypeDataKind::forTypeMetadata(), selfMeta);
 }
 
 /// Get the next argument and use it as the 'self' type metadata.
@@ -3448,7 +3531,7 @@ void NecessaryBindings::save(IRGenFunction &IGF, Address buffer) const {
     // Find the metatype for the appropriate archetype and store it in
     // the slot.
     llvm::Value *metatype = IGF.getLocalTypeData(CanType(archetype),
-                                              LocalTypeDataKind::forMetatype());
+                                          LocalTypeDataKind::forTypeMetadata());
     IGF.Builder.CreateStore(metatype, slot);
 
     // Find the witness tables for the archetype's protocol constraints and
@@ -3463,7 +3546,7 @@ void NecessaryBindings::save(IRGenFunction &IGF, Address buffer) const {
       ++metadataI;
       llvm::Value *witness =
         IGF.getLocalTypeData(CanType(archetype),
-                 LocalTypeDataKind::forArchetypeProtocolWitnessTable(protocol));
+                 LocalTypeDataKind::forAbstractProtocolWitnessTable(protocol));
       IGF.Builder.CreateStore(witness, witnessSlot);
     }
   }

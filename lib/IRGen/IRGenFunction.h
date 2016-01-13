@@ -361,23 +361,37 @@ public:
 
 //--- Type emission ------------------------------------------------------------
 public:
-  /// Look for a mapping for a local type-metadata reference.
-  /// The lookup is done for the current block which is the Builder's
-  /// insert-block.
-  llvm::Value *tryGetLocalTypeData(CanType type, LocalTypeDataKind kind);
+  /// Look up a local type data reference, returning null if no entry was
+  /// found.  This will emit code to materialize the reference if an
+  /// "abstract" entry is present.
+  llvm::Value *tryGetLocalTypeData(CanType type, LocalTypeDataKind kind) {
+    return tryGetLocalTypeData(LocalTypeDataKey{type, kind});
+  }
+  llvm::Value *tryGetLocalTypeData(LocalTypeDataKey key);
 
-  /// Retrieve a local type-metadata reference which is known to exist.
+  /// Look up a local type data reference, returning null if no entry was
+  /// found or if the only viable entries are abstract.  This will never
+  /// emit code.
+  llvm::Value *tryGetConcreteLocalTypeData(LocalTypeDataKey key);
+
+  /// Retrieve a local type data reference which is known to exist.
   llvm::Value *getLocalTypeData(CanType type, LocalTypeDataKind kind);
 
   /// Add a local type-metadata reference at a point which definitely
   /// dominates all of its uses.
   void setUnscopedLocalTypeData(CanType type, LocalTypeDataKind kind,
-                                llvm::Value *data);
+                                llvm::Value *data) {
+    setUnscopedLocalTypeData(LocalTypeDataKey{type, kind}, data);
+  }
+  void setUnscopedLocalTypeData(LocalTypeDataKey key, llvm::Value *data);
   
   /// Add a local type-metadata reference, valid at the current insertion
   /// point.
   void setScopedLocalTypeData(CanType type, LocalTypeDataKind kind,
-                              llvm::Value *data);
+                              llvm::Value *data) {
+    setScopedLocalTypeData(LocalTypeDataKey{type, kind}, data);
+  }
+  void setScopedLocalTypeData(LocalTypeDataKey key, llvm::Value *data);
 
   /// The same as tryGetLocalTypeData, just for the Layout metadata.
   ///
@@ -398,8 +412,8 @@ public:
 
   /// Given a concrete type metadata node, add all the local type data
   /// that we can reach from it.
-  void addLocalTypeDataForTypeMetadata(CanType type, IsExact_t isExact,
-                                       llvm::Value *metadata);
+  void bindLocalTypeDataFromTypeMetadata(CanType type, IsExact_t isExact,
+                                         llvm::Value *metadata);
 
   void setDominanceResolver(DominanceResolverFunction resolver) {
     assert(DominanceResolver == nullptr);
@@ -468,6 +482,7 @@ public:
     IRGenFunction &IGF;
     ConditionalDominanceScope *OldScope;
     SmallVector<LocalTypeDataKey, 2> RegisteredKeys;
+
   public:
     explicit ConditionalDominanceScope(IRGenFunction &IGF)
         : IGF(IGF), OldScope(IGF.ConditionalDominance) {
@@ -482,12 +497,7 @@ public:
       RegisteredKeys.push_back(key);
     }
 
-    ~ConditionalDominanceScope() {
-      IGF.ConditionalDominance = OldScope;
-      if (!RegisteredKeys.empty()) {
-        IGF.unregisterConditionalLocalTypeDataKeys(RegisteredKeys);
-      }
-    }
+    ~ConditionalDominanceScope();
   };
 
   /// The kind of value LocalSelf is.
@@ -506,7 +516,6 @@ public:
 private:
   LocalTypeDataCache &getOrCreateLocalTypeData();
   void destroyLocalTypeData();
-  void unregisterConditionalLocalTypeDataKeys(ArrayRef<LocalTypeDataKey> keys);
 
   LocalTypeDataCache *LocalTypeData = nullptr;
 

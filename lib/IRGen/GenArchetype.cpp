@@ -53,7 +53,7 @@ using namespace irgen;
 
 static llvm::Value *emitArchetypeTypeMetadataRef(IRGenFunction &IGF,
                                                  CanArchetypeType archetype) {
-  return IGF.getLocalTypeData(archetype, LocalTypeDataKind::forMetatype());
+  return IGF.getLocalTypeData(archetype, LocalTypeDataKind::forTypeMetadata());
 }
 
 namespace {
@@ -90,7 +90,7 @@ public:
     assert(which < getNumStoredProtocols());
     auto protocol = archetype->getConformsTo()[which];
     return IGF.getLocalTypeData(archetype,
-                 LocalTypeDataKind::forArchetypeProtocolWitnessTable(protocol));
+                 LocalTypeDataKind::forAbstractProtocolWitnessTable(protocol));
   }
 };
 
@@ -275,7 +275,7 @@ static void setMetadataRef(IRGenFunction &IGF,
                            llvm::Value *metadata) {
   assert(metadata->getType() == IGF.IGM.TypeMetadataPtrTy);
   IGF.setUnscopedLocalTypeData(CanType(archetype),
-                               LocalTypeDataKind::forMetatype(),
+                               LocalTypeDataKind::forTypeMetadata(),
                                metadata);
 
   // Create a shadow copy of the metadata in an alloca for the debug info.
@@ -301,7 +301,7 @@ static void setWitnessTable(IRGenFunction &IGF,
   assert(protocolIndex < archetype->getConformsTo().size());
   auto protocol = archetype->getConformsTo()[protocolIndex];
   IGF.setUnscopedLocalTypeData(CanType(archetype),
-                  LocalTypeDataKind::forArchetypeProtocolWitnessTable(protocol),
+                  LocalTypeDataKind::forAbstractProtocolWitnessTable(protocol),
                                wtable);
 }
 

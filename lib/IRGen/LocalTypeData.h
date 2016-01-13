@@ -113,49 +113,36 @@ private:
   class AbstractSource {
   public:
     enum class Kind {
-      /// Type metadata.  The payload is a CanType.
       TypeMetadata,
-
-      /// A protocol witness table.  The payload is a ProtocolDecl*.
-      WitnessTable,
+      ProtocolWitnessTable,
     };
-
   private:
-    uintptr_t Payload;
-    MetadataPath::Map<llvm::Value*> Cache;
+    CanType Type;
+    void *Conformance;
     llvm::Value *Value;
 
-    enum : uintptr_t { KindMask = 0x3 };
-
-    explicit AbstractSource(Kind kind, void *ptr, llvm::Value *value)
-      : Payload(uintptr_t(ptr) | unsigned(kind)), Value(value) {}
-
   public:
-    explicit AbstractSource(Kind kind, CanType type, llvm::Value *metadata)
-      : AbstractSource(kind, type.getPointer(), metadata) {}
-    explicit AbstractSource(Kind kind, ProtocolDecl *protocol,
-                            llvm::Value *witnessTable)
-      : AbstractSource(kind, (void*) protocol, witnessTable) {}
+    explicit AbstractSource(CanType type, ProtocolConformanceRef conformance,
+                            llvm::Value *value)
+      : Type(type), Conformance(conformance.getOpaqueValue()), Value(value) {
+      assert(Conformance != nullptr);
+    }
+    explicit AbstractSource(CanType type, llvm::Value *value)
+      : Type(type), Conformance(nullptr), Value(value) {}
 
     Kind getKind() const {
-      return Kind(Payload & KindMask);
+      return (Conformance ? Kind::ProtocolWitnessTable : Kind::TypeMetadata);
     }
 
     CanType getType() const {
-      assert(getKind() == Kind::TypeMetadata);
-      return CanType(reinterpret_cast<TypeBase*>(Payload & ~KindMask));
+      return Type;
     }
-    ProtocolDecl *getProtocol() const {
-      assert(getKind() == Kind::WitnessTable);
-      return reinterpret_cast<ProtocolDecl*>(Payload & ~KindMask);
+    ProtocolConformanceRef getProtocolConformance() const {
+      assert(Conformance && "not a protocol conformance");
+      return ProtocolConformanceRef::getFromOpaqueValue(Conformance);
     }
-
     llvm::Value *getValue() const {
       return Value;
-    }
-
-    MetadataPath::Map<llvm::Value*> &getCache() {
-      return Cache;
     }
   };
 
@@ -236,7 +223,7 @@ public:
 
   /// Load the value from cache if possible.  This may require emitting
   /// code if the value is cached abstractly.
-  llvm::Value *tryGet(IRGenFunction &IGF, Key key);
+  llvm::Value *tryGet(IRGenFunction &IGF, Key key, bool allowAbstract = true);
 
   /// Load the value from cache, asserting its presence.
   llvm::Value *get(IRGenFunction &IGF, Key key) {
@@ -256,6 +243,9 @@ public:
   void addAbstractForTypeMetadata(IRGenFunction &IGF, CanType type,
                                   IsExact_t isExact, llvm::Value *metadata);
 
+  void dump() const;
+
+  // Private details for ConditionalDominanceScope.
   void eraseConditional(ArrayRef<LocalTypeDataKey> keys);
 };
 

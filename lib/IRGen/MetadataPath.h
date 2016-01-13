@@ -31,6 +31,7 @@ namespace swift {
 
 namespace irgen {
   class IRGenFunction;
+  class LocalTypeDataKey;
 
 /// A path from one source metadata --- either Swift type metadata or a Swift
 /// protocol conformance --- to another.
@@ -197,22 +198,22 @@ public:
 
   /// Given a pointer to a protocol witness table, follow a path from it.
   llvm::Value *followFromWitnessTable(IRGenFunction &IGF,
-                                      ProtocolDecl *sourceDecl,
+                                      CanType conformingType,
+                                      ProtocolConformanceRef conformance,
                                       llvm::Value *source,
                                       Map<llvm::Value*> *cache) const;
 
 private:
   static llvm::Value *follow(IRGenFunction &IGF,
-                             CanType sourceType,
-                             Decl *sourceDecl,
+                             LocalTypeDataKey key,
                              llvm::Value *source,
                              MetadataPath::iterator begin,
                              MetadataPath::iterator end,
                              Map<llvm::Value*> *cache);
 
+  /// Follow a single component of a metadata path.
   static llvm::Value *followComponent(IRGenFunction &IGF,
-                                      CanType &sourceType,
-                                      Decl *&sourceDecl,
+                                      LocalTypeDataKey &key,
                                       llvm::Value *source,
                                       Component component);
 };
