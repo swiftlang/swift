@@ -4404,6 +4404,7 @@ ParserStatus Parser::parseDeclEnumCase(ParseDeclOptions Flags,
         return Status;
       }
       if (RawValueExpr.isNull()) {
+        diagnose(EqualsLoc, diag::not_a_proper_raw_value_expression);
         Status.setIsParseError();
         return Status;
       }
