@@ -75,7 +75,7 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   auto baseInfo = Types.getConstantInfo(base);
   auto derivedInfo = Types.getConstantInfo(derived);
   auto basePattern = AbstractionPattern(baseInfo.LoweredType);
-  
+
   auto overrideInfo = M.Types.getConstantOverrideInfo(derived, base);
 
   // The override member type is semantically a subtype of the base

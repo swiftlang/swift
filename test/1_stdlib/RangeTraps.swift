@@ -37,7 +37,7 @@ RangeTraps.test("HalfOpen")
   .code {
   var range = 1..<1
   expectType(Range<Int>.self, &range)
-  
+
   expectCrashLater()
   1..<0
 }

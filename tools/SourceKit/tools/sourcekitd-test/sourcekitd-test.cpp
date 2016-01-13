@@ -469,7 +469,7 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableSubStructure, false);
     sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
     break;
-      
+
   case SourceKitRequest::ExpandPlaceholder:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
     sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
@@ -714,7 +714,7 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
           sourcekitd_request_dictionary_set_value(Fmt, KeyFormatOptions, FO);
           sourcekitd_request_release(FO);
         }
-        
+
         sourcekitd_response_t FmtResp = sourcekitd_send_request_sync(Fmt);
         sourcekitd_response_description_dump_filedesc(FmtResp, STDOUT_FILENO);
         sourcekitd_response_dispose(FmtResp);

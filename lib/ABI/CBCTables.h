@@ -22604,7 +22604,7 @@ if ((0 < n) && (str[0] == 'z')) {
  }
 }
 
-return -1; 
+return -1;
 }
 } // namespace
 #endif /* SWIFT_MANGLER_CBC_TABLE_H */

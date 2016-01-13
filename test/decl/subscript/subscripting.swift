@@ -234,10 +234,10 @@ struct SubscriptTest1 {
 
 func testSubscript1(s1 : SubscriptTest1) {
   let _ : Int = s1["hello"]  // expected-error {{ambiguous subscript with base type 'SubscriptTest1' and index type 'String'}}
-  
+
   if s1["hello"] {}
-  
-  
+
+
   let _ = s1["hello"]  // expected-error {{ambiguous use of 'subscript'}}
 }
 
@@ -249,11 +249,11 @@ struct SubscriptTest2 {
 func testSubscript1(s2 : SubscriptTest2) {
   _ = s2["foo"] // expected-error {{cannot subscript a value of type 'SubscriptTest2' with an index of type 'String'}}
   // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (String, Int), (String, String)}}
-  
+
   let a = s2["foo", 1.0] // expected-error {{cannot subscript a value of type 'SubscriptTest2' with an index of type '(String, Double)'}}
   // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (String, Int), (String, String)}}
-  
-  
+
+
   let b = s2[1, "foo"] // expected-error {{cannot subscript a value of type 'SubscriptTest2' with an index of type '(Int, String)'}}
   // expected-note @-1 {{expected an argument list of type '(String, String)'}}
 }
@@ -265,7 +265,7 @@ class Foo {
         get { a } // expected-error {{use of unresolved identifier 'a'}}
         set { b } // expected-error {{use of unresolved identifier 'b'}}
     }
-    
+
     subscript(key: String) -> String { // expected-error {{invalid redeclaration of 'subscript'}}
         get { a } // expected-error {{use of unresolved identifier 'a'}}
         set { b } // expected-error {{use of unresolved identifier 'b'}}
@@ -277,7 +277,7 @@ protocol r23952125 {
   typealias ItemType
   var count: Int { get }
   subscript(index: Int) -> ItemType  // expected-error {{subscript in protocol must have explicit { get } or { get set } specifier}} {{36-36= { get set \}}}
-  
+
   var c : Int // expected-error {{property in protocol must have explicit { get } or { get set } specifier}}
 }
 

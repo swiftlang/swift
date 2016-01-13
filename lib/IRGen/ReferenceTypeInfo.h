@@ -26,7 +26,7 @@ namespace irgen {
 class WeakTypeInfo;
 class UnownedTypeInfo;
 class TypeConverter;
-  
+
 /// \brief An abstract class designed for use when implementing a type
 /// that has reference semantics.
 class ReferenceTypeInfo : public LoadableTypeInfo {
@@ -41,7 +41,7 @@ protected:
 public:
   /// Strongly retains a value.
   virtual void strongRetain(IRGenFunction &IGF, Explosion &in) const = 0;
-  
+
   /// Strongly releases a value.
   virtual void strongRelease(IRGenFunction &IGF, Explosion &in) const = 0;
 

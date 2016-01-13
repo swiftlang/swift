@@ -58,7 +58,7 @@ static void deriveBodyErrorType_enum_code(AbstractFunctionDecl *codeDecl) {
                                           SourceLoc(), SourceLoc(),
                                           Identifier(), elt, nullptr);
     pat->setImplicit();
-    
+
     auto labelItem =
       CaseLabelItem(/*IsDefault=*/false, pat, SourceLoc(), nullptr);
 
@@ -67,24 +67,24 @@ static void deriveBodyErrorType_enum_code(AbstractFunctionDecl *codeDecl) {
       llvm::raw_svector_ostream os(strBuf);
       os << code;
     }
-    
+
     auto codeStr = C.AllocateCopy(StringRef(strBuf));
 
     auto returnExpr = new (C) IntegerLiteralExpr(codeStr, SourceLoc(),
                                                  /*implicit*/ true);
     auto returnStmt = new (C) ReturnStmt(SourceLoc(), returnExpr,
                                          /*implicit*/ true);
-    
+
     auto body = BraceStmt::create(C, SourceLoc(),
                                   ASTNode(returnStmt), SourceLoc());
 
     cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem,
                                      /*HasBoundDecls=*/false, SourceLoc(),
                                      body));
-    
+
     ++code;
   }
-  
+
   Stmt *bodyStmt;
   // If the enum is empty, simply return zero. (It doesn't really matter, since
   // the enum can't be instantiated regardless.)
@@ -143,9 +143,9 @@ static ValueDecl *deriveErrorType_code(TypeChecker &tc, Decl *parentDecl,
   //     }
   //   }
   // }
-  
+
   ASTContext &C = tc.Context;
-  
+
   auto intTy = C.getIntDecl()->getDeclaredType();
 
   // Define the getter.
@@ -162,7 +162,7 @@ static ValueDecl *deriveErrorType_code(TypeChecker &tc, Decl *parentDecl,
   std::tie(propDecl, pbDecl)
     = declareDerivedReadOnlyProperty(tc, parentDecl, nominal, C.Id_code_,
                                      intTy, intTy, getterDecl);
-  
+
   auto dc = cast<IterableDeclContext>(parentDecl);
   dc->addMember(getterDecl);
   dc->addMember(propDecl);
@@ -178,7 +178,7 @@ ValueDecl *DerivedConformance::deriveErrorType(TypeChecker &tc,
                                                ValueDecl *requirement) {
   if (requirement->getName() == tc.Context.Id_code_)
     return deriveErrorType_code(tc, parentDecl, type);
-  
+
   tc.diagnose(requirement->getLoc(),
               diag::broken_errortype_requirement);
   return nullptr;
@@ -220,9 +220,9 @@ static ValueDecl *deriveBridgedNSError_enum_NSErrorDomain(TypeChecker &tc,
 
   // Note that for @objc enums the format is assumed to be "MyModule.SomeEnum".
   // If this changes, please change PrintAsObjC as well.
-  
+
   ASTContext &C = tc.Context;
-  
+
   auto stringTy = C.getStringDecl()->getDeclaredType();
 
   // Define the getter.
@@ -230,7 +230,7 @@ static ValueDecl *deriveBridgedNSError_enum_NSErrorDomain(TypeChecker &tc,
                                                  stringTy, stringTy,
                                                  /*isStatic=*/true);
   getterDecl->setBodySynthesizer(&deriveBodyBridgedNSError_enum_NSErrorDomain);
-  
+
   // Define the property.
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
@@ -239,7 +239,7 @@ static ValueDecl *deriveBridgedNSError_enum_NSErrorDomain(TypeChecker &tc,
                                      C.Id_NSErrorDomain,
                                      stringTy, stringTy,
                                      getterDecl, /*isStatic=*/true);
-  
+
   auto dc = cast<IterableDeclContext>(parentDecl);
   dc->addMember(getterDecl);
   dc->addMember(propDecl);

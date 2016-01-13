@@ -39,7 +39,7 @@ class C2 : P1 {
 // -----------------------------------------------------------------------
 
 class C3 : P1 {
-  func method(x: Int) { } 
+  func method(x: Int) { }
   // expected-warning@-1{{non-@objc method 'method' cannot satisfy optional requirement of @objc protocol 'P1'}}{{3-3=@objc }}
 
   var prop: Int = 0
@@ -57,7 +57,7 @@ class C3 : P1 {
 class C4 { }
 
 extension C4 : P1 {
-  func method(x: Int) { } 
+  func method(x: Int) { }
   // expected-warning@-1{{non-@objc method 'method' cannot satisfy optional requirement of @objc protocol 'P1'}}{{3-3=@objc }}
 
   var prop: Int { return 5 }
@@ -75,7 +75,7 @@ extension C4 : P1 {
 class C5 : P1 { }
 
 extension C5 {
-  func method(x: Int) { } 
+  func method(x: Int) { }
 
   var prop: Int { return 5 }
 
@@ -90,7 +90,7 @@ extension C5 {
 class C6 { }
 
 extension C6 : P1 {
-  @nonobjc func method(x: Int) { } 
+  @nonobjc func method(x: Int) { }
 
   @nonobjc var prop: Int { return 5 }
 
@@ -198,7 +198,7 @@ optional class optErrorClass { // expected-error{{'optional' modifier cannot be 
   optional var ivar: Int = 0 // expected-error{{'optional' can only be applied to protocol members}}
   optional func foo() { } // expected-error{{'optional' can only be applied to protocol members}}
 }
-  
+
 protocol optErrorProtocol {
   optional func foo(x: Int) // expected-error{{'optional' can only be applied to members of an @objc protocol}}
   optional typealias Assoc  // expected-error{{'optional' modifier cannot be applied to this declaration}} {{3-12=}}

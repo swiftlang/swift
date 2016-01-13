@@ -121,7 +121,7 @@ func physical_struct_lvalue(c: Int) {
    // CHECK: [[FN:%[0-9]+]] = class_method %0 : $RefSubclass, #RefSubclass.w!setter.1
    // CHECK: apply [[FN]](%1, %0) : $@convention(method) (Int, @guaranteed RefSubclass) -> ()
   }
-  
+
 
 
 func struct_rvalue() -> Val {}
@@ -196,7 +196,7 @@ func logical_struct_in_reftype_set(inout value: Val, z1: Int) {
   // CHECK: [[MAT_RESULT:%[0-9]+]] = apply [[MAT_VAL_PROP_METHOD]]([[T0]], [[STORAGE]], [[VAL_REF]])
   // CHECK: [[T0:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Ref, @thick Ref.Type) -> ()>), 0
   // CHECK: [[T1:%[0-9]+]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Val
-  // CHECK: [[OPT_CALLBACK:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Ref, @thick Ref.Type) -> ()>), 1  
+  // CHECK: [[OPT_CALLBACK:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Ref, @thick Ref.Type) -> ()>), 1
   // CHECK: [[VAL_REF_VAL_PROP_MAT:%.*]] = mark_dependence [[T1]] : $*Val on [[VAL_REF]]
   // CHECK: [[V_R_VP_Z_TUPLE_MAT:%[0-9]+]] = alloc_stack $(Int, Int)
   // CHECK: [[LD:%[0-9]+]] = load [[VAL_REF_VAL_PROP_MAT]]
@@ -506,8 +506,8 @@ struct DidSetWillSetTests: ForceAccessors {
     a = x
     a = x
   }
-  
-   
+
+
   // These are the synthesized getter and setter for the willset/didset variable.
 
   // CHECK-LABEL: // {{.*}}.DidSetWillSetTests.a.getter
@@ -516,7 +516,7 @@ struct DidSetWillSetTests: ForceAccessors {
   // CHECK-NEXT:   debug_value %0
   // CHECK-NEXT:   %2 = struct_extract %0 : $DidSetWillSetTests, #DidSetWillSetTests.a
   // CHECK-NEXT:   return %2 : $Int                      // id: %3
-  
+
   // CHECK-LABEL: // {{.*}}.DidSetWillSetTests.a.setter
   // CHECK-NEXT: sil hidden @_TFV10properties18DidSetWillSetTestss1a
   // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
@@ -594,12 +594,12 @@ func local_observing_property(arg: Int) {
       takeInt(localproperty)
     }
   }
-  
+
   takeInt(localproperty)
   localproperty = arg
 }
 
-// This is the local_observing_property function itself.  First alloc and 
+// This is the local_observing_property function itself.  First alloc and
 // initialize the property to the argument value.
 
 // CHECK-LABEL: sil hidden @{{.*}}local_observing_property
@@ -644,11 +644,11 @@ class rdar16151899Derived : rdar16151899Base {
         // This should not be a direct access, it should call the setter in the
         // base.
         x = zero
-        
+
         // CHECK:  [[BASEPTR:%[0-9]+]] = upcast {{.*}} : $rdar16151899Derived to $rdar16151899Base
         // CHECK: load{{.*}}Int
         // CHECK-NEXT: [[SETTER:%[0-9]+]] = class_method {{.*}} : $rdar16151899Base, #rdar16151899Base.x!setter.1 : (rdar16151899Base)
-        // CHECK-NEXT: apply [[SETTER]]({{.*}}, [[BASEPTR]]) 
+        // CHECK-NEXT: apply [[SETTER]]({{.*}}, [[BASEPTR]])
     }
 }
 
@@ -840,7 +840,7 @@ class GenericClass<T> {
   init() { fatalError("scaffold") }
 }
 
-// CHECK-LABEL: sil hidden @_TF10properties12genericPropsFGCS_12GenericClassSS_T_ 
+// CHECK-LABEL: sil hidden @_TF10properties12genericPropsFGCS_12GenericClassSS_T_
 func genericProps(x: GenericClass<String>) {
   // CHECK: class_method %0 : $GenericClass<String>, #GenericClass.x!getter.1
   let _ = x.x
@@ -885,14 +885,14 @@ class ClassWithLetProperty {
 class r19254812Base {}
 class r19254812Derived: r19254812Base{
   let pi = 3.14159265359
-  
+
   init(x : ()) {
     use(pi)
   }
-  
+
 // Accessing the "pi" property should not retain/release self.
 // CHECK-LABEL: sil hidden @_TFC10properties16r19254812Derivedc
-// CHECK: [[SELFMUI:%[0-9]+]] = mark_uninitialized [derivedself] 
+// CHECK: [[SELFMUI:%[0-9]+]] = mark_uninitialized [derivedself]
 
 // Initialization of the pi field: no retains/releases.
 // CHECK:  [[SELF:%[0-9]+]] = load [[SELFMUI]] : $*r19254812Derived
@@ -912,11 +912,11 @@ class r19254812Derived: r19254812Base{
 
 class RedundantSelfRetains {
   final var f : RedundantSelfRetains
-  
+
   init() {
     f = RedundantSelfRetains()
   }
-  
+
   // <rdar://problem/19275047> Extraneous retains/releases of self are bad
   func testMethod1() {
     f = RedundantSelfRetains()
@@ -925,7 +925,7 @@ class RedundantSelfRetains {
   // CHECK: bb0(%0 : $RedundantSelfRetains):
 
   // CHECK-NOT: strong_retain
-  
+
   // CHECK: [[FPTR:%[0-9]+]] = ref_element_addr %0 : $RedundantSelfRetains, #RedundantSelfRetains.f
   // CHECK-NEXT: assign {{.*}} to [[FPTR]] : $*RedundantSelfRetains
 

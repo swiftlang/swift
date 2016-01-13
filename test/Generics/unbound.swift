@@ -72,7 +72,7 @@ extension GS {
 }
 
 class GC<T, U> {
-  init() {} 
+  init() {}
 
   func f() -> GC {
     let gc = GC()

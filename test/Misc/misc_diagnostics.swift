@@ -8,7 +8,7 @@ import CoreGraphics
 var roomName : String? = nil
 
 if let realRoomName = roomName as! NSString { // expected-error {{initializer for conditional binding must have Optional type, not 'NSString'}} expected-warning {{cast from 'String?' to unrelated type 'NSString' always fails}}
-			
+
 }
 
 var pi = 3.14159265358979
@@ -104,7 +104,7 @@ func test17875634() {
 
   match += (1, 2) // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
   // expected-note @-1 {{overloads for '+=' exist with these partially matching parameter lists:}}
-  
+
   match += (row, col) // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
   // expected-note @-1 {{overloads for '+=' exist with these partially matching parameter lists:}}
 

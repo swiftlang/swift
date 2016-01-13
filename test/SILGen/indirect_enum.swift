@@ -182,7 +182,7 @@ func switchTreeA<T>(x: TreeA<T>) {
   // CHECK:     bb{{.*}}([[RIGHT_LEAF_BOX:%.*]] : $@box T):
   // CHECK:       [[RIGHT_LEAF_VALUE:%.*]] = project_box [[RIGHT_LEAF_BOX]]
   // CHECK:       switch_enum [[LEFT]] {{.*}}, default [[FAIL_LEFT:bb[0-9]+]]
-  
+
   // CHECK:     bb{{.*}}([[LEFT_LEAF_BOX:%.*]] : $@box T):
   // CHECK:       [[LEFT_LEAF_VALUE:%.*]] = project_box [[LEFT_LEAF_BOX]]
   // CHECK:       copy_addr [[LEFT_LEAF_VALUE]]

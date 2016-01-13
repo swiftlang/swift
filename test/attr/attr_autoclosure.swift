@@ -90,10 +90,10 @@ class Sub : Super {
 
 func func12_sink(x: () -> Int) { }
 
-func func12a(@autoclosure x: () -> Int) { 
+func func12a(@autoclosure x: () -> Int) {
   func12_sink(x) // expected-error{{invalid conversion from non-escaping function of type '@autoclosure () -> Int' to potentially escaping function type '() -> Int'}}
 }
-func func12b(@autoclosure(escaping) x: () -> Int) { 
+func func12b(@autoclosure(escaping) x: () -> Int) {
   func12_sink(x)
 }
 
@@ -104,7 +104,7 @@ class TestFunc12 {
 
   func test() {
     func12a(x + foo()) // okay
-    func12b(x + foo()) 
+    func12b(x + foo())
     // expected-error@-1{{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}} {{13-13=self.}}
     // expected-error@-2{{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{17-17=self.}}
   }

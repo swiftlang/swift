@@ -72,7 +72,7 @@ A.qindexHL:hover {
 	background-color: #6666cc;
 	color: #ffffff;
 }
-A.qindexHL:visited { 
+A.qindexHL:visited {
  text-decoration: none; background-color: #6666cc; color: #ffffff }
 A.el { text-decoration: none; font-weight: bold }
 A.elRef { font-weight: bold }
@@ -147,7 +147,7 @@ TD.indexvalue {
 	border: 1px solid #CCCCCC;
 }
 TR.memlist {
-   background-color: #f0f0f0; 
+   background-color: #f0f0f0;
 }
 P.formulaDsp { text-align: center; }
 IMG.formulaDsp { }
@@ -311,7 +311,7 @@ HR { height: 1px;
      border-top: 1px solid black;
 }
 
-/* 
+/*
  * LLVM Modifications.
  * Note: Everything above here is generated with "doxygen -w html" command. See
  * "doxygen --help" for details. What follows are CSS overrides for LLVM
@@ -326,7 +326,7 @@ HR { height: 1px;
         vertical-align: middle;
 }
 .title {
-  font-size: 25pt; 
+  font-size: 25pt;
   color: black;
   font-weight: bold;
   border-width: 1px;

@@ -78,7 +78,7 @@ namespace {
           EnableJumpThread(EnableJumpThread) {}
 
     bool run();
-    
+
     bool simplifyBlockArgs() {
       auto *DA = PM->getAnalysis<DominanceAnalysis>();
       auto *PDA = PM->getAnalysis<PostDominanceAnalysis>();
@@ -1010,7 +1010,7 @@ static SILBasicBlock *getTrampolineDest(SILBasicBlock *SBB) {
     SILArgument *BBArg = SBB->getBBArg(i);
     if (BrArgs[i] != BBArg)
       return nullptr;
-    
+
     // The arguments may not be used in another block, because when the
     // predecessor of SBB directly jumps to the successor, the SBB block does
     // not dominate the other use anymore.
@@ -1168,12 +1168,12 @@ static bool wouldIntroduceCriticalEdge(TermInst *T, SILBasicBlock *DestBB) {
 static SILValue skipInvert(SILValue Cond, bool &Inverted,
                            bool onlyAcceptSingleUse) {
   while (auto *BI = dyn_cast<BuiltinInst>(Cond)) {
-    
+
     if (onlyAcceptSingleUse && !BI->hasOneUse())
       return SILValue();
-    
+
     OperandValueArrayRef Args = BI->getArguments();
-    
+
     if (BI->getBuiltinInfo().ID == BuiltinValueKind::Xor) {
       // Check if it's a boolean inversion of the condition.
       if (auto *IL = dyn_cast<IntegerLiteralInst>(Args[1])) {
@@ -1219,7 +1219,7 @@ static CondFailInst *getUnConditionalFail(SILBasicBlock *BB, SILValue Cond,
   CondFailInst *CondFail = getFirstCondFail(BB);
   if (!CondFail)
     return nullptr;
-  
+
   // The simple case: check if it is a "cond_fail 1".
   auto *IL = dyn_cast<IntegerLiteralInst>(CondFail->getOperand());
   if (IL && IL->getValue() != 0)
@@ -1413,7 +1413,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
           std::next(Iter) == AllElts.end() &&
           *Iter == SEI->getCase(0).first) {
         EnumElementDecl *SecondElt = *Iter;
-        
+
         SILValue FirstValue;
         // SelectEnum must be exhaustive, so the second case must be handled
         // either by a case or the default.
@@ -1424,20 +1424,20 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
         } else {
           FirstValue = SEI->getDefaultResult();
         }
-        
-        
+
+
         std::pair<EnumElementDecl*, SILValue> SwappedCases[2] = {
           {FirstElt, SEI->getCase(0).second},
           {SecondElt, FirstValue},
         };
-        
+
         auto *NewSEI = SILBuilderWithScope(SEI)
           .createSelectEnum(SEI->getLoc(),
                             SEI->getEnumOperand(),
                             SEI->getType(),
                             SILValue(),
                             SwappedCases);
-        
+
         // We only change the condition to be NewEITI instead of all uses since
         // EITI may have other uses besides this one that need to be updated.
         BI->setCondition(NewSEI);
@@ -1472,7 +1472,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
     SILBuilderWithScope Builder(BI);
     createCondFail(FalseCFI, CFCondition, true, Builder);
     SILBuilderWithScope(BI).createBranch(BI->getLoc(), TrueSide, TrueArgs);
-    
+
     BI->eraseFromParent();
     addToWorklist(ThisBB);
     simplifyAfterDroppingPredecessor(FalseSide);
@@ -1783,7 +1783,7 @@ static SILValue getActualCallee(SILValue Callee) {
     }
     break;
   }
-  
+
   return Callee;
 }
 
@@ -1795,7 +1795,7 @@ static bool isTryApplyOfConvertFunction(TryApplyInst *TAI,
   auto *CFI = dyn_cast<ConvertFunctionInst>(TAI->getCallee());
   if (!CFI)
     return false;
-  
+
   // Check if it is a conversion of a non-throwing function into
   // a throwing function. If this is the case, replace by a
   // simple apply.
@@ -1803,7 +1803,7 @@ static bool isTryApplyOfConvertFunction(TryApplyInst *TAI,
                                             getSwiftRValueType());
   if (!OrigFnTy || OrigFnTy->hasErrorResult())
     return false;
-  
+
   auto TargetFnTy = dyn_cast<SILFunctionType>(CFI->getType().
                                               getSwiftRValueType());
   if (!TargetFnTy || !TargetFnTy->hasErrorResult())
@@ -1828,12 +1828,12 @@ static bool isTryApplyOfConvertFunction(TryApplyInst *TAI,
   // Look through the conversions and find the real callee.
   Callee = getActualCallee(CFI->getConverted());
   CalleeType = Callee.getType();
-  
+
   // If it a call of a throwing callee, bail.
   auto CalleeFnTy = dyn_cast<SILFunctionType>(CalleeType.getSwiftRValueType());
   if (!CalleeFnTy || CalleeFnTy->hasErrorResult())
     return false;
-  
+
   return true;
 }
 
@@ -1846,10 +1846,10 @@ static bool isTryApplyWithUnreachableError(TryApplyInst *TAI,
   TermInst *Term = ErrorBlock->getTerminator();
   if (!isa<UnreachableInst>(Term))
     return false;
-  
+
   if (&*ErrorBlock->begin() != Term)
     return false;
-  
+
   Callee = TAI->getCallee();
   CalleeType = TAI->getSubstCalleeSILType();
   return true;
@@ -1959,10 +1959,10 @@ bool SimplifyCFG::simplifyTermWithIdenticalDestBlocks(SILBasicBlock *BB) {
   }
   if (!commonDest)
     return false;
-  
+
   assert(commonDest->getNumBBArg() == 0 &&
          "getTrampolineDest should have checked that commonDest has no args");
-  
+
   TermInst *Term = BB->getTerminator();
   SILBuilderWithScope(Term).createBranch(Term->getLoc(), commonDest, {});
   Term->eraseFromParent();
@@ -2023,11 +2023,11 @@ bool RemoveUnreachable::run() {
 ///     bb3(%a)                 // %a is dead
 ///
 static bool tryMoveCondFailToPreds(SILBasicBlock *BB) {
-  
+
   CondFailInst *CFI = getFirstCondFail(BB);
   if (!CFI)
     return false;
-  
+
   // Find the underlying condition value of the cond_fail.
   // We only accept single uses. This is not a correctness check, but we only
   // want to the optimization if the condition gets dead after moving the
@@ -2036,25 +2036,25 @@ static bool tryMoveCondFailToPreds(SILBasicBlock *BB) {
   SILValue cond = skipInvert(CFI->getOperand(), inverted, true);
   if (!cond)
     return false;
-  
+
   // Check if the condition is a single-used argument in the current block.
   SILArgument *condArg = dyn_cast<SILArgument>(cond);
   if (!condArg || !condArg->hasOneUse())
     return false;
-  
+
   if (condArg->getParent() != BB)
     return false;
-  
+
   // Check if some of the predecessor blocks provide a constant for the
   // cond_fail condition. So that the optimization has a positive effect.
   bool somePredsAreConst = false;
   for (auto *Pred : BB->getPreds()) {
-    
+
     // The cond_fail must post-dominate the predecessor block. We may not
     // execute the cond_fail speculatively.
     if (!Pred->getSingleSuccessor())
       return false;
-    
+
     SILValue incoming = condArg->getIncomingValue(Pred);
     if (isa<IntegerLiteralInst>(incoming)) {
       somePredsAreConst = true;
@@ -2063,14 +2063,14 @@ static bool tryMoveCondFailToPreds(SILBasicBlock *BB) {
   }
   if (!somePredsAreConst)
     return false;
-  
+
   DEBUG(llvm::dbgs() << "### move to predecessors: " << *CFI);
-  
+
   // Move the cond_fail to the predecessor blocks.
   for (auto *Pred : BB->getPreds()) {
     SILValue incoming = condArg->getIncomingValue(Pred);
     SILBuilderWithScope Builder(Pred->getTerminator());
-    
+
     createCondFail(CFI, incoming, inverted, Builder);
   }
   CFI->eraseFromParent();
@@ -2146,18 +2146,18 @@ bool SimplifyCFG::canonicalizeSwitchEnums() {
   bool Changed = false;
   for (auto &BB : Fn) {
     TermInst *TI = BB.getTerminator();
-  
+
     SwitchEnumInstBase *SWI = dyn_cast<SwitchEnumInstBase>(TI);
     if (!SWI)
       continue;
-    
+
     if (!SWI->hasDefault())
       continue;
 
     NullablePtr<EnumElementDecl> elementDecl = SWI->getUniqueCaseForDefault();
     if (!elementDecl)
       continue;
-    
+
     // Construct a new instruction by copying all the case entries.
     SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 4> CaseBBs;
     for (int idx = 0, numIdcs = SWI->getNumCases(); idx < numIdcs; idx++) {
@@ -2679,7 +2679,7 @@ bool SimplifyCFG::run() {
 
   // Canonicalize switch_enum instructions.
   Changed |= canonicalizeSwitchEnums();
-  
+
   return Changed;
 }
 
@@ -3042,7 +3042,7 @@ bool simplifySwitchEnumToSelectEnum(SILBasicBlock *BB, unsigned ArgNum,
 struct CaseInfo {
   /// The input value or null if it is the default case.
   IntegerLiteralInst *Literal = nullptr;
-  
+
   /// The result value.
   SILInstruction *Result = nullptr;
 
@@ -3056,13 +3056,13 @@ struct CaseInfo {
 /// \p Pred is the predecessor block of the last merge block of the CFG pattern.
 /// \p ArgNum is the index of the argument passed to the merge block.
 CaseInfo getCaseInfo(SILValue &Input, SILBasicBlock *Pred, unsigned ArgNum) {
-  
+
   CaseInfo CaseInfo;
-  
+
   auto *TI = Pred->getTerminator();
   if (!isa<BranchInst>(TI))
     return CaseInfo;
-  
+
   // Find the Nth argument passed to BB.
   auto Arg = TI->getOperand(ArgNum);
 
@@ -3070,45 +3070,45 @@ CaseInfo getCaseInfo(SILValue &Input, SILBasicBlock *Pred, unsigned ArgNum) {
   auto *EI2 = dyn_cast<EnumInst>(Arg);
   if (!EI2)
     return CaseInfo;
-  
+
   if (EI2->hasOperand()) {
     // ... or enums with enum data. This is exactly the pattern for an enum
     // with integer raw value initialization.
     auto *EI1 = dyn_cast<EnumInst>(EI2->getOperand());
     if (!EI1)
       return CaseInfo;
-    
+
     // But not enums with enums with data.
     if (EI1->hasOperand())
       return CaseInfo;
   }
-  
+
   // Check if we come to the Pred block by comparing the input value to a
   // constant.
   SILBasicBlock *CmpBlock = Pred->getSinglePredecessor();
   if (!CmpBlock)
     return CaseInfo;
-  
+
   auto *CmpInst = dyn_cast<CondBranchInst>(CmpBlock->getTerminator());
   if (!CmpInst)
     return CaseInfo;
-  
+
   auto *CondInst = dyn_cast<BuiltinInst>(CmpInst->getCondition());
   if (!CondInst)
     return CaseInfo;
-  
+
   if (!CondInst->getName().str().startswith("cmp_eq"))
     return CaseInfo;
-  
+
   auto CondArgs = CondInst->getArguments();
   assert(CondArgs.size() == 2);
-  
+
   SILValue Arg1 = CondArgs[0];
   SILValue Arg2 = CondArgs[1];
-  
+
   if (isa<IntegerLiteralInst>(Arg1))
     std::swap(Arg1, Arg2);
-  
+
   auto *CmpVal = dyn_cast<IntegerLiteralInst>(Arg2);
   if (!CmpVal)
     return CaseInfo;
@@ -3120,7 +3120,7 @@ CaseInfo getCaseInfo(SILValue &Input, SILBasicBlock *Pred, unsigned ArgNum) {
   // Check for a common input value.
   if (Input && Input != Arg1)
     return CaseInfo;
-  
+
   Input = Arg1;
   CaseInfo.Result = EI2;
   if (CmpInst->getTrueBB() == Pred) {
@@ -3131,7 +3131,7 @@ CaseInfo getCaseInfo(SILValue &Input, SILBasicBlock *Pred, unsigned ArgNum) {
     // This is the default for the select_value.
     CaseInfo.CmpOrDefault = Pred;
   }
-  
+
   return CaseInfo;
 }
 
@@ -3173,7 +3173,7 @@ bool simplifyToSelectValue(SILBasicBlock *MergeBlock, unsigned ArgNum,
                            DominanceInfo *DT) {
   if (!DT)
     return false;
-  
+
   // Collect all case infos from the merge block's predecessors.
   SmallPtrSet<SILBasicBlock *, 8> FoundCmpBlocks;
   SmallVector<CaseInfo, 8> CaseInfos;
@@ -3186,14 +3186,14 @@ bool simplifyToSelectValue(SILBasicBlock *MergeBlock, unsigned ArgNum,
     FoundCmpBlocks.insert(CaseInfo.CmpOrDefault);
     CaseInfos.push_back(CaseInfo);
   }
-  
+
   SmallVector<std::pair<SILValue, SILValue>, 8> Cases;
   SILValue defaultResult;
-  
+
   // The block of the first input value compare. It dominates all other blocks
   // in this CFG pattern.
   SILBasicBlock *dominatingBlock = nullptr;
-  
+
   // Build the cases for the SelectValueInst and find the first dominatingBlock.
   for (auto &CaseInfo : CaseInfos) {
     if (CaseInfo.Literal) {
@@ -3220,18 +3220,18 @@ bool simplifyToSelectValue(SILBasicBlock *MergeBlock, unsigned ArgNum,
 
   if (!dominatingBlock)
     return false;
-  
+
   // Generate the select_value right before the first cond_br of the pattern.
   SILInstruction *insertPos = dominatingBlock->getTerminator();
   SILBuilder B(insertPos);
-  
+
   // Move all needed operands to a place where they dominate the select_value.
   for (auto &CaseInfo : CaseInfos) {
     if (CaseInfo.Literal)
       moveIfNotDominating(CaseInfo.Literal, insertPos, DT);
     auto *EI2 = dyn_cast<EnumInst>(CaseInfo.Result);
     assert(EI2);
-    
+
     if (EI2->hasOperand()) {
       auto *EI1 = dyn_cast<EnumInst>(EI2->getOperand());
       assert(EI1);
@@ -3241,14 +3241,14 @@ bool simplifyToSelectValue(SILBasicBlock *MergeBlock, unsigned ArgNum,
     }
     moveIfNotDominating(EI2, insertPos, DT);
   }
-  
+
   SILArgument *bbArg = MergeBlock->getBBArg(ArgNum);
   auto SelectInst = B.createSelectValue(dominatingBlock->getTerminator()->getLoc(),
                                         Input, bbArg->getType(),
                                        defaultResult, Cases);
 
   bbArg->replaceAllUsesWith(SelectInst);
-  
+
   return true;
 }
 
@@ -3262,7 +3262,7 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   // Try to create a select_value.
   if (simplifyToSelectValue(BB, i, DT))
     return true;
-  
+
   // If we are reading an i1, then check to see if it comes from
   // a switch_enum.  If so, we may be able to lower this sequence to
   // a select_enum.
@@ -3317,13 +3317,13 @@ static void tryToReplaceArgWithIncomingValue(SILBasicBlock *BB, unsigned i,
   SmallVector<SILValue, 4> Incoming;
   if (!A->getIncomingValues(Incoming) || Incoming.empty())
     return;
-  
+
   SILValue V = Incoming[0];
   for (size_t Idx = 1, Size = Incoming.size(); Idx < Size; ++Idx) {
     if (Incoming[Idx] != V)
       return;
   }
-  
+
   // If the incoming values of all predecessors are equal usually this means
   // that the common incoming value dominates the BB. But: this might be not
   // the case if BB is unreachable. Therefore we still have to check it.
@@ -3358,7 +3358,7 @@ bool SimplifyCFG::simplifyArgs(SILBasicBlock *BB) {
     // succeeds, argument A will have no uses afterwards.
     if (DT)
       tryToReplaceArgWithIncomingValue(BB, i, DT);
-    
+
     // Try to simplify the argument
     if (!A->use_empty()) {
       if (simplifyArgument(BB, i))
@@ -3435,7 +3435,7 @@ public:
 class SimplifyBBArgs : public SILFunctionTransform {
 public:
   SimplifyBBArgs() {}
-  
+
   /// The entry point to the transformation.
   void run() override {
     if (SimplifyCFG(*getFunction(), PM, getOptions().VerifyAll, false)
@@ -3443,7 +3443,7 @@ public:
       invalidateAnalysis(SILAnalysis::InvalidationKind::BranchesAndInstructions);
     }
   }
-  
+
   StringRef getName() override { return "Simplify Block Args"; }
 };
 

@@ -32,5 +32,5 @@ class CopyingClassTest {
   @NSCopying var x : NotCopyable    // expected-error {{@NSCopying is only valid with types that conform to the NSCopying protocol}}
 
   init() {}
-  
+
 }

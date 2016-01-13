@@ -113,7 +113,7 @@ func identityEq(element: MinimalEquatableValue) -> MinimalEquatableValue {
 % collections += [(array, 'RandomAccess') for array in other_array_types]
 
 % for Base, traversal in collections:
-%     oob_behavior = '.None' if Base in other_array_types else '.ExpectationFailure' 
+%     oob_behavior = '.None' if Base in other_array_types else '.ExpectationFailure'
 %     collection_or_slice = 'Slice' if 'Slice' in Base else 'Collection'
 if true {
   var resiliencyChecks = CollectionMisuseResiliencyChecks.all

@@ -99,7 +99,7 @@ static SILInstruction *optimizeBuiltinWithSameOperands(SILBuilder &Builder,
   // We have to take special care about floating point operations because of
   // potential NaN values. E.g. ordered equal FCMP_OEQ(Nan, Nan) is not true.
   switch (I->getBuiltinInfo().ID) {
-      
+
   // Replace the uses with one of the (identical) operands.
   case BuiltinValueKind::And:
   case BuiltinValueKind::Or: {
@@ -127,7 +127,7 @@ static SILInstruction *optimizeBuiltinWithSameOperands(SILBuilder &Builder,
                                           APInt(Ty->getGreatestWidth(), 0));
     }
     break;
-      
+
   // Return 1 or true.
   case BuiltinValueKind::ICMP_EQ:
   case BuiltinValueKind::ICMP_SLE:
@@ -159,7 +159,7 @@ static SILInstruction *optimizeBuiltinWithSameOperands(SILBuilder &Builder,
     };
     return B.createTuple(I->getLoc(), Ty, Elements);
   }
-      
+
   default:
     break;
   }
@@ -339,7 +339,7 @@ SILInstruction *optimizeBitOp(BuiltinInst *BI,
   if (isZero(bits))
     // The bit operation yields to a constant, e.g. x & 0 -> 0
     return Builder.createIntegerLiteral(BI->getLoc(), BI->getType(), bits);
-  
+
   if (op != firstOp) {
     // We combined multiple bit operations to a single one,
     // e.g. (x & c1) & c2 -> x & (c1 & c2)
@@ -432,7 +432,7 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
   default:
     break;
   }
-  
+
   if (I->getBuiltinInfo().ID == BuiltinValueKind::ICMP_EQ)
     return optimizeBuiltinCompareEq(I, /*Negate Eq result*/ false);
 

@@ -50,7 +50,7 @@ func otherExistential<T : EqualComparable>(t1: T) {
   var otherEqComp : OtherEqualComparable = t1 // expected-error{{value of type 'T' does not conform to specified type 'OtherEqualComparable'}} expected-error{{protocol 'OtherEqualComparable' can only be used as a generic constraint}}
   otherEqComp = t1 // expected-error{{value of type 'T' does not conform to 'OtherEqualComparable' in assignment}}
   _ = otherEqComp
-  
+
   var otherEqComp2 : OtherEqualComparable // expected-error{{protocol 'OtherEqualComparable' can only be used as a generic constraint}}
   otherEqComp2 = t1 // expected-error{{value of type 'T' does not conform to 'OtherEqualComparable' in assignment}}
   _ = otherEqComp2
@@ -109,7 +109,7 @@ func testOverload<Ovl : Overload, OtherOvl : Overload>(ovl: Ovl, ovl2: Ovl,
 
   other.f1(a) // expected-error{{cannot invoke 'f1' with an argument list of type '(Ovl.A)'}}
   // expected-note @-1 {{overloads for 'f1' exist with these partially matching parameter lists: (Self.A), (Self.B)}}
-                                                        
+
   // Overloading based on context
   var f3i : (Int) -> Int = ovl.f3
   var f3f : (Float) -> Float = ovl.f3
@@ -190,7 +190,7 @@ func testOrdered<T : Ordered>(x: T, y: Int) {
 //===----------------------------------------------------------------------===//
 // Requires clauses
 //===----------------------------------------------------------------------===//
-func conformanceViaRequires<T 
+func conformanceViaRequires<T
        where T : EqualComparable, T : MethodLessComparable
      >(t1: T, t2: T) -> Bool {
   let b1 = t1.isEqual(t2)
@@ -268,8 +268,8 @@ protocol P2 {
 
 func beginsWith2<
      E0: P1, E1: P1
-     where 
-       E0.Element == E1.Element, 
+     where
+       E0.Element == E1.Element,
        E0.Element : EqualComparable
      >(e0: E0, _ e1: E1) -> Bool
 {
@@ -277,8 +277,8 @@ func beginsWith2<
 
 func beginsWith3<
      S0: P2, S1: P2
-     where 
-       S0.AssocP1.Element == S1.AssocP1.Element, 
+     where
+       S0.AssocP1.Element == S1.AssocP1.Element,
        S1.AssocP1.Element : EqualComparable
      >(seq1: S0, _ seq2: S1) -> Bool
 {
@@ -304,6 +304,6 @@ func badTypeConformance1<T where Int : EqualComparable>(_: T) {} // expected-err
 func badTypeConformance2<T where T.Blarg : EqualComparable>(_: T) { } // expected-error{{'Blarg' is not a member type of 'T'}}
 
 func badSameType<T, U : GeneratesAnElement, V // expected-error{{generic parameter 'V' is not used in function signature}}
-                 where T == U.Element, 
+                 where T == U.Element,
                           U.Element == V // expected-error{{same-type requirement makes generic parameters 'T' and 'V' equivalent}}
-                 >(_: T) {} 
+                 >(_: T) {}

@@ -123,7 +123,7 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
                       SkipBodies ? &delayCallbacks : nullptr);
   assert(done && "Parser returned early?");
   (void)done;
-  
+
   if (SkipBodies)
     performDelayedParsing(importMod, persistentState, nullptr);
 
@@ -132,7 +132,7 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
   if (SkipBodies)
     performNameBinding(*importFile);
   else
-    performTypeChecking(*importFile, persistentState.getTopLevelContext(), 
+    performTypeChecking(*importFile, persistentState.getTopLevelContext(),
                         None);
 
   return importMod;

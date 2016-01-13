@@ -31,7 +31,7 @@ dump(Complex<Int>(real: 22, imag: 44))
 // CHECK-NEXT:    Reflection.Complex<Swift.String>
 // CHECK-NEXT:      real: is this the real life?
 // CHECK-NEXT:      imag: is it just fantasy?
-dump(Complex<String>(real: "is this the real life?", 
+dump(Complex<String>(real: "is this the real life?",
                      imag: "is it just fantasy?"))
 
 

@@ -51,12 +51,12 @@ bb0:
 // Type references
 
 // Some cyclic type references between SIL function bodies.
-class Class1 { 
-  var a : Class2 
+class Class1 {
+  var a : Class2
   init()
 }
-class Class2 { 
-  var b : Class1 
+class Class2 {
+  var b : Class1
   init()
 }
 
@@ -829,7 +829,7 @@ sil [fragile] [noinline] @noinline_callee : $@convention(thin) () -> Int {
 bb0:
   %0 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
   %1 = metatype $@thin Int.Type
-  %2 = integer_literal $Builtin.Int2048, 0 
+  %2 = integer_literal $Builtin.Int2048, 0
   %3 = apply %0(%2, %1) : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
   return %3 : $Int
 }
@@ -838,7 +838,7 @@ sil [fragile] [always_inline] @always_inline_callee : $@convention(thin) () -> I
 bb0:
   %0 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
   %1 = metatype $@thin Int.Type
-  %2 = integer_literal $Builtin.Int2048, 0 
+  %2 = integer_literal $Builtin.Int2048, 0
   %3 = apply %0(%2, %1) : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
   return %3 : $Int
 }
@@ -1048,7 +1048,7 @@ bb0(%0 : $UnsafePointer<Int8>, %1 : $UnsafePointer<Int8>, %2 : $Int64):
 
 sil [fragile] @assert_fail : $@convention(thin) (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> ()
 
-// rdar: 15893086 
+// rdar: 15893086
 struct GenericStruct<T> {
   var x : T
 }

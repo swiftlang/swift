@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 // RUN: rm -rf %t  &&  mkdir -p %t
-// 
+//
 // RUN: %target-clang %S/Inputs/SwiftObjectNSObject/SwiftObjectNSObject.m -c -o %t/SwiftObjectNSObject.o -g
 // RUN: %target-build-swift %s -I %S/Inputs/SwiftObjectNSObject/ -Xlinker %t/SwiftObjectNSObject.o -o %t/SwiftObjectNSObject
 // RUN: %target-run %t/SwiftObjectNSObject
@@ -21,7 +21,7 @@
 
 import Foundation
 
-class C { 
+class C {
   @objc func cInstanceMethod() { }
   @objc class func cClassMethod() { }
 }
@@ -31,7 +31,7 @@ class D : C {
 
 }
 
-@_silgen_name("TestSwiftObjectNSObject") 
+@_silgen_name("TestSwiftObjectNSObject")
 func TestSwiftObjectNSObject(c: C, _ d: D)
 
 TestSwiftObjectNSObject(C(), D())

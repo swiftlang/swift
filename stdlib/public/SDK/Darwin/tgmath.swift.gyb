@@ -63,24 +63,24 @@ UnaryIntrinsicFunctions = ['cos', 'sin',
                   ]
 
 # (T, T) -> T
-BinaryFunctions = ['atan2', 'hypot', 'pow', 'fmod', 
+BinaryFunctions = ['atan2', 'hypot', 'pow', 'fmod',
                    'remainder', 'copysign', 'nextafter', 'fdim', 'fmax', 'fmin']
 
 # These functions have special implementations.
-OtherFunctions = ['fpclassify', 
-                  'isnormal', 'isfinite', 'isinf', 'isnan', 'signbit', 
-                  'modf', 'ldexp', 'frexp', 'ilogb', 'scalbn', 'lgamma', 
-                  'remquo', 'nan', 'fma', 
+OtherFunctions = ['fpclassify',
+                  'isnormal', 'isfinite', 'isinf', 'isnan', 'signbit',
+                  'modf', 'ldexp', 'frexp', 'ilogb', 'scalbn', 'lgamma',
+                  'remquo', 'nan', 'fma',
                   'jn', 'yn']
 
-# These functions are imported correctly as-is.             
+# These functions are imported correctly as-is.
 OkayFunctions = ['j0', 'j1', 'y0', 'y1']
 
 # These functions are not supported for various reasons.
-UnhandledFunctions = ['math_errhandling', 'scalbln', 
-                      'lrint', 'lround', 'llrint', 'llround', 'nexttoward', 
-                      'isgreater', 'isgreaterequal', 'isless', 'islessequal', 
-                      'islessgreater', 'isunordered', '__exp10', 
+UnhandledFunctions = ['math_errhandling', 'scalbln',
+                      'lrint', 'lround', 'llrint', 'llround', 'nexttoward',
+                      'isgreater', 'isgreaterequal', 'isless', 'islessequal',
+                      'islessgreater', 'isunordered', '__exp10',
                       '__sincos', '__cospi', '__sinpi', '__tanpi', '__sincospi']
 
 
@@ -158,7 +158,7 @@ public func fpclassify(x: ${T}) -> Int {
 
 % end
 
-% # These are AllFloatTypes not OverlayFloatTypes because we need to cover 
+% # These are AllFloatTypes not OverlayFloatTypes because we need to cover
 % # them all because C's declarations are compiler builtins.
 % for T, CT, f in AllFloatTypes():
 @_transparent
@@ -239,7 +239,7 @@ public func ilogb(x: ${T}) -> Int {
 % end
 
 @warn_unused_result
-@_silgen_name("ilogb") 
+@_silgen_name("ilogb")
 func _swift_Darwin_ilogb(value: CDouble) -> CInt
 
 @_transparent
@@ -263,14 +263,14 @@ public func scalbn(x: ${T}, _ n: Int) -> ${T} {
 % for T, CT, f in AllFloatTypes():
 % # The real lgamma_r is not imported because it hides behind macro _REENTRANT.
 @warn_unused_result
-@_silgen_name("lgamma${f}_r") 
+@_silgen_name("lgamma${f}_r")
 func _swift_Darwin_lgamma${f}_r(_: ${CT},
                                 _: UnsafeMutablePointer<CInt>) -> ${CT}
 @_transparent
 @warn_unused_result
 public func lgamma(x: ${T}) -> (${T}, Int) {
   var sign = CInt(0)
-  let value = withUnsafeMutablePointer(&sign) { 
+  let value = withUnsafeMutablePointer(&sign) {
     (signp: UnsafeMutablePointer<CInt>) -> ${CT} in
     return _swift_Darwin_lgamma${f}_r(${CT}(x), signp)
   }

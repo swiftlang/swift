@@ -578,7 +578,7 @@ namespace {
     bool visitIsNonnullInst(IsNonnullInst *RHS) {
       return true;
     }
-      
+
     bool visitBridgeObjectToRefInst(BridgeObjectToRefInst *X) {
       return true;
     }
@@ -586,7 +586,7 @@ namespace {
     bool visitBridgeObjectToWordInst(BridgeObjectToWordInst *X) {
       return true;
     }
-      
+
     bool visitRefToBridgeObjectInst(RefToBridgeObjectInst *X) {
       return true;
     }

@@ -330,7 +330,7 @@ func test_isa_1(p p: P) {
     a()
     // CHECK:   function_ref @_TF6switch1aFT_T_
     // CHECK:   br [[CONT:bb[0-9]+]]
-    
+
   // CHECK: [[IS_NOT_X]]:
   // CHECK:   checked_cast_addr_br copy_on_success P in [[P]] : $*P to Y in {{%.*}} : $*Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
 
@@ -945,7 +945,7 @@ func test_struct_pattern_ao(s s: StructPatternTestAO, p: P) {
   // CHECK:   [[T0:%.*]] = struct_element_addr [[S]] : $*StructPatternTestAO, #StructPatternTestAO.y
   // CHECK:   [[Y:%.*]] = alloc_stack $P
   // CHECK:   copy_addr [[T0]] to [initialization] [[Y]]
-  
+
   switch s {
   // CHECK:   cond_br {{%.*}}, [[IS_CASE1:bb[0-9]+]], [[IS_NOT_CASE1:bb[0-9]+]]
   // CHECK: [[IS_CASE1]]:
@@ -1168,7 +1168,7 @@ func testStructWithComputedProperty(s s : StructWithComputedProperty) {
 // <rdar://problem/17272985>
 enum ABC { case A, B, C }
 
-// CHECK-LABEL: sil hidden @_TF6switch18testTupleWildcardsFTOS_3ABCS0__T_ 
+// CHECK-LABEL: sil hidden @_TF6switch18testTupleWildcardsFTOS_3ABCS0__T_
 // CHECK:         [[X:%.*]] = tuple_extract {{%.*}} : $(ABC, ABC), 0
 // CHECK:         [[Y:%.*]] = tuple_extract {{%.*}} : $(ABC, ABC), 1
 // CHECK:         switch_enum [[X]] : $ABC, case #ABC.A!enumelt: [[X_A:bb[0-9]+]], default [[X_NOT_A:bb[0-9]+]]

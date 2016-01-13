@@ -28,7 +28,7 @@ struct Owl<T : Runcible, U> {
 }
 
 class Pussycat<T : Runcible, U> {
-  init() {} 
+  init() {}
 
   // CHECK: define hidden void @_TFC16associated_types8Pussycat3eat{{.*}}(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %C16associated_types8Pussycat*)
   func eat(what: T.RuncerType.Runcee, and: T.RuncerType, with: T) { }

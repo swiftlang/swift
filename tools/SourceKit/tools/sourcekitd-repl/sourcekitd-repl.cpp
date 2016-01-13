@@ -661,7 +661,7 @@ int main(int argc, const char **argv) {
     OS << "received notification:" << '\n';
     printResponse(Resp);
   });
-  
+
   REPLInput Inp;
   if (llvm::sys::Process::StandardInIsUserInput())
     printf("%s", "Welcome to SourceKit.  Type ':help' for assistance.\n");

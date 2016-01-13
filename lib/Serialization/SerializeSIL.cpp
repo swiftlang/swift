@@ -1468,13 +1468,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     ListOfValues.push_back(
          S.addTypeRef(IBSHI->getBlockStorage().getType().getSwiftRValueType()));
     // Always an address, don't need to save category
-    
+
     ListOfValues.push_back(addValueRef(IBSHI->getInvokeFunction()));
     ListOfValues.push_back(IBSHI->getInvokeFunction().getResultNumber());
     ListOfValues.push_back(
        S.addTypeRef(IBSHI->getInvokeFunction().getType().getSwiftRValueType()));
     // Always a value, don't need to save category
-    
+
     SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
              SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
              S.addTypeRef(IBSHI->getType().getSwiftRValueType()),
@@ -1612,7 +1612,7 @@ void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
         SILAbbrCodes[WitnessAssocProtocolLayout::Code],
         S.addDeclRef(assoc.Requirement),
         S.addDeclRef(assoc.Protocol));
-          
+
       S.writeConformance(assoc.Witness, SILAbbrCodes);
       continue;
     }

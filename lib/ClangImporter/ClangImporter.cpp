@@ -391,7 +391,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     invocationArgStrs.push_back("-fmodules-cache-path=");
     invocationArgStrs.back().append(moduleCachePath);
   }
-  
+
   if (importerOpts.DetailedPreprocessingRecord) {
     invocationArgStrs.insert(invocationArgStrs.end(), {
       "-Xclang", "-detailed-preprocessing-record",
@@ -748,7 +748,7 @@ void ClangImporter::Implementation::addMacrosToLookupTable(
       // Check whether we have a macro defined in this module.
       auto info = pp.getMacroInfo(macro.first);
       if (!info || info->isFromASTFile() || info->isBuiltinMacro()) continue;
-      
+
       // Only interested in macro definitions.
       auto *defMD = dyn_cast<clang::DefMacroDirective>(MD);
       if (!defMD) continue;
@@ -2115,7 +2115,7 @@ auto ClangImporter::Implementation::importFullName(
         argumentNameIds.push_back(Identifier());
         continue;
       }
-      
+
       argumentNameIds.push_back(SwiftContext.getIdentifier(argName));
     }
 
@@ -2162,7 +2162,7 @@ auto ClangImporter::Implementation::importFullName(
       StringRef baseName = parseDeclName(nameAttr->getName(), argumentNames,
                                          isFunctionName);
       if (baseName.empty()) return result;
-      
+
       result.HasCustomName = true;
       result.Imported = formDeclName(baseName, argumentNames, isFunctionName);
 
@@ -2896,7 +2896,7 @@ ClangImporter::Implementation::getKnownGlobalVariable(
     const clang::VarDecl *global) {
   if (auto notesReader = getAPINotesForDecl(global))
     return notesReader->lookupGlobalVariable(global->getName());
-  
+
   return None;
 }
 
@@ -2905,7 +2905,7 @@ ClangImporter::Implementation::getKnownGlobalFunction(
     const clang::FunctionDecl *fn) {
   if (auto notesReader = getAPINotesForDecl(fn))
     return notesReader->lookupGlobalFunction(fn->getName());
-  
+
   return None;
 }
 
@@ -2986,7 +2986,7 @@ isAccessibilityConformingContext(const clang::DeclContext *ctx) {
       return true;
   }
   return false;
-  
+
 }
 
 /// Determine whether the given method potentially conflicts with the
@@ -3820,7 +3820,7 @@ void ClangModuleUnit::collectLinkLibraries(
       kind = LibraryKind::Framework;
     else
       kind = LibraryKind::Library;
-    
+
     callback(LinkLibrary(clangLinkLib.Library, kind));
   }
 }

@@ -25,7 +25,7 @@ bb0(%0 : $Int):                         // CHECK: bb0(%0 : $Int):
 sil @tuple_reg_promotion : $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):                         // CHECK: bb0(%0 : $Int):
   %1 = alloc_box $(Int, Int)
-  
+
   %a = tuple_element_addr %1#1 : $*(Int, Int), 0
   %b = tuple_element_addr %1#1 : $*(Int, Int), 1
   store %0 to %a : $*Int
@@ -65,16 +65,16 @@ bb0(%0 : $Int):
   // CHECK: %1 = alloc_box $Int
   %1 = alloc_box $Int
   %2 = store %0 to %1#1 : $*Int
-  
+
   // This load should be eliminated.
   %3 = load %1#1 : $*Int
   %5 = function_ref @takes_Int_inout : $@convention(thin) (@inout Int) -> ()
   %6 = apply %5(%1#1) : $@convention(thin) (@inout Int) -> ()
-  
+
   // This load is needed in case the callee modifies the allocation.
   // CHECK: [[RES:%[0-9]+]] = load
   %7 = load %1#1 : $*Int
-  
+
   // This should use the incoming argument to the function.
   // CHECK: tuple ({{.*}} : $Int, {{.*}} : $Int)
   %8 = tuple (%3 : $Int, %7 : $Int)
@@ -142,7 +142,7 @@ bb0(%0 : $Int):
 
 
 struct ContainsNativeObject {
-  var x : Int 
+  var x : Int
   var y : Builtin.NativeObject
 }
 
@@ -174,7 +174,7 @@ bb0(%0 : $Int):               // CHECK: bb0(%0 : $Int):
   %1 = alloc_stack $Int
   store %0 to %1 : $*Int
   %2 = alloc_stack $Int
-  
+
   copy_addr %1 to [initialization] %2 : $*Int
 
   %3 = load %2 : $*Int
@@ -231,7 +231,7 @@ sil @init_xy_struct : $@convention(thin) () -> XYStruct
 sil @cross_block_load_promotion_struct : $@convention(thin) (Int, Int) -> Int {
 bb0(%0 : $Int, %2 : $Int):
   %1 = alloc_stack $XYStruct
-  
+
   %7 = function_ref @init_xy_struct : $@convention(thin) () -> XYStruct
   %9 = apply %7() : $@convention(thin) () -> XYStruct
   store %9 to %1 : $*XYStruct
@@ -262,7 +262,7 @@ bb5:                                              // Preds: bb4
 sil @cross_block_load_promotion_struct2 : $@convention(thin) (Int, Int) -> Int {
 bb0(%0 : $Int, %2 : $Int):
   %1 = alloc_stack $XYStruct
-  
+
   %7 = function_ref @init_xy_struct : $@convention(thin) () -> XYStruct
   %9 = apply %7() : $@convention(thin) () -> XYStruct
   store %9 to %1 : $*XYStruct

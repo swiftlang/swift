@@ -370,7 +370,7 @@ enum class ConventionsKind : uint8_t {
         assert(!isIndirectParameter(convention));
       }
       auto loweredType = substTL.getLoweredType().getSwiftRValueType();
-      
+
       Inputs.push_back(SILParameterInfo(loweredType, convention));
     }
 
@@ -527,7 +527,7 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
   // Okay, with that we can actually construct the result type.
   CanType loweredResultType
     = substResultTL.getLoweredType().getSwiftRValueType();
-  
+
   SILResultInfo result;
   if (hasIndirectResult) {
     inputs.push_back(SILParameterInfo(loweredResultType,
@@ -558,25 +558,25 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
   // Destructure the input tuple type.
   {
     DestructureInputs InputDestructurer(M, conventions, foreignError, inputs);
-    
+
     InputDestructurer.destructure(origType.getFunctionInputType(),
                                   substFnInterfaceType.getInput(),
                                   extInfo);
   }
-  
+
   // Lower the capture context parameters, if any.
   if (constant)
   if (auto function = constant->getAnyFunctionRef()) {
     auto &Types = M.Types;
     auto loweredCaptures = Types.getLoweredLocalCaptures(*function);
-    
+
     for (auto capture : loweredCaptures.getCaptures()) {
       auto *VD = capture.getDecl();
       auto type = VD->getType()->getCanonicalType();
-      
+
       type = Types.getInterfaceTypeOutOfContext(type,
                                                 function->getAsDeclContext());
-      
+
       auto &loweredTL = Types.getTypeLowering(
                                     AbstractionPattern(genericSig, type), type);
       auto loweredTy = loweredTL.getLoweredType();
@@ -623,7 +623,7 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
       }
     }
   }
-  
+
   auto calleeConvention = ParameterConvention::Direct_Unowned;
   if (extInfo.hasContext())
     calleeConvention = conventions.getCallee();
@@ -634,7 +634,7 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
   auto silExtInfo = SILFunctionType::ExtInfo()
     .withRepresentation(extInfo.getSILRepresentation())
     .withIsNoReturn(extInfo.isNoReturn());
-  
+
   return SILFunctionType::get(genericSig,
                               silExtInfo, calleeConvention,
                               inputs, result, errorResult,
@@ -725,17 +725,17 @@ namespace {
     ParameterConvention
     getIndirectSelfParameter(const AbstractionPattern &type) const override {
       return ParameterConvention::Indirect_In_Guaranteed;
-    }    
+    }
 
     static bool classof(const Conventions *C) {
       return C->getKind() == ConventionsKind::Default;
     }
   };
-  
+
   /// The default conventions for Swift initializing constructors.
   struct DefaultInitializerConventions : DefaultConventions {
     using DefaultConventions::DefaultConventions;
-  
+
     /// Initializers must take 'self' at +1, since they will return it back
     /// at +1, and may chain onto Objective-C initializers that replace the
     /// instance.
@@ -743,7 +743,7 @@ namespace {
     getDirectSelfParameter(const AbstractionPattern &type) const override {
       return ParameterConvention::Direct_Owned;
     }
-    
+
     ParameterConvention
     getIndirectSelfParameter(const AbstractionPattern &type) const override {
       return ParameterConvention::Indirect_In;
@@ -813,7 +813,7 @@ static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
       return getSILFunctionType(M, origType, substType, substInterfaceType,
                                 extInfo, DefaultInitializerConventions(),
                                 None, constant);
-    
+
     case SILDeclRef::Kind::Func:
     case SILDeclRef::Kind::Allocator:
     case SILDeclRef::Kind::Destroyer:
@@ -1244,7 +1244,7 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
   case SILDeclRef::Kind::Func: {
     if (!c.hasDecl())
       return SelectorFamily::None;
-      
+
     auto *FD = cast<FuncDecl>(c.getDecl());
     switch (FD->getAccessorKind()) {
     case AccessorKind::NotAccessor:
@@ -1832,13 +1832,13 @@ SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
   // FIXME: these should all be modeled with a DynamicSelfType.
   overrideInterfaceTy =
       overrideInterfaceTy->replaceSelfParameterType(selfInterfaceTy);
-  
+
   bool hasDynamicSelf = false;
   if (auto funcDecl = dyn_cast<FuncDecl>(derived.getDecl()))
     hasDynamicSelf = funcDecl->hasDynamicSelf();
   else if (isa<ConstructorDecl>(derived.getDecl()))
     hasDynamicSelf = true;
-  
+
   if (hasDynamicSelf) {
     overrideInterfaceTy =
         overrideInterfaceTy->replaceCovariantResultType(selfInterfaceTy,

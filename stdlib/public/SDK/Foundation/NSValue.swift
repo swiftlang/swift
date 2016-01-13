@@ -14,7 +14,7 @@ extension NSRange : _ObjectiveCBridgeable {
   public static func _isBridgedToObjectiveC() -> Bool {
     return true
   }
-  
+
   public static func _getObjectiveCType() -> Any.Type {
     return NSValue.self
   }
@@ -29,7 +29,7 @@ extension NSRange : _ObjectiveCBridgeable {
   ) {
     result = x.rangeValue
   }
-  
+
   public static func _conditionallyBridgeFromObjectiveC(
     x: NSValue,
     inout result: NSRange?

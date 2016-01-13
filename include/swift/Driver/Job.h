@@ -35,7 +35,7 @@ class JobAction;
 
 class CommandOutput {
   types::ID PrimaryOutputType;
-  
+
   /// The primary output files of the command.
   /// Usually a command has only a single output file. Only the compiler in
   /// multi-threaded compilation produces multiple output files.
@@ -57,7 +57,7 @@ public:
     PrimaryOutputFilenames.push_back(FileName);
     BaseInputs.push_back(BaseInput);
   }
-  
+
   // This returns a std::string instead of a StringRef so that users can rely
   // on the data buffer being null-terminated.
   const std::string &getPrimaryOutputFilename() const {
@@ -68,7 +68,7 @@ public:
   ArrayRef<std::string> getPrimaryOutputFilenames() const {
     return PrimaryOutputFilenames;
   }
-  
+
   void setAdditionalOutputForType(types::ID type, StringRef OutputFilename);
   const std::string &getAdditionalOutputForType(types::ID type) const;
 

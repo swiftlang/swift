@@ -21,9 +21,9 @@ class NonContiguousNSString : NSString {
     fatalError("don't call this initializer")
   }
 
-  override init() { 
+  override init() {
     _value = []
-    super.init() 
+    super.init()
   }
 
   init(_ value: [UInt16]) {
@@ -192,7 +192,7 @@ NSStringAPIs.test("init(contentsOfURL:usedEncoding:error:)") {
 
 NSStringAPIs.test("init(withCString_:encoding:)") {
   expectOptionalEqual("foo, a basmati bar!",
-      String(CString: 
+      String(CString:
           "foo, a basmati bar!", encoding: String.defaultCStringEncoding()))
 }
 
@@ -263,7 +263,7 @@ func expectLocalizedEquality(
   _ localeID: String? = nil,
   @autoclosure _ message: () -> String = "",
   showFrame: Bool = true,
-  stackTrace: SourceLocStack = SourceLocStack(),  
+  stackTrace: SourceLocStack = SourceLocStack(),
   file: String = __FILE__, line: UInt = __LINE__
 ) {
   let trace = stackTrace.pushIf(showFrame, file: file, line: line)
@@ -271,11 +271,11 @@ func expectLocalizedEquality(
   let locale = localeID.map {
     NSLocale(localeIdentifier: $0)
   } ?? NSLocale.currentLocale()
-  
+
   expectEqual(
     expected, op(locale),
     message(), stackTrace: trace)
-  
+
   expectEqual(
     op(NSLocale.systemLocale()), op(nil),
     message(), stackTrace: trace)
@@ -285,7 +285,7 @@ NSStringAPIs.test("capitalizedStringWithLocale(_:)") {
   expectLocalizedEquality(
     "Foo Foo Foo Foo",
     "foo Foo fOO FOO".capitalizedStringWithLocale)
-  
+
   expectLocalizedEquality("Жжж","жжж".capitalizedStringWithLocale)
 
   expectEqual(
@@ -490,11 +490,11 @@ NSStringAPIs.test("dataUsingEncoding(_:allowLossyConversion:)") {
 NSStringAPIs.test("initWithData(_:encoding:)") {
   let bytes: [UInt8] = [0xe3, 0x81, 0x82, 0xe3, 0x81, 0x84, 0xe3, 0x81, 0x86]
   let data = NSData(bytes: bytes, length: bytes.count)
-  
+
   expectEmpty(String(data: data, encoding: NSNonLossyASCIIStringEncoding))
-  
+
   expectEqualSequence(
-    "あいう".characters, 
+    "あいう".characters,
     String(data: data, encoding: NSUTF8StringEncoding)!.characters)
 }
 
@@ -1398,7 +1398,7 @@ NSStringAPIs.test("stringByFoldingWithOptions(_:locale:)") {
   ) -> (NSLocale?) -> String {
     return { loc in s.stringByFoldingWithOptions(options, locale: loc) }
   }
-  
+
   expectLocalizedEquality("abcd", fwo("abCD", .CaseInsensitiveSearch), "en")
 
   // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE

@@ -9,7 +9,7 @@ import Builtin
 import Swift
 
 public struct ECurve {
-    
+
     public func point () -> ECPoint?
 }
 
@@ -17,7 +17,7 @@ public struct ECPoint {
     public let curve: ECurve
 
     public var coordinate: Int32
-    
+
     init(curve: ECurve)
 }
 

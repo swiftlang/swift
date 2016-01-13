@@ -33,7 +33,7 @@ extern "C" bool (*_swift_isDeallocating)(HeapObject *object);
 extern "C" void (*_swift_release)(HeapObject *object);
 extern "C" void (*_swift_release_n)(HeapObject *object, uint32_t n);
 
-// liboainject on iOS 8 patches the function pointers below if present. 
+// liboainject on iOS 8 patches the function pointers below if present.
 // Do not reuse these names unless you do what oainject expects you to do.
 typedef size_t AllocIndex;
 extern "C" void *(*_swift_alloc)(AllocIndex idx);

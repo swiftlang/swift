@@ -157,7 +157,7 @@ template <class Entry> class MetadataCache {
 
   /// Synchronization of metadata creation.
   std::mutex *Lock;
-  
+
   /// The head of a linked list connecting all the metadata cache entries.
   /// TODO: Remove this when LLDB is able to understand the final data
   /// structure for the metadata cache.
@@ -165,7 +165,7 @@ template <class Entry> class MetadataCache {
 
   /// Allocator for entries of this cache.
   MetadataAllocator Allocator;
-  
+
 public:
   MetadataCache() : Map(new MDMapTy()), Lock(new std::mutex()) {}
   ~MetadataCache() { delete Map; delete Lock; }

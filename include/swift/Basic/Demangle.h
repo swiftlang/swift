@@ -191,7 +191,7 @@ public:
     assert(hasIndex());
     return IndexPayload;
   }
-  
+
   typedef NodeVector::iterator iterator;
   typedef NodeVector::const_iterator const_iterator;
   typedef NodeVector::size_type size_type;
@@ -377,7 +377,7 @@ public:
     Stream.append(Value.data(), Value.size());
     return *this;
   }
-  
+
   DemanglerPrinter &operator<<(char c) & {
     Stream.push_back(c);
     return *this;
@@ -396,14 +396,14 @@ public:
   DemanglerPrinter &operator<<(int n) & {
     return *this << (long long)n;
   }
-  
+
   template<typename T>
   DemanglerPrinter &&operator<<(T &&x) && {
     return std::move(*this << std::forward<T>(x));
   }
-  
+
   std::string &&str() && { return std::move(Stream); }
-  
+
 private:
   std::string &Stream;
 };
@@ -415,7 +415,7 @@ private:
 static inline bool isDigit(int c) {
   return c >= '0' && c <= '9';
 }
-  
+
 } // end namespace Demangle
 } // end namespace swift
 

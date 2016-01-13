@@ -37,7 +37,7 @@ func useTwoIdentical(xi: Int, yi: Float) {
   x = twoIdentical(1, x)
   y = twoIdentical(1.0, y)
   y = twoIdentical(y, 1.0)
-  
+
   twoIdentical(x, y) // expected-error{{cannot invoke 'twoIdentical' with an argument list of type '(Int, Float)'}} expected-note{{expected an argument list of type '(T, T)'}}
 }
 
@@ -52,10 +52,10 @@ func useSwap(xi: Int, yi: Float) {
   var x = xi, y = yi
   mySwap(&x, &x)
   mySwap(&y, &y)
-  
+
   mySwap(x, x) // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{10-10=&}}
     // expected-error @-1 {{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{13-13=&}}
-  
+
   mySwap(&x, &y) // expected-error{{cannot convert value of type 'inout Int' to expected argument type 'inout _'}}
 }
 
@@ -83,7 +83,7 @@ func returnTuple<T, U>(_: T) -> (T, U) { }
 func testReturnTuple(x: Int, y: Float) {
   returnTuple(x) // expected-error{{cannot invoke 'returnTuple' with an argument list of type '(Int)'}}
   // expected-note @-1 {{expected an argument list of type '(T)'}}
-  
+
   var _ : (Int, Float) = returnTuple(x)
   var _ : (Float, Float) = returnTuple(y)
 
@@ -253,7 +253,7 @@ func testGetVectorSize(vi: MyVector<Int>, vf: MyVector<Float>) {
   var x : X, y : Y
   x = ovlVector(vi)
   x = ovlVector(vf)
-  
+
   var vvi : MyVector<MyVector<Int>>
   y = ovlVector(vvi)
 
@@ -280,7 +280,7 @@ postfix func <*> (_: Test<True>) -> String? { return .None }
 class Test<C: Bool_> : MetaFunction {
   typealias Result = Int
 } // picks first <*>
-typealias Inty = Test<True>.Result 
+typealias Inty = Test<True>.Result
 var iy : Inty = 5 // okay, because we picked the first <*>
 var iy2 : Inty = "hello" // expected-error{{cannot convert value of type 'String' to specified type 'Inty' (aka 'Int')}}
 

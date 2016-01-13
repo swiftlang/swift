@@ -202,7 +202,7 @@ public:
 
   using SuccessorListTy = TermInst::SuccessorListTy;
   using ConstSuccessorListTy = TermInst::ConstSuccessorListTy;
-  
+
   /// The successors of a SILBasicBlock are defined either explicitly as
   /// a single successor as the branch targets of the terminator instruction.
   ConstSuccessorListTy getSuccessors() const {

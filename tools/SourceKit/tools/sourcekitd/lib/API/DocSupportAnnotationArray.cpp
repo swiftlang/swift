@@ -65,7 +65,7 @@ public:
                              const char *,
                              unsigned,
                              unsigned> CompactArrayReaderTy;
-  
+
   static bool dictionary_apply(void *Buf, size_t Index,
                               sourcekitd_variant_dictionary_applier_t applier) {
     CompactArrayReaderTy Reader(Buf);

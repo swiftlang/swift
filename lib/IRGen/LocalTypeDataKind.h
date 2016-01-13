@@ -37,9 +37,9 @@ public:
   using RawType = uintptr_t;
 private:
   RawType Value;
-  
+
   explicit LocalTypeDataKind(RawType Value) : Value(Value) {}
-  
+
   /// Magic values for special kinds of type metadata.  These should be
   /// small so that they should never conflict with a valid pointer.
   ///
@@ -62,9 +62,9 @@ private:
 
 public:
   LocalTypeDataKind() = default;
-  
+
   // The magic values are all odd and so do not collide with pointer values.
-  
+
   /// A reference to the type metadata.
   static LocalTypeDataKind forTypeMetadata() {
     return LocalTypeDataKind(TypeMetadata);
@@ -79,7 +79,7 @@ public:
   static LocalTypeDataKind forValueWitness(ValueWitness witness) {
     return LocalTypeDataKind(ValueWitnessBase + (unsigned)witness);
   }
-  
+
   /// A reference to a protocol witness table for an archetype.
   ///
   /// This only works for non-concrete types because in principle we might
@@ -142,7 +142,7 @@ public:
     }
   }
 
-  
+
   RawType getRawValue() const {
     return Value;
   }

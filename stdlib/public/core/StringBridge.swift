@@ -76,13 +76,13 @@ internal func _cocoaStringToContiguous(
   let startIndex = range.startIndex
   let count = range.endIndex - startIndex
 
-  let buffer = _StringBuffer(capacity: max(count, minimumCapacity), 
+  let buffer = _StringBuffer(capacity: max(count, minimumCapacity),
                              initialSize: count, elementWidth: 2)
 
   _swift_stdlib_CFStringGetCharacters(
-    source, _swift_shims_CFRange(location: startIndex, length: count), 
+    source, _swift_shims_CFRange(location: startIndex, length: count),
     UnsafeMutablePointer<_swift_shims_UniChar>(buffer.start))
-  
+
   return buffer
 }
 
@@ -102,9 +102,9 @@ internal func _cocoaStringSlice(
   target: _StringCore, _ subRange: Range<Int>
 ) -> _StringCore {
   _sanityCheck(target.hasCocoaBuffer)
-  
+
   let cfSelf: _swift_shims_CFStringRef = unsafeUnwrap(target.cocoaBuffer)
-  
+
   _sanityCheck(
     _swift_stdlib_CFStringGetCharactersPtr(cfSelf) == nil,
     "Known contiguously-stored strings should already be converted to Swift")

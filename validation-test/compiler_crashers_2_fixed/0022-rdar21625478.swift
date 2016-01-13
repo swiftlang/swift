@@ -13,7 +13,7 @@ public class TypeIndexed<Value> : Resettable {
     self.defaultValue = value
     _allResettables.append(self)
   }
-  
+
   public subscript(t: Any.Type) -> Value {
     get {
       return byType[ObjectIdentifier(t)] ?? defaultValue
@@ -55,7 +55,7 @@ extension LoggingType {
   public var log: Log.Type {
     return Log.self
   }
-  
+
   public var selfType: Any.Type {
     return self.dynamicType
   }
@@ -74,16 +74,16 @@ public struct LoggingGenerator<Base: GeneratorType>
   : GeneratorType, LoggingType {
 
   public typealias Log = GeneratorLog
-  
+
   public init(_ base: Base) {
     self.base = base
   }
-  
+
   public mutating func next() -> Base.Element? {
     ++Log.next[selfType]
     return base.next()
   }
-  
+
   public var base: Base
 }
 
@@ -134,14 +134,14 @@ extension LoggingSequenceType
     ++Log.filter[selfType]
     return base.filter(includeElement)
   }
-  
+
   public func _customContainsEquatableElement(
     element: Base.Generator.Element
   ) -> Bool? {
     ++Log._customContainsEquatableElement[selfType]
     return base._customContainsEquatableElement(element)
   }
-  
+
   /// If `self` is multi-pass (i.e., a `CollectionType`), invoke
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
@@ -177,7 +177,7 @@ public struct LoggingSequence<
   public init(_ base: Base_) {
     self.base = base
   }
-  
+
   public var base: Base_
 }
 
@@ -208,7 +208,7 @@ where Index == Base.Index {
     ++CollectionLog.startIndex[selfType]
     return base.startIndex
   }
-  
+
   public var endIndex: Base.Index {
     ++CollectionLog.endIndex[selfType]
     return base.endIndex
@@ -217,11 +217,11 @@ where Index == Base.Index {
     ++CollectionLog.subscriptIndex[selfType]
     return base[position]
   }
-  
+
   public subscript(_prext_bounds: Range<Base.Index>) -> Base.SubSequence {
     ++CollectionLog.subscriptRange[selfType]
     return base[_prext_bounds]
-  }    
+  }
 
   public var isEmpty: Bool {
     ++CollectionLog.isEmpty[selfType]
@@ -232,7 +232,7 @@ where Index == Base.Index {
     ++CollectionLog.count[selfType]
     return base.count
   }
-  
+
   public func _customIndexOfEquatableElement(element: Base.Generator.Element) -> Base.Index?? {
     ++CollectionLog._customIndexOfEquatableElement[selfType]
     return base._customIndexOfEquatableElement(element)
@@ -256,7 +256,7 @@ public struct LoggingCollection<Base_: CollectionType> : LoggingCollectionType {
   public init(_ base: Base_) {
     self.base = base
   }
-  
+
   public var base: Base_
 }
 
@@ -273,7 +273,7 @@ public func expectCustomizable<
   expectNotEqual(
     0, counters[T.self], collectMoreInfo?() ?? "",
     stackTrace: stackTrace ?? SourceLocStack(), file: file, line: line)
-  
+
   expectEqual(
     counters[T.self], counters[T.Base.self], collectMoreInfo?() ?? "",
     stackTrace: stackTrace ?? SourceLocStack(), file: file, line: line)
@@ -292,7 +292,7 @@ public func expectNotCustomizable<
   expectNotEqual(
     0, counters[T.self], collectMoreInfo?() ?? "",
     stackTrace: stackTrace ?? SourceLocStack(), file: file, line: line)
-  
+
   expectEqual(
     0, counters[T.Base.self], collectMoreInfo?() ?? "",
     stackTrace: stackTrace ?? SourceLocStack(), file: file, line: line)

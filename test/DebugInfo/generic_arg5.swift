@@ -18,5 +18,5 @@ public func foo<Type>(values : [S<Type>])
   let _ = values.flatMap { arg in
     return arg
   }
- 
+
 }

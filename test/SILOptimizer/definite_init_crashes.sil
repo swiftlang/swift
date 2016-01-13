@@ -36,7 +36,7 @@ bb0(%0 : $*Single, %1 : $Int):
   %4 = alloc_box $Single
   %5 = load %0 : $*Single
   store %5 to %4#1 : $*Single
-  
+
   %8 = struct_element_addr %4#1 : $*Single, #Single.a
   store %1 to %8 : $*Int
 

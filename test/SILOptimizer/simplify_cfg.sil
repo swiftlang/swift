@@ -391,7 +391,7 @@ bb1:
 
 bb2:
   br bb4(%2 : $Int64)
-  
+
 bb4(%4 : $Int64):
   %55 = function_ref @external_f : $@convention(thin) () -> ()
   apply %55() : $@convention(thin) () -> ()
@@ -483,7 +483,7 @@ bb1:
 bb2:
   apply %f1() : $@convention(thin) () -> ()
   br bb3(%1 : $Int64)
-  
+
 bb3(%a1 : $Int64):
   return %a1 : $Int64
 }
@@ -1405,7 +1405,7 @@ enum IntEnum : Int32 {
 // CHECK-DAG: [[X11:%[0-9]+]] = enum $Optional<IntEnum>, #Optional.Some!enumelt.1, [[X10]] : $IntEnum
 // CHECK-DAG: [[X12:%[0-9]+]] = enum $IntEnum, #IntEnum.E0!enumelt
 // CHECK-DAG: [[X13:%[0-9]+]] = enum $Optional<IntEnum>, #Optional.Some!enumelt.1, [[X12]] : $IntEnum
-// CHECK-DAG: [[X14:%[0-9]+]] = select_value %0 : $Builtin.Int32, case [[X6]]: [[X8]], case [[X9]]: [[X11]], case [[X2]]: [[X13]], default [[X5]] : $Optional<IntEnum> 
+// CHECK-DAG: [[X14:%[0-9]+]] = select_value %0 : $Builtin.Int32, case [[X6]]: [[X8]], case [[X9]]: [[X11]], case [[X2]]: [[X13]], default [[X5]] : $Optional<IntEnum>
 // CHECK-DAG: return [[X14]] : $Optional<IntEnum>
 sil @create_select_value : $@convention(thin) (Builtin.Int32) -> Optional<IntEnum> {
 bb0(%0 : $Builtin.Int32):
@@ -2271,7 +2271,7 @@ bb0:
   %3 = function_ref @returnLabeledTuple : $@convention(thin) () -> (first: Int32, second: Int32)
   %6 = convert_function %3 : $@convention(thin) () -> (first: Int32, second: Int32) to $@convention(thin) () -> ((Int32, Int32), @error ErrorType)
   try_apply %6() : $@convention(thin) () -> ((Int32, Int32), @error ErrorType), normal bb1, error bb2
- 
+
 bb1(%8 : $(Int32, Int32)):
   return %8 : $(Int32, Int32)
 
@@ -2296,7 +2296,7 @@ bb0:
   %3 = function_ref @returnUnlabeledTuple : $@convention(thin) () -> (Int32, Int32)
   %6 = convert_function %3 : $@convention(thin) () -> (Int32, Int32) to $@convention(thin) () -> ((first: Int32, second: Int32), @error ErrorType)
   try_apply %6() : $@convention(thin) () -> ((first: Int32, second: Int32), @error ErrorType), normal bb1, error bb2
- 
+
 bb1(%8 : $(first: Int32, second: Int32)):
   return %8 : $(first: Int32, second: Int32)
 

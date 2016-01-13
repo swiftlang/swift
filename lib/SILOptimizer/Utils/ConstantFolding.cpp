@@ -98,7 +98,7 @@ APInt swift::constantFoldCast(APInt val, const BuiltinInfo &BI) {
   SrcTy->castTo<BuiltinIntegerType>()->getGreatestWidth();
   uint32_t DestBitWidth =
   DestTy->castTo<BuiltinIntegerType>()->getGreatestWidth();
-  
+
   APInt CastResV;
   if (SrcBitWidth == DestBitWidth) {
     return val;

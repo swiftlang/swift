@@ -295,7 +295,7 @@ class ClassWithIntProperty { final var x = 42 }
 func closeOverLetLValue() {
   let a : ClassWithIntProperty
   a = ClassWithIntProperty()
-  
+
   takeClosure { a.x }
 }
 
@@ -345,7 +345,7 @@ class SuperBase {
 }
 class SuperSub : SuperBase {
   override func boom() {}
-  
+
   // CHECK-LABEL: sil hidden @_TFC8closures8SuperSub1a
   // CHECK: [[INNER:%.*]] = function_ref @_TFFC8closures8SuperSub1a
   // CHECK: = apply [[INNER]](%0)
@@ -364,7 +364,7 @@ class SuperSub : SuperBase {
     }
     a1()
   }
-  
+
   // CHECK-LABEL: sil hidden @_TFC8closures8SuperSub1b
   // CHECK: [[INNER:%.*]] = function_ref @_TFFC8closures8SuperSub1b
   // CHECK: = apply [[INNER]](%0)
@@ -390,7 +390,7 @@ class SuperSub : SuperBase {
     }
     b1()
   }
-  
+
   // CHECK-LABEL: sil hidden @_TFC8closures8SuperSub1c
   // CHECK: [[INNER:%.*]] = function_ref @_TFFC8closures8SuperSub1c
   // CHECK: = partial_apply [[INNER]](%0)
@@ -409,7 +409,7 @@ class SuperSub : SuperBase {
     }
     c1()
   }
-  
+
   // CHECK-LABEL: sil hidden @_TFC8closures8SuperSub1d
   // CHECK: [[INNER:%.*]] = function_ref @_TFFC8closures8SuperSub1d
   // CHECK: = partial_apply [[INNER]](%0)
@@ -432,7 +432,7 @@ class SuperSub : SuperBase {
     }
     d1()
   }
-  
+
   // CHECK-LABEL: sil hidden @_TFC8closures8SuperSub1e
   // CHECK: [[INNER:%.*]] = function_ref @_TFFC8closures8SuperSub1e
   // CHECK: = apply [[INNER]](%0)
@@ -455,7 +455,7 @@ class SuperSub : SuperBase {
     }
     e1()
   }
-  
+
   // CHECK-LABEL: sil hidden @_TFC8closures8SuperSub1f
   // CHECK: [[INNER:%.*]] = function_ref @_TFFC8closures8SuperSub1f
   // CHECK: = partial_apply [[INNER]](%0)
@@ -474,7 +474,7 @@ class SuperSub : SuperBase {
       nil ?? super.boom()
     }
   }
-  
+
   // CHECK-LABEL: sil hidden @_TFC8closures8SuperSub1g
   // CHECK: [[INNER:%.*]] = function_ref @_TFFC8closures8SuperSub1g
   // CHECK: = apply [[INNER]](%0)

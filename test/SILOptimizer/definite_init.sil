@@ -28,7 +28,7 @@ bb0:
 
   %5 = function_ref @takes_Int_inout : $@convention(thin) (@inout Int) -> ()
   %6 = apply %5(%1) : $@convention(thin) (@inout Int) -> () // expected-error {{variable '<unknown>' passed by reference before being initialized}}
-  
+
   %t = tuple ()
   strong_release %0#0 : $@box Int
   return %t : $()
@@ -155,7 +155,7 @@ bb0:
   %6 = function_ref @closure0 : $@convention(thin) (@owned @box Int) -> ()
   strong_retain %1#0 : $@box Int
   mark_function_escape %0 : $*Int // expected-error {{variable '<unknown>' used by function definition before being initialized}}
-  %8 = partial_apply %6(%1#0) : $@convention(thin) (@owned @box Int) -> ()  
+  %8 = partial_apply %6(%1#0) : $@convention(thin) (@owned @box Int) -> ()
   %9 = apply %5(%8) : $@convention(thin) (@callee_owned () -> ()) -> ()
   strong_release %1#0 : $@box Int
 
@@ -237,7 +237,7 @@ bb0(%0 : $*T, %1 : $*T):
   // This should stay an assignment of %4
   copy_addr [take] %1 to %2 : $*T
   // CHECK-NEXT: copy_addr [take] %1 to %2#1 : $*T
-  
+
   // This is a load, and shouldn't be changed.
   copy_addr %2 to [initialization] %0 : $*T
   // CHECK-NEXT: copy_addr %2#1 to [initialization] %0 : $*T
@@ -338,7 +338,7 @@ bb0:
 
 
 struct ContainsNativeObject {
-  var x : Int 
+  var x : Int
   var y : Builtin.NativeObject
 }
 
@@ -348,7 +348,7 @@ bb0(%0 : $*ContainsNativeObject):
   %c = mark_uninitialized [var] %b#1 : $*ContainsNativeObject
   %1 = load %0 : $*ContainsNativeObject
   assign %1 to %c : $*ContainsNativeObject
-  
+
   strong_release %b#0 : $@box ContainsNativeObject
   %x = tuple ()
   return %x : $()
@@ -439,7 +439,7 @@ bb0:
   // CHECK-NEXT: [[ELT0:%[0-9]+]] = tuple_element_addr {{.*}}, 0
   // CHECK-NEXT: destroy_addr [[ELT0]]
   destroy_addr %1 : $*(SomeClass, SomeClass)
-  
+
   // CHECK-NEXT: dealloc_stack
   dealloc_stack %b : $*(SomeClass, SomeClass)
   %8 = tuple ()
@@ -456,7 +456,7 @@ entry(%a : $*C):
   %b = mark_uninitialized [var] %p : $*P
 
   %q = init_existential_addr %b : $*P, $C
-  
+
   // CHECK: copy_addr {{.*}} to [initialization] %2 : $*C
   copy_addr %a to [initialization] %q : $*C
   %u = function_ref @use : $@convention(thin) (@in P) -> ()
@@ -468,7 +468,7 @@ entry(%a : $*C):
 
 // CHECK-LABEL: sil @conditional_init
 // This test checks conditional destruction logic.  Because the value is only
-// initialized on some paths, we need to either hoist up the destroy_addr or 
+// initialized on some paths, we need to either hoist up the destroy_addr or
 // emit a boolean control value to make sure the value is only destroyed if
 //  actually initialized.
 sil @conditional_init : $@convention(thin) (Bool) -> () {
@@ -529,7 +529,7 @@ bb2:
   %3 = function_ref @getSomeClass : $@convention(thin) () -> @owned SomeClass
   // CHECK-NEXT: [[V2:%[0-9]+]] = apply
   %17 = apply %3() : $@convention(thin) () -> @owned SomeClass
-  
+
   // This assign is either an initialize or an assign depending on whether %0 is
   // true or not.  This gets expanded out to a conditional destroy of the value.
   // CHECK:   load [[CONTROL]]
@@ -598,7 +598,7 @@ bb0(%0 : $RootClassWithIVars, %1 : $Int):
 // CHECK-LABEL: sil @rootclass_test3
 sil @rootclass_test3 : $@convention(method) (@owned RootClassWithIVars, Int) -> @owned RootClassWithIVars {
 bb0(%0 : $RootClassWithIVars, %1 : $Int):
-  %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars  
+  %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars
 
   %11 = ref_element_addr %3 : $RootClassWithIVars, #RootClassWithIVars.y
   assign %1 to %11 : $*Int
@@ -628,7 +628,7 @@ bb0(%0 : $DerivedClassWithIVars):
   %8 = load %3 : $*DerivedClassWithIVars
   %9 = ref_element_addr %8 : $DerivedClassWithIVars, #DerivedClassWithIVars.a
   assign %7 to %9 : $*Int
-  
+
 
   %11 = load %3 : $*DerivedClassWithIVars
   %13 = upcast %11 : $DerivedClassWithIVars to $RootClassWithIVars
@@ -662,7 +662,7 @@ bb0(%0 : $DerivedClassWithIVars):
   return %18 : $DerivedClassWithIVars
 }
 
-struct MyStruct : P {} 
+struct MyStruct : P {}
 
 //CHECK-LABEL: @self_init_assert_instruction
 //CHECK:  apply
@@ -880,7 +880,7 @@ bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
   %4 = mark_uninitialized [delegatingself] %2 : $*DerivedClassWithNontrivialStoredProperties
   store %0 to %4 : $*DerivedClassWithNontrivialStoredProperties
 
-  destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties 
+  destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties
   dealloc_stack %2 : $*DerivedClassWithNontrivialStoredProperties
 
   %13 = tuple ()

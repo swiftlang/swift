@@ -54,7 +54,7 @@ class SILModule::SerializationCallback : public SerializedSILLoader::Callback {
 
   void didDeserialize(Module *M, SILGlobalVariable *var) override {
     updateLinkage(var);
-    
+
     // For globals we currently do not support available_externally.
     // In the interpreter it would result in two instances for a single global:
     // one in the imported module and one in the main module.
@@ -398,7 +398,7 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
     assert(verifySILSelfParameterType(constant, F, FTy) &&
            "Invalid signature for SIL Self parameter type");
   }
-                                      
+
 
   return F;
 }
@@ -557,14 +557,14 @@ void SILModule::eraseFunction(SILFunction *F) {
 
   assert(! F->isZombie() && "zombie function is in list of alive functions");
   if (F->isInlined() || F->isExternallyUsedSymbol()) {
-    
+
     // The owner of the function's Name is the FunctionTable key. As we remove
     // the function from the table we have to store the name string elsewhere:
     // in zombieFunctionNames.
     StringRef copiedName = F->getName().copy(zombieFunctionNames);
     FunctionTable.erase(F->getName());
     F->Name = copiedName;
-    
+
     // The function is dead, but we need it later (at IRGen) for debug info
     // or vtable stub generation. So we move it into the zombie list.
     getFunctionList().remove(F);

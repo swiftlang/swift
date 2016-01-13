@@ -102,7 +102,7 @@ public:
     OS.resetColor();
     OS.changeColor(Color);
   }
-  
+
   ~SILColor() {
     if (!OS.has_colors() || SILPrintNoColor)
       return;
@@ -203,7 +203,7 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
     Buffer << ExtNominal->getName() << ".";
     return;
   }
-  
+
   case DeclContextKind::TopLevelCodeDecl:
     // FIXME
     Buffer << "<top level code>";
@@ -350,14 +350,14 @@ static StringRef getCastConsumptionKindName(CastConsumptionKind kind) {
 static void printSILTypeColorAndSigil(raw_ostream &OS, SILType t) {
   SILColor C(OS, SC_Type);
   OS << '$';
-  
+
   // Potentially add a leading sigil for the value category.
   ::print(OS, t.getCategory());
 }
-      
+
 void SILType::print(raw_ostream &OS) const {
   printSILTypeColorAndSigil(OS, *this);
-  
+
   // Print other types as their Swift representation.
   PrintOptions SubPrinter = PrintOptions::printSIL();
   getSwiftRValueType().print(OS, SubPrinter);
@@ -369,7 +369,7 @@ void SILType::dump() const {
 }
 
 namespace {
-  
+
 /// SILPrinter class - This holds the internal implementation details of
 /// printing SIL structures.
 class SILPrinter : public SILVisitor<SILPrinter> {
@@ -385,7 +385,7 @@ class SILPrinter : public SILVisitor<SILPrinter> {
   llvm::DenseMap<const SILBasicBlock *, unsigned> BlocksToIDMap;
 
   llvm::DenseMap<const ValueBase*, unsigned> ValueToIDMap;
-  
+
   // Printers for the underlying stream.
 #define SIMPLE_PRINTER(TYPE) \
   SILPrinter &operator<<(TYPE value) { \
@@ -401,24 +401,24 @@ class SILPrinter : public SILVisitor<SILPrinter> {
   SIMPLE_PRINTER(SILDeclRef)
   SIMPLE_PRINTER(APInt)
 #undef SIMPLE_PRINTER
-  
+
   SILPrinter &operator<<(IDAndType i) {
     SILColor C(PrintState.OS, SC_Type);
     return *this << i.id << " : " << i.Ty;
   }
-  
+
   SILPrinter &operator<<(Type t) {
     // Print the type using our print options.
     t.print(PrintState.OS, PrintState.ASTOptions);
     return *this;
   }
-  
+
   SILPrinter &operator<<(SILType t) {
     printSILTypeColorAndSigil(PrintState.OS, t);
     t.getSwiftRValueType().print(PrintState.OS, PrintState.ASTOptions);
     return *this;
   }
-  
+
 public:
   SILPrinter(raw_ostream &OS, bool V = false, bool SortedSIL = false,
              llvm::DenseMap<CanType, Identifier> *AlternativeTypeNames = nullptr)
@@ -500,7 +500,7 @@ public:
 
     if (!BB->pred_empty()) {
       PrintState.OS.PadToColumn(50);
-      
+
       *this << "// Preds:";
 
       // Display the predecessors ids sorted to give a stable use order in the
@@ -658,18 +658,18 @@ public:
                          printedSlashes);
       }
     }
-    
+
     *this << '\n';
   }
-  
+
   void printInContext(SILValue V) {
     subjectValue = V;
-    
+
     auto sortByID = [&](SILValue a, SILValue b) {
       return getID(a).Number < getID(b).Number;
     };
 
-    
+
     if (auto *I = dyn_cast<SILInstruction>(V)) {
       auto operands = map<SmallVector<SILValue,4>>(I->getAllOperands(),
                                                    [](Operand const &o) {
@@ -681,10 +681,10 @@ public:
         print(operand);
       }
     }
-    
+
     *this << "-> ";
     print(V);
-    
+
     auto users = map<SmallVector<SILValue,4>>(V->getUses(),
                                               [](Operand *o) {
                                                 return o->getUser();
@@ -754,14 +754,14 @@ public:
   void printSubstitutions(ArrayRef<Substitution> Subs) {
     if (Subs.empty())
       return;
-    
+
     *this << '<';
     interleave(Subs,
                [&](const Substitution &s) { *this << s.getReplacement(); },
                [&] { *this << ", "; });
     *this << '>';
   }
-  
+
   void visitApplyInst(ApplyInst *AI) {
     *this << "apply ";
     if (AI->isNonThrowing())
@@ -787,8 +787,8 @@ public:
     *this << ", normal " << getID(AI->getNormalBB());
     *this << ", error " << getID(AI->getErrorBB());
   }
-  
-  
+
+
   void visitPartialApplyInst(PartialApplyInst *CI) {
     *this << "partial_apply ";
     *this << getID(CI->getCallee());
@@ -805,22 +805,22 @@ public:
     FRI->getReferencedFunction()->printName(PrintState.OS);
     *this << " : " << FRI->getType();
   }
-  
+
   void visitBuiltinInst(BuiltinInst *BI) {
     *this << "builtin " << QuotedString(BI->getName().str());
     printSubstitutions(BI->getSubstitutions());
     *this << "(";
-    
+
     interleave(BI->getArguments(), [&](SILValue v) {
       *this << getIDAndType(v);
     }, [&]{
       *this << ", ";
     });
-    
+
     *this << ") : ";
     *this << BI->getType();
   }
-  
+
   void visitAllocGlobalInst(AllocGlobalInst *AGI) {
     *this << "alloc_global ";
     if (AGI->getReferencedGlobal()) {
@@ -829,7 +829,7 @@ public:
       *this << "<<placeholder>>";
     }
   }
-  
+
   void visitGlobalAddrInst(GlobalAddrInst *GAI) {
     *this << "global_addr ";
     if (GAI->getReferencedGlobal()) {
@@ -885,7 +885,7 @@ public:
       break;
     case MarkUninitializedInst::DelegatingSelf: *this << "[delegatingself] ";break;
     }
-    
+
     *this << getIDAndType(MU->getOperand());
   }
   void visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *MFE) {
@@ -942,7 +942,7 @@ public:
       *this << "[initialization] ";
     *this << getIDAndType(CI->getDest());
   }
-  
+
   void printUncheckedConversionInst(ConversionInst *CI, SILValue operand,
                                     StringRef name) {
     *this << name << " " << getIDAndType(operand) << " to " << CI->getType();
@@ -953,7 +953,7 @@ public:
        << getIDAndType(CI->getOperand())
        << " to " << CI->getType();
   }
-  
+
   void visitCheckedCastBranchInst(CheckedCastBranchInst *CI) {
     *this << "checked_cast_br ";
     if (CI->isExact()) *this << "[exact] ";
@@ -968,7 +968,7 @@ public:
        << ' '    << CI->getSourceType() << " in " << getIDAndType(CI->getSrc())
        << " to " << CI->getTargetType() << " in " << getIDAndType(CI->getDest());
   }
-  
+
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CI) {
     *this << "checked_cast_addr_br "
        << getCastConsumptionKindName(CI->getConsumptionKind())
@@ -976,7 +976,7 @@ public:
        << " to " << CI->getTargetType() << " in " << getIDAndType(CI->getDest())
        << ", " << getID(CI->getSuccessBB()) << ", " << getID(CI->getFailureBB());
   }
-  
+
   void visitConvertFunctionInst(ConvertFunctionInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(), "convert_function");
   }
@@ -1055,12 +1055,12 @@ public:
     *this << "objc_protocol #" << CI->getProtocol()->getName()
        << " : " << CI->getType();
   }
-  
+
   void visitRefToBridgeObjectInst(RefToBridgeObjectInst *I) {
     *this << "ref_to_bridge_object " << getIDAndType(I->getConverted())
        << ", " << getIDAndType(I->getBitsOperand());
   }
-  
+
   void visitBridgeObjectToRefInst(BridgeObjectToRefInst *I) {
     printUncheckedConversionInst(I, I->getOperand(), "bridge_object_to_ref");
   }
@@ -1071,7 +1071,7 @@ public:
   void visitIsNonnullInst(IsNonnullInst *I) {
     *this << "is_nonnull " << getIDAndType(I->getOperand());
   }
-  
+
   void visitRetainValueInst(RetainValueInst *I) {
     *this << "retain_value " << getIDAndType(I->getOperand());
   }
@@ -1094,7 +1094,7 @@ public:
 
   void visitTupleInst(TupleInst *TI) {
     *this << "tuple ";
-    
+
     // Check to see if the type of the tuple can be inferred accurately from the
     // elements.
     bool SimpleType = true;
@@ -1104,7 +1104,7 @@ public:
         break;
       }
     }
-    
+
     // If the type is simple, just print the tuple elements.
     if (SimpleType) {
       *this << '(';
@@ -1121,7 +1121,7 @@ public:
       *this << ')';
     }
   }
-  
+
   void visitEnumInst(EnumInst *UI) {
     *this << "enum " << UI->getType() << ", "
        << SILDeclRef(UI->getElement(), SILDeclRef::Kind::EnumElement);
@@ -1135,25 +1135,25 @@ public:
        << getIDAndType(UDAI->getOperand()) << ", "
        << SILDeclRef(UDAI->getElement(), SILDeclRef::Kind::EnumElement);
   }
-  
+
   void visitUncheckedEnumDataInst(UncheckedEnumDataInst *UDAI) {
     *this << "unchecked_enum_data "
        << getIDAndType(UDAI->getOperand()) << ", "
        << SILDeclRef(UDAI->getElement(), SILDeclRef::Kind::EnumElement);
   }
-  
+
   void visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *UDAI) {
     *this << "unchecked_take_enum_data_addr "
        << getIDAndType(UDAI->getOperand()) << ", "
        << SILDeclRef(UDAI->getElement(), SILDeclRef::Kind::EnumElement);
   }
-  
+
   void visitInjectEnumAddrInst(InjectEnumAddrInst *IUAI) {
     *this << "inject_enum_addr "
        << getIDAndType(IUAI->getOperand()) << ", "
        << SILDeclRef(IUAI->getElement(), SILDeclRef::Kind::EnumElement);
   }
-  
+
   void visitTupleExtractInst(TupleExtractInst *EI) {
     *this << "tuple_extract " << getIDAndType(EI->getOperand()) << ", "
           << EI->getFieldNo();
@@ -1182,10 +1182,10 @@ public:
     *this << Name << " ";
     if (I->isVolatile())
       *this << "[volatile] ";
-    
+
     *this << getIDAndType(Operand) << ", " << I->getMember();
   }
-  
+
   void visitClassMethodInst(ClassMethodInst *AMI) {
     printMethodInst(AMI, AMI->getOperand(), "class_method");
     *this << " : " << AMI->getMember().getDecl()->getType();
@@ -1274,7 +1274,7 @@ public:
   void visitMetatypeInst(MetatypeInst *MI) {
     *this << "metatype " << MI->getType();
   }
-  
+
   void visitFixLifetimeInst(FixLifetimeInst *RI) {
     *this << "fix_lifetime " << getIDAndType(RI->getOperand());
   }
@@ -1348,7 +1348,7 @@ public:
   void visitCondFailInst(CondFailInst *FI) {
     *this << "cond_fail " << getIDAndType(FI->getOperand());
   }
-  
+
   void visitIndexAddrInst(IndexAddrInst *IAI) {
     *this << "index_addr " << getIDAndType(IAI->getBase()) << ", "
        << getIDAndType(IAI->getIndex());
@@ -1358,7 +1358,7 @@ public:
     *this << "index_raw_pointer " << getIDAndType(IAI->getBase()) << ", "
     << getIDAndType(IAI->getIndex());
   }
-  
+
   void visitUnreachableInst(UnreachableInst *UI) {
     *this << "unreachable";
   }
@@ -1366,7 +1366,7 @@ public:
   void visitReturnInst(ReturnInst *RI) {
     *this << "return " << getIDAndType(RI->getOperand());
   }
-  
+
   void visitThrowInst(ThrowInst *TI) {
     *this << "throw " << getIDAndType(TI->getOperand());
   }
@@ -1382,7 +1382,7 @@ public:
     if (SII->hasDefault())
       *this << ", default " << getID(SII->getDefaultBB());
   }
-  
+
   void printSwitchEnumInst(SwitchEnumInstBase *SOI) {
     *this << getIDAndType(SOI->getOperand());
     for (unsigned i = 0, e = SOI->getNumCases(); i < e; ++i) {
@@ -1395,7 +1395,7 @@ public:
     if (SOI->hasDefault())
       *this << ", default " << getID(SOI->getDefaultBB());
   }
-  
+
   void visitSwitchEnumInst(SwitchEnumInst *SOI) {
     *this << "switch_enum ";
     printSwitchEnumInst(SOI);
@@ -1404,7 +1404,7 @@ public:
     *this << "switch_enum_addr ";
     printSwitchEnumInst(SOI);
   }
-  
+
   void printSelectEnumInst(SelectEnumInstBase *SEI) {
     *this << getIDAndType(SEI->getEnumOperand());
 
@@ -1446,7 +1446,7 @@ public:
 
     *this << " : " << SVI->getType();
   }
-  
+
   void visitDynamicMethodBranchInst(DynamicMethodBranchInst *DMBI) {
     *this << "dynamic_method_br " << getIDAndType(DMBI->getOperand()) << ", "
           << DMBI->getMember()
@@ -1463,7 +1463,7 @@ public:
                [&] { *this << ", "; });
     *this << ')';
   }
-  
+
   void visitBranchInst(BranchInst *UBI) {
     *this << "br " << getID(UBI->getDestBB());
     printBranchArgs(UBI->getArgs());
@@ -1602,7 +1602,7 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose,
 
   if (isGlobalInit())
     OS << "[global_init] ";
-  
+
   switch (getInlineStrategy()) {
     case NoInline: OS << "[noinline] "; break;
     case AlwaysInline: OS << "[always_inline] "; break;
@@ -1621,7 +1621,7 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose,
 
   printName(OS);
   OS << " : $";
-  
+
   // Print the type by substituting our context parameter names for the dependent
   // parameters. In SIL, we may end up with multiple generic parameters that
   // have the same name from different contexts, for instance, a generic
@@ -1630,7 +1630,7 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose,
   // <T>, so we may need to introduce disambiguating aliases.
   llvm::DenseMap<CanType, Identifier> Aliases;
   llvm::DenseSet<Identifier> UsedNames;
-  
+
   auto params = ContextGenericParams;
   llvm::SmallString<16> disambiguatedNameBuf;
   unsigned disambiguatedNameCounter = 1;
@@ -1648,7 +1648,7 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose,
       if (name != param->getName())
         Aliases[CanType(param)] = name;
     }
-    
+
     params = params->getOuterParameters();
   }
 
@@ -1659,34 +1659,34 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose,
       Aliases.empty() ? nullptr : &Aliases;
     LoweredType->print(OS, withContextGenericParams);
   }
-  
+
   if (!isExternalDeclaration()) {
     OS << " {\n";
-    
+
     SILPrinter(OS, Verbose, SortedSIL, (Aliases.empty() ? nullptr : &Aliases))
       .print(this);
     OS << "}";
   }
-  
+
   OS << "\n\n";
 }
-      
+
 /// Pretty-print the SILFunction's name using SIL syntax,
 /// '@function_mangled_name'.
 void SILFunction::printName(raw_ostream &OS) const {
-  OS << "@" << Name;  
+  OS << "@" << Name;
 }
 
 /// Pretty-print a global variable to the designated stream.
 void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
   OS << "// " << demangleSymbolAsString(getName()) << '\n';
-  
+
   OS << "sil_global ";
   printLinkage(OS, getLinkage(), isDefinition());
 
   if (isFragile())
     OS << "[fragile] ";
-  
+
   if (isLet())
     OS << "[let] ";
 
@@ -1709,7 +1709,7 @@ void SILGlobalVariable::dump(bool Verbose) const {
 void SILGlobalVariable::printName(raw_ostream &OS) const {
   OS << "@" << Name;
 }
-      
+
 /// Pretty-print the SILModule to errs.
 void SILModule::dump(bool Verbose) const {
   print(llvm::errs(), Verbose);
@@ -1846,7 +1846,7 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
     OS << "canonical";
     break;
   }
-  
+
   OS << "\n\nimport Builtin\nimport " << STDLIB_NAME
      << "\nimport SwiftShims" << "\n\n";
 
@@ -1883,7 +1883,7 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
   printSILVTables(OS, Verbose, ShouldSort, getVTableList());
   printSILWitnessTables(OS, Verbose, ShouldSort, getWitnessTableList());
   printSILCoverageMaps(OS, Verbose, ShouldSort, getCoverageMapList());
-  
+
   OS << "\n\n";
 }
 
@@ -1924,7 +1924,7 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   }
 
   OS << " {\n";
-  
+
   for (auto &witness : getEntries()) {
     OS << "  ";
     switch (witness.getKind()) {
@@ -1983,7 +1983,7 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
     }
     OS << '\n';
   }
-  
+
   OS << "}\n\n";
 }
 

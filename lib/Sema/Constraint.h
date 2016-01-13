@@ -251,7 +251,7 @@ enum class FixKind : uint8_t {
 
   /// Relabel a tuple due to a call
   RelabelCallTuple,
-  
+
   /// Introduce a '!= nil' to convert an Optional to a Boolean expression.
   OptionalToBoolean,
 
@@ -263,7 +263,7 @@ enum class FixKind : uint8_t {
 
   /// Replace a call of 'X.allZeros' with a reference to 'X()'.
   AllZerosToInit,
-  
+
   /// Replace a coercion ('as') with a forced checked cast ('as!').
   CoerceToCheckedCast,
 };
@@ -281,8 +281,8 @@ class Fix {
 
 public:
   Fix() : Kind(FixKind::None), Data(0) { }
-  
-  Fix(FixKind kind) : Kind(kind), Data(0) { 
+
+  Fix(FixKind kind) : Kind(kind), Data(0) {
     assert(!isRelabelTuple() && "Use getRelabelTuple()");
     assert(kind != FixKind::ForceDowncast && "Use getForceDowncast()");
   }
@@ -301,7 +301,7 @@ public:
   bool isRelabelTuple() const { return isRelabelTupleKind(getKind()); }
 
   /// Whether the fix kind is a tuple-relabelling fix.
-  static bool isRelabelTupleKind(FixKind kind) { 
+  static bool isRelabelTupleKind(FixKind kind) {
     return kind == FixKind::TupleToScalar ||
            kind == FixKind::ScalarToTuple ||
            kind == FixKind::RelabelCallTuple;
@@ -318,7 +318,7 @@ public:
 
   void print(llvm::raw_ostream &Out, ConstraintSystem *cs) const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump(ConstraintSystem *cs) const 
+  LLVM_ATTRIBUTE_DEPRECATED(void dump(ConstraintSystem *cs) const
                               LLVM_ATTRIBUTE_USED,
                             "only for use within the debugger");
 };
@@ -350,7 +350,7 @@ class Constraint : public llvm::ilist_node<Constraint> {
   /// Whether the choice of this disjunction should be recorded in the
   /// solver state.
   unsigned RememberChoice : 1;
-  
+
   /// Whether or not this constraint is 'favored' in the sense that, if
   /// successfully applied, it should be preferred over any other constraints
   /// in its disjunction.
@@ -409,7 +409,7 @@ class Constraint : public llvm::ilist_node<Constraint> {
   Constraint(ConstraintKind kind, ConversionRestrictionKind restriction,
              Type first, Type second, ConstraintLocator *locator,
              ArrayRef<TypeVariableType *> typeVars);
-  
+
   /// Construct a relational constraint with a fix.
   Constraint(ConstraintKind kind, Fix fix,
              Type first, Type second, ConstraintLocator *locator,
@@ -422,19 +422,19 @@ class Constraint : public llvm::ilist_node<Constraint> {
 
 public:
   /// Create a new constraint.
-  static Constraint *create(ConstraintSystem &cs, ConstraintKind Kind, 
+  static Constraint *create(ConstraintSystem &cs, ConstraintKind Kind,
                             Type First, Type Second, DeclName Member,
                             ConstraintLocator *locator);
 
   /// Create an overload-binding constraint.
-  static Constraint *createBindOverload(ConstraintSystem &cs, Type type, 
-                                        OverloadChoice choice, 
+  static Constraint *createBindOverload(ConstraintSystem &cs, Type type,
+                                        OverloadChoice choice,
                                         ConstraintLocator *locator);
 
   /// Create a restricted relational constraint.
   static Constraint *createRestricted(ConstraintSystem &cs, ConstraintKind kind,
                                       ConversionRestrictionKind restriction,
-                                      Type first, Type second, 
+                                      Type first, Type second,
                                       ConstraintLocator *locator);
 
   /// Create a relational constraint with a fix.
@@ -474,7 +474,7 @@ public:
 
   /// Set whether this constraint is active or not.
   void setActive(bool active) { IsActive = active; }
-  
+
   /// Mark or retrieve whether this constraint should be favored in the system.
   void setFavored() { IsFavored = true; }
   bool isFavored() const { return IsFavored; }
@@ -485,7 +485,7 @@ public:
 
   /// Retrieve the set of type variables referenced by this constraint.
   ArrayRef<TypeVariableType *> getTypeVariables() const {
-    return { reinterpret_cast<TypeVariableType * const *>(this + 1), 
+    return { reinterpret_cast<TypeVariableType * const *>(this + 1),
              NumTypeVariables };
   }
 

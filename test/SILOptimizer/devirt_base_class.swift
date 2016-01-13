@@ -7,11 +7,11 @@ public class Base2: Base1 {
 
 private class A: Base2 { }
 
-private class B : A { 
+private class B : A {
     @inline(never) override func f() -> Int { return 1 }
 }
 
-private class C : A { 
+private class C : A {
     @inline(never) override func f() -> Int { return 2 }
 }
 
@@ -63,12 +63,12 @@ private class F2 : F1 {
 
   override func addToGraph() {
   }
-  
-  @inline(never) 
+
+  @inline(never)
   func test() {
     addConstraint()
   }
-  
+
 }
 
 private class F3 : F2 {

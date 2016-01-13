@@ -30,10 +30,10 @@ enum RT_Kind {
 
   /// void swift::swift_retainUnowned(HeapObject *object)
   RT_RetainUnowned,
-  
+
   /// void swift_checkUnowned(HeapObject *object)
   RT_CheckUnowned,
-  
+
   /// void swift_release(SwiftHeapObject *object)
   RT_Release,
 

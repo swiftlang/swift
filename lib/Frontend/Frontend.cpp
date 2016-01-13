@@ -84,7 +84,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     Context->addModuleLoader(SourceLoader::create(*Context, !immediate,
                                                   DepTracker));
   }
-  
+
   auto SML = SerializedModuleLoader::create(*Context, DepTracker);
   this->SML = SML.get();
   Context->addModuleLoader(std::move(SML));
@@ -460,7 +460,7 @@ void CompilerInstance::performSema() {
       }
       CurTUElem = MainFile.Decls.size();
     } while (!Done);
-    
+
     if (mainIsPrimary && !Context->hadError() &&
         Invocation.getFrontendOptions().PlaygroundTransform)
       performPlaygroundTransform(MainFile, Invocation.getFrontendOptions().PlaygroundHighPerformance);

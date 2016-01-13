@@ -15,7 +15,7 @@ func bridgedStatus<T>(_: T.Type) -> String {
   if !bridged && verbatim {
     return "IS NOT BRIDGED BUT IS VERBATIM?!"
   }
-  return bridged ? 
+  return bridged ?
     verbatim ? "is bridged verbatim" : "is custom-bridged"
     : "is unbridged"
 }
@@ -38,7 +38,7 @@ struct BridgedValueType : _ObjectiveCBridgeable {
   static func _isBridgedToObjectiveC() -> Bool {
     return true
   }
-  
+
   static func _getObjectiveCType() -> Any.Type {
     return C.self
   }
@@ -69,7 +69,7 @@ struct UnbridgedValueType {}
 // CHECK-NEXT: UnbridgedValueType is unbridged
 // CHECK-NEXT: UnbridgedValueType instance did not bridge
 testBridging(UnbridgedValueType(), "UnbridgedValueType")
-  
+
 //===----------------------------------------------------------------------===//
 class PlainClass {}
 

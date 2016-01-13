@@ -185,22 +185,22 @@ func intrinsic_test(inout i32: Builtin.Int32, inout i16: Builtin.Int16) {
   i32 = Builtin.int_bswap_Int32(i32) // CHECK: llvm.bswap.i32(
 
   i16 = Builtin.int_bswap_Int16(i16) // CHECK: llvm.bswap.i16(
-  
+
   var x = Builtin.int_sadd_with_overflow_Int16(i16, i16) // CHECK: call { i16, i1 } @llvm.sadd.with.overflow.i16(
-  
+
   Builtin.int_trap() // CHECK: llvm.trap()
 }
 
 // CHECK: define hidden void @_TF8builtins19sizeof_alignof_testFT_T_()
 func sizeof_alignof_test() {
   // CHECK: store i64 4, i64*
-  var xs = Builtin.sizeof(Int.self) 
+  var xs = Builtin.sizeof(Int.self)
   // CHECK: store i64 4, i64*
-  var xa = Builtin.alignof(Int.self) 
+  var xa = Builtin.alignof(Int.self)
   // CHECK: store i64 1, i64*
-  var ys = Builtin.sizeof(Bool.self) 
+  var ys = Builtin.sizeof(Bool.self)
   // CHECK: store i64 1, i64*
-  var ya = Builtin.alignof(Bool.self) 
+  var ya = Builtin.alignof(Bool.self)
 
 }
 
@@ -312,10 +312,10 @@ func atomicrmw_test(ptr: Builtin.RawPointer, a: Builtin.Int32,
 
   // CHECK: atomicrmw volatile max i32* {{.*}}, i32 {{.*}} monotonic
   var y = Builtin.atomicrmw_max_monotonic_volatile_Int32(ptr, a)
-  
+
   // CHECK: atomicrmw volatile xchg i32* {{.*}}, i32 {{.*}} singlethread acquire
   var x = Builtin.atomicrmw_xchg_acquire_volatile_singlethread_Int32(ptr, a)
-  
+
   // rdar://12939803 - ER: support atomic cmpxchg/xchg with pointers
   // CHECK: atomicrmw volatile xchg i64* {{.*}}, i64 {{.*}} singlethread acquire
   var w = Builtin.atomicrmw_xchg_acquire_volatile_singlethread_RawPointer(ptr, ptr2)

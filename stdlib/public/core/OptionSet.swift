@@ -16,7 +16,7 @@
 ///     struct PackagingOptions : OptionSetType {
 ///       let rawValue: Int
 ///       init(rawValue: Int) { self.rawValue = rawValue }
-///     
+///
 ///       static let Box = PackagingOptions(rawValue: 1)
 ///       static let Carton = PackagingOptions(rawValue: 2)
 ///       static let Bag = PackagingOptions(rawValue: 4)
@@ -32,7 +32,7 @@ public protocol OptionSetType : SetAlgebraType, RawRepresentable {
   // We can't constrain the associated Element type to be the same as
   // Self, but we can do almost as well with a default and a
   // constrained extension
-  
+
   /// An `OptionSet`'s `Element` type is normally `Self`.
   typealias Element = Self
 
@@ -43,7 +43,7 @@ public protocol OptionSetType : SetAlgebraType, RawRepresentable {
   // default (zero-argument) initializer.  Since OptionSetType's main
   // purpose is to create convenient conformances to SetAlgebraType,
   // we opt for a non-failable initializer.
-  
+
   /// Convert from a value of `RawValue`, succeeding unconditionally.
   init(rawValue: RawValue)
 }
@@ -63,7 +63,7 @@ extension OptionSetType {
     r.unionInPlace(other)
     return r
   }
-  
+
   /// Returns the set of elements contained in both `self` and `other`.
   @warn_unused_result
   public func intersect(other: Self) -> Self {
@@ -71,7 +71,7 @@ extension OptionSetType {
     r.intersectInPlace(other)
     return r
   }
-  
+
   /// Returns the set of elements contained in `self` or in `other`,
   /// but not in both `self` and `other`.
   @warn_unused_result
@@ -96,7 +96,7 @@ extension OptionSetType where Element == Self {
   public func contains(member: Self) -> Bool {
     return self.isSupersetOf(member)
   }
-  
+
   /// If `member` is not already contained in `self`, insert it.
   ///
   /// - Equivalent to `self.unionInPlace([member])`
@@ -104,7 +104,7 @@ extension OptionSetType where Element == Self {
   public mutating func insert(member: Element) {
     self.unionInPlace(member)
   }
-  
+
   /// If `member` is contained in `self`, remove and return it.
   /// Otherwise, return `nil`.
   ///
@@ -143,7 +143,7 @@ extension OptionSetType where RawValue : BitwiseOperationsType {
   public mutating func unionInPlace(other: Self) {
     self = Self(rawValue: self.rawValue | other.rawValue)
   }
-  
+
   /// Remove all elements of `self` that are not also present in
   /// `other`.
   ///
@@ -152,7 +152,7 @@ extension OptionSetType where RawValue : BitwiseOperationsType {
   public mutating func intersectInPlace(other: Self) {
     self = Self(rawValue: self.rawValue & other.rawValue)
   }
-  
+
   /// Replace `self` with a set containing all elements contained in
   /// either `self` or `other`, but not both.
   ///

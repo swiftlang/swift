@@ -28,7 +28,7 @@ class Phoûx : NSObject, Fooable {
 //
 // witness for Phoûx.foo uses the Swift vtable
 // CHECK-LABEL: _TFC14objc_witnessesX8Phox_xra3foo
-// CHECK:      bb0([[IN_ADDR:%.*]] : 
+// CHECK:      bb0([[IN_ADDR:%.*]] :
 // CHECK:         [[STACK_SLOT:%.*]] = alloc_stack $Phoûx
 // CHECK:         copy_addr [[IN_ADDR]] to [initialization] [[STACK_SLOT]]
 // CHECK:         [[VALUE:%.*]] = load [[STACK_SLOT]]

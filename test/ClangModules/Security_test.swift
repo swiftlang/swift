@@ -14,7 +14,7 @@ func testIntegration() {
 
   var dataTypeRef: Unmanaged<AnyObject>? = nil
   let status = SecItemCopyMatching(query, &dataTypeRef)
-  
+
   if status == errSecSuccess {
     if let filledRef = dataTypeRef {
       let str: NSString = filledRef.takeRetainedValue() as! NSString

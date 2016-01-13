@@ -142,7 +142,7 @@ namespace {
 /// # of BBs x(times) # of locations.
 ///
 /// we could run DSE on functions with 256 basic blocks and 256 locations,
-/// which is a large function.  
+/// which is a large function.
 constexpr unsigned MaxLSLocationBBMultiplicationNone = 256*256;
 
 /// we could run optimistic DSE on functions with less than 64 basic blocks
@@ -214,7 +214,7 @@ public:
   /// kills an upward visible store.
   llvm::SmallBitVector BBKillSet;
 
-  /// A bit vector to keep the maximum number of stores that can reach a 
+  /// A bit vector to keep the maximum number of stores that can reach a
   /// certain point of the basic block. If a bit is set, that means there is
   /// potentially an upward visible store to the location at the particular
   /// point of the basic block.
@@ -284,7 +284,7 @@ class DSEContext {
     ProcessOptimistic = 0,
     ProcessPessimistic = 1,
     ProcessNone = 2,
-  }; 
+  };
 private:
   /// The module we are currently processing.
   SILModule *Mod;
@@ -495,7 +495,7 @@ void BlockState::init(DSEContext &Ctx, bool PessimisticDF)  {
 
   // If basic block has no successor, then all local writes can be considered
   // dead for block with no successor.
-  if (BB->succ_empty()) 
+  if (BB->succ_empty())
     initReturnBlock(Ctx);
 }
 
@@ -539,7 +539,7 @@ DSEContext::ProcessKind DSEContext::getProcessFunctionKind() {
   // This function's data flow would converge in 1 iteration.
   if (RunOneIteration)
     return ProcessKind::ProcessPessimistic;
-  
+
   // We run one pessimistic data flow to do dead store elimination on
   // the function.
   if (BBCount * LocationCount > MaxLSLocationBBMultiplicationPessimistic)
@@ -562,7 +562,7 @@ void DSEContext::processBasicBlockForGenKillSet(SILBasicBlock *BB) {
     }
   }
 
-  // Compute the genset and killset. 
+  // Compute the genset and killset.
   //
   // Also compute the MaxStoreSet at the current position of the basic block.
   //
@@ -595,7 +595,7 @@ bool DSEContext::processBasicBlockWithGenKillSet(SILBasicBlock *BB) {
   S->BBWriteSetMid = S->BBWriteSetOut;
   S->BBWriteSetMid.reset(S->BBKillSet);
   S->BBWriteSetMid |= S->BBGenSet;
- 
+
   // If BBWriteSetIn changes, then keep iterating until reached a fixed point.
   return S->updateBBWriteSetIn(S->BBWriteSetMid);
 }
@@ -603,10 +603,10 @@ bool DSEContext::processBasicBlockWithGenKillSet(SILBasicBlock *BB) {
 void DSEContext::processBasicBlockForDSE(SILBasicBlock *BB,
                                          bool PessimisticDF) {
   // If we know this is not a one iteration function which means its
-  // its BBWriteSetIn and BBWriteSetOut have been computed and converged, 
+  // its BBWriteSetIn and BBWriteSetOut have been computed and converged,
   // and this basic block does not even have StoreInsts, there is no point
   // in processing every instruction in the basic block again as no store
-  // will be eliminated. 
+  // will be eliminated.
   if (!PessimisticDF && BBWithStores.find(BB) == BBWithStores.end())
        return;
 
@@ -769,7 +769,7 @@ void DSEContext::processRead(SILInstruction *I, BlockState *S, SILValue Mem,
   // Are we performing the actual DSE.
   if (isPerformingDSE(Kind)) {
     for (auto &E : Locs) {
-      // This is the last iteration, compute BBWriteSetOut and perform DSE. 
+      // This is the last iteration, compute BBWriteSetOut and perform DSE.
       processReadForDSE(S, getLocationBit(E));
     }
     return;
@@ -1030,7 +1030,7 @@ void DSEContext::processInstruction(SILInstruction *I, DSEKind Kind) {
     processDebugValueAddrInst(I, Kind);
   } else if (I->mayReadFromMemory()) {
     processUnknownReadInst(I, Kind);
-  }  
+  }
 
   // Check whether this instruction will invalidate any other locations.
   invalidateLSLocationBase(I, Kind);
@@ -1039,7 +1039,7 @@ void DSEContext::processInstruction(SILInstruction *I, DSEKind Kind) {
 void DSEContext::runIterativeDSE() {
   // Generate the genset and killset for each basic block. We can process the
   // basic blocks in any order.
-  // 
+  //
   // We also Compute the max store set at the beginning of the basic block.
   //
   auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
@@ -1063,7 +1063,7 @@ void DSEContext::runIterativeDSE() {
     HandledBBs.erase(BB);
     if (processBasicBlockWithGenKillSet(BB)) {
       for (auto X : BB->getPreds()) {
-        // We do not push basic block into the worklist if its already 
+        // We do not push basic block into the worklist if its already
         // in the worklist.
         if (HandledBBs.find(X) != HandledBBs.end())
           continue;
@@ -1083,7 +1083,7 @@ bool DSEContext::run() {
 
   // Check how to optimize this function.
   ProcessKind Kind = getProcessFunctionKind();
-  
+
   // We do not optimize this function at all.
   if (Kind == ProcessKind::ProcessNone)
       return false;

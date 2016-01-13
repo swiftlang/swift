@@ -61,7 +61,7 @@ public:
     bool Writes = false;
     bool Retains = false;
     bool Releases = false;
-    
+
     /// Sets the most conservative effects.
     void setWorstEffects() {
       Reads = true;
@@ -79,9 +79,9 @@ public:
     }
 
     friend class SideEffectAnalysis;
-    
+
   public:
-    
+
     /// Does the function read from memory (excluding reads from locally
     /// allocated memory)?
     bool mayRead() const { return Reads; }
@@ -89,7 +89,7 @@ public:
     /// Does the function write to memory (excluding writes to locally
     /// allocated memory)?
     bool mayWrite() const { return Writes; }
-    
+
     /// Does the function retain objects (excluding retains of locally
     /// allocated objects)?
     bool mayRetain() const { return Retains; }
@@ -104,17 +104,17 @@ public:
     MemoryBehavior getMemBehavior(RetainObserveKind ScanKind) const {
       if (mayRelease())
         return MemoryBehavior::MayHaveSideEffects;
-      
+
       if (ScanKind == RetainObserveKind::ObserveRetains && mayRetain())
         return MemoryBehavior::MayHaveSideEffects;
-      
+
       if (mayWrite())
         return mayRead() ? MemoryBehavior::MayReadWrite :
                            MemoryBehavior::MayWrite;
-      
+
       if (mayRead())
         return MemoryBehavior::MayRead;
-      
+
       return MemoryBehavior::None;
     }
 
@@ -158,34 +158,34 @@ public:
   ///    E.g. if a struct contains 2 references, a mayWrite effect means that
   ///    memory is written to one of the referenced objects (or to both).
   class FunctionEffects {
-    
+
     /// Side-effects which can be associated to a parameter.
     llvm::SmallVector<Effects, 6> ParamEffects;
-    
+
     /// All other side-effects which cannot be associated to a parameter.
     Effects GlobalEffects;
-    
+
     /// Side-effects on locally allocated storage. Such side-effects are not
     /// relevant to optimizations. The LocalEffects are only used to return
     /// "something" for local storage in getEffectsOn().
     Effects LocalEffects;
-    
+
     /// Does the function allocate objects, boxes, etc., i.e. everything which
     /// has a reference count.
     bool AllocsObjects = false;
-    
+
     /// Can this function trap or exit the program in any way?
     bool Traps = false;
-    
+
     /// Does this function read a reference count other than with retain or
     /// release instructions, e.g. isUnique?
     bool ReadsRC = false;
-    
+
     /// Returns the effects for an address or reference. This might be a
     /// parameter, the LocalEffects or, if the value cannot be associated to one
     /// of them, the GlobalEffects.
     Effects *getEffectsOn(SILValue Addr);
-    
+
     FunctionEffects(unsigned numParams) : ParamEffects(numParams) { }
 
     /// Sets the most conservative effects, if we don't know anything about the
@@ -196,7 +196,7 @@ public:
       Traps = true;
       ReadsRC = true;
     }
-    
+
     /// Clears all effects.
     void clear() {
       GlobalEffects.clear();
@@ -206,7 +206,7 @@ public:
       Traps = false;
       ReadsRC = false;
     }
-  
+
     /// Merge the flags from \p RHS.
     bool mergeFlags(const FunctionEffects &RHS) {
       bool Changed = false;
@@ -215,11 +215,11 @@ public:
       Changed |= updateFlag(ReadsRC, RHS.ReadsRC);
       return Changed;
     }
-    
+
     friend class SideEffectAnalysis;
-    
+
   public:
-    
+
     /// Constructs "empty" function effects.
     FunctionEffects() { }
 
@@ -243,19 +243,19 @@ public:
     /// be associated to a specific parameter, e.g. writes to global variables
     /// or writes to unknown pointers.
     const Effects &getGlobalEffects() const { return GlobalEffects; }
-    
+
     /// Get the array of parameter effects. If a side-effect can be associated
     /// to a specific parameter, it is contained here instead of the global
     /// effects.
     ArrayRef<Effects> getParameterEffects() const { return ParamEffects; }
-    
+
     /// Merge effects from \p RHS.
     bool mergeFrom(const FunctionEffects &RHS);
 
     /// Merge effects from an apply site within the function.
     bool mergeFromApply(const FunctionEffects &CalleeEffects,
                         FullApplySite FAS);
-    
+
     /// Print the function effects.
     void dump() const;
   };
@@ -297,7 +297,7 @@ private:
     /// Clears the analysis data on invalidation.
     void clear() { FE.clear(); }
   };
-  
+
   typedef BottomUpFunctionOrder<FunctionInfo> FunctionOrder;
 
   enum {
@@ -311,21 +311,21 @@ private:
 
   /// All the side-effect information for the whole module.
   llvm::DenseMap<SILFunction *, FunctionInfo *> Function2Info;
-  
+
   /// The allocator for the map values in Function2Info.
   llvm::SpecificBumpPtrAllocator<FunctionInfo> Allocator;
-  
+
   /// Callee analysis, used for determining the callees at call sites.
   BasicCalleeAnalysis *BCA;
 
   /// Get the side-effects of a function, which has an @effects attribute.
   /// Returns true if \a F has an @effects attribute which could be handled.
   static bool getDefinedEffects(FunctionEffects &Effects, SILFunction *F);
-  
+
   /// Get the side-effects of a semantic call.
   /// Return true if \p ASC could be handled.
   bool getSemanticEffects(FunctionEffects &Effects, ArraySemanticsCall ASC);
-  
+
   /// Analyze the side-effects of a function, including called functions.
   /// Visited callees are added to \p BottomUpOrder until \p RecursionDepth
   /// reaches MaxRecursionDepth.
@@ -361,9 +361,9 @@ public:
   static bool classof(const SILAnalysis *S) {
     return S->getKind() == AnalysisKind::SideEffect;
   }
-  
+
   virtual void initialize(SILPassManager *PM) override;
-  
+
   /// Get the side-effects of a function.
   const FunctionEffects &getEffects(SILFunction *F) {
     FunctionInfo *FInfo = getFunctionInfo(F);
@@ -374,10 +374,10 @@ public:
 
   /// Get the side-effects of a call site.
   void getEffects(FunctionEffects &ApplyEffects, FullApplySite FAS);
-  
+
   /// No invalidation is needed. See comment for SideEffectAnalysis.
   virtual void invalidate(InvalidationKind K) override;
-  
+
   /// No invalidation is needed. See comment for SideEffectAnalysis.
   virtual void invalidate(SILFunction *F, InvalidationKind K)  override;
 };

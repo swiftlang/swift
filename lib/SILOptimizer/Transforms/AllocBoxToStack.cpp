@@ -593,14 +593,14 @@ PromotedParamCloner::populateCloned() {
       auto promotedArg = new (M)
         SILArgument(ClonedEntryBB, promotedTy, (*I)->getDecl());
       PromotedParameters.insert(*I);
-      
+
       // Map any projections of the box to the promoted argument.
       for (auto use : (*I)->getUses()) {
         if (auto project = dyn_cast<ProjectBoxInst>(use->getUser())) {
           ValueMap.insert(std::make_pair(project, promotedArg));
         }
       }
-      
+
     } else {
       // Create a new argument which copies the original argument.
       SILValue MappedValue =
@@ -653,7 +653,7 @@ PromotedParamCloner::visitProjectBoxInst(ProjectBoxInst *Inst) {
   // and replace its uses with
   if (PromotedParameters.count(Inst->getOperand()))
     return;
-  
+
   SILCloner<PromotedParamCloner>::visitProjectBoxInst(Inst);
 }
 
@@ -873,7 +873,7 @@ class AllocBoxToStack : public SILFunctionTransform {
     if (!Promotable.empty()) {
       auto Count = rewritePromotedBoxes(Promotable, PromotedOperands, Returns);
       NumStackPromoted += Count;
-      
+
       // TODO: Update the call graph instead of invalidating it.
       // Currently we need it invalidate it because we clone functions and
       // replace partial_apply instructions which may be used by apply

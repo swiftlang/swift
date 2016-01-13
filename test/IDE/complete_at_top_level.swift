@@ -330,7 +330,7 @@ func interstitial() {}
 // TOP_LEVEL_GUARD: Decl[LocalVar]/Local: guardedName[#Int#]; name=guardedName
 
 func resyncParserB14() {}
-  
+
 
 //
 //===--- DON'T ADD ANY TESTS AFTER THIS LINE.

@@ -35,11 +35,11 @@ namespace {
     const char *ExpectedStart, *ExpectedEnd = nullptr;
 
     llvm::SourceMgr::DiagKind Classification;
-    
+
     // This is true if a '*' constraint is present to say that the diagnostic
     // may appear (or not) an uncounted number of times.
     bool mayAppear = false;
-      
+
     // This is true if a '{{none}}' is present to mark that there should be no
     // fixits at all.
     bool noFixitsMayAppear = false;
@@ -47,18 +47,18 @@ namespace {
     // This is the raw input buffer for the message text, the part in the
     // {{...}}
     StringRef MessageRange;
-    
+
     // This is the message string with escapes expanded.
     std::string MessageStr;
     unsigned LineNo = ~0U;
-    
+
     std::vector<ExpectedFixIt> Fixits;
 
     ExpectedDiagnosticInfo(const char *ExpectedStart,
                            llvm::SourceMgr::DiagKind Classification)
       : ExpectedStart(ExpectedStart), Classification(Classification) {
     }
-    
+
   };
 }
 
@@ -96,7 +96,7 @@ namespace {
     /// file and drop it back in place.
     void autoApplyFixes(unsigned BufferID,
                         ArrayRef<llvm::SMDiagnostic> diagnostics);
-    
+
   private:
     std::vector<llvm::SMDiagnostic>::iterator
     findDiagnostic(const ExpectedDiagnosticInfo &Expected,
@@ -174,7 +174,7 @@ static std::string renderFixits(ArrayRef<llvm::SMFixIt> fixits,
   bool isFirst = true;
   for (auto &ActualFixIt : fixits) {
     llvm::SMRange Range = ActualFixIt.getRange();
-    
+
     if (isFirst)
       isFirst = false;
     else
@@ -182,7 +182,7 @@ static std::string renderFixits(ArrayRef<llvm::SMFixIt> fixits,
     OS << "{{"
     << getColumnNumber(InputFile, Range.Start) << '-'
     << getColumnNumber(InputFile, Range.End) << '=';
-    
+
     for (auto C : ActualFixIt.getText()) {
       if (C == '\n')
         OS << "\\n";
@@ -202,7 +202,7 @@ static std::string renderFixits(ArrayRef<llvm::SMFixIt> fixits,
 bool DiagnosticVerifier::verifyFile(unsigned BufferID,
                                     bool shouldAutoApplyFixes) {
   using llvm::SMLoc;
-  
+
   const SourceLoc BufferStartLoc = SM.getLocForBufferStart(BufferID);
   CharSourceRange EntireRange = SM.getRangeForBuffer(BufferID);
   StringRef InputFile = SM.extractText(EntireRange);
@@ -215,7 +215,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
   unsigned PrevExpectedContinuationLine = 0;
 
   std::vector<ExpectedDiagnosticInfo> ExpectedDiagnostics;
-  
+
   auto addError = [&](const char *Loc, std::string message,
                       ArrayRef<llvm::SMFixIt> FixIts = {}) {
     auto loc = SourceLoc(SMLoc::getFromPointer(Loc));
@@ -223,8 +223,8 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
                               {}, FixIts);
     Errors.push_back(diag);
   };
-  
-  
+
+
   // Scan the memory buffer looking for expected-note/warning/error.
   for (size_t Match = InputFile.find("expected-");
        Match != StringRef::npos; Match = InputFile.find("expected-", Match+1)) {
@@ -335,7 +335,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
     else
       PrevExpectedContinuationLine = 0;
 
-    
+
     // Scan for fix-its: {{10-14=replacement text}}
     StringRef ExtraChecks = MatchStart.substr(End+2).ltrim(" \t");
     while (ExtraChecks.startswith("{{")) {
@@ -346,11 +346,11 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
                  "didn't find '}}' to match '{{' in fix-it verification");
         break;
       }
-      
+
       // Allow for close braces to appear in the replacement text.
       while (EndLoc+2 < ExtraChecks.size() && ExtraChecks[EndLoc+2] == '}')
         ++EndLoc;
-      
+
       StringRef FixItStr = ExtraChecks.slice(2, EndLoc);
       // Check for matching a later "}}" on a different line.
       if (FixItStr.find_first_of("\r\n") != StringRef::npos) {
@@ -358,16 +358,16 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
                  "fix-it verification");
         break;
       }
-      
+
       // Prepare for the next round of checks.
       ExtraChecks = ExtraChecks.substr(EndLoc+2).ltrim();
-      
+
       // Special case for specifying no fixits should appear.
       if (FixItStr == "none") {
         Expected.noFixitsMayAppear = true;
         continue;
       }
-        
+
       // Parse the pieces of the fix-it.
       size_t MinusLoc = FixItStr.find('-');
       if (MinusLoc == StringRef::npos) {
@@ -376,7 +376,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
       }
       StringRef StartColStr = FixItStr.slice(0, MinusLoc);
       StringRef AfterMinus = FixItStr.substr(MinusLoc+1);
-      
+
       size_t EqualLoc = AfterMinus.find('=');
       if (EqualLoc == StringRef::npos) {
         addError(AfterMinus.data(),
@@ -385,7 +385,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
       }
       StringRef EndColStr = AfterMinus.slice(0, EqualLoc);
       StringRef AfterEqual = AfterMinus.substr(EqualLoc+1);
-      
+
       ExpectedFixIt FixIt;
       FixIt.StartLoc = StartColStr.data()-2;
       FixIt.EndLoc = FixItStr.data()+EndLoc;
@@ -399,7 +399,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
                  "invalid column number in fix-it verification");
         continue;
       }
-      
+
       // Translate literal "\\n" into '\n', inefficiently.
       StringRef fixItText = AfterEqual.slice(0, EndLoc);
       for (const char *current = fixItText.begin(), *end = fixItText.end();
@@ -417,12 +417,12 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
           FixIt.Text += *current++;
         }
       }
-      
+
       Expected.Fixits.push_back(FixIt);
     }
 
     Expected.ExpectedEnd = ExtraChecks.data();
-    
+
     // Don't include trailing whitespace in the expected-foo{{}} range.
     while (isspace(Expected.ExpectedEnd[-1]))
       --Expected.ExpectedEnd;
@@ -432,14 +432,14 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
       ExpectedDiagnostics.push_back(Expected);
   }
 
-  
+
   // Make sure all the expected diagnostics appeared.
   std::reverse(ExpectedDiagnostics.begin(), ExpectedDiagnostics.end());
-  
+
   for (unsigned i = ExpectedDiagnostics.size(); i != 0; ) {
     --i;
     auto &expected = ExpectedDiagnostics[i];
-    
+
     // Check to see if we had this expected diagnostic.
     auto FoundDiagnosticIter = findDiagnostic(expected, BufferName);
     if (FoundDiagnosticIter == CapturedDiagnostics.end()) {
@@ -449,7 +449,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
         ExpectedDiagnostics.erase(ExpectedDiagnostics.begin()+i);
       continue;
     }
-    
+
     auto &FoundDiagnostic = *FoundDiagnosticIter;
 
     const char *IncorrectFixit = nullptr;
@@ -459,7 +459,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
       if (!checkForFixIt(fixit, FoundDiagnostic, InputFile))
         IncorrectFixit = fixit.StartLoc;
     }
-    
+
     // If we have any expected fixits that didn't get matched, then they are
     // wrong.  Replace the failed fixit with what actually happened.
     if (IncorrectFixit) {
@@ -467,13 +467,13 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
         addError(IncorrectFixit, "expected fix-it not seen");
         continue;
       }
-      
+
       // If we had an incorrect expected fixit, render it and produce a fixit
       // of our own.
       auto actual = renderFixits(FoundDiagnostic.getFixIts(), InputFile);
       auto replStartLoc = SMLoc::getFromPointer(expected.Fixits[0].StartLoc);
       auto replEndLoc = SMLoc::getFromPointer(expected.Fixits.back().EndLoc);
-      
+
       llvm::SMFixIt fix(llvm::SMRange(replStartLoc, replEndLoc), actual);
       addError(IncorrectFixit,
                "expected fix-it not seen; actual fix-its: " + actual, fix);
@@ -489,12 +489,12 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
       llvm::SMFixIt fix(llvm::SMRange(replStartLoc, replEndLoc), actual);
       addError(replStartLoc.getPointer(), "expected no fix-its; actual fix-it seen: " + actual, fix);
     }
-    
+
     // Actually remove the diagnostic from the list, so we don't match it
     // again. We do have to do this after checking fix-its, though, because
     // the diagnostic owns its fix-its.
     CapturedDiagnostics.erase(FoundDiagnosticIter);
-    
+
     // We found the diagnostic, so remove it... unless we allow an arbitrary
     // number of diagnostics, in which case we want to reprocess this.
     if (expected.mayAppear)
@@ -502,7 +502,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
     else
       ExpectedDiagnostics.erase(ExpectedDiagnostics.begin()+i);
   }
-  
+
   // Check to see if we have any incorrect diagnostics.  If so, diagnose them as
   // such.
   for (unsigned i = ExpectedDiagnostics.size(); i != 0; ) {
@@ -518,23 +518,23 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
           I->getFilename() != BufferName ||
           I->getKind() != expected.Classification)
         continue;
-      
+
       // Otherwise, we found it, break out.
       break;
     }
 
     if (I == CapturedDiagnostics.end()) continue;
-    
+
     auto StartLoc = SMLoc::getFromPointer(expected.MessageRange.begin());
     auto EndLoc = SMLoc::getFromPointer(expected.MessageRange.end());
-    
+
     llvm::SMFixIt fixIt(llvm::SMRange{ StartLoc, EndLoc }, I->getMessage());
     addError(expected.MessageRange.begin(), "incorrect message found", fixIt);
     CapturedDiagnostics.erase(I);
     ExpectedDiagnostics.erase(ExpectedDiagnostics.begin()+i);
   }
-  
-  
+
+
 
   // Diagnose expected diagnostics that didn't appear.
   std::reverse(ExpectedDiagnostics.begin(), ExpectedDiagnostics.end());
@@ -586,7 +586,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
     }, "");
     addError(expected.ExpectedStart, message, fixIt);
   }
-  
+
   // Verify that there are no diagnostics (in MemoryBuffer) left in the list.
   for (unsigned i = 0, e = CapturedDiagnostics.size(); i != e; ++i) {
     if (CapturedDiagnostics[i].getFilename() != BufferName)
@@ -611,11 +611,11 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
   // Emit all of the queue'd up errors.
   for (auto Err : Errors)
     SM.getLLVMSourceMgr().PrintMessage(llvm::errs(), Err);
-  
+
   // If auto-apply fixits is on, rewrite the original source file.
   if (shouldAutoApplyFixes)
     autoApplyFixes(BufferID, Errors);
-  
+
   return !Errors.empty();
 }
 
@@ -633,7 +633,7 @@ void DiagnosticVerifier::autoApplyFixes(unsigned BufferID,
   // If we have no fixits to apply, avoid touching the file.
   if (FixIts.empty())
     return;
-  
+
   // Sort the fixits by their start location.
   std::sort(FixIts.begin(), FixIts.end(),
             [&](const llvm::SMFixIt &lhs, const llvm::SMFixIt &rhs) -> bool {
@@ -648,25 +648,25 @@ void DiagnosticVerifier::autoApplyFixes(unsigned BufferID,
   // Apply the fixes, building up a new buffer as an std::string.
   const char *LastPos = bufferRange.begin();
   std::string Result;
-  
+
   for (auto &fix : FixIts) {
     // We cannot handle overlapping fixits, so assert that they don't happen.
     assert(LastPos <= fix.getRange().Start.getPointer() &&
            "Cannot handle overlapping fixits");
-    
+
     // Keep anything from the last spot we've checked to the start of the fixit.
     Result.append(LastPos, fix.getRange().Start.getPointer());
-    
+
     // Replace the content covered by the fixit with the replacement text.
     Result.append(fix.getText().begin(), fix.getText().end());
-    
+
     // Next character to consider is at the end of the fixit.
     LastPos = fix.getRange().End.getPointer();
   }
-  
+
   // Retain the end of the file.
   Result.append(LastPos, bufferRange.end());
-  
+
   std::ofstream outs(memBuffer->getBufferIdentifier());
   outs << Result;
 }
@@ -699,7 +699,7 @@ bool swift::verifyDiagnostics(SourceManager &SM, ArrayRef<unsigned> BufferIDs) {
   SM.getLLVMSourceMgr().setDiagHandler(nullptr, nullptr);
 
   bool autoApplyFixes = false;
-  
+
   bool HadError = false;
 
   for (auto &BufferID : BufferIDs)

@@ -171,7 +171,7 @@ func swiftOptimizesThisFunctionIncorrectly() -> Bool {
     if let whyThisIsNeverExecutedIfCalledFromFunctionAndNotFromMethod = anArray as? [NSObject] {
         return true
     }
-    
+
     return false
 }
 

@@ -58,7 +58,7 @@ namespace swift {
   class Token;
   class TopLevelContext;
   struct TypeLoc;
-  
+
   /// SILParserState - This is a context object used to optionally maintain SIL
   /// parsing context for the parser.
   class SILParserState {
@@ -138,7 +138,7 @@ namespace swift {
   /// \param HighPerformance True if the playground transform should omit
   /// instrumentation that has a high runtime performance impact.
   void performPlaygroundTransform(SourceFile &SF, bool HighPerformance);
-  
+
   /// Flags used to control type checking.
   enum class TypeCheckingFlags : unsigned {
     /// Whether to delay checking that benefits from having the entire

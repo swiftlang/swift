@@ -17,7 +17,7 @@ func test() {
   case ColorOptions.Pastel: break
   case ColorOptions.Swift: break
   } // expected-error {{switch must be exhaustive, consider adding a default clause}}
-  
+
   switch 5 as Int16 {
   case Zero: break // no-error
   } // expected-error {{switch must be exhaustive, consider adding a default clause}}

@@ -28,7 +28,7 @@ namespace Lowering {
 
 class Initialization;
 using InitializationPtr = std::unique_ptr<Initialization>;
-  
+
 /// Initialization - Abstract base class for initialization buffers. An
 /// initialization represents an uninitialized buffer or a tuple of
 /// uninitialized buffers that must be initialized with the result of an
@@ -54,7 +54,7 @@ public:
    /// If this initialization represents a single contiguous buffer, return the
   /// SILValue of that buffer's address. If not, returns an invalid SILValue.
   virtual SILValue getAddressOrNull() const = 0;
-  
+
   /// Returns the address of the single contiguous buffer represented by this
   /// initialization. Once the address has been stored to,
   /// finishInitialization must be called.
@@ -63,14 +63,14 @@ public:
     assert(address && "initialization does not represent a single buffer");
     return address;
   }
-  
-  
+
+
   /// If this initialization has an address we can directly emit into, return
   /// it.  Otherwise, return a null SILValue.
   virtual SILValue getAddressForInPlaceInitialization() const {
     return SILValue();
   }
-  
+
   /// Return true if we can get the addresses of elements with the
   /// 'getSubInitializationsForTuple' method.  Subclasses can override this to
   /// enable this behavior.
@@ -96,11 +96,11 @@ public:
     llvm_unreachable("Must implement if canSplitIntoSubelementAddresses"
                      "returns true");
   }
-  
+
   /// Perform post-initialization bookkeeping for this initialization.
   virtual void finishInitialization(SILGenFunction &gen) {}
 
-  
+
   /// When emitting an exploded RValue into an initialization, this method is
   /// called once per scalar value in the explosion.
   ///
@@ -113,7 +113,7 @@ public:
 private:
   Initialization(const Initialization &) = delete;
   Initialization(Initialization &&) = delete;
-  
+
   virtual void _anchor();
 };
 
@@ -122,7 +122,7 @@ private:
 class SingleBufferInitialization : public Initialization {
 public:
   SingleBufferInitialization() {}
-  
+
   bool isSingleBuffer() const override {
     return true;
   }
@@ -131,11 +131,11 @@ public:
   SILValue getAddressForInPlaceInitialization() const override {
     return getAddress();
   }
-  
+
   bool canSplitIntoSubelementAddresses() const override {
     return true;
   }
-  
+
   MutableArrayRef<InitializationPtr>
   getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
                                 SmallVectorImpl<InitializationPtr> &buf,
@@ -147,7 +147,7 @@ public:
     copyOrInitValueIntoSingleBuffer(explodedElement, isInit, getAddress(),
                                     loc, gen);
   }
-  
+
   /// Emit the exploded element into a buffer at the specified address.
   static void copyOrInitValueIntoSingleBuffer(ManagedValue explodedElement,
                                               bool isInit,
@@ -155,16 +155,16 @@ public:
                                               SILLocation loc,
                                               SILGenFunction &gen);
 };
-  
+
 /// This is an initialization for a specific address in memory.
 class KnownAddressInitialization : public SingleBufferInitialization {
   /// The physical address of the global.
   SILValue address;
-  
+
   virtual void anchor() const;
 public:
   KnownAddressInitialization(SILValue address) : address(address) {}
-  
+
   SILValue getAddressOrNull() const override {
     return address;
   }
@@ -204,32 +204,32 @@ public:
   /// The TupleInitialization object takes ownership of Initializations pushed
   /// here.
   SmallVector<InitializationPtr, 4> SubInitializations;
-    
+
   TupleInitialization() {}
-    
+
   SILValue getAddressOrNull() const override {
     if (SubInitializations.size() == 1)
       return SubInitializations[0]->getAddressOrNull();
     else
       return SILValue();
   }
-    
+
   bool canSplitIntoSubelementAddresses() const override {
     return true;
   }
-    
+
   MutableArrayRef<InitializationPtr>
   getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
                                 SmallVectorImpl<InitializationPtr> &buf,
                                 SILLocation Loc) override {
     return SubInitializations;
   }
-    
+
   void finishInitialization(SILGenFunction &gen) override {
     for (auto &sub : SubInitializations)
       sub->finishInitialization(gen);
   }
-    
+
   void copyOrInitValueInto(ManagedValue valueMV, bool isInit, SILLocation loc,
                            SILGenFunction &SGF) override;
 };

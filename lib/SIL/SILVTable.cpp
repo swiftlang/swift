@@ -40,7 +40,7 @@ SILFunction *
 SILVTable::getImplementation(SILModule &M, SILDeclRef method) const {
   // FIXME: We should build a sidetable cache in the module. Linear lookup here
   // is lame.
-  
+
   for (auto &entry : getEntries()) {
     // Check whether this mapping matches either the given decl directly or
     // one of its overridden decl.
@@ -50,7 +50,7 @@ SILVTable::getImplementation(SILModule &M, SILDeclRef method) const {
         return entry.second;
     } while ((m = m.getOverridden()));
   }
-  
+
   return nullptr;
 }
 
@@ -58,7 +58,7 @@ SILVTable::SILVTable(ClassDecl *c, ArrayRef<Pair> entries)
   : Class(c), NumEntries(entries.size())
 {
   memcpy(Entries, entries.begin(), sizeof(Pair) * NumEntries);
-  
+
   // Bump the reference count of functions referenced by this table.
   for (auto entry : getEntries()) {
     entry.second->incrementRefCount();

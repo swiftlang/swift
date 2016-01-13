@@ -1443,7 +1443,7 @@ private:
 
   void cacheDebugLoc(SILDebugLocation &Loc) {
     DebugLocs.insert({SILDebugLocationID(Loc), &Loc});
-  }  
+  }
 };
 
 /// An RAII version of SILBuilder that automatically sets up identical

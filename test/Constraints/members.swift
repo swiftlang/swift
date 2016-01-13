@@ -58,10 +58,10 @@ struct GZ<T> {
   var i : T
   func getI() -> T { return i }
 
-  func f1<U>(a: T, b: U) -> (T, U) { 
+  func f1<U>(a: T, b: U) -> (T, U) {
     return (a, b)
   }
-  
+
   func f2() {
     var f : Float
     var t = f1(i, b: f)
@@ -528,7 +528,7 @@ struct S22490787 {
 
 func f22490787() {
   var path: S22490787 = S22490787()
-  
+
   for p in path {  // expected-error {{type 'S22490787' does not conform to protocol 'SequenceType'}}
   }
 }

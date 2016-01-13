@@ -11,10 +11,10 @@ public class Base1 {
 // Check that call to Base1.middle cannot be devirtualized
 //
 // CHECK-LABEL: sil @_TFC19devirt_default_case5Base15outer
-// CHECK: class_method 
+// CHECK: class_method
 // CHECK: }
-  public func outer() { 
-    middle() 
+  public func outer() {
+    middle()
   }
 }
 
@@ -48,13 +48,13 @@ private class Derived2 : Base2 {
 public func callOuter(x: Int) -> Int {
 
   var o:Base2
-  
+
   if x == 1 {
     o = Base2()
   } else {
     o = Derived2()
   }
-  
+
   o.outer()
   return x
 }
@@ -65,7 +65,7 @@ class Base3 {
   @inline(never) func middle() { inner() }
 // Check that call to Base3.middle can be devirtualized when not compiling
 // for testing.
-// 
+//
 // CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TFC19devirt_default_case5Base35outer
 // CHECK: function_ref @{{.*}}TFC19devirt_default_case5Base36middle
 // CHECK: function_ref @{{.*}}TFC19devirt_default_caseP{{.*}}8Derived36middle
@@ -102,7 +102,7 @@ class C3 : A3 {}
 class D3: C3 {}
 class E3 :C3 {}
 
-// A, C,D,E all use the same implementation. 
+// A, C,D,E all use the same implementation.
 // B has its own implementation.
 @inline(never)
 func foo(a: A3) -> Int {
@@ -123,7 +123,7 @@ public func testfoo3() -> Int {
 
 class Base4 {
   @inline(never)
-  func test() { 
+  func test() {
 // Check that call to foo() can be devirtualized
 //
 // CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TFC19devirt_default_case5Base44test
@@ -132,9 +132,9 @@ class Base4 {
 // CHECK-NORMAL-NOT: class_method
 // CHECK-TESTABLE: class_method %0 : $Base4, #Base4.foo!1
 // CHECK: }
-    foo() 
+    foo()
   }
-  
+
   @inline(never) func foo() { }
 }
 
@@ -144,26 +144,26 @@ class Derived4 : Base4 {
 
 public class Base5 {
   @inline(never)
-  public func test() { 
-    foo() 
+  public func test() {
+    foo()
   }
-  
+
   @inline(never) public final func foo() { }
 }
 
 class Derived5 : Base5 {
 }
 
-public class C6 { 
-  func bar() -> Int { return 1 } 
+public class C6 {
+  func bar() -> Int { return 1 }
 }
 
-class D6 : C6 { 
-  override func bar() -> Int { return 2 } 
+class D6 : C6 {
+  override func bar() -> Int { return 2 }
 }
 
 @inline(never)
-func check_static_class_devirt(c: C6) -> Int { 
+func check_static_class_devirt(c: C6) -> Int {
 // Check that C.bar() and D.bar() are devirtualized.
 //
 // CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TF19devirt_default_case25check_static_class_devirtFCS_2C6Si
@@ -171,7 +171,7 @@ func check_static_class_devirt(c: C6) -> Int {
 // CHECK: checked_cast_br [exact] %0 : $C6 to $D6
 // CHECK: class_method
 // CHECK: return
-  return c.bar() 
+  return c.bar()
 }
 
 public func test_check_static_class_devirt() -> Int {

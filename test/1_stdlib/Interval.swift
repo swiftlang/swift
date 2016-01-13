@@ -87,14 +87,14 @@ IntervalTestSuite.test("PatternMatching") {
     default:
       closed = false
     }
-    
+
     expectEqual(halfOpenExpected, halfOpen)
     expectEqual(closedExpected, closed)
   }
 }
 
 IntervalTestSuite.test("Overlaps") {
-  
+
   func expectOverlaps<
     I0: IntervalType, I1: IntervalType where I0.Bound == I1.Bound
   >(expectation: Bool, _ lhs: I0, _ rhs: I1) {
@@ -107,7 +107,7 @@ IntervalTestSuite.test("Overlaps") {
       expectFalse(rhs.overlaps(lhs))
     }
   }
-  
+
   // 0-4, 5-10
   expectOverlaps(false, 0..<4, 5..<10)
   expectOverlaps(false, 0..<4, 5...10)
@@ -160,7 +160,7 @@ struct X<T : Comparable> : Comparable, CustomStringConvertible, CustomDebugStrin
   var debugDescription: String {
     return "X(\(String(reflecting: a)))"
   }
-  
+
   var a: T
 }
 
@@ -175,7 +175,7 @@ func == <T : Comparable>(lhs: X<T>, rhs: X<T>) -> Bool {
 IntervalTestSuite.test("CustomStringConvertible/CustomDebugStringConvertible") {
   expectEqual("0.0..<0.1", String(X(0.0)..<X(0.1)))
   expectEqual("0.0...0.1", String(X(0.0)...X(0.1)))
-  
+
   expectEqual(
     "HalfOpenInterval(X(0.0)..<X(0.5))",
     String(reflecting: HalfOpenInterval(X(0.0)..<X(0.5))))

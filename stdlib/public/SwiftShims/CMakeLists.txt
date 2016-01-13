@@ -77,7 +77,7 @@ add_custom_command_target(unused_var
 
     # Create a broken symlink that points to '../clang/$VERSION'.  It is not
     # used when running Swift tools from the build tree directly, but we will
-    # install it in such a way that it points to Clang installation.  If the 
+    # install it in such a way that it points to Clang installation.  If the
     # link can be resolved, CMake would try to follow it when installing the
     # project under certain conditions.
     COMMAND

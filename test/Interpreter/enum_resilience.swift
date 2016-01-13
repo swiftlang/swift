@@ -226,7 +226,7 @@ ResilientEnumTestSuite.test("ResilientMultiPayloadEnumSpareBitsAndExtraBits") {
   let b: [Int] = a.map {
     switch $0 {
     case .P1(let ss):
-      // FIXME: derive Equatable conformances for arbitrary tuples :-) 
+      // FIXME: derive Equatable conformances for arbitrary tuples :-)
       expectEqual(ss.0, s.0)
       expectEqual(ss.1, s.1)
       expectEqual(ss.2, s.2)

@@ -70,7 +70,7 @@ func test_mixed_overload(a: A, x: X, y: Y) {
   var x1 = a.mixed(x: x)
   x1 = x
   var y1 = a.mixed(y: y) // expected-error{{incorrect argument label in call (have 'y:', expected 'x:')}}
-  
+
   A.mixed(x) // expected-error{{missing argument label 'y:' in call}}
   var x2 = A.mixed(a)(x: x)
   x2 = x
@@ -178,7 +178,7 @@ extension A {
 
 var clams : X
 
-struct WeirdIvarLookupBehavior { 
+struct WeirdIvarLookupBehavior {
   var clams : Y
 
   func f() {

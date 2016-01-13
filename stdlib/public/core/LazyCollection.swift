@@ -57,7 +57,7 @@ public struct LazyCollection<Base : CollectionType>
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = Base.Index
-  
+
   /// Construct an instance with `base` as its underlying Collection
   /// instance.
   public init(_ base: Base) {
@@ -70,23 +70,23 @@ public struct LazyCollection<Base : CollectionType>
 /// Forward implementations to the base collection, to pick up any
 /// optimizations it might implement.
 extension LazyCollection : SequenceType {
-  
+
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
   public func generate() -> Base.Generator { return _base.generate() }
-  
+
   /// Return a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
   ///
   /// - Complexity: O(N).
   public func underestimateCount() -> Int { return _base.underestimateCount() }
 
-  public func _copyToNativeArrayBuffer() 
+  public func _copyToNativeArrayBuffer()
      -> _ContiguousArrayBuffer<Base.Generator.Element> {
     return _base._copyToNativeArrayBuffer()
   }
-  
+
   public func _initializeTo(
     ptr: UnsafeMutablePointer<Base.Generator.Element>
   ) -> UnsafeMutablePointer<Base.Generator.Element> {
@@ -95,7 +95,7 @@ extension LazyCollection : SequenceType {
 
   public func _customContainsEquatableElement(
     element: Base.Generator.Element
-  ) -> Bool? { 
+  ) -> Bool? {
     return _base._customContainsEquatableElement(element)
   }
 }
@@ -107,7 +107,7 @@ extension LazyCollection : CollectionType {
   public var startIndex: Base.Index {
     return _base.startIndex
   }
-  
+
   /// The collection's "past the end" position.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
@@ -132,7 +132,7 @@ extension LazyCollection : CollectionType {
   public subscript(bounds: Range<Index>) -> LazyCollection<Slice<Base>> {
     return Slice(base: _base, bounds: bounds).lazy
   }
-  
+
   /// Returns `true` iff `self` is empty.
   public var isEmpty: Bool {
     return _base.isEmpty
@@ -145,10 +145,10 @@ extension LazyCollection : CollectionType {
   public var count: Index.Distance {
     return _base.count
   }
-  
+
   // The following requirement enables dispatching for indexOf when
   // the element type is Equatable.
-  
+
   /// Returns `Optional(Optional(index))` if an element was found;
   /// `nil` otherwise.
   ///

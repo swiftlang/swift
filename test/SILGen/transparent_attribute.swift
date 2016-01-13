@@ -13,7 +13,7 @@ func useTransparentFuncWithDefaultArgument() -> Int {
   // CHECK: apply {{.*}} line:10:44
   // CHECK: apply {{.*}} line:10:10
   // CHECK: return
-  
+
 }
 
 func transparentFuncWithoutDefaultArgument (x: Int = 1) -> Int {
@@ -27,7 +27,7 @@ func useTransparentFuncWithoutDefaultArgument() -> Int {
   // CHECK-NOT: transparent
   // CHECK: apply {{.*}} line:23:10
   // CHECK: return
-  
+
 }
 
 // Make sure the transparent attribute is set on constructors (allocating and initializing).
@@ -36,14 +36,14 @@ struct StructWithTranspConstructor {
 }
 func testStructWithTranspConstructor() -> StructWithTranspConstructor {
   return StructWithTranspConstructor()
-  
+
   // transparent_attribute.StructWithTranspConstructor.constructor
   // CHECK-APPLY: sil hidden @_TFV21transparent_attribute27StructWithTranspConstructorC
-  
+
   // testStructWithTranspConstructor
   // CHECK-APPLY: _T21transparent_attribute31testStructWithTranspConstructorFT_VS_27StructWithTranspConstructor
   // CHECK: apply {{.*}} line:38:10
-  
+
 }
 
 struct MySt {}

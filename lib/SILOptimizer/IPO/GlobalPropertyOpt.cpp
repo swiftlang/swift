@@ -39,29 +39,29 @@ namespace {
 /// property for arrays. If the property can be proved to be true, the
 /// corresponding semantics-call is replaced by a true-literal.
 class GlobalPropertyOpt {
-  
+
   /// An entry in the dependency graph. An entry can represent
   ///   *) a value of type Array,
   ///   *) a value of type tuple, which contains an Array,
   ///   *) an AllocStack instruction which allocates an Array or
   ///   *) a struct or class field of type Array.
   struct Entry {
-    
+
     Entry(SILValue Value, VarDecl *Field) :
     Value(Value), Field(Field), isNativeTypeChecked(true) {
     }
-    
+
     /// Non-null if the entry represents an array value, a tuple with an array
     /// or an AllocStack of an array.
     SILValue Value;
-    
+
     /// Non-null if the entry represents a struct or class field.
     VarDecl *Field;
-    
+
     /// The property which we want to track: is the value/field a native swift
     /// array which doesn't need deferred type check.
     bool isNativeTypeChecked;
-    
+
     /// The edges in the dependency graph, i.e. entries, which depend on this
     /// entry.
     SmallVector<Entry *, 8> Dependencies;
@@ -83,40 +83,40 @@ class GlobalPropertyOpt {
     }
 #endif
   };
-  
+
   /// The module that we are optimizing.
   SILModule &M;
-  
+
   NominalTypeDecl *ArrayType;
-  
+
   /// All entries of the dependency graph, which represent values or AllocStack.
   llvm::DenseMap<SILValue, Entry *> ValueEntries;
-  
+
   /// All entries of the dependency graph, which represent fields.
   llvm::DenseMap<VarDecl *, Entry *> FieldEntries;
-  
+
   llvm::SpecificBumpPtrAllocator<Entry> EntryAllocator;
-  
+
   /// Represents an address of an unknown array.
   Entry unknownAddressEntry = Entry(SILValue(), nullptr);
-  
+
   /// All found calls to get-property semantic functions.
   std::vector<ApplyInst *> propertyCalls;
 
   /// Contains entries with a false property value, which must be propagated
   /// to their dependencies.
   llvm::SmallVector<Entry *, 32> WorkList;
-  
+
   bool isArrayType(SILType type) {
     return type.getNominalOrBoundGenericNominal() == ArrayType &&
            !type.isAddress();
   }
-  
+
   bool isArrayAddressType(SILType type) {
     return type.getNominalOrBoundGenericNominal() == ArrayType &&
            type.isAddress();
   }
-  
+
   /// Returns true if the type is a tuple which contains at least one array
   /// (we don't check for arrays in nested tuples).
   bool isTupleWithArray(CanType type) {
@@ -147,7 +147,7 @@ class GlobalPropertyOpt {
       return true;
     return false;
   }
-  
+
   static bool canAddressEscape(SILValue V, bool acceptWrite);
 
   /// Gets the entry for a struct or class field.
@@ -185,7 +185,7 @@ class GlobalPropertyOpt {
     }
     return &unknownAddressEntry;
   }
-  
+
   /// Gets the entry for a SIL value, e.g. an array-value or a tuple containing
   /// an array.
   Entry *getValueEntry(SILValue value) {
@@ -195,12 +195,12 @@ class GlobalPropertyOpt {
     }
     return entry;
   }
-  
+
   void setAddressEscapes(Entry *entry) {
     DEBUG(llvm::dbgs() << "     address escapes: " << *entry);
     setNotNative(entry);
   }
-  
+
   void setNotNative(Entry *entry) {
     if (entry->isNativeTypeChecked) {
       DEBUG(llvm::dbgs() << "      set not-native: " << *entry);
@@ -208,25 +208,25 @@ class GlobalPropertyOpt {
       WorkList.push_back(entry);
     }
   }
-  
+
   void addDependency(Entry *from, Entry *to) {
     DEBUG(llvm::dbgs() << "    add dependency from: " << *from <<
                           "      to: " << *to);
     from->Dependencies.push_back(to);
   }
-  
+
   void scanInstruction(swift::SILInstruction *Inst);
-  
+
   void scanInstructions();
-  
+
   void propagatePropertiesInGraph();
-  
+
   bool replacePropertyCalls();
-  
+
 public:
   GlobalPropertyOpt(SILModule &Module) :
       M(Module), ArrayType(nullptr) {}
-  
+
   bool run();
 };
 
@@ -235,7 +235,7 @@ public:
 bool GlobalPropertyOpt::canAddressEscape(SILValue V, bool acceptStore) {
   for (auto UI : V.getUses()) {
     auto *User = UI->getUser();
-    
+
     // These instructions do not cause the address to escape.
     if (isa<LoadInst>(User) ||
         isa<DebugValueInst>(User) ||
@@ -245,14 +245,14 @@ bool GlobalPropertyOpt::canAddressEscape(SILValue V, bool acceptStore) {
         isa<DeallocBoxInst>(User) ||
         isa<DeallocStackInst>(User))
       continue;
-    
+
     if (acceptStore) {
       if (auto *Store = dyn_cast<StoreInst>(User)) {
         if (Store->getDest() == UI->get())
           continue;
       }
     }
-    
+
     // These instructions only cause the value to escape if they are used in
     // a way that escapes.  Recursively check that the uses of the instruction
     // don't escape.
@@ -438,12 +438,12 @@ void GlobalPropertyOpt::propagatePropertiesInGraph() {
   DEBUG(llvm::dbgs() << "  propagate properties\n");
 
   setAddressEscapes(&unknownAddressEntry);
-  
+
   while (!WorkList.empty()) {
     Entry *entry = WorkList.pop_back_val();
     DEBUG(llvm::dbgs() << "    handle non-native entry: " << *entry);
     assert(!entry->isNativeTypeChecked);
-    
+
     // Propagate the false-value to the dependent entries.
     for (Entry *depEntry : entry->Dependencies) {
       setNotNative(depEntry);
@@ -461,16 +461,16 @@ bool GlobalPropertyOpt::replacePropertyCalls() {
       continue;
 
     SILValue array = AI->getArgument(0);
-    
+
     // Is the argument a native swift array?
     if (ValueEntries.count(array) != 0 &&
         getValueEntry(array)->isNativeTypeChecked) {
-      
+
       ArraySemanticsCall semCall(AI);
       assert(
         (semCall.getKind() == ArrayCallKind::kArrayPropsIsNativeTypeChecked) &&
              "invalid semantics type");
-  
+
       DEBUG(llvm::dbgs() << "  remove property check in function " <<
             AI->getParent()->getParent()->getName() << ": " << *AI);
       SILBuilder B(AI);
@@ -478,7 +478,7 @@ bool GlobalPropertyOpt::replacePropertyCalls() {
       auto C1 = B.createIntegerLiteral(AI->getLoc(), IntBoolTy, 1);
       auto TrueStruct = B.createStruct(AI->getLoc(), AI->getType(), {C1});
       AI->replaceAllUsesWith(TrueStruct);
-      
+
       semCall.removeCall();
       NumPropertiesReplaced++;
       Changed = true;
@@ -486,18 +486,18 @@ bool GlobalPropertyOpt::replacePropertyCalls() {
   }
   return Changed;
 }
- 
+
 /// The main entry point to the optimization.
 bool GlobalPropertyOpt::run() {
-  
+
   assert(WorkList.empty());
   assert(FieldEntries.empty() && ValueEntries.empty());
-  
+
   ArrayType = M.getASTContext().getArrayDecl();
-  
+
   // Step 1: scan the whole module and build the dependency graph.
   scanInstructions();
-  
+
   // Step 2: propagate the flags through the dependency graph.
   propagatePropertiesInGraph();
 
@@ -507,19 +507,19 @@ bool GlobalPropertyOpt::run() {
 
 /// The module pass, which runs the optimization.
 class GlobalPropertyOptPass : public SILModuleTransform {
-  
+
   void run() override {
     SILModule *M = getModule();
-    
+
     DEBUG(llvm::dbgs() << "** GlobalPropertyOpt **\n");
-    
+
     bool Changed = GlobalPropertyOpt(*M).run();
-    
+
     if (Changed) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
     }
   }
-  
+
   StringRef getName() override { return "GlobalPropertyOpt"; }
 };
 

@@ -70,9 +70,9 @@ void *MetadataAllocator::alloc(size_t size) {
       crash("unable to allocate memory for metadata cache");
     return mem;
   }
-  
+
   char *end = next + size;
-  
+
   // Allocate a new page if we need one.
   if (LLVM_UNLIKELY(((uintptr_t)next & ~pagesizeMask)
                       != (((uintptr_t)end & ~pagesizeMask)))){
@@ -84,7 +84,7 @@ void *MetadataAllocator::alloc(size_t size) {
       crash("unable to allocate memory for metadata cache");
     end = next + size;
   }
-  
+
   char *addr = next;
   next = end;
   return addr;
@@ -399,11 +399,11 @@ swift::swift_getFunctionTypeMetadata1(FunctionTypeFlags flags,
   const void *flagsArgsAndResult[] = {
     reinterpret_cast<const void*>(flags.getIntValue()),
     arg0,
-    static_cast<const void *>(result)                      
-  };                                                       
+    static_cast<const void *>(result)
+  };
   return swift_getFunctionTypeMetadata(flagsArgsAndResult);
-}                                                          
-const FunctionTypeMetadata *                               
+}
+const FunctionTypeMetadata *
 swift::swift_getFunctionTypeMetadata2(FunctionTypeFlags flags,
                                       const void *arg0,
                                       const void *arg1,
@@ -413,12 +413,12 @@ swift::swift_getFunctionTypeMetadata2(FunctionTypeFlags flags,
   const void *flagsArgsAndResult[] = {
     reinterpret_cast<const void*>(flags.getIntValue()),
     arg0,
-    arg1,                                                  
-    static_cast<const void *>(result)                      
-  };                                                       
+    arg1,
+    static_cast<const void *>(result)
+  };
   return swift_getFunctionTypeMetadata(flagsArgsAndResult);
-}                                                          
-const FunctionTypeMetadata *                               
+}
+const FunctionTypeMetadata *
 swift::swift_getFunctionTypeMetadata3(FunctionTypeFlags flags,
                                       const void *arg0,
                                       const void *arg1,
@@ -428,11 +428,11 @@ swift::swift_getFunctionTypeMetadata3(FunctionTypeFlags flags,
          && "wrong number of arguments in function metadata flags?!");
   const void *flagsArgsAndResult[] = {
     reinterpret_cast<const void*>(flags.getIntValue()),
-    arg0,                                                  
-    arg1,                                                  
-    arg2,                                                  
-    static_cast<const void *>(result)                      
-  };                                                       
+    arg0,
+    arg1,
+    arg2,
+    static_cast<const void *>(result)
+  };
   return swift_getFunctionTypeMetadata(flagsArgsAndResult);
 }
 
@@ -475,7 +475,7 @@ swift::swift_getFunctionTypeMetadata(const void *flagsArgsAndResult[]) {
   // and 1 result type
     1;
   auto &Types = FunctionTypes.get();
-  
+
   auto entry = Types.findOrAdd(flagsArgsAndResult, numKeyArguments,
     [&]() -> FunctionCacheEntry* {
       // Create a new entry for the cache.
@@ -1123,7 +1123,7 @@ swift::swift_getTupleTypeMetadata3(const Metadata *elt0, const Metadata *elt1,
 namespace {
   template<typename T>
   struct pointer_function_cast_impl;
-  
+
   template<typename OutRet, typename...OutArgs>
   struct pointer_function_cast_impl<OutRet * (OutArgs *...)> {
     template<typename InRet, typename...InArgs>
@@ -1311,7 +1311,7 @@ void swift::installCommonValueWitnesses(ValueWitnessTable *vwtable) {
   #undef INSTALL_POD_INDIRECT_WITNESS
       }
       return;
-      
+
     case sizeWithAlignmentMask(1, 0):
       commonVWT = &_TWVBi8_;
       break;
@@ -1331,14 +1331,14 @@ void swift::installCommonValueWitnesses(ValueWitnessTable *vwtable) {
       commonVWT = &_TWVBi256_;
       break;
     }
-    
+
   #define INSTALL_POD_COMMON_WITNESS(NAME) vwtable->NAME = commonVWT->NAME;
     FOR_ALL_FUNCTION_VALUE_WITNESSES(INSTALL_POD_COMMON_WITNESS)
   #undef INSTALL_POD_COMMON_WITNESS
-    
+
     return;
   }
-  
+
   if (flags.isBitwiseTakable()) {
     // Use POD value witnesses for operations that do an initializeWithTake.
     if (flags.isInlineStorage()) {
@@ -1387,7 +1387,7 @@ void swift::swift_initStructMetadata_UniversalStrategy(size_t numFields,
   vwtable->size = layout.size;
   vwtable->flags = layout.flags;
   vwtable->stride = layout.stride;
-  
+
   // Substitute in better value witnesses if we have them.
   installCommonValueWitnesses(vwtable);
 
@@ -1473,9 +1473,9 @@ static void _swift_initGenericClassObjCName(ClassMetadata *theClass) {
   auto globalNode
     = Demangle::NodeFactory::create(Demangle::Node::Kind::Global);
   globalNode->addChild(typeNode);
-  
+
   auto string = Demangle::mangleNode(globalNode);
-  
+
   auto fullNameBuf = (char*)swift_slowAlloc(string.size() + 1, 0);
   memcpy(fullNameBuf, string.c_str(), string.size() + 1);
 
@@ -2061,13 +2061,13 @@ getExistentialValueWitnesses(ExistentialTypeState &E,
     // Without ObjC interop, ErrorType is native-refcounted.
     return &_TWVBo;
 #endif
-      
+
   // Other existentials use standard representation.
   case SpecialProtocol::AnyObject:
   case SpecialProtocol::None:
     break;
   }
-  
+
   switch (classConstraint) {
   case ProtocolClassConstraint::Class:
     return getClassExistentialValueWitnesses(E, numWitnessTables);
@@ -2103,7 +2103,7 @@ ExistentialTypeMetadata::mayTakeValue(const OpaqueValue *container) const {
   // Opaque existential containers uniquely own their contained value.
   case ExistentialTypeRepresentation::Opaque:
     return true;
-    
+
   // References to boxed existential containers may be shared.
   case ExistentialTypeRepresentation::ErrorType: {
     // We can only take the value if the box is a bridged NSError, in which case
@@ -2124,7 +2124,7 @@ const {
   case ExistentialTypeRepresentation::Class:
     // Nothing to clean up after taking the class reference.
     break;
-  
+
   case ExistentialTypeRepresentation::Opaque: {
     // Containing the value may require a side allocation, which we need
     // to clean up.
@@ -2132,7 +2132,7 @@ const {
     opaque->Type->vw_deallocateBuffer(&opaque->Buffer);
     break;
   }
-  
+
   case ExistentialTypeRepresentation::ErrorType:
     // TODO: If we were able to claim the value from a uniquely-owned
     // existential box, we would want to deallocError here.
@@ -2196,7 +2196,7 @@ ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
   // The layout of the container depends on whether it's class-constrained
   // or a special protocol.
   const WitnessTable * const *witnessTables;
-  
+
   switch (getRepresentation()) {
   case ExistentialTypeRepresentation::Class: {
     auto classContainer =
@@ -2258,13 +2258,13 @@ swift::swift_getExistentialTypeMetadata(size_t numProtocols,
                              protocolArgs, numProtocols,
                              sizeof(const ProtocolDescriptor *) * numProtocols);
       auto metadata = entry->getData();
-      
+
       // Get the special protocol kind for an uncomposed protocol existential.
       // Protocol compositions are currently never special.
       auto special = SpecialProtocol::None;
       if (numProtocols == 1)
         special = protocols[0]->Flags.getSpecialProtocol();
-      
+
       metadata->setKind(MetadataKind::Existential);
       metadata->ValueWitnesses = getExistentialValueWitnesses(E,
                                                               classConstraint,
@@ -2349,7 +2349,7 @@ namespace {
 struct ForeignTypeState {
   pthread_mutex_t Lock;
   llvm::DenseMap<GlobalString, const ForeignTypeMetadata *> Types;
-  
+
   ForeignTypeState() {
     pthread_mutex_init(&Lock, nullptr);
   }
@@ -2478,12 +2478,12 @@ void _swift_debug_verifyTypeLayoutAttribute(Metadata *type,
     }
     fprintf(stderr, "\n");
   };
-  
+
   if (memcmp(runtimeValue, staticValue, size) != 0) {
     auto typeName = nameForMetadata(type);
     fprintf(stderr, "*** Type verification of %s %s failed ***\n",
             typeName.c_str(), description);
-    
+
     fprintf(stderr, "  runtime value:  ");
     presentValue(runtimeValue);
     fprintf(stderr, "  compiler value: ");

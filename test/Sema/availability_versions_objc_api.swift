@@ -11,11 +11,11 @@ func callUnavailableObjC() {
   _ = NSAvailableOn10_10() // expected-error {{'NSAvailableOn10_10' is only available on OS X 10.10 or newer}}
       // expected-note@-1 {{add @available attribute to enclosing global function}}
       // expected-note@-2 {{add 'if #available' version check}}
-  
-  
+
+
   if #available(OSX 10.10, *) {
     let o = NSAvailableOn10_10()
-    
+
     // Properties
     _ = o.propertyOn10_11 // expected-error {{'propertyOn10_11' is only available on OS X 10.11 or newer}}
         // expected-note@-1 {{add @available attribute to enclosing global function}}
@@ -24,14 +24,14 @@ func callUnavailableObjC() {
     o.propertyOn10_11 = 22 // expected-error {{'propertyOn10_11' is only available on OS X 10.11 or newer}}
         // expected-note@-1 {{add @available attribute to enclosing global function}}
         // expected-note@-2 {{add 'if #available' version check}}
-    
+
     // Methods
     o.methodAvailableOn10_11() // expected-error {{'methodAvailableOn10_11()' is only available on OS X 10.11 or newer}}
         // expected-note@-1 {{add @available attribute to enclosing global function}}
         // expected-note@-2 {{add 'if #available' version check}}
-    
+
     // Initializers
-    
+
     _ = NSAvailableOn10_10(stringOn10_11:"Hi") // expected-error {{'init(stringOn10_11:)' is only available on OS X 10.11 or newer}}
         // expected-note@-1 {{add @available attribute to enclosing global function}}
         // expected-note@-2 {{add 'if #available' version check}}

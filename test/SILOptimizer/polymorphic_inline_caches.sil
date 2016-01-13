@@ -164,7 +164,7 @@ bb0(%0 : $Builtin.NativeObject):
   return %7 : $()
   // CHECK: checked_cast_br [exact] [[CAST]] : $E to $E, bb2, bb3
   // CHECK: bb1
-  // CHECK: strong_release %0  
+  // CHECK: strong_release %0
   // CHECK: return
   // CHECK: bb2
   // CHECK: [[EFOO:%.*]] = function_ref @_TFC5casts1E3foofS0_FT_T_

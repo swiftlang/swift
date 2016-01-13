@@ -58,7 +58,7 @@ entry(%e : $Either<(), ()>):
   %a = unchecked_enum_data %l : $Either<(), ()>, #Either.Left!enumelt.1
   %b = unchecked_enum_data %r : $Either<(), ()>, #Either.Right!enumelt.1
 
-  // CHECK-NEXT: switch 
+  // CHECK-NEXT: switch
   // CHECK-NEXT:   i1 false, label %6
   // CHECK-NEXT:   i1 true, label %7
   // CHECK:      <label>:6
@@ -151,7 +151,7 @@ right(%y : $()):
 
 next(%z : $Builtin.Int8):
   // CHECK:      phi i8 [ 3, [[RIGHT]] ], [ 2, [[CENTER]] ], [ 1, [[MIDDLE]] ], [ 0, [[LEFT]] ]
-  dealloc_stack %s : $*EitherOr<(), ()> 
+  dealloc_stack %s : $*EitherOr<(), ()>
   return undef : $()
 }
 

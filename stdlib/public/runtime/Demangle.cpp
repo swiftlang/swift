@@ -13,7 +13,7 @@ _buildDemanglingForNominalType(Demangle::Node::Kind boundGenericKind,
                                const Metadata *type,
                                const NominalTypeDescriptor *description) {
   using namespace Demangle;
-  
+
   // Demangle the base name.
   auto node = demangleTypeAsNode(description->Name,
                                      strlen(description->Name));
@@ -61,15 +61,15 @@ Demangle::NodePointer swift::_swift_buildDemanglingForMetadata(const Metadata *t
 #if SWIFT_OBJC_INTEROP
     auto objcWrapper = static_cast<const ObjCClassWrapperMetadata *>(type);
     const char *className = class_getName((Class)objcWrapper->Class);
-    
+
     // ObjC classes mangle as being in the magic "__ObjC" module.
     auto module = NodeFactory::create(Node::Kind::Module, "__ObjC");
-    
+
     auto node = NodeFactory::create(Node::Kind::Class);
     node->addChild(module);
     node->addChild(NodeFactory::create(Node::Kind::Identifier,
                                        llvm::StringRef(className)));
-    
+
     return node;
 #else
     assert(false && "no ObjC interop");
@@ -87,12 +87,12 @@ Demangle::NodePointer swift::_swift_buildDemanglingForMetadata(const Metadata *t
     NodePointer type_list = NodeFactory::create(Node::Kind::TypeList);
 
     proto_list->addChild(type_list);
-    
+
     std::vector<const ProtocolDescriptor *> protocols;
     protocols.reserve(exis->Protocols.NumProtocols);
     for (unsigned i = 0, e = exis->Protocols.NumProtocols; i < e; ++i)
       protocols.push_back(exis->Protocols[i]);
-    
+
     // Sort the protocols by their mangled names.
     // The ordering in the existential type metadata is by metadata pointer,
     // which isn't necessarily stable across invocations.
@@ -100,12 +100,12 @@ Demangle::NodePointer swift::_swift_buildDemanglingForMetadata(const Metadata *t
           [](const ProtocolDescriptor *a, const ProtocolDescriptor *b) -> bool {
             return strcmp(a->Name, b->Name) < 0;
           });
-    
+
     for (auto *protocol : protocols) {
       // The protocol name is mangled as a type symbol, with the _Tt prefix.
       auto protocolNode = demangleSymbolAsNode(protocol->Name,
                                                strlen(protocol->Name));
-      
+
       // ObjC protocol names aren't mangled.
       if (!protocolNode) {
         auto module = NodeFactory::create(Node::Kind::Module,
@@ -127,12 +127,12 @@ Demangle::NodePointer swift::_swift_buildDemanglingForMetadata(const Metadata *t
       protocolNode = protocolNode->getChild(0); // Type -> ProtocolList
       protocolNode = protocolNode->getChild(0); // ProtocolList -> TypeList
       protocolNode = protocolNode->getChild(0); // TypeList -> Type
-      
+
       assert(protocolNode->getKind() == Node::Kind::Type);
       assert(protocolNode->getChild(0)->getKind() == Node::Kind::Protocol);
       type_list->addChild(protocolNode);
     }
-    
+
     return proto_list;
   }
   case MetadataKind::ExistentialMetatype: {
@@ -160,7 +160,7 @@ Demangle::NodePointer swift::_swift_buildDemanglingForMetadata(const Metadata *t
       kind = Node::Kind::ThinFunctionType;
       break;
     }
-    
+
     std::vector<NodePointer> inputs;
     for (unsigned i = 0, e = func->getNumArguments(); i < e; ++i) {
       auto arg = func->getArguments()[i];
@@ -182,14 +182,14 @@ Demangle::NodePointer swift::_swift_buildDemanglingForMetadata(const Metadata *t
     } else {
       totalInput = inputs.front();
     }
-    
+
     NodePointer args = NodeFactory::create(Node::Kind::ArgumentTuple);
     args->addChild(totalInput);
-    
+
     NodePointer resultTy = _swift_buildDemanglingForMetadata(func->ResultType);
     NodePointer result = NodeFactory::create(Node::Kind::ReturnType);
     result->addChild(resultTy);
-    
+
     auto funcNode = NodeFactory::create(kind);
     if (func->throws())
       funcNode->addChild(NodeFactory::create(Node::Kind::ThrowsAnnotation));

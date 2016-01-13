@@ -310,7 +310,7 @@ static void copyOrInitValuesInto(Initialization *init,
   static_assert(KIND == ImplodeKind::Forward ||
                 KIND == ImplodeKind::Copy, "Not handled by init");
   bool isInit = (KIND == ImplodeKind::Forward);
-  
+
   // If the element has non-tuple type, just serve it up to the initialization.
   auto tupleType = dyn_cast<TupleType>(type);
   if (!tupleType) {
@@ -321,7 +321,7 @@ static void copyOrInitValuesInto(Initialization *init,
     init->finishInitialization(gen);
     return;
   }
-  
+
   bool implodeTuple = false;
 
   if (auto Address = init->getAddressOrNull()) {
@@ -332,31 +332,31 @@ static void copyOrInitValuesInto(Initialization *init,
       implodeTuple = true;
     }
   }
-  
+
   // If we can satisfy the tuple type by breaking up the aggregate
   // initialization, do so.
   if (!implodeTuple && init->canSplitIntoSubelementAddresses()) {
     SmallVector<InitializationPtr, 4> subInitBuf;
     auto subInits = init->getSubInitializationsForTuple(gen, type,
                                                         subInitBuf, loc);
-    
+
     assert(subInits.size() == tupleType->getNumElements() &&
            "initialization does not match tuple?!");
-    
+
     for (unsigned i = 0, e = subInits.size(); i < e; ++i)
       copyOrInitValuesInto<KIND>(subInits[i].get(), values,
                                  tupleType.getElementType(i), loc, gen);
     return;
   }
-  
+
   // Otherwise, process this by turning the values corresponding to the tuple
   // into a single value (through an implosion) and then binding that value to
   // our initialization.
   SILValue scalar = implodeTupleValues<KIND>(values, gen, type, loc);
-  
+
   // This will have just used up the first values in the list, pop them off.
   values = values.slice(getRValueSize(type));
-  
+
   init->copyOrInitValueInto(ManagedValue::forUnmanaged(scalar), isInit, loc,
                             gen);
   init->finishInitialization(gen);
@@ -456,7 +456,7 @@ SILValue RValue::forwardAsSingleStorageValue(SILGenFunction &gen,
 void RValue::forwardInto(SILGenFunction &gen, Initialization *I,
                          SILLocation loc) && {
   assert(isComplete() && "rvalue is not complete");
-  
+
   ArrayRef<ManagedValue> elts = values;
   copyOrInitValuesInto<ImplodeKind::Forward>(I, elts, type, loc, gen);
 }

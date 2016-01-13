@@ -108,7 +108,7 @@ struct ConformingStruct : X {
   // CHECK-NEXT:    %7 = tuple ()
   // CHECK-NEXT:    return %7 : $()
   // CHECK-NEXT:  }
-  
+
   mutating
   func loadable(x x: Loadable) -> Loadable { return x }
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16ConformingStructS_1XS_FS1_8loadable{{.*}} : $@convention(witness_method) (Loadable, @inout ConformingStruct) -> Loadable {
@@ -118,7 +118,7 @@ struct ConformingStruct : X {
   // CHECK-NEXT:    %3 = apply %2(%0, %1) : $@convention(method) (Loadable, @inout ConformingStruct) -> Loadable
   // CHECK-NEXT:    return %3 : $Loadable
   // CHECK-NEXT:  }
-  
+
   mutating
   func addrOnly(x x: AddrOnly) -> AddrOnly { return x }
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16ConformingStructS_1XS_FS1_8addrOnly{{.*}} : $@convention(witness_method) (@out AddrOnly, @in AddrOnly, @inout ConformingStruct) -> () {
@@ -128,7 +128,7 @@ struct ConformingStruct : X {
   // CHECK-NEXT:    %4 = apply %3(%0, %1, %2) : $@convention(method) (@out AddrOnly, @in AddrOnly, @inout ConformingStruct) -> ()
   // CHECK-NEXT:    return %4 : $()
   // CHECK-NEXT:  }
-  
+
   mutating
   func generic<C>(x x: C) -> C { return x }
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16ConformingStructS_1XS_FS1_7generic{{.*}} : $@convention(witness_method) <A> (@out A, @in A, @inout ConformingStruct) -> () {
@@ -169,7 +169,7 @@ final class ConformingClass : X {
   // CHECK-NEXT:    %3 = load %2 : $*ConformingClass
   // CHECK-NEXT:    strong_retain %3 : $ConformingClass
   // CHECK-NEXT:    %5 = load %1 : $*ConformingClass
-  // CHECK:         %6 = function_ref @_TFC9witnesses15ConformingClass9selfTypes 
+  // CHECK:         %6 = function_ref @_TFC9witnesses15ConformingClass9selfTypes
   // CHECK-NEXT:    %7 = apply %6(%5, %3) : $@convention(method) (@owned ConformingClass, @guaranteed ConformingClass) -> @owned ConformingClass
   // CHECK-NEXT:    store %7 to %0 : $*ConformingClass
   // CHECK-NEXT:    %9 = tuple ()
@@ -383,7 +383,7 @@ struct IUOFailableModel : NonFailableRefinement, IUOFailableRequirement {
   // CHECK:   [[IUO_RESULT:%[0-9]+]] = apply [[INIT]]([[FOO]], [[META]]) : $@convention(thin) (Int, @thin IUOFailableModel.Type) -> ImplicitlyUnwrappedOptional<IUOFailableModel>
   // CHECK:   [[IUO_RESULT_TEMP:%[0-9]+]] = alloc_stack $ImplicitlyUnwrappedOptional<IUOFailableModel>
   // CHECK:   store [[IUO_RESULT]] to [[IUO_RESULT_TEMP]] : $*ImplicitlyUnwrappedOptional<IUOFailableModel>
-  
+
   // CHECK:   [[FORCE_FN:%[0-9]+]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue{{.*}} : $@convention(thin) <τ_0_0> (@out τ_0_0, @in ImplicitlyUnwrappedOptional<τ_0_0>) -> ()
   // CHECK:   [[RESULT_TEMP:%[0-9]+]] = alloc_stack $IUOFailableModel
   // CHECK:   apply [[FORCE_FN]]<IUOFailableModel>([[RESULT_TEMP]], [[IUO_RESULT_TEMP]]) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in ImplicitlyUnwrappedOptional<τ_0_0>) -> ()

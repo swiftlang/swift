@@ -35,7 +35,7 @@ enum class PlatformKind {
 /// Returns the short string representing the platform, suitable for
 /// use in availability specifications (e.g., "OSX").
 StringRef platformString(PlatformKind platform);
-  
+
 /// Returns the platform kind corresponding to the passed-in short platform name
 /// or None if such a platform kind does not exist.
 Optional<PlatformKind> platformFromString(StringRef Name);
@@ -52,10 +52,10 @@ StringRef prettyPlatformString(PlatformKind platform);
 /// active when the target platform is OSX and app extension restrictions are
 /// disabled. PlatformKind::none is always considered active.
 bool isPlatformActive(PlatformKind Platform, LangOptions &LangOpts);
-  
+
 /// Returns the target platform for the given language options.
 PlatformKind targetPlatform(LangOptions &LangOpts);
-  
+
 } // end namespace swift
 
 #endif

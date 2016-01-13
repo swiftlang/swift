@@ -108,7 +108,7 @@ enum class ImportTypeKind {
 
   /// \brief Import the declared type of a variable.
   Variable,
-  
+
   /// \brief Import the declared type of an audited variable.
   ///
   /// This is exactly like ImportTypeKind::Variable, except it
@@ -117,7 +117,7 @@ enum class ImportTypeKind {
 
   /// \brief Import the declared type of a struct or union field.
   RecordField,
-  
+
   /// \brief Import the result type of a function.
   ///
   /// This provides special treatment for 'void', among other things, and
@@ -219,7 +219,7 @@ namespace api_notes = clang::api_notes;
 using api_notes::FactoryAsInitKind;
 
 /// \brief Implementation of the Clang importer.
-class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation 
+class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation
   : public LazyMemberLoader, public clang::ModuleFileExtension
 {
   friend class ClangImporter;
@@ -370,7 +370,7 @@ public:
   getKnownGlobalFunction(const clang::FunctionDecl *function);
 
   /// Determine whether the given class has designated initializers,
-  /// consulting 
+  /// consulting
   bool hasDesignatedInitializers(const clang::ObjCInterfaceDecl *classDecl);
 
   /// Determine whether the given method is a designated initializer
@@ -691,7 +691,7 @@ public:
   clang::Preprocessor &getClangPreprocessor() const {
     return Instance->getPreprocessor();
   }
-  
+
   clang::CodeGenOptions &getClangCodeGenOpts() const {
     return Instance->getCodeGenOpts();
   }
@@ -881,7 +881,7 @@ public:
   bool shouldIgnoreMacro(StringRef name, const clang::MacroInfo *macro);
 
   /// \brief Classify the given Clang enumeration type to describe how it
-  /// should be imported 
+  /// should be imported
   static EnumKind classifyEnum(clang::Preprocessor &pp,
                                const clang::EnumDecl *decl);
 

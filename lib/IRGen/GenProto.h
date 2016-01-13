@@ -38,7 +38,7 @@ namespace irgen {
   class IRGenModule;
   class ProtocolInfo;
   class TypeInfo;
-  
+
   /// Extract the method pointer from an archetype's witness table
   /// as a function value.
   void emitWitnessMethodValue(IRGenFunction &IGF,
@@ -117,7 +117,7 @@ namespace irgen {
                                  Explosion &args,
                                  WitnessMetadata *witnessMetadata,
                                  const GetParameterFn &getParameter);
-  
+
   /// Perform the metadata bindings necessary to emit a generic value witness.
   void emitPolymorphicParametersForGenericValueWitness(IRGenFunction &IGF,
                                                        NominalTypeDecl *ntd,
@@ -141,7 +141,7 @@ namespace irgen {
   /// Currently, this is true if the size and/or alignment of the type is
   /// dependent on its generic parameters.
   bool hasDependentValueWitnessTable(IRGenModule &IGM, CanType ty);
-  
+
   /// Emit a value-witness table for the given type, which is assumed
   /// to be non-dependent.
   llvm::Constant *emitValueWitnessTable(IRGenModule &IGM, CanType type);
@@ -198,7 +198,7 @@ namespace irgen {
   /// Deallocate space for a value in a value buffer.
   void emitDeallocateBuffer(IRGenFunction &IGF, SILType valueType,
                             Address buffer);
-  
+
 } // end namespace irgen
 } // end namespace swift
 

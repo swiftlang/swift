@@ -436,7 +436,7 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   set(SWIFT_HOST_VARIANT_ARCH "x86_64" CACHE STRING
       "Deployment arch for Swift host tools (the compiler).")
 
-  # Display Xcode toolchain version. 
+  # Display Xcode toolchain version.
   # The SDK configuration below prints each SDK version.
   execute_process(
     COMMAND "xcodebuild" "-version"

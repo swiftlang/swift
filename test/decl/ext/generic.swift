@@ -4,7 +4,7 @@ protocol P1 { typealias AssocType }
 protocol P2 : P1 { }
 protocol P3 { }
 
-struct X<T : P1, U : P2, V> { 
+struct X<T : P1, U : P2, V> {
   struct Inner<A, B : P3> { } // expected-error{{generic type 'Inner' nested in type}}
 
   struct NonGenericInner { } // expected-error{{nested in generic type}}
@@ -13,7 +13,7 @@ struct X<T : P1, U : P2, V> {
 struct Y {
   struct Inner<A, B : P3> { } // expected-error{{generic type 'Inner' nested in type}}
 
-  struct NonGenericInner { } 
+  struct NonGenericInner { }
 }
 
 struct Z<T : P1 where T.AssocType : P3> { }
@@ -22,7 +22,7 @@ extension Int : P1 {
   typealias AssocType = Int
 }
 
-extension Double : P2 { 
+extension Double : P2 {
   typealias AssocType = Double
 }
 
@@ -65,7 +65,7 @@ extension MemberTypeCheckB {
 }
 
 extension MemberTypeCheckB {
-  var t2: Element { return t1 }  
+  var t2: Element { return t1 }
 }
 
 // rdar://problem/19795284

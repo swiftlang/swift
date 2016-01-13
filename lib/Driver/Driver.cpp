@@ -64,7 +64,7 @@ Driver::Driver(StringRef DriverExecutable,
   : Opts(createSwiftOptTable()), Diags(Diags),
     Name(Name), DriverExecutable(DriverExecutable),
     DefaultTargetTriple(llvm::sys::getDefaultTargetTriple()) {
-      
+
   // The driver kind must be parsed prior to parsing arguments, since that
   // affects how arguments are parsed.
   parseDriverKind(Args.slice(1));
@@ -95,7 +95,7 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
   .Case("swiftc", DriverKind::Batch)
   .Case("swift-autolink-extract", DriverKind::AutolinkExtract)
   .Default(None);
-  
+
   if (Kind.hasValue())
     driverKind = Kind.getValue();
   else if (!OptName.empty())
@@ -371,7 +371,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
 
   if (Diags.hadAnyError())
     return nullptr;
-  
+
   const ToolChain *TC = getToolChain(*ArgList);
   if (!TC) {
     Diags.diagnose(SourceLoc(), diag::error_unknown_target,
@@ -1682,7 +1682,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
       const TypeToPathMap *OMForInput = nullptr;
       if (OFM)
         OMForInput = OFM->getOutputMapForInput(Input);
-      
+
       OutputFile = getOutputFilename(C, JA, OI, OMForInput, C.getArgs(),
                                      AtTopLevel, Input, InputJobs,
                                      Diags, Buf);
@@ -1856,7 +1856,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
 
   // 4. Construct a Job which produces the right CommandOutput.
   std::unique_ptr<Job> ownedJob = TC.constructJob(*JA, C, std::move(InputJobs),
-                                                  InputActions, 
+                                                  InputActions,
                                                   std::move(Output), OI);
   Job *J = C.addJob(std::move(ownedJob));
 

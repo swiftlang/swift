@@ -47,8 +47,8 @@ func print3(op: String, _ d: Int, _ f: Int, _ g: Int) {
   print("\(op) \(d) \(f) \(op)")
 }
 
-func print6(op: String, _ d1: Double, _ d2: Double, 
-  _ f1: Float, _ f2: Float, _ g1: CGFloat, _ g2: CGFloat) 
+func print6(op: String, _ d1: Double, _ d2: Double,
+  _ f1: Float, _ f2: Float, _ g1: CGFloat, _ g2: CGFloat)
 {
 #if arch(i386) || arch(arm)
   if (f1 != Float(g1)  ||  f2 != Float(g2)) {
@@ -62,7 +62,7 @@ func print6(op: String, _ d1: Double, _ d2: Double,
   print("\(op) \(d1),\(d2) \(f1),\(f2) \(op)")
 }
 
-func print6(op: String, _ d1: Double, _ di: Int, 
+func print6(op: String, _ d1: Double, _ di: Int,
   _ f1: Float, _ fi: Int, _ g1: CGFloat, _ gi: Int)
 {
 #if arch(i386) || arch(arm)

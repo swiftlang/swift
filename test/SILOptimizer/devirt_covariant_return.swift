@@ -88,7 +88,7 @@ func WhatShouldIDo<T>(b : B<T>) -> B<T> {
 }
 
 func doSomethingWithB<T>(b : B<T>) {
-  
+
 }
 
 struct S {}

@@ -133,7 +133,7 @@ func overloadtest(x: Int) {
 }
 
 func localtest() {
-  func shadowbug() { 
+  func shadowbug() {
     var Foo = 10
     func g() {
       struct S {
@@ -143,7 +143,7 @@ func localtest() {
       }
     }
   }
-  func scopebug() { 
+  func scopebug() {
     var Foo = 10
     struct S {
       typealias Foo = Int
@@ -151,7 +151,7 @@ func localtest() {
     Foo = 17
     _ = Foo
   }
-  func scopebug2() { 
+  func scopebug2() {
     struct S1 {}
     struct S2 {
       var x : S1

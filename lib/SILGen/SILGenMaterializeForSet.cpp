@@ -195,7 +195,7 @@ struct MaterializeForSetEmitter {
                                  ManagedValue self, RValue &&indices,
                                  SILValue resultBuffer,
                                  SILValue callbackBuffer,
-                                 SILFunction *&callback); 
+                                 SILFunction *&callback);
   SILFunction *createSetterCallback(SILFunction &F,
                                     const TypeLowering *indicesTL,
                                     CanType indicesFormalType);
@@ -499,7 +499,7 @@ static Type getSelfTypeForCallbackDeclaration(FuncDecl *witness) {
 
 SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F, GeneratorFn generator) {
   auto &ctx = SGM.getASTContext();
- 
+
   // Mangle this as if it were a conformance thunk for a closure
   // within the witness.
   std::string name;
@@ -548,7 +548,7 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F, GeneratorF
   SILResultInfo result = {
     TupleType::getEmpty(ctx), ResultConvention::Unowned
   };
-  auto extInfo = 
+  auto extInfo =
     SILFunctionType::ExtInfo()
       .withRepresentation(SILFunctionTypeRepresentation::Thin);
 
@@ -749,7 +749,7 @@ namespace {
     void emit(SILGenFunction &gen, CleanupLocation loc) override {
       gen.B.createDeallocValueBuffer(loc, ValueType, Buffer);
     }
-  }; 
+  };
 }
 
 /// Emit a materializeForSet callback that stores the value from the

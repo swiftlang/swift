@@ -19,7 +19,7 @@ func testVariableTypes(param: Int, inout param2: Double) {
 // FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Builtin.Int2048{{$}}
   a1 = 17; _ = a1
 
-  
+
   var a2 : Int = 42
 // CHECK: VarDecl '''a2''' Int{{$}}
 // CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Int2048{{$}}

@@ -44,13 +44,13 @@ class LLVM_LIBRARY_VISIBILITY SILGenModule : public ASTVisitor<SILGenModule> {
 public:
   /// The Module being constructed.
   SILModule &M;
-  
+
   /// The type converter for the module.
   TypeConverter &Types;
-  
+
   /// The Swift module we are visiting.
   Module *SwiftModule;
-  
+
   /// TopLevelSGF - The SILGenFunction used to visit top-level code, or null if
   /// the current source file is not a script source file.
   SILGenFunction /*nullable*/ *TopLevelSGF;
@@ -100,13 +100,13 @@ public:
   NormalProtocolConformance *lastEmittedConformance = nullptr;
 
   SILFunction *emitTopLevelFunction(SILLocation Loc);
-  
+
   size_t anonymousSymbolCounter = 0;
-  
+
   /// If true, all functions and globals are made fragile. Currently only used
   /// for compiling the stdlib.
   bool makeModuleFragile;
-  
+
   Optional<SILDeclRef> StringToNSStringFn;
   Optional<SILDeclRef> NSStringToStringFn;
   Optional<SILDeclRef> ArrayToNSArrayFn;
@@ -123,11 +123,11 @@ public:
   Optional<SILDeclRef> ErrorTypeToNSErrorFn;
 
   Optional<ProtocolDecl*> PointerProtocol;
-  
+
 public:
   SILGenModule(SILModule &M, Module *SM, bool makeModuleFragile);
   ~SILGenModule();
-  
+
   SILGenModule(SILGenModule const &) = delete;
   void operator=(SILGenModule const &) = delete;
 
@@ -135,10 +135,10 @@ public:
 
   static DeclName getMagicFunctionName(SILDeclRef ref);
   static DeclName getMagicFunctionName(DeclContext *dc);
-  
+
   /// Returns the type of a constant reference.
   SILType getConstantType(SILDeclRef constant);
-  
+
   /// Returns the calling convention for a function.
   SILFunctionTypeRepresentation getDeclRefRepresentation(SILDeclRef constant) {
     return getConstantType(constant).getAs<SILFunctionType>()
@@ -153,11 +153,11 @@ public:
   /// Get the function for a SILDeclRef, creating it if necessary.
   SILFunction *getFunction(SILDeclRef constant,
                            ForDefinition_t forDefinition);
-  
+
   /// Get the dynamic dispatch thunk for a SILDeclRef.
   SILFunction *getDynamicThunk(SILDeclRef constant,
                                SILConstantInfo constantInfo);
-  
+
   /// Emit a vtable thunk for a derived method if its natural abstraction level
   /// diverges from the overridden base method. If no thunking is needed,
   /// returns a static reference to the derived method.
@@ -166,12 +166,12 @@ public:
 
   /// True if a function has been emitted for a given SILDeclRef.
   bool hasFunction(SILDeclRef constant);
-  
+
   /// Get the lowered type for a Swift type.
   SILType getLoweredType(Type t) {
     return Types.getTypeLowering(t).getLoweredType();
   }
-  
+
   /// Get or create the declaration of a reabstraction thunk with the
   /// given signature.
   SILFunction *getOrCreateReabstractionThunk(
@@ -184,7 +184,7 @@ public:
   /// Determine whether the given class has any instance variables that
   /// need to be destroyed.
   bool hasNonTrivialIVars(ClassDecl *cd);
-  
+
   /// Determine whether we need to emit an ivar destroyer for the given class.
   /// An ivar destroyer is needed if a superclass of this class may define a
   /// failing designated initializer.
@@ -216,16 +216,16 @@ public:
   void visitVarDecl(VarDecl *vd);
 
   void emitAbstractFuncDecl(AbstractFunctionDecl *AFD);
-  
+
   /// Generate code for a source file of the module.
   void emitSourceFile(SourceFile *sf, unsigned startElem);
-  
+
   /// Generates code for the given FuncDecl and adds the
   /// SILFunction to the current SILModule under the name SILDeclRef(decl). For
   /// curried functions, curried entry point Functions are also generated and
   /// added to the current SILModule.
   void emitFunction(FuncDecl *fd);
-  
+
   /// \brief Generates code for the given closure expression and adds the
   /// SILFunction to the current SILModule under the name SILDeclRef(ce).
   SILFunction *emitClosure(AbstractClosureExpr *ce);
@@ -244,7 +244,7 @@ public:
 
   /// Emits the default argument generator with the given expression.
   void emitDefaultArgGenerator(SILDeclRef constant, Expr *arg);
-  
+
   /// Emits the default argument generator for the given function.
   void emitDefaultArgGenerators(SILDeclRef::Loc decl,
                                 ArrayRef<ParameterList*> paramLists);
@@ -253,7 +253,7 @@ public:
   void emitCurryThunk(ValueDecl *fd,
                       SILDeclRef entryPoint,
                       SILDeclRef nextEntryPoint);
-  
+
   /// Emits a thunk from a foreign function to the native Swift convention.
   void emitForeignToNativeThunk(SILDeclRef thunk);
 
@@ -265,10 +265,10 @@ public:
                        SILFunction *F,
                        SILLocation L);
   void postEmitFunction(SILDeclRef constant, SILFunction *F);
-  
+
   /// Add a global variable to the SILModule.
   void addGlobalVariable(VarDecl *global);
-  
+
   /// Emit SIL related to a Clang-imported declaration.
   void emitExternalDefinition(Decl *d);
 
@@ -277,7 +277,7 @@ public:
 
   /// Emit the ObjC-compatible entry point for a method.
   void emitObjCMethodThunk(FuncDecl *method);
-  
+
   /// Emit the ObjC-compatible getter and setter for a property.
   void emitObjCPropertyMethodThunks(AbstractStorageDecl *prop);
 
@@ -289,7 +289,7 @@ public:
 
   /// Get or emit the witness table for a protocol conformance.
   SILWitnessTable *getWitnessTable(ProtocolConformance *conformance);
-  
+
   /// Emit a protocol witness entry point.
   SILFunction *emitProtocolWitness(ProtocolConformance *conformance,
                                    SILLinkage linkage,
@@ -303,7 +303,7 @@ public:
   SILFunction *emitLazyGlobalInitializer(StringRef funcName,
                                          PatternBindingDecl *binding,
                                          unsigned pbdEntry);
-  
+
   /// Emit the accessor for a global variable or stored static property.
   ///
   /// This ensures the lazy initializer has been run before returning the
@@ -315,7 +315,7 @@ public:
   void emitGlobalGetter(VarDecl *global,
                         SILGlobalVariable *onceToken,
                         SILFunction *onceFunc);
-  
+
   /// True if the given function requires an entry point for ObjC method
   /// dispatch.
   bool requiresObjCMethodEntryPoint(FuncDecl *method);
@@ -326,7 +326,7 @@ public:
 
   /// Emit a global initialization.
   void emitGlobalInitialization(PatternBindingDecl *initializer, unsigned elt);
-  
+
   /// Known functions for bridging.
   SILDeclRef getStringToNSStringFn();
   SILDeclRef getNSStringToStringFn();
@@ -342,7 +342,7 @@ public:
   SILDeclRef getDarwinBooleanToBoolFn();
   SILDeclRef getNSErrorToErrorTypeFn();
   SILDeclRef getErrorTypeToNSErrorFn();
-  
+
   /// Report a diagnostic.
   template<typename...T, typename...U>
   InFlightDiagnostic diagnose(SourceLoc loc, Diag<T...> diag,
@@ -372,7 +372,7 @@ private:
   /// Emit the deallocator for a class that uses the objc allocator.
   void emitObjCAllocatorDestructor(ClassDecl *cd, DestructorDecl *dd);
 };
- 
+
 } // end namespace Lowering
 } // end namespace swift
 

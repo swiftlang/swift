@@ -48,7 +48,7 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
   auto &impl = typeVar->getImpl();
   if (auto nodePtr = impl.getGraphNode()) {
     assert(impl.getGraphIndex() < TypeVariables.size() && "Out-of-bounds index");
-    assert(TypeVariables[impl.getGraphIndex()] == typeVar && 
+    assert(TypeVariables[impl.getGraphIndex()] == typeVar &&
            "Type variable mismatch");
     return { *nodePtr, impl.getGraphIndex() };
   }
@@ -336,7 +336,7 @@ void ConstraintGraph::Change::undo(ConstraintGraph &cg) {
   case ChangeKind::AddedMemberType: {
     auto &node = cg[MemberType.TypeVar];
 
-    // Erase the member type entry from the 
+    // Erase the member type entry from the
     auto known = node.MemberTypeIndex.find(MemberType.Name);
     assert(known != node.MemberTypeIndex.end() && "Constraint graph corrupted");
     unsigned index = known->second;
@@ -348,7 +348,7 @@ void ConstraintGraph::Change::undo(ConstraintGraph &cg) {
       node.MemberTypes[index] = node.MemberTypes.back();
       node.MemberTypeIndex[node.MemberTypes[index].first] = index;
     }
-     
+
     // Pop off the last member type.
     node.MemberTypes.pop_back();
     break;
@@ -430,20 +430,20 @@ TypeVariableType *ConstraintGraph::getMemberType(
                     std::function<TypeVariableType *()> create) {
   auto repTypeVar = CS.getRepresentative(typeVar);
   auto &node = (*this)[repTypeVar];
-  
+
   return node.getMemberType(name, [&]() {
-    auto memberTypeVar = create();  
+    auto memberTypeVar = create();
     if (ActiveScope)
       Changes.push_back(Change::addedMemberType(repTypeVar, name));
     return memberTypeVar;
   });
 }
 
-void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1, 
+void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1,
                                  TypeVariableType *typeVar2) {
   assert(CS.getRepresentative(typeVar1) == CS.getRepresentative(typeVar2) &&
          "type representatives don't match");
-  
+
   // Retrieve the node for the representative that we're merging into.
   auto typeVarRep = CS.getRepresentative(typeVar1);
   auto &repNode = (*this)[typeVarRep];
@@ -472,11 +472,11 @@ void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1,
       auto repKnown = repNode.MemberTypeIndex.find(memberType.first);
       if (repKnown == repNode.MemberTypeIndex.end()) {
         // We haven't seen this member type before. Add it.
-        repNode.MemberTypeIndex.insert({memberType.first, 
+        repNode.MemberTypeIndex.insert({memberType.first,
                                         repNode.MemberTypes.size()});
         repNode.MemberTypes.push_back(memberType);
         if (ActiveScope)
-          Changes.push_back(Change::addedMemberType(typeVarRep, 
+          Changes.push_back(Change::addedMemberType(typeVarRep,
                                                     memberType.first));
         continue;
       }
@@ -895,7 +895,7 @@ void ConstraintGraphNode::verify(ConstraintGraph &cg) {
 
   // Verify that the member types haven't gotten out of sync.
   for (auto index : MemberTypeIndex) {
-    require(index.second < MemberTypes.size(), 
+    require(index.second < MemberTypes.size(),
             "member type index out-of-range");
     requireSameValue(index.first, MemberTypes[index.second].first,
                      "member type index map provides wrong index into vector");

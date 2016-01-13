@@ -110,7 +110,7 @@ struct zip<A: GeneratorType, B: GeneratorType> : GeneratorType, SequenceType {
 
      typealias Generator = zip
      func generate() -> zip { }
-     
+
 }
 
 protocol P8 { }

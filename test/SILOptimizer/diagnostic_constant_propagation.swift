@@ -23,12 +23,12 @@ func testArithmeticOverflow() {
   xu8_2 += 40 // expected-error {{arithmetic operation '240 + 40' (on type 'UInt8') results in an overflow}}
 
   var _ : UInt8 = 230 - 240 // expected-error {{arithmetic operation '230 - 240' (on type 'UInt8') results in an overflow}}
-  
+
   var xu8_3 : UInt8 = 240   // Global (cross block) analysis.
   for _ in 0..<10 {}
   xu8_3 += 40 // expected-error {{arithmetic operation '240 + 40' (on type 'UInt8') results in an overflow}}
   var _ : UInt8 = 240 + 5 + 15 // expected-error {{arithmetic operation '245 + 15' (on type 'UInt8') results in an overflow}}
-  
+
   // TODO: We should remove the second init for Int8 - see rdar://problem/19224768
   _ = Int8(126) + Int8(1+1) // expected-error {{arithmetic operation '126 + 2' (on type 'Int8') results in an overflow}}
 //  DISABLED FOR NOW
@@ -37,11 +37,11 @@ func testArithmeticOverflow() {
 //  var csh2: Int8 = (-1 & ~(1<<7))+1 // expected - error {{arithmetic operation '127 + 1' (on type 'Int8') results in an overflow}}
 }
 
-@_transparent 
+@_transparent
 func myaddSigned(x: Int8, _ y: Int8, _ z: Int8) -> Int8 {
   return x + y
 }
-@_transparent 
+@_transparent
 func myaddUnsigned(x: UInt8, _ y: UInt8, _ z: UInt8) -> UInt8 {
   return x + y
 }
@@ -103,7 +103,7 @@ func testConvertOverflow() {
   var _ /*int16_max_conv*/    = Int16(UInt64(int16_max))
   let uint64_plus_32768 : UInt64 = 32768
   var _ /*int16_max_p1_conv*/ = Int16(uint64_plus_32768) // expected-error {{integer overflows when converted from 'UInt64' to 'Int16'}}
-  
+
   var _ /*int8_max_pa*/      : Int8   = -13333; //expected-error{{integer literal '-13333' overflows when stored into 'Int8}}
   var _ /*int32_max_p_hex*/  : Int32  = 0xFFFF_FFFF; //expected-error{{integer literal '4294967295' overflows when stored into 'Int32'}}
   var _ /*uint32_max_hex*/   : UInt32 = 0xFFFF_FFFF
@@ -147,7 +147,7 @@ func testConvertOverflow() {
   let _ /*ssint8_zero*/   = UInt8(int8_zero)
   let uint8_zero : UInt8 = 0
   let _ /*ssint8_zero2*/  = Int8(uint8_zero)
-  
+
   // Check signed to unsigned extending size conversions.
   UInt16(Int8(-1)) // expected-error{{negative integer cannot be converted to unsigned type 'UInt16'}} // expected-warning{{unused}}
   UInt64(Int16(-200)) // expected-error{{negative integer cannot be converted to unsigned type 'UInt64'}} // expected-warning{{unused}}
@@ -207,11 +207,11 @@ func testConvertOverflow() {
   var _/*float64_min_definitely_overflow*/ : Float64 = (-179769313486231590772930519078902473361797697894230657273430081157732675805500963132708477322407536021120113879871393357658789768814416622492847430639474124377767893424865485276302219601246094119453082952085005768838150682342462881473913110540827237163350510684586298239947245938479716304835356329624224137216) // expected-error {{integer literal '-179769313486231590772930519078902473361797697894230657273430081157732675805500963132708477322407536021120113879871393357658789768814416622492847430639474124377767893424865485276302219601246094119453082952085005768838150682342462881473913110540827237163350510684586298239947245938479716304835356329624224137216' overflows when stored into 'Double'}}
 }
 
-@_transparent 
+@_transparent
 func intConversionWrapperForUSCheckedConversion(x: UInt8, _ unused: UInt8) -> Int8 {
   return Int8(x)
 }
-@_transparent 
+@_transparent
 func intConversionWrapperForLiteral() -> Int8 {
   return 255 // expected-error {{integer literal '255' overflows when stored into 'Int8'}}
 }

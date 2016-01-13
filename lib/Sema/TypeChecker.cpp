@@ -101,11 +101,11 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
 
   if (!isa<LiteralExpr>(expr))
     return nullptr;
-  
+
   if (isa<NilLiteralExpr>(expr))
     return getProtocol(expr->getLoc(),
                        KnownProtocolKind::NilLiteralConvertible);
-  
+
   if (isa<IntegerLiteralExpr>(expr))
     return getProtocol(expr->getLoc(),
                        KnownProtocolKind::IntegerLiteralConvertible);
@@ -386,7 +386,7 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
          currentExternalDef != n;
          ++currentExternalDef) {
       auto decl = TC.Context.ExternalDefinitions[currentExternalDef];
-      
+
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(decl)) {
         // HACK: don't type-check the same function body twice.  This is
         // supposed to be handled by just not enqueuing things twice,
@@ -529,7 +529,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
     if (Options.contains(TypeCheckingFlags::ForImmediateMode))
       TC.setInImmediateMode(true);
-    
+
     // Lookup the swift module.  This ensures that we record all known
     // protocols in the AST.
     (void) TC.getStdlibModule(&SF);
@@ -562,7 +562,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     });
 
     // FIXME: Check for cycles in class inheritance here?
-    
+
     // Type check the top-level elements of the source file.
     for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
       if (isa<TopLevelCodeDecl>(D))
@@ -916,11 +916,11 @@ private:
         }
       }
     }
-    
+
     if (declarationIntroducesNewContext(D)) {
       return buildDeclarationRefinementContext(D);
     }
-    
+
     return nullptr;
   }
 
@@ -933,19 +933,19 @@ private:
     // probably to gin up a source range for the declaration when synthesizing
     // it.
     assert(D->getSourceRange().isValid());
-    
+
     // The potential versions in the declaration are constrained by both
     // the declared availability of the declaration and the potential versions
     // of its lexical context.
     VersionRange DeclVersionRange =
         swift::AvailabilityInference::availableRange(D, TC.Context);
     DeclVersionRange.intersectWith(getCurrentTRC()->getPotentialVersions());
-    
+
     TypeRefinementContext *NewTRC =
         TypeRefinementContext::createForDecl(TC.Context, D, getCurrentTRC(),
                                              DeclVersionRange,
                                              refinementSourceRangeForDecl(D));
-    
+
     // Record the TRC for this storage declaration so that
     // when we process the accessor, we can use this TRC as the
     // parent.
@@ -954,22 +954,22 @@ private:
         StorageContexts[StorageDecl] = NewTRC;
       }
     }
-    
+
     return NewTRC;
   }
-  
+
   /// Returns true if the declaration should introduce a new refinement context.
   bool declarationIntroducesNewContext(Decl *D) {
     if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D)) {
       return false;
     }
-    
+
     // No need to introduce a context if the declaration does not have an
     // availability attribute.
     if (!hasActiveAvailableAttribute(D, TC.Context)) {
       return false;
     }
-    
+
     // Only introduce for an AbstractStorageDecl if it is not local.
     // We introduce for the non-local case because these may
     // have getters and setters (and these may be synthesized, so they might
@@ -980,7 +980,7 @@ private:
         return false;
       }
     }
-    
+
     return true;
   }
 
@@ -995,7 +995,7 @@ private:
         return SourceRange(storageDecl->getStartLoc(),
                            storageDecl->getBracesRange().End);
       }
-      
+
       // For a variable declaration (without accessors) we use the range of the
       // containing pattern binding declaration to make sure that we include
       // any type annotation in the type refinement context range.
@@ -1005,7 +1005,7 @@ private:
           return PBD->getSourceRange();
       }
     }
-    
+
     return D->getSourceRange();
   }
 
@@ -1161,7 +1161,7 @@ private:
     // Any refinement contexts introduced in the statement condition
     // will end at the end of the last condition element.
     StmtConditionElement LastElement = Cond.back();
-    
+
     // Keep track of how many nested refinement contexts we have pushed on
     // the context stack so we can pop them when we're done building the
     // context for the StmtCondition.
@@ -1207,7 +1207,7 @@ private:
         TC.Diags.diagnose(Query->getLoc(),
                           diag::availability_query_required_for_platform,
                           platformString(targetPlatform(TC.getLangOpts())));
-        
+
         continue;
       }
 
@@ -1341,7 +1341,7 @@ private:
     return E;
   }
 };
-  
+
 }
 
 void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF,
@@ -1441,7 +1441,7 @@ bool TypeChecker::isDeclAvailable(const Decl *D, SourceLoc referenceLoc,
       AvailabilityInference::availableRange(D, Context);
   VersionRange runningOSOverApprox = overApproximateOSVersionsAtLocation(
       referenceLoc, referenceDC);
-  
+
   // The reference is safe if an over-approximation of the running OS
   // versions is fully contained within an under-approximation
   // of the versions on which the declaration is available. If this
@@ -1451,7 +1451,7 @@ bool TypeChecker::isDeclAvailable(const Decl *D, SourceLoc referenceLoc,
     OutAvailableRange = safeRangeUnderApprox;
     return false;
   }
-  
+
   return true;
 }
 

@@ -44,12 +44,12 @@ using namespace swift;
 #endif
 
 namespace {
-  
+
 /// The layout of protocol<>.
 using Any = OpaqueExistentialContainer;
 
-// Swift assumes Any is returned in memory. 
-// Use AnyReturn to guarantee that even on architectures 
+// Swift assumes Any is returned in memory.
+// Use AnyReturn to guarantee that even on architectures
 // where Any would be returned in registers.
 struct AnyReturn {
   Any any;
@@ -63,33 +63,33 @@ struct _ReflectableWitnessTable {
   /// func _getMirror() -> Mirror
   Mirror (*getMirror)(OpaqueValue *self, const Metadata *Self);
 };
-  
+
 struct MagicMirrorData;
-  
+
 struct String;
-  
+
 extern "C" void swift_stringFromUTF8InRawMemory(String *out,
                                                 const char *start,
                                                 intptr_t len);
-  
+
 struct String {
   // Keep the details of String's implementation opaque to the runtime.
   const void *x, *y, *z;
-  
+
   /// Keep String trivial on the C++ side so we can control its instantiation.
   String() = default;
-  
+
   /// Wrap a string literal in a swift String.
   template<size_t N>
   explicit String(const char (&s)[N]) {
     swift_stringFromUTF8InRawMemory(this, s, N-1);
   }
-  
+
   /// Copy an ASCII string into a swift String on the heap.
   explicit String(const char *ptr, size_t size) {
     swift_stringFromUTF8InRawMemory(this, ptr, size);
   }
-  
+
   explicit String(const char *ptr)
     : String(ptr, strlen(ptr))
   {}
@@ -104,19 +104,19 @@ struct String {
     swift_stringFromUTF8InRawMemory(this, concatenated, len1 + len2);
     free(concatenated);
   }
-#if SWIFT_OBJC_INTEROP  
+#if SWIFT_OBJC_INTEROP
   explicit String(NSString *s)
     // FIXME: Use the usual NSString bridging entry point.
     : String([s UTF8String])
   {}
 #endif
 };
-  
+
 struct Array {
   // Keep the details of Array's implementation opaque to the runtime.
   const void *x;
 };
-  
+
 struct PlaygroundQuickLook {
   struct RawData {
     Array Data;
@@ -131,7 +131,7 @@ struct PlaygroundQuickLook {
   struct Interval {
     int64_t loc,len;
   };
-  
+
   union {
     String TextOrURL;
     int64_t Int;
@@ -167,7 +167,7 @@ struct PlaygroundQuickLook {
     Raw,
   } Kind;
 };
-  
+
 struct StringMirrorTuple {
   String first;
   Mirror second;
@@ -194,13 +194,13 @@ struct OptionalPlaygroundQuickLook {
     PlaygroundQuickLook payload;
   };
 };
-  
+
 /// A Mirror witness table for use by MagicMirror.
 struct MirrorWitnessTable;
-  
+
 /// The protocol descriptor for _Reflectable from the stdlib.
 extern "C" const ProtocolDescriptor _TMps12_Reflectable;
-  
+
 // This structure needs to mirror _MagicMirrorData in the stdlib.
 struct MagicMirrorData {
   /// The owner pointer for the buffer the value lives in. For class values
@@ -215,7 +215,7 @@ struct MagicMirrorData {
 };
 static_assert(sizeof(MagicMirrorData) == sizeof(ValueBuffer),
               "MagicMirrorData doesn't exactly fill a ValueBuffer");
-  
+
 /// A magic implementation of Mirror that can use runtime metadata to walk an
 /// arbitrary object.
 ///
@@ -229,18 +229,18 @@ public:
   // The existential header.
   const Metadata *Self;
   const MirrorWitnessTable *MirrorWitness;
-  
+
   MagicMirror() = default;
-  
+
   /// Build a new MagicMirror for type T by taking ownership of the referenced
   /// value.
   MagicMirror(OpaqueValue *value, const Metadata *T, bool take);
-  
+
   /// Build a new MagicMirror for type T, sharing ownership with an existing
   /// heap object, which is retained.
   MagicMirror(HeapObject *owner, const OpaqueValue *value, const Metadata *T);
 };
-    
+
 static_assert(alignof(MagicMirror) == alignof(Mirror),
               "MagicMirror layout does not match existential container");
 static_assert(sizeof(MagicMirror) == sizeof(Mirror),
@@ -252,21 +252,21 @@ static_assert(offsetof(MagicMirror, Self) == offsetof(OpaqueExistentialContainer
 static_assert(offsetof(MagicMirror, MirrorWitness) ==
               offsetof(Mirror, MirrorWitness),
               "MagicMirror layout does not match existential container");
-  
+
 // -- Build an Any from an arbitrary value unowned-referenced by a mirror.
 
 // We intentionally use a non-POD return type with these entry points to give
 // them an indirect return ABI for compatibility with Swift.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
-  
+
 
 extern "C"
 AnyReturn swift_MagicMirrorData_value(HeapObject *owner,
                                       const OpaqueValue *value,
                                       const Metadata *type) {
   Any result;
-  
+
   result.Type = type;
   type->vw_initializeBufferWithCopy(&result.Buffer,
                                     const_cast<OpaqueValue*>(value));
@@ -286,7 +286,7 @@ AnyReturn swift_MagicMirrorData_objcValue(HeapObject *owner,
                                           const OpaqueValue *value,
                                           const Metadata *type) {
   Any result;
-    
+
   void *object = *reinterpret_cast<void * const *>(value);
   auto isa = _swift_getClass(object);
   result.Type = swift_getObjCClassMetadata(isa);
@@ -347,7 +347,7 @@ void swift_MagicMirrorData_summary(const Metadata *T, String *result) {
   }
 }
 
-  
+
 extern "C"
 const Metadata *swift_MagicMirrorData_objcValueType(HeapObject *owner,
                                                     const OpaqueValue *value,
@@ -356,9 +356,9 @@ const Metadata *swift_MagicMirrorData_objcValueType(HeapObject *owner,
   auto isa = _swift_getClass(object);
   return swift_getObjCClassMetadata(isa);
 }
-  
+
 // -- Tuple destructuring.
-  
+
 extern "C"
 intptr_t swift_TupleMirror_count(HeapObject *owner,
                                  const OpaqueValue *value,
@@ -366,7 +366,7 @@ intptr_t swift_TupleMirror_count(HeapObject *owner,
   auto Tuple = static_cast<const TupleTypeMetadata *>(type);
   return Tuple->NumElements;
 }
-  
+
 static std::tuple<const _ReflectableWitnessTable *, const Metadata *,
                   const OpaqueValue *>
 getReflectableConformance(const Metadata *T, const OpaqueValue *Value) {
@@ -385,11 +385,11 @@ recur:
   case MetadataKind::Function:
   case MetadataKind::Metatype:
     break;
-      
+
   case MetadataKind::Existential: {
     auto existential
       = static_cast<const ExistentialTypeMetadata *>(T);
-    
+
     // If the existential happens to include the _Reflectable protocol, use
     // the witness table from the container.
     unsigned wtOffset = 0;
@@ -404,7 +404,7 @@ recur:
       if (existential->Protocols[i]->Flags.needsWitnessTable())
         ++wtOffset;
     }
-    
+
     // Otherwise, unwrap the existential container and do a runtime lookup on
     // its contained value as usual.
     T = existential->getDynamicType(Value);
@@ -419,14 +419,14 @@ recur:
     // really matter yet since we don't have any special mirror behavior for
     // concrete metatypes yet.
     break;
-      
+
   // Types can't have these kinds.
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::HeapGenericLocalVariable:
   case MetadataKind::ErrorObject:
     swift::crash("Swift mirror lookup failure");
   }
-  
+
   return std::make_tuple(
       reinterpret_cast<const _ReflectableWitnessTable*>(
         swift_conformsToProtocol(T, &_TMps12_Reflectable)),
@@ -448,7 +448,7 @@ static Mirror reflect(HeapObject *owner,
   const OpaqueValue *mirrorValue;
   std::tie(witness, mirrorType, mirrorValue)
     = getReflectableConformance(T, value);
-  
+
   // Use the _Reflectable conformance if the object has one.
   if (witness) {
     auto result =
@@ -462,7 +462,7 @@ static Mirror reflect(HeapObject *owner,
   ::new (&result) MagicMirror(owner, mirrorValue, mirrorType);
   return result;
 }
-  
+
 /// \param owner passed at +1, consumed.
 /// \param value passed unowned.
 extern "C"
@@ -471,18 +471,18 @@ StringMirrorTuple swift_TupleMirror_subscript(intptr_t i,
                                               const OpaqueValue *value,
                                               const Metadata *type) {
   StringMirrorTuple result;
-  
+
   auto Tuple = static_cast<const TupleTypeMetadata *>(type);
-  
+
   if (i < 0 || (size_t)i > Tuple->NumElements)
     swift::crash("Swift mirror subscript bounds check failure");
-  
+
   // The name is the stringized element number '.0'.
   char buf[32];
   snprintf(buf, 31, ".%zd", i);
   buf[31] = 0;
   result.first = String(buf, strlen(buf));
-  
+
   // Get a Mirror for the nth element.
   auto &elt = Tuple->getElement(i);
   auto bytes = reinterpret_cast<const char*>(value);
@@ -496,7 +496,7 @@ StringMirrorTuple swift_TupleMirror_subscript(intptr_t i,
 
   return result;
 }
-  
+
 // Get a field name from a doubly-null-terminated list.
 static const char *getFieldName(const char *fieldNames, size_t i) {
   const char *fieldName = fieldNames;
@@ -510,7 +510,7 @@ static const char *getFieldName(const char *fieldNames, size_t i) {
 }
 
 // -- Struct destructuring.
-  
+
 extern "C"
 intptr_t swift_StructMirror_count(HeapObject *owner,
                                   const OpaqueValue *value,
@@ -525,16 +525,16 @@ StringMirrorTuple swift_StructMirror_subscript(intptr_t i,
                                                const OpaqueValue *value,
                                                const Metadata *type) {
   StringMirrorTuple result;
-  
+
   auto Struct = static_cast<const StructMetadata *>(type);
-  
+
   if (i < 0 || (size_t)i > Struct->Description->Struct.NumFields)
     swift::crash("Swift mirror subscript bounds check failure");
-  
+
   // Load the type and offset from their respective vectors.
   auto fieldType = Struct->getFieldTypes()[i];
   auto fieldOffset = Struct->getFieldOffsets()[i];
-  
+
   auto bytes = reinterpret_cast<const char*>(value);
   auto fieldData = reinterpret_cast<const OpaqueValue *>(bytes + fieldOffset);
 
@@ -657,7 +657,7 @@ StringMirrorTuple swift_EnumMirror_subscript(intptr_t i,
 
   return result;
 }
-  
+
 // -- Class destructuring.
 static Mirror getMirrorForSuperclass(const ClassMetadata *sup,
                                      HeapObject *owner,
@@ -688,7 +688,7 @@ StringMirrorTuple swift_ClassMirror_subscript(intptr_t i,
                                               const OpaqueValue *value,
                                               const Metadata *type) {
   StringMirrorTuple result;
-  
+
   auto Clas = static_cast<const ClassMetadata*>(type);
 
   if (classHasSuperclass(Clas)) {
@@ -703,15 +703,15 @@ StringMirrorTuple swift_ClassMirror_subscript(intptr_t i,
     }
     --i;
   }
-  
+
   if (i < 0 || (size_t)i > Clas->getDescription()->Class.NumFields)
     swift::crash("Swift mirror subscript bounds check failure");
-  
+
   // Load the type and offset from their respective vectors.
   auto fieldType = Clas->getFieldTypes()[i];
   assert(!fieldType.isIndirect()
          && "class indirect properties not implemented");
-  
+
   // FIXME: If the class has ObjC heritage, get the field offset using the ObjC
   // metadata, because we don't update the field offsets in the face of
   // resilient base classes.
@@ -727,19 +727,19 @@ StringMirrorTuple swift_ClassMirror_subscript(intptr_t i,
     swift::crash("Object appears to be Objective-C, but no runtime.");
 #endif
   }
-  
+
   auto bytes = *reinterpret_cast<const char * const*>(value);
   auto fieldData = reinterpret_cast<const OpaqueValue *>(bytes + fieldOffset);
-  
+
   result.first = String(getFieldName(Clas->getDescription()->Class.FieldNames, i));
   // 'owner' is consumed by this call.
   result.second = reflect(owner, fieldData, fieldType.getType());
   return result;
 }
-  
+
 // -- Mirror witnesses for ObjC classes.
 
-#if SWIFT_OBJC_INTEROP  
+#if SWIFT_OBJC_INTEROP
 
 extern "C" const Metadata _TMSb; // Bool
 extern "C" const Metadata _TMSi; // Int
@@ -754,10 +754,10 @@ extern "C" const Metadata _TMVs5UInt8;
 extern "C" const Metadata _TMVs6UInt16;
 extern "C" const Metadata _TMVs6UInt32;
 extern "C" const Metadata _TMVs6UInt64;
-  
+
 // Set to 1 to enable reflection of objc ivars.
 #define REFLECT_OBJC_IVARS 0
-  
+
 /// Map an ObjC type encoding string to a Swift type metadata object.
 ///
 #if REFLECT_OBJC_IVARS
@@ -773,7 +773,7 @@ static const Metadata *getMetadataForEncoding(const char *encoding) {
     return &_TMSi;
   case 'q': // long long
     return &_TMVs5Int64;
-      
+
   case 'C': // unsigned char
     return &_TMVs5UInt8;
   case 'S': // unsigned short
@@ -784,16 +784,16 @@ static const Metadata *getMetadataForEncoding(const char *encoding) {
     return &_TMSu;
   case 'Q': // unsigned long long
     return &_TMVs6UInt64;
-      
+
   case 'B': // _Bool
     return &_TMSb;
-      
+
   case '@': { // Class
     // TODO: Better metadata?
     const OpaqueMetadata *M = &_TMBO;
     return &M->base;
   }
-      
+
   default: // TODO
     // Return 'void' as the type of fields we don't understand.
     return &_TMT_;
@@ -808,7 +808,7 @@ intptr_t swift_ObjCMirror_count(HeapObject *owner,
                                 const OpaqueValue *value,
                                 const Metadata *type) {
   auto isa = (Class)type;
-  
+
   unsigned count = 0;
 #if REFLECT_OBJC_IVARS
   // Don't reflect ivars of classes that lie about their layout.
@@ -823,11 +823,11 @@ intptr_t swift_ObjCMirror_count(HeapObject *owner,
 #else
   // ObjC makes no guarantees about the state of ivars, so we can't safely
   // introspect them in the general case.
-  
+
   // The superobject counts as a child.
   if (_swift_getSuperclass((const ClassMetadata*) isa))
     count += 1;
-  
+
   swift_release(owner);
   return count;
 #endif
@@ -837,7 +837,7 @@ static Mirror ObjC_getMirrorForSuperclass(Class sup,
                                           HeapObject *owner,
                                           const OpaqueValue *value,
                                           const Metadata *type);
-  
+
 extern "C"
 StringMirrorTuple swift_ObjCMirror_subscript(intptr_t i,
                                              HeapObject *owner,
@@ -847,7 +847,7 @@ StringMirrorTuple swift_ObjCMirror_subscript(intptr_t i,
   id object = *reinterpret_cast<const id *>(value);
 #endif
   auto isa = (Class)type;
-  
+
   // If there's a superclass, it becomes the first child.
   if (auto sup = (Class) _swift_getSuperclass((const ClassMetadata*) isa)) {
     if (i == 0) {
@@ -859,7 +859,7 @@ StringMirrorTuple swift_ObjCMirror_subscript(intptr_t i,
     }
     --i;
   }
-  
+
 #if REFLECT_OBJC_IVARS
   // Copying the ivar list just to free it is lame, but we have
   // no room to save it.
@@ -874,21 +874,21 @@ StringMirrorTuple swift_ObjCMirror_subscript(intptr_t i,
     // nowhere to save it.
     ivars = class_copyIvarList(isa, &count);
   }
-  
+
   if (i < 0 || (uintptr_t)i >= (uintptr_t)count)
     swift::crash("Swift mirror subscript bounds check failure");
-  
+
   const char *name = ivar_getName(ivars[i]);
   ptrdiff_t offset = ivar_getOffset(ivars[i]);
   const char *typeEncoding = ivar_getTypeEncoding(ivars[i]);
   free(ivars);
-  
+
   const OpaqueValue *ivar =
     reinterpret_cast<const OpaqueValue *>(
     reinterpret_cast<const char*>(object) + offset);
-  
+
   const Metadata *ivarType = getMetadataForEncoding(typeEncoding);
-  
+
   StringMirrorTuple result;
   result.first = String(name, strlen(name));
   // 'owner' is consumed by this call.
@@ -897,7 +897,7 @@ StringMirrorTuple swift_ObjCMirror_subscript(intptr_t i,
 #else
   // ObjC makes no guarantees about the state of ivars, so we can't safely
   // introspect them in the general case.
-  abort();  
+  abort();
 #endif
 }
 
@@ -906,7 +906,7 @@ swift_ClassMirror_quickLookObject(HeapObject *owner, const OpaqueValue *value,
                                   const Metadata *type) {
   OptionalPlaygroundQuickLook result;
   memset(&result, 0, sizeof(result));
-  
+
   id object = [*reinterpret_cast<const id *>(value) retain];
   swift_release(owner);
   if ([object respondsToSelector:@selector(debugQuickLookObject)]) {
@@ -915,11 +915,11 @@ swift_ClassMirror_quickLookObject(HeapObject *owner, const OpaqueValue *value,
     [object release];
     object = quickLookObject;
   }
-  
+
   // NSNumbers quick-look as integers or doubles, depending on type.
   if ([object isKindOfClass:[NSNumber class]]) {
     NSNumber *n = object;
-    
+
     switch ([n objCType][0]) {
     case 'd': // double
       result.payload.Double = [n doubleValue];
@@ -929,7 +929,7 @@ swift_ClassMirror_quickLookObject(HeapObject *owner, const OpaqueValue *value,
       result.payload.Float = [n floatValue];
       result.payload.Kind = PlaygroundQuickLook::Tag::Float;
       break;
-        
+
     case 'Q': // unsigned long long
       result.payload.UInt = [n unsignedLongLongValue];
       result.payload.Kind = PlaygroundQuickLook::Tag::UInt;
@@ -941,20 +941,20 @@ swift_ClassMirror_quickLookObject(HeapObject *owner, const OpaqueValue *value,
       result.payload.Kind = PlaygroundQuickLook::Tag::Int;
       break;
     }
-    
+
     [object release];
     result.optional.isNone = false;
     return result;
   }
-  
+
   // Various other framework types are used for rich representations.
-  
+
   /// Store an ObjC reference into an Any.
   auto initializeAnyWithTakeOfObject = [](Any &any, id obj) {
     any.Type = swift_getObjCClassMetadata(_swift_getClass((const void*) obj));
     *reinterpret_cast<id *>(&any.Buffer) = obj;
   };
-  
+
   if ([object isKindOfClass:NSClassFromString(@"NSAttributedString")]) {
     initializeAnyWithTakeOfObject(result.payload.Any, object);
     result.payload.Kind = PlaygroundQuickLook::Tag::AttributedString;
@@ -989,14 +989,14 @@ swift_ClassMirror_quickLookObject(HeapObject *owner, const OpaqueValue *value,
     result.optional.isNone = false;
     return result;
   }
-  
+
   // Return none if we didn't get a suitable object.
   [object release];
   result.optional.isNone = true;
   return result;
 }
 #endif
-  
+
 // -- MagicMirror implementation.
 
 // TODO: There are other non-Apple platforms that underscore asm symbols.
@@ -1041,7 +1041,7 @@ extern "C" const Metadata MetatypeMirrorMetadata
   __asm__(UNDERSCORE "_TMVs15_MetatypeMirror");
 extern "C" const MirrorWitnessTable MetatypeMirrorWitnessTable
   __asm__(UNDERSCORE "_TWPVs15_MetatypeMirrors11_MirrorTypes");
-  
+
 #if SWIFT_OBJC_INTEROP
 extern "C" const Metadata ObjCMirrorMetadata
   __asm__(UNDERSCORE "_TMVs11_ObjCMirror");
@@ -1070,13 +1070,13 @@ static Mirror getMirrorForSuperclass(const ClassMetadata *sup,
 
   Mirror resultBuf;
   MagicMirror *result = ::new (&resultBuf) MagicMirror;
-  
+
   result->Self = &ClassSuperMirrorMetadata;
   result->MirrorWitness = &ClassSuperMirrorWitnessTable;
   result->Data.Owner = owner;
   result->Data.Type = sup;
   result->Data.Value = value;
-  
+
   return resultBuf;
 }
 
@@ -1089,7 +1089,7 @@ static Mirror ObjC_getMirrorForSuperclass(Class sup,
                                           const Metadata *type) {
   Mirror resultBuf;
   MagicMirror *result = ::new (&resultBuf) MagicMirror;
-  
+
   result->Self = &ObjCSuperMirrorMetadata;
   result->MirrorWitness = &ObjCSuperMirrorWitnessTable;
   result->Data.Owner = owner;
@@ -1102,7 +1102,7 @@ static Mirror ObjC_getMirrorForSuperclass(Class sup,
 // (type being mirrored, mirror type, mirror witness)
 using MirrorTriple
   = std::tuple<const Metadata *, const Metadata *, const MirrorWitnessTable *>;
-  
+
 static MirrorTriple
 getImplementationForClass(const OpaqueValue *Value) {
   // Get the runtime type of the object.
@@ -1124,7 +1124,7 @@ getImplementationForClass(const OpaqueValue *Value) {
   return std::make_tuple(
       isa, &ClassMirrorMetadata, &ClassMirrorWitnessTable);
 }
-  
+
 /// Get the magic mirror witnesses appropriate to a particular type.
 static MirrorTriple
 getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
@@ -1132,11 +1132,11 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
   case MetadataKind::Tuple:
     return std::make_tuple(
         T, &TupleMirrorMetadata, &TupleMirrorWitnessTable);
-      
+
   case MetadataKind::Struct:
     return std::make_tuple(
         T, &StructMirrorMetadata, &StructMirrorWitnessTable);
-      
+
   case MetadataKind::Enum:
   case MetadataKind::Optional:
     return std::make_tuple(
@@ -1147,13 +1147,13 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
   case MetadataKind::Class: {
     return getImplementationForClass(Value);
   }
-      
+
   case MetadataKind::Metatype:
   case MetadataKind::ExistentialMetatype: {
     return std::make_tuple(T, &MetatypeMirrorMetadata,
                            &MetatypeMirrorWitnessTable);
   }
-      
+
   case MetadataKind::Opaque: {
 #if SWIFT_OBJC_INTEROP
     // If this is the Builtin.UnknownObject type, use the dynamic type of the
@@ -1172,13 +1172,13 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
     }
     SWIFT_FALLTHROUGH;
   }
-    
+
   /// TODO: Implement specialized mirror witnesses for all kinds.
   case MetadataKind::Function:
   case MetadataKind::Existential:
     return std::make_tuple(
         T, &OpaqueMirrorMetadata, &OpaqueMirrorWitnessTable);
-      
+
   // Types can't have these kinds.
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::HeapGenericLocalVariable:
@@ -1186,7 +1186,7 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
     swift::crash("Swift mirror lookup failure");
   }
 }
-  
+
 /// MagicMirror ownership-taking whole-value constructor.
 ///
 /// \param owner passed at +1, consumed.
@@ -1196,16 +1196,16 @@ MagicMirror::MagicMirror(OpaqueValue *value, const Metadata *T,
   // TODO: Specialize behavior here. If the value is a swift-refcounted class
   // we don't need to put it in a box to point into it.
   BoxPair box = swift_allocBox(T);
-  
+
   if (take)
     T->vw_initializeWithTake(box.second, value);
   else
     T->vw_initializeWithCopy(box.second, value);
   std::tie(T, Self, MirrorWitness) = getImplementationForType(T, box.second);
-  
+
   Data = {box.first, box.second, T};
 }
-  
+
 /// MagicMirror ownership-sharing subvalue constructor.
 ///
 /// \param owner passed at +1, consumed.
@@ -1231,9 +1231,9 @@ MirrorReturn swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
   const OpaqueValue *cMirrorValue;
   std::tie(witness, mirrorType, cMirrorValue)
     = getReflectableConformance(T, value);
-  
+
   OpaqueValue *mirrorValue = const_cast<OpaqueValue*>(cMirrorValue);
-  
+
   // Use the _Reflectable conformance if the object has one.
   if (witness) {
     auto result = witness->getMirror(mirrorValue, mirrorType);
@@ -1242,7 +1242,7 @@ MirrorReturn swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
     T->vw_destroy(value);
     return MirrorReturn(result);
   }
-  
+
   // Otherwise, fall back to MagicMirror.
   Mirror result;
   // Take the value, unless we projected a subvalue from it. We don't want to

@@ -12,11 +12,11 @@ protocol CollectionType : Indexable, SequenceType {}
 
 public struct IndexingGenerator<Elements : Indexable>
   : GeneratorType, SequenceType {
-  
+
   public func generate() -> IndexingGenerator {
     return self
   }
-  
+
   public mutating func next() -> Elements._Element? {
     return nil
   }

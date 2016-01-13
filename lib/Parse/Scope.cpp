@@ -58,7 +58,7 @@ Scope::Scope(Parser *P, ScopeKind SC, bool InactiveConfigBlock)
     PrevResolvableDepth(SI.ResolvableDepth),
     Kind(SC), IsInactiveConfigBlock(InactiveConfigBlock) {
   assert(PrevScope || Kind == ScopeKind::TopLevel);
-  
+
   if (SI.CurScope) {
     Depth = SI.CurScope->Depth + 1;
     IsInactiveConfigBlock |= SI.CurScope->IsInactiveConfigBlock;
@@ -77,7 +77,7 @@ Scope::Scope(Parser *P, SavedScope &&SS):
     PrevResolvableDepth(SI.ResolvableDepth),
     Depth(SS.Depth),
     Kind(SS.Kind), IsInactiveConfigBlock(SS.IsInactiveConfigBlock) {
-    
+
     SI.CurScope = this;
     if (!isResolvableScope(Kind))
       SI.ResolvableDepth = Depth + 1;
@@ -118,19 +118,19 @@ void ScopeInfo::addToScope(ValueDecl *D, Parser &TheParser) {
   // A redefinition is a hit in the scoped table at the same depth.
   if (EntryI != HT.end() && EntryI->first == CurScope->getDepth()) {
     ValueDecl *PrevDecl = EntryI->second;
-    
+
     // If this is in a resolvable scope, diagnose redefinitions.  Later
     // phases will handle scopes like module-scope, etc.
     if (CurScope->getDepth() >= ResolvableDepth)
       return TheParser.diagnoseRedefinition(PrevDecl, D);
-    
+
     // If this is at top-level scope, validate that the members of the overload
     // set all agree.
-    
+
     // Check to see if D and PrevDecl are valid in the same overload set.
     if (checkValidOverload(D, PrevDecl, TheParser))
       return;
-    
+
     // Note: we don't check whether all of the elements of the overload set have
     // different argument types.  This is checked later.
   }

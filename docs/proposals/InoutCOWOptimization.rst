@@ -1,11 +1,11 @@
 :orphan:
-   
+
 ================================================
  Copy-On-Write Optimization of ``inout`` Values
 ================================================
 
 :Authors: Dave Abrahams, Joe Groff
-          
+
 :Summary: Our writeback model interacts with Copy-On-Write (COW) to
           cause some surprising inefficiencies, such as O(N) performance
           for ``x[0][0] = 1``. We propose a modified COW optimization
@@ -19,7 +19,7 @@ The problem is caused as follows:
 
 * COW depends on the programmer being able to mediate all writes (so
   she can copy if necessary)
-  
+
 * Writes to container elements and slices are mediated through
   subscript setters, so in ::
 
@@ -81,7 +81,7 @@ We need to prevent lvalues created in an ``inout`` context from
 forcing a copy-on-write.  To accomplish that:
 
 * In the class instance header, we reserve a bit ``INOUT``.
-  
+
 * When a unique reference to a COW buffer ``b`` is copied into
   an ``inout`` lvalue, we save the value of the ``b.INOUT`` bit and set it.
 
@@ -98,7 +98,7 @@ We believe this can be done with little user-facing change; the author
 of a COW type would add an attribute to the property that stores the
 buffer, and we would use a slightly different check for in-place
 writability.
-  
+
 Other Considered Solutions
 --------------------------
 

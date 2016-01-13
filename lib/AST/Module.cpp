@@ -71,7 +71,7 @@ void BuiltinUnit::LookupCache::lookupValue(
        SmallVectorImpl<ValueDecl*> &Result) {
   // Only qualified lookup ever finds anything in the builtin module.
   if (LookupKind != NLKind::QualifiedLookup) return;
-  
+
   ValueDecl *&Entry = Cache[Name];
   ASTContext &Ctx = M.getParentModule()->getASTContext();
   if (!Entry) {
@@ -136,23 +136,23 @@ class SourceFile::LookupCache {
   void populateMemberCache(const SourceFile &SF);
 public:
   typedef ModuleDecl::AccessPathTy AccessPathTy;
-  
+
   LookupCache(const SourceFile &SF);
 
   /// Throw away as much memory as possible.
   void invalidate();
-  
+
   void lookupValue(AccessPathTy AccessPath, DeclName Name,
                    NLKind LookupKind, SmallVectorImpl<ValueDecl*> &Result);
-  
+
   void lookupVisibleDecls(AccessPathTy AccessPath,
                           VisibleDeclConsumer &Consumer,
                           NLKind LookupKind);
-  
+
   void lookupClassMembers(AccessPathTy AccessPath,
                           VisibleDeclConsumer &consumer,
                           const SourceFile &SF);
-                          
+
   void lookupClassMember(AccessPathTy accessPath,
                          DeclName name,
                          SmallVectorImpl<ValueDecl*> &results,
@@ -226,10 +226,10 @@ void SourceLookupCache::lookupValue(AccessPathTy AccessPath, DeclName Name,
   // then filter out any lookups that don't match.
   if (!ModuleDecl::matchesAccessPath(AccessPath, Name))
     return;
-  
+
   auto I = TopLevelValues.find(Name);
   if (I == TopLevelValues.end()) return;
-  
+
   Result.reserve(I->second.size());
   for (ValueDecl *Elt : I->second)
     Result.push_back(Elt);
@@ -265,9 +265,9 @@ void SourceLookupCache::lookupClassMembers(AccessPathTy accessPath,
                                            const SourceFile &SF) {
   if (!MemberCachePopulated)
     populateMemberCache(SF);
-  
+
   assert(accessPath.size() <= 1 && "can only refer to top-level decls");
-  
+
   if (!accessPath.empty()) {
     for (auto &member : ClassMembers) {
       // Non-simple names are also stored under their simple name, so make
@@ -302,13 +302,13 @@ void SourceLookupCache::lookupClassMember(AccessPathTy accessPath,
                                           const SourceFile &SF) {
   if (!MemberCachePopulated)
     populateMemberCache(SF);
-  
+
   assert(accessPath.size() <= 1 && "can only refer to top-level decls");
-  
+
   auto iter = ClassMembers.find(name);
   if (iter == ClassMembers.end())
     return;
-  
+
   if (!accessPath.empty()) {
     for (ValueDecl *vd : iter->second) {
       Type ty = vd->getDeclContext()->getDeclaredTypeOfContext();
@@ -413,7 +413,7 @@ VarDecl *Module::getDSOHandle() {
   } else {
     arg = TupleType::getEmpty(ctx);
   }
-  
+
   Type type = BoundGenericType::get(unsafeMutablePtr, Type(), { arg });
   auto handleVar = new (ctx) VarDecl(/*IsStatic=*/false, /*IsLet=*/false,
                                      SourceLoc(),
@@ -432,7 +432,7 @@ VarDecl *Module::getDSOHandle() {
     file->name args;
 
 void Module::lookupValue(AccessPathTy AccessPath, DeclName Name,
-                         NLKind LookupKind, 
+                         NLKind LookupKind,
                          SmallVectorImpl<ValueDecl*> &Result) const {
   FORWARD(lookupValue, (AccessPath, Name, LookupKind, Result));
 }
@@ -538,7 +538,7 @@ void DerivedFileUnit::lookupValue(Module::AccessPathTy accessPath,
   // then filter out any lookups that don't match.
   if (!Module::matchesAccessPath(accessPath, name))
     return;
-  
+
   for (auto D : DerivedDecls) {
     if (D->getFullName().matchesRef(name))
       result.push_back(D);
@@ -549,7 +549,7 @@ void DerivedFileUnit::lookupVisibleDecls(Module::AccessPathTy accessPath,
                                          VisibleDeclConsumer &consumer,
                                          NLKind lookupKind) const {
   assert(accessPath.size() <= 1 && "can only refer to top-level decls");
-  
+
   Identifier Id;
   if (!accessPath.empty()) {
     Id = accessPath.front().first;
@@ -838,8 +838,8 @@ LookupConformanceResult Module::lookupConformance(Type type,
       ConformanceKind::Conforms
     };
   }
-  
-  
+
+
   auto nominal = type->getAnyNominal();
 
   // If we don't have a nominal type, there are no conformances.
@@ -908,7 +908,7 @@ LookupConformanceResult Module::lookupConformance(Type type,
       auto substitutions = type->gatherAllSubstitutions(this, substitutionsVec,
                                                         resolver,
                                                         explicitConformanceDC);
-      
+
       for (auto sub : substitutions) {
         if (sub.getReplacement()->is<ErrorType>())
           return { nullptr, ConformanceKind::DoesNotConform };
@@ -1015,13 +1015,13 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
       = lookupOperatorDeclForName(imported.first.second, Loc, Name, OP_MAP);
     if (!maybeOp)
       return None;
-    
+
     if (OP_DECL *op = *maybeOp)
       importedOperators[op] |= isExported;
   }
 
   typename OperatorMap<OP_DECL *>::mapped_type result = { nullptr, true };
-  
+
   if (!importedOperators.empty()) {
     // Check for conflicts.
     auto i = importedOperators.begin(), end = importedOperators.end();
@@ -1290,7 +1290,7 @@ static bool forAllImportedModules(Module *topLevel,
                                   const Callback &fn) {
   using ImportedModule = Module::ImportedModule;
   using AccessPathTy = Module::AccessPathTy;
-  
+
   llvm::SmallSet<ImportedModule, 32, Module::OrderImportedModules> visited;
   SmallVector<ImportedModule, 32> stack;
 
@@ -1513,7 +1513,7 @@ bool FileUnit::walk(ASTWalker &walker) {
 #ifndef NDEBUG
     PrettyStackTraceDecl debugStack("walking into decl", D);
 #endif
-    
+
     if (D->walk(walker))
       return true;
   }

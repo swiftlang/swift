@@ -2,14 +2,14 @@
 
 // REQUIRES: objc_interop
 
-// Check that casts between bridged types are replaced by more 
+// Check that casts between bridged types are replaced by more
 // efficient code sequences.
-// 
+//
 // In particular, checked_cast_* and unconditional_checked_* instructions,
 // which are pretty expensive at run-time (e.g. because they use
 // runtime _dynamicCast calls and check conformances at run-time),
 // should be replaced by invocations of specialized bridging functions,
-// which make use of statically known compile-time conformances and 
+// which make use of statically known compile-time conformances and
 // do not perform any conformance checks at run-time.
 
 import Foundation

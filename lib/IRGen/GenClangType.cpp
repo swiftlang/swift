@@ -151,9 +151,9 @@ public:
   clang::CanQualType visitSILFunctionType(CanSILFunctionType type);
   clang::CanQualType visitGenericTypeParamType(CanGenericTypeParamType type);
   clang::CanQualType visitDynamicSelfType(CanDynamicSelfType type);
-  
+
   clang::CanQualType visitSILBlockStorageType(CanSILBlockStorageType type);
-  
+
   clang::CanQualType visitType(CanType type);
 
   clang::CanQualType getCanonicalType(clang::QualType type) {
@@ -386,7 +386,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
   }
 
   auto swiftStructDecl = type->getDecl();
-  
+
   enum class StructKind {
     Invalid,
     UnsafeMutablePointer,
@@ -403,14 +403,14 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     .Case("Unmanaged", StructKind::Unmanaged)
     .Case("CFunctionPointer", StructKind::CFunctionPointer)
     .Default(StructKind::Invalid);
-  
+
   auto args = type.getGenericArgs();
 
   switch (kind) {
   case StructKind::Invalid:
     llvm_unreachable("Unexpected non-pointer generic struct type in imported"
                      " Clang module!");
-      
+
   case StructKind::UnsafeMutablePointer:
   case StructKind::Unmanaged:
   case StructKind::AutoreleasingUnsafeMutablePointer: {
@@ -448,7 +448,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
 
 clang::CanQualType GenClangType::visitEnumType(CanEnumType type) {
   assert(type->getDecl()->isObjC() && "not an @objc enum?!");
-  
+
   // @objc enums lower to their raw types.
   return Converter.convert(IGM,
                            type->getDecl()->getRawType()->getCanonicalType());
@@ -463,7 +463,7 @@ clang::QualType GenClangType::convertFunctionType(CanFunctionType type) {
   {
     if (resultType.isNull())
       goto no_clang_type;
-    
+
     if (auto tuple = dyn_cast<TupleType>(input)) {
       for (auto argType: tuple.getElementTypes()) {
         auto clangType = Converter.convert(IGM, argType);
@@ -507,18 +507,18 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
   enum FunctionPointerKind {
     Block, CFunctionPointer,
   };
-  
+
   FunctionPointerKind kind;
 
   switch (type->getRepresentation()) {
   case SILFunctionType::Representation::Block:
     kind = Block;
     break;
-  
+
   case SILFunctionType::Representation::CFunctionPointer:
     kind = CFunctionPointer;
     break;
-  
+
   case SILFunctionType::Representation::Thick:
   case SILFunctionType::Representation::Thin:
   case SILFunctionType::Representation::Method:
@@ -526,13 +526,13 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
   case SILFunctionType::Representation::WitnessMethod:
     llvm_unreachable("not an ObjC-compatible function");
   }
-  
+
   // Convert the return and parameter types.
   auto resultType = Converter.convert(IGM,
                 type->getSemanticResultSILType().getSwiftRValueType());
   if (resultType.isNull())
     return clang::CanQualType();
-  
+
   SmallVector<clang::QualType, 4> paramTypes;
   for (auto paramTy : type->getParametersWithoutIndirectResult()) {
     // Blocks should only take direct +0 parameters.
@@ -557,12 +557,12 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
       return clang::CanQualType();
     paramTypes.push_back(param);
   }
-  
+
   // Build the Clang function type.
   clang::FunctionProtoType::ExtProtoInfo defaultEPI;
   auto fnTy = clangCtx.getFunctionType(resultType, paramTypes, defaultEPI);
   clang::QualType ptrTy;
-  
+
   switch (kind) {
   case Block:
     ptrTy = clangCtx.getBlockPointerType(fnTy);

@@ -102,7 +102,7 @@ TEST(WeakTest, simple_objc) {
   ASSERT_NE(o2, nullptr);
 
   DestroyedObjCCount = 0;
-  
+
   WeakReference ref1;
   swift_unknownWeakInit(&ref1, o1);
 
@@ -195,7 +195,7 @@ TEST(WeakTest, simple_swift_and_objc) {
   ASSERT_NE(o2, nullptr);
 
   DestroyedObjCCount = 0;
-  
+
   WeakReference ref1;
   swift_unknownWeakInit(&ref1, o1);
 
@@ -246,7 +246,7 @@ TEST(WeakTest, simple_objc_and_swift) {
   ASSERT_NE(o2, nullptr);
 
   DestroyedObjCCount = 0;
-  
+
   WeakReference ref1;
   swift_unknownWeakInit(&ref1, o1);
 

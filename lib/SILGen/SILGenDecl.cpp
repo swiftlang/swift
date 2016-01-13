@@ -48,7 +48,7 @@ namespace {
     bool canSplitIntoSubelementAddresses() const override {
       return true;
     }
-    
+
     MutableArrayRef<InitializationPtr>
     getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
                                   SmallVectorImpl<InitializationPtr> &buf,
@@ -79,7 +79,7 @@ void TupleInitialization::copyOrInitValueInto(ManagedValue valueMV,
   for (unsigned i = 0, e = sourceType->getNumElements(); i != e; ++i) {
     SILType fieldTy = sourceSILType.getTupleElementType(i);
     auto &fieldTL = SGF.getTypeLowering(fieldTy);
-        
+
     SILValue member;
     if (value.getType().isAddress()) {
       member = SGF.B.createTupleElementAddr(loc, value, i, fieldTy);
@@ -88,9 +88,9 @@ void TupleInitialization::copyOrInitValueInto(ManagedValue valueMV,
     } else {
       member = SGF.B.createTupleExtract(loc, value, i, fieldTy);
     }
-        
+
     auto elt = SGF.emitManagedRValueWithCleanup(member, fieldTL);
-        
+
     SubInitializations[i]->copyOrInitValueInto(elt, isInit, loc, SGF);
   }
 }
@@ -129,7 +129,7 @@ getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
     SILValue fieldAddr = gen.B.createTupleElementAddr(Loc,
                                                       baseAddr, i,
                                                       fieldTy);
-    
+
     buf.push_back(InitializationPtr(new
                                     KnownAddressInitialization(fieldAddr)));
   }
@@ -146,7 +146,7 @@ copyOrInitValueIntoSingleBuffer(ManagedValue explodedElement, bool isInit,
     explodedElement.copyInto(gen, BufferAddress, loc);
     return;
   }
-  
+
   // If we didn't evaluate into the initialization buffer, do so now.
   if (explodedElement.getValue() != BufferAddress) {
     explodedElement.forwardInto(gen, loc, BufferAddress);
@@ -313,7 +313,7 @@ public:
   LetValueInitialization(VarDecl *vd, SILGenFunction &gen) : vd(vd)
   {
     auto &lowering = gen.getTypeLowering(vd->getType());
-    
+
     // Decide whether we need a temporary stack buffer to evaluate this 'let'.
     // There are three cases we need to handle here: parameters, initialized (or
     // bound) decls, and uninitialized ones.
@@ -326,7 +326,7 @@ public:
       // This value is uninitialized (and unbound) if it has a pattern binding
       // decl, with no initializer value.
       assert(!vd->hasNonPatternBindingInit() && "Bound values aren't uninit!");
-      
+
       // If this is a let-value without an initializer, then we need a temporary
       // buffer.  DI will make sure it is only assigned to once.
       needsTemporaryBuffer = true;
@@ -336,7 +336,7 @@ public:
       // buffer if the type is address only.
       needsTemporaryBuffer = lowering.isAddressOnly();
     }
-   
+
     if (needsTemporaryBuffer) {
       address = gen.emitTemporaryAllocation(vd, lowering.getLoweredType());
       if (isUninitialized)
@@ -360,7 +360,7 @@ public:
   }
 
   bool hasAddress() const { return address.isValid(); }
-  
+
   // SingleBufferInitializations always have an address.
   SILValue getAddressForInPlaceInitialization() const override {
     // Emit into the buffer that 'let's produce for address-only values if
@@ -378,7 +378,7 @@ public:
   bool canSplitIntoSubelementAddresses() const override {
     return hasAddress();
   }
-  
+
   MutableArrayRef<InitializationPtr>
   getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
                                 SmallVectorImpl<InitializationPtr> &buf,
@@ -392,7 +392,7 @@ public:
       SILValue fieldAddr = gen.B.createTupleElementAddr(Loc,
                                                         baseAddr, i,
                                                         fieldTy);
-      
+
       buf.push_back(InitializationPtr(new
                                       KnownAddressInitialization(fieldAddr)));
     }
@@ -422,7 +422,7 @@ public:
     else
       gen.B.createDebugValue(PrologueLoc, value);
   }
-  
+
   void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
                            SILLocation loc, SILGenFunction &gen) override {
     // If this let value has an address, we can handle it just like a single
@@ -431,7 +431,7 @@ public:
       return SingleBufferInitialization::
            copyOrInitValueIntoSingleBuffer(explodedElement, isInit,
                                            getAddress(), loc, gen);
-    
+
     // Otherwise, we bind the value.
     if (isInit) {
       // Disable the rvalue expression cleanup, since the let value
@@ -478,7 +478,7 @@ public:
     else
       explodedElement.copyInto(gen, VarInit->getAddress(), loc);
   }
-  
+
   void finishInitialization(SILGenFunction &gen) override {
     VarInit->finishInitialization(gen);
   }
@@ -561,7 +561,7 @@ public:
                                    JumpDest patternFailDest)
     : RefutablePatternInitialization(patternFailDest), ElementDecl(ElementDecl),
       subInitialization(std::move(subInitialization)) {}
-    
+
   void copyOrInitValueInto(ManagedValue value, bool isInit,
                            SILLocation loc, SILGenFunction &SGF) override {
     assert(isInit && "Only initialization is supported for refutable patterns");
@@ -572,7 +572,7 @@ public:
   static void emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
                             Initialization *subInit, JumpDest FailureDest,
                             SILLocation loc, SILGenFunction &SGF);
-  
+
   void finishInitialization(SILGenFunction &SGF) override {
     if (subInitialization.get())
       subInitialization.get()->finishInitialization(SGF);
@@ -585,13 +585,13 @@ static bool shouldDisableCleanupOnFailurePath(ManagedValue value,
                                               SILGenFunction &SGF) {
   // If the enum is trivial, then there is no cleanup to disable.
   if (value.isPlusZeroRValueOrTrivial()) return false;
-  
+
   // Check all of the members of the enum.  If any have a non-trivial payload,
   // then we can't disable the cleanup.
   for (auto elt : elementDecl->getParentEnum()->getAllElements()) {
     // Ignore the element that will be handled.
     if (elt == elementDecl) continue;
-    
+
     // Elements without payloads are trivial.
     if (!elt->hasArgumentType()) continue;
 
@@ -606,11 +606,11 @@ void EnumElementPatternInitialization::
 emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
               Initialization *subInit, JumpDest failureDest,
               SILLocation loc, SILGenFunction &SGF) {
-  
+
   SILBasicBlock *contBB = SGF.B.splitBlockForFallthrough();
   auto destination = std::make_pair(ElementDecl, contBB);
-  
-  
+
+
   // Get a destination that runs all of the cleanups needed when existing on the
   // failure path.  If the enum we're testing is non-trivial, there will be a
   // cleanup in this stack that will release its value.
@@ -621,34 +621,34 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
   // Optional, since the .None case doesn't need to be cleaned up.
   bool ShouldDisableCleanupOnFailure =
     shouldDisableCleanupOnFailurePath(value, ElementDecl, SGF);
-  
+
   if (ShouldDisableCleanupOnFailure)
     SGF.Cleanups.setCleanupState(value.getCleanup(), CleanupState::Dormant);
-  
+
   auto defaultBB = SGF.Cleanups.emitBlockForCleanups(failureDest, loc);
 
   // Restore it if we disabled it.
   if (ShouldDisableCleanupOnFailure)
     SGF.Cleanups.setCleanupState(value.getCleanup(), CleanupState::Active);
-  
+
   if (value.getType().isAddress())
     SGF.B.createSwitchEnumAddr(loc, value.getValue(), defaultBB, destination);
   else
     SGF.B.createSwitchEnum(loc, value.getValue(), defaultBB, destination);
-  
+
   SGF.B.setInsertionPoint(contBB);
-  
+
   // If the enum case has no bound value, we're done.
   if (!ElementDecl->hasArgumentType()) {
     assert(subInit == nullptr &&
            "Cannot have a subinit when there is no value to match against");
     return;
   }
-  
+
   // Otherwise, the bound value for the enum case is available.
   SILType eltTy = value.getType().getEnumElementType(ElementDecl, SGF.SGM.M);
   auto &eltTL = SGF.getTypeLowering(eltTy);
-  
+
   // If the case value is provided to us as a BB argument as long as the enum
   // is not address-only.
   SILValue eltValue;
@@ -660,7 +660,7 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
     // bother projecting out the address-only element value only to ignore it.
     return;
   }
-  
+
   if (value.getType().isAddress()) {
     // If the enum is address-only, take from the enum we have and load it if
     // the element value is loadable.
@@ -675,7 +675,7 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
     // Otherwise, we're consuming this as a +1 value.
     value.forward(SGF);
   }
-  
+
   // Now we have a +1 value.
   auto eltMV = SGF.emitManagedRValueWithCleanup(eltValue, eltTL);
 
@@ -692,14 +692,14 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
     eltMV = ManagedValue::forUnmanaged(boxedValue);
     eltMV = eltMV.copyUnmanaged(SGF, loc);
   }
-  
+
   // Reabstract to the substituted type, if needed.
   CanType substEltTy =
     value.getSwiftType()->getTypeOfMember(SGF.SGM.M.getSwiftModule(),
                                       ElementDecl, nullptr,
                                       ElementDecl->getArgumentInterfaceType())
       ->getCanonicalType();
-  
+
   eltMV = SGF.emitOrigToSubstValue(loc, eltMV,
                              AbstractionPattern(ElementDecl->getArgumentType()),
                              substEltTy);
@@ -718,10 +718,10 @@ public:
                           JumpDest patternFailDest)
   : RefutablePatternInitialization(patternFailDest), pattern(pattern),
     subInitialization(std::move(subInitialization)) {}
-    
+
   void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
                            SILLocation loc, SILGenFunction &SGF) override;
-  
+
   void finishInitialization(SILGenFunction &SGF) override {
     if (subInitialization.get())
       subInitialization.get()->finishInitialization(SGF);
@@ -733,16 +733,16 @@ void IsPatternInitialization::
 copyOrInitValueInto(ManagedValue value, bool isInit,
                     SILLocation loc, SILGenFunction &SGF) {
   assert(isInit && "Only initialization is supported for refutable patterns");
-  
+
   // Try to perform the cast to the destination type, producing an optional that
   // indicates whether we succeeded.
   auto destType = OptionalType::get(pattern->getCastTypeLoc().getType());
-  
+
   value = emitConditionalCheckedCast(SGF, loc, value, pattern->getType(),
                                      destType, pattern->getCastKind(),
                                      SGFContext())
             .getAsSingleValue(SGF, loc);
-  
+
   // Now that we have our result as an optional, we can use an enum projection
   // to do all the work.
   EnumElementPatternInitialization::
@@ -912,7 +912,7 @@ InitializationPtr SILGenFunction::emitInitializationForVarDecl(VarDecl *vd) {
   // so that DI tracks and enforces validity of it.
   bool isUninitialized =
     vd->getParentPatternBinding() && !vd->getParentInitializer();
-  
+
   // If this is a global variable, initialize it without allocations or
   // cleanups.
   InitializationPtr Result;
@@ -1006,7 +1006,7 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond,
 
   assert(B.hasValidInsertionPoint() &&
          "emitting condition at unreachable point");
-  
+
   for (const auto &elt : Cond) {
     SILLocation booleanTestLoc = loc;
     SILValue booleanTestValue;
@@ -1044,13 +1044,13 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond,
     assert(booleanTestValue.getType().
            castTo<BuiltinIntegerType>()->isFixedWidth(1) &&
            "Sema forces conditions to have Builtin.i1 type");
-    
+
     // Just branch on the condition.  On failure, we unwind any active cleanups,
     // on success we fall through to a new block.
     SILBasicBlock *ContBB = createBasicBlock();
     auto FailBB = Cleanups.emitBlockForCleanups(FailDest, loc);
     B.createCondBranch(booleanTestLoc, booleanTestValue, ContBB, FailBB);
-    
+
     // Finally, emit the continue block and keep emitting the rest of the
     // condition.
     B.emitBlock(ContBB);
@@ -1089,7 +1089,7 @@ namespace {
       : existentialAddr(existentialAddr),
         concreteFormalType(concreteFormalType),
         repr(repr) {}
-    
+
     void emit(SILGenFunction &gen, CleanupLocation l) override {
       switch (repr) {
       case ExistentialRepresentation::None:

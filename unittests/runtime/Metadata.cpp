@@ -109,10 +109,10 @@ void *RaceThunk(void *vargs) {
   return args->code();
 }
 
-/// RaceTest(code) runs code in many threads simultaneously, 
+/// RaceTest(code) runs code in many threads simultaneously,
 /// and returns a vector of all returned results.
 template <typename T, int NumThreads = 64>
-std::vector<T> 
+std::vector<T>
 RaceTest(std::function<T()> code)
 {
   const unsigned threadCount = NumThreads;
@@ -141,7 +141,7 @@ RaceTest(std::function<T()> code)
   return results;
 }
 
-/// RaceTest_ExpectEqual(code) runs code in many threads simultaneously, 
+/// RaceTest_ExpectEqual(code) runs code in many threads simultaneously,
 /// verifies that they all returned the same value, and returns that value.
 template<typename T>
 T RaceTest_ExpectEqual(std::function<T()> code)
@@ -476,7 +476,7 @@ TEST(MetadataTest, getExistentialMetadata) {
                 mixedWitnessTable->Flags.getSpecialProtocol());
       return mixedWitnessTable;
     });
-  
+
   const ValueWitnessTable *ExpectedErrorTypeValueWitnesses;
 #if SWIFT_OBJC_INTEROP
   ExpectedErrorTypeValueWitnesses = &_TWVBO;
@@ -582,7 +582,7 @@ TEST(MetadataTest, getGenericMetadata_SuperclassWithUnexpectedPrefix) {
 
       // Assert that we set the superclass field.
       EXPECT_EQ(SuperclassWithPrefix_AddressPoint, fields[1]);
-    
+
       // Assert that we copied the subclass suffix data.
       auto suffix = (void * const *) ((char*) inst + sizeof(ClassMetadata));
       EXPECT_EQ(&Global2, suffix[0]);

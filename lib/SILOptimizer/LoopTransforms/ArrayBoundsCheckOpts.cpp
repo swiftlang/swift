@@ -604,15 +604,15 @@ static SILValue getZeroToCountArray(SILValue Start, SILValue End) {
   auto *IL = dyn_cast<IntegerLiteralInst>(Start);
   if (!IL || IL->getValue() != 0)
     return SILValue();
-    
+
   auto *SEI = dyn_cast<StructExtractInst>(End);
   if (!SEI)
     return SILValue();
-    
+
   ArraySemanticsCall SemCall(SEI->getOperand().getDef());
   if (SemCall.getKind() != ArrayCallKind::kGetCount)
     return SILValue();
-  
+
   return SemCall.getSelf();
 }
 
@@ -630,19 +630,19 @@ static bool isLessThanCheck(SILValue Start, SILValue End,
 
   SILValue LeftArg = BI->getOperand(0);
   SILValue RightArg = BI->getOperand(1);
-  
+
   if (RightArg == Start) {
     std::swap(LeftArg, RightArg);
     Id = swapCmpID(Id);
   }
   if (LeftArg != Start || RightArg != End)
     return false;
-  
+
   if (CondBr->getTrueBB() != Preheader) {
     assert(CondBr->getFalseBB() == Preheader);
     Id = invertCmpID(Id);
   }
-  
+
   switch (Id) {
     case BuiltinValueKind::ICMP_SLT:
     case BuiltinValueKind::ICMP_ULT:
@@ -1031,7 +1031,7 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
       DEBUG(llvm::dbgs() << "  Bounds check removed\n");
       continue;
     }
-    
+
     // For hoisting bounds checks the block must dominate the exit block.
     if (!blockAlwaysExecutes)
       continue;
@@ -1045,7 +1045,7 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
 
     // Remove the old check in the loop and the match the retain with a release.
     ArrayCall.removeCall();
-  
+
     DEBUG(llvm::dbgs() << "  Bounds check hoisted\n");
     Changed = true;
   }

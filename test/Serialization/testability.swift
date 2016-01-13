@@ -37,14 +37,14 @@
   @testable import testability
 
   class Sub : Base {}
-  
+
   public func unrelated() {}
 
 #elseif MAIN
 
   #if TESTABLE
     @testable import testability_client
-  #else 
+  #else
     import testability_client
   #endif
 

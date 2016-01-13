@@ -14,14 +14,14 @@ import resilient_class
 public class ChildToResilientParent : ResilientOutsideParent {
   public override func method()
   public override class func classMethod()
-   deinit 
+   deinit
   override init()
 }
 
 public class ChildToFixedParent : OutsideParent {
   public override func method()
   public override class func classMethod()
-   deinit 
+   deinit
   override init()
 }
 

@@ -319,7 +319,7 @@ SILCombiner::visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI) {
   if (!SILType::canRefCast(SrcTy.getObjectType(), DestTy.getObjectType(),
                            URCI->getModule()))
     return nullptr;
- 
+
   SILLocation Loc = URCI->getLoc();
   Builder.setCurrentDebugScope(URCI->getDebugScope());
   LoadInst *load = Builder.createLoad(Loc, URCI->getSrc());

@@ -74,14 +74,14 @@ void ProtocolConformanceRecord::dump() const {
       printf("unique indirect class %s",
              class_getName(*getIndirectClass()));
       break;
-      
+
     case ProtocolConformanceTypeKind::UniqueGenericPattern:
       printf("unique generic type %s", symbolName(getGenericPattern()));
       break;
   }
-  
+
   printf(" => ");
-  
+
   switch (getConformanceKind()) {
     case ProtocolConformanceReferenceKind::WitnessTable:
       printf("witness table %s\n", symbolName(getStaticWitnessTable()));
@@ -113,14 +113,14 @@ const {
     if (auto *ClassMetadata = *getIndirectClass())
       return swift_getObjCClassMetadata(ClassMetadata);
     return nullptr;
-      
+
   case ProtocolConformanceTypeKind::UniqueDirectClass:
     // The class may be ObjC, in which case we need to instantiate its Swift
     // metadata.
     if (auto *ClassMetadata = getDirectClass())
       return swift_getObjCClassMetadata(ClassMetadata);
     return nullptr;
-      
+
   case ProtocolConformanceTypeKind::UniqueGenericPattern:
   case ProtocolConformanceTypeKind::Universal:
     // The record does not apply to a single type.
@@ -158,7 +158,7 @@ namespace {
 
   struct ConformanceCacheEntry {
   private:
-    const void *Type; 
+    const void *Type;
     const ProtocolDescriptor *Proto;
     uintptr_t Data;
     // All Darwin 64-bit platforms reserve the low 2^32 of address space, which
@@ -211,7 +211,7 @@ namespace {
     bool matches(const void *type, const ProtocolDescriptor *proto) {
       return type == Type && Proto == proto;
     }
-   
+
     bool isSuccessful() const {
 #if __LP64__
 #  if __APPLE__
@@ -225,13 +225,13 @@ namespace {
       return Success;
 #endif
     }
-    
+
     /// Get the cached witness table, if successful.
     const WitnessTable *getWitnessTable() const {
       assert(isSuccessful());
       return (const WitnessTable *)Data;
     }
-    
+
     /// Get the generation number under which this lookup failed.
     unsigned getFailureGeneration() const {
       assert(!isSuccessful());
@@ -248,7 +248,7 @@ struct ConformanceState {
   ConcurrentMap<size_t, ConformanceCacheEntry> Cache;
   std::vector<ConformanceSection> SectionsToScan;
   pthread_mutex_t SectionsToScanLock;
-  
+
   ConformanceState() {
     SectionsToScan.reserve(16);
     pthread_mutex_init(&SectionsToScanLock, nullptr);
@@ -278,7 +278,7 @@ static void _addImageProtocolConformancesBlock(const uint8_t *conformances,
   auto recordsEnd
     = reinterpret_cast<const ProtocolConformanceRecord*>
                                             (conformances + conformancesSize);
-  
+
   // Conformance cache should always be sufficiently initialized by this point.
   _registerProtocolConformances(Conformances.unsafeGetAlreadyInitialized(),
                                 recordsBegin, recordsEnd);
@@ -293,17 +293,17 @@ static void _addImageProtocolConformances(const mach_header *mh,
 #else
   using mach_header_platform = mach_header;
 #endif
-  
+
   // Look for a __swift2_proto section.
   unsigned long conformancesSize;
   const uint8_t *conformances =
     getsectiondata(reinterpret_cast<const mach_header_platform *>(mh),
                    SEG_TEXT, SWIFT_PROTOCOL_CONFORMANCES_SECTION,
                    &conformancesSize);
-  
+
   if (!conformances)
     return;
-  
+
   _addImageProtocolConformancesBlock(conformances, conformancesSize);
 }
 #elif defined(__ELF__)

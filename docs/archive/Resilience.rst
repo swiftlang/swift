@@ -317,14 +317,14 @@ Swift's struct layout algorithm takes as input a list of fields, and does the
 following:
 
 1. The fields are ranked:
-   
+
    * The universally fragile fields rank higher than the others.
-   
+
    * If two fields A and B are both universally fragile,
-   
+
    * If no other condition applies, fields that appear earlier in the original
      sequence have higher rank.
-   
+
 2. The size of the structure is initially 0.
 
    representations and A's type is more aligned than B's type, or otherwise if A
@@ -466,25 +466,25 @@ range of generic operations can be
 1. the size and layout of first-class objects:
 
    * local variables
-   
+
    * global variables
-   
+
    * dynamically*allocated objects
-   
+
    * member sub*objects of a structure
-   
+
    * base sub*objects of a class
-   
+
    * element sub*objects of an array
-   
+
    * parameters of functions
-   
+
    * results of functions
 
 2. the set of operations on an object:
 
    * across all protocols
-   
+
    * for a particular protocol (?)
 
 3. the set of operations on an object

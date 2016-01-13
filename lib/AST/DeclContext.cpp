@@ -129,7 +129,7 @@ Type DeclContext::getDeclaredTypeOfContext() const {
 
     if (auto ND = type->getNominalOrBoundGenericNominal())
       return ND->getDeclaredType();
-    
+
     return Type();
   }
 
@@ -365,7 +365,7 @@ Decl *DeclContext::getInnermostDeclarationDeclContext() {
 
     case DeclContextKind::SubscriptDecl:
       return cast<SubscriptDecl>(DC);
-        
+
     case DeclContextKind::NominalTypeDecl:
       return cast<NominalTypeDecl>(DC);
 
@@ -450,7 +450,7 @@ bool DeclContext::isGenericTypeContext() const {
     if (dc->isInnermostContextGeneric())
       return true;
   }
-  
+
   return false;
 }
 
@@ -524,7 +524,7 @@ DeclContext::isCascadingContextForLookup(bool functionsAreNonCascading) const {
       return SD->getFormalAccess() > Accessibility::Private;
     break;
   }
-      
+
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:
     return true;
@@ -805,7 +805,7 @@ void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint) const {
   LastDeclAndKind.setPointer(member);
 }
 
-void IterableDeclContext::setLoader(LazyMemberLoader *loader, 
+void IterableDeclContext::setLoader(LazyMemberLoader *loader,
                                     uint64_t contextData) {
   LazyLoader = loader;
   LazyLoaderContextData = contextData;

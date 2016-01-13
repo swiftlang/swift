@@ -1230,7 +1230,7 @@ public:
   bool typeCheckParameterList(ParameterList *PL, DeclContext *dc,
                               TypeResolutionOptions options,
                               GenericTypeResolver *resolver = nullptr);
-  
+
   /// Coerce a pattern to the given type.
   ///
   /// \param P The pattern, which may be modified by this coercion.
@@ -1252,7 +1252,7 @@ public:
   /// \returns true if an error occurred, false otherwise.
   bool coerceParameterListToType(ParameterList *P, DeclContext *dc, Type type);
 
-  
+
   /// Type-check an initialized variable pattern declaration.
   bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC);
   bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber);

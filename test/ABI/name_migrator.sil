@@ -20,15 +20,15 @@ class Y : X
 }
 
 //CHECK: _TQxNO4B9k8oY85A988MVdCGhJJVgx3j5
-//CHECK: _TQxNO4B9k8oY85A988MVhEtk8QJ9J 
-//CHECK: _TQxNO4B9k8oY85A988MVtjEeCW9T1 
-//CHECK: _TQxNO4B9k8oY85A988MWhEtk8QJ9J 
-//CHECK: _TQxNO4B9k8oY85A988MWtjEeCW9T1 
-sil @_TFC14devirt_access21X4pingfS0_FT_Si : $@convention(method) (@guaranteed X) -> Int 
-sil @_TFC14devirt_access21XcfMS0_FT_S0_ : $@convention(method) (@owned X) -> @owned X 
-sil @_TFC14devirt_access21XCfMS0_FT_S0_ : $@convention(thin) (@thick X.Type) -> @owned X 
-sil @_TFC14devirt_access21YcfMS0_FT_S0_ : $@convention(method) (@owned Y) -> @owned Y 
-sil @_TFC14devirt_access21YCfMS0_FT_S0_ : $@convention(thin) (@thick Y.Type) -> @owned Y 
+//CHECK: _TQxNO4B9k8oY85A988MVhEtk8QJ9J
+//CHECK: _TQxNO4B9k8oY85A988MVtjEeCW9T1
+//CHECK: _TQxNO4B9k8oY85A988MWhEtk8QJ9J
+//CHECK: _TQxNO4B9k8oY85A988MWtjEeCW9T1
+sil @_TFC14devirt_access21X4pingfS0_FT_Si : $@convention(method) (@guaranteed X) -> Int
+sil @_TFC14devirt_access21XcfMS0_FT_S0_ : $@convention(method) (@owned X) -> @owned X
+sil @_TFC14devirt_access21XCfMS0_FT_S0_ : $@convention(thin) (@thick X.Type) -> @owned X
+sil @_TFC14devirt_access21YcfMS0_FT_S0_ : $@convention(method) (@owned Y) -> @owned Y
+sil @_TFC14devirt_access21YCfMS0_FT_S0_ : $@convention(thin) (@thick Y.Type) -> @owned Y
 
 sil_vtable X {
   #X.ping!1: _TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int

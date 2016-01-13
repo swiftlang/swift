@@ -57,12 +57,12 @@ Optional<PlatformKind> swift::platformFromString(StringRef Name) {
 bool swift::isPlatformActive(PlatformKind Platform, LangOptions &LangOpts) {
   if (Platform == PlatformKind::none)
     return true;
-  
+
   if (Platform == PlatformKind::OSXApplicationExtension ||
       Platform == PlatformKind::iOSApplicationExtension)
     if (!LangOpts.EnableAppExtensionRestrictions)
       return false;
-  
+
   // FIXME: This is an awful way to get the current OS.
   switch (Platform) {
     case PlatformKind::OSX:

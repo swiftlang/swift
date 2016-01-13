@@ -14,12 +14,12 @@ func action() {
 final public class A0 {
  let x: Int32
  let y: Int32
- 
+
  init(_ x: Int32, _ y: Int32) {
    self.x = x
    self.y = y
  }
- 
+
  @inline(never)
  func sum1() -> Int32 {
     // x and y should be loaded only once.
@@ -112,14 +112,14 @@ struct Goo {
   var y: Int32
 }
 
-struct Foo { 
+struct Foo {
   var g: Goo
 }
 
-struct Bar { 
+struct Bar {
   let f: Foo
   var h: Foo
-  
+
   @inline(never)
   mutating func action() {
   }
@@ -175,12 +175,12 @@ public func testUseGlobalLet() -> Int32 {
 
 struct A1 {
   let x: Int32
-  
+
   // Propagate the value of the initializer into all instructions
   // that use it, which in turn would allow for better constant
   // propagation.
   let y: Int32 = 100
-  
+
   init(v: Int32) {
     if v > 0 {
       x = 1
@@ -253,7 +253,7 @@ struct S {
 // of struct type properly.
 // CHECK-LABEL: sil {{.*}}testStructWithLetElement
 // CHECK-NOT: function_ref @{{.*}}oops
-// CHECK: return 
+// CHECK: return
 public func testStructWithLetElement() -> Int32 {
     var someVar = S(elt: 12)
     let tmp1 = someVar.elt
@@ -264,7 +264,7 @@ public func testStructWithLetElement() -> Int32 {
     // This check should get eliminated
     if (tmp2 == tmp1) {
        // If we get here, the compiler has propagated
-       // the old value someVar.elt into tmp2, which 
+       // the old value someVar.elt into tmp2, which
        // is wrong.
        oops()
     }
@@ -277,7 +277,7 @@ public typealias Tuple3 = (Int32, Int32, Int32)
 final public class S3 {
   let x: Tuple3
   var y: Tuple3
-  
+
   init(x: Tuple3, y:Tuple3) {
     self.x = x
     self.y = y

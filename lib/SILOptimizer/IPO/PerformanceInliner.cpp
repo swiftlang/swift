@@ -51,14 +51,14 @@ namespace {
 
   llvm::cl::opt<int> TestOpt("sil-inline-test",
                                    llvm::cl::init(0), llvm::cl::Hidden);
-  
+
   // The following constants define the cost model for inlining.
-  
+
   // The base value for every call: it represents the benefit of removing the
   // call overhead.
   // This value can be overridden with the -sil-inline-threshold option.
   const unsigned RemovedCallBenefit = 80;
-  
+
   // The benefit if the condition of a terminator instruction gets constant due
   // to inlining.
   const unsigned ConstTerminatorBenefit = 2;
@@ -66,10 +66,10 @@ namespace {
   // Benefit if the operand of an apply gets constant, e.g. if a closure is
   // passed to an apply instruction in the callee.
   const unsigned ConstCalleeBenefit = 150;
-  
+
   // Additional benefit for each loop level.
   const unsigned LoopBenefitFactor = 40;
-  
+
   // Approximately up to this cost level a function can be inlined without
   // increasing the code size.
   const unsigned TrivialFunctionThreshold = 20;
@@ -77,22 +77,22 @@ namespace {
   // Represents a value in integer constant evaluation.
   struct IntConst {
     IntConst() : isValid(false), isFromCaller(false) { }
-    
+
     IntConst(const APInt &value, bool isFromCaller) :
     value(value), isValid(true), isFromCaller(isFromCaller) { }
-    
+
     // The actual value.
     APInt value;
-    
+
     // True if the value is valid, i.e. could be evaluated to a constant.
     bool isValid;
-    
+
     // True if the value is only valid, because a constant is passed to the
     // callee. False if constant propagation could do the same job inside the
     // callee without inlining it.
     bool isFromCaller;
   };
-  
+
   // Tracks constants in the caller and callee to get an estimation of what
   // values get constant if the callee is inlined.
   // This can be seen as a "simulation" of several optimizations: SROA, mem2reg
@@ -105,7 +105,7 @@ namespace {
     // instruction which stores the loaded value. Both, key and value can also
     // be copy_addr instructions.
     llvm::DenseMap<SILInstruction *, SILInstruction *> links;
-    
+
     // The current stored values at memory addresses.
     // The key is the base address of the memory (after skipping address
     // projections). The value are store (or copy_addr) instructions, which
@@ -113,27 +113,27 @@ namespace {
     // This is only an estimation, because e.g. it does not consider potential
     // aliasing.
     llvm::DenseMap<SILValue, SILInstruction *> memoryContent;
-    
+
     // Cache for evaluated constants.
     llvm::SmallDenseMap<BuiltinInst *, IntConst> constCache;
 
     // The caller/callee function which is tracked.
     SILFunction *F;
-    
+
     // The constant tracker of the caller function (null if this is the
     // tracker of the callee).
     ConstantTracker *callerTracker;
-    
+
     // The apply instruction in the caller (null if this is the tracker of the
     // callee).
     FullApplySite AI;
-    
+
     // Walks through address projections and (optionally) collects them.
     // Returns the base address, i.e. the first address which is not a
     // projection.
     SILValue scanProjections(SILValue addr,
                              SmallVectorImpl<Projection> *Result = nullptr);
-    
+
     // Get the stored value for a load. The loadInst can be either a real load
     // or a copy_addr.
     SILValue getStoredValue(SILInstruction *loadInst,
@@ -149,7 +149,7 @@ namespace {
       }
       return SILValue();
     }
-    
+
     SILInstruction *getMemoryContent(SILValue addr) {
       // The memory content can be stored in this ConstantTracker or in the
       // caller's ConstantTracker.
@@ -160,26 +160,26 @@ namespace {
         return callerTracker->getMemoryContent(addr);
       return nullptr;
     }
-    
+
     // Gets the estimated definition of a value.
     SILInstruction *getDef(SILValue val, ProjectionPath &projStack);
 
     // Gets the estimated integer constant result of a builtin.
     IntConst getBuiltinConst(BuiltinInst *BI, int depth);
-    
+
   public:
-    
+
     // Constructor for the caller function.
     ConstantTracker(SILFunction *function) :
       F(function), callerTracker(nullptr), AI()
     { }
-    
+
     // Constructor for the callee function.
     ConstantTracker(SILFunction *function, ConstantTracker *caller,
                     FullApplySite callerApply) :
        F(function), callerTracker(caller), AI(callerApply)
     { }
-    
+
     void beginBlock() {
       // Currently we don't do any sophisticated dataflow analysis, so we keep
       // the memoryContent alive only for a single block.
@@ -188,13 +188,13 @@ namespace {
 
     // Must be called for each instruction visited in dominance order.
     void trackInst(SILInstruction *inst);
-    
+
     // Gets the estimated definition of a value.
     SILInstruction *getDef(SILValue val) {
       ProjectionPath projStack;
       return getDef(val, projStack);
     }
-    
+
     // Gets the estimated definition of a value if it is in the caller.
     SILInstruction *getDefInCaller(SILValue val) {
       SILInstruction *def = getDef(val);
@@ -202,7 +202,7 @@ namespace {
         return def;
       return nullptr;
     }
-    
+
     // Gets the estimated integer constant of a value.
     IntConst getIntConst(SILValue val, int depth = 0);
   };
@@ -343,7 +343,7 @@ SILValue ConstantTracker::getStoredValue(SILInstruction *loadInst,
   for (const Projection &proj : loadProjections) {
     projStack.push_back(proj);
   }
-  
+
   //  Pop the address projections of the store from the stack.
   SmallVector<Projection, 4> storeProjections;
   scanProjections(store->getOperand(1), &storeProjections);
@@ -355,7 +355,7 @@ SILValue ConstantTracker::getStoredValue(SILInstruction *loadInst,
       return SILValue();
     projStack.pop_back();
   }
-  
+
   if (isa<StoreInst>(store))
     return store->getOperand(0);
 
@@ -376,7 +376,7 @@ static SILValue getMember(SILInstruction *inst, ProjectionPath &projStack) {
 
 SILInstruction *ConstantTracker::getDef(SILValue val,
                                           ProjectionPath &projStack) {
-  
+
   // Track the value up the dominator tree.
   for (;;) {
     if (SILInstruction *inst = dyn_cast<SILInstruction>(val)) {
@@ -413,7 +413,7 @@ IntConst ConstantTracker::getBuiltinConst(BuiltinInst *BI, int depth) {
   OperandValueArrayRef Args = BI->getArguments();
   switch (Builtin.ID) {
     default: break;
-      
+
       // Fold comparison predicates.
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload) \
@@ -429,8 +429,8 @@ case BuiltinValueKind::id:
       }
       break;
     }
-      
-      
+
+
     case BuiltinValueKind::SAddOver:
     case BuiltinValueKind::UAddOver:
     case BuiltinValueKind::SSubOver:
@@ -448,7 +448,7 @@ case BuiltinValueKind::id:
       }
       break;
     }
-      
+
     case BuiltinValueKind::SDiv:
     case BuiltinValueKind::SRem:
     case BuiltinValueKind::UDiv:
@@ -463,7 +463,7 @@ case BuiltinValueKind::id:
       }
       break;
     }
-      
+
     case BuiltinValueKind::And:
     case BuiltinValueKind::AShr:
     case BuiltinValueKind::LShr:
@@ -479,7 +479,7 @@ case BuiltinValueKind::id:
       }
       break;
     }
-      
+
     case BuiltinValueKind::Trunc:
     case BuiltinValueKind::ZExt:
     case BuiltinValueKind::SExt:
@@ -499,22 +499,22 @@ case BuiltinValueKind::id:
 // Tries to evaluate the integer constant of a value. The \p depth is used
 // to limit the complexity.
 IntConst ConstantTracker::getIntConst(SILValue val, int depth) {
-  
+
   // Don't spend too much time with constant evaluation.
   if (depth >= 10)
     return IntConst();
-  
+
   SILInstruction *I = getDef(val);
   if (!I)
     return IntConst();
-  
+
   if (auto *IL = dyn_cast<IntegerLiteralInst>(I)) {
     return IntConst(IL->getValue(), IL->getFunction() != F);
   }
   if (auto *BI = dyn_cast<BuiltinInst>(I)) {
     if (constCache.count(BI) != 0)
       return constCache[BI];
-    
+
     IntConst builtinConst = getBuiltinConst(BI, depth + 1);
     constCache[BI] = builtinConst;
     return builtinConst;
@@ -566,7 +566,7 @@ static bool calleeHasMinimalSelfRecursion(SILFunction *Callee) {
 SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
 
   SILFunction *Callee = AI.getCalleeFunction();
-  
+
   if (!Callee) {
     DEBUG(llvm::dbgs() << "        FAIL: Cannot find inlineable callee.\n");
     return nullptr;
@@ -607,7 +607,7 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
           Callee->getName() << ".\n");
     return nullptr;
   }
-  
+
   if (!Callee->shouldOptimize()) {
     DEBUG(llvm::dbgs() << "        FAIL: optimizations disabled on " <<
           Callee->getName() << ".\n");
@@ -657,7 +657,7 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
 
   DEBUG(llvm::dbgs() << "        Eligible callee: " <<
         Callee->getName() << "\n");
-  
+
   return Callee;
 }
 
@@ -737,17 +737,17 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
                                               SILLoopAnalysis *LA,
                                               ConstantTracker &callerTracker) {
   SILFunction *Callee = AI.getCalleeFunction();
-  
+
   if (Callee->getInlineStrategy() == AlwaysInline)
     return true;
-  
+
   ConstantTracker constTracker(Callee, &callerTracker, AI);
-  
+
   DominanceInfo *DT = DA->get(Callee);
   SILLoopInfo *LI = LA->get(Callee);
 
   DominanceOrder domOrder(&Callee->front(), DT, Callee->size());
-  
+
   // Calculate the inlining cost of the callee.
   unsigned CalleeCost = 0;
   unsigned Benefit = InlineCostThreshold > 0 ? InlineCostThreshold :
@@ -760,9 +760,9 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
     unsigned loopDepth = LI->getLoopDepth(block);
     for (SILInstruction &I : *block) {
       constTracker.trackInst(&I);
-      
+
       auto ICost = instructionInlineCost(I);
-      
+
       if (testThreshold >= 0) {
         // We are in test-mode: use a simplified cost model.
         CalleeCost += testCost(&I);
@@ -770,9 +770,9 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
         // Use the regular cost model.
         CalleeCost += unsigned(ICost);
       }
-      
+
       if (ApplyInst *AI = dyn_cast<ApplyInst>(&I)) {
-        
+
         // Check if the callee is passed as an argument. If so, increase the
         // threshold, because inlining will (probably) eliminate the closure.
         SILInstruction *def = constTracker.getDefInCaller(AI->getCallee());
@@ -828,9 +828,9 @@ static bool isProfitableInColdBlock(SILFunction *Callee) {
   // Testing with the TestThreshold disables inlining into cold blocks.
   if (TestThreshold >= 0)
     return false;
-  
+
   unsigned CalleeCost = 0;
-  
+
   for (SILBasicBlock &Block : *Callee) {
     for (SILInstruction &I : Block) {
       auto ICost = instructionInlineCost(I);
@@ -1106,7 +1106,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
                          << " marked to be excluded from optimizations.\n");
       continue;
     }
-    
+
     SmallVector<SILValue, 8> Args;
     for (const auto &Arg : AI.getArguments())
       Args.push_back(Arg);

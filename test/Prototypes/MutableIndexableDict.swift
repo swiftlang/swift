@@ -35,7 +35,7 @@
 //
 //    Dictionary<K,V> (a struct)
 //    +---+
-//    | * | 
+//    | * |
 //    +-|-+
 //      |
 //      V  DictionaryBufferOwner<K,V>
@@ -60,7 +60,7 @@
 //
 //    Dictionary<K,V> (a struct)
 //    +---+
-//    | * | 
+//    | * |
 //    +-|-+
 //      |  +---+
 //      |  |   |
@@ -116,7 +116,7 @@ struct FixedSizedRefArrayOfOptional<T>
 {
   typealias Storage = FixedSizedRefArrayOfOptionalStorage<T>
   let buffer: Storage.Buffer
-  
+
   init(capacity: Int)
   {
     buffer = Storage.Buffer(Storage.self, capacity, capacity)
@@ -331,7 +331,7 @@ struct Dictionary<Key: Hashable, Value> : CollectionType, SequenceType {
 
   func _find(k: Key, startBucket: Int) -> (Index,Bool) {
     var bucket = startBucket
-    
+
 
     // The invariant guarantees there's always a hole, so we just loop
     // until we find one.

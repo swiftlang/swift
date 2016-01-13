@@ -691,7 +691,7 @@ bool COWArrayOpt::checkSafeArrayValueUses(UserList &ArrayValueUsers) {
 
     if (isDebugInst(UseInst))
       continue;
-    
+
     // Found an unsafe or unknown user. The Array may escape here.
     DEBUG(llvm::dbgs() << "    Skipping Array: unsafe Array value use!\n    "
           << *UseInst);
@@ -754,7 +754,7 @@ bool COWArrayOpt::checkSafeArrayElementUse(SILInstruction *UseInst,
 
   if (isDebugInst(UseInst))
     return true;
-  
+
   // If this is an instruction which is a safe array element use if and only if
   // all of its users are safe array element uses, recursively check its uses
   // and return false if any of them are not transitive escape array element
@@ -1354,7 +1354,7 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
               Sem.getSelf().getType().getSwiftRValueType()->getCanonicalType();
           continue;
         }
-        
+
         if (Sem.getSelf()
                        .getType()
                        .getSwiftRValueType()

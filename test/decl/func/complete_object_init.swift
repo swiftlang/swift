@@ -12,9 +12,9 @@ class A {
     self.init(double: Double(f))
   }
 
-  init(double d: Double) { 
+  init(double d: Double) {
   }
-  
+
   convenience init(crazy : A) {
     self.init(int: 42)
   }
@@ -25,7 +25,7 @@ class OtherA {
     self.init(double: negated ? -d : d) // expected-note{{delegation occurs here}}
   }
 
-  init(double d: Double) { 
+  init(double d: Double) {
   }
 }
 
@@ -42,9 +42,9 @@ class DerivesA : A {
 struct S {
   convenience init(int i: Int) { // expected-error{{delegating initializers in structs are not marked with 'convenience'}}
     self.init(double: Double(i))
-  }  
+  }
 
-  init(double d: Double) { 
+  init(double d: Double) {
   }
 }
 
@@ -86,9 +86,9 @@ func testConstructB1(i: Int, f: Float, d: Double) {
 class B2 : A {
   var s: String
 
-  init() { 
+  init() {
     s = "hello"
-    super.init(double: 1.5) 
+    super.init(double: 1.5)
   }
 }
 
@@ -127,7 +127,7 @@ class Ab3 : Ab2 {
 }
 
 class Ab4 : Ab3 {
-  init(int: Int) { 
+  init(int: Int) {
     super.init(string:"four")
   }
   // expected-error{{'required' initializer 'init()' must be provided by subclass of 'Ab2'}}

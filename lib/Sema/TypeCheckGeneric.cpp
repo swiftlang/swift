@@ -32,7 +32,7 @@ Type DependentGenericTypeResolver::resolveDependentMemberType(
                                      ComponentIdentTypeRepr *ref) {
   auto archetype = Builder.resolveArchetype(baseTy);
   assert(archetype && "Bad generic context nesting?");
-  
+
   return archetype->getRepresentative()
            ->getNestedType(ref->getIdentifier(), Builder)
            ->getDependentType(Builder, true);
@@ -44,7 +44,7 @@ Type DependentGenericTypeResolver::resolveSelfAssociatedType(
        AssociatedTypeDecl *assocType) {
   auto archetype = Builder.resolveArchetype(selfTy);
   assert(archetype && "Bad generic context nesting?");
-  
+
   return archetype->getRepresentative()
            ->getNestedType(assocType->getName(), Builder)
            ->getDependentType(Builder, true);
@@ -83,7 +83,7 @@ Type GenericTypeToArchetypeResolver::resolveSelfAssociatedType(
        Type selfTy,
        DeclContext *DC,
        AssociatedTypeDecl *assocType) {
-  llvm_unreachable("Dependent type after archetype substitution");  
+  llvm_unreachable("Dependent type after archetype substitution");
 }
 
 Type GenericTypeToArchetypeResolver::resolveTypeOfContext(DeclContext *dc) {
@@ -244,7 +244,7 @@ bool TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
            isa<AbstractFunctionDecl>(lookupDC) &&
            "not a proper generic parameter context?");
     options = TR_GenericSignature;
-  }    
+  }
 
   // First, set the depth of each generic parameter, and add them to the
   // archetype builder. Do this before checking the inheritance clause,
@@ -326,10 +326,10 @@ bool TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
         req.setInvalid();
         continue;
       }
-      
+
       break;
     }
-    
+
     if (builder && builder->addRequirement(req)) {
       invalid = true;
       req.setInvalid();
@@ -523,7 +523,7 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   Type initFuncTy;
   if (auto fn = dyn_cast<FuncDecl>(func)) {
     funcTy = fn->getBodyResultTypeLoc().getType();
-    
+
     if (!funcTy) {
       funcTy = TupleType::getEmpty(Context);
     } else {
@@ -539,7 +539,7 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
       funcTy = ctor->getExtensionType()->getAnyNominal()
                  ->getDeclaredInterfaceType();
     }
-    
+
     // Adjust result type for failability.
     if (ctor->getFailability() != OTK_None)
       funcTy = OptionalType::get(ctor->getFailability(), funcTy);
@@ -583,7 +583,7 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
       // archetypes rather than dependent types. Replace the
       // archetypes with their corresponding dependent types.
       if (func->isImplicit()) {
-        argTy = getInterfaceTypeFromInternalType(func, argTy); 
+        argTy = getInterfaceTypeFromInternalType(func, argTy);
       }
 
       if (initFuncTy)
@@ -691,7 +691,7 @@ GenericSignature *TypeChecker::validateGenericSignature(
 
   // Type check the generic parameters, treating all generic type
   // parameters as dependent, unresolved.
-  DependentGenericTypeResolver dependentResolver(builder);  
+  DependentGenericTypeResolver dependentResolver(builder);
   if (checkGenericParamList(&builder, genericParams, dc,
                             false, &dependentResolver)) {
     invalid = true;
@@ -899,7 +899,7 @@ bool TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
         return true;
       }
       continue;
-      
+
     case RequirementKind::WitnessMarker:
       continue;
     }

@@ -295,14 +295,14 @@ static llvm::Function *emitExistentialScalarCastFn(IRGenModule &IGM,
       break;
     }
   }
-  
+
   // See if we already defined this function.
-  
+
   if (auto fn = IGM.Module.getFunction(name))
     return fn;
-  
+
   // Build the function type.
-  
+
   llvm::SmallVector<llvm::Type *, 4> argTys;
   llvm::SmallVector<llvm::Type *, 4> returnTys;
   argTys.push_back(IGM.Int8PtrTy);
@@ -312,14 +312,14 @@ static llvm::Function *emitExistentialScalarCastFn(IRGenModule &IGM,
     argTys.push_back(IGM.ProtocolDescriptorPtrTy);
     returnTys.push_back(IGM.WitnessTablePtrTy);
   }
-  
+
   llvm::Type *returnTy = llvm::StructType::get(IGM.getLLVMContext(), returnTys);
-  
+
   auto fnTy = llvm::FunctionType::get(returnTy, argTys, /*vararg*/ false);
   auto fn = llvm::Function::Create(fnTy, llvm::GlobalValue::PrivateLinkage,
                                    llvm::Twine(name), IGM.getModule());
   fn->setAttributes(IGM.constructInitialAttributes());
-  
+
   IRGenFunction IGF(IGM, fn);
   Explosion args = IGF.collectParameters();
 
@@ -327,7 +327,7 @@ static llvm::Function *emitExistentialScalarCastFn(IRGenModule &IGM,
   auto ref = args.claimNext();
   auto failBB = IGF.createBasicBlock("fail");
   auto conformsToProtocol = IGM.getConformsToProtocolFn();
-  
+
   Explosion rets;
   rets.add(value);
 
@@ -347,14 +347,14 @@ static llvm::Function *emitExistentialScalarCastFn(IRGenModule &IGM,
                      llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
     auto contBB = IGF.createBasicBlock("cont");
     IGF.Builder.CreateCondBr(isNull, failBB, contBB);
-    
+
     IGF.Builder.emitBlock(contBB);
     rets.add(witness);
   }
-  
+
   // If we succeeded, return the witnesses.
   IGF.emitScalarReturn(returnTy, rets);
-  
+
   // If we failed, return nil or trap.
   IGF.Builder.emitBlock(failBB);
   switch (mode) {
@@ -372,7 +372,7 @@ static llvm::Function *emitExistentialScalarCastFn(IRGenModule &IGM,
     break;
   }
   }
-  
+
   return fn;
 }
 
@@ -386,10 +386,10 @@ void irgen::emitMetatypeToObjectDowncast(IRGenFunction &IGF,
   auto triviallyFail = [&] {
     ex.add(llvm::ConstantPointerNull::get(IGF.IGM.ObjCPtrTy));
   };
-  
+
   if (!IGF.IGM.ObjCInterop)
     return triviallyFail();
-  
+
   switch (type->getRepresentation()) {
   case MetatypeRepresentation::ObjC:
     // Metatypes that can be represented as ObjC trivially cast to AnyObject.
@@ -402,7 +402,7 @@ void irgen::emitMetatypeToObjectDowncast(IRGenFunction &IGF,
     assert(!type.getInstanceType()->mayHaveSuperclass()
            && "classes should not have thin metatypes (yet)");
     return triviallyFail();
-    
+
   case MetatypeRepresentation::Thick: {
     auto instanceTy = type.getInstanceType();
     // Is the type obviously a class?
@@ -413,7 +413,7 @@ void irgen::emitMetatypeToObjectDowncast(IRGenFunction &IGF,
       ex.add(IGF.Builder.CreateBitCast(heapMetadata, IGF.IGM.ObjCPtrTy));
       return;
     }
-    
+
     // Is the type obviously not a class?
     if (!isa<ArchetypeType>(instanceTy)
         && !isa<ExistentialMetatypeType>(type))
@@ -429,7 +429,7 @@ void irgen::emitMetatypeToObjectDowncast(IRGenFunction &IGF,
       castFn = IGF.IGM.getDynamicCastMetatypeToObjectUnconditionalFn();
       break;
     }
-    
+
     auto call = IGF.Builder.CreateCall(castFn, metatypeValue);
     ex.add(call);
     return;
@@ -468,7 +468,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
         // AnyObject only requires that the type be a class.
         continue;
       }
-      
+
       // If this protocol is class-constrained but not AnyObject, checking its
       // conformance will check the class constraint too.
       hasClassConstraintByProtocol = true;
@@ -484,7 +484,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
 
     objcProtos.push_back(emitReferenceToObjCProtocol(IGF, proto));
   }
-  
+
   llvm::Type *resultType;
   if (metatypeKind) {
     switch (*metatypeKind) {
@@ -543,7 +543,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
     if (objcObject)
       objcObject = IGF.Builder.CreateBitCast(objcObject,
                                              IGF.IGM.UnknownRefCountedPtrTy);
-    
+
     // Pick the cast function based on the cast mode and on whether we're
     // casting a Swift metatype or ObjC object.
     llvm::Value *castFn;
@@ -560,7 +560,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
       break;
     }
     llvm::Value *objcCastObject = objcObject ? objcObject : value;
-    
+
     Address protoRefsBuf = IGF.createAlloca(
                                         llvm::ArrayType::get(IGF.IGM.Int8PtrTy,
                                                              objcProtos.size()),
@@ -577,7 +577,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
       ++index;
     }
 
-    
+
     objcCast = IGF.Builder.CreateCall(
         castFn,
         {objcCastObject, IGF.IGM.getSize(Size(objcProtos.size())),
@@ -663,11 +663,11 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
     condition.reset();
     IGF.Builder.CreateBr(contBB);
     IGF.Builder.emitBlock(contBB);
-    
+
     // Return null on the failure path.
     Explosion successEx = std::move(ex);
     ex.reset();
-    
+
     while (!successEx.empty()) {
       auto successVal = successEx.claimNext();
       auto failureVal = llvm::Constant::getNullValue(successVal->getType());

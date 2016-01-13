@@ -50,27 +50,27 @@ namespace {
   class PrintWithColorRAII {
     raw_ostream &OS;
     bool ShowColors;
-    
+
   public:
     PrintWithColorRAII(raw_ostream &os, llvm::raw_ostream::Colors color)
     : OS(os), ShowColors(false)
     {
       if (&os == &llvm::errs() || &os == &llvm::outs())
         ShowColors = llvm::errs().has_colors() && llvm::outs().has_colors();
-      
+
       if (ShowColors) {
         if (auto str = llvm::sys::Process::OutputColor(color, false, false)) {
           OS << str;
         }
       }
     }
-    
+
     ~PrintWithColorRAII() {
       if (ShowColors) {
         OS << llvm::sys::Process::ResetColor();
       }
     }
-    
+
     template<typename T>
     friend raw_ostream &operator<<(PrintWithColorRAII &&printer,
                                    const T &value){
@@ -285,9 +285,9 @@ namespace {
       }
       OS << ')';
     }
-    
+
     void visitIsPattern(IsPattern *P) {
-      printCommon(P, "pattern_is") 
+      printCommon(P, "pattern_is")
         << ' ' << getCheckedCastKindName(P->getCastKind()) << ' ';
       P->getCastTypeLoc().getType().print(OS);
       if (auto sub = P->getSubPattern()) {
@@ -358,7 +358,7 @@ namespace {
       if (&os == &llvm::errs() || &os == &llvm::outs())
         ShowColors = llvm::errs().has_colors() && llvm::outs().has_colors();
     }
-    
+
     void printRec(Decl *D) { PrintDecl(OS, Indent + 2).visit(D); }
     void printRec(Expr *E) { E->print(OS, Indent+2); }
     void printRec(Stmt *S) { S->print(OS, Indent+2); }
@@ -698,7 +698,7 @@ namespace {
 
     void visitPatternBindingDecl(PatternBindingDecl *PBD) {
       printCommon(PBD, "pattern_binding_decl");
-      
+
       for (auto entry : PBD->getPatternList()) {
         OS << '\n';
         printRec(entry.getPattern());
@@ -716,7 +716,7 @@ namespace {
       printAccessors(SD);
       OS << ')';
     }
-    
+
     void printCommonAFD(AbstractFunctionDecl *D, const char *Type) {
       printCommon(D, Type, FuncColor);
       if (!D->getCaptureInfo().empty()) {
@@ -760,13 +760,13 @@ namespace {
           OS << ",resulttype=" << fec->getResultType().getString();
       }
     }
-    
+
     void printParameter(const ParamDecl *P) {
       OS.indent(Indent) << "(parameter ";
       printDeclName(P);
       if (!P->getArgumentName().empty())
         OS << " apiName=" << P->getArgumentName();
-      
+
       OS << " type=";
       if (P->hasType()) {
         OS << '\'';
@@ -774,10 +774,10 @@ namespace {
         OS << '\'';
       } else
         OS << "<null type>";
-      
+
       if (!P->isLet())
         OS << " mutable";
-      
+
       if (P->isVariadic())
         OS << " variadic";
 
@@ -814,15 +814,15 @@ namespace {
         printField("default_arg", "normal");
         break;
       }
-      
+
       if (auto init = P->getDefaultValue()) {
         OS << " expression=\n";
         printRec(init->getExpr());
       }
-      
+
       OS << ')';
     }
-    
+
 
     void printParameterList(const ParameterList *params) {
       OS.indent(Indent) << "(parameter_list";
@@ -858,7 +858,7 @@ namespace {
         printRec(Body);
       }
      }
-    
+
     void visitFuncDecl(FuncDecl *FD) {
       printCommonAFD(FD, "func_decl");
       if (FD->isStatic())
@@ -877,7 +877,7 @@ namespace {
 
         OS << "_for=" << ASD->getFullName();
       }
-      
+
       for (auto VD: FD->getSatisfiedProtocolRequirements()) {
         OS << '\n';
         OS.indent(Indent+2) << "(conformance ";
@@ -911,7 +911,7 @@ namespace {
         OS << " factory";
         break;
       }
-      
+
       switch (CD->getFailability()) {
       case OTK_None:
         break;
@@ -943,7 +943,7 @@ namespace {
       }
       OS << ')';
     }
-    
+
     void visitIfConfigDecl(IfConfigDecl *ICD) {
       OS.indent(Indent) << "(#if_decl\n";
       Indent += 2;
@@ -951,17 +951,17 @@ namespace {
         OS.indent(Indent) << (Clause.Cond ? "(#if:\n" : "#else");
         if (Clause.Cond)
           printRec(Clause.Cond);
-        
+
         for (auto D : Clause.Members) {
           OS << '\n';
           printRec(D);
         }
       }
-    
+
       Indent -= 2;
       OS << ')';
     }
-    
+
     void visitInfixOperatorDecl(InfixOperatorDecl *IOD) {
       printCommon(IOD, "infix_operator_decl ");
       OS << IOD->getName() << "\n";
@@ -975,7 +975,7 @@ namespace {
       OS.indent(Indent+2);
       OS << "precedence " << IOD->getPrecedence() << ')';
     }
-    
+
     void visitPrefixOperatorDecl(PrefixOperatorDecl *POD) {
       printCommon(POD, "prefix_operator_decl ");
       OS << POD->getName() << ')';
@@ -999,14 +999,14 @@ void ParameterList::dump() const {
 
 void ParameterList::dump(raw_ostream &OS, unsigned Indent) const {
   llvm::Optional<llvm::SaveAndRestore<bool>> X;
-  
+
   // Make sure to print type variables if we can get to ASTContext.
   if (size() != 0 && get(0)) {
     auto &ctx = get(0)->getASTContext();
     X.emplace(llvm::SaveAndRestore<bool>(ctx.LangOpts.DebugConstraintSolver,
                                          true));
   }
-  
+
   PrintDecl(OS, Indent).printParameterList(this);
   llvm::errs() << '\n';
 }
@@ -1172,7 +1172,7 @@ public:
   void printRec(const Pattern *P) {
     PrintPattern(OS, Indent+2).visit(const_cast<Pattern *>(P));
   }
-  
+
   void printRec(StmtConditionElement C) {
     switch (C.getKind()) {
     case StmtConditionElement::CK_Boolean:
@@ -1180,7 +1180,7 @@ public:
     case StmtConditionElement::CK_PatternBinding:
       Indent += 2;
       OS.indent(Indent) << "(pattern\n";
-      
+
       printRec(C.getPattern());
       OS << "\n";
       printRec(C.getInitializer());
@@ -1206,7 +1206,7 @@ public:
       break;
     }
   }
-  
+
   void visitBraceStmt(BraceStmt *S) {
     printASTNodes(S->getElements(), "brace_stmt");
   }
@@ -1233,7 +1233,7 @@ public:
     }
     OS << ')';
   }
-  
+
   void visitDeferStmt(DeferStmt *S) {
     OS.indent(Indent) << "(defer_stmt\n";
     printRec(S->getTempDecl());
@@ -1254,7 +1254,7 @@ public:
     }
     OS << ')';
   }
-  
+
   void visitGuardStmt(GuardStmt *S) {
     OS.indent(Indent) << "(guard_stmt\n";
     for (auto elt : S->getCond())
@@ -1277,7 +1277,7 @@ public:
       printASTNodes(Clause.Elements, "elements");
       Indent -= 2;
     }
-    
+
     Indent -= 2;
     OS << ')';
   }
@@ -1399,7 +1399,7 @@ public:
   void visitFailStmt(FailStmt *S) {
     OS.indent(Indent) << "(fail_stmt)";
   }
-  
+
   void visitThrowStmt(ThrowStmt *S) {
     OS.indent(Indent) << "(throw_stmt\n";
     printRec(S->getSubExpr());
@@ -1533,7 +1533,7 @@ public:
   void visitNilLiteralExpr(NilLiteralExpr *E) {
     printCommon(E, "nil_literal_expr") << ')';
   }
-  
+
   void visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
     printCommon(E, "integer_literal_expr");
     if (E->isNegative())
@@ -1552,7 +1552,7 @@ public:
   }
 
   void visitBooleanLiteralExpr(BooleanLiteralExpr *E) {
-    printCommon(E, "boolean_literal_expr") 
+    printCommon(E, "boolean_literal_expr")
       << " value=" << (E->getValue() ? "true" : "false")
       << ')';
   }
@@ -1591,7 +1591,7 @@ public:
       OS << "__FUNCTION__ encoding=";
       printStringEncoding(E->getStringEncoding());
       break;
-        
+
     case MagicIdentifierLiteralExpr::Line:  OS << "__LINE__"; break;
     case MagicIdentifierLiteralExpr::Column:  OS << "__COLUMN__"; break;
     case MagicIdentifierLiteralExpr::DSOHandle:  OS << "__DSO_HANDLE__"; break;
@@ -1609,7 +1609,7 @@ public:
   void visitDiscardAssignmentExpr(DiscardAssignmentExpr *E) {
     printCommon(E, "discard_assignment_expr") << ')';
   }
-  
+
   void visitDeclRefExpr(DeclRefExpr *E) {
     printCommon(E, "declref_expr")
       << " decl=";
@@ -1692,11 +1692,11 @@ public:
     printCommon(E, "member_ref_expr")
       << " decl=";
     E->getMember().dump(OS);
-    
+
     OS << E->getAccessSemantics();
     if (E->isSuper())
       OS << " super";
-            
+
     OS << '\n';
     printRec(E->getBase());
     OS << ')';
@@ -1999,7 +1999,7 @@ public:
       OS << " ";
       E->getCaptureInfo().print(OS);
     }
-    
+
     return OS;
   }
 
@@ -2007,12 +2007,12 @@ public:
     printClosure(E, "closure_expr");
     if (E->hasSingleExpressionBody())
       OS << " single-expression";
-    
+
     if (E->getParameters()) {
       OS << '\n';
       PrintDecl(OS, Indent+2).printParameterList(E->getParameters());
     }
-    
+
     OS << '\n';
     if (E->hasSingleExpressionBody()) {
       printRec(E->getSingleExpressionBody());
@@ -2023,7 +2023,7 @@ public:
   }
   void visitAutoClosureExpr(AutoClosureExpr *E) {
     printClosure(E, "autoclosure_expr") << '\n';
-    
+
     if (E->getParameters()) {
       OS << '\n';
       PrintDecl(OS, Indent+2).printParameterList(E->getParameters());
@@ -2184,7 +2184,7 @@ void Expr::dump(raw_ostream &OS) const {
   if (auto ty = getType()) {
     llvm::SaveAndRestore<bool> X(ty->getASTContext().LangOpts.
                                  DebugConstraintSolver, true);
-  
+
     print(OS);
   } else {
     print(OS);
@@ -2338,7 +2338,7 @@ public:
     printRec(T->getBase());
     OS << ')';
   }
-  
+
   void visitInOutTypeRepr(InOutTypeRepr *T) {
     printCommon(T, "type_inout") << '\n';
     printRec(T->getBase());
@@ -2706,7 +2706,7 @@ namespace {
         OS << "=";
         OS << nestedType.first.str() << " ";
         if (!nestedType.second) {
-          PrintWithColorRAII(OS, TypeColor) << "unresolved";          
+          PrintWithColorRAII(OS, TypeColor) << "unresolved";
         } else if (auto concrete = nestedType.second.getAsConcreteType()) {
           PrintWithColorRAII(OS, TypeColor) << "concrete";
           OS << "=" << concrete.getString();
@@ -2777,11 +2777,11 @@ namespace {
       case SILFunctionType::Representation::Method:
         printField("representation", "method");
         break;
-        
+
       case SILFunctionType::Representation::ObjCMethod:
         printField("representation", "objc_method");
         break;
-        
+
       case SILFunctionType::Representation::WitnessMethod:
         printField("representation", "witness_method");
         break;
@@ -2953,7 +2953,7 @@ void TypeBase::dump() const {
 
 void TypeBase::dump(raw_ostream &os, unsigned indent) const {
   auto &ctx = const_cast<TypeBase*>(this)->getASTContext();
-  
+
   // Make sure to print type variables.
   llvm::SaveAndRestore<bool> X(ctx.LangOpts.DebugConstraintSolver, true);
   Type(const_cast<TypeBase *>(this)).dump(os, indent);

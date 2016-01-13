@@ -188,7 +188,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   unsigned N = ctor->getParameterList(1)->size() + 1;
   // Allocate the local variable for 'self'.
   emitLocalVariableWithCleanup(selfDecl, false, N)->finishInitialization(*this);
-  
+
   // Mark self as being uninitialized so that DI knows where it is and how to
   // check for it.
   SILValue selfLV;
@@ -199,7 +199,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     selfLV = B.createMarkUninitialized(selfDecl, SelfVarLoc.value, MUIKind);
     SelfVarLoc.value = selfLV;
   }
-  
+
   // Emit the prolog.
   emitProlog(ctor->getParameterList(1), ctor->getResultType(), ctor);
   emitConstructorMetatypeArg(*this, ctor);
@@ -259,7 +259,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // Emit the constructor body.
   emitStmt(ctor->getBody());
 
-  
+
   // Build a custom epilog block, since the AST representation of the
   // constructor decl (which has no self in the return type) doesn't match the
   // SIL representation.
@@ -267,16 +267,16 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   {
     SavedInsertionPoint savedIP(*this, ReturnDest.getBlock());
     assert(B.getInsertionBB()->empty() && "Epilog already set up?");
-    
+
     auto cleanupLoc = CleanupLocation::get(ctor);
-    
+
     if (!lowering.isAddressOnly()) {
       // Otherwise, load and return the final 'self' value.
       selfValue = B.createLoad(cleanupLoc, selfLV);
-      
+
       // Emit a retain of the loaded value, since we return it +1.
       lowering.emitRetainValue(B, cleanupLoc, selfValue);
-      
+
       // Inject the self value into an optional if the constructor is failable.
       if (ctor->getFailability() != OTK_None) {
         selfValue = B.createEnum(ctor, selfValue,
@@ -287,7 +287,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
       // If 'self' is address-only, copy 'self' into the indirect return slot.
       assert(IndirectReturnAddress &&
              "no indirect return for address-only ctor?!");
-      
+
       // Get the address to which to store the result.
       SILValue returnAddress;
       switch (ctor->getFailability()) {
@@ -303,12 +303,12 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
                                                  selfLV.getType());
         break;
       }
-      
+
       // We have to do a non-take copy because someone else may be using the
       // box (e.g. someone could have closed over it).
       B.createCopyAddr(cleanupLoc, selfLV, returnAddress,
                        IsNotTake, IsInitialization);
-      
+
       // Inject the enum tag if the result is optional because of failability.
       if (ctor->getFailability() != OTK_None) {
         // Inject the 'Some' tag.
@@ -317,7 +317,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
       }
     }
   }
-  
+
   // Finally, emit the epilog and post-matter.
   auto returnLoc = emitEpilog(ctor, /*UsesCustomEpilog*/true);
 
@@ -328,7 +328,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     if (!failureExitBB) {
       if (!selfValue)
         selfValue = emitEmptyTuple(ctor);
-      
+
       B.createReturn(returnLoc, selfValue);
     } else {
       if (selfValue)
@@ -649,7 +649,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // Emit the constructor body.
   emitStmt(ctor->getBody());
 
-  
+
   // Build a custom epilog block, since the AST representation of the
   // constructor decl (which has no self in the return type) doesn't match the
   // SIL representation.
@@ -664,10 +664,10 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
       // Emit the call to super.init() right before exiting from the initializer.
       if (Expr *SI = ctor->getSuperInitCall())
         emitRValue(SI);
-      
+
       selfArg = B.createLoad(cleanupLoc, VarLocs[selfDecl].value);
     }
-    
+
     // We have to do a retain because we are returning the pointer +1.
     B.emitRetainValueOperation(cleanupLoc, selfArg);
 
@@ -680,7 +680,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
                              getLoweredLoadableType(ctor->getResultType()));
     }
   }
-  
+
   // Emit the epilog and post-matter.
   auto returnLoc = emitEpilog(ctor, /*UsesCustomEpilog*/true);
 

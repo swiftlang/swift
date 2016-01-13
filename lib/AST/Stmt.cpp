@@ -98,7 +98,7 @@ SourceRange Stmt::getSourceRange() const {
   case StmtKind::ID: return getSourceRangeImpl(cast<ID##Stmt>(this));
 #include "swift/AST/StmtNodes.def"
   }
-  
+
   llvm_unreachable("statement type not handled!");
 }
 
@@ -254,7 +254,7 @@ void LabeledConditionalStmt::setCond(StmtCondition e) {
   for (auto &elt : e)
     if (auto pat = elt.getPatternOrNull())
       pat->markOwnedByStatement(this);
-  
+
   Cond = e;
 }
 
@@ -271,7 +271,7 @@ PoundAvailableInfo *PoundAvailableInfo::create(ASTContext &ctx,
                                                      SourceLoc RParenLoc) {
   unsigned size = sizeof(PoundAvailableInfo) +
                   queries.size() * sizeof(AvailabilitySpec *);
-  
+
   void *Buffer = ctx.Allocate(size, alignof(PoundAvailableInfo));
   return ::new (Buffer) PoundAvailableInfo(PoundLoc, queries, RParenLoc);
 }
@@ -293,7 +293,7 @@ getPlatformKeywordRanges(SmallVectorImpl<CharSourceRange> &PlatformRanges) {
       dyn_cast<VersionConstraintAvailabilitySpec>(getQueries()[i]);
     if (!VersionSpec)
       continue;
-    
+
     auto Loc = VersionSpec->getPlatformLoc();
     auto Platform = VersionSpec->getPlatform();
     switch (Platform) {
@@ -365,9 +365,9 @@ IfStmt::IfStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc,
 GuardStmt::GuardStmt(SourceLoc GuardLoc, Expr *Cond, Stmt *Body,
                      Optional<bool> implicit, ASTContext &Ctx)
   : GuardStmt(GuardLoc, exprToCond(Cond, Ctx), Body, implicit) {
-    
+
 }
-  
+
 
 
 SourceLoc RepeatWhileStmt::getEndLoc() const { return Cond->getEndLoc(); }

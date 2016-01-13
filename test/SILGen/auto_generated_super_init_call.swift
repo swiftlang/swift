@@ -2,7 +2,7 @@
 
 // Test that we emit a call to super.init at the end of the initializer, when none has been previously added.
 
-class Parent { 
+class Parent {
   init() {}
 }
 
@@ -19,9 +19,9 @@ class SomeDerivedClass : Parent {
 // CHECK-NEXT: [[INITCALL1:%[0-9]+]] = super_method [[SELFLOAD]] : $SomeDerivedClass, #Parent.init!initializer.1
 // CHECK-NEXT: [[RES1:%[0-9]+]] = apply [[INITCALL1]]([[PARENT]])
 // CHECK-NEXT: [[DOWNCAST:%[0-9]+]] = unchecked_ref_cast [[RES1]] : $Parent to $SomeDerivedClass
-// CHECK-NEXT: store [[DOWNCAST]] to [[SELF]] : $*SomeDerivedClass 
+// CHECK-NEXT: store [[DOWNCAST]] to [[SELF]] : $*SomeDerivedClass
   }
-  
+
   init(x: Int) {
     y = x
 // CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call16SomeDerivedClassc{{.*}} : $@convention(method) (Int, @owned SomeDerivedClass) -> @owned SomeDerivedClass
@@ -37,8 +37,8 @@ class SomeDerivedClass : Parent {
     }
     return
 // Check that we are emitting the super.init expr into the epilog block.
-    
-// CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call16SomeDerivedClassc{{.*}} : $@convention(method) (Bool, @owned SomeDerivedClass) -> @owned SomeDerivedClass    
+
+// CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call16SomeDerivedClassc{{.*}} : $@convention(method) (Bool, @owned SomeDerivedClass) -> @owned SomeDerivedClass
 // CHECK: bb4:
 // CHECK: [[SELFLOAD:%[0-9]+]] = load [[SELF:%[0-9]+]] : $*SomeDerivedClass
 // CHECK: super_method [[SELFLOAD]] : $SomeDerivedClass, #Parent.init!initializer.1 : Parent.Type -> () -> Parent , $@convention(method) (@owned Parent) -> @owned Parent
@@ -58,9 +58,9 @@ class SomeDerivedClass : Parent {
     } else {
       y = 0
     }
-      
+
     super.init()
-// CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call16SomeDerivedClassc{{.*}} : $@convention(method) (Bool, Int, @owned SomeDerivedClass) -> @owned SomeDerivedClass    
+// CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call16SomeDerivedClassc{{.*}} : $@convention(method) (Bool, Int, @owned SomeDerivedClass) -> @owned SomeDerivedClass
 // CHECK: super_method {{%[0-9]+}} : $SomeDerivedClass, #Parent.init!initializer.1 : Parent.Type -> () -> Parent , $@convention(method) (@owned Parent) -> @owned Parent
 // CHECK-NOT: function_ref @_TFC30auto_generated_super_init_call6Parentc
 // CHECK: return

@@ -92,7 +92,7 @@ enum : unsigned {
   /// Number of words reserved in generic metadata patterns.
   NumGenericMetadataPrivateDataWords = 16,
 };
-  
+
 /// Kinds of protocol conformance record.
 enum class ProtocolConformanceTypeKind : unsigned {
   /// The conformance is universal and might apply to any type.
@@ -102,12 +102,12 @@ enum class ProtocolConformanceTypeKind : unsigned {
   /// The conformance is for a nongeneric native struct or enum type.
   /// getDirectType() points to the canonical metadata for the type.
   UniqueDirectType,
-  
+
   /// The conformance is for a nongeneric foreign struct or enum type.
   /// getDirectType() points to a nonunique metadata record for the type, which
   /// needs to be uniqued by the runtime.
   NonuniqueDirectType,
-  
+
   /// The conformance is for a nongeneric class type.
   /// getIndirectClass() points to a variable that contains the pointer to the
   /// class object, which may be ObjC and thus require a runtime call to get
@@ -116,12 +116,12 @@ enum class ProtocolConformanceTypeKind : unsigned {
   /// On platforms without ObjC interop, this indirection isn't necessary,
   /// and classes could be emitted as UniqueDirectType.
   UniqueIndirectClass,
-  
+
   /// The conformance is for a generic type.
   /// getGenericPattern() points to the generic metadata pattern used to
   /// form instances of the type.
   UniqueGenericPattern,
-  
+
   /// The conformance is for a nongeneric class type.
   /// getDirectType() points to the unique class object.
   ///
@@ -130,7 +130,7 @@ enum class ProtocolConformanceTypeKind : unsigned {
   /// platforms, the class object always is the type metadata.
   UniqueDirectClass = 0xF,
 };
-  
+
 /// Kinds of reference to protocol conformance.
 enum class ProtocolConformanceReferenceKind : unsigned {
   /// A direct reference to a protocol witness table.
@@ -139,23 +139,23 @@ enum class ProtocolConformanceReferenceKind : unsigned {
   /// table.
   WitnessTableAccessor,
 };
-  
+
 struct ProtocolConformanceFlags {
 private:
   using int_type = unsigned;
   int_type Data;
-  
+
   enum : int_type {
     TypeKindMask = 0x0000000FU,
     TypeKindShift = 0,
     ConformanceKindMask = 0x00000010U,
     ConformanceKindShift = 4,
   };
-  
+
 public:
   constexpr ProtocolConformanceFlags() : Data(0) {}
   constexpr ProtocolConformanceFlags(int_type Data) : Data(Data) {}
-  
+
   constexpr ProtocolConformanceTypeKind getTypeKind() const {
     return ProtocolConformanceTypeKind((Data >> TypeKindShift) & TypeKindMask);
   }
@@ -164,7 +164,7 @@ public:
     return ProtocolConformanceFlags(
                      (Data & ~TypeKindMask) | (int_type(ptk) << TypeKindShift));
   }
-  
+
   constexpr ProtocolConformanceReferenceKind getConformanceKind() const {
     return ProtocolConformanceReferenceKind((Data >> ConformanceKindShift)
                                      & ConformanceKindMask);
@@ -174,7 +174,7 @@ public:
     return ProtocolConformanceFlags(
        (Data & ~ConformanceKindMask) | (int_type(pck) << ConformanceKindShift));
   }
-  
+
   int_type getValue() const { return Data; }
 };
 
@@ -206,13 +206,13 @@ enum class ProtocolDispatchStrategy: uint8_t {
   ///
   /// This must be 0 for ABI compatibility with Objective-C protocol_t records.
   ObjC = 0,
-  
+
   /// Uses Swift protocol witness table dispatch.
   ///
   /// To invoke methods of this protocol, a pointer to a protocol witness table
   /// corresponding to the protocol conformance must be available.
   Swift = 1,
-  
+
   /// The protocol guarantees that it has no methods to dispatch. It requires
   /// neither Objective-C metadata nor a witness table.
   Empty = 2,
@@ -230,13 +230,13 @@ class ProtocolDescriptorFlags {
 
     SpecialProtocolMask  = 0x000003C0U,
     SpecialProtocolShift = 6,
-    
+
     /// Reserved by the ObjC runtime.
     _ObjCReserved        = 0xFFFF0000U,
   };
 
   int_type Data;
-  
+
   constexpr ProtocolDescriptorFlags(int_type Data) : Data(Data) {}
 public:
   constexpr ProtocolDescriptorFlags() : Data(0) {}
@@ -258,7 +258,7 @@ public:
     return ProtocolDescriptorFlags((Data & ~SpecialProtocolMask)
                                      | (int_type(sp) << SpecialProtocolShift));
   }
-  
+
   /// Was the protocol defined in Swift 1 or 2?
   bool isSwift() const { return Data & IsSwift; }
 
@@ -266,18 +266,18 @@ public:
   ProtocolClassConstraint getClassConstraint() const {
     return ProtocolClassConstraint(bool(Data & ClassConstraint));
   }
-  
+
   /// What dispatch strategy does this protocol use?
   ProtocolDispatchStrategy getDispatchStrategy() const {
     return ProtocolDispatchStrategy((Data & DispatchStrategyMask)
                                       >> DispatchStrategyShift);
   }
-  
+
   /// Does the protocol require a witness table for method dispatch?
   bool needsWitnessTable() const {
     return needsWitnessTable(getDispatchStrategy());
   }
-  
+
   static bool needsWitnessTable(ProtocolDispatchStrategy strategy) {
     switch (strategy) {
     case ProtocolDispatchStrategy::ObjC:
@@ -287,13 +287,13 @@ public:
       return true;
     }
   }
-  
+
   /// Return the identifier if this is a special runtime-known protocol.
   SpecialProtocol getSpecialProtocol() const {
     return SpecialProtocol(uint8_t((Data & SpecialProtocolMask)
                                  >> SpecialProtocolShift));
   }
-  
+
   int_type getIntValue() const {
     return Data;
   }
@@ -326,22 +326,22 @@ public:
     return ExistentialTypeFlags((Data & ~SpecialProtocolMask)
                                   | (int_type(sp) << SpecialProtocolShift));
   }
-  
+
   unsigned getNumWitnessTables() const {
     return Data & NumWitnessTablesMask;
   }
-  
+
   ProtocolClassConstraint getClassConstraint() const {
     return ProtocolClassConstraint(bool(Data & ClassConstraintMask));
   }
-  
+
   /// Return whether this existential type represents an uncomposed special
   /// protocol.
   SpecialProtocol getSpecialProtocol() const {
     return SpecialProtocol(uint8_t((Data & SpecialProtocolMask)
                                      >> SpecialProtocolShift));
   }
-  
+
   int_type getIntValue() const {
     return Data;
   }
@@ -365,7 +365,7 @@ class FunctionTypeFlags {
     ThrowsMask       = 0x10000000U,
   };
   int_type Data;
-  
+
   constexpr FunctionTypeFlags(int_type Data) : Data(Data) {}
 public:
   constexpr FunctionTypeFlags() : Data(0) {}
@@ -373,37 +373,37 @@ public:
   constexpr FunctionTypeFlags withNumArguments(unsigned numArguments) const {
     return FunctionTypeFlags((Data & ~NumArgumentsMask) | numArguments);
   }
-  
+
   constexpr FunctionTypeFlags withConvention(FunctionMetadataConvention c) const {
     return FunctionTypeFlags((Data & ~ConventionMask)
                              | (int_type(c) << ConventionShift));
   }
-  
+
   constexpr FunctionTypeFlags withThrows(bool throws) const {
     return FunctionTypeFlags((Data & ~ThrowsMask)
                              | (throws ? ThrowsMask : 0));
   }
-  
+
   unsigned getNumArguments() const {
     return Data & NumArgumentsMask;
   }
-  
+
   FunctionMetadataConvention getConvention() const {
     return FunctionMetadataConvention((Data&ConventionMask) >> ConventionShift);
   }
-  
+
   bool throws() const {
     return bool(Data & ThrowsMask);
   }
-  
+
   int_type getIntValue() const {
     return Data;
   }
-  
+
   static FunctionTypeFlags fromIntValue(int_type Data) {
     return FunctionTypeFlags(Data);
   }
-  
+
   bool operator==(FunctionTypeFlags other) const {
     return Data == other.Data;
   }

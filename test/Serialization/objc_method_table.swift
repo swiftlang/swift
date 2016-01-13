@@ -12,7 +12,7 @@ class B : A {
   @objc func a1() { } // expected-error{{method 'a1()' with Objective-C selector 'a1' conflicts with method 'f1()' from superclass 'A' with the same Objective-C selector}}
 
   @objc init(int: Int) { // expected-error{{initializer 'init(int:)' with Objective-C selector 'initWithInt:' conflicts with method 'f2' from superclass 'A' with the same Objective-C selector}}
-    self.foo = int 
+    self.foo = int
     super.init()
   }
 

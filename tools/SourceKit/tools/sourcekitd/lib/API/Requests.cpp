@@ -107,7 +107,7 @@ static void onDocumentUpdateNotification(StringRef DocumentName) {
   auto Dict = RespBuilder.getDictionary();
   Dict.set(KeyNotification, DocumentUpdateNotificationUID);
   Dict.set(KeyName, DocumentName);
-  
+
   sourcekitd::postNotification(RespBuilder.createResponse());
 }
 
@@ -1032,7 +1032,7 @@ bool SKDocConsumer::handleAvailableAttribute(const AvailableAttrInfo &Info) {
     Elem.set(KeyDeprecated, Info.Deprecated.getValue().getAsString());
   if (Info.Obsoleted.hasValue())
     Elem.set(KeyObsoleted, Info.Obsoleted.getValue().getAsString());
-  
+
   return true;
 }
 
@@ -1500,7 +1500,7 @@ public:
                                          unsigned Length) override;
 
   bool recordAffectedRange(unsigned Offset, unsigned Length) override;
-  
+
   bool recordAffectedLineRange(unsigned Line, unsigned Length) override;
 
   bool recordFormattedText(StringRef Text) override;
@@ -1760,14 +1760,14 @@ bool SKEditorConsumer::handleDocumentSubStructureElement(UIdent Kind,
 bool SKEditorConsumer::recordAffectedRange(unsigned Offset, unsigned Length) {
   Dict.set(KeyOffset, Offset);
   Dict.set(KeyLength, Length);
-  
+
   return true;
 }
 
 bool SKEditorConsumer::recordAffectedLineRange(unsigned Line, unsigned Length) {
   Dict.set(KeyLine, Line);
   Dict.set(KeyLength, Length);
-  
+
   return true;
 }
 

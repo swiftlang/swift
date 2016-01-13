@@ -25,7 +25,7 @@ namespace swift {
   class Decl;
   class DiagnosticEngine;
   class SourceManager;
-  
+
   enum class PatternKind : uint8_t;
   enum class StaticSpellingKind : uint8_t;
   enum class DescriptiveDeclKind : uint8_t;
@@ -39,7 +39,7 @@ namespace swift {
 
   /// \brief Describes a diagnostic along with its argument types.
   ///
-  /// The diagnostics header introduces instances of this type for each 
+  /// The diagnostics header introduces instances of this type for each
   /// diagnostic, which provide both the set of argument types (used to
   /// check/convert the arguments at each call site) and the diagnostic ID
   /// (for other information about the diagnostic).
@@ -60,7 +60,7 @@ namespace swift {
       typedef T type;
     };
   }
-    
+
   /// \brief Describes the kind of diagnostic argument we're storing.
   ///
   enum class DiagnosticArgumentKind {
@@ -102,24 +102,24 @@ namespace swift {
       const DeclAttribute *DeclAttributeVal;
       clang::VersionTuple VersionVal;
     };
-    
+
   public:
     DiagnosticArgument(StringRef S)
       : Kind(DiagnosticArgumentKind::String), StringVal(S) {
     }
 
-    DiagnosticArgument(int I) 
+    DiagnosticArgument(int I)
       : Kind(DiagnosticArgumentKind::Integer), IntegerVal(I) {
     }
 
-    DiagnosticArgument(unsigned I) 
+    DiagnosticArgument(unsigned I)
       : Kind(DiagnosticArgumentKind::Unsigned), UnsignedVal(I) {
     }
 
     DiagnosticArgument(DeclName I)
       : Kind(DiagnosticArgumentKind::Identifier), IdentifierVal(I) {
     }
-    
+
     DiagnosticArgument(Identifier I)
       : Kind(DiagnosticArgumentKind::Identifier), IdentifierVal(I) {
     }
@@ -210,7 +210,7 @@ namespace swift {
       assert(Kind == DiagnosticArgumentKind::TypeRepr);
       return TyR;
     }
-    
+
     PatternKind getAsPatternKind() const {
       assert(Kind == DiagnosticArgumentKind::PatternKind);
       return PatternKindVal;
@@ -236,9 +236,9 @@ namespace swift {
       return VersionVal;
     }
   };
-  
+
   /// Diagnostic - This is a specific instance of a diagnostic along with all of
-  /// the DiagnosticArguments that it requires. 
+  /// the DiagnosticArguments that it requires.
   class Diagnostic {
   public:
     typedef DiagnosticInfo::FixIt FixIt;
@@ -257,15 +257,15 @@ namespace swift {
     Diagnostic(Diag<ArgTypes...> ID,
                typename detail::PassArgument<ArgTypes>::type... VArgs)
       : ID(ID.ID) {
-      DiagnosticArgument DiagArgs[] = { 
-        DiagnosticArgument(0), std::move(VArgs)... 
+      DiagnosticArgument DiagArgs[] = {
+        DiagnosticArgument(0), std::move(VArgs)...
       };
       Args.append(DiagArgs + 1, DiagArgs + 1 + sizeof...(VArgs));
     }
 
     /*implicit*/Diagnostic(DiagID ID, ArrayRef<DiagnosticArgument> Args)
       : ID(ID), Args(Args.begin(), Args.end()) {}
-    
+
     // Accessors.
     DiagID getID() const { return ID; }
     ArrayRef<DiagnosticArgument> getArgs() const { return Args; }
@@ -296,7 +296,7 @@ namespace swift {
       FixIts.push_back(std::move(F));
     }
   };
-  
+
   /// \brief Describes an in-flight diagnostic, which is currently active
   /// within the diagnostic engine and can be augmented within additional
   /// information (source ranges, Fix-Its, etc.).
@@ -306,40 +306,40 @@ namespace swift {
   /// diagnostic.
   class InFlightDiagnostic {
     friend class DiagnosticEngine;
-    
+
     DiagnosticEngine *Engine;
     bool IsActive;
-    
-    /// \brief Create a new in-flight diagnostic. 
+
+    /// \brief Create a new in-flight diagnostic.
     ///
     /// This constructor is only available to the DiagnosticEngine.
     InFlightDiagnostic(DiagnosticEngine &Engine)
       : Engine(&Engine), IsActive(true) { }
-    
+
     InFlightDiagnostic(const InFlightDiagnostic &) = delete;
     InFlightDiagnostic &operator=(const InFlightDiagnostic &) = delete;
     InFlightDiagnostic &operator=(InFlightDiagnostic &&) = delete;
 
   public:
     /// \brief Create an active but unattached in-flight diagnostic.
-    /// 
+    ///
     /// The resulting diagnostic can be used as a dummy, accepting the
     /// syntax to add additional information to a diagnostic without
     /// actually emitting a diagnostic.
     InFlightDiagnostic() : Engine(0), IsActive(true) { }
-    
+
     /// \brief Transfer an in-flight diagnostic to a new object, which is
     /// typically used when returning in-flight diagnostics.
     InFlightDiagnostic(InFlightDiagnostic &&Other)
       : Engine(Other.Engine), IsActive(Other.IsActive) {
       Other.IsActive = false;
     }
-    
+
     ~InFlightDiagnostic() {
       if (IsActive)
         flush();
     }
-    
+
     /// \brief Flush the active diagnostic to the diagnostic output engine.
     void flush();
 
@@ -371,7 +371,7 @@ namespace swift {
     /// \brief Add a token-based removal fix-it to the currently-active
     /// diagnostic.
     InFlightDiagnostic &fixItRemove(SourceRange R);
-    
+
     /// \brief Add a character-based removal fix-it to the currently-active
     /// diagnostic.
     InFlightDiagnostic &fixItRemoveChars(SourceLoc Start, SourceLoc End) {
@@ -449,7 +449,7 @@ namespace swift {
     DiagnosticState(DiagnosticState &&) = default;
     DiagnosticState &operator=(DiagnosticState &&) = default;
   };
-    
+
   /// \brief Class responsible for formatting diagnostics and presenting them
   /// to the user.
   class DiagnosticEngine {
@@ -480,7 +480,7 @@ namespace swift {
 
     friend class InFlightDiagnostic;
     friend class DiagnosticTransaction;
-    
+
   public:
     explicit DiagnosticEngine(SourceManager &SourceMgr)
       : SourceMgr(SourceMgr), ActiveDiagnostic() {
@@ -537,7 +537,7 @@ namespace swift {
     ///
     /// \returns An in-flight diagnostic, to which additional information can
     /// be attached.
-    InFlightDiagnostic diagnose(SourceLoc Loc, DiagID ID, 
+    InFlightDiagnostic diagnose(SourceLoc Loc, DiagID ID,
                                 ArrayRef<DiagnosticArgument> Args) {
       assert(!ActiveDiagnostic && "Already have an active diagnostic");
       ActiveDiagnostic = Diagnostic(ID, Args);
@@ -560,7 +560,7 @@ namespace swift {
       ActiveDiagnostic->setLoc(Loc);
       return InFlightDiagnostic(*this);
     }
-    
+
     /// \brief Emit a diagnostic with the given set of diagnostic arguments.
     ///
     /// \param Loc The location to which the diagnostic refers in the source
@@ -571,7 +571,7 @@ namespace swift {
     /// \param Args The diagnostic arguments, which will be converted to
     /// the types expected by the diagnostic \p ID.
     template<typename ...ArgTypes>
-    InFlightDiagnostic 
+    InFlightDiagnostic
     diagnose(SourceLoc Loc, Diag<ArgTypes...> ID,
              typename detail::PassArgument<ArgTypes>::type... Args) {
       assert(!ActiveDiagnostic && "Already have an active diagnostic");
@@ -643,7 +643,7 @@ namespace swift {
   private:
     /// \brief Flush the active diagnostic.
     void flushActiveDiagnostic();
-    
+
     /// \brief Retrieve the active diagnostic.
     Diagnostic &getActiveDiagnostic() { return *ActiveDiagnostic; }
 

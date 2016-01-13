@@ -46,7 +46,7 @@ public:
     return DidErrorOccur;
   }
 };
-  
+
 }
 
 #endif

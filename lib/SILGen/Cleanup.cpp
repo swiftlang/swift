@@ -29,14 +29,14 @@ namespace {
   /// cleanup.
   class CleanupBuffer {
     SmallVector<char, sizeof(Cleanup) + 10 * sizeof(void*)> Data;
-    
+
   public:
     CleanupBuffer(const Cleanup &cleanup) {
       size_t size = cleanup.allocated_size();
       Data.set_size(size);
       memcpy(Data.data(), reinterpret_cast<const void*>(&cleanup), size);
     }
-    
+
     Cleanup &getCopy() { return *reinterpret_cast<Cleanup*>(Data.data()); }
   };
 }
@@ -81,14 +81,14 @@ void CleanupManager::emitCleanups(CleanupsDepth depth, CleanupLocation l,
 /// Leave a scope, with all its cleanups.
 void CleanupManager::endScope(CleanupsDepth depth, CleanupLocation l) {
   Stack.checkIterator(depth);
-  
+
   // FIXME: Thread a branch through the cleanups if there are any active
   // cleanups and we have a valid insertion point.
-  
+
   if (!::hasAnyActiveCleanups(Stack.begin(), Stack.find(depth))) {
     return;
   }
-  
+
   // Iteratively mark cleanups dead and pop them.
   // Maybe we'd get better results if we marked them all dead in one shot?
   emitCleanups(depth, l);
@@ -152,7 +152,7 @@ void CleanupManager::setCleanupState(CleanupsDepth depth, CleanupState state) {
   auto iter = Stack.find(depth);
   assert(iter != Stack.end() && "can't change end of cleanups stack");
   setCleanupState(*iter, state);
-  
+
   if (state == CleanupState::Dead && iter == Stack.begin())
     popTopDeadCleanups(InnermostScope);
 }

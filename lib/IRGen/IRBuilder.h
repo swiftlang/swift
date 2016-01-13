@@ -72,7 +72,7 @@ public:
     ClearedIP = nullptr;
     IRBuilderBase::SetInsertPoint(BB);
   }
-  
+
   void SetInsertPoint(llvm::BasicBlock *BB, llvm::BasicBlock::iterator before) {
     ClearedIP = nullptr;
     IRBuilderBase::SetInsertPoint(BB, before);
@@ -164,7 +164,7 @@ public:
   llvm::LoadInst *CreateLoad(llvm::Value *addr,
                              const llvm::Twine &name = "") = delete;
   llvm::StoreInst *CreateStore(llvm::Value *value, llvm::Value *addr) = delete;
-  
+
   using IRBuilderBase::CreateStructGEP;
   Address CreateStructGEP(Address address, unsigned index, Size size,
                           const llvm::Twine &name = "") {
@@ -211,13 +211,13 @@ public:
                         std::min(dest.getAlignment(),
                                  src.getAlignment()).getValue());
   }
-  
+
   using IRBuilderBase::CreateLifetimeStart;
   llvm::CallInst *CreateLifetimeStart(Address buf, Size size) {
     return CreateLifetimeStart(buf.getAddress(),
                    llvm::ConstantInt::get(Context, APInt(64, size.getValue())));
   }
-  
+
   using IRBuilderBase::CreateLifetimeEnd;
   llvm::CallInst *CreateLifetimeEnd(Address buf, Size size) {
     return CreateLifetimeEnd(buf.getAddress(),

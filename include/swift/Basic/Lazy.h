@@ -43,10 +43,10 @@ template <class T> class Lazy {
   static void defaultInitCallback(void *ValueAddr) {
     ::new (ValueAddr) T();
   }
-  
+
 public:
   using Type = T;
-  
+
   T &get(void (*initCallback)(void *) = defaultInitCallback);
 
   /// Get the value, assuming it must have already been initialized by this

@@ -60,14 +60,14 @@ void ConstraintSystem::increaseScore(ScoreKind kind) {
     case SK_NonDefaultLiteral:
       log << "non-default literal";
       break;
-        
+
     case SK_CollectionUpcastConversion:
       log << "collection upcast conversion";
       break;
     case SK_CollectionBridgedConversion:
       log << "collection bridged conversion";
       break;
-        
+
     case SK_ValueToOptional:
       log << "value to optional";
       break;
@@ -120,7 +120,7 @@ static Type stripInitializers(Type origType) {
                                                field.getName(),
                                                DefaultArgumentKind::None,
                                                field.isVararg()));
-                                               
+
                }
                return TupleType::get(fields, type->getASTContext());
              }
@@ -141,7 +141,7 @@ static bool sameDecl(Decl *decl1, Decl *decl2) {
   // equivalent, then it doesn't matter which declaration is chosen.
   if (isa<TypeDecl>(decl1) && isa<TypeDecl>(decl2))
     return true;
-  
+
   if (decl1->getKind() != decl2->getKind())
     return false;
 
@@ -332,40 +332,40 @@ static Type addCurriedSelfType(ASTContext &ctx, Type type, DeclContext *dc) {
 /// Note that this is not a subtype or conversion check - that takes place
 /// in isDeclAsSpecializedAs.
 static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
-  
+
   if (decl1->getKind() != decl2->getKind() || isa<TypeDecl>(decl1))
     return false;
-  
+
   auto func1 = dyn_cast<FuncDecl>(decl1);
   auto func2 = dyn_cast<FuncDecl>(decl2);
-  
+
   if (func1 && func2) {
-    
+
     auto gp1 = func1->getGenericParams();
     auto gp2 = func2->getGenericParams();
-    
+
     if (gp1 && gp2) {
       auto params1 = gp1->getParams();
       auto params2 = gp2->getParams();
-      
+
       if (params1.size() == params2.size()) {
         for (size_t i = 0; i < params1.size(); i++) {
           auto p1 = params1[i];
           auto p2 = params2[i];
-          
+
           int np1 = static_cast<int>
           (p1->getArchetype()->getConformsTo().size());
           int np2 = static_cast<int>
           (p2->getArchetype()->getConformsTo().size());
           int aDelta = np1 - np2;
-          
+
           if (aDelta)
             return aDelta > 0;
         }
       }
     }
   }
-  
+
   return false;
 }
 
@@ -377,17 +377,17 @@ static Type getTypeAtIndex(const ParameterList *params, size_t index) {
     auto param = params->get(index);
     if (param->isVariadic())
       return param->getVarargBaseTy();
-  
+
     return param->getType();
   }
-  
+
   /// FIXME: This looks completely wrong for varargs within a parameter list.
   if (params->size() != 0) {
     auto lastParam = params->getArray().back();
     if (lastParam->isVariadic())
       return lastParam->getVarargBaseTy();
   }
-  
+
   return nullptr;
 }
 
@@ -401,18 +401,18 @@ static bool hasEmptyExistentialParameterMismatch(ValueDecl *decl1,
   auto func1 = dyn_cast<FuncDecl>(decl1);
   auto func2 = dyn_cast<FuncDecl>(decl2);
   if (!func1 || !func2) return false;
-    
+
   auto pl1 = func1->getParameterLists();
   auto pl2 = func2->getParameterLists();
-  
+
   auto pc = std::min(pl1.size(), pl2.size());
-  
+
   for (size_t i = 0; i < pc; i++) {
     auto t1 = getTypeAtIndex(pl1[i], i);
     auto t2 = getTypeAtIndex(pl2[i], i);
     if (!t1 || !t2)
       return false;
-    
+
     if (t2->isAnyExistentialType() && !t1->isAnyExistentialType())
       return t2->isEmptyExistentialComposition();
   }
@@ -601,7 +601,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
     selfTy2 = funcTy2->getInput()->getRValueInstanceType();
     openedType2 = funcTy2->getResult();
   }
-  
+
   // Determine the relationship between the 'self' types and add the
   // appropriate constraints. The constraints themselves never fail, but
   // they help deduce type variables that were opened.
@@ -708,11 +708,11 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
              ? SolutionCompareResult::Better
              : SolutionCompareResult::Worse;
   }
-  
+
   // Compute relative score.
   unsigned score1 = 0;
   unsigned score2 = 0;
-  
+
   auto foundRefinement1 = false;
   auto foundRefinement2 = false;
 
@@ -743,10 +743,10 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
     bool decl2InSubprotocol = false;
     if ((dc1->getContextKind() == DeclContextKind::NominalTypeDecl) &&
         (dc1->getContextKind() == dc2->getContextKind())) {
-      
+
       auto ntd1 = dyn_cast<NominalTypeDecl>(dc1);
       auto ntd2 = dyn_cast<NominalTypeDecl>(dc2);
-      
+
       identical = (ntd1 != ntd2) &&
                   (ntd1->getKind() == DeclKind::Protocol) &&
                   (ntd2->getKind() == DeclKind::Protocol);
@@ -764,15 +764,15 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
     } else {
       identical = false;
     }
-    
+
     // If the kinds of overload choice don't match...
     if (choice1.getKind() != choice2.getKind()) {
       identical = false;
-      
+
       // A declaration found directly beats any declaration found via dynamic
       // lookup, bridging, or optional unwrapping.
       if (choice1.getKind() == OverloadChoiceKind::Decl &&
-          (choice2.getKind() == OverloadChoiceKind::DeclViaDynamic || 
+          (choice2.getKind() == OverloadChoiceKind::DeclViaDynamic ||
            choice2.getKind() == OverloadChoiceKind::DeclViaBridge ||
            choice2.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional)) {
         ++score1;
@@ -806,7 +806,7 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
     case OverloadChoiceKind::DeclViaUnwrappedOptional:
       break;
     }
-    
+
     // Determine whether one declaration is more specialized than the other.
     bool firstAsSpecializedAs = false;
     bool secondAsSpecializedAs = false;
@@ -831,12 +831,12 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
               ++score2;
           } else if (ctor1->getInitKind() ==
                      CtorInitializerKind::Convenience) {
-            
+
             // If both are convenience initializers, and the instance type of
             // one is a subtype of the other's, favor the subtype constructor.
             auto resType1 = ctor1->getResultType();
             auto resType2 = ctor2->getResultType();
-            
+
             if (!resType1->isEqual(resType2)) {
               if (tc.isSubtypeOf(resType1, resType2, cs.DC)) {
                 ++score1;
@@ -874,7 +874,7 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
       ++score1;
     else if (isa<VarDecl>(decl2) && isa<FuncDecl>(decl1))
       ++score2;
-    
+
     // If we haven't found a refinement, record whether one overload is in
     // any way more constrained than another. We'll only utilize this
     // information in the case of a potential ambiguity.
@@ -882,12 +882,12 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
       if (isDeclMoreConstrainedThan(decl1, decl2)) {
         foundRefinement1 = true;
       }
-      
+
       if (isDeclMoreConstrainedThan(decl2, decl1)) {
         foundRefinement2 = true;
       }
     }
-     
+
     // If we still haven't found a refinement, check if there's a parameter-
     // wise comparison between an empty existential collection and a non-
     // existential type.
@@ -895,7 +895,7 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
       if (hasEmptyExistentialParameterMismatch(decl1, decl2)) {
         foundRefinement1 = true;
       }
-      
+
       if (hasEmptyExistentialParameterMismatch(decl2, decl1)) {
         foundRefinement2 = true;
       }
@@ -960,7 +960,7 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
     // If the types are equivalent, there's nothing more to do.
     if (type1->isEqual(type2))
       continue;
-    
+
     // If either of the types still contains type variables, we can't
     // compare them.
     // FIXME: This is really unfortunate. More type variable sharing
@@ -971,7 +971,7 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
     }
 
     // If one type is an implicitly unwrapped optional of the other,
-    // prefer the non-optional.    
+    // prefer the non-optional.
     bool type1Better = false;
     bool type2Better = false;
     if (auto type1Obj = type1->getImplicitlyUnwrappedOptionalObjectType()) {
@@ -1043,7 +1043,7 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
         ++score1;
       continue;
     }
-    
+
     // FIXME:
     // This terrible hack is in place to support equality comparisons of non-
     // equatable option types to 'nil'. Until we have a way to constrain a type
@@ -1066,7 +1066,7 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
       }
     }
   }
-  
+
   // All other things considered equal, if any overload choice is more
   // more constrained than the other, increment the score.
   if (score1 == score2) {
@@ -1317,7 +1317,7 @@ SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions) {
             overloadChoice.first,
             overloadChoice.second
           });
-        
+
       }
     }
   }

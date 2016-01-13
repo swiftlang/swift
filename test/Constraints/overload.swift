@@ -31,14 +31,14 @@ _ = f + 1
 f2(i)
 f2((i, f))
 
-class A { 
-  init() {} 
+class A {
+  init() {}
 }
-class B : A { 
-  override init() { super.init() } 
+class B : A {
+  override init() { super.init() }
 }
-class C : B { 
-  override init() { super.init() } 
+class C : B {
+  override init() { super.init() }
 }
 
 func bar(b: B) -> Int {} // #1
@@ -64,7 +64,7 @@ class X2a { }
 class X2b : X2a { }
 class X2c : X2b { }
 
-struct X2d { 
+struct X2d {
   subscript (index : X2a) -> Int {
     return 5
   }

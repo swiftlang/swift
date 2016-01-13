@@ -30,7 +30,7 @@ public struct LazyMapGenerator<
   }
 
   public var base: Base { return _base }
-  
+
   internal var _base: Base
   internal var _transform: (Base.Element) -> Element
 }
@@ -41,9 +41,9 @@ public struct LazyMapGenerator<
 /// calling the transform function on a base element.
 public struct LazyMapSequence<Base : SequenceType, Element>
   : LazySequenceType {
-  
+
   public typealias Elements = LazyMapSequence
-  
+
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
@@ -65,7 +65,7 @@ public struct LazyMapSequence<Base : SequenceType, Element>
     self._base = base
     self._transform = transform
   }
-  
+
   public var _base: Base
   internal var _transform: (Base.Generator.Element) -> Element
 
@@ -87,7 +87,7 @@ public struct LazyMapCollection<Base : CollectionType, Element>
 
   public var startIndex: Base.Index { return _base.startIndex }
   public var endIndex: Base.Index { return _base.endIndex }
-  
+
   /// Access the element at `position`.
   ///
   /// - Requires: `position` is a valid position in `self` and
@@ -100,7 +100,7 @@ public struct LazyMapCollection<Base : CollectionType, Element>
   public var isEmpty: Bool { return _base.isEmpty }
 
   public var first: Element? { return _base.first.map(_transform) }
-  
+
 
   /// Returns a *generator* over the elements of this *sequence*.
   ///
@@ -127,7 +127,7 @@ public struct LazyMapCollection<Base : CollectionType, Element>
     self._base = base
     self._transform = transform
   }
-  
+
   public var _base: Base
   var _transform: (Base.Generator.Element) -> Element
 

@@ -5,7 +5,7 @@
 // RUN: %S/../../utils/line-directive %t/CastTraps.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
-// FIXME: Casting.cpp has dozens of places to fail a cast. This test does not 
+// FIXME: Casting.cpp has dozens of places to fail a cast. This test does not
 // attempt to enumerate them all.
 
 // XFAIL: linux
@@ -55,7 +55,7 @@ protocol Proto2 { }
 
 var CastTrapsTestSuite = TestSuite("CastTraps")
 
-// Test `(T1() as Any) as T2` cast failure 
+// Test `(T1() as Any) as T2` cast failure
 // for all type pairs.
 
 % for (t1, _) in types:
@@ -77,7 +77,7 @@ CastTrapsTestSuite.test("${t1}__${t2}")
 %   end
 % end
 
-// Test `(T1() as AnyObject) as T2` cast failure 
+// Test `(T1() as AnyObject) as T2` cast failure
 // for object type to protocol type pairs
 
 % for (t1, _) in objectTypes:

@@ -29,10 +29,10 @@ FunctionEffects::getMemBehavior(RetainObserveKind ScanKind) const {
   bool Observe = (ScanKind == RetainObserveKind::ObserveRetains);
   if ((Observe && mayAllocObjects()) || mayReadRC())
     return MemoryBehavior::MayHaveSideEffects;
-  
+
   // Start with the global effects.
   auto Behavior = GlobalEffects.getMemBehavior(ScanKind);
-  
+
   // Add effects from the parameters.
   for (auto &ParamEffect : ParamEffects) {
     MemoryBehavior ArgBehavior = ParamEffect.getMemBehavior(ScanKind);
@@ -177,7 +177,7 @@ bool SideEffectAnalysis::getSemanticEffects(FunctionEffects &FE,
 
   // Currently we only handle array semantics.
   // TODO: also handle other semantic functions.
-  
+
   switch (ASC.getKind()) {
     case ArrayCallKind::kGetCount:
     case ArrayCallKind::kGetCapacity:
@@ -250,14 +250,14 @@ void SideEffectAnalysis::analyzeFunction(FunctionInfo *FInfo,
           FInfo->F->getName() << '\n');
     return;
   }
-  
+
   if (!FInfo->F->isDefinition()) {
     // We can't assume anything about external functions.
     DEBUG(llvm::dbgs() << "  -- is external " << FInfo->F->getName() << '\n');
     FInfo->FE.setWorstEffects();
     return;
   }
-  
+
   DEBUG(llvm::dbgs() << "  >> analyze " << FInfo->F->getName() << '\n');
 
   // Check all instructions of the function
@@ -329,7 +329,7 @@ void SideEffectAnalysis::analyzeInstruction(FunctionInfo *FInfo,
     case ValueKind::ReleaseValueInst:
     case ValueKind::UnownedReleaseInst:
       FInfo->FE.getEffectsOn(I->getOperand(0))->Releases = true;
-      
+
       // TODO: Check the call graph to be less conservative about what
       // destructors might be called.
       FInfo->FE.setWorstEffects();
@@ -369,7 +369,7 @@ void SideEffectAnalysis::analyzeInstruction(FunctionInfo *FInfo,
     // Excluding AllocStackInst (which is handled above).
     FInfo->FE.AllocsObjects = true;
   }
-  
+
   // Check the general memory behavior for instructions we didn't handle above.
   switch (I->getMemoryBehavior()) {
     case MemoryBehavior::None:

@@ -30,7 +30,7 @@ bb0:
   return %0 : $()
 }
 
-// Make sure that these functions are emitted in the order they 
+// Make sure that these functions are emitted in the order they
 // CHECK: define void @foo
 // CHECK: define void @bar
 // CHECK: define void @baz

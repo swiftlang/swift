@@ -80,7 +80,7 @@ public:
 
   /// Retrieve the "raw" representation of this option set.
   StorageType toRaw() const { return Storage; }
-  
+
   /// Determine whether this option set contains all of the options in the
   /// given set.
   bool contains(OptionSet set) const {

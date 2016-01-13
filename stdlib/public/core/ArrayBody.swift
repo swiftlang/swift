@@ -19,11 +19,11 @@ import SwiftShims
 
 internal struct _ArrayBody {
   var _storage: _SwiftArrayBodyStorage
-  
+
   init(count: Int, capacity: Int, elementTypeIsBridgedVerbatim: Bool = false) {
     _sanityCheck(count >= 0)
     _sanityCheck(capacity >= 0)
-    
+
     _storage = _SwiftArrayBodyStorage(
       count: count,
       _capacityAndFlags:
@@ -37,7 +37,7 @@ internal struct _ArrayBody {
   init() {
     _storage = _SwiftArrayBodyStorage(count: 0, _capacityAndFlags: 0)
   }
-  
+
   /// The number of elements stored in this Array.
   var count: Int {
     get {

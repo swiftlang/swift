@@ -155,7 +155,7 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
   } else {
     llvm_unreachable("Unhandled ValueDecl for SILDeclRef");
   }
-  
+
   assert((atUncurryLevel == ConstructAtNaturalUncurryLevel
           || atUncurryLevel <= naturalUncurryLevel)
          && "can't emit SILDeclRef below natural uncurry level");
@@ -167,7 +167,7 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
 
 SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
                        ResilienceExpansion expansion,
-                       unsigned atUncurryLevel, bool asForeign) 
+                       unsigned atUncurryLevel, bool asForeign)
  : isDirectReference(0), defaultArgIndex(0)
 {
   unsigned naturalUncurryLevel;
@@ -224,8 +224,8 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
     ? naturalUncurryLevel
     : atUncurryLevel;
   Expansion = (unsigned) expansion;
-  
-  isCurried = uncurryLevel != naturalUncurryLevel;  
+
+  isCurried = uncurryLevel != naturalUncurryLevel;
   isForeign = asForeign;
 }
 
@@ -311,10 +311,10 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   // Anonymous functions have local linkage.
   if (auto closure = getAbstractClosureExpr())
     return getLinkageForLocalContext(closure->getParent());
-  
+
   // Native function-local declarations have local linkage.
   // FIXME: @objc declarations should be too, but we currently have no way
-  // of marking them "used" other than making them external. 
+  // of marking them "used" other than making them external.
   ValueDecl *d = getDecl();
   DeclContext *moduleContext = d->getDeclContext();
   while (!moduleContext->isModuleScopeContext()) {
@@ -322,11 +322,11 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
       return getLinkageForLocalContext(moduleContext);
     moduleContext = moduleContext->getParent();
   }
-  
+
   // Currying and calling convention thunks have shared linkage.
   if (isThunk())
     return SILLinkage::Shared;
-  
+
   // Enum constructors are essentially the same as thunks, they are
   // emitted by need and have shared linkage.
   if (kind == Kind::EnumElement)
@@ -346,7 +346,7 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
       if (isa<ClangModuleUnit>(derivedFor->getModuleScopeContext()))
         return ClangLinkage;
   }
-  
+
   // Otherwise, we have external linkage.
   switch (d->getEffectiveAccess()) {
     case Accessibility::Private:
@@ -472,7 +472,7 @@ static std::string mangleConstant(SILDeclRef c, StringRef prefix) {
     assert(prefix.empty() && "can't have custom prefix on thunk");
     introducer = "_TTO";
   }
-  
+
   switch (c.kind) {
   //   entity ::= declaration                     // other declaration
   case SILDeclRef::Kind::Func:

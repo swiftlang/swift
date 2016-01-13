@@ -889,7 +889,7 @@ public:
     // Ask the value type for its mask.
     APInt bits = asDerived().getValueTypeInfoForExtraInhabitants(IGM)
                             .getFixedExtraInhabitantMask(IGM);
-    
+
     // Zext out to the size of the existential.
     bits = bits.zextOrTrunc(asDerived().getFixedSize().getValueInBits());
     return bits;
@@ -1023,7 +1023,7 @@ class ClassExistentialTypeInfo
                                          ReferenceTypeInfo>
 {
   ReferenceCounting Refcounting;
- 
+
   friend ExistentialTypeInfoBase;
   ClassExistentialTypeInfo(ArrayRef<ProtocolEntry> protocols,
                            llvm::Type *ty,
@@ -1270,12 +1270,12 @@ public:
     // is in use.
     return Refcounting;
   }
-  
+
   ArrayRef<ProtocolEntry> getStoredProtocols() const {
     return ErrorProtocolEntry;
   }
 };
-  
+
 } // end anonymous namespace
 
 static const TypeInfo *createErrorExistentialTypeInfo(IRGenModule &IGM,
@@ -1325,7 +1325,7 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
     type = IGM.createNominalType(compT);
   else
     llvm_unreachable("unknown existential type kind");
-    
+
   assert(type->isOpaque() && "creating existential type in concrete struct");
 
   // In an opaque metadata, the first two fields are the fixed buffer
@@ -1621,7 +1621,7 @@ Address irgen::emitBoxedExistentialProjection(IRGenFunction &IGF,
                                               CanArchetypeType openedArchetype){
   // TODO: Non-ErrorType boxed existentials.
   assert(_isErrorType(baseTy));
-  
+
   // Get the reference to the existential box.
   llvm::Value *box = base.claimNext();
   // Allocate scratch space to invoke the runtime.
@@ -1631,7 +1631,7 @@ Address irgen::emitBoxedExistentialProjection(IRGenFunction &IGF,
   Address out = IGF.createAlloca(IGF.IGM.OpenedErrorTripleTy,
                                  IGF.IGM.getPointerAlignment(),
                                  "project_error_out");
-  
+
   IGF.Builder.CreateCall(IGF.IGM.getGetErrorValueFn(), {box,
                          scratch.getAddress(),
                          out.getAddress()});
@@ -1640,16 +1640,16 @@ Address irgen::emitBoxedExistentialProjection(IRGenFunction &IGF,
   auto projectedPtrAddr = IGF.Builder.CreateStructGEP(out, 0, Size(0));
   auto projectedPtr = IGF.Builder.CreateLoad(projectedPtrAddr);
   auto projected = openedTI.getAddressForPointer(projectedPtr);
-  
+
   auto metadataAddr = IGF.Builder.CreateStructGEP(out, 1,
                                                   IGF.IGM.getPointerSize());
   auto metadata = IGF.Builder.CreateLoad(metadataAddr);
   auto witnessAddr = IGF.Builder.CreateStructGEP(out, 2,
                                                  2 * IGF.IGM.getPointerSize());
   auto witness = IGF.Builder.CreateLoad(witnessAddr);
-  
+
   IGF.bindArchetype(openedArchetype, metadata, witness);
-  
+
   return projected;
 }
 
@@ -1666,7 +1666,7 @@ Address irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
 
   auto &destTI = IGF.getTypeInfo(destType).as<ErrorExistentialTypeInfo>();
   auto &srcTI = IGF.getTypeInfo(loweredSrcType);
-  
+
   auto srcMetadata = IGF.emitTypeMetadataRef(formalSrcType);
   // Should only be one conformance, for the ErrorType protocol.
   assert(conformances.size() == 1 && destTI.getStoredProtocols().size() == 1);
@@ -1674,7 +1674,7 @@ Address irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
   auto witness = emitWitnessTableRef(IGF, formalSrcType, &srcMetadata,
                                      entry.getProtocol(), entry.getInfo(),
                                      conformances[0]);
-  
+
   // Call the runtime to allocate the box.
   // TODO: When there's a store or copy_addr immediately into the box, peephole
   // it into the initializer parameter to allocError.
@@ -1682,12 +1682,12 @@ Address irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
                          {srcMetadata, witness,
                            llvm::ConstantPointerNull::get(IGF.IGM.OpaquePtrTy),
                            llvm::ConstantInt::get(IGF.IGM.Int1Ty, 0)});
-  
+
   // Extract the box and value address from the result.
   auto box = IGF.Builder.CreateExtractValue(result, 0);
   auto addr = IGF.Builder.CreateExtractValue(result, 1);
   dest.add(box);
-  
+
   addr = IGF.Builder.CreateBitCast(addr,
                                    srcTI.getStorageType()->getPointerTo());
   return srcTI.getAddressForPointer(addr);
@@ -1704,7 +1704,7 @@ void irgen::emitBoxedExistentialContainerDeallocation(IRGenFunction &IGF,
 
   auto box = container.claimNext();
   auto srcMetadata = IGF.emitTypeMetadataRef(valueType);
-  
+
   IGF.Builder.CreateCall(IGF.IGM.getDeallocErrorFn(), {box, srcMetadata});
 }
 
@@ -1735,7 +1735,7 @@ void irgen::emitClassExistentialContainer(IRGenFunction &IGF,
   // As a special case, an ErrorType existential can represented as a reference
   // to an already existing NSError or CFError instance.
   SmallVector<ProtocolDecl*, 4> protocols;
-  
+
   if (outType.getSwiftRValueType()->isExistentialType(protocols)
       && protocols.size() == 1) {
     switch (getSpecialProtocolID(protocols[0])) {
@@ -1750,7 +1750,7 @@ void irgen::emitClassExistentialContainer(IRGenFunction &IGF,
       break;
     }
   }
-  
+
   assert(outType.isClassExistentialType() &&
          "creating a non-class existential type");
 

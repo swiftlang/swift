@@ -38,7 +38,7 @@ public func selectorFunc1(a a: Int, b x: Int) {}
 
 public protocol Wrapped {
   typealias Value : Equatable
-  
+
   //var value : Value
   func getValue() -> Value
 }

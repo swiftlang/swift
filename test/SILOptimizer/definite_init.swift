@@ -17,7 +17,7 @@ func partialInit() {
       _ = x
     }
   }
-  
+
   // Tuple with only some elements specified.
   func trivial_tuple() {
     var a : (Int, Int)
@@ -50,6 +50,6 @@ func tuple_test() -> Int {
 
   for _ in 0..<45 {
   }
-  
+
   return t.1+t.0  // No diagnostic, everything is fully initialized.
 }

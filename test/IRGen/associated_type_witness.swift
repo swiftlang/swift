@@ -22,7 +22,7 @@ struct Universal : P, Q {}
 // GLOBAL-LABEL: @_TWPV23associated_type_witness13WithUniversalS_8AssockedS_ = hidden constant [3 x i8*] [
 // GLOBAL-SAME:    i8* bitcast (%swift.type* ()* @_TMaV23associated_type_witness9Universal to i8*)
 // GLOBAL-SAME:    i8* bitcast (i8** ()* @_TWaV23associated_type_witness9UniversalS_1PS_ to i8*)
-// GLOBAL-SAME:    i8* bitcast (i8** ()* @_TWaV23associated_type_witness9UniversalS_1QS_ to i8*)  
+// GLOBAL-SAME:    i8* bitcast (i8** ()* @_TWaV23associated_type_witness9UniversalS_1QS_ to i8*)
 // GLOBAL-SAME:  ]
 struct WithUniversal : Assocked {
   typealias Assoc = Universal
@@ -32,7 +32,7 @@ struct WithUniversal : Assocked {
 // GLOBAL-LABEL: @_TWPurGV23associated_type_witness20GenericWithUniversalx_S_8AssockedS_ = hidden constant [3 x i8*] [
 // GLOBAL-SAME:    i8* bitcast (%swift.type* ()* @_TMaV23associated_type_witness9Universal to i8*)
 // GLOBAL-SAME:    i8* bitcast (i8** ()* @_TWaV23associated_type_witness9UniversalS_1PS_ to i8*)
-// GLOBAL-SAME:    i8* bitcast (i8** ()* @_TWaV23associated_type_witness9UniversalS_1QS_ to i8*)  
+// GLOBAL-SAME:    i8* bitcast (i8** ()* @_TWaV23associated_type_witness9UniversalS_1QS_ to i8*)
 // GLOBAL-SAME:  ]
 struct GenericWithUniversal<T> : Assocked {
   typealias Assoc = Universal

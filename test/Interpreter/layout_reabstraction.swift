@@ -65,7 +65,7 @@ print(unspecializedSizeOf(ContainsTupleOfTrivialMetatype<Int64>.self))
 
 struct ContainsTupleOfFunctions<T> {
   var x: (T, T -> T)
-  
+
   func apply() -> T {
     return x.1(x.0)
   }

@@ -21,9 +21,9 @@
 #include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
-  
+
 /// TypeVisitor - This is a simple visitor class for Swift types.
-template<typename ImplClass, typename RetTy = void, typename... Args> 
+template<typename ImplClass, typename RetTy = void, typename... Args>
 class TypeVisitor {
 public:
 
@@ -38,7 +38,7 @@ public:
     }
     llvm_unreachable("Not reachable, all cases handled");
   }
-  
+
   // Provide default implementations of abstract "visit" implementations that
   // just chain to their base class.  This allows visitors to just implement
   // the base behavior and handle all subclasses if they desire.  Since this is
@@ -53,7 +53,7 @@ public:
 #include "swift/AST/TypeNodes.def"
 
 };
-  
+
 } // end namespace swift
-  
+
 #endif

@@ -56,13 +56,13 @@ namespace {
     StringRef getFieldName() const {
       return Name;
     }
-    
+
     const TupleTypeElt &getField(SILType T) const {
       auto tup = T.castTo<TupleType>();
-      
+
       return tup->getElement(Index);
     }
-    
+
     SILType getType(IRGenModule&, SILType t) const {
       return t.getTupleElementType(Index);
     }
@@ -91,7 +91,7 @@ namespace {
       // If the field requires no storage, there's nothing to do.
       if (field.isEmpty())
         return IGF.emitFakeExplosion(field.getTypeInfo(), out);
-  
+
       // Otherwise, project from the base.
       auto fieldRange = field.getProjectionRange();
       ArrayRef<llvm::Value *> element = tuple.getRange(fieldRange.first,
@@ -139,19 +139,19 @@ namespace {
       auto &eltTI = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
       return eltTI.getFixedExtraInhabitantValue(IGM, bits, index);
     }
-        
+
     // This is dead code in NonFixedTupleTypeInfo.
     APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const {
       if (asImpl().getFields().empty())
         return APInt();
-      
+
       const FixedTypeInfo &fieldTI
         = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
       auto size = asImpl().getFixedSize().getValueInBits();
-      
+
       if (fieldTI.isKnownEmpty(ResilienceExpansion::Maximal))
         return APInt(size, 0);
-      
+
       APInt firstMask = fieldTI.getFixedExtraInhabitantMask(IGM);
       return firstMask.zextOrTrunc(size);
     }
@@ -165,7 +165,7 @@ namespace {
       return elt.getTypeInfo().getExtraInhabitantIndex(IGF, eltAddr,
                                                elt.getType(IGF.IGM, tupleType));
     }
-  
+
     void storeExtraInhabitant(IRGenFunction &IGF,
                               llvm::Value *index,
                               Address tupleAddr,

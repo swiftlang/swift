@@ -617,7 +617,7 @@ func test_open_existential_semantics_opaque(guaranteed: P1,
   // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
 
   guaranteed.f1()
-  
+
   // -- Need a guaranteed copy because it's immutable
   // CHECK: copy_addr [[IMMEDIATE_BOX]]#1 to [initialization] [[IMMEDIATE:%.*]] :
   // CHECK: [[VALUE:%.*]] = open_existential_addr [[IMMEDIATE]]
@@ -774,7 +774,7 @@ class RequiredInitClass {
 protocol ProtoDelegatesToRequired { }
 
 extension ProtoDelegatesToRequired where Self : RequiredInitClass {
-  // CHECK-LABEL: sil hidden @_TFe19protocol_extensionsRxCS_17RequiredInitClassxS_24ProtoDelegatesToRequiredrS1_C{{.*}} 
+  // CHECK-LABEL: sil hidden @_TFe19protocol_extensionsRxCS_17RequiredInitClassxS_24ProtoDelegatesToRequiredrS1_C{{.*}}
   // CHECK: bb0([[STR:%[0-9]+]] : $String, [[SELF_META:%[0-9]+]] : $@thick Self.Type):
   init(string: String) {
   // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $Self

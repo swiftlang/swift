@@ -345,7 +345,7 @@ computeNewArgInterfaceTypes(SILFunction *F,
       OutTys.push_back(param);
       continue;
     }
-    
+
     // Perform the proper conversions and then add it to the new parameter list
     // for the type.
     assert(!isIndirectParameter(param.getConvention()));
@@ -418,7 +418,7 @@ ClosureCloner::initCloned(SILFunction *Orig, StringRef ClonedName,
 
   auto SubstTy = SILType::substFuncType(M, SM, InterfaceSubs, ClonedTy,
                                         /* dropGenerics = */ false);
-  
+
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
          && "SILFunction missing location");
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getDebugScope())
@@ -456,7 +456,7 @@ ClosureCloner::populateCloned() {
       SILValue MappedValue =
         new (M) SILArgument(ClonedEntryBB, BoxedTy, (*I)->getDecl());
       BoxArgumentMap.insert(std::make_pair(*I, MappedValue));
-      
+
       // Track the projections of the box.
       for (auto *Use : (*I)->getUses()) {
         if (auto Proj = dyn_cast<ProjectBoxInst>(Use->getUser())) {
@@ -551,7 +551,7 @@ ClosureCloner::visitProjectBoxInst(ProjectBoxInst *I) {
   if (auto Arg = dyn_cast<SILArgument>(I->getOperand()))
     if (BoxArgumentMap.count(Arg))
       return;
-  
+
   SILCloner<ClosureCloner>::visitProjectBoxInst(I);
 }
 
@@ -604,19 +604,19 @@ static SILArgument *getBoxFromIndex(SILFunction *F, unsigned Index) {
 static bool
 isNonmutatingCapture(SILArgument *BoxArg) {
   SmallVector<ProjectBoxInst*, 2> Projections;
-  
+
   // Conservatively do not allow any use of the box argument other than a
   // strong_release or projection, since this is the pattern expected from
   // SILGen.
   for (auto *O : BoxArg->getUses()) {
     if (isa<StrongReleaseInst>(O->getUser()))
       continue;
-    
+
     if (auto Projection = dyn_cast<ProjectBoxInst>(O->getUser())) {
       Projections.push_back(Projection);
       continue;
     }
-    
+
     return false;
   }
 
@@ -654,7 +654,7 @@ isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
   // Marking the boxed value as escaping is OK. It's just a DI annotation.
   if (isa<MarkFunctionEscapeInst>(U))
     return true;
-  
+
   // A store or assign is ok if the alloc_box is the destination.
   if (isa<StoreInst>(U) || isa<AssignInst>(U)) {
     if (O->getOperandNumber() != 1)
@@ -677,7 +677,7 @@ isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
     // UncheckedTakeEnumDataAddr is additionally a mutation.
     if (isa<UncheckedTakeEnumDataAddrInst>(U))
       Mutations.push_back(U);
-    
+
     for (auto *UO : U->getUses())
       if (!isNonescapingUse(UO, Mutations))
         return false;
@@ -724,10 +724,10 @@ static bool
 examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
                     llvm::DenseMap<PartialApplyInst*, unsigned> &IM) {
   SmallVector<SILInstruction*, 32> Mutations;
-  
+
   // Scan the box for interesting uses.
   SILValue Box = ABI->getContainerResult();
-  
+
   for (Operand *O : Box.getUses()) {
     if (auto *PAI = dyn_cast<PartialApplyInst>(O->getUser())) {
       unsigned OpNo = O->getOperandNumber();
@@ -784,7 +784,7 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
     if (!isNonescapingUse(O, Mutations))
       return false;
   }
-  
+
   // Check for mutations of the address component.
   // If the AllocBox is used by a mark_uninitialized, scan the MUI for
   // interesting uses.

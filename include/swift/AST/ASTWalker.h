@@ -188,18 +188,18 @@ public:
   /// the subtree is skipped.
   ///
   virtual bool walkToParameterListPre(ParameterList *PL) { return true; }
-  
+
   /// walkToParameterListPost - This method is called after visiting the
   /// children of a parameter list.  If it returns false, the remaining
   /// traversal is terminated and returns failure.
   virtual bool walkToParameterListPost(ParameterList *PL) { return true; }
- 
-  
+
+
 protected:
   ASTWalker() = default;
   ASTWalker(const ASTWalker &) = default;
   virtual ~ASTWalker() = default;
-  
+
   virtual void anchor();
 };
 

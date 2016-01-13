@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the Sema interface which implement hooks invoked by the 
+// This file defines the Sema interface which implement hooks invoked by the
 // parser to build the AST.
 //
 //===----------------------------------------------------------------------===//
@@ -34,7 +34,7 @@ class ScopeInfo {
   friend class Scope;
 public:
   typedef std::pair<unsigned, ValueDecl*> ValueScopeEntry;
-  
+
   typedef TreeScopedHashTable<Identifier, ValueScopeEntry> ScopedHTTy;
   typedef ScopedHTTy::ScopeTy ScopedHTScopeTy;
   typedef ScopedHTTy::DetachedScopeTy ScopedHTDetachedScopeTy;

@@ -97,7 +97,7 @@ func testMethods(i: Int, x: Y) {
   x.m0(i)(i)
   x.m0(i)(b: i) // expected-error{{extraneous argument label 'b:' in call}} {{11-14=}}
   x.m1(i)(i) // expected-error{{missing argument label 'b:' in call}} {{11-11=b: }}
-  x.m1(i)(b: i) 
+  x.m1(i)(b: i)
   x.m2(i)(i, c: i) // expected-error{{extraneous argument label 'c:' in call}} {{14-17=}}
   x.m2(i)(i, i)
   x.m3(i)(b: i, i) // expected-error{{missing argument label 'c2:' in call}} {{17-17=c2: }}

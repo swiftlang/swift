@@ -289,7 +289,7 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
     // here -- default derivation doesn't apply in extensions.)
     if (!nominalLookupType)
       return result;
-    
+
     // Force the creation of any delayed members, to ensure proper member
     // lookup.
     this->forceExternalDeclMembers(nominalLookupType);
@@ -315,17 +315,17 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
   // Look through the metatype.
   if (auto metaT = type->getAs<AnyMetatypeType>())
     type = metaT->getInstanceType();
-  
-  // Callers must cope with dependent types directly.  
+
+  // Callers must cope with dependent types directly.
   assert(!type->isTypeParameter());
-         
+
   // Look for members with the given name.
   SmallVector<ValueDecl *, 4> decls;
   unsigned subOptions = NL_QualifiedDefault;
   if (options.contains(NameLookupFlags::KnownPrivate))
     subOptions |= NL_KnownNonCascadingDependency;
   if (options.contains(NameLookupFlags::ProtocolMembers))
-    subOptions |= NL_ProtocolMembers;    
+    subOptions |= NL_ProtocolMembers;
 
   if (!dc->lookupQualified(type, name, subOptions, this, decls))
     return result;
@@ -343,7 +343,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     validateDecl(typeDecl);
     if (!typeDecl->hasType()) // FIXME: recursion-breaking hack
       continue;
-    
+
     // If we found a member of a protocol type when looking into a non-protocol,
     // non-archetype type, only include this member in the result set if
     // this member was used as the default definition or otherwise inferred.

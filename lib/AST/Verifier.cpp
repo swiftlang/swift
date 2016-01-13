@@ -338,7 +338,7 @@ struct ASTNodeBase {};
     void cleanup(Stmt *S) { }
     void cleanup(Pattern *P) { }
     void cleanup(Decl *D) { }
-    
+
     // Base cases for the various stages of verification.
     void verifyParsed(Expr *E) {}
     void verifyParsed(Stmt *S) {}
@@ -493,7 +493,7 @@ struct ASTNodeBase {};
 
         return false;
       });
-      
+
       if (foundError)
         abort();
     }
@@ -682,7 +682,7 @@ struct ASTNodeBase {};
           abort();
         }
       }
-      
+
       if (D->getAttrs().hasAttribute<OverrideAttr>()) {
         if (!D->isInvalid() && D->hasType() &&
             !isa<ClassDecl>(D->getDeclContext()) &&
@@ -694,7 +694,7 @@ struct ASTNodeBase {};
         }
       }
 
-      
+
       verifyCheckedAlwaysBase(D);
     }
 
@@ -727,7 +727,7 @@ struct ASTNodeBase {};
       } else {
         resultType = TupleType::getEmpty(Ctx);
       }
-      
+
       if (S->hasResult()) {
         auto result = S->getResult();
         auto returnType = result->getType();
@@ -781,12 +781,12 @@ struct ASTNodeBase {};
         break;
       }
     }
-    
+
     void checkCondition(StmtCondition C) {
       for (auto elt : C)
         checkConditionElement(elt);
     }
-    
+
     void verifyChecked(IfStmt *S) {
       checkCondition(S->getCond());
       verifyCheckedBase(S);
@@ -842,7 +842,7 @@ struct ASTNodeBase {};
       Type srcObj = checkLValue(E->getSubExpr()->getType(),
                                 "result of InOutExpr");
       auto DestTy = E->getType()->castTo<InOutType>()->getObjectType();
-      
+
       checkSameType(DestTy, srcObj, "object types for InOutExpr");
       verifyCheckedBase(E);
     }
@@ -942,20 +942,20 @@ struct ASTNodeBase {};
       checkTrivialSubtype(srcTy, destTy, "MetatypeConversionExpr");
       verifyCheckedBase(E);
     }
-    
+
     void verifyChecked(ClassMetatypeToObjectExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying ClassMetatypeToObject", E);
-      
+
       auto srcTy = checkMetatypeType(E->getSubExpr()->getType(),
                                      "source of ClassMetatypeToObject");
-      
+
       if (!srcTy->mayHaveSuperclass()) {
         Out << "ClassMetatypeToObject with non-class metatype:\n";
         E->print(Out);
         Out << "\n";
         abort();
       }
-      
+
       if (!E->getType()->isEqual(
              Ctx.getProtocol(KnownProtocolKind::AnyObject)->getDeclaredType())){
         Out << "ClassMetatypeToObject does not produce AnyObject:\n";
@@ -964,14 +964,14 @@ struct ASTNodeBase {};
         abort();
       }
     }
-    
+
     void verifyChecked(ExistentialMetatypeToObjectExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx,
                                     "verifying ExistentialMetatypeToObject", E);
-      
+
       auto srcTy = checkMetatypeType(E->getSubExpr()->getType(),
                                      "source of ExistentialMetatypeToObject");
-      
+
       if (!E->getSubExpr()->getType()->is<ExistentialMetatypeType>()) {
         Out << "ExistentialMetatypeToObject with non-existential "
                "metatype:\n";
@@ -986,7 +986,7 @@ struct ASTNodeBase {};
         Out << "\n";
         abort();
       }
-      
+
       if (!E->getType()->isEqual(
              Ctx.getProtocol(KnownProtocolKind::AnyObject)->getDeclaredType())){
         Out << "ExistentialMetatypeToObject does not produce AnyObject:\n";
@@ -995,11 +995,11 @@ struct ASTNodeBase {};
         abort();
       }
     }
-    
+
     void verifyChecked(ProtocolMetatypeToObjectExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx,
                                     "verifying ProtocolMetatypeToObject", E);
-      
+
       auto srcTy = checkMetatypeType(E->getSubExpr()->getType(),
                                      "source of ProtocolMetatypeToObject");
       if (E->getSubExpr()->getType()->is<ExistentialMetatypeType>()) {
@@ -1027,14 +1027,14 @@ struct ASTNodeBase {};
         abort();
       }
     }
-    
+
     void verifyChecked(PointerToPointerExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx,
                                       "verifying PointerToPointer", E);
 
       auto fromElement = E->getSubExpr()->getType()->getAnyPointerElementType();
       auto toElement = E->getType()->getAnyPointerElementType();
-      
+
       if (!fromElement && !toElement) {
         Out << "PointerToPointer does not convert between pointer types:\n";
         E->print(Out);
@@ -1042,23 +1042,23 @@ struct ASTNodeBase {};
         abort();
       }
     }
-    
+
     void verifyChecked(InOutToPointerExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx,
                                       "verifying InOutToPointer", E);
-      
+
       auto fromElement = E->getSubExpr()->getType()->getInOutObjectType();
       auto toElement = E->getType()->getAnyPointerElementType();
-      
+
       if (!E->getSubExpr()->getType()->is<InOutType>() && !toElement) {
         Out << "InOutToPointer does not convert from inout to pointer:\n";
         E->print(Out);
         Out << "\n";
         abort();
       }
-      
+
       // Ensure we don't convert an array to a void pointer this way.
-      
+
       if (fromElement->getNominalOrBoundGenericNominal() == Ctx.getArrayDecl()
           && toElement->isEqual(Ctx.TheEmptyTupleType)) {
         Out << "InOutToPointer is converting an array to a void pointer; "
@@ -1068,21 +1068,21 @@ struct ASTNodeBase {};
         abort();
       }
     }
-    
+
     void verifyChecked(ArrayToPointerExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx,
                                       "verifying ArrayToPointer", E);
 
       // The source may be optionally inout.
       auto fromArray = E->getSubExpr()->getType()->getInOutObjectType();
-      
+
       if (fromArray->getNominalOrBoundGenericNominal() != Ctx.getArrayDecl()) {
         Out << "ArrayToPointer does not convert from array:\n";
         E->print(Out);
         Out << "\n";
         abort();
       }
-      
+
       auto toElement = E->getType()->getAnyPointerElementType();
 
       if (!toElement) {
@@ -1092,11 +1092,11 @@ struct ASTNodeBase {};
         abort();
       }
     }
-    
+
     void verifyChecked(StringToPointerExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx,
                                       "verifying StringToPointer", E);
-      
+
       if (E->getSubExpr()->getType()->getNominalOrBoundGenericNominal()
             != Ctx.getStringDecl()) {
         Out << "StringToPointer does not convert from string:\n";
@@ -1104,7 +1104,7 @@ struct ASTNodeBase {};
         Out << "\n";
         abort();
       }
-      
+
       PointerTypeKind PTK;
       auto toElement = E->getType()->getAnyPointerElementType(PTK);
       if (!toElement) {
@@ -1120,12 +1120,12 @@ struct ASTNodeBase {};
         abort();
       }
     }
-    
+
     void verifyChecked(CollectionUpcastConversionExpr *E) {
       verifyChecked(E->getSubExpr());
       verifyCheckedBase(E);
     }
-        
+
     void verifyChecked(DerivedToBaseExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying DerivedToBaseExpr", E);
 
@@ -1210,7 +1210,7 @@ struct ASTNodeBase {};
             InputExprObjectTy = checkLValue(InputExprTy, "object argument");
           Type FunctionInputObjectTy = checkLValue(FT->getInput(),
                                                    "'self' parameter");
-          
+
           checkSameOrSubType(InputExprObjectTy, FunctionInputObjectTy,
                              "object argument and 'self' parameter");
         } else if (!TT || TT->getNumElements() != 1 ||
@@ -1254,7 +1254,7 @@ struct ASTNodeBase {};
         E->dump(Out);
         abort();
       }
-      
+
       // The base of a member reference cannot be an existential type.
       if (E->getBase()->getType()->getLValueOrInOutObjectType()
             ->isAnyExistentialType()) {
@@ -1275,7 +1275,7 @@ struct ASTNodeBase {};
           }
         }
       }
-      
+
       // FIXME: Check container/member types through substitutions.
 
       verifyCheckedBase(E);
@@ -1332,16 +1332,16 @@ struct ASTNodeBase {};
 
       verifyCheckedBase(E);
     }
-    
+
     void checkOptionalObjectType(Type optionalType,
                                  Type objectType,
                                  Expr *E) {
       auto optionalRVType = optionalType->getRValueType();
       auto objectRVType = objectType->getRValueType();
-      
+
       checkSameType(objectRVType, optionalRVType->getAnyOptionalObjectType(),
                     "optional object type");
-      
+
       if (objectType->is<LValueType>() != optionalType->is<LValueType>()) {
         Out << "optional operation must preserve lvalue-ness of base\n";
         E->print(Out);
@@ -1358,7 +1358,7 @@ struct ASTNodeBase {};
       checkSameType(E->getType(), E->getSubExpr()->getType(),
                     "OptionalEvaluation cannot change type");
     }
-    
+
     void verifyChecked(BindOptionalExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying BindOptionalExpr", E);
 
@@ -1367,10 +1367,10 @@ struct ASTNodeBase {};
         E->print(Out);
         abort();
       }
-      
+
       checkOptionalObjectType(E->getSubExpr()->getType(),
                               E->getType(), E);
-      
+
       verifyCheckedBase(E);
     }
 
@@ -1485,7 +1485,7 @@ struct ASTNodeBase {};
 
       verifyCheckedBase(E);
     }
-    
+
     void verifyChecked(LValueToPointerExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying LValueToPointerExpr", E);
 
@@ -1498,10 +1498,10 @@ struct ASTNodeBase {};
         Out << "LValueToPointerExpr result type must be RawPointer\n";
         abort();
       }
-      
+
       verifyCheckedBase(E);
     }
-    
+
     void verifyChecked(DynamicTypeExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying DynamicTypeExpr", E);
 
@@ -1548,7 +1548,7 @@ struct ASTNodeBase {};
                     "then and else branches of an if-expr");
       verifyCheckedBase(E);
     }
-    
+
     void verifyChecked(SuperRefExpr *expr) {
       verifyCheckedBase(expr);
     }
@@ -1565,7 +1565,7 @@ struct ASTNodeBase {};
     void verifyChecked(ForceValueExpr *E) {
       checkOptionalObjectType(E->getSubExpr()->getType(),
                               E->getType(), E);
-      
+
       verifyCheckedBase(E);
     }
 
@@ -1702,7 +1702,7 @@ struct ASTNodeBase {};
         dumpRef(decl);
         Out << " doesn't have a complete set of protocols\n";
         abort();
-      }      
+      }
     }
 
     /// Check the given explicit protocol conformance.
@@ -1719,7 +1719,7 @@ struct ASTNodeBase {};
       case ProtocolConformanceState::Complete:
         // More checking below.
         break;
-        
+
       case ProtocolConformanceState::Incomplete:
         // Ignore incomplete conformances; we didn't need them.
         return;
@@ -1765,7 +1765,7 @@ struct ASTNodeBase {};
           if (!normal->hasTypeWitness(assocType)) {
             dumpRef(decl);
             Out << " is missing type witness for "
-                << conformance->getProtocol()->getName().str() 
+                << conformance->getProtocol()->getName().str()
                 << "." << assocType->getName().str()
                 << "\n";
             abort();
@@ -1779,17 +1779,17 @@ struct ASTNodeBase {};
             .verifyChecked(replacementType);
           continue;
         }
-        
+
         // If this is an accessor for something, ignore it.
         if (auto *FD = dyn_cast<FuncDecl>(member))
           if (FD->isAccessor())
             continue;
-        
+
         if (auto req = dyn_cast<ValueDecl>(member)) {
           if (!normal->hasWitness(req)) {
             dumpRef(decl);
             Out << " is missing witness for "
-                << conformance->getProtocol()->getName().str() 
+                << conformance->getProtocol()->getName().str()
                 << "." << req->getName().str()
                 << "\n";
             abort();
@@ -1798,7 +1798,7 @@ struct ASTNodeBase {};
         }
       }
     }
-    
+
     void verifyChecked(NominalTypeDecl *nominal) {
       // Make sure that the protocol list is fully expanded.
       verifyProtocolList(nominal, nominal->getLocalProtocols());
@@ -1876,10 +1876,10 @@ struct ASTNodeBase {};
 
       // Verify that the optionality of the result type of the
       // initializer matches the failability of the initializer.
-      if (!CD->isInvalid() && 
-          CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal() 
+      if (!CD->isInvalid() &&
+          CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal()
             != Ctx.getOptionalDecl() &&
-          CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal() 
+          CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal()
             != Ctx.getImplicitlyUnwrappedOptionalDecl()) {
         OptionalTypeKind resultOptionality = OTK_None;
         CD->getResultType()->getAnyOptionalObjectType(resultOptionality);
@@ -1890,7 +1890,7 @@ struct ASTNodeBase {};
         }
 
         // Also check the interface type.
-        if (auto genericFn 
+        if (auto genericFn
               = CD->getInterfaceType()->getAs<GenericFunctionType>()) {
           resultOptionality = OTK_None;
           genericFn->getResult()->castTo<AnyFunctionType>()->getResult()
@@ -2305,7 +2305,7 @@ struct ASTNodeBase {};
 
     void verifyChecked(ClassDecl *CD) {
       PrettyStackTraceDecl debugStack("verifying ClassDecl", CD);
-      
+
       if (!CD->hasLazyMembers()) {
         unsigned NumDestructors = 0;
         for (auto Member : CD->getMembers()) {
@@ -2319,7 +2319,7 @@ struct ASTNodeBase {};
           abort();
         }
       }
-      
+
       if (!CD->hasDestructor()) {
         Out << "every class's 'has destructor' bit must be set";
         abort();
@@ -2386,7 +2386,7 @@ struct ASTNodeBase {};
       bool Q0, Q1;
       bool isLValue0 = lookThroughLValue(T0, Q0);
       bool isLValue1 = lookThroughLValue(T1, Q1);
-      
+
       if (isLValue0 != isLValue1) {
         Out << "lvalue-ness of " << what << " do not match: "
             << isLValue0 << ", " << isLValue1 << "\n";
@@ -2498,11 +2498,11 @@ struct ASTNodeBase {};
         if (auto Proto1 = T1->getAs<ProtocolType>())
           if (Proto0->getDecl()->inheritsFrom(Proto1->getDecl()))
             return;
-      
+
       // FIXME: Actually check this?
       if (T0->isExistentialType() || T1->isExistentialType())
         return;
-      
+
       Out << "incompatible types for " << what << ": ";
       T0.print(Out);
       Out << " vs. ";
@@ -2535,12 +2535,12 @@ struct ASTNodeBase {};
       (void) Ctx.SourceMgr.findBufferContainingLoc(SR.End);
       return true;
     }
-    
+
     template<typename T>
     void checkSourceRangesBase(T ASTNode) {
       checkSourceRanges(cast<typename ASTNodeBase<T>::BaseTy>(ASTNode));
     }
-    
+
     void checkSourceRanges(Expr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying ranges", E);
 
@@ -2623,7 +2623,7 @@ struct ASTNodeBase {};
           }
           Location = Cond->getEndLoc();
         }
-        
+
         // Body elements
         auto StoredLoc = Location;
         for (auto &Element : Clause.Elements) {
@@ -2631,13 +2631,13 @@ struct ASTNodeBase {};
           if (StartLocation.isInvalid()) {
             continue;
           }
-          
+
           if (!Ctx.SourceMgr.isBeforeInBuffer(StoredLoc, StartLocation)) {
             Out << "invalid IfConfigStmt clause element start location\n";
             S->print(Out);
             abort();
           }
-          
+
           auto EndLocation = Element.getEndLoc();
           if (EndLocation.isValid() &&
               Ctx.SourceMgr.isBeforeInBuffer(Location, EndLocation)) {
@@ -2652,7 +2652,7 @@ struct ASTNodeBase {};
         abort();
       }
     }
-    
+
     void checkSourceRanges(Pattern *P) {
       PrettyStackTracePattern debugStack(Ctx, "verifying ranges", P);
 
@@ -2685,7 +2685,7 @@ struct ASTNodeBase {};
         // decls.
         if (D->isImplicit())
           return;
-        
+
         Out << "invalid source range for decl: ";
         D->print(Out);
         Out << "\n";
@@ -2740,14 +2740,14 @@ struct ASTNodeBase {};
 
         if (E->isImplicit())
           return;
-        
+
         Enclosing = E->getSourceRange();
       } else if (TypeRepr *TyR = Parent.getAsTypeRepr()) {
         Enclosing = TyR->getSourceRange();
       } else {
         llvm_unreachable("impossible parent node");
       }
-      
+
       if (!Ctx.SourceMgr.rangeContains(Enclosing, Current)) {
         Out << "child source range not contained within its parent: ";
         printEntity();

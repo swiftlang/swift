@@ -7,7 +7,7 @@
 // Abstract:   A simple "Hello World" compute example showing basic usage of OpenCL which
 //             calculates the mathematical square (X[i] = pow(X[i],2)) for a buffer of
 //             floating point values.
-//             
+//
 //
 // Version:    <1.0>
 //
@@ -76,7 +76,7 @@ var tests = TestSuite("MiscSDKOverlay")
 
 tests.test("clSetKernelArgsListAPPLE") {
   var err: cl_int                            // error code returned from api calls
-  
+
   var data = [Float](count: DATA_SIZE, repeatedValue: 0)              // original data set given to device
   var results = [Float](count: DATA_SIZE, repeatedValue: 0)           // results returned from device
   var correct: Int               // number of correct results returned
@@ -84,15 +84,15 @@ tests.test("clSetKernelArgsListAPPLE") {
   var global: size_t                      // global domain size for our calculation
   var local: size_t = 0                       // local domain size for our calculation
 
-  var device_id: cl_device_id = nil             // compute device id 
+  var device_id: cl_device_id = nil             // compute device id
   var context: cl_context                 // compute context
   var commands: cl_command_queue          // compute command queue
   var program: cl_program                 // compute program
   var kernel: cl_kernel                   // compute kernel
-  
+
   var input: cl_mem                       // device memory used for the input array
   var output: cl_mem                      // device memory used for the output array
-  
+
   // Fill our data set with random float values
   //
   var i = 0
@@ -100,7 +100,7 @@ tests.test("clSetKernelArgsListAPPLE") {
   for i = 0; i < count; i++ {
     data[i] = Float(rand()) / Float(RAND_MAX)
   }
-  
+
   // Connect to a compute device
   //
   var gpu = 1
@@ -110,8 +110,8 @@ tests.test("clSetKernelArgsListAPPLE") {
     print("Error: Failed to create a device group!")
     exit(EXIT_FAILURE)
   }
-  
-  // Create a compute context 
+
+  // Create a compute context
   //
   context = clCreateContext(nil, 1, &device_id, nil, nil, &err)
   if (context == nil)
@@ -150,7 +150,7 @@ tests.test("clSetKernelArgsListAPPLE") {
   if (err != CL_SUCCESS)
   {
     var len: Int = 0
-    
+
     var buffer = [CChar](count:2048, repeatedValue: 0)
 
     print("Error: Failed to build program executable!")
@@ -177,9 +177,9 @@ tests.test("clSetKernelArgsListAPPLE") {
   {
     print("Error: Failed to allocate device memory!")
     exit(1)
-  }    
-  
-  // Write our data set into the input array in device memory 
+  }
+
+  // Write our data set into the input array in device memory
   //
   err = clEnqueueWriteBuffer(commands, input, cl_bool(CL_TRUE), 0, sizeof(Float.self) * count, data, 0, nil, nil)
   if (err != CL_SUCCESS)
@@ -200,7 +200,7 @@ tests.test("clSetKernelArgsListAPPLE") {
       2, sizeofValue(count), countPtr)
   }
 
-  
+
   if (err != CL_SUCCESS)
   {
     print("Error: Failed to set kernel arguments! \(err)")
@@ -239,7 +239,7 @@ tests.test("clSetKernelArgsListAPPLE") {
     print("Error: Failed to read output array! \(err)")
     exit(1)
   }
-  
+
   // Validate our results
   //
   correct = 0
@@ -249,11 +249,11 @@ tests.test("clSetKernelArgsListAPPLE") {
       correct += 1
     }
   }
-  
+
   // Print a brief summary detailing the results
   //
   print("Computed '\(correct)/\(count)' correct values!")
-  
+
   // Shutdown and cleanup
   //
   clReleaseMemObject(input)

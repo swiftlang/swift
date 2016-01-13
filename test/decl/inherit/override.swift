@@ -3,7 +3,7 @@
 @objc class ObjCClassA {}
 @objc class ObjCClassB : ObjCClassA {}
 
-class A { 
+class A {
   func f1() { } // expected-note{{overridden declaration is here}}
   func f2() -> A { } // expected-note{{overridden declaration is here}}
 
@@ -21,7 +21,7 @@ extension A {
 
 class B : A { }
 
-extension B { 
+extension B {
   func f1() { }  // expected-error{{declarations in extensions cannot override yet}}
   func f2() -> B { } // expected-error{{declarations in extensions cannot override yet}}
 

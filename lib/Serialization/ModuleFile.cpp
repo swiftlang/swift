@@ -1357,7 +1357,7 @@ void ModuleFile::lookupClassMember(Module::AccessPathTy accessPath,
         auto vd = cast<ValueDecl>(getDecl(item.second));
         if (!vd->getFullName().matchesRef(name))
           continue;
-        
+
         auto dc = vd->getDeclContext();
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();

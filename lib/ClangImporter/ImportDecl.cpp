@@ -313,7 +313,7 @@ static FuncDecl *makeRawValueTrivialGetter(ClangImporter::Implementation &Impl,
                                           params,
       TypeLoc::withoutLoc(rawType), optionSetDecl);
   getterDecl->setImplicit();
-  
+
   getterDecl->setBodyResultType(rawType);
   getterDecl->setAccessibility(Accessibility::Public);
 
@@ -326,12 +326,12 @@ static FuncDecl *makeRawValueTrivialGetter(ClangImporter::Implementation &Impl,
                                         rawDecl, SourceLoc(),
                                         /*implicit*/ true);
   auto valueRet = new (C) ReturnStmt(SourceLoc(), valueRef);
-  
+
   auto body = BraceStmt::create(C, SourceLoc(), ASTNode(valueRet),
                                 SourceLoc(),
                                 /*implicit*/ true);
   getterDecl->setBody(body);
-  
+
   C.addExternalDecl(getterDecl);
 
   return getterDecl;
@@ -357,12 +357,12 @@ static FuncDecl *makeRawValueTrivialSetter(ClangImporter::Implementation &Impl,
                                          Identifier(), SourceLoc(),
                                          C.Id_value, rawType, importedDecl);
   newValueDecl->setImplicit();
-  
+
   ParameterList *params[] = {
     ParameterList::createWithoutLoc(selfDecl),
     ParameterList::createWithoutLoc(newValueDecl)
   };
-  
+
   Type voidTy = TupleType::getEmpty(C);
   FuncDecl *setterDecl = FuncDecl::create(
       C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
@@ -370,7 +370,7 @@ static FuncDecl *makeRawValueTrivialSetter(ClangImporter::Implementation &Impl,
       TypeLoc::withoutLoc(voidTy), importedDecl);
   setterDecl->setImplicit();
   setterDecl->setMutating();
-  
+
   setterDecl->setType(ParameterList::getFullType(voidTy, params));
   setterDecl->setBodyResultType(voidTy);
   setterDecl->setAccessibility(Accessibility::Public);
@@ -412,7 +412,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   ASTContext &C = Impl.SwiftContext;
   auto enumTy = enumDecl->getDeclaredTypeInContext();
   auto metaTy = MetatypeType::get(enumTy);
-  
+
   auto selfDecl = ParamDecl::createSelf(SourceLoc(), enumDecl,
                                         /*static*/false, /*inout*/true);
 
@@ -422,7 +422,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
                                  enumDecl->getRawType(),
                                  enumDecl);
   auto paramPL = ParameterList::createWithoutLoc(param);
-  
+
   DeclName name(C, C.Id_init, paramPL);
   auto *ctorDecl = new (C) ConstructorDecl(name, enumDecl->getLoc(),
                                            OTK_Optional, SourceLoc(),
@@ -442,7 +442,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   // Don't bother synthesizing the body if we've already finished type-checking.
   if (Impl.hasFinishedTypeChecking())
     return ctorDecl;
-  
+
   auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true);
   auto paramRef = new (C) DeclRefExpr(param, SourceLoc(),
                                       /*implicit*/ true);
@@ -456,11 +456,11 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
                                    /*implicit*/ true);
   auto body = BraceStmt::create(C, SourceLoc(), ASTNode(assign), SourceLoc(),
                                 /*implicit*/ true);
-  
+
   ctorDecl->setBody(body);
-  
+
   C.addExternalDecl(ctorDecl);
-  
+
   return ctorDecl;
 }
 
@@ -476,9 +476,9 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
                                         EnumDecl *enumDecl,
                                         VarDecl *rawValueDecl) {
   ASTContext &C = Impl.SwiftContext;
-  
+
   auto selfDecl = ParamDecl::createSelf(SourceLoc(), enumDecl);
-  
+
   ParameterList *params[] = {
     ParameterList::createWithoutLoc(selfDecl),
     ParameterList::createEmpty(C)
@@ -501,7 +501,7 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   // Don't bother synthesizing the body if we've already finished type-checking.
   if (Impl.hasFinishedTypeChecking())
     return getterDecl;
-  
+
   auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true);
   auto reinterpretCast
     = cast<FuncDecl>(getBuiltinValueDecl(C, C.getIdentifier("reinterpretCast")));
@@ -512,7 +512,7 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   auto ret = new (C) ReturnStmt(SourceLoc(), reinterpreted);
   auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
                                 /*implicit*/ true);
-  
+
   getterDecl->setBody(body);
   C.addExternalDecl(getterDecl);
   return getterDecl;
@@ -529,7 +529,7 @@ static FuncDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
     ParameterList::createWithoutLoc(selfDecl),
     ParameterList::createEmpty(C)
   };
-  
+
   auto getterType = importedFieldDecl->getType();
   auto getterDecl = FuncDecl::create(C, importedFieldDecl->getLoc(),
                                      StaticSpellingKind::None,
@@ -743,7 +743,7 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                          cSetterParamTypes,
                                          clang::FunctionProtoType::ExtProtoInfo());
   auto cSetterTypeInfo = Ctx.getTrivialTypeSourceInfo(cSetterType);
-  
+
   auto cSetterDecl = clang::FunctionDecl::Create(Ctx,
                                                  structDecl->getDeclContext(),
                                                  clang::SourceLocation(),
@@ -769,7 +769,7 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
   // Don't bother synthesizing the body if we've already finished type-checking.
   if (Impl.hasFinishedTypeChecking())
     return { getterDecl, setterDecl };
-  
+
   // Synthesize the getter body
   {
     auto cGetterSelfId = nullptr;
@@ -783,7 +783,7 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                   clang::SC_None,
                                                   nullptr);
     cGetterDecl->setParams(cGetterSelf);
-    
+
     auto cGetterSelfExpr = new (Ctx) clang::DeclRefExpr(cGetterSelf, false,
                                                         recordType,
                                                         clang::VK_RValue,
@@ -796,7 +796,7 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                    fieldType,
                                                    clang::VK_RValue,
                                                    clang::OK_BitField);
-    
+
     auto cGetterBody = new (Ctx) clang::ReturnStmt(clang::SourceLocation(),
                                                    cGetterExpr,
                                                    nullptr);
@@ -829,12 +829,12 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                   nullptr);
     cSetterParams.push_back(cSetterSelf);
     cSetterDecl->setParams(cSetterParams);
-    
+
     auto cSetterSelfExpr = new (Ctx) clang::DeclRefExpr(cSetterSelf, false,
                                                         recordPointerType,
                                                         clang::VK_RValue,
                                                         clang::SourceLocation());
-    
+
     auto cSetterMemberExpr = new (Ctx) clang::MemberExpr(cSetterSelfExpr,
                                                          /*isarrow=*/ true,
                                                          clang::SourceLocation(),
@@ -843,12 +843,12 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                          fieldType,
                                                          clang::VK_LValue,
                                                          clang::OK_BitField);
-    
+
     auto cSetterValueExpr = new (Ctx) clang::DeclRefExpr(cSetterValue, false,
                                                          fieldType,
                                                          clang::VK_RValue,
                                                          clang::SourceLocation());
-    
+
     auto cSetterExpr = new (Ctx) clang::BinaryOperator(cSetterMemberExpr,
                                                        cSetterValueExpr,
                                                        clang::BO_Assign,
@@ -857,7 +857,7 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                        clang::OK_Ordinary,
                                                        clang::SourceLocation(),
                                                        /*fpContractable=*/ false);
-    
+
     cSetterDecl->setBody(cSetterExpr);
 
     Impl.registerExternalDecl(setterDecl);
@@ -1111,7 +1111,7 @@ StringRef ClangImporter::Implementation::getCFTypeName(
 
     if (pointee.isTypedef() && secondaryName) {
       StringRef otherName = getImportedCFTypeName(name);
-      if (otherName != name) 
+      if (otherName != name)
         *secondaryName = otherName;
     }
 
@@ -1429,7 +1429,7 @@ namespace {
                 NameMapping = MappedTypeNameKind::DefineAndUse;
               }
 
-            // If the pointee is 'const void', 
+            // If the pointee is 'const void',
             // 'CFTypeRef', bring it in specifically as AnyObject.
             } else if (pointee.isConstVoid()) {
               auto proto = Impl.SwiftContext.getProtocol(
@@ -1506,15 +1506,15 @@ namespace {
       // Note: only occurs in templates.
       return nullptr;
     }
-    
+
     /// \brief Create a default constructor that initializes a struct to zero.
     ConstructorDecl *createDefaultConstructor(StructDecl *structDecl) {
       auto &context = Impl.SwiftContext;
-      
+
       // Create the 'self' declaration.
       auto selfDecl = ParamDecl::createSelf(SourceLoc(), structDecl,
                                             /*static*/false, /*inout*/true);
-      
+
       // self & param.
       auto emptyPL = ParameterList::createEmpty(context);
 
@@ -1524,7 +1524,7 @@ namespace {
         new (context) ConstructorDecl(name, structDecl->getLoc(),
                                       OTK_None, SourceLoc(), selfDecl, emptyPL,
                                       nullptr, SourceLoc(), structDecl);
-      
+
       // Set the constructor's type.
       auto selfType = structDecl->getDeclaredTypeInContext();
       auto selfMetatype = MetatypeType::get(selfType);
@@ -1534,7 +1534,7 @@ namespace {
       auto initFnTy = FunctionType::get(selfType, fnTy);
       constructor->setType(allocFnTy);
       constructor->setInitializerType(initFnTy);
-      
+
       constructor->setAccessibility(Accessibility::Public);
 
       // Mark the constructor transparent so that we inline it away completely.
@@ -1607,7 +1607,7 @@ namespace {
         ParameterList::createWithoutLoc(selfDecl),
         ParameterList::create(context, valueParameters)
       };
-      
+
       // Create the constructor
       DeclName name(context, context.Id_init, paramLists[1]);
       auto constructor =
@@ -1625,7 +1625,7 @@ namespace {
       auto initFnTy = FunctionType::get(selfType, fnTy);
       constructor->setType(allocFnTy);
       constructor->setInitializerType(initFnTy);
-      
+
       constructor->setAccessibility(Accessibility::Public);
 
       // Make the constructor transparent so we inline it away completely.
@@ -1671,7 +1671,7 @@ namespace {
       // We're done.
       return constructor;
     }
-    
+
     /// Import an NS_ENUM constant as a case of a Swift enum.
     Decl *importEnumCase(const clang::EnumConstantDecl *decl,
                          const clang::EnumDecl *clangEnum,
@@ -1680,11 +1680,11 @@ namespace {
       auto name = Impl.importFullName(decl).Imported.getBaseName();
       if (name.empty())
         return nullptr;
-      
+
       // Use the constant's underlying value as its raw value in Swift.
       bool negative = false;
       llvm::APSInt rawValue = decl->getInitVal();
-      
+
       // Did we already import an enum constant for this enum with the
       // same value? If so, import it as a standalone constant.
 
@@ -1708,7 +1708,7 @@ namespace {
                                                        /*implicit*/ false);
       if (negative)
         rawValueExpr->setNegative(SourceLoc());
-      
+
       auto element
         = Impl.createDeclWithClangNode<EnumElementDecl>(decl, SourceLoc(),
                                         name, TypeLoc(),
@@ -1723,7 +1723,7 @@ namespace {
 
       return element;
     }
-    
+
     /// Import an NS_OPTIONS constant as a static property of a Swift struct.
     ///
     /// This is also used to import enum case aliases.
@@ -1733,7 +1733,7 @@ namespace {
       auto name = Impl.importFullName(decl).Imported.getBaseName();
       if (name.empty())
         return nullptr;
-      
+
       // Create the constant.
       auto convertKind = ConstantConvertKind::Construction;
       if (isa<EnumDecl>(theStruct))
@@ -1758,7 +1758,7 @@ namespace {
       auto name = Impl.importFullName(alias).Imported.getBaseName();
       if (name.empty())
         return nullptr;
-      
+
       // Construct the original constant. Enum constants without payloads look
       // like simple values, but actually have type 'MyEnum.Type -> MyEnum'.
       auto constantRef = new (Impl.SwiftContext) DeclRefExpr(original,
@@ -1796,7 +1796,7 @@ namespace {
                                            Identifier name,
                                            const clang::EnumDecl *decl) {
       ASTContext &cxt = Impl.SwiftContext;
-      
+
       // Compute the underlying type.
       auto underlyingType = Impl.importType(decl->getIntegerType(),
                                             ImportTypeKind::Enum,
@@ -1817,7 +1817,7 @@ namespace {
         new (Impl.SwiftContext) SynthesizedProtocolAttr(
                                   KnownProtocolKind::OptionSetType));
 
-      
+
       // Create a field to store the underlying value.
       auto varName = Impl.SwiftContext.Id_rawValue;
       auto var = new (Impl.SwiftContext) VarDecl(/*static*/ false,
@@ -1836,7 +1836,7 @@ namespace {
           PatternBindingDecl::create(Impl.SwiftContext, SourceLoc(),
                                      StaticSpellingKind::None, SourceLoc(),
                                      varPattern, nullptr, structDecl);
-      
+
       // Create the init(rawValue:) constructor.
       auto labeledValueConstructor = createValueConstructor(
                                 structDecl, var,
@@ -1853,7 +1853,7 @@ namespace {
       structDecl->addMember(var);
       return structDecl;
     }
-    
+
 
     Decl *VisitEnumDecl(const clang::EnumDecl *decl) {
       decl = decl->getDefinition();
@@ -1861,7 +1861,7 @@ namespace {
         forwardDeclaration = true;
         return nullptr;
       }
-      
+
       auto name = getClangDeclName(Impl, decl);
       if (name.empty())
         return nullptr;
@@ -1869,9 +1869,9 @@ namespace {
       auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
         return nullptr;
-      
+
       ASTContext &cxt = Impl.SwiftContext;
-      
+
       // Create the enum declaration and record it.
       NominalTypeDecl *result;
       auto enumKind = Impl.classifyEnum(Impl.getClangPreprocessor(), decl);
@@ -1970,16 +1970,16 @@ namespace {
                                               /*isFullyBridgeable*/false);
         if (!underlyingType)
           return nullptr;
-        
+
         auto enumDecl = Impl.createDeclWithClangNode<EnumDecl>(decl,
                    Impl.importSourceLoc(decl->getLocStart()),
                    name, Impl.importSourceLoc(decl->getLocation()),
                    None, nullptr, dc);
         enumDecl->computeType();
-        
+
         // Set up the C underlying type as its Swift raw type.
         enumDecl->setRawType(underlyingType);
-        
+
         // Add protocol declarations to the enum declaration.
         enumDecl->setInherited(
           Impl.SwiftContext.AllocateCopy(
@@ -2001,10 +2001,10 @@ namespace {
         rawValue->setImplicit();
         rawValue->setAccessibility(Accessibility::Public);
         rawValue->setSetterAccessibility(Accessibility::Private);
-        
+
         // Create a pattern binding to describe the variable.
         Pattern *varPattern = createTypedNamedPattern(rawValue);
-        
+
         auto rawValueBinding =
           PatternBindingDecl::create(Impl.SwiftContext, SourceLoc(),
                                      StaticSpellingKind::None, SourceLoc(),
@@ -2016,23 +2016,23 @@ namespace {
         enumDecl->addMember(rawValueGetter);
         enumDecl->addMember(rawValue);
         enumDecl->addMember(rawValueBinding);
-        
+
         result = enumDecl;
         break;
       }
-          
+
       case EnumKind::Options: {
         result = importAsOptionSetType(dc, name, decl);
         if (!result)
           return nullptr;
-        
+
         break;
       }
       }
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
 
       // Import each of the enumerators.
-      
+
       bool addEnumeratorsAsMembers;
       switch (enumKind) {
       case EnumKind::Constants:
@@ -2044,7 +2044,7 @@ namespace {
         addEnumeratorsAsMembers = true;
         break;
       }
-      
+
       for (auto ec = decl->enumerator_begin(), ecEnd = decl->enumerator_end();
            ec != ecEnd; ++ec) {
         Decl *enumeratorDecl;
@@ -2081,7 +2081,7 @@ namespace {
       // Track whether this record contains fields we can't reference in Swift
       // as stored properties.
       bool hasUnreferenceableStorage = false;
-      
+
       // Track whether this record contains fields that can't be zero-
       // initialized.
       bool hasZeroInitializableStorage = true;
@@ -2275,7 +2275,7 @@ namespace {
       for (auto member : members) {
         result->addMember(member);
       }
-      
+
       for (auto ctor : ctors) {
         result->addMember(ctor);
       }
@@ -2310,7 +2310,7 @@ namespace {
 
     Decl *VisitEnumConstantDecl(const clang::EnumConstantDecl *decl) {
       auto clangEnum = cast<clang::EnumDecl>(decl->getDeclContext());
-      
+
       auto name = Impl.importFullName(decl).Imported.getBaseName();
       if (name.empty())
         return nullptr;
@@ -2749,7 +2749,7 @@ namespace {
         os << ")'";
         member->getAttrs().add(
           AvailableAttr::createUnconditional(
-            Impl.SwiftContext, 
+            Impl.SwiftContext,
             Impl.SwiftContext.AllocateCopy(os.str())));
       }
 
@@ -2924,7 +2924,7 @@ namespace {
 
         // Update the method type with the new result type.
         auto methodTy = type->castTo<FunctionType>();
-        type = FunctionType::get(methodTy->getInput(), resultTy, 
+        type = FunctionType::get(methodTy->getInput(), resultTy,
                                  methodTy->getExtInfo());
 
         // Create the interface type of the method.
@@ -3079,7 +3079,7 @@ namespace {
       auto known = Impl.Constructors.find({objcMethod, dc});
       if (known != Impl.Constructors.end())
         return known->second;
-      
+
       // Check whether there is already a method with this selector.
       auto selector = Impl.importSelector(objcMethod->getSelector());
       if (methodAlreadyImported(selector, /*isInstance=*/true, dc))
@@ -3572,19 +3572,19 @@ namespace {
                                                   Identifier(), loc,
                                                   valueIndex->get(0)->getName(),
                                                   elementTy, dc);
-      
-      
+
+
       auto valueIndicesPL = ParameterList::create(context, {
         paramVarDecl,
         index
       });
-      
+
       // Form the argument lists.
       ParameterList *setterArgs[] = {
         ParameterList::createWithoutLoc(selfDecl),
         valueIndicesPL
       };
-      
+
       // Form the type of the setter.
       Type setterType = ParameterList::getFullType(TupleType::getEmpty(context),
                                                    setterArgs);
@@ -3614,7 +3614,7 @@ namespace {
 
       return thunk;
     }
-    
+
     /// Retrieve the element type and of a subscript setter.
     std::pair<Type, ParamDecl *>
     decomposeSubscriptSetter(FuncDecl *setter) {
@@ -3937,7 +3937,7 @@ namespace {
       subscript->makeComputed(SourceLoc(), getterThunk, setterThunk, nullptr,
                               SourceLoc());
       auto indicesType = bodyParams->getType(context);
-      
+
       subscript->setType(FunctionType::get(indicesType, elementTy));
       addObjCAttribute(subscript, None);
 
@@ -4278,7 +4278,7 @@ namespace {
             if (auto newCtor = importConstructor(objcMethod, classDecl,
                                                  /*implicit=*/true,
                                                  ctor->getInitKind(),
-                                                 /*required=*/false, 
+                                                 /*required=*/false,
                                                  ctor->getObjCSelector(),
                                                  importedName,
                                                  objcMethod->parameters(),
@@ -4452,7 +4452,7 @@ namespace {
                                                         message);
       VD->getAttrs().add(attr);
     }
-    
+
     Decl *VisitObjCProtocolDecl(const clang::ObjCProtocolDecl *decl) {
       Identifier name = Impl.importFullName(decl).Imported.getBaseName();
       if (name.empty())
@@ -4509,10 +4509,10 @@ namespace {
 
       // Set AllArchetypes of the protocol. ObjC protocols don't have associated
       // types so only the Self archetype is present.
-      
+
       result->getGenericParams()->setAllArchetypes(
              Impl.SwiftContext.AllocateCopy(llvm::makeArrayRef(selfArchetype)));
-      
+
       // Set the generic parameters and requirements.
       auto genericParam = selfDecl->getDeclaredType()
                             ->castTo<GenericTypeParamType>();
@@ -4846,7 +4846,7 @@ namespace {
           /*static*/ false, /*IsLet*/ false,
           Impl.importSourceLoc(decl->getLocation()),
           name, type, dc);
-      
+
       // Turn this into a computed property.
       // FIXME: Fake locations for '{' and '}'?
       result->makeComputed(SourceLoc(), getter, setter, nullptr, SourceLoc());
@@ -5521,7 +5521,7 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
 
     auto updateMirroredDecl = [&](Decl *result) {
       result->setImplicit();
-    
+
       // Map the Clang attributes onto Swift attributes.
       importAttributes(decl, result);
 
@@ -5676,13 +5676,13 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
 
   // Form the argument patterns.
   SmallVector<ParameterList*, 3> getterArgs;
-  
+
   // 'self'
   if (dc->isTypeContext()) {
     auto *selfDecl = ParamDecl::createSelf(SourceLoc(), dc, isStatic);
     getterArgs.push_back(ParameterList::createWithoutLoc(selfDecl));
   }
-  
+
   // empty tuple
   getterArgs.push_back(ParameterList::createEmpty(context));
 
@@ -5711,7 +5711,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     case ConstantConvertKind::Construction:
     case ConstantConvertKind::ConstructionWithUnwrap: {
       auto typeRef = TypeExpr::createImplicit(type, context);
-      
+
       // make a "(rawValue: <subexpr>)" tuple.
       expr = TupleExpr::create(context, SourceLoc(), expr,
                                context.Id_rawValue, SourceLoc(),
@@ -5745,7 +5745,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
 
   // Mark the function transparent so that we inline it away completely.
   func->getAttrs().add(new (context) TransparentAttr(/*implicit*/ true));
-  
+
   // Set the function up as the getter.
   var->makeComputed(SourceLoc(), func, nullptr, nullptr, SourceLoc());
 

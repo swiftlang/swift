@@ -35,27 +35,27 @@ class RValue {
   std::vector<ManagedValue> values;
   CanType type;
   unsigned elementsToBeAdded;
-  
+
   /// Flag value used to mark an rvalue as invalid, because it was
   /// consumed or it was default-initialized.
   enum : unsigned { Used = ~0U };
-  
+
   // Don't copy.
   RValue(const RValue &) = delete;
   RValue &operator=(const RValue &) = delete;
-  
+
   void makeUsed() {
     elementsToBeAdded = Used;
     values = {};
   }
-  
+
   /// Private constructor used by copy().
   RValue(const RValue &copied, SILGenFunction &gen, SILLocation l);
-  
+
 public:
   /// Creates an invalid RValue object, in a "used" state.
   RValue() : elementsToBeAdded(Used) {}
-  
+
   RValue(RValue &&rv)
     : values(std::move(rv.values)),
       type(rv.type),
@@ -67,7 +67,7 @@ public:
   }
   RValue &operator=(RValue &&rv) {
     assert(isUsed() && "reassigning an unused rvalue?!");
-    
+
     assert((rv.isComplete() || rv.isUsed())
            && "moving rvalue that wasn't complete?!");
     values = std::move(rv.values);
@@ -76,7 +76,7 @@ public:
     rv.elementsToBeAdded = Used;
     return *this;
   }
-  
+
   /// Create an RValue from a single value. If the value is of tuple type, it
   /// will be exploded.
   ///
@@ -91,39 +91,39 @@ public:
   /// Construct an RValue from a pre-exploded set of
   /// ManagedValues. Used to implement the extractElement* methods.
   RValue(ArrayRef<ManagedValue> values, CanType type);
-  
+
   /// Create an RValue to which values will be subsequently added using
   /// addElement(), with the level of tuple expansion in the input specified
   /// by the abstraction pattern. The RValue will not be complete until all
   /// the elements have been added.
   explicit RValue(AbstractionPattern pattern, CanType type);
-  
+
   /// Create an RValue to which values will be subsequently added using
   /// addElement(). The RValue will not be complete until all the elements have
   /// been added.
   explicit RValue(CanType type);
-  
+
   /// True if the rvalue has been completely initialized by adding all its
   /// elements.
   bool isComplete() const & { return elementsToBeAdded == 0; }
-  
+
   /// True if this rvalue has been used.
   bool isUsed() const & { return elementsToBeAdded == Used; }
   explicit operator bool() const & { return !isUsed(); }
-  
+
   /// True if this represents an lvalue.
   bool isLValue() const & {
     return isa<InOutType>(type);
   }
-  
+
   /// Add an element to the rvalue. The rvalue must not yet be complete.
   void addElement(RValue &&element) &;
-  
+
   /// Add a ManagedValue element to the rvalue, exploding tuples if necessary.
   /// The rvalue must not yet be complete.
   void addElement(SILGenFunction &gen, ManagedValue element,
                   CanType formalType, SILLocation l) &;
-  
+
   /// Forward an rvalue into a single value, imploding tuples if necessary.
   SILValue forwardAsSingleValue(SILGenFunction &gen, SILLocation l) &&;
 
@@ -135,11 +135,11 @@ public:
 
   /// Get the rvalue as a single value, imploding tuples if necessary.
   ManagedValue getAsSingleValue(SILGenFunction &gen, SILLocation l) &&;
-  
+
   /// Get the rvalue as a single unmanaged value, imploding tuples if necessary.
   /// The values must not require any cleanups.
   SILValue getUnmanagedSingleValue(SILGenFunction &gen, SILLocation l) const &;
-  
+
   /// Peek at the single scalar value backing this rvalue without consuming it.
   /// The rvalue must not be of a tuple type.
   SILValue peekScalarValue() const & {
@@ -170,26 +170,26 @@ public:
   /// Copy this rvalue to initialize an Initialization without consuming the
   /// rvalue.
   void copyInto(SILGenFunction &gen, Initialization *I, SILLocation Loc) const&;
-  
+
   /// Forward the exploded SILValues into a SmallVector.
   void forwardAll(SILGenFunction &gen,
                   SmallVectorImpl<SILValue> &values) &&;
 
   ManagedValue materialize(SILGenFunction &gen, SILLocation loc) &&;
-  
+
   /// Take the ManagedValues from this RValue into a SmallVector.
   void getAll(SmallVectorImpl<ManagedValue> &values) &&;
-  
+
   /// Store the unmanaged SILValues into a SmallVector. The values must not
   /// require any cleanups.
   void getAllUnmanaged(SmallVectorImpl<SILValue> &values) const &;
-  
+
   /// Extract a single tuple element from the rvalue.
   RValue extractElement(unsigned element) &&;
-  
+
   /// Extract the tuple elements from the rvalue.
   void extractElements(SmallVectorImpl<RValue> &elements) &&;
-  
+
   CanType getType() const & { return type; }
 
   /// Rewrite the type of this r-value.
@@ -201,7 +201,7 @@ public:
             cast<TupleType>(newType).getElementType(0) == type));
     type = newType;
   }
-  
+
   /// Emit an equivalent value with independent ownership.
   RValue copy(SILGenFunction &gen, SILLocation l) const & {
     return RValue(*this, gen, l);

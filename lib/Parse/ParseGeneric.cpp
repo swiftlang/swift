@@ -96,17 +96,17 @@ ParserResult<GenericParamList> Parser::parseGenericParameters(SourceLoc LAngleLo
       parseGenericWhereClause(WhereLoc, Requirements)) {
     Invalid = true;
   }
-  
+
   // Parse the closing '>'.
   SourceLoc RAngleLoc;
   if (!startsWithGreater(Tok)) {
     if (!Invalid) {
       diagnose(Tok, diag::expected_rangle_generics_param);
       diagnose(LAngleLoc, diag::opening_angle);
-      
+
       Invalid = true;
     }
-    
+
     // Skip until we hit the '>'.
     skipUntilGreaterInTypeList();
     if (startsWithGreater(Tok))

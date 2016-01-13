@@ -9,7 +9,7 @@ import Swift
 // CHECK-LABEL: sil @_TF9optional3fooFT1fGSqFT_T___T_ : $@convention(thin) (@owned Optional<() -> ()>) -> ()
 sil @_TF9optional3fooFT1fGSqFT_T___T_ : $@convention(thin) (@owned Optional<() -> ()>) -> () {
 bb0(%0 : $Optional<() -> ()>):
-  %1 = alloc_box $Optional<() -> ()> 
+  %1 = alloc_box $Optional<() -> ()>
   store %0 to %1#1 : $*Optional<() -> ()>
   %3 = alloc_stack $Optional<()>
   %4 = alloc_stack $()

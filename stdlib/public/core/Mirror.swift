@@ -36,11 +36,11 @@ public struct Mirror {
   case Generated
 
   /// Suppress the representation of descendant classes that don't
-  /// override `customMirror()`.  
+  /// override `customMirror()`.
   ///
   /// This option may be useful at the root of a class cluster, where
   /// implementation details of descendants should generally not be
-  /// visible to clients.  
+  /// visible to clients.
   case Suppressed
   }
 
@@ -56,8 +56,8 @@ public struct Mirror {
   ///
   /// - Note: This option bypasses any implementation of `customMirror`
   ///   that may be supplied by a `CustomReflectable` ancestor, so this
-  ///   is typically not the right option for a `customMirror`implementation 
-    
+  ///   is typically not the right option for a `customMirror`implementation
+
   /// Generate a default mirror for all ancestor classes.
   ///
   /// This case is the default.
@@ -149,7 +149,7 @@ public struct Mirror {
   @warn_unused_result
   internal static func _legacyMirror(
     subject: AnyObject, asClass targetSuperclass: AnyClass) -> _MirrorType? {
-    
+
     // get a legacy mirror and the most-derived type
     var cls: AnyClass = subject.dynamicType
     var clsMirror = _reflect(subject)
@@ -157,15 +157,15 @@ public struct Mirror {
     // Walk up the chain of mirrors/classes until we find staticSubclass
     while let superclass: AnyClass = _getSuperclass(cls) {
       guard let superclassMirror = clsMirror._superMirror() else { break }
-      
+
       if superclass == targetSuperclass { return superclassMirror }
-      
+
       clsMirror = superclassMirror
       cls = superclass
     }
     return nil
   }
-  
+
   @warn_unused_result
   internal static func _superclassGenerator<T: Any>(
     subject: T, _ ancestorRepresentation: AncestorRepresentation
@@ -190,7 +190,7 @@ public struct Mirror {
     }
     return Mirror._noSuperclassMirror
   }
-  
+
   /// Represent `subject` with structure described by `children`,
   /// using an optional `displayStyle`.
   ///
@@ -222,7 +222,7 @@ public struct Mirror {
     self.subjectType = T.self
     self._makeSuperclassMirror = Mirror._superclassGenerator(
       subject, ancestorRepresentation)
-      
+
     self.children = Children(children)
     self.displayStyle = displayStyle
     self._defaultDescendantRepresentation
@@ -270,7 +270,7 @@ public struct Mirror {
     self.subjectType = T.self
     self._makeSuperclassMirror = Mirror._superclassGenerator(
       subject, ancestorRepresentation)
-      
+
     self.children = Children(
       unlabeledChildren.lazy.map { Child(label: nil, value: $0) }
     )
@@ -311,7 +311,7 @@ public struct Mirror {
     self.subjectType = T.self
     self._makeSuperclassMirror = Mirror._superclassGenerator(
       subject, ancestorRepresentation)
-      
+
     let lazyChildren = children.lazy.map { Child(label: $0.0, value: $0.1) }
     self.children = Children(lazyChildren)
 
@@ -380,7 +380,7 @@ extension Mirror {
     @warn_unused_result
     func customMirror() -> Mirror { return mirror }
   }
-  
+
   /// Return a specific descendant of the reflected subject, or `nil`
   /// if no such descendant exists.
   ///
@@ -533,7 +533,7 @@ internal extension Mirror {
     else {
       let legacyMirror = legacyMirror ?? Mirror._legacyMirror(
         subject, asClass: subjectClass)!
-      
+
       self = Mirror(
         legacy: legacyMirror,
         subjectType: subjectClass,

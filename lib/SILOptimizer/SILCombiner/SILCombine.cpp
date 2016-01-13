@@ -230,7 +230,7 @@ void SILCombineWorklist::addInitialGroup(ArrayRef<SILInstruction *> List) {
         << " instrs to worklist\n");
   while (!List.empty()) {
     SILInstruction *I = List.back();
-    List = List.slice(0, List.size()-1);    
+    List = List.slice(0, List.size()-1);
     WorklistMap.insert(std::make_pair(I, Worklist.size()));
     Worklist.push_back(I);
     }
@@ -342,7 +342,7 @@ namespace {
 class SILCombine : public SILFunctionTransform {
 
   llvm::SmallVector<SILInstruction *, 64> TrackingList;
-  
+
   /// The entry point to the transformation.
   void run() override {
     auto *AA = PM->getAnalysis<AliasAnalysis>();
@@ -360,15 +360,15 @@ class SILCombine : public SILFunctionTransform {
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
     }
   }
-  
+
   virtual void handleDeleteNotification(ValueBase *I) override {
     // Linear searching the tracking list doesn't hurt because usually it only
     // contains a few elements.
     auto Iter = std::find(TrackingList.begin(), TrackingList.end(), I);
     if (Iter != TrackingList.end())
-      TrackingList.erase(Iter);      
+      TrackingList.erase(Iter);
   }
-  
+
   virtual bool needsNotifications() override { return true; }
 
   StringRef getName() override { return "SIL Combine"; }

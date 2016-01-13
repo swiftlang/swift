@@ -162,7 +162,7 @@ private:
                         const VersionRange &Versions);
 
 public:
-  
+
   /// Create the root refinement context for the given SourceFile.
   static TypeRefinementContext *createRoot(SourceFile *SF,
                                            const VersionRange &Versions);
@@ -172,7 +172,7 @@ public:
                                               TypeRefinementContext *Parent,
                                               const VersionRange &Versions,
                                               SourceRange SrcRange);
-  
+
   /// Create a refinement context for the Then branch of the given IfStmt.
   static TypeRefinementContext *
   createForIfStmtThen(ASTContext &Ctx, IfStmt *S, TypeRefinementContext *Parent,
@@ -213,19 +213,19 @@ public:
 
   /// Returns the reason this context was introduced.
   Reason getReason() const;
-  
+
   /// Returns the AST node that introduced this refinement context. Note that
   /// this node may be different than the refined range. For example, a
   /// refinement context covering an IfStmt Then branch will have the
   /// IfStmt as the introduction node (and its reason as IfStmtThenBranch)
   /// but its source range will cover the Then branch.
   IntroNode getIntroductionNode() const { return Node; }
-  
+
   /// Returns the location of the node that introduced this refinement context
   /// or an invalid location if the context reflects the minimum deployment
   // target.
   SourceLoc getIntroductionLoc() const;
-  
+
   /// Returns the source range on which this context refines types.
   SourceRange getSourceRange() const { return SrcRange; }
 
@@ -249,9 +249,9 @@ public:
       "only for use within the debugger");
   void dump(raw_ostream &OS, SourceManager &SrcMgr) const;
   void print(raw_ostream &OS, SourceManager &SrcMgr, unsigned Indent = 0) const;
-  
+
   static StringRef getReasonName(Reason R);
-  
+
   // Only allow allocation of TypeRefinementContext using the allocator in
   // ASTContext.
   void *operator new(size_t Bytes, ASTContext &C,

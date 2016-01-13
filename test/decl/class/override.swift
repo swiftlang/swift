@@ -53,11 +53,11 @@ class B : A {
 }
 
 class C<T> {
-  func ret_T() -> T {} 
+  func ret_T() -> T {}
 }
 
 class D<T> : C<[T]> {
-  override func ret_T() -> [T] {} 
+  override func ret_T() -> [T] {}
 }
 
 class E {
@@ -178,7 +178,7 @@ class IUOTestSubclass : IUOTestBaseClass {
   // expected-note@-1 2 {{remove '!' to make the parameter required}}
   // expected-note@-2 2 {{add parentheses to silence this warning}}
   override func manyB(a: AnyObject!, b: AnyObject!) {} // expected-warning 2 {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
-  // expected-note@-1 2 {{remove '!' to make the parameter required}} 
+  // expected-note@-1 2 {{remove '!' to make the parameter required}}
   // expected-note@-2 2 {{add parentheses to silence this warning}}
   override func manyC(a: AnyObject!, b: AnyObject!) {} // expected-warning 2 {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
   // expected-note@-1 2 {{remove '!' to make the parameter required}}

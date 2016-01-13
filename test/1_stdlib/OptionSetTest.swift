@@ -60,27 +60,27 @@ tests.test("basics") {
   var p = P.Box
   p.intersectInPlace(.BoxOrBag)
   expectEqual(.Box, p)
-  
+
   p = .Bag
   p.intersectInPlace(.BoxOrBag)
   expectEqual(.Bag, p)
-  
+
   p = .Bag
   p.intersectInPlace(.Box)
   expectEqual(P(), p)
-  
+
   p = .Box
   p.intersectInPlace(.Satchel)
   expectEqual(P(), p)
-  
+
   p = .Bag
   p.unionInPlace(.Box)
   expectEqual(.BoxOrBag, p)
-  
+
   p = .Box
   p.unionInPlace(.Bag)
   expectEqual(.BoxOrBag, p)
-  
+
   p = .BoxOrBag
   p.unionInPlace(.Carton)
   expectEqual(.BoxOrCartonOrBag, p)

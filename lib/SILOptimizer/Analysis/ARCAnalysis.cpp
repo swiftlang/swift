@@ -431,7 +431,7 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
   // Ptr. If we fail, return true.
   CanSILFunctionType FType = FAS.getSubstCalleeType();
   auto Params = FType->getParameters();
-  for (unsigned i : indices(Params)) {    
+  for (unsigned i : indices(Params)) {
     if (!Params[i].isGuaranteed())
       continue;
     SILValue Op = FAS.getArgument(i);

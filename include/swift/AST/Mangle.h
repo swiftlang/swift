@@ -23,7 +23,7 @@ namespace swift {
 class AbstractClosureExpr;
 
 namespace Mangle {
-  
+
 enum class IncludeType : bool { No, Yes };
 
 enum class OperatorFixity {
@@ -33,7 +33,7 @@ enum class OperatorFixity {
   Postfix
 };
 
-  
+
 /// A class for mangling declarations. The Mangler accumulates name fragments
 /// with the mangleXXX methods, and the final string is constructed with the
 /// `finalize` method, after which the Mangler should not be used.
@@ -74,7 +74,7 @@ public:
     /// context and so require all generic parameters to be bound.
     All
   };
-  
+
   class ContextStack {
     Mangler &M;
     unsigned OldDepth;

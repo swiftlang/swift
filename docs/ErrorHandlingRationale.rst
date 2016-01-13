@@ -775,7 +775,7 @@ not free:
   to resume normal execution from the landing pad: if the landing pad
   only has clean-ups and therefore always restarts propagation, those
   registers will have been saved and restored further out.
-  
+
 * Languages like C++, ObjC ARC, and Swift that have non-trivial
   clean-ups for many local variables tend to have many functions with
   interesting frames.  This means both that the context-saving
@@ -1570,7 +1570,7 @@ wrapped around an arbitrary expression::
 
   // This try applies to readBool().
   if try stream.readBool() {
-  
+
     // This try applies to both of these calls.
     let x = try stream.readInt() + stream.readInt()
 

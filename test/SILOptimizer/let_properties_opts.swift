@@ -26,7 +26,7 @@
 // CHECK-WMO: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop3
 // CHECK-WMO: return
 
-// CHECK-WMO-LABEL: sil @_TFC19let_properties_opts3Fooc{{.*}} : $@convention(method) (Int64, @owned Foo) -> @owned Foo 
+// CHECK-WMO-LABEL: sil @_TFC19let_properties_opts3Fooc{{.*}} : $@convention(method) (Int64, @owned Foo) -> @owned Foo
 // CHECK-WMO-NOT: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop1
 // CHECK-WMO-NOT: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop2
 // CHECK-WMO-NOT: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop3
@@ -36,7 +36,7 @@
 // CHECK-WMO: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop3
 // CHECK-WMO: return
 
-// Check that initializers do not contain a code to initialize private properties, 
+// Check that initializers do not contain a code to initialize private properties,
 // because their values are propagated into their uses and they cannot be accessed
 // from other modules. Therefore the initialization code could be removed.
 // Specifically, the initialization code for Prop2 can be removed.
@@ -60,7 +60,7 @@ public class Foo {
   let Prop1: Int32 = 1 + 4/2 + 8
   private let Prop2: Int32 = 3*7
   internal let Prop3: Int32  = 4*8
-  public init(i:Int32) {}  
+  public init(i:Int32) {}
   public init(i:Int64) {}
 }
 
@@ -79,7 +79,7 @@ public class Foo1 {
 
 public struct Boo {
   public let Prop0: Int32 = 1
-  let Prop1: Int32 = 1 + 4/2 + 8  
+  let Prop1: Int32 = 1 + 4/2 + 8
   private let Prop2: Int32 = 3*7
   internal let Prop3: Int32 = 4*8
   public init(i:Int32) {}
@@ -91,7 +91,7 @@ public struct Boo {
 
 // CHECK-LABEL: sil @_TF19let_properties_opts13testClassLet1FCS_4Foo1Vs5Int32 : $@convention(thin) (@owned Foo1) -> Int32
 // bb0
-// CHECK: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop1 
+// CHECK: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop1
 // CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop2
 // CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop3
 // CHECK: return
@@ -102,9 +102,9 @@ public func testClassLet1(f: Foo1) -> Int32 {
 // Check that Foo1.Prop1 is not constant-folded, because its value is unknown, since it is initialized differently
 // by Foo1 initializers.
 
-// CHECK-LABEL: sil @_TF19let_properties_opts13testClassLet1FRCS_4Foo1Vs5Int32 : $@convention(thin) (@inout Foo1) -> Int32 
+// CHECK-LABEL: sil @_TF19let_properties_opts13testClassLet1FRCS_4Foo1Vs5Int32 : $@convention(thin) (@inout Foo1) -> Int32
 // bb0
-// CHECK: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop1 
+// CHECK: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop1
 // CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop2
 // CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop3
 // CHECK: return

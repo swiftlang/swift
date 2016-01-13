@@ -53,7 +53,7 @@ public:
 
   /// This is the base type of the memory allocation.
   SILType MemorySILType;
-  
+
   /// True if the memory object being analyzed represents a 'let', which is
   /// initialize-only (reassignments are not allowed).
   bool IsLet = false;
@@ -121,7 +121,7 @@ public:
         return true;
     return false;
   }
-  
+
   /// True if the memory object is the 'self' argument of a struct initializer.
   bool isStructInitSelf() const {
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
@@ -209,28 +209,28 @@ public:
 enum DIUseKind {
   /// The instruction is a Load.
   Load,
-  
+
   /// The instruction is either an initialization or an assignment, we don't
   /// know which.  This classification only happens with values of trivial type
   /// where the different isn't significant.
   InitOrAssign,
-  
+
   /// The instruction is an initialization of the tuple element.
   Initialization,
-  
+
   /// The instruction is an assignment, overwriting an already initialized
   /// value.
   Assign,
-  
+
   /// The instruction is a store to a member of a larger struct value.
   PartialStore,
-  
+
   /// An indirect 'inout' parameter of an Apply instruction.
   InOutUse,
-  
+
   /// An indirect 'in' parameter of an Apply instruction.
   IndirectIn,
-  
+
   /// This instruction is a general escape of the value, e.g. a call to a
   /// closure that captures it.
   Escape,
@@ -248,33 +248,33 @@ enum DIUseKind {
 struct DIMemoryUse {
   /// This is the instruction accessing the memory.
   SILInstruction *Inst;
-  
+
   /// This is what kind of access it is, load, store, escape, etc.
   DIUseKind Kind;
-  
+
   /// For memory objects of (potentially recursive) tuple type, this keeps
   /// track of which tuple elements are affected.
   unsigned short FirstElement, NumElements;
-  
+
   DIMemoryUse(SILInstruction *Inst, DIUseKind Kind, unsigned FE, unsigned NE)
   : Inst(Inst), Kind(Kind), FirstElement(FE), NumElements(NE) {
     assert(FE == FirstElement && NumElements == NE &&
            "more than 64K elements not supported yet");
   }
-  
+
   DIMemoryUse() : Inst(nullptr) {}
-  
+
   bool isInvalid() const { return Inst == nullptr; }
   bool isValid() const { return Inst != nullptr; }
 
   bool usesElement(unsigned i) const {
     return i >= FirstElement && i < FirstElement+NumElements;
   }
-  
+
   /// onlyTouchesTrivialElements - Return true if all of the accessed elements
   /// have trivial type.
   bool onlyTouchesTrivialElements(const DIMemoryObjectInfo &MemoryInfo) const;
-  
+
   /// getElementBitmask - Return a bitmask with the touched tuple elements
   /// set.
   APInt getElementBitmask(unsigned NumMemoryTupleElements) const {

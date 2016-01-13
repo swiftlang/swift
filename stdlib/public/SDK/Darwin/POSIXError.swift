@@ -120,7 +120,7 @@
   case ECANCELED       = 89              /* Operation canceled */
 
   case EIDRM           = 90              /* Identifier removed */
-  case ENOMSG          = 91              /* No message of desired type */   
+  case ENOMSG          = 91              /* No message of desired type */
   case EILSEQ          = 92              /* Illegal byte sequence */
   case ENOATTR         = 93              /* Attribute not found */
   case EBADMSG         = 94              /* Bad message */

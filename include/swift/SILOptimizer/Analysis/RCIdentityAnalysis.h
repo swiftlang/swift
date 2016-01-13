@@ -75,7 +75,7 @@ public:
   }
 
   virtual void initialize(SILPassManager *PM) override;
-  
+
   virtual RCIdentityFunctionInfo *newFunctionAnalysis(SILFunction *F) override {
     return new RCIdentityFunctionInfo(DA);
   }

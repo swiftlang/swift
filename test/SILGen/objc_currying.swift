@@ -64,7 +64,7 @@ func curry_returnsInnerPointer(x: CurryTest) -> () -> UnsafeMutablePointer<Void>
 // CHECK:   return [[FN]]
 
 // CHECK: sil shared @_TTOFCSo9CurryTest19returnsInnerPointerfT_GSpT__ : $@convention(method) (@guaranteed CurryTest) -> UnsafeMutablePointer<()>
-// CHECK:  bb0([[ARG1:%.*]] : 
+// CHECK:  bb0([[ARG1:%.*]] :
 // CHECK:   strong_retain [[ARG1]]
 // CHECK:   [[METHOD:%.*]] = class_method [volatile] %0 : $CurryTest, #CurryTest.returnsInnerPointer!1.foreign
 // CHECK:   [[RES:%.*]] = apply [[METHOD]](%0) : $@convention(objc_method) (CurryTest) -> @unowned_inner_pointer UnsafeMutablePointer<()>
@@ -92,7 +92,7 @@ func curry_normalOwnership_AnyObject(x: AnyObject) -> CurryTest! -> CurryTest! {
 
 // weirdOwnership is NS_RETURNS_RETAINED and NS_CONSUMES_SELF so already
 // follows Swift conventions
-// CHECK-LABEL: sil hidden @_TF13objc_currying30curry_weirdOwnership_AnyObjectFPs9AnyObject_FGSQCSo9CurryTest_GSQS1__ : $@convention(thin) (@owned AnyObject) -> @owned @callee_owned (@owned ImplicitlyUnwrappedOptional<CurryTest>) -> @owned ImplicitlyUnwrappedOptional<CurryTest> 
+// CHECK-LABEL: sil hidden @_TF13objc_currying30curry_weirdOwnership_AnyObjectFPs9AnyObject_FGSQCSo9CurryTest_GSQS1__ : $@convention(thin) (@owned AnyObject) -> @owned @callee_owned (@owned ImplicitlyUnwrappedOptional<CurryTest>) -> @owned ImplicitlyUnwrappedOptional<CurryTest>
 // CHECK:         dynamic_method_br [[SELF:%.*]] : $@opened({{.*}}) AnyObject, #CurryTest.weirdOwnership!1.foreign, [[HAS_METHOD:bb[0-9]+]]
 // CHECK:       bb1([[METHOD:%.*]] : $@convention(objc_method) (@owned ImplicitlyUnwrappedOptional<CurryTest>, @owned @opened({{.*}}) AnyObject) -> @owned ImplicitlyUnwrappedOptional<CurryTest>):
 // CHECK:         partial_apply [[METHOD]]([[SELF]])
@@ -105,7 +105,7 @@ func curry_weirdOwnership_AnyObject(x: AnyObject) -> CurryTest! -> CurryTest! {
 // CHECK:         dynamic_method_br [[SELF:%.*]] : $@opened({{.*}}) AnyObject, #CurryTest.bridged!1.foreign, [[HAS_METHOD:bb[0-9]+]]
 // CHECK:       [[HAS_METHOD]]([[METHOD:%.*]] : $@convention(objc_method) (ImplicitlyUnwrappedOptional<NSString>, @opened({{.*}}) AnyObject) -> @autoreleased ImplicitlyUnwrappedOptional<NSString>):
 // CHECK:         [[PA:%.*]] = partial_apply [[METHOD]]([[SELF]])
-// CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFo_dGSQCSo8NSString__aGSQS___XFo_oGSQSS__oGSQSS__ 
+// CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFo_dGSQCSo8NSString__aGSQS___XFo_oGSQSS__oGSQSS__
 // CHECK:         partial_apply [[THUNK]]([[PA]])
 func curry_bridged_AnyObject(x: AnyObject) -> String! -> String! {
   return x.bridged!

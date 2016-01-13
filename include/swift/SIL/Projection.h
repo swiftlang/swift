@@ -1001,7 +1001,7 @@ public:
 
   /// Returns the last element of the path.
   const Projection &back() const { return Path.back(); }
-  
+
   /// Returns the first element of the path.
   const Projection &front() const { return Path.front(); }
 
@@ -1055,7 +1055,7 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
   // Print the projection type first.
   OS << "Address Projection Type: ";
   OS << P.getType().getAddressType() << "\n";
-  if (P.isNominalKind()) { 
+  if (P.isNominalKind()) {
     OS << "Field Type: ";
     P.getDecl()->print(OS);
   } else {

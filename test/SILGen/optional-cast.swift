@@ -145,7 +145,7 @@ class C {}
 
 public struct TestAddressOnlyStruct<T>  {
   func f(a : T?) {}
-  
+
   // CHECK-LABEL: sil hidden @_TFV4main21TestAddressOnlyStruct8testCall
   // CHECK: bb0(%0 : $*ImplicitlyUnwrappedOptional<T>, %1 : $TestAddressOnlyStruct<T>):
   // CHECK: [[TMPBUF:%.*]] = alloc_stack $Optional<T>

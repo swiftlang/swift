@@ -71,11 +71,11 @@ public:
                          NonFixedOffsets offsets) const {
     return Layout.project(IGF, seq, offsets, "." + asImpl()->getFieldName());
   }
-  
+
   ElementLayout::Kind getKind() const {
     return Layout.getKind();
   }
-  
+
   Size getFixedByteOffset() const {
     return Layout.getByteOffset();
   }
@@ -105,7 +105,7 @@ private:
 protected:
   const Impl &asImpl() const { return *static_cast<const Impl*>(this); }
 
-  template <class... As> 
+  template <class... As>
   RecordTypeInfoImpl(ArrayRef<FieldImpl> fields, As&&...args)
       : Base(std::forward<As>(args)...), NumFields(fields.size()) {
     std::uninitialized_copy(fields.begin(), fields.end(),
@@ -178,7 +178,7 @@ public:
                                              field.getType(IGF.IGM, T));
     }
   }
-  
+
   void initializeWithTake(IRGenFunction &IGF,
                           Address dest, Address src,
                           SILType T) const override {
@@ -189,11 +189,11 @@ public:
                  std::min(dest.getAlignment(), src.getAlignment()).getValue());
       return;
     }
-    
+
     auto offsets = asImpl().getNonFixedOffsets(IGF, T);
     for (auto &field : getFields()) {
       if (field.isEmpty()) continue;
-      
+
       Address destField = field.projectAddress(IGF, dest, offsets);
       Address srcField = field.projectAddress(IGF, src, offsets);
       field.getTypeInfo().initializeWithTake(IGF, destField, srcField,
@@ -216,17 +216,17 @@ template <class Impl, class Base, class FieldImpl_,
           bool IsLoadable = std::is_base_of<LoadableTypeInfo, Base>::value>
 class RecordTypeInfo;
 
-/// An implementation of RecordTypeInfo for non-loadable types. 
+/// An implementation of RecordTypeInfo for non-loadable types.
 template <class Impl, class Base, class FieldImpl>
 class RecordTypeInfo<Impl, Base, FieldImpl, /*IsLoadable*/ false>
     : public RecordTypeInfoImpl<Impl, Base, FieldImpl> {
   typedef RecordTypeInfoImpl<Impl, Base, FieldImpl> super;
 protected:
-  template <class... As> 
+  template <class... As>
   RecordTypeInfo(As&&...args) : super(std::forward<As>(args)...) {}
 };
 
-/// An implementation of RecordTypeInfo for loadable types. 
+/// An implementation of RecordTypeInfo for loadable types.
 template <class Impl, class Base, class FieldImpl>
 class RecordTypeInfo<Impl, Base, FieldImpl, /*IsLoadable*/ true>
     : public RecordTypeInfoImpl<Impl, Base, FieldImpl> {
@@ -237,7 +237,7 @@ class RecordTypeInfo<Impl, Base, FieldImpl, /*IsLoadable*/ true>
 protected:
   using super::asImpl;
 
-  template <class... As> 
+  template <class... As>
   RecordTypeInfo(ArrayRef<FieldImpl> fields, unsigned explosionSize,
                  As &&...args)
     : super(fields, std::forward<As>(args)...),
@@ -282,7 +282,7 @@ public:
                   Explosion &out) const override {
     forAllFields<&LoadableTypeInfo::loadAsTake>(IGF, addr, out);
   }
-  
+
   void assign(IRGenFunction &IGF, Explosion &e, Address addr) const override {
     forAllFields<&LoadableTypeInfo::assign>(IGF, e, addr);
   }
@@ -307,7 +307,7 @@ public:
     for (auto &field : getFields())
       cast<LoadableTypeInfo>(field.getTypeInfo()).copy(IGF, src, dest);
   }
-      
+
   void consume(IRGenFunction &IGF, Explosion &src) const override {
     for (auto &field : getFields())
       cast<LoadableTypeInfo>(field.getTypeInfo()).consume(IGF, src);
@@ -317,7 +317,7 @@ public:
     for (auto &field : getFields())
       cast<LoadableTypeInfo>(field.getTypeInfo()).fixLifetime(IGF, src);
   }
-  
+
   void packIntoEnumPayload(IRGenFunction &IGF,
                            EnumPayload &payload,
                            Explosion &src,
@@ -331,7 +331,7 @@ public:
       }
     }
   }
-  
+
   void unpackFromEnumPayload(IRGenFunction &IGF, const EnumPayload &payload,
                              Explosion &dest, unsigned startOffset)
                             const override {
@@ -408,7 +408,7 @@ public:
     } else {
       return asImpl()->createNonFixed(fields, std::move(layout));
     }
-  }  
+  }
 };
 
 } // end namespace irgen

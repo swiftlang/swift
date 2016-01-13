@@ -41,10 +41,10 @@ mayBridgeToObjectiveC(Module *M, CanType T) {
   // TODO: We could be more precise with the bridged-to type.
   if (T->hasArchetype())
     return true;
-  
+
   if (T->isAnyExistentialType())
     return true;
-  
+
   if (M->getASTContext().getBridgedToObjC(M, T, nullptr))
     return true;
 
@@ -322,7 +322,7 @@ swift::classifyDynamicCast(Module *M,
     // If we don't know any better, assume that the cast may succeed.
     return DynamicCastFeasibility::MaySucceed;
   }
-  
+
   // Function casts.
   if (auto sourceFunction = dyn_cast<FunctionType>(source)) {
     if (auto targetFunction = dyn_cast<FunctionType>(target)) {
@@ -333,18 +333,18 @@ swift::classifyDynamicCast(Module *M,
       // but not vice versa.
       if (sourceFunction->throws() && !targetFunction->throws())
         return DynamicCastFeasibility::WillFail;
-      
+
       // A noreturn source function can be cast to a returning target type,
       // but not vice versa.
       // (noreturn isn't really reified at runtime though.)
       if (targetFunction->isNoReturn() && !sourceFunction->isNoReturn())
         return DynamicCastFeasibility::WillFail;
-      
+
       // The cast can't change the representation at runtime.
       if (targetFunction->getRepresentation()
             != sourceFunction->getRepresentation())
         return DynamicCastFeasibility::WillFail;
-      
+
       if (sourceFunction.getInput() == targetFunction.getInput()
           && sourceFunction.getResult() == targetFunction.getResult())
         return DynamicCastFeasibility::WillSucceed;
@@ -354,12 +354,12 @@ swift::classifyDynamicCast(Module *M,
         // substitutability.
         return a == b || a->hasArchetype() || b->hasArchetype();
       };
-    
+
       if (isSubstitutable(sourceFunction.getInput(), targetFunction.getInput())
           && isSubstitutable(targetFunction.getInput(),
                              targetFunction.getResult()))
         return DynamicCastFeasibility::MaySucceed;
-      
+
       return DynamicCastFeasibility::WillFail;
     }
   }
@@ -418,7 +418,7 @@ swift::classifyDynamicCast(Module *M,
     }
     return DynamicCastFeasibility::MaySucceed;
   }
-  
+
   if (target->isBridgeableObjectType() && mayBridgeToObjectiveC(M, source)) {
     // Try to get the ObjC type which is bridged to source type.
     assert(!source.isAnyExistentialType());
@@ -509,7 +509,7 @@ namespace {
 
     Source emitTopLevel(Source source, Target target) {
       unsigned sourceOptDepth = getOptionalDepth(source.FormalType);
-      unsigned targetOptDepth = getOptionalDepth(target.FormalType);      
+      unsigned targetOptDepth = getOptionalDepth(target.FormalType);
 
       assert(sourceOptDepth <= targetOptDepth);
       return emitAndInjectIntoOptionals(source, target,
@@ -738,7 +738,7 @@ namespace {
 
     Source emitSome(Source source, Target target, EmitSomeState &state) {
       // If our target is an address, prepareForEmitSome should have set this
-      // up so that we emitted directly into 
+      // up so that we emitted directly into
       if (target.isAddress()) {
         B.createInjectEnumAddr(Loc, target.Address, state.SomeDecl);
         return target.asAddressSource();
@@ -758,7 +758,7 @@ namespace {
       (void) objectType;
 
       auto noneDecl = Ctx.getOptionalNoneDecl(optKind);
-      
+
       if (target.isAddress()) {
         B.createInjectEnumAddr(Loc, target.Address, noneDecl);
         return target.asAddressSource();
@@ -876,7 +876,7 @@ bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
   // since it may conform to ErrorType and require ErrorType-to-NSError
   // bridging, unless we can statically see that the source type inherits
   // NSError.
-  
+
   // A class-constrained archetype may be bound to NSError, unless it has a
   // non-NSError superclass constraint. Casts to archetypes thus must always be
   // indirect.
@@ -891,14 +891,14 @@ bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
     // If NSError wasn't loaded, any base class constraint must not be NSError.
     return true;
   }
-  
+
   if (targetType == M.Types.getNSErrorType()) {
     // If we statically know the target is an NSError subclass, then the cast
     // can go through the scalar path (and it's trivially true so can be
     // killed).
     return targetType->isSuperclassOf(objectType, nullptr);
   }
-  
+
   // Three supported cases:
   // - metatype to metatype
   // - metatype to object
@@ -909,7 +909,7 @@ bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
 
   if (isa<AnyMetatypeType>(objectType) && isa<AnyMetatypeType>(targetType))
     return true;
-  
+
   // Otherwise, we need to use the general indirect-cast functions.
   return false;
 }

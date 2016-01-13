@@ -24,7 +24,7 @@
 namespace swift {
   class SILBasicBlock;
   class CaseStmt;
-  
+
 namespace Lowering {
 
 /// The destination of a direct jump.  Swift currently does not
@@ -36,7 +36,7 @@ class LLVM_LIBRARY_VISIBILITY JumpDest {
   CleanupLocation CleanupLoc;
 public:
   JumpDest(CleanupLocation L) : CleanupLoc(L) {}
-  
+
   JumpDest(SILBasicBlock *block, CleanupsDepth depth, CleanupLocation l)
     : Block(block), Depth(depth), CleanupLoc(l) {}
 
@@ -54,7 +54,7 @@ public:
     return JumpDest(CleanupLocation((Expr*) nullptr));
   }
 };
-  
+
 } // end namespace Lowering
 } // end namespace swift
 

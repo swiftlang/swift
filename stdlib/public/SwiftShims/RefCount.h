@@ -81,7 +81,7 @@ class StrongRefCount {
   // destruction overhead at runtime. Use StrongRefCount(Initialized) to produce
   // an initialized instance.
   StrongRefCount() = default;
-  
+
   // Refcount of a new object is 1.
   constexpr StrongRefCount(Initialized_t)
     : refCount(RC_ONE) { }
@@ -296,7 +296,7 @@ class WeakRefCount {
   // destruction overhead at runtime. Use WeakRefCount(Initialized) to produce
   // an initialized instance.
   WeakRefCount() = default;
-  
+
   // Weak refcount of a new object is 1.
   constexpr WeakRefCount(Initialized_t)
     : refCount(RC_ONE) { }

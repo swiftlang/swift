@@ -23,7 +23,7 @@ bb0(%0 : $Optional<() -> ()>):
   // CHECK: call void @swift_retain(%swift.refcounted* [[CTX]])
   // CHECK: br label
   retain_value %0 : $Optional<() -> ()>
-  
+
   // CHECK: icmp eq i64 %0, 0
   switch_enum %0 : $Optional<() -> ()>, case #Optional.Some!enumelt.1: bb1, case #Optional.None!enumelt: bb2
 

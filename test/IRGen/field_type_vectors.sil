@@ -4,7 +4,7 @@
 
 import Swift
 
-// CHECK-LABEL: @_TMnV18field_type_vectors3Foo = constant 
+// CHECK-LABEL: @_TMnV18field_type_vectors3Foo = constant
 // CHECK:         %swift.type** (%swift.type*)* [[FOO_TYPES_ACCESSOR:@[^,]*]],
 struct Foo {
   var x: Int

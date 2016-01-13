@@ -39,7 +39,7 @@ static void configureARM64(IRGenModule &IGM, const llvm::Triple &triple,
             SWIFT_ABI_ARM64_SWIFT_SPARE_BITS_MASK);
   setToMask(target.ObjCPointerReservedBits, 64,
             SWIFT_ABI_ARM64_OBJC_RESERVED_BITS_MASK);
-  
+
   if (triple.isOSDarwin()) {
     target.LeastValidPointerValue =
       SWIFT_ABI_DARWIN_ARM64_LEAST_VALID_POINTER;
@@ -63,7 +63,7 @@ static void configureX86_64(IRGenModule &IGM, const llvm::Triple &triple,
             SWIFT_ABI_X86_64_SWIFT_SPARE_BITS_MASK);
   setToMask(target.ObjCPointerReservedBits, 64,
             SWIFT_ABI_X86_64_OBJC_RESERVED_BITS_MASK);
-  
+
   if (triple.isOSDarwin()) {
     target.LeastValidPointerValue =
       SWIFT_ABI_DARWIN_X86_64_LEAST_VALID_POINTER;
@@ -114,13 +114,13 @@ SwiftTargetInfo SwiftTargetInfo::get(IRGenModule &IGM) {
 
   // Prepare generic target information.
   SwiftTargetInfo target(triple.getObjectFormat(), pointerSize);
-  
+
   // On Apple platforms, we implement "once" using dispatch_once, which exposes
   // -1 as ABI for the "done" value.
   if (triple.isOSDarwin())
     target.OnceDonePredicateValue = -1L;
   // TODO: Do we know this for Linux?
-  
+
   switch (triple.getArch()) {
   case llvm::Triple::x86_64:
     configureX86_64(IGM, triple, target);

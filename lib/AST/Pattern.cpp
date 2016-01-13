@@ -78,7 +78,7 @@ static_assert(CheckClassOfPattern<ID##Pattern::classof>::IsImplemented, \
 // Metaprogram to verify that every concrete class implements
 // 'SourceRange getSourceRange()'.
 typedef const char (&TwoChars)[2];
-template<typename Class> 
+template<typename Class>
 inline char checkSourceRangeType(SourceRange (Class::*)() const);
 inline TwoChars checkSourceRangeType(SourceRange (Pattern::*)() const);
 
@@ -92,7 +92,7 @@ static_assert(sizeof(checkSourceRangeType(&ID##Pattern::getSourceRange)) == 1, \
 return cast<ID##Pattern>(this)->getSourceRange();
 #include "swift/AST/PatternNodes.def"
   }
-  
+
   llvm_unreachable("pattern type not handled!");
 }
 
@@ -126,10 +126,10 @@ namespace {
   class WalkToVarDecls : public ASTWalker {
     const std::function<void(VarDecl*)> &fn;
   public:
-    
+
     WalkToVarDecls(const std::function<void(VarDecl*)> &fn)
     : fn(fn) {}
-    
+
     Pattern *walkToPatternPost(Pattern *P) override {
       // Handle vars.
       if (auto *Named = dyn_cast<NamedPattern>(P))
@@ -286,7 +286,7 @@ case PatternKind::ID: foundRefutablePattern = true; break;
 #include "swift/AST/PatternNodes.def"
     }
   });
-    
+
   return foundRefutablePattern;
 }
 

@@ -481,7 +481,7 @@ public func +<
 @warn_unused_result
 public func +<
     RRC1 : RangeReplaceableCollectionType,
-    RRC2 : RangeReplaceableCollectionType 
+    RRC2 : RangeReplaceableCollectionType
     where RRC1.Generator.Element == RRC2.Generator.Element
 >(lhs: RRC1, rhs: RRC2) -> RRC1 {
   var lhs = lhs

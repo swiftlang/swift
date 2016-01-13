@@ -95,7 +95,7 @@ static ParserStatus parseDefaultArgument(Parser &P,
       inFlight.fixItRemove(SourceRange(equalLoc, initR.get()->getEndLoc()));
     return ParserStatus();
   }
-  
+
   defaultArgs->HasDefaultArgument = true;
 
   if (initR.hasCodeCompletion()) {
@@ -319,10 +319,10 @@ mapParsedParameters(Parser &parser,
                                      paramNameLoc, paramName, Type(),
                                      parser.CurDeclContext);
     param->getAttrs() = Attrs;
-    
+
     if (argNameLoc.isInvalid() && paramNameLoc.isInvalid())
       param->setImplicit();
-    
+
     // If a type was provided, create the typed pattern.
     if (type) {
       // If 'inout' was specified, turn the type into an in-out type.
@@ -461,11 +461,11 @@ ParserResult<ParameterList> Parser::parseSingleParameterClause(
   ParserStatus status;
   SmallVector<ParsedParameter, 4> params;
   SourceLoc leftParenLoc, rightParenLoc;
-  
+
   // Parse the parameter clause.
   status |= parseParameterClause(leftParenLoc, params, rightParenLoc,
                                  /*defaultArgs=*/nullptr, paramContext);
-  
+
   // Turn the parameter clause into argument and body patterns.
   auto paramList = mapParsedParameters(*this, leftParenLoc, params,
                                      rightParenLoc, true, namePieces,
@@ -503,7 +503,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
 
     // Turn the parameter clause into argument and body patterns.
     auto pattern = mapParsedParameters(*this, leftParenLoc, params,
-                                       rightParenLoc, 
+                                       rightParenLoc,
                                        isFirstParameterClause,
                                        isFirstParameterClause ? &NamePieces
                                                               : nullptr,
@@ -533,7 +533,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
         seenArg = true;
       if (!seenArg || rightParamList->size() == 0)
         replacement = "";
-    
+
       diag.fixItReplace(SourceRange(leftParamList->getEndLoc(),
                                     rightParamList->getStartLoc()),
                         replacement);
@@ -561,7 +561,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   SmallVector<Identifier, 4> NamePieces;
   NamePieces.push_back(SimpleName);
   FullName = SimpleName;
-  
+
   ParserStatus Status;
   // We force first type of a func declaration to be a tuple for consistency.
   if (Tok.is(tok::l_paren)) {
@@ -573,7 +573,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
 
     Status = parseFunctionArguments(NamePieces, bodyParams, paramContext,
                                     defaultArgs);
-    FullName = DeclName(Context, SimpleName, 
+    FullName = DeclName(Context, SimpleName,
                         llvm::makeArrayRef(NamePieces.begin() + 1,
                                            NamePieces.end()));
 
@@ -592,7 +592,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
                                                     PreviousLoc));
     FullName = DeclName(Context, SimpleName, bodyParams.back());
   }
-  
+
   // Check for the 'throws' keyword.
   rethrows = false;
   if (Tok.is(tok::kw_throws)) {
@@ -678,9 +678,9 @@ Parser::parseConstructorArguments(DeclName &FullName,
   // Parse the parameter-clause.
   SmallVector<ParsedParameter, 4> params;
   SourceLoc leftParenLoc, rightParenLoc;
-  
+
   // Parse the parameter clause.
-  ParserStatus status 
+  ParserStatus status
     = parseParameterClause(leftParenLoc, params, rightParenLoc,
                            &DefaultArgs, ParameterContextKind::Initializer);
 
@@ -703,22 +703,22 @@ Parser::parseConstructorArguments(DeclName &FullName,
 ///
 ParserResult<Pattern> Parser::parseTypedPattern() {
   auto result = parsePattern();
-  
+
   // Now parse an optional type annotation.
   if (consumeIf(tok::colon)) {
     if (result.isNull())  // Recover by creating AnyPattern.
       result = makeParserErrorResult(new (Context) AnyPattern(PreviousLoc));
-    
+
     ParserResult<TypeRepr> Ty = parseType();
     if (Ty.hasCodeCompletion())
       return makeParserCodeCompletionResult<Pattern>();
     if (Ty.isNull())
       Ty = makeParserResult(new (Context) ErrorTypeRepr(PreviousLoc));
-    
+
     result = makeParserResult(result,
                             new (Context) TypedPattern(result.get(), Ty.get()));
   }
-  
+
   return result;
 }
 
@@ -733,17 +733,17 @@ ParserResult<Pattern> Parser::parsePattern() {
   switch (Tok.getKind()) {
   case tok::l_paren:
     return parsePatternTuple();
-    
+
   case tok::kw__:
     return makeParserResult(new (Context) AnyPattern(consumeToken(tok::kw__)));
-    
+
   case tok::identifier: {
     Identifier name;
     SourceLoc loc = consumeIdentifier(&name);
     bool isLet = InVarOrLetPattern != IVOLP_InVar;
     return makeParserResult(createBindingFromPattern(loc, name, isLet));
   }
-    
+
   case tok::code_complete:
     if (!CurDeclContext->isNominalTypeOrNominalTypeExtensionContext()) {
       // This cannot be an overridden property, so just eat the token. We cannot
@@ -776,11 +776,11 @@ ParserResult<Pattern> Parser::parsePattern() {
         diagnose(varLoc, diag::var_not_allowed_in_pattern, isLetKeyword)
         .fixItRemove(varLoc);
     }
-    
+
     // In our recursive parse, remember that we're in a var/let pattern.
     llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
     T(InVarOrLetPattern, isLetKeyword ? IVOLP_InLet : IVOLP_InVar);
-    
+
     ParserResult<Pattern> subPattern = parsePattern();
     if (subPattern.hasCodeCompletion())
       return makeParserCodeCompletionResult<Pattern>();
@@ -790,7 +790,7 @@ ParserResult<Pattern> Parser::parsePattern() {
       isLetKeyword || alwaysImmutable,
       subPattern.get()));
   }
-      
+
   default:
     if (Tok.isKeyword() &&
         (peekToken().is(tok::colon) || peekToken().is(tok::equal))) {
@@ -932,10 +932,10 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
     assert(Tok.isAny(tok::kw_let, tok::kw_var) && "expects var or let");
     bool isLet = Tok.is(tok::kw_let);
     SourceLoc varLoc = consumeToken();
-    
+
     return parseMatchingPatternAsLetOrVar(isLet, varLoc, isExprBasic);
   }
-  
+
   // matching-pattern ::= 'is' type
   if (Tok.is(tok::kw_is)) {
     SourceLoc isLoc = consumeToken(tok::kw_is);
@@ -955,13 +955,13 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
     return makeParserCodeCompletionStatus();
   if (subExpr.isNull())
     return nullptr;
-  
+
   // The most common case here is to parse something that was a lexically
   // obvious pattern, which will come back wrapped in an immediate
   // UnresolvedPatternExpr.  Transform this now to simplify later code.
   if (auto *UPE = dyn_cast<UnresolvedPatternExpr>(subExpr.get()))
     return makeParserResult(UPE->getSubPattern());
-  
+
   return makeParserResult(new (Context) ExprPattern(subExpr.get()));
 }
 
@@ -972,7 +972,7 @@ ParserResult<Pattern> Parser::parseMatchingPatternAsLetOrVar(bool isLet,
   if (InVarOrLetPattern == IVOLP_InLet ||
       InVarOrLetPattern == IVOLP_InVar)
     diagnose(varLoc, diag::var_pattern_in_var, unsigned(isLet));
-  
+
   // 'let' isn't valid inside an implicitly immutable context, but var is.
   if (isLet && InVarOrLetPattern == IVOLP_ImplicitlyImmutable)
     diagnose(varLoc, diag::let_pattern_in_immutable_context);
@@ -1040,7 +1040,7 @@ static bool canParsePatternTuple(Parser &P) {
 ///
 bool Parser::canParseTypedPattern() {
   if (!canParsePattern(*this)) return false;
-  
+
   if (consumeIf(tok::colon))
     return canParseType();
   return true;

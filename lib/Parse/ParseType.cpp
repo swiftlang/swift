@@ -208,7 +208,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     restoreParserPosition(beforeThrowsPos);
     return ty;
   }
-  
+
   // Only function types may be generic.
   if (generics) {
     auto brackets = generics->getSourceRange();
@@ -284,7 +284,7 @@ bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
 }
 
 /// parseTypeIdentifier
-///   
+///
 ///   type-identifier:
 ///     identifier generic-args? ('.' identifier generic-args?)*
 ///
@@ -383,7 +383,7 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
 }
 
 /// parseTypeComposition
-///   
+///
 ///   type-composition:
 ///     'protocol' '<' type-composition-list? '>'
 ///
@@ -392,14 +392,14 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
 ///
 ParserResult<ProtocolCompositionTypeRepr> Parser::parseTypeComposition() {
   SourceLoc ProtocolLoc = consumeToken(tok::kw_protocol);
- 
+
   // Check for the starting '<'.
   if (!startsWithLess(Tok)) {
     diagnose(Tok, diag::expected_langle_protocol);
     return nullptr;
   }
   SourceLoc LAngleLoc = consumeStartingLess();
-  
+
   // Check for empty protocol composition.
   if (startsWithGreater(Tok)) {
     SourceLoc RAngleLoc = consumeStartingGreater();
@@ -409,7 +409,7 @@ ParserResult<ProtocolCompositionTypeRepr> Parser::parseTypeComposition() {
                                              SourceRange(LAngleLoc,
                                                          RAngleLoc)));
   }
-  
+
   // Parse the type-composition-list.
   ParserStatus Status;
   SmallVector<IdentTypeRepr *, 4> Protocols;
@@ -420,7 +420,7 @@ ParserResult<ProtocolCompositionTypeRepr> Parser::parseTypeComposition() {
     if (Protocol.isNonNull())
       Protocols.push_back(Protocol.get());
   } while (consumeIf(tok::comma));
-  
+
   // Check for the terminating '>'.
   SourceLoc EndLoc = PreviousLoc;
   if (startsWithGreater(Tok)) {
@@ -491,7 +491,7 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
         type = makeParserResult(new (Context) InOutTypeRepr(type.get(),
                                                             InOutLoc));
 
-      
+
       ElementsR.push_back(
           new (Context) NamedTypeRepr(name, type.get(), nameLoc));
     } else {
@@ -560,7 +560,7 @@ ParserResult<TypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
   Parser::StructureMarkerRAII ParsingArrayBound(*this, Tok);
   SourceLoc lsquareLoc = consumeToken();
   ArrayTypeRepr *ATR = nullptr;
-  
+
   // Handle a postfix [] production, a common typo for a C-like array.
 
   // If we have something that might be an array size expression, parse it as
@@ -572,7 +572,7 @@ ParserResult<TypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
     if (sizeEx.isNull())
       return makeParserErrorResult(Base);
   }
-  
+
   SourceLoc rsquareLoc;
   if (parseMatchingToken(tok::r_square, rsquareLoc,
                          diag::expected_rbracket_array_type, lsquareLoc))
@@ -583,7 +583,7 @@ ParserResult<TypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
   diagnose(lsquareLoc, diag::new_array_syntax)
     .fixItInsert(Base->getStartLoc(), "[")
     .fixItRemove(lsquareLoc);
-  
+
   // Build a normal array slice type for recovery.
   ATR = new (Context) ArrayTypeRepr(Base,
                               SourceRange(Base->getStartLoc(), rsquareLoc));
@@ -614,7 +614,7 @@ ParserResult<TypeRepr> Parser::parseTypeCollection() {
   parseMatchingToken(tok::r_square, rsquareLoc,
                      colonLoc.isValid()
                        ? diag::expected_rbracket_dictionary_type
-                       : diag::expected_rbracket_array_type, 
+                       : diag::expected_rbracket_array_type,
                      lsquareLoc);
 
   // If we couldn't parse anything for one of the types, propagate the error.
@@ -629,7 +629,7 @@ ParserResult<TypeRepr> Parser::parseTypeCollection() {
                                                              secondTy.get(),
                                                              colonLoc,
                                                              brackets));
-    
+
   // Form the array type.
   return makeParserResult(firstTy,
                           new (Context) ArrayTypeRepr(firstTy.get(),
@@ -640,7 +640,7 @@ bool Parser::isOptionalToken(const Token &T) const {
   // A postfix '?' by itself is obviously optional.
   if (T.is(tok::question_postfix))
     return true;
-  
+
   // A postfix or bound infix operator token that begins with '?' can be
   // optional too. We'll munch off the '?', so long as it is left-bound with
   // the type (i.e., parsed as a postfix or unspaced binary operator).
@@ -715,7 +715,7 @@ static bool isGenericTypeDisambiguatingToken(Parser &P) {
   case tok::exclaim_postfix:
   case tok::question_postfix:
     return true;
-  
+
   case tok::oper_binary_unspaced:
   case tok::oper_binary_spaced:
   case tok::oper_postfix:
@@ -746,13 +746,13 @@ bool Parser::canParseGenericArguments() {
   if (!startsWithLess(Tok))
     return false;
   consumeStartingLess();
-  
+
   do {
     if (!canParseType())
       return false;
     // Parse the comma, if the list continues.
   } while (consumeIf(tok::comma));
-  
+
   if (!startsWithGreater(Tok)) {
     return false;
   } else {
@@ -800,7 +800,7 @@ bool Parser::canParseType() {
   default:
     return false;
   }
-  
+
   // '.Type', '.Protocol', '?', and '!' still leave us with type-simple.
   while (true) {
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
@@ -820,7 +820,7 @@ bool Parser::canParseType() {
     }
     break;
   }
-  
+
   // Handle type-function if we have an arrow or 'throws'/'rethrows' modifier.
   if (Tok.isAny(tok::kw_throws, tok::kw_rethrows)) {
     consumeToken();
@@ -829,7 +829,7 @@ bool Parser::canParseType() {
     if (!Tok.is(tok::arrow))
       return false;
   }
-  
+
   if (consumeIf(tok::arrow)) {
     if (!canParseType())
       return false;
@@ -842,7 +842,7 @@ bool Parser::canParseType() {
 bool Parser::canParseTypeIdentifier() {
   if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self))
     return false;
-  
+
   while (true) {
     switch (Tok.getKind()) {
     case tok::identifier:
@@ -851,7 +851,7 @@ bool Parser::canParseTypeIdentifier() {
     default:
       return false;
     }
-    
+
     if (startsWithLess(Tok)) {
       if (!canParseGenericArguments())
         return false;
@@ -871,39 +871,39 @@ bool Parser::canParseTypeIdentifier() {
 
 bool Parser::canParseTypeComposition() {
   consumeToken(tok::kw_protocol);
-  
+
   // Check for the starting '<'.
   if (!startsWithLess(Tok)) {
     return false;
   }
   consumeStartingLess();
-  
+
   // Check for empty protocol composition.
   if (startsWithGreater(Tok)) {
     consumeStartingGreater();
     return true;
   }
-  
+
   // Parse the type-composition-list.
   do {
     if (!canParseTypeIdentifier()) {
       return false;
     }
   } while (consumeIf(tok::comma));
-  
+
   // Check for the terminating '>'.
   if (!startsWithGreater(Tok)) {
     return false;
   }
   consumeStartingGreater();
-  
+
   return true;
 }
 
 bool Parser::canParseAttributes() {
   while (consumeIf(tok::at_sign)) {
     if (!consumeIf(tok::identifier)) return false;
-    
+
     if (consumeIf(tok::equal)) {
       if (Tok.isNot(tok::identifier) &&
           Tok.isNot(tok::integer_literal) &&
@@ -914,7 +914,7 @@ bool Parser::canParseAttributes() {
       // Attributes like cc(x,y,z)
       skipSingle();
     }
-    
+
     consumeIf(tok::comma);
   }
   return true;
@@ -951,13 +951,13 @@ bool Parser::canParseTypeTupleBody() {
 
         continue;
       }
-      
+
       // Otherwise, this has to be a type.
 
       // Parse attributes.
       if (!canParseAttributes())
         return false;
- 
+
       if (!canParseType())
         return false;
 
@@ -966,7 +966,7 @@ bool Parser::canParseTypeTupleBody() {
 
     } while (consumeIf(tok::comma));
   }
-  
+
   return consumeIf(tok::r_paren);
 }
 

@@ -29,16 +29,16 @@ ParameterList::create(const ASTContext &C, SourceLoc LParenLoc,
                       ArrayRef<ParamDecl*> params, SourceLoc RParenLoc) {
   assert(LParenLoc.isValid() == RParenLoc.isValid() &&
          "Either both paren locs are valid or neither are");
-  
+
   auto byteSize = sizeof(ParameterList)+params.size()*sizeof(ParamDecl*);
   auto rawMem = C.Allocate(byteSize, alignof(ParameterList));
-  
+
   //  Placement initialize the ParameterList and the Parameter's.
   auto PL = ::new (rawMem) ParameterList(LParenLoc, params.size(), RParenLoc);
 
   for (size_t i = 0, e = params.size(); i != e; ++i)
     ::new (&PL->get(i)) ParamDecl*(params[i]);
-  
+
   return PL;
 }
 
@@ -71,7 +71,7 @@ ParameterList *ParameterList::clone(const ASTContext &C,
   // If this list is empty, don't actually bother with a copy.
   if (size() == 0)
     return const_cast<ParameterList*>(this);
-  
+
   SmallVector<ParamDecl*, 8> params(begin(), end());
 
   // Remap the ParamDecls inside of the ParameterList.
@@ -85,14 +85,14 @@ ParameterList *ParameterList::clone(const ASTContext &C,
     // value for it.
     if (decl->getName().empty() && (options & Inherited))
       decl->setName(C.getIdentifier("argument"));
-    
+
     // If we're inheriting a default argument, mark it as such.
     if (decl->isDefaultArgument() && (options & Inherited)) {
       decl->setDefaultArgumentKind(DefaultArgumentKind::Inherited);
       decl->setDefaultValue(nullptr);
     }
   }
-  
+
   return create(C, params);
 }
 
@@ -101,18 +101,18 @@ ParameterList *ParameterList::clone(const ASTContext &C,
 Type ParameterList::getType(const ASTContext &C) const {
   if (size() == 0)
     return TupleType::getEmpty(C);
-  
+
   SmallVector<TupleTypeElt, 8> argumentInfo;
-  
+
   for (auto P : *this) {
     if (!P->hasType()) return Type();
-    
+
     argumentInfo.push_back({
       P->getType(), P->getArgumentName(),
       P->getDefaultArgumentKind(), P->isVariadic()
     });
   }
-  
+
   return TupleType::get(argumentInfo, C);
 }
 
@@ -124,7 +124,7 @@ Type ParameterList::getType(const ASTContext &C) const {
 Type ParameterList::getFullType(Type resultType, ArrayRef<ParameterList*> PLL) {
   auto result = resultType;
   auto &C = result->getASTContext();
-  
+
   for (auto PL : reversed(PLL)) {
     auto paramType = PL->getType(C);
     if (!paramType) return Type();
@@ -138,7 +138,7 @@ SourceRange ParameterList::getSourceRange() const {
   // If we have locations for the parens, then they define our range.
   if (LParenLoc.isValid())
     return { LParenLoc, RParenLoc };
-  
+
   // Otherwise, try the first and last parameter.
   if (size() != 0) {
     auto Start = get(0)->getStartLoc();

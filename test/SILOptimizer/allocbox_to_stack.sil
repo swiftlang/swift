@@ -72,7 +72,7 @@ bb1(%0 : $Int):
 // CHECK-DAG: [[TUPLE:%.*]] = alloc_stack $(Int, Int)
   %1 = alloc_box $TestStruct
   %a = alloc_box $(Int, Int)
-  
+
   %2 = struct_element_addr %1#1 : $*TestStruct, #TestStruct.Elt
   %3 = store %0 to %2 : $*Int
 
@@ -194,8 +194,8 @@ enum SomeUnion {
 
 
 
-sil @_TO1t9SomeUnion1yfMS0_FCS_9SomeClassS0_ : $@convention(thin) (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion 
-sil @_TC1t9SomeClassCfMS0_FT_S0_ : $@convention(thin) (@thick SomeClass.Type) -> @owned SomeClass 
+sil @_TO1t9SomeUnion1yfMS0_FCS_9SomeClassS0_ : $@convention(thin) (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion
+sil @_TC1t9SomeClassCfMS0_FT_S0_ : $@convention(thin) (@thick SomeClass.Type) -> @owned SomeClass
 
 // CHECK-LABEL: sil @union_test
 sil @union_test : $@convention(thin) () -> () {
@@ -298,7 +298,7 @@ bb1:
   %12 = load %3 : $*SomeClass
   strong_retain %12 : $SomeClass
   %14 = apply %11(%12) : $@convention(thin) (@owned SomeClass) -> ()
-  
+
   strong_release %2#0 : $@box SomeClass
   // CHECK: destroy_addr [[MUI]]
   br bb2

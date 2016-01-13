@@ -127,7 +127,7 @@ SILValue LSValue::reduce(LSLocation &Base, SILModule *M,
       removeLSLocations(Values, FirstLevel);
       continue;
     }
-    
+
     // If there are more than 1 children and all the children nodes have
     // LSValues with the same base and non-empty projection path. we can get
     // away by not extracting value for every single field.
@@ -142,7 +142,7 @@ SILValue LSValue::reduce(LSLocation &Base, SILModule *M,
       HasIdenticalValueBase &= (FirstBase == V.getBase());
     }
 
-    if (FirstLevel.size() > 1 && HasIdenticalValueBase && 
+    if (FirstLevel.size() > 1 && HasIdenticalValueBase &&
         !FirstVal.hasEmptyProjectionPath()) {
       Values[*I] = FirstVal.stripLastLevelProjection();
       // We have a value for the parent, remove all the values for children.
@@ -154,7 +154,7 @@ SILValue LSValue::reduce(LSLocation &Base, SILModule *M,
     //
     // 1. If there is only 1 child and we cannot strip off any projections,
     // that means we need to create an aggregation.
-    // 
+    //
     // 2. There are multiple children and they have the same base, but empty
     // projection paths.
     //
@@ -166,7 +166,7 @@ SILValue LSValue::reduce(LSLocation &Base, SILModule *M,
       Vals.push_back(Values[X].materialize(InsertPt));
     }
     SILBuilder Builder(InsertPt);
-    
+
     // We use an auto-generated SILLocation for now.
     // TODO: make the sil location more precise.
     NullablePtr<swift::SILInstruction> AI =
@@ -227,7 +227,7 @@ bool LSLocation::isNonEscapingLocalLSLocation(SILFunction *Fn,
   // An alloc_stack is definitely dead at the end of the function.
   if (isa<AllocStackInst>(Base))
     return true;
-  // For other allocations we ask escape analysis.		
+  // For other allocations we ask escape analysis.
   auto *ConGraph = EA->getConnectionGraph(Fn);
   if (isa<AllocationInst>(Base)) {
     auto *Node = ConGraph->getNodeOrNull(Base, EA);

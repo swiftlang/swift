@@ -24,7 +24,7 @@ tests.test("Range") {
 }
 
 tests.test("RangeGeneratorConformsToSequence") {
-  for x in (1..<2).generate() { 
+  for x in (1..<2).generate() {
     expectEqual(1, x)
   }
 }

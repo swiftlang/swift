@@ -57,7 +57,7 @@ public struct ChangeEmptyToNonEmpty {
 
 public struct ChangeEmptyToNonEmpty {
   public init() {
-    property = 0 
+    property = 0
   }
 
   public var property: Int

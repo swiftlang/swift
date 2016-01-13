@@ -2,7 +2,7 @@ public class Empty {}
 
 public class TwoInts {
   var x, y : Int
-  
+
   public init(a : Int, b : Int) {
     x = a
     y = b

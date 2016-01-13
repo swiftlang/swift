@@ -21,12 +21,12 @@ PrintTests.test("ClassPrintable") {
   let c1: ProtocolUnrelatedToPrinting = ClassPrintable(1)
   let c2: CustomStringConvertible = ClassPrintable(1)
   let c3: Any = ClassPrintable(1)
-  
+
   expectPrinted("►1◀︎", c0)
   expectPrinted("►1◀︎", c1)
   expectPrinted("►1◀︎", c2)
   expectPrinted("►1◀︎", c3)
-  
+
   let classMetatype = ClassPrintable.self
   expectPrinted("ClassPrintable", classMetatype)
   expectDebugPrinted("PrintTestTypes.ClassPrintable", classMetatype)
@@ -40,7 +40,7 @@ PrintTests.test("ClassVeryPrintable") {
   let c2: CustomStringConvertible = ClassVeryPrintable(1)
   let c3: CustomDebugStringConvertible = ClassVeryPrintable(1)
   let c4: Any = ClassVeryPrintable(1)
-  
+
   expectPrinted("<description: 1>", c0)
   expectPrinted("<description: 1>", c1)
   expectPrinted("<description: 1>", c2)

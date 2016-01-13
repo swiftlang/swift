@@ -141,7 +141,7 @@ static int swift_snprintf_l(char *Str, size_t StrSize, locale_t Locale,
 
 template <typename T>
 static uint64_t swift_floatingPointToString(char *Buffer, size_t BufferLength,
-                                            T Value, const char *Format, 
+                                            T Value, const char *Format,
                                             bool Debug) {
   if (BufferLength < 32)
     swift::crash("swift_floatingPointToString: insufficient buffer size");
@@ -150,7 +150,7 @@ static uint64_t swift_floatingPointToString(char *Buffer, size_t BufferLength,
   if (Debug) {
     Precision = std::numeric_limits<T>::max_digits10;
   }
-  
+
   // Pass a null locale to use the C locale.
   int i = swift_snprintf_l(Buffer, BufferLength, /*locale=*/nullptr, Format,
                            Precision, Value);
@@ -332,7 +332,7 @@ static const char *_swift_stdlib_strtoX_clocale_impl(
   }
   return EndPtr;
 }
-    
+
 extern "C" const char *_swift_stdlib_strtold_clocale(
   const char * nptr, void *outResult) {
   return _swift_stdlib_strtoX_clocale_impl(

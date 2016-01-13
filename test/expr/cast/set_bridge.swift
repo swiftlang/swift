@@ -2,7 +2,7 @@
 
 // REQUIRES: objc_interop
 
-class Root : Hashable { 
+class Root : Hashable {
   var hashValue: Int {
     return 0
   }
@@ -20,7 +20,7 @@ struct BridgedToObjC : Hashable, _ObjectiveCBridgeable {
   static func _isBridgedToObjectiveC() -> Bool {
     return true
   }
-  
+
   static func _getObjectiveCType() -> Any.Type {
     return ObjC.self
   }

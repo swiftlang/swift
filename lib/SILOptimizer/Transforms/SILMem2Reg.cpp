@@ -179,19 +179,19 @@ public:
 /// tuple address projections. Sets \p singleBlock to null if the load (or
 /// it's address is not in \p singleBlock.
 static bool isAddressForLoad(SILInstruction *I, SILBasicBlock *&singleBlock) {
-  
+
   if (isa<LoadInst>(I))
     return true;
 
   if (!isa<StructElementAddrInst>(I) && !isa<TupleElementAddrInst>(I))
     return false;
-  
+
   // Recursively search for other (non-)loads in the instruction's uses.
   for (auto UI : I->getUses()) {
     SILInstruction *II = UI->getUser();
     if (II->getParent() != singleBlock)
       singleBlock = nullptr;
-    
+
     if (!isAddressForLoad(II, singleBlock))
         return false;
   }
@@ -201,16 +201,16 @@ static bool isAddressForLoad(SILInstruction *I, SILBasicBlock *&singleBlock) {
 /// Returns true if this AllocStacks is captured.
 /// Sets \p inSingleBlock to true if all uses of \p ASI are in a single block.
 static bool isCaptured(AllocStackInst *ASI, bool &inSingleBlock) {
-  
+
   SILBasicBlock *singleBlock = ASI->getParent();
-  
+
   // For all users of the AllocStack instruction.
   for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E; ++UI) {
     SILInstruction *II = UI->getUser();
 
     if (II->getParent() != singleBlock)
       singleBlock = nullptr;
-    
+
     // Loads are okay.
     if (isAddressForLoad(II, singleBlock))
       continue;
@@ -290,13 +290,13 @@ promoteDebugValueAddr(DebugValueAddrInst *DVAI, SILValue Value, SILBuilder &B) {
 static bool isLoadFromStack(SILInstruction *I, AllocStackInst *ASI) {
   if (!isa<LoadInst>(I))
     return false;
-  
+
   // Skip struct and tuple address projections.
   ValueBase *op = I->getOperand(0).getDef();
   while (op != ASI) {
     if (!isa<StructElementAddrInst>(op) && !isa<TupleElementAddrInst>(op))
       return false;
-    
+
     op = cast<SILInstruction>(op)->getOperand(0).getDef();
   }
   return true;
@@ -310,7 +310,7 @@ static void collectLoads(SILInstruction *I, SmallVectorImpl<LoadInst *> &Loads) 
   }
   if (!isa<StructElementAddrInst>(I) && !isa<TupleElementAddrInst>(I))
     return;
-  
+
   // Recursively search for other loads in the instruction's uses.
   for (auto UI : I->getUses()) {
     collectLoads(UI->getUser(), Loads);
@@ -379,7 +379,7 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
         // If we are loading from the AllocStackInst and we already know the
         // content of the Alloca then use it.
         DEBUG(llvm::dbgs() << "*** Promoting load: " << *Inst);
-        
+
         replaceLoad(cast<LoadInst>(Inst), RunningVal, ASI);
         NumInstRemoved++;
       } else if (Inst->getOperand(0).getDef() == ASI) {
@@ -616,9 +616,9 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
       } else {
         Def = getLiveInValue(PhiBlocks, BB);
       }
-      
+
       DEBUG(llvm::dbgs() << "*** Replacing " << *LI << " with Def " << *Def);
-        
+
       // Replace the load with the definition that we found.
       replaceLoad(LI, Def, ASI);
       removedUser = true;

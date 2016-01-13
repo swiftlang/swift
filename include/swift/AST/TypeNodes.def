@@ -24,7 +24,7 @@
 ///   This type is always canonical.  The default behavior is TYPE(id, parent).
 
 /// BUILTIN_TYPE(id, parent)
-///   This type is a builtin type. The default behavior is 
+///   This type is a builtin type. The default behavior is
 ///   ALWAYS_CANONICAL_TYPE(id, parent).
 
 /// SUGARED_TYPE(id, parent)

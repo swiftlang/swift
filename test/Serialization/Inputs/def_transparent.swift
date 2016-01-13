@@ -59,15 +59,15 @@ public func do_switch(u u: MaybePair) {
 
 public struct Wrapper {
   public var value: Int32
-  
+
   @_transparent public init(Val: Int32) {
     value = Val
   }
-  
+
   @_transparent public func getValue() -> Int32 {
     return value
   }
-  
+
   public var valueAgain: Int32 {
     @_transparent
     get {

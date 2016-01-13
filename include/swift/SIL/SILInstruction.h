@@ -193,7 +193,7 @@ public:
                          [](const SILValue &Op1, const SILValue &Op2) -> bool {
                            return Op1 == Op2; });
   }
-  
+
   /// Returns true if the given instruction is completely identical to RHS,
   /// using \p opEqual to compare operands.
   ///
@@ -206,14 +206,14 @@ public:
         getNumTypes() != RHS->getNumTypes()) {
       return false;
     }
-    
+
     // Check types.
     //
     // Many instructions have only 1 type so it makes sense to check it first.
     for (unsigned i = 0, e = getNumTypes(); i != e; ++i)
       if (getType(i) != RHS->getType(i))
         return false;
-    
+
     // Check operands.
     for (unsigned i = 0, e = getNumOperands(); i != e; ++i)
       if (!opEqual(getOperand(i), RHS->getOperand(i)))
@@ -463,7 +463,7 @@ public:
 
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
-  
+
   /// getElementType - Get the type of the allocated memory (as opposed to the
   /// type of the instruction itself, which will be an address type).
   SILType getElementType() const {
@@ -605,7 +605,7 @@ public:
   CanType getFormalConcreteType() const {
     return ConcreteType;
   }
-  
+
   SILType getExistentialType() const {
     return getType(0);
   }
@@ -617,10 +617,10 @@ public:
   ArrayRef<ProtocolConformanceRef> getConformances() const {
     return Conformances;
   }
-  
+
   SILValue getExistentialResult() const { return SILValue(this, 0); }
   SILValue getValueAddressResult() const { return SILValue(this, 1); }
-  
+
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }
 
@@ -693,9 +693,9 @@ protected:
   }
 
   void setNonThrowing(bool isNonThrowing) { NonThrowing = isNonThrowing; }
-  
+
   bool isNonThrowingApply() const { return NonThrowing; }
-  
+
 public:
   /// The operand number of the first argument.
   static unsigned getArgumentOperandNumber() { return 1; }
@@ -928,7 +928,7 @@ public:
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::ApplyInst;
   }
-  
+
   /// Returns true if the called function has an error result but is not actually
   /// throwing an error.
   bool isNonThrowing() const {
@@ -1028,14 +1028,14 @@ class BuiltinInst : public SILInstruction {
 
   /// The name of the builtin to invoke.
   Identifier Name;
-  
+
   /// The number of tail-allocated substitutions, allocated after the operand
   /// list's tail allocation.
   unsigned NumSubstitutions;
-  
+
   /// The value arguments to the builtin.
   TailAllocatedOperandList<0> Operands;
-  
+
   Substitution *getSubstitutionsStorage() {
     return reinterpret_cast<Substitution*>(Operands.asArray().end());
   }
@@ -1055,7 +1055,7 @@ public:
   /// Return the name of the builtin operation.
   Identifier getName() const { return Name; }
   void setName(Identifier I) { Name = I; }
-  
+
   /// Currently all builtins have one result, so getType() is OK.
   /// We may want to change that eventually.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
@@ -1066,7 +1066,7 @@ public:
   /// intrinsic. The particular intrinsic functions which correspond to the
   /// returned value are defined in llvm/Intrinsics.h.
   const IntrinsicInfo &getIntrinsicInfo() const;
-  
+
   /// \brief Looks up the lazily cached identification for the builtin function.
   const BuiltinInfo &getBuiltinInfo() const;
 
@@ -1102,7 +1102,7 @@ public:
   MutableArrayRef<Substitution> getSubstitutions() {
     return {getSubstitutionsStorage(), NumSubstitutions};
   }
-  
+
   /// The arguments to the builtin.
   ArrayRef<Operand> getAllOperands() const {
     return Operands.asArray();
@@ -1115,12 +1115,12 @@ public:
   OperandValueArrayRef getArguments() const {
     return Operands.asValueArray();
   }
-  
+
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::BuiltinInst;
   }
 };
-  
+
 /// Initializes a SIL global variable. Only valid once, before any
 /// usages of the global via GlobalAddrInst.
 class AllocGlobalInst : public SILInstruction {
@@ -1139,7 +1139,7 @@ public:
 
   /// Return the referenced global variable.
   SILGlobalVariable *getReferencedGlobal() const { return Global; }
-  
+
   void setReferencedGlobal(SILGlobalVariable *v) { Global = v; }
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
@@ -1154,7 +1154,7 @@ public:
 /// AllocGlobalInst.
 class GlobalAddrInst : public LiteralInst {
   friend class SILBuilder;
-  
+
   SILGlobalVariable *Global;
 
   GlobalAddrInst(SILDebugLocation *DebugLoc, SILGlobalVariable *Global);
@@ -1165,10 +1165,10 @@ public:
 
   /// Create a placeholder instruction with an unset global reference.
   GlobalAddrInst(SILDebugLocation *DebugLoc, SILType Ty);
-  
+
   /// Return the referenced global variable.
   SILGlobalVariable *getReferencedGlobal() const { return Global; }
-  
+
   void setReferencedGlobal(SILGlobalVariable *v) { Global = v; }
 
   /// getType() is ok since this is known to only have one type.
@@ -1690,7 +1690,7 @@ public:
   /// first operand. Some instructions may take additional operands that do not
   /// affect the reference identity.
   SILValue getConverted() const { return getOperand(0); }
-  
+
   static bool classof(const ValueBase *V) {
     return V->getKind() >= ValueKind::First_ConversionInst &&
       V->getKind() <= ValueKind::Last_ConversionInst;
@@ -1841,7 +1841,7 @@ class UncheckedTrivialBitCastInst
                               SILType Ty)
       : UnaryInstructionBase(DebugLoc, Operand, Ty) {}
 };
-  
+
 /// Bitwise copy a value into another value of the same size or smaller.
 class UncheckedBitwiseCastInst
   : public UnaryInstructionBase<ValueKind::UncheckedBitwiseCastInst,
@@ -1867,12 +1867,12 @@ class RefToBridgeObjectInst : public ConversionInst {
         Operands(this, ConvertedValue, MaskValue) {}
 
 public:
-  
+
   SILValue getBitsOperand() const { return Operands[1].get(); }
-  
+
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
-  
+
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::RefToBridgeObjectInst;
   }
@@ -1921,7 +1921,7 @@ class RawPointerToRefInst
   RawPointerToRefInst(SILDebugLocation *DebugLoc, SILValue Operand, SILType Ty)
       : UnaryInstructionBase(DebugLoc, Operand, Ty) {}
 };
-  
+
 /// RefToUnownedInst - Given a value of a reference type,
 /// convert it to an unowned reference.
 ///
@@ -2077,7 +2077,7 @@ class IsNonnullInst : public UnaryInstructionBase<ValueKind::IsNonnullInst> {
   IsNonnullInst(SILDebugLocation *DebugLoc, SILValue Operand, SILType BoolTy)
       : UnaryInstructionBase(DebugLoc, Operand, BoolTy) {}
 };
-  
+
 
 /// Perform an unconditional checked cast that aborts if the cast fails.
 class UnconditionalCheckedCastInst
@@ -2575,7 +2575,7 @@ class SelectEnumInstBase
   // Tail-allocated after the operands is an array of `NumCases`
   // EnumElementDecl* pointers, referencing the case discriminators for each
   // operand.
-  
+
   EnumElementDecl **getCaseBuf() {
     return reinterpret_cast<EnumElementDecl**>(Operands.asArray().end());
   }
@@ -2598,13 +2598,13 @@ protected:
 
 public:
   SILValue getEnumOperand() const { return getOperand(); }
-  
+
   std::pair<EnumElementDecl*, SILValue>
   getCase(unsigned i) const {
     assert(i < NumCases && "case out of bounds");
     return std::make_pair(getCaseBuf()[i], Operands[i+1].get());
   }
-  
+
   /// Return the value that will be used as the result for the specified enum
   /// case.
   SILValue getCaseResult(EnumElementDecl *D) {
@@ -2616,7 +2616,7 @@ public:
     // didn't find anything.
     return getDefaultResult();
   }
-  
+
   /// \brief If the default refers to exactly one case decl, return it.
   NullablePtr<EnumElementDecl> getUniqueCaseForDefault();
 
@@ -2633,7 +2633,7 @@ public:
   /// not to need this.
   NullablePtr<EnumElementDecl> getSingleTrueElement() const;
 };
-  
+
 /// Select one of a set of values based on the case of an enum.
 class SelectEnumInst : public SelectEnumInstBase {
   friend class SILBuilder;
@@ -3131,7 +3131,7 @@ public:
   ArrayRef<ProtocolConformanceRef> getConformances() const {
     return Conformances;
   }
-  
+
   CanType getFormalConcreteType() const {
     return ConcreteType;
   }
@@ -3481,7 +3481,7 @@ private:
 public:
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
-  
+
   SILValue getInstance() const { return getOperand(0); }
   SILValue getMetatype() const { return getOperand(1); }
 
@@ -4317,7 +4317,7 @@ public:
   bool isErrorSuccessorRef(SILSuccessor *successor) const {
     assert(successor == &DestBBs[0] || successor == &DestBBs[1]);
     return successor == &DestBBs[1];
-  }  
+  }
 
   SILBasicBlock *getNormalBB() { return DestBBs[NormalIdx]; }
   const SILBasicBlock *getNormalBB() const { return DestBBs[NormalIdx]; }

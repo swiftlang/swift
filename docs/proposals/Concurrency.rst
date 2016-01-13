@@ -286,7 +286,7 @@ Streams are the only legitimate channel of communication between threads.
 
 Streams can be shared by multiple tasks. These tasks can read from and write into the stream
 concurrently. Reads from streams that contain no data and writes into full streams
-will be blocked, meaning that the operating system will put the calling thread to sleep and wait for 
+will be blocked, meaning that the operating system will put the calling thread to sleep and wait for
 new data to arrive to wake the sleeping thread.
 This property allows the Stream to be used as a synchronization mechanism.
 
@@ -642,11 +642,11 @@ length in the previous sections).
 
 The ``accept`` method is executed by a user-space scheduler and not by live
 thread and this allows the system to scale to tens of thousands of active
-actors. 
+actors.
 
 The code below depicts the famous prime numbers sieve program using actors. The
 sieve is made of a long chain of actors that pass messages to one another.
-Finally, a collector actor saves all of the messages into an array. 
+Finally, a collector actor saves all of the messages into an array.
 
 .. code-block:: swift
 

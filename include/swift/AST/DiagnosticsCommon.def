@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 //  This file defines diagnostics that can be emitted across the whole compiler.
-//  Each diagnostic is described using one of three kinds (error, warning, or 
+//  Each diagnostic is described using one of three kinds (error, warning, or
 //  note) along with a unique identifier, category, options, and text, and is
 //  followed by a signature describing the diagnostic argument kinds.
 //
@@ -47,7 +47,7 @@ ERROR(error_opening_output,common,none,
 
 
 NOTE(previous_decldef,common,none,
-     "previous %select{declaration|definition}0 of %1 is here", 
+     "previous %select{declaration|definition}0 of %1 is here",
      (bool, Identifier))
 
 

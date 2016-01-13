@@ -15,7 +15,7 @@ class ActionViewController
 // CHECK: load {{.*}}selector
 // CHECK:; <label>{{.*}}  ; preds = %{{[0-9]+}}
 // CHECK: @swift_allocObject({{.*}}, !dbg ![[DBG:[0-9]+]]
-// Test that the location is reset at the entry of a new basic block.        
+// Test that the location is reset at the entry of a new basic block.
 // CHECK: ![[DBG]] = {{.*}}line: 0
         if itemProvider.hasItemConformingToTypeIdentifier("") {
           weak var weakImageView = self.imageView

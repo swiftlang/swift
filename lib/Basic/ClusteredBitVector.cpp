@@ -104,7 +104,7 @@ void ClusteredBitVector::appendReserved(size_t numBits,
 
     // The extra bits in data[chunkIndex] are guaranteed to be zero.
     *nextChunk++ |= (getMoreBits(claimedBits) << offset);
-    
+
     numBits -= claimedBits;
     if (numBits == 0) return;
   }

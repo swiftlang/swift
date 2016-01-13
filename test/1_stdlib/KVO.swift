@@ -7,7 +7,7 @@ import Foundation
 
 struct Guts {
   var internalValue = 42
-  var value: Int { 
+  var value: Int {
     get {
       return internalValue
     }
@@ -33,7 +33,7 @@ class Target : NSString {
     super.init(coder: aDecoder)
   }
 
-  func print() { 
+  func print() {
     Swift.print("swiftValue \(self.swiftValue.value), objcValue \(objcValue)")
   }
 }
@@ -93,7 +93,7 @@ class ObserverKVO : NSObject {
        options: [.New, .Old],
        context: &kvoContext)
   }
-  
+
   func removeTarget() {
     self.target!.removeObserver(self, forKeyPath:"objcValue",
                                       context: &kvoContext)

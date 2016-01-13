@@ -16,22 +16,22 @@ func FunctionWithInnerStruct() -> Int {
   let b = 0  // expected-note {{'b' declared here}}
   struct c {  // expected-note {{type declared here}}
     var a = b  // expected-error {{struct declaration cannot close over value 'b' defined in outer scope}}
-    
+
     init() {}
   }
-  
+
   func f() { _ = b }
 }
 
 struct StructWithInnerStruct {
   let ivar = 42
   func f() { _ = ivar }
-  
+
   func a() -> Int {  // expected-note 2 {{'self' declared here}}
     struct c {      // expected-note 2 {{type declared here}}
       var x = ivar  // expected-error {{struct declaration cannot close over value 'self' defined in outer scope}}
       var y = self.ivar // expected-error {{struct declaration cannot close over value 'self' defined in outer scope}}
-      
+
       init() {}
     }
   }

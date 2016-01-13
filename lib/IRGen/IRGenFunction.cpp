@@ -140,7 +140,7 @@ void IRGenFunction::emitAllocBoxCall(llvm::Value *typeMetadata,
   auto attrs = llvm::AttributeSet::get(IGM.LLVMContext,
                                        llvm::AttributeSet::FunctionIndex,
                                        llvm::Attribute::NoUnwind);
-  
+
   llvm::CallInst *call =
     Builder.CreateCall(IGM.getAllocBoxFn(), typeMetadata);
   call->setCallingConv(IGM.RuntimeCC);
@@ -211,7 +211,7 @@ void IRGenFunction::emitFakeExplosion(const TypeInfo &type,
     } else {
       elementType = element.getScalarType();
     }
-    
+
     explosion.add(llvm::UndefValue::get(elementType));
   }
 }

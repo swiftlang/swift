@@ -616,7 +616,7 @@ StringTests.test("stringCoreExtensibility") {
   for k in 0..<3 {
     for length in 1..<16 {
       for boundary in 0..<length {
-        
+
         var x = (
             k == 0 ? asciiString("b".characters)
           : k == 1 ? ("b" as NSString as String)
@@ -624,14 +624,14 @@ StringTests.test("stringCoreExtensibility") {
         )._core
 
         if k == 0 { expectEqual(1, x.elementWidth) }
-        
+
         for i in 0..<length {
           x.appendContentsOf(
             Repeat(count: 3, repeatedValue: i < boundary ? ascii : nonAscii))
         }
         // Make sure we can append pure ASCII to wide storage
         x.appendContentsOf(Repeat(count: 2, repeatedValue: ascii))
-        
+
         expectEqualSequence(
           [UTF16.CodeUnit(UnicodeScalar("b").value)]
           + Array(Repeat(count: 3*boundary, repeatedValue: ascii))
@@ -661,14 +661,14 @@ StringTests.test("stringCoreReserve") {
       fatalError("case unhandled!")
     }
     expectEqual(!base._core.hasCocoaBuffer, startedNative)
-    
+
     var originalBuffer = base.bufferID
     let startedUnique = startedNative && base._core._owner != nil
       && isUniquelyReferencedNonObjC(&base._core._owner!)
-    
+
     base._core.reserveCapacity(0)
     // Now it's unique
-    
+
     // If it was already native and unique, no reallocation
     if startedUnique && startedNative {
       expectEqual(originalBuffer, base.bufferID)
@@ -731,7 +731,7 @@ StringTests.test("StringCoreReplace") {
 StringTests.test("CharacterViewReplace") {
   let narrow = "01234567890"
   let wide = "ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩⅪ"
-  
+
   for s1 in [narrow, wide] {
     for s2 in [narrow, wide] {
       checkRangeReplaceable(
@@ -898,7 +898,7 @@ StringTests.test(
   "forall x: Int8, y: Int8 . x < 128 ==> x <ascii y == x <unicode y") {
   let asciiDomain = (0..<128).map({ String(UnicodeScalar($0)) })
   expectEqualMethodsForDomain(
-    asciiDomain, asciiDomain, 
+    asciiDomain, asciiDomain,
     String._compareDeterministicUnicodeCollation, String._compareASCII)
 }
 
@@ -993,7 +993,7 @@ StringTests.test("unicodeViews") {
       winter.utf8[
         winter.utf8.startIndex..<winter.utf8.startIndex.successor().successor()
       ]))
-  
+
   expectEqual(
     "\u{1F3C2}", String(
       winter.utf8[winter.utf8.startIndex..<winter.utf8.startIndex.advancedBy(4)]))
@@ -1003,7 +1003,7 @@ StringTests.test("unicodeViews") {
       winter.utf16[
         winter.utf16.startIndex..<winter.utf16.startIndex.advancedBy(2)
       ]))
-  
+
   expectEqual(
     "\u{1F3C2}", String(
       winter.unicodeScalars[
@@ -1017,13 +1017,13 @@ StringTests.test("unicodeViews") {
       winter.utf8[
         winter.utf8.startIndex..<winter.utf8.startIndex.advancedBy(7)
       ]))
-  
+
   expectEqual(
     winter, String(
       winter.utf16[
         winter.utf16.startIndex..<winter.utf16.startIndex.advancedBy(3)
       ]))
-  
+
   expectEqual(
     winter, String(
       winter.unicodeScalars[
@@ -1048,7 +1048,7 @@ StringTests.test("indexConversion") {
   let s = "go further into the larder to barter."
 
   var matches: [String] = []
-  
+
   re.enumerateMatchesInString(
     s, options: NSMatchingOptions(), range: NSRange(0..<s.utf16.count)
   ) {

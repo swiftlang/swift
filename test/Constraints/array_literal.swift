@@ -77,7 +77,7 @@ struct MyArray : ArrayLiteralConvertible {
   typealias Element = Double
 
   init(arrayLiteral elements: Double...) {
-    
+
   }
 }
 

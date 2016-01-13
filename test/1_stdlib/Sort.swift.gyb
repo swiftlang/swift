@@ -145,7 +145,7 @@ Algorithm.test("sort/CollectionsWithUnusualIndices") {
   offsetAry = OffsetCollection(ary, offset: Int.min, forward: true)
   offsetAry.sortInPlace(${comparePredicate})
   expectSortedCollection(offsetAry.toArray(), ary)
-  
+
 }
 
 Algorithm.test("partition/CrashOnSingleElement") {

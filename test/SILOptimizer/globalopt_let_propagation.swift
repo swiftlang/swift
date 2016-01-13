@@ -13,7 +13,7 @@ let S = "String1"
 let VOLUME1 = I * J
 let VOLUME2 = J * 2
 let VOLUME3 = I + 10
- 
+
 
 
 struct IntWrapper1 {
@@ -51,11 +51,11 @@ struct B {
  static let PI = 3.1415
 
  static let ONE = 1.000
- 
+
  static let I = 100
- 
+
  static let J = 200
- 
+
  static let S1 = "String3"
 
  static let VOLUME1 = I * J
@@ -63,12 +63,12 @@ struct B {
  static let VOLUME2 = J * 2
 
  static let VOLUME3 = I + 10
- 
- static var PROP1: Double { 
+
+ static var PROP1: Double {
    return PI
  }
- 
- static var PROP2: Int { 
+
+ static var PROP2: Int {
    return I * J - I
  }
 
@@ -88,11 +88,11 @@ class C {
  static let PI = 3.1415
 
  static let ONE = 1.000
- 
+
  static let I = 100
- 
+
  static let J = 200
- 
+
  static let S1 = "String3"
 
  static let VOLUME1 = I * J
@@ -100,12 +100,12 @@ class C {
  static let VOLUME2 = J * 2
 
  static let VOLUME3 = I + 10
- 
- static var PROP1: Double { 
+
+ static var PROP1: Double {
    return PI
  }
- 
- static var PROP2: Int { 
+
+ static var PROP2: Int {
    return I * J - I
  }
 
@@ -265,11 +265,11 @@ public func test_static_class_let_int_complex() -> Int {
 // CHECK-NEXT: load
 @inline(never)
 public func test_var_double() -> Double {
-  return VPI + 1.0 
+  return VPI + 1.0
 }
 
 // CHECK-LABEL: sil [noinline] @_TF25globalopt_let_propagation12test_var_intFT_Si
-// CHECK: bb0: 
+// CHECK: bb0:
 // CHECK-NEXT: global_addr
 // CHECK-NEXT: struct_element_addr
 // CHECK-NEXT: load

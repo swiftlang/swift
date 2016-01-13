@@ -381,7 +381,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     auto rhsMangledName = mangleTypeAsContext(rhs->first.first);
     return lhsMangledName.compare(rhsMangledName);
   });
-  
+
   for (auto &entry : sortedMembers) {
     assert(entry.first.first != nullptr);
     if (entry.first.first->hasAccessibility() &&

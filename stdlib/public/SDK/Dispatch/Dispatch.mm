@@ -13,7 +13,7 @@
 #include <dispatch/dispatch.h>
 
 __attribute__((visibility("hidden")))
-extern "C" dispatch_queue_attr_t 
+extern "C" dispatch_queue_attr_t
 _swift_dispatch_queue_concurrent(void) {
   return DISPATCH_QUEUE_CONCURRENT;
 }

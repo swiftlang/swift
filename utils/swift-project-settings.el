@@ -11,7 +11,7 @@
 ;===----------------------------------------------------------------------===;
 ;
 ;  Emacs-lisp support for automatically formatting things according to this
-;  project's conventions.  To prevent this file from being automatically 
+;  project's conventions.  To prevent this file from being automatically
 ;  loaded, add (provide 'swift-project-settings) to your .emacs
 ;
 ;===----------------------------------------------------------------------===;
@@ -146,13 +146,13 @@ Swift header should look like.
   " "
   ;; v3 is t if there was a short description
   '(setq v3 (> (length str) 0))
-  
+
   ;; Generate dashes to fill out the rest of the top line
   (make-string (max (- 65 (+ (if v3 (+ 3 (length str)) 0) (length v2))) 3) ?-)
   "===" v1 "\n"
 
   ;; Use whatever comment character is usual for the current mode in place of "//"
-  (replace-regexp-in-string "//" v1 
+  (replace-regexp-in-string "//" v1
 "//
 // This source file is part of the Swift.org open source project
 //
@@ -167,7 +167,7 @@ Swift header should look like.
   ;; if there was a short description, add a section for a longer
   ;; description and leave the cursor there
   (when v3
-    (replace-regexp-in-string "//" v1 
+    (replace-regexp-in-string "//" v1
 "//
 //  "))
   (when v3 '_)
@@ -193,23 +193,23 @@ Swift header should look like.
   ;; When there's no comment syntax defined, we use "//"; precedent is
   ;; in the project's README file.
   '(setq v1 (replace-regexp-in-string " +\\'" "" (or comment-start "//")))
-  
+
   ;; v2 is either comment-end stripped of leading whitespace, or if it
   ;; is non-empty, v1 all over again
   '(setq v2
          (replace-regexp-in-string "\\` +" ""
           (if (and comment-end (> (length comment-end) 0)) comment-end  v1)))
-  
+
   v1 "===--- "
   str & " " | -1
   '(setq v3 (length str))
-  
+
   ;; Generate dashes to fill out the rest of the top line
   (make-string
    (max 3
         (- 77 (current-column) (length v2)))
    ?-)
-  
+
   "===" v2
   )
 
@@ -248,7 +248,7 @@ takes precedence for files in the Swift project"
 (push `(swift-stdlibunittest-stackframe "^\\(?:\\(?:out\\|err\\)>>> *\\)#[0-9]+: \\(.+\\):\\([0-9]+\\)\\(?: +.*\\)?$"
               1 2 ,(not :column) ,(not :just-a-warning))
       compilation-error-regexp-alist-alist)
-    
+
 (push 'swift-stdlibunittest-failure compilation-error-regexp-alist)
 (push `(swift-stdlibunittest-failure "^\\(?:out\\|err\\)>>> check failed at \\([^,]*\\), line \\([0-9]+\\)$"
               1 2 ,(not :column) ,(not :just-a-warning))

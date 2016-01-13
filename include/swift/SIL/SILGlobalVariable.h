@@ -31,7 +31,7 @@ class SILFunction;
 class SILInstruction;
 class SILModule;
 class VarDecl;
-  
+
 /// A global variable that has been referenced in SIL.
 class SILGlobalVariable
   : public llvm::ilist_node<SILGlobalVariable>,
@@ -43,14 +43,14 @@ private:
 
   /// The SIL module that the global variable belongs to.
   SILModule &Module;
-  
+
   /// The mangled name of the variable, which will be propagated to the
   /// binary.  A pointer into the module's lookup table.
   StringRef Name;
 
   /// The lowered type of the variable.
   SILType LoweredType;
-  
+
   /// The SIL location of the variable, which provides a link back to the AST.
   /// The variable only gets a location after it's been emitted.
   Optional<SILLocation> Location;
@@ -62,7 +62,7 @@ private:
   /// Fragile means that the variable can be "inlined" into another module.
   /// Currently this flag is set for all global variables in the stdlib.
   unsigned Fragile : 1;
-  
+
   /// Whether this is a 'let' property, which can only be initialized
   /// once (either in its declaration, or once later), making it immutable.
   unsigned IsLet : 1;
@@ -79,7 +79,7 @@ private:
   SILGlobalVariable(SILModule &M, SILLinkage linkage, bool IsFragile,
                     StringRef mangledName, SILType loweredType,
                     Optional<SILLocation> loc, VarDecl *decl);
-  
+
 public:
   static SILGlobalVariable *create(SILModule &Module, SILLinkage Linkage,
                                    bool IsFragile,
@@ -95,9 +95,9 @@ public:
   CanSILFunctionType getLoweredFunctionType() const {
     return LoweredType.castTo<SILFunctionType>();
   }
-    
+
   StringRef getName() const { return Name; }
-  
+
   void setDeclaration(bool isD) { IsDeclaration = isD; }
 
   /// True if this is a definition of the variable.
@@ -110,7 +110,7 @@ public:
   /// Get this global variable's fragile attribute.
   bool isFragile() const { return Fragile != 0; }
   void setFragile(bool isFrag) { Fragile = isFrag ? 1 : 0; }
-  
+
   /// Is this an immutable 'let' property?
   bool isLet() const { return IsLet; }
   void setLet(bool isLet) { IsLet = isLet; }
@@ -151,7 +151,7 @@ public:
   /// verify - Run the IR verifier to make sure that the variable follows
   /// invariants.
   void verify() const;
-  
+
   /// Pretty-print the variable.
   void dump(bool Verbose) const;
   void dump() const LLVM_ATTRIBUTE_USED { dump(false); }
@@ -161,14 +161,14 @@ public:
   ///
   /// \param Verbose In verbose mode, print the SIL locations.
   void print(raw_ostream &OS, bool Verbose = false) const;
-  
+
   /// Pretty-print the variable name using SIL syntax,
   /// '@var_mangled_name'.
   void printName(raw_ostream &OS) const;
-  
+
   ASTContext &getASTContext() const;
 };
-  
+
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
                                      const SILGlobalVariable &F) {
   F.print(OS);
@@ -203,7 +203,7 @@ public:
   }
   static void noteHead(SILGlobalVariable*, SILGlobalVariable*) {}
   static void deleteNode(SILGlobalVariable *V) {}
-  
+
 private:
   void createNode(const SILGlobalVariable &);
 };

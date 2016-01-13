@@ -529,7 +529,7 @@ static void addParameters(ArrayRef<Identifier> &ArgNames,
         TypeRange = InOutTyR->getBase()->getSourceRange();
       if (TypeRange.isInvalid())
         continue;
-      
+
       unsigned StartOffs = SM.getLocOffsetInBuffer(TypeRange.Start, BufferID);
       unsigned EndOffs =
         SM.getLocOffsetInBuffer(Lexer::getLocForEndOfToken(SM, TypeRange.End),
@@ -697,7 +697,7 @@ static bool reportModuleDocInfo(CompilerInvocation Invocation,
   if (makeParserAST(ParseCI, IFaceInfo.Text))
     return true;
   addParameterEntities(ParseCI, IFaceInfo);
-  
+
   Consumer.handleSourceText(IFaceInfo.Text);
   reportDocEntities(Ctx, IFaceInfo.TopEntities, Consumer);
   reportSourceAnnotations(IFaceInfo, ParseCI, Consumer);

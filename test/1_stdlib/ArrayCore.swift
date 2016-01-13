@@ -28,7 +28,7 @@ final class Tracked : ForwardIndexType, CustomStringConvertible {
     serialNumber = nextTrackedSerialNumber
     self.value = value
   }
-  
+
   deinit {
     assert(serialNumber > 0, "double destruction!")
     trackedCount -= 1
@@ -68,12 +68,12 @@ struct MrMcRange : CollectionType {
   func generate() -> IndexingGenerator<MrMcRange> {
     return IndexingGenerator(self)
   }
-  
+
   var startIndex: Int {
     print("using collection API")
     return base.startIndex
   }
-  
+
   var endIndex: Int {
     return base.endIndex
   }
@@ -81,7 +81,7 @@ struct MrMcRange : CollectionType {
   subscript(i: Int) -> Tracked {
     return Tracked(i)
   }
-  
+
   var base: Base
 }
 

@@ -82,7 +82,7 @@ class MetadataPath {
     explicit Component(unsigned primary, unsigned secondary)
         : Primary(primary), Secondary(secondary) {}
   public:
-    explicit Component(Kind kind) 
+    explicit Component(Kind kind)
         : Primary(unsigned(kind)), Secondary(0) {
       assert(!hasPrimaryIndex(kind));
     }

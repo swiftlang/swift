@@ -61,7 +61,7 @@ public:
       return *SF->getParentModule();
     return *SFOrMod.get<Module*>();
   }
-  
+
   ArrayRef<FileUnit *> getFiles() const {
     return SFOrMod.is<SourceFile*>() ? *SFOrMod.getAddrOfPtr1()
                                      : SFOrMod.get<Module*>()->getFiles();
@@ -870,7 +870,7 @@ void IndexSwiftASTWalker::getRecursiveModuleImports(Module &Mod,
         auto Files = M->getFiles();
         std::for_each(Files.begin(), Files.end(), [&](FileUnit *FU) {
           Info += "  file unit: ";
-          
+
           switch (FU->getKind()) {
           case FileUnitKind::Builtin:
             Info += "builtin";

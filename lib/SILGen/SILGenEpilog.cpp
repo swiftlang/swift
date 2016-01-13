@@ -105,7 +105,7 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
     } else {
       returnLoc = ImplicitReturnFromTopLevel;
     }
-    
+
     // Kill the branch to the now-dead epilog BB.
     pred->erase(predBranch);
 
@@ -132,7 +132,7 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
     // If we are falling through from the current block, the return is implicit.
     B.emitBlock(epilogBB, ImplicitReturnFromTopLevel);
   }
-  
+
   // Emit top-level cleanups into the epilog block.
   assert(!Cleanups.hasAnyActiveCleanups(getCleanupsDepth(),
                                         ReturnDest.getDepth()) &&
@@ -158,7 +158,7 @@ emitEpilog(SILLocation TopLevel, bool UsesCustomEpilog) {
   std::tie(maybeReturnValue, returnLoc) = emitEpilogBB(TopLevel);
 
   SILBasicBlock *ResultBB = nullptr;
-  
+
   if (!maybeReturnValue) {
     // Nothing to do.
   } else if (UsesCustomEpilog) {
@@ -177,12 +177,12 @@ emitEpilog(SILLocation TopLevel, bool UsesCustomEpilog) {
 
     B.createReturn(returnLoc, returnValue);
   }
-  
+
   emitRethrowEpilog(TopLevel);
-  
+
   if (ResultBB)
     B.setInsertionPoint(ResultBB);
-  
+
   return returnLoc;
 }
 

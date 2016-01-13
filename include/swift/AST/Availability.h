@@ -38,7 +38,7 @@ class VersionRange {
   //    x.y.x: all versions greater than or equal to x.y.z
 
   enum class ExtremalRange { Empty, All };
-  
+
   // A version range is either an extremal value (Empty, All) or
   // a single version tuple value representing the lower end point x.y.z of a
   // range [x.y.z, +Inf).
@@ -46,7 +46,7 @@ class VersionRange {
     clang::VersionTuple LowerEndpoint;
     ExtremalRange ExtremalValue;
   };
-  
+
   unsigned HasLowerEndpoint : 1;
 
 public:
@@ -85,7 +85,7 @@ public:
   bool isContainedIn(const VersionRange &Other) const {
     if (isEmpty() || Other.isAll())
       return true;
-    
+
     if (isAll() || Other.isEmpty())
       return false;
 

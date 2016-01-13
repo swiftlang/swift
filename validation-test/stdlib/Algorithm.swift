@@ -55,7 +55,7 @@ Algorithm.test("min,max") {
   expectEqual(a1.identity, min(a1, a2, b1).identity)
   expectEqual(a1.identity, min(a1, b1, a2).identity)
   expectEqual(a1.identity, min(b1, a1, a2).identity)
- 
+
   // 3-arg max()
   expectEqual(c1.identity, max(c1, b1, a1).identity)
   expectEqual(c1.identity, max(a1, c1, b1).identity)
@@ -65,13 +65,13 @@ Algorithm.test("min,max") {
   expectEqual(c1.identity, max(c2, c1, b1).identity)
   expectEqual(c1.identity, max(c2, b1, c1).identity)
   expectEqual(c1.identity, max(b1, c2, c1).identity)
-  
+
   // 4-arg min()
   expectEqual(a1.identity, min(a1, b1, a2, b2).identity)
   expectEqual(a1.identity, min(b1, a1, a2, b2).identity)
   expectEqual(a1.identity, min(c1, b1, b2, a1).identity)
   expectEqual(a1.identity, min(c1, b1, a1, a2).identity)
-  
+
   // 4-arg max()
   expectEqual(c1.identity, max(c2, b1, c1, b2).identity)
   expectEqual(c1.identity, max(b1, c2, c1, b2).identity)

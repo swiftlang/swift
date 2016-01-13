@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 //  This file provides classes and functions for conveniently working
-//  with ranges, 
+//  with ranges,
 //
 //  reversed returns an iterator_range out of the reverse iterators of a type.
 //
@@ -48,7 +48,7 @@ namespace swift {
   -> decltype(llvm::make_range(container.rbegin(), container.rend())) {
     return llvm::make_range(container.rbegin(), container.rend());
   }
-  
+
   // Wrapper for std::transform that creates a new back-insertable container
   // and transforms a range into it.
   template<typename T, typename InputRange, typename MapFn>

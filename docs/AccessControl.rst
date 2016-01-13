@@ -6,7 +6,7 @@ The general guiding principle of Swift access control:
 
   **No entity can be defined in terms of another entity that has a lower
   access level.**
-	
+
 There are three levels of access: "private", "internal", and "public".
 Private entities can only be accessed from within the source file where they
 are defined. Internal entities can be accessed anywhere within the module they
@@ -210,7 +210,7 @@ functionality beyond ``private``, ``internal``, and ``public``.
   limited with regards to extensions. Beyond that, however, a "class-only"
   limit forces code to be declared within the class that might otherwise
   naturally be a top-level helper or an extension method on another type.
-  
+
   ``private`` serves the proper use case of limiting access to the
   implementation details of a class (even from the rest of the module!) while
   not requiring that all of those implementation details be written lexically
@@ -223,7 +223,7 @@ functionality beyond ``private``, ``internal``, and ``public``.
   plans for resilient APIs. Additionally, it increases the complexity of the
   access control model for both the compiler and for developers, and like
   "class-only" it is not immediately clear how it interacts with extensions.
-  
+
   Though it is not compiler-enforced, members that might be considered
   "protected" are effectively publicly accessible, and thus should be marked
   ``public`` in Swift. They can still be documented as intended for overriding

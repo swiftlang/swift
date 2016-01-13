@@ -80,7 +80,7 @@ static bool EncodeToUTF8(unsigned CharValue,
   } else {
     return true;  // UTF8 can encode these, but they aren't valid code points.
   }
-  
+
   // Emit all of the trailing bytes.
   while (NumTrailingBytes--)
     Result.push_back(char(0x80 | (0x3F & (CharValue >> (NumTrailingBytes*6)))));
@@ -106,15 +106,15 @@ static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr,
                                                 const char *End) {
   if (Ptr >= End)
     return ~0U;
-  
+
   unsigned char CurByte = *Ptr++;
   if (CurByte < 0x80)
     return CurByte;
-  
+
   // Read the number of high bits set, which indicates the number of bytes in
   // the character.
   unsigned EncodedBytes = CLO8(CurByte);
-  
+
   // If this is 0b10XXXXXX, then it is a continuation character.
   if (EncodedBytes == 1 ||
       // If the number of encoded bytes is > 4, then this is an invalid
@@ -128,10 +128,10 @@ static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr,
       ++Ptr;
     return ~0U;
   }
-  
+
   // Drop the high bits indicating the # bytes of the result.
   unsigned CharValue = (unsigned char)(CurByte << EncodedBytes) >> EncodedBytes;
-  
+
   // Read and validate the continuation bytes.
   for (unsigned i = 1; i != EncodedBytes; ++i) {
     if (Ptr >= End)
@@ -140,22 +140,22 @@ static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr,
     // If the high bit isn't set or the second bit isn't clear, then this is not
     // a continuation byte!
     if (CurByte < 0x80 || CurByte >= 0xC0) return ~0U;
-    
+
     // Accumulate our result.
     CharValue <<= 6;
     CharValue |= CurByte & 0x3F;
     ++Ptr;
   }
-  
+
   // UTF-16 surrogate pair values are not valid code points.
   if (CharValue >= 0xD800 && CharValue <= 0xDFFF)
     return ~0U;
-  
+
   // If we got here, we read the appropriate number of accumulated bytes.
   // Verify that the encoding was actually minimal.
   // Number of bits in the value, ignoring leading zeros.
   unsigned NumBits = 32-llvm::countLeadingZeros(CharValue);
-  
+
   if (NumBits <= 5+6)
     return EncodedBytes == 2 ? CharValue : ~0U;
   if (NumBits <= 4+6+6)
@@ -219,7 +219,7 @@ void Lexer::initSubLexer(Lexer &Parent, State BeginState, State EndState) {
 InFlightDiagnostic Lexer::diagnose(const char *Loc, Diagnostic Diag) {
   if (Diags)
     return Diags->diagnose(getSourceLoc(Loc), Diag);
-  
+
   return InFlightDiagnostic();
 }
 
@@ -348,10 +348,10 @@ void Lexer::skipSlashStarComment() {
   // Make sure to advance over the * so that we don't incorrectly handle /*/ as
   // the beginning and end of the comment.
   ++CurPtr;
-  
+
   // /**/ comments can be nested, keep track of how deep we've gone.
   unsigned Depth = 1;
-  
+
   while (1) {
     switch (*CurPtr++) {
     case '*':
@@ -392,7 +392,7 @@ void Lexer::skipSlashStarComment() {
         diagnoseEmbeddedNul(Diags, CurPtr-1);
         break;
       }
-      
+
       // Otherwise, we have an unterminated /* comment.
       --CurPtr;
 
@@ -413,41 +413,41 @@ void Lexer::skipSlashStarComment() {
 static bool isValidIdentifierContinuationCodePoint(uint32_t c) {
   if (c < 0x80)
     return clang::isIdentifierBody(c, /*dollar*/true);
-  
+
   // N1518: Recommendations for extended identifier characters for C and C++
   // Proposed Annex X.1: Ranges of characters allowed
   return c == 0x00A8 || c == 0x00AA || c == 0x00AD || c == 0x00AF
     || (c >= 0x00B2 && c <= 0x00B5) || (c >= 0x00B7 && c <= 0x00BA)
     || (c >= 0x00BC && c <= 0x00BE) || (c >= 0x00C0 && c <= 0x00D6)
     || (c >= 0x00D8 && c <= 0x00F6) || (c >= 0x00F8 && c <= 0x00FF)
-  
+
     || (c >= 0x0100 && c <= 0x167F)
     || (c >= 0x1681 && c <= 0x180D)
     || (c >= 0x180F && c <= 0x1FFF)
-  
+
     || (c >= 0x200B && c <= 0x200D)
     || (c >= 0x202A && c <= 0x202E)
     || (c >= 0x203F && c <= 0x2040)
     || c == 0x2054
     || (c >= 0x2060 && c <= 0x206F)
-  
+
     || (c >= 0x2070 && c <= 0x218F)
     || (c >= 0x2460 && c <= 0x24FF)
     || (c >= 0x2776 && c <= 0x2793)
     || (c >= 0x2C00 && c <= 0x2DFF)
     || (c >= 0x2E80 && c <= 0x2FFF)
-  
+
     || (c >= 0x3004 && c <= 0x3007)
     || (c >= 0x3021 && c <= 0x302F)
     || (c >= 0x3031 && c <= 0x303F)
-  
+
     || (c >= 0x3040 && c <= 0xD7FF)
-  
+
     || (c >= 0xF900 && c <= 0xFD3D)
     || (c >= 0xFD40 && c <= 0xFDCF)
     || (c >= 0xFDF0 && c <= 0xFE44)
     || (c >= 0xFE47 && c <= 0xFFF8)
-  
+
     || (c >= 0x10000 && c <= 0x1FFFD)
     || (c >= 0x20000 && c <= 0x2FFFD)
     || (c >= 0x30000 && c <= 0x3FFFD)
@@ -476,7 +476,7 @@ static bool isValidIdentifierStartCodePoint(uint32_t c) {
       (c >= 0x20D0 && c <= 0x20FF) ||
       (c >= 0xFE20 && c <= 0xFE2F))
     return false;
-  
+
   return true;
 }
 
@@ -611,7 +611,7 @@ void Lexer::lexOperatorIdentifier() {
   bool didStart = advanceIfValidStartOfOperator(CurPtr, BufferEnd);
   assert(didStart && "unexpected operator start");
   (void) didStart;
-  
+
   do {
     if (CurPtr != BufferEnd && InSILBody &&
         (*CurPtr == '!' || *CurPtr == '?'))
@@ -653,15 +653,15 @@ void Lexer::lexOperatorIdentifier() {
         return formToken(tok::period, TokStart);
       if (rightBound)
         return formToken(tok::period_prefix, TokStart);
-      
+
       // If left bound but not right bound, handle some likely situations.
-      
+
       // If there is just some horizontal whitespace before the next token, its
       // addition is probably incorrect.
       const char *AfterHorzWhitespace = CurPtr;
       while (*AfterHorzWhitespace == ' ' || *AfterHorzWhitespace == '\t')
         ++AfterHorzWhitespace;
-      
+
       // First, when we are code completing "x.<ESC>", then make sure to return
       // a tok::period, since that is what the user is wanting to know about.
       // FIXME: isRightBound should consider this to be right bound.
@@ -670,7 +670,7 @@ void Lexer::lexOperatorIdentifier() {
         diagnose(TokStart, diag::expected_member_name);
         return formToken(tok::period, TokStart);
       }
-      
+
       if (isRightBound(AfterHorzWhitespace, leftBound) &&
           // Don't consider comments to be this.  A leading slash is probably
           // either // or /* and most likely occurs just in our testsuite for
@@ -778,7 +778,7 @@ void Lexer::lexHexNumber() {
     while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
     return formToken(tok::unknown, TokStart);
   }
-    
+
   while (isHexDigit(*CurPtr) || *CurPtr == '_')
     ++CurPtr;
   if (CurPtr - TokStart == 2) {
@@ -786,21 +786,21 @@ void Lexer::lexHexNumber() {
     while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
     return formToken(tok::unknown, TokStart);
   }
-  
+
   if (*CurPtr != '.' && *CurPtr != 'p' && *CurPtr != 'P')
     return formToken(tok::integer_literal, TokStart);
-  
+
   // (\.[0-9A-Fa-f][0-9A-Fa-f_]*)?
   if (*CurPtr == '.') {
     ++CurPtr;
-    
+
     // If the character after the '.' is not a digit, assume we have an int
     // literal followed by a dot expression.
     if (!isHexDigit(*CurPtr)) {
       --CurPtr;
       return formToken(tok::integer_literal, TokStart);
     }
-    
+
     while (isHexDigit(*CurPtr) || *CurPtr == '_')
       ++CurPtr;
     if (*CurPtr != 'p' && *CurPtr != 'P') {
@@ -808,11 +808,11 @@ void Lexer::lexHexNumber() {
       return formToken(tok::unknown, TokStart);
     }
   }
-  
+
   // [pP][+-]?[0-9][0-9_]*
   assert(*CurPtr == 'p' || *CurPtr == 'P' && "not at a hex float exponent?!");
   ++CurPtr;
-  
+
   if (*CurPtr == '+' || *CurPtr == '-')
     ++CurPtr;  // Eat the sign.
 
@@ -820,7 +820,7 @@ void Lexer::lexHexNumber() {
     diagnose(CurPtr, diag::lex_expected_digit_in_fp_exponent);
     return formToken(tok::unknown, TokStart);
   }
-  
+
   while (isDigit(*CurPtr) || *CurPtr == '_')
     ++CurPtr;
 
@@ -840,7 +840,7 @@ void Lexer::lexHexNumber() {
 void Lexer::lexNumber() {
   const char *TokStart = CurPtr-1;
   assert((isDigit(*TokStart) || *TokStart == '.') && "Unexpected start");
-  
+
   auto expected_digit = [&](const char *loc, Diag<> msg) {
     diagnose(loc, msg);
     while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
@@ -849,20 +849,20 @@ void Lexer::lexNumber() {
 
   if (*TokStart == '0' && *CurPtr == 'x')
     return lexHexNumber();
-  
+
   if (*TokStart == '0' && *CurPtr == 'o') {
     // 0o[0-7][0-7_]*
     ++CurPtr;
     if (*CurPtr < '0' || *CurPtr > '7')
       return expected_digit(CurPtr, diag::lex_expected_digit_in_int_literal);
-      
+
     while ((*CurPtr >= '0' && *CurPtr <= '7') || *CurPtr == '_')
       ++CurPtr;
     if (CurPtr - TokStart == 2)
       return expected_digit(CurPtr, diag::lex_expected_digit_in_int_literal);
     return formToken(tok::integer_literal, TokStart);
   }
-  
+
   if (*TokStart == '0' && *CurPtr == 'b') {
     // 0b[01][01_]*
     ++CurPtr;
@@ -901,25 +901,25 @@ void Lexer::lexNumber() {
   // Lex decimal point.
   if (*CurPtr == '.') {
     ++CurPtr;
-   
+
     // Lex any digits after the decimal point.
     while (isDigit(*CurPtr) || *CurPtr == '_')
       ++CurPtr;
   }
-  
+
   // Lex exponent.
   if (*CurPtr == 'e' || *CurPtr == 'E') {
     ++CurPtr;  // Eat the 'e'
     if (*CurPtr == '+' || *CurPtr == '-')
       ++CurPtr;  // Eat the sign.
-      
+
     if (!isDigit(*CurPtr))
       return expected_digit(CurPtr, diag::lex_expected_digit_in_fp_exponent);
-    
+
     while (isDigit(*CurPtr) || *CurPtr == '_')
       ++CurPtr;
   }
-  
+
   return formToken(tok::floating_literal, TokStart);
 }
 
@@ -959,7 +959,7 @@ unsigned Lexer::lexUnicodeEscape(const char *&CurPtr, Lexer *Diags) {
 /// 'StopQuote'), this returns ~0U and leaves 'CurPtr' pointing to the terminal
 /// quote.  If this is a malformed character sequence, it emits a diagnostic
 /// (when EmitDiagnostics is true) and returns ~1U.
-/// 
+///
 ///   character_escape  ::= [\][\] | [\]t | [\]n | [\]r | [\]" | [\]' | [\]0
 ///   character_escape  ::= unicode_character_escape
 unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
@@ -991,7 +991,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
     }
     // Otherwise, this is just a character.
     return CurPtr[-1];
-      
+
   case 0:
     if (CurPtr-1 != BufferEnd) {
       if (EmitDiagnostics)
@@ -1009,7 +1009,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
   case '\\':  // Escapes.
     break;
   }
-  
+
   unsigned CharValue = 0;
   // Escape processing.  We already ate the "\".
   switch (*CurPtr) {
@@ -1020,7 +1020,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
     // is an invalid escape.
     if (isAlphanumeric(*CurPtr)) ++CurPtr;
     return ~1U;
-      
+
   // Simple single-character escapes.
   case '0': ++CurPtr; return '\0';
   case 'n': ++CurPtr; return '\n';
@@ -1050,7 +1050,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
       diagnose(CharStart, diag::lex_invalid_unicode_scalar);
     return ~1U;
   }
-  
+
   return CharValue;
 }
 
@@ -1126,7 +1126,7 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
         return CurPtr-1;
       }
       continue;
-        
+
     // Paren nesting deeper to support "foo = \((a+b)-(c*d)) bar".
     case '(':
       if (!inStringLiteral()) {
@@ -1162,14 +1162,14 @@ void Lexer::lexStringLiteral() {
   // diagnostics about changing them to double quotes.
 
   bool wasErroneous = false;
-  
+
   while (true) {
     if (*CurPtr == '\\' && *(CurPtr + 1) == '(') {
       // Consume tokens until we hit the corresponding ')'.
       CurPtr += 2;
       const char *EndPtr =
           skipToEndOfInterpolatedExpression(CurPtr, BufferEnd, Diags);
-      
+
       if (*EndPtr == ')') {
         // Successfully scanned the body of the expression literal.
         CurPtr = EndPtr+1;
@@ -1185,7 +1185,7 @@ void Lexer::lexStringLiteral() {
       diagnose(TokStart, diag::lex_unterminated_string);
       return formToken(tok::unknown, TokStart);
     }
-    
+
     unsigned CharValue = lexCharacter(CurPtr, *TokStart, true);
     wasErroneous |= CharValue == ~1U;
 
@@ -1241,7 +1241,7 @@ void Lexer::lexStringLiteral() {
 /// entire string literal.  This helps us avoid parsing the body of the string
 /// as program tokens, which will only lead to massive confusion.
 const char *Lexer::findEndOfCurlyQuoteStringLiteral(const char *Body) {
-  
+
   while (true) {
     // Don't bother with string interpolations.
     if (*Body == '\\' && *(Body + 1) == '(')
@@ -1256,12 +1256,12 @@ const char *Lexer::findEndOfCurlyQuoteStringLiteral(const char *Body) {
     unsigned CharValue = lexCharacter(Body, '\0', false);
     // If the character was incorrectly encoded, give up.
     if (CharValue == ~1U) return nullptr;
-    
+
     // If we found a straight-quote, then we're done.  Just return the spot
     // to continue.
     if (CharValue == '"')
       return Body;
-    
+
     // If we found an ending curly quote (common since this thing started with
     // an opening curly quote) diagnose it with a fixit and then return.
     if (CharValue == 0x0000201D) {
@@ -1269,7 +1269,7 @@ const char *Lexer::findEndOfCurlyQuoteStringLiteral(const char *Body) {
         .fixItReplaceChars(getSourceLoc(CharStart), getSourceLoc(Body), "\"");
       return Body;
     }
-    
+
     // Otherwise, keep scanning.
   }
 }
@@ -1281,7 +1281,7 @@ const char *Lexer::findEndOfCurlyQuoteStringLiteral(const char *Body) {
 /// If it doesn't match this production, the leading ` is a punctuator.
 void Lexer::lexEscapedIdentifier() {
   assert(CurPtr[-1] == '`' && "Unexpected start of escaped identifier");
-  
+
   const char *Quote = CurPtr-1;
 
   // Check whether we have an identifier followed by another backtick, in which
@@ -1344,14 +1344,14 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
       TempString.push_back(CurChar);
       continue;
     }
-    
+
     // Invalid escapes are accepted by the lexer but diagnosed as an error.  We
     // just ignore them here.
     unsigned CharValue = 0; // Unicode character value for \x, \u, \U.
     switch (*BytesPtr++) {
     default:
       continue;   // Invalid escape, ignore it.
-          
+
       // Simple single-character escapes.
     case '0': TempString.push_back('\0'); continue;
     case 'n': TempString.push_back('\n'); continue;
@@ -1360,12 +1360,12 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
     case '"': TempString.push_back('"'); continue;
     case '\'': TempString.push_back('\''); continue;
     case '\\': TempString.push_back('\\'); continue;
-      
-        
+
+
     // String interpolation.
     case '(':
       llvm_unreachable("string contained interpolated segments");
-        
+
       // Unicode escapes of various lengths.
     case 'u':  //  \u HEX HEX HEX HEX
       if (BytesPtr[0] != '{')
@@ -1376,13 +1376,13 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
       if (CharValue == ~1U) continue;
       break;
     }
-    
-    if (CharValue < 0x80) 
+
+    if (CharValue < 0x80)
       TempString.push_back(CharValue);
     else
       EncodeToUTF8(CharValue, TempString);
   }
-  
+
   // If we didn't escape or reprocess anything, then we don't need to use the
   // temporary string, just point to the original one. We know that this
   // is safe because unescaped strings are always shorter than their escaped
@@ -1463,16 +1463,16 @@ void Lexer::lexImpl() {
 Restart:
   // Remember the start of the token so we can form the text range.
   const char *TokStart = CurPtr;
-  
+
   switch (*CurPtr++) {
   default: {
     char const *tmp = CurPtr-1;
     if (advanceIfValidStartOfIdentifier(tmp, BufferEnd))
       return lexIdentifier();
-    
+
     if (advanceIfValidStartOfOperator(tmp, BufferEnd))
       return lexOperatorIdentifier();
-    
+
     if (advanceIfValidContinuationOfIdentifier(tmp, BufferEnd)) {
       // If this is a valid identifier continuation, but not a valid identifier
       // start, attempt to recover by eating more continuation characters.
@@ -1581,13 +1581,13 @@ Restart:
       CurPtr += 2;
       return formToken(tok::pound_if, TokStart);
     }
-    
+
     if (getSubstring(TokStart + 1, 4).equals("else") &&
         isWhitespace(CurPtr[4])) {
       CurPtr += 4;
       return formToken(tok::pound_else, TokStart);
     }
-    
+
     if (getSubstring(TokStart + 1, 6).equals("elseif") &&
         isWhitespace(CurPtr[6])) {
       CurPtr += 6;
@@ -1605,7 +1605,7 @@ Restart:
       CurPtr += 4;
       return formToken(tok::pound_line, TokStart);
     }
-    
+
     if (getSubstring(TokStart + 1, 9).equals("available")) {
       CurPtr += 9;
       return formToken(tok::pound_available, TokStart);
@@ -1646,7 +1646,7 @@ Restart:
       do {
         ++CurPtr;
       } while (clang::isIdentifierBody(CurPtr[0]));
-      
+
       return formToken(tok::sil_local_name, TokStart);
     }
     return lexOperatorIdentifier();
@@ -1657,7 +1657,7 @@ Restart:
     if (isLeftBound(TokStart, BufferStart))
       return formToken(tok::exclaim_postfix, TokStart);
     return lexOperatorIdentifier();
-  
+
   case '?':
     if (isLeftBound(TokStart, BufferStart))
       return formToken(tok::question_postfix, TokStart);
@@ -1693,7 +1693,7 @@ Restart:
   case '"':
   case '\'':
     return lexStringLiteral();
-      
+
   case '`':
     return lexEscapedIdentifier();
   }
@@ -1708,7 +1708,7 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {
   int BufferID = SM.findBufferContainingLoc(Loc);
   if (BufferID < 0)
     return Token();
-  
+
   // Use fake language options; language options only affect validity
   // and the exact token produced.
   LangOptions FakeLangOpts;

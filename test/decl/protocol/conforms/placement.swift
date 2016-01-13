@@ -34,7 +34,7 @@ struct Explicit2 { }
 extension Explicit2 : P1 { } // expected-note 2{{'Explicit2' declares conformance to protocol 'P1' here}}
 extension Explicit2 : P1 { } // expected-error{{redundant conformance of 'Explicit2' to protocol 'P1'}}
 extension Explicit2 : P1 { } // expected-error{{redundant conformance of 'Explicit2' to protocol 'P1'}}
- 
+
 // ---------------------------------------------------------------------------
 // Multiple implicit conformances, with no ambiguities
 // ---------------------------------------------------------------------------

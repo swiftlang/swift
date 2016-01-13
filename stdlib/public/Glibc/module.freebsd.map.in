@@ -41,18 +41,18 @@ module SwiftGlibc [system] {
       header "@GLIBC_INCLUDE_PATH@/fenv.h"
       export *
     }
-    
+
     // note: supplied by compiler
     // module float {
     //   header "@GLIBC_INCLUDE_PATH@/float.h"
     //   export *
     // }
-    
+
     module inttypes {
       header "@GLIBC_INCLUDE_PATH@/inttypes.h"
       export *
     }
-    
+
     // note: potentially supplied by compiler
     // module iso646 {
     //   header "@GLIBC_INCLUDE_PATH@/iso646.h"
@@ -62,7 +62,7 @@ module SwiftGlibc [system] {
     //   header "@GLIBC_INCLUDE_PATH@/limits.h"
     //   export *
     // }
-    
+
     module locale {
       header "@GLIBC_INCLUDE_PATH@/locale.h"
       export *
@@ -92,12 +92,12 @@ module SwiftGlibc [system] {
     // module stddef {
     //   header "@GLIBC_INCLUDE_PATH@/stddef.h"
     //   export *
-    // }    
+    // }
     // module stdint {
     //   header "@GLIBC_INCLUDE_PATH@/stdint.h"
     //   export *
     // }
-    
+
     module stdio {
       header "@GLIBC_INCLUDE_PATH@/stdio.h"
       export *
@@ -117,7 +117,7 @@ module SwiftGlibc [system] {
     //   header "@GLIBC_INCLUDE_PATH@/tgmath.h"
     //   export *
     // }
-    
+
     module time {
       header "@GLIBC_INCLUDE_PATH@/time.h"
       export *

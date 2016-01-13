@@ -16,7 +16,7 @@ func test001() {
   let x: B
   let y: B
   let z: B
-    
+
   #^TOP_LEVEL_0^#
 // TOP_LEVEL_0_ALL: let
 // TOP_LEVEL_0_ALL-NEXT: var

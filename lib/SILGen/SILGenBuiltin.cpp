@@ -73,7 +73,7 @@ static ManagedValue emitBuiltinRetain(SILGenFunction &gen,
   // The value was produced at +1; we can produce an unbalanced
   // retain simply by disabling the cleanup.
   args[0].forward(gen);
-  return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));    
+  return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
 }
 
 static ManagedValue emitBuiltinRelease(SILGenFunction &gen,
@@ -86,7 +86,7 @@ static ManagedValue emitBuiltinRelease(SILGenFunction &gen,
   // release we need to leave the cleanup intact and then do a *second*
   // release.
   gen.B.createReleaseValue(loc, args[0].getValue());
-  return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));    
+  return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
 }
 
 static ManagedValue emitBuiltinAutorelease(SILGenFunction &gen,
@@ -98,7 +98,7 @@ static ManagedValue emitBuiltinAutorelease(SILGenFunction &gen,
   // The value was produced at +1, so to produce an unbalanced
   // autorelease we need to leave the cleanup intact.
   gen.B.createAutoreleaseValue(loc, args[0].getValue());
-  return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));    
+  return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
 }
 
 static bool requireIsOptionalNativeObject(SILGenFunction &gen,
@@ -160,7 +160,7 @@ static ManagedValue emitBuiltinLoadOrTake(SILGenFunction &gen,
                                           IsTake_t isTake) {
   assert(substitutions.size() == 1 && "load should have single substitution");
   assert(args.size() == 1 && "load should have a single argument");
-  
+
   // The substitution gives the type of the load.  This is always a
   // first-class type; there is no way to e.g. produce a @weak load
   // with this builtin.
@@ -206,22 +206,22 @@ static ManagedValue emitBuiltinDestroy(SILGenFunction &gen,
          "destroy should have a single substitution");
   // The substitution determines the type of the thing we're destroying.
   auto &ti = gen.getTypeLowering(substitutions[0].getReplacement());
-  
+
   // Destroy is a no-op for trivial types.
   if (ti.isTrivial())
     return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
-  
+
   SILType destroyType = ti.getLoweredType();
 
   // Convert the pointer argument to a SIL address.
   SILValue addr =
     gen.B.createPointerToAddress(loc, args[1].getUnmanagedValue(),
                                  destroyType.getAddressType());
-  
+
   // Destroy the value indirectly. Canonicalization will promote to loads
   // and releases if appropriate.
   gen.B.emitDestroyAddrAndFold(loc, addr);
-  
+
   return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
 }
 
@@ -238,16 +238,16 @@ static ManagedValue emitBuiltinAssign(SILGenFunction &gen,
   // The substitution determines the type of the thing we're destroying.
   CanType assignFormalType = substitutions[0].getReplacement()->getCanonicalType();
   SILType assignType = gen.getLoweredType(assignFormalType);
-  
+
   // Convert the destination pointer argument to a SIL address.
   SILValue addr = gen.B.createPointerToAddress(loc,
                                                args.back().getUnmanagedValue(),
                                                assignType.getAddressType());
-  
+
   // Build the value to be assigned, reconstructing tuples if needed.
   ManagedValue src = RValue(args.slice(0, args.size() - 1), assignFormalType)
     .getAsSingleValue(gen, loc);
-  
+
   src.assignInto(gen, loc, addr);
 
   return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
@@ -272,7 +272,7 @@ static ManagedValue emitBuiltinInit(SILGenFunction &gen,
 
   TemporaryInitialization init(addr, CleanupHandle::invalid());
   gen.emitExprInto(args[0], &init);
-  
+
   return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
 }
 
@@ -297,7 +297,7 @@ static ManagedValue emitCastToReferenceType(SILGenFunction &gen,
                                             SILType objPointerType) {
   assert(args.size() == 1 && "cast should have a single argument");
   assert(substitutions.size() == 1 && "cast should have a type substitution");
-  
+
   // Bail if the source type is not a class reference of some kind.
   if (!substitutions[0].getReplacement()->mayHaveSuperclass() &&
       !substitutions[0].getReplacement()->isClassExistentialType()) {
@@ -306,11 +306,11 @@ static ManagedValue emitCastToReferenceType(SILGenFunction &gen,
     SILValue undef = SILUndef::get(objPointerType, gen.SGM.M);
     return ManagedValue::forUnmanaged(undef);
   }
-  
+
   // Save the cleanup on the argument so we can forward it onto the cast
   // result.
   auto cleanup = args[0].getCleanup();
-  
+
   SILValue arg = args[0].getValue();
 
   // If the argument is existential, open it.
@@ -360,7 +360,7 @@ static ManagedValue emitCastFromReferenceType(SILGenFunction &gen,
 
   // The substitution determines the destination type.
   SILType destType = gen.getLoweredType(substitutions[0].getReplacement());
-  
+
   // Bail if the source type is not a class reference of some kind.
   if (!substitutions[0].getReplacement()->isBridgeableObjectType()
       || !destType.isObject()) {
@@ -370,7 +370,7 @@ static ManagedValue emitCastFromReferenceType(SILGenFunction &gen,
     SILValue result = SILUndef::get(destType, gen.SGM.M);
     return ManagedValue::forUnmanaged(result);
   }
-  
+
   // Save the cleanup on the argument so we can forward it onto the cast
   // result.
   auto cleanup = args[0].getCleanup();
@@ -410,7 +410,7 @@ static ManagedValue emitBuiltinBridgeToRawPointer(SILGenFunction &gen,
                                         CanFunctionType formalApplyType,
                                         SGFContext C) {
   assert(args.size() == 1 && "bridge should have a single argument");
-  
+
   // Take the reference type argument and cast it to RawPointer.
   // RawPointers do not have ownership semantics, so the cleanup on the
   // argument remains.
@@ -430,7 +430,7 @@ static ManagedValue emitBuiltinBridgeFromRawPointer(SILGenFunction &gen,
   assert(substitutions.size() == 1 &&
          "bridge should have a single substitution");
   assert(args.size() == 1 && "bridge should have a single argument");
-  
+
   // The substitution determines the destination type.
   // FIXME: Archetype destination type?
   auto &destLowering = gen.getTypeLowering(substitutions[0].getReplacement());
@@ -452,7 +452,7 @@ static ManagedValue emitBuiltinAddressOf(SILGenFunction &gen,
                                          CanFunctionType formalApplyType,
                                          SGFContext C) {
   assert(args.size() == 1 && "addressof should have a single argument");
-  
+
   // Take the address argument and cast it to RawPointer.
   SILType rawPointerType = SILType::getRawPointerType(gen.F.getASTContext());
   SILValue result = gen.B.createAddressToPointer(loc,
@@ -469,7 +469,7 @@ static ManagedValue emitBuiltinGep(SILGenFunction &gen,
                                    CanFunctionType formalApplyType,
                                    SGFContext C) {
   assert(args.size() == 2 && "gep should be given two arguments");
-  
+
   SILValue offsetPtr = gen.B.createIndexRawPointer(loc,
                                                  args[0].getUnmanagedValue(),
                                                  args[1].getUnmanagedValue());
@@ -484,7 +484,7 @@ static ManagedValue emitBuiltinCondFail(SILGenFunction &gen,
                                         CanFunctionType formalApplyType,
                                         SGFContext C) {
   assert(args.size() == 1 && "condfail should be given one argument");
-  
+
   gen.B.createCondFail(loc, args[0].getUnmanagedValue());
   return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
 }
@@ -506,7 +506,7 @@ emitBuiltinCastReference(SILGenFunction &gen,
   auto &toTL = gen.getTypeLowering(toTy);
   assert(!fromTL.isTrivial() && !toTL.isTrivial() && "expected ref type");
 
-  if (fromTL.isLoadable() || toTL.isLoadable()) { 
+  if (fromTL.isLoadable() || toTL.isLoadable()) {
     if (auto refCast = gen.B.tryCreateUncheckedRefCast(loc, args[0].getValue(),
                                                        toTL.getLoweredType())) {
       // Create a reference cast, forwarding the cleanup.
@@ -560,10 +560,10 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &gen,
                                          SGFContext C) {
   assert(args.size() == 1 && "reinterpretCast should be given one argument");
   assert(substitutions.size() == 2 && "reinterpretCast should have two subs");
-  
+
   auto &fromTL = gen.getTypeLowering(substitutions[0].getReplacement());
   auto &toTL = gen.getTypeLowering(substitutions[1].getReplacement());
-  
+
   // If casting between address-only types, cast the address.
   if (!fromTL.isLoadable() || !toTL.isLoadable()) {
     SILValue fromAddr;
@@ -577,7 +577,7 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &gen,
     }
     auto toAddr = gen.B.createUncheckedAddrCast(loc, fromAddr,
                                       toTL.getLoweredType().getAddressType());
-    
+
     // Load and retain the destination value if it's loadable. Leave the cleanup
     // on the original value since we don't know anything about it's type.
     if (toTL.isLoadable()) {
@@ -617,7 +617,7 @@ static ManagedValue emitBuiltinCastToBridgeObject(SILGenFunction &gen,
                                                   SGFContext C) {
   assert(args.size() == 2 && "cast should have two arguments");
   assert(subs.size() == 1 && "cast should have a type substitution");
-  
+
   // Take the reference type argument and cast it to BridgeObject.
   SILType objPointerType = SILType::getBridgeObjectType(gen.F.getASTContext());
 
@@ -629,13 +629,13 @@ static ManagedValue emitBuiltinCastToBridgeObject(SILGenFunction &gen,
     SILValue undef = SILUndef::get(objPointerType, gen.SGM.M);
     return ManagedValue::forUnmanaged(undef);
   }
-  
+
   // Save the cleanup on the argument so we can forward it onto the cast
   // result.
   auto refCleanup = args[0].getCleanup();
   SILValue ref = args[0].getValue();
   SILValue bits = args[1].getUnmanagedValue();
-  
+
   // If the argument is existential, open it.
   if (subs[0].getReplacement()->isClassExistentialType()) {
     auto openedTy
@@ -644,7 +644,7 @@ static ManagedValue emitBuiltinCastToBridgeObject(SILGenFunction &gen,
     ref = gen.B.createOpenExistentialRef(loc, ref, loweredOpenedTy);
     gen.setArchetypeOpeningSite(openedTy, ref);
   }
-  
+
   SILValue result = gen.B.createRefToBridgeObject(loc, ref, bits);
   return ManagedValue(result, refCleanup);
 }
@@ -662,7 +662,7 @@ static ManagedValue emitBuiltinCastReferenceFromBridgeObject(
 
   // The substitution determines the destination type.
   SILType destType = gen.getLoweredType(subs[0].getReplacement());
-  
+
   // Bail if the source type is not a class reference of some kind.
   if (!subs[0].getReplacement()->isBridgeableObjectType()
       || !destType.isObject()) {
@@ -672,7 +672,7 @@ static ManagedValue emitBuiltinCastReferenceFromBridgeObject(
     SILValue result = SILUndef::get(destType, gen.SGM.M);
     return ManagedValue::forUnmanaged(result);
   }
-  
+
   SILValue result = gen.B.createBridgeObjectToRef(loc, args[0].forward(gen),
                                                   destType);
   return gen.emitManagedRValueWithCleanup(result);
@@ -781,11 +781,11 @@ static ManagedValue emitBuiltinTypeTrait(SILGenFunction &gen,
          && "type trait should take a single type parameter");
   assert(args.size() == 1
          && "type trait should take a single argument");
-  
+
   unsigned result;
-  
+
   auto traitTy = substitutions[0].getReplacement()->getCanonicalType();
-  
+
   switch ((traitTy.getPointer()->*Trait)()) {
   // If the type obviously has or lacks the trait, emit a constant result.
   case TypeTraitResult::IsNot:
@@ -794,7 +794,7 @@ static ManagedValue emitBuiltinTypeTrait(SILGenFunction &gen,
   case TypeTraitResult::Is:
     result = 1;
     break;
-      
+
   // If not, emit the builtin call normally. Specialization may be able to
   // eliminate it later, or we'll lower it away at IRGen time.
   case TypeTraitResult::CanBe: {
@@ -804,11 +804,11 @@ static ManagedValue emitBuiltinTypeTrait(SILGenFunction &gen,
                                      C.getIdentifier(getBuiltinName(Kind)),
                                      SILType::getPrimitiveObjectType(int8Ty),
                                      substitutions, args[0].getValue());
-    
+
     return ManagedValue::forUnmanaged(apply);
   }
   }
-  
+
   // Produce the result as an integer literal constant.
   auto val = gen.B.createIntegerLiteral(
       loc, SILType::getBuiltinIntegerType(8, gen.getASTContext()),
@@ -822,7 +822,7 @@ SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
   if (function.kind != SILDeclRef::Kind::Func)
     return None;
   if (!function.hasDecl())
-    return None;  
+    return None;
   ValueDecl *decl = function.getDecl();
   if (!isa<BuiltinUnit>(decl->getDeclContext()))
     return None;
@@ -852,7 +852,7 @@ SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
 #define BUILTIN_SIL_OPERATION(Id, Name, Overload)                           \
   case BuiltinValueKind::Id:                                                \
     return SpecializedEmitter(&emitBuiltin##Id);
-  
+
   // Lower away type trait builtins when they're trivially solvable.
 #define BUILTIN_TYPE_TRAIT_OPERATION(Id, Name)                              \
   case BuiltinValueKind::Id:                                                \

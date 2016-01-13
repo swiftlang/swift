@@ -29,7 +29,7 @@ print("buffer has storage: \(a.storage != nil)")
 func testUnique() {
   print("buffer is unique: \(a.isUniquelyReferenced())")
   // CHECK-NEXT: buffer is unique: true
-  
+
   var addRef = [ a ]
   print("copied buffer is unique: \(a.isUniquelyReferenced())")
   // CHECK-NEXT: copied buffer is unique: false

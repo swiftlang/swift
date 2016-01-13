@@ -58,7 +58,7 @@ internal struct _CocoaArrayWrapper : CollectionType {
     let contiguousCount = withUnsafeMutablePointer(&enumerationState) {
       self.buffer.countByEnumeratingWithState($0, objects: nil, count: 0)
     }
-    
+
     return contiguousCount >= subRange.endIndex
     ? unsafeBitCast(
       enumerationState.itemsPtr, UnsafeMutablePointer<AnyObject>.self

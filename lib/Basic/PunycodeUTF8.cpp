@@ -78,10 +78,10 @@ bool Punycode::encodePunycodeUTF8(StringRef InputUTF8,
                                   std::string &OutPunycode) {
   std::vector<uint32_t> InputCodePoints;
   InputCodePoints.reserve(InputUTF8.size());
-  
+
   if (!convertUTF8toUTF32(InputUTF8, InputCodePoints))
     return false;
-  
+
   return encodePunycode(InputCodePoints, OutPunycode);
 }
 

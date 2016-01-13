@@ -21,10 +21,10 @@
 namespace swift {
 
 /// Type expansion kind.
-enum class TEKind { 
+enum class TEKind {
   TELeaf, // Leaf nodes expansion.
   TENode  // Intermediate and leaf nodes expansion.
-}; 
+};
 
 using TypeExpansionMap = llvm::DenseMap<SILType, ProjectionPathList>;
 

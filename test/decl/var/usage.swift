@@ -14,7 +14,7 @@ func basicTests() -> Int {
 
 // expected-warning@+2 {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{41-45=}}
 // expected-warning@+1 {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{54-58=}}
-func mutableParameter(a : Int, h : Int, var i : Int, var j: Int, 
+func mutableParameter(a : Int, h : Int, var i : Int, var j: Int,
        var g : Int) -> Int { // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{8-12=}}
   g += 1
   swap(&i, &j)
@@ -30,10 +30,10 @@ struct X {
 func testStruct() {
   let a = X()
   a.f()
-  
+
   var b = X()
   b.g()
-  
+
   var c = X()  // expected-warning {{variable 'c' was never mutated; consider changing to 'let' constant}} {{3-6=let}}
   c.f()
 }
@@ -43,7 +43,7 @@ func takeClosure(fn : () -> ()) {}
 class TestClass {
 
   func f() {
-   
+
     takeClosure { [weak self] in  // self is mutable but never mutated.  Ok because it is weak
       self?.f()
     }
@@ -53,19 +53,19 @@ class TestClass {
 
 func nestedFunction() -> Int {
   var x = 42  // No warning about being never-set.
-  
+
   func g() {
     x = 97
     var q = 27  // expected-warning {{variable 'q' was never used}} {{5-10=_}}
   }
   g()
-  
+
   return x
 }
 
 func neverRead() {
   var x = 42  // expected-warning {{variable 'x' was written to, but never read}}
-  
+
   x = 97
   x = 123
 }
@@ -102,15 +102,15 @@ func testSubscript() -> [Int] {
 
 func testTuple(var x : Int) -> Int { // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{16-19=}}
   var y : Int  // Ok, stored by a tuple
-  
+
   (x, y) = (1,2)
   return y
 }
-  
+
 
 
  struct TestComputedPropertyStruct {
-  
+
   var x : Int {
     get {}
     nonmutating set {}
@@ -120,7 +120,7 @@ func testTuple(var x : Int) -> Int { // expected-warning {{Use of 'var' binding 
 func test() {
   let v = TestComputedPropertyStruct()
   v.x = 42
-  
+
   var v2 = TestComputedPropertyStruct()  // expected-warning {{variable 'v2' was never mutated; consider changing to 'let' constant}} {{3-6=let}}
   v2.x = 42
 }
@@ -243,12 +243,12 @@ func test(a : Int?, b : Any) {
 
   // General case, need to insert parentheses.
   if let x = a ?? a {}  // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}} {{6-14=(}} {{20-20=) != nil}}
-  
+
   // Special case, we can turn this into an 'is' test.
   if let x = b as? Int {  // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}} {{6-14=}} {{16-19=is}}
   }
 
-  
+
 }
 
 

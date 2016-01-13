@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-class Base : Hashable { 
+class Base : Hashable {
   var hashValue: Int { return 0 }
 }
 

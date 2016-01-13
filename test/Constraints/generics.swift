@@ -70,7 +70,7 @@ class X {
   func f() {}
 }
 
-class Foo<T> : X { 
+class Foo<T> : X {
   func g() { }
 }
 
@@ -122,7 +122,7 @@ rdar14005696 ~~~ 5
 
 // <rdar://problem/15168483>
 func f1<
-  S: CollectionType 
+  S: CollectionType
   where S.Index: BidirectionalIndexType
 >(seq: S) {
   let x = (seq.indices).lazy.reverse()

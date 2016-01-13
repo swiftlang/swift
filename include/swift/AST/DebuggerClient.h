@@ -31,14 +31,14 @@ public:
 
   DebuggerClient(ASTContext &C) : Ctx(C) { }
   virtual ~DebuggerClient() = default;
-  
+
   // DebuggerClient is consulted at the beginning of the parsing
   // of various DeclKinds to see whether the decl should be parsed
   // in the global context rather than the current context.
   // This question will only be asked if the decl's current context
   // is a function marked with the LLDBDebuggerFunction attribute.
   virtual bool shouldGlobalize(Identifier Name, DeclKind kind) = 0;
-  
+
   virtual void didGlobalize (Decl *Decl) = 0;
 
   /// DebuggerClient is consulted at two times during name
@@ -51,11 +51,11 @@ public:
   virtual bool lookupOverrides(Identifier Name, DeclContext *DC,
                                SourceLoc Loc, bool IsTypeLookup,
                                ResultVector &RV) = 0;
- 
+
   /// This is the second time DebuggerClient is consulted:
   /// after all names in external Modules are checked, the client
   /// gets a chance to add names to the list of candidates that
-  /// have been found in the external module lookup.  
+  /// have been found in the external module lookup.
 
   virtual bool lookupAdditions(Identifier Name, DeclContext *DC,
                                SourceLoc Loc, bool IsTypeLookup,

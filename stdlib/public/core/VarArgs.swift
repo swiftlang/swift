@@ -47,7 +47,7 @@ protocol _CVarArgPassedAsDouble : CVarArgType {}
 /// Some types require alignment greater than Int on some architectures.
 public // SPI(CoreGraphics)
 protocol _CVarArgAlignedType : CVarArgType {
-  /// Return the required alignment in bytes of 
+  /// Return the required alignment in bytes of
   /// the value returned by `_cVarArgEncoding`.
   var _cVarArgAlignment: Int { get }
 }
@@ -134,7 +134,7 @@ extension Int64 : CVarArgType, _CVarArgAlignedType {
     return _encodeBitsAsWords(self)
   }
 
-  /// Return the required alignment in bytes of 
+  /// Return the required alignment in bytes of
   /// the value returned by `_cVarArgEncoding`.
   public var _cVarArgAlignment: Int {
     // FIXME: alignof differs from the ABI alignment on some architectures
@@ -182,7 +182,7 @@ extension UInt64 : CVarArgType, _CVarArgAlignedType {
     return _encodeBitsAsWords(self)
   }
 
-  /// Return the required alignment in bytes of 
+  /// Return the required alignment in bytes of
   /// the value returned by `_cVarArgEncoding`.
   public var _cVarArgAlignment: Int {
     // FIXME: alignof differs from the ABI alignment on some architectures
@@ -255,7 +255,7 @@ extension Float : _CVarArgPassedAsDouble, _CVarArgAlignedType {
     return _encodeBitsAsWords(Double(self))
   }
 
-  /// Return the required alignment in bytes of 
+  /// Return the required alignment in bytes of
   /// the value returned by `_cVarArgEncoding`.
   public var _cVarArgAlignment: Int {
     // FIXME: alignof differs from the ABI alignment on some architectures
@@ -270,7 +270,7 @@ extension Double : _CVarArgPassedAsDouble, _CVarArgAlignedType {
     return _encodeBitsAsWords(self)
   }
 
-  /// Return the required alignment in bytes of 
+  /// Return the required alignment in bytes of
   /// the value returned by `_cVarArgEncoding`.
   public var _cVarArgAlignment: Int {
     // FIXME: alignof differs from the ABI alignment on some architectures
@@ -286,7 +286,7 @@ final public class VaListBuilder {
 
   func append(arg: CVarArgType) {
     // Write alignment padding if necessary.
-    // This is needed on architectures where the ABI alignment of some 
+    // This is needed on architectures where the ABI alignment of some
     // supported vararg type is greater than the alignment of Int.
     // FIXME: this implementation is not portable because
     // alignof differs from the ABI alignment on some architectures
@@ -310,7 +310,7 @@ final public class VaListBuilder {
     return CVaListPointer(_fromUnsafeMutablePointer: storage)
   }
 
-  // Manage storage that is accessed as Words 
+  // Manage storage that is accessed as Words
   // but possibly more aligned than that.
   // FIXME: this should be packaged into a better storage type
 
@@ -327,7 +327,7 @@ final public class VaListBuilder {
 
       if oldStorage != nil {
         storage.moveInitializeFrom(oldStorage, count:oldCount)
-        deallocStorage(wordCount: oldAllocated, 
+        deallocStorage(wordCount: oldAllocated,
           storage: oldStorage)
       }
     }
@@ -340,7 +340,7 @@ final public class VaListBuilder {
 
   @warn_unused_result
   func rawSizeAndAlignment(wordCount: Int) -> (Builtin.Word, Builtin.Word) {
-    return ((wordCount * strideof(Int.self))._builtinWordValue, 
+    return ((wordCount * strideof(Int.self))._builtinWordValue,
       requiredAlignmentInBytes._builtinWordValue)
   }
 

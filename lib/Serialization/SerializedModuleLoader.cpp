@@ -445,7 +445,7 @@ void SerializedASTFile::lookupValue(Module::AccessPathTy accessPath,
                                     SmallVectorImpl<ValueDecl*> &results) const{
   if (!Module::matchesAccessPath(accessPath, name))
     return;
-  
+
   File.lookupValue(name, results);
 }
 

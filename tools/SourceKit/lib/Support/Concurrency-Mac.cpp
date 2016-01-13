@@ -61,7 +61,7 @@ void *WorkQueue::Impl::create(Dequeuing DeqKind, Priority Prio,
 namespace {
 struct ExecuteOnLargeStackInfo {
   dispatch_block_t BlockToRun;
-  
+
   ~ExecuteOnLargeStackInfo() {
     Block_release(BlockToRun);
   }
@@ -97,7 +97,7 @@ toCFunction(void *Ctx, WorkQueue::DispatchFn Fn, bool isStackDeep) {
 #else
   ExecuteInfo->BlockToRun = Block_copy(^{ Fn(Ctx); });
 #endif
-  
+
   return std::make_pair(ExecuteInfo, executeOnLargeStackThread);
 }
 

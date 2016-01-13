@@ -154,7 +154,7 @@ bool IterativeTypeChecker::isUnqualifiedLookupInDeclContextSatisfied(
     if (!isSatisfied(
           requestQualifiedLookupInDeclContext({dc, payload.Name, payload.Loc})))
       return false;
-      
+
     // FIXME: If there is a name, actually perform qualified lookup
     // into this DeclContext. If it succeeds, there's nothing more to
     // do.

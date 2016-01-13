@@ -79,7 +79,7 @@ class Lexer {
   /// @}
 
   Token NextToken;
-  
+
   /// \brief This is true if we're lexing a .sil file instead of a .swift
   /// file.  This enables the 'sil' keyword.
   const bool InSILMode;
@@ -89,7 +89,7 @@ class Lexer {
   /// InSILBody - This is true when we're lexing the body of a SIL declaration
   /// in a SIL file.  This enables some context-sensitive lexing.
   bool InSILBody = false;
-  
+
 public:
   /// \brief Lexer state can be saved/restored to/from objects of this class.
   class State {
@@ -316,14 +316,14 @@ public:
   SourceLoc getLocForStartOfBuffer() const {
     return SourceLoc(llvm::SMLoc::getFromPointer(BufferStart));
   }
-  
+
   /// StringSegment - A segment of a (potentially interpolated) string.
   struct StringSegment {
     enum : char { Literal, Expr } Kind;
     // Loc+Length for the segment inside the string literal, without quotes.
     SourceLoc Loc;
     unsigned Length;
-    
+
     static StringSegment getLiteral(SourceLoc Loc, unsigned Length) {
       StringSegment Result;
       Result.Kind = Literal;
@@ -331,7 +331,7 @@ public:
       Result.Length = Length;
       return Result;
     }
-    
+
     static StringSegment getExpr(SourceLoc Loc, unsigned Length) {
       StringSegment Result;
       Result.Kind = Expr;
@@ -340,7 +340,7 @@ public:
       return Result;
     }
   };
-  
+
   /// \brief Compute the bytes that the actual string literal should codegen to.
   /// If a copy needs to be made, it will be allocated out of the provided
   /// Buffer.
@@ -405,7 +405,7 @@ private:
 
   void lexImpl();
   InFlightDiagnostic diagnose(const char *Loc, Diagnostic Diag);
-  
+
   template<typename ...DiagArgTypes, typename ...ArgTypes>
   InFlightDiagnostic diagnose(const char *Loc, Diag<DiagArgTypes...> DiagID,
                               ArgTypes &&...Args) {
@@ -438,8 +438,8 @@ private:
   void tryLexEditorPlaceholder();
   const char *findEndOfCurlyQuoteStringLiteral(const char*);
 };
-  
-  
+
+
 } // end namespace swift
 
 #endif

@@ -2,7 +2,7 @@
 
 # A small utility to take the output of a Swift validation test run
 # where some compiler crashers have been fixed, and move them into the
-# "fixed" testsuite, removing the "--crash" in the process. 
+# "fixed" testsuite, removing the "--crash" in the process.
 
 import re
 import sys

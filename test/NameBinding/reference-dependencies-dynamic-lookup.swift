@@ -16,17 +16,17 @@ import Foundation
 
   // CHECK-DAG: - "bar"
   func bar(x: Int, y: Int) {}
-  
+
   // FIXME: We don't really need this twice, but de-duplicating is effort.
   // CHECK-DAG: - "bar"
   func bar(str: String) {}
-    
+
   // CHECK-DAG: - "prop"
   var prop: String?
 
   // CHECK-DAG: - "unusedProp"
   var unusedProp: Int = 0
-  
+
   // CHECK-DAG: - "classFunc"
   class func classFunc() {}
 }
@@ -41,17 +41,17 @@ func testDynamicLookup(obj: AnyObject) {
   // CHECK-DAG: - !private "bar"
   obj.bar(1, y: 2)
   obj.bar("abc")
-  
+
   // CHECK-DAG: - !private "classFunc"
   obj.dynamicType.classFunc()
-  
+
   // CHECK-DAG: - !private "prop"
   _ = obj.prop
   // CHECK-DAG: - !private "description"
   _ = obj.description
   // CHECK-DAG: - !private "method"
   _ = obj.method(5, withDouble: 5.0)
-  
+
   // CHECK-DAG: - !private "subscript"
   _ = obj[2] as AnyObject
   _ = obj[2] as AnyObject!

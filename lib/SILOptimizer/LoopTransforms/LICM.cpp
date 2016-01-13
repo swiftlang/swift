@@ -208,7 +208,7 @@ static bool hasNoSideEffect(SILInstruction *Inst, ReadSet &SafeReads) {
   // must - after hoisting - also be executed before said access.
   if (isa<CondFailInst>(Inst))
     return true;
-  
+
   // Can't hoist if the instruction could read from memory and is not marked
   // as safe.
   if (SafeReads.count(Inst))
@@ -216,7 +216,7 @@ static bool hasNoSideEffect(SILInstruction *Inst, ReadSet &SafeReads) {
 
   if (Inst->getMemoryBehavior() == SILInstruction::MemoryBehavior::None)
     return true;
-  
+
   return false;
 }
 
@@ -225,7 +225,7 @@ static bool canHoistInstruction(SILInstruction *Inst, SILLoop *Loop,
   // Can't hoist terminators.
   if (isa<TermInst>(Inst))
     return false;
-  
+
   // Can't hoist allocation and dealloc stacks.
   if (isa<AllocationInst>(Inst) || isa<DeallocStackInst>(Inst))
     return false;
@@ -239,7 +239,7 @@ static bool canHoistInstruction(SILInstruction *Inst, SILLoop *Loop,
     DEBUG(llvm::dbgs() << "   loop variant operands\n");
     return false;
   }
-  
+
   return true;
 }
 
@@ -535,7 +535,7 @@ public:
   /// We only hoist semantic calls on high-level SIL because we can be sure that
   /// e.g. an Array as SILValue is really immutable (including its content).
   bool RunsOnHighLevelSil;
-  
+
   StringRef getName() override {
     return RunsOnHighLevelSil ? "High-level Loop Invariant Code Motion" :
                                 "Loop Invariant Code Motion";

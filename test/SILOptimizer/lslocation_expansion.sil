@@ -54,10 +54,10 @@ struct S4 {
 }
 
 class SelfLoop {
-  var a: Int 
-  var b: Int 
+  var a: Int
+  var b: Int
   var c: SelfLoop
-   deinit 
+   deinit
   init()
 }
 
@@ -111,7 +111,7 @@ bb0(%0 : $B):
 // CHECK-NEXT: Address Projection Type: $*Builtin.Int64
 // CHECK-NEXT: Field Type: var value: Int64
 // CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Field Type: var a: Int  
+// CHECK-NEXT: Field Type: var a: Int
 sil @store_after_store_struct : $@convention(thin) () -> () {
   %1 = alloc_stack $S1
   %9 = integer_literal $Builtin.Int64, 0          // user: %10
@@ -186,79 +186,79 @@ sil @store_after_store_struct : $@convention(thin) () -> () {
 // CHECK-NEXT: Address Projection Type: $*Builtin.Int64
 // CHECK-NEXT: Field Type: var value: Int64
 // CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Field Type: var a: Int   
+// CHECK-NEXT: Field Type: var a: Int
 // CHECK-NEXT: Address Projection Type: $*S2
-// CHECK-NEXT: Field Type: var c: S2    
+// CHECK-NEXT: Field Type: var c: S2
 // CHECK-NEXT: Address Projection Type: $*S3
-// CHECK-NEXT: Field Type: var y: S3    
+// CHECK-NEXT: Field Type: var y: S3
 // CHECK-NEXT: alloc_stack $S4
 // CHECK-NEXT: Address Projection Type: $*Builtin.Int64
 // CHECK-NEXT: Field Type: var value: Int64
 // CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Field Type: var b: Int   
+// CHECK-NEXT: Field Type: var b: Int
 // CHECK-NEXT: Address Projection Type: $*S3
-// CHECK-NEXT: Field Type: var y: S3    
+// CHECK-NEXT: Field Type: var y: S3
 // CHECK-NEXT: alloc_stack $S4
 // CHECK-NEXT: Address Projection Type: $*Builtin.Int64
 // CHECK-NEXT: Field Type: var value: Int64
 // CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Field Type: var b: Int   
+// CHECK-NEXT: Field Type: var b: Int
 // CHECK-NEXT: Address Projection Type: $*S2
-// CHECK-NEXT: Field Type: var a: S2    
+// CHECK-NEXT: Field Type: var a: S2
 // CHECK-NEXT: Address Projection Type: $*S3
-// CHECK-NEXT: Field Type: var y: S3    
+// CHECK-NEXT: Field Type: var y: S3
 // CHECK-NEXT: alloc_stack $S4
 // CHECK-NEXT: Address Projection Type: $*Builtin.Int64
 // CHECK-NEXT: Field Type: var value: Int64
 // CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Field Type: var a: Int   
+// CHECK-NEXT: Field Type: var a: Int
 // CHECK-NEXT: Address Projection Type: $*S2
-// CHECK-NEXT: Field Type: var a: S2    
+// CHECK-NEXT: Field Type: var a: S2
 // CHECK-NEXT: Address Projection Type: $*S3
-// CHECK-NEXT: Field Type: var y: S3    
+// CHECK-NEXT: Field Type: var y: S3
 // CHECK-NEXT: alloc_stack $S4
 // CHECK-NEXT: Address Projection Type: $*Builtin.Int64
 // CHECK-NEXT: Field Type: var value: Int64
 // CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Field Type: var b: Int   
+// CHECK-NEXT: Field Type: var b: Int
 // CHECK-NEXT: Address Projection Type: $*S2
-// CHECK-NEXT: Field Type: var c: S2    
+// CHECK-NEXT: Field Type: var c: S2
 // CHECK-NEXT: Address Projection Type: $*S3
-// CHECK-NEXT: Field Type: var x: S3    
+// CHECK-NEXT: Field Type: var x: S3
 // CHECK-NEXT: alloc_stack $S4
 // CHECK-NEXT: Address Projection Type: $*Builtin.Int64
 // CHECK-NEXT: Field Type: var value: Int64
 // CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Field Type: var a: Int   
+// CHECK-NEXT: Field Type: var a: Int
 // CHECK-NEXT: Address Projection Type: $*S2
-// CHECK-NEXT: Field Type: var c: S2    
+// CHECK-NEXT: Field Type: var c: S2
 // CHECK-NEXT: Address Projection Type: $*S3
-// CHECK-NEXT: Field Type: var x: S3    
+// CHECK-NEXT: Field Type: var x: S3
 // CHECK-NEXT: alloc_stack $S4
 // CHECK-NEXT: Address Projection Type: $*Builtin.Int64
 // CHECK-NEXT: Field Type: var value: Int64
 // CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Field Type: var b: Int   
+// CHECK-NEXT: Field Type: var b: Int
 // CHECK-NEXT: Address Projection Type: $*S3
-// CHECK-NEXT: Field Type: var x: S3    
+// CHECK-NEXT: Field Type: var x: S3
 // CHECK-NEXT: alloc_stack $S4
 // CHECK-NEXT: Address Projection Type: $*Builtin.Int64
 // CHECK-NEXT: Field Type: var value: Int64
 // CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Field Type: var b: Int   
+// CHECK-NEXT: Field Type: var b: Int
 // CHECK-NEXT: Address Projection Type: $*S2
-// CHECK-NEXT: Field Type: var a: S2    
+// CHECK-NEXT: Field Type: var a: S2
 // CHECK-NEXT: Address Projection Type: $*S3
-// CHECK-NEXT: Field Type: var x: S3    
+// CHECK-NEXT: Field Type: var x: S3
 // CHECK-NEXT: alloc_stack $S4
 // CHECK-NEXT: Address Projection Type: $*Builtin.Int64
 // CHECK-NEXT: Field Type: var value: Int64
 // CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Field Type: var a: Int   
+// CHECK-NEXT: Field Type: var a: Int
 // CHECK-NEXT: Address Projection Type: $*S2
-// CHECK-NEXT: Field Type: var a: S2    
+// CHECK-NEXT: Field Type: var a: S2
 // CHECK-NEXT: Address Projection Type: $*S3
-// CHECK-NEXT: Field Type: var x: S3    
+// CHECK-NEXT: Field Type: var x: S3
 sil hidden @many_struct_allocs : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $S2, var, name "a"                  // users: %6, %18
@@ -284,7 +284,7 @@ bb0:
   return %15 : $()                                // id: %19
 }
 
-// CHECK-LABEL: self_loop 
+// CHECK-LABEL: self_loop
 // CHECK: #0 store
 // CHECK-NEXT: alloc_stack $S5, var, name "b"     // users: %4, %7
 // CHECK-NEXT: Address Projection Type: $*SelfLoop

@@ -14,9 +14,9 @@ private class A {
   // CHECK: !DISubprogram(name: "getMember"
   // CHECK-SAME:          linkageName: "{{[^"]*}}[[DISCRIMINATOR]]
   // CHECK-SAME:          line: [[@LINE+2]]
-  // CHECK-SAME:          isLocal: true, isDefinition: true 
+  // CHECK-SAME:          isLocal: true, isDefinition: true
   private func getMember() -> Int64 { return member }
-  func getVal() -> Int64 { return getMember() }  
+  func getVal() -> Int64 { return getMember() }
 }
 
 func f() {

@@ -248,7 +248,7 @@ getCalleeFunction(FullApplySite AI, bool &IsThick,
   case SILFunctionTypeRepresentation::Method:
   case SILFunctionTypeRepresentation::WitnessMethod:
     break;
-    
+
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::Block:
@@ -442,7 +442,7 @@ class MandatoryInlining : public SILModuleTransform {
     ImmutableFunctionSet::Factory SetFactory;
 
     for (auto &F : *M) {
-      
+
       // Don't inline into thunks, even transparent callees.
       if (F.isThunk())
         continue;
@@ -457,7 +457,7 @@ class MandatoryInlining : public SILModuleTransform {
       return;
 
     bool isWholeModule = M->isWholeModule();
-    
+
     // Now that we've inlined some functions, clean up.  If there are any
     // transparent functions that are deserialized from another module that are
     // now unused, just remove them from the module.
@@ -482,7 +482,7 @@ class MandatoryInlining : public SILModuleTransform {
       // even if not referenced inside SIL.
       if (F.getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod)
         continue;
-      
+
       // Okay, just erase the function from the module.
       M->eraseFunction(&F);
     }

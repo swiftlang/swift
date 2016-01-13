@@ -346,12 +346,12 @@ public func toDebugString<T>(x: T) -> String {
 public var _playgroundPrintHook : ((String) -> Void)? = {_ in () }
 
 internal struct _TeeStream<
-  L : OutputStreamType, 
+  L : OutputStreamType,
   R : OutputStreamType
 > : OutputStreamType {
   var left: L
   var right: R
-  
+
   /// Append the given `string` to this stream.
   mutating func write(string: String)
   { left.write(string); right.write(string) }

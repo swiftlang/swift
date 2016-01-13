@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 //  This file defines diagnostics emitted during lexing and parsing.
-//  Each diagnostic is described using one of three kinds (error, warning, or 
+//  Each diagnostic is described using one of three kinds (error, warning, or
 //  note) along with a unique identifier, category, options, and text, and is
 //  followed by a signature describing the diagnostic argument kinds.
 //
@@ -153,7 +153,7 @@ ERROR(expected_identifier_in_decl,decl_parsing,none,
 ERROR(expected_identifier_after_case_comma,decl_parsing,none,
       "expected identifier after comma in enum 'case' declaration", ())
 ERROR(decl_redefinition,decl_parsing,none,
-      "%select{declaration|definition}0 conflicts with previous value", 
+      "%select{declaration|definition}0 conflicts with previous value",
       (bool))
 ERROR(let_cannot_be_computed_property,decl_parsing,none,
       "'let' declarations cannot be computed properties", ())

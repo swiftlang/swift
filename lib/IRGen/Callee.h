@@ -150,7 +150,7 @@ namespace irgen {
       result.Substitutions = subs;
       return result;
     }
-    
+
     SILFunctionTypeRepresentation getRepresentation() const {
       return OrigFnType->getRepresentation();
     }

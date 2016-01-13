@@ -172,9 +172,9 @@ ContainsContainsSlice(containsSlice: ContainsSlice(slice: [1, 2, 3])) // CHECK: 
 protocol Proto {
   func foo()
 }
-extension Double : Proto { 
+extension Double : Proto {
   func foo() {
-    print("Double: \(self)\n", terminator: "") 
+    print("Double: \(self)\n", terminator: "")
   }
 }
 var pr : Proto = 3.14159

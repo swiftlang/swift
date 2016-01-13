@@ -32,7 +32,7 @@ func testNativeClass(obj obj: NonObjCClass) {
 
   // SIL: class_method [volatile] [[OBJ:%[0-9]+]] : $NonObjCClass, #NonObjCClass.objcProp!getter.1.foreign
   var x = obj.objcProp
-  
+
   // SIL: class_method [volatile] [[OBJ:%[0-9]+]] : $NonObjCClass, #NonObjCClass.subscript!getter.1.foreign
   _ = obj[42]
 }

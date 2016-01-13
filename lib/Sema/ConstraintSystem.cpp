@@ -26,7 +26,7 @@ using namespace constraints;
 ConstraintSystem::ConstraintSystem(TypeChecker &tc, DeclContext *dc,
                                    ConstraintSystemOptions options)
   : TC(tc), DC(dc), Options(options),
-    Arena(tc.Context, Allocator, 
+    Arena(tc.Context, Allocator,
           [&](TypeVariableType *baseTypeVar, AssociatedTypeDecl *assocType) {
             return getMemberType(baseTypeVar, assocType,
                                  ConstraintLocatorBuilder(nullptr),
@@ -48,13 +48,13 @@ bool ConstraintSystem::hasFreeTypeVariables() {
       return true;
     }
   }
-  
+
   return false;
 }
 
 void ConstraintSystem::addTypeVariable(TypeVariableType *typeVar) {
   TypeVariables.push_back(typeVar);
-  
+
   // Notify the constraint graph.
   (void)CG[typeVar];
 }
@@ -75,7 +75,7 @@ void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
 
 void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
                                        bool updateState) {
-  
+
   // If the type to be fixed is an optional type that wraps the type parameter
   // itself, we do not want to go through with the assignment. To do so would
   // force the type variable to be adjacent to itself.
@@ -83,7 +83,7 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
     if (optValueType->isEqual(typeVar))
       return;
   }
-  
+
   typeVar->getImpl().assignFixedType(type, getSavedBindings());
 
   if (!updateState)
@@ -369,13 +369,13 @@ bool ConstraintSystem::addConstraint(Constraint *constraint,
     // Remove the constraint from the constraint graph.
     if (simplifyExisting)
       CG.removeConstraint(constraint);
-    
+
     return true;
 
   case SolutionKind::Unsolved:
     // We couldn't solve this constraint; add it to the pile.
     if (!isExternallySolved) {
-      InactiveConstraints.push_back(constraint);        
+      InactiveConstraints.push_back(constraint);
     }
 
     // Add this constraint to the constraint graph.
@@ -391,7 +391,7 @@ bool ConstraintSystem::addConstraint(Constraint *constraint,
 }
 
 TypeVariableType *
-ConstraintSystem::getMemberType(TypeVariableType *baseTypeVar, 
+ConstraintSystem::getMemberType(TypeVariableType *baseTypeVar,
                                 AssociatedTypeDecl *assocType,
                                 ConstraintLocatorBuilder locator,
                                 unsigned options) {
@@ -401,7 +401,7 @@ ConstraintSystem::getMemberType(TypeVariableType *baseTypeVar,
     auto loc = getConstraintLocator(locator);
     auto memberTypeVar = createTypeVariable(loc, options);
     addConstraint(Constraint::create(*this, ConstraintKind::TypeMember,
-                                     baseTypeVar, memberTypeVar, 
+                                     baseTypeVar, memberTypeVar,
                                      assocType->getName(), loc));
     return memberTypeVar;
   });
@@ -450,18 +450,18 @@ namespace {
                                               member->getName(), locator));
           return memberTypeVar;
         }
-                                
-                                
+
+
         ArchetypeType::NestedType nestedType;
         ArchetypeType* archetype = nullptr;
-                                
+
         if (implArchetype->hasNestedType(member->getName())) {
           nestedType = implArchetype->getNestedType(member->getName());
           archetype = nestedType.getValue()->getAs<ArchetypeType>();
         } else if (implArchetype->isSelfDerived()) {
           archetype = implArchetype;
         }
-                                
+
         ConstraintLocator *locator;
         if (archetype) {
           locator = CS.getConstraintLocator(
@@ -471,13 +471,13 @@ namespace {
           // in which case it's quite silly to create a type variable at all.
           locator = CS.getConstraintLocator(Locator.withPathElement(member));
         }
-                                
+
         auto memberTypeVar = CS.createTypeVariable(locator,
                                                    TVO_PrefersSubtypeBinding);
 
         // Bind the member's type variable as a type member of the base.
         CS.addConstraint(Constraint::create(CS, ConstraintKind::TypeMember,
-                                            baseTypeVar, memberTypeVar, 
+                                            baseTypeVar, memberTypeVar,
                                             member->getName(), locator));
 
         if (!archetype) {
@@ -486,7 +486,7 @@ namespace {
           // variable now, and let binding occur during overload resolution.
           return memberTypeVar;
         }
-                                
+
         // FIXME: Would be better to walk the requirements of the protocol
         // of which the associated type is a member.
         if (auto superclass = member->getSuperclass()) {
@@ -539,10 +539,10 @@ namespace {
       // Replace a generic type parameter with its corresponding type variable.
       if (auto genericParam = type->getAs<GenericTypeParamType>()) {
         auto known = replacements.find(genericParam->getCanonicalType());
-        
+
         if (known == replacements.end())
           return cs.createTypeVariable(nullptr, TVO_PrefersSubtypeBinding);
-        
+
         return known->second;
       }
 
@@ -613,13 +613,13 @@ namespace {
         // Map the generic parameters to their corresponding type variables.
         llvm::SmallVector<Type, 4> arguments;
         for (auto gp : unboundDecl->getInnermostGenericParamTypes()) {
-          assert(replacements.count(gp->getCanonicalType()) && 
+          assert(replacements.count(gp->getCanonicalType()) &&
                  "Missing generic parameter?");
           arguments.push_back(replacements[gp->getCanonicalType()]);
         }
         return BoundGenericType::get(unboundDecl, parentTy, arguments);
       }
-      
+
       return type;
     }
   };
@@ -644,14 +644,14 @@ Type ConstraintSystem::openType(
 
 bool ConstraintSystem::isArrayType(Type t) {
   t = t->getDesugaredType();
-  
+
   // ArraySliceType<T> desugars to Array<T>.
   if (isa<ArraySliceType>(t.getPointer()))
     return true;
   if (auto boundStruct = dyn_cast<BoundGenericStructType>(t.getPointer())) {
     return boundStruct->getDecl() == TC.Context.getArrayDecl();
   }
-  
+
   return false;
 }
 
@@ -675,10 +675,10 @@ bool ConstraintSystem::isSetType(Type type) {
   return false;
 }
 
-Type ConstraintSystem::openBindingType(Type type, 
+Type ConstraintSystem::openBindingType(Type type,
                                        ConstraintLocatorBuilder locator) {
   Type result = openType(type, locator);
-  
+
   if (isArrayType(type)) {
     auto boundStruct = cast<BoundGenericStructType>(type.getPointer());
     if (auto replacement = getTypeChecker().getArraySliceType(
@@ -710,7 +710,7 @@ static Type getFixedTypeRecursiveHelper(ConstraintSystem &cs,
   return nullptr;
 }
 
-Type ConstraintSystem::getFixedTypeRecursive(Type type, 
+Type ConstraintSystem::getFixedTypeRecursive(Type type,
                                              TypeVariableType *&typeVar,
                                              bool wantRValue,
                                              bool retainParens) {
@@ -790,7 +790,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
                false,
                value->getDeclContext()->getGenericTypeContextDepth());
     auto openedFnType = openedType->castTo<FunctionType>();
-    
+
     // If this is a method whose result type is dynamic Self, replace
     // DynamicSelf with the actual object type.
     if (func->hasDynamicSelf()) {
@@ -898,12 +898,12 @@ void ConstraintSystem::openGeneric(
       addConstraint(ConstraintKind::Bind, typeVar, archetype, locatorPtr);
   }
 
-  
+
   GetTypeVariable getTypeVariable{*this, locator};
   ReplaceDependentTypes replaceDependentTypes(*this, dc,
                                               skipProtocolSelfConstraint,
                                               minOpeningDepth,
-                                              locator, replacements, 
+                                              locator, replacements,
                                               getTypeVariable);
 
   // Remember that any new constraints generated by opening this generic are
@@ -1012,7 +1012,7 @@ ConstraintSystem::getTypeOfMemberReference(
   llvm::DenseMap<CanType, TypeVariableType *> *replacementsPtr) {
   // Figure out the instance type used for the base.
   TypeVariableType *baseTypeVar = nullptr;
-  Type baseObjTy = getFixedTypeRecursive(baseTy, baseTypeVar, 
+  Type baseObjTy = getFixedTypeRecursive(baseTy, baseTypeVar,
                                          /*wantRValue=*/true);
   bool isInstance = true;
   if (auto baseMeta = baseObjTy->getAs<AnyMetatypeType>()) {
@@ -1106,7 +1106,7 @@ ConstraintSystem::getTypeOfMemberReference(
       // Determine the object type of 'self'.
       auto nominal = value->getDeclContext()->getDeclaredTypeOfContext()
                        ->getAnyNominal();
-      
+
       // We want to track if the generic context is represented by a
       // class-bound existential so we won't inappropriately wrap the
       // self type in an inout later on.
@@ -1114,7 +1114,7 @@ ConstraintSystem::getTypeOfMemberReference(
         isClassBoundExistential = metatype->getInstanceType()->
                                             isClassExistentialType();
       }
-      
+
       if (dc->isProtocolOrProtocolExtensionContext()) {
         // Retrieve the type variable for 'Self'.
         selfTy = replacements[dc->getProtocolSelf()->getDeclaredType()
@@ -1127,7 +1127,7 @@ ConstraintSystem::getTypeOfMemberReference(
     } else {
       selfTy = value->getDeclContext()->getDeclaredTypeOfContext();
     }
-    
+
     // If we have a type reference, look through the metatype.
     if (isTypeReference)
       openedType = openedType->castTo<AnyMetatypeType>()->getInstanceType();
@@ -1262,7 +1262,7 @@ void ConstraintSystem::addOverloadSet(Type boundType,
   assert(!choices.empty() && "Empty overload set");
 
   SmallVector<Constraint *, 4> overloads;
-  
+
   // As we do for other favored constraints, if a favored overload has been
   // specified, let it be the first term in the disjunction.
   if (favoredChoice) {
@@ -1271,25 +1271,25 @@ void ConstraintSystem::addOverloadSet(Type boundType,
                                        boundType,
                                        *favoredChoice,
                                        locator);
-    
+
     bindOverloadConstraint->setFavored();
-    
+
     overloads.push_back(bindOverloadConstraint);
   }
-  
+
   for (auto choice : choices) {
     if (favoredChoice && (favoredChoice == &choice))
       continue;
-    
+
     overloads.push_back(Constraint::createBindOverload(*this, boundType, choice,
                                                        locator));
   }
-  
+
   auto disjunction = Constraint::createDisjunction(*this, overloads, locator);
-  
+
   if (favoredChoice)
     disjunction->setFavored();
-  
+
   addConstraint(disjunction);
 }
 
@@ -1336,7 +1336,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         = getTypeOfReference(choice.getDecl(), isTypeReference,
                              choice.isSpecialized(), locator);
     }
-    
+
     if (choice.getDecl()->getAttrs().hasAttribute<OptionalAttr>() &&
         !isa<SubscriptDecl>(choice.getDecl())) {
       // For a non-subscript declaration that is an optional
@@ -1347,7 +1347,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       // Subscript declarations are handled within
       // getTypeOfMemberReference(); their result types are optional.
       refType = OptionalType::get(refType->getRValueType());
-    } 
+    }
     // For a non-subscript declaration found via dynamic lookup, strip
     // off the lvalue-ness (FIXME: as a temporary hack. We eventually
     // want this to work) and make a reference to that declaration be
@@ -1356,9 +1356,9 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // Subscript declarations are handled within
     // getTypeOfMemberReference(); their result types are unchecked
     // optional.
-    else if (isDynamicResult && !isa<SubscriptDecl>(choice.getDecl())) {    
+    else if (isDynamicResult && !isa<SubscriptDecl>(choice.getDecl())) {
       refType = ImplicitlyUnwrappedOptionalType::get(refType->getRValueType());
-    } 
+    }
 
     // If the declaration is unavailable, note that in the score.
     if (choice.getDecl()->getAttrs().isUnavailable(getASTContext())) {
@@ -1385,7 +1385,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     }
     break;
   }
-  
+
   // If we have a type variable for the 'Self' of a protocol
   // requirement that's being opened, and the resulting type has an
   // archetype in it, replace the 'Self' archetype with the
@@ -1400,14 +1400,14 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       });
   }
   assert(!refType->hasTypeParameter() && "Cannot have a dependent type here");
-  
+
   // If we're binding to an init member, the 'throws' need to line up between
   // the bound and reference types.
   if (choice.isDecl()) {
     auto decl = choice.getDecl();
     if (auto CD = dyn_cast<ConstructorDecl>(decl)) {
       auto boundFunctionType = boundType->getAs<AnyFunctionType>();
-        
+
       if (boundFunctionType &&
           CD->isBodyThrowing() != boundFunctionType->throws()) {
         boundType = FunctionType::get(boundFunctionType->getInput(),
@@ -1489,7 +1489,7 @@ Type ConstraintSystem::simplifyType(Type type,
           return result;
         }
       }
-      
+
       return tvt;
     }
 
@@ -1508,7 +1508,7 @@ Type ConstraintSystem::simplifyType(Type type,
         return FunctionType::get(ft->getInput(), ft->getResult(), extInfo);
       }
     }
-    
+
 
     return type;
   });

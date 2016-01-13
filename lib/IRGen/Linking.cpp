@@ -56,7 +56,7 @@ static StringRef mangleValueWitness(ValueWitness witness) {
   case ValueWitness::GetEnumTag: return "ug";
   case ValueWitness::DestructiveProjectEnumData: return "up";
   case ValueWitness::DestructiveInjectEnumTag: return "ui";
-      
+
   case ValueWitness::Size:
   case ValueWitness::Flags:
   case ValueWitness::Stride:
@@ -211,7 +211,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     mangler.mangleType(getType(), 0);
     mangler.mangleProtocolConformance(getProtocolConformance());
     return mangler.finalize(buffer);
-      
+
   //   global ::= 'Wt' protocol-conformance identifier
   case Kind::AssociatedTypeMetadataAccessFunction:
     mangler.append("_TWt");

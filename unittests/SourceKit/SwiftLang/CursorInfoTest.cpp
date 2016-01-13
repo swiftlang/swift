@@ -72,7 +72,7 @@ class NullEditorConsumer : public EditorConsumer {
   bool recordAffectedRange(unsigned Offset, unsigned Length) override {
     return false;
   }
-  
+
   bool recordAffectedLineRange(unsigned Line, unsigned Length) override {
     return false;
   }

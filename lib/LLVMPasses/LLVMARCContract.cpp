@@ -299,7 +299,7 @@ bool SwiftARCContractImpl::run() {
 
       if (Kind != RT_Unknown)
         continue;
-      
+
       // If we have an unknown call, we need to create any retainN calls we
       // have seen. The reason why is that we do not want to move retains,
       // releases over isUniquelyReferenced calls. Specifically imagine this:

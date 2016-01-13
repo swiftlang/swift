@@ -43,9 +43,9 @@ namespace swift {
   class PersistentParserState;
   class CodeCompletionCallbacks;
   class DelayedParsingCallbacks;
-  
+
   struct EnumElementInfo;
-  
+
   /// Different contexts in which BraceItemList are parsed.
   enum class BraceItemListKind {
     /// A statement list terminated by a closing brace. The default.
@@ -64,7 +64,7 @@ namespace swift {
     ActiveConfigBlock
   };
 
-  
+
 class Parser {
   Parser(const Parser&) = delete;
   void operator=(const Parser&) = delete;
@@ -86,24 +86,24 @@ public:
   std::vector<std::pair<SourceLoc, std::vector<ParamDecl*>>> AnonClosureVars;
 
   bool IsParsingInterfaceTokens = false;
-  
+
   /// DisabledVars is a list of variables for whom local name lookup is
   /// disabled.  This is used when parsing a PatternBindingDecl to reject self
   /// uses and to disable uses of the bound variables in a let/else block.  The
   /// diagnostic to emit is stored in DisabledVarReason.
   ArrayRef<VarDecl *> DisabledVars;
   Diag<> DisabledVarReason;
-  
+
   llvm::SmallPtrSet<Decl *, 2> AlreadyHandledDecls;
   enum {
     /// InVarOrLetPattern has this value when not parsing a pattern.
     IVOLP_NotInVarOrLet,
-    
+
     /// InVarOrLetPattern has this value when we're in a matching pattern, but
     /// not within a var/let pattern.  In this phase, identifiers are references
     /// to the enclosing scopes, not a variable binding.
     IVOLP_InMatchingPattern,
-    
+
     /// InVarOrLetPattern has this value when parsing a pattern in which bound
     /// variables are implicitly immutable, but allowed to be marked mutable by
     /// using a 'var' pattern.
@@ -113,7 +113,7 @@ public:
     /// must always be immutable, so you cannot mark a pattern as mutable with
     /// 'var'. This happens in for-each patterns.
     IVOLP_AlwaysImmutable,
-    
+
     /// When InVarOrLetPattern has this value, bound variables are mutable, and
     /// nested let/var patterns are not permitted. This happens when parsing a
     /// 'var' decl or when parsing inside a 'var' pattern.
@@ -168,7 +168,7 @@ public:
 
   /// \brief The location of the previous token.
   SourceLoc PreviousLoc;
-  
+
   /// A RAII object for temporarily changing CurDeclContext.
   class ContextChange {
   protected:
@@ -441,7 +441,7 @@ public:
     if (Tok.isAtStartOfLine()) return false;
     return consumeIf(K);
   }
-  
+
   /// \brief Read tokens until we get to one of the specified tokens, then
   /// return without consuming it.  Because we cannot guarantee that the token
   /// will ever occur, this skips to some likely good stopping point.
@@ -465,7 +465,7 @@ public:
   }
 
   void skipUntilDeclRBrace(tok T1, tok T2 = tok::unknown);
-  
+
   /// Skip a single token, but match parentheses, braces, and square brackets.
   ///
   /// Note: this does \em not match angle brackets ("<" and ">")! These are
@@ -503,9 +503,9 @@ public:
     return diagnose(Tok.getLoc(),
                     Diagnostic(DiagID, std::forward<ArgTypes>(Args)...));
   }
-  
+
   void diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New);
-     
+
   /// \brief Check whether the current token starts with '<'.
   bool startsWithLess(Token Tok) {
     return Tok.isAnyOperator() && Tok.getText()[0] == '<';
@@ -562,7 +562,7 @@ public:
                        Diag<DiagArgTypes...> ID, ArgTypes... Args) {
     return parseIdentifier(Result, L, Diagnostic(ID, Args...));
   }
-  
+
 
   /// \brief Consume an identifier or operator if present and return its name
   /// in \p Result.  Otherwise, emit an error and return true.
@@ -587,7 +587,7 @@ public:
   ///
   /// If the input is malformed, this emits the specified error diagnostic.
   bool parseToken(tok K, SourceLoc &TokLoc, const Diagnostic &D);
-  
+
   template<typename ...DiagArgTypes, typename ...ArgTypes>
   bool parseToken(tok K, Diag<DiagArgTypes...> ID, ArgTypes... Args) {
     SourceLoc L;
@@ -598,7 +598,7 @@ public:
                   Diag<DiagArgTypes...> ID, ArgTypes... Args) {
     return parseToken(K, L, Diagnostic(ID, Args...));
   }
-  
+
   /// \brief Parse the specified expected token and return its location
   /// on success.  On failure, emit the specified error diagnostic, and
   /// a note at the specified note location.
@@ -620,11 +620,11 @@ public:
                                BraceItemListKind ConfigKind =
                                    BraceItemListKind::Brace);
   ParserResult<BraceStmt> parseBraceItemList(Diag<> ID);
-  
+
   void parseIfConfigClauseElements(bool isActive,
                                    BraceItemListKind Kind,
                                    SmallVectorImpl<ASTNode> &Elements);
-  
+
   void parseTopLevelCodeDeclDelayed();
 
   //===--------------------------------------------------------------------===//
@@ -689,7 +689,7 @@ public:
   ParserResult<TypeDecl> parseDeclTypeAlias(bool WantDefinition,
                                             bool isAssociatedType,
                                             DeclAttributes &Attributes);
-  
+
   ParserResult<IfConfigDecl> parseDeclIfConfig(ParseDeclOptions Flags);
   /// Parse a #line directive.
   ParserStatus parseLineDirective();
@@ -707,7 +707,7 @@ public:
 
   bool parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                              DeclAttrKind DK);
-  
+
   /// Parse a version tuple of the form x[.y[.z]]. Returns true if there was
   /// an error parsing.
   bool parseVersionTuple(clang::VersionTuple &Version, SourceRange &Range,
@@ -721,8 +721,8 @@ public:
   bool parseTypeAttributeListPresent(TypeAttributes &Attributes);
   bool parseTypeAttribute(TypeAttributes &Attributes,
                           bool justChecking = false);
-  
-  
+
+
   ParserResult<ImportDecl> parseDeclImport(ParseDeclOptions Flags,
                                            DeclAttributes &Attributes);
   ParserStatus parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
@@ -783,7 +783,7 @@ public:
                               SourceLoc StaticLoc, bool hasInitializer,
                               const DeclAttributes &Attributes,
                               SmallVectorImpl<Decl *> &Decls);
-  
+
   void consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
                                    const DeclAttributes &Attrs);
   ParserResult<FuncDecl> parseDeclFunc(SourceLoc StaticLoc,
@@ -833,7 +833,7 @@ public:
 
   //===--------------------------------------------------------------------===//
   // Type Parsing
-  
+
   ParserResult<TypeRepr> parseType();
   ParserResult<TypeRepr> parseType(Diag<> MessageID,
                                    bool HandleCodeCompletion = true);
@@ -875,7 +875,7 @@ public:
 
   bool isOptionalToken(const Token &T) const;
   SourceLoc consumeOptionalToken();
-  
+
   bool isImplicitlyUnwrappedOptionalToken(const Token &T) const;
   SourceLoc consumeImplicitlyUnwrappedOptionalToken();
 
@@ -889,7 +889,7 @@ public:
   struct DefaultArgumentInfo {
     llvm::SmallVector<DefaultArgumentInitializer *, 4> ParsedContexts;
     unsigned NextIndex : 31;
-    
+
     /// Track whether or not one of the parameters in a signature's argument
     /// list accepts a default argument.
     unsigned HasDefaultArgument : 1;
@@ -901,7 +901,7 @@ public:
     /// Set the parsed context for all the initializers to the given
     /// function.
     void setFunctionContext(DeclContext *DC);
-    
+
     DefaultArgumentInfo(bool inTypeContext) {
       NextIndex = inTypeContext ? 1 : 0;
       HasDefaultArgument = false;
@@ -1019,7 +1019,7 @@ public:
 
   ParserResult<Pattern> parseTypedPattern();
   ParserResult<Pattern> parsePattern();
-  
+
   /// \brief Parse a tuple pattern element.
   ///
   /// \code
@@ -1031,7 +1031,7 @@ public:
   std::pair<ParserStatus, Optional<TuplePatternElt>>
   parsePatternTupleElement();
   ParserResult<Pattern> parsePatternTuple();
-  
+
   ParserResult<Pattern>
   parseOptionalPatternTypeAnnotation(ParserResult<Pattern> P,
                                      bool isOptional);
@@ -1039,10 +1039,10 @@ public:
   ParserResult<Pattern> parseMatchingPatternAsLetOrVar(bool isLet,
                                                        SourceLoc VarLoc,
                                                        bool isExprBasic);
-  
+
 
   Pattern *createBindingFromPattern(SourceLoc loc, Identifier name, bool isLet);
-  
+
 
   /// \brief Determine whether this token can only start a matching pattern
   /// production and not an expression.
@@ -1051,7 +1051,7 @@ public:
   //===--------------------------------------------------------------------===//
   // Speculative type list parsing
   //===--------------------------------------------------------------------===//
-  
+
   /// Returns true if we can parse a generic argument list at the current
   /// location in expression context. This parses types without generating
   /// AST nodes from the '<' at the current location up to a matching '>'. If
@@ -1096,7 +1096,7 @@ public:
   ParserResult<Expr> parseExprSuper();
   ParserResult<Expr> parseExprConfiguration();
   Expr *parseExprStringLiteral();
-  
+
   Expr *parseExprIdentifier();
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
                                    Identifier PlaceholderId);

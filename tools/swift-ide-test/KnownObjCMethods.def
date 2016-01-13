@@ -17,7 +17,7 @@
 
 // INSTANCE_METHOD(ClassName, Selector, Options)
 // CLASS_METHOD(ClassName, Selector, Options)
-// 
+//
 //   Describes an instance or class method.
 //
 //   ClassName: The name of the class.
@@ -80,7 +80,7 @@
 #endif
 
 START_MODULE(ObjectiveC)
-INSTANCE_METHOD(NSObject, (0, "dealloc"), 
+INSTANCE_METHOD(NSObject, (0, "dealloc"),
                 Unavailable("use 'deinit' to define a de-initializer"))
 
 INSTANCE_METHOD(NSObject, (0, "init"), DesignatedInit)
@@ -110,7 +110,7 @@ INSTANCE_METHOD(NSDictionary, (3, "initWithObjects", "forKeys", "count"),
 CLASS_METHOD(NSDistributedNotificationCenter, (1, "notificationCenterForType"),
              FactoryAsClassMethod)
 
-INSTANCE_METHOD(NSError, (3, "initWithDomain", "code", "userInfo"), 
+INSTANCE_METHOD(NSError, (3, "initWithDomain", "code", "userInfo"),
                 DesignatedInit)
 
 INSTANCE_METHOD(NSException, (3, "initWithName", "reason", "userInfo"),
@@ -121,15 +121,15 @@ INSTANCE_METHOD(NSExpression, (1, "initWithExpressionType"), DesignatedInit)
 INSTANCE_METHOD(NSExtensionContext, (2, "openURL", "completion"),
                 Unavailable("call openURL:completionHandler:"))
 
-INSTANCE_METHOD(NSFileWrapper, (3, "initWithURL", "options", "error"), 
+INSTANCE_METHOD(NSFileWrapper, (3, "initWithURL", "options", "error"),
                 DesignatedInit)
 INSTANCE_METHOD(NSFileWrapper, (1, "initDirectoryWithFileWrappers"),
                 DesignatedInit)
-INSTANCE_METHOD(NSFileWrapper, (1, "initRegularFileWithContents"), 
+INSTANCE_METHOD(NSFileWrapper, (1, "initRegularFileWithContents"),
                 DesignatedInit)
 INSTANCE_METHOD(NSFileWrapper, (1, "initSymbolicLinkWithDestinationURL"),
                 DesignatedInit)
-INSTANCE_METHOD(NSFileWrapper, (1, "initWithSerializedRepresentation"), 
+INSTANCE_METHOD(NSFileWrapper, (1, "initWithSerializedRepresentation"),
                 DesignatedInit)
 
 INSTANCE_METHOD(NSIndexPath, (0, "init"), DesignatedInit)
@@ -141,7 +141,7 @@ INSTANCE_METHOD(NSIndexSet, (1, "initWithIndexSet"), DesignatedInit)
 
 OBJC_CLASS(NSInvocation, Unavailable(""))
 
-INSTANCE_METHOD(NSInvocationOperation, (1, "initWithInvocation"), 
+INSTANCE_METHOD(NSInvocationOperation, (1, "initWithInvocation"),
                 DesignatedInit)
 
 INSTANCE_METHOD(NSMachPort, (1, "initWithMachPort"), DesignatedInit)
@@ -167,13 +167,13 @@ INSTANCE_METHOD(NSNotificationQueue, (1, "initWithNotificationCenter"),
 INSTANCE_METHOD(NSOrderedSet, (0, "init"), DesignatedInit)
 INSTANCE_METHOD(NSOrderedSet, (2, "initWithObjects", "count"), DesignatedInit)
 
-INSTANCE_METHOD(NSPortMessage, 
+INSTANCE_METHOD(NSPortMessage,
                 (3, "initWithSendPort", "receivePort", "components"),
                 DesignatedInit)
 
 CLASS_METHOD(NSProcessInfo, (0, "processInfo"), FactoryAsClassMethod)
 
-INSTANCE_METHOD(NSScriptObjectSpecifier, 
+INSTANCE_METHOD(NSScriptObjectSpecifier,
                 (3, "initWithContainerClassDescription", "containerSpecifier",
                  "key"), DesignatedInit)
 
@@ -184,16 +184,16 @@ INSTANCE_METHOD(NSThread, (0, "init"), DesignatedInit)
 
 INSTANCE_METHOD(NSURL, (2, "initWithString", "relativeToURL"), DesignatedInit)
 
-INSTANCE_METHOD(NSURLProtocol, 
-                (3, "initWithRequest", "cachedResponse", "client"), 
+INSTANCE_METHOD(NSURLProtocol,
+                (3, "initWithRequest", "cachedResponse", "client"),
                 DesignatedInit)
 
-INSTANCE_METHOD(NSURLRequest, 
+INSTANCE_METHOD(NSURLRequest,
                 (3, "initWithURL", "cachePolicy", "timeoutInterval"),
                 DesignatedInit)
 
-INSTANCE_METHOD(NSURLResponse, 
-                (4, "initWithURL", "MIMEType", "expectedContentLength", 
+INSTANCE_METHOD(NSURLResponse,
+                (4, "initWithURL", "MIMEType", "expectedContentLength",
                  "textEncodingName"), DesignatedInit)
 
 INSTANCE_METHOD(NSValue, (2, "initWithBytes", "objCType"), DesignatedInit)
@@ -238,11 +238,11 @@ INSTANCE_METHOD(NSImageCell, (1, "initImageCell"), DesignatedInit)
 
 INSTANCE_METHOD(NSLayoutManager, (0, "init"), DesignatedInit)
 
-INSTANCE_METHOD(NSMatrix, 
-                (5, "initWithFrame", "mode", "cellClass", "numberOfRows", 
+INSTANCE_METHOD(NSMatrix,
+                (5, "initWithFrame", "mode", "cellClass", "numberOfRows",
                     "numberOfColumns"), DesignatedInit)
-INSTANCE_METHOD(NSMatrix, 
-                (5, "initWithFrame", "prototype", "cellClass", "numberOfRows", 
+INSTANCE_METHOD(NSMatrix,
+                (5, "initWithFrame", "prototype", "cellClass", "numberOfRows",
                     "numberOfColumns"), DesignatedInit)
 
 INSTANCE_METHOD(NSMenu, (1, "initWithTitle"), DesignatedInit)
@@ -254,8 +254,8 @@ INSTANCE_METHOD(NSPopUpButtonCell, (2, "initTextCell", "pullsDown"),
 
 INSTANCE_METHOD(NSPrintInfo, (1, "initWithDictionary"), DesignatedInit)
 
-INSTANCE_METHOD(NSRulerMarker, 
-                (4, "initWithRulerView", "markerLocation", "image", 
+INSTANCE_METHOD(NSRulerMarker,
+                (4, "initWithRulerView", "markerLocation", "image",
                  "imageOrigin"), DesignatedInit)
 
 INSTANCE_METHOD(NSRulerView, (2, "initWithScrollView", "orientation"),
@@ -269,7 +269,7 @@ INSTANCE_METHOD(NSTableColumn, (1, "initWithIdentifier"), DesignatedInit)
 INSTANCE_METHOD(NSTextBlock, (0, "init"), DesignatedInit)
 
 // FIXME: Differs from UIKit
-// INSTANCE_METHOD(NSTextContainer, (1, "initWithContainerSize"), 
+// INSTANCE_METHOD(NSTextContainer, (1, "initWithContainerSize"),
 //                 DesignatedInit)
 
 INSTANCE_METHOD(NSTextFieldCell, (1, "initWithCoder"), DesignatedInit)
@@ -280,20 +280,20 @@ INSTANCE_METHOD(NSTextFinder, (0, "init"), DesignatedInit)
 
 INSTANCE_METHOD(NSTextInputContext, (1, "initWithClient"), DesignatedInit)
 
-INSTANCE_METHOD(NSTextTableBlock, 
-                (5, "initWithTable", "startingRow", "rowSpan", 
+INSTANCE_METHOD(NSTextTableBlock,
+                (5, "initWithTable", "startingRow", "rowSpan",
                  "startingColumn", "columnSpan"), DesignatedInit)
 
-INSTANCE_METHOD(NSTextView, (2, "initWithFrame", "textContainer"), 
+INSTANCE_METHOD(NSTextView, (2, "initWithFrame", "textContainer"),
                 DesignatedInit)
 INSTANCE_METHOD(NSTextView, (1, "initWithFrame"), DesignatedInit)
 
-INSTANCE_METHOD(NSUserDefaultsController, 
+INSTANCE_METHOD(NSUserDefaultsController,
                 (2, "initWithDefaults", "initialValues"), DesignatedInit)
 
 
-INSTANCE_METHOD(NSWindow, 
-                (4, "initWithContentRect", "styleMask", "backing", "defer"), 
+INSTANCE_METHOD(NSWindow,
+                (4, "initWithContentRect", "styleMask", "backing", "defer"),
                 DesignatedInit)
 
 INSTANCE_METHOD(NSWindowController, (1, "initWithWindow"), DesignatedInit)
@@ -395,13 +395,13 @@ CLASS_METHOD(NCWidgetController, (0, "widgetController"), FactoryAsClassMethod)
 START_MODULE(UIKit)
 
 // FIXME: Differs from AppKit
-// INSTANCE_METHOD(NSTextAttachment, (2, "initWithData", "ofType"), 
+// INSTANCE_METHOD(NSTextAttachment, (2, "initWithData", "ofType"),
 //                 DesignatedInit)
 
 INSTANCE_METHOD(NSTextContainer, (1, "initWithSize"), DesignatedInit)
 
-INSTANCE_METHOD(UIAttachmentBehavior, 
-                (4, "initWithItem", "offsetFromCenter", "attachedToItem", 
+INSTANCE_METHOD(UIAttachmentBehavior,
+                (4, "initWithItem", "offsetFromCenter", "attachedToItem",
                  "offsetFromCenter"), DesignatedInit)
 
 INSTANCE_METHOD(UICollectionView, (2, "initWithFrame", "collectionViewLayout"),
@@ -409,7 +409,7 @@ INSTANCE_METHOD(UICollectionView, (2, "initWithFrame", "collectionViewLayout"),
 
 INSTANCE_METHOD(UIDocument, (1, "initWithFileURL"), DesignatedInit)
 
-INSTANCE_METHOD(UIGestureRecognizer, (2, "initWithTarget", "action"), 
+INSTANCE_METHOD(UIGestureRecognizer, (2, "initWithTarget", "action"),
                 DesignatedInit)
 
 INSTANCE_METHOD(UIInputView, (2, "initWithFrame", "inputViewStyle"),
@@ -417,11 +417,11 @@ INSTANCE_METHOD(UIInputView, (2, "initWithFrame", "inputViewStyle"),
 
 INSTANCE_METHOD(UINavigationItem, (1, "initWithTitle"), DesignatedInit)
 
-INSTANCE_METHOD(UIStoryboardSegue, 
-                (3, "initWithIdentifier", "source", "destination"), 
+INSTANCE_METHOD(UIStoryboardSegue,
+                (3, "initWithIdentifier", "source", "destination"),
                 DesignatedInit)
 
-INSTANCE_METHOD(UITableViewCell, (2, "initWithStyle", "reuseIdentifier"), 
+INSTANCE_METHOD(UITableViewCell, (2, "initWithStyle", "reuseIdentifier"),
                 DesignatedInit)
 
 INSTANCE_METHOD(UITextView, (2, "initWithFrame", "textContainer"),
@@ -429,7 +429,7 @@ INSTANCE_METHOD(UITextView, (2, "initWithFrame", "textContainer"),
 
 INSTANCE_METHOD(UIView, (1, "initWithFrame"), DesignatedInit)
 
-INSTANCE_METHOD(UIViewController, (2, "initWithNibName", "bundle"), 
+INSTANCE_METHOD(UIViewController, (2, "initWithNibName", "bundle"),
                 DesignatedInit)
 
 // Consider all types in UIFont methods to be non-optional.

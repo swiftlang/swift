@@ -52,7 +52,7 @@ class Tracked : NSObject, Fooable {
     serialNumber = nextTrackedSerialNumber
     self.value = value
   }
-  
+
   deinit {
     assert(serialNumber > 0, "double destruction!")
     trackedCount -= 1
@@ -101,7 +101,7 @@ struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
   static func _getObjectiveCType() -> Any.Type {
     return BridgedObjC.self
   }
-  
+
   func _bridgeToObjectiveC() -> BridgedObjC {
     bridgeToOperationCount += 1
     return BridgedObjC(trak.value)
@@ -132,7 +132,7 @@ struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
     result = nil
     return false
   }
-  
+
   var description: String {
     assert(trak.serialNumber > 0, "dead Tracked!")
     return "BridgedSwift#\(trak.serialNumber)(\(trak.value))"
@@ -141,7 +141,7 @@ struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
   init(_ value: Int) {
     self.trak = Tracked(value)
   }
-  
+
   func successor() -> BridgedSwift {
     return BridgedSwift(trak.value.successor())
   }
@@ -151,12 +151,12 @@ struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
       "bridge operations "
       + "(from, to) = (\(bridgeFromOperationCount), \(bridgeToOperationCount))")
   }
-  
+
   static func resetStats() {
     bridgeFromOperationCount = 0
     bridgeToOperationCount = 0
   }
-  
+
   var trak: Tracked
 }
 
@@ -165,7 +165,7 @@ class Thunks : NSObject {
   func createBridgedObjC(value: Int) -> AnyObject {
     return BridgedObjC(value)
   }
-  
+
   @objc func acceptBridgedObjCArray(x: [BridgedObjC]) {
     print("acceptBridgedObjCArray(\(x))")
   }
@@ -241,7 +241,7 @@ func testBridgedVerbatim() {
 
   // Arrays are logically distinct after upcast
   derived[0] = Derived(33)
-  
+
   // CHECK-NEXT: {{\[Derived#[0-9]+\(33\), Derived#[0-9]+\(22\)]}}
   print(derived)
   // CHECK-NEXT: [[derived0]]
@@ -258,7 +258,7 @@ func testBridgedVerbatim() {
   // CHECK-NEXT: [[derived2:\[Derived#[0-9]+\(44\), Derived#[0-9]+\(55\)\]{1}]]
   let derivedInBaseBuffer: [Base] = [Derived(44), Derived(55)]
   print(derivedInBaseBuffer)
-  
+
   // CHECK-NEXT: Explicit downcast-ability is based on element type, not buffer type
   if let downcastBaseBuffer = derivedInBaseBuffer as? [Derived] {
     print("Explicit downcast-ability is based on element type, not buffer type")
@@ -337,14 +337,14 @@ func testExplicitlyBridged() {
   print("testExplicitlyBridged()")
 
   let bridgedSwifts = [BridgedSwift(42), BridgedSwift(17)]
-  
+
   let bridgedSwiftsAsNSArray = bridgedSwifts as NSArray
   // CHECK-NEXT: [BridgedObjC#{{[0-9]+}}(42), BridgedObjC#{{[0-9]+}}(17)]
   print("bridgedSwiftsAsNSArray = \(bridgedSwiftsAsNSArray as [AnyObject]))")
 
   // Make sure we can bridge back.
   let roundTripBridgedSwifts
-    = Swift._forceBridgeFromObjectiveC(bridgedSwiftsAsNSArray, 
+    = Swift._forceBridgeFromObjectiveC(bridgedSwiftsAsNSArray,
                                        [BridgedSwift].self)
   // CHECK-NEXT-NOT: [BridgedSwift#[[id00]](42), BridgedSwift#[[id01]](17)]
   // CHECK-NEXT: [BridgedSwift#[[id10:[0-9]+]](42), BridgedSwift#[[id11:[0-9]+]](17)]
@@ -360,9 +360,9 @@ func testExplicitlyBridged() {
   // CHECK-NEXT-NOT: [BridgedSwift#[[id10]](42), BridgedSwift#[[id11]](17)]
   // CHECK-NEXT: [BridgedSwift#{{[0-9]+}}(42), BridgedSwift#{{[0-9]+}}(17)]
   print("bridgedBackSwifts      = \(bridgedBackSwifts)")
-  
+
   // all: verbatim,  not, and doesn't bridge
-  // implicit conversions to/from NSArray 
+  // implicit conversions to/from NSArray
   // [Base] -> [Derived] and [Derived] -> [Base] where Base can be AnyObject
   // defining @objc method taking [T] and returning [T]
 
@@ -527,19 +527,19 @@ func testRoundTrip() {
       return result
     }
   }
-  
+
   let test = Test()
-  
+
   let array = [
     BridgedSwift(10), BridgedSwift(20),  BridgedSwift(30),
     BridgedSwift(40), BridgedSwift(50) ]
-  
+
   BridgedSwift.resetStats()
   test.call(array)
-  
+
   // CHECK-NEXT: ---Returned Array---
   print("---Returned Array---")
-  // CHECK-NEXT: bridge operations (from, to) = (0, 0)  
+  // CHECK-NEXT: bridge operations (from, to) = (0, 0)
   BridgedSwift.printStats()
 }
 testRoundTrip()

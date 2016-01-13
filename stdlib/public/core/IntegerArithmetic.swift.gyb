@@ -16,7 +16,7 @@
 
 %{
 integerBinaryOps = [
-   (x[:-1], x[-1], x[:-1].capitalize(), 'a result') 
+   (x[:-1], x[-1], x[:-1].capitalize(), 'a result')
     for x in 'add+ subtract- multiply* divide/'.split()
 ] + [ ('remainder', '%', 'Divide', 'the remainder') ]
 }%
@@ -44,7 +44,7 @@ public protocol IntegerArithmeticType : _IntegerArithmeticType, Comparable {
   @warn_unused_result
   func ${op} (lhs: Self, rhs: Self) -> Self
 % end
-  
+
   /// Explicitly convert to `IntMax`, trapping on overflow (except in
   /// -Ounchecked builds).
   @warn_unused_result
@@ -99,7 +99,7 @@ public protocol SignedNumberType : Comparable, IntegerLiteralConvertible {
   /// Return the difference between `lhs` and `rhs`.
   @warn_unused_result
   func - (lhs: Self, rhs: Self) -> Self
-  
+
   // Do not use this operator directly; call abs(x) instead
   func ~> (_:Self,_:(_Abs, ())) -> Self
 }

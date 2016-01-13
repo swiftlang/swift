@@ -15,11 +15,11 @@ func invalid_semi() {
 
 func nested1(x: Int) {
   var y : Int
-  
+
   func nested2(z: Int) -> Int {
     return x+y+z
   }
-  
+
   nested2(1)
 }
 
@@ -77,7 +77,7 @@ func funcdecl5(a: Int, y: Int) {
   } else {
     f2()
   }
-  
+
   // while statement.
   while (B) {
   }
@@ -123,9 +123,9 @@ func for_loop() {
   for ;; { } // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   for x = 1; x != 42; x += 1 { } // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   for infloopbooltest(); x != 12; infloopbooltest() {} // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
-  
+
   for ; { } // expected-error {{expected ';' in 'for' statement}}
-  
+
   for var y = 1; y != 42; y += 1 {} // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   for (var y = 1; y != 42; y += 1) {} // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   var z = 10
@@ -295,7 +295,7 @@ Outer:
     case 139: break   // <rdar://problem/16563853> 'break' should be able to break out of switch statements
     }
   }
-  
+
   // <rdar://problem/16692437> shadowing loop labels should be an error
 Loop:  // expected-note {{previously declared here}}
   for _ in 0...2 {
@@ -314,16 +314,16 @@ Loop:  // expected-note {{previously declared here}}
   default:
     markUsed("")
   }
-  
+
   let x : Int? = 42
-  
+
   // <rdar://problem/16879701> Should be able to pattern match 'nil' against optionals
   switch x {
   case .Some(42): break
   case nil: break
-  
+
   }
-  
+
 }
 
 
@@ -346,10 +346,10 @@ func testMyEnumWithCaseLabels(a : MyEnumWithCaseLabels) {
 // "defer"
 
 func test_defer(a : Int) {
-  
+
   defer { VoidReturn1() }
   defer { breakContinue(1)+42 }
-  
+
   // Ok:
   defer { while false { break } }
 
@@ -360,7 +360,7 @@ func test_defer(a : Int) {
 
 class SomeTestClass {
   var x = 42
-  
+
   func method() {
     defer { x = 97 }  // self. not required here!
   }
@@ -368,7 +368,7 @@ class SomeTestClass {
 
 
 func test_require(x : Int, y : Int??, cond : Bool) {
-  
+
   // These are all ok.
   guard let a = y else {}
   markUsed(a)

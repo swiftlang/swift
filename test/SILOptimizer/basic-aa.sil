@@ -440,19 +440,19 @@ sil @different_fields : $@convention(thin) () -> () {
   %5 = ref_element_addr %4 : $HalfOpenRange, #HalfOpenRange.current
   store %1 to %5 : $*Int32
   %7 = ref_element_addr %4 : $HalfOpenRange, #HalfOpenRange.end
-  store %3 to %7 : $*Int32 
+  store %3 to %7 : $*Int32
   %9 = struct_element_addr %5 : $*Int32, #Int32._value
   %10 = struct_element_addr %7 : $*Int32, #Int32._value
   %11 = load %9 : $*Builtin.Int32
   %12 = load %10 : $*Builtin.Int32
-  %13 = tuple() 
-  return %13 : $() 
+  %13 = tuple()
+  return %13 : $()
 }
 
 public final class C {
   @sil_stored final var a: Int { get set }
   @sil_stored final var b: Int { get set }
-   deinit 
+   deinit
   init()
 }
 
@@ -469,8 +469,8 @@ sil @ref_element_addr_and_object_itself : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_ref $C
   %1 = ref_element_addr %0 : $C, #C.a
-  %2 = tuple() 
-  return %2 : $() 
+  %2 = tuple()
+  return %2 : $()
 }
 
 // CHECK-LABEL: @different_fields_of_different_refs
@@ -517,6 +517,6 @@ bb0:
   %0 = alloc_stack $C
   %1 = unchecked_addr_cast %0 : $*C to $*Optional<C>
   dealloc_stack %0 : $*C
-  %2 = tuple() 
-  return %2 : $() 
+  %2 = tuple()
+  return %2 : $()
 }

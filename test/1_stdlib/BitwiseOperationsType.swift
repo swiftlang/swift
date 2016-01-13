@@ -31,7 +31,7 @@ assert(a.underlying == 0x7)
 a &= MyInt32(underlying: 0x5)
 assert(a.underlying == 0x5)
 
-// ^= 
+// ^=
 a ^= MyInt32(underlying: 0x6)
 assert(a.underlying == 0x3)
 

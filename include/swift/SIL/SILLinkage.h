@@ -66,7 +66,7 @@ enum class SILLinkage : unsigned char {
   /// module. Besides that caveat this should be treated exactly the same as
   /// shared.
   SharedExternal,
-  
+
   /// The same as SharedExternal, except that the definition is private in the
   /// other module. This can only occur if an inlined fragile function from
   /// another module references a private definition in the other module.

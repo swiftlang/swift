@@ -58,8 +58,8 @@ class ReferenceTypeVisitor : public CanTypeVisitor<ImplClass, RetTy, Args...> {
   // Function
   // PolymorphicFunction
 };
-  
+
 } // end namespace irgen
 } // end namespace swift
-  
+
 #endif

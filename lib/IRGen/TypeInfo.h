@@ -53,14 +53,14 @@ namespace irgen {
 enum class FixedPacking {
   /// It fits at offset zero.
   OffsetZero,
-  
+
   /// It doesn't fit and needs to be side-allocated.
   Allocate,
-  
+
   /// It needs to be checked dynamically.
   Dynamic
 };
-  
+
 /// Information about the IR representation and generation of the
 /// given type.
 class TypeInfo {
@@ -73,7 +73,7 @@ class TypeInfo {
 protected:
   enum SpecialTypeInfoKind {
     STIK_Unimplemented,
-    
+
     STIK_None,
 
     /// Everything after this is statically fixed-size.
@@ -121,7 +121,7 @@ private:
 
   /// Whether this type is known to be POD.
   unsigned POD : 1;
-  
+
   /// Whether this type is known to be bitwise-takable.
   unsigned BitwiseTakable : 1;
 
@@ -155,13 +155,13 @@ public:
   /// Whether this type is known to be POD, i.e. to not require any
   /// particular action on copy or destroy.
   IsPOD_t isPOD(ResilienceExpansion expansion) const { return IsPOD_t(POD); }
-  
+
   /// Whether this type is known to be bitwise-takable, i.e. "initializeWithTake"
   /// is equivalent to a memcpy.
   IsBitwiseTakable_t isBitwiseTakable(ResilienceExpansion expansion) const {
     return IsBitwiseTakable_t(BitwiseTakable);
   }
-  
+
   /// Returns the type of special interface followed by this TypeInfo.
   /// It is important for our design that this depends only on
   /// immediate type structure and not on, say, properties that can
@@ -222,7 +222,7 @@ public:
 
   /// Produce an undefined pointer to an object of this type.
   Address getUndefAddress() const;
-    
+
   /// Return the size and alignment of this type.
   virtual std::pair<llvm::Value*,llvm::Value*>
     getSizeAndAlignmentMask(IRGenFunction &IGF, SILType T) const = 0;
@@ -332,7 +332,7 @@ public:
 
   /// Destroy an object of this type in memory.
   virtual void destroy(IRGenFunction &IGF, Address address, SILType T) const = 0;
-  
+
   /// Should optimizations be enabled which rely on the representation
   /// for this type being a single object pointer?
   ///
@@ -354,7 +354,7 @@ public:
   /// Does this type statically have extra inhabitants, or may it dynamically
   /// have extra inhabitants based on type arguments?
   virtual bool mayHaveExtraInhabitants(IRGenModule &IGM) const = 0;
-  
+
   /// Map an extra inhabitant representation in memory to a unique 31-bit
   /// identifier, and map a valid representation of the type to -1.
   ///
@@ -363,7 +363,7 @@ public:
   virtual llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                                Address src,
                                                SILType T) const = 0;
-  
+
   /// Store the extra inhabitant representation indexed by a 31-bit identifier
   /// to memory.
   ///
@@ -373,32 +373,32 @@ public:
                                     llvm::Value *index,
                                     Address dest,
                                     SILType T) const = 0;
-  
+
   /// Initialize a freshly instantiated value witness table. Should be a no-op
   /// for fixed-size types.
   virtual void initializeMetadata(IRGenFunction &IGF,
                                   llvm::Value *metadata,
                                   llvm::Value *vwtable,
                                   SILType T) const = 0;
-  
+
   /// Compute the packing of values of this type into a fixed-size buffer.
   FixedPacking getFixedPacking(IRGenModule &IGM) const;
-  
+
   /// Index into an array of objects of this type.
   Address indexArray(IRGenFunction &IGF, Address base, llvm::Value *offset,
                      SILType T) const;
-  
+
   /// Destroy an array of objects of this type in memory.
   virtual void destroyArray(IRGenFunction &IGF, Address base,
                             llvm::Value *count, SILType T) const;
-  
+
   /// Initialize an array of objects of this type in memory by copying the
   /// values from another array. The arrays must not overlap.
   virtual void initializeArrayWithCopy(IRGenFunction &IGF,
                                        Address dest,
                                        Address src,
                                        llvm::Value *count, SILType T) const;
-  
+
   /// Initialize an array of objects of this type in memory by taking the
   /// values from another array. The destination array may overlap the head of
   /// the source array because the elements are taken as if in front-to-back
@@ -406,7 +406,7 @@ public:
   virtual void initializeArrayWithTakeFrontToBack(IRGenFunction &IGF,
                                        Address dest, Address src,
                                        llvm::Value *count, SILType T) const;
-  
+
   /// Initialize an array of objects of this type in memory by taking the
   /// values from another array. The destination array may overlap the tail of
   /// the source array because the elements are taken as if in back-to-front

@@ -11,7 +11,7 @@
   case KERN_PROTECTION_FAILURE        = 2
 
   /// The address range specified is already in use, or no address
-  /// range of the size specified could be found.  
+  /// range of the size specified could be found.
   case KERN_NO_SPACE                  = 3
 
   /// The function requested was not applicable to this type of
@@ -95,7 +95,7 @@
   /// kernel (it forces the kernel to restart the fault). It will not
   /// be seen by users.
   case KERN_MEMORY_DATA_MOVED         = 24
-                
+
 
   /// A strategic copy was attempted of an object upon which a quicker
   /// copy is now possible.  The caller should retry the copy using
@@ -142,7 +142,7 @@
   /// thread_depress_abort was called on a thread which was not
   /// currently depressed.
   case KERN_NOT_DEPRESSED             = 36
-                
+
   /// Object has been terminated and is no longer available
   case KERN_TERMINATED                = 37
 

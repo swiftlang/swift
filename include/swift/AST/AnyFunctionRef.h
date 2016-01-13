@@ -29,7 +29,7 @@ class AnyFunctionRef {
   PointerUnion<AbstractFunctionDecl *, AbstractClosureExpr *> TheFunction;
 
   friend struct llvm::DenseMapInfo<AnyFunctionRef>;
-  
+
   AnyFunctionRef(decltype(TheFunction) TheFunction)
     : TheFunction(TheFunction) {}
 
@@ -66,7 +66,7 @@ public:
       return AFD->getParameterLists();
     return TheFunction.get<AbstractClosureExpr *>()->getParameterLists();
   }
-  
+
   bool hasType() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->hasType();
@@ -78,7 +78,7 @@ public:
       return AFD->getType();
     return TheFunction.get<AbstractClosureExpr *>()->getType();
   }
-  
+
   /// FIXME: This should just be getType() when interface types take over in
   /// the AST.
   Type getInterfaceType() const {
@@ -110,11 +110,11 @@ public:
       return AFD;
     return TheFunction.get<AbstractClosureExpr *>();
   }
-  
+
   AbstractFunctionDecl *getAbstractFunctionDecl() const {
     return TheFunction.dyn_cast<AbstractFunctionDecl*>();
   }
-  
+
   AbstractClosureExpr *getAbstractClosureExpr() const {
     return TheFunction.dyn_cast<AbstractClosureExpr*>();
   }

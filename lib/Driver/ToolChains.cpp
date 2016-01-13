@@ -229,7 +229,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   }
 
   assert(FrontendModeOption != nullptr && "No frontend mode option specified!");
-  
+
   Arguments.push_back(FrontendModeOption);
 
   assert(context.Inputs.empty() &&
@@ -477,7 +477,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
   }
 
   assert(FrontendModeOption != nullptr && "No frontend mode option specified!");
-  
+
   Arguments.push_back(FrontendModeOption);
 
   // Add input arguments.
@@ -494,7 +494,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     assert(context.Inputs.size() == 1 && "The backend expects one input!");
     Arguments.push_back("-primary-file");
     const Job *Cmd = context.Inputs.front();
-    
+
     // In multi-threaded compilation, the backend job must select the correct
     // output file of the compilation job.
     auto OutNames = Cmd->getOutput().getPrimaryOutputFilenames();
@@ -1133,7 +1133,7 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   // Add the linker script that coalesces protocol conformance sections.
   Arguments.push_back("-Xlinker");
   Arguments.push_back("-T");
-    
+
   // FIXME: This should also query the abi type (i.e. gnueabihf)
   Arguments.push_back(context.Args.MakeArgString(
     Twine(RuntimeLibPath) + "/" + getTriple().getArchName() + "/swift.ld"));

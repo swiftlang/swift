@@ -1014,7 +1014,7 @@ void Projection::getFirstLevelProjections(
     return;
   }
 }
- 
+
 void Projection::getFirstLevelProjections(
     SILValue V, SILModule &Mod, llvm::SmallVectorImpl<Projection> &Out) {
   getFirstLevelProjections(V.getType(), Mod, Out);
@@ -1270,7 +1270,7 @@ void
 ProjectionPath::expandTypeIntoLeafProjectionPaths(SILType B, SILModule *Mod,
                                                   ProjectionPathList &Paths) {
 
-  // Perform a BFS to expand the given type into projectionpath each of 
+  // Perform a BFS to expand the given type into projectionpath each of
   // which contains 1 field from the type.
   ProjectionPathList Worklist;
   llvm::SmallVector<Projection, 8> Projections;
@@ -1334,7 +1334,7 @@ ProjectionPath::expandTypeIntoLeafProjectionPaths(SILType B, SILModule *Mod,
 void
 ProjectionPath::expandTypeIntoNodeProjectionPaths(SILType B, SILModule *Mod,
                                                   ProjectionPathList &Paths) {
-  // Perform a BFS to expand the given type into projectionpath each of 
+  // Perform a BFS to expand the given type into projectionpath each of
   // which contains 1 field from the type.
   ProjectionPathList Worklist;
   llvm::SmallVector<Projection, 8> Projections;
@@ -1383,7 +1383,7 @@ ProjectionPath::expandTypeIntoNodeProjectionPaths(SILType B, SILModule *Mod,
       continue;
     }
 
-    // Keep the intermediate nodes as well. 
+    // Keep the intermediate nodes as well.
     //
     // std::move clears the passed ProjectionPath. Give it a temporarily
     // created ProjectionPath for now.

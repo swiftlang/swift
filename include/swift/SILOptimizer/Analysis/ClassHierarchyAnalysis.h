@@ -35,7 +35,7 @@ public:
 
   ClassHierarchyAnalysis(SILModule *Mod)
       : SILAnalysis(AnalysisKind::ClassHierarchy), M(Mod) {
-      init(); 
+      init();
     }
 
   ~ClassHierarchyAnalysis();

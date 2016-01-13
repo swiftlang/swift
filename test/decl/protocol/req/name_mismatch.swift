@@ -40,5 +40,5 @@ protocol P2 {
 }
 
 struct XP2 : P2 { // expected-error{{initializer 'init(foo:)' has different argument names from those required by protocol 'P2' ('init')}}
-  let foo: Int 
+  let foo: Int
 }

@@ -2,7 +2,7 @@
 
 @unknown func f0() {} // expected-error{{unknown attribute 'unknown'}}
 
-enum binary { 
+enum binary {
   case Zero
   case One
   init() { self = .Zero }

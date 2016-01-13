@@ -80,7 +80,7 @@ to C programmers organically, starting from the familiar case that looks like
 C::
 
   enum Foo { case A, B, C, D }
-  
+
   func use(x:Foo) {
     switch x {
     case .A:
@@ -94,7 +94,7 @@ and then introducing the parallel new concepts of payloads and patterns
 together::
 
   enum Foo { case A, B, C, D, Other(String) }
-  
+
   func use(x:Foo) {
     switch x {
     case .A:
@@ -123,7 +123,7 @@ convention of 'First_*' and 'Last_*' sigils::
       Lizard = First_Reptile,
       Snake,
     Last_Reptile = Snake,
-  
+
     First_Mammal,
       Cat = First_Mammal,
       Dog,

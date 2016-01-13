@@ -78,13 +78,13 @@ public protocol Q_SequenceType : Q_SequenceDefaultsType {
   func initializeRawMemory(
     baseAddress: UnsafeMutablePointer<Element>
   )
-  
+
   static func _constrainElement(Element)
 }
 
 public extension GeneratorType {
   // typealias Generator = Self
-  
+
   public final func generate() -> Self {
     return self
   }
@@ -105,12 +105,12 @@ extension Q_CollectionDefaultsType {
   public final func count() -> Index.Distance {
     return distance(startIndex, endIndex)
   }
-  
+
   public final func underestimateCount() -> Int {
     let n = count().toIntMax()
     return n > IntMax(Int.max) ? Int.max : Int(n)
   }
-  
+
   public final func preprocessingPass<R>(body: (Self)->R) -> R? {
     return body(self)
   }
@@ -124,7 +124,7 @@ public struct Q_IndexingGenerator<C: Q_IndexableType> : GeneratorType {
   public typealias Element = C.Element
   var pos: C.Index
   let elements: C
-  
+
   public mutating func next() -> C.Element? {
     if pos == elements.endIndex {
       return nil
@@ -149,7 +149,7 @@ extension Array : Q_CollectionType {
 struct Boo : Q_CollectionType {
   let startIndex: Int = 0
   let endIndex: Int = 10
-  
+
   subscript(i: Int) -> String {
     return "Boo"
   }

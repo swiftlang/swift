@@ -183,7 +183,7 @@ public:
   /// returns the single entry in the array if it contains only one.
   static IdentTypeRepr *create(ASTContext &C,
                                ArrayRef<ComponentIdentTypeRepr *> Components);
-  
+
   class ComponentRange;
   inline ComponentRange getComponentRange();
 
@@ -681,7 +681,7 @@ private:
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
-  
+
 /// \brief An 'inout' type.
 /// \code
 ///   inout x : Int
@@ -689,20 +689,20 @@ private:
 class InOutTypeRepr : public TypeRepr {
   TypeRepr *Base;
   SourceLoc InOutLoc;
-  
+
 public:
   InOutTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
   : TypeRepr(TypeReprKind::InOut), Base(Base), InOutLoc(InOutLoc) {
   }
-  
+
   TypeRepr *getBase() const { return Base; }
   SourceLoc getInOutLoc() const { return InOutLoc; }
-  
+
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::InOut;
   }
   static bool classof(const InOutTypeRepr *T) { return true; }
-  
+
 private:
   SourceLoc getStartLocImpl() const { return InOutLoc; }
   SourceLoc getEndLocImpl() const { return Base->getEndLoc(); }

@@ -1207,8 +1207,8 @@ void RLEContext::processBasicBlocksForGenKillSet() {
     // Compute the AvailSetMax at the beginning of the basic block.
     S.mergePredecessorsAvailSetMax(*this);
 
-    // Compute the genset and killset. 
-    // 
+    // Compute the genset and killset.
+    //
     // To optimize this process, we also compute the AvailSetMax at particular
     // point in the basic block.
     for (auto I = BB->begin(), E = BB->end(); I != E; ++I) {

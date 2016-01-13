@@ -825,14 +825,14 @@ static bool performLocalRetainUnownedOpt(CallInst *Retain, BasicBlock &BB,
   // Scan until we get to the end of the block.
   for (++BBI; BBI != BBE; ++BBI) {
     Instruction &I = *BBI;
-    
+
     if (classifyInstruction(I) == RT_Release) {
       CallInst *ThisRelease = cast<CallInst>(&I);
-      
+
       // Is this the trailing release of the unowned-retained reference?
       if (ThisRelease->getArgOperand(0) != RetainedObject)
         return false;
-      
+
       // Replace the trailing release with a check_unowned.
       B.setInsertPoint(ThisRelease);
       B.createCheckUnowned(RetainedObject);
@@ -885,13 +885,13 @@ static void performRedundantCheckUnownedRemoval(BasicBlock &BB) {
         }
         continue;
       }
-        
+
       case RT_Unknown:
         // Loads cannot affect the retain.
         if (isa<LoadInst>(I) || isa<StoreInst>(I) || isa<MemIntrinsic>(I))
           continue;
         break;
-        
+
       default:
         break;
     }
@@ -909,7 +909,7 @@ static bool performGeneralOptimizations(Function &F, ARCEntryPointBuilder &B,
   // TODO: This is a really trivial local algorithm.  It could be much better.
   for (BasicBlock &BB : F) {
     SmallVector<CallInst *, 8> RetainUnownedInsts;
-    
+
     for (BasicBlock::iterator BBI = BB.begin(), E = BB.end(); BBI != E; ) {
       // Preincrement the iterator to avoid invalidation and out trouble.
       Instruction &I = *BBI++;

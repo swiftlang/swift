@@ -32,7 +32,7 @@ namespace swift {
 #if SWIFT_OBJC_INTEROP
   bool objectConformsToObjCProtocol(const void *theObject,
                                     const ProtocolDescriptor *theProtocol);
-  
+
   bool classConformsToObjCProtocol(const void *theClass,
                                     const ProtocolDescriptor *theProtocol);
 #endif

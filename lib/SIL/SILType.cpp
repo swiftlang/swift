@@ -109,7 +109,7 @@ static bool canUnsafeCastStruct(SILType fromType, StructDecl *fromStruct,
   SILType fromEltTy = fromType.getFieldType(*fromRange.begin(), M);
   if (SILType::canUnsafeCastValue(fromEltTy, toType, M))
     return true;
-  
+
   // Otherwise, flatten one level of struct elements on each side.
   StructDecl *toStruct = toType.getStructOrBoundGenericStruct();
   if (!toStruct)
@@ -122,7 +122,7 @@ static bool canUnsafeCastStruct(SILType fromType, StructDecl *fromStruct,
 
     if (fromI == fromE)
       return false; // fromType is a struct with fewer elements.
-      
+
     SILType fromEltTy = fromType.getFieldType(*fromI, M);
     SILType toEltTy = toType.getFieldType(*toI, M);
     if (!SILType::canUnsafeCastValue(fromEltTy, toEltTy, M))
@@ -263,7 +263,7 @@ bool SILType::canUnsafeCastValue(SILType fromType, SILType toType,
   }
   if (EnumDecl *fromEnum = fromType.getEnumOrBoundGenericEnum())
     return canUnsafeCastEnum(fromType, fromEnum, toType, M);
-  
+
   return false;
 }
 
@@ -447,10 +447,10 @@ SILType SILType::getAnyOptionalObjectType(SILModule &M,
     // parameter.
     auto archetype = getNominalOrBoundGenericNominal()->getGenericParams()
       ->getPrimaryArchetypes()[0];
-    
+
     auto loweredTy
       = M.Types.getLoweredType(AbstractionPattern(archetype), objectTy);
-    
+
     return SILType(loweredTy.getSwiftRValueType(), getCategory());
   }
 
@@ -474,7 +474,7 @@ static bool isBridgedErrorClass(SILModule &M,
   if (t && errorType && t->isEqual(errorType)) {
     return true;
   }
-  
+
   return false;
 }
 
@@ -487,16 +487,16 @@ ExistentialRepresentation
 SILType::getPreferredExistentialRepresentation(SILModule &M,
                                                Type containedType) const {
   SmallVector<ProtocolDecl *, 4> protocols;
-  
+
   // Existential metatypes always use metatype representation.
   if (is<ExistentialMetatypeType>())
     return ExistentialRepresentation::Metatype;
-  
+
   // Get the list of existential constraints. If the type isn't existential,
   // then there is no representation.
   if (!getSwiftRValueType()->isAnyExistentialType(protocols))
     return ExistentialRepresentation::None;
-  
+
   // The (uncomposed) ErrorType existential uses a special boxed representation.
   if (isErrorTypeExistential(protocols)) {
     // NSError or CFError references can be adopted directly as ErrorType
@@ -507,14 +507,14 @@ SILType::getPreferredExistentialRepresentation(SILModule &M,
       return ExistentialRepresentation::Boxed;
     }
   }
-  
+
   // A class-constrained protocol composition can adopt the conforming
   // class reference directly.
   for (auto proto : protocols) {
     if (proto->requiresClass())
       return ExistentialRepresentation::Class;
   }
-  
+
   // Otherwise, we need to use a fixed-sized buffer.
   return ExistentialRepresentation::Opaque;
 }
@@ -540,7 +540,7 @@ SILType::canUseExistentialRepresentation(SILModule &M,
       return repr == ExistentialRepresentation::Boxed
         || (repr == ExistentialRepresentation::Class
             && isBridgedErrorClass(M, containedType));
-    
+
     // A class-constrained composition uses ClassReference representation;
     // otherwise, we use a fixed-sized buffer
     for (auto *proto : protocols) {

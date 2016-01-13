@@ -67,7 +67,7 @@ llvm::SMLoc DiagnosticConsumer::getRawLoc(SourceLoc loc) {
 
 void
 PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                                             DiagnosticKind Kind, 
+                                             DiagnosticKind Kind,
                                              StringRef Text,
                                              const DiagnosticInfo &Info) {
   // Determine what kind of diagnostic we're emitting.
@@ -76,19 +76,19 @@ PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
     case DiagnosticKind::Error:
       SMKind = llvm::SourceMgr::DK_Error;
       break;
-    case DiagnosticKind::Warning: 
-      SMKind = llvm::SourceMgr::DK_Warning; 
+    case DiagnosticKind::Warning:
+      SMKind = llvm::SourceMgr::DK_Warning;
       break;
-      
-    case DiagnosticKind::Note: 
-      SMKind = llvm::SourceMgr::DK_Note; 
+
+    case DiagnosticKind::Note:
+      SMKind = llvm::SourceMgr::DK_Note;
       break;
   }
 
   if (Kind == DiagnosticKind::Error) {
     DidErrorOccur = true;
   }
-  
+
   // Translate ranges.
   SmallVector<llvm::SMRange, 2> Ranges;
   for (auto R : Info.Ranges)

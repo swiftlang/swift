@@ -21,10 +21,10 @@ class SwiftGizmo : A {
   @NSManaged var a: X
   @NSManaged var b: Int
   @NSManaged let c: Int  // expected-error {{@NSManaged not allowed on a 'let' property}}
-  
+
   // expected-error@+1{{@NSManaged property cannot have an initial value}}
   @NSManaged var gizmo: SwiftGizmo = SwiftGizmo()
-  
+
   // expected-error@+1{{@NSManaged not allowed on computed properties}}
   @NSManaged var computed_var: Int {
     return 5

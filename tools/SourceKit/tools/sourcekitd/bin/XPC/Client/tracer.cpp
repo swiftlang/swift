@@ -364,12 +364,12 @@ void handleTraceMessageRequest(uint64_t Session, xpc_object_t Msg) {
                             std::move(OpArgs));
         break;
       }
-        
+
       case trace::ActionKind::OperationFinished: {
         State::removeOperation(Session, readUint64(Msg, 1));
         break;
       }
-          
+
       }
 
     } else {

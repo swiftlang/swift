@@ -43,7 +43,7 @@ class Initializer : public DeclContext {
   unsigned Kind : 1;
 protected:
   unsigned SpareBits : 31;
-  
+
   Initializer(InitializerKind kind, DeclContext *parent)
     : DeclContext(DeclContextKind::Initializer, parent),
       Kind(unsigned(kind)) {
@@ -81,13 +81,13 @@ public:
     : Initializer(InitializerKind::PatternBinding, parent),
       Binding(nullptr) {
   }
- 
+
 
   void setBinding(PatternBindingDecl *binding) {
     setParent(binding->getDeclContext());
     Binding = binding;
   }
-  
+
   PatternBindingDecl *getBinding() const { return Binding; }
 
   static bool classof(const DeclContext *DC) {
@@ -182,7 +182,7 @@ public:
     return false;
   }
 };
-  
+
 } // end namespace swift
 
 #endif

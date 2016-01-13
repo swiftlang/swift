@@ -268,7 +268,7 @@ private:
   CanSILFunctionType getSubstFunctionType(SILGenModule &SGM,
                                           CanSILFunctionType origFnType) const {
     if (!HasSubstitutions) return origFnType;
-    
+
     return origFnType->substGenericArgs(SGM.M, SGM.SwiftModule,
                                         Substitutions);
   }
@@ -398,17 +398,17 @@ public:
     SpecializeLoc = loc;
     HasSubstitutions = true;
   }
-  
+
   void setCaptures(SmallVectorImpl<ManagedValue> &&captures) {
     Captures = std::move(captures);
   }
-  
+
   ArrayRef<ManagedValue> getCaptures() const {
     if (Captures)
       return *Captures;
     return {};
   }
-  
+
   bool hasCaptures() const {
     return Captures.hasValue();
   }
@@ -467,7 +467,7 @@ public:
         if (auto func = Constant.getAbstractFunctionDecl())
           if (getMethodDispatch(func) == MethodDispatch::Class)
             constant = constant->asDirectReference(true);
-      
+
       constantInfo = gen.getConstantInfo(*constant);
       SILValue ref = gen.emitGlobalFunctionRef(Loc, *constant, constantInfo);
       mv = ManagedValue::forUnmanaged(ref);
@@ -1134,7 +1134,7 @@ public:
     // Otherwise, we have a statically-dispatched call.
     CanFunctionType substFnType = getSubstFnType();
     ArrayRef<Substitution> subs;
-    
+
     auto afd = dyn_cast<AbstractFunctionDecl>(e->getDecl());
     if (afd) {
       auto constantInfo = SGF.getConstantInfo(constant);
@@ -1150,43 +1150,43 @@ public:
         substFnType = CanFunctionType::get(
           SGF.getASTContext().TheEmptyTupleType, substFnType);
     }
-    
+
     if (e->getDeclRef().isSpecialized()) {
       assert(subs.empty() && "nested local generics not yet supported");
       subs = e->getDeclRef().getSubstitutions();
     }
-    
-    
+
+
     // Enum case constructor references are open-coded.
     if (isa<EnumElementDecl>(e->getDecl()))
       setCallee(Callee::forEnumElement(SGF, constant, substFnType, e));
     else
       setCallee(Callee::forDirect(SGF, constant, substFnType, e));
-    
+
     // If the decl ref requires captures, emit the capture params.
     if (afd) {
       if (afd->getCaptureInfo().hasLocalCaptures()) {
         assert(!e->getDeclRef().isSpecialized()
                && "generic local fns not implemented");
-        
+
         SmallVector<ManagedValue, 4> captures;
         SGF.emitCaptures(e, afd, CaptureEmission::ImmediateApplication,
                          captures);
         ApplyCallee->setCaptures(std::move(captures));
       }
-      
+
       // FIXME: We should be checking hasLocalCaptures() on the lowered
       // captures in the constant info too, to generate more efficient
       // code for mutually recursive local functions which otherwise
       // capture no state.
-      
+
     }
 
     // If there are substitutions, add them, always at depth 0.
     if (!subs.empty())
       ApplyCallee->setSubstitutions(SGF, e, subs, 0);
   }
-  
+
   void visitAbstractClosureExpr(AbstractClosureExpr *e) {
     // A directly-called closure can be emitted as a direct call instead of
     // really producing a closure object.
@@ -1194,10 +1194,10 @@ public:
     // Emit the closure function if we haven't yet.
     if (!SGF.SGM.hasFunction(constant))
       SGF.SGM.emitClosure(e);
-    
+
     ArrayRef<Substitution> subs;
     CanFunctionType substFnType = getSubstFnType();
-    
+
     // FIXME: We should be checking hasLocalCaptures() on the lowered
     // captures in the constant info above, to generate more efficient
     // code for mutually recursive local functions which otherwise
@@ -1213,7 +1213,7 @@ public:
                          SGF.getASTContext().TheEmptyTupleType, substFnType);
 
     setCallee(Callee::forDirect(SGF, constant, substFnType, e));
-    
+
     // If the closure requires captures, emit them.
     if (e->getCaptureInfo().hasLocalCaptures()) {
       SmallVector<ManagedValue, 4> captures;
@@ -1225,7 +1225,7 @@ public:
     if (!subs.empty())
       ApplyCallee->setSubstitutions(SGF, e, subs, 0);
   }
-  
+
   void visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *e) {
     // FIXME: We might need to go through ObjC dispatch for references to
     // constructors imported from Clang (which won't have a direct entry point)
@@ -1388,7 +1388,7 @@ public:
     auto nominal = ctorRef->getDecl()->getDeclContext()
                      ->getDeclaredTypeOfContext()->getAnyNominal();
     bool useAllocatingCtor;
-    
+
     // Value types only have allocating initializers.
     if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))
       useAllocatingCtor = true;
@@ -1436,7 +1436,7 @@ public:
         assert(ctorRef->getDecl()->isObjC()
                && "only expect to delegate an initializer from an allocator "
                   "in objc protocol extensions");
-        
+
         self = allocateObjCObject(
                         ManagedValue::forUnmanaged(SGF.AllocatorMetatype), arg);
 
@@ -3074,7 +3074,7 @@ namespace {
       Params = Params.slice(0, Params.size() - count);
       return result;
     }
-    
+
     ArrayRef<SILParameterInfo>
     claimCaptureParams(ArrayRef<ManagedValue> captures) {
       auto firstCapture = Params.size() - captures.size();
@@ -3087,7 +3087,7 @@ namespace {
                && "capture doesn't match param type");
       }
 #endif
-      
+
       auto result = Params.slice(firstCapture, captures.size());
       Params = Params.slice(0, firstCapture);
       return result;
@@ -3251,7 +3251,7 @@ namespace {
       // Otherwise, apply these arguments to the result of the previous call.
       extraSites.push_back(std::move(site));
     }
-    
+
     /// Add a level of function application by passing in its possibly
     /// unevaluated arguments and their formal type
     template<typename...T>
@@ -3419,7 +3419,7 @@ namespace {
           if (!uncurriedSites.back().throws()) {
             initialOptions |= ApplyOptions::DoesNotThrow;
           }
-          
+
           // Collect the captures, if any.
           if (callee.hasCaptures()) {
             // The captures are represented as a placeholder curry level in the
@@ -3462,9 +3462,9 @@ namespace {
         for (auto &argSet : reversed(args))
           uncurriedArgs.append(argSet.begin(), argSet.end());
         args = {};
-        
+
         // Emit the uncurried call.
-        
+
         // Special case for superclass method calls.
         if (isPartiallyAppliedSuperMethod(uncurryLevel)) {
           assert(uncurriedArgs.size() == 1 &&
@@ -3821,7 +3821,7 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
   Callee callee = getBaseAccessorFunctionRef(gen, loc, constant, selfValue,
                                              isSuper, isDirectUse,
                                              substAccessorType, substitutions);
-  
+
   // Collect captures if the accessor has them.
   auto accessorFn = cast<AbstractFunctionDecl>(constant.getDecl());
   if (accessorFn->getCaptureInfo().hasLocalCaptures()) {

@@ -162,7 +162,7 @@ public:
     asDerived().emitScalarRetain(IGF, value);
     out.add(value);
   }
-  
+
   void consume(IRGenFunction &IGF, Explosion &in) const override {
     llvm::Value *value = in.claimNext();
     asDerived().emitScalarRelease(IGF, value);
@@ -172,7 +172,7 @@ public:
     llvm::Value *value = in.claimNext();
     asDerived().emitScalarFixLifetime(IGF, value);
   }
-  
+
   void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
     if (!Derived::IsScalarPOD) {
       addr = asDerived().projectScalar(IGF, addr);
@@ -180,14 +180,14 @@ public:
       asDerived().emitScalarRelease(IGF, value);
     }
   }
-  
+
   void packIntoEnumPayload(IRGenFunction &IGF,
                            EnumPayload &payload,
                            Explosion &src,
                            unsigned offset) const override {
     payload.insertValue(IGF, src.claimNext(), offset);
   }
-  
+
   void unpackFromEnumPayload(IRGenFunction &IGF,
                              const EnumPayload &payload,
                              Explosion &dest,
@@ -202,7 +202,7 @@ public:
 template <class Derived, class Base>
 class PODSingleScalarTypeInfo : public SingleScalarTypeInfo<Derived, Base> {
 protected:
-  template <class StorageType, class... T> 
+  template <class StorageType, class... T>
   PODSingleScalarTypeInfo(StorageType *storage, Size size,
                           SpareBitVector spareBits,
                           Alignment align, T &&...args)

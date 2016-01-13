@@ -122,7 +122,7 @@ func assign_tuple(x: (Builtin.Int64, Builtin.NativeObject),
   var y = y
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*(Builtin.Int64, Builtin.NativeObject)
   // CHECK: assign {{%.*}} to [[ADDR]]
-  // CHECK: release 
+  // CHECK: release
   Builtin.assign(x, y)
 }
 

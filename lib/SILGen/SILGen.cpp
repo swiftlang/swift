@@ -489,7 +489,7 @@ void SILGenModule::emitForeignToNativeThunk(SILDeclRef thunk) {
 void SILGenModule::emitNativeToForeignThunk(SILDeclRef thunk) {
   // Thunks are always emitted by need, so don't need delayed emission.
   assert(thunk.isForeign && "native-to-foreign thunks only");
-  
+
   SILFunction *f = getFunction(thunk, ForDefinition);
   if (thunk.hasDecl())
     preEmitFunction(thunk, thunk.getDecl(), f, thunk.getDecl());
@@ -669,7 +669,7 @@ void SILGenModule::emitObjCAllocatorDestructor(ClassDecl *cd,
 
 void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   emitAbstractFuncDecl(dd);
-  
+
   // Emit the ivar destroyer, if needed.
   if (requiresIVarDestroyer(cd)) {
     SILDeclRef ivarDestroyer(cd, SILDeclRef::Kind::IVarDestroyer,

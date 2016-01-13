@@ -24,12 +24,12 @@ PrintTests.test("Printable") {
   expectPrinted("(42, ►3◀︎)", (42, ClassPrintable(3)))
   expectPrinted("([123: 123], (1, 2, \"3\"))",
     ([123: 123], (1, 2, "3")))
-  
+
   let t0 = [ (1, "two", StructPrintable(3), StructDebugPrintable(4),
     WithoutDescription(5)) ]
   expectPrinted("[(1, \"two\", ►3◀︎, ►4◀︎, PrintTestTypes.WithoutDescription(x: 5))]",
     t0)
-  
+
   let t1 = [ (1, "2", WithoutDescription(3)),
     (4, "5", WithoutDescription(6)),
     (7, "8", WithoutDescription(9)) ]

@@ -77,7 +77,7 @@ public:
   /// The required platform.
   PlatformKind getPlatform() const { return Platform; }
   SourceLoc getPlatformLoc() const { return PlatformLoc; }
-  
+
   // The platform version to compare against.
   clang::VersionTuple getVersion() const { return Version; }
   SourceRange getVersionSrcRange() const { return VersionSrcRange; }
@@ -85,7 +85,7 @@ public:
   SourceRange getSourceRange() const;
 
   void print(raw_ostream &OS, unsigned Indent) const;
-  
+
   static bool classof(const AvailabilitySpec *Spec) {
     return Spec->getKind() == AvailabilitySpecKind::VersionConstraint;
   }
