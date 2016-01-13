@@ -1352,13 +1352,6 @@ namespace decls_block {
                // strings, separated by the prior index
   >;
 
-  using MigrationIdDeclAttrLayout = BCRecordLayout<
-    MigrationId_DECL_ATTR,
-    BCVBR<6>,  // index at the end of the ident,
-    BCBlob     // blob contains the ident and pattern
-               // strings, separated by the prior index
-  >;
-
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) \
   using CLASS##DeclAttrLayout = BCRecordLayout< \
     CLASS##_DECL_ATTR, \

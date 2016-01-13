@@ -383,10 +383,6 @@ void DeclAttribute::print(ASTPrinter &Printer,
     break;
   }
 
-  case DAK_MigrationId:
-    // Not printed.
-    return;
-
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
   }
@@ -481,8 +477,6 @@ StringRef DeclAttribute::getAttrName() const {
     return "<<synthesized protocol>>";
   case DAK_WarnUnusedResult:
     return "warn_unused_result";
-  case DAK_MigrationId:
-    return "_migration_id";
   }
   llvm_unreachable("bad DeclAttrKind");
 }

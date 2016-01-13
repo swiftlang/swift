@@ -1150,31 +1150,6 @@ public:
   }
 };
 
-/// The internal @_migration_id attribute, which is used to keep track of stdlib
-/// changes for migration purposes.
-class MigrationIdAttr : public DeclAttribute {
-  StringRef Ident;
-  StringRef PatternId;
-
-public:
-  MigrationIdAttr(SourceLoc atLoc, SourceLoc attrLoc, SourceLoc lParenLoc,
-                  StringRef ident, StringRef patternId,
-                  SourceLoc rParenLoc, bool implicit)
-    : DeclAttribute(DAK_MigrationId, attrLoc,
-                    SourceRange(atLoc, rParenLoc), implicit),
-      Ident(ident), PatternId(patternId) {}
-
-  /// Retrieve the migration identifier associated with the symbol.
-  StringRef getIdent() const { return Ident; }
-
-  /// Retrieve pattern identifier associated with the symbol.
-  StringRef getPatternId() const { return PatternId; }
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_MigrationId;
-  }
-};
-
 /// \brief Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Linked list of declaration attributes.

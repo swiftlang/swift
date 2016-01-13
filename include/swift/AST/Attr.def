@@ -239,8 +239,6 @@ SIMPLE_DECL_ATTR(indirect, Indirect,
 SIMPLE_DECL_ATTR(warn_unqualified_access, WarnUnqualifiedAccess,
                  OnFunc /*| OnVar*/ | LongAttribute, 61)
 
-DECL_ATTR(_migration_id, MigrationId, OnAnyDecl, 62)
-
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef SIMPLE_DECL_ATTR
