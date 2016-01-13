@@ -625,7 +625,7 @@ int Compilation::performJobs() {
     Diags.diagnose(SourceLoc(), diag::warning_parallel_execution_not_supported);
   }
   
-  if (!AllSourceFilesPath.empty())
+  if (AllSourceFilesPath)
     if (!writeAllSourcesFile(Diags, AllSourceFilesPath, getInputFiles()))
       return EXIT_FAILURE;
   
@@ -643,10 +643,8 @@ int Compilation::performJobs() {
   return result;
 }
 
-const std::string &Compilation::getAllSourcesPath() const {
-  auto *mutableThis = const_cast<Compilation *>(this);
-
-  if (AllSourceFilesPath.empty()) {
+const char *Compilation::getAllSourcesPath() const {
+  if (!AllSourceFilesPath) {
     SmallString<128> Buffer;
     std::error_code EC =
         llvm::sys::fs::createTemporaryFile("sources", "", Buffer);
@@ -657,8 +655,9 @@ const std::string &Compilation::getAllSourcesPath() const {
       // FIXME: This should not take down the entire process.
       llvm::report_fatal_error("unable to create list of input sources");
     }
+    auto *mutableThis = const_cast<Compilation *>(this);
     mutableThis->addTemporaryFile(Buffer.str());
-    mutableThis->AllSourceFilesPath = TempFilePaths.back();
+    mutableThis->AllSourceFilesPath = getArgs().MakeArgString(Buffer);
   }
   return AllSourceFilesPath;
 }
