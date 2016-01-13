@@ -627,7 +627,7 @@ Latest
   value for the enum to be stored indirectly, allowing for recursive data
   structures to be defined. For example:
 
-  ```swift  
+  ```swift
   enum List<T> {
     case Nil
     indirect case Cons(head: T, tail: List<T>)
@@ -2047,7 +2047,7 @@ Latest
   `@` sign.
 
 * The `@prefix`, `@infix`, and `@postfix` attributes have been changed to
-  declaration modifiers, so they are no longer spelled with an `@` sign.  
+  declaration modifiers, so they are no longer spelled with an `@` sign.
   Operator declarations have been rearranged from `operator prefix +` to
   `prefix operator +` for consistency.
 
@@ -3125,12 +3125,12 @@ Latest
       var key: CryptoKey
 
       init withKey(key: CryptoKey) -> Self {
-        self.init(withKey: key, title: "Default title")        
+        self.init(withKey: key, title: "Default title")
       }
 
       init withKey(key: CryptoKey) title(String) {
         self.key = key
-        super.init(withTitle: title)        
+        super.init(withTitle: title)
       }
     }
     ```
