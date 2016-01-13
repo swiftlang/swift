@@ -3,17 +3,17 @@
 
 public struct ChangeStoredToComputed {
   public init() {
-    celcius = 0
+    celsius = 0
   }
 
-  public var celcius: Int
+  public var celsius: Int
 
   public var fahrenheit: Int {
     get {
-      return (celcius * 9) / 5 + 32
+      return (celsius * 9) / 5 + 32
     }
     set {
-      celcius = ((newValue - 32) * 5) / 9
+      celsius = ((newValue - 32) * 5) / 9
     }
   }
 }
@@ -25,7 +25,7 @@ public struct ChangeStoredToComputed {
     fahrenheit = 32
   }
 
-  public var celcius: Int {
+  public var celsius: Int {
     get {
       return ((fahrenheit - 32) * 5) / 9
     }
