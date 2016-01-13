@@ -4390,6 +4390,7 @@ ParserStatus Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     
     // See if there's a raw value expression.
     SourceLoc EqualsLoc;
+    auto NextLoc = peekToken().getLoc();
     ParserResult<Expr> RawValueExpr;
     LiteralExpr *LiteralRawValueExpr = nullptr;
     if (Tok.is(tok::equal)) {
@@ -4404,7 +4405,7 @@ ParserStatus Parser::parseDeclEnumCase(ParseDeclOptions Flags,
         return Status;
       }
       if (RawValueExpr.isNull()) {
-        diagnose(EqualsLoc, diag::not_a_proper_raw_value_expression);
+        diagnose(NextLoc, diag::not_a_proper_raw_value_expression);
         Status.setIsParseError();
         return Status;
       }
