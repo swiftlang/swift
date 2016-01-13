@@ -2,8 +2,6 @@
 
 @noescape var fn : () -> Int = { 4 }  // expected-error {{@noescape may only be used on 'parameter' declarations}} {{1-11=}}
 
-func appliedToType(g: @noescape ()->Void) { g() }  // expected-error {{attribute can only be applied to declarations, not types}} {{20-20=@noescape }} {{23-33=}}
-
 func doesEscape(fn : () -> Int) {}
 
 func takesGenericClosure<T>(a : Int, @noescape _ fn : () -> T) {}
