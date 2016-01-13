@@ -618,3 +618,23 @@ int Compilation::performJobs() {
 
   return result;
 }
+
+const std::string &Compilation::getAllSourcesPath() const {
+  auto *mutableThis = const_cast<Compilation *>(this);
+
+  if (AllSourceFilesPath.empty()) {
+    SmallString<128> Buffer;
+    std::error_code EC =
+        llvm::sys::fs::createTemporaryFile("sources", "", Buffer);
+    if (EC) {
+      Diags.diagnose(SourceLoc(),
+                     diag::error_unable_to_make_temporary_file,
+                     EC.message());
+      // FIXME: This should not take down the entire process.
+      llvm::report_fatal_error("unable to create list of input sources");
+    }
+    mutableThis->addTemporaryFile(Buffer.str());
+    mutableThis->AllSourceFilesPath = TempFilePaths.back();
+  }
+  return AllSourceFilesPath;
+}

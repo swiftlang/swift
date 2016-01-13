@@ -78,6 +78,12 @@ private:
   /// A list of input files and their associated types.
   InputFileList InputFilesWithTypes;
 
+  /// When non-null, a temporary file containing all input .swift files.
+  /// Used for large compilations to avoid overflowing argv.
+  ///
+  /// This is a pointer to a string whose data is held in #TempFilePaths.
+  std::string AllSourceFilesPath;
+
   /// Temporary files that should be cleaned up after the compilation finishes.
   ///
   /// These apply whether the compilation succeeds or fails.
@@ -193,6 +199,15 @@ public:
   void setLastBuildTime(llvm::sys::TimeValue time) {
     LastBuildTime = time;
   }
+
+  /// Requests the path to a file containing all input source files. This can
+  /// be shared across jobs.
+  ///
+  /// If this is never called, the Compilation does not bother generating such
+  /// a file.
+  ///
+  /// \sa types::isPartOfSwiftCompilation
+  const std::string &getAllSourcesPath() const;
 
   /// Asks the Compilation to perform the Jobs which it knows about.
   /// \returns result code for the Compilation's Jobs; 0 indicates success and

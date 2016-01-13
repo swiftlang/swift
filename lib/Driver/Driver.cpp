@@ -1855,10 +1855,9 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
   }
 
   // 4. Construct a Job which produces the right CommandOutput.
-  std::unique_ptr<Job> ownedJob = TC.constructJob(*JA, std::move(InputJobs),
-                                                  std::move(Output),
-                                                  InputActions, C.getArgs(),
-                                                  C.getInputFiles(), OI);
+  std::unique_ptr<Job> ownedJob = TC.constructJob(*JA, C, std::move(InputJobs),
+                                                  InputActions, 
+                                                  std::move(Output), OI);
   Job *J = C.addJob(std::move(ownedJob));
 
   // If we track dependencies for this job, we may be able to avoid running it.

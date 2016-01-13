@@ -39,6 +39,8 @@ using namespace llvm::opt;
 
 /// The name of the Swift migrator binary.
 static const char * const SWIFT_UPDATE_NAME = "swift-update";
+/// The limit for passing a list of files on the command line.
+static const size_t TOO_MANY_FILES = 128;
 
 static void addInputsOfType(ArgStringList &Arguments,
                             ArrayRef<const Action *> Inputs,
@@ -242,25 +244,39 @@ ToolChain::constructInvocation(const CompileJobAction &job,
 
     auto *IA = cast<InputAction>(context.InputActions[0]);
     const Arg &PrimaryInputArg = IA->getInputArg();
-    bool FoundPrimaryInput = false;
 
-    for (auto inputPair : context.TopLevelInputFiles) {
-      if (!types::isPartOfSwiftCompilation(inputPair.first))
-        continue;
+    if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
+        context.getTopLevelInputFiles().size() > TOO_MANY_FILES) {
+      Arguments.push_back("-filelist");
+      Arguments.push_back(context.getAllSourcesPath().c_str());
+      Arguments.push_back("-primary-file");
+      PrimaryInputArg.render(context.Args, Arguments);
+    } else {
+      bool FoundPrimaryInput = false;
+      for (auto inputPair : context.getTopLevelInputFiles()) {
+        if (!types::isPartOfSwiftCompilation(inputPair.first))
+          continue;
 
-      // See if this input should be passed with -primary-file.
-      if (!FoundPrimaryInput &&
-          PrimaryInputArg.getIndex() == inputPair.second->getIndex()) {
-        Arguments.push_back("-primary-file");
-        FoundPrimaryInput = true;
+        // See if this input should be passed with -primary-file.
+        if (!FoundPrimaryInput &&
+            PrimaryInputArg.getIndex() == inputPair.second->getIndex()) {
+          Arguments.push_back("-primary-file");
+          FoundPrimaryInput = true;
+        }
+        Arguments.push_back(inputPair.second->getValue());
       }
-      Arguments.push_back(inputPair.second->getValue());
     }
     break;
   }
   case OutputInfo::Mode::SingleCompile: {
-    for (const Action *A : context.InputActions) {
-      cast<InputAction>(A)->getInputArg().render(context.Args, Arguments);
+    if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
+        context.InputActions.size() > TOO_MANY_FILES) {
+      Arguments.push_back("-filelist");
+      Arguments.push_back(context.getAllSourcesPath().c_str());
+    } else {
+      for (const Action *A : context.InputActions) {
+        cast<InputAction>(A)->getInputArg().render(context.Args, Arguments);
+      }
     }
     break;
   }
