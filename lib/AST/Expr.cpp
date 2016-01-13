@@ -502,7 +502,6 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::SuperRef:
   case ExprKind::Type:
   case ExprKind::OtherConstructorDeclRef:
-  case ExprKind::UnresolvedConstructor:
   case ExprKind::DotSyntaxBaseIgnored:
     return true;
 

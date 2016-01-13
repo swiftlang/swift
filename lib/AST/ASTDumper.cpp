@@ -1649,12 +1649,6 @@ public:
     E->getDeclRef().dump(OS);
     OS << ')';
   }
-  void visitUnresolvedConstructorExpr(UnresolvedConstructorExpr *E) {
-    printCommon(E, "unresolved_constructor")
-      << "  name=" << E->getName() << '\n';
-    printRec(E->getSubExpr());
-    OS << ')';
-  }
   void visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *E) {
     printCommon(E, "overloaded_decl_ref_expr")
       << " name=" << E->getDecls()[0]->getName()

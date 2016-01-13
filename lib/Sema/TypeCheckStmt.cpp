@@ -1185,11 +1185,9 @@ Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
                                             ClassDecl *ClDecl) {
   Expr *superRef = new (Context) SuperRefExpr(ctor->getImplicitSelfDecl(),
                                               SourceLoc(), /*Implicit=*/true);
-  Expr *r = new (Context) UnresolvedConstructorExpr(superRef,
-                                                    SourceLoc(),
-                                                    SourceLoc(),
-                                                    Context.Id_init,
-                                                    /*Implicit=*/true);
+  Expr *r = new (Context) UnresolvedDotExpr(superRef, SourceLoc(),
+                                            Context.Id_init, SourceLoc(),
+                                            /*Implicit=*/true);
   Expr *args = TupleExpr::createEmpty(Context, SourceLoc(), SourceLoc(),
                                       /*Implicit=*/true);
   r = new (Context) CallExpr(r, args, /*Implicit=*/true);

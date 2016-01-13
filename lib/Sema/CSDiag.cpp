@@ -1364,18 +1364,25 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
       candidates.push_back({ member, uncurryLevel });
       return;
     }
-    // Otherwise, look for a disjunction constraint explaining what the set is.
-  }
-  
-  // Calls to super.init() are automatically uncurried one level.
-  if (auto *UCE = dyn_cast<UnresolvedConstructorExpr>(fn)) {
-    uncurryLevel = 1;
 
-    auto selfTy = UCE->getSubExpr()->getType()->getLValueOrInOutObjectType();
-    if (selfTy->hasTypeVariable())
-      declName = "init";
-    else
-      declName = selfTy.getString() + ".init";
+    // If we resolved the constructor member, return it.
+    auto ctorLoc = CS->getConstraintLocator(
+                     UDE,
+                     ConstraintLocator::ConstructorMember);
+    if (auto *member = findResolvedMemberRef(ctorLoc, *CS)) {
+      candidates.push_back({ member, uncurryLevel });
+      return;
+    }
+
+    // If we have useful information about the type we're
+    // initializing, provide it.
+    if (UDE->getName().getBaseName() == CS->TC.Context.Id_init) {
+      auto selfTy = UDE->getBase()->getType()->getLValueOrInOutObjectType();
+      if (!selfTy->hasTypeVariable())
+        declName = selfTy.getString() + "." + declName;
+    }
+
+    // Otherwise, look for a disjunction constraint explaining what the set is.
   }
   
   if (isa<MemberRefExpr>(fn))
@@ -2154,29 +2161,7 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
                             /*includeInaccessibleMembers*/true);
 
   switch (result.OverallResult) {
-  case MemberLookupResult::Unsolved:
-    // Diagnose 'super.init', which can only appear inside another initializer,
-    // specially.
-    if (memberName.isSimpleName(CS->TC.Context.Id_init) &&
-        !baseObjTy->is<MetatypeType>()) {
-      if (auto ctorRef = dyn_cast<UnresolvedConstructorExpr>(anchor)) {
-        if (isa<SuperRefExpr>(ctorRef->getSubExpr())) {
-          diagnose(anchor->getLoc(),
-                   diag::super_initializer_not_in_initializer);
-          return true;
-        }
-        
-        // Suggest inserting '.dynamicType' to construct another object of the
-        // same dynamic type.
-        SourceLoc fixItLoc = ctorRef->getConstructorLoc().getAdvancedLoc(-1);
-        
-        // Place the '.dynamicType' right before the init.
-        diagnose(anchor->getLoc(), diag::init_not_instance_member)
-        .fixItInsert(fixItLoc, ".dynamicType");
-        return true;
-      }
-    }
-      
+  case MemberLookupResult::Unsolved:      
     // If we couldn't resolve a specific type for the base expression, then we
     // cannot produce a specific diagnostic.
     return false;
@@ -2192,6 +2177,29 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
   
   // If this is a failing lookup, it has no viable candidates here.
   if (result.ViableCandidates.empty()) {
+    // Diagnose 'super.init', which can only appear inside another initializer,
+    // specially.
+    if (result.UnviableCandidates.empty() &&
+        memberName.isSimpleName(CS->TC.Context.Id_init) &&
+        !baseObjTy->is<MetatypeType>()) {
+      if (auto ctorRef = dyn_cast<UnresolvedDotExpr>(expr)) {
+        if (isa<SuperRefExpr>(ctorRef->getBase())) {
+          diagnose(anchor->getLoc(),
+                   diag::super_initializer_not_in_initializer);
+          return true;
+        }
+        
+        // Suggest inserting '.dynamicType' to construct another object of the
+        // same dynamic type.
+        SourceLoc fixItLoc = ctorRef->getNameLoc().getAdvancedLoc(-1);
+        
+        // Place the '.dynamicType' right before the init.
+        diagnose(anchor->getLoc(), diag::init_not_instance_member)
+          .fixItInsert(fixItLoc, ".dynamicType");
+        return true;
+      }
+    }
+
     diagnoseUnviableLookupResults(result, baseObjTy, anchor, memberName,
                                   memberRange.Start, anchor->getLoc());
     return true;
@@ -3577,7 +3585,7 @@ namespace {
       // If the expression is obviously something that produces a metatype,
       // then don't put a constraint on it.
       auto semExpr = expr->getValueProvidingExpr();
-      if (isa<TypeExpr>(semExpr) ||isa<UnresolvedConstructorExpr>(semExpr))
+      if (isa<TypeExpr>(semExpr))
         return false;
       
       // We're making the expr have a function type, whose result is the same

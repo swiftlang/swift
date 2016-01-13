@@ -2109,104 +2109,6 @@ namespace {
       return expr;
     }
 
-    Expr *visitUnresolvedConstructorExpr(UnresolvedConstructorExpr *expr) {
-      // Resolve the callee to the constructor declaration selected.
-      auto ctorLocator = cs.getConstraintLocator(
-                           expr,
-                           ConstraintLocator::ConstructorMember);
-      
-      auto selected = getOverloadChoiceIfAvailable(ctorLocator);
-      
-      // If we didn't form a ConstructorMember constraint, then it
-      // acts like a normal member reference to '.init'.
-      if (!selected) {
-        return applyMemberRefExpr(expr, expr->getSubExpr(), expr->getDotLoc(),
-                                expr->getConstructorLoc(), expr->isImplicit());
-      }
-        
-      
-      auto choice = selected->choice;
-      auto *ctor = cast<ConstructorDecl>(choice.getDecl());
-
-      auto arg = expr->getSubExpr()->getSemanticsProvidingExpr();
-      auto &tc = cs.getTypeChecker();
-
-      // If the subexpression is a metatype, build a direct reference to the
-      // constructor.
-      if (arg->getType()->is<AnyMetatypeType>()) {
-        return buildMemberRef(expr->getSubExpr(),
-                              selected->openedFullType,
-                              expr->getDotLoc(),
-                              ctor,
-                              expr->getConstructorLoc(),
-                              expr->getType(),
-                              ConstraintLocatorBuilder(
-                                cs.getConstraintLocator(expr)),
-                              ctorLocator,
-                              expr->isImplicit(),
-                              AccessSemantics::Ordinary,
-                              /*isDynamic=*/false);
-      }
-
-      // The subexpression must be either 'self' or 'super'.
-      if (!arg->isSuperExpr()) {
-        // 'super' references have already been fully checked; handle the
-        // 'self' case below.
-        bool diagnoseBadInitRef = true;
-        if (auto dre = dyn_cast<DeclRefExpr>(arg)) {
-          if (dre->getDecl()->getName() == cs.getASTContext().Id_self) {
-            // We have a reference to 'self'.
-            diagnoseBadInitRef = false;
-
-            // Make sure the reference to 'self' occurs within an initializer.
-            if (!dyn_cast_or_null<ConstructorDecl>(
-                   cs.DC->getInnermostMethodContext())) {
-              if (!SuppressDiagnostics)
-                tc.diagnose(expr->getDotLoc(),
-                            diag::init_delegation_outside_initializer);
-              return nullptr;
-            }
-          }
-        }
-
-        // If we need to diagnose this as a bad reference to an initializer,
-        // do so now.
-        if (diagnoseBadInitRef) {
-          // Determine whether 'super' would have made sense as a base.
-          bool hasSuper = false;
-          if (auto func = cs.DC->getInnermostMethodContext()) {
-            if (auto nominalType
-                       = func->getDeclContext()->getDeclaredTypeOfContext()) {
-              if (auto classDecl = nominalType->getClassOrBoundGenericClass()) {
-                hasSuper = classDecl->hasSuperclass();
-              }
-            }
-          }
-          
-          if (SuppressDiagnostics)
-            return nullptr;
-
-          tc.diagnose(expr->getDotLoc(), diag::bad_init_ref_base, hasSuper);
-        }
-      }
-      
-      // Build a partial application of the delegated initializer.
-      Expr *ctorRef = buildOtherConstructorRef(
-                        selected->openedFullType,
-                        ctor, expr->getConstructorLoc(),
-                        cs.getConstraintLocator(
-                          expr,
-                          ConstraintLocator::ConstructorMember),
-                        expr->isImplicit());
-      auto *call
-        = new (cs.getASTContext()) DotSyntaxCallExpr(ctorRef,
-                                                     expr->getDotLoc(),
-                                                     expr->getSubExpr());
-      return finishApply(call, expr->getType(),
-                         ConstraintLocatorBuilder(
-                           cs.getConstraintLocator(expr)));
-    }
-
     Expr *visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
       return simplifyExprType(expr);
     }
@@ -2352,9 +2254,91 @@ namespace {
     /// A list of optional injections that have been diagnosed.
     llvm::SmallPtrSet<InjectIntoOptionalExpr *, 4>  DiagnosedOptionalInjections;
   private:
+    /// Create a member reference to the given constructor.
+    Expr *applyCtorRefExpr(Expr *expr, Expr *base, SourceLoc dotLoc,
+                           SourceLoc nameLoc, bool implicit,
+                           ConstraintLocator *ctorLocator,
+                           ConstructorDecl *ctor,
+                           Type openedType) {
+      // If the subexpression is a metatype, build a direct reference to the
+      // constructor.
+      if (base->getType()->is<AnyMetatypeType>()) {
+        return buildMemberRef(base, openedType, dotLoc, ctor, nameLoc,
+                              expr->getType(),
+                              ConstraintLocatorBuilder(
+                                cs.getConstraintLocator(expr)),
+                              ctorLocator,
+                              implicit,
+                              AccessSemantics::Ordinary,
+                              /*isDynamic=*/false);
+      }
+
+      // The subexpression must be either 'self' or 'super'.
+      if (!base->isSuperExpr()) {
+        // 'super' references have already been fully checked; handle the
+        // 'self' case below.
+        auto &tc = cs.getTypeChecker();
+        bool diagnoseBadInitRef = true;
+        auto arg = base->getSemanticsProvidingExpr();
+        if (auto dre = dyn_cast<DeclRefExpr>(arg)) {
+          if (dre->getDecl()->getName() == cs.getASTContext().Id_self) {
+            // We have a reference to 'self'.
+            diagnoseBadInitRef = false;
+
+            // Make sure the reference to 'self' occurs within an initializer.
+            if (!dyn_cast_or_null<ConstructorDecl>(
+                   cs.DC->getInnermostMethodContext())) {
+              if (!SuppressDiagnostics)
+                tc.diagnose(dotLoc, diag::init_delegation_outside_initializer);
+              return nullptr;
+            }
+          }
+        }
+
+        // If we need to diagnose this as a bad reference to an initializer,
+        // do so now.
+        if (diagnoseBadInitRef) {
+          // Determine whether 'super' would have made sense as a base.
+          bool hasSuper = false;
+          if (auto func = cs.DC->getInnermostMethodContext()) {
+            if (auto nominalType
+                       = func->getDeclContext()->getDeclaredTypeOfContext()) {
+              if (auto classDecl = nominalType->getClassOrBoundGenericClass()) {
+                hasSuper = classDecl->hasSuperclass();
+              }
+            }
+          }
+
+          if (SuppressDiagnostics)
+            return nullptr;
+
+          tc.diagnose(dotLoc, diag::bad_init_ref_base, hasSuper);
+        }
+      }
+
+      // Build a partial application of the delegated initializer.
+      Expr *ctorRef = buildOtherConstructorRef(openedType, ctor, nameLoc,
+                                               ctorLocator, implicit);
+      auto *call = new (cs.getASTContext()) DotSyntaxCallExpr(ctorRef, dotLoc,
+                                                              base);
+      return finishApply(call, expr->getType(),
+                         ConstraintLocatorBuilder(
+                           cs.getConstraintLocator(expr)));
+    }
 
     Expr *applyMemberRefExpr(Expr *expr, Expr *base, SourceLoc dotLoc,
                              SourceLoc nameLoc, bool implicit) {
+      // If we have a constructor member, handle it as a constructor.
+      auto ctorLocator = cs.getConstraintLocator(
+                           expr,
+                           ConstraintLocator::ConstructorMember);
+      if (auto selected = getOverloadChoiceIfAvailable(ctorLocator)) {
+        auto choice = selected->choice;
+        auto *ctor = cast<ConstructorDecl>(choice.getDecl());
+        return applyCtorRefExpr(expr, base, dotLoc, nameLoc, implicit,
+                                ctorLocator, ctor, selected->openedFullType);
+      }
+
       // Determine the declaration selected for this overloaded reference.
       auto memberLocator = cs.getConstraintLocator(expr,
                                                    ConstraintLocator::Member);

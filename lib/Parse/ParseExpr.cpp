@@ -596,13 +596,6 @@ ParserResult<Expr> Parser::parseExprSuper() {
     if (!name)
       return nullptr;
 
-    if (name.getBaseName() == Context.Id_init) {
-      Expr *result = new (Context) UnresolvedConstructorExpr(superRef,
-                                     dotLoc, nameLoc, name,
-                                     /*Implicit=*/false);
-      return makeParserResult(result);
-    }
-
     return makeParserResult(
              new (Context) UnresolvedDotExpr(superRef, dotLoc, name, nameLoc,
                                              /*Implicit=*/false));
@@ -1090,15 +1083,6 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
                                                    diag::expected_member_name);
         if (!Name) return nullptr;
       
-        // Handle initializers.
-        if (Name.getBaseName() == Context.Id_init) {
-          Expr *initRef = new (Context) UnresolvedConstructorExpr(
-                                          Result.get(), TokLoc, NameLoc, Name,
-                                          /*Implicit=*/false);
-          Result = makeParserResult(initRef);
-          continue;
-        }
-
         Result = makeParserResult(
                    new (Context) UnresolvedDotExpr(Result.get(), TokLoc, Name,
                                                    NameLoc,

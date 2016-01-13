@@ -4357,10 +4357,13 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
 
       if (isa<OtherConstructorDeclRefExpr>(Callee)) {
         arg = apply->getArg();
-      } else if (auto *UCE = dyn_cast<UnresolvedConstructorExpr>(Callee)) {
-        arg = UCE->getSubExpr();
       } else if (auto *CRE = dyn_cast<ConstructorRefCallExpr>(Callee)) {
         arg = CRE->getArg();
+      } else if (auto *dotExpr = dyn_cast<UnresolvedDotExpr>(Callee)) {
+        if (dotExpr->getName().getBaseName().str() != "init")
+          return { true, E };
+
+        arg = dotExpr->getBase();
       } else {
         // Not a constructor call.
         return { true, E };
