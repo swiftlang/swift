@@ -3,18 +3,16 @@
 # this one's short).  See -h output for instructions
 
 from __future__ import print_function
-from __future__ import unicode_literals
 
 import re
 try:
-    from StringIO import StringIO
+    from cStringIO import StringIO
 except ImportError:
     from io import StringIO
 import tokenize
 import textwrap
 from bisect import bisect
 import os
-from io import open
 
 def getLineStarts(s):
     """Return a list containing the start index of each line in s.
@@ -373,7 +371,7 @@ class ParseContext:
     def __init__(self, filename, template=None):
         self.filename = os.path.abspath(filename)
         if template is None:
-            with open(filename, 'r', encoding='utf-8') as f:
+            with open(filename) as f:
                 self.template = f.read()
         else:
             self.template = template
@@ -1047,8 +1045,8 @@ def main():
                     help='''Bindings to be set in the template's execution context'''
                     )
 
-    parser.add_argument('file', help='Path to GYB template file (defaults to stdin)', nargs='?', default=sys.stdin.fileno())
-    parser.add_argument('-o', dest='target', help='Output file (defaults to stdout)', default=sys.stdout.fileno())
+    parser.add_argument('file', type=argparse.FileType(), help='Path to GYB template file (defaults to stdin)', nargs='?', default=sys.stdin)
+    parser.add_argument('-o', dest='target', type=argparse.FileType('w'), help='Output file (defaults to stdout)', default=sys.stdout)
     parser.add_argument('--test', action='store_true', default=False, help='Run a self-test')
     parser.add_argument('--verbose-test', action='store_true', default=False, help='Run a verbose self-test')
     parser.add_argument('--dump', action='store_true', default=False, help='Dump the parsed template to stdout')
@@ -1063,14 +1061,14 @@ def main():
             sys.exit(1)
         
     bindings = dict( x.split('=', 1) for x in args.defines )
-    ast = parseTemplate(str(args.file), open(args.file, 'r', encoding='utf-8').read())
+    ast = parseTemplate(args.file.name, args.file.read())
     if args.dump:
         
         print(ast)
     # Allow the template to import .py files from its own directory
-    sys.path = [os.path.split(str(args.file))[0] or '.'] + sys.path
-
-    open(args.target, 'w+', encoding='utf-8').write(executeTemplate(ast, args.line_directive, **bindings))
+    sys.path = [os.path.split(args.file.name)[0] or '.'] + sys.path
+    
+    args.target.write(executeTemplate(ast, args.line_directive, **bindings))
 
 if __name__ == '__main__':
     main()
