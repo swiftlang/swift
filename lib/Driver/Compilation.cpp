@@ -592,6 +592,26 @@ int Compilation::performSingleCommand(const Job *Cmd) {
   return ExecuteInPlace(ExecPath, argv);
 }
 
+static bool writeAllSourcesFile(DiagnosticEngine &diags, StringRef path,
+                                ArrayRef<InputPair> inputFiles) {
+  std::error_code error;
+  llvm::raw_fd_ostream out(path, error, llvm::sys::fs::F_None);
+  if (out.has_error()) {
+    out.clear_error();
+    diags.diagnose(SourceLoc(), diag::error_unable_to_make_temporary_file,
+                   error.message());
+    return false;
+  }
+
+  for (auto inputPair : inputFiles) {
+    if (!types::isPartOfSwiftCompilation(inputPair.first))
+      continue;
+    out << inputPair.second->getValue() << "\n";
+  }
+
+  return true;
+}
+
 int Compilation::performJobs() {
   // If we don't have to do any cleanup work, just exec the subprocess.
   if (Level < OutputLevel::Parseable &&
@@ -604,7 +624,11 @@ int Compilation::performJobs() {
   if (!TaskQueue::supportsParallelExecution() && NumberOfParallelCommands > 1) {
     Diags.diagnose(SourceLoc(), diag::warning_parallel_execution_not_supported);
   }
-
+  
+  if (!AllSourceFilesPath.empty())
+    if (!writeAllSourcesFile(Diags, AllSourceFilesPath, getInputFiles()))
+      return EXIT_FAILURE;
+  
   int result = performJobsImpl();
 
   if (!SaveTemps) {
