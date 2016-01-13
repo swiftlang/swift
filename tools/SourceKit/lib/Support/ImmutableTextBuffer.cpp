@@ -100,7 +100,7 @@ bool ImmutableTextSnapshot::precedesOrSame(ImmutableTextSnapshotRef Other) {
 bool ImmutableTextSnapshot::foreachReplaceUntil(
     ImmutableTextSnapshotRef EndSnapshot,
     std::function<bool(ReplaceImmutableTextUpdateRef Upd)> Fn) {
-  
+
   assert(EndSnapshot);
   ImmutableTextUpdateRef Upd = DiffEnd;
   while (Upd != EndSnapshot->DiffEnd) {
@@ -200,7 +200,7 @@ ImmutableTextBufferRef EditableTextBuffer::getBufferForSnapshot(
 
   // Check if a buffer was created in the middle of the snapshot updates.
   ImmutableTextBufferRef StartBuf = Snap.BufferStart;
-  ImmutableTextUpdateRef Upd = StartBuf;  
+  ImmutableTextUpdateRef Upd = StartBuf;
   while (Upd != Snap.DiffEnd) {
     Upd = Upd->Next;
     if (auto Buf = dyn_cast<ImmutableTextBuffer>(Upd))

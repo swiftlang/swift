@@ -137,7 +137,7 @@ int main(int argc_, const char **argv_) {
 
     // Rewrite the program argument.
     argv[0] = SubcommandPath.c_str();
-    
+
     // Execute the subcommand.
     argv.push_back(nullptr);
     ExecuteInPlace(SubcommandPath.c_str(), argv.data());

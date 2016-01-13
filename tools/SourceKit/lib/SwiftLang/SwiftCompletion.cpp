@@ -123,7 +123,7 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
                      std::make_pair("InputBufferSize",
                                     std::to_string(UnresolvedInputFile->getBufferSize()))});
   }
-  
+
   // Resolve symlinks for the input file; we resolve them for the input files
   // in the arguments as well.
   // FIXME: We need the Swift equivalent of Clang's FileEntry.

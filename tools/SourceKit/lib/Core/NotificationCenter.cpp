@@ -25,7 +25,7 @@ void NotificationCenter::addDocumentUpdateNotificationReceiver(
 
 void NotificationCenter::postDocumentUpdateNotification(
     StringRef DocumentName) const {
-  
+
   std::string DocName = DocumentName;
   WorkQueue::dispatchOnMain([this, DocName]{
     for (auto &Fn : DocUpdReceivers)

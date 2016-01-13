@@ -227,7 +227,7 @@ public:
                                                  unsigned Length) = 0;
 
   virtual bool recordAffectedRange(unsigned Offset, unsigned Length) = 0;
-  
+
   virtual bool recordAffectedLineRange(unsigned Line, unsigned Length) = 0;
 
   virtual bool recordFormattedText(StringRef Text) = 0;

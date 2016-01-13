@@ -50,7 +50,7 @@ enum class OperationKind : uint64_t {
 
   CodeCompletionInit,
 };
-  
+
 typedef std::vector<std::pair<std::string, std::string>> StringPairs;
 
 struct SwiftInvocation {
@@ -61,7 +61,7 @@ struct SwiftInvocation {
     Files.push_back(std::make_pair(std::move(FileName), std::move(Text)));
   }
 };
-  
+
 class TraceConsumer {
 public:
   virtual ~TraceConsumer() = default;
@@ -70,7 +70,7 @@ public:
   virtual void operationStarted(uint64_t OpId, OperationKind OpKind,
                                  const SwiftInvocation &Inv,
                                  const StringPairs &OpArgs) = 0;
-  
+
   // Operation previously started with startXXX has finished
   virtual void operationFinished(uint64_t OpId) = 0;
 };
@@ -83,7 +83,7 @@ void enable();
 
 // Disable tracing
 void disable();
-  
+
 // Trace start of SourceKit operation, returns OpId
 uint64_t startOperation(OperationKind OpKind,
                         const SwiftInvocation &Inv,
