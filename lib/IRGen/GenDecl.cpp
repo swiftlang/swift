@@ -835,11 +835,10 @@ void IRGenModule::emitVTableStubs() {
     if (!stub) {
       // Create a single stub function which calls swift_deletedMethodError().
       stub = llvm::Function::Create(llvm::FunctionType::get(VoidTy, false),
-                                    llvm::GlobalValue::LinkOnceODRLinkage,
+                                    llvm::GlobalValue::InternalLinkage,
                                     "_swift_dead_method_stub");
       stub->setAttributes(constructInitialAttributes());
       Module.getFunctionList().push_back(stub);
-      stub->setVisibility(llvm::GlobalValue::HiddenVisibility);
       stub->setCallingConv(RuntimeCC);
       auto *entry = llvm::BasicBlock::Create(getLLVMContext(), "entry", stub);
       auto *errorFunc = getDeletedMethodErrorFn();
