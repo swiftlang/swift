@@ -1,4 +1,4 @@
-// RUN: rm %t.txt
+// RUN: rm -rf %t.txt
 // RUN: echo '%S/Inputs/filelist-other.swift' >> %t.txt
 // RUN: echo '%s' >> %t.txt
 // RUN: echo '%S/../Inputs/empty.swift' >> %t.txt
