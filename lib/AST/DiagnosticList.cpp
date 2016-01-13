@@ -18,7 +18,7 @@
 using namespace swift;
 
 enum class swift::DiagID : uint32_t {
-#define DIAG(KIND,ID,Category,Options,Text,Signature) ID,
+#define DIAG(KIND,ID,Options,Text,Signature) ID,
 #include "swift/AST/DiagnosticsAll.def"
 };
 
@@ -26,7 +26,7 @@ enum class swift::DiagID : uint32_t {
 // diagnostic IDs.
 namespace swift {
   namespace diag {
-#define DIAG(KIND,ID,Category,Options,Text,Signature) \
+#define DIAG(KIND,ID,Options,Text,Signature) \
     detail::DiagWithArguments<void Signature>::type ID = { DiagID::ID };
 #include "swift/AST/DiagnosticsAll.def"
   }

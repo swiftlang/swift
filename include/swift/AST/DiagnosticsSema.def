@@ -23,910 +23,910 @@
 #endif
 
 #ifndef ERROR
-#  define ERROR(ID,Category,Options,Text,Signature)   \
-  DIAG(ERROR,ID,Category,Options,Text,Signature)
+#  define ERROR(ID,Options,Text,Signature)   \
+  DIAG(ERROR,ID,Options,Text,Signature)
 #endif
 
 #ifndef WARNING
-#  define WARNING(ID,Category,Options,Text,Signature) \
-  DIAG(WARNING,ID,Category,Options,Text,Signature)
+#  define WARNING(ID,Options,Text,Signature) \
+  DIAG(WARNING,ID,Options,Text,Signature)
 #endif
 
 #ifndef NOTE
-#  define NOTE(ID,Category,Options,Text,Signature) \
-  DIAG(NOTE,ID,Category,Options,Text,Signature)
+#  define NOTE(ID,Options,Text,Signature) \
+  DIAG(NOTE,ID,Options,Text,Signature)
 #endif
 
 
-NOTE(type_declared_here,sema,none,
+NOTE(type_declared_here,none,
      "type declared here", ())
-NOTE(decl_declared_here,sema,none,
+NOTE(decl_declared_here,none,
      "%0 declared here", (Identifier))
-NOTE(extended_type_declared_here,sema,none,
+NOTE(extended_type_declared_here,none,
      "extended type declared here", ())
 
-NOTE(while_converting_default_tuple_value,sema,none,
+NOTE(while_converting_default_tuple_value,none,
      "while converting default tuple value to element type %0", (Type))
-NOTE(while_converting_subscript_index,sema,none,
+NOTE(while_converting_subscript_index,none,
      "while converting subscript index to expected type %0", (Type))
 
 //------------------------------------------------------------------------------
 // Constraint solver diagnostics
 //------------------------------------------------------------------------------
 
-ERROR(ambiguous_member_overload_set,sema,none,
+ERROR(ambiguous_member_overload_set,none,
       "ambiguous reference to member '%0'", (StringRef))
 
-ERROR(ambiguous_subscript,sema,none,
+ERROR(ambiguous_subscript,none,
       "ambiguous subscript with base type %0 and index type %1",
       (Type, Type))
-ERROR(type_not_subscriptable,sema,none,
+ERROR(type_not_subscriptable,none,
       "type %0 has no subscript members",
       (Type))
 
-ERROR(could_not_find_tuple_member,sema,none,
+ERROR(could_not_find_tuple_member,none,
       "value of tuple type %0 has no member %1", (Type, DeclName))
 
-ERROR(could_not_find_value_member,sema,none,
+ERROR(could_not_find_value_member,none,
       "value of type %0 has no member %1", (Type, DeclName))
-ERROR(could_not_find_type_member,sema,none,
+ERROR(could_not_find_type_member,none,
       "type %0 has no member %1", (Type, DeclName))
 
-ERROR(expected_argument_in_contextual_member,sema,none,
+ERROR(expected_argument_in_contextual_member,none,
       "contextual member %0 expects argument of type %1", (Identifier, Type))
-ERROR(unexpected_argument_in_contextual_member,sema,none,
+ERROR(unexpected_argument_in_contextual_member,none,
       "contextual member %0 has no associated value", (Identifier))
 
-ERROR(could_not_use_value_member,sema,none,
+ERROR(could_not_use_value_member,none,
       "member %1 cannot be used on value of type %0", (Type, DeclName))
-ERROR(could_not_use_type_member,sema,none,
+ERROR(could_not_use_type_member,none,
       "member %1 cannot be used on type %0", (Type, DeclName))
 
-ERROR(could_not_use_type_member_on_instance,sema,none,
+ERROR(could_not_use_type_member_on_instance,none,
       "static member %1 cannot be used on instance of type %0",
       (Type, DeclName))
-ERROR(could_not_use_instance_member_on_type,sema,none,
+ERROR(could_not_use_instance_member_on_type,none,
       "instance member %1 cannot be used on type %0",
       (Type, DeclName))
-ERROR(could_not_use_member_on_existential,sema,none,
+ERROR(could_not_use_member_on_existential,none,
       "member %1 cannot be used on value of protocol type %0; use a generic"
       " constraint instead",
       (Type, DeclName))
 
 
-ERROR(cannot_pass_rvalue_mutating_subelement,sema_tcs,none,
+ERROR(cannot_pass_rvalue_mutating_subelement,none,
       "cannot use mutating member on immutable value: %0",
       (StringRef))
-ERROR(cannot_pass_rvalue_mutating,sema_tcs,none,
+ERROR(cannot_pass_rvalue_mutating,none,
       "cannot use mutating member on immutable value of type %0",
       (Type))
-ERROR(cannot_pass_rvalue_mutating_getter_subelement,sema_tcs,none,
+ERROR(cannot_pass_rvalue_mutating_getter_subelement,none,
       "cannot use mutating getter on immutable value: %0",
       (StringRef))
-ERROR(cannot_pass_rvalue_mutating_getter,sema_tcs,none,
+ERROR(cannot_pass_rvalue_mutating_getter,none,
       "cannot use mutating getter on immutable value of type %0",
       (Type))
 
-ERROR(expression_too_complex,sema,none,
+ERROR(expression_too_complex,none,
       "expression was too complex to be solved in reasonable time; "
       "consider breaking up the expression into distinct sub-expressions", ())
 
-ERROR(comparison_with_nil_illegal,sema,none,
+ERROR(comparison_with_nil_illegal,none,
       "value of type %0 can never be nil, comparison isn't allowed",
       (Type))
 
-ERROR(cannot_match_expr_pattern_with_value,sema,none,
+ERROR(cannot_match_expr_pattern_with_value,none,
       "expression pattern of type %0 cannot match values of type %1",
       (Type, Type))
 
-ERROR(cannot_apply_binop_to_args,sema,none,
+ERROR(cannot_apply_binop_to_args,none,
       "binary operator '%0' cannot be applied to operands of type "
       "%1 and %2",
       (StringRef, Type, Type))
 
-ERROR(cannot_apply_binop_to_same_args,sema,none,
+ERROR(cannot_apply_binop_to_same_args,none,
       "binary operator '%0' cannot be applied to two %1 operands",
       (StringRef, Type))
 
-ERROR(cannot_apply_unop_to_arg,sema,none,
+ERROR(cannot_apply_unop_to_arg,none,
       "unary operator '%0' cannot be applied to an operand of type %1",
       (StringRef, Type))
 
-ERROR(cannot_apply_lvalue_unop_to_subelement,sema_tcs,none,
+ERROR(cannot_apply_lvalue_unop_to_subelement,none,
       "cannot pass immutable value to mutating operator: %0",
       (StringRef))
-ERROR(cannot_apply_lvalue_unop_to_rvalue,sema,none,
+ERROR(cannot_apply_lvalue_unop_to_rvalue,none,
       "cannot pass immutable value of type %0 to mutating operator",
       (Type))
 
 
-ERROR(cannot_apply_lvalue_binop_to_subelement,sema_tcs,none,
+ERROR(cannot_apply_lvalue_binop_to_subelement,none,
       "left side of mutating operator isn't mutable: %0", (StringRef))
-ERROR(cannot_apply_lvalue_binop_to_rvalue,sema,none,
+ERROR(cannot_apply_lvalue_binop_to_rvalue,none,
       "left side of mutating operator has immutable type %0", (Type))
 
-ERROR(cannot_subscript_with_index,sema,none,
+ERROR(cannot_subscript_with_index,none,
       "cannot subscript a value of type %0 with an index of type %1",
       (Type, Type))
 
-ERROR(cannot_subscript_base,sema,none,
+ERROR(cannot_subscript_base,none,
       "cannot subscript a value of type %0",
       (Type))
 
-ERROR(cannot_pass_rvalue_inout_subelement,sema_tcs,none,
+ERROR(cannot_pass_rvalue_inout_subelement,none,
       "cannot pass immutable value as inout argument: %0",
       (StringRef))
-ERROR(cannot_pass_rvalue_inout,sema_tcs,none,
+ERROR(cannot_pass_rvalue_inout,none,
       "cannot pass immutable value of type %0 as inout argument",
       (Type))
 
-ERROR(cannot_assign_to_literal,sema,none,
+ERROR(cannot_assign_to_literal,none,
       "cannot assign to a literal value", ())
 
-ERROR(cannot_call_with_no_params,sema,none,
+ERROR(cannot_call_with_no_params,none,
       "cannot invoke %select{|initializer for type }1'%0' with no arguments",
       (StringRef, bool))
 
-ERROR(cannot_call_with_params, sema, none,
+ERROR(cannot_call_with_params, none,
       "cannot invoke %select{|initializer for type }2'%0' with an argument list"
       " of type '%1'", (StringRef, StringRef, bool))
 
-ERROR(expected_do_in_statement,sema,none,
+ERROR(expected_do_in_statement,none,
       "expected 'do' keyword to designate a block of statements", ())
 
-ERROR(cannot_call_non_function_value,sema,none,
+ERROR(cannot_call_non_function_value,none,
       "cannot call value of non-function type %0", (Type))
 
-ERROR(wrong_argument_labels_overload,sema,none,
+ERROR(wrong_argument_labels_overload,none,
       "argument labels '%0' do not match any available overloads", (StringRef))
 
-ERROR(no_candidates_match_result_type,sema,none,
+ERROR(no_candidates_match_result_type,none,
       "no '%0' candidates produce the expected contextual result type %1",
       (StringRef, Type))
 
-ERROR(candidates_no_match_result_type,sema,none,
+ERROR(candidates_no_match_result_type,none,
       "'%0' produces %1, not the expected contextual result type %2",
       (StringRef, Type, Type))
 
 
 
-ERROR(invalid_callee_result_type,sema,none,
+ERROR(invalid_callee_result_type,none,
       "cannot convert call result type %0 to expected type %1",
       (Type, Type))
 
 
-ERROR(cannot_invoke_closure,sema,none,
+ERROR(cannot_invoke_closure,none,
       "cannot invoke closure expression with an argument list of type '%0'",
       (StringRef))
-ERROR(cannot_invoke_closure_type,sema,none,
+ERROR(cannot_invoke_closure_type,none,
       "cannot invoke closure of type %0 with an argument list of type '%1'",
       (Type, StringRef))
 
-ERROR(cannot_infer_closure_type,sema,none,
+ERROR(cannot_infer_closure_type,none,
       "unable to infer closure type in the current context", ())
-ERROR(cannot_infer_closure_result_type,sema,none,
+ERROR(cannot_infer_closure_result_type,none,
       "unable to infer closure return type in current context", ())
 
-ERROR(incorrect_explicit_closure_result,sema,none,
+ERROR(incorrect_explicit_closure_result,none,
       "declared closure result %0 is incompatible with contextual type %1",
       (Type, Type))
 
-ERROR(cannot_call_function_value,sema,none,
+ERROR(cannot_call_function_value,none,
       "cannot invoke value of function type with argument list '%0'",
       (StringRef))
-ERROR(cannot_call_value_of_function_type,sema,none,
+ERROR(cannot_call_value_of_function_type,none,
       "cannot invoke value of type %0 with argument list '%1'",
       (Type, StringRef))
 
-NOTE(suggest_expected_match,sema,none,
+NOTE(suggest_expected_match,none,
      "%select{expected an argument list|produces result}0 of type '%1'",
      (bool, StringRef))
 
-NOTE(suggest_partial_overloads,sema,none,
+NOTE(suggest_partial_overloads,none,
       "overloads for '%1' exist with these %select{"
       "partially matching parameter lists|result types}0: %2",
       (bool, StringRef, StringRef))
 
-ERROR(cannot_convert_initializer_value,sema,none,
+ERROR(cannot_convert_initializer_value,none,
       "cannot convert value of type %0 to specified type %1", (Type,Type))
-ERROR(cannot_convert_initializer_value_protocol,sema,none,
+ERROR(cannot_convert_initializer_value_protocol,none,
       "value of type %0 does not conform to specified type %1", (Type,Type))
-ERROR(cannot_convert_initializer_value_nil,sema_tcd,none,
+ERROR(cannot_convert_initializer_value_nil,none,
       "nil cannot initialize specified type %0", (Type))
 
-ERROR(cannot_convert_to_return_type,sema,none,
+ERROR(cannot_convert_to_return_type,none,
       "cannot convert return expression of type %0 to return type %1",
       (Type,Type))
-ERROR(cannot_convert_to_return_type_protocol,sema,none,
+ERROR(cannot_convert_to_return_type_protocol,none,
       "return expression of type %0 does not conform to %1", (Type,Type))
-ERROR(cannot_convert_to_return_type_nil,sema,none,
+ERROR(cannot_convert_to_return_type_nil,none,
       "nil is incompatible with return type %0", (Type))
 
-ERROR(cannot_convert_thrown_type,sema,none,
+ERROR(cannot_convert_thrown_type,none,
       "thrown expression type %0 does not conform to 'ErrorType'", (Type))
-ERROR(cannot_throw_nil,sema,none,
+ERROR(cannot_throw_nil,none,
       "cannot infer concrete ErrorType for thrown 'nil' value", ())
 
 
-ERROR(cannot_convert_raw_initializer_value,sema,none,
+ERROR(cannot_convert_raw_initializer_value,none,
       "cannot convert value of type %0 to raw type %1", (Type,Type))
-ERROR(cannot_convert_raw_initializer_value_nil,sema,none,
+ERROR(cannot_convert_raw_initializer_value_nil,none,
       "cannot convert nil to raw type %1", (Type))
 
-ERROR(cannot_convert_default_arg_value,sema,none,
+ERROR(cannot_convert_default_arg_value,none,
       "default argument value of type %0 cannot be converted to type %1",
       (Type,Type))
-ERROR(cannot_convert_default_arg_value_protocol,sema,none,
+ERROR(cannot_convert_default_arg_value_protocol,none,
       "default argument value of type %0 does not conform to %1", (Type,Type))
-ERROR(cannot_convert_default_arg_value_nil,sema,none,
+ERROR(cannot_convert_default_arg_value_nil,none,
       "nil default argument value of cannot be converted to type %0", (Type))
 
-ERROR(cannot_convert_argument_value,sema,none,
+ERROR(cannot_convert_argument_value,none,
       "cannot convert value of type %0 to expected argument type %1",
       (Type,Type))
-ERROR(cannot_convert_argument_value_protocol,sema_tcd,none,
+ERROR(cannot_convert_argument_value_protocol,none,
       "argument type %0 does not conform to expected type %1", (Type, Type))
-ERROR(cannot_convert_argument_value_nil,sema,none,
+ERROR(cannot_convert_argument_value_nil,none,
       "nil is not compatible with expected argument type %0", (Type))
 
-ERROR(cannot_convert_closure_result,sema,none,
+ERROR(cannot_convert_closure_result,none,
       "cannot convert value of type %0 to closure result type %1",
       (Type,Type))
-ERROR(cannot_convert_closure_result_protocol,sema_tcd,none,
+ERROR(cannot_convert_closure_result_protocol,none,
       "result value of type %0 does not conform to closure result type %1",
       (Type, Type))
-ERROR(cannot_convert_closure_result_nil,sema,none,
+ERROR(cannot_convert_closure_result_nil,none,
       "nil is not compatible with closure result type %0", (Type))
 
 // Array Element
-ERROR(cannot_convert_array_element,sema,none,
+ERROR(cannot_convert_array_element,none,
       "cannot convert value of type %0 to expected element type %1",
       (Type,Type))
-ERROR(cannot_convert_array_element_protocol,sema_tcd,none,
+ERROR(cannot_convert_array_element_protocol,none,
       "value of type %0 does not conform to expected element type %1",
       (Type, Type))
-ERROR(cannot_convert_array_element_nil,sema,none,
+ERROR(cannot_convert_array_element_nil,none,
       "nil is not compatible with expected element type %0", (Type))
 
 // Dictionary Key
-ERROR(cannot_convert_dict_key,sema,none,
+ERROR(cannot_convert_dict_key,none,
       "cannot convert value of type %0 to expected dictionary key type %1",
       (Type,Type))
-ERROR(cannot_convert_dict_key_protocol,sema_tcd,none,
+ERROR(cannot_convert_dict_key_protocol,none,
       "value of type %0 does not conform to expected dictionary key type %1",
       (Type, Type))
-ERROR(cannot_convert_dict_key_nil,sema,none,
+ERROR(cannot_convert_dict_key_nil,none,
       "nil is not compatible with expected dictionary key type %0", (Type))
 
 // Dictionary Value
-ERROR(cannot_convert_dict_value,sema,none,
+ERROR(cannot_convert_dict_value,none,
       "cannot convert value of type %0 to expected dictionary value type %1",
       (Type,Type))
-ERROR(cannot_convert_dict_value_protocol,sema_tcd,none,
+ERROR(cannot_convert_dict_value_protocol,none,
       "value of type %0 does not conform to expected dictionary value type %1",
       (Type, Type))
-ERROR(cannot_convert_dict_value_nil,sema,none,
+ERROR(cannot_convert_dict_value_nil,none,
       "nil is not compatible with expected dictionary value type %0", (Type))
 
 // Coerce Expr
-ERROR(cannot_convert_coerce,sema,none,
+ERROR(cannot_convert_coerce,none,
       "cannot convert value of type %0 to type %1 in coercion",
       (Type,Type))
-ERROR(cannot_convert_coerce_protocol,sema_tcd,none,
+ERROR(cannot_convert_coerce_protocol,none,
       "value of type %0 does not conform to %1 in coercion",
       (Type, Type))
-ERROR(cannot_convert_coerce_nil,sema,none,
+ERROR(cannot_convert_coerce_nil,none,
       "nil is not compatible with type %0 in coercion", (Type))
 
 // Assign Expr
-ERROR(cannot_convert_assign,sema,none,
+ERROR(cannot_convert_assign,none,
       "cannot assign value of type %0 to type %1",
       (Type,Type))
-ERROR(cannot_convert_assign_protocol,sema_tcd,none,
+ERROR(cannot_convert_assign_protocol,none,
       "value of type %0 does not conform to %1 in assignment",
       (Type, Type))
-ERROR(cannot_convert_assign_nil,sema,none,
+ERROR(cannot_convert_assign_nil,none,
       "nil cannot be assigned to type %0", (Type))
 
 
-ERROR(throws_functiontype_mismatch,sema_tcc,none,
+ERROR(throws_functiontype_mismatch,none,
       "invalid conversion from throwing function of type %0 to "
       "non-throwing function type %1", (Type, Type))
-ERROR(noescape_functiontype_mismatch,sema_tcc,none,
+ERROR(noescape_functiontype_mismatch,none,
       "invalid conversion from non-escaping function of type %0 to "
       "potentially escaping function type %1", (Type, Type))
 
 
 
 
-ERROR(cannot_return_value_from_void_func,sema,none,
+ERROR(cannot_return_value_from_void_func,none,
       "unexpected non-void return value in void function", ())
 
 //------------------------------------------------------------------------------
 // Name Binding
 //------------------------------------------------------------------------------
 
-ERROR(sema_no_import,sema_nb,Fatal,
+ERROR(sema_no_import,Fatal,
       "no such module '%0'", (StringRef))
-ERROR(sema_no_import_repl,sema_nb,none,
+ERROR(sema_no_import_repl,none,
       "no such module '%0'", (StringRef))
-NOTE(sema_no_import_no_sdk,sema_nb,none,
+NOTE(sema_no_import_no_sdk,none,
      "did you forget to set an SDK using -sdk or SDKROOT?", ())
-NOTE(sema_no_import_no_sdk_xcrun,sema_nb,none,
+NOTE(sema_no_import_no_sdk_xcrun,none,
      "use \"xcrun -sdk macosx swiftc\" to select the default OS X SDK "
      "installed with Xcode", ())
-WARNING(sema_import_current_module,sema_nb,none,
+WARNING(sema_import_current_module,none,
         "this file is part of module %0; ignoring import", (Identifier))
-WARNING(sema_import_current_module_with_file,sema_nb,none,
+WARNING(sema_import_current_module_with_file,none,
         "file '%0' is part of module %1; ignoring import",
         (StringRef, Identifier))
-ERROR(sema_opening_import,sema_nb,Fatal,
+ERROR(sema_opening_import,Fatal,
       "opening import file for module %0: %1", (Identifier, StringRef))
 
-ERROR(serialization_load_failed,sema,Fatal,
+ERROR(serialization_load_failed,Fatal,
       "failed to load module %0", (Identifier))
-ERROR(serialization_malformed_module,sema,Fatal,
+ERROR(serialization_malformed_module,Fatal,
       "malformed module file: %0", (StringRef))
-ERROR(serialization_module_too_new,sema,Fatal,
+ERROR(serialization_module_too_new,Fatal,
       "module file was created by a newer version of the compiler: %0",
       (StringRef))
-ERROR(serialization_module_too_old,sema,Fatal,
+ERROR(serialization_module_too_old,Fatal,
       "module file was created by an older version of the compiler; "
       "rebuild %0 and try again: %1",
       (Identifier, StringRef))
-ERROR(serialization_missing_single_dependency,sema,Fatal,
+ERROR(serialization_missing_single_dependency,Fatal,
       "missing required module '%0'", (StringRef))
-ERROR(serialization_missing_dependencies,sema,Fatal,
+ERROR(serialization_missing_dependencies,Fatal,
       "missing required modules: %0", (StringRef))
-ERROR(serialization_missing_shadowed_module,sema,Fatal,
+ERROR(serialization_missing_shadowed_module,Fatal,
       "cannot load underlying module for %0", (Identifier))
-ERROR(serialization_name_mismatch,sema,Fatal,
+ERROR(serialization_name_mismatch,Fatal,
       "cannot load module '%0' as %1", (StringRef, Identifier))
-ERROR(serialization_name_mismatch_repl,sema,none,
+ERROR(serialization_name_mismatch_repl,none,
       "cannot load module '%0' as %1", (StringRef, Identifier))
-ERROR(serialization_target_incompatible,sema,Fatal,
+ERROR(serialization_target_incompatible,Fatal,
       "module file was created for incompatible target %0: %1",
       (StringRef, StringRef))
-ERROR(serialization_target_incompatible_repl,sema,none,
+ERROR(serialization_target_incompatible_repl,none,
       "module file was created for incompatible target %0: %1",
       (StringRef, StringRef))
-ERROR(serialization_target_too_new,sema,Fatal,
+ERROR(serialization_target_too_new,Fatal,
       "module file's minimum deployment target is %0 v%1.%2%select{|.%3}3: %4",
       (StringRef, unsigned, unsigned, unsigned, StringRef))
-ERROR(serialization_target_too_new_repl,sema,none,
+ERROR(serialization_target_too_new_repl,none,
       "module file's minimum deployment target is %0 v%1.%2%select{|.%3}3: %4",
       (StringRef, unsigned, unsigned, unsigned, StringRef))
 
-ERROR(invalid_redecl,sema_nb,none,"invalid redeclaration of %0", (DeclName))
-NOTE(invalid_redecl_prev,sema_nb,none,
+ERROR(invalid_redecl,none,"invalid redeclaration of %0", (DeclName))
+NOTE(invalid_redecl_prev,none,
      "%0 previously declared here", (DeclName))
 
-ERROR(ambiguous_type_base,sema_nb,none,
+ERROR(ambiguous_type_base,none,
       "%0 is ambiguous for type lookup in this context", (Identifier))
-ERROR(invalid_member_type,sema_nb,none,
+ERROR(invalid_member_type,none,
       "%0 is not a member type of %1", (Identifier, Type))
-ERROR(invalid_member_type_suggest,sema_nb,none,
+ERROR(invalid_member_type_suggest,none,
       "%0 does not have a member type named %1; did you mean %2?",
       (Type, Identifier, Identifier))
-ERROR(ambiguous_member_type,sema_nb,none,
+ERROR(ambiguous_member_type,none,
       "ambiguous type name %0 in %1", (Identifier, Type))
-ERROR(no_module_type,sema_nb,none,
+ERROR(no_module_type,none,
       "no type named %0 in module %1", (Identifier, Identifier))
-ERROR(ambiguous_module_type,sema_nb,none,
+ERROR(ambiguous_module_type,none,
       "ambiguous type name %0 in module %1", (Identifier, Identifier))
-ERROR(use_nonmatching_operator,sema_nb,none,
+ERROR(use_nonmatching_operator,none,
       "%0 is not a %select{binary|prefix unary|postfix unary}1 operator",
       (Identifier, unsigned))
 
-ERROR(unspaced_binary_operator_fixit,sema_nb,none,
+ERROR(unspaced_binary_operator_fixit,none,
       "missing whitespace between %0 and %1 operators",
       (Identifier, Identifier, bool))
-ERROR(unspaced_binary_operator,sema_nb,none,
+ERROR(unspaced_binary_operator,none,
       "ambiguous missing whitespace between unary and binary operators", ())
-NOTE(unspaced_binary_operators_candidate,sema_nb,none,
+NOTE(unspaced_binary_operators_candidate,none,
      "could be %select{binary|postfix}2 %0 and %select{prefix|binary}2 %1",
      (Identifier, Identifier, bool))
-ERROR(unspaced_unary_operator,sema_nb,none,
+ERROR(unspaced_unary_operator,none,
       "unary operators may not be juxtaposed; parenthesize inner expression",
       ())
 
 
-ERROR(use_unresolved_identifier,sema_nb,none,
+ERROR(use_unresolved_identifier,none,
       "use of unresolved %select{identifier|operator}1 %0", (Identifier, bool))
-ERROR(use_undeclared_type,sema_nb,none,
+ERROR(use_undeclared_type,none,
       "use of undeclared type %0", (Identifier))
-ERROR(use_undeclared_type_did_you_mean,sema_nb,none,
+ERROR(use_undeclared_type_did_you_mean,none,
       "use of undeclared type %0; did you mean to use '%1'?", (Identifier, StringRef))
-NOTE(note_remapped_type,sema_nb,none,
+NOTE(note_remapped_type,none,
      "did you mean to use '%0'?", (StringRef))
-ERROR(identifier_init_failure,sema_nb,none,
+ERROR(identifier_init_failure,none,
       "could not infer type for %0", (Identifier))
-ERROR(pattern_used_in_type,sema_nb,none,
+ERROR(pattern_used_in_type,none,
       "%0 used within its own type", (Identifier))
-NOTE(note_module_as_type,sema_nb,none,
+NOTE(note_module_as_type,none,
      "cannot use module %0 as a type", (Identifier))
 
-ERROR(use_unknown_object_literal,sema_nb,none,
+ERROR(use_unknown_object_literal,none,
      "use of unknown object literal name %0", (Identifier))
-ERROR(object_literal_default_type_missing,sema_nb,none,
+ERROR(object_literal_default_type_missing,none,
      "could not infer type of %0 literal", (StringRef))
-NOTE(object_literal_resolve_import,sema_nb,none,
+NOTE(object_literal_resolve_import,none,
      "import %0 to use '%1' as the default %2 literal type",
      (StringRef, StringRef, StringRef))
 
-ERROR(use_non_type_value,sema_nb,none,
+ERROR(use_non_type_value,none,
       "%0 is not a type", (Identifier))
-NOTE(use_non_type_value_prev,sema_nb,none,
+NOTE(use_non_type_value_prev,none,
      "%0 declared here", (Identifier))
-ERROR(use_local_before_declaration,sema_nb,none,
+ERROR(use_local_before_declaration,none,
       "use of local variable %0 before its declaration", (Identifier))
-ERROR(unsupported_existential_type,sema_nb,none,
+ERROR(unsupported_existential_type,none,
       "protocol %0 can only be used as a generic constraint because it has "
       "Self or associated type requirements", (Identifier))
 
-ERROR(no_decl_in_module,sema_nb,none,
+ERROR(no_decl_in_module,none,
       "no such decl in module", ())
-ERROR(imported_decl_is_wrong_kind,sema_nb,none,
+ERROR(imported_decl_is_wrong_kind,none,
       "%0 was imported as '%1', but is a "
       "%select{**MODULE**|type|struct|class|enum|protocol|variable|function}2",
       (Identifier, StringRef, /*ImportKind*/ unsigned))
-ERROR(ambiguous_decl_in_module,sema_nb,none,
+ERROR(ambiguous_decl_in_module,none,
       "ambiguous name %0 in module %1", (Identifier, Identifier))
 
-ERROR(module_not_testable,sema_nb,none,
+ERROR(module_not_testable,none,
       "module %0 was not compiled for testing", (Identifier))
 
 // Operator decls
-ERROR(ambiguous_operator_decls,sema_nb,none,
+ERROR(ambiguous_operator_decls,none,
       "ambiguous operator declarations found for operator", ())
-NOTE(found_this_operator_decl,sema_nb,none,
+NOTE(found_this_operator_decl,none,
      "found this matching operator declaration", ())
-ERROR(operator_redeclared,sema_nb,none,
+ERROR(operator_redeclared,none,
       "operator redeclared", ())
-NOTE(previous_operator_decl,sema_nb,none,
+NOTE(previous_operator_decl,none,
      "previous operator declaration here", ())
-ERROR(declared_operator_without_operator_decl,sema_nb,none,
+ERROR(declared_operator_without_operator_decl,none,
       "operator implementation without matching operator declaration", ())
-ERROR(declared_unary_op_without_attribute,sema_nb,none,
+ERROR(declared_unary_op_without_attribute,none,
       "unary operator implementation must have a 'prefix' or 'postfix' modifier", ())
-ERROR(unary_op_missing_prepos_attribute,sema_nb,none,
+ERROR(unary_op_missing_prepos_attribute,none,
       "%select{prefix|postfix}0 unary operator missing "
       "'%select{prefix|postfix}0' modifier", (bool))
-NOTE(unary_operator_declaration_here,sema_nb,none,
+NOTE(unary_operator_declaration_here,none,
    "%select{prefix|postfix}0 operator found here", (bool))
-ERROR(invalid_arg_count_for_operator,sema_nb,none,
+ERROR(invalid_arg_count_for_operator,none,
       "operators must have one or two arguments", ())
 
 //------------------------------------------------------------------------------
 // Type Check Coercions
 //------------------------------------------------------------------------------
 
-ERROR(tuple_conversion_not_expressible,sema_tcc,none,
+ERROR(tuple_conversion_not_expressible,none,
       "cannot express tuple conversion %0 to %1", (Type, Type))
-ERROR(load_of_explicit_lvalue,sema_tcc,none,
+ERROR(load_of_explicit_lvalue,none,
       "%0 variable is not being passed by reference", (Type))
 
 //------------------------------------------------------------------------------
 // Expression Type Checking Errors
 //------------------------------------------------------------------------------
-ERROR(types_not_convertible,sema_tcc,none,
+ERROR(types_not_convertible,none,
       "%1 is not %select{convertible to|a subtype of}0 %2",
       (bool, Type, Type))
-NOTE(in_cast_expr_types,sema_tcc,none,
+NOTE(in_cast_expr_types,none,
       "in cast from type %0 to %1",
       (Type, Type))
 
-ERROR(tuple_types_not_convertible_nelts,sema_tcc,none,
+ERROR(tuple_types_not_convertible_nelts,none,
       "%0 is not convertible to %1, "
       "tuples have a different number of elements", (Type, Type))
 
-ERROR(tuple_types_not_convertible,sema_tcc,none,
+ERROR(tuple_types_not_convertible,none,
       "tuple type %0 is not convertible to tuple %1", (Type, Type))
 
-ERROR(invalid_force_unwrap,sema_tcc,none,
+ERROR(invalid_force_unwrap,none,
       "cannot force unwrap value of non-optional type %0", (Type))
-ERROR(invalid_optional_chain,sema_tcc,none,
+ERROR(invalid_optional_chain,none,
       "cannot use optional chaining on non-optional value of type %0",
       (Type))
-ERROR(if_expr_cases_mismatch,sema_tcc,none,
+ERROR(if_expr_cases_mismatch,none,
       "result values in '? :' expression have mismatching types %0 and %1",
       (Type, Type))
 
-ERROR(did_not_call_function_value,sema_tcc,none,
+ERROR(did_not_call_function_value,none,
       "function value was used as a property; add () to call it",
       ())
-ERROR(did_not_call_function,sema_tcc,none,
+ERROR(did_not_call_function,none,
       "function %0 was used as a property; add () to call it",
       (Identifier))
-ERROR(did_not_call_method,sema_tcc,none,
+ERROR(did_not_call_method,none,
       "method %0 was used as a property; add () to call it",
       (Identifier))
 
-ERROR(init_not_instance_member,sema_tcc,none,
+ERROR(init_not_instance_member,none,
       "'init' is a member of the type; insert '.dynamicType' to initialize "
       "a new object of the same dynamic type", ())
-ERROR(super_initializer_not_in_initializer,sema_tcc,none,
+ERROR(super_initializer_not_in_initializer,none,
       "'super.init' cannot be called outside of an initializer", ())
-WARNING(isa_is_always_true,sema_tcc,none, "'%0' test is always true",
+WARNING(isa_is_always_true,none, "'%0' test is always true",
         (StringRef))
-WARNING(conditional_downcast_coercion,sema_tcc,none,
+WARNING(conditional_downcast_coercion,none,
       "conditional cast from %0 to %1 always succeeds",
       (Type, Type))
-WARNING(forced_downcast_noop,sema_tcc,none,
+WARNING(forced_downcast_noop,none,
         "forced cast of %0 to same type has no effect", (Type))
 
-WARNING(forced_downcast_coercion,sema_tcc,none,
+WARNING(forced_downcast_coercion,none,
       "forced cast from %0 to %1 always succeeds; did you mean to use 'as'?",
       (Type, Type))
-ERROR(downcast_same_type,sema_tcc,none,
+ERROR(downcast_same_type,none,
       "downcast from %0 to %1 only unwraps optionals; did you mean to use "
       "'%2'?",
       (Type, Type, StringRef))
-WARNING(downcast_to_unrelated,sema_tcc,none,
+WARNING(downcast_to_unrelated,none,
         "cast from %0 to unrelated type %1 always fails", (Type, Type))
-ERROR(downcast_to_more_optional,sema_tcc,none,
+ERROR(downcast_to_more_optional,none,
       "cannot downcast from %0 to a more optional type %1",
       (Type, Type))
-ERROR(optional_chain_noop,sema_tcc,none,
+ERROR(optional_chain_noop,none,
       "optional chain has no effect, expression already produces %0",
       (Type))
-ERROR(optional_chain_isnt_chaining,sema_tcc,none,
+ERROR(optional_chain_isnt_chaining,none,
       "'?' must be followed by a call, member lookup, or subscript",
       ())
-ERROR(pattern_in_expr,sema_tcc,none,
+ERROR(pattern_in_expr,none,
       "%0 cannot appear in an expression", (PatternKind))
-NOTE(note_call_to_operator,sema_tcc,none,
+NOTE(note_call_to_operator,none,
      "in call to operator %0", (Identifier))
-NOTE(note_call_to_func,sema_tcc,none,
+NOTE(note_call_to_func,none,
      "in call to function %0", (Identifier))
-NOTE(note_call_to_initializer,sema_tcc,none,
+NOTE(note_call_to_initializer,none,
      "in call to initializer", ())
-NOTE(note_init_parameter,sema_tcc,none,
+NOTE(note_init_parameter,none,
      "in initialization of parameter %0", (Identifier))
-ERROR(missing_nullary_call,sema_tcc,none,
+ERROR(missing_nullary_call,none,
      "function produces expected type %0; did you mean to call it with '()'?",
      (Type))
-ERROR(missing_unwrap_optional,sema_tcc,none,
+ERROR(missing_unwrap_optional,none,
       "value of optional type %0 not unwrapped; did you mean to use '!' "
       "or '?'?",
      (Type))
-ERROR(missing_unwrap_optional_try,sema_tcc,none,
+ERROR(missing_unwrap_optional_try,none,
       "value of optional type %0 not unwrapped; did you mean to use 'try!' "
       "or chain with '?'?",
      (Type))
-ERROR(missing_forced_downcast,sema_tcc,none,
+ERROR(missing_forced_downcast,none,
       "%0 is not convertible to %1; "
       "did you mean to use 'as!' to force downcast?", (Type, Type))
-ERROR(missing_explicit_conversion,sema_tcc,none,
+ERROR(missing_explicit_conversion,none,
       "%0 is not implicitly convertible to %1; "
       "did you mean to use 'as' to explicitly convert?", (Type, Type))
-ERROR(missing_address_of,sema_tcc,none,
+ERROR(missing_address_of,none,
       "passing value of type %0 to an inout parameter requires explicit '&'",
       (Type))
-ERROR(extra_address_of,sema_tcc,none,
+ERROR(extra_address_of,none,
       "'&' used with non-inout argument of type %0",
       (Type))
-ERROR(extra_address_of_unsafepointer,sema_tcc,none,
+ERROR(extra_address_of_unsafepointer,none,
       "'&' is not allowed passing array value as %0 argument",
       (Type))
 
-ERROR(missing_init_on_metatype_initialization,sema_tcc,none,
+ERROR(missing_init_on_metatype_initialization,none,
       "initializing from a metatype value must reference 'init' explicitly",
       ())
-ERROR(extra_call_nonfunction,sema_tcc,none,
+ERROR(extra_call_nonfunction,none,
       "invalid use of '()' to call a value of non-function type %0",
       (Type))
-ERROR(extra_argument_labels,sema_tcc,none,
+ERROR(extra_argument_labels,none,
       "extraneous argument label%select{|s}0 '%1' in %select{call|subscript}2",
       (bool, StringRef, bool))
-ERROR(missing_argument_labels,sema_tcc,none,
+ERROR(missing_argument_labels,none,
       "missing argument label%select{|s}0 '%1' in %select{call|subscript}2",
       (bool, StringRef, bool))
-ERROR(wrong_argument_labels,sema_tcc,none,
+ERROR(wrong_argument_labels,none,
       "incorrect argument label%select{|s}0 in %select{call|subscript}3 "
       "(have '%1', expected '%2')",
       (bool, StringRef, StringRef, bool))
-ERROR(extra_named_single_element_tuple,sema_tcc,none,
+ERROR(extra_named_single_element_tuple,none,
       "cannot treat single-element named tuple as a scalar; use '.%0' to "
       "access its element", (StringRef))
-ERROR(argument_out_of_order,sema_tcc,none,
+ERROR(argument_out_of_order,none,
       "argument %0 must precede argument %1", (Identifier, Identifier))
-ERROR(argument_out_of_order_named_unnamed,sema_tcc,none,
+ERROR(argument_out_of_order_named_unnamed,none,
       "argument %0 must precede unnamed parameter #%1", (Identifier, unsigned))
 
-ERROR(instance_member_use_on_type,sema_tcc,none,
+ERROR(instance_member_use_on_type,none,
       "use of instance member %1 on type %0; "
       "did you mean to use a value of type %0 instead?", (Type, Identifier))
 
-ERROR(missing_argument_named,sema_tcc,none,
+ERROR(missing_argument_named,none,
       "missing argument for parameter %0 in call", (Identifier))
-ERROR(missing_argument_positional,sema_tcc,none,
+ERROR(missing_argument_positional,none,
       "missing argument for parameter #%0 in call", (unsigned))
-ERROR(extra_argument_named,sema_tcc,none,
+ERROR(extra_argument_named,none,
       "extra argument %0 in call", (Identifier))
-ERROR(extra_argument_positional,sema_tcc,none,
+ERROR(extra_argument_positional,none,
       "extra argument in call", ())
-ERROR(extra_argument_to_nullary_call,sema_tcc,none,
+ERROR(extra_argument_to_nullary_call,none,
       "argument passed to call that takes no arguments", ())
-ERROR(extra_trailing_closure_in_call,sema_tcc,none,
+ERROR(extra_trailing_closure_in_call,none,
       "extra trailing closure passed in call", ())
-ERROR(no_accessible_initializers,sema_tcc,none,
+ERROR(no_accessible_initializers,none,
       "%0 cannot be constructed because it has no accessible initializers",
       (Type))
-ERROR(unbound_generic_parameter,sema_tcc,none,
+ERROR(unbound_generic_parameter,none,
       "generic parameter %0 could not be inferred", (Type))
-ERROR(cannot_bind_generic_parameter_to_type,sema_tcc,none,
+ERROR(cannot_bind_generic_parameter_to_type,none,
       "cannot bind generic parameter to type %0",
       (Type))
-ERROR(string_index_not_integer,sema_tcc,none,
+ERROR(string_index_not_integer,none,
       "String may not be indexed with %0, it has variable size elements",
       (Type))
-NOTE(string_index_not_integer_note,sema_tcc,none,
+NOTE(string_index_not_integer_note,none,
      "consider using an existing high level algorithm, "
      "str.startIndex.advancedBy(n), or a projection like str.utf8", ())
 
-ERROR(invalid_c_function_pointer_conversion_expr,sema_tcc,none,
+ERROR(invalid_c_function_pointer_conversion_expr,none,
       "a C function pointer can only be formed from a reference to a 'func' or "
       "a literal closure", ())
-ERROR(c_function_pointer_from_method,sema_tcc,none,
+ERROR(c_function_pointer_from_method,none,
       "a C function pointer cannot be formed from a method", ())
-ERROR(c_function_pointer_from_generic_function,sema_tcc,none,
+ERROR(c_function_pointer_from_generic_function,none,
       "a C function pointer cannot be formed from a reference to a generic "
       "function", ())
-ERROR(c_function_pointer_from_function_with_context,sema_tcc,none,
+ERROR(c_function_pointer_from_function_with_context,none,
       "a C function pointer cannot be formed from a "
       "%select{local function|closure}0 that captures "
       "%select{context|generic parameters}1", (bool, bool))
-NOTE(c_function_pointer_captures_here,sema_tcc,none,
+NOTE(c_function_pointer_captures_here,none,
      "%0 captured here", (Identifier))
 
 //------------------------------------------------------------------------------
 // Type Check Declarations
 //------------------------------------------------------------------------------
 
-ERROR(var_type_not_materializable,sema_tcd,none,
+ERROR(var_type_not_materializable,none,
       "type %0 of variable is not materializable", (Type))
-ERROR(enum_element_not_materializable,sema_tcd,none,
+ERROR(enum_element_not_materializable,none,
       "type of enum case is not materializable", ())
 
-ERROR(missing_initializer_def,decl_parsing,PointsToFirstBadToken,
+ERROR(missing_initializer_def,PointsToFirstBadToken,
       "initializer requires a body", ())
 
 // Attributes
-ERROR(operator_not_func,sema_tcd,none,
+ERROR(operator_not_func,none,
       "operators must be declared with 'func'", ())
-ERROR(redefining_builtin_operator,sema_tcd,none,
+ERROR(redefining_builtin_operator,none,
       "cannot declare a custom %0 '%1' operator", (StringRef, StringRef))
-ERROR(invalid_infix_on_func,sema_tcd,none,
+ERROR(invalid_infix_on_func,none,
       "'infix' modifier is not required or allowed on func declarations", ())
-ERROR(attribute_requires_operator_identifier,sema_tcd,none,
+ERROR(attribute_requires_operator_identifier,none,
       "'%0' requires a function with an operator identifier", (StringRef))
-ERROR(attribute_requires_single_argument,sema_tcd,none,
+ERROR(attribute_requires_single_argument,none,
       "'%0' requires a function with one argument", (StringRef))
 
-ERROR(inout_cant_be_variadic,sema_tce,none,
+ERROR(inout_cant_be_variadic,none,
       "inout arguments cannot be variadic", ())
-ERROR(inout_only_parameter,sema_tce,none,
+ERROR(inout_only_parameter,none,
       "'inout' is only valid in parameter lists", ())
 
-ERROR(mutating_invalid_global_scope,sema_tcd,none,
+ERROR(mutating_invalid_global_scope,none,
       "'mutating' is only valid on methods", ())
-ERROR(mutating_invalid_classes,sema_tcd,none,
+ERROR(mutating_invalid_classes,none,
       "'mutating' isn't valid on methods in classes or class-bound protocols",
       ())
-ERROR(functions_mutating_and_not,sema_tcd,none,
+ERROR(functions_mutating_and_not,none,
       "method may not be declared both mutating and nonmutating", ())
-ERROR(static_functions_not_mutating,sema_tcd,none,
+ERROR(static_functions_not_mutating,none,
       "static functions may not be declared mutating", ())
 
-ERROR(transparent_stored_property,sema_tcd,none,
+ERROR(transparent_stored_property,none,
       "@_transparent cannot be applied to stored properties", ())
-ERROR(transparent_on_invalid_extension,sema_tcd,none,
+ERROR(transparent_on_invalid_extension,none,
       "@_transparent is only supported on struct and enum extensions", ())
-ERROR(transparent_in_protocols_not_supported,sema_tcd,none,
+ERROR(transparent_in_protocols_not_supported,none,
       "@_transparent is not supported on declarations within protocols", ())
-ERROR(transparent_in_classes_not_supported,sema_tcd,none,
+ERROR(transparent_in_classes_not_supported,none,
       "@_transparent is not supported on declarations within classes", ())
 
-ERROR(invalid_iboutlet,sema_tcd,none,
+ERROR(invalid_iboutlet,none,
       "only instance properties can be declared @IBOutlet", ())
-ERROR(iboutlet_nonobjc_class,sema_tcd,none,
+ERROR(iboutlet_nonobjc_class,none,
       "@IBOutlet property cannot %select{have|be an array of}0 "
       "non-'@objc' class type %1", (bool, Type))
-ERROR(iboutlet_nonobjc_protocol,sema_tcd,none,
+ERROR(iboutlet_nonobjc_protocol,none,
       "@IBOutlet property cannot %select{have|be an array of}0 "
       "non-'@objc' protocol type %1", (bool, Type))
-ERROR(iboutlet_nonobject_type,sema_tcd,none,
+ERROR(iboutlet_nonobject_type,none,
       "@IBOutlet property cannot %select{have|be an array of}0 "
       "non-object type %1", (bool, Type))
-ERROR(iboutlet_only_mutable,sema_tcd,none,
+ERROR(iboutlet_only_mutable,none,
       "@IBOutlet attribute requires property to be mutable", ())
-ERROR(iboutlet_non_optional,sema_tcd,none,
+ERROR(iboutlet_non_optional,none,
       "@IBOutlet property has non-optional type %0", (Type))
-NOTE(note_make_optional,sema_tcd,none,
+NOTE(note_make_optional,none,
       "add '?' to form the optional type %0", (Type))
-NOTE(note_make_implicitly_unwrapped_optional,sema_tcd,none,
+NOTE(note_make_implicitly_unwrapped_optional,none,
       "add '!' to form the implicitly unwrapped optional type %0", (Type))
 
-ERROR(invalid_ibdesignable_extension,sema_tcd,none,
+ERROR(invalid_ibdesignable_extension,none,
       "@IBDesignable can only be applied to classes and extensions "
       "of classes", ())
-ERROR(invalid_ibinspectable,sema_tcd,none,
+ERROR(invalid_ibinspectable,none,
       "only instance properties can be declared @IBInspectable", ())
-ERROR(invalid_ibaction_decl,sema_tcd,none,
+ERROR(invalid_ibaction_decl,none,
       "only instance methods can be declared @IBAction", ())
-ERROR(invalid_ibaction_result,sema_tcd,none,
+ERROR(invalid_ibaction_result,none,
       "methods declared @IBAction must return 'Void' (not %0)", (Type))
-ERROR(invalid_ibaction_argument_count,sema_tcd,none,
+ERROR(invalid_ibaction_argument_count,none,
       "@IBAction methods %select{must have a single argument"
       "|can only have up to 2 arguments}0", (bool))
-ERROR(ibaction_nonobjc_class_argument,sema_tcd,none,
+ERROR(ibaction_nonobjc_class_argument,none,
       "argument to @IBAction method cannot have non-'@objc' class type %0",
       (Type))
-ERROR(ibaction_nonobject_argument,sema_tcd,none,
+ERROR(ibaction_nonobject_argument,none,
       "argument to @IBAction method cannot have non-object type %0", (Type))
-ERROR(no_objc_tagged_pointer_not_class_protocol,sema_tcd,none,
+ERROR(no_objc_tagged_pointer_not_class_protocol,none,
       "@unsafe_no_objc_tagged_pointer can only be applied to class protocols",
       ())
-ERROR(swift_native_objc_runtime_base_not_on_root_class,sema_tcd,none,
+ERROR(swift_native_objc_runtime_base_not_on_root_class,none,
       "@_swift_native_objc_runtime_base_not_on_root_class can only be applied "
       "to root classes", ())
-ERROR(attr_methods_only,sema_tcd,none,
+ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
-ERROR(access_control_in_protocol,sema_tcd,none,
+ERROR(access_control_in_protocol,none,
       "%0 modifier cannot be used in protocols", (DeclAttribute))
-ERROR(access_control_setter,sema_tcd,none,
+ERROR(access_control_setter,none,
       "'%select{private|internal|public}0(set)' modifier can only be applied "
       "to variables and subscripts",
       (Accessibility))
-ERROR(access_control_setter_read_only,sema_tcd,none,
+ERROR(access_control_setter_read_only,none,
       "'%select{private|internal|public}0(set)' modifier cannot be applied to "
       "%select{constants|read-only variables|read-only properties"
       "|read-only subscripts}1",
       (Accessibility, unsigned))
-ERROR(access_control_setter_more,sema_tcd,none,
+ERROR(access_control_setter_more,none,
       "%select{private|internal|PUBLIC}0 "
       "%select{variable|property|subscript}1 cannot have "
       "%select{PRIVATE|an internal|a public}2 setter",
       (Accessibility, unsigned, Accessibility))
-WARNING(access_control_member_more,sema_tcd,none,
+WARNING(access_control_member_more,none,
     "declaring %select{PRIVATE|an internal|a public}0 %1 for "
     "%select{a private|an internal|PUBLIC}2 %3",
     (Accessibility, DescriptiveDeclKind, Accessibility, DescriptiveDeclKind))
-WARNING(access_control_ext_member_more,sema_tcd,none,
+WARNING(access_control_ext_member_more,none,
     "declaring %select{PRIVATE|an internal|a public}0 %1 in "
     "%select{a private|an internal|PUBLIC}2 extension",
     (Accessibility, DescriptiveDeclKind, Accessibility))
-ERROR(access_control_ext_requirement_member_more,sema_tcd,none,
+ERROR(access_control_ext_requirement_member_more,none,
     "cannot declare %select{PRIVATE|an internal|a public}0 %1 in "
     "an extension with %select{private|internal|PUBLIC}2 requirements",
     (Accessibility, DescriptiveDeclKind, Accessibility))
-ERROR(access_control_extension_more,sema_tcd,none,
+ERROR(access_control_extension_more,none,
       "extension of %select{private|internal|PUBLIC}0 %1 cannot be "
       "declared %select{PRIVATE|internal|public}2",
       (Accessibility, DescriptiveDeclKind, Accessibility))
 
-ERROR(invalid_decl_attribute_simple,sema_tcd,none,
+ERROR(invalid_decl_attribute_simple,none,
       "attribute cannot be applied to declaration", ())
-ERROR(invalid_decl_attribute,sema_tcd,none,
+ERROR(invalid_decl_attribute,none,
       "%0 cannot be applied to this declaration", (DeclAttribute))
-ERROR(invalid_decl_modifier,sema_tcd,none,
+ERROR(invalid_decl_modifier,none,
       "%0 modifier cannot be applied to this declaration", (DeclAttribute))
-ERROR(attribute_does_not_apply_to_type,type_parsing,none,
+ERROR(attribute_does_not_apply_to_type,none,
       "attribute does not apply to type", ())
-ERROR(optional_attribute_non_protocol,sema_tcd,none,
+ERROR(optional_attribute_non_protocol,none,
       "'optional' can only be applied to protocol members", ())
-ERROR(optional_attribute_non_objc_protocol,sema_tcd,none,
+ERROR(optional_attribute_non_objc_protocol,none,
       "'optional' can only be applied to members of an @objc protocol", 
       ())
-ERROR(optional_attribute_initializer,sema_tcd,none,
+ERROR(optional_attribute_initializer,none,
       "'optional' cannot be applied to an initializer", ())
-ERROR(unavailable_method_non_objc_protocol,sema_tcd,none,
+ERROR(unavailable_method_non_objc_protocol,none,
       "protocol members can only be marked unavailable in an @objc protocol",
       ())
-ERROR(missing_in_class_init_1,sema_tcd,none,
+ERROR(missing_in_class_init_1,none,
       "stored property %0 requires an initial value%select{| or should be "
       "@NSManaged}1", (Identifier, bool))
-ERROR(missing_in_class_init_2,sema_tcd,none,
+ERROR(missing_in_class_init_2,none,
       "stored properties %0 and %1 require initial values%select{| or should "
       "be @NSManaged}2", 
       (Identifier, Identifier, bool))
-ERROR(missing_in_class_init_3plus,sema_tcd,none,
+ERROR(missing_in_class_init_3plus,none,
       "stored properties %0, %1, %select{and %2|%2, and others}3 "
       "require initial values%select{| or should be @NSManaged}4", 
       (Identifier, Identifier, Identifier, bool, bool))
-NOTE(requires_stored_property_inits_here,sema_tcd,none,
+NOTE(requires_stored_property_inits_here,none,
      "%select{superclass|class}1 %0 requires all stored properties to have "
      "initial values%select{| or use @NSManaged}2", (Type, bool, bool))
-ERROR(class_without_init,sema_tcd,none,
+ERROR(class_without_init,none,
       "class %0 has no initializers", (Type))
-NOTE(note_no_in_class_init_1,sema_tcd,none,
+NOTE(note_no_in_class_init_1,none,
      "stored property %0 without initial value prevents synthesized "
      "initializers",
      (Identifier))
-NOTE(note_no_in_class_init_2,sema_tcd,none,
+NOTE(note_no_in_class_init_2,none,
      "stored properties %0 and %1 without initial values prevent synthesized "
      "initializers",
      (Identifier, Identifier))
-NOTE(note_no_in_class_init_3plus,sema_tcd,none,
+NOTE(note_no_in_class_init_3plus,none,
      "stored properties %0, %1, %select{and %2|%2, and others}3 "
      "without initial values prevent synthesized initializers",
      (Identifier, Identifier, Identifier, bool))
-ERROR(missing_unimplemented_init_runtime,sema_tcd,none,
+ERROR(missing_unimplemented_init_runtime,none,
       "standard library error: missing _unimplemented_initializer", ())
-ERROR(missing_undefined_runtime,sema_tcd,none,
+ERROR(missing_undefined_runtime,none,
       "standard library error: missing _undefined", ())
-WARNING(unsupported_synthesize_init_variadic,sema_tcd,none,
+WARNING(unsupported_synthesize_init_variadic,none,
         "synthesizing a variadic inherited initializer for subclass %0 is "
         "unsupported",
         (Type))
-NOTE(variadic_superclass_init_here,sema_tcd,none,
+NOTE(variadic_superclass_init_here,none,
      "variadic superclass initializer defined here", ())
 
 // Alignment attribute
-ERROR(alignment_not_power_of_two,sema_tcd,none,
+ERROR(alignment_not_power_of_two,none,
       "alignment value must be a power of two", ())
 
 // Indirect enums
-ERROR(indirect_case_without_payload,sema_tcd,none,
+ERROR(indirect_case_without_payload,none,
       "enum case %0 without associated value cannot be 'indirect'", (Identifier))
-ERROR(indirect_case_in_indirect_enum,sema_tcd,none,
+ERROR(indirect_case_in_indirect_enum,none,
       "enum case in 'indirect' enum cannot also be 'indirect'", ())
 
 // Variables (var and let).
-ERROR(unimplemented_type_var,decl_parsing,none,
+ERROR(unimplemented_type_var,none,
       "%select{ERROR|static|class}1 stored properties not yet supported"
       "%select{ in this context| in generic types| in classes}0"
       "%select{|; did you mean 'static'?}2",
       (unsigned, StaticSpellingKind, unsigned))
-ERROR(observingprop_requires_initializer,decl_parsing,none,
+ERROR(observingprop_requires_initializer,none,
       "non-member observing properties require an initializer", ())
-ERROR(global_requires_initializer,decl_parsing,none,
+ERROR(global_requires_initializer,none,
       "global '%select{var|let}0' declaration requires an initializer expression"
       "%select{ or getter/setter specifier}0", (bool))
-ERROR(static_requires_initializer,decl_parsing,none,
+ERROR(static_requires_initializer,none,
       "%select{ERROR|'static var'|'class var'|}0 declaration requires an initializer "
       "expression or getter/setter specifier", (StaticSpellingKind))
-ERROR(pattern_type_access,sema_tcd,none,
+ERROR(pattern_type_access,none,
       "%select{%select{variable|constant}0|property}1 "
       "%select{must be declared %select{private|internal|PUBLIC}4"
       "|cannot be declared %select{PRIVATE|internal|public}3}2 because its "
       "type uses %select{a private|an internal|PUBLIC}4 type",
       (bool, bool, bool, Accessibility, Accessibility))
-ERROR(pattern_type_access_inferred,sema_tcd,none,
+ERROR(pattern_type_access_inferred,none,
       "%select{%select{variable|constant}0|property}1 "
       "%select{must be declared %select{private|internal|PUBLIC}4"
       "|cannot be declared %select{PRIVATE|internal|public}3}2 because its "
       "type %5 uses %select{a private|an internal|PUBLIC}4 type",
       (bool, bool, bool, Accessibility, Accessibility, Type))
-ERROR(pattern_binds_no_variables,sema_tcd,none,
+ERROR(pattern_binds_no_variables,none,
       "%select{property|global variable}0 declaration does not bind any "
       "variables",
       (unsigned))
 
 
 // Generic types
-ERROR(unsupported_generic_nested_in_type,sema_tcd,none,
+ERROR(unsupported_generic_nested_in_type,none,
       "generic type %0 nested in type %1 is not allowed",
       (Identifier, Type))
-ERROR(unsupported_type_nested_in_generic_type,sema_tcd,none,
+ERROR(unsupported_type_nested_in_generic_type,none,
       "type %0 nested in generic type %1 is not allowed",
       (Identifier, Type))
-ERROR(unsupported_type_nested_in_generic_function,sema_tcd,none,
+ERROR(unsupported_type_nested_in_generic_function,none,
       "type %0 nested in generic function %1 is not allowed",
       (Identifier, Identifier))
 
 // Type aliases
-ERROR(circular_type_alias,sema_tct,none,
+ERROR(circular_type_alias,none,
       "type alias %0 circularly references itself", (Identifier))
-ERROR(type_alias_underlying_type_access,sema_tcd,none,
+ERROR(type_alias_underlying_type_access,none,
       "type alias %select{must be declared %select{private|internal|PUBLIC}2"
       "|cannot be declared %select{PRIVATE|internal|public}1}0 because its "
       "underlying type uses %select{a private|an internal|PUBLIC}2 type",
       (bool, Accessibility, Accessibility))
 
 // Subscripts
-ERROR(subscript_type_access,sema_tcd,none,
+ERROR(subscript_type_access,none,
       "subscript %select{must be declared %select{private|internal|PUBLIC}2"
       "|cannot be declared %select{PRIVATE|internal|public}1}0 because its "
       "%select{index|element type}3 uses "
@@ -934,606 +934,606 @@ ERROR(subscript_type_access,sema_tcd,none,
       (bool, Accessibility, Accessibility, bool))
 
 // Functions
-ERROR(function_type_access,sema_tcd,none,
+ERROR(function_type_access,none,
       "%select{function|method|initializer}3 "
       "%select{must be declared %select{private|internal|PUBLIC}2"
       "|cannot be declared %select{PRIVATE|internal|public}1}0 because its "
       "%select{parameter|result}4 uses "
       "%select{a private|an internal|PUBLIC}2 type",
       (bool, Accessibility, Accessibility, unsigned, bool))
-WARNING(non_trailing_closure_before_default_args,sema_tcd,none,
+WARNING(non_trailing_closure_before_default_args,none,
         "closure parameter prior to parameters with default arguments will "
         "not be treated as a trailing closure", ())
 
 // Extensions
-ERROR(non_nominal_extension,sema_tcd,none,
+ERROR(non_nominal_extension,none,
       "non-nominal type %0 cannot be extended", (Type))
-ERROR(extension_access_with_conformances,sema_tcd,none,
+ERROR(extension_access_with_conformances,none,
       "%0 modifier cannot be used with extensions that declare "
       "protocol conformances", (DeclAttribute))
-ERROR(extension_metatype,sema_tcd,none,
+ERROR(extension_metatype,none,
       "cannot extend a metatype %0", (Type))
-ERROR(extension_specialization,decl_parsing,none,
+ERROR(extension_specialization,none,
       "constrained extension must be declared on the unspecialized generic "
       "type %0 with constraints specified by a 'where' clause", (Identifier))
-ERROR(extension_stored_property,sema_tcd,none,
+ERROR(extension_stored_property,none,
       "extensions may not contain stored properties", ())
-ERROR(extension_nongeneric_trailing_where,sema_tcd,none,
+ERROR(extension_nongeneric_trailing_where,none,
       "trailing 'where' clause for extension of non-generic type %0", (Type))
-ERROR(extension_constrained_inheritance,sema_tcd,none,
+ERROR(extension_constrained_inheritance,none,
       "extension of type %0 with constraints cannot have an "
       "inheritance clause", (Type))
-ERROR(extension_protocol_inheritance,sema_tcd,none,
+ERROR(extension_protocol_inheritance,none,
       "extension of protocol %0 cannot have an inheritance clause", (Type))
-ERROR(extension_protocol_type_definition,sema_tcd,none,
+ERROR(extension_protocol_type_definition,none,
       "type %0 cannot be defined within a protocol extension", (DeclName))
-ERROR(extension_protocol_via_typealias,sema_tcd,none,
+ERROR(extension_protocol_via_typealias,none,
       "protocol %0 in the module being compiled cannot be extended via a "
       "typealias", (Type))
-ERROR(extension_anyobject,sema_tcd,none,
+ERROR(extension_anyobject,none,
       "'AnyObject' protocol cannot be extended", ())
 
 // Protocols
-ERROR(type_does_not_conform,sema_tcd,none,
+ERROR(type_does_not_conform,none,
       "type %0 does not conform to protocol %1", (Type, Type))
-ERROR(cannot_use_nil_with_this_type,sema_tcd,none,
+ERROR(cannot_use_nil_with_this_type,none,
       "nil cannot be used in context expecting type %0", (Type))
 
-ERROR(use_of_equal_instead_of_equality,sema_tcd,none,
+ERROR(use_of_equal_instead_of_equality,none,
       "use of '=' in a boolean context, did you mean '=='?", ())
 
 
-ERROR(protocol_does_not_conform_objc,sema_tcc,none,
+ERROR(protocol_does_not_conform_objc,none,
       "using %0 as a concrete type conforming to protocol %1 is not supported",
       (Type, Type))
-ERROR(protocol_does_not_conform_static,sema_tcc,none,
+ERROR(protocol_does_not_conform_static,none,
       "%0 cannot be used as a type conforming to protocol %1 because %1 "
       "has static requirements",
       (Type, Type))
-ERROR(protocol_derivation_is_broken,sema_tcd,none,
+ERROR(protocol_derivation_is_broken,none,
       "protocol %0 is broken; cannot derive conformance for type %1", (Type, Type))
-ERROR(type_does_not_inherit,sema_tcd,none,
+ERROR(type_does_not_inherit,none,
       "%0 requires that %1 inherit from %2", (Type, Type, Type))
-NOTE(type_does_not_inherit_requirement,sema_tcd,none,
+NOTE(type_does_not_inherit_requirement,none,
      "requirement specified as %0 : %1%2", (Type, Type, StringRef))
-ERROR(types_not_equal,sema_tcd,none,
+ERROR(types_not_equal,none,
       "%0 requires the types %1 and %2 be equivalent",
       (Type, Type, Type))
-NOTE(types_not_equal_requirement,sema_tcd,none,
+NOTE(types_not_equal_requirement,none,
      "requirement specified as %0 == %1%2", (Type, Type, StringRef))
-ERROR(non_class_cannot_conform_to_class_protocol,sema_tcd,none,
+ERROR(non_class_cannot_conform_to_class_protocol,none,
       "non-class type %0 cannot conform to class protocol %1",
       (Type, Type))
-ERROR(foreign_class_cannot_conform_to_objc_protocol,sema_tcd,none,
+ERROR(foreign_class_cannot_conform_to_objc_protocol,none,
       "Core Foundation class %0 cannot conform to @objc protocol %1 because "
       "Core Foundation types are not classes in Objective-C",
       (Type, Type))
-ERROR(protocol_has_missing_requirements,sema_tcd,none,
+ERROR(protocol_has_missing_requirements,none,
       "type %0 cannot conform to protocol %1 because it has requirements that "
       "cannot be satisfied", (Type, Type))
-ERROR(witness_argument_name_mismatch,sema_tcd,none,
+ERROR(witness_argument_name_mismatch,none,
       "%select{method|initializer}0 %1 has different argument names from those "
       "required by protocol %2 (%3)", (bool, DeclName, Type, DeclName))
-ERROR(witness_initializer_not_required,sema_tcd,none,
+ERROR(witness_initializer_not_required,none,
       "initializer requirement %0 can only be satisfied by a `required` "
       "initializer in%select{| the definition of}1 non-final class %2", 
       (DeclName, bool, Type))
-ERROR(witness_initializer_failability,sema_tcd,none,
+ERROR(witness_initializer_failability,none,
       "non-failable initializer requirement %0"
       "%select{| in Objective-C protocol}1 cannot be satisfied by a "
       "failable initializer ('init%select{?|!}1')", 
       (DeclName, bool))
-ERROR(witness_self_non_subtype,sema_tcd,none,
+ERROR(witness_self_non_subtype,none,
       "protocol %0 requirement %1 cannot be satisfied by a non-final class "
       "(%2) because it uses 'Self' in a non-parameter, non-result type "
       "position",
       (Type, DeclName, Type))
-ERROR(witness_requires_dynamic_self,sema_tcd,none,
+ERROR(witness_requires_dynamic_self,none,
       "method %0 in non-final class %1 must return `Self` to conform to "
       "protocol %2",
       (DeclName, Type, Type))
 
-ERROR(witness_not_accessible_proto,sema_tcd,none,
+ERROR(witness_not_accessible_proto,none,
       "%select{initializer %1|method %1|%select{|setter for }2property %1"
       "|subscript%select{| setter}2}0 must be declared "
       "%select{PRIVATE|internal|public}3 because it matches a requirement "
       "in %select{PRIVATE|internal|public}3 protocol %4",
       (RequirementKind, DeclName, bool, Accessibility, DeclName))
-ERROR(witness_not_accessible_type,sema_tcd,none,
+ERROR(witness_not_accessible_type,none,
       "%select{initializer %1|method %1|%select{|setter for }2property %1"
       "|subscript%select{| setter}2}0 must be as accessible as its enclosing "
       "type because it matches a requirement in protocol %4",
       (RequirementKind, DeclName, bool, Accessibility, DeclName))
-ERROR(type_witness_not_accessible_proto,sema_tcd,none,
+ERROR(type_witness_not_accessible_proto,none,
       "%0 %1 must be declared %select{PRIVATE|internal|public}2 because it "
       "matches a requirement in %select{PRIVATE|internal|public}2 protocol %3",
       (DescriptiveDeclKind, DeclName, Accessibility, DeclName))
-ERROR(type_witness_not_accessible_type,sema_tcd,none,
+ERROR(type_witness_not_accessible_type,none,
       "%0 %1 must be as accessible as its enclosing type because it "
       "matches a requirement in protocol %3",
       (DescriptiveDeclKind, DeclName, Accessibility, DeclName))
 
-ERROR(protocol_refine_access,sema_tcd,none,
+ERROR(protocol_refine_access,none,
       "%select{protocol must be declared %select{private|internal|PUBLIC}2 "
       "because it refines"
       "|%select{PRIVATE|internal|public}1 protocol cannot refine}0 "
       "%select{a private|an internal|PUBLIC}2 protocol",
       (bool, Accessibility, Accessibility))
-ERROR(protocol_property_must_be_computed_var,sema_tcd,none,
+ERROR(protocol_property_must_be_computed_var,none,
       "immutable property requirement must be declared as 'var' with a "
       "'{ get }' specifier", ())
-ERROR(protocol_property_must_be_computed,sema_tcd,none,
+ERROR(protocol_property_must_be_computed,none,
       "property in protocol must have explicit { get } or { get set } specifier",
       ())
-NOTE(inherited_protocol_does_not_conform,sema_tcd,none,
+NOTE(inherited_protocol_does_not_conform,none,
      "type %0 does not conform to inherited protocol %1", (Type, Type))
-NOTE(no_witnesses,sema_tcd,none,
+NOTE(no_witnesses,none,
      "protocol requires %select{initializer %1|function %1|property %1|"
      "subscript}0 with type %2", (RequirementKind, DeclName, Type))
-NOTE(ambiguous_witnesses,sema_tcd,none,
+NOTE(ambiguous_witnesses,none,
      "multiple matching "
      "%select{initializers named %1|functions named %1|properties named %1|"
      "subscript operators}0 with type %2", (RequirementKind, DeclName, Type))
-NOTE(ambiguous_witnesses_wrong_name,sema_tcd,none,
+NOTE(ambiguous_witnesses_wrong_name,none,
      "multiple matching "
      "%select{initializers named %1|functions named %1|properties named %1|"
      "subscript operators}0 with type %2", (RequirementKind, DeclName, Type))
-NOTE(no_witnesses_type,sema_tcd,none,
+NOTE(no_witnesses_type,none,
      "protocol requires nested type %0", (Identifier))
-NOTE(default_associated_type_req_fail,sema_tcd,none,
+NOTE(default_associated_type_req_fail,none,
      "default type %0 for associated type %1 (from protocol %2) "
      "does not conform to %3",
      (Type, DeclName, Type, Type))
-ERROR(associated_type_access,sema_tcd,none,
+ERROR(associated_type_access,none,
       "associated type in %select{PRIVATE|an internal|a public}0 protocol "
       "uses %select{a private|an internal|PUBLIC}1 type in its "
       "%select{default definition|requirement}2 ",
       (Accessibility, Accessibility, unsigned))
 
-NOTE(bad_associated_type_deduction,sema_tcd,none,
+NOTE(bad_associated_type_deduction,none,
      "unable to infer associated type %0 for protocol %1",
      (DeclName, DeclName))
-NOTE(associated_type_deduction_witness_failed,sema_tcd,none,
+NOTE(associated_type_deduction_witness_failed,none,
      "inferred type %1 (by matching requirement %0) is invalid: "
      "does not conform to %2",
      (DeclName, Type, DeclName))
-NOTE(ambiguous_associated_type_deduction,sema_tcd,none,
+NOTE(ambiguous_associated_type_deduction,none,
      "ambiguous inference of associated type %0: %1 vs. %2",
      (DeclName, Type, Type))
-NOTE(associated_type_deduction_witness,sema_tcd,none,
+NOTE(associated_type_deduction_witness,none,
      "matching requirement %0 to this declaration inferred associated type to "
      "%1",
      (DeclName, Type))
-NOTE(associated_type_deduction_default,sema_tcd,none,
+NOTE(associated_type_deduction_default,none,
      "using associated type default %0", (Type))
-NOTE(ambiguous_witnesses_type,sema_tcd,none,
+NOTE(ambiguous_witnesses_type,none,
      "multiple matching types named %0", (Identifier))
-NOTE(protocol_witness_exact_match,sema_tcd,none,
+NOTE(protocol_witness_exact_match,none,
      "candidate exactly matches%0", (StringRef))
-NOTE(protocol_witness_renamed,sema_tcd,none,
+NOTE(protocol_witness_renamed,none,
      "candidate matches (with renaming)%0", (StringRef))
-NOTE(protocol_witness_kind_conflict,sema_tcd,none,
+NOTE(protocol_witness_kind_conflict,none,
      "candidate is not %select{an initializer|a function|a variable|"
      "a subscript}0", (RequirementKind))
-NOTE(protocol_witness_type_conflict,sema_tcd,none,
+NOTE(protocol_witness_type_conflict,none,
      "candidate has non-matching type %0%1", (Type, StringRef))
 
-NOTE(protocol_witness_optionality_conflict,sema_tcd,none,
+NOTE(protocol_witness_optionality_conflict,none,
      "candidate %select{type has|result type has|parameter type has|"
      "parameter types have|result and parameter types have}0 incorrect "
      "optionality%1",
      (unsigned, StringRef))
-ERROR(err_protocol_witness_optionality,sema_tcd,none,
+ERROR(err_protocol_witness_optionality,none,
       "%select{type|result|parameter|parameters|"
       "result and parameters}0 of %1 %select{has|has|has|have|have|}0"
       " different optionality than required by protocol %2",
       (unsigned, DeclName, DeclName))
-WARNING(warn_protocol_witness_optionality,sema_tcd,none,
+WARNING(warn_protocol_witness_optionality,none,
       "%select{type|result|parameter|parameters|"
       "result and parameters}0 of %1 %select{has|has|has|have|have|}0"
       " different optionality than expected by protocol %2",
       (unsigned, DeclName, DeclName))
 
-NOTE(protocol_witness_static_conflict,sema_tcd,none,
+NOTE(protocol_witness_static_conflict,none,
      "candidate operates on %select{a type|an instance}0, not "
      "%select{an instance|a type}0 as required", (bool))
-NOTE(protocol_witness_prefix_postfix_conflict,sema_tcd,none,
+NOTE(protocol_witness_prefix_postfix_conflict,none,
      "candidate is %select{|prefix, |postfix, }1not "
      "%select{prefix|postfix}0 as required", (bool, unsigned))
-NOTE(protocol_witness_mutating_conflict,sema_tcd,none,
+NOTE(protocol_witness_mutating_conflict,none,
      "candidate is marked 'mutating' but protocol does not allow it", ())
-NOTE(protocol_witness_settable_conflict,sema_tcd,none,
+NOTE(protocol_witness_settable_conflict,none,
      "candidate is not settable, but protocol requires it", ())
-NOTE(protocol_witness_noreturn_conflict,sema_tcd,none,
+NOTE(protocol_witness_noreturn_conflict,none,
      "candidate is not @noreturn, but protocol requires it", ())
-NOTE(protocol_witness_rethrows_conflict,sema_tcd,none,
+NOTE(protocol_witness_rethrows_conflict,none,
      "candidate is not 'rethrows', but protocol requires it", ())
-NOTE(protocol_witness_throws_conflict,sema_tcd,none,
+NOTE(protocol_witness_throws_conflict,none,
      "candidate throws, but protocol does not allow it", ())
-NOTE(protocol_witness_not_objc,sema_tcd,none,
+NOTE(protocol_witness_not_objc,none,
      "candidate is not '@objc', but protocol requires it", ())
 
-NOTE(protocol_witness_type,sema_tcd,none,
+NOTE(protocol_witness_type,none,
      "possibly intended match", ())
-NOTE(protocol_witness_nonconform_type,sema_tcd,none,
+NOTE(protocol_witness_nonconform_type,none,
      "possibly intended match %0 does not conform to %1", (Type, Type))
 
-NOTE(protocol_requirement_here,sema_tcd,none,
+NOTE(protocol_requirement_here,none,
      "requirement %0 declared here", (DeclName))
-NOTE(protocol_conformance_here,sema_tcd,none,
+NOTE(protocol_conformance_here,none,
      "%select{|class }0%1 declares conformance to protocol %2 here",
      (bool, DeclName, DeclName))
-NOTE(declared_protocol_conformance_here,sema_tcd,none,
+NOTE(declared_protocol_conformance_here,none,
      "%select{%0 inherits conformance to protocol %2 from superclass|"
      "%0 declares conformance to protocol %2|"
      "%0 implicitly conforms to protocol %2 (via conformance to %3)|"
      "%0 implicitly conforms to protocol %2}1 here",
      (Type, unsigned, DeclName, DeclName))
 
-ERROR(redundant_conformance,sema_tcd,none,
+ERROR(redundant_conformance,none,
       "redundant conformance of %0 to protocol %1", (Type, DeclName))
-NOTE(protocol_conformance_implied_here,sema_tcd,none,
+NOTE(protocol_conformance_implied_here,none,
      "implied protocol conformance %0 here can be made explicit", (Identifier))
-WARNING(optional_req_nonobjc_near_match,sema_tcd,none,
+WARNING(optional_req_nonobjc_near_match,none,
         "non-@objc %select{initializer %1|method %1|property %1|subscript}0 "
         "cannot satisfy optional requirement of @objc protocol %2",
         (RequirementKind, DeclName, DeclName))
 
 // Protocols and existentials
-ERROR(assoc_type_outside_of_protocol,sema_nb,none,
+ERROR(assoc_type_outside_of_protocol,none,
       "cannot use associated type %0 outside of its protocol", (Identifier))
 
-ERROR(circular_protocol_def,sema_tcd,none,
+ERROR(circular_protocol_def,none,
       "circular protocol inheritance %0", (StringRef))
-NOTE(protocol_here,sema_tcd,none,
+NOTE(protocol_here,none,
      "protocol %0 declared here", (Identifier))
-ERROR(protocol_composition_not_protocol,sema_tcd,none, 
+ERROR(protocol_composition_not_protocol,none, 
       "non-protocol type %0 cannot be used within 'protocol<...>'", (Type))
-ERROR(objc_protocol_inherits_non_objc_protocol,sema_tcd,none,
+ERROR(objc_protocol_inherits_non_objc_protocol,none,
       "@objc protocol %0 cannot refine non-@objc protocol %1", (Type, Type))
 
-ERROR(requires_conformance_nonprotocol,sema_tcd,none,
+ERROR(requires_conformance_nonprotocol,none,
       "type %0 constrained to non-protocol type %1", (TypeLoc, TypeLoc))
-ERROR(requires_not_suitable_archetype,sema_tcd,none,
+ERROR(requires_not_suitable_archetype,none,
       "%select{|first |second }0type %1 in %select{conformance|same-type}2 "
       "requirement does not refer to a generic parameter or associated type",
       (int, TypeLoc, int))
-ERROR(requires_no_same_type_archetype,sema_tcd,none,
+ERROR(requires_no_same_type_archetype,none,
       "neither type in same-type refers to a generic parameter or "
       "associated type",
       ())
-ERROR(requires_generic_params_made_equal,sema_tcd,none,
+ERROR(requires_generic_params_made_equal,none,
       "same-type requirement makes generic parameters %0 and %1 equivalent",
       (Identifier, Identifier))
-ERROR(requires_generic_param_made_equal_to_concrete,sema_tcd,none,
+ERROR(requires_generic_param_made_equal_to_concrete,none,
       "same-type requirement makes generic parameter %0 non-generic",
       (Identifier))
-ERROR(requires_superclass_conflict,sema_tcd,none,
+ERROR(requires_superclass_conflict,none,
       "generic parameter %0 cannot be a subclass of both %1 and %2",
       (Identifier, Type, Type))
-ERROR(recursive_requirement_reference,sema_tcd,none,
+ERROR(recursive_requirement_reference,none,
       "type may not reference itself as a requirement",())
-ERROR(recursive_same_type_constraint,sema_tcd,none,
+ERROR(recursive_same_type_constraint,none,
       "same-type constraint %0 == %1 is recursive", (Type, Type))
-ERROR(requires_same_type_conflict,sema_tcd,none,
+ERROR(requires_same_type_conflict,none,
       "generic parameter %0 cannot be equal to both %1 and %2",
       (Identifier, Type, Type))
-ERROR(requires_generic_param_same_type_does_not_conform,sema_tcd,none,
+ERROR(requires_generic_param_same_type_does_not_conform,none,
       "same-type constraint type %0 does not conform to required protocol %1",
       (Type, Identifier))
-ERROR(dependent_superclass_constraint,sema_tcd,none,
+ERROR(dependent_superclass_constraint,none,
       "superclass constraint %0 cannot depend on a type parameter",
       (Type))
 
-ERROR(generic_param_access,sema_tcd,none,
+ERROR(generic_param_access,none,
       "%0 %select{must be declared %select{private|internal|PUBLIC}3"
       "|cannot be declared %select{PRIVATE|internal|public}2}1 because its "
       "generic %select{parameter|requirement}4 uses "
       "%select{a private|an internal|PUBLIC}3 type",
       (DescriptiveDeclKind, bool, Accessibility, Accessibility, bool))
 
-ERROR(override_multiple_decls_base,sema_tcd,none,
+ERROR(override_multiple_decls_base,none,
       "declaration %0 cannot override more than one superclass declaration",
       (DeclName))
-ERROR(override_multiple_decls_arg_mismatch,sema_tcd,none,
+ERROR(override_multiple_decls_arg_mismatch,none,
       "declaration %0 has different argument names from any potential "
       "overrides", (DeclName))
-NOTE(overridden_near_match_here,sema_tcd,none,
+NOTE(overridden_near_match_here,none,
      "potential overridden %select{method|initializer}0 %1 here",
       (bool, DeclName))
-ERROR(override_decl_extension,sema_tcd,none,
+ERROR(override_decl_extension,none,
       "declarations %select{in extensions|from extensions}0 cannot "
       "%select{override|be overridden}0 yet", (bool))
-NOTE(overridden_here,sema_tcd,none,
+NOTE(overridden_here,none,
      "overridden declaration is here", ())
-ERROR(override_objc_type_mismatch_method,sema_tcd,none,
+ERROR(override_objc_type_mismatch_method,none,
       "overriding method with selector %0 has incompatible type %1",
       (ObjCSelector, Type))
-ERROR(override_objc_type_mismatch_subscript,sema_tcd,none,
+ERROR(override_objc_type_mismatch_subscript,none,
       "overriding %select{|indexed |keyed }0subscript with incompatible type "
       "%1",
       (unsigned, Type))
-NOTE(overridden_here_with_type,sema_tcd,none,
+NOTE(overridden_here_with_type,none,
      "overridden declaration here has type %0", (Type))
-ERROR(missing_override,sema_tcd,none,
+ERROR(missing_override,none,
       "overriding declaration requires an 'override' keyword", ())
-ERROR(override_unavailable,sema_tcd,none,
+ERROR(override_unavailable,none,
       "cannot override %0 which has been marked unavailable", (Identifier))
 
-ERROR(override_less_available,sema_tcd,none,
+ERROR(override_less_available,none,
       "overriding %0 must be as available as declaration it overrides",
       (Identifier))
 
-ERROR(override_accessor_less_available,sema_tcd,none,
+ERROR(override_accessor_less_available,none,
       "overriding %0 for %1 must be as available as declaration it overrides",
       (DescriptiveDeclKind, Identifier))
 
-ERROR(override_let_property,sema_tcd,none,
+ERROR(override_let_property,none,
       "cannot override immutable 'let' property %0 with the getter of a 'var'",
       (Identifier))
 
 
-ERROR(override_not_accessible,sema_tcd,none,
+ERROR(override_not_accessible,none,
       "%select{|setter of }0overriding %1 must be as accessible as "
       "%select{its enclosing type|the declaration it overrides}2",
       (bool, DescriptiveDeclKind, bool))
 
-ERROR(method_does_not_override,sema_tcd,none,
+ERROR(method_does_not_override,none,
       "method does not override any method from its superclass", ())
-ERROR(property_does_not_override,sema_tcd,none,
+ERROR(property_does_not_override,none,
       "property does not override any property from its superclass", ())
-ERROR(subscript_does_not_override,sema_tcd,none,
+ERROR(subscript_does_not_override,none,
       "subscript does not override any subscript from its superclass", ())
-ERROR(initializer_does_not_override,sema_tcd,none,
+ERROR(initializer_does_not_override,none,
       "initializer does not override a designated initializer from its "
       "superclass", ())
-ERROR(failable_initializer_override,sema_tcd,none,
+ERROR(failable_initializer_override,none,
       "failable initializer %0 cannot override a non-failable initializer",
       (DeclName))
-NOTE(nonfailable_initializer_override_here,sema_tcd,none,
+NOTE(nonfailable_initializer_override_here,none,
      "non-failable initializer %0 overridden here", (DeclName))
 
-NOTE(property_override_here,sema_tcd,none,
+NOTE(property_override_here,none,
      "attempt to override property here", ())
-NOTE(subscript_override_here,sema_tcd,none,
+NOTE(subscript_override_here,none,
      "attempt to override subscript here", ())
-NOTE(convenience_init_override_here,sema_tcd,none,
+NOTE(convenience_init_override_here,none,
      "attempt to override convenience initializer here", ())
-ERROR(override_nonclass_decl,sema_tcd,none,
+ERROR(override_nonclass_decl,none,
       "'override' can only be specified on class members", ())
-ERROR(override_property_type_mismatch,sema_tcd,none,
+ERROR(override_property_type_mismatch,none,
       "property %0 with type %1 cannot override a property with type %2",
       (Identifier, Type, Type))
-ERROR(override_with_stored_property,sema_tcd,none,
+ERROR(override_with_stored_property,none,
       "cannot override with a stored property %0", (Identifier))
-ERROR(observing_readonly_property,sema_tcd,none,
+ERROR(observing_readonly_property,none,
       "cannot observe read-only property %0; it can't change", (Identifier))
-ERROR(override_mutable_with_readonly_property,sema_tcd,none,
+ERROR(override_mutable_with_readonly_property,none,
       "cannot override mutable property with read-only property %0",
       (Identifier))
-ERROR(override_argument_name_mismatch,sema_tcd,none,
+ERROR(override_argument_name_mismatch,none,
       "argument names for %select{method|initializer}0 %1 do not match those "
       "of overridden %select{method|initializer}0 %2",
       (bool, DeclName, DeclName))
-ERROR(override_ownership_mismatch,sema_tcd,none,
+ERROR(override_ownership_mismatch,none,
       "cannot override %select{strong|weak|unowned|unowned(unsafe)}0 property "
       "with %select{strong|weak|unowned|unowned(unsafe)}1 property",
       (/*Ownership*/unsigned, /*Ownership*/unsigned))
-ERROR(override_throws,sema_tcd,none,
+ERROR(override_throws,none,
       "cannot override non-throwing %select{method|initializer}0 with "
       "throwing %select{method|initializer}0", (bool))
-ERROR(override_throws_objc,sema_tcd,none,
+ERROR(override_throws_objc,none,
       "overriding a throwing @objc %select{method|initializer}0 with "
       "a non-throwing %select{method|initializer}0 is not supported", (bool))
 
-WARNING(override_unnecessary_IUO,sema_tcd,none,
+WARNING(override_unnecessary_IUO,none,
       "overriding %0 parameter of type %1 with implicitly unwrapped optional "
       "type %2",
       (DescriptiveDeclKind, Type, Type))
-WARNING(override_unnecessary_result_IUO,sema_tcd,none,
+WARNING(override_unnecessary_result_IUO,none,
       "overriding %0 optional result type %1 with implicitly unwrapped "
       "optional type %2",
       (DescriptiveDeclKind, Type, Type))
-NOTE(override_unnecessary_IUO_remove,sema_tcd,none,
+NOTE(override_unnecessary_IUO_remove,none,
      "remove '!' to make the parameter required", ())
-NOTE(override_unnecessary_IUO_use_strict,sema_tcd,none,
+NOTE(override_unnecessary_IUO_use_strict,none,
      "use '?' to make the result optional", ())
-NOTE(override_unnecessary_IUO_silence,sema_tcd,none,
+NOTE(override_unnecessary_IUO_silence,none,
      "add parentheses to silence this warning", ())
 
-ERROR(override_mutable_covariant_property,sema_tcd,none,
+ERROR(override_mutable_covariant_property,none,
       "cannot override mutable property %0 of type %1 with covariant type %2",
       (Identifier, Type, Type))
-ERROR(override_mutable_covariant_subscript,sema_tcd,none,
+ERROR(override_mutable_covariant_subscript,none,
       "cannot override mutable subscript of type %0 with covariant type %1",
       (Type, Type))
-ERROR(decl_already_final,sema_tcd,none,
+ERROR(decl_already_final,none,
       "static declarations are already final", ())
-NOTE(decl_init_here,sema_tcd,none,
+NOTE(decl_init_here,none,
      "initial value is here", ())
 
 
 // Inheritance
-ERROR(duplicate_inheritance,sema_tcd,none,
+ERROR(duplicate_inheritance,none,
   "duplicate inheritance from %0", (Type))
-ERROR(multiple_inheritance,sema_tcd,none,
+ERROR(multiple_inheritance,none,
   "multiple inheritance from classes %0 and %1", (Type, Type))
-ERROR(non_class_inheritance,sema_tcd,none,
+ERROR(non_class_inheritance,none,
   "non-class type %0 cannot inherit from class %1", (Type, Type))
-ERROR(extension_class_inheritance,sema_tcd,none,
+ERROR(extension_class_inheritance,none,
   "extension of type %0 cannot inherit from class %1", (Type, Type))
-ERROR(inheritance_from_non_protocol_or_class,sema_tcd,none,
+ERROR(inheritance_from_non_protocol_or_class,none,
   "inheritance from non-protocol, non-class type %0", (Type))
-ERROR(inheritance_from_non_protocol,sema_tcd,none,
+ERROR(inheritance_from_non_protocol,none,
   "inheritance from non-protocol type %0", (Type))
-ERROR(superclass_not_first,sema_tcd,none,
+ERROR(superclass_not_first,none,
   "superclass %0 must appear first in the inheritance clause", (Type))
-ERROR(circular_class_inheritance,sema_tcd,none,
+ERROR(circular_class_inheritance,none,
       "circular class inheritance %0", (StringRef))
-NOTE(class_here,sema_tcd,none,
+NOTE(class_here,none,
      "class %0 declared here", (Identifier))
-ERROR(inheritance_from_final_class,sema_tcd,none,
+ERROR(inheritance_from_final_class,none,
 "inheritance from a final class %0", (Identifier))
 
 
 // Enums
-ERROR(enum_case_access,sema_tcd,none,
+ERROR(enum_case_access,none,
       "enum case in %select{PRIVATE|an internal|a public}0 enum uses "
       "%select{a private|an internal|PUBLIC}1 type",
       (Accessibility, Accessibility))
-ERROR(enum_stored_property,sema_tcd,none,
+ERROR(enum_stored_property,none,
       "enums may not contain stored properties", ())
 
 // Enum raw types
-ERROR(multiple_enum_raw_types,sema_tcd,none,
+ERROR(multiple_enum_raw_types,none,
   "multiple enum raw types %0 and %1", (Type, Type))
-ERROR(circular_enum_inheritance,sema_tcd,none,
+ERROR(circular_enum_inheritance,none,
       "circular enum raw types %0", (StringRef))
-ERROR(raw_type_not_first,sema_tcd,none,
+ERROR(raw_type_not_first,none,
   "raw type %0 must appear first in the enum inheritance clause", (Type))
-ERROR(raw_type_not_literal_convertible,sema_tcd,none,
+ERROR(raw_type_not_literal_convertible,none,
       "raw type %0 is not convertible from any literal",
       (Type))
-ERROR(enum_raw_type_not_equatable,sema_tcd,none,
+ERROR(enum_raw_type_not_equatable,none,
       "RawRepresentable 'init' cannot be synthesized because raw type %0 is not "
       "Equatable", (Type))
-ERROR(enum_raw_type_access,sema_tcd,none,
+ERROR(enum_raw_type_access,none,
       "enum %select{must be declared %select{private|internal|PUBLIC}2"
       "|cannot be declared %select{PRIVATE|internal|public}1}0 because its "
       "raw type uses %select{a private|an internal|PUBLIC}2 type",
       (bool, Accessibility, Accessibility))
 
-NOTE(enum_here,sema_tcd,none,
+NOTE(enum_here,none,
      "enum %0 declared here", (Identifier))
-ERROR(empty_enum_raw_type,sema_tcd,none,
+ERROR(empty_enum_raw_type,none,
       "an enum with no cases cannot declare a raw type", ())
-ERROR(enum_raw_value_without_raw_type,sema_tcd,none,
+ERROR(enum_raw_value_without_raw_type,none,
       "enum case cannot have a raw value if the enum does not have a raw type", ())
-ERROR(enum_with_raw_type_case_with_argument,sema_tcd,none,
+ERROR(enum_with_raw_type_case_with_argument,none,
       "enum with raw type cannot have cases with arguments", ())
-NOTE(enum_raw_type_here,sema_tcd,none,
+NOTE(enum_raw_type_here,none,
      "declared raw type %0 here", (Type))
-ERROR(objc_enum_no_raw_type,sema_tcd,none,
+ERROR(objc_enum_no_raw_type,none,
       "'@objc' enum must declare an integer raw type", ())
-ERROR(objc_enum_raw_type_not_integer,sema_tcd,none,
+ERROR(objc_enum_raw_type_not_integer,none,
       "'@objc' enum raw type %0 is not an integer type", (Type))
-ERROR(enum_non_integer_raw_value_auto_increment,sema_tcd,none,
+ERROR(enum_non_integer_raw_value_auto_increment,none,
       "enum case must declare a raw value when the preceding raw value is not an integer", ())
-ERROR(enum_non_integer_convertible_raw_type_no_value,sema_tcd,none,
+ERROR(enum_non_integer_convertible_raw_type_no_value,none,
       "enum cases require explicit raw values when the raw type is not integer "
       "or string literal convertible", ())
-ERROR(enum_raw_value_not_unique,sema_tcd,none,
+ERROR(enum_raw_value_not_unique,none,
       "raw value for enum case is not unique", ())
-NOTE(enum_raw_value_used_here,sema_tcd,none,
+NOTE(enum_raw_value_used_here,none,
      "raw value previously used here", ())
-NOTE(enum_raw_value_incrementing_from_here,sema_tcd,none,
+NOTE(enum_raw_value_incrementing_from_here,none,
      "raw value auto-incremented from here",())
-NOTE(enum_raw_value_incrementing_from_zero,sema_tcd,none,
+NOTE(enum_raw_value_incrementing_from_zero,none,
      "raw value implicitly auto-incremented from zero",())
 
 // Derived conformances
 
-ERROR(broken_raw_representable_requirement,sema_tcd,none,
+ERROR(broken_raw_representable_requirement,none,
       "RawRepresentable protocol is broken: unexpected requirement", ())
-ERROR(broken_equatable_requirement,sema_tcd,none,
+ERROR(broken_equatable_requirement,none,
       "Equatable protocol is broken: unexpected requirement", ())
-ERROR(broken_hashable_requirement,sema_tcd,none,
+ERROR(broken_hashable_requirement,none,
       "Hashable protocol is broken: unexpected requirement", ())
-ERROR(broken_errortype_requirement,sema_tcd,none,
+ERROR(broken_errortype_requirement,none,
       "ErrorType protocol is broken: unexpected requirement", ())
-ERROR(broken_int_hashable_conformance,sema_tcd,none,
+ERROR(broken_int_hashable_conformance,none,
       "Int type is broken: does not conform to Hashable", ())
-ERROR(broken_int_integer_literal_convertible_conformance,sema_tcd,none,
+ERROR(broken_int_integer_literal_convertible_conformance,none,
       "Int type is broken: does not conform to IntegerLiteralConvertible", ())
-ERROR(broken_equatable_eq_operator,sema_tcd,none,
+ERROR(broken_equatable_eq_operator,none,
       "Equatable protocol is broken: no infix operator declaration for '=='", ())
-ERROR(no_equal_overload_for_int,sema_tcd,none,
+ERROR(no_equal_overload_for_int,none,
       "no overload of '==' for Int", ())
 
 // Dynamic Self
-ERROR(dynamic_self_non_method,sema_tcd,none,
+ERROR(dynamic_self_non_method,none,
       "%select{global|local}0 function cannot return 'Self'", (bool))
-ERROR(dynamic_self_struct_enum,sema_tcd,none,
+ERROR(dynamic_self_struct_enum,none,
       "%select{struct|enum}0 method cannot return 'Self'; "
       "did you mean to use the %select{struct|enum}0 type %1?",
       (int, Identifier))
 
 // Duplicate declarations
-ERROR(duplicate_enum_element,sema_tcd,none,
+ERROR(duplicate_enum_element,none,
       "duplicate definition of enum element",())
 
 //------------------------------------------------------------------------------
 // Type Check Attributes
 //------------------------------------------------------------------------------
 
-ERROR(attr_only_only_one_decl_kind,sema_tcd,none,
+ERROR(attr_only_only_one_decl_kind,none,
       "%0 may only be used on '%1' declarations", (DeclAttribute,StringRef))
 
 
-ERROR(override_final,sema_tcd,none,
+ERROR(override_final,none,
       "%0 overrides a 'final' %0", (DescriptiveDeclKind))
 
-ERROR(member_cannot_be_final,sema_tcd,none,
+ERROR(member_cannot_be_final,none,
       "only classes and class members may be marked with 'final'",
       ())
 
-ERROR(final_not_allowed_here,sema_tcd,none,
+ERROR(final_not_allowed_here,none,
       "'final' may only be applied to classes, properties, methods, and "
       "subscripts", ())
 
-ERROR(final_not_on_accessors,sema_tcd,none,
+ERROR(final_not_on_accessors,none,
       "'final' cannot be applied to accessors, it must be put on the "
       "%select{var|let|subscript}0", (unsigned))
 
-ERROR(override_noreturn_with_return,sema_tcd,none,
+ERROR(override_noreturn_with_return,none,
       "an override of a @noreturn method should also be @noreturn", ())
 
-ERROR(override_rethrows_with_non_rethrows,sema_tcd,none,
+ERROR(override_rethrows_with_non_rethrows,none,
       "override of 'rethrows' %select{method|initializer}0 should also "
       "be 'rethrows'", (bool))
-ERROR(rethrows_without_throwing_parameter,sema_tcd,none,
+ERROR(rethrows_without_throwing_parameter,none,
       "'rethrows' function must take a throwing function argument", ())
 
-ERROR(autoclosure_function_type,attribute_parsing,none,
+ERROR(autoclosure_function_type,none,
       "@autoclosure may only be applied to values of function type",
       ())
-ERROR(autoclosure_function_input_nonunit,attribute_parsing,none,
+ERROR(autoclosure_function_input_nonunit,none,
       "autoclosure argument type must be '()'", ())
-ERROR(noescape_function_type,attribute_parsing,none,
+ERROR(noescape_function_type,none,
       "@noescape may only be applied to parameters of function type",
       ())
-ERROR(noescape_implied_by_autoclosure,attribute_parsing,none,
+ERROR(noescape_implied_by_autoclosure,none,
       "@noescape is implied by @autoclosure and should not be "
       "redundantly specified", ())
-ERROR(noescape_conflicts_escaping_autoclosure,attribute_parsing,none,
+ERROR(noescape_conflicts_escaping_autoclosure,none,
       "@noescape conflicts with @autoclosure(escaping)", ())
 
 
 // NSManaged attribute
-ERROR(attr_NSManaged_not_instance_member,sema_tcd,none,
+ERROR(attr_NSManaged_not_instance_member,none,
       "@NSManaged only allowed on an instance property or method", ())
-ERROR(attr_NSManaged_not_stored,sema_tcd,none,
+ERROR(attr_NSManaged_not_stored,none,
       "@NSManaged not allowed on %select{computed|observing|addressed}0 "
       "properties", (unsigned))
-ERROR(attr_NSManaged_let_property,sema_tcd,none,
+ERROR(attr_NSManaged_let_property,none,
       "@NSManaged not allowed on a 'let' property", ())
-ERROR(attr_NSManaged_initial_value,sema_tcd,none,
+ERROR(attr_NSManaged_initial_value,none,
       "@NSManaged property cannot have an initial value", ())
-ERROR(attr_NSManaged_NSCopying,sema_tcd,none,
+ERROR(attr_NSManaged_NSCopying,none,
       "@NSManaged property cannot also be marked @NSCopying", ())
-ERROR(attr_NSManaged_method_body,sema_tcd,none,
+ERROR(attr_NSManaged_method_body,none,
       "@NSManaged method cannot have a body; it must be provided at runtime",())
 
 
 // NSCopying attribute
-ERROR(nscopying_only_on_class_properties,sema_tcd,none,
+ERROR(nscopying_only_on_class_properties,none,
       "@NSCopying may only be used on properties in classes",
       ())
-ERROR(nscopying_only_mutable,sema_tcd,none,
+ERROR(nscopying_only_mutable,none,
       "@NSCopying requires property to be mutable", ())
-ERROR(nscopying_only_stored_property,sema_tcd,none,
+ERROR(nscopying_only_stored_property,none,
       "@NSCopying is only valid on stored properties", ())
-ERROR(nscopying_doesnt_conform,sema_tcd,none,
+ERROR(nscopying_doesnt_conform,none,
       "@NSCopying is only valid with types that conform to"
       " the NSCopying protocol", ())
 
@@ -1541,23 +1541,23 @@ ERROR(nscopying_doesnt_conform,sema_tcd,none,
 #define SELECT_APPLICATION_MAIN "select{'UIApplicationMain'|'NSApplicationMain'}"
 #define SELECT_APPLICATION_DELEGATE "select{'UIApplicationDelegate'|'NSApplicationDelegate'}"
 
-ERROR(attr_ApplicationMain_not_class,sema_tcd,none,
+ERROR(attr_ApplicationMain_not_class,none,
       "%" SELECT_APPLICATION_MAIN "0 attribute may only be used on classes",
       (unsigned))
-ERROR(attr_ApplicationMain_not_ApplicationDelegate,sema_tcd,none,
+ERROR(attr_ApplicationMain_not_ApplicationDelegate,none,
       "%" SELECT_APPLICATION_MAIN "0 class must conform to the %" SELECT_APPLICATION_DELEGATE "0 protocol",
       (unsigned))
-ERROR(attr_generic_ApplicationMain_not_supported,sema_tcd,none,
+ERROR(attr_generic_ApplicationMain_not_supported,none,
       "generic %" SELECT_APPLICATION_MAIN "0 classes are not supported",
       (unsigned))
-ERROR(attr_ApplicationMain_multiple,sema_tcd,none,
+ERROR(attr_ApplicationMain_multiple,none,
       "%" SELECT_APPLICATION_MAIN "0 attribute can only apply to one class in a module",
       (unsigned))
-ERROR(attr_ApplicationMain_with_script,sema_tcd,none,
+ERROR(attr_ApplicationMain_with_script,none,
       "%" SELECT_APPLICATION_MAIN "0 attribute cannot be used in a module that contains "
       "top-level code",
       (unsigned))
-NOTE(attr_ApplicationMain_script_here,sema_tcd,none,
+NOTE(attr_ApplicationMain_script_here,none,
      "top-level code defined in this source file",
      ())
 
@@ -1565,32 +1565,32 @@ NOTE(attr_ApplicationMain_script_here,sema_tcd,none,
 #undef SELECT_APPLICATION_DELEGATE
 
 // lazy 
-ERROR(lazy_not_on_let,sema_tcd,none,
+ERROR(lazy_not_on_let,none,
       "'lazy' cannot be used on a let", ())
-ERROR(lazy_not_on_computed,sema_tcd,none,
+ERROR(lazy_not_on_computed,none,
       "'lazy' may not be used on a computed property", ())
 
-ERROR(lazy_on_already_lazy_global,sema_tcd,none,
+ERROR(lazy_on_already_lazy_global,none,
       "'lazy' may not be used on an already-lazy global", ())
-ERROR(lazy_not_in_protocol,sema_tcd,none,
+ERROR(lazy_not_in_protocol,none,
       "'lazy' isn't allowed on a protocol requirement", ())
-ERROR(lazy_requires_initializer,sema_tcd,none,
+ERROR(lazy_requires_initializer,none,
       "lazy properties must have an initializer", ())
 
-ERROR(lazy_requires_single_var,sema_tcd,none,
+ERROR(lazy_requires_single_var,none,
       "'lazy' cannot destructure an initializer", ())
 
-ERROR(lazy_must_be_property,sema_tcd,none,
+ERROR(lazy_must_be_property,none,
       "lazy is only valid for members of a struct or class", ())
-ERROR(lazy_not_observable,sema_tcd,none,
+ERROR(lazy_not_observable,none,
       "lazy properties may not have observers", ())
 
 // Debugger function attribute.
-ERROR(attr_for_debugger_support_only,sema_tcd,none,
+ERROR(attr_for_debugger_support_only,none,
       "@LLDBDebuggerSupport may only be used when debugger support is on", ())
 
 // warn_unused_result
-ERROR(attr_warn_unused_result_mutable_variable,sema_tcd,none,
+ERROR(attr_warn_unused_result_mutable_variable,none,
       "'mutable_variant' parameter of 'warn_unused_result' attribute does not "
       "make sense on a %select{non-function|non-method|non-instance method|"
       "method of a class|mutating method}0", (unsigned))
@@ -1599,265 +1599,265 @@ ERROR(attr_warn_unused_result_mutable_variable,sema_tcd,none,
 // Type Check Expressions
 //------------------------------------------------------------------------------
 
-NOTE(found_candidate,sema_tce,none,
+NOTE(found_candidate,none,
      "found this candidate", ())
-NOTE(found_candidate_type,sema_tce,none,
+NOTE(found_candidate_type,none,
      "found candidate with type %0", (Type))
-NOTE(first_declaration,sema_tce,none,
+NOTE(first_declaration,none,
      "first declaration", ())
-NOTE(second_declaration,sema_tce,none,
+NOTE(second_declaration,none,
      "second declaration", ())
 
-ERROR(no_IntegerLiteralType_found,sema_tce,none,
+ERROR(no_IntegerLiteralType_found,none,
       "standard library error: IntegerLiteralType not defined", ())
-ERROR(no_FloatLiteralType_found,sema_tce,none,
+ERROR(no_FloatLiteralType_found,none,
       "standard library error: FloatLiteralType not defined", ())
-ERROR(no_StringLiteralType_found,sema_tce,none,
+ERROR(no_StringLiteralType_found,none,
       "standard library error: StringLiteralType not defined", ())
-ERROR(no_MaxBuiltinIntegerType_found,sema_tce,none,
+ERROR(no_MaxBuiltinIntegerType_found,none,
    "standard library error: _MaxBuiltinIntegerType is not properly defined", ())
-ERROR(no_MaxBuiltinFloatType_found,sema_tce,none,
+ERROR(no_MaxBuiltinFloatType_found,none,
    "standard library error: _MaxBuiltinFloatType is not properly defined", ())
 
-ERROR(no_member_of_module,sema_tce,none,
+ERROR(no_member_of_module,none,
       "module %0 has no member named %1", (Identifier, DeclName))
 
-ERROR(super_with_no_base_class,sema_tce,none,
+ERROR(super_with_no_base_class,none,
       "'super' members cannot be referenced in a root class", ())
 
-ERROR(bad_init_ref_base,sema_tce, none,
+ERROR(bad_init_ref_base, none,
       "'init' can only refer to the initializers of "
       "'self'%select{| or 'super'}0", (bool))
-ERROR(init_delegation_outside_initializer,sema_tce,none,
+ERROR(init_delegation_outside_initializer,none,
       "initializer delegation can only occur within an initializer", ())
-ERROR(init_delegates_and_chains,sema_tce,none,
+ERROR(init_delegates_and_chains,none,
       "initializer cannot both delegate ('self.init') and chain to a "
       "superclass initializer ('super.init')", ())
-NOTE(init_delegation_or_chain,sema_tce,none,
+NOTE(init_delegation_or_chain,none,
       "previous %select{delegation|chaining}0 call is here", (bool))
-ERROR(delegating_convenience_super_init,sema_tce,none,
+ERROR(delegating_convenience_super_init,none,
       "convenience initializer for %0 must delegate (with 'self.init') rather "
       "than chaining to a superclass initializer (with 'super.init')",
       (Type))
-ERROR(delegating_designated_init,sema_tce,none,
+ERROR(delegating_designated_init,none,
       "designated initializer for %0 cannot delegate (with 'self.init'); "
       "did you mean this to be a convenience initializer?",
       (Type))
-NOTE(delegation_here,sema_tce,none, "delegation occurs here", ())
-ERROR(chain_convenience_init,sema_tce,none,
+NOTE(delegation_here,none, "delegation occurs here", ())
+ERROR(chain_convenience_init,none,
       "must call a designated initializer of the superclass %0",
       (Type))
-ERROR(delegate_chain_nonoptional_to_optional,sema_tce,none,
+ERROR(delegate_chain_nonoptional_to_optional,none,
       "a non-failable initializer cannot %select{delegate|chain}0 to "
       "failable initializer %1 written with 'init?'", (bool, DeclName))
-NOTE(init_force_unwrap,sema_tce,none,
+NOTE(init_force_unwrap,none,
      "force potentially-failing result with '!'", ())
-NOTE(init_propagate_failure,sema_tce,none,
+NOTE(init_propagate_failure,none,
      "propagate the failure with 'init?'", ())
-ERROR(delegate_chain_nonoptional_to_optional_try,sema_tce,none,
+ERROR(delegate_chain_nonoptional_to_optional_try,none,
       "a non-failable initializer cannot use 'try?' to "
       "%select{delegate|chain}0 to another initializer", (bool))
-NOTE(init_delegate_force_try,sema_tce,none,
+NOTE(init_delegate_force_try,none,
      "force potentially-failing result with 'try!'", ())
-ERROR(init_delegation_nested,sema_tce,none,
+ERROR(init_delegation_nested,none,
       "%select{initializer delegation ('self.init')|"
       "initializer chaining ('super.init')}0 cannot be nested in another "
       "%select{expression|statement}1", (bool, bool))
 
-NOTE(convenience_init_here,sema_tce,none,
+NOTE(convenience_init_here,none,
      "convenience initializer is declared here", ())
-ERROR(designated_init_in_extension,sema_tcd,none,
+ERROR(designated_init_in_extension,none,
       "designated initializer cannot be declared in an extension of %0; "
       "did you mean this to be a convenience initializer?",
       (Type))
-ERROR(enumstruct_convenience_init,sema_tce,none,
+ERROR(enumstruct_convenience_init,none,
       "delegating initializers in %0 are not marked with 'convenience'",
       (StringRef))
-ERROR(nonclass_convenience_init,sema_tce,none,
+ERROR(nonclass_convenience_init,none,
       "convenience initializer not allowed in non-class type %0",
       (Type))
 
-ERROR(dynamic_construct_class,sema_tce,none,
+ERROR(dynamic_construct_class,none,
       "constructing an object of class type %0 with a metatype value must use "
       "a 'required' initializer", (Type))
-NOTE(note_nonrequired_initializer,sema_tce,none,
+NOTE(note_nonrequired_initializer,none,
       "selected %select{non-required|implicit}0 initializer %1", 
      (bool, DeclName))
-ERROR(construct_protocol_value,sema_tce,none,
+ERROR(construct_protocol_value,none,
       "value of type %0 is a protocol; it cannot be instantiated",
       (Type))
-ERROR(construct_protocol_by_name,sema_tce,none,
+ERROR(construct_protocol_by_name,none,
       "protocol type %0 cannot be instantiated",
       (Type))
 
 // Operators
-ERROR(unknown_binop,sema_tce,none,
+ERROR(unknown_binop,none,
        "operator is not a known binary operator", ())
-ERROR(non_assoc_adjacent,sema_tce,none,
+ERROR(non_assoc_adjacent,none,
       "non-associative operator is adjacent to operator of same precedence", ())
-ERROR(incompatible_assoc,sema_tce,none,
+ERROR(incompatible_assoc,none,
       "operator is adjacent to operator of same precedence"
       " but incompatible associativity", ())
 
 // If you change this, also change enum TryKindForDiagnostics.
 #define TRY_KIND_SELECT(SUB) "%select{try|try!|try?}" #SUB
 
-ERROR(try_rhs,sema_tce,none,
+ERROR(try_rhs,none,
       "'" TRY_KIND_SELECT(0) "' cannot appear to the right of a "
       "non-assignment operator", (unsigned))
-ERROR(try_if_rhs_noncovering,sema_tce,none,
+ERROR(try_if_rhs_noncovering,none,
       "'" TRY_KIND_SELECT(0) "' following conditional operator does not cover "
       "everything to its right", (unsigned))
-ERROR(try_assign_rhs_noncovering,sema_tce,none,
+ERROR(try_assign_rhs_noncovering,none,
       "'" TRY_KIND_SELECT(0) "' following assignment operator does not cover "
       "everything to its right", (unsigned))
 
-ERROR(reference_non_inout,sema_tce,none,
+ERROR(reference_non_inout,none,
       "reference to %0 not used to initialize an inout parameter", (Type))
-NOTE(subscript_decl_here,sema_tca,none,
+NOTE(subscript_decl_here,none,
      "subscript operator declared here", ())
-ERROR(condition_broken_proto,sema_tce,none,
+ERROR(condition_broken_proto,none,
       "protocol 'BooleanType' is broken", ())
 
-ERROR(broken_bool,sema_tce,none, "type 'Bool' is broken", ())
+ERROR(broken_bool,none, "type 'Bool' is broken", ())
 
-WARNING(inject_forced_downcast,sema_tce,none,
+WARNING(inject_forced_downcast,none,
         "treating a forced downcast to %0 as optional will never produce 'nil'",
         (Type))
-NOTE(forced_to_conditional_downcast,sema_tce,none,
+NOTE(forced_to_conditional_downcast,none,
      "use 'as?' to perform a conditional downcast to %0", (Type))
-NOTE(silence_inject_forced_downcast,sema_tce,none,
+NOTE(silence_inject_forced_downcast,none,
      "add parentheses around the cast to silence this warning", ())
 
-ERROR(conditional_downcast_foreign,sema_tce,none,
+ERROR(conditional_downcast_foreign,none,
       "conditional downcast to CoreFoundation type %0 will always succeed",
       (Type))
 
-ERROR(optional_used_as_boolean,sema_tce,none,
+ERROR(optional_used_as_boolean,none,
      "optional type %0 cannot be used as a boolean; "
      "test for '!= nil' instead", (Type))
-ERROR(optional_used_as_true_boolean,sema_tce,none,
+ERROR(optional_used_as_true_boolean,none,
       "optional type %0 cannot be used as a boolean; "
       "test for '== nil' instead", (Type))
 
-ERROR(migrate_from_raw_to_init,sema_tce,none,
+ERROR(migrate_from_raw_to_init,none,
       "static method 'fromRaw' has been replaced with a failable initializer "
       "'init(rawValue:)'", ())
-ERROR(migrate_from_allZeros,sema_tce,none,
+ERROR(migrate_from_allZeros,none,
       "static method 'allZeros' has been replaced with the default initializer",
       ())
 
-ERROR(migrate_to_raw_to_raw_value,sema_tce,none,
+ERROR(migrate_to_raw_to_raw_value,none,
       "method 'fromRaw' has been replaced with a property 'rawValue'", ())
 
-ERROR(interpolation_missing_proto,sema_tce,none,
+ERROR(interpolation_missing_proto,none,
       "string interpolation requires the protocol 'StringInterpolationConvertible' to be defined",
       ())
-ERROR(interpolation_broken_proto,sema_tce,none,
+ERROR(interpolation_broken_proto,none,
       "protocol 'StringInterpolationConvertible' is broken",
       ())
 
-ERROR(object_literal_broken_proto,sema_tce,none,
+ERROR(object_literal_broken_proto,none,
       "object literal protocol is broken", ())
 
-ERROR(discard_expr_outside_of_assignment,sema_tce,none,
+ERROR(discard_expr_outside_of_assignment,none,
       "'_' can only appear in a pattern or on the left side of an assignment",
       ())
-ERROR(inout_expr_outside_of_call,sema_tce,none,
+ERROR(inout_expr_outside_of_call,none,
       "'&' can only appear immediately in a call argument list", ())
 
 
-ERROR(unresolved_member_no_inference,sema_tce,none,
+ERROR(unresolved_member_no_inference,none,
       "reference to member %0 cannot be resolved without a contextual type",
       (Identifier))
 
-ERROR(type_of_expression_is_ambiguous,sema_tce,none,
+ERROR(type_of_expression_is_ambiguous,none,
       "type of expression is ambiguous without more context", ())
 
-ERROR(specific_type_of_expression_is_ambiguous,sema_tce,none,
+ERROR(specific_type_of_expression_is_ambiguous,none,
       "expression type %0 is ambiguous without more context", (Type))
 
 
-ERROR(missing_protocol,sema_tce,none,
+ERROR(missing_protocol,none,
       "missing protocol %0", (Identifier))
-ERROR(nil_literal_broken_proto,sema_tce,none,
+ERROR(nil_literal_broken_proto,none,
       "protocol 'NilLiteralConvertible' is broken", ())
 
-ERROR(builtin_integer_literal_broken_proto,sema_tce,none,
+ERROR(builtin_integer_literal_broken_proto,none,
       "protocol '_BuiltinIntegerLiteralConvertible' is broken", ())
-ERROR(integer_literal_broken_proto,sema_tce,none,
+ERROR(integer_literal_broken_proto,none,
       "protocol 'IntegerLiteralConvertible' is broken", ())
 
-ERROR(builtin_float_literal_broken_proto,sema_tce,none,
+ERROR(builtin_float_literal_broken_proto,none,
       "protocol '_BuiltinFloatLiteralConvertible' is broken", ())
-ERROR(float_literal_broken_proto,sema_tce,none,
+ERROR(float_literal_broken_proto,none,
       "protocol 'FloatLiteralConvertible' is broken", ())
 
-ERROR(builtin_boolean_literal_broken_proto,sema_tce,none,
+ERROR(builtin_boolean_literal_broken_proto,none,
       "protocol '_BuiltinBooleanLiteralConvertible' is broken", ())
-ERROR(boolean_literal_broken_proto,sema_tce,none,
+ERROR(boolean_literal_broken_proto,none,
       "protocol 'BooleanLiteralConvertible' is broken", ())
 
-ERROR(builtin_unicode_scalar_literal_broken_proto,sema_tce,none,
+ERROR(builtin_unicode_scalar_literal_broken_proto,none,
       "protocol '_BuiltinUnicodeScalarLiteralConvertible' is broken", ())
-ERROR(unicode_scalar_literal_broken_proto,sema_tce,none,
+ERROR(unicode_scalar_literal_broken_proto,none,
       "protocol 'UnicodeScalarLiteralConvertible' is broken", ())
 
-ERROR(builtin_extended_grapheme_cluster_literal_broken_proto,sema_tce,none,
+ERROR(builtin_extended_grapheme_cluster_literal_broken_proto,none,
       "protocol '_BuiltinExtendedGraphemeClusterLiteralConvertible' is broken", ())
-ERROR(extended_grapheme_cluster_literal_broken_proto,sema_tce,none,
+ERROR(extended_grapheme_cluster_literal_broken_proto,none,
       "protocol 'ExtendedGraphemeClusterLiteralConvertible' is broken", ())
 
-ERROR(builtin_string_literal_broken_proto,sema_tce,none,
+ERROR(builtin_string_literal_broken_proto,none,
       "protocol '_BuiltinStringLiteralConvertible' is broken", ())
-ERROR(string_literal_broken_proto,sema_tce,none,
+ERROR(string_literal_broken_proto,none,
       "protocol 'StringLiteralConvertible' is broken", ())
 
-ERROR(bool_type_broken,sema_tce,none,
+ERROR(bool_type_broken,none,
       "could not find a Bool type defined for 'is'", ())
 
 // Array literals
-ERROR(array_protocol_broken,sema_tce,none,
+ERROR(array_protocol_broken,none,
       "ArrayLiteralConvertible protocol definition is broken", ())
-ERROR(type_is_not_array,sema_tce,none,
+ERROR(type_is_not_array,none,
       "contextual type %0 cannot be used with array literal", (Type))
-NOTE(meant_dictionary_lit, sema_tce,none,
+NOTE(meant_dictionary_lit,none,
      "did you mean to use a dictionary literal instead?", ())
-ERROR(should_use_empty_dictionary_literal,sema_tce,none,
+ERROR(should_use_empty_dictionary_literal,none,
       "use [:] to get an empty dictionary literal", ())
 
 // Dictionary literals
-ERROR(dictionary_protocol_broken,sema_tce,none,
+ERROR(dictionary_protocol_broken,none,
       "DictionaryLiteralConvertible protocol definition is broken", ())
-ERROR(type_is_not_dictionary,sema_tce,none,
+ERROR(type_is_not_dictionary,none,
       "contextual type %0 cannot be used with dictionary literal", (Type))
 
 
 // Generic specializations
-ERROR(cannot_explicitly_specialize_generic_function,tce_sema,none,
+ERROR(cannot_explicitly_specialize_generic_function,none,
       "cannot explicitly specialize a generic function", ())
-ERROR(not_a_generic_definition,tce_sema,none,
+ERROR(not_a_generic_definition,none,
       "cannot specialize a non-generic definition", ())
-ERROR(not_a_generic_type,tce_sema,none,
+ERROR(not_a_generic_type,none,
       "cannot specialize non-generic type %0", (Type))
-ERROR(type_parameter_count_mismatch,tce_sema,none,
+ERROR(type_parameter_count_mismatch,none,
       "generic type %0 specialized with %select{too many|too few}3 type "
       "parameters (got %2, but expected %1)",
       (Identifier, unsigned, unsigned, bool))
-ERROR(generic_type_requires_arguments,tce_sema,none,
+ERROR(generic_type_requires_arguments,none,
       "reference to generic type %0 requires arguments in <...>", (Type))
-NOTE(generic_type_declared_here,tce_sema,none,
+NOTE(generic_type_declared_here,none,
      "generic type %0 declared here", (Identifier))
 
 // Ambiguities
-ERROR(ambiguous_decl_ref,tce_sema,none,
+ERROR(ambiguous_decl_ref,none,
       "ambiguous use of %0", (DeclName))
-ERROR(ambiguous_operator_ref,tce_sema,none,
+ERROR(ambiguous_operator_ref,none,
       "ambiguous use of operator %0", (DeclName))
 
 // Cannot capture inout-ness of a parameter
 // Partial application of foreign functions not supported
-ERROR(partial_application_of_function_invalid,tce_sema,none,
+ERROR(partial_application_of_function_invalid,none,
       "partial application of %select{"
         "function with 'inout' parameters|"
         "'mutating' method|"
@@ -1866,76 +1866,76 @@ ERROR(partial_application_of_function_invalid,tce_sema,none,
       "}0 is not allowed",
       (unsigned))
 
-ERROR(self_assignment_var,tce_sema,none,
+ERROR(self_assignment_var,none,
       "assigning a variable to itself", ())
-ERROR(self_assignment_prop,tce_sema,none,
+ERROR(self_assignment_prop,none,
       "assigning a property to itself", ())
-ERROR(property_use_in_closure_without_explicit_self,tce_sema,none,
+ERROR(property_use_in_closure_without_explicit_self,none,
       "reference to property %0 in closure requires explicit 'self.' to make"
       " capture semantics explicit", (Identifier))
-ERROR(method_call_in_closure_without_explicit_self,tce_sema,none,
+ERROR(method_call_in_closure_without_explicit_self,none,
       "call to method %0 in closure requires explicit 'self.' to make"
       " capture semantics explicit", (Identifier))
-ERROR(implicit_use_of_self_in_closure,tce_sema,none,
+ERROR(implicit_use_of_self_in_closure,none,
       "implicit use of 'self' in closure; use 'self.' to make"
       " capture semantics explicit", ())
-ERROR(capture_before_declaration,tce_sema,none,
+ERROR(capture_before_declaration,none,
       "cannot capture %0 before it is declared", (Identifier))
-ERROR(transitive_capture_before_declaration,tce_sema,none,
+ERROR(transitive_capture_before_declaration,none,
       "cannot capture %0, which would use %1 before it is declared",
       (Identifier, Identifier))
-NOTE(transitive_capture_through_here,tce_sema,none,
+NOTE(transitive_capture_through_here,none,
      "%0, declared here, captures %1",
      (Identifier, Identifier))
 
-WARNING(recursive_accessor_reference,tce_sema,none,
+WARNING(recursive_accessor_reference,none,
         "attempting to %select{access|modify}1 %0 within its own "
         "%select{getter|setter}1", (Identifier, bool))
-NOTE(recursive_accessor_reference_silence,tce_sema,none,
+NOTE(recursive_accessor_reference_silence,none,
      "access 'self' explicitly to silence this warning", ())
-WARNING(store_in_willset,tce_sema,none,
+WARNING(store_in_willset,none,
         "attempting to store to property %0 within its own willSet, which is "
         "about to be overwritten by the new value", (Identifier))
 
-ERROR(value_of_module_type,tce_sema,none,
+ERROR(value_of_module_type,none,
       "expected module member name after module name", ())
 
-ERROR(value_of_metatype_type,tce_sema,none,
+ERROR(value_of_metatype_type,none,
       "expected member name or constructor call after type name", ())
 
-NOTE(add_parens_to_type,tce_sema,none,
+NOTE(add_parens_to_type,none,
      "add arguments after the type to construct a value of the type", ())
-NOTE(add_self_to_type,tce_sema,none,
+NOTE(add_self_to_type,none,
      "use '.self' to reference the type object", ())
 
-WARNING(warn_unqualified_access,tce_sema,none,
+WARNING(warn_unqualified_access,none,
         "use of %0 treated as a reference to %1 in %2 %3",
         (Identifier, DescriptiveDeclKind, DescriptiveDeclKind, DeclName))
-NOTE(fix_unqualified_access_member,tce_sema,none,
+NOTE(fix_unqualified_access_member,none,
      "use 'self.' to silence this warning", ())
-NOTE(fix_unqualified_access_top_level,tce_sema,none,
+NOTE(fix_unqualified_access_top_level,none,
      "use '%0' to reference the %1",
      (StringRef, DescriptiveDeclKind, Identifier))
-NOTE(fix_unqualified_access_top_level_multi,tce_sema,none,
+NOTE(fix_unqualified_access_top_level_multi,none,
      "use '%0' to reference the %1 in module %2",
      (StringRef, DescriptiveDeclKind, Identifier))
 
-ERROR(type_of_metatype,tce_sema,none,
+ERROR(type_of_metatype,none,
       "'.dynamicType' is not allowed after a type name", ())
-ERROR(invalid_noescape_use,tce_sema,none,
+ERROR(invalid_noescape_use,none,
       "@noescape parameter %0 may only be called", (Identifier))
-NOTE(noescape_autoclosure,tce_sema,none,
+NOTE(noescape_autoclosure,none,
     "parameter %0 is implicitly @noescape because it was declared @autoclosure",
      (Identifier))
 
-ERROR(closure_noescape_use,tce_sema,none,
+ERROR(closure_noescape_use,none,
       "closure use of @noescape parameter %0 may allow it to escape",
       (Identifier))
-ERROR(decl_closure_noescape_use,tce_sema,none,
+ERROR(decl_closure_noescape_use,none,
       "declaration closing over @noescape parameter %0 may allow it to escape",
       (Identifier))
 
-ERROR(capture_across_type_decl,tce_sema,none,
+ERROR(capture_across_type_decl,none,
       "%0 declaration cannot close over value %1 defined in outer scope",
       (DescriptiveDeclKind, Identifier))
 
@@ -1943,172 +1943,172 @@ ERROR(capture_across_type_decl,tce_sema,none,
 // Type Check Statements
 //------------------------------------------------------------------------------
 
-ERROR(jump_out_of_defer,sema_tcs,none,
+ERROR(jump_out_of_defer,none,
       "'%0' cannot transfer control out of a defer statement",
       (StringRef))
 
-ERROR(return_invalid_outside_func,sema_tcs,none,
+ERROR(return_invalid_outside_func,none,
       "return invalid outside of a func", ())
 
-ERROR(return_expr_missing,sema_tcs,none,
+ERROR(return_expr_missing,none,
       "non-void function should return a value", ())
-ERROR(return_non_failable_init,sema_tcs,none,
+ERROR(return_non_failable_init,none,
       "only a failable initializer can return 'nil'", ())
-NOTE(make_init_failable,sema_tcs,none,
+NOTE(make_init_failable,none,
       "use 'init?' to make the initializer %0 failable", (DeclName))
-ERROR(return_init_non_nil,sema_tcs,none,
+ERROR(return_init_non_nil,none,
       "'nil' is the only return value permitted in an initializer",
       ())
 
-WARNING(if_always_true,sema_tcd,none,
+WARNING(if_always_true,none,
         "'if' condition is always true", ())
-WARNING(while_always_true,sema_tcd,none,
+WARNING(while_always_true,none,
         "'while' condition is always true", ())
 
-WARNING(guard_always_succeeds,sema_tcd,none,
+WARNING(guard_always_succeeds,none,
         "'guard' condition is always true, body is unreachable", ())
 
 
-ERROR(expression_unused_function,sema_tcs,none,
+ERROR(expression_unused_function,none,
       "expression resolves to an unused function", ())
-ERROR(expression_unused_lvalue,sema_tcs,none,
+ERROR(expression_unused_lvalue,none,
       "expression resolves to an unused l-value", ())
-WARNING(expression_unused_result,sema_tcs,none,
+WARNING(expression_unused_result,none,
         "result of call to %0 is unused", (DeclName))
-WARNING(expression_unused_init_result,sema_tcs,none,
+WARNING(expression_unused_init_result,none,
         "result of initializer is unused", ())
-WARNING(expression_unused_result_message,sema_tcs,none,
+WARNING(expression_unused_result_message,none,
         "result of call to %0 is unused: %1", (DeclName, StringRef))
-WARNING(expression_unused_result_nonmutating,sema_tcs,none,
+WARNING(expression_unused_result_nonmutating,none,
         "result of call to non-mutating function %0 is unused; "
         "use %1 to mutate in-place", (DeclName, DeclName))
-WARNING(expression_unused_optional_try,sema_tcs,none,
+WARNING(expression_unused_optional_try,none,
         "result of 'try?' is unused", ())
 
-ERROR(assignment_lhs_not_lvalue,sema_tcs,none,
+ERROR(assignment_lhs_not_lvalue,none,
       "cannot assign to immutable expression of type %0", (Type))
-ERROR(assignment_lhs_is_immutable_variable,sema_tcs,none,
+ERROR(assignment_lhs_is_immutable_variable,none,
       "cannot assign to value: %0", (StringRef))
-ERROR(assignment_lhs_is_immutable_property,sema_tcs,none,
+ERROR(assignment_lhs_is_immutable_property,none,
       "cannot assign to property: %0", (StringRef))
-ERROR(assignment_subscript_has_immutable_base,sema_tcs,none,
+ERROR(assignment_subscript_has_immutable_base,none,
       "cannot assign through subscript: %0", (StringRef))
-ERROR(assignment_bang_has_immutable_subcomponent,sema_tcs,none,
+ERROR(assignment_bang_has_immutable_subcomponent,none,
       "cannot assign through '!': %0", (StringRef))
 
-NOTE(change_to_mutating,sema_tcs,none,
+NOTE(change_to_mutating,none,
      "mark %select{method|accessor}0 'mutating' to make 'self' mutable",
      (bool))
 
 // For Stmt
-WARNING(deprecated_c_style_for_stmt,sema_tcs,none,
+WARNING(deprecated_c_style_for_stmt,none,
 "C-style for statement is deprecated and will be removed in a future version of Swift", ())
-NOTE(cant_fix_c_style_for_stmt,sema_tcs,none,
+NOTE(cant_fix_c_style_for_stmt,none,
 "C-style for statement can't be automatically fixed to for-in, because the loop variable is modified inside the loop", ())
 
 // ForEach Stmt
-ERROR(sequence_protocol_broken,sema_tcs,none,
+ERROR(sequence_protocol_broken,none,
       "SequenceType protocol definition is broken", ())
-ERROR(generator_protocol_broken,sema_tcs,none,
+ERROR(generator_protocol_broken,none,
       "GeneratorType protocol definition is broken", ())
 
-ERROR(label_shadowed,sema_tcs, none,
+ERROR(label_shadowed, none,
       "label %0 cannot be reused on an inner statement", (Identifier))
-ERROR(break_outside_loop,sema_tcs,none,
+ERROR(break_outside_loop,none,
       "'break' is only allowed inside a loop, if, do, or switch", ())
-ERROR(unlabeled_break_outside_loop,sema_tcs,none,
+ERROR(unlabeled_break_outside_loop,none,
       "unlabeled 'break' is only allowed inside a loop or switch, a"
       " labeled break is required to exit an if or do", ())
 
-ERROR(continue_outside_loop,sema_tcs,none,
+ERROR(continue_outside_loop,none,
       "'continue' is only allowed inside a loop", ())
-ERROR(continue_not_in_this_stmt,sema_tcs,none,
+ERROR(continue_not_in_this_stmt,none,
       "'continue' cannot be used with %0 statements", (StringRef))
 
 // Switch Stmt
-ERROR(no_match_operator,sema_tcs,none,
+ERROR(no_match_operator,none,
       "no binary '~=' operator available for 'switch' statement", ())
-ERROR(fallthrough_outside_switch,sema_tcs,none,
+ERROR(fallthrough_outside_switch,none,
       "'fallthrough' is only allowed inside a switch", ())
-ERROR(fallthrough_from_last_case,sema_tcs,none,
+ERROR(fallthrough_from_last_case,none,
       "'fallthrough' without a following 'case' or 'default' block", ())
-ERROR(fallthrough_into_case_with_var_binding,sema_tcs,none,
+ERROR(fallthrough_into_case_with_var_binding,none,
       "'fallthrough' cannot transfer control to a case label that declares variables",
       ())
 
-ERROR(unnecessary_cast_over_optionset,sema_tcs,none,
+ERROR(unnecessary_cast_over_optionset,none,
       "unnecessary cast over raw value of %0", (Type))
 
 //------------------------------------------------------------------------------
 // Type Check Patterns
 //------------------------------------------------------------------------------
 
-ERROR(cannot_infer_type_for_pattern,sema_tcp,none,
+ERROR(cannot_infer_type_for_pattern,none,
       "type annotation missing in pattern", ())
-ERROR(refutable_pattern_requires_initializer,sema_tcd,none,
+ERROR(refutable_pattern_requires_initializer,none,
       "pattern matching requires an initializer value to match against", ())
-ERROR(invalid_pattern,sema_tcd,none,
+ERROR(invalid_pattern,none,
       "invalid pattern", ())
-WARNING(var_pattern_didnt_bind_variables, sema_tcp,none,
+WARNING(var_pattern_didnt_bind_variables,none,
         "'%0' pattern has no effect; sub-pattern didn't bind any variables",
         (StringRef))
-ERROR(iflet_pattern_matching,sema_tcp,none,
+ERROR(iflet_pattern_matching,none,
       "pattern matching in a condition requires the 'case' keyword", ())
-ERROR(iflet_implicitly_unwraps,sema_tcp,none,
+ERROR(iflet_implicitly_unwraps,none,
       "pattern matching in a condition implicitly unwraps optionals", ())
-ERROR(type_pattern_missing_is,sema_tcp,none,
+ERROR(type_pattern_missing_is,none,
       "'is' keyword required to pattern match against type name", ())
 
 
-ERROR(pattern_type_mismatch_context,sema_tcp,none,
+ERROR(pattern_type_mismatch_context,none,
       "type annotation does not match contextual type %0", (Type))
 
-ERROR(tuple_pattern_in_non_tuple_context,sema_tcp,none,
+ERROR(tuple_pattern_in_non_tuple_context,none,
       "tuple pattern cannot match values of the non-tuple type %0", (Type))
-ERROR(closure_argument_list_tuple,sema_tcp,none,
+ERROR(closure_argument_list_tuple,none,
       "contextual closure type %0 expects %1 argument%s1, "
       "but %2 were used in closure body", (Type, unsigned, unsigned))
-ERROR(closure_argument_list_missing,sema_tcp,none,
+ERROR(closure_argument_list_missing,none,
       "contextual type for closure argument list expects %0 argument%s0, "
       "which cannot be implicitly ignored", (unsigned))
 
-ERROR(tuple_pattern_length_mismatch,sema_tcp,none,
+ERROR(tuple_pattern_length_mismatch,none,
       "tuple pattern has the wrong length for tuple type %0", (Type))
-ERROR(tuple_pattern_label_mismatch,sema_tcp,none,
+ERROR(tuple_pattern_label_mismatch,none,
       "tuple pattern element label %0 must be %1", (Identifier, Identifier))
-ERROR(enum_element_pattern_member_not_found,sema_tcp,none,
+ERROR(enum_element_pattern_member_not_found,none,
       "enum case '%0' not found in type %1", (StringRef, Type))
-ERROR(optional_element_pattern_not_valid_type,sema_tcp,none,
+ERROR(optional_element_pattern_not_valid_type,none,
       "'?' pattern cannot match values of type %0", (Type))
-ERROR(condition_optional_element_pattern_not_valid_type,sema_tcp,none,
+ERROR(condition_optional_element_pattern_not_valid_type,none,
       "initializer for conditional binding must have Optional type, not %0",
       (Type))
-ERROR(enum_element_pattern_not_member_of_enum,sema_tcp,none,
+ERROR(enum_element_pattern_not_member_of_enum,none,
       "enum case '%0' is not a member of type %1", (StringRef, Type))
-ERROR(nominal_type_pattern_not_nominal_type,sema_tcp,none,
+ERROR(nominal_type_pattern_not_nominal_type,none,
       "non-nominal type %0 cannot be used with property pattern syntax", (Type))
-ERROR(nominal_type_pattern_type_mismatch,sema_tcp,none,
+ERROR(nominal_type_pattern_type_mismatch,none,
       "type %0 of pattern does not match deduced type %1", (Type, Type))
-ERROR(nominal_type_pattern_property_not_found,sema_tcp,none,
+ERROR(nominal_type_pattern_property_not_found,none,
       "property '%0' not found in type %1", (StringRef, Type))
-ERROR(nominal_type_pattern_property_ambiguous,sema_tcp,none,
+ERROR(nominal_type_pattern_property_ambiguous,none,
       "property name '%0' in type %1 is ambiguous", (StringRef, Type))
-ERROR(nominal_type_pattern_not_property,sema_tcp,none,
+ERROR(nominal_type_pattern_not_property,none,
       "member '%0' of type %1 is not a property", (StringRef, Type))
-ERROR(nominal_type_pattern_static_property,sema_tcp,none,
+ERROR(nominal_type_pattern_static_property,none,
       "cannot match type property '%0' of type %1 in a 'case' pattern",
       (StringRef, Type))
-ERROR(nominal_type_subpattern_without_property_name,pattern_parsing,none,
+ERROR(nominal_type_subpattern_without_property_name,none,
       "subpattern of a struct or class pattern must have a keyword name", ())
-ERROR(ambiguous_enum_pattern_type,sema_tcp,none,
+ERROR(ambiguous_enum_pattern_type,none,
       "generic enum type %0 is ambiguous without explicit generic parameters "
       "when matching value of type %1", (Type, Type))
-WARNING(type_inferred_to_undesirable_type,sema_tcp,none,
+WARNING(type_inferred_to_undesirable_type,none,
         "%select{variable|constant}2 %0 inferred to have type %1, "
         "which may be unexpected", (Identifier, Type, bool))
-NOTE(add_explicit_type_annotation_to_silence,sema_tcp,none,
+NOTE(add_explicit_type_annotation_to_silence,none,
      "add an explicit type annotation to silence this warning", ())
-ERROR(isa_pattern_value,sema_tcp,none,
+ERROR(isa_pattern_value,none,
       "downcast pattern value of type %0 cannot be used", (Type))
 
 //------------------------------------------------------------------------------
@@ -2117,184 +2117,184 @@ ERROR(isa_pattern_value,sema_tcp,none,
 
 
 
-ERROR(try_unhandled,sema,none,
+ERROR(try_unhandled,none,
       "errors thrown from here are not handled", ())
-ERROR(throwing_call_unhandled,sema,none,
+ERROR(throwing_call_unhandled,none,
       "call can throw, but the error is not handled", ())
-ERROR(tryless_throwing_call_unhandled,sema,none,
+ERROR(tryless_throwing_call_unhandled,none,
       "call can throw, but it is not marked with 'try' and "
       "the error is not handled", ())
-ERROR(throw_in_nonthrowing_function,sema,none,
+ERROR(throw_in_nonthrowing_function,none,
       "error is not handled because the enclosing function "
       "is not declared 'throws'", ())
 
-ERROR(throwing_call_in_rethrows_function,sema,none,
+ERROR(throwing_call_in_rethrows_function,none,
       "call can throw, but the error is not handled; a function declared "
       "'rethrows' may only throw if its parameter does", ())
-ERROR(tryless_throwing_call_in_rethrows_function,sema,none,
+ERROR(tryless_throwing_call_in_rethrows_function,none,
       "call can throw, but it is not marked with 'try' and "
       "the error is not handled; a function declared "
       "'rethrows' may only throw if its parameter does", ())
-ERROR(throw_in_rethrows_function,sema,none,
+ERROR(throw_in_rethrows_function,none,
       "a function declared 'rethrows' may only throw if its parameter does", ())
-NOTE(because_rethrows_argument_throws,sema,none,
+NOTE(because_rethrows_argument_throws,none,
      "call is to 'rethrows' function, but argument function can throw", ())
-NOTE(because_rethrows_default_argument_throws,sema,none,
+NOTE(because_rethrows_default_argument_throws,none,
      "call is to 'rethrows' function, but a defaulted argument function"
      " can throw", ())
 
-ERROR(throwing_call_in_nonthrowing_autoclosure,sema,none,
+ERROR(throwing_call_in_nonthrowing_autoclosure,none,
       "call can throw, but it is executed in a non-throwing "
       "autoclosure",())
-ERROR(tryless_throwing_call_in_nonthrowing_autoclosure,sema,none,
+ERROR(tryless_throwing_call_in_nonthrowing_autoclosure,none,
       "call can throw, but it is not marked with 'try' and "
       "it is executed in a non-throwing autoclosure",())
-ERROR(throw_in_nonthrowing_autoclosure,sema,none,
+ERROR(throw_in_nonthrowing_autoclosure,none,
       "error is not handled because it is thrown in a non-throwing "
       "autoclosure", ())
 
-ERROR(try_unhandled_in_nonexhaustive_catch,sema,none,
+ERROR(try_unhandled_in_nonexhaustive_catch,none,
       "errors thrown from here are not handled because the "
       "enclosing catch is not exhaustive", ())
-ERROR(throwing_call_in_nonexhaustive_catch,sema,none,
+ERROR(throwing_call_in_nonexhaustive_catch,none,
       "call can throw, but the enclosing catch is not exhaustive", ())
-ERROR(tryless_throwing_call_in_nonexhaustive_catch,sema,none,
+ERROR(tryless_throwing_call_in_nonexhaustive_catch,none,
       "call can throw, but it is not marked with 'try' and "
       "the enclosing catch is not exhaustive", ())
-ERROR(throw_in_nonexhaustive_catch,sema,none,
+ERROR(throw_in_nonexhaustive_catch,none,
       "error is not handled because the enclosing catch is not exhaustive", ())
 
-ERROR(throwing_call_in_illegal_context,sema,none,
+ERROR(throwing_call_in_illegal_context,none,
       "call can throw, but errors cannot be thrown out of %0",
       (StringRef))
-ERROR(throw_in_illegal_context,sema,none,
+ERROR(throw_in_illegal_context,none,
       "errors cannot be thrown out of %0", (StringRef))
 
-ERROR(throwing_operator_without_try,sema,none,
+ERROR(throwing_operator_without_try,none,
       "operator can throw but expression is not marked with 'try'", ())
-ERROR(throwing_call_without_try,sema,none,
+ERROR(throwing_call_without_try,none,
       "call can throw but is not marked with 'try'", ())
-WARNING(no_throw_in_try,sema,none,
+WARNING(no_throw_in_try,none,
         "no calls to throwing functions occur within 'try' expression", ())
 
-WARNING(no_throw_in_do_with_catch,sema,none,
+WARNING(no_throw_in_do_with_catch,none,
         "'catch' block is unreachable because no errors are thrown in 'do' block", ())
 
 //------------------------------------------------------------------------------
 // Type Check Types
 //------------------------------------------------------------------------------
 
-ERROR(sugar_type_not_found,sema_tct,none,
+ERROR(sugar_type_not_found,none,
       "broken standard library: cannot find "
       "%select{Array|Optional|ImplicitlyUnwrappedOptional|Dictionary|"
       "ErrorType}0 type", (unsigned))
-ERROR(optional_intrinsics_not_found,sema_tct,none,
+ERROR(optional_intrinsics_not_found,none,
       "broken standard library: cannot find intrinsic operations on "
       "Optional<T>", ())
-ERROR(pointer_argument_intrinsics_not_found,sema_tct,none,
+ERROR(pointer_argument_intrinsics_not_found,none,
       "broken standard library: cannot find intrinsic operations on "
       "UnsafeMutablePointer<T>", ())
-ERROR(array_literal_intrinsics_not_found,sema_tct,none,
+ERROR(array_literal_intrinsics_not_found,none,
       "broken standard library: cannot find intrinsic operations on "
       "Array<T>", ())
-ERROR(bool_intrinsics_not_found,sema_tct,none,
+ERROR(bool_intrinsics_not_found,none,
       "broken standard library: cannot find intrinsic operations on Bool", ())
-ERROR(self_in_nominal,sema_tct,none,
+ERROR(self_in_nominal,none,
       "'Self' is only available in a protocol or as the result of a "
       "method in a class; did you mean %0?", (Identifier))
-ERROR(class_super_access,sema_tcd,none,
+ERROR(class_super_access,none,
       "class %select{must be declared %select{private|internal|PUBLIC}2"
       "|cannot be declared %select{PRIVATE|internal|public}1}0 because its "
       "superclass is %select{private|internal|PUBLIC}2",
       (bool, Accessibility, Accessibility))
-ERROR(dot_protocol_on_non_existential,sema_tct,none,
+ERROR(dot_protocol_on_non_existential,none,
       "cannot use 'Protocol' with non-protocol type %0", (Type))
-ERROR(tuple_single_element,sema_tcd,none,
+ERROR(tuple_single_element,none,
       "cannot create a single-element tuple with an element label", ())
-ERROR(tuple_ellipsis,sema_tcd,none,
+ERROR(tuple_ellipsis,none,
       "cannot create a variadic tuple", ())
 
 // Ownership
-ERROR(invalid_ownership_type,attribute_parsing,none,
+ERROR(invalid_ownership_type,none,
       "'%select{strong|weak|unowned|unowned}0' may only be applied to "
       "class and class-bound protocol types, not %1",
       (/*Ownership*/unsigned, Type))
-ERROR(invalid_ownership_protocol_type,attribute_parsing,none,
+ERROR(invalid_ownership_protocol_type,none,
       "'%select{strong|weak|unowned|unowned}0' may not be applied to "
       "non-class-bound protocol %1; consider adding a class bound",
       (/*Ownership*/unsigned, Type))
-ERROR(invalid_weak_ownership_not_optional,attribute_parsing,none,
+ERROR(invalid_weak_ownership_not_optional,none,
       "'weak' variable should have optional type %0", (Type))
-ERROR(invalid_weak_let,attribute_parsing,none,
+ERROR(invalid_weak_let,none,
       "'weak' must be a mutable variable, because it may change at runtime", ())
 
 // required
-ERROR(required_initializer_nonclass,attribute_parsing,none,
+ERROR(required_initializer_nonclass,none,
       "'required' initializer in non-class type %0", (Type))
-ERROR(required_initializer_in_extension,attribute_parsing,none,
+ERROR(required_initializer_in_extension,none,
       "'required' initializer must be declared directly in class %0"
       " (not in an extension)", (Type))
-ERROR(required_initializer_missing,attribute_parsing,none,
+ERROR(required_initializer_missing,none,
       "'required' initializer %0 must be provided by subclass of %1",
       (DeclName, Type))
-NOTE(required_initializer_here,sema_tcd,none,
+NOTE(required_initializer_here,none,
       "'required' initializer is declared in superclass here", ())
 
-ERROR(required_initializer_not_accessible,sema_tcd,none,
+ERROR(required_initializer_not_accessible,none,
       "'required' initializer must be as accessible as its enclosing type", ())
-ERROR(required_initializer_missing_keyword,sema_tcd,none,
+ERROR(required_initializer_missing_keyword,none,
       "'required' modifier must be present on all overrides of a required "
       "initializer", ())
-ERROR(required_initializer_override_wrong_keyword,sema_tcd,none,
+ERROR(required_initializer_override_wrong_keyword,none,
       "use the 'required' modifier to override a required initializer", ())
-WARNING(required_initializer_override_keyword,sema_tcd,none,
+WARNING(required_initializer_override_keyword,none,
       "'override' is implied when overriding a required initializer", ())
-NOTE(overridden_required_initializer_here,sema_tcd,none,
+NOTE(overridden_required_initializer_here,none,
      "overridden required initializer is here", ())
 
 // Functions
-ERROR(attribute_requires_function_type,attribute_parsing,none,
+ERROR(attribute_requires_function_type,none,
       "attribute only applies to syntactic function types", ())
-ERROR(objc_block_cannot_be_thin,attribute_parsing,none,
+ERROR(objc_block_cannot_be_thin,none,
       "@objc_block function type cannot be @thin", ())
-ERROR(attribute_not_supported,attribute_parsing,none,
+ERROR(attribute_not_supported,none,
       "this attribute is not supported", ())
-ERROR(convention_with_deprecated_representation_attribute,attribute_parsing,none,
+ERROR(convention_with_deprecated_representation_attribute,none,
       "@convention attribute cannot be used with deprecated @%0 attribute",
       (StringRef))
-ERROR(unsupported_convention,type_parsing,none,
+ERROR(unsupported_convention,none,
       "convention '%0' not supported", (StringRef))
-ERROR(unreferenced_generic_parameter,type_parsing,none,
+ERROR(unreferenced_generic_parameter,none,
       "generic parameter '%0' is not used in function signature", (StringRef))
-WARNING(deprecated_convention_attribute,type_parsing,none,
+WARNING(deprecated_convention_attribute,none,
         "'@%0' attribute is deprecated; '@convention(%1)' should be used "
         "instead", (StringRef, StringRef))
 
 // SIL
-ERROR(opened_non_protocol, decl_parsing,none,
+ERROR(opened_non_protocol,none,
       "@opened cannot be applied to non-protocol type %0", (Type))
-ERROR(sil_function_ellipsis,type_parsing,PointsToFirstBadToken,
+ERROR(sil_function_ellipsis,PointsToFirstBadToken,
       "SIL function types cannot be variadic", ())
-ERROR(sil_function_label,type_parsing,PointsToFirstBadToken,
+ERROR(sil_function_label,PointsToFirstBadToken,
       "SIL function types cannot have labeled inputs", ())
-ERROR(sil_function_repeat_convention,type_parsing,PointsToFirstBadToken,
+ERROR(sil_function_repeat_convention,PointsToFirstBadToken,
       "repeated %select{parameter|result|callee}0 convention attribute",
       (unsigned))
-ERROR(sil_function_multiple_results,type_parsing,PointsToFirstBadToken,
+ERROR(sil_function_multiple_results,PointsToFirstBadToken,
       "SIL function types cannot have multiple results", ())
-ERROR(sil_function_multiple_error_results,type_parsing,PointsToFirstBadToken,
+ERROR(sil_function_multiple_error_results,PointsToFirstBadToken,
       "SIL function types cannot have multiple @error results", ())
-ERROR(unsupported_sil_convention,type_parsing,none,
+ERROR(unsupported_sil_convention,none,
       "convention '%0' not supported in SIL", (StringRef))
-ERROR(sil_deprecated_convention_attribute,type_parsing,none,
+ERROR(sil_deprecated_convention_attribute,none,
       "'@%0' attribute is deprecated; '@convention(%1)' must be used instead",
       (StringRef, StringRef))
 
 // SIL Metatypes
-ERROR(sil_metatype_without_repr,type_parsing,none,
+ERROR(sil_metatype_without_repr,none,
       "metatypes in SIL must have @thin, @thick, or @objc_metatype attribute",
       ())
-ERROR(sil_metatype_multiple_reprs,type_parsing,none,
+ERROR(sil_metatype_multiple_reprs,none,
       "metatypes in SIL can only be one of @thin, @thick, or @objc_metatype", 
       ())
 
@@ -2302,197 +2302,197 @@ ERROR(sil_metatype_multiple_reprs,type_parsing,none,
 // @objc and @nonobjc
 //------------------------------------------------------------------------------
 
-ERROR(attr_used_without_required_module, sema_tcd, none,
+ERROR(attr_used_without_required_module, none,
       "%0 attribute used without importing module %1",
       (DeclAttribute, Identifier))
 
-ERROR(invalid_objc_decl_context,sema_tcd,none,
+ERROR(invalid_objc_decl_context,none,
       "@objc can only be used with members of classes, @objc protocols, and "
       "concrete extensions of classes", ())
-ERROR(invalid_objc_decl,sema_tcd,none,
+ERROR(invalid_objc_decl,none,
       "only classes, protocols, methods, initializers, properties, and "
       "subscript declarations can be declared @objc", ())
-ERROR(invalid_objc_swift_rooted_class,sema_tcd,none,
+ERROR(invalid_objc_swift_rooted_class,none,
       "only classes that inherit from NSObject can be declared @objc", ())
-ERROR(invalid_nonobjc_decl,sema_tcd,none,
+ERROR(invalid_nonobjc_decl,none,
       "only methods, initializers, properties and subscript declarations can "
       "be declared @nonobjc", ())
-ERROR(objc_in_extension_context,sema_objc,none,
+ERROR(objc_in_extension_context,none,
       "members of constrained extensions cannot be declared @objc", ())
-ERROR(objc_in_generic_extension,sema_objc,none,
+ERROR(objc_in_generic_extension,none,
       "@objc is not supported within extensions of generic classes", ())
-ERROR(objc_for_generic_class,sema_objc,none,
+ERROR(objc_for_generic_class,none,
       "generic subclasses of '@objc' classes cannot have an explicit '@objc' "
       "attribute because they are not directly visible from Objective-C", ())
-ERROR(objc_getter_for_nonobjc_property,sema_tcd,none,
+ERROR(objc_getter_for_nonobjc_property,none,
       "'@objc' getter for non-'@objc' property", ())
-ERROR(objc_getter_for_nonobjc_subscript,sema_tcd,none,
+ERROR(objc_getter_for_nonobjc_subscript,none,
       "'@objc' getter for non-'@objc' subscript", ())
-ERROR(objc_setter_for_nonobjc_property,sema_tcd,none,
+ERROR(objc_setter_for_nonobjc_property,none,
       "'@objc' setter for non-'@objc' property", ())
-ERROR(objc_setter_for_nonobjc_subscript,sema_tcd,none,
+ERROR(objc_setter_for_nonobjc_subscript,none,
       "'@objc' setter for non-'@objc' subscript", ())
-ERROR(objc_enum_generic,sema_tcd,none,
+ERROR(objc_enum_generic,none,
       "'@objc' enum cannot be generic", ())
-ERROR(objc_name_req_nullary,sema_objc,none,
+ERROR(objc_name_req_nullary,none,
       "'@objc' %select{class|protocol|enum|enum case|property}0 must have a simple name", (int))
-ERROR(objc_name_subscript,sema_objc,none,
+ERROR(objc_name_subscript,none,
       "'@objc' subscript cannot have a name; did you mean to put "
       "the name on the getter or setter?", ())
-ERROR(objc_name_func_mismatch,sema_objc,none,
+ERROR(objc_name_func_mismatch,none,
       "'@objc' %select{initializer|method}0 name provides "
       "%select{one argument name|names for %1 arguments}2, but "
       "%select{initializer|method}0 has %select{one parameter|%3 parameters}4"
       "%select{| (%select{|including }4the error parameter)}5",
       (bool, unsigned, bool, unsigned, bool, bool))
-ERROR(objc_enum_case_req_name,sema_objc,none,
+ERROR(objc_enum_case_req_name,none,
       "attribute has no effect; cases within an '@objc' enum are already "
       "exposed to Objective-C", ())
-ERROR(objc_enum_case_req_objc_enum,sema_objc,none,
+ERROR(objc_enum_case_req_objc_enum,none,
       "'@objc' enum case is not allowed outside of an '@objc' enum", ())
-ERROR(objc_enum_case_multi,sema_objc,none,
+ERROR(objc_enum_case_multi,none,
       "'@objc' enum case declaration defines multiple enum cases with the same Objective-C name", ())
 
 // If you change this, also change enum ObjCReason
 #define OBJC_ATTR_SELECT "select{marked dynamic|marked @objc|marked @IBOutlet|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override}"
 
-ERROR(objc_invalid_on_var,sema_objc,none,
+ERROR(objc_invalid_on_var,none,
       "property cannot be %" OBJC_ATTR_SELECT "0 "
       "because its type cannot be represented in Objective-C", (unsigned))
-ERROR(objc_invalid_subscript_key_type,sema_objc,none,
+ERROR(objc_invalid_subscript_key_type,none,
       "subscript cannot be %" OBJC_ATTR_SELECT "0 because its key "
       "type %1 is neither an integer nor an object", (unsigned, Type))
-ERROR(objc_invalid_on_subscript,sema_objc,none,
+ERROR(objc_invalid_on_subscript,none,
       "subscript cannot be %" OBJC_ATTR_SELECT "0 because its type "
       "cannot be represented in Objective-C", (unsigned))
-ERROR(objc_invalid_with_generic_params,sema_objc,none,
+ERROR(objc_invalid_with_generic_params,none,
       "method cannot be %" OBJC_ATTR_SELECT "0 because it has generic "
       "parameters", (unsigned))
-ERROR(objc_convention_invalid,sema_objc,none,
+ERROR(objc_convention_invalid,none,
       "%0 is not representable in Objective-C, so it cannot be used"
       " with '@convention(%1)'", (Type, StringRef))
-NOTE(not_objc_empty_protocol_composition,sema_objc,none,
+NOTE(not_objc_empty_protocol_composition,none,
      "'protocol<>' is not considered '@objc'; use 'AnyObject' instead", ())
-NOTE(not_objc_protocol,sema_objc,none,
+NOTE(not_objc_protocol,none,
      "protocol %0 is not '@objc'", (Type))
-NOTE(not_objc_empty_tuple,sema_objc,none,
+NOTE(not_objc_empty_tuple,none,
       "empty tuple type cannot be represented in Objective-C", ())
-NOTE(not_objc_tuple,sema_objc,none,
+NOTE(not_objc_tuple,none,
       "tuples cannot be represented in Objective-C", ())
-NOTE(not_objc_swift_class,sema_objc,none,
+NOTE(not_objc_swift_class,none,
      "classes not annotated with @objc cannot be represented "
      "in Objective-C", ())
-NOTE(not_objc_swift_struct,sema_objc,none,
+NOTE(not_objc_swift_struct,none,
       "Swift structs cannot be represented in Objective-C", ())
-NOTE(not_objc_swift_enum,sema_objc,none,
+NOTE(not_objc_swift_enum,none,
       "non-'@objc' enums cannot be represented in Objective-C", ())
-NOTE(not_objc_generic_type_param,sema_objc,none,
+NOTE(not_objc_generic_type_param,none,
      "generic type parameters cannot be represented in Objective-C", ())
-NOTE(not_objc_function_type_param,sema_objc,none,
+NOTE(not_objc_function_type_param,none,
      "function types cannot be represented in Objective-C unless their "
      "parameters and returns can be", ())
-NOTE(not_objc_function_type_throwing,sema_objc,none,
+NOTE(not_objc_function_type_throwing,none,
       "throwing function types cannot be represented in Objective-C", ())
-NOTE(objc_inferring_on_objc_protocol_member,sema_objc,none,
+NOTE(objc_inferring_on_objc_protocol_member,none,
      "inferring '@objc' because the declaration is a member of "
      "an '@objc' protocol", ())
-NOTE(objc_overriding_objc_decl,sema_objc,none,
+NOTE(objc_overriding_objc_decl,none,
      "overriding '@objc' %select{property|subscript|initializer|method}0 %1 "
      "here", (unsigned, DeclName))
 
-ERROR(objc_invalid_on_func_curried,sema_objc,none,
+ERROR(objc_invalid_on_func_curried,none,
       "method cannot be %" OBJC_ATTR_SELECT "0 because curried functions "
       "cannot be represented in Objective-C", (unsigned))
-ERROR(objc_observing_accessor,sema_objc, none,
+ERROR(objc_observing_accessor, none,
       "observing accessors are not allowed to be marked @objc", ())
-ERROR(objc_invalid_on_func_variadic,sema_objc,none,
+ERROR(objc_invalid_on_func_variadic,none,
       "method cannot be %" OBJC_ATTR_SELECT "0 because it has a variadic "
       "parameter", (unsigned))
-ERROR(objc_invalid_on_func_param_type,sema_objc,none,
+ERROR(objc_invalid_on_func_param_type,none,
       "method cannot be %" OBJC_ATTR_SELECT "1 because the type of the "
       "parameter %0 cannot be represented in Objective-C", (unsigned, unsigned))
-ERROR(objc_invalid_on_func_single_param_type,sema_objc,none,
+ERROR(objc_invalid_on_func_single_param_type,none,
       "method cannot be %" OBJC_ATTR_SELECT "0 because the type of the "
       "parameter cannot be represented in Objective-C", (unsigned))
-ERROR(objc_invalid_on_func_result_type,sema_objc,none,
+ERROR(objc_invalid_on_func_result_type,none,
       "method cannot be %" OBJC_ATTR_SELECT "0 because its result type "
       "cannot be represented in Objective-C", (unsigned))
-ERROR(objc_invalid_on_foreign_class,sema_objc,none,
+ERROR(objc_invalid_on_foreign_class,none,
       "method cannot be %" OBJC_ATTR_SELECT "0 because Core Foundation "
       "types are not classes in Objective-C", (unsigned))
-ERROR(objc_invalid_on_throwing_optional_result,sema_objc,none,
+ERROR(objc_invalid_on_throwing_optional_result,none,
       "throwing method cannot be %" OBJC_ATTR_SELECT "0 because "
       "it returns a value of optional type %1; 'nil' indicates failure to "
       "Objective-C",
       (unsigned, Type))
-ERROR(objc_invalid_on_throwing_result,sema_objc,none,
+ERROR(objc_invalid_on_throwing_result,none,
       "throwing method cannot be %" OBJC_ATTR_SELECT "0 because "
       "it returns a value of type %1; return 'Void' or a type that bridges "
       "to an Objective-C class",
       (unsigned, Type))
-ERROR(objc_invalid_on_failing_init,sema_objc,none,
+ERROR(objc_invalid_on_failing_init,none,
       "a failable and throwing initializer cannot be "
       "%" OBJC_ATTR_SELECT "0 because 'nil' indicates failure to Objective-C",
       (unsigned))
 
-ERROR(objc_override_method_selector_mismatch,sema_objc,none,
+ERROR(objc_override_method_selector_mismatch,none,
       "Objective-C method has a different selector from the "
       "method it overrides (%0 vs. %1)", (ObjCSelector, ObjCSelector))
 
-ERROR(objc_override_property_name_mismatch,sema_objc,none,
+ERROR(objc_override_property_name_mismatch,none,
       "Objective-C property has a different name from the "
       "property it overrides (%0 vs. %1)", (Identifier, Identifier))
 
-ERROR(broken_bridged_to_objc_protocol,sema_tcd,none,
+ERROR(broken_bridged_to_objc_protocol,none,
       "_BridgedToObjectiveC protocol is broken", ())
 
-ERROR(type_not_bridged,sema_objc,none,
+ERROR(type_not_bridged,none,
       "%0 is not bridged to Objective-C", (Type))
-ERROR(missing_bridging_function,sema_objc,Fatal,
+ERROR(missing_bridging_function,Fatal,
       "missing '%select{_forceBridgeFromObjectiveC|"
       "_conditionallyBridgeFromObjectiveC}0'", (bool))
-ERROR(missing_nserror_bridging_function,sema_objc,none,
+ERROR(missing_nserror_bridging_function,none,
       "missing _bridgeNSError", ())
 
 #define OBJC_DIAG_SELECT "%select{initializer %1|implicit initializer %1|deinitializer|implicit deinitializer|method %1|getter for %1|subscript getter|setter for %1|subscript setter}0"
 
 #define OBJC_DIAG_SELECT_2 "%select{initializer %3|implicit initializer %3|deinitializer|implicit deinitializer|method %3|getter for %3|subscript getter|setter for %3|subscript setter}2"
 
-ERROR(objc_redecl,sema_objc,none,
+ERROR(objc_redecl,none,
       OBJC_DIAG_SELECT " with Objective-C selector %4 conflicts with "
       OBJC_DIAG_SELECT_2 " with the same Objective-C selector",
       (unsigned, DeclName, unsigned, DeclName, ObjCSelector))
-NOTE(objc_declared_here,sema_objc,none,
+NOTE(objc_declared_here,none,
      OBJC_DIAG_SELECT " declared here",
      (unsigned, DeclName))
 
-ERROR(objc_redecl_same,sema_objc,none,
+ERROR(objc_redecl_same,none,
       OBJC_DIAG_SELECT " with Objective-C selector %2 conflicts with "
       "previous declaration with the same Objective-C selector",
       (unsigned, DeclName, ObjCSelector))
 
-ERROR(objc_override_other,sema_objc,none,
+ERROR(objc_override_other,none,
       OBJC_DIAG_SELECT " with Objective-C selector %4 conflicts with "
       OBJC_DIAG_SELECT_2 " from superclass %5 with the same Objective-C "
       "selector",
       (unsigned, DeclName, unsigned, DeclName, ObjCSelector, Type))
 
-ERROR(objc_class_method_not_permitted,sema_objc,none,
+ERROR(objc_class_method_not_permitted,none,
       OBJC_DIAG_SELECT " defines Objective-C class method %2, which is "
       "not permitted by Swift", (unsigned, DeclName, ObjCSelector))
 
-NOTE(objc_witness_selector_mismatch,sema_objc,none,
+NOTE(objc_witness_selector_mismatch,none,
       "Objective-C method %2 provided by " OBJC_DIAG_SELECT
       " does not match the requirement's selector (%3)",
       (unsigned, DeclName, ObjCSelector, ObjCSelector))
 
-ERROR(objc_optional_requirement_conflict,sema_objc,none,
+ERROR(objc_optional_requirement_conflict,none,
       "Objective-C method %4 provided by " OBJC_DIAG_SELECT
       " conflicts with optional requirement " OBJC_DIAG_SELECT_2
       " in protocol %5",
       (unsigned, DeclName, unsigned, DeclName, ObjCSelector, DeclName))
 
-ERROR(nonobjc_not_allowed,sema_objc,none,
+ERROR(nonobjc_not_allowed,none,
       "declaration is %" OBJC_ATTR_SELECT "0, and cannot be marked @nonobjc",
       (unsigned))
 
@@ -2504,9 +2504,9 @@ ERROR(nonobjc_not_allowed,sema_objc,none,
 // dynamic
 //------------------------------------------------------------------------------
 
-ERROR(dynamic_not_in_class,sema_dynamic,none,
+ERROR(dynamic_not_in_class,none,
       "only members of classes may be dynamic", ())
-ERROR(dynamic_with_final,sema_dynamic,none,
+ERROR(dynamic_with_final,none,
       "a declaration cannot be both 'final' and 'dynamic'",
       ())
 
@@ -2514,157 +2514,157 @@ ERROR(dynamic_with_final,sema_dynamic,none,
 // @available
 //------------------------------------------------------------------------------
 
-ERROR(availability_decl_unavailable, sema_avail, none,
+ERROR(availability_decl_unavailable, none,
   "%0 is unavailable", (DeclName))
 
-ERROR(availability_decl_unavailable_rename, sema_avail, none,
+ERROR(availability_decl_unavailable_rename, none,
       "%0 has been renamed to '%1'", (DeclName, StringRef))
 
-ERROR(availability_decl_unavailable_rename_msg, sema_avail, none,
+ERROR(availability_decl_unavailable_rename_msg, none,
       "%0 has been renamed to '%1': %2", (DeclName, StringRef, StringRef))
 
-ERROR(availability_decl_unavailable_msg, sema_avail, none,
+ERROR(availability_decl_unavailable_msg, none,
   "%0 is unavailable: %1", (DeclName, StringRef))
 
-ERROR(availability_decl_unavailable_in_swift, sema_avail, none,
+ERROR(availability_decl_unavailable_in_swift, none,
   "%0 is unavailable in Swift", (DeclName))
 
-ERROR(availability_decl_unavailable_in_swift_msg, sema_avail, none,
+ERROR(availability_decl_unavailable_in_swift_msg, none,
   "%0 is unavailable in Swift: %1", (DeclName, StringRef))
 
-NOTE(availability_marked_unavailable, sema_avail, none,
+NOTE(availability_marked_unavailable, none,
   "%0 has been explicitly marked unavailable here", (DeclName))
 
-NOTE(availability_obsoleted, sema_avail, none,
+NOTE(availability_obsoleted, none,
      "%0 was obsoleted in %1 %2",
     (DeclName, StringRef, clang::VersionTuple))
 
-WARNING(availability_deprecated, sema_avail, none,
+WARNING(availability_deprecated, none,
         "%0 %select{is|%select{is|was}3}1 deprecated"
         "%select{| %select{on|in}3 %2%select{| %4}3}1",
         (DeclName, bool, StringRef, bool, clang::VersionTuple))
 
-WARNING(availability_deprecated_msg, sema_avail, none,
+WARNING(availability_deprecated_msg, none,
         "%0 %select{is|%select{is|was}3}1 deprecated"
         "%select{| %select{on|in}3 %2%select{| %4}3}1: %5",
         (DeclName, bool, StringRef, bool, clang::VersionTuple, StringRef))
 
-WARNING(availability_deprecated_rename, sema_avail, none,
+WARNING(availability_deprecated_rename, none,
         "%0 %select{is|%select{is|was}3}1 deprecated"
         "%select{| %select{on|in}3 %2%select{| %4}3}1: renamed to '%5'",
         (DeclName, bool, StringRef, bool, clang::VersionTuple, StringRef))
 
-NOTE(note_deprecated_rename, sema_avail, none,
+NOTE(note_deprecated_rename, none,
      "use '%0' instead", (StringRef))
 
-ERROR(availability_decl_more_than_enclosing, sema_avail, none,
+ERROR(availability_decl_more_than_enclosing, none,
       "declaration cannot be more available than enclosing scope", ())
 
-NOTE(availability_decl_more_than_enclosing_enclosing_here, sema_avail, none,
+NOTE(availability_decl_more_than_enclosing_enclosing_here, none,
      "enclosing scope here", ())
 
-ERROR(availability_decl_only_version_newer, sema_avail, none,
+ERROR(availability_decl_only_version_newer, none,
       "%0 is only available on %1 %2 or newer",
       (DeclName, StringRef, clang::VersionTuple))
 
-NOTE(availability_guard_with_version_check, sema_avail, none,
+NOTE(availability_guard_with_version_check, none,
      "add 'if #available' version check", ())
 
-NOTE(availability_add_attribute, sema_avail, none,
+NOTE(availability_add_attribute, none,
      "add @available attribute to enclosing %0", (DescriptiveDeclKind))
 
-ERROR(availability_accessor_only_version_newer, sema_avail, none,
+ERROR(availability_accessor_only_version_newer, none,
       "%select{getter|setter}0 for %1 is only available on %2 %3"
       " or newer",
       (/*AccessorKind*/unsigned, DeclName, StringRef, clang::VersionTuple))
 
-ERROR(availability_inout_accessor_only_version_newer, sema_avail, none,
+ERROR(availability_inout_accessor_only_version_newer, none,
       "cannot pass as inout because %select{getter|setter}0 for %1 is only "
       "available on %2 %3 or newer",
       (/*AccessorKind*/unsigned, DeclName, StringRef, clang::VersionTuple))
 
-ERROR(availability_query_required_for_platform, sema_avail, none,
+ERROR(availability_query_required_for_platform, none,
       "condition required for target platform '%0'", (StringRef))
 
-WARNING(availability_query_useless_min_deployment, sema_avail, none,
+WARNING(availability_query_useless_min_deployment, none,
         "unnecessary check for '%0'; minimum deployment target ensures guard "
         "will always be true", (StringRef))
 
-WARNING(availability_query_useless_enclosing_scope, sema_avail, none,
+WARNING(availability_query_useless_enclosing_scope, none,
         "unnecessary check for '%0'; enclosing scope ensures guard "
         "will always be true", (StringRef))
 
-NOTE(availability_query_useless_enclosing_scope_here, sema_avail, none,
+NOTE(availability_query_useless_enclosing_scope_here, none,
      "enclosing scope here", ())
 
-ERROR(availability_global_script_no_potential, sema_avail,
+ERROR(availability_global_script_no_potential,
       none, "global variable cannot be marked potentially "
       "unavailable with '@available' in script mode", ())
 
-ERROR(availability_stored_property_no_potential, sema_avail,
+ERROR(availability_stored_property_no_potential,
       none, "stored properties cannot be marked potentially unavailable with "
       "'@available'", ())
 
-ERROR(availability_protocol_requires_version, sema_avail,
+ERROR(availability_protocol_requires_version,
       none, "protocol %0 requires %1 to be available on %2 %3 and newer",
       (DeclName, DeclName, StringRef, clang::VersionTuple))
 
-NOTE(availability_protocol_requirement_here, sema_avail, none,
+NOTE(availability_protocol_requirement_here, none,
      "protocol requirement here", ())
 
-NOTE(availability_conformance_introduced_here, sema_avail, none,
+NOTE(availability_conformance_introduced_here, none,
      "conformance introduced here", ())
 
 //------------------------------------------------------------------------------
 // Variable usage diagnostics
 //------------------------------------------------------------------------------
 
-WARNING(pbd_never_used_stmtcond, sema_varusage, none,
+WARNING(pbd_never_used_stmtcond, none,
         "value %0 was defined but never used; consider replacing "
         "with boolean test",
         (Identifier))
 
-WARNING(pbd_never_used, sema_varusage, none,
+WARNING(pbd_never_used, none,
         "initialization of %select{variable|immutable value}1 %0 was never used"
         "; consider replacing with assignment to '_' or removing it",
         (Identifier, unsigned))
 
 
-WARNING(capture_never_used, sema_varusage, none,
+WARNING(capture_never_used, none,
         "capture %0 was never used",
         (Identifier))
 
-WARNING(variable_never_used, sema_varusage, none,
+WARNING(variable_never_used, none,
         "%select{variable|immutable value}1 %0 was never used; "
         "consider replacing with '_' or removing it",
         (Identifier, unsigned))
-WARNING(variable_never_mutated, sema_varusage, none,
+WARNING(variable_never_mutated, none,
         "%select{variable|parameter}1 %0 was never mutated; "
         "consider changing to 'let' constant",
         (Identifier, unsigned))
-WARNING(variable_never_read, sema_varusage, none,
+WARNING(variable_never_read, none,
         "%select{variable|parameter}1 %0 was written to, but never read",
         (Identifier, unsigned))
 
 //------------------------------------------------------------------------------
 // Naming convention diagnostics
 //------------------------------------------------------------------------------
-WARNING(omit_needless_words, sema_tcd, none,
+WARNING(omit_needless_words, none,
         "%0 could be named %1 [-Womit-needless-words]", (DeclName, DeclName))
 
-WARNING(extraneous_default_args_in_call, sema_tcd, none,
+WARNING(extraneous_default_args_in_call, none,
         "call to %0 has extraneous arguments that could use defaults", 
         (DeclName))
 
-WARNING(swift3_migration_rename, sema_tcd, none,
+WARNING(swift3_migration_rename, none,
         "%0 has been renamed %1 in Swift 3", (DeclName, DeclName))
 
 //------------------------------------------------------------------------------
 // Circular reference diagnostics
 //------------------------------------------------------------------------------
-ERROR(circular_reference, sema_tcd, none,
+ERROR(circular_reference, none,
       "circular reference", ())
-NOTE(circular_reference_through, sema_tcd, none,
+NOTE(circular_reference_through, none,
      "through reference here", ())
 
 #ifndef DIAG_NO_UNDEF

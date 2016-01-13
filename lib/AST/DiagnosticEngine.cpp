@@ -48,8 +48,6 @@ enum class DiagnosticOptions {
   Fatal,
 };
 struct StoredDiagnosticInfo {
-  // TODO: Category category;
-
   DiagnosticKind kind : 2;
   bool pointsToFirstBadToken : 1;
   bool isFatal : 1;
@@ -65,7 +63,7 @@ struct StoredDiagnosticInfo {
 // Reproduce the DiagIDs, as we want both the size and access to the raw ids
 // themselves.
 enum LocalDiagID : uint32_t {
-#define DIAG(KIND, ID, Category, Options, Text, Signature) ID,
+#define DIAG(KIND, ID, Options, Text, Signature) ID,
 #include "swift/AST/DiagnosticsAll.def"
   NumDiags
 };
@@ -73,11 +71,11 @@ enum LocalDiagID : uint32_t {
 
 // TODO: categorization
 static StoredDiagnosticInfo storedDiagnosticInfos[] = {
-#define ERROR(ID, Category, Options, Text, Signature)                          \
+#define ERROR(ID, Options, Text, Signature)                                    \
   StoredDiagnosticInfo(DiagnosticKind::Error, DiagnosticOptions::Options),
-#define WARNING(ID, Category, Options, Text, Signature)                        \
+#define WARNING(ID, Options, Text, Signature)                                  \
   StoredDiagnosticInfo(DiagnosticKind::Warning, DiagnosticOptions::Options),
-#define NOTE(ID, Category, Options, Text, Signature)                           \
+#define NOTE(ID, Options, Text, Signature)                                     \
   StoredDiagnosticInfo(DiagnosticKind::Note, DiagnosticOptions::Options),
 #include "swift/AST/DiagnosticsAll.def"
 };
@@ -85,10 +83,10 @@ static_assert(sizeof(storedDiagnosticInfos) / sizeof(StoredDiagnosticInfo) ==
                   LocalDiagID::NumDiags,
               "array size mismatch");
 
-static const char *DiagnosticStrings[] = {
-#define ERROR(ID, Category, Options, Text, Signature) Text,
-#define WARNING(ID, Category, Options, Text, Signature) Text,
-#define NOTE(ID, Category, Options, Text, Signature) Text,
+static const char *diagnosticStrings[] = {
+#define ERROR(ID, Options, Text, Signature) Text,
+#define WARNING(ID, Options, Text, Signature) Text,
+#define NOTE(ID, Options, Text, Signature) Text,
 #include "swift/AST/DiagnosticsAll.def"
     "<not a diagnostic>",
 };
@@ -503,11 +501,9 @@ DiagnosticState::Behavior DiagnosticState::determineBehavior(DiagID id) {
   //   1) If current state dictates a certain behavior, follow that
   //   2) If the user provided a behavior for this specific diagnostic, follow
   //      that
-  //   3) (TBD) If the user provided a behavior for this diagnostic's category,
-  //      follow that
-  //   4) If the user provided a behavior for this diagnostic's kind, follow
+  //   3) If the user provided a behavior for this diagnostic's kind, follow
   //      that
-  //   5) Otherwise remap the diagnostic kind
+  //   4) Otherwise remap the diagnostic kind
 
   auto diagInfo = storedDiagnosticInfos[(unsigned)id];
   bool isNote = diagInfo.kind == DiagnosticKind::Note;
@@ -529,19 +525,12 @@ DiagnosticState::Behavior DiagnosticState::determineBehavior(DiagID id) {
   if (perDiagnosticBehavior[(unsigned)id] != Behavior::Unspecified)
     return set(perDiagnosticBehavior[(unsigned)id]);
 
-  //   3) (TBD) If the user provided a behavior for this diagnostic's category,
-  //      follow that
-
-  // TODO: categorization
-  // if (perCategoryBehavior[(unsigned)id] != Behavior::Unspecified)
-  //   return set(perCategoryBehavior[(unsigned)id]);
-
-  //   4) If the user provided a behavior for this diagnostic's kind, follow
+  //   3) If the user provided a behavior for this diagnostic's kind, follow
   //      that
   if (diagInfo.kind == DiagnosticKind::Warning && ignoreAllWarnings)
     return set(Behavior::Ignore);
 
-  //   5) Otherwise remap the diagnostic kind
+  //   4) Otherwise remap the diagnostic kind
   switch (diagInfo.kind) {
   case DiagnosticKind::Note:
     return set(Behavior::Note);
@@ -692,7 +681,7 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
   llvm::SmallString<256> Text;
   {
     llvm::raw_svector_ostream Out(Text);
-    formatDiagnosticText(DiagnosticStrings[(unsigned)diagnostic.getID()],
+    formatDiagnosticText(diagnosticStrings[(unsigned)diagnostic.getID()],
                          diagnostic.getArgs(), Out);
   }
 
