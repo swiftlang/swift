@@ -98,6 +98,20 @@ static SILValue stripRCIdentityPreservingInsts(SILValue V) {
     if (SILValue NewValue = TI->getUniqueNonTrivialElt())
       return NewValue;
 
+  // Any SILArgument with a single predecessor from a "phi" perspective is
+  // dead. In such a case, the SILArgument must be rc-identical.
+  //
+  // This is the easy case. The difficult case is when you have an argument with
+  // /multiple/ predecessors.
+  //
+  // We do not need to insert this SILArgument into the visited SILArgument set
+  // since we will only visit it twice if we go around a back edge due to a
+  // different SILArgument that is actually being used for its phi node like
+  // purposes.
+  if (auto *A = dyn_cast<SILArgument>(V))
+    if (SILValue Result = A->getSingleIncomingValue())
+      return Result;
+
   return SILValue();
 }
 

@@ -60,9 +60,10 @@ SILModule &SILArgument::getModule() const {
   return getFunction()->getModule();
 }
 
-static SILValue getIncomingValueForPred(SILBasicBlock *BB, SILBasicBlock *Pred,
+static SILValue getIncomingValueForPred(const SILBasicBlock *BB,
+                                        const SILBasicBlock *Pred,
                                         unsigned Index) {
-  TermInst *TI = Pred->getTerminator();
+  const TermInst *TI = Pred->getTerminator();
 
   switch (TI->getTermKind()) {
   // TODO: This list is conservative. I think we can probably handle more of
@@ -77,15 +78,23 @@ static SILValue getIncomingValueForPred(SILBasicBlock *BB, SILBasicBlock *Pred,
   case TermKind::DynamicMethodBranchInst:
     return SILValue();
   case TermKind::BranchInst:
-    return cast<BranchInst>(TI)->getArg(Index);
+    return cast<const BranchInst>(TI)->getArg(Index);
   case TermKind::CondBranchInst:
-    return cast<CondBranchInst>(TI)->getArgForDestBB(BB, Index);
+    return cast<const CondBranchInst>(TI)->getArgForDestBB(BB, Index);
   case TermKind::CheckedCastBranchInst:
-    return cast<CheckedCastBranchInst>(TI)->getOperand();
+    return cast<const CheckedCastBranchInst>(TI)->getOperand();
   case TermKind::SwitchEnumInst:
-    return cast<SwitchEnumInst>(TI)->getOperand();
+    return cast<const SwitchEnumInst>(TI)->getOperand();
   }
   llvm_unreachable("Unhandled TermKind?!");
+}
+
+SILValue SILArgument::getSingleIncomingValue() const {
+  const SILBasicBlock *Parent = getParent();
+  const SILBasicBlock *PredBB = Parent->getSinglePredecessor();
+  if (!PredBB)
+    return SILValue();
+  return getIncomingValueForPred(Parent, PredBB, getIndex());
 }
 
 bool SILArgument::getIncomingValues(llvm::SmallVectorImpl<SILValue> &OutArray) {
