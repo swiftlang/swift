@@ -44,7 +44,7 @@ ToolChain::JobContext::JobContext(const Compilation &C,
 ArrayRef<InputPair> ToolChain::JobContext::getTopLevelInputFiles() const {
   return C.getInputFiles();
 }
-const std::string &ToolChain::JobContext::getAllSourcesPath() const {
+const char *ToolChain::JobContext::getAllSourcesPath() const {
   return C.getAllSourcesPath();
 }
 

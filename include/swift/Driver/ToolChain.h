@@ -75,7 +75,7 @@ protected:
     ArrayRef<InputPair> getTopLevelInputFiles() const;
 
     /// Forwards to Compilation::getAllSourcesPath.
-    const std::string &getAllSourcesPath() const;
+    const char *getAllSourcesPath() const;
   };
 
   /// Packs together information chosen by toolchains to create jobs.

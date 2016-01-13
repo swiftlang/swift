@@ -250,7 +250,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
         context.getTopLevelInputFiles().size() > TOO_MANY_FILES) {
       Arguments.push_back("-filelist");
-      Arguments.push_back(context.getAllSourcesPath().c_str());
+      Arguments.push_back(context.getAllSourcesPath());
       Arguments.push_back("-primary-file");
       PrimaryInputArg.render(context.Args, Arguments);
     } else {
@@ -274,7 +274,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
         context.InputActions.size() > TOO_MANY_FILES) {
       Arguments.push_back("-filelist");
-      Arguments.push_back(context.getAllSourcesPath().c_str());
+      Arguments.push_back(context.getAllSourcesPath());
     } else {
       for (const Action *A : context.InputActions) {
         cast<InputAction>(A)->getInputArg().render(context.Args, Arguments);

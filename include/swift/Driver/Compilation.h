@@ -80,9 +80,7 @@ private:
 
   /// When non-null, a temporary file containing all input .swift files.
   /// Used for large compilations to avoid overflowing argv.
-  ///
-  /// This is a pointer to a string whose data is held in #TempFilePaths.
-  std::string AllSourceFilesPath;
+  const char *AllSourceFilesPath = nullptr;
 
   /// Temporary files that should be cleaned up after the compilation finishes.
   ///
@@ -207,7 +205,7 @@ public:
   /// a file.
   ///
   /// \sa types::isPartOfSwiftCompilation
-  const std::string &getAllSourcesPath() const;
+  const char *getAllSourcesPath() const;
 
   /// Asks the Compilation to perform the Jobs which it knows about.
   /// \returns result code for the Compilation's Jobs; 0 indicates success and
