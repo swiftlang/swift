@@ -7,8 +7,8 @@
        border: 1px solid #aaa;
    }
    </style>
-   
-    
+
+
 ==================================
 Immutability and Read-Only Methods
 ==================================
@@ -41,10 +41,10 @@ Consider::
 
 What do we do with this?  Since ``+=`` has an ``inout`` first
 argument, we detect this situation statically (hopefully one day we'll
-have a better error message): 
+have a better error message):
 
 ::
-   
+
  <REPL Input>:1:9: error: expression does not type-check
  w.title += " (parenthesized remark)"
  ~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -125,7 +125,7 @@ implicitly:
 
     var x = Number(42)
     x.increment()         // mutating operation
-  
+
 * passing it to a function attributed with ``@assignment``::
 
     var y = 31
@@ -161,7 +161,7 @@ A subscript or property access expression is an rvalue if
   value type
 
 For example, consider this extension to our ``Number`` struct:
-  
+
 .. parsed-literal::
 
   extension Number {
@@ -222,9 +222,9 @@ The Big Rule
 
 .. Error:: A program that applies a mutating operation to an rvalue is ill-formed
    :class: warning
-        
+
 For example:
-                
+
 .. parsed-literal::
 
    clay = 43           // OK; a var is always assignable

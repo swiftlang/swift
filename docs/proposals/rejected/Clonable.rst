@@ -34,7 +34,7 @@ one has to engage in some kind of wrapping and forwarding::
 
   struct MyClassVal {
     var [clone] value : MyClass
-    
+
     constructor(x : A, y : B) {
        value = new MyClass(x, y)
     }
@@ -110,12 +110,12 @@ all ordinary instance variables, and a ``clone()`` of all instance
 variables marked ``[clone]``::
 
   class FooValue : Clonable  {}
-  
+
   class Bar {}
 
   class Foo : Clonable {
       var count : Int
-      var [clone] myValue : FooValue 
+      var [clone] myValue : FooValue
       var somethingIJustReferTo : Bar
   }
 
@@ -130,7 +130,7 @@ initialization, assignment, or function argument passing), even as
 part of a larger ``struct``, its ``[clone]`` member is ``clone()``\ d.
 Because ``Foo`` itself has a ``[clone]`` member, that is ``clone()``\ d
 also.  Therefore copying a ``Baz`` object ``clone()``\ s a ``Foo`` and
-``clone()``\ ing a ``Foo`` ``clone()``\ s a ``FooValue``.  
+``clone()``\ ing a ``Foo`` ``clone()``\ s a ``FooValue``.
 
 All ``struct``\ s are ``Clonable`` by default, with ``clone()`` delivering
 ordinary copy semantics.  Therefore, ::

@@ -13,7 +13,7 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
 .. note::
 
     This document uses Sphinx-specific features. If you are viewing this on
-    GitHub, you'll have to use raw mode, or download and build the docs 
+    GitHub, you'll have to use raw mode, or download and build the docs
     yourself.
 
 .. glossary::
@@ -41,7 +41,7 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     The feature that no uninitialized variables, constants, or properties will
     be read by a program, or the analysis pass that operates on SIL to
     guarantee this. This was `discussed on Apple's Swift blog`__.
-    
+
     __ https://developer.apple.com/swift/blog/?id=28
 
   existential
@@ -70,14 +70,14 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     The type of a value representing a type. Greg Parker has a good
     explanation of `Objective-C's "metaclasses"`__; because Swift has types
     that are *not* classes, a more general term is used.
-    
+
     We also sometimes refer to a value representing a type as a "metatype
     object" or just "metatype", usually within low-level contexts like IRGen
     and LLDB. This is technically incorrect (it's just a "type object"), but
     the malapropism happened early in the project and has stuck around.
-  
+
     __ http://sealiesoftware.com/blog/archive/2009/04/14/objc_explain_Classes_and_metaclasses.html
-    
+
   model
     A type that conforms to a particular protocol. Sometimes "concrete
     model". Example: "Array and Set are both models of CollectionType".
@@ -85,8 +85,8 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
   module
     Has *many* uses in the Swift world. We may want to rename some of them.
     #1 and #2 are the most common.
-    
-    1. A unit of API distribution and grouping. The ``import`` declaration 
+
+    1. A unit of API distribution and grouping. The ``import`` declaration
        brings modules into scope. Represented as ModuleDecl in the compiler.
     2. A compilation unit; that is, source files that are compiled together.
        These files may contain cross-references. Represented as "the main
@@ -105,7 +105,7 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     7. Shorthand for a "precompiled module file"; effectively "precompiled
        headers" for an entire Clang module. Never used directly by Swift.
        See also `module cache`.
-    
+
     __ http://clang.llvm.org/docs/Modules.html
 
   module cache
@@ -117,14 +117,14 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     crashes in ``clang::ASTReader``.
 
   open existential
-    An `existential` value with its dynamic type pulled out, so that the 
+    An `existential` value with its dynamic type pulled out, so that the
     compiler can do something with it.
 
   PR
-    1. "Problem Report": An issue reported in `LLVM's bug tracker`__. 
+    1. "Problem Report": An issue reported in `LLVM's bug tracker`__.
        See also `SR`.
     2. "pull request"
-    
+
     __ https://llvm.org/bugs/
 
   primary file
@@ -134,7 +134,7 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
 
   Radar
     `Apple's bug-tracking system`__, or an issue reported on that system.
-    
+
     __ https://bugreport.apple.com
 
   raw SIL
