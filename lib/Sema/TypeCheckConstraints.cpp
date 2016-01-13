@@ -1576,10 +1576,9 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       InitType = solution.simplifyType(tc, InitType);
 
       // Convert the initializer to the type of the pattern.
+      // ignoreTopLevelInjection = Binding->isConditional()
       expr = solution.coerceToType(expr, InitType, Locator,
-                                   false
-                                   /*ignoreTopLevelInjection=
-                                     Binding->isConditional()*/);
+                                   false /* ignoreTopLevelInjection */);
       if (!expr) {
         return nullptr;
       }
