@@ -64,11 +64,19 @@ public var DISPATCH_QUEUE_PRIORITY_BACKGROUND: dispatch_queue_priority_t {
   return -32768
 }
 
+#if _runtime(_ObjC)
 @warn_unused_result
 public func dispatch_get_global_queue(identifier: qos_class_t,
                                       _ flags: UInt) -> dispatch_queue_t {
   return dispatch_get_global_queue(Int(identifier.rawValue), flags)
 }
+#else
+@warn_unused_result
+public func dispatch_get_global_queue(identifier: CInt,
+                                      _ flags: UInt) -> dispatch_queue_t {
+  return dispatch_get_global_queue(identifier, flags)
+}
+#endif
 
 public var DISPATCH_QUEUE_CONCURRENT: dispatch_queue_attr_t {
   return _swift_dispatch_queue_concurrent()
@@ -122,6 +130,8 @@ public var DISPATCH_SOURCE_TYPE_DATA_ADD: dispatch_source_type_t {
 public var DISPATCH_SOURCE_TYPE_DATA_OR: dispatch_source_type_t {
   return _swift_dispatch_source_type_data_or()
 }
+
+#if _runtime(_ObjC)
 public var DISPATCH_SOURCE_TYPE_MACH_SEND: dispatch_source_type_t {
   return _swift_dispatch_source_type_mach_send()
 }
@@ -131,6 +141,8 @@ public var DISPATCH_SOURCE_TYPE_MACH_RECV: dispatch_source_type_t {
 public var DISPATCH_SOURCE_TYPE_MEMORYPRESSURE: dispatch_source_type_t {
   return _swift_dispatch_source_type_memorypressure()
 }
+#endif
+
 public var DISPATCH_SOURCE_TYPE_READ: dispatch_source_type_t {
   return _swift_dispatch_source_type_read()
 }
