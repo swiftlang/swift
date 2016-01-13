@@ -48,7 +48,7 @@ struct CompoAliasTypeWhereRequirement<T where T: Compo> {}
 
 // rdar://problem/20593294
 protocol HasAssoc {
-  typealias Assoc
+  associatedtype Assoc
   func foo()
 }
 

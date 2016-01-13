@@ -32,7 +32,7 @@ protocol P6 {
 
 // Inheritable: method involving associated type.
 protocol P7 {
-  typealias Assoc
+  associatedtype Assoc
   func f7() -> Assoc
 }
 

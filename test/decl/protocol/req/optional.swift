@@ -201,7 +201,7 @@ optional class optErrorClass { // expected-error{{'optional' modifier cannot be 
   
 protocol optErrorProtocol {
   optional func foo(x: Int) // expected-error{{'optional' can only be applied to members of an @objc protocol}}
-  optional typealias Assoc  // expected-error{{'optional' modifier cannot be applied to this declaration}} {{3-12=}}
+  optional associatedtype Assoc  // expected-error{{'optional' modifier cannot be applied to this declaration}} {{3-12=}}
 }
 
 @objc protocol optionalInitProto {
