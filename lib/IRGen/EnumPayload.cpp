@@ -24,7 +24,7 @@ using namespace irgen;
 static llvm::Value *forcePayloadValue(EnumPayload::LazyValue &value) {
   if (auto v = value.dyn_cast<llvm::Value *>())
     return v;
-  
+
   auto null = llvm::Constant::getNullValue(value.dyn_cast<llvm::Type*>());
   value = null;
   return null;
@@ -33,7 +33,7 @@ static llvm::Value *forcePayloadValue(EnumPayload::LazyValue &value) {
 static llvm::Type *getPayloadType(EnumPayload::LazyValue value) {
   if (auto t = value.dyn_cast<llvm::Type *>())
     return t;
-  
+
   return value.dyn_cast<llvm::Value *>()->getType();
 }
 
@@ -51,13 +51,13 @@ EnumPayload EnumPayload::fromBitPattern(IRGenModule &IGM,
                                         APInt bitPattern,
                                         EnumPayloadSchema schema) {
   EnumPayload result;
-  
+
   schema.forEachType(IGM, [&](llvm::Type *type) {
     unsigned bitSize = IGM.DataLayout.getTypeSizeInBits(type);
 
     llvm::IntegerType *intTy
       = llvm::IntegerType::get(IGM.getLLVMContext(), bitSize);
-    
+
     // Take some bits off of the bottom of the pattern.
     auto bits = bitPattern.zextOrTrunc(bitSize);
     auto val = llvm::ConstantInt::get(intTy, bits);
@@ -67,13 +67,13 @@ EnumPayload EnumPayload::fromBitPattern(IRGenModule &IGM,
       else
         val = llvm::ConstantExpr::getBitCast(val, type);
     }
-    
+
     result.PayloadValues.push_back(val);
-    
+
     // Shift the remaining bits down.
     bitPattern = bitPattern.lshr(bitSize);
   });
-    
+
   return result;
 }
 
@@ -89,7 +89,7 @@ static void withValueInPayload(IRGenFunction &IGF,
                                Fn &&f) {
   auto &DataLayout = IGF.IGM.DataLayout;
   int valueBitWidth = DataLayout.getTypeSizeInBits(valueType);
-  
+
   // Find the elements we need to touch.
   // TODO: Linear search through the payload elements is lame.
   MutableArrayRef<EnumPayload::LazyValue> payloads = payload.PayloadValues;
@@ -99,23 +99,23 @@ static void withValueInPayload(IRGenFunction &IGF,
   for (;;) {
     payloadType = getPayloadType(payloads.front());
     payloadBitWidth = IGF.IGM.DataLayout.getTypeSizeInBits(payloadType);
-    
+
     // Does this element overlap the area we need to touch?
     if (payloadValueOffset < payloadBitWidth) {
       // See how much of the value we can fit here.
       int valueChunkWidth = payloadBitWidth - payloadValueOffset;
       valueChunkWidth = std::min(valueChunkWidth, valueBitWidth - valueOffset);
-    
+
       f(payloads.front(),
         payloadBitWidth, payloadValueOffset,
         valueBitWidth, valueOffset);
-      
+
       // If we used the entire value, we're done.
       valueOffset += valueChunkWidth;
       if (valueOffset >= valueBitWidth)
         return;
     }
-    
+
     payloadValueOffset = std::max(payloadValueOffset - payloadBitWidth, 0);
     payloads = payloads.slice(1);
   }
@@ -144,10 +144,10 @@ void EnumPayload::insertValue(IRGenFunction &IGF, llvm::Value *value,
           return;
         }
       }
-      
+
       // Select out the chunk of the value to merge with the existing payload.
       llvm::Value *subvalue = value;
-      
+
       auto valueIntTy =
         llvm::IntegerType::get(IGF.IGM.getLLVMContext(), valueBitWidth);
       auto payloadIntTy =
@@ -161,7 +161,7 @@ void EnumPayload::insertValue(IRGenFunction &IGF, llvm::Value *value,
       if (payloadValueOffset > 0)
         subvalue = IGF.Builder.CreateShl(subvalue,
                       llvm::ConstantInt::get(payloadIntTy, payloadValueOffset));
-      
+
       // If there hasn't yet been a value stored here, we can use the adjusted
       // value directly.
       if (payloadValue.is<llvm::Type *>()) {
@@ -205,7 +205,7 @@ llvm::Value *EnumPayload::extractValue(IRGenFunction &IGF, llvm::Type *type,
           return;
         }
       }
-      
+
       // Integrate the chunk of payload into the result value.
       auto value = forcePayloadValue(payloadValue);
       auto valueIntTy =
@@ -224,7 +224,7 @@ llvm::Value *EnumPayload::extractValue(IRGenFunction &IGF, llvm::Type *type,
                          llvm::ConstantInt::get(value->getType(), valueOffset));
       if (valueBitWidth < payloadBitWidth)
         value = IGF.Builder.CreateTrunc(value, valueIntTy);
-      
+
       if (!result)
         result = value;
       else
@@ -236,13 +236,13 @@ llvm::Value *EnumPayload::extractValue(IRGenFunction &IGF, llvm::Type *type,
 EnumPayload EnumPayload::fromExplosion(IRGenModule &IGM,
                                        Explosion &in, EnumPayloadSchema schema){
   EnumPayload result;
-  
+
   schema.forEachType(IGM, [&](llvm::Type *type) {
     auto next = in.claimNext();
     assert(next->getType() == type && "explosion doesn't match payload schema");
     result.PayloadValues.push_back(next);
   });
-  
+
   return result;
 }
 
@@ -286,12 +286,12 @@ static llvm::Type *getPayloadStorageType(IRGenModule &IGM,
     payload.StorageType = getPayloadType(payload.PayloadValues.front());
     return payload.StorageType;
   }
-  
+
   SmallVector<llvm::Type *, 2> elementTypes;
   for (auto value : payload.PayloadValues) {
     elementTypes.push_back(getPayloadType(value));
   }
-  
+
   payload.StorageType = llvm::StructType::get(IGM.getLLVMContext(),
                                               elementTypes);
   return payload.StorageType;
@@ -302,10 +302,10 @@ EnumPayload EnumPayload::load(IRGenFunction &IGF, Address address,
   EnumPayload result = EnumPayload::zero(IGF.IGM, schema);
   if (result.PayloadValues.empty())
     return result;
-  
+
   auto storageTy = getPayloadStorageType(IGF.IGM, result);
   address = IGF.Builder.CreateBitCast(address, storageTy->getPointerTo());
-  
+
   if (result.PayloadValues.size() == 1) {
     result.PayloadValues.front() = IGF.Builder.CreateLoad(address);
   } else {
@@ -318,7 +318,7 @@ EnumPayload EnumPayload::load(IRGenFunction &IGF, Address address,
       offset += Size(IGF.IGM.DataLayout.getTypeAllocSize(loadedValue->getType()));
     }
   }
-  
+
   return result;
 }
 
@@ -328,7 +328,7 @@ void EnumPayload::store(IRGenFunction &IGF, Address address) const {
 
   auto storageTy = getPayloadStorageType(IGF.IGM, *this);
   address = IGF.Builder.CreateBitCast(address, storageTy->getPointerTo());
-  
+
   if (PayloadValues.size() == 1) {
     IGF.Builder.CreateStore(forcePayloadValue(PayloadValues.front()), address);
     return;
@@ -360,19 +360,19 @@ static void emitSubSwitch(IRGenFunction &IGF,
                     SwitchDefaultDest dflt) {
 recur:
   assert(!values.empty() && "didn't exit out when exhausting all values?!");
-  
+
   assert(!cases.empty() && "switching with no cases?!");
-  
+
   auto &DL = IGF.IGM.DataLayout;
   auto &pv = values.front();
   values = values.slice(1);
   auto payloadTy = getPayloadType(pv);
   unsigned size = DL.getTypeSizeInBits(payloadTy);
-  
+
   // Grab a chunk of the mask.
   auto maskPiece = mask.zextOrTrunc(size);
   mask = mask.lshr(size);
-  
+
   // If the piece is zero, this doesn't affect the switch. We can just move
   // forward and recur.
   if (maskPiece == 0) {
@@ -380,29 +380,29 @@ recur:
       casePair.first = casePair.first.lshr(size);
     goto recur;
   }
-  
+
   // Force the value we will test.
   auto v = forcePayloadValue(pv);
   auto payloadIntTy = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), size);
-  
+
   // Need to coerce to integer for 'icmp eq' if it's not already an integer
   // or pointer. (Switching or masking will also require a cast to integer.)
   if (!isa<llvm::IntegerType>(v->getType())
       && !isa<llvm::PointerType>(v->getType()))
     v = IGF.Builder.CreateBitOrPointerCast(v, payloadIntTy);
-  
+
   // Apply the mask if it's interesting.
   if (!maskPiece.isAllOnesValue()) {
     v = IGF.Builder.CreateBitOrPointerCast(v, payloadIntTy);
     auto maskConstant = llvm::ConstantInt::get(payloadIntTy, maskPiece);
     v = IGF.Builder.CreateAnd(v, maskConstant);
   }
-  
+
   // Gather the values we will switch over for this payload chunk.
   // FIXME: std::map is lame. Should hash APInts.
   std::map<APInt, SmallVector<std::pair<APInt, llvm::BasicBlock*>, 2>, ult>
     subCases;
-  
+
   for (auto casePair : cases) {
     // Grab a chunk of the value.
     auto valuePiece = casePair.first.zextOrTrunc(size);
@@ -410,10 +410,10 @@ recur:
     subCases[valuePiece].push_back({std::move(casePair.first).lshr(size),
                                     casePair.second});
   }
-  
+
   bool needsAdditionalCases = !values.empty() && mask != 0;
   SmallVector<std::pair<llvm::BasicBlock *, decltype(cases)>, 2> recursiveCases;
-  
+
   auto blockForCases
     = [&](MutableArrayRef<std::pair<APInt, llvm::BasicBlock*>> cases)
         -> llvm::BasicBlock *
@@ -428,7 +428,7 @@ recur:
       assert(cases.size() == 1 && "more than one case for final destination?!");
       return cases.front().second;
     };
-  
+
   // If there's only one case, do a cond_br.
   if (subCases.size() == 1) {
     auto &subCase = *subCases.begin();
@@ -439,7 +439,7 @@ recur:
       IGF.Builder.CreateBr(block);
       goto next;
     }
-  
+
     auto &valuePiece = subCase.first;
     llvm::Value *valueConstant = llvm::ConstantInt::get(payloadIntTy,
                                                         valuePiece);
@@ -449,12 +449,12 @@ recur:
     IGF.Builder.CreateCondBr(cmp, block, dflt.getPointer());
     goto next;
   }
-  
+
   // Otherwise, do a switch.
   {
     v = IGF.Builder.CreateBitOrPointerCast(v, payloadIntTy);
     auto swi = IGF.Builder.CreateSwitch(v, dflt.getPointer(), subCases.size());
-    
+
     for (auto &subCase : subCases) {
       auto &valuePiece = subCase.first;
       auto valueConstant = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(),
@@ -463,7 +463,7 @@ recur:
       swi->addCase(valueConstant, blockForCases(subCase.second));
     }
   }
-  
+
 next:
   // Emit the recursive cases.
   for (auto &recursive : recursiveCases) {
@@ -483,7 +483,7 @@ void EnumPayload::emitSwitch(IRGenFunction &IGF,
       IGF.Builder.CreateBr(cases[0].second);
       return;
     }
-  
+
     auto *cmp = emitCompare(IGF, mask, cases[0].first);
     IGF.Builder.CreateCondBr(cmp, cases[0].second, dflt.getPointer());
     return;
@@ -492,9 +492,9 @@ void EnumPayload::emitSwitch(IRGenFunction &IGF,
   // Otherwise, break down the decision tree.
   SmallVector<std::pair<APInt, llvm::BasicBlock*>, 4> mutableCases
     (cases.begin(), cases.end());
-  
+
   emitSubSwitch(IGF, PayloadValues, mask, mutableCases, dflt);
-  
+
   assert(IGF.Builder.hasPostTerminatorIP());
 }
 
@@ -507,7 +507,7 @@ EnumPayload::emitCompare(IRGenFunction &IGF, APInt mask, APInt value) const {
 
   assert((~mask & value) == 0
          && "value has masked out bits set?!");
-  
+
   auto &DL = IGF.IGM.DataLayout;
   llvm::Value *condition = nullptr;
   for (auto &pv : PayloadValues) {
@@ -517,14 +517,14 @@ EnumPayload::emitCompare(IRGenFunction &IGF, APInt mask, APInt value) const {
     // Break off a piece of the mask and value.
     auto maskPiece = mask.zextOrTrunc(size);
     auto valuePiece = value.zextOrTrunc(size);
-    
+
     mask = mask.lshr(size);
     value = value.lshr(size);
-    
+
     // If this piece is zero, it doesn't affect the comparison.
     if (maskPiece == 0)
       continue;
-    
+
     // Apply the mask and test.
     bool isMasked = !maskPiece.isAllOnesValue();
     auto intTy = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), size);
@@ -534,12 +534,12 @@ EnumPayload::emitCompare(IRGenFunction &IGF, APInt mask, APInt value) const {
         || (!isa<llvm::IntegerType>(v->getType())
             && !isa<llvm::PointerType>(v->getType())))
       v = IGF.Builder.CreateBitOrPointerCast(v, intTy);
-    
+
     if (isMasked) {
       auto maskConstant = llvm::ConstantInt::get(intTy, maskPiece);
       v = IGF.Builder.CreateAnd(v, maskConstant);
     }
-    
+
     llvm::Value *valueConstant = llvm::ConstantInt::get(intTy, valuePiece);
     valueConstant = IGF.Builder.CreateBitOrPointerCast(valueConstant,
                                                        v->getType());
@@ -549,7 +549,7 @@ EnumPayload::emitCompare(IRGenFunction &IGF, APInt mask, APInt value) const {
     else
       condition = IGF.Builder.CreateAnd(condition, cmp);
   }
-  
+
   // We should have handled the cases where there are no significant conditions
   // in the early exit.
   assert(condition && "no significant condition?!");
@@ -570,7 +570,7 @@ EnumPayload::emitApplyAndMask(IRGenFunction &IGF, APInt mask) {
     // Break off a chunk of the mask.
     auto maskPiece = mask.zextOrTrunc(size);
     mask = mask.lshr(size);
-    
+
     // If this piece is all ones, it has no effect.
     if (maskPiece.isAllOnesValue())
       continue;
@@ -585,7 +585,7 @@ EnumPayload::emitApplyAndMask(IRGenFunction &IGF, APInt mask) {
       pv = payloadTy;
       continue;
     }
-    
+
     // Otherwise, apply the mask to the existing value.
     auto v = pv.get<llvm::Value*>();
     auto payloadIntTy = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), size);
@@ -615,17 +615,17 @@ EnumPayload::emitApplyOrMask(IRGenFunction &IGF, APInt mask) {
     // If this piece is zero, it has no effect.
     if (maskPiece == 0)
       continue;
-    
+
     auto payloadIntTy = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), size);
     auto maskConstant = llvm::ConstantInt::get(payloadIntTy, maskPiece);
-    
+
     // If the payload value is vacant, or the mask is all ones,
     // we can adopt the mask value directly.
     if (pv.is<llvm::Type *>() || maskPiece.isAllOnesValue()) {
       pv = IGF.Builder.CreateBitOrPointerCast(maskConstant, payloadTy);
       continue;
     }
-    
+
     // Otherwise, apply the mask to the existing value.
     auto v = pv.get<llvm::Value*>();
     v = IGF.Builder.CreateBitOrPointerCast(v, payloadIntTy);
@@ -684,7 +684,7 @@ EnumPayload::emitGatherSpareBits(IRGenFunction &IGF,
       payloadOffset += DL.getTypeSizeInBits(pv.get<llvm::Type*>());
       continue;
     }
-    
+
     unsigned size = DL.getTypeSizeInBits(v->getType());
     // Slice the spare bit vector.
     // FIXME: this is inefficient.
@@ -695,13 +695,13 @@ EnumPayload::emitGatherSpareBits(IRGenFunction &IGF,
         spareBitsPart.setBit(i);
         ++numBitsInPart;
       }
-    
+
     payloadOffset += size;
-    
+
     // If there were no spare bits in this part, it has nothing to add.
     if (numBitsInPart == 0)
       continue;
-    
+
     if (firstBitOffset >= bitWidth)
       break;
 
@@ -709,7 +709,7 @@ EnumPayload::emitGatherSpareBits(IRGenFunction &IGF,
     auto bits = irgen::emitGatherSpareBits(IGF, spareBitsPart,
                                            v, firstBitOffset, bitWidth);
     firstBitOffset += numBitsInPart;
-    
+
     // Accumulate it into the full set.
     if (!spareBitValue)
       spareBitValue = bits;

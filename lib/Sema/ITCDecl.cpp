@@ -311,7 +311,7 @@ void IterativeTypeChecker::processResolveTypeDecl(
       // FIXME: This is silly.
       if (!typeAliasDecl->hasType())
         typeAliasDecl->computeType();
-      
+
       TypeResolutionOptions options;
       options |= TR_GlobalTypeAlias;
       if (typeAliasDecl->getFormalAccess() == Accessibility::Private)
@@ -326,7 +326,7 @@ void IterativeTypeChecker::processResolveTypeDecl(
         typeAliasDecl->overwriteType(ErrorType::get(getASTContext()));
         typeAliasDecl->getUnderlyingTypeLoc().setInvalidType(getASTContext());
       }
-      
+
       return;
     }
 

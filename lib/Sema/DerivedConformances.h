@@ -27,7 +27,7 @@ namespace swift {
   class Type;
   class TypeChecker;
   class ValueDecl;
-  
+
 namespace DerivedConformance {
 
 /// Determine the derivable requirement that would satisfy the given
@@ -75,7 +75,7 @@ ValueDecl *deriveEquatable(TypeChecker &tc,
                            Decl *parentDecl,
                            NominalTypeDecl *type,
                            ValueDecl *requirement);
-  
+
 /// Derive a Hashable requirement for a type.
 ///
 /// Currently this is only implemented for enums without associated values.
@@ -87,7 +87,7 @@ ValueDecl *deriveHashable(TypeChecker &tc,
                           Decl *parentDecl,
                           NominalTypeDecl *type,
                           ValueDecl *requirement);
-  
+
 /// Derive an ErrorType requirement for an enum type.
 ///
 /// A unique string representation of the enum type will be used as the domain
@@ -137,7 +137,7 @@ declareDerivedReadOnlyProperty(TypeChecker &tc,
 DeclRefExpr *createSelfDeclRef(AbstractFunctionDecl *fn);
 
 }
-  
+
 }
 
 #endif

@@ -24,7 +24,7 @@
 
 namespace swift {
 namespace irgen {
-  
+
 /// A description of how to represent an enum payload as a value.
 /// A payload can either use a generic word-chunked representation, or attempt
 /// to follow the explosion schema of one of its payload types.
@@ -47,11 +47,11 @@ public:
   static EnumPayloadSchema withBitSize(unsigned bits) {
     return EnumPayloadSchema(bits);
   }
-  
+
   ExplosionSchema *getSchema() const {
     return Value.dyn_cast<ExplosionSchema*>();
   }
-  
+
   /// Invoke a functor for each element type in the schema.
   template<typename TypeFn /* void(llvm::Type *schemaType) */>
   void forEachType(IRGenModule &IGM, TypeFn &&fn) const {
@@ -67,11 +67,11 @@ public:
       }
       return;
     }
-    
+
     // Otherwise, chunk into pointer-sized integer values by default.
     unsigned bitSize = Value.get<llvm::Fixnum<31>>();
     unsigned pointerSize = IGM.getPointerSize().getValueInBits();
-    
+
     while (bitSize >= pointerSize) {
       fn(IGM.SizeTy);
       bitSize -= pointerSize;
@@ -97,10 +97,10 @@ class EnumPayload {
 public:
   /// A value, or the type of a zero value in the payload.
   using LazyValue = llvm::PointerUnion<llvm::Value *, llvm::Type *>;
-  
+
   mutable SmallVector<LazyValue, 2> PayloadValues;
   mutable llvm::Type *StorageType = nullptr;
-  
+
   EnumPayload() = default;
 
   /// Generate a "zero" enum payload.
@@ -111,40 +111,40 @@ public:
   static EnumPayload fromBitPattern(IRGenModule &IGM,
                                     APInt bitPattern,
                                     EnumPayloadSchema schema);
-  
+
   /// Insert a value into the enum payload.
   ///
   /// The current payload value at the given offset is assumed to be zero.
   void insertValue(IRGenFunction &IGF,
                    llvm::Value *value, unsigned bitOffset);
-  
+
   /// Extract a value from the enum payload.
   llvm::Value *extractValue(IRGenFunction &IGF,
                             llvm::Type *type, unsigned bitOffset) const;
-  
+
   /// Take an enum payload out of an explosion.
   static EnumPayload fromExplosion(IRGenModule &IGM,
                                    Explosion &in,
                                    EnumPayloadSchema schema);
-  
+
   /// Add the payload to an explosion.
   void explode(IRGenModule &IGM, Explosion &out) const;
-  
+
   /// Pack into another enum payload.
   void packIntoEnumPayload(IRGenFunction &IGF,
                            EnumPayload &dest,
                            unsigned bitOffset) const;
-  
+
   /// Unpack from another enum payload.
   static EnumPayload unpackFromEnumPayload(IRGenFunction &IGF,
                                            const EnumPayload &src,
                                            unsigned bitOffset,
                                            EnumPayloadSchema schema);
-  
+
   /// Load an enum payload from memory.
   static EnumPayload load(IRGenFunction &IGF, Address address,
                           EnumPayloadSchema schema);
-  
+
   /// Store an enum payload to memory.
   void store(IRGenFunction &IGF, Address address) const;
 
@@ -154,28 +154,28 @@ public:
                   APInt mask,
                   ArrayRef<std::pair<APInt, llvm::BasicBlock*>> cases,
                   SwitchDefaultDest dflt) const;
-  
+
   /// Emit an equality comparison operation that payload & mask == value.
   llvm::Value *emitCompare(IRGenFunction &IGF,
                            APInt mask,
                            APInt value) const;
-  
+
   /// Apply an AND mask to the payload.
   void emitApplyAndMask(IRGenFunction &IGF, APInt mask);
-  
+
   /// Apply an OR mask to the payload.
   void emitApplyOrMask(IRGenFunction &IGF, APInt mask);
-  
+
   /// Apply an OR mask to the payload.
   void emitApplyOrMask(IRGenFunction &IGF, EnumPayload mask);
-  
+
   /// Gather bits from an enum payload based on a spare bit mask.
   llvm::Value *emitGatherSpareBits(IRGenFunction &IGF,
                                    const SpareBitVector &spareBits,
                                    unsigned firstBitOffset,
                                    unsigned bitWidth) const;
 };
-  
+
 }
 }
 

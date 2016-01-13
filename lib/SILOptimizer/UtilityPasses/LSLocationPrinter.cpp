@@ -184,7 +184,7 @@ public:
     unsigned Counter = 0;
     for (auto &BB : Fn) {
       for (auto &II : BB) {
-   
+
         // Expand it first.
         //
         if (auto *LI = dyn_cast<LoadInst>(&II)) {

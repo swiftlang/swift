@@ -29,7 +29,7 @@ namespace {
 struct InferredAvailability {
   UnconditionalAvailabilityKind Unconditional
     = UnconditionalAvailabilityKind::None;
-  
+
   Optional<clang::VersionTuple> Introduced;
   Optional<clang::VersionTuple> Deprecated;
   Optional<clang::VersionTuple> Obsoleted;

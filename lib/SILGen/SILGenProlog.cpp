@@ -54,7 +54,7 @@ public:
 };
 } // end anonymous namespace
 
-  
+
 namespace {
 class StrongReleaseCleanup : public Cleanup {
   SILValue box;
@@ -208,7 +208,7 @@ public:
 };
 } // end anonymous namespace
 
-  
+
 namespace {
 
 /// A helper for creating SILArguments and binding variables to the argument
@@ -312,7 +312,7 @@ struct ArgumentInitHelper {
       makeArgumentIntoBinding(PD->getType(), &*f.begin(), PD);
       return;
     }
-    
+
     ManagedValue argrv = makeArgument(PD->getType(), &*f.begin(), PD);
     // Emit debug information for the argument.
     SILLocation loc(PD);
@@ -329,11 +329,11 @@ struct ArgumentInitHelper {
 };
 } // end anonymous namespace
 
-  
+
 static void makeArgument(Type ty, ParamDecl *decl,
                          SmallVectorImpl<SILValue> &args, SILGenFunction &gen) {
   assert(ty && "no type?!");
-  
+
   // Destructure tuple arguments.
   if (TupleType *tupleTy = ty->getAs<TupleType>()) {
     for (auto fieldType : tupleTy->getElementTypes())
@@ -382,7 +382,7 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
     gen.VarLocs[VD] = SILGenFunction::VarLoc::get(val);
     if (auto *AllocStack = dyn_cast<AllocStackInst>(val))
       AllocStack->setArgNo(ArgNo);
-    else 
+    else
       gen.B.createDebugValue(Loc, val, {/*Constant*/true, ArgNo});
 
     // TODO: Closure contexts should always be guaranteed.

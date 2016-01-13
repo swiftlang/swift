@@ -71,7 +71,7 @@ enum class ValueWitness : unsigned {
   // Several other candidates that are likely to see use in
   // existential code are then grouped together for cache-locality
   // reasons.
-  
+
   ///   void (*destroyBuffer)(B *buffer, M *self);
   ///
   /// Given a valid buffer which owns a valid object of this type,
@@ -85,7 +85,7 @@ enum class ValueWitness : unsigned {
   /// object in the source buffer.  This can be decomposed as:
   ///   initializeBufferWithCopy(dest, self->projectBuffer(src), self)
   InitializeBufferWithCopyOfBuffer,
-  
+
   ///   T *(*projectBuffer)(B *buffer, M *self);
   ///
   /// Given an initialized fixed-size buffer, find its allocated
@@ -129,7 +129,7 @@ enum class ValueWitness : unsigned {
   ///
   /// Given an invalid buffer, initialize it by taking the value
   /// of the source object.  The source object becomes invalid.
-  /// Returns the dest object.  
+  /// Returns the dest object.
   InitializeBufferWithTake,
 
   ///   T *(*initializeWithTake)(T *dest, T *src, M *self);
@@ -147,32 +147,32 @@ enum class ValueWitness : unsigned {
   AssignWithTake,
 
   ///   T *(*allocateBuffer)(B *buffer, M *self);
-  /// 
+  ///
   /// Given a buffer in an invalid state, make it the owner of storage
   /// for an uninitialized object of this type.  Return the address of
   /// that object.
   AllocateBuffer,
-  
+
   ///   T *(*initializeBufferWithTakeOfBuffer)(B *dest, B *src, M *self);
   /// Given an invalid buffer, initialize it by taking the value out of
   /// the source buffer.  This can be (inefficiently) decomposed as:
   ///   initializeBufferWithTake(dest, self->projectBuffer(src), self)
   ///   deallocateBuffer(src, self)
   InitializeBufferWithTakeOfBuffer,
-  
+
   ///   void (*destroyArray)(T *object, size_t n, witness_t *self);
   ///
   /// Given a valid array of n objects of this type, destroy the object, leaving
   /// the array invalid. This is useful when generically destroying an array of
   /// objects to avoid calling the scalar 'destroy' witness in a loop.
   DestroyArray,
-  
+
   ///   T *(*initializeArrayWithCopy)(T *dest, T *src, size_t n, M *self);
   ///
   /// Given an invalid array of n objects of this type, initialize the objects
   /// as a copy of the source array.  Returns the dest array.
   InitializeArrayWithCopy,
-  
+
   ///   T *(*initializeArrayWithTakeFrontToBack)(T *dest, T *src, size_t n, M *self);
   ///
   /// Given an invalid array of n objects of this type, initialize the objects
@@ -230,14 +230,14 @@ enum class ValueWitness : unsigned {
   ///
   /// The required size per element of an array of this type.
   Stride,
-  
+
   Last_RequiredValueWitness = Stride,
   Last_RequiredTypeLayoutWitness = Last_RequiredValueWitness,
 
   /// The following value witnesses are conditionally present based on
   /// the Enum_HasExtraInhabitants bit of the flags.
   First_ExtraInhabitantValueWitness,
-  
+
   ///   size_t extraInhabitantFlags;
   ///
   /// These bits are always present if the extra inhabitants witnesses are:
@@ -265,7 +265,7 @@ enum class ValueWitness : unsigned {
   /// an extra inhabitant is by definition an invalid representation of the
   /// type. index must be less than numExtraInhabitants.
   StoreExtraInhabitant = First_ExtraInhabitantValueWitnessFunction,
-  
+
   ///   int (*getExtraInhabitantIndex)(T *obj, M *self);
   ///
   /// Given an invalid object of this type with an extra inhabitant
@@ -274,7 +274,7 @@ enum class ValueWitness : unsigned {
   /// the return value is the same index that can be passed to
   /// storeExtraInhabitant to reproduce the representation.
   GetExtraInhabitantIndex,
-  
+
   Last_ExtraInhabitantValueWitnessFunction = GetExtraInhabitantIndex,
   Last_ExtraInhabitantValueWitness = Last_ExtraInhabitantValueWitnessFunction,
 
@@ -308,10 +308,10 @@ namespace ValueWitnessFlags {
     AlignmentMask       = 0x0FFFF,
     IsNonPOD            = 0x10000,
     IsNonInline         = 0x20000,
-    
+
     /// Flags pertaining to enum representation.
     Enum_FlagMask = 0xC0000,
-    
+
     /// If Flags & Enum_FlagMask == Enum_IsOpaque, then the type does not
     /// support any optimized representation in enums.
     Enum_IsOpaque = 0x00000,
@@ -333,25 +333,25 @@ namespace ValueWitnessFlags {
     HasEnumWitnesses = 0x00200000,
   };
 }
-  
+
 namespace ExtraInhabitantFlags {
   enum : uint64_t {
     NumExtraInhabitantsMask = 0x7FFFFFFFULL,
-    
+
     NumSpareBitsMask   = 0x0000FFFF00000000ULL,
     NumSpareBitsShift  = 32,
-    
+
     SpareBitsShiftMask = 0xFFFF000000000000ULL,
     SpareBitsShiftShift = 48,
   };
 }
- 
+
 enum {
   NumRequiredValueWitnesses
     = unsigned(ValueWitness::Last_RequiredValueWitness) + 1,
   NumRequiredValueWitnessFunctions
     = unsigned(ValueWitness::Last_RequiredValueWitnessFunction) + 1,
-  
+
   MaxNumValueWitnesses
     = unsigned(ValueWitness::Last_ValueWitness) + 1,
   MaxNumTypeLayoutWitnesses

@@ -152,7 +152,7 @@ static void printModule(SILModule *Mod, bool EmitVerboseSIL) {
 
 SILPassManager::SILPassManager(SILModule *M, llvm::StringRef Stage) :
   Mod(M), StageName(Stage) {
-  
+
 #define ANALYSIS(NAME) \
   Analysis.push_back(create##NAME##Analysis(Mod));
 #include "swift/SILOptimizer/Analysis/Analysis.def"

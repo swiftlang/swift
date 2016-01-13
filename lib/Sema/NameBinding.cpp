@@ -38,8 +38,8 @@ using namespace swift;
 using ImportedModule = Module::ImportedModule;
 using ImportOptions = SourceFile::ImportOptions;
 
-namespace {  
-  class NameBinder {    
+namespace {
+  class NameBinder {
   public:
     SourceFile &SF;
     ASTContext &Context;
@@ -50,7 +50,7 @@ namespace {
     InFlightDiagnostic diagnose(ArgTypes &&...Args) {
       return Context.Diags.diagnose(std::forward<ArgTypes>(Args)...);
     }
-    
+
     void addImport(
         SmallVectorImpl<std::pair<ImportedModule, ImportOptions>> &imports,
         ImportDecl *ID);
@@ -66,7 +66,7 @@ Module *
 NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
   assert(!modulePath.empty());
   auto moduleID = modulePath[0];
-  
+
   // The Builtin module cannot be explicitly imported unless we're a .sil file
   // or in the REPL.
   if ((SF.Kind == SourceFileKind::SIL || SF.Kind == SourceFileKind::REPL) &&
@@ -85,7 +85,7 @@ NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
       return importer->loadModule(moduleID.second, modulePath);
     return nullptr;
   }
-  
+
   return Context.getModule(modulePath);
 }
 

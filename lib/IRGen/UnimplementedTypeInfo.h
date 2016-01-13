@@ -27,13 +27,13 @@ namespace irgen {
 class UnimplementedTypeInfo : public TypeInfo {
 public:
   UnimplementedTypeInfo(IRGenModule &IGM, llvm::Type *storageTy);
-  
+
   std::pair<llvm::Value*,llvm::Value*>
   getSizeAndAlignmentMask(IRGenFunction &IGF, SILType T) const override;
-  
+
   std::tuple<llvm::Value*,llvm::Value*,llvm::Value*>
   getSizeAndAlignmentMaskAndStride(IRGenFunction &IGF, SILType T) const override;
-  
+
   llvm::Value *getSize(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *getAlignmentMask(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *getStride(IRGenFunction &IGF, SILType T) const override;
@@ -70,15 +70,15 @@ public:
                           llvm::Value *metadata,
                           llvm::Value *vwtable,
                           SILType T) const override;
-  
+
   llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
                                          SILType T) const override;
-  
+
   static bool classof(const TypeInfo *type) {
     return type->getSpecialTypeInfoKind() <= STIK_Unimplemented;
   }
 };
-  
+
 }
 }
 

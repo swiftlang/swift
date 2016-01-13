@@ -1673,7 +1673,7 @@ namespace {
       assert(piEntry.getOutOfLineBaseIndex().getValue() == Table.size()
              && "offset doesn't match ProtocolInfo layout");
 #endif
-      
+
       SILEntries = SILEntries.slice(1);
 
       // TODO: Use the witness entry instead of falling through here.
@@ -1789,7 +1789,7 @@ namespace {
 
         SILEntries = SILEntries.slice(1);
 
-        llvm::Constant *wtableAccessFunction = 
+        llvm::Constant *wtableAccessFunction =
           getAssociatedTypeWitnessTableAccessFunction(requirement, associate,
                                             protocol, associatedConformance);
         Table.push_back(wtableAccessFunction);
@@ -2194,7 +2194,7 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
   llvm::Value *instantiationArgs =
     llvm::ConstantPointerNull::get(IGM.Int8PtrPtrTy);
   if (SpecializedBaseConformances.empty()) {
-    instantiationFn = llvm::ConstantInt::get(IGM.RelativeAddressTy, 0);    
+    instantiationFn = llvm::ConstantInt::get(IGM.RelativeAddressTy, 0);
   } else {
     llvm::Constant *fn = buildInstantiationFunction();
     instantiationFn = IGM.emitDirectRelativeReference(fn, cache, { 3 });
@@ -2553,7 +2553,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   SmallVector<llvm::Constant*, 32> witnesses;
   WitnessTableBuilder wtableBuilder(*this, witnesses, wt);
   wtableBuilder.build();
-  
+
   assert(getProtocolInfo(wt->getConformance()->getProtocol())
            .getNumWitnesses() == witnesses.size()
          && "witness table size doesn't match ProtocolInfo");
@@ -2993,14 +2993,14 @@ namespace {
         assert(witnessMetadata && "no metadata for witness method");
         llvm::Value *metatype = witnessMetadata->SelfMetadata;
         assert(metatype && "no Self metadata for witness method");
-        
+
         // Mark this as the cached metatype for Self.
         CanType argTy = getArgTypeInContext(FnType->getParameters().size() - 1);
         IGF.setUnscopedLocalTypeData(argTy,
                                     LocalTypeDataKind::forTypeMetadata(), metatype);
         return metatype;
       }
-          
+
       case SourceKind::WitnessExtraData: {
         // The 'Self' parameter is provided last.
         // TODO: For default implementations, the witness table pointer for
@@ -3307,7 +3307,7 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
   case Component::Kind::Impossible:
     llvm_unreachable("following an impossible path!");
 
-  } 
+  }
   llvm_unreachable("bad metadata path component");
 }
 
@@ -3900,10 +3900,10 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   // Find the witness we're interested in.
   auto index = fnProtoInfo.getWitnessEntry(fn).getFunctionIndex();
   llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
-  
+
   // Cast the witness pointer to i8*.
   witness = IGF.Builder.CreateBitCast(witness, IGF.IGM.Int8PtrTy);
-  
+
   // Build the value.
   out.add(witness);
 }

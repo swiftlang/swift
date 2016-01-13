@@ -337,11 +337,11 @@ static bool isAvailabilityCheck(SILBasicBlock *BB) {
   CondBranchInst *CBR = dyn_cast<CondBranchInst>(BB->getTerminator());
   if (!CBR)
     return false;
-  
+
   ApplyInst *AI = dyn_cast<ApplyInst>(CBR->getCondition());
   if (!AI)
     return false;
-  
+
   SILFunction *F = AI->getCalleeFunction();
   if (!F || !F->hasSemanticsAttrs())
     return false;
@@ -399,13 +399,13 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
              "ill-formed global init call");
       SILBasicBlock *DomBB =
         DT->findNearestCommonDominator(AI->getParent(), CommonAI->getParent());
-      
+
       // We must not move initializers around availability-checks.
       if (!isAvailabilityCheckOnDomPath(DomBB, CommonAI->getParent(), DT)) {
         if (DomBB != CommonAI->getParent()) {
           CommonAI->moveBefore(&*DomBB->begin());
           placeFuncRef(CommonAI, DT);
-          
+
           // Try to hoist the existing AI again if we move it to another block,
           // e.g. from a loop exit into the loop.
           HoistAI = CommonAI;
@@ -416,7 +416,7 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
       }
     } else {
       ParentFuncs[ParentF] = AI;
-      
+
       // It's the first time we found a call to InitF in this function, so we
       // try to hoist it out of any loop.
       HoistAI = AI;

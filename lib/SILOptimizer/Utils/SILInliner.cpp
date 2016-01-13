@@ -272,7 +272,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::ThickToObjCMetatypeInst:
     case ValueKind::ObjCToThickMetatypeInst:
       return InlineCost::Expensive;
-      
+
     // TODO: Bridge object conversions imply a masking operation that should be
     // "hella cheap" but not really expensive
     case ValueKind::BridgeObjectToRefInst:

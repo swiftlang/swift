@@ -114,7 +114,7 @@ protected:
     assert(F && "function does not exist");
     Worklist.insert(F);
   }
-  
+
   /// Marks a function as alive if it is not alive yet.
   void ensureAlive(SILFunction *F) {
     if (!isAlive(F))
@@ -145,14 +145,14 @@ protected:
     // All implementations of derived classes may be called.
     if (isDerivedOrEqual(ImplCl, MethodCl))
       return true;
-    
+
     // Check if the method implementation is the same in a super class, i.e.
     // it is not overridden in the derived class.
     auto *Impl1 = MethodCl->findImplementingMethod(FD);
     assert(Impl1);
     auto *Impl2 = ImplCl->findImplementingMethod(FD);
     assert(Impl2);
-    
+
     return Impl1 == Impl2;
   }
 
@@ -530,7 +530,7 @@ class SILDeadFuncElimination : public SILModuleTransform {
     DeadFunctionElimination deadFunctionElimination(getModule());
     deadFunctionElimination.eliminateFunctions(this);
   }
-  
+
   StringRef getName() override { return "Dead Function Elimination"; }
 };
 

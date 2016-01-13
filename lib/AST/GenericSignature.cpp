@@ -40,7 +40,7 @@ GenericSignature::GenericSignature(ArrayRef<GenericTypeParamType *> params,
     CanonicalSignatureOrASTContext = &getASTContext(params, requirements);
 }
 
-ArrayRef<GenericTypeParamType *> 
+ArrayRef<GenericTypeParamType *>
 GenericSignature::getInnermostGenericParams() const {
   auto params = getGenericParams();
 
@@ -128,7 +128,7 @@ GenericSignature::getCanonicalSignature() const {
   if (CanonicalSignatureOrASTContext.is<ASTContext*>())
     // TODO: CanGenericSignature should be const-correct.
     return CanGenericSignature(const_cast<GenericSignature*>(this));
-  
+
   // Otherwise, return the stored canonical signature.
   return CanGenericSignature(
            CanonicalSignatureOrASTContext.get<GenericSignature*>());
@@ -137,7 +137,7 @@ GenericSignature::getCanonicalSignature() const {
 /// Canonical ordering for dependent types in generic signatures.
 static int compareDependentTypes(const CanType *pa, const CanType *pb) {
   auto a = *pa, b = *pb;
-  
+
   // Fast-path check for equality.
   if (a == b)
     return 0;
@@ -154,7 +154,7 @@ static int compareDependentTypes(const CanType *pa, const CanType *pb) {
     }
     return -1;
   }
-  
+
   // - Dependent members
   if (auto dma = dyn_cast<DependentMemberType>(a)) {
     if (isa<GenericTypeParamType>(b))
@@ -165,21 +165,21 @@ static int compareDependentTypes(const CanType *pa, const CanType *pb) {
       auto bbase = dmb.getBase();
       if (int compareBases = compareDependentTypes(&abase, &bbase))
         return compareBases;
-      
+
       // - by protocol, so t_n_m.`P.T` < t_n_m.`Q.T` (given P < Q)
       auto protoa = dma->getAssocType()->getProtocol();
       auto protob = dmb->getAssocType()->getProtocol();
       if (int compareProtocols
             = ProtocolType::compareProtocols(&protoa, &protob))
         return compareProtocols;
-      
+
       // - by name, so t_n_m.`P.T` < t_n_m.`P.U`
       return dma->getAssocType()->getName().str().compare(
                                           dmb->getAssocType()->getName().str());
     }
     return -1;
   }
-  
+
   // - Other types.
   //
   // There should only ever be one of these in a set of constraints related to
@@ -194,60 +194,60 @@ GenericSignature::getCanonicalManglingSignature(ModuleDecl &M) const {
   // Start from the elementwise-canonical signature.
   auto canonical = getCanonicalSignature();
   auto &Context = canonical->getASTContext();
-  
+
   // See if we cached the mangling signature.
   auto cached = Context.ManglingSignatures.find({canonical, &M});
   if (cached != Context.ManglingSignatures.end()) {
     return cached->second;
   }
-  
+
   // Otherwise, we need to compute it.
   // Dump the generic signature into an ArchetypeBuilder that will figure out
   // the minimal set of requirements.
-  std::unique_ptr<ArchetypeBuilder> builder(new ArchetypeBuilder(M, 
+  std::unique_ptr<ArchetypeBuilder> builder(new ArchetypeBuilder(M,
                                                                  Context.Diags));
-  
+
   builder->addGenericSignature(canonical, /*adoptArchetypes*/ false,
                                /*treatRequirementsAsExplicit*/ true);
-  
+
   // Sort out the requirements.
   struct DependentConstraints {
     CanType baseClass;
     SmallVector<CanType, 2> protocols;
   };
-  
+
   SmallVector<CanType, 2> depTypes;
   llvm::DenseMap<CanType, DependentConstraints> constraints;
   llvm::DenseMap<CanType, SmallVector<CanType, 2>> sameTypes;
-  
+
   builder->enumerateRequirements([&](RequirementKind kind,
           ArchetypeBuilder::PotentialArchetype *archetype,
           llvm::PointerUnion<Type, ArchetypeBuilder::PotentialArchetype *> type,
           RequirementSource source) {
     CanType depTy
       = archetype->getDependentType(*builder, false)->getCanonicalType();
-    
+
     // Filter out redundant requirements.
     switch (source.getKind()) {
     case RequirementSource::Explicit:
       // The requirement was explicit and required, keep it.
       break;
-      
+
     case RequirementSource::Protocol:
       // Keep witness markers.
       if (kind == RequirementKind::WitnessMarker)
         break;
       return;
-    
+
     case RequirementSource::Redundant:
     case RequirementSource::Inferred:
       // The requirement was inferred or redundant, drop it.
       return;
-      
+
     case RequirementSource::OuterScope:
       llvm_unreachable("shouldn't have an outer scope!");
     }
-    
+
     switch (kind) {
     case RequirementKind::WitnessMarker: {
       // Introduce the dependent type into the constraint set, to ensure we
@@ -270,7 +270,7 @@ GenericSignature::getCanonicalManglingSignature(ModuleDecl &M) const {
       depConstraints.baseClass = constraintType;
       return;
     }
-      
+
     case RequirementKind::Conformance: {
       assert(std::find(depTypes.begin(), depTypes.end(),
                        depTy) != depTypes.end()
@@ -278,13 +278,13 @@ GenericSignature::getCanonicalManglingSignature(ModuleDecl &M) const {
       // Organize conformance constraints, sifting out the base class
       // requirement.
       auto &depConstraints = constraints[depTy];
-      
+
       auto constraintType = type.get<Type>()->getCanonicalType();
       assert(constraintType->isExistentialType());
       depConstraints.protocols.push_back(constraintType);
       return;
     }
-    
+
     case RequirementKind::SameType:
       // Collect the same-type constraints by their representative.
       CanType repTy;
@@ -296,47 +296,47 @@ GenericSignature::getCanonicalManglingSignature(ModuleDecl &M) const {
         // to a concrete type.
         auto representative
           = type.get<ArchetypeBuilder::PotentialArchetype *>();
-        
+
         if (representative->isConcreteType())
           repTy = representative->getConcreteType()->getCanonicalType();
         else
           repTy = representative->getDependentType(*builder, false)
             ->getCanonicalType();
       }
-      
+
       sameTypes[repTy].push_back(depTy);
       return;
     }
   });
-  
+
   // Order the dependent types canonically.
   llvm::array_pod_sort(depTypes.begin(), depTypes.end(), compareDependentTypes);
-  
+
   // Build a new set of minimized requirements.
   // Emit the conformance constraints.
   SmallVector<Requirement, 4> minimalRequirements;
   for (auto depTy : depTypes) {
     minimalRequirements.push_back(Requirement(RequirementKind::WitnessMarker,
                                               depTy, Type()));
-    
+
     auto foundConstraints = constraints.find(depTy);
     if (foundConstraints != constraints.end()) {
       const auto &depConstraints = foundConstraints->second;
-      
+
       if (depConstraints.baseClass)
         minimalRequirements.push_back(Requirement(RequirementKind::Superclass,
                                                   depTy,
                                                   depConstraints.baseClass));
-      
+
       for (auto protocol : depConstraints.protocols)
         minimalRequirements.push_back(Requirement(RequirementKind::Conformance,
                                                   depTy, protocol));
     }
   }
-  
+
   // Collect the same type constraints.
   unsigned sameTypeBegin = minimalRequirements.size();
-  
+
   for (auto &group : sameTypes) {
     // Sort the types in the set.
     auto types = std::move(group.second);
@@ -350,7 +350,7 @@ GenericSignature::getCanonicalManglingSignature(ModuleDecl &M) const {
       minimalRequirements.push_back(Requirement(RequirementKind::SameType,
                                                 lhsType, rhsType));
   }
-  
+
   // Sort the same-types by LHS, then by RHS.
   std::sort(minimalRequirements.begin() + sameTypeBegin, minimalRequirements.end(),
     [](const Requirement &a, const Requirement &b) -> bool {
@@ -363,14 +363,14 @@ GenericSignature::getCanonicalManglingSignature(ModuleDecl &M) const {
       CanType aRHS(a.getSecondType()), bRHS(b.getSecondType());
       return compareDependentTypes(&aRHS, &bRHS);
     });
-  
+
   // Build the minimized signature.
   auto manglingSig = GenericSignature::get(canonical->getGenericParams(),
                                            minimalRequirements,
                                            /*isKnownCanonical=*/true);
-  
+
   CanGenericSignature canSig(manglingSig);
-  
+
   // Cache the result.
   Context.ManglingSignatures.insert({{canonical, &M}, canSig});
   Context.setArchetypeBuilder(canSig, &M, std::move(builder));
@@ -390,18 +390,18 @@ ASTContext &GenericSignature::getASTContext() const {
 TypeSubstitutionMap
 GenericSignature::getSubstitutionMap(ArrayRef<Substitution> args) const {
   TypeSubstitutionMap subs;
-  
+
   // An empty parameter list gives an empty map.
   if (getGenericParams().empty()) {
     assert(args.empty() && "substitutions but no generic params?!");
     return subs;
   }
-  
+
   // Seed the type map with pre-existing substitutions.
   for (auto depTy : getAllDependentTypes()) {
     auto replacement = args.front().getReplacement();
     args = args.slice(1);
-    
+
     if (auto subTy = depTy->getAs<SubstitutableType>()) {
       subs[subTy] = replacement;
     }
@@ -409,7 +409,7 @@ GenericSignature::getSubstitutionMap(ArrayRef<Substitution> args) const {
       subs[dTy] = replacement;
     }
   }
-  
+
   assert(args.empty() && "did not use all substitutions?!");
   return subs;
 }

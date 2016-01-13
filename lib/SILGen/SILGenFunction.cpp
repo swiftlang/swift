@@ -135,7 +135,7 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
                  "delayed application of builtin");
     return SILUndef::get(constantInfo.getSILType(), SGM.M);
   }
-  
+
   // If the constant is a thunk we haven't emitted yet, emit it.
   if (!SGM.hasFunction(constant)) {
     if (constant.isCurried) {
@@ -150,7 +150,7 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
         if (requiresForeignToNativeThunk(vd))
           next = next.asForeign();
       }
-      
+
       // Preserve whether the curry thunks lead to a direct reference to the
       // method implementation.
       next = next.asDirectReference(constant.isDirectReference);
@@ -226,7 +226,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
   // For boxed captures, we need to mark the contained variables as having
   // escaped for DI diagnostics.
   SmallVector<SILValue, 2> escapesToMark;
-  
+
   // Partial applications take ownership of the context parameters, so we'll
   // need to pass ownership rather than merely guaranteeing parameters.
   bool canGuarantee;
@@ -241,7 +241,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
   // TODO: Or we always retain them when guaranteed contexts aren't enabled.
   if (!SGM.M.getOptions().EnableGuaranteedClosureContexts)
     canGuarantee = false;
-  
+
   for (auto capture : captureInfo.getCaptures()) {
     auto *vd = capture.getDecl();
 
@@ -264,7 +264,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
           capturedArgs.push_back(guaranteed);
           break;
         }
-      
+
         // Just retain a by-val let.
         B.emitRetainValueOperation(loc, Val);
       } else {
@@ -280,7 +280,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         auto type = getTypeLowering(vd->getType()).getLoweredType();
         Val = emitConversionFromSemanticValue(loc, Val, type);
       }
-      
+
       capturedArgs.push_back(emitManagedRValueWithCleanup(Val));
       break;
     }
@@ -334,7 +334,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     }
     }
   }
-  
+
   // Mark box addresses as captured for DI purposes. The values must have
   // been fully initialized before we close over them.
   if (!escapesToMark.empty()) {

@@ -53,8 +53,8 @@ namespace irgen {
   llvm::Value *emitDynamicTypeOfOpaqueArchetype(IRGenFunction &IGF,
                                                 Address archetypeAddr,
                                                 SILType archetypeType);
-  
-  
+
+
 } // end namespace irgen
 } // end namespace swift
 

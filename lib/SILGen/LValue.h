@@ -154,7 +154,7 @@ public:
   /// base value.
   virtual AccessKind getBaseAccessKind(SILGenFunction &SGF,
                                        AccessKind accessKind) const = 0;
-  
+
   /// Returns the logical type-as-rvalue of the value addressed by the
   /// component.  This is always an object type, never an address.
   SILType getTypeOfRValue() const { return TypeData.TypeOfRValue; }
@@ -223,7 +223,7 @@ public:
   /// Clone the path component onto the heap.
   virtual std::unique_ptr<LogicalPathComponent>
   clone(SILGenFunction &gen, SILLocation l) const = 0;
-  
+
   /// Set the property.
   ///
   /// \param base - always an address, but possibly an r-value
@@ -308,7 +308,7 @@ public:
   virtual ManagedValue untranslate(SILGenFunction &gen, SILLocation loc,
                                    ManagedValue value,
                                    SGFContext ctx = SGFContext()) && = 0;
-  
+
 };
 
 inline TranslationPathComponent &PathComponent::asTranslation() {
@@ -355,7 +355,7 @@ public:
         return false;
     return true;
   }
-  
+
   /// Is the lvalue's final component physical?
   bool isLastComponentPhysical() const {
     assert(isValid());
@@ -381,7 +381,7 @@ public:
     assert(isLastComponentTranslation());
     Path.pop_back();
   }
-  
+
   /// Add a new component at the end of the access path of this lvalue.
   template <class T, class... As>
   void add(As &&... args) {
@@ -457,7 +457,7 @@ public:
   void dump() const;
   void print(raw_ostream &OS) const;
 };
-  
+
 /// RAII object to enable writebacks for logical lvalues evaluated within the
 /// scope, which will be applied when the object goes out of scope.
 ///
@@ -496,14 +496,14 @@ public:
     popImpl();
     gen = nullptr;
   }
-  
+
   WritebackScope(const WritebackScope &) = delete;
   WritebackScope &operator=(const WritebackScope &) = delete;
-  
+
   WritebackScope(WritebackScope &&o);
   WritebackScope &operator=(WritebackScope &&o);
 };
-  
+
 /// RAII object used to enter an inout conversion scope. Writeback scopes formed
 /// during the inout conversion scope will be no-ops.
 class InOutConversionScope {

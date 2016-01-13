@@ -84,7 +84,7 @@ static void mangleIdentifier(StringRef ident, OperatorKind operatorKind,
                              bool usePunycode, DemanglerPrinter &out) {
   std::string punycodeBuf;
   if (usePunycode) {
-    // If the identifier contains non-ASCII character, we mangle 
+    // If the identifier contains non-ASCII character, we mangle
     // with an initial X and Punycode the identifier string.
     if (isNonAscii(ident)) {
       out << 'X';
@@ -154,7 +154,7 @@ namespace {
 static size_t deepHash(Node *node) {
   DeepHasher hasher;
   hasher.hash(node);
-  return hasher.value;  
+  return hasher.value;
 }
 
 static bool deepEquals(Node *lhs, Node *rhs) {
@@ -980,7 +980,7 @@ void Remangler::mangleType(Node *node) {
   mangleSingleChildNode(node);
 }
 
-template <size_t N> 
+template <size_t N>
 static bool stripPrefix(StringRef &string, const char (&data)[N]) {
   constexpr size_t prefixLength = N - 1;
   if (!string.startswith(StringRef(data, prefixLength)))
@@ -1295,7 +1295,7 @@ void Remangler::mangleEntityGenericType(Node *node, EntityContext &ctx) {
 
 void Remangler::mangleDependentGenericSignature(Node *node) {
   auto i = node->begin(), e = node->end();
-  
+
   // If there's only one generic param, mangle nothing.
   if (node->getNumChildren() >= 1
       && node->getChild(0)->getKind() == Node::Kind::DependentGenericParamCount
@@ -1306,7 +1306,7 @@ void Remangler::mangleDependentGenericSignature(Node *node) {
     ++i;
     goto mangle_requirements;
   }
-  
+
   // Remangle generic params.
   for (; i != e &&
          i->get()->getKind() == Node::Kind::DependentGenericParamCount; ++i) {
@@ -1316,13 +1316,13 @@ void Remangler::mangleDependentGenericSignature(Node *node) {
     else
       Out << 'z';
   }
-  
+
 mangle_requirements:
   if (i == e) { // no generic requirements
     Out << 'r';
     return;
   }
-  
+
   Out << 'R';
   mangleNodes(i, e); // generic requirements
   Out << 'r';

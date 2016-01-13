@@ -50,7 +50,7 @@ public:
 
     // If changing this layout, you must update the magic number in
     // emitParentMetadataRef.
-    
+
     // Struct field offsets.
     asImpl().noteStartOfFieldOffsets();
     for (VarDecl *prop : Target->getStoredProperties())
@@ -61,7 +61,7 @@ public:
       asImpl().addGenericFields(*generics);
     }
   }
-  
+
   // Note the start of the field offset vector.
   void noteStartOfFieldOffsets() {}
 };

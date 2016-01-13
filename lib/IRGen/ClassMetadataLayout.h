@@ -167,7 +167,7 @@ private:
     }
     asImpl().noteEndOfFieldOffsets(theClass);
   }
-  
+
   /// Notes the beginning of the field offset vector for a particular ancestor
   /// of a generic-layout class.
   void noteStartOfFieldOffsets(ClassDecl *whichClass) {}
@@ -194,21 +194,21 @@ private:
     // If the method does not have a vtable entry, don't add any.
     if (!hasKnownVTableEntry(IGM, fn))
       return;
-    
+
     // TODO: consider emitting at different explosion levels and
     // uncurryings.
     auto explosionLevel = ResilienceExpansion::Minimal;
     unsigned uncurryLevel = SILDeclRef::ConstructAtNaturalUncurryLevel;
-    
+
     if (isa<FuncDecl>(fn))
       maybeAddMethod(fn, SILDeclRef::Kind::Func, explosionLevel, uncurryLevel);
     else {
       auto ctor = cast<ConstructorDecl>(fn);
       if (ctor->isRequired())
-        maybeAddMethod(fn, SILDeclRef::Kind::Allocator, explosionLevel, 
+        maybeAddMethod(fn, SILDeclRef::Kind::Allocator, explosionLevel,
                        uncurryLevel);
-      maybeAddMethod(fn, SILDeclRef::Kind::Initializer, explosionLevel, 
-                     uncurryLevel);      
+      maybeAddMethod(fn, SILDeclRef::Kind::Initializer, explosionLevel,
+                     uncurryLevel);
     }
   }
 

@@ -762,7 +762,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     // Check any generic parameters for something with the given name.
     namelookup::FindLocalVal(SM, Loc, Consumer)
           .checkGenericParams(GenericParams);
-    
+
     DC = DC->getParent();
     Reason = DeclVisibilityKind::MemberOfOutsideNominal;
   }

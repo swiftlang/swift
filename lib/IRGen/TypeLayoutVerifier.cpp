@@ -49,7 +49,7 @@ irgen::emitTypeLayoutVerifier(IRGenFunction &IGF,
   };
   llvm::DenseMap<llvm::Type *, VerifierArgumentBuffers>
     verifierArgBufs;
-  
+
   auto getSizeConstant = [&](Size sz) -> llvm::Constant * {
     return llvm::ConstantInt::get(IGF.IGM.SizeTy, sz.getValue());
   };
@@ -69,16 +69,16 @@ irgen::emitTypeLayoutVerifier(IRGenFunction &IGF,
     auto openedAnyTy = ArchetypeType::getOpened(anyTy);
     auto maxAbstraction = AbstractionPattern(openedAnyTy);
     auto &ti = IGF.getTypeInfoForUnlowered(maxAbstraction, formalType);
-    
+
     // If there's no fixed type info, we rely on the runtime anyway, so there's
     // nothing to verify.
     // TODO: There are some traits of partially-fixed layouts we could check too.
     auto *fixedTI = dyn_cast<FixedTypeInfo>(&ti);
     if (!fixedTI)
       return;
-    
+
     auto metadata = IGF.emitTypeMetadataRef(formalType);
-    
+
     auto verify = [&](llvm::Value *runtimeVal,
                       llvm::Value *staticVal,
                       const llvm::Twine &description) {
@@ -98,10 +98,10 @@ irgen::emitTypeLayoutVerifier(IRGenFunction &IGF,
         bufs = {runtimeBuf, staticBuf};
         verifierArgBufs[runtimeVal->getType()] = bufs;
       }
-      
+
       IGF.Builder.CreateStore(runtimeVal, bufs.runtimeBuf);
       IGF.Builder.CreateStore(staticVal, bufs.staticBuf);
-      
+
       auto runtimePtr = IGF.Builder.CreateBitCast(bufs.runtimeBuf.getAddress(),
                                                   IGF.IGM.Int8PtrTy);
       auto staticPtr = IGF.Builder.CreateBitCast(bufs.staticBuf.getAddress(),
@@ -110,7 +110,7 @@ irgen::emitTypeLayoutVerifier(IRGenFunction &IGF,
                     IGF.IGM.DataLayout.getTypeStoreSize(runtimeVal->getType()));
       auto msg
         = IGF.IGM.getAddrOfGlobalString(description.str());
-      
+
       IGF.Builder.CreateCall(
           verifierFn, {metadata, runtimePtr, staticPtr, count, msg});
     };
@@ -146,16 +146,16 @@ irgen::emitTypeLayoutVerifier(IRGenFunction &IGF,
       verify(emitLoadOfExtraInhabitantCount(IGF, layoutType),
              getSizeConstant(Size(xiCount)),
              "extra inhabitant count");
-      
+
       // Verify that the extra inhabitant representations are consistent.
-      
+
       /* TODO: Update for EnumPayload implementation changes.
-      
+
       auto xiBuf = IGF.createAlloca(fixedTI->getStorageType(),
                                     fixedTI->getFixedAlignment(),
                                     "extra-inhabitant");
       auto xiOpaque = IGF.Builder.CreateBitCast(xiBuf, IGF.IGM.OpaquePtrTy);
-      
+
       // TODO: Randomize the set of extra inhabitants we check.
       unsigned bits = fixedTI->getFixedSize().getValueInBits();
       for (unsigned i = 0, e = std::min(xiCount, 1024u);
@@ -167,12 +167,12 @@ irgen::emitTypeLayoutVerifier(IRGenFunction &IGF,
                                  llvm::ConstantInt::get(IGF.IGM.Int8Ty, 0x5A),
                                  fixedTI->getFixedSize().getValue(),
                                  fixedTI->getFixedAlignment().getValue());
-        
+
         // Ask the runtime to store an extra inhabitant.
         auto index = llvm::ConstantInt::get(IGF.IGM.Int32Ty, i);
         emitStoreExtraInhabitantCall(IGF, layoutType, index,
                                      xiOpaque.getAddress());
-        
+
         // Compare the stored extra inhabitant against the fixed extra
         // inhabitant pattern.
         auto fixedXI = fixedTI->getFixedExtraInhabitantValue(IGF.IGM, bits, i);
@@ -180,17 +180,17 @@ irgen::emitTypeLayoutVerifier(IRGenFunction &IGF,
                                             fixedXI->getType()->getPointerTo());
         llvm::Value *runtimeXI = IGF.Builder.CreateLoad(xiBuf2);
         runtimeXI = fixedTI->maskFixedExtraInhabitant(IGF, runtimeXI);
-        
+
         numberBuf.clear();
         {
           llvm::raw_svector_ostream os(numberBuf);
           os << i;
           os.flush();
         }
-        
+
         verify(runtimeXI, fixedXI,
                llvm::Twine("stored extra inhabitant ") + numberBuf.str());
-        
+
         // Now store the fixed extra inhabitant and ask the runtime to identify
         // it.
         // Mask in junk to make sure the runtime correctly ignores it.
@@ -203,9 +203,9 @@ irgen::emitTypeLayoutVerifier(IRGenFunction &IGF,
         llvm::Value *xiFillMask = IGF.Builder.CreateAnd(notMaskVal, xiFill);
         llvm::Value *xiValMask = IGF.Builder.CreateAnd(maskVal, fixedXI);
         llvm::Value *filledXI = IGF.Builder.CreateOr(xiFillMask, xiValMask);
-        
+
         IGF.Builder.CreateStore(filledXI, xiBuf2);
-        
+
         auto runtimeIndex = emitGetExtraInhabitantIndexCall(IGF, layoutType,
                                                         xiOpaque.getAddress());
         verify(runtimeIndex, index,

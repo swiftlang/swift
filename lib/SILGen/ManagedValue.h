@@ -52,7 +52,7 @@ class ManagedValue {
   /// whether it represents an lvalue.  InContext is represented with the lvalue
   /// flag set but with a null SILValue.
   llvm::PointerIntPair<SILValue, 1, bool> valueAndFlag;
-  
+
   /// A handle to the cleanup that destroys this value, or
   /// CleanupHandle::invalid() if the value has no cleanup.
   CleanupHandle cleanup;
@@ -62,9 +62,9 @@ class ManagedValue {
   }
 
 public:
-  
+
   ManagedValue() = default;
-  
+
   /// Create a managed value for a +1 rvalue.
   ManagedValue(SILValue value, CleanupHandle cleanup)
     : valueAndFlag(value, false), cleanup(cleanup) {
@@ -83,7 +83,7 @@ public:
            "lvalues always have isAddress() type");
     return ManagedValue(value, true, CleanupHandle::invalid());
   }
-  
+
   /// Create a managed value that indicates that the value you're looking for
   /// got stored into an initialization specified by an SGFContext, instead of
   /// being represented by this ManagedValue.
@@ -102,43 +102,43 @@ public:
   bool isPlusZeroRValueOrTrivial() const {
     // If this is an lvalue or isInContext() then it is not an RValue.
     if (isLValue() || isInContext()) return false;
-    
+
     // If this has a cleanup attached, then it is +1 rvalue.  If not, it is
     // either +0 or trivial (in which case +0 vs +1 doesn't matter).
     return !hasCleanup();
   }
-  
+
   SILValue getLValueAddress() const {
     assert(isLValue() && "This isn't an lvalue");
     return getValue();
   }
-  
+
   SILValue getUnmanagedValue() const {
     assert(!hasCleanup());
     return getValue();
   }
   SILValue getValue() const { return valueAndFlag.getPointer(); }
-  
+
   SILType getType() const { return getValue().getType(); }
-  
+
 
   CanType getSwiftType() const {
     return isLValue()
       ? getType().getSwiftType()
       : getType().getSwiftRValueType();
   }
-  
+
   /// Emit a copy of this value with independent ownership.
   ManagedValue copy(SILGenFunction &gen, SILLocation l);
-  
+
   /// Store a copy of this value with independent ownership into the given
   /// uninitialized address.
   void copyInto(SILGenFunction &gen, SILValue dest, SILLocation L);
-  
+
   /// This is the same operation as 'copy', but works on +0 values that don't
   /// have cleanups.  It returns a +1 value with one.
   ManagedValue copyUnmanaged(SILGenFunction &gen, SILLocation loc);
-  
+
   bool hasCleanup() const { return cleanup.isValid(); }
   CleanupHandle getCleanup() const { return cleanup; }
 
@@ -154,18 +154,18 @@ public:
 
   /// Disable the cleanup for this value.
   void forwardCleanup(SILGenFunction &gen) const;
-  
+
   /// Forward this value, deactivating the cleanup and returning the
   /// underlying value.
   SILValue forward(SILGenFunction &gen) const;
-  
+
   /// Forward this value into memory by storing it to the given address.
   ///
   /// \param gen - The SILGenFunction.
   /// \param loc - the AST location to associate with emitted instructions.
   /// \param address - the address to assign to.
   void forwardInto(SILGenFunction &gen, SILLocation loc, SILValue address);
-  
+
   /// Assign this value into memory, destroying the existing
   /// value at the destination address.
   ///
@@ -173,7 +173,7 @@ public:
   /// \param loc - the AST location to associate with emitted instructions.
   /// \param address - the address to assign to.
   void assignInto(SILGenFunction &gen, SILLocation loc, SILValue address);
-  
+
   explicit operator bool() const {
     // "InContext" is not considered false.
     return bool(getValue()) || valueAndFlag.getInt();
@@ -252,7 +252,7 @@ public:
     return { asUnmanagedValue(), CastConsumptionKind::CopyOnSuccess };
   }
 };
-  
+
 } // end namespace Lowering
 } // end namespace swift
 

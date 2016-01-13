@@ -801,7 +801,7 @@ void Serializer::writeParameterList(const ParameterList *PL) {
   abbrCode = DeclTypeAbbrCodes[ParameterListEltLayout::Code];
   for (auto &param : *PL) {
     // FIXME: Default argument expressions?
-    
+
     auto defaultArg =
       getRawStableDefaultArgumentKind(param->getDefaultArgumentKind());
     ParameterListEltLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -1361,7 +1361,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
   case DeclContextKind::SubscriptDecl: {
     auto SD = cast<SubscriptDecl>(DC);
     writeCrossReference(DC->getParent(), pathLen + 1);
-    
+
     Type ty = SD->getInterfaceType()->getCanonicalType();
 
     abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
@@ -1372,7 +1372,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
                                          isProtocolExt);
     break;
   }
-      
+
   case DeclContextKind::AbstractFunctionDecl: {
     if (auto fn = dyn_cast<FuncDecl>(DC)) {
       if (auto storage = fn->getAccessorStorageDecl()) {
@@ -1608,7 +1608,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
                                       theAttr->Name);
     return;
   }
-  
+
   case DAK_Alignment: {
     auto *theAlignment = cast<AlignmentAttr>(DA);
     auto abbrCode = DeclTypeAbbrCodes[AlignmentDeclAttrLayout::Code];
@@ -1617,20 +1617,20 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
                                         theAlignment->Value);
     return;
   }
-  
+
   case DAK_SwiftNativeObjCRuntimeBase: {
     auto *theBase = cast<SwiftNativeObjCRuntimeBaseAttr>(DA);
     auto abbrCode
       = DeclTypeAbbrCodes[SwiftNativeObjCRuntimeBaseDeclAttrLayout::Code];
     auto nameID = addIdentifierRef(theBase->BaseClassName);
-    
+
     SwiftNativeObjCRuntimeBaseDeclAttrLayout::emitRecord(Out, ScratchRecord,
                                                      abbrCode,
                                                      theBase->isImplicit(),
                                                      nameID);
     return;
   }
-  
+
   case DAK_Semantics: {
     auto *theAttr = cast<SemanticsAttr>(DA);
     auto abbrCode = DeclTypeAbbrCodes[SemanticsDeclAttrLayout::Code];
@@ -1719,7 +1719,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     }
     auto abbrCode = DeclTypeAbbrCodes[ObjCDeclAttrLayout::Code];
     ObjCDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                   theAttr->isImplicit(), 
+                                   theAttr->isImplicit(),
                                    theAttr->isNameImplicit(), numArgs, pieces);
     return;
   }
@@ -2948,21 +2948,21 @@ void Serializer::writeType(Type ty) {
             fnTy->isNoReturn(),
             fnTy->throws(),
             genericParams);
-    
+
     // Write requirements.
     writeRequirements(fnTy->getRequirements());
     break;
   }
-      
+
   case TypeKind::SILBlockStorage: {
     auto storageTy = cast<SILBlockStorageType>(ty.getPointer());
-    
+
     unsigned abbrCode = DeclTypeAbbrCodes[SILBlockStorageTypeLayout::Code];
     SILBlockStorageTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                       addTypeRef(storageTy->getCaptureType()));
     break;
   }
-      
+
   case TypeKind::SILBox: {
     auto boxTy = cast<SILBoxType>(ty.getPointer());
 
@@ -2971,14 +2971,14 @@ void Serializer::writeType(Type ty) {
                                  addTypeRef(boxTy->getBoxedType()));
     break;
   }
-      
+
   case TypeKind::SILFunction: {
     auto fnTy = cast<SILFunctionType>(ty.getPointer());
 
     auto representation = fnTy->getRepresentation();
     auto stableRepresentation =
       getRawStableSILFunctionTypeRepresentation(representation);
-    
+
     auto interfaceResult = fnTy->getResult();
     TypeID interfaceResultTyID = addTypeRef(interfaceResult.getType());
     auto stableInterfaceResultConvention =
@@ -3026,7 +3026,7 @@ void Serializer::writeType(Type ty) {
       writeRequirements({});
     break;
   }
-      
+
   case TypeKind::ArraySlice: {
     auto sliceTy = cast<ArraySliceType>(ty.getPointer());
 
@@ -3172,7 +3172,7 @@ void Serializer::writeType(Type ty) {
     if (!allGenericArgsInDecl) {
 #ifndef NDEBUG
       if (someGenericArgsInDecl && isDeclXRef(generic->getDecl()))
-        // Emit warning message. 
+        // Emit warning message.
         llvm::errs() << "Serialization: we may have two copied of Archetype\n";
 #endif
       genericArgIDs.clear();

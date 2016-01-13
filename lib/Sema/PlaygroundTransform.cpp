@@ -73,7 +73,7 @@ private:
     };
     TargetKinds TargetKind = TargetKinds::None;
 
-    BracePair(const SourceRange &BR) : 
+    BracePair(const SourceRange &BR) :
       BraceRange(BR) { }
   };
 
@@ -139,7 +139,7 @@ private:
     }
     return EI;
   }
-    
+
   class ClosureFinder : public ASTWalker {
   private:
     Instrumenter &I;
@@ -166,15 +166,15 @@ private:
       return { true, E };
     }
   };
-    
+
   ClosureFinder CF;
 
 public:
   Instrumenter (ASTContext &C, DeclContext *DC, std::mt19937_64 &RNG,
                 bool HP) :
     RNG(RNG), Context(C), TypeCheckDC(DC), HighPerformance(HP), CF(*this) { }
-    
-  Stmt *transformStmt(Stmt *S) { 
+
+  Stmt *transformStmt(Stmt *S) {
     switch (S->getKind()) {
     default:
       return S;
@@ -210,7 +210,7 @@ public:
       return transformDoCatchStmt(cast<DoCatchStmt>(S));
     }
   }
-    
+
   // transform*() return their input if it's unmodified,
   // or a modified copy of their input otherwise.
   IfStmt *transformIfStmt(IfStmt *IS) {
@@ -230,7 +230,7 @@ public:
 
     return IS;
   }
-  
+
   GuardStmt *transformGuardStmt(GuardStmt *GS) {
     if (Stmt *BS = GS->getBody())
       GS->setBody(transformStmt(BS));
@@ -244,7 +244,7 @@ public:
         WS->setBody(NB);
       }
     }
-      
+
     return WS;
   }
 
@@ -255,7 +255,7 @@ public:
         RWS->setBody(NB);
       }
     }
-      
+
     return RWS;
   }
 
@@ -266,7 +266,7 @@ public:
         FS->setBody(NB);
       }
     }
-      
+
     return FS;
   }
 
@@ -277,7 +277,7 @@ public:
         FES->setBody(NB);
       }
     }
-      
+
     return FES;
   }
 
@@ -292,7 +292,7 @@ public:
         }
       }
     }
-      
+
     return SS;
   }
 
@@ -323,7 +323,7 @@ public:
     }
     return DCS;
   }
-  
+
   Decl *transformDecl(Decl *D) {
     if (D->isImplicit())
       return D;
@@ -340,7 +340,7 @@ public:
         transformDecl(Member);
       }
     }
-    
+
     return D;
   }
 
@@ -352,7 +352,7 @@ public:
       return std::make_pair(Added<Expr*>(nullptr), nullptr);
     case ExprKind::DeclRef: {
       ValueDecl *D = cast<DeclRefExpr>(E)->getDecl();
-      Added<Expr *> DRE = 
+      Added<Expr *> DRE =
         new (Context) DeclRefExpr(ConcreteDeclRef(D),
                                   cast<DeclRefExpr>(E)->getLoc(),
                                   true, // implicit
@@ -383,7 +383,7 @@ public:
       return digForVariable(cast<InOutExpr>(E)->getSubExpr());
     }
   }
-  
+
   std::string digForName(Expr *E) {
     Added <Expr *> RE = nullptr;
     ValueDecl *VD = nullptr;
@@ -394,7 +394,7 @@ public:
       return std::string("");
     }
   }
-  
+
   static DeclRefExpr *digForInoutDeclRef(Expr *E) {
     if (auto inout = dyn_cast<InOutExpr>(E)) {
       return dyn_cast<DeclRefExpr>(
@@ -442,7 +442,7 @@ public:
       }
       llvm::errs() << Text << "\n";
     }
-    bool hadError() { 
+    bool hadError() {
       return error;
     }
   };
@@ -467,7 +467,7 @@ public:
       }
       return true;
     }
-    bool hadError() { 
+    bool hadError() {
       return error;
     }
   };
@@ -477,13 +477,13 @@ public:
                                       Added<T*> &parsedExpr) {
     DiagnosticEngine diags(Ctx.SourceMgr);
     ErrorGatherer errorGatherer(diags);
-  
+
     TypeChecker TC(Ctx, diags);
 
     Expr *E = *parsedExpr;
     TC.typeCheckExpression(E, DC);
     parsedExpr = Added<T*>(dyn_cast<T>(E));
-    
+
     if (*parsedExpr) {
       ErrorFinder errorFinder;
       parsedExpr->walk(errorFinder);
@@ -517,7 +517,7 @@ public:
             Added<Expr *> Base_RE = nullptr;
             ValueDecl *BaseVD = nullptr;
             std::tie(Base_RE, BaseVD) = digForVariable(MRE->getBase());
-            
+
             if (*Base_RE) {
               Added<Stmt *> Log = logDeclOrMemberRef(Base_RE);
               if (*Log) {
@@ -541,7 +541,7 @@ public:
             NAE->setType(Context.TheEmptyTupleType);
             AE->setImplicit(true);
             std::string Name = digForName(AE->getDest());
-            
+
             Added<Stmt *> Log(buildLoggerCall(
               new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
                                         SourceLoc(),
@@ -727,12 +727,12 @@ public:
     // FIXME: This is a band-aid used to work around the fact that the
     // above code can introduce null elements into the vector. The
     // right fix is to avoid doing that above.
-    Elements.erase(std::remove_if(Elements.begin(), Elements.end(), 
+    Elements.erase(std::remove_if(Elements.begin(), Elements.end(),
                                   [](ASTNode node) {
                                     return node.isNull();
                                   }),
                    Elements.end());
-    
+
     return swift::BraceStmt::create(Context, BS->getLBraceLoc(),
                                     Context.AllocateCopy(Elements),
                                     BS->getRBraceLoc());
@@ -759,12 +759,12 @@ public:
   Added<Stmt *> logDeclOrMemberRef(Added<Expr *> RE) {
     if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(*RE)) {
       VarDecl *VD = cast<VarDecl>(DRE->getDecl());
-  
+
       if (isa<ConstructorDecl>(TypeCheckDC) && VD->getNameStr().equals("self")){
         // Don't log "self" in a constructor
         return nullptr;
       }
-  
+
       return buildLoggerCall(
         new (Context) DeclRefExpr(ConcreteDeclRef(VD),
                                   SourceLoc(),
@@ -781,7 +781,7 @@ public:
         // Don't log attributes of "self" in a constructor
         return nullptr;
       }
-  
+
       return buildLoggerCall(
         new (Context) MemberRefExpr(B,
                                     SourceLoc(),
@@ -796,7 +796,7 @@ public:
   }
 
   std::pair<PatternBindingDecl*, VarDecl*>
-    maybeFixupPrintArgument(ApplyExpr *Print) { 
+    maybeFixupPrintArgument(ApplyExpr *Print) {
     Expr *ArgTuple = Print->getArg();
     if (ParenExpr *PE = dyn_cast<ParenExpr>(ArgTuple)) {
       std::pair<PatternBindingDecl*, VarDecl*> PV =
@@ -858,7 +858,7 @@ public:
                          VarDecl *&ArgVariable) {
     const char *LoggerName = isDebugPrint ? "$builtin_debugPrint" :
                                             "$builtin_print";
-    
+
     UnresolvedDeclRefExpr *LoggerRef =
       new (Context) UnresolvedDeclRefExpr(
         Context.getIdentifier(LoggerName),
@@ -889,9 +889,9 @@ public:
     char NameBuf[11] = { 0 };
     snprintf(NameBuf, 11, "tmp%u", TmpNameIndex);
     TmpNameIndex++;
-        
+
     Expr *MaybeLoadInitExpr = nullptr;
-    
+
     if (LValueType *LVT =
           dyn_cast<LValueType>(InitExpr->getType().getPointer())) {
       MaybeLoadInitExpr = new (Context) LoadExpr (InitExpr,
@@ -923,7 +923,7 @@ public:
     const char *Name) {
     assert(Name);
     std::string *NameInContext = Context.AllocateObjectCopy(std::string(Name));
-    
+
     Expr *NameExpr = new (Context) StringLiteralExpr(NameInContext->c_str(),
                                                      SourceRange());
     NameExpr->setImplicit(true);
@@ -933,16 +933,16 @@ public:
     std::uniform_int_distribution<unsigned int> Distribution(0, 0x7fffffffu);
     const unsigned int id_num = Distribution(RNG);
     ::snprintf(id_buf, buf_size, "%u", id_num);
-    Expr *IDExpr = new (Context) IntegerLiteralExpr(id_buf, 
+    Expr *IDExpr = new (Context) IntegerLiteralExpr(id_buf,
                                                     SourceLoc(), true);
-    
+
     Expr *LoggerArgExprs[] = {
         *E,
         NameExpr,
         IDExpr
       };
 
-    return buildLoggerCallWithArgs("$builtin_log_with_id", 
+    return buildLoggerCallWithArgs("$builtin_log_with_id",
                                    MutableArrayRef<Expr *>(LoggerArgExprs),
                                    SR);
   }
@@ -1019,13 +1019,13 @@ public:
     ::snprintf(end_line_buf, buf_size, "%d", EndLC.first);
     ::snprintf(end_column_buf, buf_size, "%d", EndLC.second);
 
-    Expr *StartLine = new (Context) IntegerLiteralExpr(start_line_buf, 
+    Expr *StartLine = new (Context) IntegerLiteralExpr(start_line_buf,
                                                        SR.End, true);
     Expr *EndLine = new (Context) IntegerLiteralExpr(end_line_buf,
                                                      SR.End, true);
-    Expr *StartColumn = new (Context) IntegerLiteralExpr(start_column_buf, 
+    Expr *StartColumn = new (Context) IntegerLiteralExpr(start_column_buf,
                                                          SR.End, true);
-    Expr *EndColumn = new (Context) IntegerLiteralExpr(end_column_buf, 
+    Expr *EndColumn = new (Context) IntegerLiteralExpr(end_column_buf,
                                                        SR.End, true);
 
     std::pair<PatternBindingDecl *, VarDecl *> PV =
@@ -1045,9 +1045,9 @@ public:
         EndColumn
       };
 
-    TupleExpr *SendDataArgs = TupleExpr::createImplicit(Context, 
+    TupleExpr *SendDataArgs = TupleExpr::createImplicit(Context,
                                                         SendDataArgExprs, { });
-    UnresolvedDeclRefExpr *SendDataRef = 
+    UnresolvedDeclRefExpr *SendDataRef =
       new (Context) UnresolvedDeclRefExpr(
         Context.getIdentifier("$builtin_send_data"),
         DeclRefKind::Ordinary,

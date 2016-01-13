@@ -163,7 +163,7 @@ void ASTPrinter::printIndent() {
   llvm::SmallString<16> Str;
   for (unsigned i = 0; i != CurrentIndentation; ++i)
     Str += ' ';
-  
+
   printText(Str);
 }
 
@@ -177,12 +177,12 @@ void ASTPrinter::printTextImpl(StringRef Text) {
     printText(Str);
     printIndent();
   }
-  
+
   const Decl *PreD = PendingDeclPreCallback;
   const Decl *LocD = PendingDeclLocCallback;
   PendingDeclPreCallback = nullptr;
   PendingDeclLocCallback = nullptr;
-  
+
   if (PreD) {
     printDeclPre(PreD);
   }
@@ -580,7 +580,7 @@ void PrintAST::printPattern(const Pattern *pattern) {
       const auto &Elt = Fields[i];
       if (i != 0)
         Printer << ", ";
-      
+
       printPattern(Elt.getPattern());
     }
     Printer << ")";
@@ -958,7 +958,7 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
   switch (storageKind) {
   case AbstractStorageDecl::Stored:
     llvm_unreachable("filtered out above!");
-    
+
   case AbstractStorageDecl::StoredWithTrivialAccessors:
   case AbstractStorageDecl::Computed:
     PrintAccessor(ASD->getGetter(), "get");
@@ -1256,7 +1256,7 @@ void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
         return;
       }
       assert(nominal && "extension of non-nominal type");
-      
+
       if (auto ct = decl->getExtendedType()->getAs<ClassType>()) {
         if (auto ParentType = ct->getParent()) {
           ParentType.print(Printer, Options);
@@ -1315,7 +1315,7 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
   } else {
     Printer << "let ";
   }
-  
+
   bool isFirst = true;
   for (auto entry : decl->getPatternList()) {
     if (!shouldPrintPattern(entry.getPattern()))
@@ -1324,7 +1324,7 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
       isFirst = false;
     else
       Printer << ", ";
-    
+
     printPattern(entry.getPattern());
 
     // We also try to print type for named patterns, e.g. var Field = 10;
@@ -1597,7 +1597,7 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
   } else {
     if (param->hasType())
       TheTypeLoc = TypeLoc::withoutLoc(param->getType());
-    
+
     if (Type T = TheTypeLoc.getType()) {
       if (auto *IOT = T->getAs<InOutType>()) {
         Printer << "inout ";
@@ -1640,17 +1640,17 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
     Options.ExcludeAttrList.push_back(DAK_NoEscape);
   if (!hasAutoClosure)
     Options.ExcludeAttrList.push_back(DAK_AutoClosure);
-  
-  
+
+
   // If the parameter is variadic, we will print the "..." after it, but we have
   // to strip off the added array type.
   if (param->isVariadic() && TheTypeLoc.getType()) {
     if (auto *BGT = TheTypeLoc.getType()->getAs<BoundGenericType>())
       TheTypeLoc.setType(BGT->getGenericArgs()[0]);
   }
-  
+
   printTypeLoc(TheTypeLoc);
-  
+
   if (param->isVariadic())
     Printer << "...";
 
@@ -1659,8 +1659,8 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
     RemoveFunc(DAK_NoEscape);
   if (!hasAutoClosure)
     RemoveFunc(DAK_AutoClosure);
-  
-  
+
+
   if (Options.PrintDefaultParameterPlaceholder &&
       param->isDefaultArgument()) {
     Printer << " = ";
@@ -1679,7 +1679,7 @@ void PrintAST::printParameterList(ParameterList *PL, bool isCurried,
   for (unsigned i = 0, e = PL->size(); i != e; ++i) {
     if (i > 0)
       Printer << ", ";
-    
+
     printOneParameter(PL->get(i), isCurried, isAPINameByDefault(i));
   }
   Printer << ")";
@@ -1915,14 +1915,14 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
   else
     if (decl->getInitKind() == CtorInitializerKind::Factory)
       Printer << "/*not inherited*/ ";
-  
+
   recordDeclLoc(decl,
     [&]{
       Printer << "init";
       switch (decl->getFailability()) {
       case OTK_None:
         break;
-        
+
       case OTK_Optional:
         Printer << "?";
         break;
@@ -1937,7 +1937,7 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
 
       printFunctionParameters(decl);
     });
-  
+
   if (!Options.FunctionDefinitions || !decl->getBody()) {
     return;
   }
@@ -2288,7 +2288,7 @@ void Pattern::print(llvm::raw_ostream &OS, const PrintOptions &Options) const {
 namespace {
 class TypePrinter : public TypeVisitor<TypePrinter> {
   using super = TypeVisitor;
-  
+
   ASTPrinter &Printer;
   const PrintOptions &Options;
   Optional<std::vector<GenericParamList *>> UnwrappedGenericParams;
@@ -2328,7 +2328,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     case DeclContextKind::AbstractFunctionDecl:
       visit(cast<AbstractFunctionDecl>(DC)->getType());
       return;
-        
+
     case DeclContextKind::SubscriptDecl:
       visit(cast<SubscriptDecl>(DC)->getType());
       return;
@@ -2455,7 +2455,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 public:
   TypePrinter(ASTPrinter &Printer, const PrintOptions &PO)
       : Printer(Printer), Options(PO) {}
-  
+
   void visit(Type T) {
     // If we have an alternate name for this type, use it.
     if (Options.AlternativeTypeNames) {
@@ -2494,7 +2494,7 @@ public:
   void visitBuiltinBridgeObjectType(BuiltinBridgeObjectType *T) {
     Printer << "Builtin.BridgeObject";
   }
-  
+
   void visitBuiltinUnsafeValueBufferType(BuiltinUnsafeValueBufferType *T) {
     Printer << "Builtin.UnsafeValueBuffer";
   }
@@ -2717,7 +2717,7 @@ public:
     else if (info.isNoEscape() && !IsAttrExcluded(DAK_NoEscape))
       // autoclosure implies noescape.
       Printer << "@noescape ";
-    
+
     if (Options.PrintFunctionRepresentationAttrs) {
       // TODO: coalesce into a single convention attribute.
       switch (info.getSILRepresentation()) {
@@ -2785,10 +2785,10 @@ public:
   void visitFunctionType(FunctionType *T) {
     printFunctionExtInfo(T->getExtInfo());
     printWithParensIfNotSimple(T->getInput());
-    
+
     if (T->throws())
       Printer << " throws";
-    
+
     Printer << " -> ";
     T->getResult().print(Printer, Options);
   }
@@ -2838,7 +2838,7 @@ public:
       // Return the max valid depth of firstType and secondType.
       unsigned firstDepth = getDepthOfType(req.getFirstType());
       unsigned secondDepth = getDepthOfType(req.getSecondType());
-      
+
       unsigned maxDepth;
       if (firstDepth == ErrorDepth && secondDepth != ErrorDepth)
         maxDepth = secondDepth;
@@ -2846,7 +2846,7 @@ public:
         maxDepth = firstDepth;
       else
         maxDepth = std::max(firstDepth, secondDepth);
-      
+
       return maxDepth;
     }
     }
@@ -2876,7 +2876,7 @@ public:
       // Collect requirements for this level.
       // Because of same-type requirements, these aren't well-ordered.
       SmallVector<Requirement, 2> requirementsAtDepth;
-      
+
       for (auto reqt : requirements) {
         unsigned currentDepth = getDepthOfRequirement(reqt);
         // Collect requirements at the current depth.
@@ -2890,7 +2890,7 @@ public:
       printSingleDepthOfGenericSignature(
         genericParams.slice(paramIdx, lastParamIdx - paramIdx),
         requirementsAtDepth);
-      
+
       paramIdx = lastParamIdx;
     }
   }
@@ -3015,7 +3015,7 @@ public:
       T->getResult().print(Printer, Options);
     }
   }
-  
+
   void visitSILBlockStorageType(SILBlockStorageType *T) {
     Printer << "@block_storage ";
     printWithParensIfNotSimple(T->getCaptureType());
@@ -3173,7 +3173,7 @@ public:
       Printer << "$T" << T->getID();
       return;
     }
-    
+
     Printer << "_";
   }
 };
@@ -3327,10 +3327,10 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
       os << ' ';
     }
   }
- 
+
   getType()->print(os, PO);
   os << ": ";
- 
+
   switch (getKind()) {
   case ProtocolConformanceKind::Normal: {
     auto normal = cast<NormalProtocolConformance>(this);

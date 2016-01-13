@@ -374,13 +374,13 @@ void Parser::skipSingle() {
     consumeToken();
     // skipUntil also implicitly stops at tok::pound_endif.
     skipUntil(tok::pound_else, tok::pound_elseif);
-      
+
     if (Tok.isAny(tok::pound_else, tok::pound_elseif))
       skipSingle();
     else
       consumeIf(tok::pound_endif);
     break;
-      
+
   default:
     consumeToken();
     break;
@@ -390,7 +390,7 @@ void Parser::skipSingle() {
 void Parser::skipUntil(tok T1, tok T2) {
   // tok::unknown is a sentinel that means "don't skip".
   if (T1 == tok::unknown && T2 == tok::unknown) return;
-  
+
   while (Tok.isNot(tok::eof, tok::pound_endif, T1, T2))
     skipSingle();
 }
@@ -435,7 +435,7 @@ SourceLoc Parser::skipUntilGreaterInTypeList(bool protocolComposition) {
     default:
       if (Tok.isAnyOperator() && startsWithGreater(Tok))
         return consumeStartingGreater();
-      
+
       break;
     }
     lastLoc = Tok.getLoc();

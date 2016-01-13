@@ -57,12 +57,12 @@ namespace irgen {
                                       CanSILFunctionType substType,
                                       CanSILFunctionType outType,
                                       Explosion &out);
-  
+
   /// Does an ObjC method or C function with the given signature
   /// require an sret indirect result?
   llvm::PointerType *requiresExternalIndirectResult(IRGenModule &IGM,
                                                     CanSILFunctionType fnType);
-  
+
   /// Add function attributes to an attribute set for an indirect return
   /// argument.
   void addIndirectReturnAttributes(IRGenModule &IGM,
@@ -78,18 +78,18 @@ namespace irgen {
   /// extending.
   void addExtendAttribute(IRGenModule &IGM, llvm::AttributeSet &attrs,
                           unsigned index, bool signExtend);
-  
+
   /// Emit a call to a builtin function.
   void emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
                        SILType resultType,
                        Explosion &args, Explosion &result,
                        ArrayRef<Substitution> substitutions);
-  
+
   /// Project the capture address from on-stack block storage.
   Address projectBlockStorageCapture(IRGenFunction &IGF,
                                      Address storageAddr,
                                      CanSILBlockStorageType storageTy);
-  
+
   /// Emit the block header into a block storage slot.
   void emitBlockHeader(IRGenFunction &IGF,
                        Address storage,
@@ -108,7 +108,7 @@ namespace irgen {
                                   clang::CanQual<clang::Type> clangType,
                                   SILType swiftType,
                                   const LoadableTypeInfo &swiftTI);
-  
+
   /// Allocate a stack buffer of the appropriate size to bitwise-coerce a value
   /// between two LLVM types.
   std::pair<Address, Size>

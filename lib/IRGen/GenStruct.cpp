@@ -68,7 +68,7 @@ namespace {
     StringRef getFieldName() const {
       return Field->getName().str();
     }
-    
+
     SILType getType(IRGenModule &IGM, SILType T) const {
       return T.getFieldType(Field, *IGM.SILMod);
     }
@@ -134,7 +134,7 @@ namespace {
       // If the field requires no storage, there's nothing to do.
       if (fieldInfo.isEmpty())
         return;
-  
+
       // Otherwise, project from the base.
       auto fieldRange = fieldInfo.getProjectionRange();
       auto elements = in.getRange(fieldRange.first, fieldRange.second);
@@ -154,7 +154,7 @@ namespace {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       return fieldInfo.projectAddress(IGF, addr, offsets);
     }
-       
+
     /// Return the constant offset of a field as a SizeTy, or nullptr if the
     /// field is not at a fixed offset.
     llvm::Constant *getConstantFieldOffset(IRGenModule &IGM,
@@ -193,16 +193,16 @@ namespace {
     APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const {
       if (asImpl().getFields().empty())
         return APInt();
-      
+
       // Currently we only use the first field's extra inhabitants. The other
       // fields can be ignored.
       const FixedTypeInfo &fieldTI
         = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
       auto targetSize = asImpl().getFixedSize().getValueInBits();
-      
+
       if (fieldTI.isKnownEmpty(ResilienceExpansion::Maximal))
         return APInt(targetSize, 0);
-      
+
       APInt fieldMask = fieldTI.getFixedExtraInhabitantMask(IGM);
       if (targetSize > fieldMask.getBitWidth())
         fieldMask = fieldMask.zext(targetSize);
@@ -310,7 +310,7 @@ namespace {
       return None;
     }
   };
-  
+
   /// Find the beginning of the field offset vector in a struct's metadata.
   static Address
   emitAddressOfFieldOffsetVector(IRGenFunction &IGF,
@@ -321,9 +321,9 @@ namespace {
     {
       GetStartOfFieldOffsets(IRGenModule &IGM, StructDecl *target)
         : StructMetadataScanner(IGM, target) {}
-      
+
       Size StartOfFieldOffsets = Size::invalid();
-      
+
       void noteAddressPoint() {
         assert(StartOfFieldOffsets == Size::invalid()
                && "found field offsets before address point?");
@@ -331,15 +331,15 @@ namespace {
       }
       void noteStartOfFieldOffsets() { StartOfFieldOffsets = NextOffset; }
     };
-    
+
     // Find where the field offsets begin.
     GetStartOfFieldOffsets scanner(IGF.IGM, S);
     scanner.layout();
     assert(scanner.StartOfFieldOffsets != Size::invalid()
            && "did not find start of field offsets?!");
-    
+
     Size StartOfFieldOffsets = scanner.StartOfFieldOffsets;
-    
+
     // Find that offset into the metadata.
     llvm::Value *fieldVector
       = IGF.Builder.CreateBitCast(metadata, IGF.IGM.SizeTy->getPointerTo());
@@ -348,7 +348,7 @@ namespace {
                             StartOfFieldOffsets / IGF.IGM.getPointerSize(),
                             StartOfFieldOffsets);
   }
-  
+
   /// Accessor for the non-fixed offsets of a struct type.
   class StructNonFixedOffsets : public NonFixedOffsetsImpl {
     SILType TheStruct;
@@ -356,14 +356,14 @@ namespace {
     StructNonFixedOffsets(SILType type) : TheStruct(type) {
       assert(TheStruct.getStructOrBoundGenericStruct());
     }
-    
+
     llvm::Value *getOffsetForIndex(IRGenFunction &IGF, unsigned index) {
       // Get the field offset vector from the struct metadata.
       llvm::Value *metadata = IGF.emitTypeMetadataRefForLayout(TheStruct);
       Address fieldVector = emitAddressOfFieldOffsetVector(IGF,
                                     TheStruct.getStructOrBoundGenericStruct(),
                                     metadata);
-      
+
       // Grab the indexed offset.
       fieldVector = IGF.Builder.CreateConstArrayGEP(fieldVector, index,
                                                     IGF.IGM.getPointerSize());
@@ -428,7 +428,7 @@ namespace {
         IGF.Builder.CreateStore(metadata, field);
         ++index;
       }
-      
+
       // Ask the runtime to lay out the struct.
       auto numFields = llvm::ConstantInt::get(IGF.IGM.SizeTy,
                                               storedProperties.size());

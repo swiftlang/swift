@@ -58,7 +58,7 @@ public:
                         T &&...args) {
     // The archetype order here needs to be consistent with
     // NominalTypeDescriptorBase::addGenericParams.
-    
+
     // Note that we intentionally don't forward the generic arguments.
 
     // Add all the primary archetypes.

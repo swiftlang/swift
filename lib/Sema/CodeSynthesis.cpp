@@ -104,8 +104,8 @@ buildIndexForwardingParamList(AbstractStorageDecl *storage,
                                                 ParameterList::Implicit);
   if (prefix.empty())
     return indices;
-  
-  
+
+
   // Otherwise, we need to build up a new parameter list.
   SmallVector<ParamDecl*, 4> elements;
 
@@ -127,7 +127,7 @@ static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
     getterParams.push_back(ParameterList::createSelf(loc,
                                                      storage->getDeclContext(),
                                                      /*isStatic*/false));
-    
+
   // Add an index-forwarding clause.
   getterParams.push_back(buildIndexForwardingParamList(storage, {}));
 
@@ -172,7 +172,7 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
                                                storage->getDeclContext(),
                                                /*isStatic*/false));
   }
-  
+
   // Add a "(value : T, indices...)" argument list.
   auto storageType = getTypeOfStorage(storage, TC);
   valueDecl = buildLetArgument(storage->getLoc(),
@@ -320,7 +320,7 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
       Identifier(), loc, SourceLoc(), SourceLoc(), /*generic=*/nullptr, Type(),
       params, TypeLoc::withoutLoc(retTy), DC);
   materializeForSet->setImplicit();
-  
+
   // materializeForSet is mutating and static if the setter is.
   auto setter = storage->getSetter();
   materializeForSet->setMutating(setter->isMutating());
@@ -329,7 +329,7 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   // materializeForSet is final if the storage is.
   if (storage->isFinal())
     makeFinal(ctx, materializeForSet);
-  
+
   // If the storage is dynamic or ObjC-native, we can't add a dynamically-
   // dispatched method entry for materializeForSet, so force it to be
   // statically dispatched. ("final" would be inappropriate because the
@@ -355,16 +355,16 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   // definition to be compiled.
   if (needsToBeRegisteredAsExternalDecl(storage))
     TC.Context.addExternalDecl(materializeForSet);
-  
+
   return materializeForSet;
 }
 
 void swift::convertStoredVarInProtocolToComputed(VarDecl *VD, TypeChecker &TC) {
   auto *Get = createGetterPrototype(VD, TC);
-  
+
   // Okay, we have both the getter and setter.  Set them in VD.
   VD->makeComputed(VD->getLoc(), Get, nullptr, nullptr, VD->getLoc());
-  
+
   // We've added some members to our containing class, add them to the members
   // list.
   addMemberToContextIfNeeded(Get, VD->getDeclContext());
@@ -386,25 +386,25 @@ static Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
   SmallVector<Identifier, 4> labels;
   SmallVector<SourceLoc, 4> labelLocs;
   SmallVector<Expr *, 4> args;
-  
+
   for (auto param : params) {
     // We cannot express how to forward variadic parameters yet.
     if (param->isVariadic())
       return nullptr;
-    
+
     Expr *ref = new (ctx) DeclRefExpr(param, SourceLoc(), /*implicit*/ true);
     if (param->getType()->is<InOutType>())
       ref = new (ctx) InOutExpr(SourceLoc(), ref, Type(), /*implicit=*/true);
     args.push_back(ref);
-    
+
     labels.push_back(param->getArgumentName());
     labelLocs.push_back(SourceLoc());
   }
-  
+
   // A single unlabelled value is not a tuple.
   if (args.size() == 1 && labels[0].empty())
     return args[0];
-  
+
   return TupleExpr::create(ctx, SourceLoc(), args, labels, labelLocs,
                            SourceLoc(), false, IsImplicit);
 }
@@ -429,7 +429,7 @@ static Expr *buildSubscriptIndexReference(ASTContext &ctx, FuncDecl *accessor) {
   // Ignore the materializeForSet callback storage parameter.
   if (accessorKind == AccessorKind::IsMaterializeForSet)
     params = params.slice(1);
-  
+
   // Okay, everything else should be forwarded, build the expression.
   auto result = buildArgumentForwardingExpr(params, ctx);
   assert(result && "FIXME: Cannot forward varargs");
@@ -702,7 +702,7 @@ static void synthesizeTrivialGetter(FuncDecl *getter,
                                     AbstractStorageDecl *storage,
                                     TypeChecker &TC) {
   auto &ctx = TC.Context;
-  
+
   Expr *result = createPropertyLoadOrCallSuperclassGetter(getter, storage, TC);
   ASTNode returnStmt = new (ctx) ReturnStmt(SourceLoc(), result, IsImplicit);
 
@@ -710,7 +710,7 @@ static void synthesizeTrivialGetter(FuncDecl *getter,
   getter->setBody(BraceStmt::create(ctx, loc, returnStmt, loc, true));
 
   maybeMarkTransparent(getter, storage, TC);
- 
+
   // Register the accessor as an external decl if the storage was imported.
   if (needsToBeRegisteredAsExternalDecl(storage))
     TC.Context.addExternalDecl(getter);
@@ -796,7 +796,7 @@ void swift::addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
   if (doesStorageNeedSetter(storage)) {
     setter = createSetterPrototype(storage, setterValueParam, TC);
   }
-  
+
   // Okay, we have both the getter and setter.  Set them in VD.
   storage->addTrivialAccessors(getter, setter, nullptr);
 
@@ -866,7 +866,7 @@ void TypeChecker::synthesizeWitnessAccessorsForStorage(
     addTrivialAccessorsToStorage(storage, *this);
     return;
   }
-  
+
   // Otherwise, if the requirement is settable, ensure that there's a
   // materializeForSet function.
   //
@@ -889,7 +889,7 @@ void swift::synthesizeMaterializeForSet(FuncDecl *materializeForSet,
   maybeMarkTransparent(materializeForSet, storage, TC);
 
   TC.typeCheckDecl(materializeForSet, true);
-  
+
   // Register the accessor as an external decl if the storage was imported.
   if (needsToBeRegisteredAsExternalDecl(storage))
     TC.Context.addExternalDecl(materializeForSet);
@@ -902,10 +902,10 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
   assert(VD->getGetter() && VD->getSetter() &&
          !VD->getGetter()->hasBody() && !VD->getSetter()->hasBody() &&
          "willSet/didSet var already has a getter or setter");
-  
+
   auto &Ctx = VD->getASTContext();
   SourceLoc Loc = VD->getLoc();
-  
+
   // The getter is always trivial: just perform a (direct!) load of storage, or
   // a call of a superclass getter if this is an override.
   auto *Get = VD->getGetter();
@@ -929,7 +929,7 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
   if (VD->getDidSetFunc()) {
     Expr *OldValueExpr
       = createPropertyLoadOrCallSuperclassGetter(Set, VD, TC);
-    
+
     OldValue = new (Ctx) VarDecl(/*isStatic*/false, /*isLet*/ true,
                                  SourceLoc(), Ctx.getIdentifier("tmp"),
                                  Type(), Set);
@@ -943,7 +943,7 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
     SetterBody.push_back(tmpPBD);
     SetterBody.push_back(OldValue);
   }
-  
+
   // Create:
   //   (call_expr (dot_syntax_call_expr (decl_ref_expr(willSet)),
   //                                    (decl_ref_expr(self))),
@@ -964,7 +964,7 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
         VD->getDeclContext()->isClassOrClassExtensionContext())
       makeFinal(Ctx, willSet);
   }
-  
+
   // Create an assignment into the storage or call to superclass setter.
   auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, SourceLoc(), true);
   createPropertyStoreOrCallSuperclassSetter(Set, ValueDRE, VD, SetterBody, TC);
@@ -1036,7 +1036,7 @@ namespace {
         CE->setParent(NewDC);
         return { false, E };
       }
-      
+
       if (auto CLE = dyn_cast<CaptureListExpr>(E)) {
         // Make sure to recontextualize any decls in the capture list as well.
         for (auto &CLE : CLE->getCaptureList()) {
@@ -1100,7 +1100,7 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   // Build the "if" around the early return.
   Tmp1DRE = new (Ctx) DeclRefExpr(Tmp1VD, SourceLoc(), /*Implicit*/true,
                                   AccessSemantics::DirectToStorage);
-  
+
   // Call through "hasValue" on the decl ref.
   Tmp1DRE->setType(OptionalType::get(VD->getType()));
   constraints::ConstraintSystem cs(TC,
@@ -1108,7 +1108,7 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
                                    constraints::ConstraintSystemOptions());
   constraints::Solution solution(cs, constraints::Score());
   auto HasValueExpr = solution.convertOptionalToBool(Tmp1DRE, nullptr);
-  
+
   Body.push_back(new (Ctx) IfStmt(SourceLoc(), HasValueExpr, Return,
                                   /*elseloc*/SourceLoc(), /*else*/nullptr,
                                   /*implicit*/ true, Ctx));
@@ -1369,13 +1369,13 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       if (var->isImplicit())
         continue;
       tc.validateDecl(var);
-      
+
       // Initialized 'let' properties have storage, but don't get an argument
       // to the memberwise initializer since they already have an initial
       // value that cannot be overridden.
       if (var->isLet() && var->getParentInitializer())
         continue;
-      
+
       accessLevel = std::min(accessLevel, var->getFormalAccess());
 
       auto varType = tc.getTypeOfRValue(var);
@@ -1397,7 +1397,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
   }
 
   auto paramList = ParameterList::create(context, params);
-  
+
   // Create the constructor.
   DeclName name(context, context.Id_init, paramList);
   auto *selfParam = ParamDecl::createSelf(Loc, decl,
@@ -1487,9 +1487,9 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   OptionSet<ParameterList::CloneFlags> options = ParameterList::Implicit;
   options |= ParameterList::Inherited;
   auto *bodyParams = superclassCtor->getParameterList(1)->clone(ctx,options);
-  
+
   // Create the initializer declaration.
-  auto ctor = new (ctx) ConstructorDecl(superclassCtor->getFullName(), 
+  auto ctor = new (ctx) ConstructorDecl(superclassCtor->getFullName(),
                                         classDecl->getBraces().Start,
                                         superclassCtor->getFailability(),
                                         SourceLoc(), selfDecl, bodyParams,

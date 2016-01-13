@@ -705,7 +705,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       OpCode = (unsigned)ValueKind::ApplyInst;
       IsNonThrowingApply = true;
       break;
-        
+
     default:
       llvm_unreachable("unexpected apply inst kind");
     }
@@ -796,7 +796,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONEOPERAND_ONETYPE_INST(PointerToThinFunction)
   ONEOPERAND_ONETYPE_INST(ProjectBlockStorage)
 #undef ONEOPERAND_ONETYPE_INST
-  
+
   case ValueKind::DeallocExistentialBoxInst: {
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
            "Layout should be OneTypeOneOperand.");
@@ -808,13 +808,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
 
   }
-  
+
   case ValueKind::RefToBridgeObjectInst: {
     auto RefTy = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
     auto Ref = getLocalValue(ValID, ValResNum, RefTy);
     auto BitsTy = getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2);
     auto Bits = getLocalValue(ValID2, ValResNum2, BitsTy);
-    
+
     ResultVal = Builder.createRefToBridgeObject(Loc, Ref, Bits);
     break;
   }
@@ -1027,7 +1027,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       Substitutions.push_back(*sub);
     }
     Identifier Name = MF->getIdentifier(ValID);
-    
+
     ResultVal = Builder.createBuiltin(Loc, Name, ResultTy, Substitutions,
                                       Args);
     break;
@@ -1449,7 +1449,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     Type ResultLoweredTy = MF->getType(ListOfValues[2]);
     SILValueCategory ResultCategory = (SILValueCategory)ListOfValues[3];
     SILType ResultTy = getSILType(ResultLoweredTy, ResultCategory);
-    
+
     SILValue DefaultVal = nullptr;
     if (ListOfValues[4])
       DefaultVal = getLocalValue(ListOfValues[5], ListOfValues[6],
@@ -1525,7 +1525,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.createSelectValue(Loc, Cond, ResultTy,
                                           DefaultVal, CaseValuesAndResults);
     break;
-  }  
+  }
   case ValueKind::EnumInst: {
     // Format: a type, an operand and a decl ID. Use SILTwoOperandsLayout: type,
     // (DeclID + hasOperand), and an operand.

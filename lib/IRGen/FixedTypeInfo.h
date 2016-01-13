@@ -39,11 +39,11 @@ private:
   /// for well-formed and complete types, such as a trivial enum or
   /// tuple.
   Size StorageSize;
-  
+
   /// The spare bit mask for this type. SpareBits[0] is the LSB of the first
   /// byte. This may be empty if the type has no spare bits.
   SpareBitVector SpareBits;
-  
+
 protected:
   FixedTypeInfo(llvm::Type *type, Size size,
                 const SpareBitVector &spareBits,
@@ -122,7 +122,7 @@ public:
   Size getFixedStride() const {
     return StorageSize.roundUpToAlignment(getFixedAlignment());
   }
-  
+
   /// Returns the fixed number of "extra inhabitants" (that is, bit
   /// patterns that don't represent valid values of the type) in the type
   /// representation.
@@ -154,24 +154,24 @@ public:
                                              unsigned index) const {
     return getSpareBitFixedExtraInhabitantValue(IGM, bits, index);
   }
-  
+
   /// Create an extra inhabitant constant using the spare bits of the type.
   APInt getSpareBitFixedExtraInhabitantValue(IRGenModule &IGM,
                                              unsigned bits,
                                              unsigned index) const;
-  
+
   /// Map an extra inhabitant representation in memory to a unique 31-bit
   /// identifier, and map a valid representation of the type to -1.
   llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                        Address src, SILType T) const override {
     return getSpareBitExtraInhabitantIndex(IGF, src);
   }
-  
+
   /// Map an extra inhabitant representation derived from spare bits to an
   /// index.
   llvm::Value *getSpareBitExtraInhabitantIndex(IRGenFunction &IGF,
                                                Address src) const;
-  
+
   /// Store the extra inhabitant representation indexed by a 31-bit identifier
   /// to memory.
   void storeExtraInhabitant(IRGenFunction &IGF,
@@ -179,20 +179,20 @@ public:
                             Address dest, SILType T) const override {
     storeSpareBitExtraInhabitant(IGF, index, dest);
   }
-  
+
   /// Store the indexed spare-bit-derived extra inhabitant to memory.
   void storeSpareBitExtraInhabitant(IRGenFunction &IGF,
                                     llvm::Value *index,
                                     Address dest) const;
-  
+
   /// Get the spare bit mask for the type.
   const SpareBitVector &getSpareBits() const { return SpareBits; }
-  
+
   /// True if the type representation has statically "spare" unused bits.
   bool hasFixedSpareBits() const {
     return SpareBits.any();
   }
-  
+
   /// Applies the fixed spare bits mask for this type to the given BitVector,
   /// clearing any bits used by valid representations of the type.
   ///
@@ -210,7 +210,7 @@ public:
   ///
   /// and end up with a spare bits mask for the entire enum.
   void applyFixedSpareBitsMask(SpareBitVector &mask) const;
-  
+
   /// Applies a fixed spare bits mask to the given BitVector,
   /// clearing any bits used by valid representations of the type.
   ///
@@ -219,13 +219,13 @@ public:
   /// larger than this type, the trailing bits are untouched.
   static void applyFixedSpareBitsMask(SpareBitVector &mask,
                                       const SpareBitVector &spareBits);
-  
+
   /// Fixed-size types never need dynamic value witness table instantiation.
   void initializeMetadata(IRGenFunction &IGF,
                           llvm::Value *metadata,
                           llvm::Value *vwtable,
                           SILType T) const override {}
-  
+
   static bool classof(const FixedTypeInfo *type) { return true; }
   static bool classof(const TypeInfo *type) { return type->isFixedSize(); }
 };

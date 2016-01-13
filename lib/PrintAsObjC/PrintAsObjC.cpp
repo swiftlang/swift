@@ -88,7 +88,7 @@ static Identifier getNameForObjC(const ValueDecl *VD,
 
 namespace {
 class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
-                    private TypeVisitor<ObjCPrinter, void, 
+                    private TypeVisitor<ObjCPrinter, void,
                                         Optional<OptionalTypeKind>> {
   friend ASTVisitor;
   friend TypeVisitor;
@@ -119,7 +119,7 @@ public:
 
   bool shouldInclude(const ValueDecl *VD) {
     return VD->isObjC() && VD->getFormalAccess() >= minRequiredAccess &&
-      !(isa<ConstructorDecl>(VD) && 
+      !(isa<ConstructorDecl>(VD) &&
         cast<ConstructorDecl>(VD)->hasStubImplementation());
   }
 
@@ -232,7 +232,7 @@ private:
     protocolMembersOptional = false;
     os << "@end\n";
   }
-  
+
   void visitEnumDecl(EnumDecl *ED) {
     printDocumentationComment(ED);
     os << "typedef ";
@@ -268,7 +268,7 @@ private:
         os << customEltName
            << " SWIFT_COMPILE_NAME(\"" << Elt->getName() << "\")";
       }
-      
+
       if (auto ILE = cast_or_null<IntegerLiteralExpr>(Elt->getRawValueExpr())) {
         os << " = ";
         if (ILE->isNegative())
@@ -373,7 +373,7 @@ private:
     }
 
     // Constructors and methods returning DynamicSelf return
-    // instancetype.    
+    // instancetype.
     if (isa<ConstructorDecl>(AFD) ||
         (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->hasDynamicSelf())) {
       if (errorConvention && errorConvention->stripsResultOptionality()) {
@@ -407,7 +407,7 @@ private:
     llvm::SmallString<128> selectorBuf;
     ArrayRef<Identifier> selectorPieces
       = AFD->getObjCSelector().getSelectorPieces();
-    
+
     const auto &params = paramLists[1]->getArray();
     unsigned paramIndex = 0;
     for (unsigned i = 0, n = selectorPieces.size(); i != n; ++i) {
@@ -752,11 +752,11 @@ private:
       MAP(COpaquePointer, "void *", true);
 
       Identifier ID_ObjectiveC = ctx.Id_ObjectiveC;
-      specialNames[{ID_ObjectiveC, ctx.getIdentifier("ObjCBool")}] 
+      specialNames[{ID_ObjectiveC, ctx.getIdentifier("ObjCBool")}]
         = { "BOOL", false};
-      specialNames[{ID_ObjectiveC, ctx.getIdentifier("Selector")}] 
+      specialNames[{ID_ObjectiveC, ctx.getIdentifier("Selector")}]
         = { "SEL", true };
-      specialNames[{ID_ObjectiveC, ctx.getIdentifier("NSZone")}] 
+      specialNames[{ID_ObjectiveC, ctx.getIdentifier("NSZone")}]
         = { "struct _NSZone *", true };
 
       specialNames[{ctx.Id_Darwin, ctx.getIdentifier("DarwinBoolean")}]
@@ -861,7 +861,7 @@ private:
     os << clangDecl->getKindName() << " ";
   }
 
-  void visitStructType(StructType *ST, 
+  void visitStructType(StructType *ST,
                        Optional<OptionalTypeKind> optionalKind) {
     const StructDecl *SD = ST->getStructOrBoundGenericStruct();
     if (SD == M.getASTContext().getStringDecl()) {
@@ -1020,8 +1020,8 @@ private:
     }
   }
 
-  void visitProtocolType(ProtocolType *PT, 
-                         Optional<OptionalTypeKind> optionalKind, 
+  void visitProtocolType(ProtocolType *PT,
+                         Optional<OptionalTypeKind> optionalKind,
                          bool isMetatype = false) {
     os << (isMetatype ? "Class" : "id");
 
@@ -1038,7 +1038,7 @@ private:
     printNullability(optionalKind);
   }
 
-  void visitProtocolCompositionType(ProtocolCompositionType *PCT, 
+  void visitProtocolCompositionType(ProtocolCompositionType *PCT,
                                     Optional<OptionalTypeKind> optionalKind,
                                     bool isMetatype = false) {
     CanType canonicalComposition = PCT->getCanonicalType();
@@ -1058,7 +1058,7 @@ private:
     printNullability(optionalKind);
   }
 
-  void visitExistentialMetatypeType(ExistentialMetatypeType *MT, 
+  void visitExistentialMetatypeType(ExistentialMetatypeType *MT,
                                     Optional<OptionalTypeKind> optionalKind) {
     Type instanceTy = MT->getInstanceType();
     if (auto protoTy = instanceTy->getAs<ProtocolType>()) {
@@ -1070,7 +1070,7 @@ private:
     }
   }
 
-  void visitMetatypeType(MetatypeType *MT, 
+  void visitMetatypeType(MetatypeType *MT,
                          Optional<OptionalTypeKind> optionalKind) {
     Type instanceTy = MT->getInstanceType();
     if (auto classTy = instanceTy->getAs<ClassType>()) {
@@ -1084,7 +1084,7 @@ private:
       visitType(MT, optionalKind);
     }
   }
-                      
+
   void printFunctionType(FunctionType *FT, char pointerSigil,
                          Optional<OptionalTypeKind> optionalKind) {
     visitPart(FT->getResult(), OTK_None);
@@ -1093,7 +1093,7 @@ private:
     openFunctionTypes.push_back(FT);
   }
 
-  void visitFunctionType(FunctionType *FT, 
+  void visitFunctionType(FunctionType *FT,
                          Optional<OptionalTypeKind> optionalKind) {
     switch (FT->getRepresentation()) {
     case AnyFunctionType::Representation::Thin:
@@ -1139,28 +1139,28 @@ private:
     visitPart(PT->getSinglyDesugaredType(), optionalKind);
   }
 
-  void visitSubstitutedType(SubstitutedType *ST, 
+  void visitSubstitutedType(SubstitutedType *ST,
                             Optional<OptionalTypeKind> optionalKind) {
     visitPart(ST->getSinglyDesugaredType(), optionalKind);
   }
 
-  void visitSyntaxSugarType(SyntaxSugarType *SST, 
+  void visitSyntaxSugarType(SyntaxSugarType *SST,
                             Optional<OptionalTypeKind> optionalKind) {
     visitPart(SST->getSinglyDesugaredType(), optionalKind);
   }
 
-  void visitDictionaryType(DictionaryType *DT, 
+  void visitDictionaryType(DictionaryType *DT,
                            Optional<OptionalTypeKind> optionalKind) {
     visitPart(DT->getSinglyDesugaredType(), optionalKind);
   }
 
-  void visitDynamicSelfType(DynamicSelfType *DST, 
+  void visitDynamicSelfType(DynamicSelfType *DST,
                             Optional<OptionalTypeKind> optionalKind) {
     printNullability(optionalKind, NullabilityPrintKind::ContextSensitive);
     os << "instancetype";
   }
 
-  void visitReferenceStorageType(ReferenceStorageType *RST, 
+  void visitReferenceStorageType(ReferenceStorageType *RST,
                                  Optional<OptionalTypeKind> optionalKind) {
     visitPart(RST->getReferentType(), optionalKind);
   }
@@ -1171,7 +1171,7 @@ private:
   /// finishFunctionType()). If only a part of a type is being printed, use
   /// visitPart().
 public:
-  void print(Type ty, Optional<OptionalTypeKind> optionalKind, 
+  void print(Type ty, Optional<OptionalTypeKind> optionalKind,
              StringRef name = "") {
     PrettyStackTraceType trace(M.getASTContext(), "printing", ty);
 
@@ -1388,10 +1388,10 @@ public:
       os << "@protocol " << getNameForObjC(PD) << ";\n";
     });
   }
-  
+
   void forwardDeclare(const EnumDecl *ED) {
     assert(ED->isObjC() || ED->hasClangNode());
-    
+
     forwardDeclare(ED, [&]{
       os << "enum " << ED->getName() << " : ";
       printer.print(ED->getRawType(), OTK_None);
@@ -1520,14 +1520,14 @@ public:
     printer.print(ED);
     return true;
   }
-  
+
   bool writeEnum(const EnumDecl *ED) {
     if (addImport(ED))
       return true;
-    
+
     if (seenTypes[ED].first == EmissionState::Defined)
       return true;
-    
+
     seenTypes[ED] = {EmissionState::Defined, true};
     printer.print(ED);
 
@@ -1784,9 +1784,9 @@ public:
       // FIXME: This will end up taking linear time.
       auto lhsMembers = cast<ExtensionDecl>(*lhs)->getMembers();
       auto rhsMembers = cast<ExtensionDecl>(*rhs)->getMembers();
-      unsigned numLHSMembers = std::distance(lhsMembers.begin(), 
+      unsigned numLHSMembers = std::distance(lhsMembers.begin(),
                                              lhsMembers.end());
-      unsigned numRHSMembers = std::distance(rhsMembers.begin(), 
+      unsigned numRHSMembers = std::distance(rhsMembers.begin(),
                                              rhsMembers.end());
       if (numLHSMembers != numRHSMembers)
         return numLHSMembers < numRHSMembers ? Descending : Ascending;

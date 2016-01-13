@@ -34,7 +34,7 @@ void performStmtDiagnostics(TypeChecker &TC, const Stmt *S);
 
 void performAbstractFuncDeclDiagnostics(TypeChecker &TC,
                                         AbstractFunctionDecl *AFD);
-  
+
 /// Emit a fix-it to set the accessibility of \p VD to \p desiredAccess.
 ///
 /// This actually updates \p VD as well.

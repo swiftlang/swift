@@ -62,9 +62,9 @@ private:
 
 public:
   LocalTypeDataKind() = default;
-  
+
   // The magic values are all odd and so do not collide with pointer values.
-  
+
   /// A reference to the type metadata.
   static LocalTypeDataKind forTypeMetadata() {
     return LocalTypeDataKind(TypeMetadata);
@@ -79,7 +79,7 @@ public:
   static LocalTypeDataKind forValueWitness(ValueWitness witness) {
     return LocalTypeDataKind(ValueWitnessBase + (unsigned)witness);
   }
-  
+
   /// A reference to a protocol witness table for an archetype.
   ///
   /// This only works for non-concrete types because in principle we might

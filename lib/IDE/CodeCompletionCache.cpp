@@ -159,7 +159,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
   auto stringCount = read32le(strings);
   assert(strings + stringCount == end && "incorrect file size");
   (void)stringCount; // so it is not seen as "unused" in release builds.
-  
+
   // STRINGS
   auto getString = [&](uint32_t index) -> StringRef {
     if (index == ~0u)

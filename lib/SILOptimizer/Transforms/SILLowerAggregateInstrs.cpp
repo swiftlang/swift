@@ -193,7 +193,7 @@ static bool expandRetainValue(RetainValueInst *CV) {
   auto &TL = Module.getTypeLowering(Type);
   TL.emitLoweredRetainValue(Builder, CV->getLoc(), Value,
                           TypeLowering::LoweringStyle::DeepNoEnum);
-  
+
   DEBUG(llvm::dbgs() << "    Expanding Copy Value: " << *CV);
 
   ++NumExpand;

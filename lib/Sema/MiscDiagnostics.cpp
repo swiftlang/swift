@@ -92,7 +92,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
   class DiagnoseWalker : public ASTWalker {
     SmallPtrSet<Expr*, 4> AlreadyDiagnosedMetatypes;
     SmallPtrSet<DeclRefExpr*, 4> AlreadyDiagnosedNoEscapes;
-    
+
     // Keep track of acceptable DiscardAssignmentExpr's.
     SmallPtrSet<DiscardAssignmentExpr*, 2> CorrectDiscardAssignmentExprs;
 
@@ -312,7 +312,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         // Check whether there are needless words that could be omitted.
         TC.checkOmitNeedlessWords(Call);
       }
-      
+
       // If we have an assignment expression, scout ahead for acceptable _'s.
       if (auto *AE = dyn_cast<AssignExpr>(E))
         markAcceptableDiscardExprs(AE->getDest());
@@ -355,7 +355,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     /// in simple pattern-like expressions, so we reject anything complex here.
     void markAcceptableDiscardExprs(Expr *E) {
       if (!E) return;
-      
+
       if (auto *PE = dyn_cast<ParenExpr>(E))
         return markAcceptableDiscardExprs(PE->getSubExpr());
       if (auto *TE = dyn_cast<TupleExpr>(E)) {
@@ -368,7 +368,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       // Otherwise, we can't support this.
     }
-    
+
 
     void checkUseOfModule(DeclRefExpr *E) {
       // Allow module values as a part of:
@@ -568,7 +568,7 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
 
       if (auto *AE = dyn_cast<AssignExpr>(E)) {
         subExpr = AE->getDest();
-        
+
         // If we couldn't flatten this expression, don't explode.
         if (!subExpr)
           return { true, E };
@@ -605,7 +605,7 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
                           Var->getName(), Accessor->isSetter());
             }
           }
-          
+
           // If this is a direct store in a "willSet", we reject this because
           // it is about to get overwritten.
           if (isStore &&
@@ -622,7 +622,7 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
         if (MRE->getMember().getDecl() == Var &&
             isa<DeclRefExpr>(MRE->getBase()) &&
             MRE->getBase()->isImplicit()) {
-          
+
           if (MRE->getAccessSemantics() != AccessSemantics::DirectToStorage) {
             bool shouldDiagnose = false;
             // Warn about any property access in the getter.
@@ -746,7 +746,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
 
       return { true, E };
     }
-    
+
     Expr *walkToExprPost(Expr *E) override {
       if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
         if (isClosureRequiringSelfQualification(CE)) {
@@ -754,7 +754,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
           --InClosure;
         }
       }
-      
+
       return E;
     }
   };
@@ -920,7 +920,7 @@ public:
       walkInOutExpr(IO);
       return skipChildren();
     }
-    
+
     return visitChildren();
   }
 
@@ -960,7 +960,7 @@ private:
     }
     walkInContext(Source, MemberAccessContext::Getter);
   }
-  
+
   /// Walk a member reference expression, checking for availability.
   void walkMemberRef(MemberRefExpr *E) {
     // Walk the base in a getter context.
@@ -979,7 +979,7 @@ private:
       diagStorageAccess(ASD, E->getSourceRange(), DC);
     }
   }
-  
+
   /// Walk an inout expression, checking for availability.
   void walkInOutExpr(InOutExpr *E) {
     walkInContext(E->getSubExpr(), MemberAccessContext::InOut);
@@ -998,7 +998,7 @@ private:
     if (!D->hasAccessorFunctions()) {
       return;
     }
-    
+
     // Check availability of accessor functions
     switch (AccessContext) {
     case MemberAccessContext::Getter:
@@ -1125,7 +1125,7 @@ bool AvailabilityWalker::diagnoseIncDecDeprecation(const ValueDecl *D,
     replacement = " = " + SM.extractText(CSR).str();
     replacement += isInc ? ".successor()" : ".predecessor()";
   }
-  
+
   if (!replacement.empty()) {
     // If we emit a deprecation diagnostic, produce a fixit hint as well.
     TC.diagnoseDeprecated(R, DC, Attr, D->getFullName(),
@@ -1163,15 +1163,15 @@ static void diagAvailability(TypeChecker &TC, const Expr *E,
 namespace {
 class VarDeclUsageChecker : public ASTWalker {
   TypeChecker &TC;
-  
+
   // Keep track of some information about a variable.
   enum {
     RK_Read        = 1,      ///< Whether it was ever read.
     RK_Written     = 2,      ///< Whether it was ever written or passed inout.
-    
+
     RK_CaptureList = 4       ///< Var is an entry in a capture list.
   };
-  
+
   /// These are all of the variables that we are tracking.  VarDecls get added
   /// to this when the declaration is seen.  We use a MapVector to keep the
   /// diagnostics emission in deterministic order.
@@ -1180,13 +1180,13 @@ class VarDeclUsageChecker : public ASTWalker {
   /// This is a mapping from an OpaqueValue to the expression that initialized
   /// it.
   llvm::SmallDenseMap<OpaqueValueExpr*, Expr*> OpaqueValueMap;
-  
+
   /// This is a mapping from VarDecls to the if/while/guard statement that they
   /// occur in, when they are in a pattern in a StmtCondition.
   llvm::SmallDenseMap<VarDecl*, LabeledConditionalStmt*> StmtConditionForVD;
-  
+
   bool sawError = false;
-  
+
   VarDeclUsageChecker(const VarDeclUsageChecker &) = delete;
   void operator=(const VarDeclUsageChecker &) = delete;
 
@@ -1197,18 +1197,18 @@ public:
       for (auto param : *PL)
         if (shouldTrackVarDecl(param))
           VarDecls[param] = 0;
-    
+
   }
-    
+
   VarDeclUsageChecker(TypeChecker &TC, VarDecl *VD) : TC(TC) {
     // Track a specific VarDecl
     VarDecls[VD] = 0;
   }
-    
+
   void suppressDiagnostics() {
     sawError = true; // set this flag so that no diagnostics will be emitted on delete.
   }
-    
+
   // After we have scanned the entire region, diagnose variables that could be
   // declared with a narrower usage kind.
   ~VarDeclUsageChecker();
@@ -1231,7 +1231,7 @@ public:
     }
     return sawMutation;
   }
-    
+
   bool isVarDeclEverWritten(VarDecl *VD) {
     return (VarDecls[VD] & RK_Written) != 0;
   }
@@ -1240,18 +1240,18 @@ public:
     // If the variable is implicit, ignore it.
     if (VD->isImplicit() || VD->getLoc().isInvalid())
       return false;
-    
+
     // If the variable was invalid, ignore it and notice that the code is
     // malformed.
     if (VD->isInvalid() || !VD->hasType()) {
       sawError = true;
       return false;
     }
-    
+
     // If the variable is already unnamed, ignore it.
     if (!VD->hasName() || VD->getName().str() == "_")
       return false;
-    
+
     return true;
   }
 
@@ -1263,17 +1263,17 @@ public:
     if (vdi != VarDecls.end())
       vdi->second |= Flag;
   }
-  
+
   void markBaseOfAbstractStorageDeclStore(Expr *E, ConcreteDeclRef decl);
-  
+
   void markStoredOrInOutExpr(Expr *E, unsigned Flags);
-  
+
   // We generally walk into declarations, other than types and nested functions.
   // FIXME: peek into capture lists of nested functions.
   bool walkToDeclPre(Decl *D) override {
     if (isa<TypeDecl>(D))
       return false;
-      
+
     // If this is a VarDecl, then add it to our list of things to track.
     if (auto *vd = dyn_cast<VarDecl>(D))
       if (shouldTrackVarDecl(vd)) {
@@ -1298,18 +1298,18 @@ public:
         // possibly be used.
         VarDecls.clear();
       }
-      
+
       // Don't walk into it though, it may not even be type checked yet.
       return false;
     }
 
-    
+
     // Note that we ignore the initialization behavior of PatternBindingDecls,
     // but we do want to walk into them, because we want to see any uses or
     // other things going on in the initializer expressions.
     return true;
   }
-  
+
   /// The heavy lifting happens when visiting expressions.
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override;
 
@@ -1322,7 +1322,7 @@ public:
     // for them.
     if (auto *ICS = dyn_cast<IfConfigStmt>(S))
       handleIfConfig(ICS);
-      
+
     // Keep track of an association between vardecls and the StmtCondition that
     // they are bound in for IfStmt, GuardStmt, WhileStmt, etc.
     if (auto LCS = dyn_cast<LabeledConditionalStmt>(S)) {
@@ -1333,7 +1333,7 @@ public:
           });
         }
     }
-      
+
     return { true, S };
   }
 
@@ -1349,7 +1349,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
   // lets let the bigger issues get resolved first.
   if (sawError)
     return;
-  
+
   for (auto elt : VarDecls) {
     auto *var = elt.first;
     unsigned access = elt.second;
@@ -1358,24 +1358,24 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     // not mutations.
     if (var->isLet())
       access &= ~RK_Written;
-    
+
     // If this variable has WeakStorageType, then it can be mutated in ways we
     // don't know.
     if (var->getType()->is<WeakStorageType>())
       access |= RK_Written;
-    
+
     // If this is a vardecl with 'inout' type, then it is an inout argument to a
     // function, never diagnose anything related to it.
     if (var->getType()->is<InOutType>())
-      continue;    
-    
+      continue;
+
     // Consider parameters to always have been read.  It is common to name a
     // parameter and not use it (e.g. because you are an override or want the
     // named keyword, etc).  Warning to rewrite it to _ is more annoying than
     // it is useful.
     if (isa<ParamDecl>(var))
       access |= RK_Read;
-    
+
     // Diagnose variables that were never used (other than their
     // initialization).
     //
@@ -1388,7 +1388,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
                     var->getName());
         continue;
       }
-      
+
       // If the source of the VarDecl is a trivial PatternBinding with only a
       // single binding, rewrite the whole thing into an assignment.
       //    let x = foo()
@@ -1402,7 +1402,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
             .fixItReplace(SourceRange(pbd->getLoc(), var->getLoc()), "_");
           continue;
         }
-      
+
       // If the variable is defined in a pattern in an if/while/guard statement,
       // see if we can produce a tuned fixit.  When we have something like:
       //
@@ -1425,7 +1425,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
                   initExpr->getStartLoc().getAdvancedLocOrInvalid(-1);
                 if (beforeExprLoc.isValid()) {
                   unsigned noParens = initExpr->canAppendCallParentheses();
-                  
+
                   // If the subexpr is an "as?" cast, we can rewrite it to
                   // be an "is" test.
                   bool isIsTest = false;
@@ -1433,14 +1433,14 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
                       !initExpr->isImplicit()) {
                     noParens = isIsTest = true;
                   }
-                  
+
                   auto diagIF = TC.diagnose(var->getLoc(),
                                             diag::pbd_never_used_stmtcond,
                                             var->getName());
                   auto introducerLoc = SC->getCond()[0].getIntroducerLoc();
                   diagIF.fixItReplace(SourceRange(introducerLoc, beforeExprLoc),
                                       &"("[noParens]);
-                  
+
                   if (isIsTest) {
                     // If this was an "x as? T" check, rewrite it to "x is T".
                     auto CCE = cast<ConditionalCheckedCastExpr>(initExpr);
@@ -1456,7 +1456,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
               }
         }
       }
-      
+
       // Otherwise, this is something more complex, perhaps
       //    let (a,b) = foo()
       // Just rewrite the one variable with a _.
@@ -1466,7 +1466,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
         .fixItReplace(var->getLoc(), "_");
       continue;
     }
-    
+
     // If this is a mutable 'var', and it was never written to, suggest
     // upgrading to 'let'.  We do this even for a parameter.
     if (!var->isLet() && (access & RK_Written) == 0 &&
@@ -1474,7 +1474,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
         // never mutated, but 'x' was.
         !isVarDeclPartOfPBDThatHadSomeMutation(var)) {
       SourceLoc FixItLoc;
-      
+
       // Try to find the location of the 'var' so we can produce a fixit.  If
       // this is a simple PatternBinding, use its location.
       if (auto *PBD = var->getParentPatternBinding()) {
@@ -1486,7 +1486,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
           if (auto *VP = dyn_cast<VarPattern>(P))
             foundVP = VP;
         });
-        
+
         if (foundVP && !foundVP->isLet())
           FixItLoc = foundVP->getLoc();
       }
@@ -1502,7 +1502,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
           .fixItReplace(FixItLoc, "let");
       continue;
     }
-    
+
     // If this is a variable that was only written to, emit a warning.
     if ((access & RK_Read) == 0) {
       TC.diagnose(var->getLoc(), diag::variable_never_read, var->getName(),
@@ -1534,7 +1534,7 @@ markBaseOfAbstractStorageDeclStore(Expr *base, ConcreteDeclRef decl) {
     base->walk(*this);
     return;
   }
-  
+
   // Otherwise this is a read and write of the base.
   return markStoredOrInOutExpr(base, RK_Written|RK_Read);
 }
@@ -1547,22 +1547,22 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
     sawError = true;
     return;
   }
-  
+
   // Ignore parens and other easy cases.
   E = E->getSemanticsProvidingExpr();
-  
+
   // If we found a decl that is being assigned to, then mark it.
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
     addMark(DRE->getDecl(), Flags);
     return;
   }
-  
+
   if (auto *TE = dyn_cast<TupleExpr>(E)) {
     for (auto &elt : TE->getElements())
       markStoredOrInOutExpr(elt, Flags);
     return;
   }
-  
+
   // If this is an assignment into a mutating subscript lvalue expr, then we
   // are mutating the base expression.  We also need to visit the index
   // expressions as loads though.
@@ -1573,27 +1573,27 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
       markBaseOfAbstractStorageDeclStore(SE->getBase(), SE->getDecl());
     else  // FIXME: Should not be needed!
       markStoredOrInOutExpr(SE->getBase(), RK_Written|RK_Read);
-    
+
     return;
   }
-  
+
   if (auto *ioe = dyn_cast<InOutExpr>(E))
     return markStoredOrInOutExpr(ioe->getSubExpr(), RK_Written|RK_Read);
-  
+
   if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
     markBaseOfAbstractStorageDeclStore(MRE->getBase(), MRE->getMember());
     return;
   }
-  
+
   if (auto *TEE = dyn_cast<TupleElementExpr>(E))
     return markStoredOrInOutExpr(TEE->getBase(), Flags);
-  
+
   if (auto *FVE = dyn_cast<ForceValueExpr>(E))
     return markStoredOrInOutExpr(FVE->getSubExpr(), Flags);
 
   if (auto *BOE = dyn_cast<BindOptionalExpr>(E))
     return markStoredOrInOutExpr(BOE->getSubExpr(), Flags);
-  
+
   // If this is an OpaqueValueExpr that we've seen a mapping for, jump to the
   // mapped value.
   if (auto *OVE = dyn_cast<OpaqueValueExpr>(E))
@@ -1605,7 +1605,7 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
   E->walk(*this);
 }
 
-   
+
 
 /// The heavy lifting happens when visiting expressions.
 std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
@@ -1625,27 +1625,27 @@ std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
   // about.
   if (auto *assign = dyn_cast<AssignExpr>(E)) {
     markStoredOrInOutExpr(assign->getDest(), RK_Written);
-    
+
     // Don't walk into the LHS of the assignment, only the RHS.
     assign->getSrc()->walk(*this);
     return { false, E };
   }
-  
+
   // '&x' is a read and write of 'x'.
   if (auto *io = dyn_cast<InOutExpr>(E)) {
     markStoredOrInOutExpr(io->getSubExpr(), RK_Read|RK_Written);
     // Don't bother walking into this.
     return { false, E };
   }
-  
+
   // If we see an OpenExistentialExpr, remember the mapping for its OpaqueValue.
   if (auto *oee = dyn_cast<OpenExistentialExpr>(E))
     OpaqueValueMap[oee->getOpaqueValue()] = oee->getExistentialValue();
-  
+
   // If we saw an ErrorExpr, take note of this.
   if (isa<ErrorExpr>(E))
     sawError = true;
-  
+
   return { true, E };
 }
 
@@ -1680,11 +1680,11 @@ void VarDeclUsageChecker::handleIfConfig(IfConfigStmt *ICS) {
 void swift::performAbstractFuncDeclDiagnostics(TypeChecker &TC,
                                                AbstractFunctionDecl *AFD) {
   assert(AFD->getBody() && "Need a body to check");
-  
+
   // Don't produce these diagnostics for implicitly generated code.
   if (AFD->getLoc().isInvalid() || AFD->isImplicit() || AFD->isInvalid())
     return;
-  
+
   // Check for unused variables, as well as variables that are could be
   // declared as constants.
   AFD->getBody()->walk(VarDeclUsageChecker(TC, AFD));
@@ -1745,7 +1745,7 @@ static bool unaryIncrementForConvertingCStyleForLoop(const ForStmt *FS, VarDecl 
     return false;
   if (unaryFuncExpr->getDecl()->getNameStr() != "++")
     return false;
-  return incrementDeclRefExpr->getDecl() == loopVar;    
+  return incrementDeclRefExpr->getDecl() == loopVar;
 }
 
 static bool plusEqualOneIncrementForConvertingCStyleForLoop(TypeChecker &TC, const ForStmt *FS, VarDecl *loopVar) {
@@ -1785,9 +1785,9 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
   // If we're missing semi-colons we'll already be erroring out, and this may not even have been intended as C-style.
   if (FS->getFirstSemicolonLoc().isInvalid() || FS->getSecondSemicolonLoc().isInvalid())
     return;
-    
+
   InFlightDiagnostic diagnostic = TC.diagnose(FS->getStartLoc(), diag::deprecated_c_style_for_stmt);
-    
+
   // Try to construct a fix it using for-each:
 
   // Verify that there is only one loop variable, and it is declared here.
@@ -1804,21 +1804,21 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
 
   if (!loopVar || !startValue || !endValue || !strideByOne)
     return;
-    
+
   // Verify that the loop variable is invariant inside the body.
   VarDeclUsageChecker checker(TC, loopVar);
   checker.suppressDiagnostics();
   FS->getBody()->walk(checker);
-    
+
   if (checker.isVarDeclEverWritten(loopVar)) {
     diagnostic.flush();
     TC.diagnose(FS->getStartLoc(), diag::cant_fix_c_style_for_stmt);
     return;
   }
-    
+
   SourceLoc loopPatternEnd = Lexer::getLocForEndOfToken(TC.Context.SourceMgr, loopVarDecl->getPattern(0)->getEndLoc());
   SourceLoc endOfIncrementLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr, FS->getIncrement().getPtrOrNull()->getEndLoc());
-    
+
   diagnostic
    .fixItReplaceChars(loopPatternEnd, startValue->getStartLoc(), " in ")
    .fixItReplaceChars(FS->getFirstSemicolonLoc(), endValue->getStartLoc(), " ..< ")
@@ -1842,7 +1842,7 @@ void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
 
 void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
   TC.checkUnsupportedProtocolType(const_cast<Stmt *>(S));
-    
+
   if (auto forStmt = dyn_cast<ForStmt>(S))
     checkCStyleForLoop(TC, forStmt);
 }
@@ -2051,7 +2051,7 @@ static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
     paramTypes.push_back(getTypeNameForOmission(param->getType())
                          .withDefaultArgument(param->isDefaultArgument()));
   }
-  
+
   // Handle contextual type, result type, and returnsSelf.
   Type contextType = afd->getDeclContext()->getDeclaredInterfaceType();
   Type resultType;
@@ -2212,10 +2212,10 @@ static bool hasExtraneousDefaultArguments(AbstractFunctionDecl *afd,
 
   if (auto shuffle = dyn_cast<TupleShuffleExpr>(arg))
     arg = shuffle->getSubExpr();
-    
+
   TupleExpr *argTuple = dyn_cast<TupleExpr>(arg);
   ParenExpr *argParen = dyn_cast<ParenExpr>(arg);
-  
+
   ASTContext &ctx = afd->getASTContext();
   // Skip over the implicit 'self'.
   auto *bodyParams = afd->getParameterList(afd->getImplicitSelfDecl()?1:0);

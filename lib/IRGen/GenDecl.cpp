@@ -79,7 +79,7 @@ static bool isTypeMetadataEmittedLazily(CanType type) {
 }
 
 namespace {
-  
+
 /// Add methods, properties, and protocol conformances from a JITed extension
 /// to an ObjC class using the ObjC runtime.
 ///
@@ -91,13 +91,13 @@ class CategoryInitializerVisitor
   IRGenFunction &IGF;
   IRGenModule &IGM = IGF.IGM;
   IRBuilder &Builder = IGF.Builder;
-  
+
   llvm::Constant *class_replaceMethod;
   llvm::Constant *class_addProtocol;
-  
+
   llvm::Constant *classMetadata;
   llvm::Constant *metaclassMetadata;
-  
+
 public:
   CategoryInitializerVisitor(IRGenFunction &IGF, ExtensionDecl *ext)
     : IGF(IGF)
@@ -127,13 +127,13 @@ public:
     for (auto *p : ext->getLocalProtocols()) {
       if (!p->isObjC())
         continue;
-      
+
       llvm::Value *protoRef = IGM.getAddrOfObjCProtocolRef(p, NotForDefinition);
       auto proto = Builder.CreateLoad(protoRef, IGM.getPointerAlignment());
       Builder.CreateCall(class_addProtocol, {classMetadata, proto});
     }
   }
-  
+
   void visitMembers(ExtensionDecl *ext) {
     for (Decl *member : ext->getMembers())
       visit(member);
@@ -142,7 +142,7 @@ public:
   void visitTypeDecl(TypeDecl *type) {
     // We'll visit nested types separately if necessary.
   }
-  
+
   void visitFuncDecl(FuncDecl *method) {
     if (!requiresObjCMethodDescriptor(method)) return;
 
@@ -155,19 +155,19 @@ public:
                                   /*extended*/false,
                                   /*concrete*/true,
                                   name, types, imp);
-    
+
     // When generating JIT'd code, we need to call sel_registerName() to force
     // the runtime to unique the selector.
     llvm::Value *sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(),
                                           name);
-    
+
     llvm::Value *args[] = {
       method->isStatic() ? metaclassMetadata : classMetadata,
       sel,
       imp,
       types
     };
-    
+
     Builder.CreateCall(class_replaceMethod, args);
   }
 
@@ -199,7 +199,7 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *binding) {
     // Ignore the PBD and just handle the individual vars.
   }
-  
+
   void visitVarDecl(VarDecl *prop) {
     if (!requiresObjCPropertyDescriptor(IGM, prop)) return;
 
@@ -228,7 +228,7 @@ public:
       sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(),
                                name);
       llvm::Value *setterArgs[] = {theClass, sel, imp, types};
-      
+
       Builder.CreateCall(class_replaceMethod, setterArgs);
     }
   }
@@ -236,7 +236,7 @@ public:
   void visitSubscriptDecl(SubscriptDecl *subscript) {
     assert(!subscript->isStatic() && "objc doesn't support class subscripts");
     if (!requiresObjCSubscriptDescriptor(IGM, subscript)) return;
-    
+
     llvm::Constant *name, *imp, *types;
     emitObjCGetterDescriptorParts(IGM, subscript,
                                   name, types, imp);
@@ -253,7 +253,7 @@ public:
       sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(),
                                name);
       llvm::Value *setterArgs[] = {classMetadata, sel, imp, types};
-      
+
       Builder.CreateCall(class_replaceMethod, setterArgs);
     }
   }
@@ -272,9 +272,9 @@ class ObjCProtocolInitializerVisitor
                  *objc_registerProtocol,
                  *protocol_addMethodDescription,
                  *protocol_addProtocol;
-  
+
   llvm::Value *NewProto = nullptr;
-  
+
 public:
   ObjCProtocolInitializerVisitor(IRGenFunction &IGF)
     : IGF(IGF)
@@ -285,14 +285,14 @@ public:
     protocol_addMethodDescription = IGM.getProtocolAddMethodDescriptionFn();
     protocol_addProtocol = IGM.getProtocolAddProtocolFn();
   }
-  
+
   void visitMembers(ProtocolDecl *proto) {
     // Check if the ObjC runtime already has a descriptor for this
     // protocol. If so, use it.
     SmallString<32> buf;
     auto protocolName
       = IGM.getAddrOfGlobalString(proto->getObjCRuntimeName(buf));
-    
+
     auto existing = Builder.CreateCall(objc_getProtocol, protocolName);
     auto isNull = Builder.CreateICmpEQ(existing,
                    llvm::ConstantPointerNull::get(IGM.ProtocolDescriptorPtrTy));
@@ -301,16 +301,16 @@ public:
     auto newBB = IGF.createBasicBlock("new_protocol");
     auto contBB = IGF.createBasicBlock("cont");
     Builder.CreateCondBr(isNull, newBB, existingBB);
-    
+
     // Nothing to do if there's already a descriptor.
     Builder.emitBlock(existingBB);
     Builder.CreateBr(contBB);
-    
+
     Builder.emitBlock(newBB);
-    
+
     // Allocate the protocol descriptor.
     NewProto = Builder.CreateCall(objc_allocateProtocol, protocolName);
-    
+
     // Add the parent protocols.
     for (auto inherited : proto->getInherited()) {
       SmallVector<ProtocolDecl*, 4> protocols;
@@ -328,21 +328,21 @@ public:
         Builder.CreateCall(protocol_addProtocol, {NewProto, parent});
       }
     }
-    
+
     // Add the members.
     for (Decl *member : proto->getMembers())
       visit(member);
-    
+
     // Register it.
     Builder.CreateCall(objc_registerProtocol, NewProto);
     Builder.CreateBr(contBB);
-    
+
     // Store the reference to the runtime's idea of the protocol descriptor.
     Builder.emitBlock(contBB);
     auto result = Builder.CreatePHI(IGM.ProtocolDescriptorPtrTy, 2);
     result->addIncoming(existing, existingBB);
     result->addIncoming(NewProto, newBB);
-    
+
     llvm::Value *ref = IGM.getAddrOfObjCProtocolRef(proto, NotForDefinition);
     ref = IGF.Builder.CreateBitCast(ref,
                                   IGM.ProtocolDescriptorPtrTy->getPointerTo());
@@ -359,7 +359,7 @@ public:
     emitObjCMethodDescriptorParts(IGM, method, /*extended*/true,
                                   /*concrete*/false,
                                   name, types, imp);
-    
+
     // When generating JIT'd code, we need to call sel_registerName() to force
     // the runtime to unique the selector.
     llvm::Value *sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(), name);
@@ -373,17 +373,17 @@ public:
       llvm::ConstantInt::get(IGM.ObjCBoolTy,
                    isa<ConstructorDecl>(method) || method->isInstanceMember()),
     };
-    
+
     Builder.CreateCall(protocol_addMethodDescription, args);
   }
-  
+
   void visitPatternBindingDecl(PatternBindingDecl *binding) {
     // Ignore the PBD and just handle the individual vars.
   }
-  
+
   void visitAbstractStorageDecl(AbstractStorageDecl *prop) {
     // TODO: Add properties to protocol.
-    
+
     llvm::Constant *name, *imp, *types;
     emitObjCGetterDescriptorParts(IGM, prop,
                                   name, types, imp);
@@ -400,7 +400,7 @@ public:
                              prop->isInstanceMember()),
     };
     Builder.CreateCall(protocol_addMethodDescription, getterArgs);
-    
+
     if (prop->isSettable(nullptr)) {
       emitObjCSetterDescriptorParts(IGM, prop, name, types, imp);
       sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(), name);
@@ -504,10 +504,10 @@ void IRGenModule::emitRuntimeRegistration() {
                            ObjCClasses.empty() &&
                            ObjCCategoryDecls.empty())))
     return;
-  
+
   // Find the entry point.
   SILFunction *EntryPoint = SILMod->lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION);
-  
+
   // If we're debugging, we probably don't have a main. Find a
   // function marked with the LLDBDebuggerFunction attribute instead.
   if (!EntryPoint && Context.LangOpts.DebuggerSupport) {
@@ -524,14 +524,14 @@ void IRGenModule::emitRuntimeRegistration() {
       }
     }
   }
-  
+
   if (!EntryPoint)
     return;
-    
+
   llvm::Function *EntryFunction = Module.getFunction(EntryPoint->getName());
   if (!EntryFunction)
     return;
-  
+
   // Create a new function to contain our logic.
   auto fnTy = llvm::FunctionType::get(VoidTy, /*varArg*/ false);
   auto RegistrationFunction = llvm::Function::Create(fnTy,
@@ -539,7 +539,7 @@ void IRGenModule::emitRuntimeRegistration() {
                                            "runtime_registration",
                                            getModule());
   RegistrationFunction->setAttributes(constructInitialAttributes());
-  
+
   // Insert a call into the entry function.
   {
     llvm::BasicBlock *EntryBB = &EntryFunction->getEntryBlock();
@@ -548,21 +548,21 @@ void IRGenModule::emitRuntimeRegistration() {
     Builder.llvm::IRBuilderBase::SetInsertPoint(EntryBB, IP);
     Builder.CreateCall(RegistrationFunction, {});
   }
-  
+
   IRGenFunction RegIGF(*this, RegistrationFunction);
-  
+
   // Register ObjC protocols, classes, and extensions we added.
   if (ObjCInterop) {
     if (!ObjCProtocols.empty()) {
       // We need to initialize ObjC protocols in inheritance order, parents
       // first.
-      
+
       llvm::DenseSet<ProtocolDecl*> protos;
       for (auto &proto : ObjCProtocols)
         protos.insert(proto.first);
-      
+
       llvm::SmallVector<ProtocolDecl*, 4> protoInitOrder;
-      
+
       std::function<void(ProtocolDecl*)> orderProtocol
         = [&](ProtocolDecl *proto) {
           // Recursively put parents first.
@@ -580,7 +580,7 @@ void IRGenModule::emitRuntimeRegistration() {
           protos.erase(found);
           protoInitOrder.push_back(proto);
         };
-      
+
       while (!protos.empty()) {
         orderProtocol(*protos.begin());
       }
@@ -591,11 +591,11 @@ void IRGenModule::emitRuntimeRegistration() {
           .visitMembers(proto);
       }
     }
-    
+
     for (llvm::WeakVH &ObjCClass : ObjCClasses) {
       RegIGF.Builder.CreateCall(getInstantiateObjCClassFn(), {ObjCClass});
     }
-      
+
     for (ExtensionDecl *ext : ObjCCategoryDecls) {
       CategoryInitializerVisitor(RegIGF, ext).visitMembers(ext);
     }
@@ -617,7 +617,7 @@ void IRGenModule::emitRuntimeRegistration() {
     };
     auto end = llvm::ConstantExpr::getGetElementPtr(
         /*Ty=*/nullptr, conformances, endIndices);
-    
+
     RegIGF.Builder.CreateCall(getRegisterProtocolConformancesFn(), {begin, end});
   }
   RegIGF.Builder.CreateRetVoid();
@@ -713,7 +713,7 @@ void IRGenModuleDispatcher::emitGlobalTopLevel() {
     IGM->emitSILGlobalVariable(&v);
   }
   PrimaryIGM->emitCoverageMapping();
-  
+
   // Emit SIL functions.
   bool isWholeModule = PrimaryIGM->SILMod->isWholeModule();
   for (SILFunction &f : *PrimaryIGM->SILMod) {
@@ -736,7 +736,7 @@ void IRGenModuleDispatcher::emitGlobalTopLevel() {
     CurrentIGMPtr IGM = getGenModule(wt.getConformance()->getDeclContext());
     IGM->emitSILWitnessTable(&wt);
   }
-  
+
   for (auto Iter : *this) {
     IRGenModule *IGM = Iter.second;
     IGM->finishEmitAfterTopLevel();
@@ -831,7 +831,7 @@ void IRGenModule::emitVTableStubs() {
     const SILFunction &F = *I;
     if (! F.isExternallyUsedSymbol())
       continue;
-    
+
     if (!stub) {
       // Create a single stub function which calls swift_deletedMethodError().
       stub = llvm::Function::Create(llvm::FunctionType::get(VoidTy, false),
@@ -853,7 +853,7 @@ void IRGenModule::emitVTableStubs() {
 
 void IRGenModule::emitTypeVerifier() {
   // Look up the types to verify.
-  
+
   SmallVector<CanType, 4> TypesToVerify;
   for (auto name : Opts.VerifyTypeLayoutNames) {
     // Look up the name in the module.
@@ -866,7 +866,7 @@ void IRGenModule::emitTypeVerifier() {
                              name);
       continue;
     }
-    
+
     TypeDecl *typeDecl = nullptr;
     for (auto decl : lookup) {
       if (auto td = dyn_cast<TypeDecl>(decl)) {
@@ -883,7 +883,7 @@ void IRGenModule::emitTypeVerifier() {
       Context.Diags.diagnose(SourceLoc(), diag::type_to_verify_not_found, name);
       continue;
     }
-    
+
     {
       auto type = typeDecl->getDeclaredInterfaceType();
       if (type->hasTypeParameter()) {
@@ -891,7 +891,7 @@ void IRGenModule::emitTypeVerifier() {
                                name);
         continue;
       }
-      
+
       TypesToVerify.push_back(type->getCanonicalType());
     }
   next:;
@@ -904,11 +904,11 @@ void IRGenModule::emitTypeVerifier() {
 
   if (!EntryPoint)
     return;
-  
+
   llvm::Function *EntryFunction = Module.getFunction(EntryPoint->getName());
   if (!EntryFunction)
     return;
-  
+
   // Create a new function to contain our logic.
   auto fnTy = llvm::FunctionType::get(VoidTy, /*varArg*/ false);
   auto VerifierFunction = llvm::Function::Create(fnTy,
@@ -916,7 +916,7 @@ void IRGenModule::emitTypeVerifier() {
                                              "type_verifier",
                                              getModule());
   VerifierFunction->setAttributes(constructInitialAttributes());
-  
+
   // Insert a call into the entry function.
   {
     llvm::BasicBlock *EntryBB = &EntryFunction->getEntryBlock();
@@ -1032,10 +1032,10 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
   case Kind::GenericProtocolWitnessTableCache:
   case Kind::GenericProtocolWitnessTableInstantiationFunction:
     return SILLinkage::Private;
-  
+
   case Kind::SILFunction:
     return getSILFunction()->getEffectiveSymbolLinkage();
-      
+
   case Kind::SILGlobalVariable:
     return getSILGlobalVariable()->getLinkage();
   }
@@ -1046,10 +1046,10 @@ bool LinkEntity::isFragile(IRGenModule &IGM) const {
   switch (getKind()) {
     case Kind::SILFunction:
       return getSILFunction()->isFragile();
-      
+
     case Kind::SILGlobalVariable:
       return getSILGlobalVariable()->isFragile();
-      
+
     case Kind::DirectProtocolWitnessTable: {
       auto wt = IGM.SILMod->lookUpWitnessTable(getProtocolConformance());
       if (wt.first) {
@@ -1058,7 +1058,7 @@ bool LinkEntity::isFragile(IRGenModule &IGM) const {
         return false;
       }
     }
-      
+
     default:
       break;
   }
@@ -1071,11 +1071,11 @@ static std::pair<llvm::GlobalValue::LinkageTypes,
 getIRLinkage(IRGenModule &IGM,
              SILLinkage linkage, bool isFragile, ForDefinition_t isDefinition,
              bool isWeakImported) {
-  
+
 #define RESULT(LINKAGE, VISIBILITY)        \
 { llvm::GlobalValue::LINKAGE##Linkage, \
 llvm::GlobalValue::VISIBILITY##Visibility }
-  
+
   if (isFragile) {
     // Fragile functions/globals must be visible from outside, regardless of
     // their accessibility. If a caller is also fragile and inlined into another
@@ -1095,7 +1095,7 @@ llvm::GlobalValue::VISIBILITY##Visibility }
         break;
     }
   }
-  
+
   switch (linkage) {
   case SILLinkage::Public: return RESULT(External, Default);
   case SILLinkage::Shared:
@@ -1300,7 +1300,7 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
 
   case DeclKind::Subscript:
     llvm_unreachable("there are no global subscript operations");
-      
+
   case DeclKind::EnumCase:
   case DeclKind::EnumElement:
     llvm_unreachable("there are no global enum elements");
@@ -1343,7 +1343,7 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   case DeclKind::TopLevelCode:
     // All the top-level code will be lowered separately.
     return;
-      
+
   // Operator decls aren't needed for IRGen.
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
@@ -1460,11 +1460,11 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     gvar = link.createVariable(*this, storageType, fixedAlignment,
                                DbgTy, loc, var->getName());
   }
-  
+
   // Set the alignment from the TypeInfo.
   Address gvarAddr = Address(gvar, fixedAlignment);
   gvar->setAlignment(fixedAlignment.getValue());
-  
+
   return gvarAddr;
 }
 
@@ -1515,11 +1515,11 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
         !isPossiblyUsedExternally(f->getLinkage(), SILMod->isWholeModule()))
       dispatcher.addLazyFunction(f);
   }
-    
+
   llvm::AttributeSet attrs;
   llvm::FunctionType *fnType = getFunctionType(f->getLoweredFunctionType(),
                                                attrs);
-  
+
   auto cc = expandCallingConv(*this, f->getRepresentation());
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
@@ -2170,7 +2170,7 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   Alignment alignment = getPointerAlignment();
 
   ClassDecl *ObjCClass = nullptr;
-  
+
   // Patterns use the pattern type and no adjustment.
   if (isPattern) {
     defaultVarTy = TypeMetadataPatternStructTy;
@@ -2198,7 +2198,7 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
            && "metadata for foreign type should be emitted as "
               "foreign candidate");
     (void)nom;
-    
+
     defaultVarTy = TypeMetadataStructTy;
     adjustmentIndex = 0;
   } else {
@@ -2222,7 +2222,7 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
                                      TypeMetadataAddress::AddressPoint,
                                      isPattern);
 
-  auto DbgTy = ObjCClass 
+  auto DbgTy = ObjCClass
     ? DebugTypeInfo(ObjCClass, ObjCClassPtrTy,
                     getPointerSize(), getPointerAlignment())
     : DebugTypeInfo(MetatypeType::get(concreteType),
@@ -2247,7 +2247,7 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
     addr = llvm::ConstantExpr::getInBoundsGetElementPtr(
                                                  /*Ty=*/nullptr, addr, indices);
   }
-  
+
   return addr;
 }
 
@@ -2302,7 +2302,7 @@ llvm::Constant *IRGenModule::getAddrOfProtocolDescriptor(ProtocolDecl *D,
                                                 ForDefinition_t forDefinition) {
   if (D->isObjC())
     return getAddrOfObjCProtocolRecord(D, forDefinition);
-  
+
   auto entity = LinkEntity::forProtocolDescriptor(D);
   auto ty = ProtocolDescriptorStructTy;
   return getAddrOfLLVMVariable(entity, getPointerAlignment(),
@@ -2315,11 +2315,11 @@ Optional<llvm::Function*> IRGenModule::getAddrOfIVarInitDestroy(
                             bool isDestroyer,
                             bool isForeign,
                             ForDefinition_t forDefinition) {
-  SILDeclRef silRef(cd, 
+  SILDeclRef silRef(cd,
                     isDestroyer? SILDeclRef::Kind::IVarDestroyer
-                               : SILDeclRef::Kind::IVarInitializer, 
+                               : SILDeclRef::Kind::IVarInitializer,
                     ResilienceExpansion::Minimal,
-                    SILDeclRef::ConstructAtNaturalUncurryLevel, 
+                    SILDeclRef::ConstructAtNaturalUncurryLevel,
                     isForeign);
 
   // Find the SILFunction for the ivar initializer or destroyer.
@@ -2337,7 +2337,7 @@ llvm::Function *IRGenModule::getAddrOfValueWitness(CanType abstractType,
   // We shouldn't emit value witness symbols for generic type instances.
   assert(!isa<BoundGenericType>(abstractType) &&
          "emitting value witness for generic type instance?!");
-  
+
   LinkEntity entity = LinkEntity::forValueWitness(abstractType, index);
 
   llvm::Function *&entry = GlobalFuncs[entity];

@@ -140,7 +140,7 @@ TypeRefinementContext *
 TypeRefinementContext::findMostRefinedSubContext(SourceLoc Loc,
                                                  SourceManager &SM) {
   assert(Loc.isValid());
-  
+
   if (SrcRange.isValid() && !SM.rangeContainsTokenLoc(SrcRange, Loc))
     return nullptr;
 

@@ -48,7 +48,7 @@ class REPLContext {
 public:
   /// The SourceMgr buffer ID of the REPL input.
   unsigned CurBufferID;
-  
+
   /// The index into the source file's Decls at which to start
   /// typechecking the next REPL input.
   unsigned CurElem;
@@ -86,7 +86,7 @@ public:
                               reinterpret_cast<UTF16*>(targetEnd),
                               flags);
   }
-  
+
   static ConversionResult ConvertToUTF8(const wchar_t** sourceStart,
                                         const wchar_t* sourceEnd,
                                         char** targetStart,
@@ -114,7 +114,7 @@ public:
                               reinterpret_cast<UTF32*>(targetEnd),
                               flags);
   }
-  
+
   static ConversionResult ConvertToUTF8(const wchar_t** sourceStart,
                                         const wchar_t* sourceEnd,
                                         char** targetStart,
@@ -129,7 +129,7 @@ public:
 };
 
 using Convert = ConvertForWcharSize<sizeof(wchar_t)>;
-  
+
 #if defined(__APPLE__) || defined(__FreeBSD__)
 static void convertFromUTF8(llvm::StringRef utf8,
                             llvm::SmallVectorImpl<wchar_t> &out) {
@@ -144,7 +144,7 @@ static void convertFromUTF8(llvm::StringRef utf8,
   (void)res;
   out.set_size(wide_begin - out.begin());
 }
-  
+
 static void convertToUTF8(llvm::ArrayRef<wchar_t> wide,
                           llvm::SmallVectorImpl<char> &out) {
   size_t reserve = out.size() + wide.size()*4;
@@ -218,7 +218,7 @@ class PrettyStackTraceREPL : public llvm::PrettyStackTraceEntry {
   REPLInput &Input;
 public:
   PrettyStackTraceREPL(REPLInput &Input) : Input(Input) {}
-  
+
   void print(llvm::raw_ostream &out) const override;
 };
 }
@@ -237,8 +237,8 @@ public:
 /// grovel into the REPL's AST, then locking will be necessary to serialize
 /// access to the AST.
 class REPLInput {
-  PrettyStackTraceREPL StackTrace;  
-  
+  PrettyStackTraceREPL StackTrace;
+
   EditLine *e;
   HistoryW *h;
   size_t PromptContinuationLevel;
@@ -247,7 +247,7 @@ class REPLInput {
   bool PromptedForLine;
   bool Outdented;
   REPLCompletions completions;
-  
+
   llvm::SmallVector<wchar_t, 80> PromptString;
 
   /// A buffer for all lines that the user entered, but we have not parsed yet.
@@ -264,7 +264,7 @@ public:
   {
     // Only show colors if both stderr and stdout have colors.
     ShowColors = llvm::errs().has_colors() && llvm::outs().has_colors();
-    
+
     // Make sure the terminal color gets restored when the REPL is quit.
     if (ShowColors)
       atexit([] {
@@ -281,16 +281,16 @@ public:
     el_wset(e, EL_HIST, history, h);
     el_wset(e, EL_SIGNAL, 1);
     el_wset(e, EL_GETCFN, GetCharFn);
-    
+
     // Provide special outdenting behavior for '}' and ':'.
     el_wset(e, EL_ADDFN, L"swift-close-brace", L"Reduce {} indentation level",
             BindingFn<&REPLInput::onCloseBrace>);
     el_wset(e, EL_BIND, L"}", L"swift-close-brace", nullptr);
-    
+
     el_wset(e, EL_ADDFN, L"swift-colon", L"Reduce label indentation level",
             BindingFn<&REPLInput::onColon>);
     el_wset(e, EL_BIND, L":", L"swift-colon", nullptr);
-    
+
     // Provide special indent/completion behavior for tab.
     el_wset(e, EL_ADDFN, L"swift-indent-or-complete",
            L"Indent line or trigger completion",
@@ -300,17 +300,17 @@ public:
     el_wset(e, EL_ADDFN, L"swift-complete",
             L"Trigger completion",
             BindingFn<&REPLInput::onComplete>);
-    
+
     // Provide some common bindings to complement editline's defaults.
     // ^W should delete previous word, not the entire line.
     el_wset(e, EL_BIND, L"\x17", L"ed-delete-prev-word", nullptr);
     // ^_ should undo.
     el_wset(e, EL_BIND, L"\x1f", L"vi-undo", nullptr);
-    
+
     HistEventW ev;
     history_w(h, &ev, H_SETSIZE, 800);
   }
-  
+
   ~REPLInput() {
     if (ShowColors)
       llvm::outs().resetColor();
@@ -323,7 +323,7 @@ public:
     fflush(stdout);
     el_end(e);
   }
-  
+
   SourceFile &getREPLInputFile();
 
   REPLInputKind getREPLInput(SmallVectorImpl<char> &Result) {
@@ -337,7 +337,7 @@ public:
     // Reset color before showing the prompt.
     if (ShowColors)
       llvm::outs().resetColor();
-    
+
     do {
       // Read one line.
       PromptContinuationLevel = SCR.IndentLevel;
@@ -353,12 +353,12 @@ public:
           llvm::outs() << "\n";
         return REPLInputKind::REPLQuit;
       }
-      
+
       if (Autoindent) {
         size_t indent = PromptContinuationLevel*2;
         CurrentLines.append(indent, ' ');
       }
-      
+
       convertToUTF8(llvm::makeArrayRef(WLine, WLine + wcslen(WLine)),
                     CurrentLines);
 
@@ -411,11 +411,11 @@ public:
     // The lexer likes null-terminated data.
     Result.push_back('\0');
     Result.pop_back();
-    
+
     // Colorize the response output.
     if (ShowColors)
       llvm::outs().changeColor(llvm::raw_ostream::CYAN);
-    
+
     return REPLInputKind::SourceCode;
   }
 
@@ -425,7 +425,7 @@ private:
     el_wget(e, EL_CLIENTDATA, &clientdata);
     return const_cast<wchar_t*>(((REPLInput*)clientdata)->getPrompt());
   }
-  
+
   const wchar_t *getPrompt() {
     PromptString.clear();
 
@@ -436,8 +436,8 @@ private:
       if (colorCode)
         appendEscapeSequence(PromptString, colorCode);
     }
-    
-    
+
+
     if (!NeedPromptContinuation)
       PromptString.insert(PromptString.end(), PS1, PS1 + wcslen(PS1));
     else {
@@ -445,7 +445,7 @@ private:
       if (Autoindent)
         PromptString.append(2*PromptContinuationLevel, L' ');
     }
-    
+
     if (ShowColors) {
       const char *colorCode = llvm::sys::Process::ResetColor();
       if (colorCode)
@@ -479,14 +479,14 @@ private:
     *out = wchar_t(c);
     return 1;
   }
-  
+
   template<unsigned char (REPLInput::*method)(int)>
   static unsigned char BindingFn(EditLine *e, int ch) {
     void *clientdata;
     el_wget(e, EL_CLIENTDATA, &clientdata);
     return (((REPLInput*)clientdata)->*method)(ch);
   }
-  
+
   bool isAtStartOfLine(const LineInfoW *line) {
     for (wchar_t c : llvm::makeArrayRef(line->buffer,
                                         line->cursor - line->buffer)) {
@@ -504,23 +504,23 @@ private:
 
     if (p == line->cursor)
       return false;
-    
+
     do {
       ++p;
     } while (p != line->cursor && (iswalnum(*p) || *p == L'_'));
-    
+
     while (p != line->cursor && iswspace(*p))
       ++p;
 
     return p+1 == line->cursor || *p == L':';
   }
-  
+
   // /^\s*set\s*\(.*\)\s*:$/
   bool lineLooksLikeSetter(const LineInfoW *line) {
     const wchar_t *p = line->buffer;
     while (p != line->cursor && iswspace(*p))
       ++p;
-    
+
     if (p == line->cursor || *p++ != L's')
       return false;
     if (p == line->cursor || *p++ != L'e')
@@ -530,10 +530,10 @@ private:
 
     while (p != line->cursor && iswspace(*p))
       ++p;
-    
+
     if (p == line->cursor || *p++ != L'(')
       return false;
-    
+
     if (line->cursor - p < 2 || line->cursor[-1] != L':')
       return false;
 
@@ -542,13 +542,13 @@ private:
 
     return *p == L')';
   }
-  
+
   // /^\s*case.*:$/
   bool lineLooksLikeCase(const LineInfoW *line) {
     const wchar_t *p = line->buffer;
     while (p != line->cursor && iswspace(*p))
       ++p;
-    
+
     if (p == line->cursor || *p++ != L'c')
       return false;
     if (p == line->cursor || *p++ != L'a')
@@ -557,7 +557,7 @@ private:
       return false;
     if (p == line->cursor || *p++ != L'e')
       return false;
-    
+
     return line->cursor[-1] == ':';
   }
 
@@ -569,12 +569,12 @@ private:
       Outdented = true;
     }
   }
-  
+
   unsigned char onColon(int ch) {
     // Add the character to the string.
     wchar_t s[2] = {(wchar_t)ch, 0};
     el_winsertstr(e, s);
-    
+
     const LineInfoW *line = el_wline(e);
 
     // Outdent if the line looks like a label.
@@ -586,32 +586,32 @@ private:
     // Outdent if the line looks like a 'case' label.
     else if (lineLooksLikeCase(line))
       outdent();
-    
+
     return CC_REFRESH;
   }
-  
+
   unsigned char onCloseBrace(int ch) {
     bool atStart = isAtStartOfLine(el_wline(e));
-    
+
     // Add the character to the string.
     wchar_t s[2] = {(wchar_t)ch, 0};
     el_winsertstr(e, s);
-    
+
     // Don't outdent if we weren't at the start of the line.
     if (!atStart) {
       return CC_REFRESH;
     }
-    
+
     outdent();
     return CC_REFRESH;
   }
-  
+
   unsigned char onIndentOrComplete(int ch) {
     const LineInfoW *line = el_wline(e);
-    
+
     // FIXME: UTF-8? What's that?
     size_t cursorPos = line->cursor - line->buffer;
-    
+
     // If there's nothing but whitespace before the cursor, indent to the next
     // 2-character tab stop.
     if (isAtStartOfLine(line)) {
@@ -619,11 +619,11 @@ private:
       el_winsertstr(e, indent);
       return CC_REFRESH;
     }
-    
+
     // Otherwise, look for completions.
     return onComplete(ch);
   }
-  
+
   void insertStringRef(StringRef s) {
     if (s.empty())
       return;
@@ -633,7 +633,7 @@ private:
     TmpStr.push_back(L'\0');
     el_winsertstr(e, TmpStr.data());
   }
-  
+
   void displayCompletions(llvm::ArrayRef<llvm::StringRef> list) {
     // FIXME: Do the print-completions-below-the-prompt thing bash does.
     llvm::outs() << '\n';
@@ -643,17 +643,17 @@ private:
     el_get(e, EL_GETTC, "li", &lines_int);
     el_get(e, EL_GETTC, "co", &columns_int);
     assert(lines_int > 0 && columns_int > 0 && "negative or zero screen size?!");
-    
+
     auto lines = size_t(lines_int), columns = size_t(columns_int);
     size_t trimToColumns = columns > 2 ? columns - 2 : 0;
-    
+
     size_t trimmed = 0;
     if (list.size() > lines - 1) {
       size_t trimToLines = lines > 2 ? lines - 2 : 0;
       trimmed = list.size() - trimToLines;
       list = list.slice(0, trimToLines);
     }
-    
+
     for (StringRef completion : list) {
       if (completion.size() > trimToColumns)
         completion = completion.slice(0, trimToColumns);
@@ -662,14 +662,14 @@ private:
     if (trimmed > 0)
       llvm::outs() << "  (and " << trimmed << " more)\n";
   }
-  
+
   unsigned char onComplete(int ch) {
     const LineInfoW *line = el_wline(e);
     llvm::ArrayRef<wchar_t> wprefix(line->buffer, line->cursor - line->buffer);
     llvm::SmallString<64> Prefix;
     Prefix.assign(CurrentLines);
     convertToUTF8(wprefix, Prefix);
-    
+
     if (!completions) {
       // If we aren't currently working with a completion set, generate one.
       completions.populate(getREPLInputFile(), Prefix);
@@ -680,7 +680,7 @@ private:
         ? CC_REFRESH
         : CC_REFRESH_BEEP;
     }
-    
+
     // Otherwise, advance through the completion state machine.
     switch (completions.getState()) {
     case CompletionState::CompletedRoot:
@@ -706,7 +706,7 @@ private:
       insertStringRef(Next.InsertableString);
       return CC_REFRESH;
     }
-    
+
     case CompletionState::Empty:
     case CompletionState::Unique:
       // We already provided a definitive completion--nothing else to do.
@@ -822,10 +822,10 @@ private:
         llvm::MemoryBuffer::getMemBufferCopy(Line, "<REPL Input>"));
     bool ShouldRun = appendToREPLFile(REPLInputFile, PersistentState, RC,
                                       std::move(InputBuf));
-    
+
     // SILGen the module and produce SIL diagnostics.
     std::unique_ptr<SILModule> sil;
-    
+
     if (!CI.getASTContext().hadError()) {
       sil = performSILGeneration(REPLInputFile, CI.getSILOptions(),
                                  RC.CurIRGenElem);
@@ -840,17 +840,17 @@ private:
       CI.getASTContext().Diags.resetHadAnyError();
       while (REPLInputFile.Decls.size() > RC.CurElem)
         REPLInputFile.Decls.pop_back();
-      
+
       // FIXME: Handling of "import" declarations?  Is there any other
       // state which needs to be reset?
-      
+
       return true;
     }
-    
+
     RC.CurElem = REPLInputFile.Decls.size();
-    
+
     DumpSource += Line;
-    
+
     // If we didn't see an expression, statement, or decl which might have
     // side-effects, keep reading.
     if (!ShouldRun)
@@ -863,14 +863,14 @@ private:
                                           "REPLLine", llvm::getGlobalContext(),
                                           RC.CurIRGenElem);
     RC.CurIRGenElem = RC.CurElem;
-    
+
     if (CI.getASTContext().hadError())
       return false;
 
     // LineModule will get destroy by the following link process.
     // Make a copy of it to be able to correct produce DumpModule.
     std::unique_ptr<llvm::Module> SaveLineModule(CloneModule(LineModule.get()));
-    
+
     if (!linkLLVMModules(Module, LineModule.get()
                          // TODO: reactivate the linker mode if it is
                          // supported in llvm again. Otherwise remove the
@@ -894,11 +894,11 @@ private:
     }
     llvm::Function *DumpModuleMain = DumpModule.getFunction("main");
     DumpModuleMain->setName("repl.line");
-    
+
     if (IRGenImportedModules(CI, *NewModule, ImportedModules, InitFns,
                              IRGenOpts, SILOpts))
       return false;
-    
+
     llvm::Module *TempModule = NewModule.get();
     EE->addModule(std::move(NewModule));
 
@@ -907,7 +907,7 @@ private:
     for (auto InitFn : InitFns)
       EE->runFunctionAsMain(InitFn, CmdLine, 0);
     InitFns.clear();
-    
+
     // FIXME: The way we do this is really ugly... we should be able to
     // improve this.
     if (!RanGlobalInitializers) {
@@ -916,7 +916,7 @@ private:
     }
     llvm::Function *EntryFn = TempModule->getFunction("main");
     EE->runFunctionAsMain(EntryFn, CmdLine, 0);
-    
+
     return true;
   }
 
@@ -957,7 +957,7 @@ public:
     std::vector<std::string> Features;
     std::tie(TargetOpt, CPU, Features)
       = getIRTargetOptions(IRGenOpts, CI.getASTContext());
-    
+
     builder.setRelocationModel(llvm::Reloc::PIC_);
     builder.setTargetOptions(TargetOpt);
     builder.setMCPU(CPU);
@@ -986,9 +986,9 @@ public:
       if (Ctx.hadError())
         return;
     }
-    
+
     RC.CurElem = RC.CurIRGenElem = REPLInputFile.Decls.size();
-    
+
     if (llvm::sys::Process::StandardInIsUserInput())
       llvm::outs() <<
           "***  You are running Swift's integrated REPL,  ***\n"
@@ -996,25 +996,25 @@ public:
           "***  The full REPL is built as part of LLDB.   ***\n"
           "***  Type ':help' for assistance.              ***\n";
   }
-  
+
   swift::Module *getMainModule() const {
     return REPLInputFile.getParentModule();
   }
   StringRef getDumpSource() const { return DumpSource; }
-  
+
   /// Get the REPLInput object owned by the REPL instance.
   REPLInput &getInput() { return Input; }
-  
+
   /// Responds to a REPL input. Returns true if the repl should continue,
   /// false if it should quit.
   bool handleREPLInput(REPLInputKind inputKind, llvm::StringRef Line) {
     switch (inputKind) {
       case REPLInputKind::REPLQuit:
         return false;
-        
+
       case REPLInputKind::Empty:
         return true;
-        
+
       case REPLInputKind::REPLDirective: {
         unsigned BufferID =
             CI.getSourceMgr().addMemBufferCopy(Line, "<REPL Input>");
@@ -1023,7 +1023,7 @@ public:
         Token Tok;
         L.lex(Tok);
         assert(Tok.is(tok::colon));
-        
+
         if (L.peekNextToken().getText() == "help") {
           llvm::outs() << "Available commands:\n"
                "  :quit - quit the interpreter (you can also use :exit "
@@ -1062,7 +1062,7 @@ public:
                                    &REPLInputFile, nullptr);
           for (auto result : lookup.Results) {
             printOrDumpDecl(result.getValueDecl(), doPrint);
-              
+
             if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl())) {
               if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
                 TypeDecl *origTypeDecl = typeAliasDecl->getUnderlyingType()
@@ -1092,7 +1092,7 @@ public:
           if (Tok.is(tok::identifier)) {
             accessPath.push_back({ctx.getIdentifier(Tok.getText()),
                                   Tok.getLoc()});
-            
+
             while (L.peekNextToken().is(tok::period)) {
               L.lex(Tok);
               L.lex(Tok);
@@ -1108,7 +1108,7 @@ public:
           } else {
             llvm::outs() << "Not a module name: '" << Tok.getText() << "'\n";
           }
-          
+
           if (!accessPath.empty()) {
             auto M = ctx.getModule(accessPath);
             if (!M)
@@ -1122,7 +1122,7 @@ public:
               }
             }
           }
-          
+
         } else if (L.peekNextToken().getText() == "constraints") {
           L.lex(Tok);
           L.lex(Tok);
@@ -1153,7 +1153,7 @@ public:
         }
         return true;
       }
-        
+
       case REPLInputKind::SourceCode: {
         // Execute this source line.
         return executeSwiftSource(Line, CmdLine);
@@ -1176,7 +1176,7 @@ void swift::runREPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   REPLEnvironment env(CI, CmdLine, llvm::getGlobalContext(), ParseStdlib);
   if (CI.getASTContext().hadError())
     return;
-  
+
   llvm::SmallString<80> Line;
   REPLInputKind inputKind;
   do {

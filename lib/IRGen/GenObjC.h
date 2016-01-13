@@ -148,17 +148,17 @@ namespace irgen {
   /// Get the type encoding for an ObjC property.
   void getObjCEncodingForPropertyType(IRGenModule &IGM, VarDecl *property,
                                       std::string &s);
-  
+
   /// Produces extended encoding of ObjC block signature.
   /// \returns the encoded type.
   llvm::Constant *getBlockTypeExtendedEncoding(IRGenModule &IGM,
                                                CanSILFunctionType invokeTy);
-  
+
   /// Produces extended encoding of method type.
   /// \returns the encoded type.
   llvm::Constant *getMethodTypeExtendedEncoding(IRGenModule &IGM,
                                                 AbstractFunctionDecl *method);
-  
+
   /// Build an Objective-C method descriptor for the given property's
   /// getter and setter methods.
   std::pair<llvm::Constant *, llvm::Constant *>
@@ -167,7 +167,7 @@ namespace irgen {
   /// Build an Objective-C method descriptor for the given subscript's
   /// getter and setter methods.
   std::pair<llvm::Constant *, llvm::Constant *>
-  emitObjCSubscriptMethodDescriptors(IRGenModule &IGM, 
+  emitObjCSubscriptMethodDescriptors(IRGenModule &IGM,
                                      SubscriptDecl *subscript);
 
   /// True if the FuncDecl requires an ObjC method descriptor.

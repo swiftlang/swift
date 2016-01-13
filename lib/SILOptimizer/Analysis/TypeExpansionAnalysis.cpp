@@ -34,7 +34,7 @@ TypeExpansionAnalysis::getTypeExpansionProjectionPaths(SILType B, SILModule *Mod
   auto Iter = Cache.find(B);
   if (Iter != Cache.end()) {
     return Iter->second;
-  }   
+  }
 
   // Flush the cache if the size of the cache is too large.
   if (Cache.size() > TypeExpansionAnalysisMaxCacheSize) {

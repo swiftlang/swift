@@ -115,7 +115,7 @@ SourceRange Expr::getSourceRange() const {
   case ExprKind::ID: return getSourceRangeImpl(cast<ID##Expr>(this));
 #include "swift/AST/ExprNodes.def"
   }
-  
+
   llvm_unreachable("expression type not handled!");
 }
 
@@ -167,7 +167,7 @@ Expr *Expr::getSemanticsProvidingExpr() {
 
   if (DefaultValueExpr *DE = dyn_cast<DefaultValueExpr>(this))
     return DE->getSubExpr()->getSemanticsProvidingExpr();
-  
+
   return this;
 }
 
@@ -335,10 +335,10 @@ forEachImmediateChildExpr(const std::function<Expr*(Expr*)> &callback) {
   struct ChildWalker : ASTWalker {
     const std::function<Expr*(Expr*)> &callback;
     Expr *ThisNode;
-    
+
     ChildWalker(const std::function<Expr*(Expr*)> &callback, Expr *ThisNode)
       : callback(callback), ThisNode(ThisNode) {}
-    
+
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       // When looking at the current node, of course we want to enter it.  We
       // also don't want to enumerate it.
@@ -348,7 +348,7 @@ forEachImmediateChildExpr(const std::function<Expr*(Expr*)> &callback) {
       // Otherwise we must be a child of our expression, enumerate it!
       return { false, callback(E) };
     }
-    
+
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
       return { false, S };
     }
@@ -360,7 +360,7 @@ forEachImmediateChildExpr(const std::function<Expr*(Expr*)> &callback) {
     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
     bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   };
-  
+
   this->walk(ChildWalker(callback, this));
 }
 
@@ -414,7 +414,7 @@ bool Expr::isTypeReference() const {
   // If the result isn't a metatype, there's nothing else to do.
   if (!getType()->is<AnyMetatypeType>())
     return false;
-  
+
   const Expr *expr = this;
   do {
     // Skip syntax.
@@ -766,7 +766,7 @@ LiteralExpr *LiteralExpr::shallowClone(ASTContext &Ctx) const {
   DISPATCH_CLONE(MagicIdentifierLiteral)
 #undef DISPATCH_CLONE
   }
-  
+
   Result->setType(getType());
   Result->setImplicit(isImplicit());
   return Result;
@@ -870,7 +870,7 @@ MemberRefExpr::MemberRefExpr(Expr *base, SourceLoc dotLoc,
                              bool Implicit, AccessSemantics semantics)
   : Expr(ExprKind::MemberRef, Implicit), Base(base),
     Member(member), DotLoc(dotLoc), NameRange(nameRange) {
-   
+
   MemberRefExprBits.Semantics = (unsigned) semantics;
   MemberRefExprBits.IsSuper = false;
 }
@@ -881,7 +881,7 @@ Type OverloadSetRefExpr::getBaseType() const {
   if (auto *DRE = dyn_cast<OverloadedMemberRefExpr>(this)) {
     return DRE->getBase()->getType()->getRValueType();
   }
-  
+
   llvm_unreachable("Unhandled overloaded set reference expression");
 }
 
@@ -915,9 +915,9 @@ SourceLoc TupleExpr::getEndLoc() const {
 }
 
 TupleExpr::TupleExpr(SourceLoc LParenLoc, ArrayRef<Expr *> SubExprs,
-                     ArrayRef<Identifier> ElementNames, 
+                     ArrayRef<Identifier> ElementNames,
                      ArrayRef<SourceLoc> ElementNameLocs,
-                     SourceLoc RParenLoc, bool HasTrailingClosure, 
+                     SourceLoc RParenLoc, bool HasTrailingClosure,
                      bool Implicit, Type Ty)
   : Expr(ExprKind::Tuple, Implicit, Ty),
     LParenLoc(LParenLoc), RParenLoc(RParenLoc),
@@ -926,15 +926,15 @@ TupleExpr::TupleExpr(SourceLoc LParenLoc, ArrayRef<Expr *> SubExprs,
   TupleExprBits.HasTrailingClosure = HasTrailingClosure;
   TupleExprBits.HasElementNames = !ElementNames.empty();
   TupleExprBits.HasElementNameLocations = !ElementNameLocs.empty();
-  
+
   assert(LParenLoc.isValid() == RParenLoc.isValid() &&
          "Mismatched parenthesis location information validity");
   assert(ElementNames.empty() || ElementNames.size() == SubExprs.size());
-  assert(ElementNameLocs.empty() || 
+  assert(ElementNameLocs.empty() ||
          ElementNames.size() == ElementNameLocs.size());
 
   // Copy elements.
-  memcpy(getElements().data(), SubExprs.data(), 
+  memcpy(getElements().data(), SubExprs.data(),
          SubExprs.size() * sizeof(Expr *));
 
   // Copy element names, if provided.
@@ -951,11 +951,11 @@ TupleExpr::TupleExpr(SourceLoc LParenLoc, ArrayRef<Expr *> SubExprs,
 }
 
 TupleExpr *TupleExpr::create(ASTContext &ctx,
-                             SourceLoc LParenLoc, 
+                             SourceLoc LParenLoc,
                              ArrayRef<Expr *> SubExprs,
-                             ArrayRef<Identifier> ElementNames, 
+                             ArrayRef<Identifier> ElementNames,
                              ArrayRef<SourceLoc> ElementNameLocs,
-                             SourceLoc RParenLoc, bool HasTrailingClosure, 
+                             SourceLoc RParenLoc, bool HasTrailingClosure,
                              bool Implicit, Type Ty) {
   unsigned size = sizeof(TupleExpr);
   size += SubExprs.size() * sizeof(Expr*);
@@ -966,10 +966,10 @@ TupleExpr *TupleExpr::create(ASTContext &ctx,
                              RParenLoc, HasTrailingClosure, Implicit, Ty);
 }
 
-TupleExpr *TupleExpr::createEmpty(ASTContext &ctx, SourceLoc LParenLoc, 
+TupleExpr *TupleExpr::createEmpty(ASTContext &ctx, SourceLoc LParenLoc,
                                   SourceLoc RParenLoc, bool Implicit) {
-  return create(ctx, LParenLoc, { }, { }, { }, RParenLoc, 
-                /*HasTrailingClosure=*/false, Implicit, 
+  return create(ctx, LParenLoc, { }, { }, { }, RParenLoc,
+                /*HasTrailingClosure=*/false, Implicit,
                 TupleType::getEmpty(ctx));
 }
 
@@ -1157,7 +1157,7 @@ UnresolvedSelectorExpr *UnresolvedSelectorExpr::create(ASTContext &C,
              ArrayRef<ComponentLoc> components) {
   assert(name.getArgumentNames().size() + 1 == components.size() &&
          "number of component locs does not match number of name components");
-  
+
   void *buf = C.Allocate(sizeof(UnresolvedSelectorExpr)
                            + (name.getArgumentNames().size() + 1)
                                * sizeof(ComponentLoc),

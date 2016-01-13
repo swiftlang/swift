@@ -27,7 +27,7 @@ using namespace swift;
 using namespace constraints;
 
 Constraint::Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
-                       ConstraintLocator *locator, 
+                       ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
   : Kind(kind), HasRestriction(false), HasFix(false), IsActive(false),
     RememberChoice(false), IsFavored(false), NumTypeVariables(typeVars.size()),
@@ -37,7 +37,7 @@ Constraint::Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
 }
 
-Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, 
+Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
                        DeclName Member, ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
   : Kind(Kind), HasRestriction(false), HasFix(false), IsActive(false),
@@ -99,18 +99,18 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
 }
 
-Constraint::Constraint(Type type, OverloadChoice choice, 
+Constraint::Constraint(Type type, OverloadChoice choice,
                        ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
   : Kind(ConstraintKind::BindOverload),
     HasRestriction(false), HasFix(false), IsActive(false),
     RememberChoice(false), IsFavored(false), NumTypeVariables(typeVars.size()),
     Overload{type, choice}, Locator(locator)
-{ 
+{
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
 }
 
-Constraint::Constraint(ConstraintKind kind, 
+Constraint::Constraint(ConstraintKind kind,
                        ConversionRestrictionKind restriction,
                        Type first, Type second, ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
@@ -127,7 +127,7 @@ Constraint::Constraint(ConstraintKind kind,
 Constraint::Constraint(ConstraintKind kind, Fix fix,
                        Type first, Type second, ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
-  : Kind(kind), TheFix(fix.getKind()), FixData(fix.getData()), 
+  : Kind(kind), TheFix(fix.getKind()), FixData(fix.getData()),
     HasRestriction(false), HasFix(true),
     IsActive(false), RememberChoice(false), IsFavored(false),
     NumTypeVariables(typeVars.size()),
@@ -173,7 +173,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::TypeMember:
-    return create(cs, getKind(), getFirstType(), Type(), getMember(), 
+    return create(cs, getKind(), getFirstType(), Type(), getMember(),
                   getLocator());
 
   case ConstraintKind::Defaultable:
@@ -342,7 +342,7 @@ void Constraint::dump(ConstraintSystem *CS) const {
   // Print all type variables as $T0 instead of _ here.
   llvm::SaveAndRestore<bool> X(CS->getASTContext().LangOpts.
                                DebugConstraintSolver, true);
-  
+
   dump(&CS->getASTContext().SourceMgr);
 }
 
@@ -552,7 +552,7 @@ static void uniqueTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVars) {
                  typeVars.end());
 }
 
-Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind, 
+Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
                                Type first, Type second, DeclName member,
                                ConstraintLocator *locator) {
   // Collect type variables.
@@ -564,14 +564,14 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
   uniqueTypeVariables(typeVars);
 
   // Create the constraint.
-  unsigned size = sizeof(Constraint) 
+  unsigned size = sizeof(Constraint)
                 + typeVars.size() * sizeof(TypeVariableType*);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(kind, first, second, member, locator, typeVars);
 }
 
-Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type, 
-                                           OverloadChoice choice, 
+Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type,
+                                           OverloadChoice choice,
                                            ConstraintLocator *locator) {
   // Collect type variables.
   SmallVector<TypeVariableType *, 4> typeVars;
@@ -582,16 +582,16 @@ Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type,
   }
 
   // Create the constraint.
-  unsigned size = sizeof(Constraint) 
+  unsigned size = sizeof(Constraint)
                 + typeVars.size() * sizeof(TypeVariableType*);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(type, choice, locator, typeVars);
 }
 
-Constraint *Constraint::createRestricted(ConstraintSystem &cs, 
-                                         ConstraintKind kind, 
+Constraint *Constraint::createRestricted(ConstraintSystem &cs,
+                                         ConstraintKind kind,
                                          ConversionRestrictionKind restriction,
-                                         Type first, Type second, 
+                                         Type first, Type second,
                                          ConstraintLocator *locator) {
   // Collect type variables.
   SmallVector<TypeVariableType *, 4> typeVars;
@@ -602,7 +602,7 @@ Constraint *Constraint::createRestricted(ConstraintSystem &cs,
   uniqueTypeVariables(typeVars);
 
   // Create the constraint.
-  unsigned size = sizeof(Constraint) 
+  unsigned size = sizeof(Constraint)
                 + typeVars.size() * sizeof(TypeVariableType*);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(kind, restriction, first, second, locator,
@@ -675,7 +675,7 @@ Constraint *Constraint::createDisjunction(ConstraintSystem &cs,
 
   // Create the disjunction constraint.
   uniqueTypeVariables(typeVars);
-  unsigned size = sizeof(Constraint) 
+  unsigned size = sizeof(Constraint)
                 + typeVars.size() * sizeof(TypeVariableType*);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   auto disjunction =  new (mem) Constraint(ConstraintKind::Disjunction,

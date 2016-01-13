@@ -62,16 +62,16 @@ static bool isDelayedOperatorDecl(ValueDecl *vd) {
 }
 
 namespace {
-  
+
   /// Internal struct for tracking information about types within a series
   /// of "linked" expressions. (Such as a chain of binary operator invocations.)
   struct LinkedTypeInfo {
     uint haveIntLiteral : 1;
     uint haveFloatLiteral : 1;
     uint haveStringLiteral : 1;
-    
+
     llvm::SmallSet<TypeBase*, 16> collectedTypes;
-    
+
     LinkedTypeInfo() {
       haveIntLiteral = false;
       haveFloatLiteral = false;
@@ -82,86 +82,86 @@ namespace {
   /// Walks an expression sub-tree, and collects information about expressions
   /// whose types are mutually dependent upon one another.
   class LinkedExprCollector : public ASTWalker {
-    
+
     llvm::SmallVectorImpl<Expr*> &LinkedExprs;
 
   public:
-    
+
     LinkedExprCollector(llvm::SmallVectorImpl<Expr*> &linkedExprs) :
         LinkedExprs(linkedExprs) {}
-    
+
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      
+
       // Store top-level binary exprs for further analysis.
       if (isa<BinaryExpr>(expr) ||
-          
+
           // Literal exprs are contextually typed, so store them off as well.
           isa<LiteralExpr>(expr)) {
         LinkedExprs.push_back(expr);
         return {false, expr};
       }
-      
+
       return { true, expr };
     }
-    
+
     Expr *walkToExprPost(Expr *expr) override {
       return expr;
     }
-    
+
     /// \brief Ignore statements.
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
       return { false, stmt };
     }
-    
+
     /// \brief Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
   };
-  
+
   /// Given a collection of "linked" expressions, analyzes them for
   /// commonalities regarding their types. This will help us compute a
   /// "best common type" from the expression types.
   class LinkedExprAnalyzer : public ASTWalker {
-    
+
     LinkedTypeInfo &LTI;
     ConstraintSystem &CS;
-    
+
   public:
-    
+
     LinkedExprAnalyzer(LinkedTypeInfo &lti, ConstraintSystem &cs) :
         LTI(lti), CS(cs) {}
-    
+
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      
+
       if (isa<IntegerLiteralExpr>(expr)) {
         LTI.haveIntLiteral = true;
         return {false, expr};
       }
-      
+
       if (isa<FloatLiteralExpr>(expr)) {
         LTI.haveFloatLiteral = true;
         return {false, expr};
       }
-      
+
       if (isa<StringLiteralExpr>(expr)) {
         LTI.haveStringLiteral = true;
         return {false, expr};
       }
-      
+
       if (auto UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
-        
+
         if (UDE->getType() &&
             !isa<TypeVariableType>(UDE->getType().getPointer()))
           LTI.collectedTypes.insert(UDE->getType().getPointer());
-        
+
         // Don't recurse into the base expression.
         return {false, expr};
       }
-      
+
       if (auto favoredType = CS.getFavoredType(expr)) {
         LTI.collectedTypes.insert(favoredType);
         return {false, expr};
       }
-      
+
       // In the case of a function application, we would have already captured
       // the return type during constraint generation, so there's no use in
       // looking any further.
@@ -170,36 +170,36 @@ namespace {
             isa<PostfixUnaryExpr>(expr))) {
         return { false, expr };
       }
-      
+
       return { true, expr };
     }
-    
+
     Expr *walkToExprPost(Expr *expr) override {
       return expr;
     }
-    
+
     /// \brief Ignore statements.
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
       return { false, stmt };
     }
-    
+
     /// \brief Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
   };
-  
+
   /// For a given expression, given information that is global to the
   /// expression, attempt to derive a favored type for it.
   bool computeFavoredTypeForExpr(Expr *expr, ConstraintSystem &CS) {
     LinkedTypeInfo lti;
-    
+
     expr->walk(LinkedExprAnalyzer(lti, CS));
-    
+
     if (!lti.collectedTypes.empty()) {
       // TODO: Compute the BCT.
       CS.setFavoredType(expr, *lti.collectedTypes.begin());
       return true;
     }
-    
+
     if (lti.haveFloatLiteral) {
       if (auto floatProto =
             CS.TC.Context.getProtocol(
@@ -210,7 +210,7 @@ namespace {
         }
       }
     }
-    
+
     if (lti.haveIntLiteral) {
       if (auto intProto =
             CS.TC.Context.getProtocol(
@@ -221,7 +221,7 @@ namespace {
         }
       }
     }
-    
+
     if (lti.haveStringLiteral) {
       if (auto stringProto =
           CS.TC.Context.getProtocol(
@@ -232,10 +232,10 @@ namespace {
         }
       }
     }
-    
+
     return false;
   }
-  
+
   /// Determine whether the given parameter and argument type should be
   /// "favored" because they match exactly.
   bool isFavoredParamAndArg(ConstraintSystem &CS,
@@ -244,15 +244,15 @@ namespace {
                             Type otherArgTy) {
     if (argTy->getAs<LValueType>())
       argTy = argTy->getLValueOrInOutObjectType();
-    
+
     if (!otherArgTy.isNull() &&
         otherArgTy->getAs<LValueType>())
       otherArgTy = otherArgTy->getLValueOrInOutObjectType();
-    
+
     // Do the types match exactly?
     if (paramTy->isEqual(argTy))
       return true;
-    
+
     // If the argument is a type variable created for a literal that has a
     // default type, this is a favored param/arg pair if the parameter is of
     // that default type.
@@ -264,7 +264,7 @@ namespace {
         // favored type to the default type for the literal.
         if (!otherArgTy.isNull() &&
             otherArgTy->getAs<StructType>()) {
-          
+
           if (CS.TC.conformsToProtocol(otherArgTy,
                                        proto,
                                        CS.DC,
@@ -278,10 +278,10 @@ namespace {
         }
       }
     }
-    
+
     return false;
   }
-  
+
   /// Extracts == from a type's Equatable conformance.
   ///
   /// This only applies to types whose Equatable conformance can be derived.
@@ -295,16 +295,16 @@ namespace {
     CS.TC.Context.getProtocol(KnownProtocolKind::Equatable);
     if (!equatableProto)
       return;
-    
+
     paramTy = paramTy->getLValueOrInOutObjectType();
     paramTy = paramTy->getReferenceStorageReferent();
-    
+
     auto nominal = paramTy->getAnyNominal();
     if (!nominal)
       return;
     if (!nominal->derivesProtocolConformance(equatableProto))
       return;
-    
+
     ProtocolConformance *conformance = nullptr;
     if (!CS.TC.conformsToProtocol(paramTy, equatableProto,
                                   CS.DC, ConformanceCheckFlags::InExpression,
@@ -312,7 +312,7 @@ namespace {
       return;
     if (!conformance)
       return;
-    
+
     auto requirement =
     equatableProto->lookupDirect(CS.TC.Context.Id_EqualsOperator);
     assert(requirement.size() == 1 && "broken Equatable protocol");
@@ -320,12 +320,12 @@ namespace {
         conformance->getWitness(requirement.front(), &CS.TC);
     if (!witness)
       return;
-    
+
     // FIXME: If we ever have derived == for generic types, we may need to
     // revisit this.
     if (witness.getDecl()->getType()->hasArchetype())
       return;
-    
+
     OverloadChoice choice{
       Type(), witness.getDecl(), /*specialized=*/false, CS
     };
@@ -333,7 +333,7 @@ namespace {
         Constraint::createBindOverload(CS, tyvarType, choice, csLoc);
     newConstraints.push_back(overload);
   }
-  
+
   /// Favor certain overloads in a call based on some basic analysis
   /// of the overload set and call arguments.
   ///
@@ -356,7 +356,7 @@ namespace {
     auto tyvarType = expr->getFn()->getType()->getAs<TypeVariableType>();
     if (!tyvarType)
       return;
-    
+
     // This type variable is only currently associated with the function
     // being applied, and the only constraint attached to it should
     // be the disjunction constraint for the overload group.
@@ -365,15 +365,15 @@ namespace {
     CG.gatherConstraints(tyvarType, constraints);
     if (constraints.empty())
       return;
-    
+
     // Look for the disjunction that binds the overload set.
     for (auto constraint : constraints) {
       if (constraint->getKind() != ConstraintKind::Disjunction)
         continue;
-      
+
       auto oldConstraints = constraint->getNestedConstraints();
       auto csLoc = CS.getConstraintLocator(expr->getFn());
-      
+
       // Only replace the disjunctive overload constraint.
       if (oldConstraints[0]->getKind() != ConstraintKind::BindOverload) {
         continue;
@@ -392,38 +392,38 @@ namespace {
       }
 
       SmallVector<Constraint *, 4> favoredConstraints;
-      
+
       TypeBase *favoredTy = nullptr;
-      
+
       // Copy over the existing bindings, dividing the constraints up
       // into "favored" and non-favored lists.
       for (auto oldConstraint : oldConstraints) {
         auto overloadChoice = oldConstraint->getOverloadChoice();
         if (isFavored(overloadChoice.getDecl())) {
           favoredConstraints.push_back(oldConstraint);
-          
+
           favoredTy = overloadChoice.getDecl()->
               getType()->getAs<AnyFunctionType>()->
               getResult().getPointer();
         }
       }
-      
+
       if (favoredConstraints.size() == 1) {
         CS.setFavoredType(expr, favoredTy);
       }
-      
+
       // If there might be replacement constraints, get them now.
       SmallVector<Constraint *, 4> replacementConstraints;
       if (createReplacements)
         createReplacements(tyvarType, oldConstraints, replacementConstraints);
-      
+
       // If we did not find any favored constraints, just introduce
       // the replacement constraints (if they differ).
       if (favoredConstraints.empty()) {
         if (replacementConstraints.size() > oldConstraints.size()) {
           // Remove the old constraint.
           CS.removeInactiveConstraint(constraint);
-          
+
           CS.addConstraint(
                            Constraint::createDisjunction(CS,
                                                          replacementConstraints,
@@ -431,17 +431,17 @@ namespace {
         }
         break;
       }
-      
+
       // Remove the original constraint from the inactive constraint
       // list and add the new one.
       CS.removeInactiveConstraint(constraint);
-      
+
       // Create the disjunction of favored constraints.
       auto favoredConstraintsDisjunction =
           Constraint::createDisjunction(CS,
                                         favoredConstraints,
                                         csLoc);
-      
+
       // If we didn't actually build a disjunction, clone
       // the underlying constraint so we can mark it as
       // favored.
@@ -449,9 +449,9 @@ namespace {
         favoredConstraintsDisjunction
             = favoredConstraintsDisjunction->clone(CS);
       }
-      
+
       favoredConstraintsDisjunction->setFavored();
-      
+
       // Find the disjunction of fallback constraints. If any
       // constraints were added here, create a new disjunction.
       Constraint *fallbackConstraintsDisjunction = constraint;
@@ -461,34 +461,34 @@ namespace {
                                           replacementConstraints,
                                           csLoc);
       }
-      
+
       // Form the (favored, fallback) disjunction.
       auto aggregateConstraints = {
         favoredConstraintsDisjunction,
         fallbackConstraintsDisjunction
       };
-      
+
       CS.addConstraint(
                        Constraint::createDisjunction(CS,
                                                      aggregateConstraints,
                                                      csLoc));
       break;
     }
-    
+
   }
-  
+
   /// Determine whether or not a given NominalTypeDecl has a failable
   /// initializer member.
   bool hasFailableInits(NominalTypeDecl *NTD,
                         ConstraintSystem *CS) {
-    
+
     // TODO: Note that we search manually, rather than invoking lookupMember
     // on the ConstraintSystem object. Because this is a hot path, this keeps
     // the overhead of the check low, and is twice as fast.
     if (!NTD->getSearchedForFailableInits()) {
       // Set flag before recursing to catch circularity.
       NTD->setSearchedForFailableInits();
-      
+
       for (auto member : NTD->getMembers()) {
         if (auto CD = dyn_cast<ConstructorDecl>(member)) {
           if (CD->getFailability()) {
@@ -497,7 +497,7 @@ namespace {
           }
         }
       }
-      
+
       if (!NTD->getHasFailableInits()) {
         for (auto extension : NTD->getExtensions()) {
           for (auto member : extension->getMembers()) {
@@ -509,7 +509,7 @@ namespace {
             }
           }
         }
-        
+
         if (!NTD->getHasFailableInits()) {
           for (auto parentTyLoc : NTD->getInherited()) {
             if (auto nominalType =
@@ -523,41 +523,41 @@ namespace {
         }
       }
     }
-    
+
     return NTD->getHasFailableInits();
   }
-  
+
   Type getInnerParenType(const Type &t) {
     if (auto parenType = dyn_cast<ParenType>(t.getPointer())) {
       return getInnerParenType(parenType->getUnderlyingType());
     }
-    
+
     return t;
   }
-  
+
   size_t getOperandCount(Type t) {
     size_t nOperands = 0;
-    
+
     if (auto parenTy = dyn_cast<ParenType>(t.getPointer())) {
       if (parenTy->getDesugaredType())
         nOperands = 1;
     } else if (auto tupleTy = t->getAs<TupleType>()) {
       nOperands = tupleTy->getElementTypes().size();
     }
-    
+
     return nOperands;
   }
-  
+
   /// Return a pair, containing the total parameter count of a function, coupled
   /// with the number of non-default parameters.
   std::pair<size_t, size_t> getParamCount(ValueDecl *VD) {
     auto fty = VD->getType()->getAs<AnyFunctionType>();
     assert(fty && "attempting to count parameters of a non-function type");
-    
+
     auto t = fty->getInput();
     size_t nOperands = getOperandCount(t);
     size_t nNoDefault = 0;
-    
+
     if (auto AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
       for (auto params : AFD->getParameterLists()) {
         for (auto param : *params) {
@@ -568,57 +568,57 @@ namespace {
     } else {
       nNoDefault = nOperands;
     }
-    
+
     return { nOperands, nNoDefault };
   }
-  
+
   /// Favor unary operator constraints where we have exact matches
   /// for the operand and contextual type.
   void favorMatchingUnaryOperators(ApplyExpr *expr,
                                    ConstraintSystem &CS) {
     // Find the argument type.
     auto argTy = getInnerParenType(expr->getArg()->getType());
-    
+
     // Determine whether the given declaration is favored.
     auto isFavoredDecl = [&](ValueDecl *value) -> bool {
       auto valueTy = value->getType();
-      
+
       auto fnTy = valueTy->getAs<AnyFunctionType>();
       if (!fnTy)
         return false;
-      
+
       // Figure out the parameter type.
       if (value->getDeclContext()->isTypeContext()) {
         fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
       }
-      
+
       Type paramTy = fnTy->getInput();
       auto resultTy = fnTy->getResult();
       auto contextualTy = CS.getContextualType(expr);
-      
+
       return isFavoredParamAndArg(CS, paramTy, argTy, Type()) &&
           (!contextualTy || contextualTy->isEqual(resultTy));
     };
-    
+
     favorCallOverloads(expr, CS, isFavoredDecl);
   }
-  
+
   void favorMatchingOverloadExprs(ApplyExpr *expr,
                                   ConstraintSystem &CS) {
     // Find the argument type.
     size_t nArgs = getOperandCount(expr->getArg()->getType());
     auto fnExpr = expr->getFn();
-    
+
     // Check to ensure that we have an OverloadedDeclRef, and that we're not
     // favoring multiple overload constraints. (Otherwise, in this case
     // favoring is useless.
     if (auto ODR = dyn_cast<OverloadedDeclRefExpr>(fnExpr)) {
       bool haveMultipleApplicableOverloads = false;
-      
+
       for (auto VD : ODR->getDecls()) {
         if (VD->getType()->getAs<AnyFunctionType>()) {
           auto nParams = getParamCount(VD);
-          
+
           if (nArgs == nParams.first) {
             if (haveMultipleApplicableOverloads) {
               return;
@@ -628,30 +628,30 @@ namespace {
           }
         }
       }
-      
+
       // Determine whether the given declaration is favored.
       auto isFavoredDecl = [&](ValueDecl *value) -> bool {
         auto valueTy = value->getType();
-        
+
         auto fnTy = valueTy->getAs<AnyFunctionType>();
         if (!fnTy)
           return false;
-        
+
         auto paramCount = getParamCount(value);
-        
+
         return nArgs == paramCount.first ||
                nArgs == paramCount.second;
       };
-      
+
       favorCallOverloads(expr, CS, isFavoredDecl);
-      
+
     }
-    
+
     if (auto favoredTy = CS.getFavoredType(expr->getArg())) {
       // Determine whether the given declaration is favored.
       auto isFavoredDecl = [&](ValueDecl *value) -> bool {
         auto valueTy = value->getType();
-        
+
         auto fnTy = valueTy->getAs<AnyFunctionType>();
         if (!fnTy)
           return false;
@@ -666,7 +666,7 @@ namespace {
           }
         }
         Type paramTy = fnTy->getInput();
-        
+
         return favoredTy->isEqual(paramTy);
       };
 
@@ -685,7 +685,7 @@ namespace {
                          mustConsider);
     }
   }
-  
+
   /// Favor binary operator constraints where we have exact matches
   /// for the operands and contextual type.
   void favorMatchingBinaryOperators(ApplyExpr *expr,
@@ -700,7 +700,7 @@ namespace {
     //     literals, we can favor operator overloads whose argument types are
     //     identical to the literal type, or whose return types are identical
     //     to any contextual type associated with the application expression.
-    
+
     // Find the argument types.
     auto argTy = expr->getArg()->getType();
     auto argTupleTy = argTy->castTo<TupleType>();
@@ -708,63 +708,63 @@ namespace {
     Type firstArgTy = getInnerParenType(argTupleTy->getElement(0).getType());
     Type secondArgTy =
     getInnerParenType(argTupleTy->getElement(1).getType());
-    
+
     auto firstFavoredTy = CS.getFavoredType(argTupleExpr->getElement(0));
     auto secondFavoredTy = CS.getFavoredType(argTupleExpr->getElement(1));
-    
+
     auto favoredExprTy = CS.getFavoredType(expr);
-    
+
     // If the parent has been favored on the way down, propagate that
     // information to its children.
     if (!firstFavoredTy) {
       CS.setFavoredType(argTupleExpr->getElement(0), favoredExprTy);
       firstFavoredTy = favoredExprTy;
     }
-    
+
     if (!secondFavoredTy) {
       CS.setFavoredType(argTupleExpr->getElement(1), favoredExprTy);
       secondFavoredTy = favoredExprTy;
     }
-    
+
     if (firstFavoredTy && firstArgTy->getAs<TypeVariableType>()) {
       firstArgTy = firstFavoredTy;
     }
-    
+
     if (secondFavoredTy && secondArgTy->getAs<TypeVariableType>()) {
       secondArgTy = secondFavoredTy;
     }
-    
+
     // Determine whether the given declaration is favored.
     auto isFavoredDecl = [&](ValueDecl *value) -> bool {
       auto valueTy = value->getType();
-      
+
       auto fnTy = valueTy->getAs<AnyFunctionType>();
       if (!fnTy)
         return false;
-      
+
       // Figure out the parameter type.
       if (value->getDeclContext()->isTypeContext()) {
         fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
       }
-      
+
       Type paramTy = fnTy->getInput();
       auto paramTupleTy = paramTy->getAs<TupleType>();
       if (!paramTupleTy || paramTupleTy->getNumElements() != 2)
         return false;
-      
+
       auto firstParamTy = paramTupleTy->getElement(0).getType();
       auto secondParamTy = paramTupleTy->getElement(1).getType();
-      
+
       auto resultTy = fnTy->getResult();
       auto contextualTy = CS.getContextualType(expr);
-      
+
       return
         (isFavoredParamAndArg(CS, firstParamTy, firstArgTy, secondArgTy) ||
          isFavoredParamAndArg(CS, secondParamTy, secondArgTy, firstArgTy)) &&
         firstParamTy->isEqual(secondParamTy) &&
         (!contextualTy || contextualTy->isEqual(resultTy));
     };
-    
+
     auto createReplacements
     = [&](TypeVariableType *tyvarType,
           ArrayRef<Constraint *> oldConstraints,
@@ -772,20 +772,20 @@ namespace {
       auto declRef = dyn_cast<OverloadedDeclRefExpr>(expr->getFn());
       if (!declRef)
         return;
-      
+
       if (!declRef->isPotentiallyDelayedGlobalOperator())
         return;
-      
+
       Identifier eqOperator = CS.TC.Context.Id_EqualsOperator;
       if (declRef->getDecls()[0]->getName() != eqOperator)
         return;
-      
+
       if (declRef->isSpecialized())
         return;
-      
+
       replacementConstraints.append(oldConstraints.begin(),
                                     oldConstraints.end());
-      
+
       auto csLoc = CS.getConstraintLocator(expr->getFn());
       addNewEqualsOperatorOverloads(CS, replacementConstraints, firstArgTy,
                                     tyvarType, csLoc);
@@ -795,21 +795,21 @@ namespace {
                                       tyvarType, csLoc);
       }
     };
-    
+
     favorCallOverloads(expr, CS, isFavoredDecl, createReplacements);
   }
-  
+
   class ConstraintOptimizer : public ASTWalker {
-    
+
     ConstraintSystem &CS;
-    
+
   public:
-    
+
     ConstraintOptimizer(ConstraintSystem &cs) :
       CS(cs) {}
-    
+
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      
+
       if (auto applyExpr = dyn_cast<ApplyExpr>(expr)) {
         if (isa<PrefixUnaryExpr>(applyExpr) ||
             isa<PostfixUnaryExpr>(applyExpr)) {
@@ -820,7 +820,7 @@ namespace {
           favorMatchingOverloadExprs(applyExpr, CS);
         }
       }
-      
+
       // If the paren expr has a favored type, and the subExpr doesn't,
       // propagate downwards. Otherwise, propagate upwards.
       if (auto parenExpr = dyn_cast<ParenExpr>(expr)) {
@@ -832,19 +832,19 @@ namespace {
                             CS.getFavoredType(parenExpr->getSubExpr()));
         }
       }
-      
+
       return { true, expr };
     }
-    
+
     Expr *walkToExprPost(Expr *expr) override {
       return expr;
     }
-    
+
     /// \brief Ignore statements.
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
       return { false, stmt };
     }
-    
+
     /// \brief Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
   };
@@ -875,7 +875,7 @@ namespace {
       // If we're referring to an invalid declaration, fail.
       if (!decl)
         return nullptr;
-      
+
       CS.getTypeChecker().validateDecl(decl, true);
       if (decl->isInvalid())
         return nullptr;
@@ -883,7 +883,7 @@ namespace {
       auto memberLocator =
         CS.getConstraintLocator(expr, ConstraintLocator::Member);
       auto tv = CS.createTypeVariable(memberLocator, TVO_CanBindToLValue);
-      
+
       OverloadChoice choice(base->getType(), decl, /*isSpecialized=*/false, CS);
       auto locator = CS.getConstraintLocator(expr, ConstraintLocator::Member);
       CS.addBindOverloadConstraint(tv, choice, locator);
@@ -900,7 +900,7 @@ namespace {
         = CS.getConstraintLocator(expr, ConstraintLocator::SubscriptIndex);
       auto resultLocator
         = CS.getConstraintLocator(expr, ConstraintLocator::SubscriptResult);
-      
+
       Type outputTy;
 
       // The base type must have a subscript declaration with type
@@ -908,48 +908,48 @@ namespace {
       // expression must be convertible to I and the subscript expression
       // itself has type inout? O, where O may or may not be an lvalue.
       auto inputTv = CS.createTypeVariable(indexLocator, /*options=*/0);
-      
+
       // For an integer subscript expression on an array slice type, instead of
       // introducing a new type variable we can easily obtain the element type.
       if (auto subscriptExpr = dyn_cast<SubscriptExpr>(expr)) {
-        
+
         auto isLValueBase = false;
         auto baseTy = subscriptExpr->getBase()->getType();
-        
+
         if (baseTy->getAs<LValueType>()) {
           isLValueBase = true;
           baseTy = baseTy->getLValueOrInOutObjectType();
         }
-        
+
         if (auto arraySliceTy = dyn_cast<ArraySliceType>(baseTy.getPointer())) {
           baseTy = arraySliceTy->getDesugaredType();
-          
+
           auto indexExpr = subscriptExpr->getIndex();
-          
+
           if (auto parenExpr = dyn_cast<ParenExpr>(indexExpr)) {
             indexExpr = parenExpr->getSubExpr();
           }
-          
+
           if(isa<IntegerLiteralExpr>(indexExpr)) {
-            
+
             outputTy = baseTy->getAs<BoundGenericType>()->getGenericArgs()[0];
-            
+
             if (isLValueBase)
               outputTy = LValueType::get(outputTy);
           }
         } else if (auto dictTy = CS.isDictionaryType(baseTy)) {
           auto keyTy = dictTy->first;
           auto valueTy = dictTy->second;
-          
+
           if (isFavoredParamAndArg(CS, keyTy, index->getType(), Type())) {
             outputTy = OptionalType::get(valueTy);
-            
+
             if (isLValueBase)
               outputTy = LValueType::get(outputTy);
           }
         }
       }
-      
+
       if (outputTy.isNull()) {
         outputTy = CS.createTypeVariable(resultLocator,
                                               TVO_CanBindToLValue);
@@ -989,7 +989,7 @@ namespace {
     virtual ~ConstraintGenerator() = default;
 
     ConstraintSystem &getConstraintSystem() const { return CS; }
-    
+
     virtual Type visitErrorExpr(ErrorExpr *E) {
       // FIXME: Can we do anything with error expressions at this point?
       return nullptr;
@@ -1008,13 +1008,13 @@ namespace {
       auto protocol = CS.getTypeChecker().getLiteralProtocol(expr);
       if (!protocol)
         return nullptr;
-      
+
 
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                       TVO_PrefersSubtypeBinding);
-      
+
       tv->getImpl().literalConformanceProto = protocol;
-      
+
       CS.addConstraint(ConstraintKind::ConformsTo, tv,
                        protocol->getDeclaredType(),
                        CS.getConstraintLocator(expr));
@@ -1069,7 +1069,7 @@ namespace {
                                             locator));
 
       }
-      
+
       return tv;
     }
 
@@ -1107,9 +1107,9 @@ namespace {
 
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                       TVO_PrefersSubtypeBinding);
-      
+
       tv->getImpl().literalConformanceProto = protocol;
-      
+
       CS.addConstraint(ConstraintKind::ConformsTo, tv,
                        protocol->getDeclaredType(),
                        CS.getConstraintLocator(expr));
@@ -1157,14 +1157,14 @@ namespace {
         return nullptr;
 
       auto locator = CS.getConstraintLocator(E);
-      
+
       // Create an overload choice referencing this declaration and immediately
       // resolve it. This records the overload for use later.
       auto tv = CS.createTypeVariable(locator, TVO_CanBindToLValue);
       CS.resolveOverload(locator, tv,
                          OverloadChoice(Type(), E->getDecl(),
                                         E->isSpecialized(), CS));
-      
+
       if (E->getDecl()->getType() &&
           !E->getDecl()->getType()->getAs<TypeVariableType>()) {
         CS.setFavoredType(E, E->getDecl()->getType().getPointer());
@@ -1198,7 +1198,7 @@ namespace {
         type = E->getTypeLoc().getType();
       }
       if (!type || type->is<ErrorType>()) return Type();
-      
+
       auto locator = CS.getConstraintLocator(E);
       type = CS.openType(type, locator);
       E->getTypeLoc().setType(type, /*validated=*/true);
@@ -1207,7 +1207,7 @@ namespace {
 
     Type visitUnresolvedConstructorExpr(UnresolvedConstructorExpr *expr) {
       ASTContext &C = CS.getASTContext();
-      
+
       // Open a member constraint for constructor delegations on the subexpr
       // type.
       if (CS.TC.getSelfForInitDelegationInConstructor(CS.DC, expr)){
@@ -1221,7 +1221,7 @@ namespace {
         //   self = Self.init()
         //   self.super = Super.init()
         baseTy = MetatypeType::get(baseTy, CS.getASTContext());
-        
+
         auto argsTy = CS.createTypeVariable(
                         CS.getConstraintLocator(expr),
                         TVO_CanBindToLValue|TVO_PrefersSubtypeBinding);
@@ -1231,18 +1231,18 @@ namespace {
         CS.addValueMemberConstraint(baseTy, C.Id_init,
           methodTy,
           CS.getConstraintLocator(expr, ConstraintLocator::ConstructorMember));
-        
+
         // The result of the expression is the partial application of the
         // constructor to the subexpression.
         return methodTy;
       }
-      
+
       // If we aren't delegating from within an initializer, then 'x.init' is
       // just a reference to the constructor as a member of the metatype value
       // 'x'.
       return addMemberRefConstraints(expr, expr->getSubExpr(), C.Id_init);
     }
-    
+
     Type visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
@@ -1255,10 +1255,10 @@ namespace {
       auto tv = CS.createTypeVariable(locator, TVO_CanBindToLValue);
       ArrayRef<ValueDecl*> decls = expr->getDecls();
       SmallVector<OverloadChoice, 4> choices;
-      
+
       if (!decls.empty() && isDelayedOperatorDecl(decls[0]))
         expr->setIsPotentiallyDelayedGlobalOperator();
-      
+
       for (unsigned i = 0, n = decls.size(); i != n; ++i) {
         // If the result is invalid, skip it.
         // FIXME: Note this as invalid, in case we don't find a solution,
@@ -1312,7 +1312,7 @@ namespace {
       CS.addOverloadSet(tv, choices, locator);
       return tv;
     }
-    
+
     Type visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *expr) {
       // This is an error case, where we're trying to use type inference
       // to help us determine which declaration the user meant to refer to.
@@ -1320,17 +1320,17 @@ namespace {
       return CS.createTypeVariable(CS.getConstraintLocator(expr),
                                    TVO_CanBindToLValue);
     }
-    
+
     Type visitMemberRefExpr(MemberRefExpr *expr) {
       return addMemberRefConstraints(expr, expr->getBase(),
                                      expr->getMember().getDecl());
     }
-    
+
     Type visitDynamicMemberRefExpr(DynamicMemberRefExpr *expr) {
       return addMemberRefConstraints(expr, expr->getBase(),
                                      expr->getMember().getDecl());
     }
-    
+
     virtual Type visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
       auto baseLocator = CS.getConstraintLocator(
                             expr,
@@ -1368,14 +1368,14 @@ namespace {
         CS.addConstraint(ConstraintKind::ApplicableFunction, funcTy,
           memberTy,
           CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
-        
+
         return baseTy;
       }
 
       // Otherwise, the member needs to be convertible to the base type.
       CS.addConstraint(ConstraintKind::Conversion, memberTy, baseTy,
         CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
-      
+
       // The member type also needs to be convertible to the context type, which
       // preserves lvalue-ness.
       auto resultTy = CS.createTypeVariable(memberLocator, TVO_CanBindToLValue);
@@ -1389,14 +1389,14 @@ namespace {
     Type visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
       return addMemberRefConstraints(expr, expr->getBase(), expr->getName());
     }
-    
+
     Type visitUnresolvedSelectorExpr(UnresolvedSelectorExpr *expr) {
       return addMemberRefConstraints(expr, expr->getBase(), expr->getName());
     }
-    
+
     Type visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *expr) {
       auto baseTy = expr->getSubExpr()->getType();
-      
+
       // We currently only support explicit specialization of generic types.
       // FIXME: We could support explicit function specialization.
       auto &tc = CS.getTypeChecker();
@@ -1407,7 +1407,7 @@ namespace {
                     diag::while_parsing_as_left_angle_bracket);
         return Type();
       }
-      
+
       if (AnyMetatypeType *meta = baseTy->getAs<AnyMetatypeType>()) {
         if (BoundGenericType *bgt
               = meta->getInstanceType()->getAs<BoundGenericType>()) {
@@ -1436,7 +1436,7 @@ namespace {
                              typeVars[i], specializations[i].getType(),
                              locator);
           }
-          
+
           return baseTy;
         } else {
           tc.diagnose(expr->getSubExpr()->getLoc(), diag::not_a_generic_type,
@@ -1449,14 +1449,14 @@ namespace {
 
       // FIXME: If the base type is a type variable, constrain it to a metatype
       // of a bound generic type.
-      
+
       tc.diagnose(expr->getSubExpr()->getLoc(),
                   diag::not_a_generic_definition);
       tc.diagnose(expr->getLAngleLoc(),
                   diag::while_parsing_as_left_angle_bracket);
       return Type();
     }
-    
+
     Type visitSequenceExpr(SequenceExpr *expr) {
       // If a SequenceExpr survived until CSGen, then there was an upstream
       // error that was already reported.
@@ -1490,11 +1490,11 @@ namespace {
     virtual Type visitParenExpr(ParenExpr *expr) {
       auto &ctx = CS.getASTContext();
       expr->setType(ParenType::get(ctx, expr->getSubExpr()->getType()));
-      
+
       if (auto favoredTy = CS.getFavoredType(expr->getSubExpr())) {
         CS.setFavoredType(expr, favoredTy);
       }
-      
+
       return expr->getType();
     }
 
@@ -1521,10 +1521,10 @@ namespace {
       return addSubscriptConstraints(expr, expr->getBase(), expr->getIndex(),
                                      decl);
     }
-    
+
     Type visitArrayExpr(ArrayExpr *expr) {
       ASTContext &C = CS.getASTContext();
-      
+
       // An array expression can be of a type T that conforms to the
       // ArrayLiteralConvertible protocol.
       auto &tc = CS.getTypeChecker();
@@ -1544,18 +1544,18 @@ namespace {
       auto contextualType = CS.getContextualType(expr);
       Type contextualArrayType = nullptr;
       Type contextualArrayElementType = nullptr;
-      
+
       // If a contextual type exists for this expression, apply it directly.
       if (contextualType && CS.isArrayType(contextualType)) {
         // Is the array type a contextual type
         contextualArrayType = contextualType;
         contextualArrayElementType =
             CS.getBaseTypeForArrayType(contextualType.getPointer());
-        
+
         CS.addConstraint(ConstraintKind::ConformsTo, contextualType,
                          arrayProto->getDeclaredType(),
                          locator);
-        
+
         unsigned index = 0;
         for (auto element : expr->getElements()) {
           CS.addConstraint(ConstraintKind::Conversion,
@@ -1565,17 +1565,17 @@ namespace {
                                                    LocatorPathElt::
                                                     getTupleElement(index++)));
         }
-        
+
         return contextualArrayType;
       }
-      
+
       auto arrayTy = CS.createTypeVariable(locator, TVO_PrefersSubtypeBinding);
 
       // The array must be an array literal type.
       CS.addConstraint(ConstraintKind::ConformsTo, arrayTy,
                        arrayProto->getDeclaredType(),
                        locator);
-      
+
       // Its subexpression should be convertible to a tuple (T.Element...).
       // FIXME: We should really go through the conformance above to extract
       // the element type, rather than just looking for the element type.
@@ -1645,7 +1645,7 @@ namespace {
                                                 locatorBuilder.withPathElement(
                                                   ConstraintLocator::ArrayElementType),
                                                 /*options=*/0);
-      
+
       TupleTypeElt tupleElts[2] = { TupleTypeElt(dictionaryKeyTy),
                                     TupleTypeElt(dictionaryValueTy) };
       Type elementTy = TupleType::get(tupleElts, C);
@@ -1693,14 +1693,14 @@ namespace {
         // Otherwise, create a fresh type variable.
         Type ty = CS.createTypeVariable(CS.getConstraintLocator(locator),
                                         /*options=*/0);
-        
+
         param->overwriteType(ty);
       }
-      
+
       return params->getType(CS.getASTContext());
     }
 
-    
+
     /// \brief Produces a type for the given pattern, filling in any missing
     /// type information with fresh type variables.
     ///
@@ -1722,7 +1722,7 @@ namespace {
 
       case PatternKind::Named: {
         auto var = cast<NamedPattern>(pattern)->getDecl();
-        
+
         auto boundExpr = locator.trySimplifyToExpr();
         auto haveBoundCollectionLiteral = boundExpr &&
                                             !var->hasNonPatternBindingInit() &&
@@ -1778,7 +1778,7 @@ namespace {
         }
         return TupleType::get(tupleTypeElts, CS.getASTContext());
       }
-      
+
       // Refutable patterns occur when checking the PatternBindingDecls in an
       // if/let or while/let condition.  They always require an initial value,
       // so they always allow unspecified types.
@@ -1848,7 +1848,7 @@ namespace {
       body->walk(finder);
       return finder.hasNoResult();
     }
-    
+
     /// \brief Walk a closure AST to determine if it can throw.
     bool closureCanThrow(ClosureExpr *expr) {
       // A walker that looks for 'try' or 'throw' expressions
@@ -1857,7 +1857,7 @@ namespace {
       class FindInnerThrows : public ASTWalker {
         ConstraintSystem &CS;
         bool FoundThrow = false;
-        
+
         std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
           // If we've found a 'try', record it and terminate the traversal.
           if (isa<TryExpr>(expr)) {
@@ -1869,19 +1869,19 @@ namespace {
           if (isa<ForceTryExpr>(expr) || isa<OptionalTryExpr>(expr)) {
             return { false, expr };
           }
-          
+
           // Do not recurse into other closures.
           if (isa<ClosureExpr>(expr))
             return { false, expr };
-          
+
           return { true, expr };
         }
-        
+
         bool walkToDeclPre(Decl *decl) override {
           // Do not walk into function or type declarations.
           if (!isa<PatternBindingDecl>(decl))
             return false;
-          
+
           return true;
         }
 
@@ -1945,7 +1945,7 @@ namespace {
           clause->setErrorPattern(pattern);
           return clause->isSyntacticallyExhaustive();
         }
-        
+
         std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
           // If we've found a 'throw', record it and terminate the traversal.
           if (isa<ThrowStmt>(stmt)) {
@@ -1971,43 +1971,43 @@ namespace {
             // We've already walked all the children we care about.
             return { false, stmt };
           }
-          
+
           return { true, stmt };
         }
-        
+
       public:
         FindInnerThrows(ConstraintSystem &cs) : CS(cs) {}
 
         bool foundThrow() { return FoundThrow; }
       };
-      
+
       if (expr->getThrowsLoc().isValid())
         return true;
-      
+
       auto body = expr->getBody();
-      
+
       if (!body)
         return false;
-      
+
       auto tryFinder = FindInnerThrows(CS);
       body->walk(tryFinder);
       return tryFinder.foundThrow();
     }
-    
+
 
     Type visitClosureExpr(ClosureExpr *expr) {
-      
+
       // If a contextual function type exists, we can use that to obtain the
       // expected return type, rather than allocating a fresh type variable.
       auto contextualType = CS.getContextualType(expr);
       Type crt;
-      
+
       if (contextualType) {
         if (auto cft = contextualType->getAs<AnyFunctionType>()) {
           crt = cft->getResult();
         }
       }
-      
+
       // Closure expressions always have function type. In cases where a
       // parameter or return type is omitted, a fresh type variable is used to
       // stand in for that parameter or return type, allowing it to be inferred
@@ -2044,10 +2044,10 @@ namespace {
                          LocatorPathElt::getTupleElement(0)));
 
       auto extInfo = FunctionType::ExtInfo();
-      
+
       if (closureCanThrow(expr))
         extInfo = extInfo.withThrows();
-      
+
       // FIXME: If we want keyword arguments for closures, add them here.
       funcTy = FunctionType::get(paramTy, funcTy, extInfo);
 
@@ -2096,9 +2096,9 @@ namespace {
 
     Type visitApplyExpr(ApplyExpr *expr) {
       Type outputTy;
-      
+
       auto fnExpr = expr->getFn();
-      
+
       if (isa<DeclRefExpr>(fnExpr)) {
         if (auto fnType = fnExpr->getType()->getAs<AnyFunctionType>()) {
           outputTy = fnType->getResult();
@@ -2106,13 +2106,13 @@ namespace {
       } else if (auto TE = dyn_cast<TypeExpr>(fnExpr)) {
         outputTy = TE->getType()->getAs<MetatypeType>()->getInstanceType();
         NominalTypeDecl *NTD = nullptr;
-        
+
         if (auto nominalType = outputTy->getAs<NominalType>()) {
           NTD = nominalType->getDecl();
         } else if (auto bgT = outputTy->getAs<BoundGenericType>()) {
           NTD = bgT->getDecl();
         }
-        
+
         if (NTD) {
           if (!(isa<ClassDecl>(NTD) || isa<StructDecl>(NTD)) ||
               hasFailableInits(NTD, &CS)) {
@@ -2121,35 +2121,35 @@ namespace {
         } else {
           outputTy = Type();
         }
-        
+
       } else if (auto OSR = dyn_cast<OverloadSetRefExpr>(fnExpr)) {
         if (auto FD = dyn_cast<FuncDecl>(OSR->getDecls()[0])) {
 
           // If we've already agreed upon an overloaded return type, use it.
           if (FD->getHaveSearchedForCommonOverloadReturnType()) {
-            
+
             if (FD->getHaveFoundCommonOverloadReturnType()) {
               outputTy = FD->getType()->getAs<AnyFunctionType>()->getResult();
             }
-            
+
           } else {
-          
+
             // Determine if the overloads all share a common return type.
             Type commonType;
             Type resultType;
-            
+
             for (auto OD : OSR->getDecls()) {
-              
+
               if (auto OFD = dyn_cast<FuncDecl>(OD)) {
                 auto OFT = OFD->getType()->getAs<AnyFunctionType>();
-                
+
                 if (!OFT) {
                   commonType = Type();
                   break;
                 }
-                
+
                 resultType = OFT->getResult();
-                
+
                 if (commonType.isNull()) {
                   commonType = resultType;
                 } else if (!commonType->isEqual(resultType)) {
@@ -2162,7 +2162,7 @@ namespace {
                 break;
               }
             }
-            
+
             // TODO: For now, disallow tyvar, archetype and function types.
             if (!(commonType.isNull() ||
                   commonType->getAs<TypeVariableType>() ||
@@ -2170,12 +2170,12 @@ namespace {
                   commonType->getAs<AnyFunctionType>())) {
               outputTy = commonType;
             }
-            
+
             // Set the search bits appropriately.
             for (auto OD : OSR->getDecls()) {
               if (auto OFD = dyn_cast<FuncDecl>(OD)) {
                 OFD->setHaveSearchedForCommonOverloadReturnType();
-                
+
                 if (!outputTy.isNull())
                   OFD->setHaveFoundCommonOverloadReturnType();
               }
@@ -2183,7 +2183,7 @@ namespace {
           }
         }
       }
-      
+
       // The function subexpression has some rvalue type T1 -> T2 for fresh
       // variables T1 and T2.
       if (outputTy.isNull()) {
@@ -2201,7 +2201,7 @@ namespace {
       FunctionType::ExtInfo extInfo;
       if (isa<ClosureExpr>(fnExpr->getSemanticsProvidingExpr()))
         extInfo = extInfo.withNoEscape();
-      
+
       auto funcTy = FunctionType::get(expr->getArg()->getType(), outputTy,
                                       extInfo);
 
@@ -2236,12 +2236,12 @@ namespace {
         superclassTy = MetatypeType::get(superclassTy);
       return superclassTy;
     }
-    
+
     Type visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *expr) {
       // The result is void.
       return TupleType::getEmpty(CS.getASTContext());
     }
-    
+
     Type visitIfExpr(IfExpr *expr) {
       // The conditional expression must conform to LogicValue.
       Expr *condExpr = expr->getCondExpr();
@@ -2266,14 +2266,14 @@ namespace {
                        CS.getConstraintLocator(expr->getElseExpr()));
       return resultTy;
     }
-    
+
     virtual Type visitImplicitConversionExpr(ImplicitConversionExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
 
     Type visitForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
       auto &tc = CS.getTypeChecker();
-      
+
       // Validate the resulting type.
       TypeResolutionOptions options = TR_AllowUnboundGenerics;
       options |= TR_InExpression;
@@ -2296,7 +2296,7 @@ namespace {
 
     Type visitCoerceExpr(CoerceExpr *expr) {
       auto &tc = CS.getTypeChecker();
-      
+
       // Validate the resulting type.
       TypeResolutionOptions options = TR_AllowUnboundGenerics;
       options |= TR_InExpression;
@@ -2369,7 +2369,7 @@ namespace {
 
       // Add a checked cast constraint.
       auto fromType = expr->getSubExpr()->getType();
-      
+
       CS.addConstraint(ConstraintKind::CheckedCast, fromType, toType,
                        CS.getConstraintLocator(expr));
 
@@ -2382,27 +2382,27 @@ namespace {
       auto typeVar = CS.createTypeVariable(locator, /*options=*/0);
       return LValueType::get(typeVar);
     }
-    
+
     Type visitAssignExpr(AssignExpr *expr) {
       // Handle invalid code.
       if (!expr->getDest() || !expr->getSrc())
         return Type();
-      
+
       // Compute the type to which the source must be converted to allow
       // assignment to the destination.
       auto destTy = CS.computeAssignDestType(expr->getDest(), expr->getLoc());
       if (!destTy)
         return Type();
-      
+
       // The source must be convertible to the destination.
       CS.addConstraint(ConstraintKind::Conversion,
                        expr->getSrc()->getType(), destTy,
                        CS.getConstraintLocator(expr->getSrc()));
-      
+
       expr->setType(TupleType::getEmpty(CS.getASTContext()));
       return expr->getType();
     }
-    
+
     Type visitUnresolvedPatternExpr(UnresolvedPatternExpr *expr) {
       // If there are UnresolvedPatterns floating around after name binding,
       // they are pattern productions in invalid positions.
@@ -2431,14 +2431,14 @@ namespace {
       auto objectTy = CS.createTypeVariable(locator,
                                             TVO_PrefersSubtypeBinding
                                             | TVO_CanBindToLValue);
-      
+
       // The result is the object type of the optional subexpression.
       CS.addConstraint(ConstraintKind::OptionalObject,
                        expr->getSubExpr()->getType(), objectTy,
                        locator);
       return objectTy;
     }
-    
+
     Type visitOptionalEvaluationExpr(OptionalEvaluationExpr *expr) {
       // The operand must be coercible to T? for some type T.  We'd
       // like this to be the smallest possible nesting level of
@@ -2464,7 +2464,7 @@ namespace {
       auto objectTy = CS.createTypeVariable(locator,
                                             TVO_PrefersSubtypeBinding
                                             | TVO_CanBindToLValue);
-      
+
       // The result is the object type of the optional subexpression.
       CS.addConstraint(ConstraintKind::OptionalObject,
                        expr->getSubExpr()->getType(), objectTy,
@@ -2624,14 +2624,14 @@ namespace {
     llvm::DenseMap<Expr *, Expr *> ParentMap;
 
   public:
-    ArgumentLabelWalker(ConstraintSystem &cs, Expr *expr) 
+    ArgumentLabelWalker(ConstraintSystem &cs, Expr *expr)
       : CS(cs), ParentMap(expr->getParentMap()) { }
 
     void associateArgumentLabels(Expr *arg, ArrayRef<Identifier> labels,
                                  bool labelsArePermanent) {
       // Our parent must be a call.
       auto call = dyn_cast_or_null<CallExpr>(ParentMap[arg]);
-      if (!call) 
+      if (!call)
         return;
 
       // We must have originated at the call argument.
@@ -2668,7 +2668,7 @@ namespace {
           associateArgumentLabels(expr, tuple->getElementNames(), true);
         else {
           llvm::SmallVector<Identifier, 4> names(tuple->getNumElements(),
-                                                 Identifier()); 
+                                                 Identifier());
           associateArgumentLabels(expr, names, false);
         }
       } else if (auto paren = dyn_cast<ParenExpr>(expr)) {
@@ -2691,12 +2691,12 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
   // Walk the expression, generating constraints.
   ConstraintGenerator cg(*this);
   ConstraintWalker cw(cg);
-  
+
   Expr* result = expr->walk(cw);
-  
+
   if (result)
     this->optimizeConstraints(result);
-  
+
   return result;
 }
 
@@ -2709,9 +2709,9 @@ Expr *ConstraintSystem::generateConstraintsShallow(Expr *expr) {
   auto type = cg.visit(expr);
   if (!type)
     return nullptr;
-  
+
   this->optimizeConstraints(expr);
-  
+
   expr->setType(type);
   return expr;
 }
@@ -2723,18 +2723,18 @@ Type ConstraintSystem::generateConstraints(Pattern *pattern,
 }
 
 void ConstraintSystem::optimizeConstraints(Expr *e) {
-  
+
   SmallVector<Expr *, 16> linkedExprs;
-  
+
   // Collect any linked expressions.
   LinkedExprCollector collector(linkedExprs);
   e->walk(collector);
-  
+
   // Favor types, as appropriate.
   for (auto linkedExpr : linkedExprs) {
     computeFavoredTypeForExpr(linkedExpr, *this);
   }
-  
+
   // Optimize the constraints.
   ConstraintOptimizer optimizer(*this);
   e->walk(optimizer);

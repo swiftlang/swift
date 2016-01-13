@@ -86,7 +86,7 @@ void SILGenFunction::emitInjectOptionalValueInto(SILLocation loc,
   auto destPayload = B.createInitEnumDataAddr(loc, dest,
                                             someDecl,
                                             loweredPayloadTy.getAddressType());
-  
+
   CanType formalOptType = optType.getSwiftRValueType();
   auto archetype = formalOptType->getNominalOrBoundGenericNominal()
     ->getGenericParams()->getPrimaryArchetypes()[0];
@@ -98,21 +98,21 @@ void SILGenFunction::emitInjectOptionalValueInto(SILLocation loc,
   std::move(value).forwardInto(*this, origType,
                                &emitInto,
                                payloadTL);
-  
+
   // Inject the tag.
   B.createInjectEnumAddr(loc, dest, someDecl);
 }
 
-void SILGenFunction::emitInjectOptionalNothingInto(SILLocation loc, 
+void SILGenFunction::emitInjectOptionalNothingInto(SILLocation loc,
                                                    SILValue dest,
                                                    const TypeLowering &optTL) {
   OptionalTypeKind OTK;
   optTL.getLoweredType().getSwiftRValueType()->getAnyOptionalObjectType(OTK);
   assert(OTK != OTK_None);
-  
+
   B.createInjectEnumAddr(loc, dest, getASTContext().getOptionalNoneDecl(OTK));
 }
-      
+
 /// Return a value for an optional ".None" of the specified type. This only
 /// works for loadable enum types.
 SILValue SILGenFunction::getOptionalNoneValue(SILLocation loc,
@@ -140,12 +140,12 @@ getOptionalSomeValue(SILLocation loc, ManagedValue value,
     ->getCanonicalType();
   assert(OTK != OTK_None);
   auto someDecl = getASTContext().getOptionalSomeDecl(OTK);
-  
+
   auto archetype = formalOptType->getNominalOrBoundGenericNominal()
                         ->getGenericParams()->getPrimaryArchetypes()[0];
   AbstractionPattern origType(archetype);
 
-  
+
   // Reabstract input value to the type expected by the enum.
   value = emitSubstToOrigValue(loc, value, origType, formalObjectType);
 
@@ -215,7 +215,7 @@ SILValue SILGenFunction::emitDoesOptionalHaveValue(SILLocation loc,
   SILValue yes = B.createIntegerLiteral(loc, boolTy, 1);
   SILValue no = B.createIntegerLiteral(loc, boolTy, 0);
   auto someDecl = getASTContext().getOptionalSomeDecl(optionalKind);
-  
+
   if (addrOrValue.getType().isAddress())
     return B.createSelectEnumAddr(loc, addrOrValue, boolTy, no,
                                   std::make_pair(someDecl, yes));
@@ -256,9 +256,9 @@ ManagedValue SILGenFunction::emitUncheckedGetOptionalValueFrom(SILLocation loc,
   auto formalPayloadTy = formalOptionalTy
     ->getAnyOptionalObjectType()
     ->getCanonicalType();
-  
+
   auto someDecl = getASTContext().getOptionalSomeDecl(OTK);
- 
+
   ManagedValue payload;
 
   // Take the payload from the optional.  Cheat a bit in the +0
@@ -272,7 +272,7 @@ ManagedValue SILGenFunction::emitUncheckedGetOptionalValueFrom(SILLocation loc,
     payloadVal =
       B.createUncheckedTakeEnumDataAddr(loc, addrOrValue.forward(*this),
                                         someDecl, origPayloadTy);
-  
+
     if (optTL.isLoadable())
       payloadVal = B.createLoad(loc, payloadVal);
   }
@@ -282,7 +282,7 @@ ManagedValue SILGenFunction::emitUncheckedGetOptionalValueFrom(SILLocation loc,
     payload = emitManagedRValueWithCleanup(payloadVal);
   else
     payload = ManagedValue::forUnmanaged(payloadVal);
-  
+
   // Reabstract it to the substituted form, if necessary.
   return emitOrigToSubstValue(loc, payload, AbstractionPattern::getOpaque(),
                               formalPayloadTy, C);
@@ -309,7 +309,7 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
   else
     result = new (F.getModule()) SILArgument(contBB, resultTL.getLoweredType());
 
-  
+
   // Branch on whether the input is optional, this doesn't consume the value.
   auto isPresent = emitDoesOptionalHaveValue(loc, input.getValue());
   B.createCondBranch(loc, isPresent, isPresentBB, isNotPresentBB);
@@ -472,7 +472,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       mv.forwardInto(*this, loc, init->getAddress());
       init->finishInitialization(*this);
     }
-    
+
     return emitManagedRValueWithCleanup(existential);
   }
   case ExistentialRepresentation::Opaque: {
@@ -513,7 +513,7 @@ ManagedValue SILGenFunction::emitClassMetatypeToObject(SILLocation loc,
                                              MetatypeRepresentation::ObjC);
   value = B.createThickToObjCMetatype(loc, value,
                            SILType::getPrimitiveObjectType(objcMetatypeTy));
-  
+
   // Convert to an object reference.
   value = B.createObjCMetatypeToObject(loc, value, resultTy);
 
@@ -524,7 +524,7 @@ ManagedValue SILGenFunction::emitExistentialMetatypeToObject(SILLocation loc,
                                                              ManagedValue v,
                                                              SILType resultTy) {
   SILValue value = v.getUnmanagedValue();
-  
+
   // Convert the metatype to objc representation.
   auto metatypeTy = value.getType().castTo<ExistentialMetatypeType>();
   auto objcMetatypeTy = CanExistentialMetatypeType::get(
@@ -532,10 +532,10 @@ ManagedValue SILGenFunction::emitExistentialMetatypeToObject(SILLocation loc,
                                               MetatypeRepresentation::ObjC);
   value = B.createThickToObjCMetatype(loc, value,
                                SILType::getPrimitiveObjectType(objcMetatypeTy));
-  
+
   // Convert to an object reference.
   value = B.createObjCExistentialMetatypeToObject(loc, value, resultTy);
-  
+
   return ManagedValue::forUnmanaged(value);
 }
 
@@ -546,14 +546,14 @@ ManagedValue SILGenFunction::emitProtocolMetatypeToObject(SILLocation loc,
     ->getInstanceType()->castTo<ProtocolType>()->getDecl();
 
   SILValue value = B.createObjCProtocol(loc, protocol, resultTy);
-  
+
   // Protocol objects, despite being global objects, inherit default reference
   // counting semantics from NSObject, so we need to retain the protocol
   // reference when we use it to prevent it being released and attempting to
   // deallocate itself. It doesn't matter if we ever actually clean up that
   // retain though.
   B.createStrongRetain(loc, value);
-  
+
   return ManagedValue::forUnmanaged(value);
 }
 
@@ -567,7 +567,7 @@ SILGenFunction::emitOpenExistential(
   bool isUnique = true;
   bool canConsume;
   SILValue archetypeValue;
-  
+
   SILType existentialType = existentialValue.getType();
   switch (existentialType.getPreferredExistentialRepresentation(SGM.M)) {
   case ExistentialRepresentation::Opaque:

@@ -40,11 +40,11 @@ namespace irgen {
   class IRGenModule;
   class OwnedAddress;
   class Size;
-  
+
   enum class ReferenceCounting : unsigned char;
   enum class IsaEncoding : unsigned char;
   enum class ClassDeallocationKind : unsigned char;
-  
+
   OwnedAddress projectPhysicalClassMemberAddress(IRGenFunction &IGF,
                                                  llvm::Value *base,
                                                  SILType baseType,
@@ -55,7 +55,7 @@ namespace irgen {
              llvm::Constant * /*metaclassData*/,
              Size>
   emitClassPrivateDataFields(IRGenModule &IGM, ClassDecl *cls);
-  
+
   llvm::Constant *emitClassPrivateData(IRGenModule &IGM, ClassDecl *theClass);
   void emitGenericClassPrivateDataTemplate(IRGenModule &IGM,
                                       ClassDecl *theClass,
@@ -77,7 +77,7 @@ namespace irgen {
                                    bool objc, int &StackAllocSize);
 
   /// Emit an allocation of a class using a metadata value.
-  llvm::Value *emitClassAllocationDynamic(IRGenFunction &IGF, 
+  llvm::Value *emitClassAllocationDynamic(IRGenFunction &IGF,
                                           llvm::Value *metadata,
                                           SILType selfType,
                                           bool objc);
@@ -102,14 +102,14 @@ namespace irgen {
   /// correspond to the runtime alignment of instances of the class.
   llvm::Constant *tryEmitClassConstantFragileInstanceAlignMask(IRGenModule &IGM,
                                                         ClassDecl *theClass);
-  
+
   /// What reference counting mechanism does a class use?
   ReferenceCounting getReferenceCountingForClass(IRGenModule &IGM,
                                                  ClassDecl *theClass);
-  
+
   /// What isa-encoding mechanism does a type use?
   IsaEncoding getIsaEncodingForType(IRGenModule &IGM, CanType type);
-  
+
   ClassDecl *getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *theClass);
 
   bool getClassHasMetadataPattern(IRGenModule &IGM, ClassDecl *theClass);

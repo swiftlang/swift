@@ -104,38 +104,38 @@ const {
 
 void UnimplementedTypeInfo::deallocateStack(IRGenFunction &IGF, Address addr,
                                             SILType T) const {
-  
+
 }
 
 void UnimplementedTypeInfo::assignWithCopy(IRGenFunction &IGF, Address dest,
                                            Address src, SILType T) const {
-  
+
 }
 
 void UnimplementedTypeInfo::assignWithTake(IRGenFunction &IGF, Address dest,
                                            Address src, SILType T) const {
-  
+
 }
 
 void UnimplementedTypeInfo::initializeWithTake(IRGenFunction &IGF, Address dest,
                                                Address src, SILType T) const {
-  
+
 }
 
 void UnimplementedTypeInfo::initializeWithCopy(IRGenFunction &IGF, Address dest,
                                                Address src, SILType T) const {
-  
+
 }
 
 void UnimplementedTypeInfo::initializeFromParams(IRGenFunction &IGF,
                                                  Explosion &params,
                                                  Address src, SILType T) const {
-  
+
 }
 
 void UnimplementedTypeInfo::destroy(IRGenFunction &IGF, Address address,
                                     SILType T) const {
-  
+
 }
 
 bool UnimplementedTypeInfo::mayHaveExtraInhabitants(IRGenModule &IGM) const {
@@ -152,13 +152,13 @@ void UnimplementedTypeInfo::storeExtraInhabitant(IRGenFunction &IGF,
                                                  llvm::Value *index,
                                                  Address dest,
                                                  SILType T) const {
-  
+
 }
 void UnimplementedTypeInfo::initializeMetadata(IRGenFunction &IGF,
                                                llvm::Value *metadata,
                                                llvm::Value *vwtable,
                                                SILType T) const {
-  
+
 }
 
 llvm::Value *UnimplementedTypeInfo::isDynamicallyPackedInline(IRGenFunction &IGF,

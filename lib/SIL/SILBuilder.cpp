@@ -23,7 +23,7 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
   CanSILFunctionType FTI = origTy.castTo<SILFunctionType>();
   if (!subs.empty())
     FTI = FTI->substGenericArgs(M, M.getSwiftModule(), subs);
-  
+
   assert(!FTI->isPolymorphic()
          && "must provide substitutions for generic partial_apply");
   auto params = FTI->getParameters();
@@ -32,7 +32,7 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
   auto extInfo = SILFunctionType::ExtInfo(
                                         SILFunctionType::Representation::Thick,
                                         /*noreturn*/ FTI->isNoReturn());
-  
+
   auto appliedFnType = SILFunctionType::get(nullptr, extInfo,
                                             ParameterConvention::Direct_Owned,
                                             newParams,
@@ -65,7 +65,7 @@ SILInstruction *SILBuilder::createUncheckedBitCast(SILLocation Loc,
         createSILDebugLocation(Loc), Op, Ty));
 
   if (auto refCast = tryCreateUncheckedRefCast(Loc, Op, Ty))
-    return refCast;  
+    return refCast;
 
   // The destination type is nontrivial, and may be smaller than the source
   // type, so RC identity cannot be assumed.
@@ -293,7 +293,7 @@ SILBuilder::getOrCreateDebugLocation(SILLocation Loc, const SILDebugScope *DS) {
   auto *&L = DebugLocs[SILDebugLocationID(TmpLoc)];
   if (L)
     return L;
- 
+
   // It's new, allocate it on our own allocator and insert it into the set.
   L = new (F.getModule()) SILDebugLocation(Loc, DS);
   return L;

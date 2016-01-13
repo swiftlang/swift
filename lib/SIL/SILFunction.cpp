@@ -151,7 +151,7 @@ void SILFunction::numberValues(llvm::DenseMap<const ValueBase*,
   for (auto &BB : *this) {
     for (auto I = BB.bbarg_begin(), E = BB.bbarg_end(); I != E; ++I)
       ValueToNumberMap[*I] = idx++;
-    
+
     for (auto &I : BB)
       ValueToNumberMap[&I] = idx++;
   }
@@ -181,46 +181,46 @@ struct SubstDependentSILType
 {
   SILModule &M;
   SubstFn Subst;
-  
+
   SubstDependentSILType(SILModule &M, SubstFn Subst)
     : M(M), Subst(std::move(Subst))
   {}
-  
+
   using super = CanTypeVisitor<SubstDependentSILType<SubstFn>, CanType>;
   using super::visit;
-  
+
   CanType visitDependentMemberType(CanDependentMemberType t) {
     // If a dependent member type appears in lowered position, we need to lower
     // its context substitution against the associated type's abstraction
     // pattern.
     CanType astTy = Subst(t);
     AbstractionPattern origTy(t->getAssocType()->getArchetype());
-    
+
     return M.Types.getLoweredType(origTy, astTy)
       .getSwiftRValueType();
   }
-  
+
   CanType visitTupleType(CanTupleType t) {
     // Dependent members can appear in lowered position inside tuples.
-    
+
     SmallVector<TupleTypeElt, 4> elements;
-    
+
     for (auto &elt : t->getElements())
       elements.push_back(elt.getWithType(visit(CanType(elt.getType()))));
-    
+
     return TupleType::get(elements, t->getASTContext())
       ->getCanonicalType();
   }
-  
+
   CanType visitSILFunctionType(CanSILFunctionType t) {
     // Dependent members can appear in lowered position inside SIL functions.
-    
+
     SmallVector<SILParameterInfo, 4> params;
     for (auto &param : t->getParameters())
       params.push_back(param.map([&](CanType pt) -> CanType {
         return visit(pt);
       }));
-    
+
     SILResultInfo result = t->getResult().map([&](CanType elt) -> CanType {
         return visit(elt);
       });
@@ -231,14 +231,14 @@ struct SubstDependentSILType
           return visit(elt);
       });
     }
-    
+
     return SILFunctionType::get(t->getGenericSignature(),
                                 t->getExtInfo(),
                                 t->getCalleeConvention(),
                                 params, result, errorResult,
                                 t->getASTContext());
   }
-  
+
   CanType visitType(CanType t) {
     // Other types get substituted into context normally.
     return Subst(t);
@@ -253,7 +253,7 @@ SILType doSubstDependentSILType(SILModule &M,
     .visit(t.getSwiftRValueType());
   return SILType::getPrimitiveType(result, t.getCategory());
 }
-  
+
 } // end anonymous namespace
 
 SILType SILFunction::mapTypeIntoContext(SILType type) const {

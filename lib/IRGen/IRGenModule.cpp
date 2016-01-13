@@ -131,7 +131,7 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
     Types(*new TypeConverter(*this))
 {
   dispatcher.addGenModule(SF, this);
-  
+
   VoidTy = llvm::Type::getVoidTy(getLLVMContext());
   Int1Ty = llvm::Type::getInt1Ty(getLLVMContext());
   Int8Ty = llvm::Type::getInt8Ty(getLLVMContext());
@@ -187,9 +187,9 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
     Int32Ty,                // size
     Int32Ty                 // flags
   });
-  
+
   ProtocolDescriptorPtrTy = ProtocolDescriptorStructTy->getPointerTo();
-  
+
   // A tuple type metadata record has a couple extra fields.
   auto tupleElementTy = createStructType(*this, "swift.tuple_element_type", {
     TypeMetadataPtrTy,      // Metadata *Type;
@@ -255,7 +255,7 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
     FunctionPtrTy,
     RefCountedPtrTy,
   });
-  
+
   OpaquePtrTy = llvm::StructType::create(LLVMContext, "swift.opaque")
                   ->getPointerTo(DefaultAS);
 
@@ -296,7 +296,7 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
     ObjCClassPtrTy
   };
   ObjCSuperStructTy->setBody(objcSuperElts);
-  
+
   ObjCBlockStructTy = llvm::StructType::create(LLVMContext, "objc_block");
   ObjCBlockPtrTy = ObjCBlockStructTy->getPointerTo(DefaultAS);
   llvm::Type *objcBlockElts[] = {
@@ -309,11 +309,11 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
                     // point too.
   };
   ObjCBlockStructTy->setBody(objcBlockElts);
-  
+
   auto ErrorStructTy = llvm::StructType::create(LLVMContext, "swift.error");
   // ErrorStruct is currently opaque to the compiler.
   ErrorPtrTy = ErrorStructTy->getPointerTo(DefaultAS);
-  
+
   llvm::Type *openedErrorTriple[] = {
     OpaquePtrTy,
     TypeMetadataPtrTy,
@@ -323,11 +323,11 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
                                               openedErrorTriple,
                                               /*packed*/ false);
   OpenedErrorTriplePtrTy = OpenedErrorTripleTy->getPointerTo(DefaultAS);
-  
+
   InvariantMetadataID = LLVMContext.getMDKindID("invariant.load");
   InvariantNode = llvm::MDNode::get(LLVMContext, {});
   DereferenceableID = LLVMContext.getMDKindID("dereferenceable");
-  
+
   // TODO: use "tinycc" on platforms that support it
   RuntimeCC = llvm::CallingConv::C;
 
@@ -380,7 +380,7 @@ static llvm::Constant *getRuntimeFn(IRGenModule &IGM,
                          = std::initializer_list<Attribute::AttrKind>()) {
   if (cache)
     return cache;
-  
+
   llvm::Type *retTy;
   if (retTypes.size() == 1)
     retTy = *retTypes.begin();
@@ -511,7 +511,7 @@ llvm::AttributeSet IRGenModule::getAllocAttrs() {
 /// Construct initial attributes from options.
 llvm::AttributeSet IRGenModule::constructInitialAttributes() {
   llvm::AttributeSet attrsUpdated;
-  // Add DisableFPElim. 
+  // Add DisableFPElim.
   if (!Opts.DisableFPElim) {
     attrsUpdated = attrsUpdated.addAttribute(LLVMContext,
                      llvm::AttributeSet::FunctionIndex,
@@ -707,10 +707,10 @@ void IRGenModule::emitAutolinkInfo() {
     auto EntriesConstant = llvm::ConstantDataArray::getString(
       LLVMContext, EntriesString, /*AddNull=*/false);
 
-    auto var = new llvm::GlobalVariable(*getModule(), 
+    auto var = new llvm::GlobalVariable(*getModule(),
                                         EntriesConstant->getType(), true,
                                         llvm::GlobalValue::PrivateLinkage,
-                                        EntriesConstant, 
+                                        EntriesConstant,
                                         "_swift1_autolink_entries");
     var->setSection(".swift1_autolink_entries");
     var->setAlignment(getPointerAlignment().getValue());

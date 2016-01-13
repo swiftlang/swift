@@ -790,7 +790,7 @@ bool CopyForwarding::forwardPropagateCopy(
 /// not including:
 /// - 'Def' itself
 /// - Transitive uses of 'Def' (listed elsewhere in DestUserInsts)
-/// 
+///
 /// If the returned root is not 'Def' itself, then 'Def' must be an address
 /// projection that can be trivially rematerialized with the root as its
 /// operand.
@@ -875,7 +875,7 @@ bool CopyForwarding::backwardPropagateCopy(
 
   for (auto *DVAI : DebugValueInstsToDelete)
     DVAI->eraseFromParent();
-  
+
   // Convert a reinitialization of this address into a destroy, followed by an
   // initialization. Replacing a copy with a destroy+init is not by itself
   // profitable. However, it does allow us to eliminate the later copy, and the

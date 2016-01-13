@@ -238,7 +238,7 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
                                 TypeLoc(), discriminator, newTopLevel);
 
   CE->setType(ParameterList::getFullType(TupleType::getEmpty(Context), params));
-  
+
   // Convert the pattern to a string we can print.
   llvm::SmallString<16> PrefixString;
   PrefixString += "// ";
@@ -350,7 +350,7 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
     }
 
     auto pattern = patternEntry.getPattern();
-    
+
     llvm::SmallString<16> PatternString;
     PatternBindingPrintLHS(PatternString).visit(pattern);
 
@@ -383,7 +383,7 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
                                         PBD->getStartLoc(), name,
                                         pattern->getType(), &SF);
     SF.Decls.push_back(vd);
-    
+
 
     // Create a PatternBindingDecl to bind the expression into the decl.
     Pattern *metavarPat = new (Context) NamedPattern(vd);
@@ -393,22 +393,22 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
                                    StaticSpellingKind::None,
                                    PBD->getStartLoc(), metavarPat,
                                    patternEntry.getInit(), &SF);
-    
+
     auto MVBrace = BraceStmt::create(Context, metavarBinding->getStartLoc(),
                                      ASTNode(metavarBinding),
                                      metavarBinding->getEndLoc());
-    
+
     auto *MVTLCD = new (Context) TopLevelCodeDecl(&SF, MVBrace);
     SF.Decls.push_back(MVTLCD);
-    
-    
+
+
     // Replace the initializer of PBD with a reference to our repl temporary.
     Expr *E = TC.buildCheckedRefExpr(vd, &SF,
                                      vd->getStartLoc(), /*Implicit=*/true);
     E = TC.coerceToMaterializable(E);
     PBD->setInit(entryIdx, E);
     SF.Decls.push_back(PBTLCD);
-    
+
     // Finally, print out the result, by referring to the repl temp.
     E = TC.buildCheckedRefExpr(vd, &SF, vd->getStartLoc(), /*Implicit=*/true);
     generatePrintOfExpression(PatternString, E);

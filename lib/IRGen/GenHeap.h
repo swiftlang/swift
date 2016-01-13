@@ -37,14 +37,14 @@ class HeapLayout : public StructLayout {
   SmallVector<SILType, 8> ElementTypes;
   NecessaryBindings Bindings;
   mutable llvm::Constant *privateMetadata = nullptr;
-  
+
 public:
   HeapLayout(IRGenModule &IGM, LayoutStrategy strategy,
              ArrayRef<SILType> elementTypes,
              ArrayRef<const TypeInfo *> elementTypeInfos,
              llvm::StructType *typeToFill = 0,
              NecessaryBindings &&bindings = {});
-  
+
   /// True if the heap object carries type bindings.
   ///
   /// If true, the first element of the heap layout will be the type metadata
@@ -52,7 +52,7 @@ public:
   bool hasBindings() const {
     return !Bindings.empty();
   }
-  
+
   const NecessaryBindings &getBindings() const {
     return Bindings;
   }
@@ -61,7 +61,7 @@ public:
   ArrayRef<SILType> getElementTypes() const {
     return ElementTypes;
   }
-  
+
   /// Build a size function for this layout.
   llvm::Constant *createSizeFn(IRGenModule &IGM) const;
 
@@ -76,19 +76,19 @@ class HeapNonFixedOffsets : public NonFixedOffsetsImpl {
   llvm::Value *TotalAlignMask;
 public:
   HeapNonFixedOffsets(IRGenFunction &IGF, const HeapLayout &layout);
-  
+
   llvm::Value *getOffsetForIndex(IRGenFunction &IGF, unsigned index) override {
     auto result = Offsets[index];
     assert(result != nullptr
            && "fixed-layout field doesn't need NonFixedOffsets");
     return result;
   }
-  
+
   // The total size of the heap object.
   llvm::Value *getSize() const {
     return TotalSize;
   }
-  
+
   // The total alignment of the heap object.
   llvm::Value *getAlignMask() const {
     return TotalAlignMask;
@@ -106,7 +106,7 @@ void emitDeallocateClassInstance(IRGenFunction &IGF,
                                  llvm::Value *object,
                                  llvm::Value *size,
                                  llvm::Value *alignMask);
-  
+
 /// Emit a partial class instance deallocation from a failing constructor.
 void emitDeallocatePartialClassInstance(IRGenFunction &IGF,
                                         llvm::Value *object,

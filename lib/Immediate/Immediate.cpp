@@ -276,7 +276,7 @@ bool swift::immediate::IRGenImportedModules(
 int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
                           IRGenOptions &IRGenOpts, const SILOptions &SILOpts) {
   ASTContext &Context = CI.getASTContext();
-  
+
   // IRGen the main module.
   auto *swiftModule = CI.getMainModule();
   // FIXME: We shouldn't need to use the global context here, but
@@ -329,7 +329,7 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
         Module->dump());
 
   EE->finalizeObject();
-  
+
   // Run the generated program.
   for (auto InitFn : InitFns) {
     DEBUG(llvm::dbgs() << "Running initialization function "

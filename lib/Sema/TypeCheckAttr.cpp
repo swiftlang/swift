@@ -155,7 +155,7 @@ void AttributeEarlyChecker::visitTransparentAttr(TransparentAttr *attr) {
       return diagnoseAndRemoveAttr(attr,diag::transparent_on_invalid_extension);
     return;
   }
-  
+
   DeclContext *Ctx = D->getDeclContext();
   // Protocol declarations cannot be transparent.
   if (isa<ProtocolDecl>(Ctx))
@@ -163,7 +163,7 @@ void AttributeEarlyChecker::visitTransparentAttr(TransparentAttr *attr) {
                                  diag::transparent_in_protocols_not_supported);
   // Class declarations cannot be transparent.
   if (isa<ClassDecl>(Ctx)) {
-    
+
     // @transparent is always ok on implicitly generated accessors: they can
     // be dispatched (even in classes) when the references are within the
     // class themself.
@@ -172,7 +172,7 @@ void AttributeEarlyChecker::visitTransparentAttr(TransparentAttr *attr) {
       return diagnoseAndRemoveAttr(attr,
                                    diag::transparent_in_classes_not_supported);
   }
-  
+
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     // Stored properties and variables can't be transparent.
     if (VD->hasStorage())
@@ -187,14 +187,14 @@ void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
     return diagnoseAndRemoveAttr(attr, diag::mutating_invalid_global_scope);
   if (FD->getDeclContext()->getDeclaredTypeInContext()->hasReferenceSemantics())
     return diagnoseAndRemoveAttr(attr, diag::mutating_invalid_classes);
-  
+
   // Verify we don't have both mutating and nonmutating.
   if (FD->getAttrs().hasAttribute<MutatingAttr>())
     if (auto *NMA = FD->getAttrs().getAttribute<NonMutatingAttr>()) {
       diagnoseAndRemoveAttr(NMA, diag::functions_mutating_and_not);
       if (NMA == attr) return;
     }
-  
+
   // Verify that we don't have a static function.
   if (FD->isStatic())
     return diagnoseAndRemoveAttr(attr, diag::static_functions_not_mutating);
@@ -205,7 +205,7 @@ void AttributeEarlyChecker::visitDynamicAttr(DynamicAttr *attr) {
   auto contextTy = D->getDeclContext()->getDeclaredTypeInContext();
   if (!contextTy || !contextTy->getClassOrBoundGenericClass())
     return diagnoseAndRemoveAttr(attr, diag::dynamic_not_in_class);
-    
+
   // Members cannot be both dynamic and final.
   if (D->getAttrs().hasAttribute<FinalAttr>())
     return diagnoseAndRemoveAttr(attr, diag::dynamic_with_final);
@@ -283,7 +283,7 @@ isAcceptableOutletType(Type type, bool &isArray, TypeChecker &TC) {
 
   if (type->isExistentialType())
     return diag::iboutlet_nonobjc_protocol;
-  
+
   // No other types are permitted.
   return diag::iboutlet_nonobject_type;
 }
@@ -665,7 +665,7 @@ public:
                                      Identifier Id_ApplicationDelegate,
                                      Identifier Id_Kit,
                                      Identifier Id_ApplicationMain);
-  
+
   void visitNSApplicationMainAttr(NSApplicationMainAttr *attr);
   void visitUIApplicationMainAttr(UIApplicationMainAttr *attr);
 
@@ -859,12 +859,12 @@ void AttributeChecker::visitUnsafeNoObjCTaggedPointerAttr(
                 diag::no_objc_tagged_pointer_not_class_protocol);
     attr->setInvalid();
   }
-  
+
   if (!proto->requiresClass()
       && !proto->getAttrs().hasAttribute<ObjCAttr>()) {
     TC.diagnose(attr->getLocation(),
                 diag::no_objc_tagged_pointer_not_class_protocol);
-    attr->setInvalid();    
+    attr->setInvalid();
   }
 }
 
@@ -878,7 +878,7 @@ void AttributeChecker::visitSwiftNativeObjCRuntimeBaseAttr(
     attr->setInvalid();
     return;
   }
-  
+
   if (theClass->hasSuperclass()) {
     TC.diagnose(attr->getLocation(),
                 diag::swift_native_objc_runtime_base_not_on_root_class);
@@ -1020,7 +1020,7 @@ void AttributeChecker::visitNSCopyingAttr(NSCopyingAttr *attr) {
   // Check the type.  It must be must be [unchecked]optional, weak, a normal
   // class, AnyObject, or classbound protocol.
   // must conform to the NSCopying protocol.
-  
+
 }
 
 void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
@@ -1032,7 +1032,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
     UIApplicationMainClass,
     NSApplicationMainClass,
   };
-  
+
   unsigned applicationMainKind;
   if (isa<UIApplicationMainAttr>(attr))
     applicationMainKind = UIApplicationMainClass;
@@ -1040,9 +1040,9 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
     applicationMainKind = NSApplicationMainClass;
   else
     llvm_unreachable("not an ApplicationMain attr");
-  
+
   auto *CD = dyn_cast<ClassDecl>(D);
-  
+
   // The applicant not being a class should have been diagnosed by the early
   // checker.
   if (!CD) return;
@@ -1055,7 +1055,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
     attr->setInvalid();
     return;
   }
-  
+
   // @XXApplicationMain classes must conform to the XXApplicationDelegate
   // protocol.
   auto &C = D->getASTContext();
@@ -1085,13 +1085,13 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
 
   if (attr->isInvalid())
     return;
-  
+
   // Register the class as the main class in the module. If there are multiples
   // they will be diagnosed.
   auto *SF = cast<SourceFile>(CD->getModuleScopeContext());
   if (SF->registerMainClass(CD, attr->getLocation()))
     attr->setInvalid();
-  
+
   // Check that we have the needed symbols in the frameworks.
   auto lookupOptions = defaultUnqualifiedLookupOptions;
   lookupOptions |= NameLookupFlags::KnownPrivate;
@@ -1342,13 +1342,13 @@ void AttributeChecker::visitWarnUnusedResultAttr(WarnUnusedResultAttr *attr) {
     if (func->getExtensionType()->getClassOrBoundGenericClass()) {
       TC.diagnose(attr->getLocation(),
                   diag::attr_warn_unused_result_mutable_variable, 3);
-      return;      
+      return;
     }
 
     if (func->isMutating()) {
       TC.diagnose(attr->getLocation(),
                   diag::attr_warn_unused_result_mutable_variable, 4);
-      return;      
+      return;
     }
   }
 }

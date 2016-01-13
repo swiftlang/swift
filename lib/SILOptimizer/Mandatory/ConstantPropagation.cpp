@@ -94,7 +94,7 @@ constantFoldBinaryWithOverflow(BuiltinInst *BI, llvm::Intrinsic::ID ID,
         CanType RHSTy = Args->getElement(1)->getType()->getCanonicalType();
         if (LHSTy == RHSTy)
           OpType = Args->getElement(1)->getType();
-        
+
         LHSRange = Args->getElement(0)->getSourceRange();
         RHSRange = Args->getElement(1)->getSourceRange();
       }
@@ -102,7 +102,7 @@ constantFoldBinaryWithOverflow(BuiltinInst *BI, llvm::Intrinsic::ID ID,
 
     bool Signed = false;
     StringRef Operator = "+";
-    
+
     switch (ID) {
       default: llvm_unreachable("Invalid case");
       case llvm::Intrinsic::sadd_with_overflow:
@@ -243,7 +243,7 @@ constantFoldAndCheckDivision(BuiltinInst *BI, BuiltinValueKind ID,
 
   bool Overflowed;
   APInt ResVal = constantFoldDiv(NumVal, DenomVal, Overflowed, ID);
-  
+
   // If we overflowed...
   if (Overflowed) {
     // And we are not asked to produce diagnostics, just return nullptr...
@@ -475,8 +475,8 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
         UserDstTy = CE->getType();
       }
     }
-    
- 
+
+
     // Assume that we are converting from a literal if the Source size is
     // 2048. Is there a better way to identify conversions from literals?
     bool Literal = (SrcBitWidth == 2048);
@@ -510,12 +510,12 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
       // Try to print user-visible types if they are available.
       if (!UserDstTy.isNull()) {
         auto diagID = diag::integer_literal_overflow;
-        
+
         // If this is a negative literal in an unsigned type, use a specific
         // diagnostic.
         if (SrcTySigned && !DstTySigned && SrcVal.isNegative())
           diagID = diag::negative_integer_literal_overflow_unsigned;
-        
+
         diagnose(M.getASTContext(), Loc.getSourceLoc(),
                  diagID, UserDstTy, SrcAsString);
       // Otherwise, print the Builtin Types.
@@ -652,7 +652,7 @@ case BuiltinValueKind::id:
 
       SmallString<10> SrcAsString;
       SrcVal.toString(SrcAsString, /*radix*/10, true /*isSigned*/);
-      
+
       // Otherwise emit our diagnostics and then return nullptr.
       diagnose(M.getASTContext(), Loc.getSourceLoc(),
                diag::integer_literal_overflow,

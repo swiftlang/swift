@@ -64,7 +64,7 @@ swift::isInstructionTriviallyDead(SILInstruction *I) {
   // operation so we can remove these if they are trivially dead.
   if (isa<UncheckedTakeEnumDataAddrInst>(I))
     return true;
-  
+
   if (!I->mayHaveSideEffects())
     return true;
 
@@ -120,7 +120,7 @@ recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
 
     for (auto I : DeadInsts) {
       // This will remove this instruction and all its uses.
-      
+
       eraseFromParentWithDebugInsts(I);
     }
 

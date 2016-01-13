@@ -195,7 +195,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
     SILValue v = new (gen.SGM.M) SILArgument(entry, param.getSILType());
 
     ManagedValue mv;
-    
+
     // If the parameter is a block, we need to copy it to ensure it lives on
     // the heap. The adapted closure value might outlive the block's original
     // scope.
@@ -205,12 +205,12 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
       case ParameterConvention::Direct_Owned:
         gen.emitManagedRValueWithCleanup(v);
         break;
-        
+
       case ParameterConvention::Direct_Deallocating:
       case ParameterConvention::Direct_Guaranteed:
       case ParameterConvention::Direct_Unowned:
         break;
-        
+
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_In_Guaranteed:
       case ParameterConvention::Indirect_Inout:
@@ -218,7 +218,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
       case ParameterConvention::Indirect_Out:
         llvm_unreachable("indirect params to blocks not supported");
       }
-      
+
       SILValue blockCopy = gen.B.createCopyBlock(loc, v);
       mv = gen.emitManagedRValueWithCleanup(blockCopy);
     } else {
@@ -248,7 +248,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
         llvm_unreachable("indirect arguments to blocks not supported");
       }
     }
-    
+
     args.push_back(gen.emitBridgedToNativeValue(loc, mv,
                                 SILFunctionTypeRepresentation::CFunctionPointer,
                                 funcParam.getType()));
@@ -423,18 +423,18 @@ static ManagedValue emitNativeToCBridgedValue(SILGenFunction &gen,
     return gen.emitOptionalToOptional(loc, v, bridgedTy,
                                       emitNativeToCBridgedValue);
   }
-  
+
   // Check if we need to wrap the bridged result in an optional.
   OptionalTypeKind OTK;
   if (SILType bridgedObjectType =
         bridgedTy.getAnyOptionalObjectType(gen.SGM.M, OTK)) {
     auto bridgedPayload
       = emitNativeToCBridgedNonoptionalValue(gen, loc, v, bridgedObjectType);
-    
+
     return gen.getOptionalSomeValue(loc, bridgedPayload,
                                     gen.getTypeLowering(bridgedTy));
   }
-  
+
   return emitNativeToCBridgedNonoptionalValue(gen, loc, v, bridgedTy);
 }
 
@@ -856,7 +856,7 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
       argValue = native.forward(gen);
     else
       argValue = native.getValue();
-    
+
     args.push_back(argValue);
   }
 
@@ -929,7 +929,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
       // by bridging the native return value, but we may need to
       // adjust it slightly.
       SILValue bridgedResult =
-        emitBridgeReturnValueForForeignError(loc, nativeResult, 
+        emitBridgeReturnValueForForeignError(loc, nativeResult,
                                              objcFnTy->getRepresentation(),
                                              origNativeResultType,
                                              substNativeResultType,

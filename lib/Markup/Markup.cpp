@@ -182,7 +182,7 @@ ParseResult<Image> parseImage(MarkupContext &MC, LineList &LL, ParseState State)
   assert(cmark_node_get_type(State.Node) == CMARK_NODE_IMAGE
       && State.Event == CMARK_EVENT_ENTER);
   std::string Destination(cmark_node_get_url(State.Node));
-  
+
   auto NodeTitle = cmark_node_get_title(State.Node);
   std::string TitleString = NodeTitle ? NodeTitle : "";
   auto Title = TitleString.empty() ? None : Optional<StringRef>(TitleString);

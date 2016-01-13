@@ -34,7 +34,7 @@ using namespace irgen;
 /// Emit a global variable.
 Address IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
   auto &ti = getTypeInfo(var->getLoweredType());
-  
+
   // If the variable is empty in all resilience domains, don't actually emit it;
   // just return undef.
   if (ti.isKnownEmpty(ResilienceExpansion::Minimal))
@@ -43,7 +43,7 @@ Address IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
   /// Get the global variable.
   Address addr = getAddrOfSILGlobalVariable(var, ti,
                      var->isDefinition() ? ForDefinition : NotForDefinition);
-  
+
   /// Add a zero initializer.
   if (var->isDefinition()) {
     auto gvar = cast<llvm::GlobalVariable>(addr.getAddress());
@@ -64,7 +64,7 @@ ContainedAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF, SILType T,
   Address alloca =
     IGF.createAlloca(getStorageType(), getFixedAlignment(), name);
   IGF.Builder.CreateLifetimeStart(alloca, getFixedSize());
-  
+
   return { alloca, alloca };
 }
 

@@ -53,8 +53,8 @@ struct QuotedString {
 
   explicit QuotedString(std::string Value) : Value(Value) {}
 };
-  
-  
+
+
   DemanglerPrinter &operator<<(DemanglerPrinter &printer,
                                const QuotedString &QS) {
     printer << '"';
@@ -301,7 +301,7 @@ static StringRef toString(ValueWitnessKind k) {
 class Demangler {
   std::vector<NodePointer> Substitutions;
   NameSource Mangled;
-public:  
+public:
   Demangler(llvm::StringRef mangled) : Mangled(mangled) {}
 
 /// Try to demangle a child node of the given kind.  If that fails,
@@ -374,7 +374,7 @@ public:
   NodePointer demangleTypeName() {
     return demangleType();
   }
-  
+
 private:
   enum class IsProtocol {
     yes = true, no = false
@@ -872,7 +872,7 @@ private:
     // We don't know how to handle this specialization.
     return nullptr;
   }
-  
+
   NodePointer demangleDeclName() {
     // decl-name ::= local-decl-name
     // local-decl-name ::= 'L' index identifier
@@ -907,7 +907,7 @@ private:
   NodePointer demangleIdentifier(Optional<Node::Kind> kind = None) {
     if (!Mangled)
       return nullptr;
-    
+
     bool isPunycoded = Mangled.nextIf('X');
     std::string decodeBuffer;
 
@@ -918,7 +918,7 @@ private:
         return {};
       return decodeBuffer;
     };
-    
+
     bool isOperator = false;
     if (Mangled.nextIf('o')) {
       isOperator = true;
@@ -949,10 +949,10 @@ private:
       return nullptr;
     if (!Mangled.hasAtLeast(length))
       return nullptr;
-    
+
     StringRef identifier = Mangled.slice(length);
     Mangled.advanceOffset(length);
-    
+
     // Decode Unicode identifiers.
     identifier = decode(identifier);
     if (identifier.empty())
@@ -980,7 +980,7 @@ private:
       }
       identifier = opDecodeBuffer;
     }
-    
+
     return NodeFactory::create(*kind, identifier);
   }
 
@@ -1191,7 +1191,7 @@ private:
       return demangleEntity();
     return demangleModule();
   }
-  
+
   NodePointer demangleProtocolList() {
     NodePointer proto_list = NodeFactory::create(Node::Kind::ProtocolList);
     NodePointer type_list = NodeFactory::create(Node::Kind::TypeList);
@@ -1228,7 +1228,7 @@ private:
   NodePointer demangleEntity() {
     // static?
     bool isStatic = Mangled.nextIf('Z');
-  
+
     // entity-kind
     Node::Kind entityBasicKind;
     if (Mangled.nextIf('F')) {
@@ -1355,7 +1355,7 @@ private:
       if (!type) return nullptr;
       entity->addChild(type);
     }
-    
+
     if (isStatic) {
       auto staticNode = NodeFactory::create(Node::Kind::Static);
       staticNode->addChild(entity);
@@ -1453,7 +1453,7 @@ private:
     // Demangle the associated type name.
     return demangleDependentMemberTypeName(nodeType);
   }
-  
+
   NodePointer demangleAssociatedTypeCompound() {
     // Demangle the base type.
     auto base = demangleGenericParamIndex();
@@ -1464,7 +1464,7 @@ private:
     while (!Mangled.nextIf('_')) {
       NodePointer nodeType = NodeFactory::create(Node::Kind::Type);
       nodeType->addChild(base);
-      
+
       base = demangleDependentMemberTypeName(nodeType);
       if (!base)
         return nullptr;
@@ -1472,7 +1472,7 @@ private:
 
     return base;
   }
-  
+
   NodePointer demangleDependentType() {
     if (!Mangled)
       return nullptr;
@@ -1484,7 +1484,7 @@ private:
       if (!baseType) return nullptr;
       return demangleDependentMemberTypeName(baseType);
     }
-    
+
     // Otherwise, we have a generic parameter.
     return demangleGenericParamIndex();
   }
@@ -1515,13 +1515,13 @@ private:
     auto sig = NodeFactory::create(Node::Kind::DependentGenericSignature);
     // First read in the parameter counts at each depth.
     Node::IndexType count = ~(Node::IndexType)0;
-    
+
     auto addCount = [&]{
       auto countNode =
         NodeFactory::create(Node::Kind::DependentGenericParamCount, count);
       sig->addChild(countNode);
     };
-    
+
     while (Mangled.peek() != 'R' && Mangled.peek() != 'r') {
       if (Mangled.nextIf('z')) {
         count = 0;
@@ -1532,26 +1532,26 @@ private:
       }
       addCount();
     }
-    
+
     // No mangled parameters means we have exactly one.
     if (count == ~(Node::IndexType)0) {
       count = 1;
       addCount();
     }
-    
+
     // Next read in the generic requirements, if any.
     if (Mangled.nextIf('r'))
       return sig;
-    
+
     if (!Mangled.nextIf('R'))
       return nullptr;
-    
+
     while (!Mangled.nextIf('r')) {
       NodePointer reqt = demangleGenericRequirement();
       if (!reqt) return nullptr;
       sig->addChild(reqt);
     }
-    
+
     return sig;
   }
 
@@ -1568,7 +1568,7 @@ private:
 
     unreachable("Unhandled metatype representation");
   }
-  
+
   NodePointer demangleGenericRequirement() {
     NodePointer constrainedType = demangleConstrainedType();
     if (!constrainedType)
@@ -1624,7 +1624,7 @@ private:
     reqt->addChild(constraint);
     return reqt;
   }
-  
+
   NodePointer demangleArchetypeType() {
     auto makeSelfType = [&](NodePointer proto) -> NodePointer {
       auto selfType = NodeFactory::create(Node::Kind::SelfTypeRef);
@@ -1632,7 +1632,7 @@ private:
       Substitutions.push_back(selfType);
       return selfType;
     };
-    
+
     auto makeAssociatedType = [&](NodePointer root) -> NodePointer {
       NodePointer name = demangleIdentifier();
       if (!name) return nullptr;
@@ -1642,13 +1642,13 @@ private:
       Substitutions.push_back(assocType);
       return assocType;
     };
-    
+
     if (Mangled.nextIf('P')) {
       NodePointer proto = demangleProtocolName();
       if (!proto) return nullptr;
       return makeSelfType(proto);
     }
-    
+
     if (Mangled.nextIf('Q')) {
       NodePointer root = demangleArchetypeType();
       if (!root) return nullptr;
@@ -1719,7 +1719,7 @@ private:
     }
     return tuple;
   }
-  
+
   NodePointer postProcessReturnTypeNode (NodePointer out_args) {
     NodePointer out_node = NodeFactory::create(Node::Kind::ReturnType);
     out_node->addChild(out_args);
@@ -1734,7 +1734,7 @@ private:
     nodeType->addChild(type);
     return nodeType;
   }
-  
+
   NodePointer demangleFunctionType(Node::Kind kind) {
     bool throws = false;
     if (Mangled &&
@@ -1748,18 +1748,18 @@ private:
     if (!out_args)
       return nullptr;
     NodePointer block = NodeFactory::create(kind);
-    
+
     if (throws) {
       block->addChild(NodeFactory::create(Node::Kind::ThrowsAnnotation));
     }
-    
+
     NodePointer in_node = NodeFactory::create(Node::Kind::ArgumentTuple);
     block->addChild(in_node);
     in_node->addChild(in_args);
     block->addChild(postProcessReturnTypeNode(out_args));
     return block;
   }
-  
+
   NodePointer demangleTypeImpl() {
     if (!Mangled)
       return nullptr;
@@ -2209,7 +2209,7 @@ private:
         return nullptr;
       kind = Node::Kind::ImplErrorResult;
     }
-  
+
     auto getContext = [](Node::Kind kind) -> ImplConventionContext {
       if (kind == Node::Kind::ImplParameter)
         return ImplConventionContext::Parameter;
@@ -2229,7 +2229,7 @@ private:
     node->addChild(NodeFactory::create(Node::Kind::ImplConvention,
                                        convention));
     node->addChild(type);
-    
+
     return node;
   }
 };
@@ -2257,16 +2257,16 @@ private:
   std::string Str;
   DemanglerPrinter Printer;
   DemangleOptions Options;
-  
+
 public:
   NodePrinter(DemangleOptions options) : Printer(Str), Options(options) {}
-  
+
   std::string printRoot(NodePointer root) {
     print(root);
     return Str;
   }
 
-private:  
+private:
   void printChildren(Node::iterator begin,
                      Node::iterator end,
                      const char *sep = nullptr) {
@@ -2277,14 +2277,14 @@ private:
         Printer << sep;
     }
   }
-  
+
   void printChildren(NodePointer pointer, const char *sep = nullptr) {
     if (!pointer)
       return;
     Node::iterator begin = pointer->begin(), end = pointer->end();
     printChildren(begin, end, sep);
   }
-  
+
   NodePointer getFirstChildOfKind(NodePointer pointer, Node::Kind kind) {
     if (!pointer)
       return nullptr;
@@ -2309,7 +2309,7 @@ private:
     return (node->getKind() == Node::Kind::Module &&
             node->getText() == STDLIB_NAME);
   }
-  
+
   static bool isDebuggerGeneratedModule(NodePointer node) {
       return (node->getKind() == Node::Kind::Module &&
               0 == node->getText().find(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX));
@@ -2319,7 +2319,7 @@ private:
     return (node->getKind() == Node::Kind::Identifier &&
             node->getText() == desired);
   }
-  
+
   enum class SugarType {
     None,
     Optional,
@@ -2327,7 +2327,7 @@ private:
     Array,
     Dictionary
   };
-  
+
   /// Determine whether this is a "simple" type, from the type-simple
   /// production.
   bool isSimpleType(NodePointer pointer) {
@@ -2478,20 +2478,20 @@ private:
   }
 
   SugarType findSugar(NodePointer pointer) {
-    if (pointer->getNumChildren() == 1 && 
+    if (pointer->getNumChildren() == 1 &&
         pointer->getKind() == Node::Kind::Type)
       return findSugar(pointer->getChild(0));
-    
+
     if (pointer->getNumChildren() != 2)
       return SugarType::None;
-    
+
     if (pointer->getKind() != Node::Kind::BoundGenericEnum &&
         pointer->getKind() != Node::Kind::BoundGenericStructure)
       return SugarType::None;
 
     auto unboundType = pointer->getChild(0)->getChild(0); // drill through Type
     auto typeArgs = pointer->getChild(1);
-    
+
     if (pointer->getKind() == Node::Kind::BoundGenericEnum) {
       // Swift.Optional
       if (isIdentifier(unboundType->getChild(1), "Optional") &&
@@ -2501,7 +2501,7 @@ private:
       }
 
       // Swift.ImplicitlyUnwrappedOptional
-      if (isIdentifier(unboundType->getChild(1), 
+      if (isIdentifier(unboundType->getChild(1),
                        "ImplicitlyUnwrappedOptional") &&
           typeArgs->getNumChildren() == 1 &&
           isSwiftModule(unboundType->getChild(0))) {
@@ -2529,7 +2529,7 @@ private:
 
     return SugarType::None;
   }
-  
+
   void printBoundGeneric(NodePointer pointer) {
     if (pointer->getNumChildren() < 2)
       return;
@@ -2547,7 +2547,7 @@ private:
     }
 
     SugarType sugarType = findSugar(pointer);
-    
+
     switch (sugarType) {
       case SugarType::None:
         printBoundGenericNoSugar(pointer);
@@ -2856,7 +2856,7 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
       }
     }
 
-    if (useParens) Printer << ')';      
+    if (useParens) Printer << ')';
   };
 
   Node::Kind kind = pointer->getKind();
@@ -3555,10 +3555,10 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::ErrorType:
     Printer << "<ERROR TYPE>";
     return;
-      
+
   case Node::Kind::DependentGenericSignature: {
     Printer << '<';
-    
+
     unsigned depth = 0;
     unsigned numChildren = pointer->getNumChildren();
     for (;
@@ -3568,7 +3568,7 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
          ++depth) {
       if (depth != 0)
         Printer << "><";
-      
+
       unsigned count = pointer->getChild(depth)->getIndex();
       for (unsigned index = 0; index < count; ++index) {
         if (index != 0)
@@ -3578,7 +3578,7 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
         Printer << archetypeName(index, depth);
       }
     }
-    
+
     if (depth != numChildren) {
       if (!Options.DisplayWhereClauses) {
         Printer << " where ...";
@@ -3608,7 +3608,7 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::DependentGenericSameTypeRequirement: {
     NodePointer fst = pointer->getChild(0);
     NodePointer snd = pointer->getChild(1);
-    
+
     print(fst);
     Printer << " == ";
     print(snd);
@@ -3673,7 +3673,7 @@ std::string Demangle::demangleTypeAsString(const char *MangledName,
   auto mangled = StringRef(MangledName, MangledNameLength);
   auto root = demangleTypeAsNode(MangledName, MangledNameLength, Options);
   if (!root) return mangled.str();
-  
+
   std::string demangling = nodeToString(std::move(root), Options);
   if (demangling.empty())
     return mangled.str();

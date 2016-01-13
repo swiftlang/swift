@@ -36,7 +36,7 @@ public:
 private:
   /// The function attributes for the call.
   llvm::AttributeSet Attrs;
-  
+
   /// The builtin/special arguments to pass to the call.
   SmallVector<llvm::Value*, 8> Args;
 
@@ -80,12 +80,12 @@ public:
   void setArgs(Explosion &arg,
                ArrayRef<SILParameterInfo> params,
                WitnessMetadata *witnessMetadata = nullptr);
-  
+
   void addAttribute(unsigned Index, llvm::Attribute::AttrKind Attr);
 
   void emitToMemory(Address addr, const TypeInfo &substResultTI);
   void emitToExplosion(Explosion &out);
-   
+
   void invalidate();
 };
 

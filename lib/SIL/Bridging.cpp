@@ -178,7 +178,7 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
                                           MetatypeRepresentation::ObjC);
     }
   }
-  
+
   if (auto funTy = t->getAs<FunctionType>()) {
     switch (funTy->getExtInfo().getSILRepresentation()) {
     // Functions that are already represented as blocks or C function pointers

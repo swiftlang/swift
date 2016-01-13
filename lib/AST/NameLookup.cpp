@@ -143,7 +143,7 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
 
   /// Objective-C initializers are tracked by their context type and
   /// full name.
-  llvm::SmallDenseMap<std::pair<CanType, DeclName>, 
+  llvm::SmallDenseMap<std::pair<CanType, DeclName>,
                       llvm::TinyPtrVector<ConstructorDecl *>>
     ObjCCollidingConstructors;
   bool anyCollisions = false;
@@ -165,7 +165,7 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
         if (!assocType->getArchetype())
           continue;
     }
-    
+
     // If the decl is currently being validated, this is likely a recursive
     // reference and we'll want to skip ahead so as to avoid having its type
     // attempt to desugar itself.
@@ -277,7 +277,7 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
       }
     }
   }
-  
+
   // Check for collisions among Objective-C initializers. When such collisions
   // exist, we pick the
   for (const auto &colliding : ObjCCollidingConstructors) {
@@ -919,7 +919,7 @@ void NominalTypeDecl::makeMemberVisible(ValueDecl *member) {
     auto &ctx = getASTContext();
     LookupTable.setPointer(new (ctx) MemberLookupTable(ctx));
   }
-  
+
   LookupTable.getPointer()->addMember(member);
 }
 
@@ -1045,7 +1045,7 @@ bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC) const {
   // accessibility, it is not set.
   if (hasStorage() && !isSettable(nullptr))
     return true;
-  
+
   return checkAccessibility(DC, getDeclContext(), getSetterAccessibility());
 }
 
@@ -1133,7 +1133,7 @@ bool DeclContext::lookupQualified(Type type,
 
     if (auto *debugClient = topLevelScope->getParentModule()->getDebugClient())
       filterForDiscriminator(decls, debugClient);
-    
+
     return !decls.empty();
   }
 
@@ -1151,7 +1151,7 @@ bool DeclContext::lookupQualified(Type type,
   if (auto nominal = type->getAnyNominal()) {
     visited.insert(nominal);
     stack.push_back(nominal);
-    
+
     wantProtocolMembers = (options & NL_ProtocolMembers) &&
                           !isa<ProtocolDecl>(nominal);
 
@@ -1213,7 +1213,7 @@ bool DeclContext::lookupQualified(Type type,
     // error later.
     if (decl->isBeingTypeChecked())
       return true;
-    
+
     // Filter out designated initializers, if requested.
     if (onlyCompleteObjectInits) {
       if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {

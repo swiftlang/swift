@@ -38,7 +38,7 @@ STATISTIC(NumHoisted, "Number of instructions hoisted");
 using namespace swift;
 
 namespace {
-  
+
 //===----------------------------------------------------------------------===//
 //                                  Utility
 //===----------------------------------------------------------------------===//
@@ -129,10 +129,10 @@ using ValueToBBArgIdxMap = llvm::DenseMap<ValueInBlock, int>;
 enum OperandRelation {
   /// Uninitialized state.
   NotDeterminedYet,
-  
+
   /// The original operand values are equal.
   AlwaysEqual,
-  
+
   /// The operand values are equal after replacing with the successor block
   /// arguments.
   EqualAfterMove
@@ -201,10 +201,10 @@ SILInstruction *findIdenticalInBlock(SILBasicBlock *BB, SILInstruction *Iden,
 
   SILBasicBlock::iterator InstToSink = BB->getTerminator()->getIterator();
   SILBasicBlock *IdenBlock = Iden->getParent();
-  
+
   // The compare function for instruction operands.
   auto operandCompare = [&](const SILValue &Op1, const SILValue &Op2) -> bool {
-    
+
     if (opRelation != EqualAfterMove && Op1 == Op2) {
       // The trivial case.
       opRelation = AlwaysEqual;
@@ -226,7 +226,7 @@ SILInstruction *findIdenticalInBlock(SILBasicBlock *BB, SILInstruction *Iden,
     }
     return false;
   };
-  
+
   while (SkipBudget) {
     // If we found a sinkable instruction that is identical to our goal
     // then return it.
@@ -742,7 +742,7 @@ static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
   NullablePtr<EnumElementDecl> TrueElement = SEI->getSingleTrueElement();
   if (TrueElement.isNull())
     return false;
-  
+
   // Next go over all instructions after I in the basic block. If none of them
   // can decrement our ptr value, we can move the retain over the ref count
   // inst. If any of them do potentially decrement the ref count of Ptr, we can
@@ -761,7 +761,7 @@ static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
   if (RCIA->getRCIdentityRoot(Ptr) !=
       RCIA->getRCIdentityRoot(SEI->getEnumOperand()))
     return false;
-  
+
   // Work out which enum element is the true branch, and which is false.
   // If the enum only has 2 values and its tag isn't the true branch, then we
   // know the true branch must be the other tag.
@@ -1108,7 +1108,7 @@ public:
   /// Top level merging function for predecessors.
   void mergePredecessorStates(BBToDataflowStateMap &BBToStateMap);
 
-  /// 
+  ///
   void mergeSinglePredTermInfoIntoState(BBToDataflowStateMap &BBToStateMap,
                                         SILBasicBlock *Pred);
 

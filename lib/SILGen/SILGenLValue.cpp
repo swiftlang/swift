@@ -158,9 +158,9 @@ class LLVM_LIBRARY_VISIBILITY SILGenLValue
 public:
   SILGenFunction &gen;
   SILGenLValue(SILGenFunction &gen) : gen(gen) {}
-  
+
   LValue visitRec(Expr *e, AccessKind accessKind);
-  
+
   /// Dummy handler to log unimplemented nodes.
   LValue visitExpr(Expr *e, AccessKind accessKind);
 
@@ -171,7 +171,7 @@ public:
   LValue visitOpaqueValueExpr(OpaqueValueExpr *e, AccessKind accessKind);
 
   // Nodes that make up components of lvalue paths
-  
+
   LValue visitMemberRefExpr(MemberRefExpr *e, AccessKind accessKind);
   LValue visitSubscriptExpr(SubscriptExpr *e, AccessKind accessKind);
   LValue visitTupleElementExpr(TupleElementExpr *e, AccessKind accessKind);
@@ -181,7 +181,7 @@ public:
                                   AccessKind accessKind);
 
   // Expressions that wrap lvalues
-  
+
   LValue visitInOutExpr(InOutExpr *e, AccessKind accessKind);
   LValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e,
                                        AccessKind accessKind);
@@ -288,7 +288,7 @@ void WritebackScope::popImpl() {
   gen->InWritebackScope = wasInWritebackScope;
 
   // Check to see if there is anything going on here.
-  
+
   auto &stack = gen->getWritebackStack();
   size_t depthAtPop = stack.size();
   if (depthAtPop == savedDepth) return;
@@ -419,7 +419,7 @@ namespace {
                         LValueTypeData typeData)
       : PhysicalPathComponent(typeData, RefElementKind),
         Field(field), SubstFieldType(substFieldType) {}
-    
+
     ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
                         AccessKind accessKind) && override {
       assert(base.getType().isObject() &&
@@ -442,7 +442,7 @@ namespace {
     TupleElementComponent(unsigned elementIndex, LValueTypeData typeData)
       : PhysicalPathComponent(typeData, TupleElementKind),
         ElementIndex(elementIndex) {}
-    
+
     ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
                         AccessKind accessKind) && override {
       assert(base && "invalid value for element base");
@@ -466,7 +466,7 @@ namespace {
                            LValueTypeData typeData)
       : PhysicalPathComponent(typeData, StructElementKind),
         Field(field), SubstFieldType(substFieldType) {}
-    
+
     ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
                         AccessKind accessKind) && override {
       assert(base && "invalid value for element base");
@@ -486,7 +486,7 @@ namespace {
   public:
     ForceOptionalObjectComponent(LValueTypeData typeData)
       : PhysicalPathComponent(typeData, OptionalObjectKind) {}
-    
+
     ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
                         AccessKind accessKind) && override {
       // Assert that the optional value is present.
@@ -571,11 +571,11 @@ static bool isReadNoneFunction(const Expr *e) {
             (name.getArgumentNames()[0].str() == "integerLiteral" ||
              name.getArgumentNames()[0].str() == "_builtinIntegerLiteral"));
   }
-  
+
   // Look through DotSyntaxCallExpr, since the literal functions are curried.
   if (auto *CRCE = dyn_cast<ConstructorRefCallExpr>(e))
     return isReadNoneFunction(CRCE->getFn());
-  
+
   return false;
 }
 
@@ -585,13 +585,13 @@ static bool isReadNoneFunction(const Expr *e) {
 /// produce the same value.
 static bool areCertainlyEqualIndices(const Expr *e1, const Expr *e2) {
   if (e1->getKind() != e2->getKind()) return false;
-  
+
   // Look through ParenExpr's.
   if (auto *pe1 = dyn_cast<ParenExpr>(e1)) {
     auto *pe2 = cast<ParenExpr>(e2);
     return areCertainlyEqualIndices(pe1->getSubExpr(), pe2->getSubExpr());
   }
-  
+
   // Calls are identical if the callee and operands are identical and we know
   // that the call is something that is "readnone".
   if (auto *ae1 = dyn_cast<ApplyExpr>(e1)) {
@@ -600,11 +600,11 @@ static bool areCertainlyEqualIndices(const Expr *e1, const Expr *e2) {
            areCertainlyEqualIndices(ae1->getArg(), ae2->getArg()) &&
            isReadNoneFunction(ae1->getFn());
   }
-  
+
   // TypeExpr's that produce the same metatype type are identical.
   if (isa<TypeExpr>(e1))
     return true;
-  
+
   if (auto *dre1 = dyn_cast<DeclRefExpr>(e1)) {
     auto *dre2 = cast<DeclRefExpr>(e2);
     return dre1->getDecl() == dre2->getDecl() &&
@@ -621,7 +621,7 @@ static bool areCertainlyEqualIndices(const Expr *e1, const Expr *e2) {
     return bl1->getValue() == cast<BooleanLiteralExpr>(e2)->getValue();
   if (auto *sl1 = dyn_cast<StringLiteralExpr>(e1))
     return sl1->getValue() == cast<StringLiteralExpr>(e2)->getValue();
-  
+
   // Compare tuple expressions.
   if (auto *te1 = dyn_cast<TupleExpr>(e1)) {
     auto *te2 = cast<TupleExpr>(e2);
@@ -683,7 +683,7 @@ namespace {
 
       if (subscripts)
         result.subscripts = std::move(subscripts);
-      
+
       return result;
     }
 
@@ -760,7 +760,7 @@ namespace {
                                subscriptIndex)
     {
     }
-    
+
     GetterSetterComponent(const GetterSetterComponent &copied,
                           SILGenFunction &gen,
                           SILLocation loc)
@@ -784,7 +784,7 @@ namespace {
       // Pass in just the setter.
       auto args =
         std::move(*this).prepareAccessorArgs(gen, loc, base, setter);
-      
+
       return gen.emitSetAccessor(loc, setter, substitutions,
                                  std::move(args.base), IsSuper,
                                  IsDirectAccessorUse,
@@ -968,20 +968,20 @@ namespace {
       // Continue.
       gen.B.emitBlock(contBB, loc);
     }
-    
+
     ManagedValue get(SILGenFunction &gen, SILLocation loc,
                      ManagedValue base, SGFContext c) && override {
       SILDeclRef getter = gen.getGetterDeclRef(decl, IsDirectAccessorUse);
 
       auto args =
         std::move(*this).prepareAccessorArgs(gen, loc, base, getter);
-      
+
       return gen.emitGetAccessor(loc, getter, substitutions,
                                  std::move(args.base), IsSuper,
                                  IsDirectAccessorUse,
                                  std::move(args.subscripts), c);
     }
-    
+
     std::unique_ptr<LogicalPathComponent>
     clone(SILGenFunction &gen, SILLocation loc) const override {
       LogicalPathComponent *clone = new GetterSetterComponent(*this, gen, loc);
@@ -1019,14 +1019,14 @@ namespace {
         case AbstractStorageDecl::StoredWithObservers:
         case AbstractStorageDecl::AddressedWithObservers:
           break;
-          
+
         case AbstractStorageDecl::InheritedWithObservers:
         case AbstractStorageDecl::Computed:
         case AbstractStorageDecl::ComputedWithMutableAddress:
           break;
         }
       }
-      
+
       // If the property is a generic requirement, allow aliases, because
       // it may be conformed to using a stored property.
       if (isa<ProtocolDecl>(decl->getDeclContext()))
@@ -1043,7 +1043,7 @@ namespace {
       }
 
       // Otherwise, it is a subscript, check the index values.
-      
+
       // If the indices are literally identical SILValue's, then there is
       // clearly a conflict.
       if (!subscripts.isObviouslyEqual(rhs.subscripts)) {
@@ -1160,7 +1160,7 @@ namespace {
       assert(gen.InWritebackScope &&
              "offsetting l-value for modification without writeback scope");
 
-      SILDeclRef addressor = gen.getAddressorDeclRef(decl, accessKind, 
+      SILDeclRef addressor = gen.getAddressorDeclRef(decl, accessKind,
                                                      IsDirectAccessorUse);
       auto args =
         std::move(*this).prepareAccessorArgs(gen, loc, base, addressor);
@@ -1230,7 +1230,7 @@ namespace {
   /// substituted type in a concrete context.
   class OrigToSubstComponent : public TranslationPathComponent {
     AbstractionPattern OrigType;
-    
+
   public:
     OrigToSubstComponent(AbstractionPattern origType,
                          CanType substFormalType,
@@ -1291,7 +1291,7 @@ namespace {
       return gen.emitSubstToOrigValue(loc, mv, getOrigFormalType(),
                                       getSubstFormalType(), c);
     }
-    
+
     std::unique_ptr<LogicalPathComponent>
     clone(SILGenFunction &gen, SILLocation loc) const override {
       LogicalPathComponent *clone
@@ -1495,7 +1495,7 @@ LValue SILGenLValue::visitRec(Expr *e, AccessKind accessKind) {
     // Decide if we can evaluate this expression at +0 for the rest of the
     // lvalue.
     SGFContext Ctx;
-    
+
     // Calls through opaque protocols can be done with +0 rvalues.  This allows
     // us to avoid materializing copies of existentials.
     if (gen.SGM.Types.isIndirectPlusZeroSelfParameter(e->getType()))
@@ -1519,7 +1519,7 @@ LValue SILGenLValue::visitRec(Expr *e, AccessKind accessKind) {
           Ctx = SGFContext::AllowGuaranteedPlusZero;
       }
     }
-    
+
     ManagedValue rv = gen.emitRValueAsSingleValue(e, Ctx);
     CanType formalType = getSubstFormalRValueType(e);
     auto typeData = getValueTypeData(formalType, rv.getValue());
@@ -1760,7 +1760,7 @@ void LValue::addMemberVarComponent(SILGenFunction &gen, SILLocation loc,
   // Find the substituted storage type.
   SILType varStorageType =
     gen.SGM.Types.getSubstitutedStorageType(var, formalRValueType);
-    
+
   // For static variables, emit a reference to the global variable backing
   // them.
   // FIXME: This has to be dynamically looked up for classes, and
@@ -1791,7 +1791,7 @@ void LValue::addMemberVarComponent(SILGenFunction &gen, SILLocation loc,
     assert(baseFormalType->getStructOrBoundGenericStruct());
     add<StructElementComponent>(var, varStorageType, typeData);
   }
-  
+
   // If the member has weak or unowned storage, convert it away.
   if (varStorageType.is<ReferenceStorageType>()) {
     add<OwnershipComponent>(typeData);
@@ -1804,7 +1804,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
 
   auto accessSemantics = e->getAccessSemantics();
   auto strategy = decl->getAccessStrategy(accessSemantics, accessKind);
-  
+
   LValue lv = visitRec(e->getBase(),
                        getBaseAccessKind(decl, accessKind, strategy));
   assert(lv.isValid());
@@ -1843,7 +1843,7 @@ void LValue::addMemberSubscriptComponent(SILGenFunction &gen, SILLocation loc,
                                indexExprForDiagnostics, &indices);
   } else {
     assert(strategy == AccessStrategy::Addressor);
-    auto storageType = 
+    auto storageType =
       gen.SGM.Types.getSubstitutedStorageType(decl, formalRValueType);
     add<AddressorComponent>(decl, isSuper, /*direct*/ true,
                             subs, baseFormalType, typeData, storageType,
@@ -1902,7 +1902,7 @@ getOptionalObjectTypeData(SILGenFunction &gen,
   CanType objectTy = baseTypeData.SubstFormalType.getAnyOptionalObjectType(otk);
   assert(objectTy);
   EnumElementDecl *someDecl = gen.getASTContext().getOptionalSomeDecl(otk);
-  
+
   return {
     AbstractionPattern(someDecl->getArgumentType()),
     objectTy,
@@ -2044,7 +2044,7 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
     // address RValue.
     if (isPlusZeroOk && rvalueTL.getLoweredType() == addrTL.getLoweredType())
       return ManagedValue::forUnmanaged(addr);
-        
+
     // Copy the address-only value.
     SILValue copy = getBufferForExprResult(loc, rvalueTL.getLoweredType(), C);
     emitSemanticLoadInto(loc, addr, addrTL, copy, rvalueTL,
@@ -2280,9 +2280,9 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
   if (semanticValue.getType() == storageType) {
     return semanticValue;
   }
-  
+
   // @weak types are never loadable, so we don't need to handle them here.
-  
+
   // For @unowned types, place into an unowned box.
   if (auto unownedType = storageType.getAs<UnownedStorageType>()) {
     assert(unownedType->isLoadable(ResilienceExpansion::Maximal));
@@ -2301,7 +2301,7 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
     B.emitStrongReleaseAndFold(loc, semanticValue);
     return unmanaged;
   }
-  
+
   llvm_unreachable("unexpected storage type that differs from type-of-rvalue");
 }
 
@@ -2404,20 +2404,20 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc, RValue &&src,
     // Explode to an r-value.
     src = RValue(*this, loc, srcFormalType, srcValue);
   }
-  
+
   // Resolve all components up to the last, keeping track of value-type logical
   // properties we need to write back to.
   ManagedValue destAddr;
   PathComponent &&component =
     drillToLastComponent(*this, loc, std::move(dest), destAddr,
                          AccessKind::ReadWrite);
-  
+
   // Write to the tail component.
   if (component.isPhysical()) {
     auto finalDestAddr =
       std::move(component.asPhysical()).offset(*this, loc, destAddr,
                                                AccessKind::Write);
-    
+
     std::move(src).getAsSingleValue(*this, loc)
       .assignInto(*this, loc, finalDestAddr.getValue());
   } else {
@@ -2436,7 +2436,7 @@ void SILGenFunction::emitCopyLValueInto(SILLocation loc, LValue &&src,
       RValue(*this, loc, src.getSubstFormalType(), loaded)
         .forwardInto(*this, dest, loc);
   };
-  
+
   // If the source is a physical lvalue, the destination is a single address,
   // and there's no semantic conversion necessary, do a copy_addr from the
   // lvalue into the destination.
@@ -2448,7 +2448,7 @@ void SILGenFunction::emitCopyLValueInto(SILLocation loc, LValue &&src,
   if (src.getTypeOfRValue().getSwiftRValueType()
         != destAddr.getType().getSwiftRValueType())
     return skipPeephole();
-  
+
   auto srcAddr = emitAddressOfLValue(loc, std::move(src), AccessKind::Read)
                    .getUnmanagedValue();
   B.createCopyAddr(loc, srcAddr, destAddr, IsNotTake, IsInitialization);
@@ -2463,14 +2463,14 @@ void SILGenFunction::emitAssignLValueToLValue(SILLocation loc,
     emitAssignToLValue(loc, RValue(*this, loc, src.getSubstFormalType(),
                                    loaded), std::move(dest));
   };
-  
+
   // Only perform the peephole if both operands are physical and there's no
   // semantic conversion necessary.
   if (!src.isPhysical())
     return skipPeephole();
   if (!dest.isPhysical())
     return skipPeephole();
-  
+
   auto srcAddr = emitAddressOfLValue(loc, std::move(src), AccessKind::Read)
                    .getUnmanagedValue();
   auto destAddr = emitAddressOfLValue(loc, std::move(dest), AccessKind::Write)

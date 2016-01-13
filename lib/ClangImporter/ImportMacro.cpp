@@ -279,7 +279,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
     // Check for a single-token expansion of the form <literal>.
     // TODO: or <identifier>.
     const clang::Token &tok = *tokenI;
-    
+
     // If it's a literal token, we might be able to translate the literal.
     if (tok.isLiteral()) {
       return importLiteral(impl, DC, macro, name, tok, ClangN);
@@ -316,7 +316,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
     // but are pervasive in C headers anyway.
     clang::Token const &first = tokenI[0];
     clang::Token const &second = tokenI[1];
-    
+
     if (isSignToken(first) && second.is(clang::tok::numeric_constant))
       return importNumericLiteral(impl, DC, macro, name, &first, second, ClangN);
 

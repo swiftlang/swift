@@ -83,18 +83,18 @@ EscapeAnalysis::CGNode *EscapeAnalysis::ConnectionGraph::
 getNode(ValueBase *V, EscapeAnalysis *EA, bool createIfNeeded) {
   if (isa<FunctionRefInst>(V))
     return nullptr;
-  
+
   if (!V->hasValue())
     return nullptr;
-  
+
   if (!EA->isPointer(V))
     return nullptr;
-  
+
   V = skipProjections(V);
 
   if (!createIfNeeded)
     return lookupNode(V);
-  
+
   CGNode * &Node = Values2Nodes[V];
   if (!Node) {
     if (SILArgument *Arg = dyn_cast<SILArgument>(V)) {
@@ -444,7 +444,7 @@ bool EscapeAnalysis::ConnectionGraph::mergeFrom(ConnectionGraph *SourceGraph,
       CGNode *SourceNd = Mapping.getMappedNodes()[Idx];
       CGNode *DestNd = Mapping.get(SourceNd);
       assert(DestNd);
-      
+
       if (SourceNd->getEscapeState() >= EscapeState::Global) {
         // We don't need to merge the source subgraph of nodes which have the
         // global escaping state set.
@@ -583,9 +583,9 @@ struct CGForDotView {
   };
 
   CGForDotView(const EscapeAnalysis::ConnectionGraph *CG);
-  
+
   std::string getNodeLabel(const Node *Node) const;
-  
+
   std::string getNodeAttributes(const Node *Node) const;
 
   std::vector<Node> Nodes;
@@ -639,7 +639,7 @@ std::string CGForDotView::getNodeLabel(const Node *Node) const {
   llvm::raw_string_ostream O(Label);
   if (ValueBase *V = Node->OrigNode->V)
     O << '%' << InstToIDMap.lookup(V) << '\n';
-  
+
   switch (Node->OrigNode->Type) {
     case swift::EscapeAnalysis::NodeType::Content:
       O << "content";
@@ -691,7 +691,7 @@ std::string CGForDotView::getNodeAttributes(const Node *Node) const {
   if (Orig->getEscapeState() != swift::EscapeAnalysis::EscapeState::None &&
       !attr.empty())
     attr += ',';
-  
+
   switch (Orig->getEscapeState()) {
     case swift::EscapeAnalysis::EscapeState::None:
       break;

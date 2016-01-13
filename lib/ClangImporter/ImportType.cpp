@@ -233,7 +233,7 @@ namespace {
     }
 #define TYPE(Class, Base)
 #include "clang/AST/TypeNodes.def"
-    
+
     // Given a loaded type like CInt, look through the name alias sugar that the
     // stdlib uses to show the underlying type.  We want to import the signature
     // of the exit(3) libc function as "func exit(Int32)", not as
@@ -243,7 +243,7 @@ namespace {
         return NAT->getSinglyDesugaredType();
       return T;
     }
-    
+
     ImportResult VisitBuiltinType(const clang::BuiltinType *type) {
       switch (type->getKind()) {
       case clang::BuiltinType::Void:
@@ -253,7 +253,7 @@ namespace {
       case clang::BuiltinType::CLANG_BUILTIN_KIND:                        \
         return unwrapCType(Impl.getNamedSwiftType(Impl.getStdlibModule(), \
                                         #SWIFT_TYPE_NAME));
-          
+
 #include "swift/ClangImporter/BuiltinMappedTypes.def"
 
       // Types that cannot be mapped into Swift, and probably won't ever be.
@@ -319,8 +319,8 @@ namespace {
     ImportResult VisitMemberPointerType(const clang::MemberPointerType *type) {
       return Type();
     }
-    
-    ImportResult VisitPointerType(const clang::PointerType *type) {      
+
+    ImportResult VisitPointerType(const clang::PointerType *type) {
       auto pointeeQualType = type->getPointeeType();
 
       // Special case for NSZone*, which has its own Swift wrapper.
@@ -335,7 +335,7 @@ namespace {
             return wrapperTy;
         }
       }
-      
+
       // All other C pointers to concrete types map to
       // UnsafeMutablePointer<T> or COpaquePointer (FIXME:, except in
       // parameter position under the pre-
@@ -356,7 +356,7 @@ namespace {
       // COpaquePointer.
       if (!pointeeType)
         return getOpaquePointerType();
-      
+
       if (pointeeQualType->isFunctionType()) {
         auto funcTy = pointeeType->castTo<FunctionType>();
         return {
@@ -368,7 +368,7 @@ namespace {
       }
 
       auto quals = pointeeQualType.getQualifiers();
-      
+
       if (quals.hasConst())
         return {Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
                                                      "UnsafePointer",
@@ -403,7 +403,7 @@ namespace {
       if (!pointeeType)
         return Type();
       FunctionType *fTy = pointeeType->castTo<FunctionType>();
-      
+
       auto rep = FunctionType::Representation::Block;
       auto funcTy = FunctionType::get(fTy->getInput(), fTy->getResult(),
                                    fTy->getExtInfo().withRepresentation(rep));
@@ -426,27 +426,27 @@ namespace {
       // context.
       return Type();
     }
-    
+
     ImportResult VisitConstantArrayType(const clang::ConstantArrayType *type) {
       // FIXME: In a function argument context, arrays should import as
       // pointers.
-      
+
       // FIXME: Map to a real fixed-size Swift array type when we have those.
       // Importing as a tuple at least fills the right amount of space, and
       // we can cheese static-offset "indexing" using .$n operations.
-      
+
       Type elementType = Impl.importType(type->getElementType(),
                                          ImportTypeKind::Pointee,
                                          AllowNSUIntegerAsInt,
                                          /*can fully bridge*/false);
       if (!elementType)
         return Type();
-      
+
       TupleTypeElt elt(elementType);
       SmallVector<TupleTypeElt, 8> elts;
       for (size_t i = 0, size = type->getSize().getZExtValue(); i < size; ++i)
         elts.push_back(elt);
-      
+
       return TupleType::get(elts, elementType->getASTContext());
     }
 
@@ -454,13 +454,13 @@ namespace {
       auto *SIMD = Impl.tryLoadSIMDModule();
       if (!SIMD)
         return Type();
-      
+
       // Map the element type and count to a Swift name, such as
       // float x 3 => Float3.
       SmallString<16> name;
       {
         llvm::raw_svector_ostream names(name);
-        
+
         if (auto builtinTy
               = dyn_cast<clang::BuiltinType>(type->getElementType())){
           switch (builtinTy->getKind()) {
@@ -476,10 +476,10 @@ namespace {
         } else {
           return Type();
         }
-        
+
         names << type->getNumElements();
       }
-      
+
       return Impl.getNamedSwiftType(SIMD, name);
     }
 
@@ -804,7 +804,7 @@ namespace {
         return { ProtocolCompositionType::get(Impl.SwiftContext, protocols),
                  ImportHint::ObjCPointer };
       }
-      
+
       // Beyond here, we're using AnyObject.
       auto proto = Impl.SwiftContext.getProtocol(
                      KnownProtocolKind::AnyObject);
@@ -1180,7 +1180,7 @@ Type ClangImporter::Implementation::importType(clang::QualType type,
                 clangContext.getObjCSelRedefinitionType()))
       type = clangContext.getObjCSelType();
   }
-  
+
   // If nullability is provided as part of the type, that overrides
   // optionality provided externally.
   if (auto nullability = type->getNullability(clangContext)) {
@@ -1435,7 +1435,7 @@ importFunctionType(const clang::FunctionDecl *clangDecl,
                                      /*IsLet*/ true,
                                      SourceLoc(), name,
                                      importSourceLoc(param->getLocation()),
-                                     bodyName, swiftParamTy, 
+                                     bodyName, swiftParamTy,
                                      ImportedHeaderUnit);
 
     if (addNoEscapeAttr)
@@ -1462,10 +1462,10 @@ importFunctionType(const clang::FunctionDecl *clangDecl,
 
   // Form the parameter list.
   parameterList = ParameterList::create(SwiftContext, parameters);
-  
+
   FunctionType::ExtInfo extInfo;
   extInfo = extInfo.withIsNoReturn(isNoReturn);
-  
+
   // Form the function type.
   auto argTy = parameterList->getType(SwiftContext);
   return FunctionType::get(argTy, swiftResultTy, extInfo);
@@ -1959,7 +1959,7 @@ static Type adjustResultTypeForThrowingFunction(
     return resultTy;
   }
 }
-                                     
+
 /// Produce the foreign error convention from the imported error info,
 /// error parameter type, and original result type.
 static ForeignErrorConvention
@@ -2179,7 +2179,7 @@ Type ClangImporter::Implementation::importMethodType(
         importKind = ImportTypeKind::CFRetainedOutParameter;
       else if (param->hasAttr<clang::CFReturnsNotRetainedAttr>())
         importKind = ImportTypeKind::CFUnretainedOutParameter;
-      
+
       swiftParamTy = importType(paramTy, importKind,
                                 allowNSUIntegerAsIntInParam,
                                 /*isFullyBridgeable*/true,
@@ -2227,7 +2227,7 @@ Type ClangImporter::Implementation::importMethodType(
       = createDeclWithClangNode<ParamDecl>(param,
                                      /*IsLet*/ true, SourceLoc(), name,
                                      importSourceLoc(param->getLocation()),
-                                     bodyName, swiftParamTy, 
+                                     bodyName, swiftParamTy,
                                      ImportedHeaderUnit);
 
     if (addNoEscapeAttr) {
@@ -2237,7 +2237,7 @@ Type ClangImporter::Implementation::importMethodType(
 
     // Set up the parameter info.
     auto paramInfo = bodyVar;
-    
+
     // Determine whether we have a default argument.
     if (InferDefaultArguments &&
         (kind == SpecialMethodKind::Regular ||
@@ -2245,7 +2245,7 @@ Type ClangImporter::Implementation::importMethodType(
       bool isLastParameter = (paramIndex == params.size() - 1) ||
         (paramIndex == params.size() - 2 &&
          errorInfo && errorInfo->ParamIndex == params.size() - 1);
-      
+
       auto defaultArg = inferDefaultArgument(getClangPreprocessor(),
                                              param->getType(),
                                              optionalityOfParam,
@@ -2262,7 +2262,7 @@ Type ClangImporter::Implementation::importMethodType(
 
   // If we have a constructor with no parameters and a name with an
   // argument name, synthesize a Void parameter with that name.
-  if (kind == SpecialMethodKind::Constructor && params.empty() && 
+  if (kind == SpecialMethodKind::Constructor && params.empty() &&
       argNames.size() == 1) {
     addEmptyTupleParameter(argNames[0]);
   }
@@ -2282,10 +2282,10 @@ Type ClangImporter::Implementation::importMethodType(
     return Type();
   }
 
-  
+
   // Form the parameter list.
   *bodyParams = ParameterList::create(SwiftContext, swiftParams);
-  
+
   FunctionType::ExtInfo extInfo;
   extInfo = extInfo.withIsNoReturn(isNoReturn);
 
@@ -2296,7 +2296,7 @@ Type ClangImporter::Implementation::importMethodType(
     // Mark that the function type throws.
     extInfo = extInfo.withThrows(true);
   }
-  
+
   // Form the function type.
   return FunctionType::get((*bodyParams)->getType(SwiftContext),
                            swiftResultTy, extInfo);

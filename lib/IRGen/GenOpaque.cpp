@@ -122,7 +122,7 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
     return llvm::FunctionType::get(ptrTy, args, /*isVarArg*/ false)
       ->getPointerTo();
   }
-      
+
   // T *(*initializeArrayWithCopy)(T *dest, T *src, size_t n, M *self);
   // T *(*initializeArrayWithTakeFrontToBack)(T *dest, T *src, size_t n, M *self);
   // T *(*initializeArrayWithTakeBackToFront)(T *dest, T *src, size_t n, M *self);
@@ -134,7 +134,7 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
     return llvm::FunctionType::get(ptrTy, args, /*isVarArg*/ false)
       ->getPointerTo();
   }
-      
+
   /// void (*storeExtraInhabitant)(T *obj, unsigned index, M *self);
   case ValueWitness::StoreExtraInhabitant: {
     llvm::Type *ptrTy = IGM.OpaquePtrTy;
@@ -142,23 +142,23 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
     llvm::Type *metaTy = IGM.TypeMetadataPtrTy;
     llvm::Type *voidTy = IGM.VoidTy;
     llvm::Type *args[] = {ptrTy, indexTy, metaTy};
-    
+
     return llvm::FunctionType::get(voidTy, args, /*isVarArg*/ false)
       ->getPointerTo();
   }
-      
+
   /// int (*getExtraInhabitantIndex)(T *obj, M *self);
   case ValueWitness::GetExtraInhabitantIndex: {
     llvm::Type *ptrTy = IGM.OpaquePtrTy;
     llvm::Type *metaTy = IGM.TypeMetadataPtrTy;
     llvm::Type *indexTy = IGM.Int32Ty;
-    
+
     llvm::Type *args[] = {ptrTy, metaTy};
-    
+
     return llvm::FunctionType::get(indexTy, args, /*isVarArg*/ false)
       ->getPointerTo();
   }
-  
+
   /// unsigned (*getEnumTag)(T *obj, M *self);
   case ValueWitness::GetEnumTag: {
     llvm::Type *ptrTy = IGM.OpaquePtrTy;
@@ -322,7 +322,7 @@ llvm::Value *IRGenFunction::emitValueWitness(CanType type, ValueWitness index) {
   if (auto witness =
         tryGetLocalTypeData(type, LocalTypeDataKind::forValueWitness(index)))
     return witness;
-  
+
   auto vwtable = emitValueWitnessTableRef(type);
   auto witness = emitLoadOfValueWitness(*this, vwtable, index);
   setScopedLocalTypeData(type, LocalTypeDataKind::forValueWitness(index),
@@ -335,7 +335,7 @@ llvm::Value *IRGenFunction::emitValueWitnessForLayout(SILType type,
   if (auto witness = tryGetLocalTypeDataForLayout(type,
                                     LocalTypeDataKind::forValueWitness(index)))
     return witness;
-  
+
   auto vwtable = emitValueWitnessTableRefForLayout(type);
   auto witness = emitLoadOfValueWitness(*this, vwtable, index);
   setScopedLocalTypeDataForLayout(type,
@@ -643,7 +643,7 @@ llvm::Value *irgen::emitGetExtraInhabitantIndexCall(IRGenFunction &IGF,
   auto metadata = IGF.emitTypeMetadataRefForLayout(T);
   llvm::Value *fn = IGF.emitValueWitnessForLayout(T,
                                          ValueWitness::GetExtraInhabitantIndex);
-  
+
   llvm::CallInst *call =
     IGF.Builder.CreateCall(fn, {srcObject, metadata});
   call->setCallingConv(IGF.IGM.RuntimeCC);

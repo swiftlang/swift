@@ -98,7 +98,7 @@ HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
         // Don't need to dynamically calculate this offset.
         Offsets.push_back(nullptr);
         break;
-      
+
       case ElementLayout::Kind::NonFixed:
         // Start calculating non-fixed offsets from the end of the first fixed
         // field.
@@ -124,15 +124,15 @@ HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
                                      prevElt.getType().getSize(IGF, prevType));
           }
         }
-        
+
         // Round up to alignment to get the offset.
         auto alignMask = elt.getType().getAlignmentMask(IGF, eltTy);
         auto notAlignMask = IGF.Builder.CreateNot(alignMask);
         offset = IGF.Builder.CreateAdd(offset, alignMask);
         offset = IGF.Builder.CreateAnd(offset, notAlignMask);
-        
+
         Offsets.push_back(offset);
-        
+
         // Advance by the field's size to start the next field.
         offset = IGF.Builder.CreateAdd(offset,
                                        elt.getType().getSize(IGF, eltTy));
@@ -342,9 +342,9 @@ namespace {
                                const SpareBitVector &spareBits,
                                Size size, Alignment alignment)
       : PODSingleScalarTypeInfo(type, size, spareBits, alignment) {}
-  
+
     // Unmanaged types have the same spare bits as managed heap objects.
-    
+
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
       return true;
     }
@@ -417,7 +417,7 @@ namespace {
     void emitScalarFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
       IGF.emitFixLifetime(value);
     }
-    
+
     unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
       return IGM.getUnownedExtraInhabitantCount(ReferenceCounting::Native);
     }
@@ -430,7 +430,7 @@ namespace {
     }
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
-                                         SILType T) const override {    
+                                         SILType T) const override {
       return IGF.getUnownedExtraInhabitantIndex(src,
                                                 ReferenceCounting::Native);
     }
@@ -644,7 +644,7 @@ namespace {
 
     // Unowned types have the same extra inhabitants as normal pointers.
     // They do not, however, necessarily have any spare bits.
-    
+
     unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
       return IGM.getUnownedExtraInhabitantCount(ReferenceCounting::Unknown);
     }
@@ -712,7 +712,7 @@ namespace {
     void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
       IGF.emitUnknownWeakDestroy(addr);
     }
-                                
+
     llvm::Type *getOptionalIntType() const {
       return llvm::IntegerType::get(ValueType->getContext(),
                                     getFixedSize().getValueInBits());
@@ -824,11 +824,11 @@ static void emitUnaryRefCountCall(IRGenFunction &IGF,
       llvm::FunctionType::get(IGF.IGM.VoidTy, value->getType(), false);
     fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
   }
-  
+
   // Emit the call.
   llvm::CallInst *call = IGF.Builder.CreateCall(fn, value);
   call->setCallingConv(IGF.IGM.RuntimeCC);
-  call->setDoesNotThrow();  
+  call->setDoesNotThrow();
 }
 
 /// Emit a copy-like call to perform a ref-counting operation.
@@ -849,11 +849,11 @@ static void emitCopyLikeCall(IRGenFunction &IGF,
       llvm::FunctionType::get(IGF.IGM.VoidTy, paramTypes, false);
     fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
   }
-  
+
   // Emit the call.
   llvm::CallInst *call = IGF.Builder.CreateCall(fn, {dest, src});
   call->setCallingConv(IGF.IGM.RuntimeCC);
-  call->setDoesNotThrow();  
+  call->setDoesNotThrow();
 }
 
 /// Emit a call to a function with a loadWeak-like signature.
@@ -918,7 +918,7 @@ void IRGenFunction::emitNativeStrongRetain(llvm::Value *value) {
   // Make sure the input pointer is the right type.
   if (value->getType() != IGM.RefCountedPtrTy)
     value = Builder.CreateBitCast(value, IGM.RefCountedPtrTy);
-  
+
   // Emit the call.
   llvm::CallInst *call =
     Builder.CreateCall(IGM.getNativeStrongRetainFn(), value);
@@ -1173,7 +1173,7 @@ void IRGenFunction::emitNativeUnownedTakeAssign(Address dest, Address src) {
 llvm::Constant *IRGenModule::getFixLifetimeFn() {
   if (FixLifetimeFn)
     return FixLifetimeFn;
-  
+
   // Generate a private stub function for the LLVM ARC optimizer to recognize.
   auto fixLifetimeTy = llvm::FunctionType::get(VoidTy, RefCountedPtrTy,
                                                /*isVarArg*/ false);
@@ -1188,11 +1188,11 @@ llvm::Constant *IRGenModule::getFixLifetimeFn() {
   // no longer needed.
   fixLifetime->addAttribute(llvm::AttributeSet::FunctionIndex,
                             llvm::Attribute::NoInline);
-  
+
   // Give the function an empty body.
   auto entry = llvm::BasicBlock::Create(LLVMContext, "", fixLifetime);
   llvm::ReturnInst::Create(LLVMContext, entry);
-  
+
   FixLifetimeFn = fixLifetime;
   return fixLifetime;
 }

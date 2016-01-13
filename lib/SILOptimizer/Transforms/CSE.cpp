@@ -89,7 +89,7 @@ public:
   hash_code visitBridgeObjectToWordInst(BridgeObjectToWordInst *X) {
     return llvm::hash_combine(X->getKind(), X->getType(), X->getOperand());
   }
-  
+
   hash_code visitRefToBridgeObjectInst(RefToBridgeObjectInst *X) {
     OperandValueArrayRef Operands(X->getAllOperands());
     return llvm::hash_combine(
@@ -249,7 +249,7 @@ public:
                                                        Operands.end()),
                               X->hasSubstitutions());
   }
-  
+
   hash_code visitEnumInst(EnumInst *X) {
     // We hash the enum by hashing its kind, element, and operand if it has one.
     if (!X->hasOperand())
@@ -293,18 +293,18 @@ public:
                                    X->getEnumOperand(),
                                    X->getType(),
                                    X->hasDefault());
-    
+
     for (unsigned i = 0, e = X->getNumCases(); i < e; ++i) {
       hash = llvm::hash_combine(hash, X->getCase(i).first,
                                 X->getCase(i).second);
     }
-    
+
     if (X->hasDefault())
       hash = llvm::hash_combine(hash, X->getDefaultResult());
-    
+
     return hash;
   }
-  
+
   hash_code visitSelectEnumInst(SelectEnumInst *X) {
     return visitSelectEnumInstBase(X);
   }
@@ -402,15 +402,15 @@ public:
       : SEA(SEA), RunsOnHighLevelSil(RunsOnHighLevelSil) {}
 
   bool processFunction(SILFunction &F, DominanceInfo *DT);
-  
+
   bool canHandle(SILInstruction *Inst);
 
 private:
-  
+
   /// True if CSE is done on high-level SIL, i.e. semantic calls are not inlined
   /// yet. In this case some semantic calls can be CSEd.
   bool RunsOnHighLevelSil;
-  
+
   // NodeScope - almost a POD, but needs to call the constructors for the
   // scoped hash tables so that a new scope gets pushed on. These are RAII so
   // that the scope gets popped when the NodeScope is destroyed.
@@ -578,7 +578,7 @@ bool CSE::canHandle(SILInstruction *Inst) {
   if (auto *AI = dyn_cast<ApplyInst>(Inst)) {
     if (!AI->mayReadOrWriteMemory())
       return true;
-    
+
     if (RunsOnHighLevelSil) {
       ArraySemanticsCall SemCall(AI);
       switch (SemCall.getKind()) {
@@ -594,7 +594,7 @@ bool CSE::canHandle(SILInstruction *Inst) {
           return false;
       }
     }
-    
+
     // We can CSE function calls which do not read or write memory and don't
     // have any other side effects.
     SideEffectAnalysis::FunctionEffects Effects;
@@ -606,7 +606,7 @@ bool CSE::canHandle(SILInstruction *Inst) {
     auto MB = Effects.getMemBehavior(RetainObserveKind::ObserveRetains);
     if (MB == SILInstruction::MemoryBehavior::None)
       return true;
-    
+
     return false;
   }
   if (auto *BI = dyn_cast<BuiltinInst>(Inst)) {
@@ -675,13 +675,13 @@ bool CSE::canHandle(SILInstruction *Inst) {
 
 namespace {
 class SILCSE : public SILFunctionTransform {
-  
+
   /// True if CSE is done on high-level SIL, i.e. semantic calls are not inlined
   /// yet. In this case some semantic calls can be CSEd.
   /// We only CSE semantic calls on high-level SIL because we can be sure that
   /// e.g. an Array as SILValue is really immutable (including its content).
   bool RunsOnHighLevelSil;
-  
+
   void run() override {
     DEBUG(llvm::dbgs() << "***** CSE on function: " << getFunction()->getName()
           << " *****\n");
@@ -699,7 +699,7 @@ class SILCSE : public SILFunctionTransform {
   StringRef getName() override {
     return RunsOnHighLevelSil ? "High-level CSE" : "CSE";
   }
-  
+
 public:
   SILCSE(bool RunsOnHighLevelSil) : RunsOnHighLevelSil(RunsOnHighLevelSil) {}
 };

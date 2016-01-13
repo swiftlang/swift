@@ -454,7 +454,7 @@ if ((tailbits & 1) == 1) {
    return {'J', 3};
   }
  }
-} 
+}
  assert(false); return {0, 0};
 }
 void variable_encode(uint64_t &bits, uint64_t &num_bits, char ch) {

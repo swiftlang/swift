@@ -31,7 +31,7 @@ namespace irgen {
   class Explosion;
   class IRGenFunction;
   class IRGenModule;
-  
+
   Address projectPhysicalStructMemberAddress(IRGenFunction &IGF,
                                              Address base,
                                              SILType baseType,

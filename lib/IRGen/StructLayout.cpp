@@ -122,17 +122,17 @@ void irgen::applyLayoutAttributes(IRGenModule &IGM,
                                   bool IsFixedLayout,
                                   Alignment &MinimumAlign) {
   assert(ASTTy && "shouldn't call applyLayoutAttributes without a type");
-  
+
   auto &Diags = IGM.Context.Diags;
   auto decl = ASTTy->getAnyNominal();
   if (!decl)
     return;
-  
+
   if (auto alignment = decl->getAttrs().getAttribute<AlignmentAttr>()) {
     assert(alignment->Value != 0
            && ((alignment->Value - 1) & alignment->Value) == 0
            && "alignment not a power of two!");
-    
+
     if (!IsFixedLayout)
       Diags.diagnose(alignment->getLocation(),
                      diag::alignment_dynamic_type_layout_unsupported);
@@ -211,7 +211,7 @@ bool StructLayoutBuilder::addFields(llvm::MutableArrayRef<ElementLayout> elts,
     IsKnownPOD &= eltTI.isPOD(ResilienceExpansion::Maximal);
     IsKnownBitwiseTakable &= eltTI.isBitwiseTakable(ResilienceExpansion::Maximal);
     IsKnownAlwaysFixedSize &= eltTI.isFixedSize(ResilienceExpansion::Minimal);
-    
+
     // If the element type is empty, it adds nothing.
     if (eltTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
       addEmptyElement(elt);
@@ -266,7 +266,7 @@ void StructLayoutBuilder::addFixedSizeElement(ElementLayout &elt) {
     if (isFixedLayout()) {
       auto paddingTy = llvm::ArrayType::get(IGM.Int8Ty, paddingRequired);
       StructFields.push_back(paddingTy);
-      
+
       // The padding can be used as spare bits by enum layout.
       CurSpareBits.appendSetBits(Size(paddingRequired).getValueInBits());
     }
@@ -319,7 +319,7 @@ void StructLayoutBuilder::addElementAtFixedOffset(ElementLayout &elt) {
   elt.completeFixed(elt.getType().isPOD(ResilienceExpansion::Maximal),
                     CurSize, StructFields.size());
   StructFields.push_back(elt.getType().getStorageType());
-  
+
   // Carry over the spare bits from the element.
   CurSpareBits.append(eltTI.getSpareBits());
 }

@@ -107,7 +107,7 @@ void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
       // Check whether this entry matches any existing entry.
       for (auto &existingEntry : entry.DeclsOrMacros) {
         // If it matches an existing declaration, there's nothing to do.
-        if (decl && isDeclEntry(existingEntry) && 
+        if (decl && isDeclEntry(existingEntry) &&
             matchesExistingDecl(decl, mapStoredDecl(existingEntry)))
           return;
 
@@ -138,7 +138,7 @@ void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
 }
 
 
-auto SwiftLookupTable::findOrCreate(StringRef baseName) 
+auto SwiftLookupTable::findOrCreate(StringRef baseName)
   -> llvm::DenseMap<StringRef, SmallVector<FullTableEntry, 2>>::iterator {
   // If there is no base name, there is nothing to find.
   if (baseName.empty()) return LookupTable.end();
@@ -148,7 +148,7 @@ auto SwiftLookupTable::findOrCreate(StringRef baseName)
 
   // If we found something, we're done.
   if (known != LookupTable.end()) return known;
-  
+
   // If there's no reader, we've found all there is to find.
   if (!Reader) return known;
 
@@ -710,7 +710,7 @@ SwiftLookupTableReader::create(clang::ModuleFileExtension *extension,
       // API notes format.
       if (cursor.SkipBlock())
         return nullptr;
-      
+
       next = cursor.advance();
       continue;
     }

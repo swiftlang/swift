@@ -134,7 +134,7 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
     ParameterList::createWithoutLoc(selfDecl),
     ParameterList::createEmpty(C)
   };
-  
+
   FuncDecl *getterDecl =
     FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
                      DeclName(), SourceLoc(), SourceLoc(), SourceLoc(),
@@ -149,7 +149,7 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
                                 propertyContextType);
   Type selfType = getterDecl->computeSelfType();
   selfDecl->overwriteType(selfType);
-  
+
   if (genericParams)
     type = PolymorphicFunctionType::get(selfType, type, genericParams);
   else

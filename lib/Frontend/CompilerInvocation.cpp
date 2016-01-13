@@ -712,7 +712,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
-  
+
   if (auto A = Args.getLastArg(OPT_enable_access_control,
                                OPT_disable_access_control)) {
     Opts.EnableAccessControl
@@ -727,7 +727,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EnableTargetOSChecking
       = A->getOption().matches(OPT_enable_target_os_checking);
   }
-  
+
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
   Opts.IterativeTypeChecker |= Args.hasArg(OPT_iterative_type_checker);
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
@@ -762,7 +762,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
     Opts.DebugConstraintSolverAttempt = attempt;
   }
-  
+
   if (const Arg *A = Args.getLastArg(OPT_debug_forbid_typecheck_prefix)) {
     Opts.DebugForbidTypecheckPrefix = A->getValue();
   }
@@ -774,10 +774,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
       return true;
     }
-    
+
     Opts.SolverMemoryThreshold = threshold;
   }
-  
+
   for (const Arg *A : make_range(Args.filtered_begin(OPT_D),
                                  Args.filtered_end())) {
     Opts.addBuildConfigOption(A->getValue());
@@ -900,9 +900,9 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   // Opts.RuntimeIncludePath is set by calls to
   // setRuntimeIncludePath() or setMainExecutablePath().
   // Opts.RuntimeImportPath is set by calls to
-  // setRuntimeIncludePath() or setMainExecutablePath() and 
+  // setRuntimeIncludePath() or setMainExecutablePath() and
   // updated by calls to setTargetTriple() or parseArgs().
-  // Assumes exactly one of setMainExecutablePath() or setRuntimeIncludePath() 
+  // Assumes exactly one of setMainExecutablePath() or setRuntimeIncludePath()
   // is called before setTargetTriple() and parseArgs().
   // TODO: improve the handling of RuntimeIncludePath.
 
@@ -962,7 +962,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       return true;
     }
   }
-  
+
   if (const Arg *A = Args.getLastArg(OPT_disable_sil_linking,
                                      OPT_sil_link_all)) {
     if (A->getOption().matches(OPT_disable_sil_linking))
@@ -1153,7 +1153,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_use_jit))
     Opts.UseJIT = true;
-  
+
   for (const Arg *A : make_range(Args.filtered_begin(OPT_verify_type_layout),
                                  Args.filtered_end())) {
     Opts.VerifyTypeLayoutNames.push_back(A->getValue());

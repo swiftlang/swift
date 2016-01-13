@@ -104,7 +104,7 @@ ProtocolConformance::getTypeWitnessSubstAndDecl(AssociatedTypeDecl *assocType,
 }
 
 const Substitution &
-ProtocolConformance::getTypeWitness(AssociatedTypeDecl *assocType, 
+ProtocolConformance::getTypeWitness(AssociatedTypeDecl *assocType,
                                     LazyResolver *resolver) const {
   return getTypeWitnessSubstAndDecl(assocType, resolver).first;
 }
@@ -131,7 +131,7 @@ ProtocolConformance::getTypeWitnessByName(Type type,
 
   if (!assocType)
     return nullptr;
-  
+
   assert(conformance && "Missing conformance information");
   if (!conformance->hasTypeWitness(assocType, resolver)) {
     return nullptr;
@@ -238,7 +238,7 @@ bool NormalProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,
 
 std::pair<const Substitution &, TypeDecl *>
 NormalProtocolConformance::getTypeWitnessSubstAndDecl(
-                      AssociatedTypeDecl *assocType, 
+                      AssociatedTypeDecl *assocType,
                       LazyResolver *resolver) const {
   if (Resolver)
     resolveLazyInfo();
@@ -267,7 +267,7 @@ void NormalProtocolConformance::setTypeWitness(
 
   /// Retrieve the value witness corresponding to the given requirement.
 ConcreteDeclRef NormalProtocolConformance::getWitness(
-                  ValueDecl *requirement, 
+                  ValueDecl *requirement,
                   LazyResolver *resolver) const {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Request type witness");
   if (Resolver)
@@ -317,7 +317,7 @@ SpecializedProtocolConformance::getGenericSubstitutionIterator() const {
 }
 
 bool SpecializedProtocolConformance::hasTypeWitness(
-                      AssociatedTypeDecl *assocType, 
+                      AssociatedTypeDecl *assocType,
                       LazyResolver *resolver) const {
   return TypeWitnesses.find(assocType) != TypeWitnesses.end() ||
          GenericConformance->hasTypeWitness(assocType, resolver);
@@ -325,7 +325,7 @@ bool SpecializedProtocolConformance::hasTypeWitness(
 
 std::pair<const Substitution &, TypeDecl *>
 SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
-                      AssociatedTypeDecl *assocType, 
+                      AssociatedTypeDecl *assocType,
                       LazyResolver *resolver) const {
   // If we've already created this type witness, return it.
   auto known = TypeWitnesses.find(assocType);
@@ -410,7 +410,7 @@ ProtocolConformance *ProtocolConformance::subst(Module *module,
                                       ArchetypeConformanceMap &conformanceMap) {
   if (getType()->isEqual(substType))
     return this;
-  
+
   switch (getKind()) {
   case ProtocolConformanceKind::Normal:
     if (substType->isSpecialized()) {
@@ -426,7 +426,7 @@ ProtocolConformance *ProtocolConformance::subst(Module *module,
     assert(substType->isEqual(getType())
            && "substitution changed non-specialized type?!");
     return this;
-      
+
   case ProtocolConformanceKind::Inherited: {
     // Substitute the base.
     auto inheritedConformance
@@ -449,9 +449,9 @@ ProtocolConformance *ProtocolConformance::subst(Module *module,
     newSubs.reserve(spec->getGenericSubstitutions().size());
     for (auto &sub : spec->getGenericSubstitutions())
       newSubs.push_back(sub.subst(module, subs, subMap, conformanceMap));
-    
+
     auto ctxNewSubs = module->getASTContext().AllocateCopy(newSubs);
-    
+
     return module->getASTContext()
       .getSpecializedConformance(substType, spec->getGenericConformance(),
                                  ctxNewSubs);
@@ -473,16 +473,16 @@ ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
     subs = spec->getGenericSubstitutionIterator();
     break;
   }
-    
+
   case ProtocolConformanceKind::Normal:
   case ProtocolConformanceKind::Inherited:
     unspecialized = this;
     break;
   }
-  
-  
+
+
   ProtocolConformance *foundInherited;
-  
+
   // Search for the inherited conformance among our immediate parents.
   auto &inherited = unspecialized->getInheritedConformances();
   auto known = inherited.find(protocol);
@@ -503,7 +503,7 @@ ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
   llvm_unreachable("Can't find the inherited conformance.");
 
 found_inherited:
-  
+
   // Specialize the inherited conformance, if necessary.
   if (!subs.empty()) {
     TypeSubstitutionMap subMap;

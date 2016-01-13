@@ -80,7 +80,7 @@ public:
       if (CondFailToMerge.size() > 1)
         Changed |= mergeCondFails(CondFailToMerge);
     }
-    
+
     if (Changed) {
       PM->invalidateAnalysis(F, SILAnalysis::InvalidationKind::Instructions);
     }

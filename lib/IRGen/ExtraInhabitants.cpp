@@ -35,12 +35,12 @@ static unsigned getNumLowObjCReservedBits(IRGenModule &IGM) {
 /// Return the number of extra inhabitants for a pointer that reserves
 /// the given number of low bits.
 static unsigned getPointerExtraInhabitantCount(IRGenModule &IGM,
-                                               unsigned numReservedLowBits) {  
+                                               unsigned numReservedLowBits) {
   // FIXME: We could also make extra inhabitants using spare bits, but we
   // probably don't need to.
   uint64_t rawCount =
     IGM.TargetInfo.LeastValidPointerValue >> numReservedLowBits;
-  
+
   // The runtime limits the count to INT_MAX.
   return std::min((uint64_t)INT_MAX, rawCount);
 }
@@ -68,7 +68,7 @@ getPointerFixedExtraInhabitantValue(IRGenModule &IGM, unsigned bits,
   APInt apValue(bits, value);
   if (offset > 0)
     apValue = apValue.shl(offset);
-  
+
   return apValue;
 }
 
@@ -98,7 +98,7 @@ static llvm::Value *getPointerExtraInhabitantIndex(IRGenFunction &IGF,
   llvm::BasicBlock *contBB = IGF.createBasicBlock("is-valid-pointer");
   SmallVector<std::pair<llvm::BasicBlock*, llvm::Value*>, 3> phiValues;
   auto invalidIndex = llvm::ConstantInt::getSigned(IGF.IGM.Int32Ty, -1);
-  
+
   src = IGF.Builder.CreateBitCast(src, IGF.IGM.SizeTy->getPointerTo());
 
   // Check if the inhabitant is below the least valid pointer value.
@@ -113,7 +113,7 @@ static llvm::Value *getPointerExtraInhabitantIndex(IRGenFunction &IGF,
     IGF.Builder.CreateCondBr(isValid, contBB, invalidBB);
     IGF.Builder.emitBlock(invalidBB);
   }
-                       
+
   // Check if the inhabitant has any reserved low bits set.
   // FIXME: This check is unneeded if the type is known to be pure Swift.
   if (numReservedLowBits) {
@@ -128,14 +128,14 @@ static llvm::Value *getPointerExtraInhabitantIndex(IRGenFunction &IGF,
     IGF.Builder.CreateCondBr(maskedZero, untaggedBB, contBB);
     IGF.Builder.emitBlock(untaggedBB);
   }
-  
+
   // The inhabitant is an invalid pointer. Derive its extra inhabitant index.
   {
     llvm::Value *index = val;
 
     // Shift away the reserved bits.
     if (numReservedLowBits) {
-      index = IGF.Builder.CreateLShr(index, 
+      index = IGF.Builder.CreateLShr(index,
                     llvm::ConstantInt::get(IGF.IGM.SizeTy, numReservedLowBits));
     }
 
@@ -153,7 +153,7 @@ static llvm::Value *getPointerExtraInhabitantIndex(IRGenFunction &IGF,
   auto phi = IGF.Builder.CreatePHI(IGF.IGM.Int32Ty, phiValues.size());
   for (auto &entry : phiValues) {
     phi->addIncoming(entry.second, entry.first);
-  }  
+  }
   return phi;
 }
 

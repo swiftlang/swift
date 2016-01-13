@@ -86,7 +86,7 @@ void ConformanceLookupTable::ConformanceEntry::dump(raw_ostream &os,
 
   switch (getKind()) {
   case ConformanceEntryKind::Implied:
-    os << " implied_by=@" 
+    os << " implied_by=@"
        << static_cast<const void *>(Source.getImpliedSource());
     break;
 
@@ -119,7 +119,7 @@ void *ConformanceLookupTable::operator new(size_t Bytes,
   return C.Allocate(Bytes, Alignment);
 }
 
-ConformanceLookupTable::ConformanceLookupTable(ASTContext &ctx, 
+ConformanceLookupTable::ConformanceLookupTable(ASTContext &ctx,
                                                NominalTypeDecl *nominal,
                                                LazyResolver *resolver) {
   // Register a cleanup with the ASTContext to call the conformance
@@ -216,7 +216,7 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
   }
 }
 
-void ConformanceLookupTable::inheritConformances(ClassDecl *classDecl, 
+void ConformanceLookupTable::inheritConformances(ClassDecl *classDecl,
                                                  ClassDecl *superclassDecl,
                                                  ExtensionDecl *superclassExt,
                                                  LazyResolver *resolver) {
@@ -249,9 +249,9 @@ void ConformanceLookupTable::inheritConformances(ClassDecl *classDecl,
     // anyway.
     if (!protocols.insert(protocol).second)
       return;
-    
+
     // Add the inherited entry.
-    (void)addProtocol(classDecl, protocol, getSuperclassLoc(), 
+    (void)addProtocol(classDecl, protocol, getSuperclassLoc(),
                       ConformanceSource::forInherited(classDecl));
   };
 
@@ -276,7 +276,7 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
                      if (resolver)
                        resolver->resolveInheritanceClause(nominal);
 
-                     addProtocols(nominal, nominal->getInherited(), 
+                     addProtocols(nominal, nominal->getInherited(),
                                   ConformanceSource::forExplicit(nominal),
                                   resolver);
                    },
@@ -301,7 +301,7 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
         resolver->resolveSuperclass(classDecl);
 
       if (Type superclass = classDecl->getSuperclass()) {
-        if (auto superclassDecl 
+        if (auto superclassDecl
               = superclass->getClassOrBoundGenericClass()) {
           // Break infinite recursion when visiting ill-formed classes
           // with circular inheritance.
@@ -315,7 +315,7 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
             superclassDecl,
             ConformanceStage::Resolved,
             resolver);
-          
+
           // Expand inherited conformances.
           forEachInStage(stage, superclassDecl, resolver,
                          [&](NominalTypeDecl *superclass) {
@@ -329,7 +329,7 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
         }
       }
     }
-    break;    
+    break;
 
   case ConformanceStage::ExpandedImplied:
     // Record explicit conformances and import inherited conformances
@@ -350,7 +350,7 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
     // Expand inherited conformances so we have the complete set of
     // conformances.
     updateLookupTable(nominal, ConformanceStage::ExpandedImplied, resolver);
-    
+
     /// Determine whether any extensions were added that might require
     /// us to compute conformances again.
     bool anyChanged = false;
@@ -361,7 +361,7 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
                    [&](ExtensionDecl *ext) {
                      anyChanged = true;
                    });
-                   
+
     if (anyChanged) {
       // Compute the conformances for each protocol.
       bool anySuperseded = false;
@@ -485,7 +485,7 @@ void ConformanceLookupTable::addProtocols(NominalTypeDecl *nominal,
 }
 
 void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
-                                                       DeclContext *dc, 
+                                                       DeclContext *dc,
                                                        LazyResolver *resolver) {
   // Note: recursive type-checking implies that AllConformances
   // may be reallocated during this traversal, so pay the lookup cost
@@ -553,7 +553,7 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
                           !isReplaceable(rhs->getRankingKind())) ||
                          (rhs->isFixed() &&
                           !isReplaceable(lhs->getRankingKind()));
-      
+
     return lhs->isFixed() ? Ordering::Before : Ordering::After;
   }
 
@@ -698,7 +698,7 @@ bool ConformanceLookupTable::resolveConformances(NominalTypeDecl *nominal,
 
       case Ordering::Before:
         otherEntry->markSupersededBy(*this, entry, diagnoseSuperseded);
-        anySuperseded = true; 
+        anySuperseded = true;
         break;
 
       case Ordering::After:
@@ -707,7 +707,7 @@ bool ConformanceLookupTable::resolveConformances(NominalTypeDecl *nominal,
         doneWithEntry = true;
         break;
       }
-    
+
       if (doneWithEntry)
         break;
     }
@@ -744,7 +744,7 @@ DeclContext *ConformanceLookupTable::getConformingContext(
     // If we had a circular dependency, the superclass may not exist.
     if (!classDecl->getSuperclass())
       return nullptr;
-        
+
     auto superclassDecl
       = classDecl->getSuperclass()->getClassOrBoundGenericClass();
 
@@ -878,9 +878,9 @@ void ConformanceLookupTable::registerProtocolConformance(
 }
 
 bool ConformanceLookupTable::lookupConformance(
-       Module *module, 
+       Module *module,
        NominalTypeDecl *nominal,
-       ProtocolDecl *protocol, 
+       ProtocolDecl *protocol,
        LazyResolver *resolver,
        SmallVectorImpl<ProtocolConformance *> &conformances) {
   // Update to record all explicit and inherited conformances.
@@ -924,7 +924,7 @@ void ConformanceLookupTable::lookupConformances(
   /// declaration may provide a conformance. Only some of these will
   /// result in conformances that are attributed to this declaration
   /// context.
-  auto &potentialConformances = AllConformances[dc]; 
+  auto &potentialConformances = AllConformances[dc];
   for (const auto &potential : potentialConformances) {
     resolveConformances(nominal, potential->getProtocol(), resolver);
   }
@@ -964,7 +964,7 @@ void ConformanceLookupTable::lookupConformances(
       for (const auto *entry : knownDiags->second) {
         ConformanceEntry *supersededBy = entry->getSupersededBy();
 
-        diagnostics->push_back({entry->getProtocol(), 
+        diagnostics->push_back({entry->getProtocol(),
                                 entry->getDeclaredLoc(),
                                 entry->getKind(),
                                 entry->getDeclaredConformance()->getProtocol(),
@@ -1114,7 +1114,7 @@ ConformanceLookupTable::getSatisfiedProtocolRequirementsForMember(
 void ConformanceLookupTable::dump() const {
   dump(llvm::errs());
 }
-  
+
 void ConformanceLookupTable::dump(raw_ostream &os) const {
   for (const auto &dcEntries : AllConformances) {
     os << "Conformances in context:\n";

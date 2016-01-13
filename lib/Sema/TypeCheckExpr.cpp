@@ -40,7 +40,7 @@ static void substituteInputSugarArgumentType(Type argTy, CanType resultTy,
   // If we already failed finding a unique sugar, bail out.
   if (!uniqueSugarTy)
     return;
-    
+
   if (TupleType *argTupleTy = argTy->getAs<TupleType>()) {
     // Recursively walk tuple arguments.
     for (auto &field : argTupleTy->getElements()) {
@@ -51,7 +51,7 @@ static void substituteInputSugarArgumentType(Type argTy, CanType resultTy,
     }
     return;
   }
-  
+
   if (argTy->getCanonicalType() != resultTy) {
     // If the argument is a metatype of what we're looking for, propagate that.
     if (auto MTT = argTy->getAs<MetatypeType>())
@@ -65,13 +65,13 @@ static void substituteInputSugarArgumentType(Type argTy, CanType resultTy,
   // propagate parens from arguments to the result type.
   if (auto *PT = dyn_cast<ParenType>(argTy.getPointer()))
     argTy = PT->getUnderlyingType();
-  
+
   // If this is the first match against the sugar type we found, use it.
   if (!resultSugarTy) {
     resultSugarTy = argTy;
     return;
   }
-  
+
   // Make sure this argument's sugar is consistent with the sugar we
   // already found.
   if (argTy->isSpelledLike(resultSugarTy))
@@ -85,7 +85,7 @@ static void substituteInputSugarArgumentType(Type argTy, CanType resultTy,
 Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
   if (!E->getType() || E->getType()->is<ErrorType>())
     return E;
-  
+
   Type resultTy = E->getFn()->getType()->castTo<FunctionType>()->getResult();
 
   /// Check to see if you have "x+y" (where x and y are type aliases) that match
@@ -95,7 +95,7 @@ Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
   substituteInputSugarArgumentType(E->getArg()->getType(),
                                    resultTy->getCanonicalType(),
                                    resultSugarTy, uniqueSugarTy);
-  
+
   if (resultSugarTy && uniqueSugarTy && E->getType()->isCanonical()) {
     E->setType(resultSugarTy);
     return E;
@@ -206,7 +206,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
   if (tryEval) {
     LHS = tryEval->getSubExpr();
   }
-  
+
   // If this is an assignment operator, and the left operand is an optional
   // evaluation, pull the operator into the chain.
   OptionalEvaluationExpr *optEval = nullptr;
@@ -282,7 +282,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
     }
     return result;
   };
-  
+
   if (auto *ifExpr = dyn_cast<IfExpr>(Op)) {
     // Resolve the ternary expression.
     assert(!ifExpr->isFolded() && "already folded if expr in sequence?!");
@@ -298,26 +298,26 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
     assign->setSrc(RHS);
     return makeResultExpr(assign);
   }
-  
+
   if (auto *as = dyn_cast<ExplicitCastExpr>(Op)) {
     // Resolve the 'as' or 'is' expression.
     assert(!as->isFolded() && "already folded 'as' expr in sequence?!");
     assert(RHS == as && "'as' with non-type RHS?!");
-    as->setSubExpr(LHS);    
+    as->setSubExpr(LHS);
     return makeResultExpr(as);
   }
-  
+
   // Build the argument to the operation.
   Expr *ArgElts[] = { LHS, RHS };
   auto ArgElts2 = TC.Context.AllocateCopy(MutableArrayRef<Expr*>(ArgElts));
   TupleExpr *Arg = TupleExpr::create(TC.Context,
-                                     SourceLoc(), 
+                                     SourceLoc(),
                                      ArgElts2, { }, { }, SourceLoc(),
                                      /*hasTrailingClosure=*/false,
                                      LHS->isImplicit() && RHS->isImplicit());
 
-  
-  
+
+
   // Build the operation.
   return makeResultExpr(new (TC.Context) BinaryExpr(Op, Arg, Op->isImplicit()));
 }
@@ -332,14 +332,14 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
   // Invariant: All elements at even indices are operator references.
   assert(!S.empty());
   assert((S.size() & 1) == 0);
-  
+
   struct Op {
     Expr *op;
     InfixData infixData;
-    
+
     explicit operator bool() const { return op; }
   };
-  
+
   /// Get the operator, if appropriate to this pass.
   auto getNextOperator = [&]() -> Op {
     Expr *op = S[0];
@@ -353,12 +353,12 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
   // Extract out the first operator.
   Op Op1 = getNextOperator();
   if (!Op1) return LHS;
-  
+
   // We will definitely be consuming at least one operator.
   // Pull out the prospective RHS and slice off the first two elements.
   Expr *RHS = S[1];
   S = S.slice(2);
-  
+
   while (!S.empty()) {
     assert((S.size() & 1) == 0);
     assert(Op1.infixData.isValid() && "Not a valid operator to fold");
@@ -374,15 +374,15 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
       S = S.slice(2);
       continue;
     }
-    
+
     // Pull out the next binary operator.
     Expr *Op2 = S[0];
-  
+
     InfixData Op2Info = getInfixData(TC, DC, Op2);
     // If the second operator's precedence is lower than the min
     // precedence, break out of the loop.
     if (Op2Info.getPrecedence() < MinPrecedence) break;
-    
+
     // If the first operator's precedence is higher than the second
     // operator's precedence, or they have matching precedence and are
     // both left-associative, fold LHS and RHS immediately.
@@ -434,7 +434,7 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
     } else {
       TC.diagnose(Op1.op->getLoc(), diag::incompatible_assoc);
     }
-    
+
     // Recover by arbitrarily binding the first two.
     LHS = makeBinOp(TC, Op1.op, LHS, RHS, Op1.infixData, S.empty());
     return foldSequence(TC, DC, LHS, S, MinPrecedence);
@@ -456,7 +456,7 @@ Type TypeChecker::getTypeOfRValue(ValueDecl *value, bool wantInterfaceType) {
   // Uses of inout argument values are lvalues.
   if (auto iot = type->getAs<InOutType>())
     return iot->getObjectType();
-  
+
   // Uses of values with lvalue type produce their rvalue.
   if (auto LV = type->getAs<LValueType>())
     return LV->getObjectType();
@@ -485,7 +485,7 @@ bool TypeChecker::requirePointerArgumentIntrinsics(SourceLoc loc) {
 
 bool TypeChecker::requireArrayLiteralIntrinsics(SourceLoc loc) {
   if (Context.hasArrayLiteralIntrinsics(this)) return false;
-  
+
   diagnose(loc, diag::array_literal_intrinsics_not_found);
   return true;
 }
@@ -502,7 +502,7 @@ static bool doesStorageProduceLValue(TypeChecker &TC,
   // Unsettable storage decls always produce rvalues.
   if (!storage->isSettable(useDC, base))
     return false;
-  
+
   if (TC.Context.LangOpts.EnableAccessControl &&
       !storage->isSetterAccessibleFrom(useDC))
     return false;
@@ -873,25 +873,25 @@ namespace {
       // entity.
       llvm::DenseSet<ValueDecl *> checkedCaptures;
       llvm::SmallVector<FuncDecl *, 2> capturePath;
-      
+
       std::function<bool (ValueDecl *)>
       validateForwardCapture = [&](ValueDecl *capturedDecl) -> bool {
         if (!checkedCaptures.insert(capturedDecl).second)
           return true;
-      
+
         // Captures at nonlocal scope are order-invariant.
         if (!capturedDecl->getDeclContext()->isLocalContext())
           return true;
-        
+
         // Assume implicit decl captures are OK.
         if (!CaptureLoc.isValid() || !capturedDecl->getLoc().isValid())
           return true;
-        
+
         // Check the order of the declarations.
         if (!TC.Context.SourceMgr.isBeforeInBuffer(CaptureLoc,
                                                    capturedDecl->getLoc()))
           return true;
-        
+
         // Forward captures of functions are OK, if the function doesn't
         // transitively capture variables ahead of the original function.
         if (auto func = dyn_cast<FuncDecl>(capturedDecl)) {
@@ -908,7 +908,7 @@ namespace {
               return false;
           return true;
         }
-        
+
         // Diagnose the improper forward capture.
         if (Diagnosed.insert(capturedDecl).second) {
           if (capturedDecl == DRE->getDecl()) {
@@ -933,7 +933,7 @@ namespace {
         }
         return false;
       };
-      
+
       if (!validateForwardCapture(DRE->getDecl()))
         return { false, DRE };
 
@@ -986,7 +986,7 @@ namespace {
     bool walkToDeclPre(Decl *D) override {
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
         propagateCaptures(AFD, AFD->getLoc());
-        
+
         // Can default parameter initializers capture state?  That seems like
         // a really bad idea.
         for (auto *paramList : AFD->getParameterLists())

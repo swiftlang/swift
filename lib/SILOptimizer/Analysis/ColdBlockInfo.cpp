@@ -48,14 +48,14 @@ static BranchHint getBranchHint(SILValue Cond) {
     }
     return BranchHint::None;
   }
-  
+
   // Handle the @semantic function used for branch hints. The generic
   // fast/slowPath calls are frequently only inlined one level down to
   // _branchHint before inlining the call sites that they guard.
   auto AI = dyn_cast<ApplyInst>(Cond);
   if (!AI)
     return BranchHint::None;
-  
+
   if (auto *F = AI->getCalleeFunction()) {
     if (F->hasSemanticsAttrs()) {
       if (F->hasSemanticsAttr("branchhint")) {

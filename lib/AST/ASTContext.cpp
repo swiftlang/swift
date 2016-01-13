@@ -130,15 +130,15 @@ struct ASTContext::Implementation {
 
   /// The declaration of Swift.ImplicitlyUnwrappedOptional<T>.None.
   EnumElementDecl *ImplicitlyUnwrappedOptionalNoneDecl = nullptr;
-  
+
   /// The declaration of Swift.UnsafeMutablePointer<T>.
   NominalTypeDecl *UnsafeMutablePointerDecl = nullptr;
   VarDecl *UnsafeMutablePointerMemoryDecl = nullptr;
-  
+
   /// The declaration of Swift.UnsafePointer<T>.
   NominalTypeDecl *UnsafePointerDecl = nullptr;
   VarDecl *UnsafePointerMemoryDecl = nullptr;
-  
+
   /// The declaration of Swift.AutoreleasingUnsafeMutablePointer<T>.
   NominalTypeDecl *AutoreleasingUnsafeMutablePointerDecl = nullptr;
   VarDecl *AutoreleasingUnsafeMutablePointerMemoryDecl = nullptr;
@@ -158,7 +158,7 @@ struct ASTContext::Implementation {
   // Declare cached declarations for each of the known declarations.
 #define FUNC_DECL(Name, Id) FuncDecl *Get##Name = nullptr;
 #include "swift/AST/KnownDecls.def"
-  
+
   /// func _doesOptionalHaveValueAsBool<T>(v: Optional<T>) -> Bool
   FuncDecl *DoesOptionalHaveValueAsBoolDecls[NumOptionalTypeKinds] = {};
 
@@ -170,7 +170,7 @@ struct ASTContext::Implementation {
 
   /// func _getBool(Builtin.Int1) -> Bool
   FuncDecl *GetBoolDecl = nullptr;
-  
+
   /// func ==(Int, Int) -> Bool
   FuncDecl *EqualIntDecl = nullptr;
 
@@ -183,7 +183,7 @@ struct ASTContext::Implementation {
   /// func _stdlib_isOSVersionAtLeast(Builtin.Word,Builtin.Word, Builtin.word)
   //    -> Builtin.Int1
   FuncDecl *IsOSVersionAtLeastDecl = nullptr;
-  
+
   /// \brief The set of known protocols, lazily populated as needed.
   ProtocolDecl *KnownProtocols[NumKnownProtocols] = { };
 
@@ -228,7 +228,7 @@ struct ASTContext::Implementation {
   /// Mapping from archetypes with lazily-resolved nested types to the
   /// archetype builder and potential archetype corresponding to that
   /// archetype.
-  llvm::DenseMap<const ArchetypeType *, 
+  llvm::DenseMap<const ArchetypeType *,
                  std::pair<ArchetypeBuilder *,
                            ArchetypeBuilder::PotentialArchetype *>>
     LazyArchetypes;
@@ -688,7 +688,7 @@ NominalTypeDecl *ASTContext::getUnsafeMutablePointerDecl() const {
   if (!Impl.UnsafeMutablePointerDecl)
     Impl.UnsafeMutablePointerDecl = findStdlibType(
       *this, "UnsafeMutablePointer", 1);
-  
+
   return Impl.UnsafeMutablePointerDecl;
 }
 
@@ -696,7 +696,7 @@ NominalTypeDecl *ASTContext::getUnsafePointerDecl() const {
   if (!Impl.UnsafePointerDecl)
     Impl.UnsafePointerDecl
       = findStdlibType(*this, "UnsafePointer", 1);
-  
+
   return Impl.UnsafePointerDecl;
 }
 
@@ -704,14 +704,14 @@ NominalTypeDecl *ASTContext::getAutoreleasingUnsafeMutablePointerDecl() const {
   if (!Impl.AutoreleasingUnsafeMutablePointerDecl)
     Impl.AutoreleasingUnsafeMutablePointerDecl
       = findStdlibType(*this, "AutoreleasingUnsafeMutablePointer", 1);
-  
+
   return Impl.AutoreleasingUnsafeMutablePointerDecl;
 }
 
 NominalTypeDecl *ASTContext::getUnmanagedDecl() const {
   if (!Impl.UnmanagedDecl)
     Impl.UnmanagedDecl = findStdlibType(*this, "Unmanaged", 1);
-  
+
   return Impl.UnmanagedDecl;
 }
 
@@ -934,26 +934,26 @@ FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
 FuncDecl *ASTContext::getEqualIntDecl(LazyResolver *resolver) const {
   if (Impl.EqualIntDecl)
     return Impl.EqualIntDecl;
-  
+
   CanType intType = getIntDecl()->getDeclaredType().getCanonicalTypeOrNull();
   CanType boolType = getBoolDecl()->getDeclaredType().getCanonicalTypeOrNull();
   SmallVector<ValueDecl *, 30> equalFuncs;
   lookupInSwiftModule("==", equalFuncs);
-  
+
   // Find the overload for Int.
   for (ValueDecl *vd : equalFuncs) {
     // All "==" decls should be functions, but who knows...
     FuncDecl *funcDecl = dyn_cast<FuncDecl>(vd);
     if (!funcDecl)
       continue;
-    
+
     if (resolver)
       resolver->resolveDeclSignature(funcDecl);
 
     CanType input, resultType;
     if (!isNonGenericIntrinsic(funcDecl, input, resultType))
       continue;
-    
+
     // Check for the signature: (Int, Int) -> Bool
     auto tType = dyn_cast<TupleType>(input.getPointer());
     assert(tType);
@@ -1058,7 +1058,7 @@ static bool isGenericIntrinsic(FuncDecl *fn, CanType &input, CanType &output,
 }
 
 // Find library intrinsic function.
-static FuncDecl *findLibraryFunction(const ASTContext &ctx, FuncDecl *&cache, 
+static FuncDecl *findLibraryFunction(const ASTContext &ctx, FuncDecl *&cache,
                                      StringRef name, LazyResolver *resolver) {
   if (cache) return cache;
 
@@ -1372,7 +1372,7 @@ ArchetypeBuilder *ASTContext::getOrCreateArchetypeBuilder(
   auto builder = new ArchetypeBuilder(*mod, Diags);
   builder->addGenericSignature(sig, /*adoptArchetypes=*/false,
                                /*treatRequirementsAsExplicit=*/true);
-  
+
   // Store this archetype builder.
   Impl.ArchetypeBuilders[{sig, mod}]
     = std::unique_ptr<ArchetypeBuilder>(builder);
@@ -1645,11 +1645,11 @@ size_t ASTContext::getTotalMemory() const {
 
 size_t ASTContext::getSolverMemory() const {
   size_t Size = 0;
-  
+
   if (Impl.CurrentConstraintSolverArena) {
     Size += Impl.CurrentConstraintSolverArena->getTotalMemory();
   }
-  
+
   return Size;
 }
 
@@ -1727,7 +1727,7 @@ namespace {
     SourceFile &SF;
 
   public:
-    OrderDeclarationsWithSourceFileAndClassBias(SourceManager &srcMgr, 
+    OrderDeclarationsWithSourceFileAndClassBias(SourceManager &srcMgr,
                                                 SourceFile &sf)
       : SrcMgr(srcMgr), SF(sf) { }
 
@@ -2041,9 +2041,9 @@ static void removeValidObjCConflictingMethods(
                                    }
 
                                    return false;
-                                 } 
-                                 
-                                 if (auto ctor 
+                                 }
+
+                                 if (auto ctor
                                        = dyn_cast<ConstructorDecl>(method)) {
                                    if (ctor->hasStubImplementation())
                                      return true;
@@ -2059,7 +2059,7 @@ static void removeValidObjCConflictingMethods(
 /// Determine whether the should associate a conflict among the given
 /// set of methods with the specified source file.
 static bool shouldAssociateConflictWithSourceFile(
-              SourceFile &sf, 
+              SourceFile &sf,
               ArrayRef<AbstractFunctionDecl *> methods) {
   bool anyInSourceFile = false;
   bool anyInOtherSourceFile = false;
@@ -2079,7 +2079,7 @@ static bool shouldAssociateConflictWithSourceFile(
       anyInOtherSourceFile = true;
   }
 
-  return anyInSourceFile || 
+  return anyInSourceFile ||
     (!anyInOtherSourceFile && anyClassMethodsInSourceFile);
 }
 
@@ -3004,10 +3004,10 @@ CanSILBlockStorageType SILBlockStorageType::get(CanType captureType) {
   auto found = ctx.Impl.SILBlockStorageTypes.find(captureType);
   if (found != ctx.Impl.SILBlockStorageTypes.end())
     return CanSILBlockStorageType(found->second);
-  
+
   void *mem = ctx.Allocate(sizeof(SILBlockStorageType),
                            alignof(SILBlockStorageType));
-  
+
   SILBlockStorageType *storageTy = new (mem) SILBlockStorageType(captureType);
   ctx.Impl.SILBlockStorageTypes.insert({captureType, storageTy});
   return CanSILBlockStorageType(storageTy);
@@ -3018,10 +3018,10 @@ CanSILBoxType SILBoxType::get(CanType boxType) {
   auto found = ctx.Impl.SILBoxTypes.find(boxType);
   if (found != ctx.Impl.SILBoxTypes.end())
     return CanSILBoxType(found->second);
-  
+
   void *mem = ctx.Allocate(sizeof(SILBlockStorageType),
                            alignof(SILBlockStorageType));
-  
+
   auto storageTy = new (mem) SILBoxType(boxType);
   ctx.Impl.SILBoxTypes.insert({boxType, storageTy});
   return CanSILBoxType(storageTy);
@@ -3100,7 +3100,7 @@ ArraySliceType *ArraySliceType::get(Type base) {
 }
 
 DictionaryType *DictionaryType::get(Type keyType, Type valueType) {
-  auto properties = keyType->getRecursiveProperties() 
+  auto properties = keyType->getRecursiveProperties()
                   | valueType->getRecursiveProperties();
   auto arena = getArena(properties);
 
@@ -3110,7 +3110,7 @@ DictionaryType *DictionaryType::get(Type keyType, Type valueType) {
     = C.Impl.getArena(arena).DictionaryTypes[{keyType, valueType}];
   if (entry) return entry;
 
-  return entry = new (C, arena) DictionaryType(C, keyType, valueType, 
+  return entry = new (C, arena) DictionaryType(C, keyType, valueType,
                                                properties);
 }
 
@@ -3262,7 +3262,7 @@ CanArchetypeType ArchetypeType::getOpened(Type existential,
   if (knownID) {
     // ... and we already have an archetype for that ID, return it.
     auto found = openedExistentialArchetypes.find(*knownID);
-    
+
     if (found != openedExistentialArchetypes.end()) {
       auto result = found->second;
       assert(result->getOpenedExistentialType()->isEqual(existential) &&
@@ -3282,7 +3282,7 @@ CanArchetypeType ArchetypeType::getOpened(Type existential,
   // Tail-allocate space for the UUID.
   void *archetypeBuf = ctx.Allocate(sizeof(ArchetypeType) + sizeof(UUID),
                                     alignof(ArchetypeType), arena);
-  
+
   auto result = ::new (archetypeBuf) ArchetypeType(ctx, existential,
                                        ctx.AllocateCopy(conformsTo),
                                        existential->getSuperclass(nullptr));
@@ -3443,7 +3443,7 @@ void DeclName::initialize(ASTContext &C, Identifier baseName,
 DeclName::DeclName(ASTContext &C, Identifier baseName,
                    ParameterList *paramList) {
   SmallVector<Identifier, 4> names;
-  
+
   for (auto P : *paramList)
     names.push_back(P->getArgumentName());
   initialize(C, baseName, names);

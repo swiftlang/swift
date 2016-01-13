@@ -225,7 +225,7 @@ AliasResult AliasAnalysis::aliasAddressProjection(SILValue V1, SILValue V2,
 
     return AliasResult::MayAlias;
   }
-  
+
   assert(!Projection::isAddrProjection(O1) &&
          "underlying object may not be a projection");
   assert(!Projection::isAddrProjection(O2) &&

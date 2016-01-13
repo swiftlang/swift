@@ -456,7 +456,7 @@ AbstractionPattern AbstractionPattern::dropLastTupleElement() const {
     }
   }
   }
-  llvm_unreachable("bad kind");  
+  llvm_unreachable("bad kind");
 }
 
 AbstractionPattern AbstractionPattern::getLValueObjectType() const {
@@ -506,7 +506,7 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
     auto clangFunctionType = getClangFunctionType(getClangType());
     return AbstractionPattern(getGenericSignatureForFunctionComponent(),
                               getResultType(getType()),
-                              clangFunctionType->getReturnType().getTypePtr());    
+                              clangFunctionType->getReturnType().getTypePtr());
   }
   case Kind::CurriedObjCMethodType:
     return getPartialCurriedObjCMethod(

@@ -52,13 +52,13 @@ public:
     // emitParentMetadataRef.
 
     // Instantiation-specific.
-    
+
     // Reserve a word to cache the payload size if the type has dynamic layout.
     auto &strategy = getEnumImplStrategy(IGM,
            Target->DeclContext::getDeclaredTypeInContext()->getCanonicalType());
     if (strategy.needsPayloadSizeInMetadata())
       asImpl().addPayloadSize();
-    
+
     // Add fields for generic cases.
     if (auto generics = Target->getGenericParamsOfContext())
       asImpl().addGenericFields(*generics);

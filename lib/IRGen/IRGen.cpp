@@ -81,7 +81,7 @@ static void addSwiftStackPromotionPass(const PassManagerBuilder &Builder,
     PM.add(createSwiftStackPromotionPass());
 }
 
-// FIXME: Copied from clang/lib/CodeGen/CGObjCMac.cpp. 
+// FIXME: Copied from clang/lib/CodeGen/CGObjCMac.cpp.
 // These should be moved to a single definition shared by clang and swift.
 enum ImageInfoFlags {
   eImageInfo_FixAndContinue      = (1 << 0),
@@ -146,7 +146,7 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
     PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
                            addSwiftContractPass);
   }
-  
+
   // Configure the function passes.
   legacy::FunctionPassManager FunctionPasses(Module);
   FunctionPasses.add(createTargetTransformInfoWrapperPass(
@@ -381,7 +381,7 @@ static void embedBitcode(llvm::Module *M, const IRGenOptions &Opts)
 static void initLLVMModule(const IRGenModule &IGM) {
   auto *Module = IGM.getModule();
   assert(Module && "Expected llvm:Module for IR generation!");
-  
+
   Module->setTargetTriple(IGM.Triple.str());
 
   // Set the module's string representation.
@@ -414,7 +414,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
                   TargetMachine, SILMod, Opts.getSingleOutputFilename());
 
   initLLVMModule(IGM);
-  
+
   {
     SharedTimer timer("IRGen");
     // Emit the module contents.
@@ -521,22 +521,22 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
                                         StringRef ModuleName, int numThreads) {
 
   IRGenModuleDispatcher dispatcher;
-  
+
   auto OutputIter = Opts.OutputFilenames.begin();
   bool IGMcreated = false;
-  
+
   auto &Ctx = M->getASTContext();
   // Create an IRGenModule for each source file.
   for (auto *File : M->getFiles()) {
     auto nextSF = dyn_cast<SourceFile>(File);
     if (!nextSF || nextSF->ASTStage < SourceFile::TypeChecked)
       continue;
-    
+
     // Create a target machine.
     llvm::TargetMachine *TargetMachine = createTargetMachine(Opts, Ctx);
-    
+
     const llvm::DataLayout DataLayout = TargetMachine->createDataLayout();
-    
+
     LLVMContext *Context = new LLVMContext();
     const llvm::Triple &Triple = Ctx.LangOpts.Target;
 
@@ -547,7 +547,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
       Ctx.Diags.diagnose(SourceLoc(), diag::too_few_output_filenames);
       return;
     }
-  
+
     // Create the IR emitter.
     IRGenModule *IGM = new IRGenModule(dispatcher, nextSF, Ctx, *Context,
                                        Opts, ModuleName, DataLayout, Triple,
@@ -556,7 +556,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
 
     initLLVMModule(*IGM);
   }
-  
+
   if (!IGMcreated) {
     // TODO: Check this already at argument parsing.
     Ctx.Diags.diagnose(SourceLoc(), diag::no_input_files_for_mt);
@@ -565,7 +565,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
 
   // Emit the module contents.
   dispatcher.emitGlobalTopLevel();
-  
+
   for (auto *File : M->getFiles()) {
     if (SourceFile *SF = dyn_cast<SourceFile>(File)) {
       IRGenModule *IGM = dispatcher.getGenModule(SF);
@@ -576,7 +576,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
       });
     }
   }
-  
+
   IRGenModule *PrimaryGM = dispatcher.getPrimaryIGM();
 
   // Emit protocol conformances.
@@ -584,19 +584,19 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
 
   // Okay, emit any definitions that we suddenly need.
   dispatcher.emitLazyDefinitions();
-  
+
  // Emit symbols for eliminated dead methods.
   PrimaryGM->emitVTableStubs();
-    
+
   // Verify type layout if we were asked to.
   if (!Opts.VerifyTypeLayoutNames.empty())
     PrimaryGM->emitTypeVerifier();
-  
+
   std::for_each(Opts.LinkLibraries.begin(), Opts.LinkLibraries.end(),
                 [&](LinkLibrary linkLib) {
                   PrimaryGM->addLinkLibrary(linkLib);
                 });
-  
+
   // Hack to handle thunks eagerly synthesized by the Clang importer.
   swift::Module *prev = nullptr;
   for (auto external : Ctx.ExternalDefinitions) {
@@ -604,15 +604,15 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     if (next == prev)
       continue;
     prev = next;
-    
+
     if (next->getName() == M->getName())
       continue;
-    
+
     next->collectLinkLibraries([&](LinkLibrary linkLib) {
       PrimaryGM->addLinkLibrary(linkLib);
     });
   }
-  
+
   llvm::StringSet<> referencedGlobals;
 
   for (auto it = dispatcher.begin(); it != dispatcher.end(); ++it) {
@@ -636,7 +636,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   for (auto it = dispatcher.begin(); it != dispatcher.end(); ++it) {
     IRGenModule *IGM = it->second;
     llvm::Module *M = IGM->getModule();
-    
+
     // Update the linkage of shared functions/globals.
     // If a shared function/global is referenced from another file it must have
     // weak instead of linkonce linkage. Otherwise LLVM would remove the

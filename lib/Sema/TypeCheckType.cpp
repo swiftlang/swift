@@ -46,7 +46,7 @@ Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType) {
   return ArraySliceType::get(elementType);
 }
 
-Type TypeChecker::getDictionaryType(SourceLoc loc, Type keyType, 
+Type TypeChecker::getDictionaryType(SourceLoc loc, Type keyType,
                                     Type valueType) {
   if (!Context.getDictionaryDecl()) {
     diagnose(loc, diag::sugar_type_not_found, 3);
@@ -177,7 +177,7 @@ void TypeChecker::forceExternalDeclMembers(NominalTypeDecl *nominalDecl) {
   if (nominalDecl->hasDelayedMemberDecls()) {
     nominalDecl->forceDelayed();
   }
-  
+
   if (nominalDecl->hasDelayedMembers()) {
     this->handleExternalDecl(nominalDecl);
     nominalDecl->setHasDelayedMembers(false);
@@ -210,9 +210,9 @@ Type TypeChecker::resolveTypeInContext(
   // a generic type with no generic arguments or a non-generic type, use the
   // type within the context.
   if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
-    
+
     forceExternalDeclMembers(nominal);
-    
+
     if (!nominal->getGenericParams() || !isSpecialized) {
       for (DeclContext *dc = fromDC; dc; dc = dc->getParent()) {
         switch (dc->getContextKind()) {
@@ -228,7 +228,7 @@ Type TypeChecker::resolveTypeInContext(
           if (cast<NominalTypeDecl>(dc) == nominal)
             return resolver->resolveTypeOfContext(nominal);
           continue;
-            
+
         case DeclContextKind::ExtensionDecl:
           // If this is an extension of our nominal type, return the type
           // within the context of its extension.
@@ -591,7 +591,7 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
       comp->setValue(nominal);
       return type;
     }
-    
+
     // Fallback.
     SourceLoc L = comp->getIdLoc();
     SourceRange R = SourceRange(comp->getIdLoc());
@@ -763,7 +763,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   // declaration context.
   if (unsatisfiedDependency &&
       (*unsatisfiedDependency)(
-        requestUnqualifiedLookupInDeclContext({ lookupDC, 
+        requestUnqualifiedLookupInDeclContext({ lookupDC,
                                                 comp->getIdentifier(),
                                                 comp->getIdLoc() })))
     return nullptr;
@@ -787,7 +787,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     auto typeDecl = dyn_cast<TypeDecl>(result.Decl);
     if (!typeDecl)
       continue;
-    
+
     // If necessary, add delayed members to the declaration.
     if (auto nomDecl = dyn_cast<NominalTypeDecl>(typeDecl)) {
       TC.forceExternalDeclMembers(nomDecl);
@@ -1203,7 +1203,7 @@ Type TypeChecker::resolveIdentifierType(
   auto ComponentRange = IdType->getComponentRange();
   auto Components = llvm::makeArrayRef(ComponentRange.begin(),
                                        ComponentRange.end());
-  Type result = resolveIdentTypeComponent(*this, DC, Components, options, 
+  Type result = resolveIdentTypeComponent(*this, DC, Components, options,
                                           diagnoseErrors, resolver,
                                           unsatisfiedDependency);
   if (!result) return nullptr;
@@ -1237,7 +1237,7 @@ Type TypeChecker::resolveIdentifierType(
     Components.back()->setInvalid();
     return ErrorType::get(Context);
   }
-  
+
   return result;
 }
 
@@ -1246,7 +1246,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
                                GenericTypeResolver *resolver,
                                UnsatisfiedDependency *unsatisfiedDependency) {
   // FIXME: Verify that these aren't circular and infinite size.
-  
+
   // If we've already validated this type, don't do so again.
   if (Loc.wasValidated())
     return Loc.isError();
@@ -1355,7 +1355,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
 
   TypeResolver typeResolver(*this, DC, resolver, unsatisfiedDependency);
   auto result = typeResolver.resolveType(TyR, options);
-  
+
   // If we resolved down to an error, make sure to mark the typeRepr as invalid
   // so we don't produce a redundant diagnostic.
   if (result && result->is<ErrorType>())
@@ -1450,10 +1450,10 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // The type we're working with, in case we want to build it differently
   // based on the attributes we see.
   Type ty;
-  
+
   // In SIL *only*, allow @thin, @thick, or @objc_metatype to apply to
   // a metatype.
-  if (attrs.has(TAK_thin) || attrs.has(TAK_thick) || 
+  if (attrs.has(TAK_thin) || attrs.has(TAK_thick) ||
       attrs.has(TAK_objc_metatype)) {
     if (auto SF = DC->getParentSourceFile()) {
       if (SF->Kind == SourceFileKind::SIL) {
@@ -1484,9 +1484,9 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           // Check for @thick.
           if (attrs.has(TAK_thick)) {
             if (storedRepr)
-              TC.diagnose(repr->getStartLoc(), 
+              TC.diagnose(repr->getStartLoc(),
                           diag::sil_metatype_multiple_reprs);
-              
+
             storedRepr = MetatypeRepresentation::Thick;
             attrs.clearAttribute(TAK_thick);
           }
@@ -1494,9 +1494,9 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           // Check for @objc_metatype.
           if (attrs.has(TAK_objc_metatype)) {
             if (storedRepr)
-              TC.diagnose(repr->getStartLoc(), 
+              TC.diagnose(repr->getStartLoc(),
                           diag::sil_metatype_multiple_reprs);
-              
+
             storedRepr = MetatypeRepresentation::ObjC;
             attrs.clearAttribute(TAK_objc_metatype);
           }
@@ -1527,14 +1527,14 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       attrs.clearAttribute(attr);
     }
   };
-  
+
   // Some function representation attributes are not supported at source level;
   // only SIL knows how to handle them.  Reject them unless this is a SIL input.
   if (!(options & TR_SILType)) {
     for (auto silOnlyAttr : {TAK_callee_owned, TAK_callee_guaranteed}) {
       checkUnsupportedAttr(silOnlyAttr);
     }
-  }  
+  }
 
   // Other function representation attributes are not normally supported at
   // source level, but we want to support them there in SIL files.
@@ -1544,7 +1544,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       checkUnsupportedAttr(silOnlyAttr);
     }
   }
-  
+
   bool hasFunctionAttr = false;
   for (auto i : FunctionAttrs)
     if (attrs.has(i)) {
@@ -1565,7 +1565,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         .highlight(attrs.getLoc(TAK_thin));
       thin = false;
     }
-    
+
     bool isNoEscape = attrs.has(TAK_noescape);
 
     auto calleeConvention = ParameterConvention::Direct_Unowned;
@@ -1602,7 +1602,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         } else {
           rep = *parsedRep;
         }
-        
+
         // Don't allow both @convention and the old representation attrs.
         if (attrs.has(TAK_thin)) {
           TC.diagnose(attrs.getLoc(TAK_thin),
@@ -1630,11 +1630,11 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           rep = SILFunctionType::Representation::Thick;
         }
       }
-      
+
       // Resolve the function type directly with these attributes.
       SILFunctionType::ExtInfo extInfo(rep,
                                        attrs.has(TAK_noreturn));
-      
+
       ty = resolveSILFunctionType(fnRepr, options, extInfo, calleeConvention);
       if (!ty || ty->is<ErrorType>()) return ty;
     } else {
@@ -1655,7 +1655,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         } else {
           rep = *parsedRep;
         }
-        
+
         // Don't allow both @convention and the old representation attrs.
         if (attrs.has(TAK_thin)) {
           TC.diagnose(attrs.getLoc(TAK_thin),
@@ -1672,19 +1672,19 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                           StringRef oldName,
                                           StringRef newName) {
           auto start = attrs.getLoc(kind);
-          
+
           SmallString<32> fixitString;
           {
             llvm::raw_svector_ostream os(fixitString);
             os << "convention(" << newName << ")";
           }
-          
+
           TC.diagnose(start, diag::deprecated_convention_attribute,
                       oldName, newName)
             .highlight(start)
             .fixItReplace(start, fixitString);
         };
-      
+
         // Handle the old attributes.
         if (thin) {
           rep = FunctionType::Representation::Thin;
@@ -1696,7 +1696,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           rep = FunctionType::Representation::Swift;
         }
       }
-      
+
       // Resolve the function type directly with these attributes.
       FunctionType::ExtInfo extInfo(rep,
                                     attrs.has(TAK_noreturn),
@@ -1718,7 +1718,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         attrs.clearAttribute(i);
       }
     }
-  } 
+  }
 
   // If we didn't build the type differently above, build it normally now.
   if (!ty) ty = resolveType(repr, options);
@@ -1747,19 +1747,19 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       }
     }
   }
-  
+
   // In SIL *only*, allow @block_storage to specify a block storage type.
   if ((options & TR_SILType) && attrs.has(TAK_block_storage)) {
     ty = SILBlockStorageType::get(ty->getCanonicalType());
     attrs.clearAttribute(TAK_block_storage);
   }
-  
+
   // In SIL *only*, allow @box to specify a box type.
   if ((options & TR_SILType) && attrs.has(TAK_box)) {
     ty = SILBoxType::get(ty->getCanonicalType());
     attrs.clearAttribute(TAK_box);
   }
-  
+
   for (unsigned i = 0; i != TypeAttrKind::TAK_Count; ++i)
     if (attrs.has((TypeAttrKind)i))
       TC.diagnose(attrs.getLoc((TypeAttrKind)i),
@@ -1779,7 +1779,7 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   if (!outputTy || outputTy->is<ErrorType>()) return outputTy;
 
   extInfo = extInfo.withThrows(repr->throws());
-  
+
   // SIL uses polymorphic function types to resolve overloaded member functions.
   if (auto generics = repr->getGenericParams()) {
     return PolymorphicFunctionType::get(inputTy, outputTy, generics, extInfo);
@@ -1806,7 +1806,7 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   case AnyFunctionType::Representation::Swift:
     break;
   }
-  
+
   return fnTy;
 }
 
@@ -1879,7 +1879,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     genericSig
       = repr->getGenericParams()->getAsCanonicalGenericSignature(archetypeMap,
                                                                  Context);
-    
+
     auto getArchetypesAsDependentTypes = [&](Type t) -> Type {
       if (!t) return t;
       if (auto arch = t->getAs<ArchetypeType>()) {
@@ -1891,7 +1891,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       }
       return t;
     };
-    
+
     for (auto &param : params) {
       auto transParamType =
         param.getType().transform(getArchetypesAsDependentTypes)
@@ -2092,7 +2092,7 @@ Type TypeResolver::resolveInOutType(InOutTypeRepr *repr,
     repr->setInvalid();
     return ErrorType::get(Context);
   }
-  
+
   return InOutType::get(ty);
 }
 
@@ -2118,8 +2118,8 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
 
   Type valueTy = resolveType(repr->getValue(), withoutContext(options));
   if (!valueTy || valueTy->is<ErrorType>()) return valueTy;
-  
-  if (auto dictTy = TC.getDictionaryType(repr->getBrackets().Start, keyTy, 
+
+  if (auto dictTy = TC.getDictionaryType(repr->getBrackets().Start, keyTy,
                                          valueTy)) {
     // Check the requirements on the generic arguments.
     auto unboundTy = UnboundGenericType::get(TC.Context.getDictionaryDecl(),
@@ -2171,13 +2171,13 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
                                     TypeResolutionOptions options) {
   SmallVector<TupleTypeElt, 8> elements;
   elements.reserve(repr->getElements().size());
-  
+
   // If this is the top level of a function input list, peel off the
   // ImmediateFunctionInput marker and install a FunctionInput one instead.
   auto elementOptions = withoutContext(options);
   if (options & TR_ImmediateFunctionInput)
     elementOptions |= TR_FunctionInput;
-  
+
   for (auto tyR : repr->getElements()) {
     if (NamedTypeRepr *namedTyR = dyn_cast<NamedTypeRepr>(tyR)) {
       Type ty = resolveType(namedTyR->getTypeRepr(), elementOptions);
@@ -2201,7 +2201,7 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
       TC.diagnose(repr->getEllipsisLoc(), diag::tuple_ellipsis);
       repr->removeEllipsis();
       complained = true;
-    } 
+    }
 
     // Single-element labeled tuples are not permitted, either.
     if (elements.size() == 1 && elements[0].hasName() &&
@@ -2255,7 +2255,7 @@ Type TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
   if (!ty || ty->is<ErrorType>()) return ty;
 
   Optional<MetatypeRepresentation> storedRepr;
-  
+
   // In SIL mode, a metatype must have a @thin, @thick, or
   // @objc_metatype attribute, so metatypes should have been lowered
   // in resolveAttributedType.
@@ -2286,7 +2286,7 @@ Type TypeResolver::resolveProtocolType(ProtocolTypeRepr *repr,
   if (!ty || ty->is<ErrorType>()) return ty;
 
   Optional<MetatypeRepresentation> storedRepr;
-  
+
   // In SIL mode, a metatype must have a @thin, @thick, or
   // @objc_metatype attribute, so metatypes should have been lowered
   // in resolveAttributedType.
@@ -2445,7 +2445,7 @@ static bool isParamListRepresentableInObjC(TypeChecker &TC,
   unsigned NumParams = PL->size();
   for (unsigned ParamIndex = 0; ParamIndex != NumParams; ParamIndex++) {
     auto param = PL->get(ParamIndex);
-    
+
     // Swift Varargs are not representable in Objective-C.
     if (param->isVariadic()) {
       if (Diagnose && Reason != ObjCReason::DoNotDiagnose) {
@@ -2454,13 +2454,13 @@ static bool isParamListRepresentableInObjC(TypeChecker &TC,
           .highlight(param->getSourceRange());
         describeObjCReason(TC, AFD, Reason);
       }
-      
+
       return false;
     }
-    
+
     if (TC.isRepresentableInObjC(AFD, param->getType()))
       continue;
-    
+
     // Permit '()' when this method overrides a method with a
     // foreign error convention that replaces NSErrorPointer with ()
     // and this is the replaced parameter.
@@ -2633,7 +2633,7 @@ bool TypeChecker::isRepresentableInObjC(
       if (!storage->isObjC()) {
         if (Diagnose) {
           auto error = FD->isGetter()
-                    ? (isa<VarDecl>(storage) 
+                    ? (isa<VarDecl>(storage)
                          ? diag::objc_getter_for_nonobjc_property
                          : diag::objc_getter_for_nonobjc_subscript)
                     : (isa<VarDecl>(storage)
@@ -2830,11 +2830,11 @@ bool TypeChecker::isRepresentableInObjC(
         // It can't be a trailing closure unless it has a specific form.
         // Only consider the rvalue type.
         type = type->getRValueType();
-        
+
         // Look through one level of optionality.
         if (auto objectType = type->getAnyOptionalObjectType())
           type = objectType;
-        
+
         // Is it a function type?
         if (!type->is<AnyFunctionType>()) break;
         --errorParameterIndex;
@@ -2945,7 +2945,7 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
     if (TupleTy->getNumElements() == 1 && !TupleTy->getElement(0).isVararg())
       IndicesType = TupleTy->getElementType(0);
   }
-  
+
   if (IndicesType->is<ErrorType>())
     return false;
 
@@ -3045,7 +3045,7 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
     // If the type was imported from Clang, it is representable in Objective-C.
     if (NTD->hasClangNode())
       return true;
-    
+
     // If the type is @objc, it is representable in Objective-C.
     if (NTD->isObjC())
       return true;
@@ -3182,7 +3182,7 @@ bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
     case AnyFunctionType::Representation::CFunctionPointer:
       break;
     }
-    
+
     Type Input = FT->getInput();
     if (auto InputTuple = Input->getAs<TupleType>()) {
       for (auto &Elt : InputTuple->getElements()) {
@@ -3371,7 +3371,7 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
     lookupAndAddLibraryTypes(*this, FoundationModule, StdlibTypeNames,
                              ObjCMappedTypes);
   }
-  
+
   // Pull SIMD types of size 2...4 from the SIMD module, if it exists.
   Identifier ID_SIMD = Context.Id_simd;
   if (auto SIMDModule = Context.getLoadedModule(ID_SIMD)) {

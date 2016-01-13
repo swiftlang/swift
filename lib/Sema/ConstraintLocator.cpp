@@ -131,7 +131,7 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       out << "comparing call argument #" << llvm::utostr(elt.getValue())
           << " to parameter #" << llvm::utostr(elt.getValue2());
       break;
-        
+
     case ClosureResult:
       out << "closure result";
       break;
@@ -183,7 +183,7 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
     case UnresolvedMember:
       out << "unresolved member";
       break;
-        
+
     case ParentType:
       out << "parent type";
       break;
@@ -220,7 +220,7 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       out << "witness ";
       elt.getWitness()->dumpRef(out);
       break;
-        
+
     case OpenedGeneric:
       out << "opened generic";
       break;

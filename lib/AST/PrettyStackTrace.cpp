@@ -68,7 +68,7 @@ void swift::printDeclDescription(llvm::raw_ostream &out, const Decl *D,
             out << "mutableAddressor";
             break;
           }
-          
+
           out << " for " << ASD->getFullName();
           hasPrintedName = true;
         }

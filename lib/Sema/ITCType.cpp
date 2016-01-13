@@ -74,7 +74,7 @@ void IterativeTypeChecker::processResolveTypeRepr(
   auto typeRepr = std::get<0>(payload);
   auto dc = std::get<1>(payload);
   auto options = static_cast<TypeResolutionOptions>(std::get<2>(payload));
-  
+
   // FIXME: TypeChecker::resolveType() is mostly non-ad-hoc-recursive
   // when given an UnsatisfiedDependency.
   TC.resolveType(typeRepr, dc, options, nullptr, &unsatisfiedDependency);

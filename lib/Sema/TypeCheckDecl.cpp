@@ -53,7 +53,7 @@ struct RawValueKey {
   enum class Kind : uint8_t {
     String, Float, Int, Tombstone, Empty
   } kind;
-  
+
   struct IntValueTy {
     uint64_t v0;
     uint64_t v1;
@@ -79,7 +79,7 @@ struct RawValueKey {
     IntValueTy intValue;
     FloatValueTy floatValue;
   };
-  
+
   explicit RawValueKey(LiteralExpr *expr) {
     switch (expr->getKind()) {
     case ExprKind::IntegerLiteral:
@@ -117,13 +117,13 @@ struct RawValueKey {
       llvm_unreachable("not a valid literal expr for raw value");
     }
   }
-  
+
   explicit RawValueKey(Kind k) : kind(k) {
     assert((k == Kind::Tombstone || k == Kind::Empty)
            && "this ctor is only for creating DenseMap special values");
   }
 };
-  
+
 /// Used during enum raw value checking to identify the source of a raw value,
 /// which may have been derived by auto-incrementing, for diagnostic purposes.
 struct RawValueSource {
@@ -185,7 +185,7 @@ public:
     }
   }
 };
-  
+
 } // end llvm namespace
 
 /// Determine whether the given declaration can inherit a class.
@@ -405,7 +405,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       allProtocols.insert(protocols.begin(), protocols.end());
       continue;
     }
-    
+
     // If this is an enum inheritance clause, check for a raw type.
     if (isa<EnumDecl>(decl)) {
       // Check if we already had a raw type.
@@ -416,7 +416,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
         inherited.setInvalidType(Context);
         continue;
       }
-      
+
       // If this is not the first entry in the inheritance clause, complain.
       if (i > 0) {
         SourceLoc afterPriorLoc
@@ -439,7 +439,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       // Record the raw type.
       superclassTy = inheritedTy;
       superclassRange = inherited.getSourceRange();
-      
+
       // Add the RawRepresentable conformance implied by the raw type.
       allProtocols.insert(getProtocol(decl->getLoc(),
                                       KnownProtocolKind::RawRepresentable));
@@ -575,7 +575,7 @@ static ArrayRef<EnumDecl *> getInheritedForCycleCheck(TypeChecker &tc,
                                                       EnumDecl *enumDecl,
                                                       EnumDecl **scratch) {
   tc.checkInheritanceClause(enumDecl);
-  
+
   if (enumDecl->hasRawType()) {
     *scratch = enumDecl->getRawType()->getEnumOrBoundGenericEnum();
     return *scratch ? ArrayRef<EnumDecl*>(*scratch) : ArrayRef<EnumDecl*>{};
@@ -738,7 +738,7 @@ static void markInvalidGenericSignature(ValueDecl *VD,
     genericParams = AFD->getGenericParams();
   else
     genericParams = cast<NominalTypeDecl>(VD)->getGenericParams();
-  
+
   // If there aren't any generic parameters at this level, we're done.
   if (genericParams == nullptr)
     return;
@@ -748,11 +748,11 @@ static void markInvalidGenericSignature(ValueDecl *VD,
 
   if (auto sig = DC->getGenericSignatureOfContext())
     builder.addGenericSignature(sig, true);
-  
+
   // Visit each of the generic parameters.
   for (auto param : *genericParams)
     builder.addGenericParameter(param);
-  
+
   // Wire up the archetypes.
   for (auto GP : *genericParams)
     GP->setArchetype(builder.getArchetype(GP));
@@ -904,14 +904,14 @@ static bool isDefaultInitializable(TypeRepr *typeRepr) {
     // Weak ownership implies optionality.
     if (attributed->getAttrs().getOwnership() == Ownership::Weak)
       return true;
-    
+
     return isDefaultInitializable(attributed->getTypeRepr());
   }
 
   // Look through named types.
   if (auto named = dyn_cast<NamedTypeRepr>(typeRepr))
     return isDefaultInitializable(named->getTypeRepr());
-  
+
   // Optional types are default-initializable.
   if (isa<OptionalTypeRepr>(typeRepr) ||
       isa<ImplicitlyUnwrappedOptionalTypeRepr>(typeRepr))
@@ -976,7 +976,7 @@ static bool isDefaultInitializable(PatternBindingDecl *pbd) {
     // Otherwise, we can't default initialize this binding.
     return false;
   }
-  
+
   return true;
 }
 
@@ -1125,20 +1125,20 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
 
 /// Does the context allow pattern bindings that don't bind any variables?
 static bool contextAllowsPatternBindingWithoutVariables(DeclContext *dc) {
-  
+
   // Property decls in type context must bind variables.
   if (dc->isTypeContext())
     return false;
-  
+
   // Global variable decls must bind variables, except in scripts.
   if (dc->isModuleScopeContext()) {
     if (dc->getParentSourceFile()
         && dc->getParentSourceFile()->isScriptMode())
       return true;
-    
+
     return false;
   }
-  
+
   return true;
 }
 
@@ -1150,7 +1150,7 @@ static void validatePatternBindingDecl(TypeChecker &tc,
   if (binding->getPattern(entryNumber)->hasType() ||
       binding->isBeingTypeChecked())
     return;
-  
+
   binding->setIsBeingTypeChecked();
 
   // On any path out of this function, make sure to mark the binding as done
@@ -1329,7 +1329,7 @@ Type swift::configureImplicitSelf(TypeChecker &tc,
   // neither inout.
   selfDecl->setLet(!selfTy->is<InOutType>());
   selfDecl->overwriteType(selfTy);
-  
+
   // Install the self type on the Parameter that contains it.  This ensures that
   // we don't lose it when generic types get reverted.
   selfDecl->getTypeLoc() = TypeLoc::withoutLoc(selfTy);
@@ -2187,7 +2187,7 @@ static void checkObjCBridgingFunctions(TypeChecker &TC,
   assert(mod);
   Module::AccessPathTy unscopedAccess = {};
   SmallVector<ValueDecl *, 4> results;
-  
+
   auto &Ctx = TC.Context;
   mod->lookupValue(unscopedAccess, Ctx.getIdentifier(bridgedTypeName),
                    NLKind::QualifiedLookup, results);
@@ -2195,7 +2195,7 @@ static void checkObjCBridgingFunctions(TypeChecker &TC,
                    NLKind::QualifiedLookup, results);
   mod->lookupValue(unscopedAccess, Ctx.getIdentifier(reverseConversion),
                    NLKind::QualifiedLookup, results);
-  
+
   for (auto D : results)
     TC.validateDecl(D);
 }
@@ -2203,9 +2203,9 @@ static void checkObjCBridgingFunctions(TypeChecker &TC,
 static void checkBridgedFunctions(TypeChecker &TC) {
   if (TC.HasCheckedBridgeFunctions)
     return;
-  
+
   TC.HasCheckedBridgeFunctions = true;
-  
+
   #define BRIDGE_TYPE(BRIDGED_MOD, BRIDGED_TYPE, _, NATIVE_TYPE, OPT) \
   Identifier ID_##BRIDGED_MOD = TC.Context.getIdentifier(#BRIDGED_MOD);\
   if (Module *module = TC.Context.getLoadedModule(ID_##BRIDGED_MOD)) {\
@@ -2214,7 +2214,7 @@ static void checkBridgedFunctions(TypeChecker &TC) {
     "_convert" #NATIVE_TYPE "To" #BRIDGED_TYPE); \
   }
   #include "swift/SIL/BridgedTypes.def"
-  
+
   if (Module *module = TC.Context.getLoadedModule(ID_Foundation)) {
     checkObjCBridgingFunctions(TC, module, "NSArray",
                                "_convertNSArrayToArray",
@@ -2419,7 +2419,7 @@ static LiteralExpr *getAutomaticRawValueExpr(TypeChecker &TC,
       return new (TC.Context) IntegerLiteralExpr("0", SourceLoc(),
                                                  /*Implicit=*/true);
     }
-    
+
     if (auto intLit = dyn_cast<IntegerLiteralExpr>(prevValue)) {
       APInt nextVal = intLit->getValue() + 1;
       bool negative = nextVal.slt(0);
@@ -2518,7 +2518,7 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
   for (auto elt : ED->getAllElements()) {
     // Make sure the element is checked out before we poke at it.
     TC.validateDecl(elt);
-    
+
     if (elt->isInvalid())
       continue;
 
@@ -2530,7 +2530,7 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
                   diag::enum_raw_type_here, rawTy);
       continue;
     }
-    
+
     // Check the raw value expr, if we have one.
     if (auto *rawValue = elt->getRawValueExpr()) {
       Expr *typeCheckedExpr = rawValue;
@@ -2652,7 +2652,7 @@ public:
       : TC(TC), IsFirstPass(IsFirstPass), IsSecondPass(IsSecondPass) {}
 
   void visit(Decl *decl) {
-    
+
     DeclVisitor<DeclChecker>::visit(decl);
 
     if (auto valueDecl = dyn_cast<ValueDecl>(decl)) {
@@ -2732,7 +2732,7 @@ public:
   void visitGenericTypeParamDecl(GenericTypeParamDecl *D) {
     llvm_unreachable("cannot reach here");
   }
-  
+
   void visitImportDecl(ImportDecl *ID) {
     TC.checkDeclAttributesEarly(ID);
     TC.checkDeclAttributes(ID);
@@ -2827,7 +2827,7 @@ public:
 
     // Note: The Else body is type checked when the enclosing BraceStmt is
     // checked.
-    
+
     if (PBD->isInvalid() || PBD->isBeingTypeChecked())
       return;
 
@@ -2881,9 +2881,9 @@ public:
     // uninitialized vars are not allowed.
     for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
       auto entry = PBD->getPatternList()[i];
-    
+
       if (entry.getInit() || isInSILMode) continue;
-      
+
       entry.getPattern()->forEachVariable([&](VarDecl *var) {
         // If the variable has no storage, it never needs an initializer.
         if (!var->hasStorage())
@@ -3051,19 +3051,19 @@ public:
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     if (TAD->isBeingTypeChecked()) {
-      
+
       if (!TAD->hasUnderlyingType()) {
         TAD->setInvalid();
         TAD->overwriteType(ErrorType::get(TC.Context));
         TAD->getUnderlyingTypeLoc().setInvalidType(TC.Context);
-        
+
         TC.diagnose(TAD->getLoc(), diag::circular_type_alias, TAD->getName());
       }
       return;
     }
-    
+
     TAD->setIsBeingTypeChecked();
-    
+
     TC.checkDeclAttributesEarly(TAD);
     TC.computeAccessibility(TAD);
     if (!IsSecondPass) {
@@ -3075,7 +3075,7 @@ public:
         options |= TR_GlobalTypeAlias;
       if (TAD->getFormalAccess() == Accessibility::Private)
         options |= TR_KnownNonCascadingDependency;
-      
+
       if (TAD->getDeclContext()->isModuleScopeContext()) {
         IterativeTypeChecker ITC(TC);
         ITC.satisfy(requestResolveTypeDecl(TAD));
@@ -3100,10 +3100,10 @@ public:
       checkAccessibility(TC, TAD);
 
     TC.checkDeclAttributes(TAD);
-    
+
     TAD->setIsBeingTypeChecked(false);
   }
-  
+
   void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
     if (assocType->isBeingTypeChecked()) {
 
@@ -3225,12 +3225,12 @@ public:
 
       checkExplicitConformance(ED, ED->getDeclaredTypeInContext());
     }
-    
+
     for (Decl *member : ED->getMembers())
       visit(member);
     for (Decl *global : ED->getDerivedGlobalDecls())
       visit(global);
-    
+
 
     TC.checkDeclAttributes(ED);
   }
@@ -3313,7 +3313,7 @@ public:
       if (!pbd)
         continue;
 
-      if (pbd->isStatic() || !pbd->hasStorage() || 
+      if (pbd->isStatic() || !pbd->hasStorage() ||
           isDefaultInitializable(pbd) || pbd->isInvalid())
         continue;
 
@@ -3476,7 +3476,7 @@ public:
     }
 
     PD->setIsBeingTypeChecked();
-    
+
     TC.validateDecl(PD);
 
     {
@@ -3594,9 +3594,9 @@ public:
       } else if (e - i - 1 == 0 && outerGenericParams) {
         params = outerGenericParams;
       }
-      
+
       auto Info = TC.applyFunctionTypeAttributes(FD, i);
-      
+
       if (params) {
         funcTy = PolymorphicFunctionType::get(argTy, funcTy, params, Info);
       } else {
@@ -3741,7 +3741,7 @@ public:
     auto typeRepr = func->getBodyResultTypeLoc().getTypeRepr();
     if (!typeRepr)
       return false;
-      
+
     return checkDynamicSelfReturn(func, typeRepr, 0);
   }
 
@@ -4023,7 +4023,7 @@ public:
         isObjC = None;
       markAsObjC(TC, FD, isObjC, errorConvention);
     }
-    
+
     inferDynamic(TC.Context, FD);
 
     TC.checkDeclAttributes(FD);
@@ -4154,18 +4154,18 @@ public:
     // Determine the input and result types of this function.
     auto fnType = type->castTo<AnyFunctionType>();
     Type inputType = fnType->getInput();
-    Type resultType = dropResultOptionality(fnType->getResult(), 
+    Type resultType = dropResultOptionality(fnType->getResult(),
                                             uncurryLevel - 1);
-    
+
     // Produce the resulting function type.
     if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
       return GenericFunctionType::get(genericFn->getGenericSignature(),
                                       inputType, resultType,
                                       fnType->getExtInfo());
     }
-    
-    assert(!isa<PolymorphicFunctionType>(fnType));  
-    return FunctionType::get(inputType, resultType, fnType->getExtInfo());    
+
+    assert(!isa<PolymorphicFunctionType>(fnType));
+    return FunctionType::get(inputType, resultType, fnType->getExtInfo());
   }
 
   /// Diagnose overrides of '(T) -> T?' with '(T!) -> T!'.
@@ -4214,7 +4214,7 @@ public:
 
     auto paramList = method->getParameterList(1);
     auto parentInput = parentTy->getInput();
-    
+
     if (auto parentTupleInput = parentInput->getAs<TupleType>()) {
       // FIXME: If we ever allow argument reordering, this is incorrect.
       ArrayRef<ParamDecl*> sharedParams = paramList->getArray();
@@ -4316,7 +4316,7 @@ public:
     if (auto *fd = dyn_cast<FuncDecl>(decl))
       if (fd->isAccessor())
         return false;
-    
+
     auto method = dyn_cast<AbstractFunctionDecl>(decl);
     ConstructorDecl *ctor = nullptr;
     if (method)
@@ -4431,7 +4431,7 @@ public:
         hadExactMatch = true;
         continue;
       }
-      
+
       // If this is a property, we accept the match and then reject it below if
       // the types don't line up, since you can't overload properties based on
       // types.
@@ -4462,7 +4462,7 @@ public:
         }
         TC.diagnose(parentDecl, diag::overridden_here_with_type,
                     parentDeclTy);
-        
+
         // Put an invalid 'override' attribute here.
         makeInvalidOverrideAttr(TC, decl);
 
@@ -4564,7 +4564,7 @@ public:
       // If this is an exact type match, we're successful!
       if (declTy->isEqual(matchType)) {
         // Nothing to do.
-        
+
       } else if (method) {
         // Private migration help for overrides of Objective-C methods.
         if ((!isa<FuncDecl>(method) || !cast<FuncDecl>(method)->isAccessor()) &&
@@ -4589,14 +4589,14 @@ public:
         auto propertyTy = property->getInterfaceType();
         auto parentPropertyTy = adjustSuperclassMemberDeclType(TC, matchDecl,
                                                                superclass);
-        
+
         if (!propertyTy->canOverride(parentPropertyTy, false, &TC)) {
           TC.diagnose(property, diag::override_property_type_mismatch,
                       property->getName(), propertyTy, parentPropertyTy);
           TC.diagnose(matchDecl, diag::property_override_here);
           return true;
         }
-        
+
         // Differing only in Optional vs. ImplicitlyUnwrappedOptional is fine.
         bool IsSilentDifference = false;
         if (auto propertyTyNoOptional = propertyTy->getAnyOptionalObjectType())
@@ -4604,7 +4604,7 @@ public:
               parentPropertyTy->getAnyOptionalObjectType())
             if (propertyTyNoOptional->isEqual(parentPropertyTyNoOptional))
               IsSilentDifference = true;
-        
+
         // The overridden property must not be mutable.
         if (cast<AbstractStorageDecl>(matchDecl)->getSetter() &&
             !IsSilentDifference) {
@@ -4748,7 +4748,7 @@ public:
       }
 
       // FIXME: Customize message to the kind of thing.
-      TC.diagnose(Override, diag::override_final, 
+      TC.diagnose(Override, diag::override_final,
                   Override->getDescriptiveKind());
       TC.diagnose(Base, diag::overridden_here);
     }
@@ -4870,7 +4870,7 @@ public:
     // Check property and subscript overriding.
     if (auto *baseASD = dyn_cast<AbstractStorageDecl>(base)) {
       auto *overrideASD = cast<AbstractStorageDecl>(override);
-      
+
       // Make sure that the overriding property doesn't have storage.
       if (overrideASD->hasStorage() && !overrideASD->hasObservers()) {
         TC.diagnose(overrideASD, diag::override_with_stored_property,
@@ -4903,8 +4903,8 @@ public:
         TC.diagnose(baseASD, diag::property_override_here);
         return true;
       }
-      
-      
+
+
       // Make sure a 'let' property is only overridden by 'let' properties.  A
       // let property provides more guarantees than the getter of a 'var'
       // property.
@@ -4915,7 +4915,7 @@ public:
         return true;
       }
     }
-    
+
     // Non-Objective-C declarations in extensions cannot override or
     // be overridden.
     if ((base->getDeclContext()->isExtensionContext() ||
@@ -4926,7 +4926,7 @@ public:
       TC.diagnose(base, diag::overridden_here);
       return true;
     }
-    
+
     // If the overriding declaration does not have the 'override' modifier on
     // it, complain.
     if (!override->getAttrs().hasAttribute<OverrideAttr>() &&
@@ -4966,7 +4966,7 @@ public:
     if (base->getAttrs().isUnavailable(TC.Context)) {
       TC.diagnose(override, diag::override_unavailable, override->getName());
     }
-    
+
     if (!TC.getLangOpts().DisableAvailabilityChecking) {
       diagnoseOverrideForAvailability(TC, override, base);
     }
@@ -5022,7 +5022,7 @@ public:
     } else {
       llvm_unreachable("Unexpected decl");
     }
-    
+
     return false;
   }
 
@@ -5063,16 +5063,16 @@ public:
 
     if (!EED->hasAccessibility())
       EED->setAccessibility(ED->getFormalAccess());
-    
+
     EED->setIsBeingTypeChecked();
 
     // Only attempt to validate the argument type or raw value if the element
     // is not currently being validated.
     if (EED->getRecursiveness() == ElementRecursiveness::NotRecursive) {
       EED->setRecursiveness(ElementRecursiveness::PotentiallyRecursive);
-      
+
       validateAttributes(TC, EED);
-      
+
       if (!EED->getArgumentTypeLoc().isNull()) {
         if (TC.validateType(EED->getArgumentTypeLoc(), EED->getDeclContext(),
                             TR_EnumCase)) {
@@ -5101,7 +5101,7 @@ public:
                 ElementRecursiveness::PotentiallyRecursive) {
       EED->setRecursiveness(ElementRecursiveness::Recursive);
     }
-    
+
     // If the element was not already marked as recursive by a re-entrant call,
     // we can be sure it's not recursive.
     if (EED->getRecursiveness() == ElementRecursiveness::PotentiallyRecursive) {
@@ -5192,7 +5192,7 @@ public:
     // See swift::performTypeChecking for TopLevelCodeDecl handling.
     llvm_unreachable("TopLevelCodeDecls are handled elsewhere");
   }
-  
+
   void visitIfConfigDecl(IfConfigDecl *ICD) {
     // The active members of the #if block will be type checked along with
     // their enclosing declaration.
@@ -5356,7 +5356,7 @@ public:
           CD->getOverriddenDecl()->getFailability() == OTK_None) {
         TC.diagnose(CD, diag::failable_initializer_override,
                     CD->getFullName());
-        TC.diagnose(CD->getOverriddenDecl(), 
+        TC.diagnose(CD->getOverriddenDecl(),
                     diag::nonfailable_initializer_override_here,
                     CD->getOverriddenDecl()->getFullName());
       }
@@ -5633,7 +5633,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
       break;
     }
-    
+
     // FIXME: Avoid full check in these cases?
     DeclContext *DC = typeParam->getDeclContext();
     switch (DC->getContextKind()) {
@@ -5658,7 +5658,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
     case DeclContextKind::ExtensionDecl:
       llvm_unreachable("not yet implemented");
-    
+
     case DeclContextKind::AbstractClosureExpr:
       llvm_unreachable("cannot have type params");
 
@@ -5679,7 +5679,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     }
     break;
   }
-  
+
   case DeclKind::Enum:
   case DeclKind::Struct:
   case DeclKind::Class: {
@@ -5745,8 +5745,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     if (proto->hasType())
       return;
     proto->computeType();
-    
-    
+
+
     auto gp = proto->getGenericParams();
 
     // Resolve the inheritance clauses for each of the associated
@@ -5816,7 +5816,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     ValidatedTypes.insert(proto);
     break;
   }
-      
+
   case DeclKind::Var:
   case DeclKind::Param: {
     auto VD = cast<VarDecl>(D);
@@ -5834,7 +5834,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         if (PBD->isInvalid() || !parentPattern->hasType()) {
           parentPattern->setType(ErrorType::get(Context));
           setBoundVarsTypeError(parentPattern, Context);
-          
+
           // If no type has been set for the initializer, we need to diagnose
           // the failure.
           if (VD->getParentInitializer() &&
@@ -5842,7 +5842,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
             diagnose(parentPattern->getLoc(), diag::identifier_init_failure,
                      parentPattern->getBoundName());
           }
-          
+
           return;
         }
       } else if (VD->isSelfParameter()) {
@@ -5856,7 +5856,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
           }
         } else {
           D->setType(ErrorType::get(Context));
-        }      
+        }
       } else {
         // FIXME: This case is hit when code completion occurs in a function
         // parameter list. Previous parameters are definitely in scope, but
@@ -5959,7 +5959,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
     break;
   }
-      
+
   case DeclKind::Func: {
     if (D->hasType())
       return;
@@ -6116,7 +6116,7 @@ static Type checkExtensionGenericParams(
                                                         genericArgs));
       }
     }
-    
+
     return builder.inferRequirements(extendedTypeInfer, genericParams);
   };
 
@@ -6362,16 +6362,16 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
     if (pbd->isStatic() || !pbd->hasStorage() || isDefaultInitializable(pbd) ||
         pbd->isInvalid())
       continue;
-   
+
     for (auto entry : pbd->getPatternList()) {
       if (entry.getInit()) continue;
-      
+
       SmallVector<VarDecl *, 4> vars;
       entry.getPattern()->collectVariables(vars);
       if (vars.empty()) continue;
 
       auto varLoc = vars[0]->getLoc();
-      
+
       Optional<InFlightDiagnostic> diag;
       switch (vars.size()) {
       case 1:
@@ -6384,12 +6384,12 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
         break;
       case 3:
         diag.emplace(tc.diagnose(varLoc, diag::note_no_in_class_init_3plus,
-                                 vars[0]->getName(), vars[1]->getName(), 
+                                 vars[0]->getName(), vars[1]->getName(),
                                  vars[2]->getName(), false));
         break;
       default:
         diag.emplace(tc.diagnose(varLoc, diag::note_no_in_class_init_3plus,
-                                 vars[0]->getName(), vars[1]->getName(), 
+                                 vars[0]->getName(), vars[1]->getName(),
                                  vars[2]->getName(), true));
         break;
       }
@@ -6519,7 +6519,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // If we already added implicit initializers, we're done.
   if (decl->addedImplicitInitializers())
     return;
-  
+
   // Don't add implicit constructors for an invalid declaration
   if (decl->isInvalid())
     return;
@@ -6569,7 +6569,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
         // to the memberwise initializer since they already have an initial
         // value that cannot be overridden.
         if (var->isLet() && var->getParentInitializer()) {
-          
+
           // We cannot handle properties like:
           //   let (a,b) = (1,2)
           // for now, just disable implicit init synthesization in structs in
@@ -6579,10 +6579,10 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
             SP = TP->getSubPattern();
           if (!isa<NamedPattern>(SP) && isa<StructDecl>(decl))
             return;
-          
+
           continue;
         }
-        
+
         FoundMemberwiseInitializedProperty = true;
       }
       continue;
@@ -6603,7 +6603,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
             if (vd->getAttrs().hasAttribute<NSManagedAttr>())
               CheckDefaultInitializer = false;
           });
-          
+
           // If we cannot default initialize the property, we cannot
           // synthesize a default initializer for the class.
           if (CheckDefaultInitializer && !isDefaultInitializable(pbd))
@@ -6630,7 +6630,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     }
     return;
   }
- 
+
   // For a class with a superclass, automatically define overrides
   // for all of the superclass's designated initializers.
   // FIXME: Currently skipping generic classes.
@@ -6746,7 +6746,7 @@ void TypeChecker::addImplicitEnumConformances(EnumDecl *ED) {
     elt->setTypeCheckedRawValueExpr(typeChecked);
     checkEnumElementErrorHandling(elt);
   }
-  
+
   // Type-check the protocol conformances of the enum decl to instantiate its
   // derived conformances.
   DeclChecker(*this, false, false)
@@ -6786,7 +6786,7 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
         // Check to see if this ctor has zero arguments, or if they all have
         // default values.
         auto params = ctor->getParameters();
-        
+
         bool missingInit = false;
         for (auto param : *params) {
           if (!param->isDefaultArgument()) {
@@ -6918,7 +6918,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
                     : isa<EnumElementDecl>(D)? 3
                     : 4;
           SourceLoc firstNameLoc = objcAttr->getNameLocs().front();
-          SourceLoc afterFirstNameLoc = 
+          SourceLoc afterFirstNameLoc =
             Lexer::getLocForEndOfToken(TC.Context.SourceMgr, firstNameLoc);
           TC.diagnose(firstNameLoc, diag::objc_name_req_nullary, which)
             .fixItRemoveChars(afterFirstNameLoc, objcAttr->getRParenLoc());
@@ -6946,10 +6946,10 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
 
         unsigned numArgumentNames = objcName->getNumArgs();
         if (numArgumentNames != numParameters) {
-          TC.diagnose(objcAttr->getNameLocs().front(), 
+          TC.diagnose(objcAttr->getNameLocs().front(),
                       diag::objc_name_func_mismatch,
-                      isa<FuncDecl>(func), 
-                      numArgumentNames, 
+                      isa<FuncDecl>(func),
+                      numArgumentNames,
                       numArgumentNames != 1,
                       numParameters,
                       numParameters != 1,
@@ -7031,12 +7031,12 @@ void TypeChecker::fixAbstractFunctionNames(InFlightDiagnostic &diag,
     return;
 
   auto name = func->getFullName();
-  
+
   // Fix the name of the function itself.
   if (name.getBaseName() != targetName.getBaseName()) {
     diag.fixItReplace(func->getLoc(), targetName.getBaseName().str());
   }
-  
+
   // Fix the argument names that need fixing.
   assert(name.getArgumentNames().size()
            == targetName.getArgumentNames().size());
@@ -7044,12 +7044,12 @@ void TypeChecker::fixAbstractFunctionNames(InFlightDiagnostic &diag,
   for (unsigned i = 0, n = name.getArgumentNames().size(); i != n; ++i) {
     auto origArg = name.getArgumentNames()[i];
     auto targetArg = targetName.getArgumentNames()[i];
-    
+
     if (origArg == targetArg)
       continue;
-    
+
     auto *param = params->get(i);
-    
+
     // The parameter has an explicitly-specified API name, and it's wrong.
     if (param->getArgumentNameLoc() != param->getLoc() &&
         param->getArgumentNameLoc().isValid()) {
@@ -7060,13 +7060,13 @@ void TypeChecker::fixAbstractFunctionNames(InFlightDiagnostic &diag,
                               param->getLoc());
         continue;
       }
-      
+
       // Fix the API name.
       StringRef targetArgStr = targetArg.empty()? "_" : targetArg.str();
       diag.fixItReplace(param->getArgumentNameLoc(), targetArgStr);
       continue;
     }
-    
+
     // The parameter did not specify a separate API name. Insert one.
     if (targetArg.empty())
       diag.fixItInsert(param->getLoc(), "_ ");
@@ -7079,7 +7079,7 @@ void TypeChecker::fixAbstractFunctionNames(InFlightDiagnostic &diag,
 
     // Find the location to update or insert.
     SourceLoc loc = func->getLoc();
-    
+
     StringRef replacement;
     if (targetArg.empty())
       replacement = "_";
@@ -7088,6 +7088,6 @@ void TypeChecker::fixAbstractFunctionNames(InFlightDiagnostic &diag,
 
     diag.fixItInsert(loc, replacement);
   }
-  
+
   // FIXME: Update the AST accordingly.
 }

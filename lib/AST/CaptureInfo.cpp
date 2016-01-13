@@ -47,14 +47,14 @@ void CaptureInfo::dump() const {
 void CaptureInfo::print(raw_ostream &OS) const {
   OS << "captures=(";
   bool isFirst = true;
-  
+
   for (auto capture : getCaptures()) {
     if (isFirst)
       isFirst = false;
     else
       OS << ", ";
     OS << capture.getDecl()->getName();
-    
+
     if (capture.isDirect())
       OS << "<direct>";
     if (capture.isNoEscape())

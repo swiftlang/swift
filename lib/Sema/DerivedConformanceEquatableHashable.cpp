@@ -37,12 +37,12 @@ static bool canDeriveConformance(NominalTypeDecl *type) {
   auto enumDecl = dyn_cast<EnumDecl>(type);
   if (!enumDecl)
     return false;
-  
+
   // The enum must not have associated values.
   // TODO: Enums with Equatable/Hashable/Comparable payloads
   if (!enumDecl->hasOnlyCasesWithoutAssociatedValues())
     return false;
-  
+
   return true;
 }
 
@@ -68,7 +68,7 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
                                   SourceLoc(), C.getIdentifier(indexName),
                                   intType, funcDecl);
   indexVar->setImplicit();
-  
+
   // generate: var indexVar
   Pattern *indexPat = new (C) NamedPattern(indexVar, /*implicit*/ true);
   indexPat->setType(intType);
@@ -87,15 +87,15 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
                                           SourceLoc(), SourceLoc(),
                                           Identifier(), elt, nullptr);
     pat->setImplicit();
-    
+
     auto labelItem = CaseLabelItem(/*IsDefault=*/false, pat, SourceLoc(),
                                    nullptr);
-    
+
     // generate: indexVar = <index>
     llvm::SmallString<8> indexVal;
     APInt(32, index++).toString(indexVal, 10, /*signed*/ false);
     auto indexStr = C.AllocateCopy(indexVal);
-    
+
     auto indexExpr = new (C) IntegerLiteralExpr(StringRef(indexStr.data(),
                                                 indexStr.size()), SourceLoc(),
                                                 /*implicit*/ true);
@@ -109,13 +109,13 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
                                      /*HasBoundDecls=*/false,
                                      SourceLoc(), body));
   }
-  
+
   // generate: switch enumVar { }
   auto enumRef = new (C) DeclRefExpr(enumVarDecl, SourceLoc(),
                                       /*implicit*/true);
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), enumRef,
                                        SourceLoc(), cases, SourceLoc(), C);
-  
+
   stmts.push_back(indexBind);
   stmts.push_back(switchStmt);
 
@@ -142,14 +142,14 @@ static void deriveBodyEquatable_enum_eq(AbstractFunctionDecl *eqDecl) {
                                            aParam, eqDecl, "index_a");
   DeclRefExpr *bIndex = convertEnumToIndex(statements, parentDC, enumDecl,
                                            bParam, eqDecl, "index_b");
-  
+
   // Generate the compare of the indices.
   FuncDecl *cmpFunc = C.getEqualIntDecl(nullptr);
   assert(cmpFunc && "should have a == for int as we already checked for it");
-  
+
   auto fnType = dyn_cast<FunctionType>(cmpFunc->getType()->getCanonicalType());
   auto tType = fnType.getInput();
-  
+
   TupleExpr *abTuple = TupleExpr::create(C, SourceLoc(), { aIndex, bIndex },
                                          { }, { }, SourceLoc(),
                                          /*HasTrailingClosure*/ false,
@@ -188,23 +188,23 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
   //   }
   //   return index_a == index_b
   // }
-  
+
   ASTContext &C = tc.Context;
-  
+
   auto parentDC = cast<DeclContext>(parentDecl);
   auto enumTy = parentDC->getDeclaredTypeInContext();
-  
+
   auto getParamDecl = [&](StringRef s) -> ParamDecl* {
     return new (C) ParamDecl(/*isLet*/true, SourceLoc(), Identifier(),
                              SourceLoc(), C.getIdentifier(s), enumTy,
                              parentDC);
   };
-  
+
   auto params = ParameterList::create(C, {
     getParamDecl("a"),
     getParamDecl("b")
   });
-  
+
   auto genericParams = parentDC->getGenericParamsOfContext();
   auto boolTy = C.getBoolDecl()->getDeclaredType();
   auto moduleDC = parentDecl->getModuleContext();
@@ -251,7 +251,7 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
       enumIfaceTy, enumIfaceTy,
     };
     auto ifaceParamsTy = TupleType::get(ifaceParamElts, C);
-    
+
     interfaceTy = GenericFunctionType::get(
                                      genericSig, ifaceParamsTy, boolTy,
                                      AnyFunctionType::ExtInfo());
@@ -270,7 +270,7 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
   // normally.
   if (enumDecl->hasClangNode())
     tc.Context.addExternalDecl(eqDecl);
-  
+
   // Since it's an operator we insert the decl after the type at global scope.
   insertOperatorDecl(C, cast<IterableDeclContext>(parentDecl), eqDecl);
 
@@ -308,7 +308,7 @@ deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
 
   DeclRefExpr *indexRef = convertEnumToIndex(statements, parentDC, enumDecl,
                                              selfDecl, hashValueDecl, "index");
-  
+
   auto memberRef = new (C) UnresolvedDotExpr(indexRef, SourceLoc(),
                                              C.Id_hashValue,
                                              SourceLoc(),
@@ -340,10 +340,10 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
   //   }
   // }
   ASTContext &C = tc.Context;
-  
+
   auto parentDC = cast<DeclContext>(parentDecl);
   Type intType = C.getIntDecl()->getDeclaredType();
-  
+
   // We can't form a Hashable conformance if Int isn't Hashable or
   // IntegerLiteralConvertible.
   if (!tc.conformsToProtocol(intType,C.getProtocol(KnownProtocolKind::Hashable),
@@ -359,14 +359,14 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
                 diag::broken_int_integer_literal_convertible_conformance);
     return nullptr;
   }
-  
+
   auto selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC);
-  
+
   ParameterList *params[] = {
     ParameterList::createWithoutLoc(selfDecl),
     ParameterList::createEmpty(C)
   };
-  
+
   FuncDecl *getterDecl =
       FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
                        Identifier(), SourceLoc(), SourceLoc(), SourceLoc(),
@@ -380,7 +380,7 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
   Type methodType = FunctionType::get(TupleType::getEmpty(tc.Context), intType);
   Type selfType = getterDecl->computeSelfType();
   selfDecl->overwriteType(selfType);
-  
+
   Type type;
   if (genericParams)
     type = PolymorphicFunctionType::get(selfType, methodType, genericParams);
@@ -388,7 +388,7 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
     type = FunctionType::get(selfType, methodType);
   getterDecl->setType(type);
   getterDecl->setBodyResultType(intType);
-  
+
   // Compute the interface type of hashValue().
   Type interfaceType;
   Type selfIfaceType = getterDecl->computeInterfaceSelfType(false);
@@ -397,7 +397,7 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
                                              AnyFunctionType::ExtInfo());
   else
     interfaceType = FunctionType::get(selfType, methodType);
-  
+
   getterDecl->setInterfaceType(interfaceType);
   getterDecl->setAccessibility(enumDecl->getFormalAccess());
 
@@ -406,7 +406,7 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
   // normally.
   if (enumDecl->hasClangNode())
     tc.Context.addExternalDecl(getterDecl);
-  
+
   // Create the property.
   VarDecl *hashValueDecl = new (C) VarDecl(/*static*/ false,
                                            /*let*/ false,
@@ -423,13 +423,13 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
     = new (C) TypedPattern(hashValuePat, TypeLoc::withoutLoc(intType),
                            /*implicit*/ true);
   hashValuePat->setType(intType);
-  
+
   auto patDecl = PatternBindingDecl::create(C, SourceLoc(),
                                             StaticSpellingKind::None,
                                             SourceLoc(), hashValuePat, nullptr,
                                             parentDC);
   patDecl->setImplicit();
-  
+
   auto dc = cast<IterableDeclContext>(parentDecl);
   dc->addMember(getterDecl);
   dc->addMember(hashValueDecl);
@@ -444,7 +444,7 @@ ValueDecl *DerivedConformance::deriveHashable(TypeChecker &tc,
   // Check that we can actually derive Hashable for this type.
   if (!canDeriveConformance(type))
     return nullptr;
-  
+
   // Build the necessary decl.
   if (requirement->getName().str() == "hashValue") {
     if (auto theEnum = dyn_cast<EnumDecl>(type))

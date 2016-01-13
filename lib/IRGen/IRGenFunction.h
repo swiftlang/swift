@@ -53,7 +53,7 @@ namespace swift {
   class Substitution;
   class ValueDecl;
   class VarDecl;
-  
+
 namespace irgen {
   class Explosion;
   class FunctionRef;
@@ -90,7 +90,7 @@ public:
   Explosion collectParameters();
   void emitScalarReturn(SILType resultTy, Explosion &scalars);
   void emitScalarReturn(llvm::Type *resultTy, Explosion &scalars);
-  
+
   void emitBBForReturn();
   bool emitBranchToReturnBB();
 
@@ -103,7 +103,7 @@ public:
 
   /// Set the error result slot.
   void setErrorResultSlot(llvm::Value *address);
-  
+
 private:
   void emitPrologue();
   void emitEpilogue();
@@ -151,7 +151,7 @@ public:
                                 const llvm::Twine &name ="");
   void emitDeallocRawCall(llvm::Value *pointer, llvm::Value *size,
                           llvm::Value *alignMask);
-  
+
   void emitAllocBoxCall(llvm::Value *typeMetadata,
                          llvm::Value *&box,
                          llvm::Value *&valueAddress);
@@ -172,7 +172,7 @@ public:
   // can't uniquely represent the type or perform value witness operations on
   // it.
   llvm::Value *emitTypeLayoutRef(SILType type);
-  
+
   // Emit a reference to a metadata object that can be used for layout, but
   // cannot be used to identify a type. This will produce a layout appropriate
   // to the abstraction level of the given type. It may be able to avoid runtime
@@ -183,11 +183,11 @@ public:
   // here, since for some types it's easier to get a shared reference to one
   // than a metadata reference, and it would be more type-safe.
   llvm::Value *emitTypeMetadataRefForLayout(SILType type);
-  
+
   llvm::Value *emitValueWitnessTableRef(CanType type);
   llvm::Value *emitValueWitnessTableRefForLayout(SILType type);
   llvm::Value *emitValueWitnessTableRefForMetadata(llvm::Value *metadata);
-  
+
   llvm::Value *emitValueWitness(CanType type, ValueWitness index);
   llvm::Value *emitValueWitnessForLayout(SILType type, ValueWitness index);
 
@@ -512,7 +512,7 @@ public:
 
   llvm::Value *getLocalSelfMetadata();
   void setLocalSelfMetadata(llvm::Value *value, LocalSelfKind kind);
-  
+
 private:
   LocalTypeDataCache &getOrCreateLocalTypeData();
   void destroyLocalTypeData();
@@ -524,10 +524,10 @@ private:
   DominanceResolverFunction DominanceResolver = nullptr;
   DominancePoint ActiveDominancePoint = DominancePoint::universal();
   ConditionalDominanceScope *ConditionalDominance = nullptr;
-  
+
   /// The value that satisfies metadata lookups for dynamic Self.
   llvm::Value *LocalSelf = nullptr;
-  
+
   LocalSelfKind SelfKind;
 };
 

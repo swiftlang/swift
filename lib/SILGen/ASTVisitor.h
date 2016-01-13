@@ -21,7 +21,7 @@
 
 namespace swift {
 namespace Lowering {
-  
+
 /// Lowering::ASTVisitor - This is a specialization of
 /// swift::ASTVisitor which works only on resolved nodes and
 /// which automatically ignores certain AST node kinds.
@@ -47,7 +47,7 @@ public:
     llvm_unreachable(#Id "Expr should not survive to SILGen"); \
   }
 #include "swift/AST/ExprNodes.def"
-  
+
   ExprRetTy visitErrorExpr(ErrorExpr *E, Args...AA) {
     llvm_unreachable("expression kind should not survive to SILGen");
   }

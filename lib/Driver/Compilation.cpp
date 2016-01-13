@@ -50,7 +50,7 @@ Compilation::Compilation(DiagnosticEngine &Diags, OutputLevel Level,
                          bool SkipTaskExecution,
                          bool SaveTemps)
   : Diags(Diags), Level(Level), RawInputArgs(std::move(InputArgs)),
-    TranslatedArgs(std::move(TranslatedArgs)), 
+    TranslatedArgs(std::move(TranslatedArgs)),
     InputFilesWithTypes(std::move(InputsWithTypes)), ArgsHash(ArgsHash),
     BuildStartTime(StartTime),
     NumberOfParallelCommands(NumberOfParallelCommands),
@@ -624,11 +624,11 @@ int Compilation::performJobs() {
   if (!TaskQueue::supportsParallelExecution() && NumberOfParallelCommands > 1) {
     Diags.diagnose(SourceLoc(), diag::warning_parallel_execution_not_supported);
   }
-  
+
   if (!AllSourceFilesPath.empty())
     if (!writeAllSourcesFile(Diags, AllSourceFilesPath, getInputFiles()))
       return EXIT_FAILURE;
-  
+
   int result = performJobsImpl();
 
   if (!SaveTemps) {

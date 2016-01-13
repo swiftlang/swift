@@ -951,7 +951,7 @@ public:
     auto message = diag::throwing_call_without_try;
     auto loc = E.getStartLoc();
     SourceRange highlight;
-    
+
     // Generate more specific messages in some cases.
     if (auto e = dyn_cast_or_null<ApplyExpr>(E.dyn_cast<Expr*>())) {
       if (isa<PrefixUnaryExpr>(e) || isa<PostfixUnaryExpr>(e) ||
@@ -961,7 +961,7 @@ public:
       }
       highlight = e->getSourceRange();
     }
-    
+
     TC.diagnose(loc, message).highlight(highlight);
     maybeAddRethrowsNote(TC, loc, reason);
   }
@@ -1423,7 +1423,7 @@ private:
   }
 };
 
-} // end anonymous namespace 
+} // end anonymous namespace
 
 void TypeChecker::checkTopLevelErrorHandling(TopLevelCodeDecl *code) {
   CheckErrorCoverage checker(*this, Context::forTopLevelCode(code));

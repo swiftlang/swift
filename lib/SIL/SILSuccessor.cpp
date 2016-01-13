@@ -17,16 +17,16 @@ using namespace swift;
 void SILSuccessor::operator=(SILBasicBlock *BB) {
   // If we're not changing anything, we're done.
   if (SuccessorBlock == BB) return;
-  
+
   assert(ContainingInst &&"init method not called after default construction?");
-  
+
   // If we were already pointing to a basic block, remove ourself from its
   // predecessor list.
   if (SuccessorBlock) {
     *Prev = Next;
     if (Next) Next->Prev = Prev;
   }
-  
+
   // If we have a successor, add ourself to its prev list.
   if (BB) {
     Prev = &BB->PredList;
@@ -34,7 +34,7 @@ void SILSuccessor::operator=(SILBasicBlock *BB) {
     if (Next) Next->Prev = &Next;
     BB->PredList = this;
   }
-  
+
   SuccessorBlock = BB;
 }
 

@@ -223,7 +223,7 @@ StringRef camel_case::toLowercaseWord(StringRef string,
   return StringRef(scratch.data(), scratch.size());
 }
 
-StringRef camel_case::toSentencecase(StringRef string, 
+StringRef camel_case::toSentencecase(StringRef string,
                                      SmallVectorImpl<char> &scratch) {
   if (string.empty())
     return string;
@@ -236,7 +236,7 @@ StringRef camel_case::toSentencecase(StringRef string,
   scratch.clear();
   scratch.push_back(clang::toUppercase(string[0]));
   scratch.append(string.begin() + 1, string.end());
-  return StringRef(scratch.data(), scratch.size());  
+  return StringRef(scratch.data(), scratch.size());
 }
 
 StringRef camel_case::dropPrefix(StringRef string) {
@@ -808,7 +808,7 @@ bool swift::omitNeedlessWords(StringRef &baseName,
     // Omit needless words from the name.
     StringRef name = role == NameRole::BaseName ? baseName : argNames[i];
     StringRef newName = ::omitNeedlessWords(name, paramTypes[i], role,
-                                            role == NameRole::BaseName 
+                                            role == NameRole::BaseName
                                               ? allPropertyNames
                                               : nullptr,
                                             scratch);

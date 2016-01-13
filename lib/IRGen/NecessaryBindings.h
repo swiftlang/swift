@@ -40,14 +40,14 @@ class NecessaryBindings {
 
 public:
   NecessaryBindings() = default;
-  
+
   /// Collect the necessary bindings to invoke a function with the given
   /// signature.
   static NecessaryBindings forFunctionInvocations(IRGenModule &IGM,
                                                   CanSILFunctionType origType,
                                                   CanSILFunctionType substType,
                                                   ArrayRef<Substitution> subs);
-  
+
   /// Collect the necessary bindings to perform value operations on a type.
   static NecessaryBindings forValueOperations(IRGenModule &IGM, CanType type);
 

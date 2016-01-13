@@ -342,7 +342,7 @@ void DeclAttribute::print(ASTPrinter &Printer,
   case DAK_SetterAccessibility:
     Printer << getAttrName() << "(set)";
     break;
-    
+
   case DAK_SwiftNativeObjCRuntimeBase: {
     auto *attr = cast<SwiftNativeObjCRuntimeBaseAttr>(this);
     Printer << "@_swift_native_objc_runtime_base("
@@ -526,8 +526,8 @@ ObjCAttr *ObjCAttr::createUnnamedImplicit(ASTContext &Ctx) {
   return new (Ctx) ObjCAttr(None, false);
 }
 
-ObjCAttr *ObjCAttr::createNullary(ASTContext &Ctx, SourceLoc AtLoc, 
-                                  SourceLoc ObjCLoc, SourceLoc LParenLoc, 
+ObjCAttr *ObjCAttr::createNullary(ASTContext &Ctx, SourceLoc AtLoc,
+                                  SourceLoc ObjCLoc, SourceLoc LParenLoc,
                                   SourceLoc NameLoc, Identifier Name,
                                   SourceLoc RParenLoc) {
   unsigned size = sizeof(ObjCAttr) + 3 * sizeof(SourceLoc);
@@ -543,8 +543,8 @@ ObjCAttr *ObjCAttr::createNullary(ASTContext &Ctx, Identifier Name,
   return new (Ctx) ObjCAttr(ObjCSelector(Ctx, 0, Name), isNameImplicit);
 }
 
-ObjCAttr *ObjCAttr::createSelector(ASTContext &Ctx, SourceLoc AtLoc, 
-                                   SourceLoc ObjCLoc, SourceLoc LParenLoc, 
+ObjCAttr *ObjCAttr::createSelector(ASTContext &Ctx, SourceLoc AtLoc,
+                                   SourceLoc ObjCLoc, SourceLoc LParenLoc,
                                    ArrayRef<SourceLoc> NameLocs,
                                    ArrayRef<Identifier> Names,
                                    SourceLoc RParenLoc) {
@@ -557,10 +557,10 @@ ObjCAttr *ObjCAttr::createSelector(ASTContext &Ctx, SourceLoc AtLoc,
                             NameLocs);
 }
 
-ObjCAttr *ObjCAttr::createSelector(ASTContext &Ctx, 
+ObjCAttr *ObjCAttr::createSelector(ASTContext &Ctx,
                                    ArrayRef<Identifier> Names,
                                    bool isNameImplicit) {
-  return new (Ctx) ObjCAttr(ObjCSelector(Ctx, Names.size(), Names), 
+  return new (Ctx) ObjCAttr(ObjCSelector(Ctx, Names.size(), Names),
                             isNameImplicit);
 }
 

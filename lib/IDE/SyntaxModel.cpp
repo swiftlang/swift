@@ -684,7 +684,7 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
         VisitedNodesInsideIfConfig.insert(Element);
       }
     }
-    
+
     if (!ConfigS->hadMissingEnd())
       if (!passNonTokenNode({ SyntaxNodeKind::BuildConfigKeyword,
         CharSourceRange(ConfigS->getEndLoc(), 6/*'#endif'*/) }))
@@ -868,7 +868,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       if (!passNonTokenNode({SyntaxNodeKind::BuildConfigKeyword,
                             CharSourceRange(Clause.Loc, TokLen) }))
         return false;
-      
+
       if (Clause.Cond && !annotateIfConfigConditionIdentifiers(Clause.Cond))
         return false;
 
@@ -876,7 +876,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
         if (D->walk(*this))
           return false;
     }
-    
+
     if (!ConfigD->hadMissingEnd())
       if (!passNonTokenNode({ SyntaxNodeKind::BuildConfigKeyword,
             CharSourceRange(ConfigD->getEndLoc(), 6/*'#endif'*/) }))
@@ -1287,7 +1287,7 @@ bool ModelASTWalker::processComment(CharSourceRange Range) {
   if (!passNode(Node))
     return false;
 
-  return searchForURL(AfterMarker);  
+  return searchForURL(AfterMarker);
 }
 
 bool ModelASTWalker::findUrlStartingLoc(StringRef Text,
