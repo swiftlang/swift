@@ -22,6 +22,7 @@
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
 
 using namespace swift;
@@ -90,6 +91,34 @@ static void debugFailWithCrash() {
   LLVM_BUILTIN_TRAP;
 }
 
+static unsigned readInputFileList(std::vector<std::string> &inputFiles,
+                                  const llvm::opt::Arg *filelistPath,
+                                  const llvm::opt::Arg *primaryFileArg) {
+  bool foundPrimaryFile = false;
+  unsigned primaryFileIndex = 0;
+  StringRef primaryFile;
+  if (primaryFileArg)
+    primaryFile = primaryFileArg->getValue();
+
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
+      llvm::MemoryBuffer::getFile(filelistPath->getValue());
+  assert(buffer && "can't read filelist; unrecoverable");
+
+  for (StringRef line : make_range(llvm::line_iterator(*buffer.get()), {})) {
+    inputFiles.push_back(line);
+    if (foundPrimaryFile)
+      continue;
+    if (line == primaryFile)
+      foundPrimaryFile = true;
+    else
+      ++primaryFileIndex;
+  }
+
+  if (primaryFileArg)
+    assert(foundPrimaryFile && "primary file not found in filelist");
+  return primaryFileIndex;
+}
+
 static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
                               DiagnosticEngine &Diags) {
   using namespace options;
@@ -142,16 +171,25 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     }
   }
 
-  for (const Arg *A : make_range(Args.filtered_begin(OPT_INPUT,
-                                                     OPT_primary_file),
-                                 Args.filtered_end())) {
-    if (A->getOption().matches(OPT_INPUT)) {
-      Opts.InputFilenames.push_back(A->getValue());
-    } else if (A->getOption().matches(OPT_primary_file)) {
-      Opts.PrimaryInput = SelectedInput(Opts.InputFilenames.size());
-      Opts.InputFilenames.push_back(A->getValue());
-    } else {
-      llvm_unreachable("Unknown input-related argument!");
+  if (const Arg *A = Args.getLastArg(OPT_filelist)) {
+    const Arg *primaryFileArg = Args.getLastArg(OPT_primary_file);
+    auto primaryFileIndex = readInputFileList(Opts.InputFilenames, A,
+                                              primaryFileArg);
+    if (primaryFileArg)
+      Opts.PrimaryInput = SelectedInput(primaryFileIndex);
+    assert(!Args.hasArg(OPT_INPUT) && "mixing -filelist with inputs");
+  } else {
+    for (const Arg *A : make_range(Args.filtered_begin(OPT_INPUT,
+                                                       OPT_primary_file),
+                                   Args.filtered_end())) {
+      if (A->getOption().matches(OPT_INPUT)) {
+        Opts.InputFilenames.push_back(A->getValue());
+      } else if (A->getOption().matches(OPT_primary_file)) {
+        Opts.PrimaryInput = SelectedInput(Opts.InputFilenames.size());
+        Opts.InputFilenames.push_back(A->getValue());
+      } else {
+        llvm_unreachable("Unknown input-related argument!");
+      }
     }
   }
 
