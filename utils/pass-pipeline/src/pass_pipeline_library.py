@@ -98,7 +98,7 @@ def lower_passlist():
         p.SpeculativeDevirtualizer,
         p.FunctionSignatureOpts,
     ])
-        
+
 def normal_passpipelines():
     result = []
 

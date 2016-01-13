@@ -89,7 +89,7 @@ def parseGenericOperator(m):
     for m2 in re.finditer(genericParameterConstraint, genericParams, reFlags):
         typeParameter = m2.group(1)
         protocol = m2.group(2)
-        
+
         # we're only interested if we can find a function parameter of that type
         if not re.search(r':\s*%s\s*[,)]' % typeParameter, functionParams): continue
 
@@ -105,7 +105,7 @@ def parseGenericOperator(m):
 def parseProtocol(m):
     child = m.group(1)
     # skip irrelevant protocols
-    if re.match(r'_Builtin.*Convertible', child): return 
+    if re.match(r'_Builtin.*Convertible', child): return
     graph.setdefault(child, set())
     body[child] = bodyLines(m.group(3))
     if m.group(2):
@@ -139,7 +139,7 @@ clusters = dict((c, nodes) for (c, nodes) in clusterBuilder.items() if len(nodes
 # A set of all intra-cluster edges
 clusterEdges = set(
     (s, t) for (c, elements) in clusters.items()
-    for s in elements 
+    for s in elements
     for t in graph[s] if t in elements)
 
 print('digraph ProtocolHierarchies {')
@@ -159,15 +159,15 @@ for node in sorted(graph.keys()):
     generics = sorted(genericOperators.get(node, set()))
     style = 'solid' if node.startswith('_') else 'bold'
     divider = '<HR/>\n' if len(requirements) != 0 and len(generics) != 0 else ''
-    
+
     label = node if len(requirements + generics) == 0 else (
         '\n<TABLE BORDER="0">\n<TR><TD>\n%s\n</TD></TR><HR/>\n%s%s%s</TABLE>\n' % (
         node,
         '\n'.join('<TR><TD>%s</TD></TR>' % r for r in requirements),
         divider,
         '\n'.join('<TR><TD>%s</TD></TR>' % g for g in generics)))
-    
-    
+
+
     print(interpolate('    %(node)s [style = %(style)s, label=<%(label)s>]'))
 for (parent, children) in sorted(graph.items()):
     print('    %s -> {' % parent, end=' ')

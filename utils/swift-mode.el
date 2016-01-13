@@ -134,7 +134,7 @@
     (defvar electric-indent-chars nil))
   (unless (boundp 'electric-pair-pairs)
     (defvar electric-pair-pairs nil))
-    
+
   (set (make-local-variable 'electric-indent-chars)
        (append "{}()[]:," electric-indent-chars))
   (set (make-local-variable 'electric-pair-pairs)
@@ -145,8 +145,8 @@
                  (?{ . ?})  (?[ . ?]) (?( . ?)) (?` . ?`)) electric-pair-pairs))
   (set (make-local-variable 'electric-layout-rules)
        '((?\{ . after) (?\} . before)))
-  
-  (set (make-local-variable 'font-lock-defaults) 
+
+  (set (make-local-variable 'font-lock-defaults)
        '(swift-font-lock-keywords) ))
 
 (defun swift-indent-line ()
@@ -155,7 +155,7 @@
     (save-excursion
       (widen)
       (setq indent-level (car (syntax-ppss (point-at-bol))))
-      
+
       ;; Look at the first non-whitespace to see if it's a close paren
       (beginning-of-line)
       (skip-syntax-forward " ")
@@ -185,13 +185,13 @@
         ,(concat
      "^"
        "[ \t]+" "\\(?:(@\\)?"
-       "[A-Z][A-Za-z0-9_]*@" 
+       "[A-Z][A-Za-z0-9_]*@"
      ;; Filename \1
        "\\("
-          "[0-9]*[^0-9\n]" 
-          "\\(?:" 
-             "[^\n :]" "\\|" " [^/\n]" "\\|" ":[^ \n]" 
-          "\\)*?" 
+          "[0-9]*[^0-9\n]"
+          "\\(?:"
+             "[^\n :]" "\\|" " [^/\n]" "\\|" ":[^ \n]"
+          "\\)*?"
        "\\)"
        ":"
        ;; Line number (\2)
@@ -209,10 +209,10 @@
        "[0-9]+[.][ \t]+While .* at \\[?"
      ;; Filename \1
        "\\("
-          "[0-9]*[^0-9\n]" 
-          "\\(?:" 
-             "[^\n :]" "\\|" " [^/\n]" "\\|" ":[^ \n]" 
-          "\\)*?" 
+          "[0-9]*[^0-9\n]"
+          "\\(?:"
+             "[^\n :]" "\\|" " [^/\n]" "\\|" ":[^ \n]"
+          "\\)*?"
        "\\)"
        ":"
        ;; Line number (\2)
@@ -229,10 +229,10 @@
      "^\\(?:assertion failed\\|fatal error\\): \\(?:.*: \\)?file "
      ;; Filename \1
        "\\("
-          "[0-9]*[^0-9\n]" 
-          "\\(?:" 
-             "[^\n :]" "\\|" " [^/\n]" "\\|" ":[^ \n]" 
-          "\\)*?" 
+          "[0-9]*[^0-9\n]"
+          "\\(?:"
+             "[^\n :]" "\\|" " [^/\n]" "\\|" ":[^ \n]"
+          "\\)*?"
        "\\)"
        ", line "
        ;; Line number (\2)

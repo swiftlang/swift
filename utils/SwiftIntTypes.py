@@ -84,22 +84,22 @@ def all_numeric_type_names():
     return all_integer_type_names() + all_real_number_type_names()
 
 def numeric_type_names_Macintosh_only():
-    return ['Float80']  
+    return ['Float80']
 
 # Swift_Programming_Language/Expressions.html
 
 def all_integer_binary_operator_names():
     return ['<<', '>>', '&*', '&', '&+', '&-', '|', '^']
-    
+
 def all_integer_or_real_binary_operator_names():
     return ['*', '/', '%', '+', '-', '..<', '...']
-    
+
 def all_arithmetic_comparison_operator_names():
     return ['<', '<=', '>', '>=', '==', '!=']
-    
+
 def all_integer_assignment_operator_names():
     return ['<<=', '>>=', '&=', '^=', '|=']
-    
+
 def all_integer_or_real_assignment_operator_names():
     return ['=', '*=', '/=', '%=', '+=', '-=']
-    
+

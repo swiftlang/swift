@@ -49,7 +49,7 @@ def apply_edits(path):
         if fname not in edits_per_file:
             edits_per_file[fname] = []
         edits_per_file[fname].append((ed[1], ed[2], ed[3]))
-    
+
     for fname, edits in edits_per_file.iteritems():
         print('Updating', fname)
         edits.sort(reverse=True)
