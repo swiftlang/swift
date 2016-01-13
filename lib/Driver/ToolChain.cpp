@@ -33,7 +33,7 @@ using namespace llvm::opt;
 
 const char * const ToolChain::SWIFT_EXECUTABLE_NAME;
 
-ToolChain::JobContext::JobContext(const Compilation &C,
+ToolChain::JobContext::JobContext(Compilation &C,
                                   ArrayRef<const Job *> Inputs,
                                   ArrayRef<const Action *> InputActions,
                                   const CommandOutput &Output,
@@ -48,9 +48,26 @@ const char *ToolChain::JobContext::getAllSourcesPath() const {
   return C.getAllSourcesPath();
 }
 
+const char *
+ToolChain::JobContext::getTemporaryFilePath(const llvm::Twine &name,
+                                            StringRef suffix) const {
+  SmallString<128> buffer;
+  std::error_code EC =
+      llvm::sys::fs::createTemporaryFile(name, suffix, buffer);
+  if (EC) {
+    // FIXME: This should not take down the entire process.
+    llvm::report_fatal_error("unable to create temporary file for filelist");
+  }
+
+  C.addTemporaryFile(buffer.str());
+  // We can't just reference the data in the TemporaryFiles vector because
+  // that could theoretically get copied to a new address.
+  return C.getArgs().MakeArgString(buffer.str());
+}
+
 std::unique_ptr<Job>
 ToolChain::constructJob(const JobAction &JA,
-                        const Compilation &C,
+                        Compilation &C,
                         SmallVectorImpl<const Job *> &&inputs,
                         const ActionList &inputActions,
                         std::unique_ptr<CommandOutput> output,

@@ -42,6 +42,22 @@ namespace driver {
     DynamicLibrary
   };
 
+  /// Used by a Job to request a "filelist": a file containing a list of all
+  /// input or output files of a certain type.
+  ///
+  /// The Compilation is responsible for generating this file before running
+  /// the Job this info is attached to.
+  struct FilelistInfo {
+    enum WhichFiles : bool {
+      Input,
+      Output
+    };
+
+    StringRef path;
+    types::ID type;
+    WhichFiles whichFiles;
+  };
+
 } // end namespace driver
 } // end namespace swift
 

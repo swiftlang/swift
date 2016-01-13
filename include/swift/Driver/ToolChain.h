@@ -52,7 +52,7 @@ protected:
   /// Packs together the supplementary information about the job being created.
   class JobContext {
   private:
-    const Compilation &C;
+    Compilation &C;
 
   public:
     ArrayRef<const Job *> Inputs;
@@ -67,7 +67,7 @@ protected:
     const llvm::opt::ArgList &Args;
 
   public:
-    JobContext(const Compilation &C, ArrayRef<const Job *> Inputs,
+    JobContext(Compilation &C, ArrayRef<const Job *> Inputs,
                ArrayRef<const Action *> InputActions,
                const CommandOutput &Output, const OutputInfo &OI);
 
@@ -76,6 +76,13 @@ protected:
 
     /// Forwards to Compilation::getAllSourcesPath.
     const char *getAllSourcesPath() const;
+
+    /// Creates a new temporary file for use by a job.
+    ///
+    /// The returned string already has its lifetime extended to match other
+    /// arguments.
+    const char *getTemporaryFilePath(const llvm::Twine &name,
+                                     StringRef suffix = "") const;
   };
 
   /// Packs together information chosen by toolchains to create jobs.
@@ -83,10 +90,12 @@ protected:
     const char *ExecutableName;
     llvm::opt::ArgStringList Arguments;
     std::vector<std::pair<const char *, const char *>> ExtraEnvironment;
+    FilelistInfo FilelistInfo;
 
-    InvocationInfo(const char *name, llvm::opt::ArgStringList args,
+    InvocationInfo(const char *name, llvm::opt::ArgStringList args = {},
                    decltype(ExtraEnvironment) extraEnv = {})
-      : ExecutableName(name), Arguments(args), ExtraEnvironment(extraEnv) {}
+      : ExecutableName(name), Arguments(std::move(args)),
+        ExtraEnvironment(std::move(extraEnv)) {}
   };
 
   virtual InvocationInfo
@@ -145,7 +154,7 @@ public:
   /// This method dispatches to the various \c constructInvocation methods,
   /// which may be overridden by platform-specific subclasses.
   std::unique_ptr<Job> constructJob(const JobAction &JA,
-                                    const Compilation &C,
+                                    Compilation &C,
                                     SmallVectorImpl<const Job *> &&inputs,
                                     const ActionList &inputActions,
                                     std::unique_ptr<CommandOutput> output,

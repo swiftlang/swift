@@ -28,6 +28,7 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: touch %t/a.o
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -o linker 2>&1 | FileCheck -check-prefix COMPILE_AND_LINK %s
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -driver-use-filelists -o linker 2>&1 | FileCheck -check-prefix FILELIST %s
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -module-name LINKER | FileCheck -check-prefix INFERRED_NAME %s
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -o libLINKER.dylib | FileCheck -check-prefix INFERRED_NAME %s
@@ -162,6 +163,15 @@
 // COMPILE_AND_LINK-DAG: /a.o
 // COMPILE_AND_LINK-DAG: .o
 // COMPILE_AND_LINK: -o linker
+
+
+// FILELIST: bin/ld{{"? }}
+// FILELIST-NOT: .o
+// FILELIST: -filelist {{"?[^-]}}
+// FILELIST-NOT: .o
+// FILELIST: /a.o
+// FILELIST-NOT: .o
+// FILELIST: -o linker
 
 
 // INFERRED_NAME: bin/swift
