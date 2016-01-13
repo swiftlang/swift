@@ -88,6 +88,8 @@ def driver_use_frontend_path : Separate<["-"], "driver-use-frontend-path">,
 def driver_show_incremental : Flag<["-"], "driver-show-incremental">,
   InternalDebugOpt,
   HelpText<"With -v, dump information about why files are being rebuilt">;
+def driver_use_filelists : Flag<["-"], "driver-use-filelists">,
+  InternalDebugOpt, HelpText<"Pass input files as filelists whenever possible">;
 
 def driver_always_rebuild_dependents :
   Flag<["-"], "driver-always-rebuild-dependents">, InternalDebugOpt,

@@ -204,8 +204,8 @@ public func ~= <I: IntervalType>(pattern: I, value: I.Bound) -> Bool {
 %import gyb
 %TBoilerplate = gyb.parseTemplate("../common/MirrorBoilerplate.gyb")
 
-%Boilerplate = gyb.executeTemplate(TBoilerplate,\
-%                                  introspecteeType='T',\
+%Boilerplate = gyb.executeTemplate(TBoilerplate,
+%                                  introspecteeType='T',
 %                                  disposition='Struct')
 
 internal struct _IntervalMirror<

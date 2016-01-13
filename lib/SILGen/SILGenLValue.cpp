@@ -1360,6 +1360,17 @@ namespace {
   };
 } // end anonymous namespace.
 
+LValue LValue::forValue(ManagedValue value,
+                        CanType substFormalType) {
+  assert(value.getType().isObject());
+  LValueTypeData typeData = getValueTypeData(substFormalType,
+                                             value.getValue());
+
+  LValue lv;
+  lv.add<ValueComponent>(value, typeData);
+  return lv;
+}
+
 LValue LValue::forAddress(ManagedValue address,
                           AbstractionPattern origFormalType,
                           CanType substFormalType) {

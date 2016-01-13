@@ -29,7 +29,6 @@ using namespace llvm;
 // General
 //===----------------------------------------------------------------------===//
 
-static std::atomic<uint64_t> operation_id(0);
 static uint64_t tracing_session = llvm::sys::TimeValue::now().msec();
 
 uint64_t trace::getTracingSession() {

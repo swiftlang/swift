@@ -30,9 +30,8 @@
 namespace swift {
 namespace driver {
 
-class Action;
-class InputAction;
 class Job;
+class JobAction;
 
 class CommandOutput {
   types::ID PrimaryOutputType;
@@ -92,7 +91,7 @@ public:
 private:
   /// The action which caused the creation of this Job, and the conditions
   /// under which it must be run.
-  llvm::PointerIntPair<const Action *, 2, Condition> SourceAndCondition;
+  llvm::PointerIntPair<const JobAction *, 2, Condition> SourceAndCondition;
 
   /// The list of other Jobs which are inputs to this Job.
   SmallVector<const Job *, 4> Inputs;
@@ -118,7 +117,7 @@ private:
   llvm::sys::TimeValue InputModTime = llvm::sys::TimeValue::MaxTime();
 
 public:
-  Job(const Action &Source,
+  Job(const JobAction &Source,
       SmallVectorImpl<const Job *> &&Inputs,
       std::unique_ptr<CommandOutput> Output,
       const char *Executable,
@@ -129,7 +128,9 @@ public:
         Executable(Executable), Arguments(std::move(Arguments)),
         ExtraEnvironment(std::move(ExtraEnvironment)) {}
 
-  const Action &getSource() const { return *SourceAndCondition.getPointer(); }
+  const JobAction &getSource() const {
+    return *SourceAndCondition.getPointer();
+  }
 
   const char *getExecutable() const { return Executable; }
   const llvm::opt::ArgStringList &getArguments() const { return Arguments; }

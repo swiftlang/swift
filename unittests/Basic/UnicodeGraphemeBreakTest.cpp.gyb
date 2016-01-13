@@ -17,7 +17,7 @@
 
 %{
 
-from GYBUnicodeDataUtils import *
+from GYBUnicodeDataUtils import get_grapheme_cluster_break_tests_as_UTF8
 
 grapheme_cluster_break_tests = \
     get_grapheme_cluster_break_tests_as_UTF8(unicodeGraphemeBreakTestFile)

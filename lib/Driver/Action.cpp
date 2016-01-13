@@ -18,8 +18,8 @@
 using namespace swift::driver;
 using namespace llvm::opt;
 
-Action::~Action() {
-  if (OwnsInputs) {
+JobAction::~JobAction() {
+  if (getOwnsInputs()) {
     llvm::DeleteContainerPointers(Inputs);
   }
 }

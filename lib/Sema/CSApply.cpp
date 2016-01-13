@@ -2284,9 +2284,16 @@ namespace {
     }
 
     Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
-      // Dig out the type of the base, which will be the result
-      // type of this expression.
+      // Dig out the type of the base, which will be the result type of this
+      // expression.  If constraint solving resolved this to an UnresolvedType,
+      // then we're in an ambiguity tolerant mode used for diagnostic
+      // generation.  Just leave this as an unresolved member reference.
       Type resultTy = simplifyType(expr->getType());
+      if (resultTy->is<UnresolvedType>()) {
+        expr->setType(resultTy);
+        return expr;
+      }
+
       Type baseTy = resultTy->getRValueType();
       auto &tc = cs.getTypeChecker();
 
@@ -2346,16 +2353,25 @@ namespace {
     llvm::SmallPtrSet<InjectIntoOptionalExpr *, 4>  DiagnosedOptionalInjections;
   private:
 
-    Expr *applyMemberRefExpr(Expr *expr,
-                             Expr *base,
-                             SourceLoc dotLoc,
-                             SourceLoc nameLoc,
-                             bool implicit) {
+    Expr *applyMemberRefExpr(Expr *expr, Expr *base, SourceLoc dotLoc,
+                             SourceLoc nameLoc, bool implicit) {
       // Determine the declaration selected for this overloaded reference.
       auto memberLocator = cs.getConstraintLocator(expr,
                                                    ConstraintLocator::Member);
-      auto selected = getOverloadChoice(memberLocator);
+      auto selectedElt = getOverloadChoiceIfAvailable(memberLocator);
 
+      if (!selectedElt) {
+        // If constraint solving resolved this to an UnresolvedType, then we're
+        // in an ambiguity tolerant mode used for diagnostic generation.  Just
+        // leave this as whatever type of member reference it already is.
+        Type resultTy = simplifyType(expr->getType());
+        assert(resultTy->hasUnresolvedType() &&
+               "Should have a selected member if we got a type");
+        expr->setType(resultTy);
+        return expr;
+      }
+
+      auto selected = *selectedElt;
       switch (selected.choice.getKind()) {
       case OverloadChoiceKind::DeclViaBridge: {
         // Look through an implicitly unwrapped optional.
@@ -2406,14 +2422,12 @@ namespace {
 
       case OverloadChoiceKind::TupleIndex: {
         auto baseTy = base->getType()->getRValueType();
-        if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)) {
+        if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)){
           base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy,
                                          cs.getConstraintLocator(base));
         }
 
-        return new (cs.getASTContext()) TupleElementExpr(
-                                          base,
-                                          dotLoc,
+        return new (cs.getASTContext()) TupleElementExpr(base, dotLoc,
                                           selected.choice.getTupleIndex(),
                                           nameLoc,
                                           simplifyType(expr->getType()));
@@ -5272,10 +5286,22 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     return result;
   }
 
+  // If this is an UnresolvedType in the system, preserve it.
+  if (fn->getType()->is<UnresolvedType>()) {
+    apply->setType(fn->getType());
+    return apply;
+  }
+
   // We have a type constructor.
   auto metaTy = fn->getType()->castTo<AnyMetatypeType>();
   auto ty = metaTy->getInstanceType();
-  
+
+  // If this is an UnresolvedType in the system, preserve it.
+  if (ty->is<UnresolvedType>()) {
+    apply->setType(ty);
+    return apply;
+  }
+
   // If the metatype value isn't a type expression, the user should reference
   // '.init' explicitly, for clarity.
   if (!fn->isTypeReference()) {

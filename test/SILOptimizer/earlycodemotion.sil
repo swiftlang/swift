@@ -1,13 +1,20 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -early-codemotion | FileCheck %s
+// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all %s -early-codemotion | FileCheck %s
 
 import Builtin
-import Swift
 
 struct Int {
   var value : Builtin.Int64
 }
 
+struct Int32 {
+  var value : Builtin.Int32
+}
+
 struct Int64 {
+  var value : Builtin.Int64
+}
+
+struct UInt64 {
   var value : Builtin.Int64
 }
 
@@ -52,6 +59,11 @@ struct foo {
   var a: Int
   init(a: Int)
   init()
+}
+
+enum Optional<T> {
+case None
+case Some(T)
 }
 
 sil @user : $@convention(thin) (Builtin.NativeObject) -> ()

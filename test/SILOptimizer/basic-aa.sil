@@ -1,9 +1,21 @@
-// RUN: %target-sil-opt %s -aa=basic-aa -aa-dump -o /dev/null | FileCheck %s
+// RUN: %target-sil-opt -module-name Swift %s -aa=basic-aa -aa-dump -o /dev/null | FileCheck %s
 
 // REQUIRES: asserts
 
 import Builtin
-import Swift
+
+struct Int {
+  var _value: Builtin.Int64
+}
+
+struct Int32 {
+  var _value: Builtin.Int32
+}
+
+enum Optional<T> {
+case None
+case Some(T)
+}
 
 // Address Arguments don't alias if they are arguments to the first BB.
 //

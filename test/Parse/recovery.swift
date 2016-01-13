@@ -131,6 +131,7 @@ func missingControllingExprInRepeatWhile() {
   } while { true }() // expected-error{{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{10-10=;}}
 }
 
+// expected-note @+1 {{in call to function 'acceptsClosure'}}
 func acceptsClosure<T>(t: T) -> Bool { return true }
 
 func missingControllingExprInFor() {
@@ -174,7 +175,7 @@ func missingControllingExprInFor() {
   }
 
   // A trailing closure is not accepted for the condition.
-  for ; acceptsClosure { 42 }; { // expected-error{{does not conform to protocol 'BooleanType'}} expected-error{{expression resolves to an unused function}}
+  for ; acceptsClosure { 42 }; { // expected-error{{generic parameter 'T' could not be inferred}} expected-error{{expression resolves to an unused function}}
 // expected-error@-1{{expected ';' in 'for' statement}}
 // expected-error@-2{{braced block}}
   }

@@ -18,6 +18,7 @@
 #define SWIFT_DRIVER_COMPILATION_H
 
 #include "swift/Driver/Job.h"
+#include "swift/Driver/Util.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseSet.h"
@@ -56,12 +57,6 @@ enum class OutputLevel {
 
 class Compilation {
 private:
-  /// The driver we were created by.
-  const Driver &TheDriver;
-
-  /// The default tool chain.
-  const ToolChain &DefaultToolChain;
-
   /// The DiagnosticEngine to which this Compilation should emit diagnostics.
   DiagnosticEngine &Diags;
 
@@ -72,10 +67,22 @@ private:
   SmallVector<std::unique_ptr<const Job>, 32> Jobs;
 
   /// The original (untranslated) input argument list.
-  std::unique_ptr<llvm::opt::InputArgList> InputArgs;
+  ///
+  /// This is only here for lifetime management. Any inspection of
+  /// command-line arguments should use #getArgs().
+  std::unique_ptr<llvm::opt::InputArgList> RawInputArgs;
 
   /// The translated input arg list.
   std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs;
+
+  /// A list of input files and their associated types.
+  InputFileList InputFilesWithTypes;
+
+  /// When non-null, a temporary file containing all input .swift files.
+  /// Used for large compilations to avoid overflowing argv.
+  ///
+  /// This is a pointer to a string whose data is held in #TempFilePaths.
+  std::string AllSourceFilesPath;
 
   /// Temporary files that should be cleaned up after the compilation finishes.
   ///
@@ -132,20 +139,16 @@ private:
   }
   
 public:
-  Compilation(const Driver &D, const ToolChain &DefaultToolChain,
-              DiagnosticEngine &Diags, OutputLevel Level,
+  Compilation(DiagnosticEngine &Diags, OutputLevel Level,
               std::unique_ptr<llvm::opt::InputArgList> InputArgs,
               std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs,
+              InputFileList InputsWithTypes,
               StringRef ArgsHash, llvm::sys::TimeValue StartTime,
               unsigned NumberOfParallelCommands = 1,
               bool EnableIncrementalBuild = false,
               bool SkipTaskExecution = false,
               bool SaveTemps = false);
   ~Compilation();
-
-  const Driver &getDriver() const { return TheDriver; }
-
-  const ToolChain &getDefaultToolChain() const { return DefaultToolChain; }
 
   ArrayRefView<std::unique_ptr<const Job>, const Job *, Compilation::unwrap>
   getJobs() const {
@@ -163,9 +166,8 @@ public:
              TempFilePaths.end();
   }
 
-  const llvm::opt::InputArgList &getInputArgs() const { return *InputArgs; }
-
   const llvm::opt::DerivedArgList &getArgs() const { return *TranslatedArgs; }
+  ArrayRef<InputPair> getInputFiles() const { return InputFilesWithTypes; }
 
   unsigned getNumberOfParallelCommands() const {
     return NumberOfParallelCommands;
@@ -197,6 +199,15 @@ public:
   void setLastBuildTime(llvm::sys::TimeValue time) {
     LastBuildTime = time;
   }
+
+  /// Requests the path to a file containing all input source files. This can
+  /// be shared across jobs.
+  ///
+  /// If this is never called, the Compilation does not bother generating such
+  /// a file.
+  ///
+  /// \sa types::isPartOfSwiftCompilation
+  const std::string &getAllSourcesPath() const;
 
   /// Asks the Compilation to perform the Jobs which it knows about.
   /// \returns result code for the Compilation's Jobs; 0 indicates success and

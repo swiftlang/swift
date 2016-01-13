@@ -25,11 +25,13 @@
 # this template, which is probably reasonable since those are "the meat" of every Mirror
 }%
 
-%import inspect,os.path,sys
+%import inspect
+%import os.path
+%import sys
 %sys.path = [os.path.split(inspect.getframeinfo(inspect.currentframe()).filename)[0] or '.'] + sys.path
 %import MirrorCommon
-%genericConstraintString = MirrorCommon.getGenericConstraintString(\
-%                          genericArgs if 'genericArgs' in locals() else None,\
-%                          genericConstraints if 'genericConstraints' in locals() else None)
+%genericConstraintString = MirrorCommon.getGenericConstraintString(
+%    genericArgs if 'genericArgs' in locals() else None,
+%    genericConstraints if 'genericConstraints' in locals() else None)
 
 internal struct _${introspecteeType}Mirror${genericConstraintString} : _MirrorType

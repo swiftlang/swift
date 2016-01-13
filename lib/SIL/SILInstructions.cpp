@@ -774,8 +774,13 @@ OperandValueArrayRef CondBranchInst::getFalseArgs() const {
   return Operands.asValueArray().slice(1 + NumTrueArgs, NumFalseArgs);
 }
 
-SILValue
-CondBranchInst::getArgForDestBB(SILBasicBlock *DestBB, SILArgument *A) {
+SILValue CondBranchInst::getArgForDestBB(SILBasicBlock *DestBB,
+                                         SILArgument *Arg) const {
+  return getArgForDestBB(DestBB, Arg->getIndex());
+}
+
+SILValue CondBranchInst::getArgForDestBB(SILBasicBlock *DestBB,
+                                         unsigned ArgIndex) const {
   // If TrueBB and FalseBB equal, we cannot find an arg for this DestBB so
   // return an empty SILValue.
   if (getTrueBB() == getFalseBB()) {
@@ -783,14 +788,12 @@ CondBranchInst::getArgForDestBB(SILBasicBlock *DestBB, SILArgument *A) {
     return SILValue();
   }
 
-  unsigned i = A->getIndex();
-
   if (DestBB == getTrueBB())
-    return Operands[1 + i].get();
+    return Operands[1 + ArgIndex].get();
 
   assert(DestBB == getFalseBB()
          && "By process of elimination BB must be false BB");
-  return Operands[1 + NumTrueArgs + i].get();
+  return Operands[1 + NumTrueArgs + ArgIndex].get();
 }
 
 ArrayRef<Operand> CondBranchInst::getTrueOperands() const {

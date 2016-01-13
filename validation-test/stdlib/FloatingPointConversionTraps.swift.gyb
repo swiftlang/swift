@@ -20,7 +20,7 @@ import ObjectiveC
 
 %{
 
-from SwiftIntTypes import *
+from SwiftIntTypes import all_integer_types
 
 # Test cases are written in a way that they don't depend on the word size.
 word_bits = 4

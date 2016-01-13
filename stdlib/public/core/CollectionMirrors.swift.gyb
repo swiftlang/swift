@@ -15,24 +15,24 @@
 %TMirrorConformance = gyb.parseTemplate("../common/MirrorConformance.gyb")
 %TMirrorBoilerplate = gyb.parseTemplate("../common/MirrorBoilerplate.gyb")
 
-% for Type in [['CollectionOfOne',1,"element",\
-%               'CollectionOfOne(\( _reflect(_value.element).summary ))'],\
+% for Type in [['CollectionOfOne',1,"element",
+%               'CollectionOfOne(\( _reflect(_value.element).summary ))'],
 %             ['EmptyCollection',0,"DONTSHOWME",'EmptyCollection']]:
 %   Self = Type[0]
 %   Count = Type[1]
 %   ElementName = Type[2]
 %   SummaryString = Type[3]
-%   MirrorDecl = gyb.executeTemplate(TMirrorDecl,\
-%                                    introspecteeType=Self,\
-%                                    genericArgs=['T'],\
+%   MirrorDecl = gyb.executeTemplate(TMirrorDecl,
+%                                    introspecteeType=Self,
+%                                    genericArgs=['T'],
 %                                    disposition='Struct')
-%   MirrorConformance = gyb.executeTemplate(TMirrorConformance,\
-%                                    introspecteeType=Self,\
-%                                    genericArgs=['T'],\
+%   MirrorConformance = gyb.executeTemplate(TMirrorConformance,
+%                                    introspecteeType=Self,
+%                                    genericArgs=['T'],
 %                                    disposition='Struct')
-%   MirrorBoilerplate = gyb.executeTemplate(TMirrorBoilerplate,\
-%                                    introspecteeType=Self,\
-%                                    genericArgs=['T'],\
+%   MirrorBoilerplate = gyb.executeTemplate(TMirrorBoilerplate,
+%                                    introspecteeType=Self,
+%                                    genericArgs=['T'],
 %                                    disposition='Struct')
 
 ${MirrorDecl} {

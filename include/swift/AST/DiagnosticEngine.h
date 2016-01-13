@@ -378,6 +378,77 @@ namespace swift {
       return fixItReplaceChars(Start, End, {});
     }
   };
+
+  /// \brief Class to track, map, and remap diagnostic severity and fatality
+  ///
+  class DiagnosticState {
+  public:
+    /// \brief Describes the current behavior to take with a diagnostic
+    enum class Behavior : uint8_t {
+      Unspecified,
+      Ignore,
+      Note,
+      Warning,
+      Error,
+      Fatal,
+    };
+
+  private:
+    /// \brief Whether we should continue to emit diagnostics, even after a
+    /// fatal error
+    bool showDiagnosticsAfterFatalError = false;
+
+    /// \brief Don't emit any warnings
+    bool ignoreAllWarnings = false;
+
+    /// \brief Whether a fatal error has occurred
+    bool fatalErrorOccurred = false;
+
+    /// \brief Whether any error diagnostics have been emitted.
+    bool anyErrorOccurred = false;
+
+    /// \brief Track the previous emitted Behavior, useful for notes
+    Behavior previousBehavior = Behavior::Unspecified;
+
+    /// \brief Track settable, per-diagnostic state that we store
+    std::vector<Behavior> perDiagnosticState;
+
+  public:
+    DiagnosticState();
+
+    /// \brief Figure out the Behavior for the given diagnostic, taking current
+    /// state such as fatality into account.
+    Behavior determineBehavior(DiagID);
+
+    bool hadAnyError() const { return anyErrorOccurred; }
+    bool hasFatalErrorOccurred() const { return fatalErrorOccurred; }
+
+    void setShowDiagnosticsAfterFatalError(bool val = true) {
+      showDiagnosticsAfterFatalError = val;
+    }
+
+    /// \brief Whether to skip emitting warnings
+    void setIgnoreAllWarnings(bool val) { ignoreAllWarnings = val; }
+    bool getIgnoreAllWarnings() const { return ignoreAllWarnings; }
+
+    void resetHadAnyError() {
+      anyErrorOccurred = false;
+      fatalErrorOccurred = false;
+    }
+
+    /// Set per-diagnostic behavior
+    void setDiagnosticBehavior(DiagID id, Behavior behavior) {
+      perDiagnosticState[(unsigned)id] = behavior;
+    }
+
+  private:
+    // Make the state movable only
+    DiagnosticState(const DiagnosticState &) = delete;
+    const DiagnosticState &operator=(const DiagnosticState &) = delete;
+
+    DiagnosticState(DiagnosticState &&) = default;
+    DiagnosticState &operator=(DiagnosticState &&) = default;
+  };
     
   /// \brief Class responsible for formatting diagnostics and presenting them
   /// to the user.
@@ -390,19 +461,7 @@ namespace swift {
     /// emitting diagnostics.
     SmallVector<DiagnosticConsumer *, 2> Consumers;
 
-    /// HadAnyError - True if any error diagnostics have been emitted.
-    bool HadAnyError;
-
-    enum class FatalErrorState {
-      None,
-      JustEmitted,
-      Fatal
-    };
-
-    /// Sticky flag set to \c true when a fatal error is emitted.
-    FatalErrorState FatalState = FatalErrorState::None;
-
-    bool ShowDiagnosticsAfterFatalError = false;
+    DiagnosticState state;
 
     /// \brief The currently active diagnostic, if there is one.
     Optional<Diagnostic> ActiveDiagnostic;
@@ -424,25 +483,32 @@ namespace swift {
     
   public:
     explicit DiagnosticEngine(SourceManager &SourceMgr)
-      : SourceMgr(SourceMgr), HadAnyError(false), ActiveDiagnostic() {
+      : SourceMgr(SourceMgr), ActiveDiagnostic() {
     }
 
     /// hadAnyError - return true if any *error* diagnostics have been emitted.
-    bool hadAnyError() const {
-      return HadAnyError;
-    }
+    bool hadAnyError() const { return state.hadAnyError(); }
 
     bool hasFatalErrorOccurred() const {
-      return FatalState != FatalErrorState::None;
+      return state.hasFatalErrorOccurred();
     }
 
-    void setShowDiagnosticsAfterFatalError(bool Val = true) {
-      ShowDiagnosticsAfterFatalError = Val;
+    void setShowDiagnosticsAfterFatalError(bool val = true) {
+      state.setShowDiagnosticsAfterFatalError(val);
+    }
+
+    /// \brief Whether to skip emitting warnings
+    void setIgnoreAllWarnings(bool val) { state.setIgnoreAllWarnings(val); }
+    bool getIgnoreAllWarnings() const {
+      return state.getIgnoreAllWarnings();
+    }
+
+    void ignoreDiagnostic(DiagID id) {
+      state.setDiagnosticBehavior(id, DiagnosticState::Behavior::Ignore);
     }
 
     void resetHadAnyError() {
-      HadAnyError = false;
-      FatalState = FatalErrorState::None;
+      state.resetHadAnyError();
     }
 
     /// \brief Add an additional DiagnosticConsumer to receive diagnostics.
@@ -572,10 +638,7 @@ namespace swift {
 
     /// \returns true if diagnostic is marked with PointsToFirstBadToken
     /// option.
-    bool isDiagnosticPointsToFirstBadToken(DiagID ID) const;
-
-    /// \returns true if diagnostic is marked as fatal.
-    bool isDiagnosticFatal(DiagID ID) const;
+    bool isDiagnosticPointsToFirstBadToken(DiagID id) const;
 
   private:
     /// \brief Flush the active diagnostic.

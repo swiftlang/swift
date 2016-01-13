@@ -50,12 +50,32 @@ protected:
   constexpr static const char * const SWIFT_EXECUTABLE_NAME = "swift";
 
   /// Packs together the supplementary information about the job being created.
-  struct JobContext {
+  class JobContext {
+  private:
+    const Compilation &C;
+
+  public:
     ArrayRef<const Job *> Inputs;
-    const CommandOutput &Output;
     ArrayRef<const Action *> InputActions;
-    const llvm::opt::ArgList &Args;
+    const CommandOutput &Output;
     const OutputInfo &OI;
+
+    /// The arguments to the driver. Can also be used to create new strings with
+    /// the same lifetime.
+    ///
+    /// This just caches C.getArgs().
+    const llvm::opt::ArgList &Args;
+
+  public:
+    JobContext(const Compilation &C, ArrayRef<const Job *> Inputs,
+               ArrayRef<const Action *> InputActions,
+               const CommandOutput &Output, const OutputInfo &OI);
+
+    /// Forwards to Compilation::getInputFiles.
+    ArrayRef<InputPair> getTopLevelInputFiles() const;
+
+    /// Forwards to Compilation::getAllSourcesPath.
+    const std::string &getAllSourcesPath() const;
   };
 
   /// Packs together information chosen by toolchains to create jobs.
@@ -125,10 +145,10 @@ public:
   /// This method dispatches to the various \c constructInvocation methods,
   /// which may be overridden by platform-specific subclasses.
   std::unique_ptr<Job> constructJob(const JobAction &JA,
+                                    const Compilation &C,
                                     SmallVectorImpl<const Job *> &&inputs,
-                                    std::unique_ptr<CommandOutput> output,
                                     const ActionList &inputActions,
-                                    const llvm::opt::ArgList &args,
+                                    std::unique_ptr<CommandOutput> output,
                                     const OutputInfo &OI) const;
 
   /// Return the default language type to use for the given extension.

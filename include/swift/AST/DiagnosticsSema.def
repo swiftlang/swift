@@ -516,9 +516,12 @@ NOTE(in_cast_expr_types,sema_tcc,none,
       "in cast from type %0 to %1",
       (Type, Type))
 
-ERROR(tuple_types_not_convertible,sema_tcc,none,
+ERROR(tuple_types_not_convertible_nelts,sema_tcc,none,
       "%0 is not convertible to %1, "
       "tuples have a different number of elements", (Type, Type))
+
+ERROR(tuple_types_not_convertible,sema_tcc,none,
+      "tuple type %0 is not convertible to tuple %1", (Type, Type))
 
 ERROR(invalid_force_unwrap,sema_tcc,none,
       "cannot force unwrap value of non-optional type %0", (Type))
@@ -1762,6 +1765,11 @@ ERROR(discard_expr_outside_of_assignment,sema_tce,none,
       ())
 ERROR(inout_expr_outside_of_call,sema_tce,none,
       "'&' can only appear immediately in a call argument list", ())
+
+
+ERROR(unresolved_member_no_inference,sema_tce,none,
+      "reference to member %0 cannot be resolved without a contextual type",
+      (Identifier))
 
 ERROR(type_of_expression_is_ambiguous,sema_tce,none,
       "type of expression is ambiguous without more context", ())

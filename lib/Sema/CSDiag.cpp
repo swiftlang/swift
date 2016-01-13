@@ -2443,15 +2443,6 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
 
   fromType = fromType->getRValueType();
   auto toType = CS->simplifyType(constraint->getSecondType());
-
-  // If the second type is a type variable, the expression itself is
-  // ambiguous.  Bail out so the general ambiguity diagnosing logic can handle
-  // it.
-  if (isUnresolvedOrTypeVarType(fromType) ||
-      isUnresolvedOrTypeVarType(toType) ||
-      // FIXME: Why reject unbound generic types here?
-      fromType->is<UnboundGenericType>())
-    return false;
   
   // Try to simplify irrelevant details of function types.  For example, if
   // someone passes a "() -> Float" function to a "() throws -> Int"
@@ -2489,19 +2480,70 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   // a failed conversion constraint of "A -> B" to "_ -> C", where the error is
   // that B isn't convertible to C.
   if (CS->getContextualTypePurpose() == CTP_CalleeResult) {
-    if (auto destFT = toType->getAs<FunctionType>()) {
-      auto srcFT = fromType->getAs<FunctionType>();
-      if (!isUnresolvedOrTypeVarType(srcFT->getResult())) {
-        // Otherwise, the error is that the result types mismatch.
-        diagnose(expr->getLoc(), diag::invalid_callee_result_type,
-                 srcFT->getResult(), destFT->getResult())
-          .highlight(expr->getSourceRange());
-        return true;
-      }
+    auto destFT = toType->getAs<FunctionType>();
+    auto srcFT = fromType->getAs<FunctionType>();
+    if (destFT && srcFT && !isUnresolvedOrTypeVarType(srcFT->getResult())) {
+      // Otherwise, the error is that the result types mismatch.
+      diagnose(expr->getLoc(), diag::invalid_callee_result_type,
+               srcFT->getResult(), destFT->getResult())
+        .highlight(expr->getSourceRange());
+      return true;
     }
   }
   
+  
+  // If simplification has turned this into the same types, then this isn't the
+  // broken constraint that we're looking for.
+  if (fromType->isEqual(toType) &&
+      constraint->getKind() != ConstraintKind::ConformsTo)
+    return false;
+  
+  
+  // If we have two tuples with mismatching types, produce a tailored
+  // diagnostic.
+  if (auto fromTT = fromType->getAs<TupleType>())
+    if (auto toTT = toType->getAs<TupleType>()) {
+      if (fromTT->getNumElements() != toTT->getNumElements()) {
+        diagnose(anchor->getLoc(), diag::tuple_types_not_convertible_nelts,
+                 fromTT, toTT)
+        .highlight(anchor->getSourceRange());
+        return true;
+      }
+     
+      SmallVector<TupleTypeElt, 4> FromElts;
+      auto voidTy = CS->getASTContext().TheUnresolvedType;
+      
+      for (unsigned i = 0, e = fromTT->getNumElements(); i != e; ++i)
+        FromElts.push_back({ voidTy, fromTT->getElement(i).getName() });
+      auto TEType = TupleType::get(FromElts, CS->getASTContext());
+      
+      SmallVector<int, 4> sources;
+      SmallVector<unsigned, 4> variadicArgs;
+      
+      // If the shuffle conversion is invalid (e.g. incorrect element labels),
+      // then we have a type error.
+      if (computeTupleShuffle(TEType->castTo<TupleType>()->getElements(),
+                              toTT->getElements(), sources, variadicArgs)) {
+        diagnose(anchor->getLoc(), diag::tuple_types_not_convertible,
+                 fromTT, toTT)
+        .highlight(anchor->getSourceRange());
+        return true;
+      }
+    }
+  
+  
+  // If the second type is a type variable, the expression itself is
+  // ambiguous.  Bail out so the general ambiguity diagnosing logic can handle
+  // it.
+  if (fromType->hasUnresolvedType() || fromType->hasTypeVariable() ||
+      toType->hasUnresolvedType() || toType->hasTypeVariable() ||
+      // FIXME: Why reject unbound generic types here?
+      fromType->is<UnboundGenericType>())
+    return false;
+
+  
   if (auto PT = toType->getAs<ProtocolType>()) {
+    
     // Check for "=" converting to BooleanType.  The user probably meant ==.
     if (auto *AE = dyn_cast<AssignExpr>(expr->getValueProvidingExpr()))
       if (PT->getDecl()->isSpecificProtocol(KnownProtocolKind::BooleanType)) {
@@ -2530,23 +2572,6 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
     }
     return true;
   }
-
-  // If simplification has turned this into the same types, then this isn't the
-  // broken constraint that we're looking for.
-  if (fromType->isEqual(toType))
-    return false;
-
-  
-  // If we have two tuples with mismatching types, produce a tailored
-  // diagnostic.
-  if (auto fromTT = fromType->getAs<TupleType>())
-    if (auto toTT = toType->getAs<TupleType>())
-      if (fromTT->getNumElements() != toTT->getNumElements()) {
-        diagnose(anchor->getLoc(), diag::tuple_types_not_convertible,
-                 fromTT, toTT)
-          .highlight(anchor->getSourceRange());
-        return true;
-      }
   
   diagnose(anchor->getLoc(), diag::types_not_convertible,
            constraint->getKind() == ConstraintKind::Subtype,
@@ -2778,9 +2803,9 @@ static Type replaceArchetypesAndTypeVarsWithUnresolved(Type ty) {
  auto &ctx = ty->getASTContext();
 
   return ty.transform([&](Type type) -> Type {
-    if (type->is<TypeVariableType>())
-      return ctx.TheUnresolvedType;
-    if (type->is<ArchetypeType>())
+    if (type->is<TypeVariableType>() ||
+        type->is<ArchetypeType>() ||
+        type->isTypeParameter())
       return ctx.TheUnresolvedType;
     return type;
   });
@@ -2818,7 +2843,8 @@ typeCheckChildIndependently(Expr *subExpr, Type convertType,
       if (FT->isAutoClosure())
         convertType = FT->getResult();
 
-    if (convertType->hasTypeVariable() || convertType->hasArchetype())
+    if (convertType->hasTypeVariable() || convertType->hasArchetype() ||
+        convertType->isTypeParameter())
       convertType = replaceArchetypesAndTypeVarsWithUnresolved(convertType);
     
     // If the conversion type contains no info, drop it.
@@ -3870,6 +3896,10 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     return true;
   }
 
+  if (argExpr->getType()->hasUnresolvedType())
+    return false;
+  
+  
   std::string argString = getTypeListString(argExpr->getType());
 
   // If we couldn't get the name of the callee, then it must be something of a
@@ -3958,6 +3988,15 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
                                              destType->getRValueType(),
                                              CTP_AssignSource);
   if (!srcExpr) return true;
+
+  // If we are assigning to _ and have unresolved types on the RHS, then we have
+  // an ambiguity problem.
+  if (isa<DiscardAssignmentExpr>(destExpr->getSemanticsProvidingExpr()) &&
+      srcExpr->getType()->hasUnresolvedType()) {
+    diagnoseAmbiguity(srcExpr);
+    return true;
+  }
+
   return false;
 }
 
@@ -4946,22 +4985,32 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
     return;
   }
   
-
-  // Attempt to re-type-check the entire expression, while allowing ambiguity.
-  auto exprType = getTypeOfTypeCheckedChildIndependently(expr);
-  // If it failed and diagnosed something, then we're done.
-  if (!exprType) return;
-
-  // If we were able to find something more specific than "unknown" (perhaps
-  // something like "[_:_]" for a dictionary literal), include it in the
-  // diagnostic.
-  if (!isUnresolvedOrTypeVarType(exprType)) {
-    diagnose(E->getLoc(), diag::specific_type_of_expression_is_ambiguous,
-             exprType)
-      .highlight(E->getSourceRange());
-    return;
+  if (auto UME = dyn_cast<UnresolvedMemberExpr>(E)) {
+    if (!CS->getContextualType()) {
+      diagnose(E->getLoc(), diag::unresolved_member_no_inference,UME->getName())
+        .highlight(SourceRange(UME->getDotLoc(), UME->getNameLoc()));
+      return;
+    }
   }
-  
+
+  // Attempt to re-type-check the entire expression, allowing ambiguity, but
+  // ignoring a contextual type.
+  if (expr == E) {
+    auto exprType = getTypeOfTypeCheckedChildIndependently(expr);
+    // If it failed and diagnosed something, then we're done.
+    if (!exprType) return;
+
+    // If we were able to find something more specific than "unknown" (perhaps
+    // something like "[_:_]" for a dictionary literal), include it in the
+    // diagnostic.
+    if (!isUnresolvedOrTypeVarType(exprType)) {
+      diagnose(E->getLoc(), diag::specific_type_of_expression_is_ambiguous,
+               exprType)
+        .highlight(E->getSourceRange());
+      return;
+    }
+  }
+
   // If there are no posted constraints or failures, then there was
   // not enough contextual information available to infer a type for the
   // expression.

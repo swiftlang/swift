@@ -209,16 +209,14 @@ func good(a: A<EE>) -> Int {
 }
 
 func bad(a: A<EE>) {
-  a.map { // expected-error {{cannot invoke 'map' with an argument list of type '((EE) -> _)'}}
-  // expected-note@-1 {{expected an argument list of type '(EE -> T)'}}
+  a.map { // expected-error {{generic parameter 'T' could not be inferred}}
     let _: EE = $0
     return 1
   }
 }
 
 func ugly(a: A<EE>) {
-  a.map { // expected-error {{cannot invoke 'map' with an argument list of type '((EE) -> _)'}}
-  // expected-note@-1 {{expected an argument list of type '(EE -> T)'}}
+  a.map { // expected-error {{generic parameter 'T' could not be inferred}}
     switch $0 {
     case .A:
       return 1

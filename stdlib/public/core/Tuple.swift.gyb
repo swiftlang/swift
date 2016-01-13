@@ -13,7 +13,7 @@
 // Generate comparison functions for tuples up to some reasonable arity.
 
 % for arity in range(2,7):
-%   typeParams = [chr(ord("A")+i) for i in range(arity)]
+%   typeParams = [chr(ord("A") + i) for i in range(arity)]
 %   tupleT = "({})".format(",".join(typeParams))
 
 %   equatableTypeParams = ", ".join(["{} : Equatable".format(c) for c in typeParams])

@@ -1562,21 +1562,25 @@ bool ConstraintSystem::solveSimplified(
     // constraints that could show up here?
     if (allowFreeTypeVariables != FreeTypeVariableBinding::Disallow &&
         hasFreeTypeVariables()) {
-      bool anyNonConformanceConstraints = false;
-      for (auto &constraint : InactiveConstraints) {
-        if (constraint.getKind() == ConstraintKind::ConformsTo ||
-            constraint.getKind() == ConstraintKind::SelfObjectOfProtocol ||
-            constraint.getKind() == ConstraintKind::TypeMember)
-          continue;
-
-        anyNonConformanceConstraints = true;
-        break;
-      }
 
       // If this solution is worse than the best solution we've seen so far,
       // skip it.
       if (worseThanBestSolution())
         return true;
+
+      bool anyNonConformanceConstraints = false;
+      for (auto &constraint : InactiveConstraints) {
+        switch (constraint.getClassification()) {
+        case ConstraintClassification::Relational:
+        case ConstraintClassification::Member:
+          continue;
+        default:
+          break;
+        }
+
+        anyNonConformanceConstraints = true;
+        break;
+      }
 
       if (!anyNonConformanceConstraints) {
         auto solution = finalize(allowFreeTypeVariables);

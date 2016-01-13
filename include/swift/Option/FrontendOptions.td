@@ -28,6 +28,9 @@ def delayed_function_body_parsing :
 def primary_file : Separate<["-"], "primary-file">,
   HelpText<"Produce output for this file, not the whole module">;
 
+def filelist : Separate<["-"], "filelist">,
+  HelpText<"Specify source inputs in a file rather than on the command line">;
+
 def emit_module_doc : Flag<["-"], "emit-module-doc">,
   HelpText<"Emit a module documentation file based on documentation "
            "comments">;

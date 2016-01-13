@@ -1008,3 +1008,11 @@ struct MutatingGetterStruct {
   }
 }
 
+
+protocol ProtocolWithReadWriteSubscript {
+  subscript(i: Int) -> Int { get set }
+}
+
+struct CrashWithUnnamedSubscript : ProtocolWithReadWriteSubscript {
+  subscript(_: Int) -> Int { get { } set { } }
+}
