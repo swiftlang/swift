@@ -453,6 +453,10 @@ public:
   /// than their underlying types.
   llvm::DenseMap<Type, Accessibility> TypeAccessibilityCache;
 
+  // Caches whether a given declaration is "as specialized" as another.
+  llvm::DenseMap<std::pair<ValueDecl*, ValueDecl*>, bool> 
+    specializedOverloadComparisonCache;
+  
   // We delay validation of C and Objective-C type-bridging functions in the
   // standard library until we encounter a declaration that requires one. This
   // flag is set to 'true' once the bridge functions have been checked.

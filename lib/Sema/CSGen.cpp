@@ -85,6 +85,7 @@ namespace {
     llvm::SmallVector<TypeVariableType *, 16> stringLiteralTyvars;
 
     llvm::SmallVector<ClosureExpr *, 4> closureExprs;
+    llvm::SmallVector<BinaryExpr *, 4> binaryExprs;
 
     // TODO: manage as a set of lists, to speed up addition of binding
     // constraints.
@@ -94,6 +95,10 @@ namespace {
       haveIntLiteral = false;
       haveFloatLiteral = false;
       haveStringLiteral = false;
+    }
+
+    bool haveLiteral() { 
+      return haveIntLiteral || haveFloatLiteral || haveStringLiteral; 
     }
   };
 
@@ -193,8 +198,7 @@ namespace {
       
       if (auto UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
         
-        if (UDE->getType() &&
-            !isa<TypeVariableType>(UDE->getType().getPointer()))
+        if (UDE->getType())
           LTI.collectedTypes.insert(UDE->getType().getPointer());
         
         // Don't recurse into the base expression.
@@ -216,8 +220,7 @@ namespace {
         if (auto varDecl = dyn_cast<VarDecl>(DRE->getDecl())) {
           if (varDecl->isAnonClosureParam()) {
             LTI.anonClosureParams.push_back(DRE);
-          } else if (DRE->getType() &&
-            !isa<TypeVariableType>(DRE->getType().getPointer())) {
+          } else if (DRE->getType()) {
             LTI.collectedTypes.insert(DRE->getType().getPointer());
           }
           return { false, expr };
@@ -229,9 +232,13 @@ namespace {
       // looking any further.
       if (isa<ApplyExpr>(expr) &&
           !(isa<BinaryExpr>(expr) || isa<PrefixUnaryExpr>(expr) ||
-            isa<PostfixUnaryExpr>(expr))) {
+            isa<PostfixUnaryExpr>(expr))) {      
         return { false, expr };
-      }    
+      }
+
+      if (isa<BinaryExpr>(expr)) {
+        LTI.binaryExprs.push_back(dyn_cast<BinaryExpr>(expr));
+      }  
       
       if (auto favoredType = CS.getFavoredType(expr)) {
         LTI.collectedTypes.insert(favoredType);
@@ -324,7 +331,7 @@ namespace {
           }
         }
       }
-    }    
+    }
 
     // Link integer literal tyvars.
     if (lti.intLiteralTyvars.size() > 1) {
@@ -362,9 +369,72 @@ namespace {
       }
     }
 
-    if (!lti.collectedTypes.empty()) {
+    if (lti.collectedTypes.size() == 1) {
       // TODO: Compute the BCT.
       CS.setFavoredType(expr, *lti.collectedTypes.begin());
+      
+      // If we have a chain of identical binop expressions with homogenous
+      // argument types, we can directly simplify the associated constraint
+      // graph.
+      auto simplifyBinOpExprTyVars = [&]() {
+        if (!lti.haveLiteral()) {
+          for (auto binExp1 : lti.binaryExprs) {
+            for (auto binExp2 : lti.binaryExprs) {
+              if (binExp1 == binExp2)
+                continue;
+
+              auto fnTy1 = binExp1->getType()->getAs<TypeVariableType>();
+              auto fnTy2 = binExp2->getType()->getAs<TypeVariableType>();
+
+              if (!(fnTy1 && fnTy2))
+                return;
+
+              auto ODR1 = dyn_cast<OverloadedDeclRefExpr>(binExp1->getFn());
+              auto ODR2 = dyn_cast<OverloadedDeclRefExpr>(binExp2->getFn());
+
+              if (!(ODR1 && ODR2))
+                return; 
+
+              // TODO: We currently limit this optimization to known arithmetic
+              // operators, but we should be able to broaden this out to
+              // logical operators as well.
+              if (!isArithmeticOperatorDecl(ODR1->getDecls()[0]))
+                return;
+
+              if (ODR1->getDecls()[0]->getName().str() != 
+                   ODR2->getDecls()[0]->getName().str())
+                return;
+
+              // All things equal, we can merge the tyvars for the function
+              // types.
+              auto rep1 = CS.getRepresentative(fnTy1);
+              auto rep2 = CS.getRepresentative(fnTy2);
+
+              if (rep1 != rep2) {
+                CS.mergeEquivalenceClasses(rep1, rep2, 
+                                           /*updateWorkList*/ false);
+              }                    
+
+              auto odTy1 = ODR1->getType()->getAs<TypeVariableType>();
+              auto odTy2 = ODR2->getType()->getAs<TypeVariableType>();
+
+              if (odTy1 && odTy2) {
+                auto odRep1 = CS.getRepresentative(odTy1);
+                auto odRep2 = CS.getRepresentative(odTy2);
+
+                // Since we'll be choosing the same overload, we can merge
+                // the overload tyvar as well.
+                if (odRep1 != odRep2)
+                  CS.mergeEquivalenceClasses(odRep1, odRep2,
+                                             /*updateWorkList*/ false);
+              }
+            }
+          }
+        }
+      };
+
+      simplifyBinOpExprTyVars();       
+
       return true;
     }    
     

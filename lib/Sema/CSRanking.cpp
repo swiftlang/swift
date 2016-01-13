@@ -489,208 +489,218 @@ static unsigned countDefaultArguments(AbstractFunctionDecl *func) {
 static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
                                   ValueDecl *decl1, ValueDecl *decl2) {
 
-
   if (tc.getLangOpts().DebugConstraintSolver) {
     auto &log = tc.Context.TypeCheckerDebug->getStream();
-    log << "Comparing declarations \n";
+    log << "Comparing declarations\n";
     decl1->print(log); 
     log << "\nand\n";
     decl2->print(log);
     log << "\n";
   }
 
-  // If the kinds are different, there's nothing we can do.
-  // FIXME: This is wrong for type declarations, which we're skipping
-  // entirely.
-  if (decl1->getKind() != decl2->getKind() || isa<TypeDecl>(decl1))
-    return false;
+  if (!tc.specializedOverloadComparisonCache.count({decl1, decl2})) {
 
-  // A non-generic declaration is more specialized than a generic declaration.
-  if (auto func1 = dyn_cast<AbstractFunctionDecl>(decl1)) {
-    auto func2 = cast<AbstractFunctionDecl>(decl2);
-    if (static_cast<bool>(func1->getGenericParams()) !=
-          static_cast<bool>(func2->getGenericParams()))
-      return func2->getGenericParams();
+    auto compareSpecializations = [&] () -> bool {
+      // If the kinds are different, there's nothing we can do.
+      // FIXME: This is wrong for type declarations, which we're skipping
+      // entirely.
+      if (decl1->getKind() != decl2->getKind() || isa<TypeDecl>(decl1))
+        return false;
+
+      // A non-generic declaration is more specialized than a generic declaration.
+      if (auto func1 = dyn_cast<AbstractFunctionDecl>(decl1)) {
+        auto func2 = cast<AbstractFunctionDecl>(decl2);
+        if (static_cast<bool>(func1->getGenericParams()) !=
+              static_cast<bool>(func2->getGenericParams()))
+          return func2->getGenericParams();
+      }
+
+      // A witness is always more specialized than the requirement it satisfies.
+      switch (compareWitnessAndRequirement(tc, dc, decl1, decl2)) {
+      case Comparison::Unordered:
+        break;
+
+      case Comparison::Better:
+        return true;
+
+      case Comparison::Worse:
+        return false;
+      }
+
+      // Members of protocol extensions have special overloading rules.
+      ProtocolDecl *inProtocolExtension1 = decl1->getDeclContext()
+                                             ->isProtocolExtensionContext();
+      ProtocolDecl *inProtocolExtension2 = decl2->getDeclContext()
+                                             ->isProtocolExtensionContext();
+      if (inProtocolExtension1 && inProtocolExtension2) {
+        // Both members are in protocol extensions.
+        // Determine whether the 'Self' type from the first protocol extension
+        // satisfies all of the requirements of the second protocol extension.
+        DeclContext *dc1 = decl1->getDeclContext();
+        DeclContext *dc2 = decl2->getDeclContext();
+        bool better1 = isProtocolExtensionAsSpecializedAs(tc, dc1, dc2);
+        bool better2 = isProtocolExtensionAsSpecializedAs(tc, dc2, dc1);
+        if (better1 != better2) {
+          return better1;
+        }
+      } else if (inProtocolExtension1 || inProtocolExtension2) {
+        // One member is in a protocol extension, the other is in a concrete type.
+        // Prefer the member in the concrete type.
+        return inProtocolExtension2;
+      }
+
+      Type type1 = decl1->getInterfaceType();
+      Type type2 = decl2->getInterfaceType();
+
+      /// What part of the type should we check?
+      enum {
+        CheckAll,
+        CheckInput,
+      } checkKind;
+      if (isa<AbstractFunctionDecl>(decl1) || isa<EnumElementDecl>(decl1)) {
+        // Nothing to do: these have the curried 'self' already.
+        if (auto elt = dyn_cast<EnumElementDecl>(decl1)) {
+          checkKind = elt->hasArgumentType() ? CheckInput : CheckAll;
+        } else {
+          checkKind = CheckInput;
+        }
+      } else {
+        // Add a curried 'self' type.
+        assert(!type1->is<GenericFunctionType>() && "Odd generic function type?");
+        assert(!type2->is<GenericFunctionType>() && "Odd generic function type?");
+        type1 = addCurriedSelfType(tc.Context, type1, decl1->getDeclContext());
+        type2 = addCurriedSelfType(tc.Context, type2, decl2->getDeclContext());
+
+        // For a subscript declaration, only look at the input type (i.e., the
+        // indices).
+        if (isa<SubscriptDecl>(decl1))
+          checkKind = CheckInput;
+        else
+          checkKind = CheckAll;
+      }
+
+      // Construct a constraint system to compare the two declarations.
+      ConstraintSystem cs(tc, dc, ConstraintSystemOptions());
+
+      auto locator = cs.getConstraintLocator(nullptr);
+      // FIXME: Locator when anchored on a declaration.
+      // Get the type of a reference to the second declaration.
+      Type openedType2 = cs.openType(type2, locator,
+                                     decl2->getPotentialGenericDeclContext());
+
+      // Get the type of a reference to the first declaration, swapping in
+      // archetypes for the dependent types.
+      ArchetypeOpener opener(decl1->getPotentialGenericDeclContext());
+      Type openedType1 = cs.openType(type1, locator,
+                                     decl1->getPotentialGenericDeclContext(),
+                                     /*skipProtocolSelfConstraint=*/false,
+                                     &opener);
+
+      // Extract the self types from the declarations, if they have them.
+      Type selfTy1;
+      Type selfTy2;
+      if (decl1->getDeclContext()->isTypeContext()) {
+        auto funcTy1 = openedType1->castTo<FunctionType>();
+        selfTy1 = funcTy1->getInput()->getRValueInstanceType();
+        openedType1 = funcTy1->getResult();
+      }
+      if (decl2->getDeclContext()->isTypeContext()) {
+        auto funcTy2 = openedType2->castTo<FunctionType>();
+        selfTy2 = funcTy2->getInput()->getRValueInstanceType();
+        openedType2 = funcTy2->getResult();
+      }
+      
+      // Determine the relationship between the 'self' types and add the
+      // appropriate constraints. The constraints themselves never fail, but
+      // they help deduce type variables that were opened.
+      switch (computeSelfTypeRelationship(tc, dc, decl1->getDeclContext(),
+                                          decl2->getDeclContext())) {
+      case SelfTypeRelationship::Unrelated:
+        // Skip the self types parameter entirely.
+        break;
+
+      case SelfTypeRelationship::Equivalent:
+        cs.addConstraint(ConstraintKind::Equal, selfTy1, selfTy2, locator);
+        break;
+
+      case SelfTypeRelationship::Subclass:
+        cs.addConstraint(ConstraintKind::Subtype, selfTy1, selfTy2, locator);
+        break;
+
+      case SelfTypeRelationship::Superclass:
+        cs.addConstraint(ConstraintKind::Subtype, selfTy2, selfTy1, locator);
+        break;
+
+      case SelfTypeRelationship::ConformsTo:
+        cs.addConstraint(ConstraintKind::ConformsTo, selfTy1, selfTy2, locator);
+        break;
+
+      case SelfTypeRelationship::ConformedToBy:
+        cs.addConstraint(ConstraintKind::ConformsTo, selfTy2, selfTy1, locator);
+        break;
+      }
+
+      switch (checkKind) {
+      case CheckAll:
+        // Check whether the first type is a subtype of the second.
+        cs.addConstraint(ConstraintKind::Subtype,
+                         openedType1,
+                         openedType2,
+                         locator);
+        break;
+
+      case CheckInput: {
+        // Check whether the first function type's input is a subtype of the
+        // second type's inputs, i.e., can we forward the arguments?
+        auto funcTy1 = openedType1->castTo<FunctionType>();
+        auto funcTy2 = openedType2->castTo<FunctionType>();
+        cs.addConstraint(ConstraintKind::Subtype,
+                         funcTy1->getInput(),
+                         funcTy2->getInput(),
+                         locator);
+        break;
+      }
+      }
+
+      // Solve the system.
+      auto solution = cs.solveSingle(FreeTypeVariableBinding::Allow);
+
+
+      // Ban value-to-optional conversions.
+      if (solution && solution->getFixedScore().Data[SK_ValueToOptional] == 0)
+        return true;
+
+      // Between two imported functions/methods, prefer one with fewer
+      // defaulted arguments.
+      //
+      // FIXME: This is a total hack; we should be comparing based on the
+      // number of default arguments at were actually used. It's only safe to
+      // do this because the count will be zero except when under the
+      // experimental InferDefaultArguments mode of the Clang importer.
+      if (isa<AbstractFunctionDecl>(decl1) && 
+          isa<AbstractFunctionDecl>(decl2) &&
+          decl1->getClangDecl() && 
+          decl2->getClangDecl()) {
+        unsigned defArgsIn1
+          = countDefaultArguments(cast<AbstractFunctionDecl>(decl1));
+        unsigned defArgsIn2
+          = countDefaultArguments(cast<AbstractFunctionDecl>(decl2));
+        if (defArgsIn1 < defArgsIn2)
+          return true;
+      }
+
+      return false;
+    };
+
+    tc.specializedOverloadComparisonCache[{decl1, decl2}] = 
+        compareSpecializations();
+  } else if (tc.getLangOpts().DebugConstraintSolver) {
+    auto &log = tc.Context.TypeCheckerDebug->getStream();
+    log << "Found cached comparison: " 
+        << tc.specializedOverloadComparisonCache[{decl1, decl2}] << "\n";
   }
 
-  // A witness is always more specialized than the requirement it satisfies.
-  switch (compareWitnessAndRequirement(tc, dc, decl1, decl2)) {
-  case Comparison::Unordered:
-    break;
-
-  case Comparison::Better:
-    return true;
-
-  case Comparison::Worse:
-    return false;
-  }
-
-  // Members of protocol extensions have special overloading rules.
-  ProtocolDecl *inProtocolExtension1 = decl1->getDeclContext()
-                                         ->isProtocolExtensionContext();
-  ProtocolDecl *inProtocolExtension2 = decl2->getDeclContext()
-                                         ->isProtocolExtensionContext();
-  if (inProtocolExtension1 && inProtocolExtension2) {
-    // Both members are in protocol extensions.
-    // Determine whether the 'Self' type from the first protocol extension
-    // satisfies all of the requirements of the second protocol extension.
-    DeclContext *dc1 = decl1->getDeclContext();
-    DeclContext *dc2 = decl2->getDeclContext();
-    bool better1 = isProtocolExtensionAsSpecializedAs(tc, dc1, dc2);
-    bool better2 = isProtocolExtensionAsSpecializedAs(tc, dc2, dc1);
-    if (better1 != better2) {
-      return better1;
-    }
-  } else if (inProtocolExtension1 || inProtocolExtension2) {
-    // One member is in a protocol extension, the other is in a concrete type.
-    // Prefer the member in the concrete type.
-    return inProtocolExtension2;
-  }
-
-  Type type1 = decl1->getInterfaceType();
-  Type type2 = decl2->getInterfaceType();
-
-  /// What part of the type should we check?
-  enum {
-    CheckAll,
-    CheckInput,
-  } checkKind;
-  if (isa<AbstractFunctionDecl>(decl1) || isa<EnumElementDecl>(decl1)) {
-    // Nothing to do: these have the curried 'self' already.
-    if (auto elt = dyn_cast<EnumElementDecl>(decl1)) {
-      checkKind = elt->hasArgumentType() ? CheckInput : CheckAll;
-    } else {
-      checkKind = CheckInput;
-    }
-  } else {
-    // Add a curried 'self' type.
-    assert(!type1->is<GenericFunctionType>() && "Odd generic function type?");
-    assert(!type2->is<GenericFunctionType>() && "Odd generic function type?");
-    type1 = addCurriedSelfType(tc.Context, type1, decl1->getDeclContext());
-    type2 = addCurriedSelfType(tc.Context, type2, decl2->getDeclContext());
-
-    // For a subscript declaration, only look at the input type (i.e., the
-    // indices).
-    if (isa<SubscriptDecl>(decl1))
-      checkKind = CheckInput;
-    else
-      checkKind = CheckAll;
-  }
-
-  // Construct a constraint system to compare the two declarations.
-  ConstraintSystem cs(tc, dc, ConstraintSystemOptions());
-
-  auto locator = cs.getConstraintLocator(nullptr);
-  // FIXME: Locator when anchored on a declaration.
-  // Get the type of a reference to the second declaration.
-  Type openedType2 = cs.openType(type2, locator,
-                                 decl2->getInnermostDeclContext());
-
-  // Get the type of a reference to the first declaration, swapping in
-  // archetypes for the dependent types.
-  llvm::DenseMap<CanType, TypeVariableType *> replacements;
-  auto dc1 = decl1->getInnermostDeclContext();
-  Type openedType1 = cs.openType(type1, locator, replacements, dc1);
-  for (const auto &replacement : replacements) {
-    if (auto mapped = ArchetypeBuilder::mapTypeIntoContext(dc1,
-                                                           replacement.first)) {
-      cs.addConstraint(ConstraintKind::Bind, replacement.second, mapped,
-                       locator);
-    }
-  }
-
-  // Extract the self types from the declarations, if they have them.
-  Type selfTy1;
-  Type selfTy2;
-  if (decl1->getDeclContext()->isTypeContext()) {
-    auto funcTy1 = openedType1->castTo<FunctionType>();
-    selfTy1 = funcTy1->getInput()->getRValueInstanceType();
-    openedType1 = funcTy1->getResult();
-  }
-  if (decl2->getDeclContext()->isTypeContext()) {
-    auto funcTy2 = openedType2->castTo<FunctionType>();
-    selfTy2 = funcTy2->getInput()->getRValueInstanceType();
-    openedType2 = funcTy2->getResult();
-  }
-  
-  // Determine the relationship between the 'self' types and add the
-  // appropriate constraints. The constraints themselves never fail, but
-  // they help deduce type variables that were opened.
-  switch (computeSelfTypeRelationship(tc, dc, decl1->getDeclContext(),
-                                      decl2->getDeclContext())) {
-  case SelfTypeRelationship::Unrelated:
-    // Skip the self types parameter entirely.
-    break;
-
-  case SelfTypeRelationship::Equivalent:
-    cs.addConstraint(ConstraintKind::Equal, selfTy1, selfTy2, locator);
-    break;
-
-  case SelfTypeRelationship::Subclass:
-    cs.addConstraint(ConstraintKind::Subtype, selfTy1, selfTy2, locator);
-    break;
-
-  case SelfTypeRelationship::Superclass:
-    cs.addConstraint(ConstraintKind::Subtype, selfTy2, selfTy1, locator);
-    break;
-
-  case SelfTypeRelationship::ConformsTo:
-    cs.addConstraint(ConstraintKind::ConformsTo, selfTy1, selfTy2, locator);
-    break;
-
-  case SelfTypeRelationship::ConformedToBy:
-    cs.addConstraint(ConstraintKind::ConformsTo, selfTy2, selfTy1, locator);
-    break;
-  }
-
-  switch (checkKind) {
-  case CheckAll:
-    // Check whether the first type is a subtype of the second.
-    cs.addConstraint(ConstraintKind::Subtype,
-                     openedType1,
-                     openedType2,
-                     locator);
-    break;
-
-  case CheckInput: {
-    // Check whether the first function type's input is a subtype of the second
-    // type's inputs, i.e., can we forward the arguments?
-    auto funcTy1 = openedType1->castTo<FunctionType>();
-    auto funcTy2 = openedType2->castTo<FunctionType>();
-    cs.addConstraint(ConstraintKind::Subtype,
-                     funcTy1->getInput(),
-                     funcTy2->getInput(),
-                     locator);
-    break;
-  }
-  }
-
-  // Solve the system.
-  auto solution = cs.solveSingle(FreeTypeVariableBinding::Allow);
-
-
-  // Ban value-to-optional conversions.
-  if (solution && solution->getFixedScore().Data[SK_ValueToOptional] == 0)
-    return true;
-
-  // Between two imported functions/methods, prefer one with fewer defaulted
-  // arguments.
-  //
-  // FIXME: This is a total hack; we should be comparing based on the number of
-  // default arguments at were actually used. It's only safe to do this because
-  // the count will be zero except when under the experimental
-  // InferDefaultArguments mode of the Clang importer.
-  if (isa<AbstractFunctionDecl>(decl1) && isa<AbstractFunctionDecl>(decl2) &&
-      decl1->getClangDecl() && decl2->getClangDecl()) {
-    unsigned defArgsIn1
-      = countDefaultArguments(cast<AbstractFunctionDecl>(decl1));
-    unsigned defArgsIn2
-      = countDefaultArguments(cast<AbstractFunctionDecl>(decl2));
-    if (defArgsIn1 < defArgsIn2)
-      return true;
-  }
-
-  return false;
+  return tc.specializedOverloadComparisonCache[{decl1, decl2}];
 }
 
 Comparison TypeChecker::compareDeclarations(DeclContext *dc,
@@ -710,6 +720,13 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
                                    ArrayRef<Solution> solutions,
                                    const SolutionDiff &diff,
                                    unsigned idx1, unsigned idx2) {
+
+  if (cs.TC.getLangOpts().DebugConstraintSolver) {
+    auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
+    log.indent(cs.solverState->depth * 2)
+      << "comparing solutions " << idx1 << " and " << idx2 <<"\n";
+  }
+
   // Whether the solutions are identical.
   bool identical = true;
 
