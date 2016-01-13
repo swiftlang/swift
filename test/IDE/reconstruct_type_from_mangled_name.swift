@@ -41,7 +41,7 @@ class Myclass2 {
 
     var arr3 : [Myclass1]
     arr3.append(Myclass1())
-// CHECK: reconstructed type from usr for 'arr3' is 'Array<Myclass1>'fdasfd
+// CHECK: reconstructed type from usr for 'arr3' is 'Array<Myclass1>'
 // CHECK: reconstructed type from usr for 'append' is '@lvalue Array<Myclass1> -> Myclass1 -> ()'
   }
 }
