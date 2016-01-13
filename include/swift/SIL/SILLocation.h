@@ -326,7 +326,7 @@ public:
   SourceLoc getSourceLoc() const;
   SourceLoc getStartSourceLoc() const;
   SourceLoc getEndSourceLoc() const;
-  
+
   SourceRange getSourceRange() const {
     return { getStartSourceLoc(), getEndSourceLoc() };
   }
@@ -537,7 +537,7 @@ public:
     L.setSpecialFlags(Flags);
     return L;
   }
-  
+
 private:
   friend class SILLocation;
   static bool isKind(const SILLocation& L) {

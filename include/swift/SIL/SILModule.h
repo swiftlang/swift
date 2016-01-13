@@ -119,10 +119,10 @@ private:
   /// Functions, which are dead (and not in the functions list anymore),
   /// but kept alive for debug info generation.
   FunctionListType zombieFunctions;
-  
+
   /// Stores the names of zombie functions.
   llvm::BumpPtrAllocator zombieFunctionNames;
-  
+
   /// Lookup table for SIL vtables from class decls.
   llvm::DenseMap<const ClassDecl *, SILVTable *> VTableLookupTable;
 
@@ -167,7 +167,7 @@ private:
   /// constructed. In certain cases this was before all Modules had been loaded
   /// causing us to not
   std::unique_ptr<SerializedSILLoader> SILLoader;
-  
+
   /// True if this SILModule really contains the whole module, i.e.
   /// optimizations can assume that they see the whole module.
   bool wholeModule;
@@ -497,7 +497,7 @@ public:
 
   /// Pretty-print the module.
   void dump(bool Verbose = false) const;
-  
+
   /// Pretty-print the module to a file.
   /// Useful for dumping the module when running in a debugger.
   /// Warning: no error handling is done. Fails with an assert if the file

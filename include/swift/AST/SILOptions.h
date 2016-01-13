@@ -30,7 +30,7 @@ public:
 
   /// The number of threads for multi-threaded code generation.
   int NumThreads = 0;
-  
+
   enum LinkingMode {
     /// Skip SIL linking.
     LinkNone,
@@ -100,7 +100,7 @@ public:
 
   /// Use super_method for native super method calls instead of function_ref.
   bool UseNativeSuperMethod = false;
-  
+
   /// Emit captures and function contexts using +0 caller-guaranteed ARC
   /// conventions.
   bool EnableGuaranteedClosureContexts = false;

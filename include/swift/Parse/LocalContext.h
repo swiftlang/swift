@@ -57,7 +57,7 @@ public:
   /// True if we saw any anonymous closures.  This is useful when
   /// parsing an initializer context, because such contexts only
   /// need to exist if the initializer contains closures.
-  bool hasClosures() const { return NextClosureDiscriminator != 0; }    
+  bool hasClosures() const { return NextClosureDiscriminator != 0; }
 };
 
 /// Information associated with parsing the top-level context.

@@ -28,7 +28,7 @@
 
 namespace swift {
   class ParameterList;
-  
+
 /// ASTVisitor - This is a simple visitor class for Swift expressions.
 template<typename ImplClass,
          typename ExprRetTy = void,
@@ -53,7 +53,7 @@ public:
     }
     llvm_unreachable("Not reachable, all cases handled");
   }
-  
+
   ExprRetTy visit(Expr *E, Args... AA) {
     switch (E->getKind()) {
 
@@ -67,7 +67,7 @@ public:
     }
     llvm_unreachable("Not reachable, all cases handled");
   }
-  
+
   // Provide default implementations of abstract "visit" implementations that
   // just chain to their base class.  This allows visitors to just implement
   // the base behavior and handle all subclasses if they desire.  Since this is
@@ -159,15 +159,15 @@ public:
              A, ::std::forward<Args>(AA)...);                       \
   }
 #include "swift/AST/Attr.def"
-  
+
   bool visit(ParameterList *PL) {
     return static_cast<ImplClass*>(this)->visitParameterList(PL);
   }
-  
+
   bool visitParameterList(ParameterList *PL) { return false; }
 };
-  
-  
+
+
 template<typename ImplClass, typename ExprRetTy = void, typename... Args>
 using ExprVisitor = ASTVisitor<ImplClass, ExprRetTy, void, void, void, void,
                                void, Args...>;

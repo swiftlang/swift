@@ -21,7 +21,7 @@
 #include <cstdint>
 #include "swift/Runtime/Config.h"
 
-// Bring in the definition of HeapObject 
+// Bring in the definition of HeapObject
 #include "../../../stdlib/public/SwiftShims/HeapObject.h"
 
 namespace swift {
@@ -75,7 +75,7 @@ template<typename A, typename B>
 struct TwoWordPair {
   A first;
   B second;
-  
+
   TwoWordPair() = default;
   TwoWordPair(A first, B second);
 
@@ -86,29 +86,29 @@ struct TwoWordPair {
   // too much.
 #if __arm__ || __i386__
   enum class Return : unsigned long long {};
-  
+
   operator Return() const {
     union {
       TwoWordPair value;
       Return mangled;
     } reinterpret = {*this};
-    
+
     return reinterpret.mangled;
   }
-  
+
   /*implicit*/ TwoWordPair(Return r) {
     union {
       Return mangled;
       TwoWordPair value;
     } reinterpret = {r};
-    
+
     *this = reinterpret.value;
   }
 #else
   using Return = TwoWordPair;
 #endif
 };
-  
+
 template<typename A, typename B>
 inline TwoWordPair<A,B>::TwoWordPair(A first, B second)
   : first(first), second(second)
@@ -120,7 +120,7 @@ inline TwoWordPair<A,B>::TwoWordPair(A first, B second)
   static_assert(alignof(TwoWordPair) == alignof(void*),
                 "pair must be word-aligned");
 }
-  
+
 using BoxPair = TwoWordPair<HeapObject *, OpaqueValue *>;
 
 /// Allocates a heap object that can contain a value of the given type.
@@ -133,7 +133,7 @@ using BoxPair = TwoWordPair<HeapObject *, OpaqueValue *>;
 extern "C" BoxPair::Return swift_allocBox(Metadata const *type);
 
 // Allocate plain old memory. This is the generalized entry point
-// Never returns nil. The returned memory is uninitialized. 
+// Never returns nil. The returned memory is uninitialized.
 //
 // An "alignment mask" is just the alignment (a power of 2) minus 1.
 extern "C" void *swift_slowAlloc(size_t bytes, size_t alignMask);
@@ -184,7 +184,7 @@ extern "C" HeapObject *swift_tryPin(HeapObject *object);
 ///
 /// The object reference may be nil (to simplify the protocol).
 extern "C" void swift_unpin(HeapObject *object);
-  
+
 /// Atomically decrements the retain count of an object.  If the
 /// retain count reaches zero, the object is destroyed as follows:
 ///
@@ -778,7 +778,7 @@ static inline void *swift_unknownUnownedTakeStrong(UnownedReference *ref) {
 #endif /* SWIFT_OBJC_INTEROP */
 
 #if SWIFT_OBJC_INTEROP
-  
+
 /// Destroy an unowned reference to an object with unknown reference counting.
 extern "C" void swift_unknownUnownedDestroy(UnownedReference *ref);
 

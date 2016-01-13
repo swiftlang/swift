@@ -157,7 +157,7 @@ protected:
     other.Begin = other.End = other.Allocated = (char*) (&other + 1);
     assert(other.isAllocatedInline());
   }
-  
+
 public:
   ~DiverseStackImpl() {
     checkValid();
@@ -235,7 +235,7 @@ public:
   stable_iterator stabilize(iterator it) const {
     checkIterator(it);
     return stable_iterator(End - it.Ptr);
-  } 
+  }
 
   class const_iterator {
     const char *Ptr;

@@ -78,7 +78,7 @@ enum ForDefinition_t : bool {
 /// initializing entry points of a constructor, etc.
 struct SILDeclRef {
   typedef llvm::PointerUnion<ValueDecl *, AbstractClosureExpr *> Loc;
-  
+
   /// Represents the "kind" of the SILDeclRef. For some Swift decls there
   /// are multiple SIL entry points, and the kind is used to distinguish them.
   enum class Kind : unsigned {
@@ -93,11 +93,11 @@ struct SILDeclRef {
     /// Initializer - this constant references the initializing constructor
     /// entry point of the class ConstructorDecl in loc.
     Initializer,
-    
+
     /// EnumElement - this constant references the injection function for
     /// an EnumElementDecl.
     EnumElement,
-    
+
     /// Destroyer - this constant references the destroying destructor for the
     /// DestructorDecl in loc.
     Destroyer,
@@ -105,7 +105,7 @@ struct SILDeclRef {
     /// Deallocator - this constant references the deallocating
     /// destructor for the DestructorDecl in loc.
     Deallocator,
-    
+
     /// GlobalAccessor - this constant references the lazy-initializing
     /// accessor for the global VarDecl in loc.
     GlobalAccessor,
@@ -131,7 +131,7 @@ struct SILDeclRef {
     /// .cxx_destruct.
     IVarDestroyer,
   };
-  
+
   /// The ValueDecl or AbstractClosureExpr represented by this SILDeclRef.
   Loc loc;
   /// The Kind of this SILDeclRef.
@@ -149,7 +149,7 @@ struct SILDeclRef {
   unsigned isDirectReference : 1;
   /// The default argument index for a default argument getter.
   unsigned defaultArgIndex : 10;
-  
+
   /// A magic value for SILDeclRef constructors to ask for the natural uncurry
   /// level of the constant.
   enum : unsigned { ConstructAtNaturalUncurryLevel = ~0U };
@@ -158,19 +158,19 @@ struct SILDeclRef {
   /// available resilience expansion of the constant.
   static constexpr ResilienceExpansion ConstructAtBestResilienceExpansion
     = /*TODO*/ ResilienceExpansion::Minimal;
-  
+
   /// Produces a null SILDeclRef.
   SILDeclRef() : loc(), kind(Kind::Func), uncurryLevel(0), Expansion(0),
                  isCurried(0), isForeign(0), isDirectReference(0),
                  defaultArgIndex(0) {}
-  
+
   /// Produces a SILDeclRef of the given kind for the given decl.
   explicit SILDeclRef(ValueDecl *decl, Kind kind,
                       ResilienceExpansion expansion
                         = ResilienceExpansion::Minimal,
                       unsigned uncurryLevel = ConstructAtNaturalUncurryLevel,
                       bool isForeign = false);
-  
+
   /// Produces the 'natural' SILDeclRef for the given ValueDecl or
   /// AbstractClosureExpr:
   /// - If 'loc' is a func or closure, this returns a Func SILDeclRef.
@@ -196,7 +196,7 @@ struct SILDeclRef {
 
   bool isNull() const { return loc.isNull(); }
   explicit operator bool() const { return !isNull(); }
-  
+
   bool hasDecl() const { return loc.is<ValueDecl *>(); }
   bool hasClosureExpr() const {
     return loc.is<AbstractClosureExpr *>()
@@ -221,13 +221,13 @@ struct SILDeclRef {
     return dyn_cast<AutoClosureExpr>(getAbstractClosureExpr());
   }
   FuncDecl *getFuncDecl() const { return dyn_cast<FuncDecl>(getDecl()); }
-  
+
   AbstractFunctionDecl *getAbstractFunctionDecl() const {
     return dyn_cast<AbstractFunctionDecl>(getDecl());
   }
-  
+
   Optional<AnyFunctionRef> getAnyFunctionRef() const;
-  
+
   SILLocation getAsRegularLocation() const;
 
   /// Produce a mangled form of this constant.
@@ -261,14 +261,14 @@ struct SILDeclRef {
   bool isDefaultArgGenerator() const {
     return kind == Kind::DefaultArgGenerator;
   }
-  
+
   /// \brief True if the function should be treated as transparent.
   bool isTransparent() const;
   /// \brief True if the function has noinline attribute.
   bool isNoinline() const;
   /// \brief True if the function has __always inline attribute.
   bool isAlwaysInline() const;
-  
+
   /// \return True if the function has an effects attribute.
   bool hasEffectsAttribute() const;
 
@@ -299,14 +299,14 @@ struct SILDeclRef {
   bool operator!=(SILDeclRef rhs) const {
     return !(*this == rhs);
   }
-  
+
   void print(llvm::raw_ostream &os) const;
   void dump() const;
 
   ResilienceExpansion getResilienceExpansion() const {
     return ResilienceExpansion(Expansion);
   }
-  
+
   // Returns the SILDeclRef for an entity at a shallower uncurry level.
   SILDeclRef atUncurryLevel(unsigned level) const {
     assert(level <= uncurryLevel && "can't safely go to deeper uncurry level");
@@ -318,14 +318,14 @@ struct SILDeclRef {
                       willBeCurried, willBeDirect, willBeForeign,
                       defaultArgIndex);
   }
-  
+
   /// Returns the foreign (or native) entry point corresponding to the same
   /// decl.
   SILDeclRef asForeign(bool foreign = true) const {
     return SILDeclRef(loc.getOpaqueValue(), kind, Expansion, uncurryLevel,
                       isCurried, isDirectReference, foreign, defaultArgIndex);
   }
-  
+
   SILDeclRef asDirectReference(bool direct = true) const {
     SILDeclRef r = *this;
     // The 'direct' distinction only makes sense for curry thunks.
@@ -337,7 +337,7 @@ struct SILDeclRef {
   /// True if the decl ref references a thunk from a natively foreign
   /// declaration to Swift calling convention.
   bool isForeignToNativeThunk() const;
-  
+
   /// True if the decl ref references a thunk from a natively Swift declaration
   /// to foreign C or ObjC calling convention.
   bool isNativeToForeignThunk() const;
@@ -350,10 +350,10 @@ struct SILDeclRef {
     auto overridden = getDecl()->getOverriddenDecl();
     if (!overridden)
       return SILDeclRef();
-    
+
     return SILDeclRef(overridden, kind, getResilienceExpansion(), uncurryLevel);
   }
-  
+
   /// Return a SILDeclRef to the declaration whose vtable entry this declaration
   /// overrides. This may be different from "getOverridden" because some
   /// declarations do not always have vtable entries.

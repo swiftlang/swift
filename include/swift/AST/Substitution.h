@@ -27,7 +27,7 @@ namespace llvm {
 namespace swift {
   class ArchetypeType;
   class ProtocolConformanceRef;
-  
+
 /// DenseMap type used internally by Substitution::subst to track conformances
 /// applied to archetypes.
 using ArchetypeConformanceMap
@@ -41,15 +41,15 @@ class Substitution {
 public:
   /// The replacement type.
   Type getReplacement() const { return Replacement; }
-  
+
   /// The protocol conformances for the replacement. These appear in the same
   /// order as Archetype->getConformsTo() for the substituted archetype.
   const ArrayRef<ProtocolConformanceRef> getConformances() const {
     return Conformance;
   }
-  
+
   Substitution() {}
-  
+
   Substitution(Type Replacement, ArrayRef<ProtocolConformanceRef> Conformance);
 
   bool operator!=(const Substitution &other) const { return !(*this == other); }
@@ -57,16 +57,16 @@ public:
   void print(llvm::raw_ostream &os,
              const PrintOptions &PO = PrintOptions()) const;
   void dump() const;
-  
+
   /// Substitute the replacement and conformance types with the given
   /// substitution vector.
   Substitution subst(ModuleDecl *module,
                      GenericParamList *context,
                      ArrayRef<Substitution> subs) const;
-  
+
 private:
   friend class ProtocolConformance;
-  
+
   Substitution subst(ModuleDecl *module,
                      ArrayRef<Substitution> subs,
                      TypeSubstitutionMap &subMap,

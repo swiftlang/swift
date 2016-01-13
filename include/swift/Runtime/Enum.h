@@ -18,7 +18,7 @@
 #define SWIFT_RUNTIME_ENUM_H
 
 namespace swift {
-  
+
 struct OpaqueValue;
 struct ValueWitnessTable;
 struct Metadata;
@@ -83,7 +83,7 @@ extern "C" void swift_initEnumMetadataMultiPayload(ValueWitnessTable *vwtable,
 /// \returns The index of the enum case.
 extern "C" unsigned swift_getEnumCaseMultiPayload(const OpaqueValue *value,
                                                   const EnumMetadata *enumType);
-  
+
 /// \brief Store the tag value for the given case into a multi-payload enum,
 ///        whose associated payload (if any) has already been initialized.
 extern "C" void swift_storeEnumTagMultiPayload(OpaqueValue *value,

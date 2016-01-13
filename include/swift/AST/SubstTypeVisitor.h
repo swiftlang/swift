@@ -139,7 +139,7 @@ public:
     return static_cast<Impl*>(this)->visitType(origTy, substTy);
   }
 };
-  
+
 } // end namespace swift
-  
+
 #endif

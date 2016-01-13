@@ -74,7 +74,7 @@ namespace swift {
   class ValueDecl;
   class VarDecl;
   class VisibleDeclConsumer;
-  
+
   /// NLKind - This is a specifier for the kind of name lookup being performed
   /// by various query methods.
   enum class NLKind {
@@ -194,14 +194,14 @@ class ModuleDecl : public TypeDecl, public DeclContext {
 public:
   typedef ArrayRef<std::pair<Identifier, SourceLoc>> AccessPathTy;
   typedef std::pair<ModuleDecl::AccessPathTy, ModuleDecl*> ImportedModule;
-  
+
   static bool matchesAccessPath(AccessPathTy AccessPath, DeclName Name) {
     assert(AccessPath.size() <= 1 && "can only refer to top-level decls");
-  
+
     return AccessPath.empty()
       || DeclName(AccessPath.front().first).matchesRef(Name);
   }
-  
+
   /// Arbitrarily orders ImportedModule records, for inclusion in sets and such.
   class OrderImportedModules {
   public:
@@ -720,7 +720,7 @@ public:
       return true;
     });
   }
-  
+
   template <typename Fn>
   bool forAllVisibleModules(Fn &&fn) {
     using RetTy = typename std::result_of<Fn(ModuleDecl::ImportedModule)>::type;
@@ -780,7 +780,7 @@ public:
   void *operator new(size_t Bytes, ASTContext &C,
                      unsigned Alignment = alignof(FileUnit));
 };
-  
+
 /// A container for a module-level definition derived as part of an implicit
 /// protocol conformance.
 class DerivedFileUnit final : public FileUnit {
@@ -797,11 +797,11 @@ public:
   void lookupValue(ModuleDecl::AccessPathTy accessPath, DeclName name,
                    NLKind lookupKind,
                    SmallVectorImpl<ValueDecl*> &result) const override;
-  
+
   void lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
                           VisibleDeclConsumer &consumer,
                           NLKind lookupKind) const override;
-  
+
   void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
 
   Identifier
@@ -1029,21 +1029,21 @@ public:
   static bool classof(const DeclContext *DC) {
     return isa<FileUnit>(DC) && classof(cast<FileUnit>(DC));
   }
-  
+
   /// True if this is a "script mode" source file that admits top-level code.
   bool isScriptMode() const {
     switch (Kind) {
     case SourceFileKind::Main:
     case SourceFileKind::REPL:
       return true;
-      
+
     case SourceFileKind::Library:
     case SourceFileKind::SIL:
       return false;
     }
     llvm_unreachable("bad SourceFileKind");
   }
-  
+
   ClassDecl *getMainClass() const override {
     return MainClass;
   }

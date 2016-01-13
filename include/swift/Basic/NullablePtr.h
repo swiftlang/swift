@@ -40,7 +40,7 @@ public:
                 std::is_convertible<OtherT, T>::value,
                 PlaceHolder
               >::type = PlaceHolder()) : Ptr(Other.getPtrOrNull()) {}
-  
+
   bool isNull() const { return Ptr == 0; }
   bool isNonNull() const { return Ptr != 0; }
 
@@ -55,13 +55,13 @@ public:
     assert(Ptr && "Pointer wasn't checked for null!");
     return Ptr;
   }
-  
+
   T *getPtrOrNull() { return Ptr; }
   const T *getPtrOrNull() const { return Ptr; }
 
   explicit operator bool() const { return Ptr; }
 };
-  
+
 } // end namespace swift
 
 #endif

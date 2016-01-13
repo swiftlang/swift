@@ -12,7 +12,7 @@
 //
 //  This file defines driver-only diagnostics emitted in processing
 //  command-line arguments and setting up compilation.
-//  Each diagnostic is described using one of three kinds (error, warning, or 
+//  Each diagnostic is described using one of three kinds (error, warning, or
 //  note) along with a unique identifier, category, options, and text, and is
 //  followed by a signature describing the diagnostic argument kinds.
 //

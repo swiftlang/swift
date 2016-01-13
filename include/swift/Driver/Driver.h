@@ -99,13 +99,13 @@ public:
 
   // Whether the driver should generate compiler fixits as source edits.
   bool ShouldGenerateFixitEdits = false;
-  
+
   /// The number of threads for multi-threaded compilation.
   unsigned numThreads = 0;
 
   /// Returns true if multi-threading is enabled.
   bool isMultiThreading() const { return numThreads > 0; }
-  
+
   /// The name of the module which we are building.
   std::string ModuleName;
 
@@ -170,9 +170,9 @@ public:
   const std::string &getSwiftProgramPath() const {
     return DriverExecutable;
   }
-  
+
   DriverKind getDriverKind() const { return driverKind; }
-  
+
   ArrayRef<const char *> getArgsWithoutProgramNameAndDriverMode(
                                             ArrayRef<const char *> Args) const;
 

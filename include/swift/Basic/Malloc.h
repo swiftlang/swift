@@ -26,22 +26,22 @@ namespace swift {
 // FIXME: Use C11 aligned_alloc or Windows _aligned_malloc if available.
 inline void *AlignedAlloc(size_t size, size_t align) {
   // posix_memalign only accepts alignments greater than sizeof(void*).
-  // 
+  //
   if (align < sizeof(void*))
     align = sizeof(void*);
-  
+
   void *r;
   int res = posix_memalign(&r, align, size);
   assert(res == 0 && "posix_memalign failed");
   (void)res; // Silence the unused variable warning
   return r;
 }
-  
+
 // FIXME: Use Windows _aligned_free if available.
 inline void AlignedFree(void *p) {
   free(p);
 }
-  
+
 }
 
 #endif

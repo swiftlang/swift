@@ -30,7 +30,7 @@ namespace swift {
   namespace detail {
     template<typename T>
     struct DiagWithArguments;
-    
+
     template<typename ...ArgTypes>
     struct DiagWithArguments<void(ArgTypes...)> {
       typedef Diag<ArgTypes...> type;

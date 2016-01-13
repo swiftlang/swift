@@ -41,7 +41,7 @@
 namespace swift {
 
 class SILInstruction;
-  
+
 /// Returns true if the instruction \p Inst is an instruction which is only
 /// relevant for debug information and has no other impact on program semantics.
 inline bool isDebugInst(SILInstruction *Inst) {
@@ -64,42 +64,42 @@ inline void deleteAllDebugUses(ValueBase *Inst) {
 /// debug instructions. Otherwise it provides a view ot all debug-instructions.
 template <typename Base, bool nonDebugInsts> class DebugUseIterator
 : public std::iterator<std::forward_iterator_tag, Operand *, ptrdiff_t> {
-  
+
   Base BaseIterator;
-  
+
   // Skip any debug or non-debug instructions (depending on the nonDebugInsts
   // template argument).
   void skipInsts() {
     while (true) {
       if (*BaseIterator == nullptr)
         return;
-      
+
       SILInstruction *User = BaseIterator->getUser();
       if (isDebugInst(User) != nonDebugInsts)
         return;
-      
+
       BaseIterator++;
     }
   }
-  
+
 public:
-  
+
   DebugUseIterator(Base BaseIterator) : BaseIterator(BaseIterator) {
     skipInsts();
   }
-  
+
   DebugUseIterator() = default;
-  
+
   Operand *operator*() const { return *BaseIterator; }
   Operand *operator->() const { return *BaseIterator; }
   SILInstruction *getUser() const { return BaseIterator.getUser(); }
-  
+
   DebugUseIterator &operator++() {
     BaseIterator++;
     skipInsts();
     return *this;
   }
-  
+
   DebugUseIterator operator++(int unused) {
     DebugUseIterator Copy = *this;
     ++*this;

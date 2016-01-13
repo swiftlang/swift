@@ -27,21 +27,21 @@
 #include <array>
 
 namespace swift {
-  
+
 class UUID {
 public:
   enum {
     /// The number of bytes in a UUID's binary representation.
     Size = 16,
-    
+
     /// The number of characters in a UUID's string representation.
     StringSize = 36,
-    
+
     /// The number of bytes necessary to store a null-terminated UUID's string
     /// representation.
     StringBufferSize = StringSize + 1,
   };
-  
+
   unsigned char Value[Size];
 
 private:
@@ -49,34 +49,34 @@ private:
   enum FromTime_t { FromTime };
 
   UUID(FromRandom_t);
-  
+
   UUID(FromTime_t);
-  
+
 public:
   /// Default constructor.
   UUID();
-  
+
   UUID(std::array<unsigned char, Size> bytes) {
     memcpy(Value, &bytes, Size);
   }
-  
+
   /// Create a new random UUID from entropy (/dev/random).
   static UUID fromRandom() { return UUID(FromRandom); }
-  
+
   /// Create a new pseudorandom UUID using the time, MAC address, and pid.
   static UUID fromTime() { return UUID(FromTime); }
-  
+
   /// Parse a UUID from a C string.
   static Optional<UUID> fromString(const char *s);
-  
+
   /// Convert a UUID to its string representation.
   void toString(llvm::SmallVectorImpl<char> &out) const;
-  
+
   int compare(UUID y) const;
-  
+
 #define COMPARE_UUID(op) \
   bool operator op(UUID y) { return compare(y) op 0; }
-  
+
   COMPARE_UUID(==)
   COMPARE_UUID(!=)
   COMPARE_UUID(<)
@@ -85,9 +85,9 @@ public:
   COMPARE_UUID(>=)
 #undef COMPARE_UUID
 };
-  
+
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, UUID uuid);
-  
+
 }
 
 namespace llvm {
@@ -101,7 +101,7 @@ namespace llvm {
       return {{{0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
                 0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFE}}};
     }
-    
+
     static unsigned getHashValue(swift::UUID uuid) {
       union {
         swift::UUID uu;
@@ -110,7 +110,7 @@ namespace llvm {
       return reinterpret.words[0] ^ reinterpret.words[1]
            ^ reinterpret.words[2] ^ reinterpret.words[3];
     }
-    
+
     static bool isEqual(swift::UUID a, swift::UUID b) {
       return a == b;
     }

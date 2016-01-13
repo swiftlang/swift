@@ -409,7 +409,7 @@ private:
   Pattern *maybeReadPattern();
 
   ParameterList *readParameterList();
-  
+
   GenericParamList *maybeGetOrReadGenericParams(serialization::DeclID contextID,
                                                 DeclContext *DC,
                                                 llvm::BitstreamCursor &Cursor);

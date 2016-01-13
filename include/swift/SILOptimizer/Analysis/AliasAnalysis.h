@@ -46,7 +46,7 @@ namespace {
     size_t V1, V2;
     // V1 is a SILInstruction and therefore ResultNo is always 0.
     unsigned ResultNo2;
-    RetainObserveKind InspectionMode; 
+    RetainObserveKind InspectionMode;
   };
 }
 
@@ -117,11 +117,11 @@ private:
   /// without having to scan the whole map. So, instead of storing pointers we
   /// map pointers to indices and store the indices.
   ValueEnumerator<ValueBase*> AliasValueBaseToIndex;
-  
+
   /// Same as AliasValueBaseToIndex, map a pointer to the indices for
   /// MemoryBehaviorCache.
   ///
-  /// NOTE: we do not use the same ValueEnumerator for the alias cache, 
+  /// NOTE: we do not use the same ValueEnumerator for the alias cache,
   /// as when either cache is cleared, we can not clear the ValueEnumerator
   /// because doing so could give rise to collisions in the other cache.
   ValueEnumerator<ValueBase*> MemoryBehaviorValueBaseToIndex;
@@ -132,7 +132,7 @@ private:
   /// Perform an alias query to see if V1, V2 refer to the same values.
   AliasResult aliasInner(SILValue V1, SILValue V2,
                          SILType TBAAType1 = SILType(),
-                         SILType TBAAType2 = SILType());  
+                         SILType TBAAType2 = SILType());
 
   /// Returns True if memory of type \p T1 and \p T2 may alias.
   bool typesMayAlias(SILType T1, SILType T2);
@@ -155,9 +155,9 @@ public:
   static bool classof(const SILAnalysis *S) {
     return S->getKind() == AnalysisKind::Alias;
   }
-  
+
   virtual void initialize(SILPassManager *PM) override;
-  
+
   /// Perform an alias query to see if V1, V2 refer to the same values.
   AliasResult alias(SILValue V1, SILValue V2, SILType TBAAType1 = SILType(),
                     SILType TBAAType2 = SILType());
@@ -334,7 +334,7 @@ namespace llvm {
       return LHS.V1 == RHS.V1 &&
              LHS.V2 == RHS.V2 &&
              LHS.ResultNo2 == RHS.ResultNo2 &&
-             LHS.InspectionMode == RHS.InspectionMode; 
+             LHS.InspectionMode == RHS.InspectionMode;
     }
   };
 }

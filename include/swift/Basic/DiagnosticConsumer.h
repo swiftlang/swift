@@ -58,7 +58,7 @@ struct DiagnosticInfo {
   /// \brief Extra source ranges that are attached to the diagnostic.
   ArrayRef<FixIt> FixIts;
 };
-  
+
 /// \brief Abstract interface for classes that present diagnostics to the user.
 class DiagnosticConsumer {
 protected:
@@ -75,7 +75,7 @@ protected:
 
 public:
   virtual ~DiagnosticConsumer();
-  
+
   /// \brief Invoked whenever the frontend emits a diagnostic.
   ///
   /// \param SM The source manager associated with the source locations in
@@ -94,7 +94,7 @@ public:
                                 DiagnosticKind Kind, StringRef Text,
                                 const DiagnosticInfo &Info) = 0;
 };
-  
+
 /// \brief DiagnosticConsumer that discards all diagnostics.
 class NullDiagnosticConsumer : public DiagnosticConsumer {
 public:
@@ -102,7 +102,7 @@ public:
                         DiagnosticKind Kind, StringRef Text,
                         const DiagnosticInfo &Info) override;
 };
-  
+
 }
 
 #endif

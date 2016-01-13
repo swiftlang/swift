@@ -58,13 +58,13 @@ class SILPassManager {
   /// the pass doesn't need to run, because nothing has changed since the
   /// previous run of that pass.
   typedef std::bitset<(size_t)PassKind::AllPasses_Last + 1> CompletedPasses;
-  
+
   /// A completed-passes mask for each function.
   llvm::DenseMap<SILFunction *, CompletedPasses> CompletedPassesMap;
 
   /// Set to true when a pass invalidates an analysis.
   bool currentPassHasInvalidated = false;
-  
+
 public:
   /// C'tor. It creates and registers all analysis passes, which are defined
   /// in Analysis.def.
@@ -121,7 +121,7 @@ public:
     for (auto AP : Analysis)
       if (!AP->isLocked())
         AP->invalidate(F, K);
-    
+
     currentPassHasInvalidated = true;
     // Any change let all passes run again.
     CompletedPassesMap[F].reset();

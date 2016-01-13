@@ -157,7 +157,7 @@ public:
   // Members that should only be used by ASTContext.cpp.
   struct Implementation;
   Implementation &Impl;
-  
+
   friend class ConstraintCheckerArenaRAII;
 public:
   ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
@@ -203,9 +203,9 @@ public:
 
   // FIXME: Once DenseMap learns about move semantics, use std::unique_ptr
   // and remove the explicit delete loop in the destructor.
-  typedef llvm::DenseMap<std::pair<CanType, ProtocolDecl *>, 
+  typedef llvm::DenseMap<std::pair<CanType, ProtocolDecl *>,
                          ConformanceEntry> ConformsToMap;
-  
+
   /// \brief The list of external definitions imported by this context.
   llvm::SetVector<Decl *> ExternalDefinitions;
 
@@ -222,7 +222,7 @@ public:
 
   /// Cache of remapped types (useful for diagnostics).
   llvm::StringMap<Type> RemappedTypes;
-  
+
   /// Cache for generic mangling signatures.
   llvm::DenseMap<std::pair<GenericSignature*, ModuleDecl*>,
                  CanGenericSignature> ManglingSignatures;
@@ -249,7 +249,7 @@ public:
 
     if (LangOpts.UseMalloc)
       return AlignedAlloc(bytes, alignment);
-    
+
     return getAllocator(arena).Allocate(bytes, alignment);
   }
 
@@ -354,10 +354,10 @@ public:
   /// Retrieve the declaration of Swift.ErrorType.
   NominalTypeDecl *getExceptionTypeDecl() const;
   CanType getExceptionType() const;
-  
+
   /// Retrieve the declaration of Swift.Bool.
   NominalTypeDecl *getBoolDecl() const;
-  
+
   /// Retrieve the declaration of Swift.Int.
   NominalTypeDecl *getIntDecl() const;
 
@@ -396,7 +396,7 @@ public:
 
   /// Retrieve the declaration of Swift.Optional<T>.Some.
   EnumElementDecl *getOptionalSomeDecl() const;
-  
+
   /// Retrieve the declaration of Swift.Optional<T>.None.
   EnumElementDecl *getOptionalNoneDecl() const;
 
@@ -411,7 +411,7 @@ public:
 
   /// Retrieve the declaration of Swift.OptionSetType.
   NominalTypeDecl *getOptionSetTypeDecl() const;
-  
+
   /// Retrieve the declaration of Swift.UnsafeMutablePointer<T>.
   NominalTypeDecl *getUnsafeMutablePointerDecl() const;
 
@@ -476,7 +476,7 @@ public:
 
   /// Retrieve the declaration of Swift.==(Int, Int) -> Bool.
   FuncDecl *getEqualIntDecl(LazyResolver *resolver) const;
-  
+
   /// Retrieve the declaration of Swift._unimplemented_initializer.
   FuncDecl *getUnimplementedInitializerDecl(LazyResolver *resolver) const;
 
@@ -485,7 +485,7 @@ public:
 
   // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast.
   FuncDecl *getIsOSVersionAtLeastDecl(LazyResolver *resolver) const;
-  
+
   /// Look for the declaration with the given name within the
   /// swift module.
   void lookupInSwiftModule(StringRef name,
@@ -493,7 +493,7 @@ public:
 
   /// Retrieve a specific, known protocol.
   ProtocolDecl *getProtocol(KnownProtocolKind kind) const;
-  
+
   /// Get the Objective-C type that a Swift type bridges to, if any.
   Optional<Type> getBridgedToObjC(const DeclContext *dc,
                                   Type type,
@@ -534,7 +534,7 @@ public:
   //===--------------------------------------------------------------------===//
 
   bool hadError() const;
-  
+
   //===--------------------------------------------------------------------===//
   // Type manipulation routines.
   //===--------------------------------------------------------------------===//
@@ -548,21 +548,21 @@ public:
   const CanType TheUnknownObjectType;     /// Builtin.UnknownObject
   const CanType TheRawPointerType;        /// Builtin.RawPointer
   const CanType TheUnsafeValueBufferType; /// Builtin.UnsafeValueBuffer
-  
+
   const CanType TheIEEE32Type;            /// 32-bit IEEE floating point
   const CanType TheIEEE64Type;            /// 64-bit IEEE floating point
-  
+
   // Target specific types.
   const CanType TheIEEE16Type;            /// 16-bit IEEE floating point
   const CanType TheIEEE80Type;            /// 80-bit IEEE floating point
   const CanType TheIEEE128Type;           /// 128-bit IEEE floating point
   const CanType ThePPC128Type;            /// 128-bit PowerPC 2xDouble
-  
+
   /// Retrieve a type member of the given base type variable.
   ///
   /// Note that this routine is only usable when a constraint system
   /// is active.
-  Type getTypeVariableMemberType(TypeVariableType *baseTypeVar, 
+  Type getTypeVariableMemberType(TypeVariableType *baseTypeVar,
                                  AssociatedTypeDecl *assocType);
 
   /// Adds a search path to SearchPathOpts, unless it is already present.
@@ -727,7 +727,7 @@ public:
 
   /// Record compiler-known protocol information in the AST.
   void recordKnownProtocols(ModuleDecl *Stdlib);
-  
+
   /// \brief Retrieve the substitutions for a bound generic type, if known.
   Optional<ArrayRef<Substitution>>
   getSubstitutions(BoundGenericType *Bound, DeclContext *gpContext) const;
@@ -742,7 +742,7 @@ public:
 
   /// \brief Returns memory usage of this ASTContext.
   size_t getTotalMemory() const;
-  
+
   /// \brief Returns memory used exclusively by constraint solver.
   size_t getSolverMemory() const;
 
@@ -854,7 +854,7 @@ private:
 /// DiagnosticsSema.def.
 std::pair<unsigned, DeclName> getObjCMethodDiagInfo(
                                 AbstractFunctionDecl *method);
-  
+
 } // end namespace swift
 
 #endif

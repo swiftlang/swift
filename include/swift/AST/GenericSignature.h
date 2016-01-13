@@ -30,7 +30,7 @@ class ArchetypeBuilder;
 /// signature and their dependent members.
 class GenericSignatureWitnessIterator {
   ArrayRef<Requirement> p;
-  
+
 public:
   GenericSignatureWitnessIterator() = default;
   GenericSignatureWitnessIterator(ArrayRef<Requirement> p)
@@ -38,7 +38,7 @@ public:
   {
     assert(p.empty() || p.front().getKind() == RequirementKind::WitnessMarker);
   }
-  
+
   GenericSignatureWitnessIterator &operator++() {
     do {
       p = p.slice(1);
@@ -46,35 +46,35 @@ public:
              && p.front().getKind() != RequirementKind::WitnessMarker);
     return *this;
   }
-  
+
   GenericSignatureWitnessIterator operator++(int) {
     auto copy = *this;
     ++(*this);
     return copy;
   }
-  
+
   Type operator*() const {
     assert(p.front().getKind() == RequirementKind::WitnessMarker);
     return p.front().getFirstType();
   }
-  
+
   Type operator->() const {
     assert(p.front().getKind() == RequirementKind::WitnessMarker);
     return p.front().getFirstType();
   }
-  
+
   bool operator==(const GenericSignatureWitnessIterator &o) {
     return p.data() == o.p.data() && p.size() == o.p.size();
   }
-  
+
   bool operator!=(const GenericSignatureWitnessIterator &o) {
     return p.data() != o.p.data() || p.size() != o.p.size();
   }
-  
+
   static GenericSignatureWitnessIterator emptyRange() {
     return GenericSignatureWitnessIterator();
   }
-  
+
   // Allow the witness iterator to be used with a ranged for.
   GenericSignatureWitnessIterator begin() const {
     return *this;
@@ -114,7 +114,7 @@ class GenericSignature : public llvm::FoldingSetNode {
 
   mutable llvm::PointerUnion<GenericSignature *, ASTContext *>
     CanonicalSignatureOrASTContext;
-  
+
   static ASTContext &getASTContext(ArrayRef<GenericTypeParamType *> params,
                                    ArrayRef<Requirement> requirements);
 
@@ -157,13 +157,13 @@ public:
     assert(Mem);
     return Mem;
   }
-  
+
   /// Build a substitution map from a vector of Substitutions that correspond to
   /// the generic parameters in this generic signature. The order of primary
   /// archetypes in the substitution vector must match the order of generic
   /// parameters in getGenericParams().
   TypeSubstitutionMap getSubstitutionMap(ArrayRef<Substitution> args) const;
-  
+
   /// Return a range that iterates through first all of the generic parameters
   /// of the signature, followed by all of their recursive member types exposed
   /// through protocol requirements.
@@ -177,12 +177,12 @@ public:
 
   /// Determines whether this ASTContext is canonical.
   bool isCanonical() const;
-  
+
   ASTContext &getASTContext() const;
-  
+
   /// Canonicalize the components of a generic signature.
   CanGenericSignature getCanonicalSignature() const;
-  
+
   /// Canonicalize a generic signature down to its essential requirements,
   /// for mangling purposes.
   ///
@@ -195,7 +195,7 @@ public:
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getGenericParams(), getRequirements());
   }
-  
+
   /// Determine whether the given dependent type is required to be a class.
   bool requiresClass(Type type, ModuleDecl &mod);
 
@@ -213,19 +213,19 @@ public:
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<GenericTypeParamType *> genericParams,
                       ArrayRef<Requirement> requirements);
-  
+
   void print(raw_ostream &OS) const;
   void dump() const;
   std::string getAsString() const;
 };
-  
+
 inline
 CanGenericSignature::CanGenericSignature(GenericSignature *Signature)
   : Signature(Signature)
 {
   assert(!Signature || Signature->isCanonical());
 }
-  
+
 inline ArrayRef<CanTypeWrapper<GenericTypeParamType>>
 CanGenericSignature::getGenericParams() const{
   ArrayRef<GenericTypeParamType*> params = Signature->getGenericParams();

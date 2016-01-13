@@ -248,13 +248,13 @@ public:
   void getMangledName(raw_ostream &os, const clang::NamedDecl *clangDecl) const;
 
   using ClangModuleLoader::addDependency;
-  
+
   // Print statistics from the Clang AST reader.
   void printStatistics() const override;
 
   /// Dump Swift lookup tables.
   void dumpSwiftLookupTables();
-  
+
   /// Given the path of a Clang module, collect the names of all its submodules
   /// and their corresponding visibility. Calling this function does not load the
   /// module.

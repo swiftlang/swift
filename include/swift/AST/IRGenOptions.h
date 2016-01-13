@@ -89,7 +89,7 @@ public:
 
   /// \brief Whether we're generating IR for the JIT.
   unsigned UseJIT : 1;
-  
+
   /// \brief Whether we should run LLVM optimizations after IRGen.
   unsigned DisableLLVMOptzns : 1;
 
@@ -101,7 +101,7 @@ public:
 
   /// Disable frame pointer elimination?
   unsigned DisableFPElim : 1;
-  
+
   /// Special codegen for playgrounds.
   unsigned Playground : 1;
 
@@ -137,7 +137,7 @@ public:
                    EmitStackPromotionChecks(false), GenerateProfile(false),
                    EmbedMode(IRGenEmbedMode::None)
                    {}
-  
+
   /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.
   StringRef getSingleOutputFilename() const {

@@ -37,7 +37,7 @@ enum class Ownership {
   /// \brief an 'unowned(unsafe)' reference
   Unmanaged,
 };
-  
+
 } // end namespace swift
 
 #endif

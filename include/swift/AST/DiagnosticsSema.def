@@ -12,7 +12,7 @@
 //
 //  This file defines diagnostics emitted during semantic analysis and type
 //  checking.
-//  Each diagnostic is described using one of three kinds (error, warning, or 
+//  Each diagnostic is described using one of three kinds (error, warning, or
 //  note) along with a unique identifier, category, options, and text, and is
 //  followed by a signature describing the diagnostic argument kinds.
 //
@@ -817,7 +817,7 @@ ERROR(attribute_does_not_apply_to_type,type_parsing,none,
 ERROR(optional_attribute_non_protocol,sema_tcd,none,
       "'optional' can only be applied to protocol members", ())
 ERROR(optional_attribute_non_objc_protocol,sema_tcd,none,
-      "'optional' can only be applied to members of an @objc protocol", 
+      "'optional' can only be applied to members of an @objc protocol",
       ())
 ERROR(optional_attribute_initializer,sema_tcd,none,
       "'optional' cannot be applied to an initializer", ())
@@ -829,11 +829,11 @@ ERROR(missing_in_class_init_1,sema_tcd,none,
       "@NSManaged}1", (Identifier, bool))
 ERROR(missing_in_class_init_2,sema_tcd,none,
       "stored properties %0 and %1 require initial values%select{| or should "
-      "be @NSManaged}2", 
+      "be @NSManaged}2",
       (Identifier, Identifier, bool))
 ERROR(missing_in_class_init_3plus,sema_tcd,none,
       "stored properties %0, %1, %select{and %2|%2, and others}3 "
-      "require initial values%select{| or should be @NSManaged}4", 
+      "require initial values%select{| or should be @NSManaged}4",
       (Identifier, Identifier, Identifier, bool, bool))
 NOTE(requires_stored_property_inits_here,sema_tcd,none,
      "%select{superclass|class}1 %0 requires all stored properties to have "
@@ -1016,12 +1016,12 @@ ERROR(witness_argument_name_mismatch,sema_tcd,none,
       "required by protocol %2 (%3)", (bool, DeclName, Type, DeclName))
 ERROR(witness_initializer_not_required,sema_tcd,none,
       "initializer requirement %0 can only be satisfied by a `required` "
-      "initializer in%select{| the definition of}1 non-final class %2", 
+      "initializer in%select{| the definition of}1 non-final class %2",
       (DeclName, bool, Type))
 ERROR(witness_initializer_failability,sema_tcd,none,
       "non-failable initializer requirement %0"
       "%select{| in Objective-C protocol}1 cannot be satisfied by a "
-      "failable initializer ('init%select{?|!}1')", 
+      "failable initializer ('init%select{?|!}1')",
       (DeclName, bool))
 ERROR(witness_self_non_subtype,sema_tcd,none,
       "protocol %0 requirement %1 cannot be satisfied by a non-final class "
@@ -1187,7 +1187,7 @@ ERROR(circular_protocol_def,sema_tcd,none,
       "circular protocol inheritance %0", (StringRef))
 NOTE(protocol_here,sema_tcd,none,
      "protocol %0 declared here", (Identifier))
-ERROR(protocol_composition_not_protocol,sema_tcd,none, 
+ERROR(protocol_composition_not_protocol,sema_tcd,none,
       "non-protocol type %0 cannot be used within 'protocol<...>'", (Type))
 ERROR(objc_protocol_inherits_non_objc_protocol,sema_tcd,none,
       "@objc protocol %0 cannot refine non-@objc protocol %1", (Type, Type))
@@ -1564,7 +1564,7 @@ NOTE(attr_ApplicationMain_script_here,sema_tcd,none,
 #undef SELECT_APPLICATION_MAIN
 #undef SELECT_APPLICATION_DELEGATE
 
-// lazy 
+// lazy
 ERROR(lazy_not_on_let,sema_tcd,none,
       "'lazy' cannot be used on a let", ())
 ERROR(lazy_not_on_computed,sema_tcd,none,
@@ -1681,7 +1681,7 @@ ERROR(dynamic_construct_class,sema_tce,none,
       "constructing an object of class type %0 with a metatype value must use "
       "a 'required' initializer", (Type))
 NOTE(note_nonrequired_initializer,sema_tce,none,
-      "selected %select{non-required|implicit}0 initializer %1", 
+      "selected %select{non-required|implicit}0 initializer %1",
      (bool, DeclName))
 ERROR(construct_protocol_value,sema_tce,none,
       "value of type %0 is a protocol; it cannot be instantiated",
@@ -2295,7 +2295,7 @@ ERROR(sil_metatype_without_repr,type_parsing,none,
       "metatypes in SIL must have @thin, @thick, or @objc_metatype attribute",
       ())
 ERROR(sil_metatype_multiple_reprs,type_parsing,none,
-      "metatypes in SIL can only be one of @thin, @thick, or @objc_metatype", 
+      "metatypes in SIL can only be one of @thin, @thick, or @objc_metatype",
       ())
 
 //------------------------------------------------------------------------------
@@ -2653,7 +2653,7 @@ WARNING(omit_needless_words, sema_tcd, none,
         "%0 could be named %1 [-Womit-needless-words]", (DeclName, DeclName))
 
 WARNING(extraneous_default_args_in_call, sema_tcd, none,
-        "call to %0 has extraneous arguments that could use defaults", 
+        "call to %0 has extraneous arguments that could use defaults",
         (DeclName))
 
 //------------------------------------------------------------------------------

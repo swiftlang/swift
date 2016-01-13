@@ -47,7 +47,7 @@ namespace swift {
 
     /// \brief Disable API availability checking.
     bool DisableAvailabilityChecking = false;
-    
+
     /// Whether to warn about "needless" words in declarations.
     bool WarnOmitNeedlessWords = false;
 
@@ -143,17 +143,17 @@ namespace swift {
     /// \brief Perform all dynamic allocations using malloc/free instead of
     /// optimized custom allocator, so that memory debugging tools can be used.
     bool UseMalloc = false;
-    
+
     /// \brief Enable experimental "switch" pattern-matching features.
     bool EnableExperimentalPatterns = false;
 
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;
-    
+
     /// Don't mangle the Self type as part of declaration manglings.
     bool DisableSelfTypeMangling = true;
-    
+
     /// Sets the target we are building for and updates configuration options
     /// to match.
     ///
@@ -197,10 +197,10 @@ namespace swift {
     void clearAllTargetConfigOptions() {
       TargetConfigOptions.clear();
     }
-    
+
     /// Returns the value for the given target configuration or an empty string.
     StringRef getTargetConfigOption(StringRef Name) const;
-    
+
     /// Explicit build configuration options, initialized via the '-D'
     /// compiler flag.
     void addBuildConfigOption(StringRef Name) {
@@ -236,7 +236,7 @@ namespace swift {
 
   private:
     llvm::SmallVector<std::pair<std::string, std::string>, 2>
-        TargetConfigOptions; 
+        TargetConfigOptions;
     llvm::SmallVector<std::string, 2> BuildConfigOptions;
   };
 }

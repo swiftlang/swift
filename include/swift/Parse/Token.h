@@ -45,11 +45,11 @@ enum class tok {
   pound_line,
   pound_available,
   comment,
-  
+
 #define KEYWORD(X) kw_ ## X,
 #define PUNCTUATOR(X, Y) X,
 #include "swift/Parse/Tokens.def"
-  
+
   NUM_TOKENS
 };
 
@@ -70,10 +70,10 @@ class Token {
   ///
   /// Hopefully 128 Mib is enough.
   unsigned CommentLength : 27;
-  
+
   /// \brief Whether this token is an escaped `identifier` token.
   unsigned EscapedIdentifier : 1;
-  
+
   /// Text - The actual string covered by the token in the source buffer.
   StringRef Text;
 
@@ -86,10 +86,10 @@ class Token {
 public:
   Token() : Kind(tok::NUM_TOKENS), AtStartOfLine(false), CommentLength(0),
             EscapedIdentifier(false) {}
-  
+
   tok getKind() const { return Kind; }
   void setKind(tok K) { Kind = K; }
-  
+
   /// is/isNot - Predicates to check if this token is a specific kind, as in
   /// "if (Tok.is(tok::l_brace)) {...}".
   bool is(tok K) const { return Kind == K; }
@@ -114,7 +114,7 @@ public:
   bool isBinaryOperator() const {
     return Kind == tok::oper_binary_spaced || Kind == tok::oper_binary_unspaced;
   }
-  
+
   bool isAnyOperator() const {
     return isBinaryOperator() || Kind == tok::oper_postfix ||
            Kind == tok::oper_prefix;
@@ -135,7 +135,7 @@ public:
 
   /// \brief Set whether this token occurred at the start of a line.
   void setAtStartOfLine(bool value) { AtStartOfLine = value; }
-  
+
   /// \brief True if this token is an escaped identifier token.
   bool isEscapedIdentifier() const { return EscapedIdentifier; }
   /// \brief Set whether this token is an escaped identifier token.
@@ -144,12 +144,12 @@ public:
            "only identifiers can be escaped identifiers");
     EscapedIdentifier = value;
   }
-  
+
   bool isContextualKeyword(StringRef ContextKW) const {
     return is(tok::identifier) && !isEscapedIdentifier() &&
            Text == ContextKW;
   }
-  
+
   /// Return true if this is a contextual keyword that could be the start of a
   /// decl.
   bool isContextualDeclKeyword() const {
@@ -215,7 +215,7 @@ public:
   bool isFollowingLParen() const {
     return !isAtStartOfLine() && Kind == tok::l_paren;
   }
-  
+
   /// True if the token is an l_square token that does not start a new line.
   bool isFollowingLSquare() const {
     return !isAtStartOfLine() && Kind == tok::l_square;
@@ -229,7 +229,7 @@ public:
     default: return false;
     }
   }
-  
+
   /// getLoc - Return a source location identifier for the specified
   /// offset in the current file.
   SourceLoc getLoc() const {
@@ -255,7 +255,7 @@ public:
       SourceLoc(llvm::SMLoc::getFromPointer(TrimedComment.begin())),
       TrimedComment.size());
   }
-  
+
   SourceLoc getCommentStart() const {
     if (CommentLength == 0) return SourceLoc();
     return SourceLoc(llvm::SMLoc::getFromPointer(trimComment().begin()));
@@ -281,7 +281,7 @@ public:
     EscapedIdentifier = false;
   }
 };
-  
+
 } // end namespace swift
 
 

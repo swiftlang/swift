@@ -361,7 +361,7 @@ public:
            hasStoredObjCMethod());
     return CanGenericSignature(GenericSig);
   }
-  
+
   /// Return an open-coded abstraction pattern for a tuple.  The
   /// caller is responsible for ensuring that the storage for the
   /// tuple elements is valid for as long as the abstraction pattern is.
@@ -692,7 +692,7 @@ public:
     case Kind::PartialCurriedObjCMethodType:
     case Kind::CurriedObjCMethodType:
     case Kind::ObjCMethodType:
-      llvm_unreachable("pattern is not a tuple");      
+      llvm_unreachable("pattern is not a tuple");
     case Kind::Tuple:
       return getNumTupleElements_Stored();
     case Kind::Type:

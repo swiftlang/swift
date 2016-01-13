@@ -216,7 +216,7 @@ def import_cf_types : Flag<["-"], "import-cf-types">,
 
 def solver_memory_threshold : Separate<["-"], "solver-memory-threshold">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Set the upper bound for memory consumption, in bytes, by the constraint solver">;   
+  HelpText<"Set the upper bound for memory consumption, in bytes, by the constraint solver">;
 
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,

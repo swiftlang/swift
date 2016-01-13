@@ -380,7 +380,7 @@ private:
 
     // The last key (i.e. End-1) must be strictly lower than
     // upperBound-1, or in other words, End must precede upperBound.
-    if (upperBound.hasValue()) 
+    if (upperBound.hasValue())
       assert(Traits::precedes(node->End, upperBound.getValue()));
 
     // The keys in the left sub-tree must all be strictly less than

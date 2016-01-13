@@ -69,11 +69,11 @@ public:
     /// The requirement was part of a protocol requirement, e.g., an
     /// inherited protocol or a requirement on an associated type.
     Protocol,
-    /// 
+    ///
     /// The requirement was inferred from part of the signature.
     Inferred,
     /// The requirement came from an outer scope.
-    /// FIXME: eliminate this in favor of keeping requirement sources in 
+    /// FIXME: eliminate this in favor of keeping requirement sources in
     /// GenericSignatures, at least non-canonical ones?
     OuterScope,
   };
@@ -133,22 +133,22 @@ private:
                                  ProtocolDecl *Proto,
                                  RequirementSource Source,
                                 llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
-  
+
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetypes are equivalent.
   bool addSameTypeRequirementBetweenArchetypes(PotentialArchetype *T1,
                                                PotentialArchetype *T2,
                                                RequirementSource Source);
-  
+
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetype is bound to a concrete type.
   bool addSameTypeRequirementToConcrete(PotentialArchetype *T,
                                         Type Concrete,
                                         RequirementSource Source);
-  
+
   /// \brief Add a new superclass requirement specifying that the given
   /// potential archetype has the given type as an ancestor.
-  bool addSuperclassRequirement(PotentialArchetype *T, 
+  bool addSuperclassRequirement(PotentialArchetype *T,
                                 Type Superclass,
                                 RequirementSource Source);
 
@@ -205,7 +205,7 @@ public:
                             PotentialArchetype *archetype,
                             llvm::PointerUnion<Type, PotentialArchetype *> type,
                             RequirementSource source)> f);
-  
+
 
 private:
   PotentialArchetype *addGenericParameter(GenericTypeParamType *GenericParam,
@@ -228,7 +228,7 @@ public:
   ///
   /// \returns true if an error occurred, false otherwise.
   bool addGenericParameter(GenericTypeParamType *GenericParam);
-  
+
   /// \brief Add a new requirement.
   ///
   /// \returns true if this requirement makes the set of requirements
@@ -240,7 +240,7 @@ public:
   /// Adding an already-checked requirement cannot fail. This is used to
   /// re-inject requirements from outer contexts.
   void addRequirement(const Requirement &req, RequirementSource source);
-  
+
   /// \brief Add all of a generic signature's parameters and requirements.
   ///
   /// FIXME: Requirements from the generic signature are treated as coming from
@@ -314,7 +314,7 @@ public:
   /// structurally with their corresponding archetypes and resolve dependent
   /// member types to the appropriate associated types.
   Type substDependentType(Type type);
-  
+
   /// \brief Retrieve the archetype that corresponds to the given generic
   /// parameter.
   ArchetypeType *getArchetype(GenericTypeParamDecl *GenericParam);
@@ -323,11 +323,11 @@ public:
   /// archetype assignment. The 'primary' archetypes will occur first in this
   /// list.
   ArrayRef<ArchetypeType *> getAllArchetypes();
-  
+
   using SameTypeRequirement
     = std::pair<PotentialArchetype *,
                 PointerUnion<Type, PotentialArchetype*>>;
-  
+
   /// Retrieve the set of same-type requirements that apply to the potential
   /// archetypes known to this builder.
   ArrayRef<SameTypeRequirement> getSameTypeRequirements() const;
@@ -346,7 +346,7 @@ public:
   /// dependent types.
   static Type mapTypeIntoContext(DeclContext *dc, Type type,
                                  LazyResolver *resolver = nullptr);
-  
+
   /// \brief Dump all of the requirements, both specified and inferred.
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump(),
@@ -362,7 +362,7 @@ public:
                                  LazyResolver *resolver = nullptr);
 
   // In SILFunction.cpp:
-  
+
   /// \brief Resolve the given dependent type using our context archetypes.
   ///
   /// Given an arbitrary type, this will substitute dependent type parameters
@@ -443,27 +443,27 @@ class ArchetypeBuilder::PotentialArchetype {
     : ParentOrParam(Parent), NameOrAssociatedType(Name), Representative(this),
       IsRecursive(false), Invalid(false), SubstitutingConcreteType(false),
       RecursiveConcreteType(false), Renamed(false)
-  { 
+  {
     assert(Parent != nullptr && "Not an associated type?");
     EquivalenceClass.push_back(this);
   }
 
   /// \brief Construct a new potential archetype for an associated type.
   PotentialArchetype(PotentialArchetype *Parent, AssociatedTypeDecl *AssocType)
-    : ParentOrParam(Parent), NameOrAssociatedType(AssocType), 
+    : ParentOrParam(Parent), NameOrAssociatedType(AssocType),
       Representative(this), IsRecursive(false), Invalid(false),
       SubstitutingConcreteType(false), RecursiveConcreteType(false),
       Renamed(false)
-  { 
+  {
     assert(Parent != nullptr && "Not an associated type?");
     EquivalenceClass.push_back(this);
   }
 
   /// \brief Construct a new potential archetype for a generic parameter.
-  PotentialArchetype(GenericTypeParamType *GenericParam, 
+  PotentialArchetype(GenericTypeParamType *GenericParam,
                      ProtocolDecl *RootProtocol,
                      Identifier Name)
-    : ParentOrParam(GenericParam), RootProtocol(RootProtocol), 
+    : ParentOrParam(GenericParam), RootProtocol(RootProtocol),
       NameOrAssociatedType(Name), Representative(this), IsRecursive(false),
       Invalid(false), SubstitutingConcreteType(false),
       RecursiveConcreteType(false), Renamed(false)
@@ -488,8 +488,8 @@ public:
 
   /// Retrieve the parent of this potential archetype, which will be non-null
   /// when this potential archetype is an associated type.
-  PotentialArchetype *getParent() const { 
-    return ParentOrParam.dyn_cast<PotentialArchetype *>(); 
+  PotentialArchetype *getParent() const {
+    return ParentOrParam.dyn_cast<PotentialArchetype *>();
   }
 
   /// Retrieve the generic parameter at the root of this potential archetype.
@@ -514,7 +514,7 @@ public:
   /// Retrieve the generic type parameter for this potential
   /// archetype, if it corresponds to a generic parameter.
   GenericTypeParamType *getGenericParam() const {
-    return ParentOrParam.dyn_cast<GenericTypeParamType *>(); 
+    return ParentOrParam.dyn_cast<GenericTypeParamType *>();
   }
 
   /// Retrieve the set of protocols to which this type conforms.
@@ -535,7 +535,7 @@ public:
   /// Retrieve the requirement source for the superclass requirement.
   const RequirementSource &getSuperclassSource() const {
     return *SuperclassSource;
-  } 
+  }
 
   /// Retrieve the set of nested types.
   const llvm::MapVector<Identifier, llvm::TinyPtrVector<PotentialArchetype *>> &
@@ -586,7 +586,7 @@ public:
 
     return ArchetypeOrConcreteType.isConcreteType();
   }
-  
+
   /// Get the concrete type this potential archetype is constrained to.
   Type getConcreteType() const {
     assert(isConcreteType());

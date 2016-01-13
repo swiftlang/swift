@@ -49,7 +49,7 @@ public:
   ValueDecl *getValueDecl() const {
     return Value;
   }
-  
+
   ValueDecl *getBaseDecl() const {
     return Base;
   }

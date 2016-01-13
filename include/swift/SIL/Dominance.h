@@ -75,13 +75,13 @@ public:
 ///   }
 /// \endcode
 class DominanceOrder {
-  
+
   SmallVector<SILBasicBlock *, 16> buffer;
   DominanceInfo *DT;
   size_t srcIdx = 0;
-  
+
 public:
-  
+
   /// Constructor.
   /// \p entry The root of the dominator (sub-)tree.
   /// \p DT The dominance info of the function.

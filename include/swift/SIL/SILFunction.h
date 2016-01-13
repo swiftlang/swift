@@ -46,21 +46,21 @@ public:
 
   /// The visibility of this method's class (if any).
   enum ClassVisibility_t {
-    
+
     /// This is a method in the vtable of a public class.
     PublicClass,
-    
+
     /// This is a method in the vtable of an internal class.
     InternalClass,
-    
+
     /// All other cases (e.g. this function is not a method).
     NotRelevant
   };
-    
+
 private:
   friend class SILBasicBlock;
   friend class SILModule;
-    
+
   /// Module - The SIL module that the function belongs to.
   SILModule &Module;
 
@@ -111,7 +111,7 @@ private:
   /// The visibility of the parent class, if this is a method which is contained
   /// in the vtable of that class.
   unsigned ClassVisibility : 2;
-    
+
   /// The function's global_init attribute.
   unsigned GlobalInitFlag : 1;
 
@@ -252,7 +252,7 @@ public:
           "Function should be deleted instead of getting a zombie");
     Zombie = true;
   }
-  
+
   /// Returns true if this function is dead, but kept in the module's zombie list.
   bool isZombie() const { return Zombie; }
 
@@ -322,7 +322,7 @@ public:
     }
     return L;
   }
-    
+
   /// Helper method which returns true if this function has "external" linkage.
   bool isAvailableExternally() const {
     return swift::isAvailableExternally(getLinkage());
@@ -429,7 +429,7 @@ public:
   ClassVisibility_t getClassVisibility() const {
     return ClassVisibility_t(ClassVisibility);
   }
-    
+
   /// Get this function's noinline attribute.
   Inline_t getInlineStrategy() const { return Inline_t(InlineStrategy); }
   void setInlineStrategy(Inline_t inStr) { InlineStrategy = inStr; }
@@ -554,7 +554,7 @@ public:
                           return isa<ThrowInst>(TI);
                         });
   }
-  
+
   /// Return the unique basic block containing a throw inst if it
   /// exists. Otherwise, returns end.
   const_iterator findThrowBB() const {
@@ -564,7 +564,7 @@ public:
                           return isa<ThrowInst>(TI);
                         });
   }
-    
+
   //===--------------------------------------------------------------------===//
   // Argument Helper Methods
   //===--------------------------------------------------------------------===//
@@ -607,7 +607,7 @@ public:
   /// Pretty-print the SILFunction.
   void dump(bool Verbose) const;
   void dump() const;
-  
+
   /// Pretty-print the SILFunction.
   /// Useful for dumping the function when running in a debugger.
   /// Warning: no error handling is done. Fails with an assert if the file
