@@ -25,8 +25,9 @@
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.10   %s | FileCheck -check-prefix NO_ARCLITE %s
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios8.0        %s | FileCheck -check-prefix NO_ARCLITE %s
 
-// RUN: touch %ta.o
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %ta.o -o linker 2>&1 | FileCheck -check-prefix COMPILE_AND_LINK %s
+// RUN: rm -rf %t && mkdir %t
+// RUN: touch %t/a.o
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -o linker 2>&1 | FileCheck -check-prefix COMPILE_AND_LINK %s
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -module-name LINKER | FileCheck -check-prefix INFERRED_NAME %s
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -o libLINKER.dylib | FileCheck -check-prefix INFERRED_NAME %s
@@ -154,11 +155,11 @@
 
 
 // COMPILE_AND_LINK: bin/swift
-// COMPILE_AND_LINK-NOT: a.o
+// COMPILE_AND_LINK-NOT: /a.o
 // COMPILE_AND_LINK: linker.swift
-// COMPILE_AND_LINK-NOT: a.o
+// COMPILE_AND_LINK-NOT: /a.o
 // COMPILE_AND_LINK-NEXT: bin/ld{{"? }}
-// COMPILE_AND_LINK-DAG: a.o
+// COMPILE_AND_LINK-DAG: /a.o
 // COMPILE_AND_LINK-DAG: .o
 // COMPILE_AND_LINK: -o linker
 
