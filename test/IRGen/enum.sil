@@ -144,7 +144,7 @@ import Swift
 // CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsO4enum10NoPayloads to i8*)
 // -- getExtraInhabitantIndex
 // CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgO4enum10NoPayloads to i8*)
-// CHECK: ] 
+// CHECK: ]
 
 // -- Single-payload enums take unused extra inhabitants from their payload
 //    as their own.
@@ -162,7 +162,7 @@ import Swift
 // CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsO4enum19SinglePayloadNested to i8*)
 // -- getExtraInhabitantIndex
 // CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgO4enum19SinglePayloadNested to i8*)
-// CHECK: ] 
+// CHECK: ]
 
 
 // CHECK: @_TMPO4enum20DynamicSinglePayload = global { {{.*}}* } {

@@ -504,7 +504,7 @@ func testProtocolQualified(obj: CopyableNSObject, cell: CopyableSomeCell,
   _ = cell as NSObjectProtocol
   _ = cell as NSCopying // expected-error {{'CopyableSomeCell' (aka 'SomeCell') is not convertible to 'NSCopying'; did you mean to use 'as!' to force downcast?}} {{12-14=as!}}
   _ = cell as SomeCell
-  
+
   _ = plainObj as CopyableNSObject // expected-error {{'NSObject' is not convertible to 'CopyableNSObject' (aka 'protocol<NSCopying, NSObjectProtocol>'); did you mean to use 'as!' to force downcast?}} {{16-18=as!}}
   _ = plainCell as CopyableSomeCell // FIXME: This is not really typesafe.
 }

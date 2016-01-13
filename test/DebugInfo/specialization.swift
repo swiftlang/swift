@@ -6,7 +6,7 @@
 // CHECK: bb0(%0 : $*Int, %1 : $*Int, %2 : $*Int):
 // CHECK:  debug_value_addr %1 : $*Int, let, name "i", argno 1
 // CHECK:  debug_value_addr %2 : $*Int, let, name "j", argno 2
-  
+
 @inline(never)
 public func sum<T : IntegerArithmeticType>(i : T, _ j : T) -> T {
   let result = i + j

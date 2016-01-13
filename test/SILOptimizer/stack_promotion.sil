@@ -262,7 +262,7 @@ bb0:
 
 bb1:
   br bb2
- 
+
 bb2:
   %o1 = alloc_ref $XX
   %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> XX
@@ -286,33 +286,33 @@ bb2:
 // CHECK: return
 sil @promote_array : $@convention(thin) (Int, Int, Int, Int) -> () {
 bb0(%0 : $Int, %1 : $Int, %2 : $Int, %3 : $Int):
-  %4 = function_ref @swift_bufferAllocate : $@convention(thin) (@thick AnyObject.Type, Int, Int) -> @owned AnyObject 
-  %5 = metatype $@thick DummyArrayStorage<Int>.Type 
-  %6 = init_existential_metatype %5 : $@thick DummyArrayStorage<Int>.Type, $@thick AnyObject.Type 
+  %4 = function_ref @swift_bufferAllocate : $@convention(thin) (@thick AnyObject.Type, Int, Int) -> @owned AnyObject
+  %5 = metatype $@thick DummyArrayStorage<Int>.Type
+  %6 = init_existential_metatype %5 : $@thick DummyArrayStorage<Int>.Type, $@thick AnyObject.Type
 
   // allocate the buffer
-  %7 = apply %4(%6, %1, %2) : $@convention(thin) (@thick AnyObject.Type, Int, Int) -> @owned AnyObject 
-  %8 = metatype $@thin Array<Int>.Type            
-  %9 = function_ref @init_array_with_buffer : $@convention(thin) (@owned AnyObject, Int, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>) 
+  %7 = apply %4(%6, %1, %2) : $@convention(thin) (@thick AnyObject.Type, Int, Int) -> @owned AnyObject
+  %8 = metatype $@thin Array<Int>.Type
+  %9 = function_ref @init_array_with_buffer : $@convention(thin) (@owned AnyObject, Int, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
 
   // initialize the buffer
-  %10 = apply %9(%7, %3, %8) : $@convention(thin) (@owned AnyObject, Int, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>) 
-  %11 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 0 
-  %12 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 1 
-  %13 = struct_extract %12 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue 
-  %14 = pointer_to_address %13 : $Builtin.RawPointer to $*Int 
+  %10 = apply %9(%7, %3, %8) : $@convention(thin) (@owned AnyObject, Int, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
+  %11 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 0
+  %12 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 1
+  %13 = struct_extract %12 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
+  %14 = pointer_to_address %13 : $Builtin.RawPointer to $*Int
 
   // store the 2 elements
-  store %0 to %14 : $*Int                         
-  %16 = integer_literal $Builtin.Word, 1          
-  %17 = index_addr %14 : $*Int, %16 : $Builtin.Word 
-  store %0 to %17 : $*Int                         
+  store %0 to %14 : $*Int
+  %16 = integer_literal $Builtin.Word, 1
+  %17 = index_addr %14 : $*Int, %16 : $Builtin.Word
+  store %0 to %17 : $*Int
 
   // pass the array to a function
-  %19 = function_ref @take_array : $@convention(thin) (@owned Array<Int>) -> () 
+  %19 = function_ref @take_array : $@convention(thin) (@owned Array<Int>) -> ()
   %20 = apply %19(%11) : $@convention(thin) (@owned Array<Int>) -> ()
-  %21 = tuple ()                                  
-  return %21 : $()                                
+  %21 = tuple ()
+  return %21 : $()
 }
 
 // CHECK-LABEL: sil @dont_promote_escaping_array
@@ -322,30 +322,30 @@ bb0(%0 : $Int, %1 : $Int, %2 : $Int, %3 : $Int):
 // CHECK: return
 sil @dont_promote_escaping_array : $@convention(thin) (Int, Int, Int, Int) -> @owned Array<Int> {
 bb0(%0 : $Int, %1 : $Int, %2 : $Int, %3 : $Int):
-  %4 = function_ref @swift_bufferAllocate : $@convention(thin) (@thick AnyObject.Type, Int, Int) -> @owned AnyObject 
-  %5 = metatype $@thick DummyArrayStorage<Int>.Type 
-  %6 = init_existential_metatype %5 : $@thick DummyArrayStorage<Int>.Type, $@thick AnyObject.Type 
+  %4 = function_ref @swift_bufferAllocate : $@convention(thin) (@thick AnyObject.Type, Int, Int) -> @owned AnyObject
+  %5 = metatype $@thick DummyArrayStorage<Int>.Type
+  %6 = init_existential_metatype %5 : $@thick DummyArrayStorage<Int>.Type, $@thick AnyObject.Type
 
   // allocate the buffer
-  %7 = apply %4(%6, %1, %2) : $@convention(thin) (@thick AnyObject.Type, Int, Int) -> @owned AnyObject 
-  %8 = metatype $@thin Array<Int>.Type            
-  %9 = function_ref @init_array_with_buffer : $@convention(thin) (@owned AnyObject, Int, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>) 
+  %7 = apply %4(%6, %1, %2) : $@convention(thin) (@thick AnyObject.Type, Int, Int) -> @owned AnyObject
+  %8 = metatype $@thin Array<Int>.Type
+  %9 = function_ref @init_array_with_buffer : $@convention(thin) (@owned AnyObject, Int, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
 
   // initialize the buffer
-  %10 = apply %9(%7, %3, %8) : $@convention(thin) (@owned AnyObject, Int, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>) 
-  %11 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 0 
-  %12 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 1 
-  %13 = struct_extract %12 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue 
-  %14 = pointer_to_address %13 : $Builtin.RawPointer to $*Int 
+  %10 = apply %9(%7, %3, %8) : $@convention(thin) (@owned AnyObject, Int, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
+  %11 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 0
+  %12 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 1
+  %13 = struct_extract %12 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
+  %14 = pointer_to_address %13 : $Builtin.RawPointer to $*Int
 
   // store the 2 elements
-  store %0 to %14 : $*Int                         
-  %16 = integer_literal $Builtin.Word, 1          
-  %17 = index_addr %14 : $*Int, %16 : $Builtin.Word 
-  store %0 to %17 : $*Int                         
+  store %0 to %14 : $*Int
+  %16 = integer_literal $Builtin.Word, 1
+  %17 = index_addr %14 : $*Int, %16 : $Builtin.Word
+  store %0 to %17 : $*Int
 
   // return the array
-  return %11 : $Array<Int>                        
+  return %11 : $Array<Int>
 }
 
 sil [_semantics "array.uninitialized"] @init_array_with_buffer : $@convention(thin) (@owned AnyObject, Int, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
@@ -354,9 +354,9 @@ sil @swift_bufferAllocate : $@convention(thin) (@thick AnyObject.Type, Int, Int)
 
 sil @take_array : $@convention(thin) (@owned Array<Int>) -> () {
 bb0(%0 : $Array<Int>):
-  release_value %0 : $Array<Int>                  
-  %2 = tuple ()                                   
-  return %2 : $()                                 
+  release_value %0 : $Array<Int>
+  %2 = tuple ()
+  return %2 : $()
 }
 
 

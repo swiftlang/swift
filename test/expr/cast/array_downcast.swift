@@ -34,7 +34,7 @@ struct B : _ObjectiveCBridgeable {
   static func _isBridgedToObjectiveC() -> Bool {
     return true
   }
-  
+
   static func _getObjectiveCType() -> Any.Type {
     return A.self
   }
@@ -54,7 +54,7 @@ struct B : _ObjectiveCBridgeable {
   }
 }
 
-func testBridgedDowncastAnyObject(arr: [AnyObject], arrOpt: [AnyObject]?, 
+func testBridgedDowncastAnyObject(arr: [AnyObject], arrOpt: [AnyObject]?,
                                   arrIUO: [AnyObject]!) {
   var b = B()
 
@@ -72,7 +72,7 @@ func testBridgedDowncastAnyObject(arr: [AnyObject], arrOpt: [AnyObject]?,
   _ = b
 }
 
-func testBridgedIsAnyObject(arr: [AnyObject], arrOpt: [AnyObject]?, 
+func testBridgedIsAnyObject(arr: [AnyObject], arrOpt: [AnyObject]?,
                              arrIUO: [AnyObject]!) -> Bool {
   let b = B()
 

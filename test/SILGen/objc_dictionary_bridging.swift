@@ -21,7 +21,7 @@ import gizmo
 
   // Bridging dictionary results
   // CHECK-LABEL: sil hidden [thunk] @_TToFC24objc_dictionary_bridging3Foo24bridge_Dictionary_result{{.*}} : $@convention(objc_method) (Foo) -> @autoreleased NSDictionary
-  func bridge_Dictionary_result() -> Dictionary<Foo, Foo> { 
+  func bridge_Dictionary_result() -> Dictionary<Foo, Foo> {
     // CHECK: bb0([[SELF:%[0-9]+]] : $Foo):
     // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC24objc_dictionary_bridging3Foo24bridge_Dictionary_result{{.*}} : $@convention(method) (@guaranteed Foo) -> @owned Dictionary<Foo, Foo>
     // CHECK-NEXT:   [[DICT:%[0-9]+]] = apply [[SWIFT_FN]]([[SELF]]) : $@convention(method) (@guaranteed Foo) -> @owned Dictionary<Foo, Foo>
@@ -38,7 +38,7 @@ import gizmo
   // CHECK: bb0([[SELF:%[0-9]+]] : $Foo):
   // CHECK:   [[GETTER:%[0-9]+]] = function_ref @_TFC24objc_dictionary_bridging3Foog8propertyGVs10DictionaryS0_S0__ : $@convention(method) (@guaranteed Foo) -> @owned Dictionary<Foo, Foo>
   // CHECK:   [[DICT:%[0-9]+]] = apply [[GETTER]]([[SELF]]) : $@convention(method) (@guaranteed Foo) -> @owned Dictionary<Foo, Foo>
-  
+
   // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TF10Foundation32_convertDictionaryToNSDictionary{{.*}} : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
   // CHECK:   [[NSDICT:%[0-9]+]] = apply [[CONVERTER]]<Foo, Foo>([[DICT]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
   // CHECK:   return [[NSDICT]] : $NSDictionary

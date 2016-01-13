@@ -63,7 +63,7 @@ Optional(.none) // expected-error{{generic parameter 'T' could not be inferred}}
 "\(hello), \(world) #\(i)!"
 
 class File {
-  init() { 
+  init() {
     fd = 0
     body = ""
   }
@@ -75,7 +75,7 @@ class File {
 }
 
 // Non-trivial references to metatypes.
-struct Foo { 
+struct Foo {
   struct Inner { }
 }
 extension Foo {
@@ -104,9 +104,9 @@ z as Z
 
 // Construction from inouts.
 struct FooRef { }
-struct BarRef { 
-  init(inout x: FooRef) {} 
-  init(inout x: Int) {} 
+struct BarRef {
+  init(inout x: FooRef) {}
+  init(inout x: Int) {}
 }
 var f = FooRef()
 var x = 0

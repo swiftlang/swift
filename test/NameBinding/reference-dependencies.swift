@@ -140,7 +140,7 @@ func lookUpManyTopLevelNames() {
   // CHECK-DAG: !private "UInt"
   // CHECK-DAG: !private "+"
   let _: UInt = [1, 2].reduce(0, combine: +)
-  
+
   // CHECK-DAG: !private "-"
   let _: UInt = 3 - 2 - 1
 
@@ -166,7 +166,7 @@ func lookUpManyTopLevelNames() {
   _ = OtherFileOuterType.InnerType()
 
   // CHECK-DAG: !private "OtherFileAliasForSecret"
-  _ = OtherFileAliasForSecret.constant  
+  _ = OtherFileAliasForSecret.constant
 
   // CHECK-DAG: !private "otherFileUse"
   // CHECK-DAG: !private "otherFileGetImpl"
@@ -175,10 +175,10 @@ func lookUpManyTopLevelNames() {
   // CHECK-DAG: !private "otherFileUseGeneric"
   // CHECK-DAG: !private "otherFileGetImpl2"
   otherFileUseGeneric(otherFileGetImpl2())
-  
+
   // CHECK-DAG: !private "getOtherFileIntArray"
   for _ in getOtherFileIntArray() {}
-  
+
   // CHECK-DAG: !private "getOtherFileEnum"
   switch getOtherFileEnum() {
   case .Value:
@@ -192,9 +192,9 @@ func lookUpManyTopLevelNames() {
   _ = { (_: PrivateTopLevelStruct.ValueType) -> PrivateTopLevelStruct2.ValueType? in
     return nil
   }
-  
+
   typealias X = OtherFileEnumWrapper.Enum
-  
+
   let value: Any = .Value as X
   switch value {
   case is OtherFileEnumWrapper.Enum:
@@ -206,9 +206,9 @@ func lookUpManyTopLevelNames() {
   case 50:
     break
   }
-  
+
   for _: OtherFileEnumWrapper.Enum in EmptyGenerator<X>() {}
-  
+
   // CHECK-DAG: !private "otherFileGetNonImpl"
   overloadedOnProto(otherFileGetNonImpl())
 }
@@ -303,7 +303,7 @@ func outerPrivate3() {
 // CHECK-DAG: !private "PrivateTopLevelTy1"
 private extension Use4 {
   var privateTy1: PrivateTopLevelTy1? { return nil }
-} 
+}
 // CHECK-DAG: !private "PrivateTopLevelTy2"
 // CHECK-DAG: "PrivateProto2"
 extension Private2 : PrivateProto2 {

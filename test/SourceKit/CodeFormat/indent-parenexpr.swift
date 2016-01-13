@@ -10,7 +10,7 @@ func foo() {
     bar(abc, {
 
     })
-    
+
     bar((
 
     ))

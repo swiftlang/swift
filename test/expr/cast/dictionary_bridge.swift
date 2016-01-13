@@ -2,7 +2,7 @@
 
 // REQUIRES: objc_interop
 
-class Root : Hashable { 
+class Root : Hashable {
   var hashValue: Int {
     return 0
   }
@@ -20,7 +20,7 @@ struct BridgedToObjC : Hashable, _ObjectiveCBridgeable {
   static func _isBridgedToObjectiveC() -> Bool {
     return true
   }
-  
+
   static func _getObjectiveCType() -> Any.Type {
     return ObjC.self
   }
@@ -86,7 +86,7 @@ func testUpcastBridge() {
   dictDO = dictBB // expected-error{{cannot assign value of type 'Dictionary<BridgedToObjC, BridgedToObjC>' to type 'Dictionary<DerivesObjC, ObjC>'}}
   dictOD = dictBB // expected-error{{cannot assign value of type 'Dictionary<BridgedToObjC, BridgedToObjC>' to type 'Dictionary<ObjC, DerivesObjC>'}}
   dictDD = dictBB // expected-error{{cannot assign value of type 'Dictionary<BridgedToObjC, BridgedToObjC>' to type 'Dictionary<DerivesObjC, DerivesObjC>'}}
-  
+
   _ = dictDD; _ = dictDO; _ = dictOD; _ = dictOO; _ = dictOR; _ = dictOR; _ = dictRR; _ = dictRO
 }
 

@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -O -emit-sil %s | FileCheck %s
 
-public protocol Foo { 
+public protocol Foo {
   func foo(x:Int) -> Int
 }
 
@@ -42,10 +42,10 @@ func callGetSelf(f: Foo) -> Foo {
 // Check that calls to f.foo() get devirtualized and are not invoked
 // via the expensive witness_method instruction.
 // To achieve that the information about a concrete type C should
-// be propagated from init_existential_addr into witness_method and 
+// be propagated from init_existential_addr into witness_method and
 // apply instructions.
 
-// CHECK-LABEL: sil [noinline] @_TF34devirt_protocol_method_invocations38test_devirt_protocol_method_invocationFCS_1CSi 
+// CHECK-LABEL: sil [noinline] @_TF34devirt_protocol_method_invocations38test_devirt_protocol_method_invocationFCS_1CSi
 // CHECK-NOT: witness_method
 // CHECK: checked_cast
 // CHECK-NOT: checked_cast
@@ -147,7 +147,7 @@ public func test24114020() -> Int {
 // It's not obvious why this isn't completely devirtualized.
 // CHECK: sil @_TF34devirt_protocol_method_invocations12test24114020FT_Si
 // CHECK:   [[T0:%.*]] = alloc_stack $SimpleBase
-// CHECK:   [[T1:%.*]] = witness_method $SimpleBase, #Base.x!getter.1 
+// CHECK:   [[T1:%.*]] = witness_method $SimpleBase, #Base.x!getter.1
 // CHECK:   [[T2:%.*]] = apply [[T1]]<SimpleBase>([[T0]])
 // CHECK:   return [[T2]]
 

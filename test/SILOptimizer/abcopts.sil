@@ -48,7 +48,7 @@ bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
   // CHECK: [[CHECKBOUNDS:%[0-9]+]] = function_ref @checkbounds
   // CHECK: [[LD1:%[0-9]+]] = load %0
 
-  %2 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken 
+  %2 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   %3 = load %0 : $*ArrayInt
   %4 = struct_extract %3 : $ArrayInt, #ArrayInt.buffer
   %5 = struct_extract %4 : $ArrayIntBuffer, #ArrayIntBuffer.storage

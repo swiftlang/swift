@@ -6,8 +6,8 @@
 import Foundation
 
 class Model : NSObject {
-  let undoManager: NSUndoManager = { 
-    let u = NSUndoManager() 
+  let undoManager: NSUndoManager = {
+    let u = NSUndoManager()
     u.groupsByEvent = false
     return u
   }()

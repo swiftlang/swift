@@ -27,7 +27,7 @@ class Base {
   // PROVIDES-MEMBER-NEGATIVE-NOT: - ["{{.+}}4Base", "{{.+}}"]
   func foo() {}
 }
-  
+
 // PROVIDES-NOMINAL-DAG: 3Sub"
 // DEPENDS-NOMINAL-DAG: 9OtherBase"
 class Sub : OtherBase {

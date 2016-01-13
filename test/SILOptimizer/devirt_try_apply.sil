@@ -13,7 +13,7 @@ public class Base {
   @inline(never) func foo() throws -> Int32?
   @inline(never) func boo1() throws -> Base
   @inline(never) func boo2() throws -> Base?
-   deinit 
+   deinit
   init()
 }
 
@@ -21,7 +21,7 @@ public class Derived1 : Base {
   @inline(never) override func foo() throws -> Int32?
   @inline(never) override func boo1() throws -> Derived1
   @inline(never) override func boo2() throws -> Derived1?
-   deinit 
+   deinit
   override init()
 }
 
@@ -29,7 +29,7 @@ public class Derived2 : Base {
   @inline(never) override func foo() throws -> Int32
   @inline(never) override func boo1() throws -> Derived2
   @inline(never) override func boo2() throws -> Derived2
-   deinit 
+   deinit
   override init()
 }
 
@@ -39,13 +39,13 @@ public protocol P {
 
 public class CP1 : P {
   public func foo() throws -> Int32
-   deinit 
+   deinit
   init()
 }
 
 public class CP2 : CP1 {
   override public func foo() throws -> Int32
-   deinit 
+   deinit
   override init()
 }
 
@@ -799,19 +799,19 @@ sil private_external [fragile] @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_f
 
 
 public class A {
-   deinit 
+   deinit
   init()
 }
 
 class D1 {
   func f1() throws -> A?
-   deinit 
+   deinit
   init()
 }
 
 class D3 : D1 {
   override func f1() throws -> A
-   deinit 
+   deinit
   override init()
 }
 

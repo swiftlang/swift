@@ -55,7 +55,7 @@ if true {
 
   print(nonPointerBits(bo) == 0)
   // CHECK-NEXT: true
-  
+
   var bo3 = Builtin.castToBridgeObject(C(), 0._builtinWordValue)
   print(_getBool(Builtin.isUnique(&bo3)))
   // CHECK-NEXT: true
@@ -80,10 +80,10 @@ if true {
   print(x === x1)
   // CHECK-NEXT: true
   print(x === x2)
-  
+
   print(nonPointerBits(bo) == NATIVE_SPARE_BITS)
   // CHECK-NEXT: true
-  
+
   var bo3 = Builtin.castToBridgeObject(C(), NATIVE_SPARE_BITS._builtinWordValue)
   print(_getBool(Builtin.isUnique(&bo3)))
   // CHECK-NEXT: true
@@ -125,10 +125,10 @@ if true {
 }
 
 var unTaggedString: NSString {
-  return NSString(format: "A long string that won't fit in a tagged pointer")  
+  return NSString(format: "A long string that won't fit in a tagged pointer")
 }
 
-// Try with an un-tagged pointer. 
+// Try with an un-tagged pointer.
 if true {
   let x = unTaggedString
   let bo = nonNativeBridgeObject(x)
@@ -139,7 +139,7 @@ if true {
   print(x === x1)
   // CHECK-NEXT: true
   print(x === x2)
-  
+
   var bo3 = nonNativeBridgeObject(unTaggedString)
   print(_getBool(Builtin.isUnique(&bo3)))
   // CHECK-NEXT: false

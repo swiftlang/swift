@@ -13,13 +13,13 @@ struct BridgedSwift : Hashable, _ObjectiveCBridgeable {
   static func _isBridgedToObjectiveC() -> Bool {
     return true
   }
-  
+
   var hashValue: Int { return 0 }
 
   static func _getObjectiveCType() -> Any.Type {
     return BridgedObjC.self
   }
-  
+
   func _bridgeToObjectiveC() -> BridgedObjC {
     return BridgedObjC()
   }
@@ -40,7 +40,7 @@ struct BridgedSwift : Hashable, _ObjectiveCBridgeable {
 func == (x: BridgedSwift, y: BridgedSwift) -> Bool { return true }
 
 // CHECK-LABEL: sil hidden @_TF17collection_upcast15testArrayUpcast
-// CHECK: bb0([[ARRAY:%[0-9]+]] : $Array<BridgedObjC>): 
+// CHECK: bb0([[ARRAY:%[0-9]+]] : $Array<BridgedObjC>):
 func testArrayUpcast(array: [BridgedObjC]) {
   // CHECK: [[UPCAST_FN:%[0-9]+]] = function_ref @_TFs15_arrayForceCast{{.*}} : $@convention(thin) <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Array<τ_0_1>
   // CHECK-NEXT: apply [[UPCAST_FN]]<BridgedObjC, AnyObject>([[ARRAY]]) : $@convention(thin) <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Array<τ_0_1>
@@ -68,7 +68,7 @@ func testDictionaryUpcast(dict: Dictionary<BridgedObjC, BridgedObjC>) {
 func testDictionaryUpcastBridged(dict: Dictionary<BridgedSwift, BridgedSwift>) {
   // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFs29_dictionaryBridgeToObjectiveC{{.*}} : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
   // CHECK-NEXT: apply [[BRIDGE_FN]]<BridgedSwift, BridgedSwift, NSObject, AnyObject>([[DICT]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
-  let anyObjectDict: Dictionary<NSObject, AnyObject> = dict  
+  let anyObjectDict: Dictionary<NSObject, AnyObject> = dict
 }
 
 // CHECK-LABEL: sil hidden @_TF17collection_upcast13testSetUpcast
@@ -84,5 +84,5 @@ func testSetUpcast(dict: Set<BridgedObjC>) {
 func testSetUpcastBridged(dict: Set<BridgedSwift>) {
   // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFs22_setBridgeToObjectiveC{{.*}} : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@owned Set<τ_0_0>) -> @owned Set<τ_0_1>
   // CHECK: apply [[BRIDGE_FN]]<BridgedSwift, NSObject>([[SET]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@owned Set<τ_0_0>) -> @owned Set<τ_0_1>
-  let anyObjectSet: Set<NSObject> = dict  
+  let anyObjectSet: Set<NSObject> = dict
 }

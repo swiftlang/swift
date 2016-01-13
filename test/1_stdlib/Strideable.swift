@@ -99,15 +99,15 @@ StrideTestSuite.test("HalfOpen") {
       sum,
       R(start).stride(to: R(end), by: stepSize).reduce(0) { $0 + $1.x })
   }
-  
+
   check(from: 1, to: 15, by: 3, sum: 35)  // 1 + 4 + 7 + 10 + 13
   check(from: 1, to: 16, by: 3, sum: 35)  // 1 + 4 + 7 + 10 + 13
   check(from: 1, to: 17, by: 3, sum: 51)  // 1 + 4 + 7 + 10 + 13 + 16
-  
+
   check(from: 1, to: -13, by: -3, sum: -25)  // 1 + -2 + -5 + -8 + -11
   check(from: 1, to: -14, by: -3, sum: -25)  // 1 + -2 + -5 + -8 + -11
   check(from: 1, to: -15, by: -3, sum: -39)  // 1 + -2 + -5 + -8 + -11 + -14
-  
+
   check(from: 4, to: 16, by: -3, sum: 0)
   check(from: 1, to: -16, by: 3, sum: 0)
 }
@@ -124,15 +124,15 @@ StrideTestSuite.test("Closed") {
       sum,
       R(start).stride(through: R(end), by: stepSize).reduce(0) { $0 + $1.x })
   }
-  
+
   check(from: 1, through: 15, by: 3, sum: 35)  // 1 + 4 + 7 + 10 + 13
   check(from: 1, through: 16, by: 3, sum: 51)  // 1 + 4 + 7 + 10 + 13 + 16
   check(from: 1, through: 17, by: 3, sum: 51)  // 1 + 4 + 7 + 10 + 13 + 16
-  
+
   check(from: 1, through: -13, by: -3, sum: -25) // 1 + -2 + -5 + -8 + -11
   check(from: 1, through: -14, by: -3, sum: -39) // 1 + -2 + -5 + -8 + -11 + -14
   check(from: 1, through: -15, by: -3, sum: -39) // 1 + -2 + -5 + -8 + -11 + -14
-  
+
   check(from: 4, through: 16, by: -3, sum: 0)
   check(from: 1, through: -16, by: 3, sum: 0)
 }

@@ -45,7 +45,7 @@ func testEquality() {
   let x4 : (_ : P2) -> ()
   x3 = x4
   _ = x3
-  
+
   // Empty protocol-conformance types are empty.
   let x5 : (_ : Any) -> ()
   let x6 : (_ : Any2) -> ()

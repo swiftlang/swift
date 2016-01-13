@@ -36,7 +36,7 @@ func test1a() -> unionSearchFlags {
 
 func test1b(b : Bool) {
   _ = 123
-  _ = .description == 1 // expected-error{{type of expression is ambiguous without more context}} 
+  _ = .description == 1 // expected-error{{type of expression is ambiguous without more context}}
 }
 
 enum MaybeInt {
@@ -80,9 +80,9 @@ func test3(a: ZeroOneTwoThree) {
   test3(ZeroOneTwoThree.Zero)
   test3 // expected-error {{expression resolves to an unused function}}
   (ZeroOneTwoThree.Zero)
-  
+
   var _ : ZeroOneTwoThree = .One(4)
-  
+
   var _ : (Int,Int) -> ZeroOneTwoThree = .Two // expected-error{{type '(Int, Int) -> ZeroOneTwoThree' has no member 'Two'}}
   var _ : Int = .Two // expected-error{{type 'Int' has no member 'Two'}}
 }
@@ -126,16 +126,16 @@ extension CGSize {
   func area() -> Int {
     return width*self.height
   }
-  
+
   func area_wrapper() -> Int {
     return area()
   }
 }
 
-struct CGRect { 
+struct CGRect {
   var origin : CGPoint,
   size : CGSize
-  
+
   func area() -> Int {
     return self.size.area()
   }
@@ -162,7 +162,7 @@ func test5(myorigin: CGPoint) {
   _ = (r : x1.size).r.area()
   _ = x1.size.area()
   _ = (r : x1.size).r.area()
-  
+
   _ = x1.area
 
   _ = x1.search(42)
@@ -174,7 +174,7 @@ func test5(myorigin: CGPoint) {
   // TODO: something like this, how do we get it in scope in the {} block?
   //if (var Some(x) = somemaybeint) { ... }
 
-  
+
 }
 
 struct StructTest1 {
@@ -206,11 +206,11 @@ struct EmptyStruct {
   func foo() {}
 }
 
-func f() { 
+func f() {
   let a : UnionTest1
   a.bar()
   UnionTest1.baz()  // dot syntax access to a static method.
-  
+
   // Test that we can get the "address of a member".
   var _ : () -> () = UnionTest1.baz
   var _ : (UnionTest1) -> () -> () = UnionTest1.bar
@@ -246,7 +246,7 @@ func units(x: Int) -> distance {
 
 
 
-var %% : distance -> distance // expected-error {{expected pattern}} 
+var %% : distance -> distance // expected-error {{expected pattern}}
 
 func badTupleElement() {
   typealias X = (x : Int, y : Int)

@@ -63,7 +63,7 @@ func arrayToPointer() {
   // CHECK: release_value [[OWNER]]
 }
 
-// CHECK-LABEL: sil hidden @_TF18pointer_conversion15stringToPointerFSST_ 
+// CHECK-LABEL: sil hidden @_TF18pointer_conversion15stringToPointerFSST_
 func stringToPointer(s: String) {
   takesConstVoidPointer(s)
   // CHECK: [[TAKES_CONST_VOID_POINTER:%.*]] = function_ref @_TF18pointer_conversion21takesConstVoidPointerFGSPT__T_
@@ -76,7 +76,7 @@ func stringToPointer(s: String) {
   // CHECK: release_value [[OWNER]]
 }
 
-// CHECK-LABEL: sil hidden @_TF18pointer_conversion14inoutToPointerFT_T_ 
+// CHECK-LABEL: sil hidden @_TF18pointer_conversion14inoutToPointerFT_T_
 func inoutToPointer() {
   var int = 0
   // CHECK: [[INT:%.*]] = alloc_box $Int

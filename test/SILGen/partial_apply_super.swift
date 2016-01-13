@@ -50,7 +50,7 @@ class Child : Parent {
     doFoo(super.classMethod)
   }
 
-  // CHECK-LABEL: sil hidden @_TFC19partial_apply_super5Child20callFinalSuperMethodfT_T_ : $@convention(method) (@guaranteed Child) -> () 
+  // CHECK-LABEL: sil hidden @_TFC19partial_apply_super5Child20callFinalSuperMethodfT_T_ : $@convention(method) (@guaranteed Child) -> ()
   // CHECK: [[DOFOO:%[0-9]+]] = function_ref @_TF19partial_apply_super5doFooFFT_T_T_ : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
   // CHECK: [[CASTED_SELF:%[0-9]+]] = upcast %0 : $Child to $Parent
   // CHECK: [[SUPER_METHOD:%[0-9]+]] = function_ref @_TFC19partial_apply_super6Parent11finalMethodFT_T_ : $@convention(thin) (@owned Parent) -> @owned @callee_owned () -> ()

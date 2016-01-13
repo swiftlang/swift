@@ -65,7 +65,7 @@ struct WillSetDidSetClass {
 
 class DynamicPropertiesBase {
   var x: String { return "base" }
-  
+
   var y : String {
     get {
       return "base"
@@ -118,13 +118,13 @@ func test() {
   Bar.staticStoredBar = 654321
   // CHECK: 654321
   print(Bar.staticStoredBar)
-  
-  
+
+
   var ds = WillSetDidSetStruct()
   print("start is \(ds.x)")
   ds.x = 42
   print("now is \(ds.x)")
-  
+
   // CHECK: start is 0
   // CHECK: from 0 to 42
   // CHECK: got 42
@@ -134,7 +134,7 @@ func test() {
   print("start is \(dsc.x)")
   dsc.x = 42
   print("now is \(dsc.x)")
-  
+
   // CHECK: start is 0
   // CHECK: from 0 to 42
   // CHECK: got 42
@@ -144,7 +144,7 @@ func test() {
   // Properties should be dynamically dispatched.
   var dpd = DynamicPropertiesDerived()
   print("dpd.x is \(dpd.x)")  // CHECK: dpd.x is derived
-  
+
   var dpb : DynamicPropertiesBase = dpd
   print("dpb.x is \(dpb.x)")  // CHECK: dpb.x is derived
 
@@ -183,7 +183,7 @@ class LazyPropertyClass {
   deinit {
     print("LazyPropertyClass.deinit #\(id)")
   }
-  
+
 
 }
 

@@ -34,7 +34,7 @@ func test0() {
 // CHECK: [[A:%.*]] = alloc_stack $A
 // CHECK: [[T0:%.*]] = function_ref @_TFV10addressors1AC
 // CHECK: [[T1:%.*]] = metatype $@thin A.Type
-// CHECK: [[AVAL:%.*]] = apply [[T0]]([[T1]]) 
+// CHECK: [[AVAL:%.*]] = apply [[T0]]([[T1]])
 // CHECK: store [[AVAL]] to [[A]]
   var a = A()
 
@@ -217,7 +217,7 @@ func test_d(inout array: D) -> Int32 {
   take_int_inout(&array[1])
 
 // CHECK:   [[T0:%.*]] = load [[ARRAY]]
-// CHECK:   [[T1:%.*]] = function_ref @_TFV10addressors1Dg9subscriptFVs5Int32S1_ 
+// CHECK:   [[T1:%.*]] = function_ref @_TFV10addressors1Dg9subscriptFVs5Int32S1_
 // CHECK:   [[T2:%.*]] = apply [[T1]]({{%.*}}, [[T0]])
 // CHECK:   return [[T2]]
   return array[2]
@@ -465,7 +465,7 @@ class I {
 // CHECK:   [[PTR:%.*]] = address_to_pointer [[ADDR]]
 //   Set up the callback.
 // CHECK:   [[CALLBACK_FN:%.*]] = function_ref @_TFFC10addressors1Im5valueVs5Int32U_XfTBpRBBRS0_XMTS0__T_ :
-// CHECK:   [[CALLBACK:%.*]] = enum $Optional<{{.*}}>, #Optional.Some!enumelt.1, [[CALLBACK_FN]] 
+// CHECK:   [[CALLBACK:%.*]] = enum $Optional<{{.*}}>, #Optional.Some!enumelt.1, [[CALLBACK_FN]]
 //   Epilogue.
 // CHECK:   [[RESULT:%.*]] = tuple ([[PTR]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout I, @thick I.Type) -> ()>)
 // CHECK:   return [[RESULT]]
@@ -504,4 +504,4 @@ func test_rec(outer: RecOuter) -> Int32 {
 // CHECK-LABEL: sil hidden @_TF10addressors8test_recFCS_8RecOuterVs5Int32 : $@convention(thin) (@owned RecOuter) -> Int32 {
 // CHECK:   function_ref @_TFC10addressors8RecOuterap6middleVS_9RecMiddle
 // CHECK:   struct_element_addr {{.*}} : $*RecMiddle, #RecMiddle.inner
-// CHECK:   function_ref @_TFV10addressors8RecInnerg9subscriptFVs5Int32S1_ 
+// CHECK:   function_ref @_TFV10addressors8RecInnerg9subscriptFVs5Int32S1_

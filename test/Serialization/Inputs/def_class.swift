@@ -2,7 +2,7 @@ public class Empty {}
 
 public class TwoInts {
   public var x, y : Int
-  
+
   required public init(a : Int, b : Int) {
     x = a
     y = b
@@ -41,7 +41,7 @@ public class Pair<A, B> {
 
 public class GenericCtor<U> {
   public init<T>(_ t : T) {}
-  
+
   public func doSomething<T>(t : T) {}
 }
 
@@ -139,7 +139,7 @@ public class OtherBoolPair<T> : OtherPair<Bool, Bool> {
 
 public class RequiresPairLike<P : PairLike> { }
 
-public func getReqPairLike() -> RequiresPairLike<OtherBoolPair<Bool>> { 
+public func getReqPairLike() -> RequiresPairLike<OtherBoolPair<Bool>> {
   return RequiresPairLike<OtherBoolPair<Bool>>()
 }
 

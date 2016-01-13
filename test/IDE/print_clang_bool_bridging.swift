@@ -58,22 +58,22 @@ class Test : NSObject {
   var propCBool: Bool
   var propObjCBool: Bool
   var propDarwinBoolean: Bool
-  
+
   func testCBool(b: Bool) -> Bool
   func testObjCBool(b: Bool) -> Bool
   func testDarwinBoolean(b: Bool) -> Bool
-  
+
   var propCBoolBlock: (Bool) -> Bool
   var propObjCBoolBlock: (Bool) -> Bool
   var propDarwinBooleanBlock: (Bool) -> Bool
-  
+
   func testCBoolFnToBlock(fp: @convention(c) (Bool) -> Bool) -> (Bool) -> Bool
   func testObjCBoolFnToBlock(fp: @convention(c) (ObjCBool) -> ObjCBool) -> (Bool) -> Bool
   func testDarwinBooleanFnToBlock(fp: @convention(c) (DarwinBoolean) -> DarwinBoolean) -> (Bool) -> Bool
-  
+
   func produceCBoolBlockTypedef(outBlock: AutoreleasingUnsafeMutablePointer<(@convention(block) (Bool) -> Bool)?>)
   func produceObjCBoolBlockTypedef(outBlock: AutoreleasingUnsafeMutablePointer<(@convention(block) (ObjCBool) -> ObjCBool)?>)
   func produceDarwinBooleanBlockTypedef(outBlock: AutoreleasingUnsafeMutablePointer<(@convention(block) (DarwinBoolean) -> DarwinBoolean)?>)
-  
+
   init()
 }

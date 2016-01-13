@@ -98,7 +98,7 @@ printTriple(q)
 class FourthWheel<P, Q, R, S> : AwkwardTriple<P, Q, R> {
   var fourth: S
 
-  init(_ front: UInt8, _ first: P, _ second: Q, _ back: UInt8, _ third: R, 
+  init(_ front: UInt8, _ first: P, _ second: Q, _ back: UInt8, _ third: R,
        _ fourth: S) {
     self.fourth = fourth
     super.init(front, first, second, back, third)

@@ -5,7 +5,7 @@
 NS_REFINED_FOR_SWIFT
 @protocol PrivProto
 @end
-  
+
 @interface Foo : NSObject <PrivProto>
 @property id privValue NS_REFINED_FOR_SWIFT;
 

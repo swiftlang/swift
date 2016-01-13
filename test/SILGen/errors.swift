@@ -12,7 +12,7 @@ enum HomeworkError : ErrorType {
 
 // CHECK: sil hidden @_TF6errors10make_a_cat{{.*}} : $@convention(thin) () -> (@owned Cat, @error ErrorType) {
 // CHECK:      [[T0:%.*]] = function_ref @_TFC6errors3CatC{{.*}} : $@convention(thin) (@thick Cat.Type) -> @owned Cat
-// CHECK-NEXT: [[T1:%.*]] = metatype $@thick Cat.Type 
+// CHECK-NEXT: [[T1:%.*]] = metatype $@thick Cat.Type
 // CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
 // CHECK-NEXT: return [[T2]] : $Cat
 func make_a_cat() throws -> Cat {

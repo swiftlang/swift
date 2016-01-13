@@ -410,7 +410,7 @@ bb0(%0 : $Int32, %1 : $@box T):
 
 // Check that there is a generic specialization of foo
 // CHECK-LABEL: sil shared [noinline] @_TTSg5V4main1CS0_S_1PS__S0_S0_S1_S____TF5test43fooUS_1P_S0___FTQ_Q0__FTVs5Int32Sf_S1_ : $@convention(thin) (@in C, @in C) -> @owned @callee_owned (Int32, Float) -> Int32
-// CHECK: function_ref @_TTSg5V4main1CS0_S_1PS__Sf___TF5test43booUS_1P___FQ_FTVs5Int32Q0__S1_ 
+// CHECK: function_ref @_TTSg5V4main1CS0_S_1PS__Sf___TF5test43booUS_1P___FQ_FTVs5Int32Q0__S1_
 // check that it invokes a generic specialization of the reabstraction thunk helper which invokes a specialization boo
 // CHECK: [[THUNK_SPECIALIZATION:%[0-9]+]] = function_ref @_TTSg5V4main1CS0_S_1PS__S0_S0_S1_S____TTRG1_RPq_P5test41P_Pq0_PS0___XFo_dVs5Int32iSf_dS1__XFo_dS1_dSf_dS1__
 // CHECK-NOT: apply

@@ -291,7 +291,7 @@ struct Waw {
   var b:Val
 
   // -- loadable value initializer with tuple destructuring:
-  // CHECK-LABEL: sil hidden @_TFV8lifetime3WawC{{.*}} : $@convention(thin) (@owned Ref, Val, Val, @thin Waw.Type) -> @owned Waw 
+  // CHECK-LABEL: sil hidden @_TFV8lifetime3WawC{{.*}} : $@convention(thin) (@owned Ref, Val, Val, @thin Waw.Type) -> @owned Waw
   // CHECK: bb0([[A0:%.*]] : $Ref, [[A1:%.*]] : $Val, [[B:%.*]] : $Val, {{%.*}} : $@thin Waw.Type):
   // CHECK-NEXT:   [[A:%.*]] = tuple ([[A0]] : {{.*}}, [[A1]] : {{.*}})
   // CHECK-NEXT:   [[RET:%.*]] = struct $Waw ([[A]] : {{.*}}, [[B]] : {{.*}})
@@ -370,7 +370,7 @@ func logical_lvalue_lifetime(r: RefWithProp, _ i: Int, _ v: Val) {
   // CHECK: [[ADDR:%.*]] = pointer_to_address [[PTR]]
   // CHECK: [[OPTCALLBACK:%.*]] = tuple_extract [[MATERIALIZE]] : {{.*}}, 1
   // CHECK: [[MARKED_ADDR:%.*]] = mark_dependence [[ADDR]] : $*Aleph on [[R2]]
-  // CHECK: {{.*}}([[CALLBACK:%.*]] : 
+  // CHECK: {{.*}}([[CALLBACK:%.*]] :
   // CHECK: [[TEMP:%.*]] = alloc_stack $RefWithProp
   // CHECK: store [[R2]] to [[TEMP]]
   // CHECK: apply [[CALLBACK]]({{.*}}, [[STORAGE]], [[TEMP]], {{%.*}})
@@ -521,8 +521,8 @@ class ImplicitDtor {
 class ImplicitDtorDerived<T> : ImplicitDtor {
   var z:T
 
-  init(z : T) { 
-    super.init() 
+  init(z : T) {
+    super.init()
     self.z = z
   }
 
@@ -629,7 +629,7 @@ class D : B {
     // CHECK: [[THIS2_SUP:%[0-9]+]] = apply [[SUPER_CTOR]]([[Y]], [[THIS1_SUP]])
     // CHECK: [[THIS2:%[0-9]+]] = unchecked_ref_cast [[THIS2_SUP]] : $B to $D
     // CHECK: [[THIS1:%[0-9]+]] = load [[THISADDR]]
-    // CHECK: release 
+    // CHECK: release
   }
 
   func foo() {}

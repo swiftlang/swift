@@ -25,7 +25,7 @@ func bad_containers_3(bc: BadContainer3) {
 }
 
 struct BadGeneratorType1 {
-  
+
 }
 
 struct BadContainer4 : SequenceType { // expected-error{{type 'BadContainer4' does not conform to protocol 'SequenceType'}}
@@ -92,7 +92,7 @@ func discard_binding() {
   for _ in [0] {}
 }
 
-struct X<T> { 
+struct X<T> {
   var value: T
 }
 
@@ -129,14 +129,14 @@ func testForEachInference() {
   // Generic sequence resolved contextually
   for i: Int in getGenericSeq() { }
   for d: Double in getGenericSeq() { }
-  
+
   // Inference of generic arguments in the element type from the
   // sequence.
-  for x: X in getXIntSeq() { 
+  for x: X in getXIntSeq() {
     let z = x.value + 1
   }
 
-  for x: X in getOvlSeq() { 
+  for x: X in getOvlSeq() {
     let z = x.value + 1
   }
 

@@ -10,7 +10,7 @@ class IBActionWrapperTy {
   // CHECK-ios-NOT: attr_ibaction_ios.swift:[[@LINE-1]]
   // CHECK-macosx: attr_ibaction_ios.swift:[[@LINE-2]]:18: error: @IBAction methods must have a single argument
   // CHECK-watchos-NOT: attr_ibaction_ios.swift:[[@LINE-3]]
-  
+
   @IBAction func reqReq(_: AnyObject, _: AnyObject) {}
   @IBAction func reqOpt(_: AnyObject, _: AnyObject?) {}
   @IBAction func reqImp(_: AnyObject, _: AnyObject!) {}

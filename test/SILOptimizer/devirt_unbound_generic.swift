@@ -37,7 +37,7 @@ class Base<T> {
 class Derived<T> : Base<T> {
   override func foo() {
   }
-  
+
   override class func boo() {
   }
 }

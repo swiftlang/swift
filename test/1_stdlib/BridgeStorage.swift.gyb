@@ -122,10 +122,10 @@ var unTaggedNSString : NSString {
 % for Self in ['_BridgeStorage']:
 allTests.test("${Self}") {
   typealias B = ${Self}<C,NSString>
-  
+
   let oy: NSString = "oy"
   expectTrue(B(objC: oy).objCInstance == oy)
-  
+
   for i in 0..<2 {
     if true {
       var b = B(native: C(), bits: i)
@@ -137,7 +137,7 @@ allTests.test("${Self}") {
       }
       expectEqual(i, b.spareBits)
     }
-    
+
     if true {
       let c = C()
       var b = B(native: c, bits: i)
@@ -151,12 +151,12 @@ allTests.test("${Self}") {
         expectFalse(b.isUniquelyReferenced_native_noSpareBits())
       }
     }
-    
+
   }
-  
+
   var b = B(native: C(), bits: 0)
   expectTrue(b.isUniquelyReferencedNative())
-  
+
   // Add a reference and verify that it's still native but no longer unique
   var c = b
   expectFalse(b.isUniquelyReferencedNative())
@@ -168,7 +168,7 @@ allTests.test("${Self}") {
   expectTrue(bb.nativeInstance === n)
   expectTrue(bb.isNative)
   expectFalse(bb.isObjC)
-  
+
   var d = B(objC: taggedNSString)
   expectFalse(d.isUniquelyReferencedNative())
   expectFalse(d.isNative)

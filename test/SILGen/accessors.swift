@@ -109,7 +109,7 @@ func test1(ref: B) {
 // CHECK-NEXT: [[OPT_CALLBACK:%.*]] = tuple_extract [[T2]] {{.*}}, 1
 // CHECK-NEXT: [[ADDR:%.*]] = mark_dependence [[T4]] : $*MutatingSub on %0 : $B
 // CHECK-NEXT: // function_ref accessors.MutatingSub.subscript.getter : (Swift.Int) -> Swift.Int
-// CHECK-NEXT: [[T0:%.*]] = function_ref @_TFV9accessors11MutatingSubg9subscriptFSiSi : $@convention(method) (Int, @inout MutatingSub) -> Int 
+// CHECK-NEXT: [[T0:%.*]] = function_ref @_TFV9accessors11MutatingSubg9subscriptFSiSi : $@convention(method) (Int, @inout MutatingSub) -> Int
 // CHECK-NEXT: [[VALUE:%.*]] = apply [[T0]]([[INDEX1]], [[ADDR]])
 // CHECK-NEXT: switch_enum [[OPT_CALLBACK]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout B, @thick B.Type) -> ()>, case #Optional.Some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.None!enumelt: [[CONT:bb[0-9]+]]
 // CHECK:    [[WRITEBACK]]([[CALLBACK:%.*]] : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout B, @thick B.Type) -> ()):
@@ -132,7 +132,7 @@ func test1(ref: B) {
 // CHECK-NEXT: [[OPT_CALLBACK:%.*]] = tuple_extract [[T2]] {{.*}}, 1
 // CHECK-NEXT: [[ADDR:%.*]] = mark_dependence [[T4]] : $*MutatingSub on %0 : $B
 // CHECK-NEXT: // function_ref accessors.MutatingSub.subscript.setter : (Swift.Int) -> Swift.Int
-// CHECK-NEXT: [[T0:%.*]] = function_ref @_TFV9accessors11MutatingSubs9subscriptFSiSi : $@convention(method) (Int, Int, @inout MutatingSub) -> () 
+// CHECK-NEXT: [[T0:%.*]] = function_ref @_TFV9accessors11MutatingSubs9subscriptFSiSi : $@convention(method) (Int, Int, @inout MutatingSub) -> ()
 // CHECK-NEXT: apply [[T0]]([[VALUE]], [[INDEX0]], [[ADDR]])
 // CHECK-NEXT: switch_enum [[OPT_CALLBACK]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout B, @thick B.Type) -> ()>, case #Optional.Some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.None!enumelt: [[CONT:bb[0-9]+]]
 // CHECK:    [[WRITEBACK]]([[CALLBACK:%.*]] : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout B, @thick B.Type) -> ()):

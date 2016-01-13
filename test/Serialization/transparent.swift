@@ -62,7 +62,7 @@ func test_switch(u: MaybePair) {
 // SIL-LABEL: sil public_external [transparent] [fragile] @_TFV15def_transparent7Wrapper13getValueAgain{{.*}} : $@convention(method) (Wrapper) -> Int32 {
 func test_wrapper() {
   var w = Wrapper(Val: 42)
-  
+
   print(w.value, terminator: "")
   print(w.getValue(), terminator: "")
   print(w.valueAgain, terminator: "")

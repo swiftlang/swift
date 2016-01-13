@@ -890,7 +890,7 @@ func double(inout val: Int) {
 
 class ObservingPropertiesNotMutableInWillSet {
   var anotherObj : ObservingPropertiesNotMutableInWillSet
-  
+
   init() {}
   var property: Int = 42 {
     willSet {
@@ -979,7 +979,7 @@ class Base16375910 {
   var x : Int {   // expected-note {{attempt to override property here}}
     return 42
   }
-  
+
   var y : Int {          // expected-note {{attempt to override property here}}
     get { return 4 }
     set {}

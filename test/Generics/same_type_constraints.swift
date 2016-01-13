@@ -51,14 +51,14 @@ public struct GeneratorOf<T> : GeneratorType, SequenceType {
   public init(_ nextElement: () -> T?) {
     self._next = nextElement
   }
-  
+
   /// Construct an instance whose `next()` method pulls its results
   /// from `base`.
   public init<G: GeneratorType where G.Element == T>(_ base: G) {
     var base = base
     self._next = { base.next() }
   }
-  
+
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
@@ -79,7 +79,7 @@ public struct GeneratorOf<T> : GeneratorType, SequenceType {
 
 // rdar://problem/19009056
 public struct LazySequenceOf<S : SequenceType, A where S.Generator.Element == A> : SequenceType {
-  public func generate() -> GeneratorOf<A> { 
+  public func generate() -> GeneratorOf<A> {
     return GeneratorOf<A>({ return nil })
   }
   public subscript(i : A) -> A { return i }

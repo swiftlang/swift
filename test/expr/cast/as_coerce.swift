@@ -5,10 +5,10 @@
   func foo()
 }
 
-class A : P1 { 
+class A : P1 {
   @objc func foo() { }
 }
-@objc class B : A { 
+@objc class B : A {
   func bar() { }
 }
 
@@ -38,7 +38,7 @@ var i32 = 1 as Int32
 var i8 = -1 as Int8
 
 // Coerce to a superclass with generic parameter inference
-class C1<T> { 
+class C1<T> {
   func f(x: T) { }
 }
 class C2<T> : C1<Int> { }

@@ -76,5 +76,5 @@ func testStaticButNotInline() -> CInt {
 
 // CHECK: attributes [[INLINEHINT_SSP_UWTABLE]] = { inlinehint ssp {{.*}}}
 // CHECK: attributes [[SSP]] = { ssp {{.*}} }
-// CHECK: attributes [[INNER_ZERO_ATTR]] = { inlinehint nounwind ssp 
+// CHECK: attributes [[INNER_ZERO_ATTR]] = { inlinehint nounwind ssp
 // CHECK: attributes [[GET_INT_ATTR]] = {

@@ -56,7 +56,7 @@ func direct_to_static_method(obj: AnyObject) {
 func opt_to_class(obj: AnyObject) {
   var obj = obj
   // CHECK: [[ENTRY:[A-Za-z0-9]+]]([[PARAM:%[0-9]+]] : $AnyObject)
-  // CHECK: [[EXISTBOX:%[0-9]+]] = alloc_box $AnyObject 
+  // CHECK: [[EXISTBOX:%[0-9]+]] = alloc_box $AnyObject
   // CHECK-NEXT: strong_retain [[PARAM]]
   // CHECK-NEXT: store [[PARAM]] to [[EXISTBOX]]#1
   // CHECK-NEXT: [[OPTBOX:%[0-9]+]] = alloc_box $ImplicitlyUnwrappedOptional<() -> ()>
@@ -76,7 +76,7 @@ func opt_to_class(obj: AnyObject) {
   // CHECK-NEXT: store [[THUNK]] to [[THUNK_PAYLOAD]]
   // CHECK-NEXT: inject_enum_addr [[OPTIONAL]]{{.*}}Some
   // CHECK-NEXT: br [[CONTBB:[a-zA-Z0-9]+]]
-  
+
   // No method BB:
   // CHECK: [[NOBB]]:
   // CHECK-NEXT: inject_enum_addr [[OPTIONAL]]{{.*}}None

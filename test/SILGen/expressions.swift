@@ -15,7 +15,7 @@ struct SillyString : _BuiltinStringLiteralConvertible, StringLiteralConvertible 
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
     byteSize: Builtin.Word,
     isASCII: Builtin.Int1
-  ) { 
+  ) {
   }
 
   init(extendedGraphemeClusterLiteral value: SillyString) { }
@@ -23,7 +23,7 @@ struct SillyString : _BuiltinStringLiteralConvertible, StringLiteralConvertible 
   init(
     _builtinStringLiteral start: Builtin.RawPointer,
     byteSize: Builtin.Word,
-    isASCII: Builtin.Int1) { 
+    isASCII: Builtin.Int1) {
   }
 
   init(stringLiteral value: SillyString) { }
@@ -38,7 +38,7 @@ struct SillyUTF16String : _BuiltinUTF16StringLiteralConvertible, StringLiteralCo
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
     byteSize: Builtin.Word,
     isASCII: Builtin.Int1
-  ) { 
+  ) {
   }
 
   init(extendedGraphemeClusterLiteral value: SillyString) { }
@@ -52,7 +52,7 @@ struct SillyUTF16String : _BuiltinUTF16StringLiteralConvertible, StringLiteralCo
   init(
     _builtinUTF16StringLiteral start: Builtin.RawPointer,
     numberOfCodeUnits: Builtin.Word
-  ) { 
+  ) {
   }
 
   init(stringLiteral value: SillyUTF16String) { }
@@ -470,7 +470,7 @@ func if_expr(a: Bool, b: Bool, x: Int, y: Int, z : Int) -> Int {
 // it isn't affected as this testcase slides up and down the file over time.
 func magic_identifier_expansion(a: Int = __COLUMN__) {
   // CHECK-LABEL: sil hidden @{{.*}}magic_identifier_expansion
-  
+
   // This should expand to the column number of the first _.
   var tmp = __COLUMN__
   // CHECK: integer_literal $Builtin.Int2048, 13

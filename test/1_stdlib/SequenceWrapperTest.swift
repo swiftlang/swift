@@ -40,7 +40,7 @@ func expectWrapperDispatch<R1, R2>(
   //===--- TRACE boilerplate ----------------------------------------------===//
   @autoclosure _ message: () -> String = "",
   showFrame: Bool = true,
-  stackTrace: SourceLocStack = SourceLocStack(),  
+  stackTrace: SourceLocStack = SourceLocStack(),
   file: String = __FILE__, line: UInt = __LINE__
 ) {
   let newTrace = stackTrace.pushIf(showFrame, file: file, line: line)

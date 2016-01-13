@@ -27,7 +27,7 @@ func h() {}
 #else /* aaa */
 #endif /* bbb */
 
-#if foo.bar() 
+#if foo.bar()
       .baz() // expected-error {{unexpected target configuration expression (expected 'os' or 'arch')}}
 
 #endif
@@ -37,7 +37,7 @@ struct S {
   #else
   #else  // expected-error {{further conditions after #else are unreachable}}
   #endif
-  
+
   #if FOO
   #elseif BAR
   #elseif BAZ

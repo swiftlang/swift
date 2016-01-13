@@ -67,65 +67,65 @@ PrintTests.test("Printable") {
     expectPrinted("-2147483648", Int.min)
     expectPrinted("2147483647", Int.max)
   }
-  
+
   expectPrinted("0", Int(0))
   expectPrinted("42", Int(42))
   expectPrinted("-42", Int(-42))
-  
+
   if (UInt64(UInt.max) > 0x1_0000_0000 as UInt64) {
     expectPrinted("18446744073709551615", UInt.max)
   } else {
     expectPrinted("4294967295", UInt.max)
   }
-  
+
   expectPrinted("0", UInt.min)
   expectPrinted("0", UInt(0))
   expectPrinted("42", UInt(42))
-  
+
   expectPrinted("-128", Int8.min)
   expectPrinted("127", Int8.max)
   expectPrinted("0", Int8(0))
   expectPrinted("42", Int8(42))
   expectPrinted("-42", Int8(-42))
-  
+
   expectPrinted("0", UInt8.min)
   expectPrinted("255", UInt8.max)
   expectPrinted("0", UInt8(0))
   expectPrinted("42", UInt8(42))
-  
+
   expectPrinted("-32768", Int16.min)
   expectPrinted("32767", Int16.max)
   expectPrinted("0", Int16(0))
   expectPrinted("42", Int16(42))
   expectPrinted("-42", Int16(-42))
-  
+
   expectPrinted("0", UInt16.min)
   expectPrinted("65535", UInt16.max)
   expectPrinted("0", UInt16(0))
   expectPrinted("42", UInt16(42))
-  
+
   expectPrinted("-2147483648", Int32.min)
   expectPrinted("2147483647", Int32.max)
   expectPrinted("0", Int32(0))
   expectPrinted("42", Int32(42))
   expectPrinted("-42", Int32(-42))
-  
+
   expectPrinted("0", UInt32.min)
   expectPrinted("4294967295", UInt32.max)
   expectPrinted("0", UInt32(0))
   expectPrinted("42", UInt32(42))
-  
+
   expectPrinted("-9223372036854775808", Int64.min)
   expectPrinted("9223372036854775807", Int64.max)
   expectPrinted("0", Int64(0))
   expectPrinted("42", Int64(42))
   expectPrinted("-42", Int64(-42))
-  
+
   expectPrinted("0", UInt64.min)
   expectPrinted("18446744073709551615", UInt64.max)
   expectPrinted("0", UInt64(0))
   expectPrinted("42", UInt64(42))
-  
+
   expectPrinted("-42", Int8(-42))
   expectPrinted("-42", Int16(-42))
   expectPrinted("-42", Int32(-42))

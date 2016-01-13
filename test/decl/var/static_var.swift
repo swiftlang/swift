@@ -74,7 +74,7 @@ func inGlobalFunc() {
 
   static let l1: Int = 0 // expected-error {{static properties may only be declared on a type}}{{3-10=}}
   class let l2: Int = 0 // expected-error {{class properties may only be declared on a type}}{{3-9=}}
-  
+
   v1 = 1; v2 = 1
   _ = v1+v2+l1+l2
 }

@@ -30,11 +30,11 @@ class D {
 
 var d = D()
 
-#if !FOO 
+#if !FOO
 func f1() -> Bool {
 	return true
 }
-#else 
+#else
 func f1() -> Int {
 #if BAR
 	return 1
@@ -46,7 +46,7 @@ func f1() -> Int {
 
 var i: Int = f1()
 
-protocol P1 { 
+protocol P1 {
 #if FOO
   func fFOO() -> Int
 #endif

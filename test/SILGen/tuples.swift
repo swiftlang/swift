@@ -78,7 +78,7 @@ func testShuffleTuple() {
   // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]()
   // CHECK-NEXT: store [[T1]] to [[Y]]#1
   // CHECK-NEXT: // function_ref
-  // CHECK-NEXT: [[T0:%.*]] = function_ref @_TF6tuples6make_pFT_PS_1P_ 
+  // CHECK-NEXT: [[T0:%.*]] = function_ref @_TF6tuples6make_pFT_PS_1P_
   // CHECK-NEXT: apply [[T0]]([[X]]#1)
   var (x,y) : (y:P, x:Int) = (x: make_int(), y: make_p())
 
@@ -90,7 +90,7 @@ func testShuffleTuple() {
   // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]()
   // CHECK-NEXT: store [[T1]] to [[PAIR_1]]
   // CHECK-NEXT: // function_ref
-  // CHECK-NEXT: [[T0:%.*]] = function_ref @_TF6tuples6make_pFT_PS_1P_ 
+  // CHECK-NEXT: [[T0:%.*]] = function_ref @_TF6tuples6make_pFT_PS_1P_
     // CHECK-NEXT: apply [[T0]]([[PAIR_0]])
   var pair : (y:P, x:Int) = (x: make_int(), y: make_p())
 
@@ -100,7 +100,7 @@ func testShuffleTuple() {
   // CHECK:      [[T0:%.*]] = function_ref @_TF6tuples8make_intFT_Si
   // CHECK-NEXT: [[INT:%.*]] = apply [[T0]]()
   // CHECK-NEXT: // function_ref
-  // CHECK-NEXT: [[T0:%.*]] = function_ref @_TF6tuples6make_pFT_PS_1P_ 
+  // CHECK-NEXT: [[T0:%.*]] = function_ref @_TF6tuples6make_pFT_PS_1P_
   // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $P
   // CHECK-NEXT: apply [[T0]]([[TEMP]])
   // CHECK-NEXT: [[TEMP2:%.*]] = alloc_stack $(y: P, x: Int)

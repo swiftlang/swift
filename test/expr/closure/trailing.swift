@@ -69,8 +69,8 @@ var c3 = C().map // expected-note{{parsing trailing closure for this call}}
 func multiTrailingClosure(a : () -> (), b : () -> ()) {
   multiTrailingClosure({}) {} // ok
   multiTrailingClosure {} {}   // expected-error {{missing argument for parameter #1 in call}} expected-error {{consecutive statements on a line must be separated by ';'}} {{26-26=;}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}}
-  
-  
+
+
 }
 
 func labeledArgumentAndTrailingClosure() {
@@ -83,7 +83,7 @@ func labeledArgumentAndTrailingClosure() {
 
   // Trailing closure binds to last parameter, always.
  takeTwoFuncsWithDefaults { "Hello, " + $0 }
-  takeTwoFuncsWithDefaults { $0 + 1 } // expected-error {{cannot convert value of type '(_) -> Int' to expected argument type '(String -> String)?'}} 
+  takeTwoFuncsWithDefaults { $0 + 1 } // expected-error {{cannot convert value of type '(_) -> Int' to expected argument type '(String -> String)?'}}
   takeTwoFuncsWithDefaults(f1: {$0 + 1 })
 }
 

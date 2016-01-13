@@ -7,7 +7,7 @@ protocol Fooable: class {
 }
 
 class Foo: Fooable {
-  
+
   func foo() { }
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC15witnesses_class3FooS_7FooableS_FS1_3foo
   // CHECK-NOT:     function_ref

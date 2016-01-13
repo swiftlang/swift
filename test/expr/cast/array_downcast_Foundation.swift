@@ -40,7 +40,7 @@ func testDowncastOptionalObject(obj: AnyObject?!) -> [String]? {
   // CHECK: (forced_checked_cast_expr type='[String]'{{.*value_cast}}
   // CHECK: (bind_optional_expr implicit type='AnyObject'
   // CHECK-NEXT: (force_value_expr implicit type='AnyObject?'
-  // CHECK-NEXT: (declref_expr type='AnyObject?!' 
+  // CHECK-NEXT: (declref_expr type='AnyObject?!'
   return obj as! [String]?
 }
 

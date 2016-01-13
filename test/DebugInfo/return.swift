@@ -7,7 +7,7 @@ class X {
 
 // CHECK: define {{.*}}ifelseexpr
 public func ifelseexpr() -> Int64 {
-  var x = X(i:0) 
+  var x = X(i:0)
   // CHECK: [[META:%.*]] = call %swift.type* @_TMaC6return1X()
   // CHECK: [[X:%.*]] = call %C6return1X* @_TFC6return1XCfT1iVs5Int64_S0_(
   // CHECK-SAME:                                  i64 0, %swift.type* [[META]])

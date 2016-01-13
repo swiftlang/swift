@@ -67,7 +67,7 @@ class SomeClass {}
 // <rdar://problem/16877304> weak let's should be rejected
 weak let V = SomeClass()  // expected-error {{'weak' must be a mutable variable, because it may change at runtime}}
 
-let a = b ; let b = a // expected-error{{could not infer type for 'a'}} 
+let a = b ; let b = a // expected-error{{could not infer type for 'a'}}
 // expected-error@-1 {{'a' used within its own type}}
 // FIXME: That second error is bogus.
 
@@ -78,7 +78,7 @@ let uselessValue : String?
 func tuplePatternDestructuring(x : Int, y : Int) {
   let (b: _, a: h) = (b: x, a: y)
   _ = h
-  
+
   // <rdar://problem/20392122> Destructuring tuple with labels doesn't work
   let (i, j) = (b: x, a: y)
   _ = i+j

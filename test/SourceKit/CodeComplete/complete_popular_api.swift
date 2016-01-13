@@ -1,5 +1,5 @@
 func test(x: Foo) {
-  
+
   x.
 }
 

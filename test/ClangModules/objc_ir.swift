@@ -39,7 +39,7 @@ func extensionMethods(b b: B) {
 // CHECK: define hidden void @_TF7objc_ir19initCallToAllocInitFT1iVs5Int32_T_
 func initCallToAllocInit(i i: CInt) {
   // CHECK: call {{.*}} @_TFCSo1BCfT3intVs5Int32_GSQS__
- 
+
   B(int: i)
 }
 

@@ -14,7 +14,7 @@ func == (x: C, y: C) -> Bool { return true }
 class D : C {}
 
 // Unrelated to the classes above.
-class U : Hashable { 
+class U : Hashable {
   var hashValue: Int {
     return 0
   }

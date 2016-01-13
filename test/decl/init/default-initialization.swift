@@ -12,7 +12,7 @@ struct B {
 func locals() {
   var al : A
   var bl : B
-  
+
   al = A(i: 1)
   bl = B(a: al)
   _ = bl

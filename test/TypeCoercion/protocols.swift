@@ -75,7 +75,7 @@ protocol OtherPrintable {
 
 struct TestFormat {}
 
-protocol FormattedPrintable : MyPrintable { 
+protocol FormattedPrintable : MyPrintable {
   func print(_: TestFormat)
 }
 

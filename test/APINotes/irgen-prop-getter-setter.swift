@@ -13,7 +13,7 @@ class MyView: NSView {
         self.layer = CALayer()
         self.nextKeyView = nil
         subviews = []
-    }    
+    }
 }
 var m = MyView()
 m.drawRect()

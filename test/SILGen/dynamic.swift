@@ -268,7 +268,7 @@ func objcMethodDispatch() {
 func dynamicMethodDispatch() {
   // CHECK: function_ref @_TFC7dynamic3FooC
   let c = Foo(dynamic: 0)
-  // CHECK: class_method [volatile] {{%.*}} : $Foo, #Foo.dynamicMethod!1.foreign 
+  // CHECK: class_method [volatile] {{%.*}} : $Foo, #Foo.dynamicMethod!1.foreign
   c.dynamicMethod()
   // CHECK: class_method [volatile] {{%.*}} : $Foo, #Foo.dynamicProp!getter.1.foreign
   let x = c.dynamicProp
@@ -282,7 +282,7 @@ func dynamicMethodDispatch() {
 
 // CHECK-LABEL: sil hidden @_TF7dynamic15managedDispatchFCS_3FooT_
 func managedDispatch(c: Foo) {
-  // CHECK: class_method [volatile] {{%.*}} : $Foo, #Foo.managedProp!getter.1.foreign 
+  // CHECK: class_method [volatile] {{%.*}} : $Foo, #Foo.managedProp!getter.1.foreign
   let x = c.managedProp
   // CHECK: class_method [volatile] {{%.*}} : $Foo, #Foo.managedProp!setter.1.foreign
   c.managedProp = x

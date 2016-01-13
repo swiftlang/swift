@@ -55,14 +55,14 @@ func recover_colon_arrow_4 : { }       // expected-error {{expected '->' after f
 
 func recover_missing_body_1() // expected-error {{expected '{' in body of function declaration}}
 func recover_missing_body_2() // expected-error {{expected '{' in body of function declaration}}
-    -> Int 
+    -> Int
 
 // Ensure that we don't skip over the 'func g' over to the right paren in
 // function g, while recovering from parse error in f() parameter tuple.  We
 // should produce the error about missing right paren.
 //
 // FIXME: The errors are awful.  We should produce just the error about paren.
-func f_recover_missing_tuple_paren(a: Int // expected-note {{to match this opening '('}} expected-error{{expected '{' in body of function declaration}} expected-error {{expected ')' in parameter}} 
+func f_recover_missing_tuple_paren(a: Int // expected-note {{to match this opening '('}} expected-error{{expected '{' in body of function declaration}} expected-error {{expected ')' in parameter}}
 func g_recover_missing_tuple_paren(b: Int) {
 }
 

@@ -19,11 +19,11 @@ case Error(ErrorType)
   init(success x: Value) {
     self = Success(x)
   }
-  
+
   init(error: ErrorType) {
     self = Error(error)
   }
-  
+
   func map<U>(@noescape transform: (Value) -> U) -> Result<U> {
     switch self {
     case Success(let x): return .Success(transform(x))

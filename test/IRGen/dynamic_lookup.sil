@@ -4,7 +4,7 @@
 // REQUIRES: objc_interop
 
 import Swift
-import Builtin 
+import Builtin
 
 class X {
   @objc func f() { }
@@ -56,7 +56,7 @@ sil @dynamic_lookup_br : $@convention(thin) (AnyObject) -> () {
 bb0(%0 : $AnyObject):
   %1 = alloc_box $AnyObject
   store %0 to %1#1 : $*AnyObject
-  %3 = alloc_box $Optional<() -> ()>              
+  %3 = alloc_box $Optional<() -> ()>
   %4 = load %1#1 : $*AnyObject
   strong_retain %4 : $AnyObject
   %6 = open_existential_ref %4 : $AnyObject to $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject
@@ -118,7 +118,7 @@ bb2:
 
 bb3:
   %43 = tuple ()
-  return %43 : $()  
+  return %43 : $()
 }
 
 // CHECK-LABEL: define void @_T1t16opt_to_subscriptFT3objPSo13AnyObject_1iSi_T_(%objc_object*, {{(i32|i64)}})
@@ -141,7 +141,7 @@ bb0(%0 : $AnyObject, %1 : $Int):
 
 bb1(%13 : $@convention(objc_method) (Int, Builtin.UnknownObject) -> Int): // Preds: bb0
   %14 = partial_apply %13(%11) : $@convention(objc_method) (Int, Builtin.UnknownObject) -> Int
-  %15 = load %3#1 : $*Int             
+  %15 = load %3#1 : $*Int
   %16 = apply %14(%15) : $@callee_owned Int -> Int
   br bb3
 

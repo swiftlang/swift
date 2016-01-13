@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -parse-as-library 
+// RUN: %target-parse-verify-swift -parse-as-library
 
 struct S {
   init() {

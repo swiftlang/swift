@@ -12,7 +12,7 @@ var a : A
 var b : B
 var c : C
 var d : D
-var ef : E<Float> 
+var ef : E<Float>
 var fi : F<Int>
 
 func f0(b : B) {}

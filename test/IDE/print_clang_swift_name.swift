@@ -10,7 +10,7 @@
 
 
 class Test : NSObject {
-  
+
   // "Factory methods" that we'd rather have as initializers.
   @available(*, unavailable, message="superseded by import of -[NSObject init]")
   convenience init()
@@ -19,27 +19,27 @@ class Test : NSObject {
   convenience init(dummyParam: ())
   @available(*, unavailable, message="use object construction 'Test(dummyParam:)'")
   class func b() -> Self
-  
+
   convenience init(cc x: AnyObject)
   @available(*, unavailable, message="use object construction 'Test(cc:)'")
   class func c(x: AnyObject) -> Self
   convenience init(_ x: AnyObject)
   @available(*, unavailable, message="use object construction 'Test(_:)'")
   class func d(x: AnyObject) -> Self
-  
+
   convenience init(aa a: AnyObject, _ b: AnyObject, cc c: AnyObject)
   @available(*, unavailable, message="use object construction 'Test(aa:_:cc:)'")
   class func e(a: AnyObject, e b: AnyObject, e c: AnyObject) -> Self
-  
+
   /*not inherited*/ init(fixedType: ())
   @available(*, unavailable, message="use object construction 'Test(fixedType:)'")
   class func f() -> Test
-  
+
   // Would-be initializers.
   class func zz() -> Self
   class func yy(aa x: AnyObject) -> Self
   class func xx(x: AnyObject, bb xx: AnyObject) -> Self
-  
+
   init()
 }
 
@@ -57,7 +57,7 @@ class TestError : NSObject {
   convenience init(error: (), block: () -> Void) throws
   @available(*, unavailable, message="use object construction 'TestError(error:block:)'")
   class func err4(callback block: () -> Void) throws -> Self
-  
+
   convenience init(aa x: AnyObject?) throws
   @available(*, unavailable, message="use object construction 'TestError(aa:)'")
   class func err5(x: AnyObject?) throws -> Self
@@ -67,7 +67,7 @@ class TestError : NSObject {
   convenience init(block: () -> Void) throws
   @available(*, unavailable, message="use object construction 'TestError(block:)'")
   class func err7(callback block: () -> Void) throws -> Self
-  
+
   // Would-be initializers.
   class func ww(x: AnyObject?) throws -> Self
   class func w2(x: AnyObject?, error: ()) throws -> Self

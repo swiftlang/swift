@@ -10,7 +10,7 @@ bb0:
 bb1:                                              // Preds: bb0
   %8 = br bb2
 bb2:                                              // Preds: bb1 bb0
-  %9 = tuple ()                              
+  %9 = tuple ()
   %10 = return %9 : $()
 }
 // CHECK-LABEL:@test1
@@ -30,7 +30,7 @@ bb0:
 bb1:                                              // Preds: bb0
   %22 = br bb2
 bb2:                                              // Preds: bb1 bb0
-  %32 = tuple ()                                
+  %32 = tuple ()
   %33 = return %32 : $()
 }
 // CHECK-LABEL:sil @test2
@@ -68,7 +68,7 @@ bb5:                                              // Preds: bb1
   br bb6
 
 bb6:
-  %28 = tuple () 
+  %28 = tuple ()
   %29 = return %28 : $()
 }
 // CHECK-LABEL: sil @loopWithFalse
@@ -78,8 +78,8 @@ bb6:
 // CHECK-NEXT:  br bb2
 // CHECK:bb2:                                              // Preds: bb1
 // CHECK:br bb3
-// CHECK:bb3:                         
-// CHECK-NEXT:  tuple ()                          
+// CHECK:bb3:
+// CHECK-NEXT:  tuple ()
 // CHECK-NEXT:  return
 // CHECK-NEXT:}
 
@@ -112,7 +112,7 @@ bb5:                                              // Preds: bb1
   br bb6
 
 bb6:
-  %28 = tuple () 
+  %28 = tuple ()
   %29 = return %28 : $()
 }
 // CHECK-LABEL:sil @InfLoop
@@ -138,9 +138,9 @@ bb0:
 // CHECK-LABEL: sil @removeTriviallyDeadInstructions
 sil @removeTriviallyDeadInstructions : $@convention(thin) (@owned B) -> () {
 bb0(%0 : $B):
-  %1 = alloc_box $B                           
+  %1 = alloc_box $B
   %2 = store %0 to %1#1 : $*B                 // CHECK: store
-  %3 = load %1#1 : $*B                        
+  %3 = load %1#1 : $*B
   %4 = strong_retain %3 : $B                         // CHECK: strong_retain
   %5 = unchecked_ref_cast %3 : $B to $Builtin.NativeObject     // CHECK-NOT: unchecked_ref_cast
   %7 = strong_release %3 : $B                        // CHECK: strong_release
@@ -149,8 +149,8 @@ bb0(%0 : $B):
   %10 = apply %9() : $@convention(thin) @noreturn () -> ()
   %6 = unchecked_ref_cast %5 : $Builtin.NativeObject to $B // CHECK-NOT: unchecked_ref_cast
   %11 = tuple()
-  %12 = return %11 : $()                      
-}                                             
+  %12 = return %11 : $()
+}
 
 // CHECK-LABEL: sil @removeTriviallyDeadButUsedByUnreachableBlock
 sil @removeTriviallyDeadButUsedByUnreachableBlock : $@convention(thin) (@owned B) -> () {
@@ -158,11 +158,11 @@ bb0(%0 : $B):
   %5 = unchecked_ref_cast %0 : $B to $Builtin.NativeObject  // CHECK-NOT: unchecked_ref_cast
   %11 = integer_literal $Builtin.Int1, 0          // CHECK-NOT: integer_literal
   %13 = cond_br %11, bb1, bb2                  // CHECK: br
-bb1:                                              
+bb1:
   %21 = unchecked_ref_cast %5 : $Builtin.NativeObject to $B // CHECK-NOT: unchecked_ref_cast
   %22 = br bb2
-bb2:                                              
-  %32 = tuple ()                                
+bb2:
+  %32 = tuple ()
   %33 = return %32 : $()                          // CHECK: return
 }                                                 // CHECK: }
 
@@ -171,13 +171,13 @@ sil @removeTriviallyDeadCrossBasicBlocks : $@convention(thin) (@owned B, Builtin
 bb0(%0:  $B, %1: $Builtin.Int1):
   %5 = unchecked_ref_cast %0 : $B to $Builtin.NativeObject     // CHECK-NOT: unchecked_ref_cast
   %13 = cond_br %1, bb1, bb2                   // CHECK: cond_br
-bb1:                                              
+bb1:
   %22 = br bb2
-bb2:                                              
+bb2:
   %9 = function_ref @exit : $@convention(thin) @noreturn () -> () // ret.exit : () -> ()
   %10 = apply %9() : $@convention(thin) @noreturn () -> ()
   %21 = unchecked_ref_cast %5 : $Builtin.NativeObject to $B // CHECK-NOT: unchecked_ref_cast
-  %32 = tuple ()                                
+  %32 = tuple ()
   %33 = return %32 : $()
 }                                                 // CHECK: }
 
@@ -205,7 +205,7 @@ sil @removePredecessorWithBBArgs : $@convention(thin) (Int, Int) -> Int {
 bb0(%0 : $Int, %1 : $Int):
  %2 = integer_literal $Builtin.Int1, 0
  %3 = cond_br %2, bb2(%0 : $Int), bb3(%1 : $Int)
-bb2(%4 : $Int): 
+bb2(%4 : $Int):
  br bb4(%4 : $Int)
 bb3(%5 : $Int):
   br bb4(%5 : $Int)

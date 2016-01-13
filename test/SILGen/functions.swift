@@ -86,7 +86,7 @@ class SomeClass {
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $@thick SomeClass.Type):
   init(x:Int, y:Int) {}
 
-  // CHECK-LABEL: sil hidden @_TFC9functions9SomeClass6method{{.*}} : $@convention(method) (Builtin.Int64, @guaranteed SomeClass) -> () 
+  // CHECK-LABEL: sil hidden @_TFC9functions9SomeClass6method{{.*}} : $@convention(method) (Builtin.Int64, @guaranteed SomeClass) -> ()
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $SomeClass):
   func method(x: Int) {}
 
@@ -291,7 +291,7 @@ func calls(i: Int, j: Int, k: Int) {
   SomeClassWithBenefits().curried_method(c)(i)(y: j)
 
   // -- Curry the Type onto static method argument lists.
-  
+
   // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
   // CHECK: [[METHOD:%[0-9]+]] = class_method [[META:%[0-9]+]] : {{.*}}, #SomeClass.static_method!1
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]

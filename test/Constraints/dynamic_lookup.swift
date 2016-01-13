@@ -16,7 +16,7 @@ class C {
 }
 
 class X {
-  init() {} 
+  init() {}
 
   @objc func foo(i: Int) { }
   @objc func bar() { }
@@ -32,7 +32,7 @@ class X {
 }
 
 class Y : P {
-  init() {} 
+  init() {}
 
   @objc func foo(s: String) { }
   @objc func wibble() { }

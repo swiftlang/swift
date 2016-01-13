@@ -24,10 +24,10 @@ PrintTests.test("CustomStringConvertible") {
 PrintTests.test("Printable") {
   expectPrinted("true", CBool(true))
   expectPrinted("false", CBool(false))
-  
+
   expectPrinted("true", Bool(true))
   expectPrinted("false", Bool(false))
-  
+
   expectPrinted("true", true)
   expectPrinted("false", false)
 }

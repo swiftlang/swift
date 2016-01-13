@@ -225,7 +225,7 @@ func checkFloatingPointComparison_${FloatSelf}(
   //===--- TRACE boilerplate ----------------------------------------------===//
   // @autoclosure _ message: () -> String = "",
   showFrame: Bool = true,
-  stackTrace: SourceLocStack = SourceLocStack(),  
+  stackTrace: SourceLocStack = SourceLocStack(),
   file: String = __FILE__, line: UInt = __LINE__
 ) {
   let newTrace = stackTrace.pushIf(showFrame, file: file, line: line)
@@ -663,7 +663,7 @@ FloatingPointClassification.test("FloatingPointClassification/Equatable") {
     .PositiveInfinity
   ]
   // Values should be equal iff indices equal
-  checkEquatable(values, oracle: { $0 == $1 }) 
+  checkEquatable(values, oracle: { $0 == $1 })
 }
 
 runAllTests()

@@ -21,7 +21,7 @@ class X : P, CP {
   class func factory(i: Int) -> Self { return self.init(int: i) }
 }
 
-class Y : X { 
+class Y : X {
   required init(int i: Int) { }
 }
 
@@ -35,7 +35,7 @@ class GY<T> : GX<[T]> { }
 func testDynamicSelfDispatch(y: Y) {
 // CHECK: bb0([[Y:%[0-9]+]] : $Y):
 // CHECK:   strong_retain [[Y]]
-// CHECK:   [[Y_AS_X:%[0-9]+]] = upcast [[Y]] : $Y to $X  
+// CHECK:   [[Y_AS_X:%[0-9]+]] = upcast [[Y]] : $Y to $X
 // CHECK:   [[X_F:%[0-9]+]] = class_method [[Y_AS_X]] : $X, #X.f!1 : (Self) -> () -> Self , $@convention(method) (@guaranteed X) -> @owned X
 // CHECK:   [[X_RESULT:%[0-9]+]] = apply [[X_F]]([[Y_AS_X]]) : $@convention(method) (@guaranteed X) -> @owned X
 // CHECK:   strong_release [[Y_AS_X]]

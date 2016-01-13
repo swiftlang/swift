@@ -30,10 +30,10 @@ func testConstruction(i: Int, s: String) {
   let s0Opt = S0(string: s)
   assert(s0Opt != nil)
   var _: S0 = s0Opt // expected-error{{value of optional type 'S0?' not unwrapped; did you mean to use '!' or '?'?}} {{20-20=!}}
-  
+
   let s0IUO = S0(int: i)
   assert(s0IUO != nil)
-  
+
   _ = s0IUO
 }
 
@@ -109,10 +109,10 @@ extension Super {
   }
 
   convenience init(convenienceNonFailFailIUO: String) { // okay, trap on failure
-    self.init(failIUO: convenienceNonFailFailIUO) 
+    self.init(failIUO: convenienceNonFailFailIUO)
   }
 
-  convenience init?(convenienceFailNonFail: String) { 
+  convenience init?(convenienceFailNonFail: String) {
     self.init() // okay, can introduce its own failure
   }
 
@@ -121,10 +121,10 @@ extension Super {
   }
 
   convenience init?(convenienceFailFailIUO: String) { // okay, propagates ! as ?
-    self.init(failIUO: convenienceFailFailIUO) 
+    self.init(failIUO: convenienceFailFailIUO)
   }
 
-  convenience init!(convenienceFailIUONonFail: String) { 
+  convenience init!(convenienceFailIUONonFail: String) {
     self.init() // okay, can introduce its own failure
   }
 
@@ -133,7 +133,7 @@ extension Super {
   }
 
   convenience init!(convenienceFailIUOFailIUO: String) { // okay, propagates !
-    self.init(failIUO: convenienceFailIUOFailIUO) 
+    self.init(failIUO: convenienceFailIUOFailIUO)
   }
 }
 
@@ -155,7 +155,7 @@ struct SomeStruct {
 // ----------------------------------------------------------------------------
 class Sub2 : Super {
   override init!(fail: String) { // okay to change ? to !
-    super.init(fail: fail) 
+    super.init(fail: fail)
   }
   override init?(failIUO: String) { // okay to change ! to ?
     super.init(failIUO: failIUO)

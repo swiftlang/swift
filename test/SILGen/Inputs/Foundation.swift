@@ -44,7 +44,7 @@ extension String : _ObjectiveCBridgeable {
   public static func _isBridgedToObjectiveC() -> Bool {
     return true
   }
-  
+
   public static func _getObjectiveCType() -> Any.Type {
     return NSString.self
   }
@@ -68,7 +68,7 @@ extension Int : _ObjectiveCBridgeable {
   public static func _isBridgedToObjectiveC() -> Bool {
     return true
   }
-  
+
   public static func _getObjectiveCType() -> Any.Type {
     return NSNumber.self
   }

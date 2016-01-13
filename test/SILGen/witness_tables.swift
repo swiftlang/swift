@@ -70,7 +70,7 @@ struct ConformingAssoc : AssocReqt {
 struct ConformingStruct : AnyProtocol {
   typealias AssocType = SomeAssoc
   typealias AssocWithReqt = ConformingAssoc
-  
+
   func method(x x: Arg, y: ConformingStruct) {}
   func generic<D: ArchetypeReqt>(x x: D, y: ConformingStruct) {}
 
@@ -107,7 +107,7 @@ struct ConformingAddressOnlyStruct : AnyProtocol {
 
   typealias AssocType = SomeAssoc
   typealias AssocWithReqt = ConformingAssoc
-  
+
   func method(x x: Arg, y: ConformingAddressOnlyStruct) {}
   func generic<E: ArchetypeReqt>(x x: E, y: ConformingAddressOnlyStruct) {}
 
@@ -135,7 +135,7 @@ func <~>(x: ConformingAddressOnlyStruct, y: ConformingAddressOnlyStruct) {}
 class ConformingClass : AnyProtocol {
   typealias AssocType = SomeAssoc
   typealias AssocWithReqt = ConformingAssoc
-  
+
   func method(x x: Arg, y: ConformingClass) {}
   func generic<F: ArchetypeReqt>(x x: F, y: ConformingClass) {}
 
@@ -164,7 +164,7 @@ struct ConformsByExtension {}
 extension ConformsByExtension : AnyProtocol {
   typealias AssocType = SomeAssoc
   typealias AssocWithReqt = ConformingAssoc
-  
+
   func method(x x: Arg, y: ConformsByExtension) {}
   func generic<G: ArchetypeReqt>(x x: G, y: ConformsByExtension) {}
 
@@ -192,7 +192,7 @@ func <~>(x: ConformsByExtension, y: ConformsByExtension) {}
 extension OtherModuleStruct : AnyProtocol {
   typealias AssocType = SomeAssoc
   typealias AssocWithReqt = ConformingAssoc
-  
+
   func method(x x: Arg, y: OtherModuleStruct) {}
   func generic<H: ArchetypeReqt>(x x: H, y: OtherModuleStruct) {}
 
@@ -222,7 +222,7 @@ protocol OtherProtocol {}
 struct ConformsWithMoreGenericWitnesses : AnyProtocol, OtherProtocol {
   typealias AssocType = SomeAssoc
   typealias AssocWithReqt = ConformingAssoc
-  
+
   func method<I, J>(x x: I, y: J) {}
   func generic<K, L>(x x: K, y: L) {}
 
@@ -250,7 +250,7 @@ func <~> <P: OtherProtocol>(x: P, y: P) {}
 class ConformingClassToClassProtocol : ClassProtocol {
   typealias AssocType = SomeAssoc
   typealias AssocWithReqt = ConformingAssoc
-  
+
   func method(x x: Arg, y: ConformingClassToClassProtocol) {}
   func generic<Q: ArchetypeReqt>(x x: Q, y: ConformingClassToClassProtocol) {}
 
@@ -526,7 +526,7 @@ protocol Initializer {
 // TABLE-NEXT:  method #Initializer.init!allocator.1: @_TTWV14witness_tables20HasInitializerStructS_11InitializerS_FS1_C{{.*}}
 // TABLE-NEXT: }
 // SYMBOL: sil hidden [transparent] [thunk] @_TTWV14witness_tables20HasInitializerStructS_11InitializerS_FS1_C{{.*}} : $@convention(witness_method) (@out HasInitializerStruct, Arg, @thick HasInitializerStruct.Type) -> ()
-struct HasInitializerStruct : Initializer { 
+struct HasInitializerStruct : Initializer {
   init(arg: Arg) { }
 }
 
@@ -547,4 +547,4 @@ enum HasInitializerEnum : Initializer {
 
   init(arg: Arg) { self = .A }
 }
-  
+

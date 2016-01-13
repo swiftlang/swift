@@ -126,7 +126,7 @@ func errorRecovery() {
   var d: (Int,Int,Int) = (1,2) // expected-error {{cannot convert value of type '(Int, Int)' to specified type '(Int, Int, Int)'}}
   var e: (Int,Int) = (1, 2, 3) // expected-error {{cannot convert value of type '(Int, Int, Int)' to specified type '(Int, Int)'}}
   var f: (Int,Int) = (1, 2, f : 3) // expected-error {{cannot convert value of type '(Int, Int, f: Int)' to specified type '(Int, Int)'}}
-  
+
   // <rdar://problem/22426860> CrashTracer: [USER] swift at …mous_namespace::ConstraintGenerator::getTypeForPattern + 698
   var (g1, g2, g3) = (1, 2) // expected-error {{'(Int, Int)' is not convertible to '(_, _, _)', tuples have a different number of elements}}
 }
@@ -223,7 +223,7 @@ func test_lambda() {
     if (n < 2) {
       return n
     }
-    
+
     return fib(n-1)+fib(n-2) // expected-error 2 {{variable used within its own initial value}}
   }
 }
@@ -312,7 +312,7 @@ func int_literals() {
   // Overly large integer.
   // FIXME: Should warn about it. <rdar://problem/14070127>
   _ = 123912312312312312312
-  
+
 }
 
 // <rdar://problem/12830375>
@@ -354,7 +354,7 @@ var fl_c: Float = 2.0
 // FIXME: crummy diagnostic
 var fl_d: Float = 2.0.0 // expected-error {{expected named member of numeric literal}}
 var fl_e: Float = 1.0e42
-var fl_f: Float = 1.0e+  // expected-error {{expected a digit in floating point exponent}} 
+var fl_f: Float = 1.0e+  // expected-error {{expected a digit in floating point exponent}}
 var fl_g: Float = 1.0E+42
 var fl_h: Float = 2e-42
 var vl_i: Float = -.45   // expected-error {{'.45' is not a valid floating point literal; it must be written '0.45'}} {{20-20=0}}
@@ -407,9 +407,9 @@ func stringliterals(d: [String: Int]) {
   // rdar://11385385
   let x = 4
   "Hello \(x+1) world"
-  
+
   "Error: \(x+1"; // expected-error {{unterminated string literal}}
-  
+
   "Error: \(x+1   // expected-error {{unterminated string literal}}
   ;    // expected-error {{';' statements are not allowed}}
 
@@ -517,7 +517,7 @@ func conversionTest(inout a: Double, inout b: Int) {
   var pi_f2 = Float(getPi()) // expected-error {{ambiguous use of 'getPi()'}}
   var pi_d2 = Double(getPi()) // expected-error {{ambiguous use of 'getPi()'}}
   var pi_s2: SpecialPi = getPi() // no-warning
-  
+
   var float = Float.self
   var pi_f3 = float.init(getPi()) // expected-error {{ambiguous use of 'getPi()'}}
   var pi_f4 = float.init(pi_f)
@@ -556,11 +556,11 @@ func unaryOps(inout i8: Int8, inout i64: Int64) {
   i8 -= 1
 
   Int64(5) += 1 // expected-error{{left side of mutating operator isn't mutable: function call returns immutable value}}
-  
+
   // <rdar://problem/17691565> attempt to modify a 'let' variable with ++ results in typecheck error not being able to apply ++ to Float
   let a = i8 // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
   a += 1 // expected-error {{left side of mutating operator isn't mutable: 'a' is a 'let' constant}}
-  
+
   var b : Int { get { }}
   b += 1  // expected-error {{left side of mutating operator isn't mutable: 'b' is a get-only property}}
 }
@@ -643,7 +643,7 @@ func unusedExpressionResults() {
 // Collection Literals
 //===----------------------------------------------------------------------===//
 
-func arrayLiterals() { 
+func arrayLiterals() {
   var a = [1,2,3]
   var b : [Int] = []
   var c = []  // expected-error {{expression type '[_]' is ambiguous without more context}}
@@ -717,14 +717,14 @@ func testOptionalTypeParsing(a : AnyObject) -> String {
 
 func testParenExprInTheWay() {
   let x = 42
-  
+
   if x & 4.0 {}  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
   if (x & 4.0) {}   // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
   if !(x & 4.0) {}  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
-  
+
   if x & x {} // expected-error {{type 'Int' does not conform to protocol 'BooleanType'}}
 }
 
@@ -751,7 +751,7 @@ func inoutTests(inout arr: Int) {
 
   inoutTests((&x))   // expected-error {{'&' can only appear immediately in a call argument list}}
   inoutTests(&x)
-  
+
   // <rdar://problem/17489894> inout not rejected as operand to assignment operator
   &x += y  // expected-error {{'&' can only appear immediately in a call argument list}}
 

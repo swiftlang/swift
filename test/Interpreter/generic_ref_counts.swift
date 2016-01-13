@@ -15,7 +15,7 @@ struct Generic<T> {
   mutating func isUniquelyReferenced() -> Bool {
     return buffer.isUniquelyReferenced()
   }
-  
+
   var buffer: _HeapBuffer<Int, T>
 }
 func g0() {
@@ -39,7 +39,7 @@ struct NonGeneric {
   mutating func isUniquelyReferenced() -> Bool {
     return buffer.isUniquelyReferenced()
   }
-  
+
   var buffer: _HeapBuffer<Int, T>
 }
 func g1() {

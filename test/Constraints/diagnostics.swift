@@ -4,7 +4,7 @@ protocol P {
   typealias SomeType
 }
 
-protocol P2 { 
+protocol P2 {
   func wonka()
 }
 
@@ -16,7 +16,7 @@ extension Double : P {
   typealias SomeType = Double
 }
 
-func f0(x: Int, 
+func f0(x: Int,
         _ y: Float) { }
 
 func f1(_: (Int, Float) -> Int) { }
@@ -39,7 +39,7 @@ var d : Double
 // Tuple size mismatch.
 f1(
    f4 // expected-error {{cannot convert value of type '(Int) -> Int' to expected argument type '(Int, Float) -> Int'}}
-   ) 
+   )
 
 // Tuple element unused.
 f0(i, i,
@@ -218,7 +218,7 @@ class r21447318 {
 
 func test21447318(a : r21447318, b : () -> r21447318) {
   a.doThing.doThing()  // expected-error {{method 'doThing' was used as a property; add () to call it}} {{12-12=()}}
-  
+
   b.doThing() // expected-error {{function 'b' was used as a property; add () to call it}} {{4-4=()}}
 }
 
@@ -239,7 +239,7 @@ func r18800223(i : Int) {
   // 19648528
   _ = true ? [i] : i // expected-error {{result values in '? :' expression have mismatching types '[Int]' and 'Int'}}
 
-  
+
   var buttonTextColor: String?
   _ = (buttonTextColor != nil) ? 42 : {$0}; // expected-error {{result values in '? :' expression have mismatching types 'Int' and '(_) -> _'}}
 }
@@ -370,7 +370,7 @@ extension CurriedClass {
 
 extension CurriedClass {
   func m1(a : Int, b : Int) {}
-  
+
   func m2(a : Int) {}
 }
 
@@ -455,10 +455,10 @@ enum Color {
   case Unknown(description: String)
 
   static func rainbow() -> Color {}
-  
+
   static func overload(a a : Int) -> Color {}
   static func overload(b b : Int) -> Color {}
-  
+
   static func frob(a : Int, inout b : Int) -> Color {}
 }
 let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{'map' produces '[T]', not the expected contextual result type '(Int, Color)'}}
@@ -539,7 +539,7 @@ typealias MyClosure = ([Int]) -> Bool
 func r21684487() {
   var closures = Array<MyClosure>()
   let testClosure = {(list: [Int]) -> Bool in return true}
-  
+
   let closureIndex = closures.indexOf{$0 === testClosure} // expected-error {{cannot convert value of type 'MyClosure' (aka 'Array<Int> -> Bool') to expected argument type 'AnyObject?'}}
 }
 
@@ -549,10 +549,10 @@ func r18397777(d : r21447318?) {
 
   if c != nil { // expected-error {{value of type 'r21447318' can never be nil, comparison isn't allowed}}
   }
-  
+
   if d {  // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '!= nil' instead}} {{6-6=(}} {{7-7= != nil)}}
   }
-  
+
   if !d { // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '== nil' instead}} {{6-7=}} {{7-7=(}} {{8-8= == nil)}}
   }
 
@@ -605,7 +605,7 @@ extension Array {
   func g() -> String {
     return "foo".unavail([""])  // expected-error {{'unavail' is unavailable: calling this is unwise}}
   }
-  
+
   func h() -> String {
     return "foo".unavail([0])  // expected-error {{cannot invoke 'unavail' with an argument list of type '([Int])'}}
     // expected-note @-1 {{expected an argument list of type '(T)'}}

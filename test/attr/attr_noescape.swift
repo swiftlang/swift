@@ -216,7 +216,7 @@ class NoEscapeImmediatelyApplied {
     // Shouldn't require "self.", the closure is obviously @noescape.
     _ = { return ivar }()
   }
-  
+
   final var ivar  = 42
 }
 

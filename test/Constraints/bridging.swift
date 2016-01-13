@@ -4,7 +4,7 @@
 
 import Foundation
 
-class BridgedClass : NSObject, NSCopying { 
+class BridgedClass : NSObject, NSCopying {
   func copyWithZone(zone: NSZone) -> AnyObject {
     return self
   }
@@ -18,7 +18,7 @@ struct BridgedStruct : Hashable, _ObjectiveCBridgeable {
  static func _isBridgedToObjectiveC() -> Bool {
     return true
   }
-  
+
   static func _getObjectiveCType() -> Any.Type {
     return BridgedClass.self
   }
@@ -28,7 +28,7 @@ struct BridgedStruct : Hashable, _ObjectiveCBridgeable {
   }
 
   static func _forceBridgeFromObjectiveC(
-    x: BridgedClass, 
+    x: BridgedClass,
     inout result: BridgedStruct?) {
   }
 
@@ -42,13 +42,13 @@ struct BridgedStruct : Hashable, _ObjectiveCBridgeable {
 
 func ==(x: BridgedStruct, y: BridgedStruct) -> Bool { return true }
 
-struct NotBridgedStruct : Hashable { 
+struct NotBridgedStruct : Hashable {
   var hashValue: Int { return 0 }
 }
 
 func ==(x: NotBridgedStruct, y: NotBridgedStruct) -> Bool { return true }
 
-class OtherClass : Hashable { 
+class OtherClass : Hashable {
   var hashValue: Int { return 0 }
 }
 func ==(x: OtherClass, y: OtherClass) -> Bool { return true }
@@ -252,7 +252,7 @@ func rdar19836341(ns: NSString?, vns: NSString?) {
   // 'NSString?' and not '@lvalue NSString?':
   let _: String? = vns // expected-error{{cannot convert value of type 'NSString?' to specified type 'String?'}}
   var _: String? = vns // expected-error{{cannot convert value of type 'NSString?' to specified type 'String?'}}
-  
+
   vns = ns
 }
 

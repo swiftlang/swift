@@ -124,7 +124,7 @@ func objc_enum_switch(x: ExportedToObjC) -> Int {
 
 // CHECK-LABEL: define hidden void @_TF12objc_ns_enum22objc_enum_method_callsFCS_15ObjCEnumMethodsT_(%C12objc_ns_enum15ObjCEnumMethods*)
 func objc_enum_method_calls(x: ObjCEnumMethods) {
-  
+
   // CHECK: call i64 bitcast (void ()* @objc_msgSend to i64 ([[OBJC_ENUM_METHODS]]*, i8*)*)
   // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OBJC_ENUM_METHODS]]*, i8*, i64)*)
   x.enumIn(x.enumOut())

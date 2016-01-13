@@ -16,7 +16,7 @@ class X {
   }
 }
 
-class Y { 
+class Y {
   init() {}
   @objc class func g() { print("Y.g()") }
 }
@@ -25,7 +25,7 @@ class Z {
    init() {}
 }
 
-extension Z { 
+extension Z {
   @objc func f() { print("Z.f()") }
 }
 

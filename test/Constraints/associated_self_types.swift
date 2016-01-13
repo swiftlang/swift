@@ -29,10 +29,10 @@ struct No<NT> : GeneratorType {
 
 class X<XT> : Q {
   typealias Generator = No<XT>
-  
+
   func f<SX: SequenceType where SX.Generator.Element == X.Generator.Element>(x: SX) {
   }
-  
+
   func generate() -> No<XT> {
     return No<XT>()
   }

@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-sil -O %s | FileCheck %s
 
-// Check that devirtualizer can properly handle concrete non-generic subclasses 
+// Check that devirtualizer can properly handle concrete non-generic subclasses
 // of generic classes.
 // It should not crash on them.
 
@@ -8,7 +8,7 @@ public class Base<T> {
    func foo() -> Int32 {
      return 1
    }
-   
+
    func boo() -> Int32 {
      return 11
    }

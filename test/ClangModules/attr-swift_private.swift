@@ -12,7 +12,7 @@
 
 import SwiftPrivateAttr
 
-// Note: The long-term plan is for these to only be available from the Swift 
+// Note: The long-term plan is for these to only be available from the Swift
 // half of a module, or from an overlay. At that point we should test that these
 // are available in that case and /not/ in the normal import case.
 
@@ -21,7 +21,7 @@ public func testProperty(foo: Foo) {
   // CHECK: @"\01L_selector(setPrivValue:)"
   _ = foo.__privValue
   foo.__privValue = foo
-  
+
 #if !IRGEN
   _ = foo.privValue // expected-error {{value of type 'Foo' has no member 'privValue'}}
 #endif

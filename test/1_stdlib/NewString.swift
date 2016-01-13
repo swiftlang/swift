@@ -149,7 +149,7 @@ func ascii() {
 
   let i3 = newNSASCII.startIndex.advancedBy(3)
   let i6 = newNSASCII.startIndex.advancedBy(6)
-  
+
   // Slicing the String
   print("  \(repr(newNSASCII[i3..<i6]))")
 

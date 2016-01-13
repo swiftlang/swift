@@ -67,14 +67,14 @@ import CoreFoundation
 class ClassWithCustomName {
   func forwardCustomName(_: ClassWithCustomName2) {}
 }
-  
+
 // CHECK-LABEL: SWIFT_CLASS_NAMED("ClassWithCustomName2")
 // CHECK-NEXT: @interface CustomName2{{$}}
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc(CustomName2)
 class ClassWithCustomName2 {}
-  
+
 // CHECK-LABEL: SWIFT_CLASS_NAMED("ClassWithCustomNameSub")
 // CHECK-NEXT: @interface CustomNameSub : CustomName{{$}}
 // CHECK-NEXT: init

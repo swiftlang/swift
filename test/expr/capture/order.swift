@@ -78,14 +78,14 @@ func outOfOrderEnum() {
 }
 
 func captureInClosure() {
-  var x = { (i: Int) in 
+  var x = { (i: Int) in
     currentTotal += i // expected-error{{use of local variable 'currentTotal' before its declaration}}
   }
 
   var currentTotal = 0 // expected-note{{'currentTotal' declared here}}
 }
 
-class X { 
+class X {
   func foo() { }
 }
 

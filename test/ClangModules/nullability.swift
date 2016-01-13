@@ -26,7 +26,7 @@ func testSomeClass(sc: SomeClass, osc: SomeClass?) {
 
   sc.methodG(sc, second: sc)
   sc.methodG(osc, second: sc) // expected-error{{value of optional type 'SomeClass?' not unwrapped; did you mean to use '!' or '?'?}} {{17-17=!}}
-  sc.methodG(sc, second: osc) 
+  sc.methodG(sc, second: osc)
 
   let ci: CInt = 1
   var sc2 = SomeClass(int: ci)

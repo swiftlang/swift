@@ -82,11 +82,11 @@ public func testFunctionPointers() {
   // CHECK: = function_ref @_TToFF18objc_bool_bridging20testFunctionPointersFT_T_U_FSbSb : $@convention(c) (Bool) -> Bool
   let x: CBoolFn = { $0 }
   _ = x(true)
-  
+
   // CHECK-OBJCBOOL: = function_ref @_TToFF18objc_bool_bridging20testFunctionPointersFT_T_U0_FV10ObjectiveC8ObjCBoolS1_ : $@convention(c) (ObjCBool) -> ObjCBool
   let y: ObjCBoolFn = { $0 }
   _ = y(true)
-  
+
   // CHECK: = function_ref @_TToFF18objc_bool_bridging20testFunctionPointersFT_T_U1_FV6Darwin13DarwinBooleanS1_ : $@convention(c) (DarwinBoolean) -> DarwinBoolean
   let z: DarwinBooleanFn = { $0 }
   _ = z(true)
@@ -121,11 +121,11 @@ public func testBlocks() {
   // CHECK: = function_ref @_TFF18objc_bool_bridging10testBlocksFT_T_U_FSbSb : $@convention(thin) (Bool) -> Bool
   let x: @convention(block) (Bool) -> Bool = { $0 }
   _ = x(true)
-  
+
   // CHECK-OBJCBOOL: = function_ref @_TFF18objc_bool_bridging10testBlocksFT_T_U0_FV10ObjectiveC8ObjCBoolS1_ : $@convention(thin) (ObjCBool) -> ObjCBool
   let y: @convention(block) (ObjCBool) -> ObjCBool = { $0 }
   _ = y(true)
-  
+
   // CHECK: = function_ref @_TFF18objc_bool_bridging10testBlocksFT_T_U1_FV6Darwin13DarwinBooleanS1_ : $@convention(thin) (DarwinBoolean) -> DarwinBoolean
   let z: @convention(block) (DarwinBoolean) -> DarwinBoolean = { $0 }
   _ = z(true)
@@ -137,12 +137,12 @@ public func testBlockProps(x: Test) {
   // CHECK: [[SETTER_1:%.+]] = class_method [volatile] %0 : $Test, #Test.propCBoolBlock!setter.1.foreign
   // CHECK: = apply [[SETTER_1]]({{%.+}}, %0) : $@convention(objc_method) (@convention(block) (Bool) -> Bool, Test) -> ()
   x.propCBoolBlock = { $0 }
-  
+
   // CHECK-OBJCBOOL: = function_ref @_TFF18objc_bool_bridging14testBlockPropsFCSo4TestT_U0_FSbSb : $@convention(thin) (Bool) -> Bool
   // CHECK-OBJCBOOL: [[SETTER_2:%.+]] = class_method [volatile] %0 : $Test, #Test.propObjCBoolBlock!setter.1.foreign
   // CHECK-OBJCBOOL: = apply [[SETTER_2]]({{%.+}}, %0) : $@convention(objc_method) (@convention(block) (ObjCBool) -> ObjCBool, Test) -> ()
   x.propObjCBoolBlock = { $0 }
-  
+
   // CHECK: = function_ref @_TFF18objc_bool_bridging14testBlockPropsFCSo4TestT_U1_FSbSb : $@convention(thin) (Bool) -> Bool
   // CHECK: [[SETTER_3:%.+]] = class_method [volatile] %0 : $Test, #Test.propDarwinBooleanBlock!setter.1.foreign
   // CHECK: = apply [[SETTER_3]]({{%.+}}, %0) : $@convention(objc_method) (@convention(block) (DarwinBoolean) -> DarwinBoolean, Test) -> ()
@@ -156,7 +156,7 @@ public func testFunctionPointerMethods(x: Test) {
   // CHECK: [[RESULT_1:%.+]] = apply [[METHOD_1]]([[CLOSURE_1]], %0)
   // CHECK: function_ref @_TTRXFdCb_dSb_dSb_XFo_dSb_dSb_
   _ = x.testCBoolFnToBlock { $0 }
-  
+
   // CHECK-OBJCBOOL: [[METHOD_2:%.+]] = class_method [volatile] %0 : $Test, #Test.testObjCBoolFnToBlock!1.foreign
   // CHECK-OBJCBOOL: [[CLOSURE_2:%.+]] = function_ref @_TToFF18objc_bool_bridging26testFunctionPointerMethodsFCSo4TestT_U0_FV10ObjectiveC8ObjCBoolS2_ : $@convention(c) (ObjCBool) -> ObjCBool
   // CHECK-OBJCBOOL: [[RESULT_2:%.+]] = apply [[METHOD_2]]([[CLOSURE_2]], %0)

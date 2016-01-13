@@ -29,8 +29,8 @@ func funcdecl4(a: ((Int) -> Int), _ b: Int) {}
 func funcdecl5(a: Int, _ y: Int) {
   // Pass in a closure containing the call to funcdecl3.
   funcdecl4({ funcdecl3() }, 12)  // expected-error {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{14-14= _ in}}
-  
-  
+
+
   func6(fn: {$0 + $1})       // Closure with two named anonymous arguments
   func6(fn: {($0) + $1})    // Closure with sequence expr inferred type
   func6(fn: {($0) + $0})    // expected-error{{cannot convert value of type '(Int, Int)' to expected argument type 'Int'}}
@@ -48,34 +48,34 @@ func funcdecl5(a: Int, _ y: Int) {
   // Tuple expressions with named elements.
   var i : (y : Int, x : Int) = (x : 42, y : 11)
   funcdecl1(123, 444)
-  
+
   // Calls.
   4()  // expected-error {{invalid use of '()' to call a value of non-function type 'Int'}} {{4-6=}}
-  
-  
+
+
   // rdar://12017658 - Infer some argument types from func6.
   func6(fn: { a, b -> Int in a+b})
   // Return type inference.
   func6(fn: { a,b in a+b })
-  
+
   // Infer incompatible type.
   func6(fn: {a,b -> Float in 4.0 })    // expected-error {{declared closure result 'Float' is incompatible with contextual type 'Int'}} {{21-26=Int}}  // Pattern doesn't need to name arguments.
   func6(fn: { _,_ in 4 })
-  
+
   func6(fn: {a,b in 4.0 })  // expected-error {{cannot convert value of type 'Double' to closure result type 'Int'}}
-  
+
   // TODO: This diagnostic can be improved: rdar://22128205
   func6(fn: {(a : Float, b) in 4 }) // expected-error {{cannot convert value of type '(Float, _) -> Int' to expected argument type '(Int, Int) -> Int'}}
 
-  
-  
+
+
   var fn = {}
   var fn2 = { 4 }
-  
-  
+
+
   var c : Int = { a,b -> Int in a+b} // expected-error{{cannot convert value of type '(Int, Int) -> Int' to specified type 'Int'}}
-  
-  
+
+
 }
 
 func unlabeledClosureArgument() {
@@ -177,7 +177,7 @@ func testCaptureBehavior(ptr : SomeClass) {
   doStuff { uv1.foo() }
   doStuff { uv2.foo() }
 
-  
+
   // Capture list tests
   let v1 : SomeClass? = ptr
   let v2 : SomeClass = ptr
@@ -254,7 +254,7 @@ var x = {return $0}(1)
 func returnsInt() -> Int { return 0 }
 takesVoidFunc(returnsInt) // expected-error {{cannot convert value of type '() -> Int' to expected argument type '() -> ()'}}
 takesVoidFunc({() -> Int in 0}) // expected-error {{declared closure result 'Int' is incompatible with contextual type '()'}} {{22-25=()}}
-  
+
 // These used to crash the compiler, but were fixed to support the implementation of rdar://problem/17228969
 Void(0) // expected-error{{argument passed to call that takes no arguments}}
 _ = {0}

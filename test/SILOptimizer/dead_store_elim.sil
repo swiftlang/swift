@@ -57,7 +57,7 @@ struct S4 {
  init(a: Int, b: Int)
  init()
 }
- 
+
 struct S5 {
  var x: S4
  var y: Int
@@ -87,7 +87,7 @@ struct S7 {
 class SelfLoop {
   var a: SelfLoop
   init()
-   deinit 
+   deinit
 }
 
 struct S8 {
@@ -146,7 +146,7 @@ bb0:
 //
 // CHECK-LABEL: blocking_read_on_local_store
 // CHECK: bb0
-// CHECK: store 
+// CHECK: store
 // CHECK: return
 sil hidden @blocking_read_on_local_store : $@convention(thin) () -> () {
 bb0:
@@ -161,7 +161,7 @@ bb0:
 }
 
 // CHECK-LABEL: sil @store_after_store
-// CHECK: bb0 
+// CHECK: bb0
 // CHECK-NOT: store
 // CHECK: return
 sil @store_after_store : $@convention(thin) (@owned B) -> () {
@@ -274,7 +274,7 @@ bb2:
 // be turned to a debug_value and thus act as a read on the memory
 // location..
 //
-// CHECK-LABEL: blocking_debug_value_addr_on_dead_store 
+// CHECK-LABEL: blocking_debug_value_addr_on_dead_store
 // CHECK: bb0
 // CHECK: store
 // CHECK: debug_value_addr
@@ -284,7 +284,7 @@ bb0:
   %1 = integer_literal $Builtin.Int64, 1          // user: %2
   %2 = struct $Int (%1 : $Builtin.Int64)          // user: %3
   store %2 to %0 : $*Int                        // id: %3
-  debug_value_addr %0 : $*Int  
+  debug_value_addr %0 : $*Int
   %4 = tuple ()                                   // user: %6
   dealloc_stack %0 : $*Int       // id: %5
   return %4 : $()                                 // id: %6
@@ -812,7 +812,7 @@ bb3:                                              // Preds: bb1 bb2
 // CHECK: store
 // CHECK: store
 // CHECK-NOT: store
-// CHECK: load 
+// CHECK: load
 sil hidden @DeadStoreInSimpleTuple : $@convention(thin) () -> Int {
 bb0:
   %0 = alloc_stack $(a: Int, b: Int), var, name "x"    // users: %1, %2, %11, %15, %20
@@ -1209,12 +1209,12 @@ bb0(%0 : $*S7):
   return %9 : $()                                 // id: %11
 }
 
-/// We are not performing partial dead store for store %3 to %0#1 : $*S7, 
+/// We are not performing partial dead store for store %3 to %0#1 : $*S7,
 /// i.e. too many stores generated, but make sure we track the store correctly
 /// so that we can get rid of  store %56 to %57 : $*Int.
 ///
 /// CHECK-LABEL : PartialDeadStoreBailOutProperPropagation
-/// CHECK: bb0 
+/// CHECK: bb0
 /// CHECK-NOT: store
 /// CHECK: function_ref
 sil hidden @PartialDeadStoreBailOutProperPropagation : $@convention(thin) () -> () {
@@ -1241,10 +1241,10 @@ bb0:
 /// we have a case which partial dead store miscompiles a program,
 /// in that case the bitvector is not tracked correctly and we end
 /// up deleting the entire larger store, store %3 to %0#1 : $*S3 in
-/// this case. 
+/// this case.
 ///
 /// CHECK-LABEL: PartialDeadStoreInSimpleSmallStruct
-/// CHECK: apply 
+/// CHECK: apply
 /// CHECK-NEXT: struct_extract
 sil hidden @PartialDeadStoreInSimpleSmallStruct : $@convention(thin) (@inout S3) -> () {
 bb0(%0 : $*S3):
@@ -1267,7 +1267,7 @@ bb0(%0 : $*S3):
 /// CHECK-LABEL: SelfLoopClassTestTypeExpansion
 /// CHECK: [[RET0:%.+]] = struct_extract
 /// CHECK: [[RET1:%.+]] = struct_element_addr
-/// CHECK-NEXT: store [[RET0:%.+]] to [[RET1:%.+]] : $*SelfLoop  
+/// CHECK-NEXT: store [[RET0:%.+]] to [[RET1:%.+]] : $*SelfLoop
 sil hidden @SelfLoopClassTestTypeExpansion : $@convention(thin) (@inout S8) -> () {
 bb0(%0 : $*S8):
   %1 = function_ref @S8_init : $@convention(thin) (@thin S8.Type) -> @owned S8 // user: %3
@@ -1399,11 +1399,11 @@ bb0(%0 : $Optional<protocol<>.Type>):
 
 /// Make sure we DO get rid of the store as a dead store, i.e. no read to a store
 /// to a local variable.
-/// 
+///
 /// CHECK-LABEL: local_dead_store
 /// CHECK: load
-/// CHECK-NOT: store 
-/// CHECK: return 
+/// CHECK-NOT: store
+/// CHECK: return
 sil @local_dead_store : $@convention(thin) (Optional<protocol<>.Type>) -> Int {
 bb0(%0 : $Optional<protocol<>.Type>):
   %2 = alloc_stack $Optional<protocol<>.Type>     // users: %3, %17, %19, %26

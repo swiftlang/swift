@@ -29,11 +29,11 @@ protocol Protocol_Class2 : class {}
 
 @objc extension PlainClass { } // expected-error{{@objc cannot be applied to this declaration}}{{1-7=}}
 
-@objc  
+@objc
 var subject_globalVar: Int // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
 
 var subject_getterSetter: Int {
-  @objc 
+  @objc
   get { // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
     return 0
   }
@@ -43,10 +43,10 @@ var subject_getterSetter: Int {
 }
 
 var subject_global_observingAccessorsVar1: Int = 0 {
-  @objc 
+  @objc
   willSet { // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
   }
-  @objc 
+  @objc
   didSet { // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
   }
 }
@@ -188,7 +188,7 @@ extension subject_genericClass where T : Hashable {
 
 extension subject_genericClass {
   @objc var extProp: Int { return 0 } // expected-error{{@objc is not supported within extensions of generic classes}}
-  
+
   @objc func extFoo() {} // expected-error{{@objc is not supported within extensions of generic classes}}
 }
 
@@ -209,7 +209,7 @@ enum subject_enum: Int {
   @nonobjc // expected-error {{@nonobjc cannot be applied to this declaration}}
   case subject_enumElement7
 
-  @objc   
+  @objc
   init() {} // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
 
   @objc
@@ -1199,7 +1199,7 @@ class infer_instanceVar1 {
   var var_CFunctionPointer_invalid_1: @convention(c) Int // expected-error {{attribute only applies to syntactic function types}}
   // CHECK-LABEL: {{^}} var var_CFunctionPointer_invalid_2: @convention(c) PlainStruct -> Int
   var var_CFunctionPointer_invalid_2: @convention(c) PlainStruct -> Int // expected-error {{'PlainStruct -> Int' is not representable in Objective-C, so it cannot be used with '@convention(c)'}}
-  
+
   // <rdar://problem/20918869> Confusing diagnostic for @convention(c) throws
   var var_CFunctionPointer_invalid_3 : @convention(c) (Int) throws -> Int // expected-error {{'(Int) throws -> Int' is not representable in Objective-C, so it cannot be used with '@convention(c)'}}
 
@@ -1365,7 +1365,7 @@ class infer_instanceVar1 {
   var var_ArrayType4: [AnyObject -> AnyObject] // no-error
   // CHECK-LABEL: {{^}}  var var_ArrayType4: [AnyObject -> AnyObject]
 
-  @objc var var_ArrayType4_: [AnyObject -> AnyObject] 
+  @objc var var_ArrayType4_: [AnyObject -> AnyObject]
   // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
   var var_ArrayType5: [Protocol_ObjC1]
@@ -1736,7 +1736,7 @@ class Class_ObjC2 {
 }
 
 @objc() // expected-error{{expected name within parentheses of @objc attribute}}
-class Class_ObjC3 { 
+class Class_ObjC3 {
 }
 
 // @objc with selector names
@@ -1788,7 +1788,7 @@ class BadClass2 {
 
   @objc(foo) // expected-error{{'@objc' method name provides names for 0 arguments, but method has one parameter}}
   func noArgNamesOneParam(x: Int) { }
-  
+
   @objc(foo) // expected-error{{'@objc' method name provides names for 0 arguments, but method has one parameter}}
   func noArgNamesOneParam2(_: Int) { }
 

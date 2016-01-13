@@ -24,7 +24,7 @@ func f0<T, U>(t: T, _ f: (inout T) -> U) -> U {
 }
 
 struct X2 {
-  func g() -> Float { return 0 }  
+  func g() -> Float { return 0 }
 }
 
 f0(X2(), {$0.g()})

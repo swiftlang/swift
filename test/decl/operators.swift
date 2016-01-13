@@ -26,7 +26,7 @@ func ++++(lhs: Y, rhs: Y) -> Y {} // okay
 
 func useInt(x: Int) {}
 func test() {
-  var x : Int  
+  var x : Int
   let y : Int = 42
   // Produce a diagnostic for using the result of an assignment as a value.
   // rdar://12961094
@@ -64,7 +64,7 @@ prefix func -/* this also should be a comment, not an operator */
 func +*/ () {}   // expected-error {{expected identifier in function declaration}} expected-error {{unexpected end of block comment}} expected-error {{braced block of statements is an unused closure}} expected-error{{begin with a closure}} expected-note{{discard the result}} {{13-13=_ = }} expected-error{{expression resolves to an unused function}}
 func errors() {
   */    // expected-error {{unexpected end of block comment}}
-  
+
   // rdar://12962712 - reject */ in an operator as it should end a block comment.
   */+    // expected-error {{unexpected end of block comment}}
 }
@@ -163,7 +163,7 @@ func operator_in_func_bad () {
                                                                     // expected-error {{use of unresolved identifier 'input'}}
 }
 
-infix operator ? {}  // expected-error {{expected operator name in operator declaration}} 
+infix operator ? {}  // expected-error {{expected operator name in operator declaration}}
 
 infix operator ??= {}
 

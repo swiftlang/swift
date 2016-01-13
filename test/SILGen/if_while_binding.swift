@@ -75,7 +75,7 @@ func if_else_chain() {
 func while_loop() {
   // CHECK:   br [[LOOP_ENTRY:bb[0-9]+]]
   // CHECK: [[LOOP_ENTRY]]:
-  
+
   // CHECK:   switch_enum {{.*}} : $Optional<String>, case #Optional.Some!enumelt.1: [[LOOP_BODY:bb[0-9]+]], default [[LOOP_EXIT:bb[0-9]+]]
   while let x = foo() {
   // CHECK: [[LOOP_BODY]]([[X:%[0-9]+]] : $String):
@@ -261,7 +261,7 @@ func if_multi_where() {
 // CHECK-LABEL: sil hidden @_TF16if_while_binding18if_leading_booleanFSiT_
 func if_leading_boolean(a : Int) {
   // Test the boolean condition.
-  
+
   // CHECK: debug_value %0 : $Int, let, name "a"
   // CHECK: [[EQRESULT:%[0-9]+]] = apply {{.*}}(%0, %0) : $@convention(thin) (Int, Int) -> Bool
 
@@ -271,7 +271,7 @@ func if_leading_boolean(a : Int) {
   // Call Foo and test for the optional being present.
 // CHECK: [[CHECKFOO]]:
   // CHECK: [[OPTRESULT:%[0-9]+]] = apply {{.*}}() : $@convention(thin) () -> @owned Optional<String>
-  
+
   // CHECK:   switch_enum [[OPTRESULT]] : $Optional<String>, case #Optional.Some!enumelt.1: [[SUCCESS:bb.*]], default [[IF_DONE:bb[0-9]+]]
 
 // CHECK: [[SUCCESS]]([[B:%[0-9]+]] : $String):
@@ -298,7 +298,7 @@ func testAsPatternInIfLet(a : BaseClass?) {
   // CHECK-NEXT:   debug_value %0 : $Optional<BaseClass>, let, name "a"
   // CHECK-NEXT:   retain_value %0 : $Optional<BaseClass>
   // CHECK-NEXT:   switch_enum %0 : $Optional<BaseClass>, case #Optional.Some!enumelt.1: [[OPTPRESENTBB:bb[0-9]+]], default [[NILBB:bb[0-9]+]]
-  
+
   // CHECK:      [[OPTPRESENTBB]](%4 : $BaseClass):
   // CHECK-NEXT:   checked_cast_br %4 : $BaseClass to $DerivedClass, [[ISDERIVEDBB:bb[0-9]+]], [[ISBASEBB:bb[0-9]+]]
 
@@ -318,8 +318,8 @@ func testAsPatternInIfLet(a : BaseClass?) {
   // CHECK-NEXT:   debug_value [[DERIVEDVAL]] : $DerivedClass
   // CHECK-NEXT:   strong_release [[DERIVEDVAL]] : $DerivedClass
   // CHECK-NEXT:   br [[NILBB]]
-   
-  
+
+
   // CHECK:      [[NILBB]]:
   // CHECK-NEXT:   release_value %0 : $Optional<BaseClass>
   // CHECK-NEXT:   tuple ()

@@ -8,7 +8,7 @@ class Bar<T> {
 
 //CHECK: function_with_interesting_stuff
 //CHECK-NOT: class_method
-//CHECK: return 
+//CHECK: return
 func function_with_interesting_stuff() {
   var x = Bar<Int>(x: 3)
   x.ping()

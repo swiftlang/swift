@@ -348,7 +348,7 @@ bb1:
   call void @noread_user(%swift.refcounted* %A)
   tail call void @swift_release(%swift.refcounted* %A)
   call void @user(%swift.refcounted* %A)
-  
+
   br label %bb3
 
 bb2:

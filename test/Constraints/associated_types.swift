@@ -1,21 +1,21 @@
 // RUN: %target-parse-verify-swift
 
 protocol Runcible {
-  typealias Runcee 
+  typealias Runcee
 }
 
-class Mince { 
-  init() {} 
+class Mince {
+  init() {}
 }
 
 class Spoon : Runcible {
-  init() {} 
+  init() {}
 
   typealias Runcee = Mince
 }
 
 class Owl<T:Runcible> {
-  init() {} 
+  init() {}
 
   func eat(what: T.Runcee, with: T) { }
 }

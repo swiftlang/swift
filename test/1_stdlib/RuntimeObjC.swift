@@ -391,7 +391,7 @@ Runtime.test("typeName") {
 
   var a : Any = SomeObjCClass()
   expectEqual("a.SomeObjCClass", _typeName(a.dynamicType))
-  
+
   a = SomeNSObjectSubclass()
   expectEqual("a.SomeNSObjectSubclass", _typeName(a.dynamicType))
 
@@ -463,7 +463,7 @@ Runtime.test("casting AnyObject to class metatypes") {
     expectTrue(ao as? AnyClass == SomeClass.self)
     expectTrue(ao as? SomeClass.Type == SomeClass.self)
   }
-  
+
   do {
     var ao : AnyObject = SomeNSObjectSubclass()
     expectTrue(ao as? Any.Type == nil)
@@ -484,7 +484,7 @@ Runtime.test("casting AnyObject to class metatypes") {
   do {
     var nso: NSObject = SomeNSObjectSubclass()
     expectTrue(nso as? AnyClass == nil)
-    
+
     nso = (SomeNSObjectSubclass.self as AnyObject) as! NSObject
     expectTrue(nso as? Any.Type == SomeNSObjectSubclass.self)
     expectTrue(nso as? AnyClass == SomeNSObjectSubclass.self)
@@ -681,7 +681,7 @@ Reflection.test("MetatypeMirror") {
 
     expectEqual(_reflect(concreteClassMetatype).objectIdentifier!,
                 _reflect(objcProtocolMetatype).objectIdentifier!)
-                
+
     let objcProtocolConcreteMetatype = SomeObjCProto.self
     let expectedObjCProtocolConcrete = "- a.SomeObjCProto #0\n"
     output = ""
@@ -694,7 +694,7 @@ Reflection.test("MetatypeMirror") {
     output = ""
     dump(compositionConcreteMetatype, &output)
     expectEqual(expectedComposition, output)
-    
+
     let objcDefinedProtoType = NSObjectProtocol.self
     expectEqual(String(objcDefinedProtoType), "NSObject")
   }

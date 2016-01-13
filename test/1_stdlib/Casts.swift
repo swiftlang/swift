@@ -30,7 +30,7 @@ let CastsTests = TestSuite("Casts")
 // Test for SR-426: missing release for some types after failed conversion
 class DeinitTester {
     private let onDeinit: () -> ()
-    
+
     init(onDeinit: () -> ()) {
         self.onDeinit = onDeinit
     }
@@ -40,7 +40,7 @@ class DeinitTester {
 }
 
 func testFailedTupleCast(onDeinit: () -> ()) {
-    // This function is to establish a scope for t to 
+    // This function is to establish a scope for t to
     // be deallocated at the end of.
     let t: Any = (1, DeinitTester(onDeinit: onDeinit))
     _ = t is Any.Type
@@ -68,7 +68,7 @@ CastsTests.test("No overrelease of existential boxes in failed casts") {
             }
         }
     }
-    
+
     let err: ErrorType = ErrClass()
     bar(err)
 }

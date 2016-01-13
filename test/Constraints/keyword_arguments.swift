@@ -93,7 +93,7 @@ allkeywords1(y: 1, x: 2) // expected-error{{argument 'x' must precede argument '
 func defargs1(x x: Int = 1, y: Int = 2, z: Int = 3) {}
 
 // Using defaults (in-order)
-defargs1() 
+defargs1()
 defargs1(x: 1)
 defargs1(x: 1, y: 2)
 

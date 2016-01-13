@@ -194,10 +194,10 @@ public func driver() {
 
   WhatShouldIDo(b1)
   WhatShouldIDo2(b1)
-  
+
   WhatShouldIDo(b2)
   WhatShouldIDo2(b2)
-  
+
   WhatShouldIDo(b3)
   WhatShouldIDo2(b3)
 

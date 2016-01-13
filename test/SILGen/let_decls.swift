@@ -12,7 +12,7 @@ func test1(a : Int) -> Int {
   let (b,c) = (a, 32)
 
   return b+c
-  
+
   // CHECK: return
 }
 
@@ -68,14 +68,14 @@ func test3() {
   // CHECK: [[GETFN:%[0-9]+]] = function_ref{{.*}}getAString
   // CHECK-NEXT: [[STR:%[0-9]+]] = apply [[GETFN]]()
   let o = getAString()
-  
+
   // CHECK-NOT: release_value
 
   // CHECK: [[USEFN:%[0-9]+]] = function_ref{{.*}}useAString
   // CHECK-NEXT: retain_value [[STR]]
   // CHECK-NEXT: [[USE:%[0-9]+]] = apply [[USEFN]]([[STR]])
   useAString(o)
-  
+
   // CHECK: release_value [[STR]]
 }
 
@@ -91,7 +91,7 @@ func produceAddressOnlyStruct<T>(x : T) -> AddressOnlyStruct<T> {}
 // CHECK-LABEL: sil hidden @{{.*}}testAddressOnlyStructString
 func testAddressOnlyStructString<T>(a : T) -> String {
   return produceAddressOnlyStruct(a).str
-  
+
   // CHECK: [[PRODFN:%[0-9]+]] = function_ref @{{.*}}produceAddressOnlyStruct
   // CHECK: [[TMPSTRUCT:%[0-9]+]] = alloc_stack $AddressOnlyStruct<T>
   // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]],
@@ -106,7 +106,7 @@ func testAddressOnlyStructString<T>(a : T) -> String {
 // CHECK-LABEL: sil hidden @{{.*}}testAddressOnlyStructElt
 func testAddressOnlyStructElt<T>(a : T) -> T {
   return produceAddressOnlyStruct(a).elt
-  
+
   // CHECK: [[PRODFN:%[0-9]+]] = function_ref @{{.*}}produceAddressOnlyStruct
   // CHECK: [[TMPSTRUCT:%[0-9]+]] = alloc_stack $AddressOnlyStruct<T>
   // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]],
@@ -142,7 +142,7 @@ struct GetOnlySubscriptStruct {
 // CHECK-LABEL: sil hidden @{{.*}}testGetOnlySubscript
 func testGetOnlySubscript(x : GetOnlySubscriptStruct, idx : Int) -> Int {
   return x[idx]
-  
+
   // CHECK: [[SUBFN:%[0-9]+]] = function_ref @{{.*}}g9subscript
   // CHECK-NEXT: [[CALL:%[0-9]+]] = apply [[SUBFN]](
   // CHECK: return [[CALL]]
@@ -157,7 +157,7 @@ struct CloseOverAddressOnlyConstant<T> {
     let AOV = Optional<T>()
     takeClosure({ AOV.getLV() })
   }
-  
+
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}callThroughLet
@@ -238,7 +238,7 @@ func test_weird_property(v : WeirdPropertyTest, i : Int) -> Int {
   // CHECK: [[SETFN:%[0-9]+]] = function_ref @_TFV9let_decls17WeirdPropertyTests1pSi
   // CHECK: apply [[SETFN]](%1, [[VVAL]])
   v.p = i
-  
+
   // The getter is mutating, so it takes the box address.
   // CHECK: [[GETFN:%[0-9]+]] = function_ref @_TFV9let_decls17WeirdPropertyTestg1pSi
   // CHECK-NEXT: [[RES:%[0-9]+]] = apply [[GETFN]]([[VBOX]]#1)
@@ -291,7 +291,7 @@ func testLetProtocolBases(p : SimpleProtocol) {
   // CHECK-NEXT: witness_method
   // CHECK-NEXT: apply
   p.doSomethingGreat()
-  
+
   // CHECK-NEXT: destroy_addr %0
   // CHECK-NEXT: tuple
   // CHECK-NEXT: return
@@ -324,7 +324,7 @@ func testDebugValue(a : Int, b : SimpleProtocol) -> Int {
 
   // CHECK: apply
   b.doSomethingGreat()
-  
+
   // CHECK: destroy_addr
 
   // CHECK: return %0
@@ -405,7 +405,7 @@ struct StructMemberTest {
   // CHECK:  %3 = struct_extract %2 : $AnotherStruct, #AnotherStruct.i
   // CHECK-NOT:  release_value %0 : $StructMemberTest
   // CHECK:  return %3 : $Int
-  
+
   func testTupleMemberLoad() -> Int {
     return t.1.i
   }
@@ -438,7 +438,7 @@ struct GenericStruct<T> {
   func getB() -> Int {
     return b
   }
-  
+
   // CHECK-LABEL: sil hidden @{{.*}}GenericStruct4getB{{.*}} : $@convention(method) <T> (@in_guaranteed GenericStruct<T>) -> Int
   // CHECK: bb0(%0 : $*GenericStruct<T>):
   // CHECK-NEXT: debug_value_addr %0 : $*GenericStruct<T>, let, name "self"
@@ -492,7 +492,7 @@ struct LetDeclInStruct {
 }
 
 // rdar://19854166 - Swift 1.2 uninitialized constant causes crash
-// The destroy_addr for a let stack temporary should be generated against 
+// The destroy_addr for a let stack temporary should be generated against
 // mark_uninitialized instruction, so DI will see it.
 func test_unassigned_let_constant() {
   let string : String

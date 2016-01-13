@@ -24,12 +24,12 @@ PrintTests.test("Printable") {
   expectDebugPrinted(
   "[PrintTestTypes.WithoutDescription(x: 1), PrintTestTypes.WithoutDescription(x: 2), PrintTestTypes.WithoutDescription(x: 3)]",
   s0)
-  
+
   expectPrinted("EmptyStructWithoutDescription()",
     EmptyStructWithoutDescription())
   expectDebugPrinted("PrintTestTypes.EmptyStructWithoutDescription()",
     EmptyStructWithoutDescription())
-  
+
   expectPrinted(
     "ValuesWithoutDescription<Double, String, Array<Int>>(t: 1.25, u: \"abc\", v: [1, 2, 3])",
     ValuesWithoutDescription(1.25, "abc", [ 1, 2, 3 ]))
@@ -40,7 +40,7 @@ PrintTests.test("Printable") {
 PrintTests.test("custom string convertible structs") {
   struct Wrapper : CustomStringConvertible {
     var x: CustomStringConvertible? = nil
-    
+
     var description: String {
       return "Wrapper(\(x.debugDescription))"
     }
@@ -69,12 +69,12 @@ PrintTests.test("StructPrintable") {
   let s1: ProtocolUnrelatedToPrinting = StructPrintable(1)
   let s2: CustomStringConvertible = StructPrintable(1)
   let s3: Any = StructPrintable(1)
-  
+
   expectPrinted("►1◀︎", s0)
   expectPrinted("►1◀︎", s1)
   expectPrinted("►1◀︎", s2)
   expectPrinted("►1◀︎", s3)
-  
+
   let structMetatype = StructPrintable.self
   expectPrinted("StructPrintable", structMetatype)
   expectDebugPrinted("PrintTestTypes.StructPrintable", structMetatype)
@@ -103,7 +103,7 @@ PrintTests.test("StructVeryPrintable") {
   let s2: CustomStringConvertible = StructVeryPrintable(1)
   let s3: CustomDebugStringConvertible = StructVeryPrintable(1)
   let s4: Any = StructVeryPrintable(1)
-  
+
   expectPrinted("<description: 1>", s0)
   expectPrinted("<description: 1>", s1)
   expectPrinted("<description: 1>", s2)

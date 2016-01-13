@@ -28,7 +28,7 @@ private class PrivAccess {
   public var pubProp : Int = 0
   private var privProp : Int = 0
   internal func intFunc() {}
-  
+
   class Nested {
     func defFunc() {}
   }

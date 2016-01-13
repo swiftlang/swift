@@ -27,12 +27,12 @@ bb0:
 // Type references
 
 // Some cyclic type references between SIL function bodies.
-class Class1 { 
-  var a : Class2 
+class Class1 {
+  var a : Class2
   init()
 }
-class Class2 { 
-  var b : Class1 
+class Class2 {
+  var b : Class1
   init()
 }
 
@@ -107,7 +107,7 @@ bb0:                                         // CHECK: bb0:
 
   // CHECK: integer_literal $Builtin.Word, 1
   %3 = integer_literal $Builtin.Word, 1
-  
+
   // CHECK: apply
   %4 = apply %1(%3, %2) : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
   // CHECK: return
@@ -179,7 +179,7 @@ protocol P {
 sil @existentials : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
   // CHECK: open_existential_addr %0
-  %1 = open_existential_addr %0 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000") P 
+  %1 = open_existential_addr %0 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000") P
 
   // CHECK: witness_method ${{.*}}, #P.doIt!1
   %2 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.doIt!1, %1 : $*@opened("01234567-89ab-cdef-0123-000000000000") P : $@convention(witness_method) <T: P> (@inout T) -> ()
@@ -190,7 +190,7 @@ bb0(%0 : $*P):
   %3 = apply %2<@opened("01234567-89ab-cdef-0123-000000000000") P>(%1) : $@convention(witness_method) <T: P> (@inout T) -> ()
   %4 = tuple ()                       // CHECK: tuple ()
   %5 = destroy_addr %0 : $*P          // CHECK: destroy_addr %0 : $*P
-  %6 = return %4 : $()                // CHECK: return 
+  %6 = return %4 : $()                // CHECK: return
 }
 
 
@@ -216,10 +216,10 @@ bb0:
 
   // CHECK: class_method {{.*}} : $C, #C.doIt!1
   %2 = class_method %C : $C, #C.doIt!1 : C -> () -> () , $@convention(method) (@guaranteed C) -> ()
-  
+
   // CHECK: alloc_ref $D
   %D = alloc_ref $D
-  
+
   // CHECK: upcast {{.*}} : $D to $C
   %a = upcast %D : $D to $C
 
@@ -628,15 +628,15 @@ bb0(%0 : $SomeClass):
 sil @test_basic_block_arguments : $@convention(thin) (Builtin.Int1) -> Builtin.Word {
 bb0(%0 : $Builtin.Int1):
   cond_br %0, bb1, bb2
-bb1:                                        
-  %2 = integer_literal $Builtin.Word, 5       
+bb1:
+  %2 = integer_literal $Builtin.Word, 5
   br bb3(%2 : $Builtin.Word)
 //CHECK: br bb3(%2 : $Builtin.Word)
-bb2:                                            
-  %4 = integer_literal $Builtin.Word, 6        
+bb2:
+  %4 = integer_literal $Builtin.Word, 6
   br bb3(%4 : $Builtin.Word)
 //CHECK: br bb3(%4 : $Builtin.Word)
-bb3(%6 : $Builtin.Word):                               
+bb3(%6 : $Builtin.Word):
 //CHECK: bb3(%6 : $Builtin.Word)
   return %6 : $Builtin.Word
 }
@@ -842,7 +842,7 @@ bb3:
 
 bb4:
   // CHECK: function_ref
-  %37 = function_ref @_T6switch1aFT_T_ : $@convention(thin) () -> () 
+  %37 = function_ref @_T6switch1aFT_T_ : $@convention(thin) () -> ()
   %38 = apply %37() : $@convention(thin) () -> ()
   br bb6
 
@@ -1206,7 +1206,7 @@ entry(%x : $Class1, %w : $Builtin.Word):
 sil [_semantics "foo"] @test_semantics : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
-  return %0 : $() 
+  return %0 : $()
 }
 
 // CHECK-LABEL: sil shared_external @test_shared_external_definition : $@convention(thin) () -> () {
@@ -1422,7 +1422,7 @@ else:
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK: #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_
 // CHECK: #Foo.subscript!setter.1: _TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_
-// CHECK: } 
+// CHECK: }
 sil_vtable Foo {
   #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_
   #Foo.subscript!setter.1: _TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_

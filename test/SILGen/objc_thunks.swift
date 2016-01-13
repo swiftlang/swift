@@ -62,7 +62,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   strong_release %0
   // CHECK-NEXT:   return [[RES]] : $Gizmo
   // CHECK-NEXT: }
-  
+
   // CHECK-LABEL: sil hidden [transparent] @_TFC11objc_thunks6Hoozitg15typicalPropertyCSo5Gizmo : $@convention(method) (@guaranteed Hoozit) -> @owned Gizmo
   // CHECK: bb0(%0 : $Hoozit):
   // CHECK-NEXT:   debug_value %0
@@ -103,7 +103,7 @@ class Hoozit : Gizmo {
   // CHECK: bb0(%0 : $Hoozit):
   // CHECK:        [[ADDR:%.*]] = ref_element_addr %0 : {{.*}}, #Hoozit.copyProperty
   // CHECK-NEXT:   [[RES:%.*]] = load [[ADDR]]
-  // CHECK-NEXT:   retain [[RES]] 
+  // CHECK-NEXT:   retain [[RES]]
   // CHECK-NEXT:   return [[RES]]
 
   // -- setter is normal
@@ -144,7 +144,7 @@ class Hoozit : Gizmo {
     set {}
   }
   // -- getter
-  // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6Hoozitg10rwPropertyCSo5Gizmo : $@convention(objc_method) (Hoozit) -> @autoreleased Gizmo 
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6Hoozitg10rwPropertyCSo5Gizmo : $@convention(objc_method) (Hoozit) -> @autoreleased Gizmo
 
   // -- setter
   // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6Hoozits10rwPropertyCSo5Gizmo : $@convention(objc_method) (Gizmo, Hoozit) -> () {
@@ -284,7 +284,7 @@ extension Hoozit {
   dynamic convenience init(int i: Int) { self.init(bellsOn: i) }
 
   // CHECK-LABEL: sil hidden @_TFC11objc_thunks6Hoozitc{{.*}} : $@convention(method) (Double, @owned Hoozit) -> @owned Hoozit
-  convenience init(double d: Double) { 
+  convenience init(double d: Double) {
     // CHECK: [[SELF_BOX:%[0-9]+]] = alloc_box $Hoozit
     // CHECK: [[SELFMUI:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1
     // CHECK: [[X_BOX:%[0-9]+]] = alloc_box $X
@@ -303,7 +303,7 @@ extension Hoozit {
     // CHECK-NEXT: apply [[OTHER_REF]]() : $@convention(thin) () -> ()
     // CHECK-NEXT: strong_release [[X_BOX]]#0 : $@box X
     // CHECK-NEXT: br [[EPILOG_BB]]
-    
+
     // CHECK: [[EPILOG_BB]]:
     // CHECK-NOT: super_method
     // CHECK: return

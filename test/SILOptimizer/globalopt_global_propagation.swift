@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend  -O -emit-sil  %s | FileCheck %s
 // RUN: %target-swift-frontend  -O -wmo -emit-sil  %s | FileCheck -check-prefix=CHECK-WMO %s
 
-// Check that values of internal and private global variables, which are provably assigned only 
+// Check that values of internal and private global variables, which are provably assigned only
 // once, are propagated into their uses and enable further optimizations like constant
 // propagation, simplifications, etc.
 
@@ -34,7 +34,7 @@ public func assignSecondTime() {
 
 // Having multiple assignments to a global should prevent from performing the propagation of its value.
 
-// Loads from private global variables can be removed, 
+// Loads from private global variables can be removed,
 // because they cannot be changed outside of this source file.
 // CHECK-LABEL: sil [noinline] @_TF28globalopt_global_propagation30test_private_global_var_doubleFT_Sd
 // CHECK: bb0:
@@ -44,10 +44,10 @@ public func assignSecondTime() {
 // CHECK: return
 @inline(never)
 public func test_private_global_var_double() -> Double {
-  return PVD + 1.0 
+  return PVD + 1.0
 }
 
-// Loads from private global variables can be removed, 
+// Loads from private global variables can be removed,
 // because they cannot be changed outside of this source file.
 // CHECK-LABEL: sil [noinline] @_TF28globalopt_global_propagation27test_private_global_var_intFT_Si
 // CHECK: bb0:
@@ -70,7 +70,7 @@ public func test_private_global_var_int() -> Int {
 // CHECK-WMO: return
 @inline(never)
 public func test_internal_global_var_double() -> Double {
-  return IVD + 1.0 
+  return IVD + 1.0
 }
 
 // Loads from internal global variables can be removed if this is a WMO compilation, because
@@ -94,13 +94,13 @@ public func test_internal_global_var_int() -> Int {
 // CHECK-WMO-NEXT: load
 @inline(never)
 public func test_public_global_var_double() -> Double {
-  return VD + 1.0 
+  return VD + 1.0
 }
 
 
 // Loads from public global variables cannot be removed, because their values could be changed elsewhere.
 // CHECK-LABEL: sil [noinline] @_TF28globalopt_global_propagation26test_public_global_var_intFT_Si
-// CHECK: bb0: 
+// CHECK: bb0:
 // CHECK-NEXT: global_addr
 // CHECK-NEXT: struct_element_addr
 // CHECK-NEXT: load
@@ -111,7 +111,7 @@ public func test_public_global_var_int() -> Int {
 
 // Values of globals cannot be propagated as there are multiple assignments to it.
 // CHECK-WMO-LABEL: sil [noinline] @_TF28globalopt_global_propagation57test_internal_and_private_global_var_with_two_assignmentsFT_Si
-// CHECK-WMO: bb0: 
+// CHECK-WMO: bb0:
 // CHECK-WMO: global_addr
 // CHECK-WMO: global_addr
 // CHECK-WMO: struct_element_addr

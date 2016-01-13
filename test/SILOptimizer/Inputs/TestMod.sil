@@ -13,7 +13,7 @@ func genlibfunc3<X>(x: X) -> X
 class MyClass {
   init()
   func mymethod<X>(x: X) -> X
-   deinit 
+   deinit
 }
 
 sil @_TFC7TestMod7MyClassD : $@convention(method) (@owned MyClass) -> ()

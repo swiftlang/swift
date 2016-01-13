@@ -20,7 +20,7 @@ func getDescription(o: NSObject) -> String {
 // CHECK:  [[T0:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue
 // CHECK:  apply [[T0]]<String>([[NATIVE_BUF:%[0-9]*]],
 // CHECK:  [[NATIVE:%.*]] = load [[NATIVE_BUF]]
-// CHECK:  return [[NATIVE]] 
+// CHECK:  return [[NATIVE]]
 // CHECK:}
 
 func getUppercaseString(s: NSString) -> String {
@@ -244,7 +244,7 @@ class Bas : NSObject {
   // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
   // CHECK:   [[VALUE_BOX:%.*]] = enum $Optional<NSString>, #Optional.Some!enumelt.1, [[VALUE]]
   // CHECK:   [[STR:%.*]] = apply [[NSSTRING_TO_STRING]]([[VALUE_BOX]])
-  
+
   // CHECK:   [[SETIMPL:%.*]] = function_ref @_TFC13objc_bridging3Bass11strRealPropSS
   // CHECK:   apply [[SETIMPL]]([[STR]], %1)
 
@@ -342,7 +342,7 @@ class Bas : NSObject {
   // CHECK:   strong_release [[SELF]] : $Bas
   // CHECK:   return [[RESULT]] : $()
   func arrayArg(array: [AnyObject]) { }
-  
+
   // CHECK-LABEL: sil hidden [thunk] @_TToFC13objc_bridging3Bas11arrayResult{{.*}} : $@convention(objc_method) (Bas) -> @autoreleased NSArray
   // CHECK: bb0([[SELF:%[0-9]+]] : $Bas):
   // CHECK:   strong_retain [[SELF]] : $Bas

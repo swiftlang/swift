@@ -9,28 +9,28 @@ import Builtin
 ///////////////////////
 
 class foo {
-   deinit 
+   deinit
   init()
 }
 
 class boo : foo {
-   deinit 
+   deinit
   override init()
 }
 
 class baz : foo {
-   deinit 
+   deinit
   override init()
 }
 
 class goo : boo {
-   deinit 
+   deinit
   override init()
 }
 
 sil @boo_init : $@convention(thin) (@thick boo.Type) -> @owned boo
 sil @baz_init : $@convention(thin) (@thick baz.Type) -> @owned baz
-sil @goo_init : $@convention(thin) (@thick goo.Type) -> @owned goo 
+sil @goo_init : $@convention(thin) (@thick goo.Type) -> @owned goo
 
 // CHECK-LABEL: no_parent_child_relation_reftype_tests
 // CHECK: PAIR #1.
@@ -39,22 +39,22 @@ sil @goo_init : $@convention(thin) (@thick goo.Type) -> @owned goo
 // CHECK: NoAlias
 sil hidden @no_parent_child_relation_reftype_tests : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_stack $boo, var, name "a"                 // users: %5, %14 
-  %1 = alloc_stack $baz, var, name "b"                 // users: %9, %13 
+  %0 = alloc_stack $boo, var, name "a"                 // users: %5, %14
+  %1 = alloc_stack $baz, var, name "b"                 // users: %9, %13
   %2 = function_ref @boo_init : $@convention(thin) (@thick boo.Type) -> @owned boo // user: %4
   %3 = metatype $@thick boo.Type                  // user: %4
-  %4 = apply %2(%3) : $@convention(thin) (@thick boo.Type) -> @owned boo // users: %5, %11 
+  %4 = apply %2(%3) : $@convention(thin) (@thick boo.Type) -> @owned boo // users: %5, %11
   store %4 to %0 : $*boo                        // id: %5
   %6 = function_ref @baz_init : $@convention(thin) (@thick baz.Type) -> @owned baz // user: %8
   %7 = metatype $@thick baz.Type                  // user: %8
-  %8 = apply %6(%7) : $@convention(thin) (@thick baz.Type) -> @owned baz // users: %9, %10 
+  %8 = apply %6(%7) : $@convention(thin) (@thick baz.Type) -> @owned baz // users: %9, %10
   store %8 to %1 : $*baz                        // id: %9
-  strong_release %8 : $baz                        // id: %10 
-  strong_release %4 : $boo                        // id: %11 
-  %12 = tuple ()                                  // user: %15 
-  dealloc_stack %1 : $*baz       // id: %13 
-  dealloc_stack %0 : $*boo       // id: %14 
-  return %12 : $()                                // id: %15 
+  strong_release %8 : $baz                        // id: %10
+  strong_release %4 : $boo                        // id: %11
+  %12 = tuple ()                                  // user: %15
+  dealloc_stack %1 : $*baz       // id: %13
+  dealloc_stack %0 : $*boo       // id: %14
+  return %12 : $()                                // id: %15
 }
 
 // CHECK-LABEL: with_parent_child_relation_reftype_tests
@@ -65,22 +65,22 @@ bb0:
 // CHECK: MayAlias
 sil hidden @with_parent_child_relation_reftype_tests : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_stack $boo, var, name "a"                 // users: %5, %14 
-  %1 = alloc_stack $goo, var, name "b"                 // users: %9, %13 
+  %0 = alloc_stack $boo, var, name "a"                 // users: %5, %14
+  %1 = alloc_stack $goo, var, name "b"                 // users: %9, %13
   %2 = function_ref @boo_init : $@convention(thin) (@thick boo.Type) -> @owned boo // user: %4
   %3 = metatype $@thick boo.Type                  // user: %4
-  %4 = apply %2(%3) : $@convention(thin) (@thick boo.Type) -> @owned boo // users: %5, %11 
+  %4 = apply %2(%3) : $@convention(thin) (@thick boo.Type) -> @owned boo // users: %5, %11
   store %4 to %0 : $*boo                        // id: %5
   %6 = function_ref @goo_init : $@convention(thin) (@thick goo.Type) -> @owned goo // user: %8
   %7 = metatype $@thick goo.Type                  // user: %8
-  %8 = apply %6(%7) : $@convention(thin) (@thick goo.Type) -> @owned goo // users: %9, %10 
+  %8 = apply %6(%7) : $@convention(thin) (@thick goo.Type) -> @owned goo // users: %9, %10
   store %8 to %1 : $*goo                        // id: %9
-  strong_release %8 : $goo                        // id: %10 
-  strong_release %4 : $boo                        // id: %11 
-  %12 = tuple ()                                  // user: %15 
-  dealloc_stack %1 : $*goo       // id: %13 
-  dealloc_stack %0 : $*boo       // id: %14 
-  return %12 : $()                                // id: %15 
+  strong_release %8 : $goo                        // id: %10
+  strong_release %4 : $boo                        // id: %11
+  %12 = tuple ()                                  // user: %15
+  dealloc_stack %1 : $*goo       // id: %13
+  dealloc_stack %0 : $*boo       // id: %14
+  return %12 : $()                                // id: %15
 }
 
 // CHECK-LABEL: @builtin_test

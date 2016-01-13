@@ -54,7 +54,7 @@ func callClassMethod() -> Gizmo? {
   if foo == nil {
     print("nil")
   }
-  return foo  
+  return foo
 }
 
 // OPT-LABEL: sil hidden @_TF21objc_nonnull_lie_hack12loadPropertyFCSo5GizmoGSqS0__ : $@convention(thin) (@owned Gizmo) -> @owned Optional<Gizmo>
@@ -67,7 +67,7 @@ func loadProperty(gizmo: Gizmo) -> Gizmo? {
   if foo == nil {
     print("nil")
   }
-  return foo  
+  return foo
 }
 
 // OPT-LABEL: sil hidden @_TF21objc_nonnull_lie_hack19loadUnownedPropertyFCSo5GizmoGSqS0__
@@ -80,5 +80,5 @@ func loadUnownedProperty(gizmo: Gizmo) -> Gizmo? {
   if foo == nil {
     print("nil")
   }
-  return foo  
+  return foo
 }

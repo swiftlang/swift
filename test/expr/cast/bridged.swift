@@ -6,7 +6,7 @@
 
 class NSObject { }
 
-class BridgedClass : NSObject { 
+class BridgedClass : NSObject {
 }
 
 class SubclassOfBridgedClass : BridgedClass { }
@@ -15,7 +15,7 @@ struct BridgedStruct : _ObjectiveCBridgeable {
   static func _isBridgedToObjectiveC() -> Bool {
     return true
   }
-  
+
   static func _getObjectiveCType() -> Any.Type {
     return BridgedClass.self
   }
@@ -37,7 +37,7 @@ struct BridgedStruct : _ObjectiveCBridgeable {
   }
 }
 
-func testBridgeDowncast(obj: AnyObject, objOpt: AnyObject?, 
+func testBridgeDowncast(obj: AnyObject, objOpt: AnyObject?,
                         objImplicitOpt: AnyObject!) -> BridgedStruct? {
   let s1Opt = obj as? BridgedStruct
   var s2Opt = objOpt as? BridgedStruct
@@ -53,7 +53,7 @@ func testBridgeDowncast(obj: AnyObject, objOpt: AnyObject?,
   return s1Opt
 }
 
-func testBridgeIsa(obj: AnyObject, objOpt: AnyObject?, 
+func testBridgeIsa(obj: AnyObject, objOpt: AnyObject?,
                    objImplicitOpt: AnyObject!) {
   if obj is BridgedStruct { }
   if objOpt is BridgedStruct { }
@@ -61,7 +61,7 @@ func testBridgeIsa(obj: AnyObject, objOpt: AnyObject?,
 }
 
 func testBridgeDowncastSuperclass(obj: NSObject, objOpt: NSObject?,
-                                  objImplicitOpt: NSObject!) 
+                                  objImplicitOpt: NSObject!)
        -> BridgedStruct? {
   _ = obj as? BridgedStruct
   _ = objOpt as? BridgedStruct

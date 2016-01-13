@@ -9,9 +9,9 @@ struct S {
     // CHECK: bb0([[SELF_META:%[0-9]+]] : $@thin S.Type):
     // CHECK-NEXT:   [[SELF_BOX:%[0-9]+]] = alloc_box $S
     // CHECK-NEXT:   [[SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1 : $*S
-    
+
     // CHECK:   [[S_DELEG_INIT:%[0-9]+]] = function_ref @_TFV19init_ref_delegation1SC{{.*}} : $@convention(thin) (X, @thin S.Type) -> S
-    
+
     // CHECK:   [[X_CTOR:%[0-9]+]] = function_ref @_TFV19init_ref_delegation1XC{{.*}} : $@convention(thin) (@thin X.Type) -> X
     // CHECK-NEXT:   [[X_META:%[0-9]+]] = metatype $@thin X.Type
     // CHECK-NEXT:   [[X:%[0-9]+]] = apply [[X_CTOR]]([[X_META]]) : $@convention(thin) (@thin X.Type) -> X
