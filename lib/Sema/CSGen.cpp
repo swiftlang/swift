@@ -1205,42 +1205,6 @@ namespace {
       return MetatypeType::get(type);
     }
 
-    Type visitUnresolvedConstructorExpr(UnresolvedConstructorExpr *expr) {
-      // Open a member constraint for constructor delegations on the subexpr
-      // type.
-      if (CS.TC.getSelfForInitDelegationInConstructor(CS.DC, expr)){
-        auto baseTy = expr->getSubExpr()->getType()
-                        ->getLValueOrInOutObjectType();
-        // 'self' or 'super' will reference an instance, but the constructor
-        // is semantically a member of the metatype. This:
-        //   self.init()
-        //   super.init()
-        // is really more like:
-        //   self = Self.init()
-        //   self.super = Super.init()
-        baseTy = MetatypeType::get(baseTy, CS.getASTContext());
-        
-        auto argsTy = CS.createTypeVariable(
-                        CS.getConstraintLocator(expr),
-                        TVO_CanBindToLValue|TVO_PrefersSubtypeBinding);
-        auto resultTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
-                                              /*options=*/0);
-        auto methodTy = FunctionType::get(argsTy, resultTy);
-        CS.addValueMemberConstraint(baseTy, expr->getName(),
-          methodTy,
-          CS.getConstraintLocator(expr, ConstraintLocator::ConstructorMember));
-        
-        // The result of the expression is the partial application of the
-        // constructor to the subexpression.
-        return methodTy;
-      }
-      
-      // If we aren't delegating from within an initializer, then 'x.init' is
-      // just a reference to the constructor as a member of the metatype value
-      // 'x'.
-      return addMemberRefConstraints(expr, expr->getSubExpr(), expr->getName());
-    }
-    
     Type visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
@@ -1385,6 +1349,36 @@ namespace {
     }
 
     Type visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
+      // Open a member constraint for constructor delegations on the
+      // subexpr type.
+      if (CS.TC.getSelfForInitDelegationInConstructor(CS.DC, expr)){
+        auto baseTy = expr->getBase()->getType()
+                        ->getLValueOrInOutObjectType();
+
+        // 'self' or 'super' will reference an instance, but the constructor
+        // is semantically a member of the metatype. This:
+        //   self.init()
+        //   super.init()
+        // is really more like:
+        //   self = Self.init()
+        //   self.super = Super.init()
+        baseTy = MetatypeType::get(baseTy, CS.getASTContext());
+
+        auto argsTy = CS.createTypeVariable(
+                        CS.getConstraintLocator(expr),
+                        TVO_CanBindToLValue|TVO_PrefersSubtypeBinding);
+        auto resultTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
+                                              /*options=*/0);
+        auto methodTy = FunctionType::get(argsTy, resultTy);
+        CS.addValueMemberConstraint(baseTy, expr->getName(),
+          methodTy,
+          CS.getConstraintLocator(expr, ConstraintLocator::ConstructorMember));
+
+        // The result of the expression is the partial application of the
+        // constructor to the subexpression.
+        return methodTy;
+      }
+
       return addMemberRefConstraints(expr, expr->getBase(), expr->getName());
     }
     

@@ -1040,40 +1040,6 @@ public:
   }
 };
 
-/// An unresolved reference to a constructor member of a value. Resolves to a
-/// DotSyntaxCall involving the value and the resolved constructor.
-class UnresolvedConstructorExpr : public Expr {
-  Expr *SubExpr;
-  SourceLoc DotLoc;
-  SourceLoc ConstructorLoc;
-  DeclName Name;
-
-public:
-  UnresolvedConstructorExpr(Expr *SubExpr, SourceLoc DotLoc,
-                            SourceLoc ConstructorLoc, DeclName Name,
-                            bool Implicit)
-    : Expr(ExprKind::UnresolvedConstructor, Implicit),
-      SubExpr(SubExpr), DotLoc(DotLoc), ConstructorLoc(ConstructorLoc),
-      Name(Name)
-  {}
-  
-  Expr *getSubExpr() const { return SubExpr; }
-  void setSubExpr(Expr *e) { SubExpr = e; }
-  
-  SourceLoc getLoc() const { return ConstructorLoc; }
-  SourceLoc getConstructorLoc() const { return ConstructorLoc; }
-  SourceLoc getDotLoc() const { return DotLoc; }
-  
-  DeclName getName() const { return Name; }
-
-  SourceLoc getStartLoc() const { return SubExpr->getStartLoc(); }
-  SourceLoc getEndLoc() const { return ConstructorLoc; }
-  
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::UnresolvedConstructor;
-  }
-};
-
 /// OverloadSetRefExpr - A reference to an overloaded set of values with a
 /// single name.
 ///

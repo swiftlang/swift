@@ -579,10 +579,14 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
 /// Otherwise, return nil.
 VarDecl *
 TypeChecker::getSelfForInitDelegationInConstructor(DeclContext *DC,
-                                           UnresolvedConstructorExpr *ctorRef) {
+                                                   UnresolvedDotExpr *ctorRef) {
+  // If the reference isn't to a constructor, we're done.
+  if (ctorRef->getName().getBaseName() != Context.Id_init)
+    return nullptr;
+
   if (auto ctorContext
         = dyn_cast_or_null<ConstructorDecl>(DC->getInnermostMethodContext())) {
-    auto nestedArg = ctorRef->getSubExpr();
+    auto nestedArg = ctorRef->getBase();
     if (auto inout = dyn_cast<InOutExpr>(nestedArg))
       nestedArg = inout->getSubExpr();
     if (nestedArg->isSuperExpr())
@@ -715,9 +719,9 @@ namespace {
       // determine where to place the RebindSelfInConstructorExpr node.
       // When updating this logic, also update
       // RebindSelfInConstructorExpr::getCalledConstructor.
-      if (auto nestedCtor = dyn_cast<UnresolvedConstructorExpr>(expr)) {
+      if (auto unresolvedDot = dyn_cast<UnresolvedDotExpr>(expr)) {
         if (auto self
-              = TC.getSelfForInitDelegationInConstructor(DC, nestedCtor)) {
+              = TC.getSelfForInitDelegationInConstructor(DC, unresolvedDot)) {
           // Walk our ancestor expressions looking for the appropriate place
           // to insert the RebindSelfInConstructorExpr.
           Expr *target = nullptr;
@@ -730,7 +734,7 @@ namespace {
               foundRebind = true;
               break;
             }
-            
+
             // Recognize applications.
             if (auto apply = dyn_cast<ApplyExpr>(ancestor)) {
               // If we already saw an application, we're done.
@@ -739,7 +743,7 @@ namespace {
 
               // If the function being called is not our unresolved initializer
               // reference, we're done.
-              if (apply->getFn()->getSemanticsProvidingExpr() != nestedCtor)
+              if (apply->getFn()->getSemanticsProvidingExpr() != unresolvedDot)
                 break;
 
               foundApply = true;
