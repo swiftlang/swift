@@ -1999,21 +1999,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         break;
       }
 
-      case decls_block::MigrationId_DECL_ATTR: {
-        uint64_t endOfIdentIndex;
-        serialization::decls_block::MigrationIdDeclAttrLayout::readRecord(
-          scratch, endOfIdentIndex);
-
-        StringRef ident = blobData.substr(0, endOfIdentIndex);
-        StringRef pattern = blobData.substr(endOfIdentIndex);
-        Attr = new (ctx) MigrationIdAttr(SourceLoc(), SourceLoc(),
-                                         SourceLoc(),
-                                         ctx.AllocateCopy(ident),
-                                         ctx.AllocateCopy(pattern),
-                                         SourceLoc(), /*isImplicit=*/false);
-        break;
-      }
-
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...) \
       case decls_block::CLASS##_DECL_ATTR: { \
         bool isImplicit; \

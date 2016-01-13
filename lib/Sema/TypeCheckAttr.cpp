@@ -76,7 +76,6 @@ public:
   IGNORED_ATTR(UIApplicationMain)
   IGNORED_ATTR(UnsafeNoObjCTaggedPointer)
   IGNORED_ATTR(WarnUnusedResult)
-  IGNORED_ATTR(MigrationId)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -646,7 +645,6 @@ public:
     IGNORED_ATTR(SILStored)
     IGNORED_ATTR(Testable)
     IGNORED_ATTR(WarnUnqualifiedAccess)
-    IGNORED_ATTR(MigrationId)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);

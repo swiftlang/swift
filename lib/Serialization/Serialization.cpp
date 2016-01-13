@@ -1739,21 +1739,6 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
                                                blob);
     return;
   }
-
-  case DAK_MigrationId: {
-    auto *theAttr = cast<MigrationIdAttr>(DA);
-
-    // Compute the blob.
-    SmallString<128> blob;
-    blob += theAttr->getIdent();
-    uint64_t endOfIdentIndex = blob.size();
-    blob += theAttr->getPatternId();
-    auto abbrCode = DeclTypeAbbrCodes[MigrationIdDeclAttrLayout::Code];
-    MigrationIdDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                          endOfIdentIndex,
-                                          blob);
-    return;
-  }
   }
 }
 

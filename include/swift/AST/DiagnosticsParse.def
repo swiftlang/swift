@@ -1131,20 +1131,6 @@ WARNING(attr_warn_unused_result_unknown_parameter,attribute_parsing,none,
 ERROR(attr_warn_unused_result_expected_rparen,attribute_parsing,none,
       "expected ')' after 'warn_unused_result' attribute", ())
 
-// _migration_id
-WARNING(attr_migration_id_expected_name,attribute_parsing,none,
-        "expected parameter 'pattern'", ())
-WARNING(attr_migration_id_unknown_parameter,attribute_parsing,none,
-        "unknown parameter '%0' in '_migration_id' attribute", (StringRef))
-ERROR(attr_migration_id_expected_eq,attribute_parsing,none,
-      "expected '=' following '%0' parameter", (StringRef))
-ERROR(attr_migration_id_expected_string,attribute_parsing,none,
-      "expected a string following '=' for '%0' parameter", (StringRef))
-WARNING(attr_migration_id_duplicate_parameter,attribute_parsing,none,
-      "duplicate '%0' parameter; previous value will be ignored", (StringRef))
-ERROR(attr_migration_id_expected_rparen,attribute_parsing,none,
-      "expected ')' after '_migration_id' attribute", ())
-
 //------------------------------------------------------------------------------
 // Generics parsing diagnostics
 //------------------------------------------------------------------------------
