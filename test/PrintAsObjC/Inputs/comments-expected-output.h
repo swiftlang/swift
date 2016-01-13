@@ -94,7 +94,7 @@ SWIFT_CLASS("_TtC8comments9CodeBlock")
 /// <code>f0() // WOW!
 /// f0() // WOW!
 /// f0() // WOW!
-///
+/// 
 /// </code>
 - (void)f0;
 - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
@@ -176,7 +176,7 @@ SWIFT_CLASS("_TtC8comments20IndentedBlockComment")
 /// <code>var x = 1
 /// // var y = 2
 /// var z = 3
-///
+/// 
 /// </code>
 - (void)f1;
 
@@ -190,7 +190,7 @@ SWIFT_CLASS("_TtC8comments20IndentedBlockComment")
 /// <code>var x = 1
 /// // var y = 2
 /// var z = 3
-///
+/// 
 /// </code>
 - (void)f2;
 - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
@@ -259,11 +259,11 @@ SWIFT_CLASS("_TtC8comments15ParamAndReturns")
 
 /// Aaa.  f2.
 ///
-/// \param first
+/// \param first 
 ///
 /// \param second Aaa.
 ///
-/// \param third
+/// \param third 
 /// Bbb.
 - (void)f2:(NSInteger)first second:(double)second third:(float)third;
 

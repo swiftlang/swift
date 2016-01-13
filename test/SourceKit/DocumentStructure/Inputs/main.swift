@@ -66,7 +66,7 @@ extension Foo {
     }
 }
 
-// rdar://19539259
+// rdar://19539259 
 var (sd2: Qtys)
 {
   417(d: nil)
