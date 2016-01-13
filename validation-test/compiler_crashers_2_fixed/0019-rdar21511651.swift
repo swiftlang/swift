@@ -3,7 +3,7 @@
 internal protocol _SequenceWrapperType {
   typealias Base : SequenceType
   typealias Generator : GeneratorType = Base.Generator
-  
+
   var _base: Base {get}
 }
 
@@ -22,10 +22,10 @@ extension SequenceType
 
   public func _customContainsEquatableElement(
     element: Base.Generator.Element
-  ) -> Bool? { 
+  ) -> Bool? {
     return _base._customContainsEquatableElement(element)
   }
-  
+
   /// If `self` is multi-pass (i.e., a `CollectionType`), invoke
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
@@ -60,7 +60,7 @@ extension CollectionType
   public var startIndex: Base.Index {
     return _base.startIndex
   }
-  
+
   /// The collection's "past the end" position.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
@@ -98,8 +98,8 @@ public protocol _prext_LazySequenceType : SequenceType {
   /// Note: this property need not be implemented by conforming types,
   /// it has a default implementation in a protocol extension that
   /// just returns `self`.
-  var elements: Elements {get} 
-  
+  var elements: Elements {get}
+
   /// An Array, created on-demand, containing the elements of this
   /// lazy SequenceType.
   ///
@@ -179,7 +179,7 @@ public struct _prext_LazyCollection<Base_ : CollectionType>
 
   typealias Base = Base_
   typealias Index = Base.Index
-  
+
   /// Construct an instance with `base` as its underlying Collection
   /// instance.
   public init(_ base: Base_) {
@@ -232,7 +232,7 @@ public struct _prext_MapSequence<Base : SequenceType, T>
   : _prext_LazySequenceType, _SequenceWrapperType {
 
   typealias Elements = _prext_MapSequence
-  
+
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
@@ -256,7 +256,7 @@ public struct _prext_MapCollection<Base : CollectionType, T>
 
   public var startIndex: Base.Index { return _base.startIndex }
   public var endIndex: Base.Index { return _base.endIndex }
-  
+
   /// Access the element at `position`.
   ///
   /// - Requires: `position` is a valid position in `self` and
@@ -307,7 +307,7 @@ extension _prext_LazyCollectionType {
  // ${'Local Variables'}:
  // eval: (read-only-mode 1)
  // End:
- 
+
 //===--- New stuff --------------------------------------------------------===//
 internal protocol __prext_ReverseCollectionType : _prext_LazyCollectionType {
   typealias Base : CollectionType

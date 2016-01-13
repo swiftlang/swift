@@ -34,7 +34,7 @@ struct EmptyVector<T: ApproximateRealType> : VectorType {
     return Element() // zero
   }
   var count: Int { return 0 }
-  
+
   subscript(i: Int) -> Element {
     get { fatalError("subscript out-of-range") }
     set { fatalError("subscript out-of-range") }
@@ -43,7 +43,7 @@ struct EmptyVector<T: ApproximateRealType> : VectorType {
 
 struct Vector<Tail: VectorType> : VectorType {
   typealias Element = Tail.Element
-  
+
   init(head: Element, tail: Tail) {
     self.head = head
     self.tail = tail
@@ -60,7 +60,7 @@ struct Vector<Tail: VectorType> : VectorType {
     self.tail = Tail()
   }
   */
-  
+
   func dotProduct(other: Vector) -> Element {
     return head * other.head + tail.dotProduct(other.tail)
   }

@@ -9,7 +9,7 @@ func yyy<T, Result>(inout arg: T, @noescape _ body: U<T> -> Result) -> Result {
 
 enum YYY: Int, OptionSetType {
   case A = 1
-  
+
   init(rawValue: Int) {
     self = .A
   }

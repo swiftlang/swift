@@ -1687,7 +1687,7 @@ for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
       _fixLifetime(b)
     }
   }
-  
+
   ArrayTestSuite.test("\(testPrefix)/SequenceMap")
   .skip(.Custom(
     { _isFastAssertConfiguration() },

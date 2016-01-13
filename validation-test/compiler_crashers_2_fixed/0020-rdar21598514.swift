@@ -11,7 +11,7 @@ public class TypeIndexed<Value> : Resettable {
     self.defaultValue = value
     _allResettables.append(self)
   }
-  
+
   public subscript(t: Any.Type) -> Value {
     get {
       return byType[ObjectIdentifier(t)] ?? defaultValue
@@ -41,7 +41,7 @@ extension LoggingType {
   public var log: Log.Type {
     return Log.self
   }
-  
+
   public var selfType: Any.Type {
     return self.dynamicType
   }
@@ -60,16 +60,16 @@ public struct LoggingGenerator<Base: GeneratorType>
   : GeneratorType, LoggingType {
 
   typealias Log = GeneratorLog
-  
+
   public init(_ base: Base) {
     self.base = base
   }
-  
+
   public mutating func next() -> Base.Element? {
     ++Log.next[selfType]
     return base.next()
   }
-  
+
   public var base: Base
 }
 
@@ -97,7 +97,7 @@ extension LoggingSequenceType {
   public init(_ base: Base) {
     self.base = base
   }
-  
+
   public func generate() -> LoggingGenerator<Base.Generator> {
     ++SequenceLog.generate[selfType]
     return LoggingGenerator(base.generate())
@@ -121,14 +121,14 @@ extension LoggingSequenceType {
     ++SequenceLog.filter[selfType]
     return base.filter(includeElement)
   }
-  
+
   public func _customContainsEquatableElement(
     element: Base.Generator.Element
   ) -> Bool? {
     ++SequenceLog._customContainsEquatableElement[selfType]
     return base._customContainsEquatableElement(element)
   }
-  
+
   /// If `self` is multi-pass (i.e., a `CollectionType`), invoke
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
@@ -157,11 +157,11 @@ extension LoggingSequenceType {
 public struct LoggingSequence<Base_: SequenceType> : LoggingSequenceType {
   typealias Log = SequenceLog
   typealias Base = Base_
-  
+
   public init(_ base: Base_) {
     self.base = base
   }
-  
+
   public var base: Base_
 }
 
@@ -188,11 +188,11 @@ extension LoggingCollectionType {
     ++CollectionLog.subscriptIndex[selfType]
     return base[position]
   }
-  
+
   subscript(_prext_bounds: Range<Base.Index>) -> Base._prext_SubSequence {
     ++CollectionLog.subscriptRange[selfType]
     return base[_prext_bounds]
-  }    
+  }
 
   var isEmpty: Bool {
     ++CollectionLog.isEmpty[selfType]
@@ -203,7 +203,7 @@ extension LoggingCollectionType {
     ++CollectionLog.count[selfType]
     return base.count
   }
-  
+
   func _customIndexOfEquatableElement(element: Generator.Element) -> Base.Index?? {
     ++CollectionLog._customIndexOfEquatableElement[selfType]
     return base._customIndexOfEquatableElement(element)

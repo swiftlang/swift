@@ -21,10 +21,10 @@ struct PiecewiseTransformedGeneratorOf<
                                       >
        : GeneratorType {
     typealias Element = Target
-    
+
     var sourceGenerator: SourceGenerator
     var transformerGenerator: TransformerGenerator
-    
+
     mutating func next() -> Element? {
         let source: Transformable.Source? = sourceGenerator.next()
         if let source: Transformable.Source = source {
@@ -48,20 +48,20 @@ struct PiecewiseTransformedSequenceOf<
         SourceSequence.Generator.Element == Transformable.Source,
         TransformerSequence.Generator.Element == Transformable.Transformer
         >: SequenceType {
-    
+
     typealias Source = SourceSequence.Generator.Element
     typealias Target = Transformable.Target
     typealias Generator = PiecewiseTransformedGeneratorOf<Source, Target, SourceSequence.Generator, TransformerSequence.Generator, Transformable>
-    
- 
+
+
     let inputs: SourceSequence
     let transformers: TransformerSequence
-    
+
     init(inputs: SourceSequence, transformers: TransformerSequence) {
         self.inputs = inputs
         self.transformers = transformers
     }
-    
+
     func generate() -> Generator {
         return PiecewiseTransformedGeneratorOf(sourceGenerator: inputs.generate(), transformerGenerator: transformers.generate())
     }
