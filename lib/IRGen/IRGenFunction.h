@@ -384,7 +384,7 @@ public:
     setUnscopedLocalTypeData(LocalTypeDataKey{type, kind}, data);
   }
   void setUnscopedLocalTypeData(LocalTypeDataKey key, llvm::Value *data);
-  
+
   /// Add a local type-metadata reference, valid at the current insertion
   /// point.
   void setScopedLocalTypeData(CanType type, LocalTypeDataKind kind,

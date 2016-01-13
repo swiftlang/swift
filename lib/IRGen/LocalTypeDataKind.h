@@ -37,9 +37,9 @@ public:
   using RawType = uintptr_t;
 private:
   RawType Value;
-  
+
   explicit LocalTypeDataKind(RawType Value) : Value(Value) {}
-  
+
   /// Magic values for special kinds of type metadata.  These should be
   /// small so that they should never conflict with a valid pointer.
   ///
@@ -142,7 +142,7 @@ public:
     }
   }
 
-  
+
   RawType getRawValue() const {
     return Value;
   }

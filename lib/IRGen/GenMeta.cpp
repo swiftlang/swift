@@ -1174,7 +1174,7 @@ static llvm::Value *emitCallToTypeMetadataAccessFunction(IRGenFunction &IGF,
 
   // Save the metadata for future lookups.
   IGF.setScopedLocalTypeData(type, LocalTypeDataKind::forTypeMetadata(), call);
-  
+
   return call;
 }
 

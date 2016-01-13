@@ -327,7 +327,7 @@ public struct ${Self}<Element>
     // _getOwnerWithSemanticLabel_native hinders optimization.
     return Builtin.castToNativeObject(_buffer.owner)
   }
-  
+
   static internal func _copyBuffer(inout buffer: _Buffer) {
     let newBuffer = _ContiguousArrayBuffer<Element>(
       count: buffer.count, minimumCapacity: buffer.count)
