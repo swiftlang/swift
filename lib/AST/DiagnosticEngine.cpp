@@ -47,6 +47,20 @@ enum class DiagnosticOptions {
   /// After a fatal error subsequent diagnostics are suppressed.
   Fatal,
 };
+struct StoredDiagnosticInfo {
+  // TODO: Category category;
+
+  DiagnosticKind kind : 2;
+  bool pointsToFirstBadToken : 1;
+  bool isFatal : 1;
+
+  StoredDiagnosticInfo(DiagnosticKind k, bool firstBadToken, bool fatal)
+      : kind(k), pointsToFirstBadToken(firstBadToken), isFatal(fatal) {}
+  StoredDiagnosticInfo(DiagnosticKind k, DiagnosticOptions opts)
+      : StoredDiagnosticInfo(k,
+                             opts == DiagnosticOptions::PointsToFirstBadToken,
+                             opts == DiagnosticOptions::Fatal) {}
+};
 
 // Reproduce the DiagIDs, as we want both the size and access to the raw ids
 // themselves.
@@ -57,6 +71,20 @@ enum LocalDiagID : uint32_t {
 };
 }
 
+// TODO: categorization
+static StoredDiagnosticInfo storedDiagnosticInfos[] = {
+#define ERROR(ID, Category, Options, Text, Signature)                          \
+  StoredDiagnosticInfo(DiagnosticKind::Error, DiagnosticOptions::Options),
+#define WARNING(ID, Category, Options, Text, Signature)                        \
+  StoredDiagnosticInfo(DiagnosticKind::Warning, DiagnosticOptions::Options),
+#define NOTE(ID, Category, Options, Text, Signature)                           \
+  StoredDiagnosticInfo(DiagnosticKind::Note, DiagnosticOptions::Options),
+#include "swift/AST/DiagnosticsAll.def"
+};
+static_assert(sizeof(storedDiagnosticInfos) / sizeof(StoredDiagnosticInfo) ==
+                  LocalDiagID::NumDiags,
+              "array size mismatch");
+
 static const char *DiagnosticStrings[] = {
 #define ERROR(ID, Category, Options, Text, Signature) Text,
 #define WARNING(ID, Category, Options, Text, Signature) Text,
@@ -65,29 +93,9 @@ static const char *DiagnosticStrings[] = {
     "<not a diagnostic>",
 };
 
-static bool DiagnosticPointsToFirstBadToken[] = {
-#define ERROR(ID, Category, Options, Text, Signature)                          \
-  DiagnosticOptions::Options == DiagnosticOptions::PointsToFirstBadToken,
-#define WARNING(ID, Category, Options, Text, Signature)                        \
-  DiagnosticOptions::Options == DiagnosticOptions::PointsToFirstBadToken,
-#define NOTE(ID, Category, Options, Text, Signature)                           \
-  DiagnosticOptions::Options == DiagnosticOptions::PointsToFirstBadToken,
-#include "swift/AST/DiagnosticsAll.def"
-    "<not a diagnostic>",
-};
-
 DiagnosticState::DiagnosticState() {
-  // Initialize our per-diagnostic state to the default
-  perDiagnosticState.resize(LocalDiagID::NumDiags);
-#define ERROR(ID, Category, Options, Text, Signature)                          \
-  perDiagnosticState[LocalDiagID::ID] =                                        \
-      DiagnosticOptions::Options == DiagnosticOptions::Fatal ? Behavior::Fatal \
-                                                             : Behavior::Error;
-#define WARNING(ID, Category, Options, Text, Signature)                        \
-  perDiagnosticState[LocalDiagID::ID] = Behavior::Warning;
-#define NOTE(ID, Category, Options, Text, Signature)                           \
-  perDiagnosticState[LocalDiagID::ID] = Behavior::Note;
-#include "swift/AST/DiagnosticsAll.def"
+  // Initialize our per-diagnostic state to default
+  perDiagnosticBehavior.resize(LocalDiagID::NumDiags, Behavior::Unspecified);
 }
 
 static CharSourceRange toCharSourceRange(SourceManager &SM, SourceRange SR) {
@@ -196,7 +204,7 @@ void InFlightDiagnostic::flush() {
 }
 
 bool DiagnosticEngine::isDiagnosticPointsToFirstBadToken(DiagID ID) const {
-  return DiagnosticPointsToFirstBadToken[(unsigned)ID];
+  return storedDiagnosticInfos[(unsigned) ID].pointsToFirstBadToken;
 }
 
 /// \brief Skip forward to one of the given delimiters.
@@ -491,26 +499,57 @@ DiagnosticState::Behavior DiagnosticState::determineBehavior(DiagID id) {
     return lvl;
   };
 
-  auto behavior = perDiagnosticState[(unsigned)id];
+  // We determine how to handle a diagnostic based on the following rules
+  //   1) If current state dictates a certain behavior, follow that
+  //   2) If the user provided a behavior for this specific diagnostic, follow
+  //      that
+  //   3) (TBD) If the user provided a behavior for this diagnostic's category,
+  //      follow that
+  //   4) If the user provided a behavior for this diagnostic's kind, follow
+  //      that
+  //   5) Otherwise remap the diagnostic kind
+
+  auto diagInfo = storedDiagnosticInfos[(unsigned)id];
+  bool isNote = diagInfo.kind == DiagnosticKind::Note;
+
+  //   1) If current state dictates a certain behavior, follow that
 
   // Notes relating to ignored diagnostics should also be ignored
-  if (previousBehavior == Behavior::Ignore && behavior == Behavior::Note)
+  if (previousBehavior == Behavior::Ignore && isNote)
     return set(Behavior::Ignore);
 
   // Suppress diagnostics when in a fatal state, except for follow-on notes
-  // about the original fatal diag
-  if (fatalErrorOccurred) {
-    bool emitAnyways = showDiagnosticsAfterFatalError ||
-                       (behavior == Behavior::Note &&
-                        previousBehavior != Behavior::Ignore);
-    if (!emitAnyways)
+  if (fatalErrorOccurred)
+    if (!showDiagnosticsAfterFatalError && !isNote)
       return set(Behavior::Ignore);
-  }
 
-  if (behavior == Behavior::Warning && ignoreAllWarnings)
+  //   2) If the user provided a behavior for this specific diagnostic, follow
+  //      that
+
+  if (perDiagnosticBehavior[(unsigned)id] != Behavior::Unspecified)
+    return set(perDiagnosticBehavior[(unsigned)id]);
+
+  //   3) (TBD) If the user provided a behavior for this diagnostic's category,
+  //      follow that
+
+  // TODO: categorization
+  // if (perCategoryBehavior[(unsigned)id] != Behavior::Unspecified)
+  //   return set(perCategoryBehavior[(unsigned)id]);
+
+  //   4) If the user provided a behavior for this diagnostic's kind, follow
+  //      that
+  if (diagInfo.kind == DiagnosticKind::Warning && ignoreAllWarnings)
     return set(Behavior::Ignore);
 
-  return set(behavior);
+  //   5) Otherwise remap the diagnostic kind
+  switch (diagInfo.kind) {
+  case DiagnosticKind::Note:
+    return set(Behavior::Note);
+  case DiagnosticKind::Error:
+    return set(diagInfo.isFatal ? Behavior::Fatal : Behavior::Error);
+  case DiagnosticKind::Warning:
+    return set(Behavior::Warning);
+  }
 }
 
 void DiagnosticEngine::flushActiveDiagnostic() {
@@ -653,7 +692,8 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
   llvm::SmallString<256> Text;
   {
     llvm::raw_svector_ostream Out(Text);
-    formatDiagnosticText(DiagnosticStrings[(unsigned)diagnostic.getID()], diagnostic.getArgs(), Out);
+    formatDiagnosticText(DiagnosticStrings[(unsigned)diagnostic.getID()],
+                         diagnostic.getArgs(), Out);
   }
 
   // Pass the diagnostic off to the consumer.
@@ -662,7 +702,8 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
   Info.Ranges = diagnostic.getRanges();
   Info.FixIts = diagnostic.getFixIts();
   for (auto &Consumer : Consumers) {
-    Consumer->handleDiagnostic(SourceMgr, loc, toDiagnosticKind(behavior), Text, Info);
+    Consumer->handleDiagnostic(SourceMgr, loc, toDiagnosticKind(behavior), Text,
+                               Info);
   }
 }
 

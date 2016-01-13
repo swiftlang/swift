@@ -411,7 +411,7 @@ namespace swift {
     Behavior previousBehavior = Behavior::Unspecified;
 
     /// \brief Track settable, per-diagnostic state that we store
-    std::vector<Behavior> perDiagnosticState;
+    std::vector<Behavior> perDiagnosticBehavior;
 
   public:
     DiagnosticState();
@@ -438,7 +438,7 @@ namespace swift {
 
     /// Set per-diagnostic behavior
     void setDiagnosticBehavior(DiagID id, Behavior behavior) {
-      perDiagnosticState[(unsigned)id] = behavior;
+      perDiagnosticBehavior[(unsigned)id] = behavior;
     }
 
   private:
@@ -461,6 +461,7 @@ namespace swift {
     /// emitting diagnostics.
     SmallVector<DiagnosticConsumer *, 2> Consumers;
 
+    /// \brief Tracks diagnostic behaviors and state
     DiagnosticState state;
 
     /// \brief The currently active diagnostic, if there is one.
