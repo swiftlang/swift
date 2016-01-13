@@ -837,8 +837,18 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   const Driver &D = getDriver();
   const llvm::Triple &Triple = getTriple();
 
-  ArgStringList Arguments;
-  addPrimaryInputsOfType(Arguments, context.Inputs, types::TY_Object);
+  InvocationInfo II{"ld"};
+  ArgStringList &Arguments = II.Arguments;
+
+  if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
+      context.Inputs.size() > TOO_MANY_FILES) {
+    Arguments.push_back("-filelist");
+    Arguments.push_back(context.getTemporaryFilePath("inputs", "LinkFileList"));
+    II.FilelistInfo = {Arguments.back(), types::TY_Object, FilelistInfo::Input};
+  } else {
+    addPrimaryInputsOfType(Arguments, context.Inputs, types::TY_Object);
+  }
+
   addInputsOfType(Arguments, context.InputActions, types::TY_Object);
 
   if (context.OI.DebugInfoKind == IRGenDebugInfoKind::Normal) {
@@ -1013,7 +1023,7 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   Arguments.push_back("-o");
   Arguments.push_back(context.Output.getPrimaryOutputFilename().c_str());
 
-  return {"ld", Arguments};
+  return II;
 }
 
 ToolChain::InvocationInfo
