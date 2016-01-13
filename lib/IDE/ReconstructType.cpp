@@ -114,7 +114,7 @@ struct EnumElementInfo {
   uint32_t extra_value;   // If not UINT32_MAX, then this value is an extra value
   // that appears at offset 0 to tell one or more empty
   // enums apart. This value will only be filled in if there
-  // are one ore more enum elements that have a non-zero byte size
+  // are one or more enum elements that have a non-zero byte size
 
   EnumElementInfo() :
   clang_type(),
@@ -1925,7 +1925,7 @@ VisitNodeSetterGetter (SwiftASTContext *ast,
   }
   else
   {
-    // Otherwise this is a getter/setter/etc for an variable.  Currently you can't write a getter/setter that
+    // Otherwise this is a getter/setter/etc for a variable.  Currently you can't write a getter/setter that
     // takes a different type from the type of the variable.  So there is only one possible function.
     swift::AbstractStorageDecl *var_decl = nullptr;
 
