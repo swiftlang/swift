@@ -236,14 +236,14 @@ enum QuxEnum : Int {
 // QUX_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal:    .Qux1[#QuxEnum#]{{; name=.+$}}
 // QUX_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal:    .Qux2[#QuxEnum#]{{; name=.+$}}
 // QUX_ENUM_NO_DOT-NEXT: Decl[Constructor]/CurrNominal:   ({#rawValue: Int#})[#QuxEnum?#]{{; name=.+$}}
-// QUX_ENUM_NO_DOT-NEXT: Decl[TypeAlias]/Super:            .RawValue[#Int#]{{; name=.+$}}
+// QUX_ENUM_NO_DOT-NEXT: Decl[AssociatedType]/Super:            .RawValue[#Int#]{{; name=.+$}}
 // QUX_ENUM_NO_DOT-NEXT: End completions
 
 // QUX_ENUM_DOT: Begin completions, 4 items
 // QUX_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal:    Qux1[#QuxEnum#]{{; name=.+$}}
 // QUX_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal:    Qux2[#QuxEnum#]{{; name=.+$}}
 // QUX_ENUM_DOT-NEXT: Decl[Constructor]/CurrNominal: init({#rawValue: Int#})[#QuxEnum?#]{{; name=.+$}}
-// QUX_ENUM_DOT-NEXT: Decl[TypeAlias]/Super:            RawValue[#Int#]{{; name=.+$}}
+// QUX_ENUM_DOT-NEXT: Decl[AssociatedType]/Super:            RawValue[#Int#]{{; name=.+$}}
 // QUX_ENUM_DOT-NEXT: End completions
 
 func freeFunc() {}

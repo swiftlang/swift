@@ -68,8 +68,8 @@ class GenericClass {
 
 // CHECK: [[@LINE+1]]:10 s:P14swift_ide_test4Prot{{$}}
 protocol Prot {
-  // CHECK: [[@LINE+1]]:13 s:P14swift_ide_test4Prot5Blarg{{$}}
-  typealias Blarg
+  // CHECK: [[@LINE+1]]:18 s:P14swift_ide_test4Prot5Blarg{{$}}
+  associatedtype Blarg
   // CHECK: [[@LINE+1]]:8 s:FP14swift_ide_test4Prot8protMethFwx5BlargwxS1_{{$}}
   func protMeth(x: Blarg) -> Blarg
   // CHECK: [[@LINE+2]]:7 s:vP14swift_ide_test4Prot17protocolProperty1Si{{$}}

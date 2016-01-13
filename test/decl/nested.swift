@@ -30,7 +30,7 @@ struct OuterGeneric<D> {
   }
 
   protocol InnerProtocol { // expected-error{{declaration is only valid at file scope}}
-    typealias Rooster
+    associatedtype Rooster
     func flip(r: Rooster)
     func flop(t: D)
   }
@@ -93,7 +93,7 @@ class OuterGenericClass<T> {
   } 
 
   protocol InnerProtocol { // expected-error{{declaration is only valid at file scope}}
-    typealias Rooster
+    associatedtype Rooster
     func flip(r: Rooster)
     func flop(t: T)
   }
@@ -160,16 +160,16 @@ class OuterGenericClass<T> {
 }
 
 protocol OuterProtocol {
-  typealias Hen
+  associatedtype Hen
   protocol InnerProtocol { // expected-error{{type not allowed here}}
-    typealias Rooster
+    associatedtype Rooster
     func flip(r: Rooster)
     func flop(h: Hen)
   }
 }
 
 protocol Racoon {
-  typealias Stripes
+  associatedtype Stripes
   class Claw<T> { // expected-error{{type not allowed here}}
     func mangle(s: Stripes) {}
   }

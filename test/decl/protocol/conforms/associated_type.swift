@@ -3,7 +3,7 @@
 class C { }
 
 protocol P { // expected-note{{requirement specified as 'Self.AssocP' : 'C' [with Self = X]}}
-  typealias AssocP : C
+  associatedtype AssocP : C
 }
 
 struct X : P { // expected-error{{'P' requires that 'AssocP' (aka 'Int') inherit from 'C'}}

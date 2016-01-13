@@ -4,7 +4,7 @@ struct X { }
 
 // Simple default definition for associated types.
 protocol P1 {
-  typealias AssocType1 = Int
+  associatedtype AssocType1 = Int
 }
 
 extension X : P1 { }
@@ -13,7 +13,7 @@ var i: X.AssocType1 = 17
 
 // Dependent default definition for associated types
 protocol P2 {
-  typealias AssocType2 = Self
+  associatedtype AssocType2 = Self
 }
 
 extension X : P2 { }
@@ -22,7 +22,7 @@ var xAssoc2: X.AssocType2 = X()
 // Dependent default definition for associated types that doesn't meet
 // requirements.
 protocol P3 {
-  typealias AssocType3 : P1 = Self // expected-note{{default type 'X2' for associated type 'AssocType3' (from protocol 'P3') does not conform to 'P1'}}
+  associatedtype AssocType3 : P1 = Self // expected-note{{default type 'X2' for associated type 'AssocType3' (from protocol 'P3') does not conform to 'P1'}}
 }
 
 extension X : P3 { } // okay

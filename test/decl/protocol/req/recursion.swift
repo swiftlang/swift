@@ -1,14 +1,14 @@
 // RUN: %target-parse-verify-swift
 
 protocol SomeProtocol {
-	typealias T
+	associatedtype T
 }
 
 extension SomeProtocol where T == Optional<T> { } // expected-error{{same-type constraint 'Self.T' == 'Optional<Self.T>' is recursive}}
 
 // rdar://problem/20000145
 public protocol P {
-  typealias T
+  associatedtype T
 }
 public struct S<A: P where A.T == S<A>> {}
 
@@ -18,5 +18,5 @@ class X<T where T == X> { // expected-error{{same-type requirement makes generic
 }
 
 protocol Y {
-  typealias Z = Z // expected-error{{type alias 'Z' circularly references itself}}
+  associatedtype Z = Z // expected-error{{type alias 'Z' circularly references itself}}
 }
