@@ -2037,8 +2037,12 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     if (tuple->getNumElements() == 1)
       return t.getTupleElementType(0);
 
-  // TODO: Consider resilience for structs and enums.
   if (auto structDecl = t.getStructOrBoundGenericStruct()) {
+    // If the struct has to be accessed resiliently from this resilience domain,
+    // we can't assume anything about its layout.
+    if (IGM.isResilient(structDecl, expansion))
+      return SILType();
+
     // C ABI wackiness may cause a single-field struct to have different layout
     // from its field.
     if (structDecl->hasUnreferenceableStorage()
@@ -2056,6 +2060,11 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
   }
 
   if (auto enumDecl = t.getEnumOrBoundGenericEnum()) {
+    // If the enum has to be accessed resiliently from this resilience domain,
+    // we can't assume anything about its layout.
+    if (IGM.isResilient(enumDecl, expansion))
+      return SILType();
+
     auto allCases = enumDecl->getAllElements();
     
     auto theCase = allCases.begin();

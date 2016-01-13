@@ -2485,6 +2485,9 @@ ProtocolInfo::~ProtocolInfo() {
 const ConformanceInfo &
 ProtocolInfo::getConformance(IRGenModule &IGM, ProtocolDecl *protocol,
                              const ProtocolConformance *conformance) const {
+  assert(conformance->getProtocol() == protocol &&
+         "conformance is for wrong protocol");
+
   // Drill down to the root normal conformance.
   auto normalConformance = conformance->getRootNormalConformance();
 
@@ -3502,10 +3505,16 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
     return emitArchetypeWitnessTableRef(IGF, archetype, proto);
   }
 
-  // All other source types should be concrete enough that we have conformance
-  // info for them.
+  // All other source types should be concrete enough that we have
+  // conformance info for them.  However, that conformance info might be
+  // more concrete than we're expecting.
+  // TODO: make a best effort to devirtualize, maybe?
+  auto concreteConformance = conformance.getConcrete();
+  if (concreteConformance->getProtocol() != proto) {
+    concreteConformance = concreteConformance->getInheritedConformance(proto);
+  }
   auto &conformanceI =
-    protoI.getConformance(IGF.IGM, proto, conformance.getConcrete());
+    protoI.getConformance(IGF.IGM, proto, concreteConformance);
   return conformanceI.getTable(IGF, srcType, srcMetadataCache);
 }
 
