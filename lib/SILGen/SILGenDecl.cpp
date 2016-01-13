@@ -1135,16 +1135,6 @@ void SILGenModule::emitExternalWitnessTable(ProtocolConformance *c) {
 void SILGenModule::emitExternalDefinition(Decl *d) {
   switch (d->getKind()) {
   case DeclKind::Func: {
-    auto FD = cast<FuncDecl>(d);
-
-    // If this is a synthesized accessor for storage defined within the
-    // context we are currently emitting, we will emit the accessor when
-    // we visit the storage; skip it.
-    if (FD->getDeclContext()->isChildContextOf(M.getAssociatedContext())) {
-      assert(FD->isAccessor());
-      break;
-    }
-
     emitFunction(cast<FuncDecl>(d));
     break;
   }
