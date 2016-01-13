@@ -1925,7 +1925,7 @@ VisitNodeSetterGetter (SwiftASTContext *ast,
   }
   else
   {
-    // Otherwise this is a getter/setter/etc for an variable.  Currently you can't write a getter/setter that
+    // Otherwise this is a getter/setter/etc for a variable.  Currently you can't write a getter/setter that
     // takes a different type from the type of the variable.  So there is only one possible function.
     swift::AbstractStorageDecl *var_decl = nullptr;
 
