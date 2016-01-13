@@ -1,8 +1,14 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -allocbox-to-stack | FileCheck %s
 
 import Builtin
-import Swift
 
+struct Int {
+  var _value: Builtin.Int64
+}
+
+struct Bool {
+  var _value: Builtin.Int1
+}
 
 // CHECK-LABEL: sil @simple_promotion
 sil @simple_promotion : $(Int) -> Int {
@@ -271,7 +277,7 @@ sil @useSomeClass : $@convention(thin) (@owned SomeClass) -> ()
 
 public protocol My_Incrementable { }
 
-struct Int : My_Incrementable { }
+extension Int : My_Incrementable { }
 
 // CHECK-LABEL: sil @test_mui
 sil @test_mui : $@convention(thin) (Builtin.Int1) -> () {
