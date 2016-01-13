@@ -35,7 +35,7 @@ struct _NSCursorMirror : _MirrorType {
   var quickLookObject: PlaygroundQuickLook? {
     return .Some(.Image(_value.image))
   }
-  
+
   var disposition : _MirrorDisposition { return .Aggregate }
 }
 
@@ -49,28 +49,28 @@ struct _NSViewMirror : _MirrorType {
   static var _views = Set<NSView>()
 
   var _v : NSView
-  
+
   init(_ v : NSView) { _v = v }
-  
+
   var value: Any { return _v }
-  
+
   var valueType: Any.Type { return (_v as Any).dynamicType }
-  
+
   var objectIdentifier: ObjectIdentifier? { return .None }
-  
+
   var count: Int { return 0 }
-  
+
   subscript(_: Int) -> (String, _MirrorType) {
     _preconditionFailure("_MirrorType access out of bounds")
   }
-  
+
   var summary: String { return "" }
-  
+
   var quickLookObject: PlaygroundQuickLook? {
     // adapted from the Xcode QuickLooks implementation
-    
+
     var result: PlaygroundQuickLook? = nil
-    
+
     // if you set NSView.needsDisplay, you can get yourself in a recursive scenario where the same view
     // could need to draw itself in order to get a QLObject for itself, which in turn if your code was
     // instrumented to log on-draw, would cause yourself to get back here and so on and so forth
@@ -80,20 +80,20 @@ struct _NSViewMirror : _MirrorType {
     // FIXME: is there a way to say "cacheDisplayInRect butDoNotRedrawEvenIfISaidSo"?
     if !_NSViewMirror._views.contains(_v) {
       _NSViewMirror._views.insert(_v)
-      
+
       let bounds = _v.bounds
       if let b = _v.bitmapImageRepForCachingDisplayInRect(bounds) {
         _v.cacheDisplayInRect(bounds, toBitmapImageRep: b)
         result = .Some(.View(b))
       }
-      
+
       _NSViewMirror._views.remove(_v)
     }
-    
+
     return result
-    
+
   }
-  
+
   var disposition : _MirrorDisposition { return .Aggregate }
 }
 

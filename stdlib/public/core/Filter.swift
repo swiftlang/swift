@@ -47,7 +47,7 @@ public struct LazyFilterGenerator<
   public var base: Base { return _base }
 
   internal var _base: Base
-  
+
   /// The predicate used to determine which elements produced by
   /// `base` are also produced by `self`.
   internal var _predicate: (Base.Element) -> Bool
@@ -60,7 +60,7 @@ public struct LazyFilterGenerator<
 ///   is a `LazyFilterSequence`.
 public struct LazyFilterSequence<Base : SequenceType>
   : LazySequenceType {
-  
+
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
@@ -93,7 +93,7 @@ public struct LazyFilterSequence<Base : SequenceType>
 /// `p` in its underlying collection `c` such that `c[p]`
 /// satisfies the predicate with which the `LazyFilterIndex` was
 /// initialized.
-/// 
+///
 /// - Note: The performance of advancing a `LazyFilterIndex`
 ///   depends on how sparsely the filtering predicate is satisfied,
 ///   and may not offer the usual performance given by models of

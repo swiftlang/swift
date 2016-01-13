@@ -22,18 +22,18 @@
 
 ${MirrorDecl} {
   ${MirrorBoilerplate}
-  
+
   var count: Int { return 0 }
-  
+
   subscript(_: Int) -> (String, _MirrorType) {
     _preconditionFailure("_MirrorType access out of bounds")
   }
 
   var summary: String { return _value.description }
-  
+
   var quickLookObject: PlaygroundQuickLook? {
       // this code comes straight from the quicklooks
-      
+
       guard let data = (_value as AnyObject)._copyImageData?() else { return nil }
       // we could send a Raw, but I don't want to make a copy of the
       // bytes for no good reason make an NSImage out of them and
@@ -45,7 +45,7 @@ ${MirrorDecl} {
 #endif
       return .Some(.Sprite(img))
   }
-  
+
 }
 
 ${MirrorConformance}

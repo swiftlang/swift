@@ -26,15 +26,15 @@ struct _BridgeStorage<
 > {
   public // @testable
   typealias Native = NativeClass
-  
+
   public // @testable
   typealias ObjC = ObjCClass
-  
+
   @inline(__always)
   public // @testable
   init(native: Native, bits: Int) {
     _sanityCheck(_usesNativeSwiftReferenceCounting(NativeClass.self))
-    
+
     // More bits are available on some platforms, but it's not portable
     _sanityCheck(0...1 ~= bits,
         "BridgeStorage can't store bits outside the range 0...1")
@@ -42,21 +42,21 @@ struct _BridgeStorage<
     rawValue = _makeNativeBridgeObject(
       native, UInt(bits) << _objectPointerLowSpareBitShift)
   }
-  
+
   @inline(__always)
   public // @testable
   init(objC: ObjC) {
     _sanityCheck(_usesNativeSwiftReferenceCounting(NativeClass.self))
     rawValue = _makeObjCBridgeObject(objC)
   }
-  
+
   @inline(__always)
   public // @testable
   init(native: Native) {
     _sanityCheck(_usesNativeSwiftReferenceCounting(NativeClass.self))
     rawValue = Builtin.reinterpretCast(native)
   }
-  
+
   public // @testable
   var spareBits: Int {
   @inline(__always) get {
@@ -65,7 +65,7 @@ struct _BridgeStorage<
       _nonPointerBits(rawValue) >> _objectPointerLowSpareBitShift)
     }
   }
-  
+
   @inline(__always)
   @warn_unused_result
   public // @testable
@@ -87,7 +87,7 @@ struct _BridgeStorage<
               (_objCTaggedPointerBits | _objectPointerIsObjCBit)) == 0
     }
   }
-  
+
   @inline(__always)
   @warn_unused_result
   public // @testable
@@ -103,7 +103,7 @@ struct _BridgeStorage<
       return !isNative
     }
   }
-  
+
   public // @testable
   var nativeInstance: Native {
     @inline(__always) get {
@@ -111,7 +111,7 @@ struct _BridgeStorage<
       return Builtin.castReferenceFromBridgeObject(rawValue)
     }
   }
-  
+
   public // @testable
   var nativeInstance_noSpareBits: Native {
     @inline(__always) get {
@@ -120,7 +120,7 @@ struct _BridgeStorage<
       return Builtin.reinterpretCast(rawValue)
     }
   }
-  
+
   @inline(__always)
   @warn_unused_result
   public // @testable
@@ -144,7 +144,7 @@ struct _BridgeStorage<
       return Builtin.castReferenceFromBridgeObject(rawValue)
     }
   }
-  
+
   //===--- private --------------------------------------------------------===//
   internal var _isTagged: Bool {
     @inline(__always) get {

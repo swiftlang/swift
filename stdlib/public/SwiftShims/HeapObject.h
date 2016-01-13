@@ -19,7 +19,7 @@
 #include "swift/Basic/type_traits.h"
 
 namespace swift {
-#endif 
+#endif
 
 struct HeapMetadata;
 
@@ -41,7 +41,7 @@ struct HeapObject {
   HeapObject() = default;
 
   // Initialize a HeapObject header as appropriate for a newly-allocated object.
-  constexpr HeapObject(HeapMetadata const *newMetadata) 
+  constexpr HeapObject(HeapMetadata const *newMetadata)
     : metadata(newMetadata)
     , refCount(StrongRefCount::Initialized)
     , weakRefCount(WeakRefCount::Initialized)
@@ -56,6 +56,6 @@ static_assert(std::is_trivially_destructible<HeapObject>::value,
               "HeapObject must be trivially destructible");
 
 }
-#endif 
+#endif
 
 #endif

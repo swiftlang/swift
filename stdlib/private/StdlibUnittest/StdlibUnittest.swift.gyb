@@ -89,14 +89,14 @@ public struct SourceLocStack {
 %{
   TRACE = '''@autoclosure _ message: () -> String = "",
     showFrame: Bool = true,
-    stackTrace: SourceLocStack = SourceLocStack(),  
+    stackTrace: SourceLocStack = SourceLocStack(),
     file: String = __FILE__, line: UInt = __LINE__'''
 
-  # When the parameter list would start with a ${TRACE}, we use 
-  # ${TRACE1} instead, to avoid the warning about an extraneous 
+  # When the parameter list would start with a ${TRACE}, we use
+  # ${TRACE1} instead, to avoid the warning about an extraneous
   # '_' on the first parameter.
-  TRACE1 = TRACE.replace(' _ ', ' ', 1) 
-  
+  TRACE1 = TRACE.replace(' _ ', ' ', 1)
+
   stackTrace = 'stackTrace.pushIf(showFrame, file: file, line: line)'
 
   trace = 'message(),\n  stackTrace: ' + stackTrace
@@ -1502,7 +1502,7 @@ public func checkEquatable<
       expectEqual(
         predictedXY, oracle(j, i),
         "bad oracle: broken symmetry between indices \(i), \(j)")
-      
+
       let y = instances[j]
 
       let xy = x == y
@@ -1510,10 +1510,10 @@ public func checkEquatable<
 
       // Not-equal is an inverse of equal
       expectNotEqual(xy, x != y, ${trace})
-      
+
       // Symmetry
       expectEqual(xy, y == x, ${trace})
-      
+
       for k in instances.indices {
         let z = instances[k]
         // Transitivity
@@ -1547,7 +1547,7 @@ public func checkHashable<
   ${TRACE}
 ) {
   checkEquatable(instances, oracle: equalityOracle, ${trace})
-  
+
   for x in instances {
     for y in instances {
       if x == y {
@@ -1574,7 +1574,7 @@ public func checkHashable<T : Hashable>(
 /// generate equality expectations from pairs of positions in
 /// `instances`.
 ///
-/// - Precondition: ${'''`endIndex` is reachable from all 
+/// - Precondition: ${'''`endIndex` is reachable from all
 ///   elements of `instances`.''' if inc == 'inc' else '''all
 ///   elements of `instances` are reachable from `startIndex`.'''}
 public func check${inc.capitalize()}rementable<
@@ -1669,7 +1669,7 @@ public func checkComparable<
   // Also checks that equality is consistent with comparison and that
   // the oracle obeys the equality laws
   checkEquatable(instances, oracle: { oracle($0, $1).isEQ() }, ${trace})
-  
+
   for i in instances.indices {
     let x = instances[i]
 
@@ -1677,23 +1677,23 @@ public func checkComparable<
     expectFalse(x > x, ${trace})
     expectTrue(x <= x, ${trace})
     expectTrue(x >= x, ${trace})
-    
+
     for j in instances.indices where i != j {
       let y = instances[j]
-      
+
       let expected = oracle(i, j)
-      
+
       expectEqual(
         expected.flip(), oracle(j, i),
         "bad oracle: missing antisymmetry: "
         + "(\(String(reflecting: i)), \(String(reflecting: j)))",
         stackTrace: ${stackTrace})
-      
+
       expectEqual(expected.isLT(), x < y, ${trace})
       expectEqual(expected.isLE(), x <= y, ${trace})
       expectEqual(expected.isGE(), x >= y, ${trace})
       expectEqual(expected.isGT(), x > y, ${trace})
-      
+
       for k in instances.indices {
         let expected2 = oracle(j, k)
         if expected == expected2 {
@@ -1745,11 +1745,11 @@ public func checkStrideable<
       return d < 0 ? .LT : d == 0 ? .EQ : .GT
     },
     ${trace})
-  
+
   for i in instances.indices {
     let x = instances[i]
     expectEqual(x, x.advancedBy(0))
-    
+
     for j in strides.indices {
       let y = strides[j]
       expectEqual(advanceOracle(i, j), x.advancedBy(y))
@@ -1829,7 +1829,7 @@ public func checkForwardIndex<
   endIndex: Instances.Generator.Element, ${TRACE}
 ) {
   typealias Index = Instances.Generator.Element
-  
+
   checkIncrementable(
     instances, equalityOracle: equalityOracle, endIndex: endIndex, ${trace})
 
@@ -1852,7 +1852,7 @@ public func checkBidirectionalIndex<
 >(
   instances: Instances,
   equalityOracle: (Instances.Index, Instances.Index) -> Bool,
-  startIndex: Instances.Generator.Element, 
+  startIndex: Instances.Generator.Element,
   endIndex: Instances.Generator.Element,
   ${TRACE}
 ) {
@@ -1870,7 +1870,7 @@ public func checkBidirectionalIndex<
 }
 
 /// Test that the elements of `instances` satisfy the semantic
-/// requirements of `RandomAccessIndexType`, using 
+/// requirements of `RandomAccessIndexType`, using
 /// `advanceOracle` and 'distanceOracle' to generate expectations
 /// about the results of `advancedBy` and `distanceTo` from pairs of
 /// positions in `instances` and `distances`.
@@ -1889,7 +1889,7 @@ public func checkRandomAccessIndex<
     (Instances.Index, Instances.Index) -> Distances.Generator.Element,
   advanceOracle:
     (Instances.Index, Distances.Index) -> Instances.Generator.Element,
-  startIndex: Instances.Generator.Element, 
+  startIndex: Instances.Generator.Element,
   endIndex: Instances.Generator.Element,
   ${TRACE}
 ) {
@@ -1975,7 +1975,7 @@ public func checkSequence<
 
   // Check that _initializeTo does the right thing if we can do so
   // without destroying the sequence.
-  sequence._preprocessingPass { (sequence) -> Void in 
+  sequence._preprocessingPass { (sequence) -> Void in
     var count = 0
     for _ in sequence { count += 1 }
     let buf = UnsafeMutablePointer<S.Generator.Element>.alloc(count)
@@ -2106,7 +2106,7 @@ public func check${traversal}Collection<
           startIndex, collection.startIndex,
           "Iteration should not change startIndex",
           stackTrace: ${stackTrace})
-        
+
         expectEqual(
           endIndex, collection.endIndex,
           "Iteration should not change endIndex",
@@ -2212,7 +2212,7 @@ public func checkSliceableWithBidirectionalIndex<
   checkBidirectionalCollection(expected, sliceable, ${trace})
 
   let expectedArray = Array(expected)
-  
+
   var start = sliceable.startIndex
   for startNumericIndex in 0...expectedArray.count {
     if start != sliceable.endIndex {
@@ -2271,7 +2271,7 @@ where
   for (ix, i) in source.indices.enumerate() {
     for (jx_, j) in (i..<source.endIndex).enumerate() {
       let jx = jx_ + ix
-      
+
       let oldCount = jx - ix
       for newCount in 0..<(2 * oldCount) {
         let newValues = makeNewValues(newCount)
@@ -2285,17 +2285,17 @@ where
         }
 
         var a = makeCollection()
-     
+
         a.replaceRange(nthIndex(a, ix)..<nthIndex(a, jx), with: newValues)
         let growth = newCount - oldCount
-        
+
         let expectedCount = source.count + growth
         let actualCount = numericCast(a.count) as Int
         if actualCount != expectedCount {
           reportFailure(
             &a, "\(actualCount) != expected count \(expectedCount)")
         }
-        
+
         for (kx, k) in a.indices.enumerate() {
           let expectedValue = kx < ix ? nth(source, kx)
           : kx < jx + growth ? nth(newValues, kx - ix)
@@ -2344,7 +2344,7 @@ public func expectEqualSequence<
   where Expected.Generator.Element == Actual.Generator.Element
 >(expected: Expected, _ actual: Actual, ${TRACE},
   sameValue: (Expected.Generator.Element, Expected.Generator.Element) -> Bool) {
-  
+
   if !expected.elementsEqual(actual, isEquivalent: sameValue) {
     expectationFailure("expected elements: \"\(expected)\"\n"
       + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
@@ -2472,7 +2472,7 @@ public func expectEqualUnicodeScalars(
   expected: [UInt32], _ actual: String, ${TRACE}) {
   let actualUnicodeScalars = Array(
     actual.unicodeScalars.lazy.map { $0.value })
-  
+
   if !expected.elementsEqual(actualUnicodeScalars) {
     expectationFailure(
       "expected elements: \"\(asHex(expected))\"\n"

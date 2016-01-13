@@ -36,7 +36,7 @@ public class TypeIndexed<Value> : Resettable {
     self.defaultValue = value
     _allResettables.append(self)
   }
-  
+
   public subscript(t: Any.Type) -> Value {
     get {
       return byType[TypeIdentifier(t)] ?? defaultValue
@@ -57,7 +57,7 @@ extension TypeIndexed where Value : ForwardIndexType {
     t: Any.Type,
     @autoclosure _ message: () -> String = "",
     showFrame: Bool = true,
-    stackTrace: SourceLocStack = SourceLocStack(),  
+    stackTrace: SourceLocStack = SourceLocStack(),
     file: String = __FILE__, line: UInt = __LINE__,
     body: () -> R
   ) -> R {
@@ -75,7 +75,7 @@ extension TypeIndexed where Value : Equatable {
     t: Any.Type,
     @autoclosure _ message: () -> String = "",
     showFrame: Bool = true,
-    stackTrace: SourceLocStack = SourceLocStack(),  
+    stackTrace: SourceLocStack = SourceLocStack(),
     file: String = __FILE__, line: UInt = __LINE__,
     body: () -> R
   ) -> R {
@@ -101,7 +101,7 @@ public func expectEqual<V: Comparable>(
   expected: DictionaryLiteral<Any.Type, V>, _ actual: TypeIndexed<V>,
   @autoclosure _ message: () -> String = "",
   showFrame: Bool = true,
-  stackTrace: SourceLocStack = SourceLocStack(),  
+  stackTrace: SourceLocStack = SourceLocStack(),
   file: String = __FILE__, line: UInt = __LINE__
 ) {
   expectEqualsUnordered(

@@ -95,7 +95,7 @@ struct NativeBox {
   static void destroy(T *value) {
     value->T::~T();
   }
-  
+
   static void destroyArray(T *array, size_t n) {
     if (isPOD) return;
     while (n--) {
@@ -113,13 +113,13 @@ struct NativeBox {
     src->T::~T();
     return result;
   }
-  
+
   static T *initializeArrayWithCopy(T *dest, T *src, size_t n) {
     if (isPOD) {
       std::memcpy(dest, src, n * stride);
       return dest;
     }
-    
+
     T *r = dest;
     while (n--) {
       new (dest) T(*src);
@@ -127,13 +127,13 @@ struct NativeBox {
     }
     return r;
   }
-  
+
   static T *initializeArrayWithTakeFrontToBack(T *dest, T *src, size_t n) {
     if (isPOD) {
       std::memmove(dest, src, n * stride);
       return dest;
     }
-    
+
     T *r = dest;
     while (n--) {
       new (dest) T(*src);
@@ -141,13 +141,13 @@ struct NativeBox {
     }
     return r;
   }
-  
+
   static T *initializeArrayWithTakeBackToFront(T *dest, T *src, size_t n) {
     if (isPOD) {
       std::memmove(dest, src, n * stride);
       return dest;
     }
-    
+
     T *r = dest;
     dest = next(dest, n); src = next(src, n);
     while (n--) {
@@ -156,7 +156,7 @@ struct NativeBox {
     }
     return r;
   }
-  
+
   static T *assignWithCopy(T *dest, T *src) {
     *dest = *src;
     return dest;
@@ -199,12 +199,12 @@ template <class Impl, class T> struct RetainableBoxBase {
     *dest = *src;
     return dest;
   }
-  
+
   static void destroyArray(T *arr, size_t n) {
     while (n--)
       Impl::release(*arr++);
   }
-  
+
   static T *initializeArrayWithCopy(T *dest, T *src, size_t n) {
     T *r = dest;
     memcpy(dest, src, n * sizeof(T));
@@ -212,7 +212,7 @@ template <class Impl, class T> struct RetainableBoxBase {
       Impl::retain(*dest++);
     return r;
   }
-  
+
   static T *initializeArrayWithTakeFrontToBack(T *dest, T *src, size_t n) {
     memmove(dest, src, n * sizeof(T));
     return dest;
@@ -221,7 +221,7 @@ template <class Impl, class T> struct RetainableBoxBase {
     memmove(dest, src, n * sizeof(T));
     return dest;
   }
-  
+
   static T *assignWithCopy(T *dest, T *src) {
     T oldValue = *dest;
     *dest = Impl::retain(*src);
@@ -317,14 +317,14 @@ struct WeakRetainableBoxBase {
     while (n--)
       Impl::destroy(arr++);
   }
-  
+
   static T *initializeArrayWithCopy(T *dest, T *src, size_t n) {
     T *r = dest;
     while (n--)
       Impl::initializeWithCopy(dest++, src++);
     return r;
   }
-  
+
   static T *initializeArrayWithTakeFrontToBack(T *dest, T *src, size_t n) {
     T *r = dest;
     while (n--)
@@ -484,7 +484,7 @@ struct BridgeObjectBox :
     RetainableBoxBase<BridgeObjectBox, void*> {
   // TODO: Enable the nil extra inhabitant.
   static constexpr unsigned numExtraInhabitants = 1;
-      
+
   static void *retain(void *obj) {
     return swift_bridgeObjectRetain(obj);
   }
@@ -492,7 +492,7 @@ struct BridgeObjectBox :
   static void release(void *obj) {
     swift_bridgeObjectRelease(obj);
   }
-      
+
   static void storeExtraInhabitant(void **dest, int index) {
     *dest = nullptr;
   }
@@ -501,7 +501,7 @@ struct BridgeObjectBox :
     return *src == nullptr ? 0 : -1;
   }
 };
-  
+
 /// A box implementation class for unmanaged, pointer-aligned pointers.
 /// Metatype values have this layout.
 struct PointerPointerBox : NativeBox<void**> {
@@ -645,7 +645,7 @@ struct AggregateBox {
   static char *initializeWithTake(char *dest, char *src) {
     return Helper::initializeWithTake(dest, src);
   }
-    
+
   static char *assignWithCopy(char *dest, char *src) {
     return Helper::assignWithCopy(dest, src);
   }
@@ -653,7 +653,7 @@ struct AggregateBox {
   static char *assignWithTake(char *dest, char *src) {
     return Helper::assignWithTake(dest, src);
   }
-  
+
   static void destroyArray(char *array, size_t n) {
     if (isPOD)
       return;
@@ -667,7 +667,7 @@ struct AggregateBox {
       std::memcpy(dest, src, n * stride);
       return dest;
     }
-    
+
     char *r = dest;
     while (n--) {
       initializeWithCopy(dest, src);
@@ -680,7 +680,7 @@ struct AggregateBox {
       std::memmove(dest, src, n * stride);
       return dest;
     }
-    
+
     char *r = dest;
     while (n--) {
       initializeWithTake(dest, src);
@@ -693,7 +693,7 @@ struct AggregateBox {
       std::memmove(dest, src, n * stride);
       return dest;
     }
-    
+
     char *r = dest;
     dest += stride * n; src += stride * n;
     while (n--) {
@@ -703,7 +703,7 @@ struct AggregateBox {
     return r;
   }
 };
-  
+
 /// A template for using the Swift allocation APIs with a known size
 /// and alignment.
 template <size_t Size, size_t Alignment>
@@ -920,7 +920,7 @@ struct ValueWitnesses : BufferValueWitnesses<ValueWitnesses<Box>,
   static void destroyArray(OpaqueValue *array, size_t n, const Metadata *self) {
     return Box::destroyArray((typename Box::type*)array, n);
   }
-  
+
   static OpaqueValue *initializeArrayWithCopy(OpaqueValue *dest,
                                               OpaqueValue *src,
                                               size_t n,
@@ -928,7 +928,7 @@ struct ValueWitnesses : BufferValueWitnesses<ValueWitnesses<Box>,
     return (OpaqueValue*) Box::initializeArrayWithCopy((typename Box::type*) dest,
                                                  (typename Box::type*) src, n);
   }
-  
+
   static OpaqueValue *initializeArrayWithTakeFrontToBack(OpaqueValue *dest,
                                               OpaqueValue *src,
                                               size_t n,
@@ -937,7 +937,7 @@ struct ValueWitnesses : BufferValueWitnesses<ValueWitnesses<Box>,
                                                    (typename Box::type*) dest,
                                                    (typename Box::type*) src, n);
   }
-  
+
   static OpaqueValue *initializeArrayWithTakeBackToFront(OpaqueValue *dest,
                                               OpaqueValue *src,
                                               size_t n,
@@ -946,7 +946,7 @@ struct ValueWitnesses : BufferValueWitnesses<ValueWitnesses<Box>,
                                                    (typename Box::type*) dest,
                                                    (typename Box::type*) src, n);
   }
-  
+
   // These should not get instantiated if the type doesn't have extra
   // inhabitants.
 
@@ -985,26 +985,26 @@ struct NonFixedValueWitnesses :
   static void destroy(OpaqueValue *value, const Metadata *self) {
     return Box::destroy((typename Box::type*) value, self);
   }
-  
+
   static void destroyArray(OpaqueValue *array, size_t n,
                            const Metadata *self) {
     return Box::destroyArray((typename Box::type*) array, n, self);
   }
-  
+
   static OpaqueValue *initializeWithCopy(OpaqueValue *dest, OpaqueValue *src,
                                          const Metadata *self) {
     return (OpaqueValue*) Box::initializeWithCopy((typename Box::type*) dest,
                                                   (typename Box::type*) src,
                                                   self);
   }
-  
+
   static OpaqueValue *initializeWithTake(OpaqueValue *dest, OpaqueValue *src,
                                          const Metadata *self) {
     return (OpaqueValue*) Box::initializeWithTake((typename Box::type*) dest,
                                                   (typename Box::type*) src,
                                                   self);
   }
-  
+
   static OpaqueValue *initializeArrayWithCopy(OpaqueValue *dest,
                                               OpaqueValue *src,
                                               size_t n,
@@ -1014,7 +1014,7 @@ struct NonFixedValueWitnesses :
                                                   (typename Box::type*) src,
                                                   n, self);
   }
-  
+
   static OpaqueValue *initializeArrayWithTakeFrontToBack(OpaqueValue *dest,
                                                          OpaqueValue *src,
                                                          size_t n,

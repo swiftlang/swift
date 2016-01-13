@@ -33,11 +33,11 @@ public func _stdlib_isOSVersionAtLeast(
   )
 
   let result = runningVersion >= queryVersion
-  
+
   return result._value
 #else
   // FIXME: As yet, there is no obvious versioning standard for platforms other
-  // than Darwin-based OS', so we just assume false for now. 
+  // than Darwin-based OS', so we just assume false for now.
   // rdar://problem/18881232
   return false._value
 #endif

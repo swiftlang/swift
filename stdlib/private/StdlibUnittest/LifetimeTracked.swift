@@ -39,7 +39,7 @@ public final class LifetimeTracked : ForwardIndexType, CustomStringConvertible {
 
   public static var instances: Int = 0
   internal static var _nextSerialNumber = 0
-  
+
   public let value: Int
   public var identity: Int
   public var serialNumber: Int = 0

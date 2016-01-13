@@ -24,7 +24,7 @@ extension LoggingType {
   public var log: Log.Type {
     return Log.self
   }
-  
+
   public var selfType: Any.Type {
     return self.dynamicType
   }
@@ -43,16 +43,16 @@ public struct LoggingGenerator<Base: GeneratorType>
   : GeneratorType, LoggingType {
 
   public typealias Log = GeneratorLog
-  
+
   public init(_ base: Base) {
     self.base = base
   }
-  
+
   public mutating func next() -> Base.Element? {
     Log.next[selfType] += 1
     return base.next()
   }
-  
+
   public var base: Base
 }
 
@@ -560,7 +560,7 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
     Log._initializeTo[selfType] += 1
     return base._initializeTo(ptr)
   }
-  
+
   public var base: Base
 }
 % end
@@ -574,7 +574,7 @@ public func expectCustomizable<
   //===--- TRACE boilerplate ----------------------------------------------===//
   @autoclosure _ message: () -> String = "",
   showFrame: Bool = true,
-  stackTrace: SourceLocStack = SourceLocStack(),  
+  stackTrace: SourceLocStack = SourceLocStack(),
   file: String = __FILE__, line: UInt = __LINE__
 ) {
   let newTrace = stackTrace.pushIf(showFrame, file: file, line: line)
@@ -592,7 +592,7 @@ public func expectNotCustomizable<
   //===--- TRACE boilerplate ----------------------------------------------===//
   @autoclosure _ message: () -> String = "",
   showFrame: Bool = true,
-  stackTrace: SourceLocStack = SourceLocStack(),  
+  stackTrace: SourceLocStack = SourceLocStack(),
   file: String = __FILE__, line: UInt = __LINE__
 ) {
   let newTrace = stackTrace.pushIf(showFrame, file: file, line: line)

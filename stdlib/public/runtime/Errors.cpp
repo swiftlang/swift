@@ -48,7 +48,7 @@ reportOnCrash(const char *message)
 {
   static pthread_mutex_t crashlogLock = PTHREAD_MUTEX_INITIALIZER;
   pthread_mutex_lock(&crashlogLock);
-  
+
   char *oldMessage = (char *)CRGetCrashLogMessage();
 
   char *newMessage;

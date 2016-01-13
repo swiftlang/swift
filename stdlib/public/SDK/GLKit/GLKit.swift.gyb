@@ -96,7 +96,7 @@ extension GLKQuaternion {
   public var _tuple: _Tuple {
     @inline(__always) get { return unsafeBitCast(self, _Tuple.self) }
   }
-  
+
   public var v: GLKVector3 {
     @inline(__always) get {
       let (i, j, k, _) = _tuple

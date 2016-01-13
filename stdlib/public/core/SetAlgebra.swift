@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  
+//
 //
 //===----------------------------------------------------------------------===//
 
@@ -48,12 +48,12 @@
 public protocol SetAlgebraType : Equatable, ArrayLiteralConvertible {
   /// A type for which `Self` provides a containment test.
   typealias Element
-  
+
   /// Creates an empty set.
   ///
   /// - Equivalent to `[] as Self`
   init()
-  
+
   /// Returns `true` if `self` contains `member`.
   ///
   /// - Equivalent to `self.intersect([member]) == [member]`
@@ -64,7 +64,7 @@ public protocol SetAlgebraType : Equatable, ArrayLiteralConvertible {
   /// both `self` and `other`.
   @warn_unused_result
   func union(other: Self) -> Self
-  
+
   /// Returns the set of elements contained in both `self` and `other`.
   @warn_unused_result
   func intersect(other: Self) -> Self
@@ -79,7 +79,7 @@ public protocol SetAlgebraType : Equatable, ArrayLiteralConvertible {
   /// - Equivalent to `self.unionInPlace([member])`
   /// - Postcondition: `self.contains(member)`
   mutating func insert(member: Element)
-  
+
   /// If `member` is contained in `self`, removes and returns it.
   /// Otherwise, removes all elements subsumed by `member` and returns
   /// `nil`.
@@ -104,7 +104,7 @@ public protocol SetAlgebraType : Equatable, ArrayLiteralConvertible {
   /// either `self` or `other`, but not both.
   ///
   /// - Equivalent to replacing `self` with `self.exclusiveOr(other)`
-  mutating func exclusiveOrInPlace(other: Self)  
+  mutating func exclusiveOrInPlace(other: Self)
 
   //===--- Requirements with default implementations ----------------------===//
   /// Returns the set of elements contained in `self` but not in `other`.
@@ -125,7 +125,7 @@ public protocol SetAlgebraType : Equatable, ArrayLiteralConvertible {
 
   /// Return true iff `self.contains(e)` is `false` for all `e`.
   var isEmpty: Bool { get }
-  
+
   /// Creates the set containing all elements of `sequence`.
   init<S : SequenceType where S.Generator.Element == Element>(_ sequence: S)
 

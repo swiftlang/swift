@@ -21,7 +21,7 @@ public // @testable
 protocol _SequenceWrapperType {
   typealias Base : SequenceType
   typealias Generator : GeneratorType = Base.Generator
-  
+
   var _base: Base {get}
 }
 
@@ -51,13 +51,13 @@ extension SequenceType
   ) rethrows -> [Base.Generator.Element] {
     return try _base.filter(includeElement)
   }
-  
+
   public func _customContainsEquatableElement(
     element: Base.Generator.Element
-  ) -> Bool? { 
+  ) -> Bool? {
     return _base._customContainsEquatableElement(element)
   }
-  
+
   /// If `self` is multi-pass (i.e., a `CollectionType`), invoke
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
@@ -95,7 +95,7 @@ extension CollectionType
   public var startIndex: Base.Index {
     return _base.startIndex
   }
-  
+
   /// The collection's "past the end" position.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
@@ -127,13 +127,13 @@ extension CollectionType
   ) -> [Base.Generator.Element] {
     return _base.filter(includeElement)
   }
-  
+
   public func _customContainsEquatableElement(
     element: Base.Generator.Element
-  ) -> Bool? { 
+  ) -> Bool? {
     return _base._customContainsEquatableElement(element)
   }
-  
+
   /// If `self` is multi-pass (i.e., a `CollectionType`), invoke
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.

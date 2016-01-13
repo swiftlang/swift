@@ -3174,7 +3174,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
     value: Value, forKey key: Key
   ) -> Value? {
     var (i, found) = native._find(key, native._bucket(key))
-    
+
     let minCapacity = found
       ? native.capacity
       : NativeStorage.getMinCapacity(

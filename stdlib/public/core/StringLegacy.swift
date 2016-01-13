@@ -31,11 +31,11 @@ extension String {
     self = String._fromWellFormedCodeUnitSequence(UTF32.self,
         input: Repeat(count: count, repeatedValue: c.value))
   }
-  
+
   public var _lines : [String] {
     return _split("\n")
   }
-  
+
   @warn_unused_result
   public func _split(separator: UnicodeScalar) -> [String] {
     let scalarSlices = unicodeScalars.split { $0 == separator }
@@ -104,12 +104,12 @@ extension String {
 
   // FIXME: can't just use a default arg for radix below; instead we
   // need these single-arg overloads <rdar://problem/17775455>
-  
+
   /// Create an instance representing `v` in base 10.
   public init<T : _SignedIntegerType>(_ v: T) {
     self = _int64ToString(v.toIntMax())
   }
-  
+
   /// Create an instance representing `v` in base 10.
   public init<T : UnsignedIntegerType>(_ v: T) {
     self = _uint64ToString(v.toUIntMax())
@@ -126,7 +126,7 @@ extension String {
     self = _int64ToString(
       v.toIntMax(), radix: Int64(radix), uppercase: uppercase)
   }
-  
+
   /// Create an instance representing `v` in the given `radix` (base).
   ///
   /// Numerals greater than 9 are represented as roman letters,
@@ -163,7 +163,7 @@ extension String {
     return String(rng[startIndex..<rng.endIndex])
   }
 
-  /// Split the given string at the given delimiter character, returning 
+  /// Split the given string at the given delimiter character, returning
   /// the strings before and after that character (neither includes the character
   /// found) and a boolean value indicating whether the delimiter was found.
   public func _splitFirst(delim: UnicodeScalar)
@@ -172,8 +172,8 @@ extension String {
     let rng = unicodeScalars
     for i in rng.indices {
       if rng[i] == delim {
-        return (String(rng[rng.startIndex..<i]), 
-                String(rng[i.successor()..<rng.endIndex]), 
+        return (String(rng[rng.startIndex..<i]),
+                String(rng[i.successor()..<rng.endIndex]),
                 true)
       }
     }
@@ -181,7 +181,7 @@ extension String {
   }
 
   /// Split the given string at the first character for which the given
-  /// predicate returns true. Returns the string before that character, the 
+  /// predicate returns true. Returns the string before that character, the
   /// character that matches, the string after that character, and a boolean value
   /// indicating whether any character was found.
   public func _splitFirstIf(@noescape predicate: (UnicodeScalar) -> Bool)
@@ -191,8 +191,8 @@ extension String {
     for i in rng.indices {
       if predicate(rng[i]) {
         return (String(rng[rng.startIndex..<i]),
-                rng[i], 
-                String(rng[i.successor()..<rng.endIndex]), 
+                rng[i],
+                String(rng[i.successor()..<rng.endIndex]),
                 true)
       }
     }

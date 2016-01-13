@@ -26,7 +26,7 @@ extension String {
     public init(_ text: String) {
       self._core = text._core
     }
-    
+
     public // @testable
     init(_ _core: _StringCore) {
       self._core = _core
@@ -70,10 +70,10 @@ extension String.CharacterView : CollectionType {
   internal var unicodeScalars: UnicodeScalarView {
     return UnicodeScalarView(_core)
   }
-  
+
   /// A character position.
   public struct Index : BidirectionalIndexType, Comparable, _Reflectable {
-    public // SPI(Foundation)    
+    public // SPI(Foundation)
     init(_base: String.UnicodeScalarView.Index) {
       self._base = _base
       self._lengthUTF16 = Index._measureExtendedGraphemeClusterForward(_base)

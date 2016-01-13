@@ -212,10 +212,10 @@ public struct ${Self}<Element>
   public subscript(index: Int) -> Element {
     get {
       // This call may be hoisted or eliminated by the optimizer.  If
-      // there is an inout violation, this value may be stale so needs to be 
+      // there is an inout violation, this value may be stale so needs to be
       // checked again below.
       let wasNativeTypeChecked = _hoistableIsNativeTypeChecked()
-      
+
       // Make sure the index is in range and wasNativeTypeChecked is
       // still valid.
       let token = _checkSubscript(
@@ -227,7 +227,7 @@ public struct ${Self}<Element>
     }
     mutableAddressWithPinnedNativeOwner {
       _makeMutableAndUniqueOrPinned() // makes the array native, too
-      _checkSubscript_native(index)   
+      _checkSubscript_native(index)
       return (_getElementAddress(index), Builtin.tryPin(_getOwner_native()))
     }
   }
@@ -319,7 +319,7 @@ public struct ${Self}<Element>
       // We are hiding the access to '_buffer.owner' behind
       // _getOwner() to help the compiler hoist uniqueness checks in
       // the case of class or objective c existential typed array
-      // elements. 
+      // elements.
       return _getOwnerWithSemanticLabel_native()
     }
 #endif
@@ -560,13 +560,13 @@ extension ${Self} : _ArrayType {
   internal static func _adoptStorage(
     storage: AnyObject, count: Int
   ) -> (Array, UnsafeMutablePointer<Element>) {
-    
+
     _sanityCheck(
       storage is _ContiguousArrayStorage<Element>, "Invalid array storage type")
-    
+
     let innerBuffer = _ContiguousArrayBuffer<Element>(
       count: count, storage: unsafeDowncast(storage))
-    
+
     return (
       Array(_Buffer(innerBuffer, shiftedToStartIndex: 0)),
       innerBuffer.firstElementAddress)
@@ -773,7 +773,7 @@ extension ${Self} : _ArrayType {
   public func sorted(isOrderedBefore: (Element, Element) -> Bool) -> ${Self} {
     fatalError("unavailable function can't be called")
   }
-  
+
   @warn_unused_result
   public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
     return _extractOrCopyToNativeArrayBuffer(self._buffer)

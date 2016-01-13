@@ -16,7 +16,7 @@ import SwiftShims
 # Utility code for later in this template
 #
 
-# // Bit counts for all floating point types. 
+# // Bit counts for all floating point types.
 # // 80-bit floating point types are only permitted on x86 architectures. This
 # // restriction is handled via #if's in the generated code.
 allFloatBits = [32, 64, 80]
@@ -178,7 +178,7 @@ public struct ${Self} {
     self._value = Builtin.sitofp_Int64_FPIEEE${bits}(zero._value)
   }
 
-  @_transparent 
+  @_transparent
   public // @testable
   init(_bits v: Builtin.FPIEEE${bits}) {
     self._value = v
@@ -592,7 +592,7 @@ extension ${Self} : Strideable {
   func distanceTo(other: ${Self}) -> ${Self} {
     return other - self
   }
-  
+
   /// Returns a `Self` `x` such that `self.distanceTo(x)` approximates
   /// `n`.
   ///

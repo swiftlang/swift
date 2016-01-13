@@ -202,7 +202,7 @@ public func ~= <I : ForwardIndexType where I : Comparable> (
   pattern: Range<I>, value: I
 ) -> Bool {
   // Intervals can check for containment in O(1).
-  return 
+  return
     HalfOpenInterval(pattern.startIndex, pattern.endIndex).contains(value)
 }
 

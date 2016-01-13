@@ -537,11 +537,11 @@ extension String {
 
 extension String {
   public typealias Index = CharacterView.Index
-  
+
   /// The position of the first `Character` in `self.characters` if
   /// `self` is non-empty; identical to `endIndex` otherwise.
   public var startIndex: Index { return characters.startIndex }
-  
+
   /// The "past the end" position in `self.characters`.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
@@ -587,7 +587,7 @@ extension String {
       (inout v: CharacterView) in v.append(c)
     }
   }
-  
+
   public mutating func appendContentsOf<
       S : SequenceType
   where S.Generator.Element == Character
@@ -596,7 +596,7 @@ extension String {
       (inout v: CharacterView) in v.appendContentsOf(newElements)
     }
   }
-  
+
   /// Create an instance containing `characters`.
   public init<
       S : SequenceType

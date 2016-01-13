@@ -894,9 +894,9 @@ extension String {
       return nil
     }
   }
-  
+
   // FIXME: handle optional locale with default arguments
-  
+
   // - (instancetype)
   //     initWithData:(NSData *)data
   //     encoding:(NSStringEncoding)encoding
@@ -907,7 +907,7 @@ extension String {
     guard let s = NSString(data: data, encoding: encoding) else { return nil }
     self = s as String
   }
-  
+
   // - (instancetype)initWithFormat:(NSString *)format, ...
 
   /// Returns a `String` object initialized by using a given
@@ -1651,7 +1651,7 @@ extension String {
     }
     return r
   }
-  
+
   /// Returns `true` iff `other` is non-empty and contained within
   /// `self` by case-insensitive, non-literal search, taking into
   /// account the current locale.

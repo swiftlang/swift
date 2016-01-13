@@ -81,9 +81,9 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
   size_t payloadSize = payloadLayout->size;
   unsigned payloadNumExtraInhabitants
     = payloadLayout->getNumExtraInhabitants();
-  
+
   unsigned unusedExtraInhabitants = 0;
-  
+
   // If there are enough extra inhabitants for all of the cases, then the size
   // of the enum is the same as its payload.
   size_t size;
@@ -95,7 +95,7 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
                                       emptyCases - payloadNumExtraInhabitants,
                                       1 /*payload case*/);
   }
-  
+
   size_t align = payloadLayout->flags.getAlignment();
   vwtable->size = size;
   vwtable->flags = payloadLayout->flags
@@ -103,7 +103,7 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
     .withEnumWitnesses(true)
     .withInlineStorage(ValueWitnessTable::isValueInline(size, align));
   vwtable->stride = llvm::RoundUpToAlignment(size, align);
-  
+
   // Substitute in better common value witnesses if we have them.
   // If the payload type is a single-refcounted pointer, and the enum has
   // a single empty case, then we can borrow the witnesses of the single
@@ -222,13 +222,13 @@ swift::swift_storeEnumTagSinglePayload(OpaqueValue *value,
     // If this is the payload case, we're done.
     if (whichCase == -1)
       return;
-    
+
     // Store the extra inhabitant.
     static_cast<const ExtraInhabitantsValueWitnessTable*>(payloadWitnesses)
       ->storeExtraInhabitant(value, whichCase, payload);
     return;
   }
-  
+
   // Factor the case index into payload and extra tag parts.
   unsigned caseIndex = whichCase - payloadNumExtraInhabitants;
   unsigned payloadIndex, extraTagIndex;
@@ -240,7 +240,7 @@ swift::swift_storeEnumTagSinglePayload(OpaqueValue *value,
     extraTagIndex = 1U + (caseIndex >> payloadBits);
     payloadIndex = caseIndex & ((1U << payloadBits) - 1U);
   }
-  
+
   // Store into the value.
   // FIXME: endianness.
   memcpy(valueAddr, &payloadIndex, std::min(size_t(4), payloadSize));
@@ -265,15 +265,15 @@ swift::swift_initEnumMetadataMultiPayload(ValueWitnessTable *vwtable,
     isPOD &= payloadLayout->flags.isPOD();
     isBT &= payloadLayout->flags.isBitwiseTakable();
   }
-  
+
   // Store the max payload size in the metadata.
   enumType->getPayloadSize() = payloadSize;
-  
+
   // The total size includes space for the tag.
   unsigned totalSize = payloadSize + getNumTagBytes(payloadSize,
                                 enumType->Description->Enum.getNumEmptyCases(),
                                 numPayloads);
-  
+
   // Set up the layout info in the vwtable.
   vwtable->size = totalSize;
   vwtable->flags = ValueWitnessFlags()
@@ -286,7 +286,7 @@ swift::swift_initEnumMetadataMultiPayload(ValueWitnessTable *vwtable,
     .withInlineStorage(ValueWitnessTable::isValueInline(totalSize, alignMask+1))
     ;
   vwtable->stride = (totalSize + alignMask) & ~alignMask;
-  
+
   installCommonValueWitnesses(vwtable);
 }
 
@@ -314,10 +314,10 @@ static void storeMultiPayloadValue(OpaqueValue *value,
                                    MultiPayloadLayout layout,
                                    unsigned payloadValue) {
   auto bytes = reinterpret_cast<char *>(value);
-  
+
   memcpy(bytes, &payloadValue,
          std::min(layout.payloadSize, sizeof(payloadValue)));
-  
+
   // If the payload is larger than the value, zero out the rest.
   if (layout.payloadSize > sizeof(payloadValue))
     memset(bytes + sizeof(payloadValue), 0,
@@ -383,7 +383,7 @@ swift::swift_getEnumCaseMultiPayload(const OpaqueValue *value,
   } else {
     // Otherwise, the other part of the discriminator is in the payload.
     unsigned payloadValue = loadMultiPayloadValue(value, layout);
-    
+
     if (layout.payloadSize >= 4) {
       return numPayloads + payloadValue;
     } else {

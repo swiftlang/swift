@@ -84,7 +84,7 @@ public struct FlattenSequence<
   public func generate() -> FlattenGenerator<Base.Generator> {
     return FlattenGenerator(_base.generate())
   }
-  
+
   internal var _base: Base
 }
 
@@ -97,7 +97,7 @@ extension SequenceType where Generator.Element : SequenceType {
 }
 
 extension LazySequenceType
-  where Elements.Generator.Element == Generator.Element, 
+  where Elements.Generator.Element == Generator.Element,
     Generator.Element : SequenceType {
   /// A concatenation of the elements of `self`.
   @warn_unused_result
@@ -114,7 +114,7 @@ extension LazySequenceType
 %   constraints = '%(Base)sGenerator.Element : CollectionType'
 %   if traversal == 'Bidirectional':
 %     constraints += ''',
-%   %(Base)sIndex : BidirectionalIndexType, 
+%   %(Base)sIndex : BidirectionalIndexType,
 %   %(Base)sGenerator.Element.Index : BidirectionalIndexType'''
 %   Index = Collection + 'Index'
 public struct ${Index}<
@@ -137,7 +137,7 @@ public struct ${Index}<
     }
     return ${Index}(_endIndexOfFlattened: _base)
   }
-  
+
 % if traversal == 'Bidirectional':
   /// Returns the previous consecutive value before `self`.
   ///
@@ -197,7 +197,7 @@ public struct ${Index}<
     self._inner = inner
     self._innerCollection = innerCollection
   }
-  
+
   internal let _base: BaseElements
   internal let _outer: BaseElements.Index
   internal let _inner: BaseElements.Generator.Element.Index?
@@ -206,7 +206,7 @@ public struct ${Index}<
 
 @warn_unused_result
 public func == <BaseElements> (
-  lhs: ${Index}<BaseElements>, 
+  lhs: ${Index}<BaseElements>,
   rhs: ${Index}<BaseElements>
 ) -> Bool {
   return lhs._outer == rhs._outer && lhs._inner == rhs._inner
@@ -242,7 +242,7 @@ public struct ${Collection}<
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = ${Index}<Base>
-  
+
   /// Creates a flattened view of `base`.
   public init(_ base: Base) {
     self._base = base
@@ -310,7 +310,7 @@ extension CollectionType where ${constraints % {'Base': ''}} {
 }
 
 extension LazyCollectionType
-  where ${constraints % {'Base': ''}}, 
+  where ${constraints % {'Base': ''}},
   ${constraints % {'Base': 'Elements.'}},
   Generator.Element == Elements.Generator.Element {
   /// A concatenation of the elements of `self`.

@@ -37,20 +37,20 @@ _getErrorAllocatedSizeAndAlignmentMask(const Metadata *type) {
   unsigned valueAlignMask = vw->getAlignmentMask();
   size = (size + valueAlignMask) & ~(size_t)valueAlignMask;
   size += vw->getSize();
-  
+
   size_t alignMask = (alignof(SwiftError) - 1) | valueAlignMask;
-  
+
   return {size, alignMask};
 }
 
 /// Destructor for an ErrorType box.
 static void _destroyErrorObject(HeapObject *obj) {
   auto error = static_cast<SwiftError *>(obj);
-  
+
   // Destroy the value inside.
   auto type = error->type;
   type->vw_destroy(error->getValue());
-  
+
   // Deallocate the buffer.
   auto sizeAndAlign = _getErrorAllocatedSizeAndAlignmentMask(type);
   swift_deallocObject(obj, sizeAndAlign.first, sizeAndAlign.second);
@@ -68,15 +68,15 @@ swift::swift_allocError(const swift::Metadata *type,
                         OpaqueValue *initialValue,
                         bool isTake) {
   auto sizeAndAlign = _getErrorAllocatedSizeAndAlignmentMask(type);
-  
+
   auto allocated = swift_allocObject(&ErrorTypeMetadata,
                                      sizeAndAlign.first, sizeAndAlign.second);
-  
+
   auto error = reinterpret_cast<SwiftError*>(allocated);
-  
+
   error->type = type;
   error->errorConformance = errorConformance;
-  
+
   // If an initial value was given, copy or take it in.
   auto valuePtr = error->getValue();
   if (initialValue) {
@@ -85,7 +85,7 @@ swift::swift_allocError(const swift::Metadata *type,
     else
       type->vw_initializeWithCopy(valuePtr, initialValue);
   }
-  
+
   return BoxPair{allocated, valuePtr};
 }
 

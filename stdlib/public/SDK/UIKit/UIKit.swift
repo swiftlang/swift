@@ -170,39 +170,39 @@ struct _UIViewMirror : _MirrorType {
   static var _views = Set<UIView>()
 
   var _v : UIView
-  
+
   init(_ v : UIView) { _v = v }
-  
+
   var value: Any { return _v }
-  
+
   var valueType: Any.Type { return (_v as Any).dynamicType }
-  
+
   var objectIdentifier: ObjectIdentifier? { return .None }
-  
+
   var count: Int { return 0 }
-  
+
   subscript(_: Int) -> (String, _MirrorType) {
     _preconditionFailure("_MirrorType access out of bounds")
   }
-  
+
   var summary: String { return "" }
-  
+
   var quickLookObject: PlaygroundQuickLook? {
     // iOS 7 or greater only
-    
+
     var result: PlaygroundQuickLook? = nil
-    
+
     if !_UIViewMirror._views.contains(_v) {
       _UIViewMirror._views.insert(_v)
-      
+
       let bounds = _v.bounds
       // in case of an empty rectangle abort the logging
       if (bounds.size.width == 0) || (bounds.size.height == 0) {
         return nil
       }
-      
+
       UIGraphicsBeginImageContextWithOptions(bounds.size, false, 0.0)
-      
+
       // UIKit is about to update this to be optional, so make it work
       // with both older and newer SDKs. (In this context it should always
       // be present.)
@@ -210,19 +210,19 @@ struct _UIViewMirror : _MirrorType {
       UIColor(white:1.0, alpha:0.0).set()
       CGContextFillRect(ctx, bounds)
       _v.layer.renderInContext(ctx)
-      
+
       let image: UIImage! = UIGraphicsGetImageFromCurrentImageContext()
-      
+
       UIGraphicsEndImageContext()
-      
+
       result = .Some(.View(image))
-      
+
       _UIViewMirror._views.remove(_v)
     }
-    
+
     return result
   }
-  
+
   var disposition : _MirrorDisposition { return .Aggregate }
 }
 
