@@ -3508,7 +3508,7 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   // All other source types should be concrete enough that we have
   // conformance info for them.  However, that conformance info might be
   // more concrete than we're expecting.
-  // TODO: make a best beffort to devirtualize, maybe?
+  // TODO: make a best effort to devirtualize, maybe?
   auto concreteConformance = conformance.getConcrete();
   if (concreteConformance->getProtocol() != proto) {
     concreteConformance = concreteConformance->getInheritedConformance(proto);
