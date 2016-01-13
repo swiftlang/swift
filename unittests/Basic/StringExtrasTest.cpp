@@ -17,14 +17,14 @@ TEST(CamelCaseWordsTest, Iteration) {
   // Iteration contents.
   auto iter = words.begin();
   EXPECT_EQ(*iter, "URL");
-  
+
   // Stepping forward.
   ++iter;
-  EXPECT_EQ(*iter, "By");  
+  EXPECT_EQ(*iter, "By");
 
   // Immediately stepping back (fast path).
   --iter;
-  EXPECT_EQ(*iter, "URL");  
+  EXPECT_EQ(*iter, "URL");
 
   // Immediately stepping forward (fast path).
   ++iter;
@@ -32,7 +32,7 @@ TEST(CamelCaseWordsTest, Iteration) {
 
   // Stepping forward.
   ++iter;
-  EXPECT_EQ(*iter, "Prepending");  
+  EXPECT_EQ(*iter, "Prepending");
 
   // Stepping back twice (slow path).
   --iter;
