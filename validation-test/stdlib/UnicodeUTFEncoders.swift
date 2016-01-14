@@ -1,8 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
-
-// FIXME: rdar://problem/19648117 Needs splitting objc parts out
-// XFAIL: linux
+// REQUIRES: objc_interop
 
 import SwiftPrivate
 import StdlibUnittest
