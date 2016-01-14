@@ -1,5 +1,6 @@
 public class Empty {}
 
+@swift3_migration(renamed="DosInts", message="because I can")
 public class TwoInts {
   public var x, y : Int
   

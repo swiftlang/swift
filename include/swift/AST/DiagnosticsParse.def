@@ -1044,6 +1044,17 @@ ERROR(attr_interpolated_string,attribute_parsing,none,
 ERROR(attr_only_at_non_local_scope, attribute_parsing, none,
       "attribute '%0' can only be used in a non-local scope", (StringRef))
 
+ERROR(attr_expected_equal_separator,attribute_parsing,none,
+      "expected '=' following '%0' argument of '%1'",
+      (StringRef, StringRef))
+
+ERROR(attr_expected_string_literal_arg,attribute_parsing,none,
+      "expected string literal for '%0' argument of '%1'",
+      (StringRef, StringRef))
+
+ERROR(attr_duplicate_argument,attribute_parsing,none,
+      "duplicate '%0' argument", (StringRef))
+
 // accessibility
 ERROR(attr_accessibility_expected_set,attribute_parsing,none,
       "expected 'set' as subject of '%0' modifier", (StringRef))
@@ -1063,7 +1074,7 @@ ERROR(attr_availability_expected_option,attribute_parsing,none,
       "'obsoleted', 'message', or 'renamed'", (StringRef))
 
 ERROR(attr_availability_expected_equal,attribute_parsing,none,
-"expected '=' after '%1' in '%0' attribute", (StringRef, StringRef))
+      "expected '=' after '%1' in '%0' attribute", (StringRef, StringRef))
 
 ERROR(attr_availability_expected_version,attribute_parsing,none,
       "expected version number in '%0' attribute", (StringRef))
@@ -1110,6 +1121,17 @@ ERROR(effects_attribute_expect_option,attribute_parsing,none,
       "expected '%0' option (readnone, readonly, readwrite)", (StringRef))
 ERROR(effects_attribute_unknown_option,attribute_parsing,none,
       "unknown option '%0' for attribute '%1'", (StringRef, StringRef))
+
+// swift3_migration
+ERROR(attr_swift3_migration_label,attribute_parsing,none,
+      "expected 'renamed' or 'message' in 'swift3_migration' attribute", ())
+WARNING(warn_attr_swift3_migration_unknown_label,attribute_parsing,none,
+        "expected 'renamed' or 'message' in 'swift3_migration' attribute", ())
+ERROR(attr_swift3_migration_expected_rparen,attribute_parsing,none,
+      "expected ')' after name for 'swift3_migration' attribute", ())
+ERROR(attr_bad_swift_name,attribute_parsing,none,
+      "ill-formed Swift name '%0'", (StringRef))
+
 
 // unowned
 ERROR(attr_unowned_invalid_specifier,attribute_parsing,none,

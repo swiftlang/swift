@@ -222,6 +222,14 @@ ASTPrinter &ASTPrinter::operator<<(UUID UU) {
   return *this;
 }
 
+ASTPrinter &ASTPrinter::operator<<(DeclName name) {
+  llvm::SmallString<32> str;
+  llvm::raw_svector_ostream os(str);
+  name.print(os);
+  printTextImpl(os.str());
+  return *this;
+}
+
 /// Determine whether to escape the given keyword in the given context.
 static bool escapeKeywordInContext(StringRef keyword, PrintNameContext context){
   switch (context) {

@@ -52,7 +52,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 233; // superclass requirement kind
+const uint16_t VERSION_MINOR = 234; // swift3_migration attribute added
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -1342,6 +1342,14 @@ namespace decls_block {
     BCFixed<1>, // implicit name flag
     BCVBR<4>,   // # of arguments (+1) or zero if no name
     BCArray<IdentifierIDField>
+  >;
+
+  using Swift3MigrationDeclAttrLayout = BCRecordLayout<
+    Swift3Migration_DECL_ATTR,
+    BCFixed<1>, // implicit flag
+    BCVBR<5>,   // number of bytes in rename string
+    BCVBR<5>,   // number of bytes in message string
+    BCBlob      // rename, followed by message
   >;
 
   using WarnUnusedResultDeclAttrLayout = BCRecordLayout<

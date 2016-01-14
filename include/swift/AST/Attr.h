@@ -1150,6 +1150,28 @@ public:
   }
 };
 
+/// The @swift3_migration attribute which describes the transformations
+/// required to migrate the given Swift 2.x API to Swift 3.
+class Swift3MigrationAttr : public DeclAttribute {
+  DeclName Renamed;
+  StringRef Message;
+
+public:
+  Swift3MigrationAttr(SourceLoc atLoc, SourceLoc attrLoc, SourceLoc lParenLoc,
+                      DeclName renamed, StringRef message, SourceLoc rParenLoc,
+                      bool implicit)
+    : DeclAttribute(DAK_Swift3Migration, atLoc, SourceRange(attrLoc, rParenLoc),
+                    implicit),
+      Renamed(renamed), Message(message) { }
+
+  DeclName getRenamed() const { return Renamed; }
+  StringRef getMessage() const { return Message; }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Swift3Migration;
+  }
+};
+
 /// \brief Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Linked list of declaration attributes.

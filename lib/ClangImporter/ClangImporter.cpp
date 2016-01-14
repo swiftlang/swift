@@ -33,6 +33,7 @@
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporterOptions.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/Parser.h"
 #include "swift/Config.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Mangle.h"
@@ -1351,51 +1352,6 @@ ClangImporter::Implementation::exportName(Identifier name) {
   return ident;
 }
 
-/// Parse a stringified Swift declaration name, e.g. "init(frame:)".
-static StringRef parseDeclName(StringRef Name,
-                               SmallVectorImpl<StringRef> &ArgNames,
-                               bool &IsFunctionName) {
-  if (Name.back() != ')') {
-    IsFunctionName = false;
-    if (Lexer::isIdentifier(Name) && Name != "_")
-      return Name;
-
-    return "";
-  }
-
-  IsFunctionName = true;
-
-  StringRef BaseName, Parameters;
-  std::tie(BaseName, Parameters) = Name.split('(');
-  if (!Lexer::isIdentifier(BaseName) || BaseName == "_")
-    return "";
-
-  if (Parameters.empty())
-    return "";
-  Parameters = Parameters.drop_back(); // ')'
-
-  if (Parameters.empty())
-    return BaseName;
-
-  if (Parameters.back() != ':')
-    return "";
-
-  do {
-    StringRef NextParam;
-    std::tie(NextParam, Parameters) = Parameters.split(':');
-
-    if (!Lexer::isIdentifier(NextParam))
-      return "";
-    Identifier NextParamID;
-    if (NextParam == "_")
-      ArgNames.push_back("");
-    else
-      ArgNames.push_back(NextParam);
-  } while (!Parameters.empty());
-
-  return BaseName;
-}
-
 /// \brief Returns the common prefix of two strings at camel-case word
 /// granularity.
 ///
@@ -2092,37 +2048,6 @@ auto ClangImporter::Implementation::importFullName(
     }
   }
 
-  // Local function that forms a DeclName from the given strings.
-  auto formDeclName = [&](StringRef baseName,
-                          ArrayRef<StringRef> argumentNames,
-                          bool isFunction) -> DeclName {
-    // We cannot import when the base name is not an identifier.
-    if (!Lexer::isIdentifier(baseName))
-      return DeclName();
-
-    // Get the identifier for the base name.
-    Identifier baseNameId = SwiftContext.getIdentifier(baseName);
-
-    // For non-functions, just use the base name.
-    if (!isFunction) return baseNameId;
-
-    // For functions, we need to form a complete name.
-
-    // Convert the argument names.
-    SmallVector<Identifier, 4> argumentNameIds;
-    for (auto argName : argumentNames) {
-      if (argumentNames.empty() || !Lexer::isIdentifier(argName)) {
-        argumentNameIds.push_back(Identifier());
-        continue;
-      }
-      
-      argumentNameIds.push_back(SwiftContext.getIdentifier(argName));
-    }
-
-    // Build the result.
-    return DeclName(SwiftContext, baseNameId, argumentNameIds);
-  };
-
   // If we have a swift_name attribute, use that.
   if (auto *nameAttr = D->getAttr<clang::SwiftNameAttr>()) {
     bool skipCustomName = false;
@@ -2164,7 +2089,8 @@ auto ClangImporter::Implementation::importFullName(
       if (baseName.empty()) return result;
       
       result.HasCustomName = true;
-      result.Imported = formDeclName(baseName, argumentNames, isFunctionName);
+      result.Imported = formDeclName(SwiftContext, baseName, argumentNames,
+                                     isFunctionName);
 
       if (method) {
         // Get the parameters.
@@ -2545,8 +2471,9 @@ auto ClangImporter::Implementation::importFullName(
     }
   }
 
-  result.Imported = formDeclName(baseName, argumentNames, isFunction);
-  result.Alias = formDeclName(aliasBaseName, aliasArgumentNames,
+  result.Imported = formDeclName(SwiftContext, baseName, argumentNames,
+                                 isFunction);
+  result.Alias = formDeclName(SwiftContext, aliasBaseName, aliasArgumentNames,
                               aliasIsFunction);
   return result;
 }
