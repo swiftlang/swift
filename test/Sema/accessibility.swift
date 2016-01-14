@@ -171,7 +171,7 @@ typealias GenericArgs = Optional<PrivateStruct> // expected-error {{type alias m
 
 
 public protocol HasAssocType {
-  typealias Inferred
+  associatedtype Inferred
   func test(input: Inferred)
 }
 
@@ -238,20 +238,20 @@ internal class InternalClass {}
 private class PrivateClass {}
 
 public protocol AssocTypes {
-  typealias Foo
+  associatedtype Foo
 
-  typealias Internal: InternalClass // expected-error {{associated type in a public protocol uses an internal type in its requirement}}
-  typealias InternalConformer: InternalProto // expected-error {{associated type in a public protocol uses an internal type in its requirement}}
-  typealias PrivateConformer: PrivateProto // expected-error {{associated type in a public protocol uses a private type in its requirement}}
-  typealias PI: PrivateProto, InternalProto // expected-error {{associated type in a public protocol uses a private type in its requirement}}
-  typealias IP: InternalProto, PrivateProto // expected-error {{associated type in a public protocol uses a private type in its requirement}}
+  associatedtype Internal: InternalClass // expected-error {{associated type in a public protocol uses an internal type in its requirement}}
+  associatedtype InternalConformer: InternalProto // expected-error {{associated type in a public protocol uses an internal type in its requirement}}
+  associatedtype PrivateConformer: PrivateProto // expected-error {{associated type in a public protocol uses a private type in its requirement}}
+  associatedtype PI: PrivateProto, InternalProto // expected-error {{associated type in a public protocol uses a private type in its requirement}}
+  associatedtype IP: InternalProto, PrivateProto // expected-error {{associated type in a public protocol uses a private type in its requirement}}
 
-  typealias PrivateDefault = PrivateStruct // expected-error {{associated type in a public protocol uses a private type in its default definition}}
-  typealias PublicDefault = PublicStruct
-  typealias PrivateDefaultConformer: PublicProto = PrivateStruct // expected-error {{associated type in a public protocol uses a private type in its default definition}}
-  typealias PublicDefaultConformer: PrivateProto = PublicStruct // expected-error {{associated type in a public protocol uses a private type in its requirement}}
-  typealias PrivatePrivateDefaultConformer: PrivateProto = PrivateStruct // expected-error {{associated type in a public protocol uses a private type in its requirement}}
-  typealias PublicPublicDefaultConformer: PublicProto = PublicStruct
+  associatedtype PrivateDefault = PrivateStruct // expected-error {{associated type in a public protocol uses a private type in its default definition}}
+  associatedtype PublicDefault = PublicStruct
+  associatedtype PrivateDefaultConformer: PublicProto = PrivateStruct // expected-error {{associated type in a public protocol uses a private type in its default definition}}
+  associatedtype PublicDefaultConformer: PrivateProto = PublicStruct // expected-error {{associated type in a public protocol uses a private type in its requirement}}
+  associatedtype PrivatePrivateDefaultConformer: PrivateProto = PrivateStruct // expected-error {{associated type in a public protocol uses a private type in its requirement}}
+  associatedtype PublicPublicDefaultConformer: PublicProto = PublicStruct
 }
 
 public protocol RequirementTypes {

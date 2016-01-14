@@ -21,7 +21,7 @@ struct X1b : P1 {
 
 // Function with an associated type
 protocol P2 {
-  typealias Assoc : P1 // expected-note{{ambiguous inference of associated type 'Assoc': 'X1a' vs. 'X1b'}}
+  associatedtype Assoc : P1 // expected-note{{ambiguous inference of associated type 'Assoc': 'X1a' vs. 'X1b'}}
   // expected-note@-1{{protocol requires nested type 'Assoc'}}
   func f1(x: Assoc) // expected-note{{protocol requires function 'f1' with type 'Assoc -> ()'}} expected-note{{protocol requires function 'f1' with type 'Assoc -> ()'}}
 }
@@ -87,7 +87,7 @@ struct X2z : P2 { // expected-error{{type 'X2z' does not conform to protocol 'P2
 prefix operator ~~ {}
 
 protocol P3 {
-  typealias Assoc : P1
+  associatedtype Assoc : P1
   prefix func ~~(_: Self) -> Assoc // expected-note{{protocol requires function '~~' with type 'X3z -> Assoc'}}
 }
 
@@ -110,7 +110,7 @@ postfix func ~~(_: X3z) -> X1a {} // expected-note{{candidate is postfix, not pr
 // Protocol with postfix unary function
 postfix operator ~~ {}
 protocol P4 {
-  typealias Assoc : P1
+  associatedtype Assoc : P1
   postfix func ~~ (_: Self) -> Assoc // expected-note{{protocol requires function '~~' with type 'X4z -> Assoc'}}
 }
 
@@ -222,7 +222,7 @@ struct X9 : P9 {
 prefix func %%%(x: X9) -> X9 { }
 
 protocol P10 {
-  typealias Assoc
+  associatedtype Assoc
   func bar(x: Assoc)
 }
 
@@ -237,7 +237,7 @@ protocol P11 {
 }
 
 protocol P12 {
-  typealias Index : P1 // expected-note{{unable to infer associated type 'Index' for protocol 'P12'}}
+  associatedtype Index : P1 // expected-note{{unable to infer associated type 'Index' for protocol 'P12'}}
   func getIndex() -> Index
 }
 

@@ -1,5 +1,5 @@
 protocol Fooable {
-  typealias AssocType
+  associatedtype AssocType
   func foo(x : AssocType)
 }
 

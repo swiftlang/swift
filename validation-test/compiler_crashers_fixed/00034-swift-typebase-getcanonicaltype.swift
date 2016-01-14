@@ -7,8 +7,8 @@
 class a<f : b, g : b where f.d == g> {
 }
 protocol b {
-    typealias d
-    typealias e
+    associatedtype d
+    associatedtype e
 }
 struct c<h : b> : b {
     typealias d = h

@@ -474,7 +474,7 @@ protocol Supportable {
   mutating func support() throws
 }
 protocol Buildable {
-  typealias Structure : Supportable
+  associatedtype Structure : Supportable
   var firstStructure: Structure { get set }
   subscript(name: String) -> Structure { get set }
 }
