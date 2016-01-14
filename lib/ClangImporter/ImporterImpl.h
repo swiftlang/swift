@@ -841,7 +841,27 @@ public:
   ImportedName importFullName(const clang::NamedDecl *D,
                               ImportNameOptions options = None,
                               clang::DeclContext **effectiveContext = nullptr,
-                              clang::Sema *clangSemaOverride = nullptr);
+                              clang::Sema *clangSemaOverride = nullptr) {
+    return importFullName(D, options, effectiveContext, clangSemaOverride,
+                          OmitNeedlessWords);
+  }
+
+  /// Imports the full name of the given Clang declaration into Swift.
+  ///
+  /// Note that this may result in a name very different from the Clang name,
+  /// so it should not be used when referencing Clang symbols.
+  ///
+  /// \param D The Clang declaration whose name should be imported.
+  ///
+  /// \param effectiveContext If non-null, will be set to the effective
+  /// Clang declaration context in which the declaration will be imported.
+  /// This can differ from D's redeclaration context when the Clang importer
+  /// introduces nesting, e.g., for enumerators within an NS_ENUM.
+  ImportedName importFullName(const clang::NamedDecl *D,
+                              ImportNameOptions options,
+                              clang::DeclContext **effectiveContext,
+                              clang::Sema *clangSemaOverride,
+                              bool omitNeedlessWords);
 
   /// \brief Import the given Clang identifier into Swift.
   ///

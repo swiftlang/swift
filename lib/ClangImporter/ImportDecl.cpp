@@ -5251,6 +5251,41 @@ void ClangImporter::Implementation::importAttributes(
   if (ClangDecl->hasAttr<clang::PureAttr>()) {
     MappedDecl->getAttrs().add(new (C) EffectsAttr(EffectsKind::ReadOnly));
   }
+
+  // Add the swift3_migration attribute to the given declaration, if
+  // appropriate.
+  if (!isa<SubscriptDecl>(MappedDecl)) {
+    if (auto valueDecl = dyn_cast<ValueDecl>(MappedDecl)) {
+      // Import the name as we would for Swift 3.
+      ImportNameOptions options;
+      auto swift3Name = importFullName(ClangDecl, options, nullptr, nullptr,
+                                       /*omitNeedlessWords=*/true);
+
+      // If we ended up importing an initializer name, but we're referring to
+      // the factory method version, import again with the initializer mapping
+      // suppressed.
+      if (swift3Name.Imported.getBaseName() == SwiftContext.Id_init &&
+          !isa<ConstructorDecl>(valueDecl)) {
+        options |= ImportNameFlags::SuppressFactoryMethodAsInit;
+        swift3Name = importFullName(ClangDecl, options, nullptr, nullptr,
+                                    /*omitNeedlessWords=*/true);
+      }
+
+      // If the Swift 3 name differs from the name of the declaration, add the
+      // swift3_migration attribute with the rename.
+      if (swift3Name.Imported &&
+          swift3Name.Imported != valueDecl->getFullName()) {
+        MappedDecl->getAttrs().add(new (SwiftContext) Swift3MigrationAttr(
+                                                        SourceLoc(),
+                                                        SourceLoc(),
+                                                        SourceLoc(),
+                                                        swift3Name.Imported,
+                                                        "",
+                                                        SourceLoc(),
+                                                        /*implicit=*/true));
+      }
+    }
+  }
 }
 
 Decl *

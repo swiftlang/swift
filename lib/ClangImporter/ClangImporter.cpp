@@ -2004,7 +2004,8 @@ auto ClangImporter::Implementation::importFullName(
        const clang::NamedDecl *D,
        ImportNameOptions options,
        clang::DeclContext **effectiveContext,
-       clang::Sema *clangSemaOverride) -> ImportedName {
+       clang::Sema *clangSemaOverride,
+       bool omitNeedlessWords) -> ImportedName {
   clang::Sema &clangSema = clangSemaOverride ? *clangSemaOverride
                                              : getClangSema();
   ImportedName result;
@@ -2136,7 +2137,7 @@ auto ClangImporter::Implementation::importFullName(
     // Map the identifier.
     baseName = D->getDeclName().getAsIdentifierInfo()->getName();
 
-    if (OmitNeedlessWords) {
+    if (omitNeedlessWords) {
       // For Objective-C BOOL properties, use the name of the getter
       // which, conventionally, has an "is" prefix.
       if (auto property = dyn_cast<clang::ObjCPropertyDecl>(D)) {
@@ -2202,7 +2203,7 @@ auto ClangImporter::Implementation::importFullName(
         // Swift 2 lowercased all subsequent argument names.
         // Swift 3 may handle this as part of omitting needless words, below,
         // but don't preempt that here.
-        if (!OmitNeedlessWords)
+        if (!omitNeedlessWords)
           argName = camel_case::toLowercaseWord(argName, stringScratch);
 
         argumentNames.push_back(argName);
@@ -2385,7 +2386,7 @@ auto ClangImporter::Implementation::importFullName(
   // Omit needless words.
   clang::ASTContext &clangCtx = clangSema.Context;
   StringScratchSpace omitNeedlessWordsScratch;
-  if (OmitNeedlessWords) {
+  if (omitNeedlessWords) {
     // Objective-C properties.
     if (auto objcProperty = dyn_cast<clang::ObjCPropertyDecl>(D)) {
       auto contextType = getClangDeclContextType(D->getDeclContext());
@@ -2404,10 +2405,11 @@ auto ClangImporter::Implementation::importFullName(
                                    /*forInstance=*/true);
         }
 
-        (void)omitNeedlessWords(baseName, { }, "", propertyTypeName,
-                                contextTypeName, { }, /*returnsSelf=*/false,
-                                /*isProperty=*/true, allPropertyNames,
-                                omitNeedlessWordsScratch);
+        (void)swift::omitNeedlessWords(baseName, { }, "", propertyTypeName,
+                                       contextTypeName, { },
+                                       /*returnsSelf=*/false,
+                                       /*isProperty=*/true, allPropertyNames,
+                                       omitNeedlessWordsScratch);
       }
     }
 
