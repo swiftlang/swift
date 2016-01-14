@@ -77,11 +77,10 @@ EnumPayload EnumPayload::fromBitPattern(IRGenModule &IGM,
   return result;
 }
 
-template<typename Fn /* void(LazyValue &payloadValue,
-                             unsigned payloadBitWidth,
-                             unsigned payloadValueOffset,
-                             unsigned valueBitWidth,
-                             unsigned valueOffset) */>
+// Fn: void(LazyValue &payloadValue, unsigned payloadBitWidth,
+//          unsigned payloadValueOffset, unsigned valueBitWidth,
+//          unsigned valueOffset)
+template<typename Fn>
 static void withValueInPayload(IRGenFunction &IGF,
                                const EnumPayload &payload,
                                llvm::Type *valueType,

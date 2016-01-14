@@ -77,10 +77,9 @@ namespace {
       return getFixedBufferAlignment(IGM);
     }
 
-    /*
-    friend bool operator==(ExistentialLayout a, ExistentialLayout b) {
-      return a.NumTables == b.NumTables;
-    }*/
+    // friend bool operator==(ExistentialLayout a, ExistentialLayout b) {
+    //   return a.NumTables == b.NumTables;
+    // }
 
     /// Given the address of an existential object, drill down to the
     /// buffer.
