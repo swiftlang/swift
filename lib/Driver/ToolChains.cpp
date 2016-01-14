@@ -548,24 +548,37 @@ ToolChain::constructInvocation(const BackendJobAction &job,
 ToolChain::InvocationInfo
 ToolChain::constructInvocation(const MergeModuleJobAction &job,
                                const JobContext &context) const {
-  ArgStringList Arguments;
+  InvocationInfo II{SWIFT_EXECUTABLE_NAME};
+  ArgStringList &Arguments = II.Arguments;
 
-  if (context.OI.CompilerMode != OutputInfo::Mode::UpdateCode)
+  if (context.OI.CompilerMode == OutputInfo::Mode::UpdateCode)
+    II.ExecutableName = SWIFT_UPDATE_NAME;
+  else
     Arguments.push_back("-frontend");
 
   // We just want to emit a module, so pass -emit-module without any other
   // mode options.
   Arguments.push_back("-emit-module");
 
-  size_t origLen = Arguments.size();
-  (void)origLen;
-  addInputsOfType(Arguments, context.Inputs, types::TY_SwiftModuleFile);
-  addInputsOfType(Arguments, context.InputActions, types::TY_SwiftModuleFile);
-  assert(Arguments.size() - origLen >=
-         context.Inputs.size() + context.InputActions.size());
-  assert((Arguments.size() - origLen == context.Inputs.size() ||
-          !context.InputActions.empty()) &&
-         "every input to MergeModule must generate a swiftmodule");
+  if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
+      context.Inputs.size() > TOO_MANY_FILES) {
+    Arguments.push_back("-filelist");
+    Arguments.push_back(context.getTemporaryFilePath("inputs", ""));
+    II.FilelistInfo = {Arguments.back(), types::TY_SwiftModuleFile,
+                       FilelistInfo::Input};
+
+    addInputsOfType(Arguments, context.InputActions, types::TY_SwiftModuleFile);
+  } else {
+    size_t origLen = Arguments.size();
+    (void)origLen;
+    addInputsOfType(Arguments, context.Inputs, types::TY_SwiftModuleFile);
+    addInputsOfType(Arguments, context.InputActions, types::TY_SwiftModuleFile);
+    assert(Arguments.size() - origLen >=
+           context.Inputs.size() + context.InputActions.size());
+    assert((Arguments.size() - origLen == context.Inputs.size() ||
+            !context.InputActions.empty()) &&
+           "every input to MergeModule must generate a swiftmodule");
+  }
 
   // Tell all files to parse as library, which is necessary to load them as
   // serialized ASTs.
@@ -591,11 +604,7 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   Arguments.push_back(
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 
-  auto program = SWIFT_EXECUTABLE_NAME;
-  if (context.OI.CompilerMode == OutputInfo::Mode::UpdateCode)
-    program = SWIFT_UPDATE_NAME;
-
-  return {program, Arguments};
+  return II;
 }
 
 ToolChain::InvocationInfo

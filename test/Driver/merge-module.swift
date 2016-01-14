@@ -14,6 +14,8 @@
 // RUN: FileCheck %s < %t.complex.txt
 // RUN: FileCheck -check-prefix THREE-OUTPUTS %s < %t.complex.txt
 
+// RUN: %swiftc_driver -emit-module -driver-print-jobs -driver-use-filelists %s %S/../Inputs/empty.swift -module-name main 2>&1 | FileCheck -check-prefix FILELISTS %s
+
 // CHECK: bin/swift{{c?}} -frontend
 // CHECK: -module-name {{[^ ]+}}
 // CHECK: -o [[OBJECTFILE:.*]]
@@ -66,6 +68,16 @@
 // THREE-OUTPUTS: -emit-module [[MODULE]]
 // THREE-OUTPUTS: -emit-objc-header-path sdk.foo.h
 // THREE-OUTPUTS: -o sdk.foo.out
+
+
+// FILELISTS: bin/swift{{c?}} -frontend
+// FILELISTS-NEXT: bin/swift{{c?}} -frontend
+// FILELISTS-NEXT: bin/swift{{c?}} -frontend
+// FILELISTS-NOT: .swiftmodule
+// FILELISTS: -filelist {{[^ ]+}}
+// FILELISTS-NOT: .swiftmodule
+// FILELISTS: -o {{[^ ]+}}
+
 
 // RUN: %swiftc_driver -driver-print-jobs -emit-module %S/Inputs/main.swift %S/Inputs/lib.swift -module-name merge -o /tmp/modules > %t.complex.txt
 // RUN: FileCheck %s < %t.complex.txt
