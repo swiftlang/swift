@@ -2460,11 +2460,7 @@ namespace {
       auto loc = Impl.importSourceLoc(decl->getLocation());
 
       // If we had no argument labels to start with, add empty labels now.
-      if (name.isSimpleName()) {
-        llvm::SmallVector<Identifier, 2> argNames(bodyParams->size(),
-                                                  Identifier());
-        name = DeclName(Impl.SwiftContext, name.getBaseName(), argNames);
-      }
+      assert(!name.isSimpleName() && "Cannot have a simple name here");
 
       // FIXME: Poor location info.
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
