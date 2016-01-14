@@ -37,11 +37,11 @@
 //
 // REQUIRES: OS=macosx
 
-// FOUNDATION-LABEL: {{^}}/// Aaa.  NSAvailableOnOSX10_10AndIOS8_0.  Bbb.
-// FOUNDATION-NEXT: {{^}}@available(OSX 10.10, *){{$}}
+// FOUNDATION-LABEL: {{^}}/// Aaa.  NSAvailableOnOSX10_51AndIOS8_0.  Bbb.
+// FOUNDATION-NEXT: {{^}}@available(OSX 10.51, *){{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSPotentiallyUnavailableOptions.  Bbb.
-// FOUNDATION-NEXT: {{^}}@available(OSX 10.10, *){{$}}
+// FOUNDATION-NEXT: {{^}}@available(OSX 10.51, *){{$}}
 // FOUNDATION-NEXT: {{^}}struct NSPotentiallyUnavailableOptions : OptionSetType {{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSOptionsWithUnavailableElement.  Bbb.
@@ -50,11 +50,11 @@
 // FOUNDATION-NEXT: {{^}}  let rawValue: UInt{{$}}
 // FOUNDATION-NEXT: {{^}}  static var First: NSOptionsWithUnavailableElement { get }{{$}}
 // FOUNDATION-NEXT: {{^}}  static var Second: NSOptionsWithUnavailableElement { get }{{$}}
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.10, *){{$}}
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.51, *){{$}}
 // FOUNDATION-NEXT: {{^}}  static var Third: NSOptionsWithUnavailableElement { get }{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSUnavailableEnum.  Bbb.
-// FOUNDATION-NEXT: {{^}}@available(OSX 10.10, *){{$}}
+// FOUNDATION-NEXT: {{^}}@available(OSX 10.51, *){{$}}
 // FOUNDATION-NEXT: {{^}}enum NSUnavailableEnum : UInt {{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSEnumWithUnavailableElement.  Bbb.
@@ -63,25 +63,25 @@
 // FOUNDATION-NEXT: {{^}}  var rawValue: UInt { get }{{$}}
 // FOUNDATION-NEXT: {{^}}  case First{{$}}
 // FOUNDATION-NEXT: {{^}}  case Second{{$}}
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.10, *){{$}}
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.51, *){{$}}
 // FOUNDATION-NEXT: {{^}}  case Third{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  UnannotatedFrameworkProtocol.  Bbb.
 // FOUNDATION-NEXT: {{^}}protocol UnannotatedFrameworkProtocol {{{$}}
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.10, *){{$}}
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.51, *){{$}}
 // FOUNDATION-NEXT: {{^}}  func doSomethingWithClass(k: AnnotatedFrameworkClass?){{$}}
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.10, *){{$}}
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.51, *){{$}}
 // FOUNDATION-NEXT: {{^}}  func doSomethingWithNonNullableClass(k: AnnotatedFrameworkClass){{$}}
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.10, *){{$}}
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.51, *){{$}}
 // FOUNDATION-NEXT: {{^}}  func doSomethingWithIUOClass(k: AnnotatedFrameworkClass!){{$}}
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.10, *){{$}}
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.51, *){{$}}
 // FOUNDATION-NEXT: {{^}}  func returnSomething() -> AnnotatedFrameworkClass?{{$}}
 // FOUNDATION-NEXT: {{^}}  func noUnavailableTypesInSignature(){{$}}
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.11, *){{$}}
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.52, *){{$}}
 // FOUNDATION-NEXT: {{^}}  func doSomethingWithClass(k: AnnotatedFrameworkClass, andLaterClass lk: AnnotatedLaterFrameworkClass){{$}}
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.12, *)
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.53, *)
 // FOUNDATION-NEXT: {{^}}  func someMethodWithAvailability()
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.10, *){{$}}
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.51, *){{$}}
 // FOUNDATION-NEXT: {{^}}  var someProperty: AnnotatedFrameworkClass { get set }{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  AnnotatedFrameworkProtocol.  Bbb.
@@ -92,56 +92,56 @@
 // FOUNDATION-LABEL: /// Aaa.  FrameworkClassConformingToUnannotatedFrameworkProtocol.  Bbb.
 // FOUNDATION-NEXT: {{^}}class FrameworkClassConformingToUnannotatedFrameworkProtocol : NSObject, UnannotatedFrameworkProtocol {{{$}}
 // FOUNDATION-NEXT: {{^}}  init(){{$}}
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.10, *){{$}}
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.51, *){{$}}
 // FOUNDATION-NEXT: {{^}}  func doSomethingWithClass(k: AnnotatedFrameworkClass?){{$}}
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.10, *){{$}}
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.51, *){{$}}
 // FOUNDATION-NEXT: {{^}}  func doSomethingWithNonNullableClass(k: AnnotatedFrameworkClass){{$}}
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.10, *){{$}}
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.51, *){{$}}
 // FOUNDATION-NEXT: {{^}}  func doSomethingWithIUOClass(k: AnnotatedFrameworkClass!){{$}}
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.10, *){{$}}
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.51, *){{$}}
 // FOUNDATION-NEXT: {{^}}  func returnSomething() -> AnnotatedFrameworkClass?{{$}}
 // FOUNDATION-NEXT: {{^}}  func noUnavailableTypesInSignature(){{$}}
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.11, *){{$}}
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.52, *){{$}}
 // FOUNDATION-NEXT: {{^}}  func doSomethingWithClass(k: AnnotatedFrameworkClass, andLaterClass lk: AnnotatedLaterFrameworkClass){{$}}
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.12, *)
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.53, *)
 // FOUNDATION-NEXT: {{^}}  func someMethodWithAvailability()
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.10, *){{$}}
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.51, *){{$}}
 // FOUNDATION-NEXT: {{^}}  var someProperty: AnnotatedFrameworkClass{{$}}
 
 // FOUNDATION-LABEL: /// Aaa.  LaterFrameworkClassConformingToUnannotatedFrameworkProtocol.  Bbb.
-// FOUNDATION-NEXT: {{^}}@available(OSX 10.11, *){{$}}
+// FOUNDATION-NEXT: {{^}}@available(OSX 10.52, *){{$}}
 // FOUNDATION-NEXT: {{^}}class LaterFrameworkClassConformingToUnannotatedFrameworkProtocol : NSObject, UnannotatedFrameworkProtocol {{{$}}
 // FOUNDATION-NEXT: {{^}}  init(){{$}}
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.11, *){{$}}
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.52, *){{$}}
 // FOUNDATION-NEXT: {{^}}  func doSomethingWithClass(k: AnnotatedFrameworkClass?){{$}}
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.11, *){{$}}
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.52, *){{$}}
 // FOUNDATION-NEXT: {{^}}  func doSomethingWithNonNullableClass(k: AnnotatedFrameworkClass){{$}}
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.11, *){{$}}
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.52, *){{$}}
 // FOUNDATION-NEXT: {{^}}  func doSomethingWithIUOClass(k: AnnotatedFrameworkClass!){{$}}
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.11, *){{$}}
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.52, *){{$}}
 // FOUNDATION-NEXT: {{^}}  func returnSomething() -> AnnotatedFrameworkClass?{{$}}
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.11, *){{$}}
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.52, *){{$}}
 // FOUNDATION-NEXT: {{^}}  func noUnavailableTypesInSignature(){{$}}
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.11, *){{$}}
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.52, *){{$}}
 // FOUNDATION-NEXT: {{^}}  func doSomethingWithClass(k: AnnotatedFrameworkClass, andLaterClass lk: AnnotatedLaterFrameworkClass){{$}}
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.12, *)
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.53, *)
 // FOUNDATION-NEXT: {{^}}  func someMethodWithAvailability()
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.11, *){{$}}
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.52, *){{$}}
 // FOUNDATION-NEXT: {{^}}  var someProperty: AnnotatedFrameworkClass{{$}}
 }
 
 // FOUNDATION-LABEL: /// Aaa.  FrameworkClassConformingToLaterAnnotatedFrameworkProtocol.  Bbb.
 // FOUNDATION-NEXT: {{^}}class FrameworkClassConformingToLaterAnnotatedFrameworkProtocol : NSObject, LaterAnnotatedFrameworkProtocol {
 // FOUNDATION-NEXT: {{^}}  init()
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.11, *)
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.52, *)
 // FOUNDATION-NEXT: {{^}}  func returnSomething() -> AnnotatedFrameworkClass?
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.11, *)
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.52, *)
 // FOUNDATION-NEXT: {{^}}  func doSomethingWithClass(k: AnnotatedFrameworkClass, andLaterClass lk: AnnotatedLaterFrameworkClass)
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.11, *)
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.52, *)
 // FOUNDATION-NEXT: {{^}}  func noUnavailableTypesInSignature()
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.12, *)
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.53, *)
 // FOUNDATION-NEXT: {{^}}  func someMethodWithAvailability()
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.11, *)
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.52, *)
 // FOUNDATION-NEXT: {{^}}  var someProperty: AnnotatedFrameworkClass
 }
 
