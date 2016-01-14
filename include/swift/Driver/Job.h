@@ -113,6 +113,9 @@ private:
   /// These strings must be kept alive as long as the Job is alive.
   EnvironmentVector ExtraEnvironment;
 
+  /// Whether the job wants a list of input or output files created.
+  FilelistInfo FilelistFileInfo;
+
   /// The modification time of the main input file, if any.
   llvm::sys::TimeValue InputModTime = llvm::sys::TimeValue::MaxTime();
 
@@ -122,11 +125,13 @@ public:
       std::unique_ptr<CommandOutput> Output,
       const char *Executable,
       llvm::opt::ArgStringList Arguments,
-      EnvironmentVector ExtraEnvironment = {})
+      EnvironmentVector ExtraEnvironment = {},
+      FilelistInfo Info = {})
       : SourceAndCondition(&Source, Condition::Always),
         Inputs(std::move(Inputs)), Output(std::move(Output)),
         Executable(Executable), Arguments(std::move(Arguments)),
-        ExtraEnvironment(std::move(ExtraEnvironment)) {}
+        ExtraEnvironment(std::move(ExtraEnvironment)),
+        FilelistFileInfo(std::move(Info)) {}
 
   const JobAction &getSource() const {
     return *SourceAndCondition.getPointer();
@@ -134,6 +139,7 @@ public:
 
   const char *getExecutable() const { return Executable; }
   const llvm::opt::ArgStringList &getArguments() const { return Arguments; }
+  FilelistInfo getFilelistInfo() const { return FilelistFileInfo; }
 
   ArrayRef<const Job *> getInputs() const { return Inputs; }
   const CommandOutput &getOutput() const { return *Output; }

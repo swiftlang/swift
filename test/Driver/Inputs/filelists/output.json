@@ -1,0 +1,11 @@
+{
+  "./a.swift": {
+    "object": "./a.o",
+  },
+  "./b.swift": {
+    "object": "./b.o",
+  },
+  "./c.swift": {
+    "object": "./c.o",
+  }
+}

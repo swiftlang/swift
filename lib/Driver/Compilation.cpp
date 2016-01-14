@@ -215,6 +215,40 @@ static void writeCompilationRecord(StringRef path, StringRef argsHash,
   }
 }
 
+static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags) {
+  FilelistInfo filelistInfo = job->getFilelistInfo();
+  if (filelistInfo.path.empty())
+    return true;
+
+  std::error_code error;
+  llvm::raw_fd_ostream out(filelistInfo.path, error, llvm::sys::fs::F_None);
+  if (out.has_error()) {
+    out.clear_error();
+    diags.diagnose(SourceLoc(), diag::error_unable_to_make_temporary_file,
+                   error.message());
+    return false;
+  }
+
+  if (filelistInfo.whichFiles == FilelistInfo::Input) {
+    // FIXME: Duplicated from ToolChains.cpp.
+    for (const Job *input : job->getInputs()) {
+      auto &outputInfo = input->getOutput();
+      if (outputInfo.getPrimaryOutputType() == filelistInfo.type) {
+        for (auto &output : outputInfo.getPrimaryOutputFilenames())
+          out << output << "\n";
+      } else {
+        auto &output = outputInfo.getAnyOutputForType(filelistInfo.type);
+        if (!output.empty())
+          out << output << "\n";
+      }
+    }
+  } else {
+    llvm_unreachable("unimplemented");
+  }
+
+  return true;
+}
+
 int Compilation::performJobsImpl() {
   // Create a TaskQueue for execution.
   std::unique_ptr<TaskQueue> TQ;
@@ -261,6 +295,11 @@ int Compilation::performJobsImpl() {
       State.BlockingCommands[Blocking].push_back(Cmd);
       return;
     }
+
+    // FIXME: Failing here should not take down the whole process.
+    bool success = writeFilelistIfNecessary(Cmd, Diags);
+    assert(success && "failed to write filelist");
+    (void)success;
 
     assert(Cmd->getExtraEnvironment().empty() &&
            "not implemented for compilations with multiple jobs");
