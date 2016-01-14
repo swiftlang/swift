@@ -21,11 +21,11 @@
 #define DEBUG_TYPE "arc-sequence-opts"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "GlobalARCPairingAnalysis.h"
-#include "ProgramTerminationAnalysis.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopRegionAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ProgramTerminationAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 
