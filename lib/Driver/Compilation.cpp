@@ -617,6 +617,9 @@ int Compilation::performSingleCommand(const Job *Cmd) {
     break;
   }
 
+  if (!writeFilelistIfNecessary(Cmd, Diags))
+    return 1;
+
   if (Level == OutputLevel::Verbose)
     Cmd->printCommandLine(llvm::errs());
 
