@@ -401,6 +401,9 @@ namespace swift {
     /// \brief Don't emit any warnings
     bool ignoreAllWarnings = false;
 
+    /// \brief Emit all warnings as errors
+    bool warningsAsErrors = false;
+
     /// \brief Whether a fatal error has occurred
     bool fatalErrorOccurred = false;
 
@@ -430,6 +433,10 @@ namespace swift {
     /// \brief Whether to skip emitting warnings
     void setIgnoreAllWarnings(bool val) { ignoreAllWarnings = val; }
     bool getIgnoreAllWarnings() const { return ignoreAllWarnings; }
+
+    /// \brief Whether to treat warnings as errors
+    void setWarningsAsErrors(bool val) { warningsAsErrors = val; }
+    bool getWarningsAsErrors() const { return warningsAsErrors; }
 
     void resetHadAnyError() {
       anyErrorOccurred = false;
@@ -502,6 +509,12 @@ namespace swift {
     void setIgnoreAllWarnings(bool val) { state.setIgnoreAllWarnings(val); }
     bool getIgnoreAllWarnings() const {
       return state.getIgnoreAllWarnings();
+    }
+
+    /// \brief Whether to treat warnings as errors
+    void setWarningsAsErrors(bool val) { state.setWarningsAsErrors(val); }
+    bool getWarningsAsErrors() const {
+      return state.getWarningsAsErrors();
     }
 
     void ignoreDiagnostic(DiagID id) {
