@@ -49,16 +49,27 @@ func _XCTRunThrowableBlockBridge(@noescape _: @convention(block) () -> Void) -> 
 /// The Swift-style result of evaluating a block which may throw an exception.
 enum _XCTThrowableBlockResult {
   case Success
+  case FailedWithError(error: ErrorType)
   case FailedWithException(className: String, name: String, reason: String)
   case FailedWithUnknownException
 }
 
-/// Asks some Objective-C code to evaluate a block which may throw an exception,
+/// Asks some Objective-C code to evaluate a block which may throw an exception or error,
 /// and if it does consume the exception and return information about it.
-func _XCTRunThrowableBlock(@noescape block: () -> Void) -> _XCTThrowableBlockResult {
-  let d = _XCTRunThrowableBlockBridge(block)
+func _XCTRunThrowableBlock(@noescape block: () throws -> Void) -> _XCTThrowableBlockResult {
+  var blockErrorOptional: ErrorType?
   
-  if d.count > 0 {
+  let d = _XCTRunThrowableBlockBridge({
+    do {
+      try block()
+    } catch {
+      blockErrorOptional = error
+    }
+  })
+  
+  if let blockError = blockErrorOptional {
+    return .FailedWithError(error: blockError)
+  } else if d.count > 0 {
     let t: String = d["type"] as! String
     
     if t == "objc" {
@@ -79,14 +90,14 @@ public func XCTFail(message: String = "", file: StaticString = __FILE__, line: U
   _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, "" as NSString), message, file, line)
 }
 
-public func XCTAssertNil(@autoclosure expression: () -> Any?, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertNil(@autoclosure expression: () throws -> Any?, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.Nil
   
   // evaluate the expression exactly once
   var expressionValueOptional: Any?
   
   let result = _XCTRunThrowableBlock {
-    expressionValueOptional = expression()
+    expressionValueOptional = try expression()
   }
   
   switch result {
@@ -107,6 +118,9 @@ public func XCTAssertNil(@autoclosure expression: () -> Any?, @autoclosure _ mes
       _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr as NSString), message, file, line)
     }
     
+  case .FailedWithError(let error):
+    _XCTRegisterFailure(false, "XCTAssertNil failed: threw error \"\(error)\"", message, file, line)
+    
   case .FailedWithException(_, _, let reason):
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 1, reason as NSString), message, file, line)
     
@@ -115,14 +129,14 @@ public func XCTAssertNil(@autoclosure expression: () -> Any?, @autoclosure _ mes
   }
 }
 
-public func XCTAssertNotNil(@autoclosure expression: () -> Any?, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertNotNil(@autoclosure expression: () throws -> Any?, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.NotNil
   
   // evaluate the expression exactly once
   var expressionValueOptional: Any?
   
   let result = _XCTRunThrowableBlock {
-    expressionValueOptional = expression()
+    expressionValueOptional = try expression()
   }
   
   switch result {
@@ -143,6 +157,9 @@ public func XCTAssertNotNil(@autoclosure expression: () -> Any?, @autoclosure _ 
       _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr as NSString), message, file, line)
     }
     
+  case .FailedWithError(let error):
+    _XCTRegisterFailure(false, "XCTAssertNotNil failed: threw error \"\(error)\"", message, file, line)
+    
   case .FailedWithException(_, _, let reason):
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 1, reason as NSString), message, file, line)
     
@@ -151,19 +168,19 @@ public func XCTAssertNotNil(@autoclosure expression: () -> Any?, @autoclosure _ 
   }
 }
 
-public func XCTAssert( @autoclosure expression: () -> BooleanType, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__)  -> Void {
+public func XCTAssert( @autoclosure expression: () throws -> BooleanType, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__)  -> Void {
   // XCTAssert is just a cover for XCTAssertTrue.
   XCTAssertTrue(expression, message, file: file, line: line)
 }
 
-public func XCTAssertTrue(@autoclosure expression: () -> BooleanType, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertTrue(@autoclosure expression: () throws -> BooleanType, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.True
   
   // evaluate the expression exactly once
   var expressionValueOptional: Bool?
   
   let result = _XCTRunThrowableBlock {
-    expressionValueOptional = expression().boolValue
+    expressionValueOptional = try expression().boolValue
   }
   
   switch result {
@@ -176,6 +193,9 @@ public func XCTAssertTrue(@autoclosure expression: () -> BooleanType, @autoclosu
       _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0), message, file, line)
     }
     
+  case .FailedWithError(let error):
+    _XCTRegisterFailure(false, "XCTAssertTrue failed: threw error \"\(error)\"", message, file, line)
+    
   case .FailedWithException(_, _, let reason):
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 1, reason as NSString), message, file, line)
     
@@ -184,14 +204,14 @@ public func XCTAssertTrue(@autoclosure expression: () -> BooleanType, @autoclosu
   }
 }
 
-public func XCTAssertFalse(@autoclosure expression: () -> BooleanType, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__)  -> Void {
+public func XCTAssertFalse(@autoclosure expression: () throws -> BooleanType, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__)  -> Void {
   let assertionType = _XCTAssertionType.False
   
   // evaluate the expression exactly once
   var expressionValueOptional: Bool?
   
   let result = _XCTRunThrowableBlock {
-    expressionValueOptional = expression().boolValue
+    expressionValueOptional = try expression().boolValue
   }
   
   switch result {
@@ -204,6 +224,9 @@ public func XCTAssertFalse(@autoclosure expression: () -> BooleanType, @autoclos
       _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0), message, file, line)
     }
     
+  case .FailedWithError(let error):
+    _XCTRegisterFailure(false, "XCTAssertFalse failed: threw error \"\(error)\"", message, file, line)
+    
   case .FailedWithException(_, _, let reason):
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 1, reason as NSString), message, file, line)
     
@@ -212,7 +235,7 @@ public func XCTAssertFalse(@autoclosure expression: () -> BooleanType, @autoclos
   }
 }
 
-public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () -> T?, @autoclosure _ expression2: () -> T?, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () throws -> T?, @autoclosure _ expression2: () throws -> T?, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.Equal
   
   // evaluate each expression exactly once
@@ -220,8 +243,8 @@ public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () -> T?, @a
   var expressionValue2Optional: T?
   
   let result = _XCTRunThrowableBlock {
-    expressionValue1Optional = expression1()
-    expressionValue2Optional = expression2()
+    expressionValue1Optional = try expression1()
+    expressionValue2Optional = try expression2()
   }
   
   switch result {
@@ -235,6 +258,9 @@ public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () -> T?, @a
       
       _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
     }
+    
+  case .FailedWithError(let error):
+    _XCTRegisterFailure(false, "XCTAssertEqual failed: threw error \"\(error)\"", message, file, line)
     
   case .FailedWithException(_, _, let reason):
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 1, reason as NSString), message, file, line)
@@ -250,7 +276,7 @@ public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () -> T?, @a
 //  Array<T>
 //  Dictionary<T, U>
 
-public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () -> ArraySlice<T>, @autoclosure _ expression2: () -> ArraySlice<T>, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () throws -> ArraySlice<T>, @autoclosure _ expression2: () throws -> ArraySlice<T>, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.Equal
   
   // evaluate each expression exactly once
@@ -258,8 +284,8 @@ public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () -> ArrayS
   var expressionValue2Optional: ArraySlice<T>?
   
   let result = _XCTRunThrowableBlock {
-    expressionValue1Optional = expression1()
-    expressionValue2Optional = expression2()
+    expressionValue1Optional = try expression1()
+    expressionValue2Optional = try expression2()
   }
   
   switch result {
@@ -277,6 +303,9 @@ public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () -> ArrayS
       _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
     }
     
+  case .FailedWithError(let error):
+    _XCTRegisterFailure(false, "XCTAssertEqual failed: threw error \"\(error)\"", message, file, line)
+    
   case .FailedWithException(_, _, let reason):
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 1, reason as NSString), message, file, line)
     
@@ -285,7 +314,7 @@ public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () -> ArrayS
   }
 }
 
-public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () -> ContiguousArray<T>, @autoclosure _ expression2: () -> ContiguousArray<T>, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () throws -> ContiguousArray<T>, @autoclosure _ expression2: () throws -> ContiguousArray<T>, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.Equal
   
   // evaluate each expression exactly once
@@ -293,8 +322,8 @@ public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () -> Contig
   var expressionValue2Optional: ContiguousArray<T>?
   
   let result = _XCTRunThrowableBlock {
-    expressionValue1Optional = expression1()
-    expressionValue2Optional = expression2()
+    expressionValue1Optional = try expression1()
+    expressionValue2Optional = try expression2()
   }
   
   switch result {
@@ -312,6 +341,9 @@ public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () -> Contig
       _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
     }
     
+  case .FailedWithError(let error):
+    _XCTRegisterFailure(false, "XCTAssertEqual failed: threw error \"\(error)\"", message, file, line)
+    
   case .FailedWithException(_, _, let reason):
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 1, reason as NSString), message, file, line)
     
@@ -320,7 +352,7 @@ public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () -> Contig
   }
 }
 
-public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () -> [T], @autoclosure _ expression2: () -> [T], @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () throws -> [T], @autoclosure _ expression2: () throws -> [T], @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.Equal
   
   // evaluate each expression exactly once
@@ -328,8 +360,8 @@ public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () -> [T], @
   var expressionValue2Optional: [T]?
   
   let result = _XCTRunThrowableBlock {
-    expressionValue1Optional = expression1()
-    expressionValue2Optional = expression2()
+    expressionValue1Optional = try expression1()
+    expressionValue2Optional = try expression2()
   }
   
   switch result {
@@ -347,6 +379,9 @@ public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () -> [T], @
       _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
     }
     
+  case .FailedWithError(let error):
+    _XCTRegisterFailure(false, "XCTAssertEqual failed: threw error \"\(error)\"", message, file, line)
+    
   case .FailedWithException(_, _, let reason):
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 1, reason as NSString), message, file, line)
     
@@ -355,7 +390,7 @@ public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () -> [T], @
   }
 }
 
-public func XCTAssertEqual<T, U : Equatable>(@autoclosure expression1: () -> [T: U], @autoclosure _ expression2: () -> [T: U], @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertEqual<T, U : Equatable>(@autoclosure expression1: () throws -> [T: U], @autoclosure _ expression2: () throws -> [T: U], @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.Equal
   
   // evaluate each expression exactly once
@@ -363,8 +398,8 @@ public func XCTAssertEqual<T, U : Equatable>(@autoclosure expression1: () -> [T:
   var expressionValue2Optional: [T: U]?
   
   let result = _XCTRunThrowableBlock {
-    expressionValue1Optional = expression1()
-    expressionValue2Optional = expression2()
+    expressionValue1Optional = try expression1()
+    expressionValue2Optional = try expression2()
   }
   
   switch result {
@@ -382,6 +417,9 @@ public func XCTAssertEqual<T, U : Equatable>(@autoclosure expression1: () -> [T:
       _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
     }
     
+  case .FailedWithError(let error):
+    _XCTRegisterFailure(false, "XCTAssertEqual failed: threw error \"\(error)\"", message, file, line)
+    
   case .FailedWithException(_, _, let reason):
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 1, reason as NSString), message, file, line)
     
@@ -390,7 +428,7 @@ public func XCTAssertEqual<T, U : Equatable>(@autoclosure expression1: () -> [T:
   }
 }
 
-public func XCTAssertNotEqual<T : Equatable>(@autoclosure expression1: () -> T?, @autoclosure _ expression2: () -> T?, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertNotEqual<T : Equatable>(@autoclosure expression1: () throws -> T?, @autoclosure _ expression2: () throws -> T?, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.NotEqual
   
   // evaluate each expression exactly once
@@ -398,8 +436,8 @@ public func XCTAssertNotEqual<T : Equatable>(@autoclosure expression1: () -> T?,
   var expressionValue2Optional: T?
   
   let result = _XCTRunThrowableBlock {
-    expressionValue1Optional = expression1()
-    expressionValue2Optional = expression2()
+    expressionValue1Optional = try expression1()
+    expressionValue2Optional = try expression2()
   }
   
   switch result {
@@ -413,6 +451,9 @@ public func XCTAssertNotEqual<T : Equatable>(@autoclosure expression1: () -> T?,
       
       _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
     }
+    
+  case .FailedWithError(let error):
+    _XCTRegisterFailure(false, "XCTAssertNotEqual failed: threw error \"\(error)\"", message, file, line)
     
   case .FailedWithException(_, _, let reason):
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 1, reason as NSString), message, file, line)
@@ -428,7 +469,7 @@ public func XCTAssertNotEqual<T : Equatable>(@autoclosure expression1: () -> T?,
 //  Array<T>
 //  Dictionary<T, U>
 
-public func XCTAssertNotEqual<T : Equatable>(@autoclosure expression1: () -> ContiguousArray<T>, @autoclosure _ expression2: () -> ContiguousArray<T>, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertNotEqual<T : Equatable>(@autoclosure expression1: () throws -> ContiguousArray<T>, @autoclosure _ expression2: () throws -> ContiguousArray<T>, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.NotEqual
   
   // evaluate each expression exactly once
@@ -436,8 +477,8 @@ public func XCTAssertNotEqual<T : Equatable>(@autoclosure expression1: () -> Con
   var expressionValue2Optional: ContiguousArray<T>?
   
   let result = _XCTRunThrowableBlock {
-    expressionValue1Optional = expression1()
-    expressionValue2Optional = expression2()
+    expressionValue1Optional = try expression1()
+    expressionValue2Optional = try expression2()
   }
   
   switch result {
@@ -455,6 +496,9 @@ public func XCTAssertNotEqual<T : Equatable>(@autoclosure expression1: () -> Con
       _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
     }
     
+  case .FailedWithError(let error):
+    _XCTRegisterFailure(false, "XCTAssertNotEqual failed: threw error \"\(error)\"", message, file, line)
+    
   case .FailedWithException(_, _, let reason):
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 1, reason as NSString), message, file, line)
     
@@ -463,7 +507,7 @@ public func XCTAssertNotEqual<T : Equatable>(@autoclosure expression1: () -> Con
   }
 }
 
-public func XCTAssertNotEqual<T : Equatable>(@autoclosure expression1: () -> ArraySlice<T>, @autoclosure _ expression2: () -> ArraySlice<T>, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertNotEqual<T : Equatable>(@autoclosure expression1: () throws -> ArraySlice<T>, @autoclosure _ expression2: () throws -> ArraySlice<T>, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.NotEqual
   
   // evaluate each expression exactly once
@@ -471,8 +515,8 @@ public func XCTAssertNotEqual<T : Equatable>(@autoclosure expression1: () -> Arr
   var expressionValue2Optional: ArraySlice<T>?
   
   let result = _XCTRunThrowableBlock {
-    expressionValue1Optional = expression1()
-    expressionValue2Optional = expression2()
+    expressionValue1Optional = try expression1()
+    expressionValue2Optional = try expression2()
   }
   
   switch result {
@@ -490,6 +534,9 @@ public func XCTAssertNotEqual<T : Equatable>(@autoclosure expression1: () -> Arr
       _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
     }
     
+  case .FailedWithError(let error):
+    _XCTRegisterFailure(false, "XCTAssertNotEqual failed: threw error \"\(error)\"", message, file, line)
+    
   case .FailedWithException(_, _, let reason):
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 1, reason as NSString), message, file, line)
     
@@ -498,7 +545,7 @@ public func XCTAssertNotEqual<T : Equatable>(@autoclosure expression1: () -> Arr
   }
 }
 
-public func XCTAssertNotEqual<T : Equatable>(@autoclosure expression1: () -> [T], @autoclosure _ expression2: () -> [T], @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertNotEqual<T : Equatable>(@autoclosure expression1: () throws -> [T], @autoclosure _ expression2: () throws -> [T], @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.NotEqual
   
   // evaluate each expression exactly once
@@ -506,8 +553,8 @@ public func XCTAssertNotEqual<T : Equatable>(@autoclosure expression1: () -> [T]
   var expressionValue2Optional: [T]?
   
   let result = _XCTRunThrowableBlock {
-    expressionValue1Optional = expression1()
-    expressionValue2Optional = expression2()
+    expressionValue1Optional = try expression1()
+    expressionValue2Optional = try expression2()
   }
   
   switch result {
@@ -525,6 +572,9 @@ public func XCTAssertNotEqual<T : Equatable>(@autoclosure expression1: () -> [T]
       _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
     }
     
+  case .FailedWithError(let error):
+    _XCTRegisterFailure(false, "XCTAssertNotEqual failed: threw error \"\(error)\"", message, file, line)
+    
   case .FailedWithException(_, _, let reason):
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 1, reason as NSString), message, file, line)
     
@@ -533,7 +583,7 @@ public func XCTAssertNotEqual<T : Equatable>(@autoclosure expression1: () -> [T]
   }
 }
 
-public func XCTAssertNotEqual<T, U : Equatable>(@autoclosure expression1: () -> [T: U], @autoclosure _ expression2: () -> [T: U], @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertNotEqual<T, U : Equatable>(@autoclosure expression1: () throws -> [T: U], @autoclosure _ expression2: () throws -> [T: U], @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.NotEqual
   
   // evaluate each expression exactly once
@@ -541,8 +591,8 @@ public func XCTAssertNotEqual<T, U : Equatable>(@autoclosure expression1: () -> 
   var expressionValue2Optional: [T: U]?
   
   let result = _XCTRunThrowableBlock {
-    expressionValue1Optional = expression1()
-    expressionValue2Optional = expression2()
+    expressionValue1Optional = try expression1()
+    expressionValue2Optional = try expression2()
   }
   
   switch result {
@@ -559,6 +609,9 @@ public func XCTAssertNotEqual<T, U : Equatable>(@autoclosure expression1: () -> 
       
       _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
     }
+    
+  case .FailedWithError(let error):
+    _XCTRegisterFailure(false, "XCTAssertNotEqual failed: threw error \"\(error)\"", message, file, line)
     
   case .FailedWithException(_, _, let reason):
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 1, reason as NSString), message, file, line)
@@ -583,7 +636,7 @@ func _XCTCheckEqualWithAccuracy_CGFloat(value1: CGFloat, _ value2: CGFloat, _ ac
     && (abs(value1 - value2) <= accuracy)
 }
 
-public func XCTAssertEqualWithAccuracy<T : FloatingPointType>(@autoclosure expression1: () -> T, @autoclosure _ expression2: () -> T, accuracy: T, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertEqualWithAccuracy<T : FloatingPointType>(@autoclosure expression1: () throws -> T, @autoclosure _ expression2: () throws -> T, accuracy: T, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.EqualWithAccuracy
   
   // evaluate each expression exactly once
@@ -591,8 +644,8 @@ public func XCTAssertEqualWithAccuracy<T : FloatingPointType>(@autoclosure expre
   var expressionValue2Optional: T?
   
   let result = _XCTRunThrowableBlock {
-    expressionValue1Optional = expression1()
-    expressionValue2Optional = expression2()
+    expressionValue1Optional = try expression1()
+    expressionValue2Optional = try expression2()
   }
   
   switch result {
@@ -628,6 +681,9 @@ public func XCTAssertEqualWithAccuracy<T : FloatingPointType>(@autoclosure expre
       _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString, accuracyStr as NSString), message, file, line)
     }
     
+  case .FailedWithError(let error):
+    _XCTRegisterFailure(false, "XCTAssertEqualWithAccuracy failed: threw error \"\(error)\"", message, file, line)
+    
   case .FailedWithException(_, _, let reason):
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 1, reason as NSString), message, file, line)
     
@@ -651,7 +707,7 @@ func _XCTCheckNotEqualWithAccuracy_CGFloat(value1: CGFloat, _ value2: CGFloat, _
     || (abs(value1 - value2) > accuracy)
 }
 
-public func XCTAssertNotEqualWithAccuracy<T : FloatingPointType>(@autoclosure expression1: () -> T, @autoclosure _ expression2: () -> T, _ accuracy: T, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertNotEqualWithAccuracy<T : FloatingPointType>(@autoclosure expression1: () throws -> T, @autoclosure _ expression2: () throws -> T, _ accuracy: T, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.NotEqualWithAccuracy
   
   // evaluate each expression exactly once
@@ -659,8 +715,8 @@ public func XCTAssertNotEqualWithAccuracy<T : FloatingPointType>(@autoclosure ex
   var expressionValue2Optional: T?
   
   let result = _XCTRunThrowableBlock {
-    expressionValue1Optional = expression1()
-    expressionValue2Optional = expression2()
+    expressionValue1Optional = try expression1()
+    expressionValue2Optional = try expression2()
   }
   
   switch result {
@@ -696,6 +752,9 @@ public func XCTAssertNotEqualWithAccuracy<T : FloatingPointType>(@autoclosure ex
       _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString, accuracyStr as NSString), message, file, line)
     }
     
+  case .FailedWithError(let error):
+    _XCTRegisterFailure(false, "XCTAssertNotEqualWithAccuracy failed: threw error \"\(error)\"", message, file, line)
+    
   case .FailedWithException(_, _, let reason):
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 1, reason as NSString), message, file, line)
     
@@ -704,7 +763,7 @@ public func XCTAssertNotEqualWithAccuracy<T : FloatingPointType>(@autoclosure ex
   }
 }
 
-public func XCTAssertGreaterThan<T : Comparable>(@autoclosure expression1: () -> T, @autoclosure _ expression2: () -> T, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertGreaterThan<T : Comparable>(@autoclosure expression1: () throws -> T, @autoclosure _ expression2: () throws -> T, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.GreaterThan
   
   // evaluate each expression exactly once
@@ -712,8 +771,8 @@ public func XCTAssertGreaterThan<T : Comparable>(@autoclosure expression1: () ->
   var expressionValue2Optional: T?
   
   let result = _XCTRunThrowableBlock {
-    expressionValue1Optional = expression1()
-    expressionValue2Optional = expression2()
+    expressionValue1Optional = try expression1()
+    expressionValue2Optional = try expression2()
   }
 
   switch result {
@@ -731,6 +790,9 @@ public func XCTAssertGreaterThan<T : Comparable>(@autoclosure expression1: () ->
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
   }
   
+  case .FailedWithError(let error):
+    _XCTRegisterFailure(false, "XCTAssertGreaterThan failed: threw error \"\(error)\"", message, file, line)
+    
   case .FailedWithException(_, _, let reason):
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 1, reason as NSString), message, file, line)
     
@@ -739,7 +801,7 @@ public func XCTAssertGreaterThan<T : Comparable>(@autoclosure expression1: () ->
   }
 }
 
-public func XCTAssertGreaterThanOrEqual<T : Comparable>(@autoclosure expression1: () -> T, @autoclosure _ expression2: () -> T, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__)
+public func XCTAssertGreaterThanOrEqual<T : Comparable>(@autoclosure expression1: () throws -> T, @autoclosure _ expression2: () throws -> T, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__)
 {
   let assertionType = _XCTAssertionType.GreaterThanOrEqual
   
@@ -748,8 +810,8 @@ public func XCTAssertGreaterThanOrEqual<T : Comparable>(@autoclosure expression1
   var expressionValue2Optional: T?
   
   let result = _XCTRunThrowableBlock {
-    expressionValue1Optional = expression1()
-    expressionValue2Optional = expression2()
+    expressionValue1Optional = try expression1()
+    expressionValue2Optional = try expression2()
   }
   
   switch result {
@@ -767,6 +829,9 @@ public func XCTAssertGreaterThanOrEqual<T : Comparable>(@autoclosure expression1
       _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
     }
     
+  case .FailedWithError(let error):
+    _XCTRegisterFailure(false, "XCTAssertGreaterThanOrEqual failed: threw error \"\(error)\"", message, file, line)
+    
   case .FailedWithException(_, _, let reason):
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 1, reason as NSString), message, file, line)
     
@@ -775,7 +840,7 @@ public func XCTAssertGreaterThanOrEqual<T : Comparable>(@autoclosure expression1
   }
 }
 
-public func XCTAssertLessThan<T : Comparable>(@autoclosure expression1: () -> T, @autoclosure _ expression2: () -> T, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertLessThan<T : Comparable>(@autoclosure expression1: () throws -> T, @autoclosure _ expression2: () throws -> T, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.LessThan
   
   // evaluate each expression exactly once
@@ -783,8 +848,8 @@ public func XCTAssertLessThan<T : Comparable>(@autoclosure expression1: () -> T,
   var expressionValue2Optional: T?
   
   let result = _XCTRunThrowableBlock {
-    expressionValue1Optional = expression1()
-    expressionValue2Optional = expression2()
+    expressionValue1Optional = try expression1()
+    expressionValue2Optional = try expression2()
   }
   
   switch result {
@@ -802,6 +867,9 @@ public func XCTAssertLessThan<T : Comparable>(@autoclosure expression1: () -> T,
       _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
     }
     
+  case .FailedWithError(let error):
+    _XCTRegisterFailure(false, "XCTAssertLessThan failed: threw error \"\(error)\"", message, file, line)
+    
   case .FailedWithException(_, _, let reason):
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 1, reason as NSString), message, file, line)
     
@@ -810,7 +878,7 @@ public func XCTAssertLessThan<T : Comparable>(@autoclosure expression1: () -> T,
   }
 }
 
-public func XCTAssertLessThanOrEqual<T : Comparable>(@autoclosure expression1: () -> T, @autoclosure _ expression2: () -> T, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__)
+public func XCTAssertLessThanOrEqual<T : Comparable>(@autoclosure expression1: () throws -> T, @autoclosure _ expression2: () throws -> T, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__)
 {
   let assertionType = _XCTAssertionType.LessThanOrEqual
   
@@ -819,8 +887,8 @@ public func XCTAssertLessThanOrEqual<T : Comparable>(@autoclosure expression1: (
   var expressionValue2Optional: T?
   
   let result = _XCTRunThrowableBlock {
-    expressionValue1Optional = expression1()
-    expressionValue2Optional = expression2()
+    expressionValue1Optional = try expression1()
+    expressionValue2Optional = try expression2()
   }
   
   switch result {
@@ -837,6 +905,9 @@ public func XCTAssertLessThanOrEqual<T : Comparable>(@autoclosure expression1: (
       
       _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
     }
+    
+  case .FailedWithError(let error):
+    _XCTRegisterFailure(false, "XCTAssertLessThanOrEqual failed: threw error \"\(error)\"", message, file, line)
     
   case .FailedWithException(_, _, let reason):
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 1, reason as NSString), message, file, line)
@@ -865,6 +936,9 @@ public func XCTAssertThrowsError<T>(@autoclosure expression: () throws -> T, @au
     } else {
       _XCTRegisterFailure(true, "XCTAssertThrowsError failed: did not throw an error", message, file, line)
     }
+    
+  case .FailedWithError(let error):
+    _XCTRegisterFailure(false, "XCTAssertLessThanOrEqual failed: threw error \"\(error)\"", message, file, line)
     
   case .FailedWithException(_, _, let reason):
     _XCTRegisterFailure(true, "XCTAssertThrowsError failed: throwing \(reason)", message, file, line)
