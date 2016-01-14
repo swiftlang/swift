@@ -2459,6 +2459,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(DeclContext *dc) {
   // Find the superclass type with the context matching that of the member.
   auto ownerNominal = dc->isNominalTypeOrNominalTypeExtensionContext();
   while (!baseTy->is<ErrorType>() &&
+         baseTy->getAnyNominal() &&
          baseTy->getAnyNominal() != ownerNominal) {
     baseTy = baseTy->getSuperclass(resolver);
     assert(baseTy && "Couldn't find appropriate context");
