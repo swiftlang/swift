@@ -35,7 +35,7 @@ public enum FloatingPointClassification {
 
 /// A set of common requirements for Swift's floating point types.
 public protocol FloatingPointType : Strideable {
-  typealias _BitsType
+  associatedtype _BitsType
 
   @warn_unused_result
   static func _fromBitPattern(bits: _BitsType) -> Self

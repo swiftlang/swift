@@ -1083,7 +1083,7 @@ internal func _forceCreateUniqueMutableBufferImpl<_Buffer : _ArrayBufferType>(
 }
 
 internal protocol _PointerFunctionType {
-  typealias Element
+  associatedtype Element
   func call(_: UnsafeMutablePointer<Element>, count: Int)
 }
 

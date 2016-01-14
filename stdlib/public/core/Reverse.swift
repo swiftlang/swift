@@ -11,11 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 public protocol ReverseIndexType : BidirectionalIndexType {
-  typealias Base : BidirectionalIndexType
+  associatedtype Base : BidirectionalIndexType
   
   /// A type that can represent the number of steps between pairs of
   /// `ReverseIndex` values where one value is reachable from the other.
-  typealias Distance: _SignedIntegerType = Base.Distance
+  associatedtype Distance: _SignedIntegerType = Base.Distance
 
   /// The successor position in the underlying (un-reversed)
   /// collection.
@@ -104,8 +104,8 @@ public struct ReverseRandomAccessIndex<Base: RandomAccessIndexType>
 }
 
 public protocol _ReverseCollectionType : CollectionType {
-  typealias Index : ReverseIndexType
-  typealias Base : CollectionType
+  associatedtype Index : ReverseIndexType
+  associatedtype Base : CollectionType
   var _base: Base {get}
 }
 
