@@ -760,7 +760,7 @@ namespace {
         if (outputTupleType) {
           // The input is exploded and the output is not. Translate values
           // and store them to a result tuple in memory.
-          assert(outputOrigType.isOpaque() &&
+          assert(outputOrigType.isTypeParameter() &&
                  "Output is not a tuple and is not opaque?");
 
           auto output = claimNextOutputType();
@@ -785,7 +785,7 @@ namespace {
         if (inputTupleType) {
           // The input is exploded and the output is not. Translate values
           // and store them to a result tuple in memory.
-          assert(inputOrigType.isOpaque() &&
+          assert(inputOrigType.isTypeParameter() &&
                  "Input is not a tuple and is not opaque?");
 
           return translateAndExplodeOutOf(inputOrigType,
@@ -984,7 +984,7 @@ namespace {
                                   AbstractionPattern outputOrigType,
                                   CanTupleType outputSubstType,
                                   ManagedValue inputTupleAddr) {
-      assert(inputOrigType.isOpaque());
+      assert(inputOrigType.isTypeParameter());
       assert(outputOrigType.matchesTuple(outputSubstType));
       assert(!inputSubstType->hasInOut() &&
              !outputSubstType->hasInOut());
@@ -1031,7 +1031,7 @@ namespace {
                                  CanTupleType outputSubstType,
                                  TemporaryInitialization &tupleInit) {
       assert(inputOrigType.matchesTuple(inputSubstType));
-      assert(outputOrigType.isOpaque());
+      assert(outputOrigType.isTypeParameter());
       assert(!inputSubstType->hasInOut() &&
              !outputSubstType->hasInOut());
       assert(inputSubstType->getNumElements() ==

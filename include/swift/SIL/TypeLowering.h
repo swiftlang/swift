@@ -481,7 +481,8 @@ class TypeConverter {
     IsDependent_t isDependent() const {
       if (SubstType->hasTypeParameter())
         return IsDependent;
-      if (!OrigType.isOpaque() && OrigType.getType()->hasTypeParameter())
+      if (!OrigType.isTypeParameter() &&
+          OrigType.getType()->hasTypeParameter())
         return IsDependent;
       return IsNotDependent;
     }

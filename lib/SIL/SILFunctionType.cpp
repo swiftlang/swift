@@ -262,7 +262,9 @@ enum class ConventionsKind : uint8_t {
                             const TypeLowering &substTL) {
       // If the substituted type is passed indirectly, so must the
       // unsubstituted type.
-      if (origType.isOpaque() || substTL.isPassedIndirectly()) {
+      if ((origType.isTypeParameter() &&
+           !origType.requiresClass(*M.getSwiftModule()))||
+          substTL.isPassedIndirectly()) {
         return true;
 
       // If the substitution didn't change the type, then a negative
@@ -340,9 +342,10 @@ enum class ConventionsKind : uint8_t {
       // l-value type -- then it's a valid target for substitution and
       // we should not expand it.
       if (isa<TupleType>(substType) &&
-          (!origType.isOpaque() || !substType->isMaterializable())) {
+          (!origType.isTypeParameter() ||
+           !substType->isMaterializable())) {
         auto substTuple = cast<TupleType>(substType);
-        assert(origType.isOpaque() ||
+        assert(origType.isTypeParameter() ||
                origType.getNumTupleElements() == substTuple->getNumElements());
         for (auto i : indices(substTuple.getElementTypes())) {
           visit(origType.getTupleElementType(i),
@@ -358,7 +361,7 @@ enum class ConventionsKind : uint8_t {
       auto &substTL = M.Types.getTypeLowering(origType, substType);
       ParameterConvention convention;
       if (isa<InOutType>(substType)) {
-        assert(origType.isOpaque() || origType.getAs<InOutType>());
+        assert(origType.isTypeParameter() || origType.getAs<InOutType>());
         convention = ParameterConvention::Indirect_Inout;
       } else if (isPassedIndirectly(origType, substType, substTL)) {
         convention = Convs.getIndirectParameter(origParamIndex, origType);
@@ -436,7 +439,7 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
   // for thick or polymorphic functions.  We don't need to worry about
   // non-opaque patterns because the type-checker forbids non-thick
   // function types from having generic parameters or results.
-  if (origType.isOpaque() &&
+  if (origType.isTypeParameter() &&
       substFnOldType->getExtInfo().getSILRepresentation()
         != SILFunctionType::Representation::Thick &&
       isa<FunctionType>(substFnOldType)) {
@@ -509,7 +512,8 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
 
   // If the unsubstituted type is dependent, then we use the most
   // general type for the function, which involves an indirect result.
-  } else if (origResultType.isOpaque()) {
+  } else if (origResultType.isTypeParameter() &&
+             !origResultType.requiresClass(*M.getSwiftModule())) {
     hasIndirectResult = true;
 
   // If the substitution didn't change the result type, we can use the

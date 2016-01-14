@@ -49,31 +49,6 @@ TypeConverter::getIndicesAbstractionPattern(SubscriptDecl *decl) {
   return AbstractionPattern(decl->getIndicesType());
 }
 
-bool AbstractionPattern::isOpaqueType(CanGenericSignature signature,
-                                      CanGenericTypeParamType type) {
-  // Enormous hack!  We need to be asking the signature about this
-  // in a more principled way.
-  for (auto &reqt : signature->getRequirements()) {
-    switch (reqt.getKind()) {
-    case RequirementKind::Superclass:
-      if (CanType(reqt.getFirstType()) != type) continue;
-      return false;
-
-    case RequirementKind::Conformance:
-      if (CanType(reqt.getFirstType()) != type) continue;
-      if (cast<ProtocolType>(CanType(reqt.getSecondType()))->requiresClass())
-        return false;
-      continue;
-
-    case RequirementKind::SameType:
-    case RequirementKind::WitnessMarker:
-      continue;
-    }
-    llvm_unreachable("bad requirement kind");
-  }
-  return true;
-}
-
 static const clang::Type *getClangType(const clang::Decl *decl) {
   if (auto valueDecl = dyn_cast<clang::ValueDecl>(decl)) {
     return valueDecl->getType().getTypePtr();
@@ -183,6 +158,8 @@ bool AbstractionPattern::matchesTuple(CanTupleType substType) {
   case Kind::ClangFunctionParamTupleType:
   case Kind::ClangType:
   case Kind::Type:
+    if (isTypeParameter())
+      return true;
     auto tuple = dyn_cast<TupleType>(getType());
     return (tuple && tuple->getNumElements() == substType->getNumElements());
   }
@@ -242,6 +219,8 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
                               cast<TupleType>(getType()).getElementType(index),
                               getClangArrayElementType(getClangType(), index));
   case Kind::Type:
+    if (isTypeParameter())
+      return AbstractionPattern::getOpaque();
     return AbstractionPattern(getGenericSignature(),
                               cast<TupleType>(getType()).getElementType(index));
   case Kind::ClangFunctionParamTupleType:
@@ -439,6 +418,8 @@ AbstractionPattern AbstractionPattern::dropLastTupleElement() const {
   case Kind::ObjCMethodFormalParamTupleType:
     llvm_unreachable("operation is not needed on method abstraction patterns");
   case Kind::Type:
+    if (isTypeParameter())
+      return AbstractionPattern::getOpaque();
     return AbstractionPattern(getGenericSignature(),
                               dropLastElement(getType()));
 
@@ -500,6 +481,8 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
   case Kind::Opaque:
     return *this;
   case Kind::Type:
+    if (isTypeParameter())
+      return AbstractionPattern::getOpaque();
     return AbstractionPattern(getGenericSignatureForFunctionComponent(),
                               getResultType(getType()));
   case Kind::ClangType: {
@@ -535,6 +518,8 @@ AbstractionPattern AbstractionPattern::getFunctionInputType() const {
   case Kind::Opaque:
     return *this;
   case Kind::Type:
+    if (isTypeParameter())
+      return AbstractionPattern::getOpaque();
     return AbstractionPattern(getGenericSignatureForFunctionComponent(),
                               cast<AnyFunctionType>(getType()).getInput());
   case Kind::ClangType: {

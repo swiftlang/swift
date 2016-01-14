@@ -1393,7 +1393,7 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
       auto origMeta = origType.getAs<MetatypeType>();
       if (!origMeta) {
         // If the metatype matches a dependent type, it must be thick.
-        assert(origType.isOpaque());
+        assert(origType.isTypeParameter());
         repr = MetatypeRepresentation::Thick;
       } else {
         // Otherwise, we're thin if the metatype is thinnable both
@@ -1456,7 +1456,7 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
       if (origType.isExactType(substType)) {
         return AbstractionPattern(origType.getGenericSignature(),
                                   substLoweredType);
-      } else if (origType.isOpaque()) {
+      } else if (origType.isTypeParameter()) {
         return origType;
       } else {
         auto origFnType = cast<AnyFunctionType>(origType.getType());
