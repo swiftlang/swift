@@ -528,7 +528,7 @@ DiagnosticState::Behavior DiagnosticState::determineBehavior(DiagID id) {
   //   3) If the user provided a behavior for this diagnostic's kind, follow
   //      that
   if (diagInfo.kind == DiagnosticKind::Warning) {
-    if (ignoreAllWarnings)
+    if (suppressWarnings)
       return set(Behavior::Ignore);
     if (warningsAsErrors)
       return set(Behavior::Error);

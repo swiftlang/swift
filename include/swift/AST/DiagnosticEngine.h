@@ -399,7 +399,7 @@ namespace swift {
     bool showDiagnosticsAfterFatalError = false;
 
     /// \brief Don't emit any warnings
-    bool ignoreAllWarnings = false;
+    bool suppressWarnings = false;
 
     /// \brief Emit all warnings as errors
     bool warningsAsErrors = false;
@@ -431,8 +431,8 @@ namespace swift {
     }
 
     /// \brief Whether to skip emitting warnings
-    void setIgnoreAllWarnings(bool val) { ignoreAllWarnings = val; }
-    bool getIgnoreAllWarnings() const { return ignoreAllWarnings; }
+    void setSuppressWarnings(bool val) { suppressWarnings = val; }
+    bool getSuppressWarnings() const { return suppressWarnings; }
 
     /// \brief Whether to treat warnings as errors
     void setWarningsAsErrors(bool val) { warningsAsErrors = val; }
@@ -506,9 +506,9 @@ namespace swift {
     }
 
     /// \brief Whether to skip emitting warnings
-    void setIgnoreAllWarnings(bool val) { state.setIgnoreAllWarnings(val); }
-    bool getIgnoreAllWarnings() const {
-      return state.getIgnoreAllWarnings();
+    void setSuppressWarnings(bool val) { state.setSuppressWarnings(val); }
+    bool getSuppressWarnings() const {
+      return state.getSuppressWarnings();
     }
 
     /// \brief Whether to treat warnings as errors

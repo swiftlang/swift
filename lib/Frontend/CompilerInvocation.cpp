@@ -922,6 +922,11 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
     Args.hasArg(OPT_show_diagnostics_after_fatal);
   Opts.UseColor |= Args.hasArg(OPT_color_diagnostics);
   Opts.FixitCodeForAllDiagnostics |= Args.hasArg(OPT_fixit_all);
+  Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
+  Opts.WarningsAsErrors |= Args.hasArg(OPT_warnings_as_errors);
+
+  assert(!(Opts.WarningsAsErrors && Opts.SuppressWarnings) &&
+         "conflicting arguments; should of been caught by driver");
 
   return false;
 }

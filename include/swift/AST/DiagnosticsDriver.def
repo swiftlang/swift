@@ -115,6 +115,10 @@ ERROR(error_input_changed_during_build,none,
       "input file '%0' was modified during the build",
       (StringRef))
 
+ERROR(error_conflicting_options, none,
+      "conflicting options '%0' and '%1'",
+      (StringRef, StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
