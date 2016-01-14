@@ -154,9 +154,12 @@ static void addCommonFrontendArgs(const ToolChain &TC,
 ToolChain::InvocationInfo
 ToolChain::constructInvocation(const CompileJobAction &job,
                                const JobContext &context) const {
-  ArgStringList Arguments;
+  InvocationInfo II{SWIFT_EXECUTABLE_NAME};
+  ArgStringList &Arguments = II.Arguments;
 
-  if (context.OI.CompilerMode != OutputInfo::Mode::UpdateCode)
+  if (context.OI.CompilerMode == OutputInfo::Mode::UpdateCode)
+    II.ExecutableName = SWIFT_UPDATE_NAME;
+  else
     Arguments.push_back("-frontend");
 
   // Determine the frontend mode option.
@@ -358,20 +361,25 @@ ToolChain::constructInvocation(const CompileJobAction &job,
 
   // Add the output file argument if necessary.
   if (context.Output.getPrimaryOutputType() != types::TY_Nothing) {
-    for (auto &FileName : context.Output.getPrimaryOutputFilenames()) {
-      Arguments.push_back("-o");
-      Arguments.push_back(FileName.c_str());
+    if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
+        context.Output.getPrimaryOutputFilenames().size() > TOO_MANY_FILES) {
+      Arguments.push_back("-output-filelist");
+      Arguments.push_back(context.getTemporaryFilePath("outputs", ""));
+      II.FilelistInfo = {Arguments.back(),
+                         context.Output.getPrimaryOutputType(),
+                         FilelistInfo::Output};
+    } else {
+      for (auto &FileName : context.Output.getPrimaryOutputFilenames()) {
+        Arguments.push_back("-o");
+        Arguments.push_back(FileName.c_str());
+      }
     }
   }
 
   if (context.Args.hasArg(options::OPT_embed_bitcode_marker))
     Arguments.push_back("-embed-bitcode-marker");
 
-  auto program = SWIFT_EXECUTABLE_NAME;
-  if (context.OI.CompilerMode == OutputInfo::Mode::UpdateCode)
-    program = SWIFT_UPDATE_NAME;
-
-  return {program, Arguments};
+  return II;
 }
 
 ToolChain::InvocationInfo

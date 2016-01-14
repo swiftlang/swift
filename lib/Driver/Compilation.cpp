@@ -232,7 +232,7 @@ static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags) {
   if (filelistInfo.whichFiles == FilelistInfo::Input) {
     // FIXME: Duplicated from ToolChains.cpp.
     for (const Job *input : job->getInputs()) {
-      auto &outputInfo = input->getOutput();
+      const CommandOutput &outputInfo = input->getOutput();
       if (outputInfo.getPrimaryOutputType() == filelistInfo.type) {
         for (auto &output : outputInfo.getPrimaryOutputFilenames())
           out << output << "\n";
@@ -243,7 +243,10 @@ static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags) {
       }
     }
   } else {
-    llvm_unreachable("unimplemented");
+    const CommandOutput &outputInfo = job->getOutput();
+    assert(outputInfo.getPrimaryOutputType() == filelistInfo.type);
+    for (auto &output : outputInfo.getPrimaryOutputFilenames())
+      out << output << "\n";
   }
 
   return true;
