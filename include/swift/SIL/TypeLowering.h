@@ -671,20 +671,6 @@ public:
     return getConstantInfo(constant).getSILType();
   }
 
-  /// Returns the formal AST type of a constant reference.
-  /// Parameters remain uncurried and unbridged.
-  CanAnyFunctionType getConstantFormalType(SILDeclRef constant)
-  SIL_FUNCTION_TYPE_DEPRECATED {
-    return getConstantInfo(constant).FormalType;
-  }
-
-  /// Returns the lowered AST type of a constant reference.
-  /// Parameters have been uncurried and bridged.
-  CanAnyFunctionType getConstantLoweredType(SILDeclRef constant)
-  SIL_FUNCTION_TYPE_DEPRECATED {
-    return getConstantInfo(constant).LoweredType;
-  }
-
   /// Returns the SILFunctionType for the given declaration.
   CanSILFunctionType getConstantFunctionType(SILDeclRef constant) {
     return getConstantInfo(constant).SILFnType;
