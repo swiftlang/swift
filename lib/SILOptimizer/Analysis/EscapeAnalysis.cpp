@@ -1207,6 +1207,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       return;
     case ValueKind::StrongReleaseInst:
     case ValueKind::ReleaseValueInst:
+    case ValueKind::StrongUnpinInst:
     case ValueKind::UnownedReleaseInst: {
       SILValue OpV = I->getOperand(0);
       if (CGNode *AddrNode = ConGraph->getNode(OpV, this)) {
@@ -1314,6 +1315,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case ValueKind::BridgeObjectToRefInst:
     case ValueKind::UncheckedAddrCastInst:
     case ValueKind::UnconditionalCheckedCastInst:
+    case ValueKind::StrongPinInst:
       // A cast is almost like a projection.
       if (CGNode *OpNode = ConGraph->getNode(I->getOperand(0), this)) {
         ConGraph->setNode(I, OpNode);
