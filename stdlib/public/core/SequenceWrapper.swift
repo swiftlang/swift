@@ -19,8 +19,8 @@
 /// A type that is just a wrapper over some base Sequence
 public // @testable
 protocol _SequenceWrapperType {
-  typealias Base : SequenceType
-  typealias Generator : GeneratorType = Base.Generator
+  associatedtype Base : SequenceType
+  associatedtype Generator : GeneratorType = Base.Generator
   
   var _base: Base {get}
 }

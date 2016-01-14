@@ -201,10 +201,10 @@ import SwiftShims
 /// This protocol is only used for compile-time checks that
 /// every storage type implements all required operations.
 internal protocol _HashStorageType {
-  typealias Key
-  typealias Value
-  typealias Index
-  typealias SequenceElement
+  associatedtype Key
+  associatedtype Value
+  associatedtype Index
+  associatedtype SequenceElement
   var startIndex: Index { get }
   var endIndex: Index { get }
 

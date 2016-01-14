@@ -96,7 +96,7 @@ public protocol _DisallowMixedSignArithmetic : _IntegerType {
   // Int(1), which would otherwise compile due to the arithmetic
   // operators defined for Strideable types (unsigned types are
   // Strideable).
-  typealias _DisallowMixedSignArithmetic : SignedIntegerType = Int
+  associatedtype _DisallowMixedSignArithmetic : SignedIntegerType = Int
 }
 
 /// A set of common requirements for Swift's unsigned integer types.

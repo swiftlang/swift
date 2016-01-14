@@ -73,7 +73,7 @@ protocol _ArrayType
 
   //===--- implementation detail  -----------------------------------------===//
 
-  typealias _Buffer : _ArrayBufferType
+  associatedtype _Buffer : _ArrayBufferType
   init(_ buffer: _Buffer)
 
   // For testing.

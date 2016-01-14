@@ -14,7 +14,7 @@
 @swift3_migration(renamed="Interval")
 public protocol IntervalType {
   /// The type of the `Interval`'s endpoints.
-  typealias Bound : Comparable
+  associatedtype Bound : Comparable
 
   /// Returns `true` iff the interval contains `value`.
   @warn_unused_result

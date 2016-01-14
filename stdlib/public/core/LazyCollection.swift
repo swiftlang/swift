@@ -28,7 +28,7 @@ public protocol LazyCollectionType
   /// possibly with a simpler type.
   ///
   /// - See also: `elements`
-  typealias Elements: CollectionType = Self
+  associatedtype Elements: CollectionType = Self
 
 }
 
