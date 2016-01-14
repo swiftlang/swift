@@ -91,9 +91,9 @@ static void debugFailWithCrash() {
   LLVM_BUILTIN_TRAP;
 }
 
-static unsigned readInputFileList(std::vector<std::string> &inputFiles,
-                                  const llvm::opt::Arg *filelistPath,
-                                  const llvm::opt::Arg *primaryFileArg) {
+static unsigned readFileList(std::vector<std::string> &inputFiles,
+                             const llvm::opt::Arg *filelistPath,
+                             const llvm::opt::Arg *primaryFileArg = nullptr) {
   bool foundPrimaryFile = false;
   unsigned primaryFileIndex = 0;
   StringRef primaryFile;
@@ -173,8 +173,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(OPT_filelist)) {
     const Arg *primaryFileArg = Args.getLastArg(OPT_primary_file);
-    auto primaryFileIndex = readInputFileList(Opts.InputFilenames, A,
-                                              primaryFileArg);
+    auto primaryFileIndex = readFileList(Opts.InputFilenames, A,
+                                         primaryFileArg);
     if (primaryFileArg)
       Opts.PrimaryInput = SelectedInput(primaryFileIndex);
     assert(!Args.hasArg(OPT_INPUT) && "mixing -filelist with inputs");
@@ -328,7 +328,12 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   else
     Opts.InputKind = InputFileKind::IFK_Swift;
 
-  Opts.OutputFilenames = Args.getAllArgValues(OPT_o);
+  if (const Arg *A = Args.getLastArg(OPT_output_filelist)) {
+    readFileList(Opts.OutputFilenames, A);
+    assert(!Args.hasArg(OPT_o) && "don't use -o with -output-filelist");
+  } else {
+    Opts.OutputFilenames = Args.getAllArgValues(OPT_o);
+  }
 
   bool UserSpecifiedModuleName = false;
   {

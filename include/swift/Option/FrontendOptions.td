@@ -30,6 +30,8 @@ def primary_file : Separate<["-"], "primary-file">,
 
 def filelist : Separate<["-"], "filelist">,
   HelpText<"Specify source inputs in a file rather than on the command line">;
+def output_filelist : Separate<["-"], "output-filelist">,
+  HelpText<"Specify outputs in a file rather than on the command line">;
 
 def emit_module_doc : Flag<["-"], "emit-module-doc">,
   HelpText<"Emit a module documentation file based on documentation "
