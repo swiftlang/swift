@@ -17,6 +17,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Parse/Parser.h"
 #include "swift/Serialization/BCReadingExtras.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -1980,6 +1981,22 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
           Attr = ObjCAttr::create(ctx, ObjCSelector(ctx, numArgs-1, pieces),
                                   isImplicitName);
         Attr->setImplicit(isImplicit);
+        break;
+      }
+
+      case decls_block::Swift3Migration_DECL_ATTR: {
+        bool isImplicit;
+        uint64_t renameLength;
+        uint64_t messageLength;
+        serialization::decls_block::Swift3MigrationDeclAttrLayout::readRecord(
+          scratch, isImplicit, renameLength, messageLength);
+        StringRef renameStr = blobData.substr(0, renameLength);
+        StringRef message = blobData.substr(renameLength,
+                                            renameLength + messageLength);
+        DeclName renamed = parseDeclName(getContext(), renameStr);
+        Attr = new (ctx) Swift3MigrationAttr(SourceLoc(), SourceLoc(),
+                                             SourceLoc(), renamed,
+                                             message, SourceLoc(), isImplicit);
         break;
       }
 
