@@ -72,8 +72,8 @@ public class SubscriptCursorTest {
 
 // RUN: rm -rf %t.tmp
 // RUN: mkdir %t.tmp
-// RUN: %swiftc_driver -emit-module -target x86_64-apple-macosx10.9 -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
-// RUN: %sourcekitd-test -req=cursor -pos=9:8 %s -- -triple x86_64-apple-macosx10.9 -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s | FileCheck -check-prefix=CHECK1 %s
+// RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
+// RUN: %sourcekitd-test -req=cursor -pos=9:8 %s -- -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s | FileCheck -check-prefix=CHECK1 %s
 // CHECK1:      source.lang.swift.ref.var.global (4:5-4:9)
 // CHECK1-NEXT: glob
 // CHECK1-NEXT: s:v11cursor_info4globSi{{$}}
