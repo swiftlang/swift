@@ -584,8 +584,6 @@ ERROR(throw_in_function_type,type_parsing,none,
 // Enum Types
 ERROR(expected_expr_enum_case_raw_value,type_parsing,PointsToFirstBadToken,
       "expected expression after '=' in 'case'", ())
-ERROR(not_a_proper_raw_value_expression,type_parsing,none,
-      "not a proper raw value expression", ())
 ERROR(nonliteral_enum_case_raw_value,type_parsing,PointsToFirstBadToken,
       "raw value for enum case must be a literal", ())
 
