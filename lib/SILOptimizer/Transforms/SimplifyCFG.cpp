@@ -20,6 +20,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
+#include "swift/SILOptimizer/Analysis/ProgramTerminationAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Local.h"
@@ -35,6 +36,7 @@ using namespace swift;
 STATISTIC(NumBlocksDeleted,  "Number of unreachable blocks removed");
 STATISTIC(NumBlocksMerged,   "Number of blocks merged together");
 STATISTIC(NumJumpThreads,    "Number of jumps threaded");
+STATISTIC(NumTermBlockSimplified,  "Number of programterm block simplified");
 STATISTIC(NumConstantFolded, "Number of terminators constant folded");
 STATISTIC(NumDeadArguments,  "Number of unused arguments removed");
 STATISTIC(NumSROAArguments, "Number of aggregate argument levels split by "
@@ -169,6 +171,7 @@ namespace {
     bool simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI);
     bool simplifySwitchEnumBlock(SwitchEnumInst *SEI);
     bool simplifyUnreachableBlock(UnreachableInst *UI);
+    bool simplifyProgramTerminationBlock(SILBasicBlock *BB);
     bool simplifyArgument(SILBasicBlock *BB, unsigned i);
     bool simplifyArgs(SILBasicBlock *BB);
     bool trySimplifyCheckedCastBr(TermInst *Term, DominanceInfo *DT);
@@ -2135,6 +2138,9 @@ bool SimplifyCFG::simplifyBlocks() {
 
     // Simplify the block argument list.
     Changed |= simplifyArgs(BB);
+
+    // Simplify the program termination block.
+    Changed |= simplifyProgramTerminationBlock(BB);
   }
 
   return Changed;
@@ -3369,6 +3375,40 @@ bool SimplifyCFG::simplifyArgs(SILBasicBlock *BB) {
     removeArgument(BB, i);
     Changed = true;
   }
+
+  return Changed;
+}
+
+bool SimplifyCFG::simplifyProgramTerminationBlock(SILBasicBlock *BB) {
+  // If this is not ARC-inert, do not do anything to it.
+  //
+  // TODO: should we use ProgramTerminationAnalysis ?. The reason we do not
+  // use the analysis is because the CFG is likely to be invalidated right
+  // after this pass, o we do not really get the benefit of reusing the
+  // computation for the next iteration of the pass.
+  if (!isARCInertTrapBB(BB))
+    return false;
+
+  // This is going to be the last basic block this program is going to execute
+  // and this block is inert from the ARC's prospective, no point to do any
+  // releases at this point.
+  bool Changed = false;
+  llvm::SmallPtrSet<SILInstruction *, 4> InstsToRemove;
+  for (auto &I : *BB) {
+    if (!isa<StrongReleaseInst>(I) && !isa<UnownedReleaseInst>(I) && 
+        !isa<ReleaseValueInst>(I) && !isa<DestroyAddrInst>(I))
+      continue;
+    InstsToRemove.insert(&I);
+  }
+
+  // Remove the instructions.
+  for (auto I : InstsToRemove) {
+    I->eraseFromParent();
+    Changed = true;
+  }
+
+  if (Changed)
+   ++NumTermBlockSimplified;
 
   return Changed;
 }
