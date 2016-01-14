@@ -131,6 +131,15 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
     Types(*new TypeConverter(*this))
 {
   dispatcher.addGenModule(SF, this);
+
+  // If the command line contains an explicit request about whether to add
+  // LLVM value names, honor it.  Otherwise, add value names only if the
+  // final result is textual LLVM assembly.
+  if (Opts.HasValueNamesSetting) {
+    EnableValueNames = Opts.ValueNames;
+  } else {
+    EnableValueNames = (Opts.OutputKind == IRGenOutputKind::LLVMAssembly);
+  }
   
   VoidTy = llvm::Type::getVoidTy(getLLVMContext());
   Int1Ty = llvm::Type::getInt1Ty(getLLVMContext());

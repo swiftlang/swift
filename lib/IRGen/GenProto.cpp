@@ -72,6 +72,43 @@
 using namespace swift;
 using namespace irgen;
 
+static bool shouldSetName(IRGenModule &IGM, llvm::Value *value, CanType type) {
+  // If value names are globally disabled, honor that.
+  if (!IGM.EnableValueNames) return false;
+
+  // Suppress value names for values with opened existentials.
+  if (type->hasOpenedExistential()) return false;
+
+  // If the value already has a name, honor that.
+  if (value->hasName()) return false;
+
+  // Only do this for local values.
+  return (isa<llvm::Instruction>(value) || isa<llvm::Argument>(value));
+}
+
+void irgen::setTypeMetadataName(IRGenModule &IGM, llvm::Value *metadata,
+                                CanType type) {
+  if (!shouldSetName(IGM, metadata, type)) return;
+
+  SmallString<128> name; {
+    llvm::raw_svector_ostream out(name);
+    type.print(out);
+  }
+  metadata->setName(type->getString());
+}
+
+void irgen::setProtocolWitnessTableName(IRGenModule &IGM, llvm::Value *wtable,
+                                        CanType type,
+                                        ProtocolDecl *requirement) {
+  if (!shouldSetName(IGM, wtable, type)) return;
+
+  SmallString<128> name; {
+    llvm::raw_svector_ostream out(name);
+    type.print(out);
+    out << '.' << requirement->getNameStr();
+  }
+  wtable->setName(name);
+}
 
 namespace {
   /// A concrete witness table, together with its known layout.
@@ -1886,10 +1923,11 @@ getAssociatedTypeMetadataAccessFunction(AssociatedTypeDecl *requirement,
   Explosion parameters = IGF.collectParameters();
 
   llvm::Value *self = parameters.claimNext();
-  self->setName("Self");
+  setTypeMetadataName(IGM, self, ConcreteType);
 
   Address destTable(parameters.claimNext(), IGM.getPointerAlignment());
-  destTable.getAddress()->setName("wtable");
+  setProtocolWitnessTableName(IGM, destTable.getAddress(), ConcreteType,
+                              requirement->getProtocol());
 
   // If the associated type is directly fulfillable from the type,
   // we don't need a cache entry.
@@ -1968,13 +2006,16 @@ getAssociatedTypeWitnessTableAccessFunction(AssociatedTypeDecl *requirement,
   Explosion parameters = IGF.collectParameters();
 
   llvm::Value *associatedTypeMetadata = parameters.claimNext();
-  associatedTypeMetadata->setName(Twine("Self.") + requirement->getNameStr());
+  if (IGM.EnableValueNames)
+    associatedTypeMetadata->setName(Twine(ConcreteType->getString())
+                                      + "." + requirement->getNameStr());
 
   llvm::Value *self = parameters.claimNext();
-  self->setName("Self");
+  setTypeMetadataName(IGM, self, ConcreteType);
 
   Address destTable(parameters.claimNext(), IGM.getPointerAlignment());
-  destTable.getAddress()->setName("wtable");
+  setProtocolWitnessTableName(IGM, destTable.getAddress(), ConcreteType,
+                              requirement->getProtocol());
 
   const ConformanceInfo *conformanceI = nullptr;
   if (associatedConformance.isConcrete()) {
@@ -2944,7 +2985,7 @@ namespace {
         CanType argTy = getArgTypeInContext(source.getParamIndex());
 
         llvm::Value *metatype = in.claimNext();
-        metatype->setName("Self");
+        setTypeMetadataName(IGF.IGM, metatype, argTy);
 
         // Mark this as the cached metatype for the l-value's object type.
         IGF.setUnscopedLocalTypeData(argTy, LocalTypeDataKind::forTypeMetadata(),
@@ -2959,6 +3000,7 @@ namespace {
         
         // Mark this as the cached metatype for Self.
         CanType argTy = getArgTypeInContext(FnType->getParameters().size() - 1);
+        setTypeMetadataName(IGF.IGM, metadata, argTy);
         IGF.setUnscopedLocalTypeData(argTy,
                                LocalTypeDataKind::forTypeMetadata(), metadata);
         return metadata;
@@ -3173,6 +3215,7 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
 
     if (source) {
       source = emitArgumentMetadataRef(IGF, generic->getDecl(), index, source);
+      setTypeMetadataName(IGF.IGM, source, sourceKey.Type);
     }
     return source;
   }
@@ -3191,9 +3234,10 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
     sourceKey.Kind = LocalTypeDataKind::forProtocolWitnessTable(conformance);
 
     if (source) {
+      auto protocol = conformance.getRequirement();
       source = emitArgumentWitnessTableRef(IGF, generic->getDecl(), argIndex,
-                                           conformance.getRequirement(),
-                                           source);
+                                           protocol, source);
+      setProtocolWitnessTableName(IGF.IGM, source, sourceKey.Type, protocol);
     }
     return source;
   }
@@ -3212,6 +3256,7 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
 
     if (source) {
       source = emitParentMetadataRef(IGF, nominalDecl, source);
+      setTypeMetadataName(IGF.IGM, source, sourceKey.Type);
     }
     return source;
   }
@@ -3240,6 +3285,8 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
       source = emitInvariantLoadOfOpaqueWitness(IGF, source,
                                                 entry.getOutOfLineBaseIndex());
       source = IGF.Builder.CreateBitCast(source, IGF.IGM.WitnessTablePtrTy);
+      setProtocolWitnessTableName(IGF.IGM, source, sourceKey.Type,
+                                  inheritedProtocol);
     }
     return source;
   }
@@ -3282,7 +3329,6 @@ static void getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF,
                                           llvm::Function::arg_iterator &it,
                                           CanType abstractType) {
   llvm::Value *arg = &*it++;
-  arg->setName("Self");
   assert(arg->getType() == IGF.IGM.TypeMetadataPtrTy &&
          "Self argument is not a type?!");
 

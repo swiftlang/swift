@@ -2514,6 +2514,7 @@ irgen::emitFieldTypeAccessor(IRGenModule &IGM,
 
   CanType formalType = type->getDeclaredTypeInContext()->getCanonicalType();
   llvm::Value *metadata = IGF.collectParameters().claimNext();
+  setTypeMetadataName(IGM, metadata, formalType);
   
   // Get the address at which the field type vector reference should be
   // cached.
@@ -3719,7 +3720,7 @@ emitInvariantLoadFromMetadataAtIndex(IRGenFunction &IGF,
                                      llvm::Value *metadata,
                                      int index,
                                      llvm::Type *objectTy,
-                                     const llvm::Twine &suffix = "") {
+                               const Twine &suffix = Twine::createNull()) {
   auto result = emitLoadFromMetadataAtIndex(IGF, metadata, index, objectTy,
                                             suffix);
   IGF.setInvariantLoad(result);
@@ -4128,7 +4129,8 @@ static llvm::Value *emitLoadOfHeapMetadataRef(IRGenFunction &IGF,
 
     auto metadata = IGF.Builder.CreateLoad(Address(slot,
                                                IGF.IGM.getPointerAlignment()));
-    metadata->setName(llvm::Twine(object->getName()) + ".metadata");
+    if (IGF.IGM.EnableValueNames && object->hasName())
+      metadata->setName(llvm::Twine(object->getName()) + ".metadata");
     return metadata;
   }
       

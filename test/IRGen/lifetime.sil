@@ -18,11 +18,8 @@ bb0(%x : $*T):
   return %0 : $()
 }
 // CHECK:    define void @generic([[OPAQUE]]* noalias nocapture, [[TYPE]]* %T) {{.*}} {
-//  Type metadata.
-// CHECK: alloca
 //   The fixed-size buffer.
 // CHECK:      [[YBUF:%.*]] = alloca [[BUFFER:.*]], align
-// CHECK-NEXT: store %swift.type
 // CHECK-NEXT: [[YBUFLIFE:%.*]] = bitcast [[BUFFER]]* [[YBUF]] to i8*
 // CHECK-NEXT: call void @llvm.lifetime.start(i64 [[BUFFER_SIZE:12|24]], i8* [[YBUFLIFE]])
 //   Allocate it.

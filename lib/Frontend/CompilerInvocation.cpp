@@ -1125,6 +1125,13 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.LinkLibraries.push_back(LinkLibrary(A->getValue(), Kind));
   }
 
+  if (auto valueNames = Args.getLastArg(OPT_disable_llvm_value_names,
+                                        OPT_enable_llvm_value_names)) {
+    Opts.HasValueNamesSetting = true;
+    Opts.ValueNames =
+      valueNames->getOption().matches(OPT_enable_llvm_value_names);
+  }
+
   Opts.DisableLLVMOptzns |= Args.hasArg(OPT_disable_llvm_optzns);
   Opts.DisableLLVMARCOpts |= Args.hasArg(OPT_disable_llvm_arc_opts);
   Opts.DisableLLVMSLPVectorizer |= Args.hasArg(OPT_disable_llvm_slp_vectorizer);

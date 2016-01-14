@@ -38,6 +38,13 @@ namespace irgen {
   class IRGenModule;
   class ProtocolInfo;
   class TypeInfo;
+
+  /// Set an LLVM value name for the given type metadata.
+  void setTypeMetadataName(IRGenModule &IGM, llvm::Value *value, CanType type);
+
+  /// Set an LLVM value name for the given protocol witness table.
+  void setProtocolWitnessTableName(IRGenModule &IGM, llvm::Value *value,
+                                   CanType type, ProtocolDecl *protocol);
   
   /// Extract the method pointer from an archetype's witness table
   /// as a function value.

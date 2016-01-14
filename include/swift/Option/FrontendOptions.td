@@ -181,6 +181,12 @@ def disable_llvm_slp_vectorizer : Flag<["-"], "disable-llvm-slp-vectorizer">,
 def disable_llvm_verify : Flag<["-"], "disable-llvm-verify">,
   HelpText<"Don't run the LLVM IR verifier.">;
 
+def disable_llvm_value_names : Flag<["-"], "disable-llvm-value-names">,
+  HelpText<"Don't add names to local values in LLVM IR">;
+
+def enable_llvm_value_names : Flag<["-"], "enable-llvm-value-names">,
+  HelpText<"Add names to local values in LLVM IR">;
+
 def stack_promotion_checks : Flag<["-"], "emit-stack-promotion-checks">,
   HelpText<"Emit runtime checks for correct stack promotion of objects.">;
 

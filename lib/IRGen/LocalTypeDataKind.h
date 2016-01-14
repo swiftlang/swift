@@ -150,6 +150,9 @@ public:
   bool operator==(LocalTypeDataKind other) const {
     return Value == other.Value;
   }
+  bool operator!=(LocalTypeDataKind other) const {
+    return Value != other.Value;
+  }
 };
 
 class LocalTypeDataKey {

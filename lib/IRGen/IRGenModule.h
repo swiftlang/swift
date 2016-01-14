@@ -322,6 +322,9 @@ public:
   /// Does the current target require Objective-C interoperation?
   bool ObjCInterop = true;
 
+  /// Should we add value names to local IR values?
+  bool EnableValueNames = false;
+
   llvm::Type *VoidTy;                  /// void (usually {})
   llvm::IntegerType *Int1Ty;           /// i1
   llvm::IntegerType *Int8Ty;           /// i8

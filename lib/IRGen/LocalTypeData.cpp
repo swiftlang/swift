@@ -18,8 +18,11 @@
 #include "LocalTypeData.h"
 #include "Fulfillment.h"
 #include "GenMeta.h"
+#include "GenProto.h"
+#include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "swift/AST/IRGenOptions.h"
 #include "swift/SIL/SILModule.h"
 
 using namespace swift;
@@ -176,8 +179,37 @@ LocalTypeDataCache::AbstractCacheEntry::follow(IRGenFunction &IGF,
   llvm_unreachable("bad source kind");
 }
 
+static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
+                                               LocalTypeDataKey key,
+                                               llvm::Value *data) {
+  // Only if debug info is enabled.
+  if (!IGF.IGM.DebugInfo) return;
+
+  // Only for type metadata.
+  if (key.Kind != LocalTypeDataKind::forTypeMetadata()) return;
+
+  // Only for archetypes, and not for opened archetypes.
+  auto type = dyn_cast<ArchetypeType>(key.Type);
+  if (!type) return;
+  if (type->getOpenedExistentialType()) return;
+
+  // At -O0, create an alloca to keep the type alive.
+  auto name = type->getFullName();
+  if (!IGF.IGM.Opts.Optimize) {
+    auto temp = IGF.createAlloca(data->getType(), IGF.IGM.getPointerAlignment(),
+                                 name);
+    IGF.Builder.CreateStore(data, temp);
+    data = temp.getAddress();
+  }
+
+  // Emit debug info for the metadata.
+  IGF.IGM.DebugInfo->emitTypeMetadata(IGF, data, name);
+}
+
 void IRGenFunction::setScopedLocalTypeData(LocalTypeDataKey key,
                                            llvm::Value *data) {
+  maybeEmitDebugInfoForLocalTypeData(*this, key, data);
+
   // Register with the active ConditionalDominanceScope if necessary.
   bool isConditional = isConditionalDominancePoint();
   if (isConditional) {
@@ -190,6 +222,8 @@ void IRGenFunction::setScopedLocalTypeData(LocalTypeDataKey key,
 
 void IRGenFunction::setUnscopedLocalTypeData(LocalTypeDataKey key,
                                              llvm::Value *data) {
+  maybeEmitDebugInfoForLocalTypeData(*this, key, data);
+
   // This is supportable, but it would require ensuring that we add the
   // entry after any conditional entries; otherwise the stack discipline
   // will get messed up.
@@ -204,6 +238,7 @@ void IRGenFunction::bindLocalTypeDataFromTypeMetadata(CanType type,
                                                       llvm::Value *metadata) {
   // Remember that we have this type metadata concretely.
   if (isExact) {
+    if (!metadata->hasName()) setTypeMetadataName(IGM, metadata, type);
     setScopedLocalTypeData(type, LocalTypeDataKind::forTypeMetadata(), metadata);
   }
 

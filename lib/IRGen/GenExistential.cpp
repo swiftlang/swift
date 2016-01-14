@@ -102,8 +102,7 @@ namespace {
     /// Given the address of an existential object, load its witness table.
     llvm::Value *loadWitnessTable(IRGenFunction &IGF, Address addr,
                                   unsigned which) const {
-      return IGF.Builder.CreateLoad(projectWitnessTable(IGF, addr, which),
-                                    "witness-table");
+      return IGF.Builder.CreateLoad(projectWitnessTable(IGF, addr, which));
     }
 
     /// Given the address of an existential object, drill down to the
@@ -115,8 +114,7 @@ namespace {
     /// Given the address of an existential object, load its metadata
     /// object.
     llvm::Value *loadMetadataRef(IRGenFunction &IGF, Address addr) {
-      return IGF.Builder.CreateLoad(projectMetadataRef(IGF, addr),
-                               addr.getAddress()->getName() + ".metadata");
+      return IGF.Builder.CreateLoad(projectMetadataRef(IGF, addr));
     }
   };
 }
