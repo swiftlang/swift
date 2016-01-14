@@ -1,11 +1,14 @@
 {
   "./a.swift": {
     "object": "./a.o",
+    "swiftmodule": "./a.swiftmodule",
   },
   "./b.swift": {
     "object": "./b.o",
+    "swiftmodule": "./b.swiftmodule",
   },
   "./c.swift": {
     "object": "./c.o",
+    "swiftmodule": "./c.swiftmodule",
   }
 }
