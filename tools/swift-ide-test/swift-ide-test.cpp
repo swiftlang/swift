@@ -285,6 +285,11 @@ UseSwiftLookupTables(
   llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+Swift3Migration("swift3-migration",
+                   llvm::cl::desc("Enable Fix-It based migration aids for Swift 3"),
+                   llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 OmitNeedlessWords("enable-omit-needless-words",
                    llvm::cl::desc("Omit needless words when importing Objective-C names"),
                    llvm::cl::init(false));
@@ -2470,6 +2475,7 @@ int main(int argc, char *argv[]) {
     !options::DisableAccessControl;
   InitInvok.getLangOptions().CodeCompleteInitsInPostfixExpr |=
       options::CodeCompleteInitsInPostfixExpr;
+  InitInvok.getLangOptions().Swift3Migration |= options::Swift3Migration;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
     options::ObjCForwardDeclarations;
   InitInvok.getClangImporterOptions().OmitNeedlessWords |=

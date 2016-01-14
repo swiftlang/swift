@@ -225,6 +225,10 @@ def enable_swift_name_lookup_tables :
   Flag<["-"], "enable-swift-name-lookup-tables">,
   HelpText<"Enable Swift name lookup tables in the Clang importer">;
 
+def swift3_migration :
+  Flag<["-"], "swift3-migration">,
+  HelpText<"Enable Fix-It based migration aids for Swift 3">;
+
 def warn_omit_needless_words :
   Flag<["-"], "Womit-needless-words">,
   HelpText<"Warn about needless words in names">;
