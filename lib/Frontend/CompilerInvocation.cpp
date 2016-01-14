@@ -733,6 +733,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Opts.DebuggerSupport)
     Opts.EnableDollarIdentifiers = true;
   Opts.Playground |= Args.hasArg(OPT_playground);
+  Opts.Swift3Migration |= Args.hasArg(OPT_swift3_migration);
   Opts.WarnOmitNeedlessWords = Args.hasArg(OPT_warn_omit_needless_words);
 
   Opts.EnableThrowWithoutTry |= Args.hasArg(OPT_enable_throw_without_try);

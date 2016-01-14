@@ -150,7 +150,10 @@ namespace swift {
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;
-    
+
+    /// Enable the Swift 3 migration via Fix-Its.
+    bool Swift3Migration = false;
+
     /// Sets the target we are building for and updates configuration options
     /// to match.
     ///
