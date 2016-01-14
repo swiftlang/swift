@@ -846,6 +846,34 @@ public func XCTAssertLessThanOrEqual<T : Comparable>(@autoclosure expression1: (
   }
 }
 
+public func XCTAssertThrowsError<T>(@autoclosure expression: () throws -> T, @autoclosure _ message: () -> String = "", file: StaticString = __FILE__, line: UInt = __LINE__, _ errorHandler: (error: ErrorType) -> Void = { _ in }) -> Void {
+  // evaluate expression exactly once
+  var caughtErrorOptional: ErrorType?
+  
+  let result = _XCTRunThrowableBlock {
+    do {
+      _ = try expression()
+    } catch {
+      caughtErrorOptional = error
+    }
+  }
+  
+  switch result {
+  case .Success:
+    if let caughtError = caughtErrorOptional {
+      errorHandler(error: caughtError)
+    } else {
+      _XCTRegisterFailure(true, "XCTAssertThrowsError failed: did not throw an error", message, file, line)
+    }
+    
+  case .FailedWithException(_, _, let reason):
+    _XCTRegisterFailure(true, "XCTAssertThrowsError failed: throwing \(reason)", message, file, line)
+    
+  case .FailedWithUnknownException:
+    _XCTRegisterFailure(true, "XCTAssertThrowsError failed: throwing an unknown exception", message, file, line)
+  }
+}
+
 #if XCTEST_ENABLE_EXCEPTION_ASSERTIONS
 // --- Currently-Unsupported Assertions ---
 
