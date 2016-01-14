@@ -705,9 +705,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalPatterns |=
     Args.hasArg(OPT_enable_experimental_patterns);
 
-  Opts.DisableSelfTypeMangling |=
-    Args.hasArg(OPT_disable_self_type_mangling);
-
   Opts.EnableResilience = false;
   if (auto A = Args.getLastArg(OPT_enable_resilience,
                                OPT_disable_resilience)) {

@@ -621,10 +621,7 @@ Type Mangler::getDeclTypeForMangling(const ValueDecl *decl,
   }
 
   // Shed the 'self' type and generic requirements from method manglings.
-  if (C.LangOpts.DisableSelfTypeMangling
-      && isMethodDecl(decl)
-      && type && !type->is<ErrorType>()) {
-
+  if (isMethodDecl(decl) && type && !type->is<ErrorType>()) {
     // Drop the Self argument clause from the type.
     type = type->castTo<AnyFunctionType>()->getResult();
 
