@@ -117,7 +117,8 @@ ToolChain::constructJob(const JobAction &JA,
   return llvm::make_unique<Job>(JA, std::move(inputs), std::move(output),
                                 executablePath,
                                 std::move(invocationInfo.Arguments),
-                                std::move(invocationInfo.ExtraEnvironment));
+                                std::move(invocationInfo.ExtraEnvironment),
+                                std::move(invocationInfo.FilelistInfo));
 }
 
 std::string
