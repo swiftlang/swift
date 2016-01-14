@@ -727,6 +727,39 @@ entry(%0 : $*Y, %1 : $*Y):
   return %r : $()
 }
 
+// CHECK-LABEL: CG of take_c_func
+// CHECK-NEXT:    Arg %0 Esc: G, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: G, Succ: 
+// CHECK-NEXT:    Ret  Esc: R, Succ: %0
+// CHECK-NEXT:  End
+sil @take_c_func : $@convention(thin) (@convention(c) () -> ()) -> @convention(c) () -> () {
+bb0(%0 : $@convention(c) () -> ()):
+  %3 = apply %0() : $@convention(c) () -> ()
+  return %0 : $@convention(c) () -> ()
+}
+
+// CHECK-LABEL: CG of c_func
+// CHECK-NEXT:  End
+sil @c_func : $@convention(c) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK-LABEL: CG of pass_c_func
+// CHECK-NEXT:    Val %2 Esc: , Succ: (%2.1)
+// CHECK-NEXT:    Con %2.1 Esc: G, Succ: 
+// CHECK-NEXT:  End
+sil @pass_c_func : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @take_c_func : $@convention(thin) (@convention(c) () -> ()) -> @convention(c) () -> ()
+  %1 = function_ref @c_func : $@convention(c) () -> ()
+  %3 = apply %0(%1) : $@convention(thin) (@convention(c) () -> ()) -> @convention(c) () -> ()
+  %4 = tuple ()
+  return %4 : $()
+}
+
+
 // CHECK-LABEL: CG of test_select_enum
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: 
 // CHECK-NEXT:    Arg %1 Esc: A, Succ: 

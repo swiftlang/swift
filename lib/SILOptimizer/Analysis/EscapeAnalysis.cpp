@@ -1503,9 +1503,18 @@ bool EscapeAnalysis::mergeCalleeGraph(FullApplySite FAS,
     // of the apply site.
     SILValue CallerArg = (Idx < numCallerArgs ? FAS.getArgument(Idx) :
                           FAS.getCallee());
-    if (CGNode *CalleeNd = CalleeGraph->getNode(Callee->getArgument(Idx), this)) {
-      Callee2CallerMapping.add(CalleeNd, CallerGraph->getNode(CallerArg, this));
-    }
+    CGNode *CalleeNd = CalleeGraph->getNode(Callee->getArgument(Idx), this);
+    if (!CalleeNd)
+      continue;
+
+    CGNode *CallerNd = CallerGraph->getNode(CallerArg, this);
+    // There can be the case that we see a callee argument as pointer but not
+    // the caller argument. E.g. if the callee argument has a @convention(c)
+    // function type and the caller passes a function_ref.
+    if (!CallerNd)
+      continue;
+
+    Callee2CallerMapping.add(CalleeNd, CallerNd);
   }
 
   // Map the return value.
