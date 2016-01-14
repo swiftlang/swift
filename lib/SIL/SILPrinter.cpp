@@ -1847,8 +1847,12 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
     break;
   }
   
-  OS << "\n\nimport Builtin\nimport " << STDLIB_NAME
-     << "\nimport SwiftShims" << "\n\n";
+  OS << "\n\nimport Builtin";
+
+  if (!M->isStdlibModule())
+    OS << "\nimport " << STDLIB_NAME;
+
+  OS << "\nimport SwiftShims" << "\n\n";
 
   // Print the declarations and types from the origin module, unless we're not
   // in whole-module mode.
