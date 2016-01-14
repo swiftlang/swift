@@ -31,7 +31,7 @@ func test(xi: A<Int>) {
 
 protocol P {
   
-  typealias Assoc
+  associatedtype Assoc
 
   
   func generateAssoc() -> Assoc

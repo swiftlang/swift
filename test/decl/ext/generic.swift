@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-protocol P1 { typealias AssocType }
+protocol P1 { associatedtype AssocType }
 protocol P2 : P1 { }
 protocol P3 { }
 
@@ -43,7 +43,7 @@ extension LValueCheck {
 struct MemberTypeCheckA<T> { }
 
 protocol MemberTypeProto {
-  typealias AssocType
+  associatedtype AssocType
 
   func foo(a: AssocType)
   init(_ assoc: MemberTypeCheckA<AssocType>)
@@ -148,7 +148,7 @@ extension GenericClass where Self : P3 { }
 // expected-error@-2{{type 'GenericClass' in conformance requirement does not refer to a generic parameter or associated type}}
 
 protocol P4 {
-  typealias T
+  associatedtype T
   init(_: T)
 }
 

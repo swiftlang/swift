@@ -44,14 +44,14 @@ var TopLevelVar: TopLevelVar? { return nil } // expected-error 2 {{use of undecl
 
 
 protocol AProtocol {
-  typealias e : e  // expected-error {{inheritance from non-protocol, non-class type 'Self.e'}}
+  associatedtype e : e  // expected-error {{inheritance from non-protocol, non-class type 'Self.e'}}
 }
 
 
 
 // <rdar://problem/15604574> Protocol conformance checking needs to be delayed
 protocol P15604574 {
-  typealias FooResult
+  associatedtype FooResult
   func foo() -> FooResult
 }
 

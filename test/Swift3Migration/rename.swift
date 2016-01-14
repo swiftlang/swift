@@ -31,7 +31,7 @@ func test(xi: X<Int>) {
 
 protocol P {
   @swift3_migration(renamed="Assoc")
-  typealias AssocType
+  associatedtype AssocType
 
   @swift3_migration(renamed="generateAssoc()")
   func getAssoc() -> AssocType

@@ -181,7 +181,7 @@ let (var z) = 42  // expected-error {{'var' cannot appear nested inside another 
 // at least we don't crash anymore.
 
 protocol PP {
-  typealias E
+  associatedtype E
 }
 
 struct A<T> : PP {

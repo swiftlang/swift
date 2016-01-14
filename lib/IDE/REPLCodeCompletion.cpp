@@ -111,6 +111,7 @@ static void toDisplayString(CodeCompletionResult *Result,
 
         case CodeCompletionDeclKind::Protocol:
         case CodeCompletionDeclKind::TypeAlias:
+        case CodeCompletionDeclKind::AssociatedType:
         case CodeCompletionDeclKind::GenericTypeParam:
         case CodeCompletionDeclKind::Constructor:
         case CodeCompletionDeclKind::Destructor:
