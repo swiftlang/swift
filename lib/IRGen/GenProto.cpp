@@ -2626,10 +2626,6 @@ namespace {
       /// The polymorphic arguments are derived from a Self type binding
       /// passed via the WitnessMethod convention.
       WitnessSelf,
-
-      /// The polymorphic arguments are derived from a Self type binding
-      /// embedded in a thick WitnessMethod function value.
-      WitnessExtraData,
     };
 
     static bool requiresSourceIndex(SourceKind kind) {
@@ -2723,19 +2719,6 @@ namespace {
       }
     }
 
-    /// Extract dependent type metadata for a value witness function of the given
-    /// type.
-    PolymorphicConvention(NominalTypeDecl *ntd, Module &M)
-      : M(M), FnType(getNotionalFunctionType(ntd))
-    {
-      initGenerics();
-
-      auto paramType = FnType->getParameters()[0].getType();
-      Sources.emplace_back(SourceKind::Metadata, 0, paramType);
-
-      considerType(paramType, IsInexact, 0, MetadataPath());
-    }
-
     ArrayRef<Source> getSources() const { return Sources; }
 
     GenericSignatureWitnessIterator getAllDependentTypes() const {
@@ -2751,24 +2734,6 @@ namespace {
       // equal to concrete types, but isn't necessarily parallel with
       // substitutions.
       Generics = FnType->getGenericSignature();
-    }
-
-    static CanSILFunctionType getNotionalFunctionType(NominalTypeDecl *D) {
-      ASTContext &ctx = D->getASTContext();
-      SILFunctionType::ExtInfo extInfo(SILFunctionType::Representation::Method,
-                                       /*noreturn*/ false);
-      SILResultInfo result(TupleType::getEmpty(ctx),
-                           ResultConvention::Unowned);
-      SILParameterInfo param(D->getDeclaredInterfaceType()->getCanonicalType(),
-                              ParameterConvention::Direct_Owned);
-
-      CanGenericSignature sig = D->getGenericSignatureOfContext()
-        ? D->getGenericSignatureOfContext()->getCanonicalSignature()
-        : nullptr;
-
-      return SILFunctionType::get(sig, extInfo,
-                                  ParameterConvention::Direct_Unowned,
-                                  param, result, None, ctx);
     }
 
     void considerNewTypeSource(SourceKind kind, unsigned paramIndex,
@@ -2943,22 +2908,19 @@ namespace {
     void emit(Explosion &in, WitnessMetadata *witnessMetadata,
               const GetParameterFn &getParameter);
 
-    /// Emit polymorphic parameters for a generic value witness.
-    EmitPolymorphicParameters(IRGenFunction &IGF, NominalTypeDecl *ntd)
-      : PolymorphicConvention(ntd, *IGF.IGM.SILMod->getSwiftModule()),
-        IGF(IGF), ContextParams(ntd->getGenericParams()) {}
-
-    void emitForGenericValueWitness(llvm::Value *selfMeta);
-
   private:
     // Emit metadata bindings after the source, if any, has been bound.
     void emitWithSourcesBound(Explosion &in);
 
-    CanType getArgTypeInContext(unsigned paramIndex) const {
+    CanType getTypeInContext(CanType type) const {
       return ArchetypeBuilder::mapTypeIntoContext(
                             IGF.IGM.SILMod->getSwiftModule(), ContextParams,
-                            FnType->getParameters()[paramIndex].getType())
+                            type)
         ->getCanonicalType();
+    }
+
+    CanType getArgTypeInContext(unsigned paramIndex) const {
+      return getTypeInContext(FnType->getParameters()[paramIndex].getType());
     }
 
     /// Emit the source value for parameters.
@@ -2979,11 +2941,12 @@ namespace {
       }
 
       case SourceKind::GenericLValueMetadata: {
+        CanType argTy = getArgTypeInContext(source.getParamIndex());
+
         llvm::Value *metatype = in.claimNext();
         metatype->setName("Self");
 
         // Mark this as the cached metatype for the l-value's object type.
-        CanType argTy = getArgTypeInContext(source.getParamIndex());
         IGF.setUnscopedLocalTypeData(argTy, LocalTypeDataKind::forTypeMetadata(),
                                      metatype);
         return metatype;
@@ -2991,24 +2954,14 @@ namespace {
 
       case SourceKind::WitnessSelf: {
         assert(witnessMetadata && "no metadata for witness method");
-        llvm::Value *metatype = witnessMetadata->SelfMetadata;
-        assert(metatype && "no Self metadata for witness method");
+        llvm::Value *metadata = witnessMetadata->SelfMetadata;
+        assert(metadata && "no Self metadata for witness method");
         
         // Mark this as the cached metatype for Self.
         CanType argTy = getArgTypeInContext(FnType->getParameters().size() - 1);
         IGF.setUnscopedLocalTypeData(argTy,
-                                    LocalTypeDataKind::forTypeMetadata(), metatype);
-        return metatype;
-      }
-          
-      case SourceKind::WitnessExtraData: {
-        // The 'Self' parameter is provided last.
-        // TODO: For default implementations, the witness table pointer for
-        // the 'Self : P' conformance must be provided last along with the
-        // metatype.
-        llvm::Value *metatype = in.takeLast();
-        metatype->setName("Self");
-        return metatype;
+                               LocalTypeDataKind::forTypeMetadata(), metadata);
+        return metadata;
       }
       }
       llvm_unreachable("bad source kind!");
@@ -3021,7 +2974,8 @@ namespace {
       auto &source = getSources()[sourceIndex];
       auto &sourceValue = SourceValues[sourceIndex];
 
-      return fulfillment.Path.followFromTypeMetadata(IGF, source.Type,
+      CanType sourceType = getTypeInContext(source.Type);
+      return fulfillment.Path.followFromTypeMetadata(IGF, sourceType,
                                                      sourceValue.Value,
                                                      &sourceValue.Cache);
     }
@@ -3041,20 +2995,6 @@ void EmitPolymorphicParameters::emit(Explosion &in,
   }
 
   emitWithSourcesBound(in);
-}
-
-/// Emit a polymorphic parameters clause for a generic value witness, binding
-/// all the metadata necessary.
-void
-EmitPolymorphicParameters::emitForGenericValueWitness(llvm::Value *selfMeta) {
-  // We get the source metadata verbatim from the value witness signature.
-  assert(getSources().size() == 1);
-  SourceValues.emplace_back();
-  SourceValues.back().Value = selfMeta;
-
-  // All our archetypes should be satisfiable from the source.
-  Explosion empty;
-  emitWithSourcesBound(empty);
 }
 
 void
@@ -3337,30 +3277,17 @@ void irgen::emitPolymorphicParameters(IRGenFunction &IGF,
   EmitPolymorphicParameters(IGF, Fn).emit(in, witnessMetadata, getParameter);
 }
 
-/// Perform the metadata bindings necessary to emit a generic value witness.
-void irgen::emitPolymorphicParametersForGenericValueWitness(IRGenFunction &IGF,
-                                                        NominalTypeDecl *ntd,
-                                                        llvm::Value *selfMeta) {
-  // Nothing to do if the type isn't generic.
-  if (!ntd->getGenericParamsOfContext())
-    return;
-
-  EmitPolymorphicParameters(IGF, ntd).emitForGenericValueWitness(selfMeta);
-  // Register the 'Self' argument as generic metadata for the type.
-  IGF.setUnscopedLocalTypeData(ntd->getDeclaredTypeInContext()->getCanonicalType(),
-                               LocalTypeDataKind::forTypeMetadata(), selfMeta);
-}
-
 /// Get the next argument and use it as the 'self' type metadata.
 static void getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF,
                                           llvm::Function::arg_iterator &it,
                                           CanType abstractType) {
-  llvm::Value *arg = getArg(it, "Self");
+  llvm::Value *arg = &*it++;
+  arg->setName("Self");
   assert(arg->getType() == IGF.IGM.TypeMetadataPtrTy &&
          "Self argument is not a type?!");
-  if (auto ugt = dyn_cast<UnboundGenericType>(abstractType)) {
-    emitPolymorphicParametersForGenericValueWitness(IGF, ugt->getDecl(), arg);
-  }
+
+  auto formalType = getFormalTypeInContext(abstractType);
+  IGF.bindLocalTypeDataFromTypeMetadata(formalType, IsExact, arg);
 }
 
 namespace {
@@ -3659,11 +3586,6 @@ namespace {
         // EmitPolymorphicArguments::emit.
         case SourceKind::WitnessSelf:
           continue;
-
-        // The 'Self' argument(s) are added implicitly from ExtraData
-        // of the function value.
-        case SourceKind::WitnessExtraData:
-          continue;
         }
         llvm_unreachable("bad source kind!");
       }
@@ -3788,11 +3710,6 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
       witnessMetadata->SelfMetadata = self;
       continue;
     }
-
-    case SourceKind::WitnessExtraData:
-      // The 'Self' argument(s) are added implicitly from ExtraData of the
-      // function value.
-      continue;
     }
     llvm_unreachable("bad source kind");
   }
@@ -3847,8 +3764,6 @@ namespace {
         return out.push_back(IGM.TypeMetadataPtrTy);
       case SourceKind::WitnessSelf:
         return; // handled as a special case in expand()
-      case SourceKind::WitnessExtraData:
-        return; // added implicitly as ExtraData
       }
       llvm_unreachable("bad source kind");
     }

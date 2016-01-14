@@ -7,7 +7,7 @@ import Swift
 
 // CHECK-LABEL: define private %swift.type** @get_field_types_TreeA
 // -- Leaf(T)
-// CHECK:         [[BITS:%.*]] = ptrtoint %swift.type* %T to [[WORD]]
+// CHECK:         [[BITS:%.*]] = ptrtoint %swift.type* {{.*}} to [[WORD]]
 // CHECK:         [[INDIRECT_FLAG:%.*]] = or [[WORD]] [[BITS]], 1
 // -- Branch(TreeA, TreeA)
 // CHECK:         [[TUPLE:%.*]] = call %swift.type* @swift_getTupleTypeMetadata2

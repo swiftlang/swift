@@ -118,11 +118,6 @@ namespace irgen {
                                  WitnessMetadata *witnessMetadata,
                                  const GetParameterFn &getParameter);
   
-  /// Perform the metadata bindings necessary to emit a generic value witness.
-  void emitPolymorphicParametersForGenericValueWitness(IRGenFunction &IGF,
-                                                       NominalTypeDecl *ntd,
-                                                       llvm::Value *selfMeta);
-
   /// Add the trailing arguments necessary for calling a witness method.
   void emitTrailingWitnessArguments(IRGenFunction &IGF,
                                     WitnessMetadata &witnessMetadata,

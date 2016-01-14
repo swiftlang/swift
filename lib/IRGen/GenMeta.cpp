@@ -2512,6 +2512,7 @@ irgen::emitFieldTypeAccessor(IRGenModule &IGM,
   IRGenFunction IGF(IGM, fn);
   auto metadataArrayPtrTy = IGM.TypeMetadataPtrTy->getPointerTo();
 
+  CanType formalType = type->getDeclaredTypeInContext()->getCanonicalType();
   llvm::Value *metadata = IGF.collectParameters().claimNext();
   
   // Get the address at which the field type vector reference should be
@@ -2561,7 +2562,7 @@ irgen::emitFieldTypeAccessor(IRGenModule &IGM,
   
   // Bind the metadata instance to our local type data so we
   // use it to provide metadata for generic parameters in field types.
-  emitPolymorphicParametersForGenericValueWitness(IGF, type, metadata);
+  IGF.bindLocalTypeDataFromTypeMetadata(formalType, IsExact, metadata);
   
   // Allocate storage for the field vector.
   unsigned allocSize = fieldTypes.size() * IGM.getPointerSize().getValue();
