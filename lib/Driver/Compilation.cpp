@@ -652,6 +652,10 @@ static bool writeAllSourcesFile(DiagnosticEngine &diags, StringRef path,
 }
 
 int Compilation::performJobs() {
+  if (AllSourceFilesPath)
+    if (!writeAllSourcesFile(Diags, AllSourceFilesPath, getInputFiles()))
+      return EXIT_FAILURE;
+
   // If we don't have to do any cleanup work, just exec the subprocess.
   if (Level < OutputLevel::Parseable &&
       (SaveTemps || TempFilePaths.empty()) &&
@@ -663,10 +667,6 @@ int Compilation::performJobs() {
   if (!TaskQueue::supportsParallelExecution() && NumberOfParallelCommands > 1) {
     Diags.diagnose(SourceLoc(), diag::warning_parallel_execution_not_supported);
   }
-  
-  if (AllSourceFilesPath)
-    if (!writeAllSourcesFile(Diags, AllSourceFilesPath, getInputFiles()))
-      return EXIT_FAILURE;
   
   int result = performJobsImpl();
 
