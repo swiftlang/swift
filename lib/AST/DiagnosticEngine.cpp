@@ -527,8 +527,12 @@ DiagnosticState::Behavior DiagnosticState::determineBehavior(DiagID id) {
 
   //   3) If the user provided a behavior for this diagnostic's kind, follow
   //      that
-  if (diagInfo.kind == DiagnosticKind::Warning && ignoreAllWarnings)
-    return set(Behavior::Ignore);
+  if (diagInfo.kind == DiagnosticKind::Warning) {
+    if (ignoreAllWarnings)
+      return set(Behavior::Ignore);
+    if (warningsAsErrors)
+      return set(Behavior::Error);
+  }
 
   //   4) Otherwise remap the diagnostic kind
   switch (diagInfo.kind) {
