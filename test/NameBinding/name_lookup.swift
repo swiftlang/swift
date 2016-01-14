@@ -450,7 +450,7 @@ func useProto<R : MyProto>(value: R) -> R.Element {
 }
 
 protocol MyProto {
-  associatedtype Element
+  typealias Element
   func get() -> Element
 }
 

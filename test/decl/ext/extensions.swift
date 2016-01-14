@@ -86,7 +86,7 @@ var x = c.p1
 c.p1 = 1
 
 protocol P3 {
-  associatedtype Assoc
+  typealias Assoc
   func foo() -> Assoc
 }
 

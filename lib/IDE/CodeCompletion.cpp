@@ -445,9 +445,8 @@ CodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   case DeclKind::Module:
     return CodeCompletionDeclKind::Module;
   case DeclKind::TypeAlias:
-    return CodeCompletionDeclKind::TypeAlias;
   case DeclKind::AssociatedType:
-    return CodeCompletionDeclKind::AssociatedType;
+    return CodeCompletionDeclKind::TypeAlias;
   case DeclKind::GenericTypeParam:
     return CodeCompletionDeclKind::GenericTypeParam;
   case DeclKind::Enum:
@@ -538,9 +537,6 @@ void CodeCompletionResult::print(raw_ostream &OS) const {
       break;
     case CodeCompletionDeclKind::TypeAlias:
       Prefix.append("[TypeAlias]");
-      break;
-    case CodeCompletionDeclKind::AssociatedType:
-      Prefix.append("[AssociatedType]");
       break;
     case CodeCompletionDeclKind::GenericTypeParam:
       Prefix.append("[GenericTypeParam]");
@@ -4738,7 +4734,6 @@ void swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
       case CodeCompletionDeclKind::Enum:
       case CodeCompletionDeclKind::Protocol:
       case CodeCompletionDeclKind::TypeAlias:
-      case CodeCompletionDeclKind::AssociatedType:
       case CodeCompletionDeclKind::GenericTypeParam:
         return true;
       case CodeCompletionDeclKind::EnumElement:

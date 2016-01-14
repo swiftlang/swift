@@ -30,7 +30,7 @@ enum GoodEnum {
 }
 
 protocol GoodProtocol1 : diag_values_of_module_type_foo.SomeProtocol {
-  associatedtype GoodTypealias1 : diag_values_of_module_type_foo.SomeProtocol
+  typealias GoodTypealias1 : diag_values_of_module_type_foo.SomeProtocol
 }
 
 typealias GoodTypealias1 = Swift.Int

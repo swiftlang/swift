@@ -1695,7 +1695,6 @@ static bool isKeywordPossibleDeclStart(const Token &Tok) {
   case tok::kw_struct:
   case tok::kw_subscript:
   case tok::kw_typealias:
-  case tok::kw_associatedtype:
   case tok::kw_var:
   case tok::pound_if:
   case tok::pound_line:
@@ -2017,7 +2016,6 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       StaticLoc = SourceLoc();   // we handled static if present.
       break;
     case tok::kw_typealias:
-    case tok::kw_associatedtype:
       DeclResult = parseDeclTypeAlias(!(Flags & PD_DisallowTypeAliasDef),
                                        Flags.contains(PD_InProtocol),
                                       Attributes);
@@ -2664,22 +2662,7 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
 ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
                                                   bool isAssociatedType,
                                                   DeclAttributes &Attributes) {
-  SourceLoc TypeAliasLoc;
-    
-  if (isAssociatedType) {
-    if (consumeIf(tok::kw_typealias, TypeAliasLoc)) {
-      diagnose(TypeAliasLoc, diag::typealias_inside_protocol)
-        .fixItReplace(TypeAliasLoc, "associatedtype");
-    } else {
-      TypeAliasLoc = consumeToken(tok::kw_associatedtype);
-    }
-  } else {
-    if (consumeIf(tok::kw_associatedtype, TypeAliasLoc)) {
-      diagnose(TypeAliasLoc, diag::associatedtype_outside_protocol);
-      return makeParserErrorResult<TypeDecl>();
-    }
-    TypeAliasLoc = consumeToken(tok::kw_typealias);
-  }
+  SourceLoc TypeAliasLoc = consumeToken(tok::kw_typealias);
   
   Identifier Id;
   SourceLoc IdLoc;
@@ -2687,7 +2670,7 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
 
   Status |=
       parseIdentifierDeclName(*this, Id, IdLoc, tok::colon, tok::equal,
-                              diag::expected_identifier_in_decl, isAssociatedType ? "associatedtype" : "typealias");
+                              diag::expected_identifier_in_decl, "typealias");
   if (Status.isError())
     return nullptr;
     

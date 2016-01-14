@@ -5,7 +5,7 @@ protocol Incrementable  {
 }
 
 protocol _ForwardIndexType  {
-  associatedtype Distance  = MyInt
+  typealias Distance  = MyInt
 }
 
 protocol ForwardIndexType : _ForwardIndexType {
@@ -19,7 +19,7 @@ protocol BidirectionalIndexType : ForwardIndexType, _BidirectionalIndexType {
 }
 
 protocol _RandomAccessIndexType : _BidirectionalIndexType {
-  associatedtype Distance
+  typealias Distance
 }
 
 protocol RandomAccessIndexType 

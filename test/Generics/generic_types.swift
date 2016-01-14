@@ -292,11 +292,11 @@ class X3 { }
 var x2 : X2<X3> // expected-error{{'X2' requires that 'X3' inherit from 'X1'}}
 
 protocol P {
-  associatedtype AssocP
+  typealias AssocP
 }
 
 protocol Q {
-  associatedtype AssocQ
+  typealias AssocQ
 }
 
 struct X4 : P, Q {

@@ -91,7 +91,7 @@ protocol FooProtocol {}
 protocol BarProtocol {}
 protocol BazProtocol { func baz() }
 protocol QuxProtocol {
-  associatedtype Qux
+  typealias Qux
 }
 
 protocol SubFooProtocol : FooProtocol { }
@@ -470,8 +470,8 @@ class d0121_TestClassDerived : d0120_TestClassBase {
 protocol d0130_TestProtocol {
 // PASS_COMMON-LABEL: {{^}}protocol d0130_TestProtocol {{{$}}
 
-  associatedtype NestedTypealias
-// PASS_COMMON-NEXT: {{^}}  associatedtype NestedTypealias{{$}}
+  typealias NestedTypealias
+// PASS_COMMON-NEXT: {{^}}  typealias NestedTypealias{{$}}
 
   var property1: Int { get }
 // PASS_COMMON-NEXT: {{^}}  var property1: Int { get }{{$}}
@@ -879,14 +879,14 @@ typealias SimpleTypealias1 = FooProtocol
 // Associated types.
 
 protocol AssociatedType1 {
-  associatedtype AssociatedTypeDecl1 = Int
-// PASS_ONE_LINE-DAG: {{^}}  associatedtype AssociatedTypeDecl1 = Int{{$}}
+  typealias AssociatedTypeDecl1 = Int
+// PASS_ONE_LINE-DAG: {{^}}  typealias AssociatedTypeDecl1 = Int{{$}}
 
-  associatedtype AssociatedTypeDecl2 : FooProtocol
-// PASS_ONE_LINE-DAG: {{^}}  associatedtype AssociatedTypeDecl2 : FooProtocol{{$}}
+  typealias AssociatedTypeDecl2 : FooProtocol
+// PASS_ONE_LINE-DAG: {{^}}  typealias AssociatedTypeDecl2 : FooProtocol{{$}}
 
-  associatedtype AssociatedTypeDecl3 : FooProtocol, BarProtocol
-// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  associatedtype AssociatedTypeDecl3 : FooProtocol, BarProtocol{{$}}
+  typealias AssociatedTypeDecl3 : FooProtocol, BarProtocol
+// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  typealias AssociatedTypeDecl3 : FooProtocol, BarProtocol{{$}}
 }
 
 //===---
@@ -1157,12 +1157,12 @@ infix operator %%<> {
 //===---
 
 protocol d2700_ProtocolWithAssociatedType1 {
-  associatedtype TA1
+  typealias TA1
   func returnsTA1() -> TA1
 }
 
 // PASS_COMMON: {{^}}protocol d2700_ProtocolWithAssociatedType1 {{{$}}
-// PASS_COMMON-NEXT: {{^}}  associatedtype TA1{{$}}
+// PASS_COMMON-NEXT: {{^}}  typealias TA1{{$}}
 // PASS_COMMON-NEXT: {{^}}  func returnsTA1() -> Self.TA1{{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}
 
@@ -1336,7 +1336,7 @@ public func ParamAttrs3(@noescape a : () -> ()) {
 // Protocol extensions
 
 protocol ProtocolToExtend {
-  associatedtype Assoc
+  typealias Assoc
 }
 
 extension ProtocolToExtend where Self.Assoc == Int {}

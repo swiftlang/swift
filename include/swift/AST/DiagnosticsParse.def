@@ -707,12 +707,6 @@ ERROR(expected_close_to_config_stmt,stmt_parsing,none,
 ERROR(expected_close_after_else,stmt_parsing,none,
       "further conditions after #else are unreachable", ())
 
-/// Associatedtype Statement
-WARNING(typealias_inside_protocol,stmt_parsing,none,
-        "use of 'typealias' to declare associated types is deprecated; use 'associatedtype' instead", ())
-ERROR(associatedtype_outside_protocol,stmt_parsing,none,
-      "associated types can only be defined in a protocol; define a type or introduce a 'typealias' to satisfy an associated type requirement", ())
-
 // Return Statement
 ERROR(expected_expr_return,stmt_parsing,PointsToFirstBadToken,
       "expected expression in 'return' statement", ())

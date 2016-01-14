@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
 protocol P {
-  associatedtype A
+  typealias A
   func generate() -> Int
 }
 func f<U: P>(rhs: U) -> X<U.A> { // expected-error {{use of undeclared type 'X'}}
@@ -19,8 +19,8 @@ struct Zzz<T> {
 }
 
 protocol _CollectionType {
-  associatedtype Index
-  associatedtype _Element
+  typealias Index
+  typealias _Element
   subscript(i: Index) -> _Element {get}
 }
 

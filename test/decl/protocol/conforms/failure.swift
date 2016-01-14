@@ -29,7 +29,7 @@ protocol P3 {
   func foo() // expected-note {{protocol requires function 'foo()'}}
   func bar() // okay
   func baz() -> Baz
-  associatedtype Baz
+  typealias Baz
 }
 
 extension P3 {
@@ -45,7 +45,7 @@ protocol P4 {
   func foo() // expected-note {{protocol requires function 'foo()'}}
   func bar() // expected-note {{protocol requires function 'bar()'}}
   func baz() -> Baz // okay
-  associatedtype Baz
+  typealias Baz
 }
 protocol P4Helper {}
 
@@ -59,7 +59,7 @@ struct P4Conformer : P4 { // expected-error {{does not conform}}
 
 
 protocol P5 {
-  associatedtype Foo
+  typealias Foo
   func foo() -> Foo // expected-note {{protocol requires function 'foo()'}}
   func bar() -> Foo // okay
   func baz() -> Foo // okay
@@ -75,14 +75,14 @@ struct P5Conformer : P5 { // expected-error {{does not conform}}
 
 
 protocol P6Base {
-  associatedtype Foo
+  typealias Foo
   func foo()
   func bar() -> Foo // expected-note{{protocol requires function 'bar()' }}
 }
 extension P6Base {
 }
 protocol P6 : P6Base {
-  associatedtype Bar // expected-note {{protocol requires nested type 'Bar'}}
+  typealias Bar // expected-note {{protocol requires nested type 'Bar'}}
 }
 extension P6 {
   func bar() -> Bar? { return nil } // expected-note{{candidate has non-matching type}}

@@ -1393,7 +1393,7 @@ void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
   if (!Options.SkipIntroducerKeywords)
-    Printer << "associatedtype ";
+    Printer << "typealias ";
   recordDeclLoc(decl,
     [&]{
       Printer.printName(decl->getName());

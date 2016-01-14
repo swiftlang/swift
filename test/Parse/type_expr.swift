@@ -17,7 +17,7 @@ struct Foo {
 }
 
 protocol Zim {
-  associatedtype Zang
+  typealias Zang
 
   init()
   // TODO class var prop: Int { get }

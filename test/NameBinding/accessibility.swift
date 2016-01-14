@@ -104,7 +104,7 @@ extension Foo : MethodProto {} // expected-error {{type 'Foo' does not conform t
 
 
 protocol TypeProto {
-  associatedtype TheType // expected-note * {{protocol requires nested type 'TheType'}}
+  typealias TheType // expected-note * {{protocol requires nested type 'TheType'}}
 }
 
 extension OriginallyEmpty {}

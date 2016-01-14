@@ -137,7 +137,7 @@ func test3(c: SB1, s: S2) {
 func test4(inout a: Int) {}
 
 protocol Prot2 {
-  associatedtype Element
+  typealias Element
   var p : Int { get }
   func foo()
 }

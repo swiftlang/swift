@@ -172,10 +172,10 @@ func redundant(@noescape  // expected-error {{@noescape is implied by @autoclosu
 
 
 protocol P1 {
-  associatedtype Element
+  typealias Element
 }
 protocol P2 : P1 {
-  associatedtype Element
+  typealias Element
 }
 
 func overloadedEach<O: P1, T>(source: O, _ transform: O.Element -> (), _: T) {}

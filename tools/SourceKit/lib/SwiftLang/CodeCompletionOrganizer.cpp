@@ -394,7 +394,6 @@ static bool matchesExpectedStyle(Completion *completion, NameStyle style) {
   case CodeCompletionDeclKind::Enum:
   case CodeCompletionDeclKind::Protocol:
   case CodeCompletionDeclKind::TypeAlias:
-  case CodeCompletionDeclKind::AssociatedType:
     return style.possiblyUpperCamelCase();
 
   case CodeCompletionDeclKind::StaticMethod:

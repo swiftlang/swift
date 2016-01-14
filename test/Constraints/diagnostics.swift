@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
 protocol P {
-  associatedtype SomeType
+  typealias SomeType
 }
 
 protocol P2 { 
@@ -684,5 +684,4 @@ func r23641896() {
   _ = g[12]  // expected-error {{'subscript' is unavailable: cannot subscript String with an Int, see the documentation comment for discussion}}
 
 }
-
 

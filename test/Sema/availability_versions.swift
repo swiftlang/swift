@@ -1395,7 +1395,7 @@ protocol ProtocolWithRequirementMentioningUnavailable {
 }
 
 protocol HasMethodF {
-  associatedtype T
+  typealias T
   func f(p: T) // expected-note 5{{protocol requirement here}}
 }
 

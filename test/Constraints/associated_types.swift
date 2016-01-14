@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
 protocol Runcible {
-  associatedtype Runcee
+  typealias Runcee 
 }
 
 class Mince { 

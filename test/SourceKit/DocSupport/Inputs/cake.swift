@@ -1,5 +1,5 @@
 public protocol Prot {
-  associatedtype Element
+  typealias Element
   var p : Int { get }
   func foo()
 }

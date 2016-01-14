@@ -10,7 +10,7 @@ class D : C {
 class E { }
 
 protocol P { // expected-note{{requirement specified as 'Self.Assoc' : 'C' [with Self = X2]}}
-  associatedtype Assoc : C
+  typealias Assoc : C
   func getAssoc() -> Assoc
 }
 

@@ -72,8 +72,8 @@ func testRuncible(x: Runcible) { // expected-error{{protocol 'Runcible' can only
 //===----------------------------------------------------------------------===//
 
 protocol Overload {
-  associatedtype A
-  associatedtype B
+  typealias A
+  typealias B
   func getA() -> A
   func getB() -> B
   func f1(_: A) -> A
@@ -128,8 +128,8 @@ func testOverload<Ovl : Overload, OtherOvl : Overload>(ovl: Ovl, ovl2: Ovl,
 // Subscripting
 //===----------------------------------------------------------------------===//
 protocol Subscriptable {
-  associatedtype Index
-  associatedtype Value
+  typealias Index
+  typealias Value
 
   func getIndex() -> Index
   func getValue() -> Value
@@ -138,7 +138,7 @@ protocol Subscriptable {
 }
 
 protocol IntSubscriptable {
-  associatedtype ElementType
+  typealias ElementType
 
   func getElement() -> ElementType
 
@@ -200,12 +200,12 @@ func conformanceViaRequires<T
 }
 
 protocol GeneratesAnElement {
-  associatedtype Element : EqualComparable
+  typealias Element : EqualComparable
   func generate() -> Element
 }
 
 protocol AcceptsAnElement {
-  associatedtype Element : MethodLessComparable
+  typealias Element : MethodLessComparable
   func accept(e : Element)
 }
 
@@ -218,12 +218,12 @@ func impliedSameType<T : GeneratesAnElement where T : AcceptsAnElement>(t: T) {
 }
 
 protocol GeneratesAssoc1 {
-  associatedtype Assoc1 : EqualComparable
+  typealias Assoc1 : EqualComparable
   func get() -> Assoc1
 }
 
 protocol GeneratesAssoc2 {
-  associatedtype Assoc2 : MethodLessComparable
+  typealias Assoc2 : MethodLessComparable
   func get() -> Assoc2
 }
 
@@ -235,12 +235,12 @@ func simpleSameType
 }
 
 protocol GeneratesMetaAssoc1 {
-  associatedtype MetaAssoc1 : GeneratesAnElement
+  typealias MetaAssoc1 : GeneratesAnElement
   func get() -> MetaAssoc1
 }
 
 protocol GeneratesMetaAssoc2 {
-  associatedtype MetaAssoc2 : AcceptsAnElement
+  typealias MetaAssoc2 : AcceptsAnElement
   func get() -> MetaAssoc2
 }
 
@@ -258,11 +258,11 @@ func recursiveSameType
 
 // <rdar://problem/13985164>
 protocol P1 {
-  associatedtype Element
+  typealias Element
 }
 
 protocol P2 {
-  associatedtype AssocP1 : P1
+  typealias AssocP1 : P1
   func getAssocP1() -> AssocP1
 }
 

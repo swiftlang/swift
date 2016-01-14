@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
 protocol P {
-  associatedtype Assoc = Self
+  typealias Assoc = Self
 }
 
 struct X : P {
@@ -15,7 +15,7 @@ func f<T: P>(x: T, y: Y<T>.Assoc) {
 }
 
 protocol P1 {
-  associatedtype A = Int
+  typealias A = Int
 }
 
 struct X1<T> : P1 {

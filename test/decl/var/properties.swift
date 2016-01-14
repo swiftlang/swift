@@ -944,7 +944,7 @@ var didSetPropertyTakingOldValue : Int = 0 {
 
 // rdar://16280138 - synthesized getter is defined in terms of archetypes, not interface types
 protocol AbstractPropertyProtocol {
-  associatedtype Index
+  typealias Index
   var a : Index { get }
 }
 struct AbstractPropertyStruct<T> : AbstractPropertyProtocol {

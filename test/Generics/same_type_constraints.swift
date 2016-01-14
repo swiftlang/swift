@@ -1,13 +1,13 @@
 // RUN: %target-parse-verify-swift
 
 protocol Fooable {
-  associatedtype Foo
+  typealias Foo
 
   var foo: Foo { get }
 }
 
 protocol Barrable {
-  associatedtype Bar: Fooable
+  typealias Bar: Fooable
   var bar: Bar { get }
 }
 
@@ -29,7 +29,7 @@ struct SatisfySameTypeRequirement : TestSameTypeRequirement {
 }
 
 protocol TestSameTypeAssocTypeRequirement {
-  associatedtype Assoc
+  typealias Assoc
   func foo<F1: Fooable where F1.Foo == Assoc>(f: F1)
 }
 struct SatisfySameTypeAssocTypeRequirement : TestSameTypeAssocTypeRequirement {
@@ -104,12 +104,12 @@ public final class IterateGenerator<A> : GeneratorType {
 
 // rdar://problem/18475138
 public protocol Observable : class {
-    associatedtype Output
+    typealias Output
     func addObserver(obj : Output -> Void)
 }
 
 public protocol Bindable : class {
-    associatedtype Input
+    typealias Input
     func foo()
 }
 
@@ -135,7 +135,7 @@ struct Pair<T, U> {
 }
 
 protocol Seq {
-  associatedtype Element
+  typealias Element
 
   func zip<OtherSeq: Seq, ResultSeq: Seq where ResultSeq.Element == Pair<Element, OtherSeq.Element>.Type_> (otherSeq: OtherSeq) -> ResultSeq
 }
@@ -153,7 +153,7 @@ extension Dictionary {
 
 // rdar://problem/19245317
 protocol P {
-	associatedtype T: P // expected-error{{type may not reference itself as a requirement}}
+	typealias T: P // expected-error{{type may not reference itself as a requirement}}
 }
 
 struct S<A: P> {
@@ -165,7 +165,7 @@ protocol Food { }
 class Grass : Food { }
 
 protocol Animal {
-    associatedtype EdibleFood:Food
+    typealias EdibleFood:Food
     func eat(f:EdibleFood)
 }
 class Cow : Animal {
@@ -226,12 +226,12 @@ func testSameTypeTuple(a: Array<(Int,Int)>, s: ArraySlice<(Int,Int)>) {
 
 // rdar://problem/20256475
 protocol FooType {
-  associatedtype Element
+  typealias Element
 
   func getElement() -> Element
 }
 protocol BarType {
-  associatedtype Foo : FooType
+  typealias Foo : FooType
 
   func getFoo() -> Foo
 
@@ -248,7 +248,7 @@ protocol P1 { }
 protocol P2Base { }
 
 protocol P2 : P2Base {
-  associatedtype Q : P1
+  typealias Q : P1
 
   func getQ() -> Q
 }
@@ -263,11 +263,11 @@ func sameTypeParameterizedConcrete<C : P2 where C.Q == XP1<C>>(c: C) {
 
 // rdar://problem/21621421
 protocol P3 {
-  associatedtype AssocP3 : P1
+  typealias AssocP3 : P1
 }
 
 protocol P4 {
-  associatedtype AssocP4 : P3
+  typealias AssocP4 : P3
 }
 
 struct X1 : P1 { }
@@ -292,12 +292,12 @@ struct X6<T> { }
 protocol P6 { }
 
 protocol P7 {
-  associatedtype AssocP7
+  typealias AssocP7
 }
 
 protocol P8 {
-  associatedtype AssocP8 : P7
-  associatedtype AssocOther
+  typealias AssocP8 : P7
+  typealias AssocOther
 }
 
 func testP8<C : P8 where C.AssocOther == X6<C.AssocP8.AssocP7>>(c: C) { }
@@ -306,7 +306,7 @@ func testP8<C : P8 where C.AssocOther == X6<C.AssocP8.AssocP7>>(c: C) { }
 struct Ghost<T> {}
 
 protocol Timewarp {
-  associatedtype Wormhole
+  typealias Wormhole
 }
 
 struct Teleporter<A, B where A : Timewarp, A.Wormhole == Ghost<B>> {}

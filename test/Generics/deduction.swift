@@ -266,7 +266,7 @@ func testGetVectorSize(vi: MyVector<Int>, vf: MyVector<Float>) {
 postfix operator <*> {}
 
 protocol MetaFunction {
-  associatedtype Result
+  typealias Result
   postfix func <*> (_: Self) -> Result?
 }
 

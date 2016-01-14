@@ -2,7 +2,7 @@
 
 // Deduction of associated types.
 protocol Fooable {
-  associatedtype AssocType
+  typealias AssocType
   func foo(x : AssocType)
 }
 
@@ -39,7 +39,7 @@ var d : Double
 d = yd
 
 protocol P1 {
-  associatedtype Assoc1
+  typealias Assoc1
   func foo() -> Assoc1
 }
 
@@ -50,7 +50,7 @@ struct S1 : P1 {
 prefix operator % {}
 
 protocol P2 {
-  associatedtype Assoc2
+  typealias Assoc2
   prefix func %(target: Self) -> Assoc2
 }
 
@@ -63,12 +63,12 @@ extension S1 : P2 {
 
 // <rdar://problem/14418181>
 protocol P3 {
-  associatedtype Assoc3
+  typealias Assoc3
   func foo() -> Assoc3
 }
 
 protocol P4 : P3 {
-  associatedtype Assoc4
+  typealias Assoc4
   func bar() -> Assoc4
 }
 
@@ -93,7 +93,7 @@ protocol P6 {
 }
 
 protocol P7 : P6 {
-  associatedtype Assoc : P6
+  typealias Assoc : P6
   func ~> (x: Self, _: S7a) -> Assoc
 }
 
@@ -116,12 +116,12 @@ struct zip<A: GeneratorType, B: GeneratorType> : GeneratorType, SequenceType {
 protocol P8 { }
 
 protocol P9 {
-  associatedtype A1 : P8
+  typealias A1 : P8
 }
 
 protocol P10 {
-  associatedtype A1b : P8
-  associatedtype A2 : P9
+  typealias A1b : P8
+  typealias A2 : P9
 
   func f()
   func g(a: A1b)
@@ -159,7 +159,7 @@ protocol A {
 }
 
 protocol B : A {
-  associatedtype e : A = C<Self> // expected-note {{default type 'C<C<a>>' for associated type 'e' (from protocol 'B') does not conform to 'A'}}
+  typealias e : A = C<Self> // expected-note {{default type 'C<C<a>>' for associated type 'e' (from protocol 'B') does not conform to 'A'}}
 }
 
 extension B {
@@ -169,11 +169,3 @@ extension B {
 
 struct C<a : B> : B { // expected-error {{type 'C<a>' does not conform to protocol 'B'}} expected-error {{type 'C<a>' does not conform to protocol 'A'}}
 }
-
-// SR-511
-protocol sr511 {
-  typealias Foo // expected-warning {{use of 'typealias' to declare associated types is deprecated; use 'associatedtype' instead}} {{3-12=associatedtype}}
-}
-
-associatedtype Foo = Int // expected-error {{associated types can only be defined in a protocol; define a type or introduce a 'typealias' to satisfy an associated type requirement}}
-

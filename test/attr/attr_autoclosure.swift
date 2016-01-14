@@ -44,10 +44,10 @@ class DerivedClass {
 }
 
 protocol P1 {
-  associatedtype Element
+  typealias Element
 }
 protocol P2 : P1 {
-  associatedtype Element
+  typealias Element
 }
 
 func overloadedEach<O: P1>(source: O, _ closure: () -> ()) {

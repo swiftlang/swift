@@ -3,7 +3,7 @@
 protocol Empty {}
 
 protocol P {
-  associatedtype Element
+  typealias Element
   init()
 }
 

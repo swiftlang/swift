@@ -14,6 +14,6 @@ protocol _BuiltinFloatLiteralConvertible {
 }
 
 protocol FloatLiteralConvertible {
-  associatedtype FloatLiteralType : _BuiltinFloatLiteralConvertible
+  typealias FloatLiteralType : _BuiltinFloatLiteralConvertible
   static func convertFromFloatLiteral(value: FloatLiteralType) -> Self
 }
