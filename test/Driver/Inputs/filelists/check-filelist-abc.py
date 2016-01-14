@@ -23,6 +23,9 @@ if '-primary-file' in sys.argv:
 else:
   primaryFile = None
 
+if primaryFile and primaryFile.endswith(".bc"):
+  sys.exit()
+
 filelistFile = sys.argv[sys.argv.index('-filelist') + 1]
 
 with open(filelistFile, 'r') as f:
@@ -37,3 +40,12 @@ elif lines[0].endswith(".swiftmodule\n"):
   print("Handled modules")
 else:
   print("Handled all")
+
+if '-num-threads' in sys.argv:
+  outputListFile = sys.argv[sys.argv.index('-output-filelist') + 1]
+  with open(outputListFile, 'r') as f:
+    lines = f.readlines()
+    assert lines[0].endswith("/a.o\n") or lines[0].endswith("/a.bc\n")
+    assert lines[1].endswith("/b.o\n") or lines[1].endswith("/b.bc\n")
+    assert lines[2].endswith("/c.o\n") or lines[2].endswith("/c.bc\n")
+  print("...with output!")
