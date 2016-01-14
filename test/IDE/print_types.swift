@@ -105,7 +105,7 @@ func testCurriedFuncType1(a: Int)(b: Float) {} // expected-warning{{curried func
 
 protocol FooProtocol {}
 protocol BarProtocol {}
-protocol QuxProtocol { typealias Qux }
+protocol QuxProtocol { associatedtype Qux }
 
 struct GenericStruct<A, B : FooProtocol> {}
 

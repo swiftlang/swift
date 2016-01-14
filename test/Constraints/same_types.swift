@@ -1,13 +1,13 @@
 // RUN: %target-parse-verify-swift
 
 protocol Fooable {
-  typealias Foo
+  associatedtype Foo
 
   var foo: Foo { get }
 }
 
 protocol Barrable {
-  typealias Bar: Fooable
+  associatedtype Bar: Fooable
   var bar: Bar { get }
 }
 

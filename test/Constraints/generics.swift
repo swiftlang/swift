@@ -43,7 +43,7 @@ func foo<T : P>(arg: T) -> T {
 
 // Associated types and metatypes
 protocol SomeProtocol {
-  typealias SomeAssociated
+  associatedtype SomeAssociated
 }
 
 func generic_metatypes<T : SomeProtocol>(x: T)
@@ -101,7 +101,7 @@ func foo2(p1: P1) -> P2 {
 
 // <rdar://problem/14005696>
 protocol BinaryMethodWorkaround {
-  typealias MySelf
+  associatedtype MySelf
 }
 
 protocol Squigglable : BinaryMethodWorkaround {
