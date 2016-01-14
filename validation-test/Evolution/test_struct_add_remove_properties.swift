@@ -28,13 +28,13 @@ StructAddRemovePropertiesTest.test("ChangeStoredToComputed") {
   var t = ChangeStoredToComputed()
 
   do {
-    expectEqual(t.celcius, 0)
+    expectEqual(t.celsius, 0)
     expectEqual(t.fahrenheit, 32)
   }
 
   do {
-    t.celcius = 10
-    expectEqual(t.celcius, 10)
+    t.celsius = 10
+    expectEqual(t.celsius, 10)
     expectEqual(t.fahrenheit, 50)
   }
 
@@ -43,9 +43,9 @@ StructAddRemovePropertiesTest.test("ChangeStoredToComputed") {
       t += 10
     }
 
-    increaseTemperature(&t.celcius)
+    increaseTemperature(&t.celsius)
 
-    expectEqual(t.celcius, 20)
+    expectEqual(t.celsius, 20)
     expectEqual(t.fahrenheit, 68)
   }
 }
