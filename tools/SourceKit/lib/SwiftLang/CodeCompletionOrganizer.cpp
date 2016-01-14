@@ -873,6 +873,7 @@ void CompletionBuilder::getFilterName(CodeCompletionString *str,
       bool shouldPrint = !C.isAnnotation();
       switch (C.getKind()) {
       case ChunkKind::TypeAnnotation:
+      case ChunkKind::CallParameterInternalName:
       case ChunkKind::CallParameterClosureType:
       case ChunkKind::CallParameterType:
       case ChunkKind::DeclAttrParamEqual:
