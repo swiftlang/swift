@@ -100,7 +100,8 @@ getNode(ValueBase *V, EscapeAnalysis *EA, bool createIfNeeded) {
     if (SILArgument *Arg = dyn_cast<SILArgument>(V)) {
       if (Arg->isFunctionArg()) {
         Node = allocNode(V, NodeType::Argument);
-        Node->mergeEscapeState(EscapeState::Arguments);
+        if (!isSummaryGraph)
+          Node->mergeEscapeState(EscapeState::Arguments);
       } else {
         Node = allocNode(V, NodeType::Value);
       }
@@ -1692,6 +1693,35 @@ bool EscapeAnalysis::canPointToSameMemory(SILValue V1, SILValue V2) {
     return Content1 == Content2;
   }
   return true;
+}
+
+bool EscapeAnalysis::canParameterEscape(FullApplySite FAS, int ParamIdx,
+                                        bool checkContentOfIndirectParam) {
+  CalleeList Callees = BCA->getCalleeList(FAS);
+  if (!Callees.allCalleesVisible())
+    return true;
+
+  // Derive the connection graph of the apply from the known callees.
+  for (SILFunction *Callee : Callees) {
+    FunctionInfo *FInfo = getFunctionInfo(Callee);
+    if (!FInfo->isValid())
+      recompute(FInfo);
+
+    CGNode *Node = FInfo->SummaryGraph.getNodeOrNull(
+                                         Callee->getArgument(ParamIdx), this);
+    if (!Node)
+      return true;
+
+    if (checkContentOfIndirectParam) {
+      Node = Node->getContentNodeOrNull();
+      if (!Node)
+        continue;
+    }
+
+    if (Node->escapes())
+      return true;
+  }
+  return false;
 }
 
 void EscapeAnalysis::invalidate(InvalidationKind K) {

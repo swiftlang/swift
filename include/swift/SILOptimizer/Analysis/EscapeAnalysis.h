@@ -297,7 +297,12 @@ private:
           return true;
       }
     }
-  };
+
+    /// Returns the content node if of this node if it exists in the graph.
+    CGNode *getContentNodeOrNull() const {
+      return pointsTo;
+    }
+};
 
   /// Mapping from nodes in a callee-graph to nodes in a caller-graph.
   class CGNodeMap {
@@ -371,8 +376,12 @@ public:
     /// The allocator for nodes.
     llvm::SpecificBumpPtrAllocator<CGNode> NodeAllocator;
 
+    /// True if this is a summary graph.
+    bool isSummaryGraph;
+    
     /// Constructs a connection graph for a function.
-    ConnectionGraph(SILFunction *F) : F(F) {
+    ConnectionGraph(SILFunction *F, bool isSummaryGraph) :
+      F(F), isSummaryGraph(isSummaryGraph) {
     }
 
     /// Returns true if the connection graph is empty.
@@ -445,7 +454,8 @@ public:
     CGNode *getReturnNode() {
       if (!ReturnNode) {
         ReturnNode = allocNode(nullptr, NodeType::Return);
-        ReturnNode->mergeEscapeState(EscapeState::Return);
+        if (!isSummaryGraph)
+          ReturnNode->mergeEscapeState(EscapeState::Return);
       }
       return ReturnNode;
     }
@@ -581,7 +591,7 @@ private:
 
   /// All the information we keep for a function.
   struct FunctionInfo : public FunctionInfoBase<FunctionInfo> {
-    FunctionInfo(SILFunction *F) : Graph(F), SummaryGraph(F) { }
+    FunctionInfo(SILFunction *F) : Graph(F, false), SummaryGraph(F, true) { }
 
     /// The connection graph for the function. This is what clients of the
     /// analysis will see.
@@ -739,6 +749,14 @@ public:
   /// This means that either \p To is the same as \p V or contains a reference
   /// to \p V.
   bool canEscapeToValue(SILValue V, SILValue To);
+
+  /// Returns true if the parameter with index \p ParamIdx can escape in the
+  /// called function of apply site \p FAS.
+  /// If it is an indirect parameter and \p checkContentOfIndirectParam is true
+  /// then the escape status is not checked for the address itself but for the
+  /// referenced pointer (if the referenced type is a pointer).
+  bool canParameterEscape(FullApplySite FAS, int ParamIdx,
+                          bool checkContentOfIndirectParam);
 
   /// Returns true if the pointers \p V1 and \p V2 can possibly point to the
   /// same memory.
