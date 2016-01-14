@@ -2130,7 +2130,7 @@ auto ClangImporter::Implementation::importFullName(
   case clang::DeclarationName::CXXOperatorName:
   case clang::DeclarationName::CXXUsingDirective:
     // Handling these is part of C++ interoperability.
-    return result;
+    llvm_unreachable("unhandled C++ interoperability");
 
   case clang::DeclarationName::Identifier:
     // Map the identifier.
@@ -2145,6 +2145,17 @@ auto ClangImporter::Implementation::importFullName(
       }
     }
 
+    // For C functions, create empty argument names.
+    if (auto function = dyn_cast<clang::FunctionDecl>(D)) {
+      isFunction = true;
+      params = { function->param_begin(), function->param_end() };
+      for (auto param : params) {
+        (void)param;
+        argumentNames.push_back(StringRef());
+      }
+      if (function->isVariadic())
+        argumentNames.push_back(StringRef());
+    }
     break;
 
   case clang::DeclarationName::ObjCMultiArgSelector:
