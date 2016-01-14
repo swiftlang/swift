@@ -69,6 +69,12 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   if (Invocation.getDiagnosticOptions().ShowDiagnosticsAfterFatalError) {
     Diagnostics.setShowDiagnosticsAfterFatalError();
   }
+  if (Invocation.getDiagnosticOptions().SuppressWarnings) {
+    Diagnostics.setSuppressWarnings(true);
+  }
+  if (Invocation.getDiagnosticOptions().WarningsAsErrors) {
+    Diagnostics.setWarningsAsErrors(true);
+  }
 
   // If we are asked to emit a module documentation file, configure lexing and
   // parsing to remember comments.
