@@ -17,8 +17,12 @@
 // CHECK-NOT: output
 // CHECK-NOT: Handled
 
+
 // RUN: (cd %t && %swiftc_driver_plain -driver-use-frontend-path %S/Inputs/filelists/check-filelist-abc.py -emit-library ./a.swift ./b.swift ./c.swift -module-name main -driver-use-filelists -output-file-map=%S/Inputs/filelists/output.json -force-single-frontend-invocation -num-threads 1 2>&1 | FileCheck -check-prefix=CHECK-WMO-THREADED %s)
 // RUN: (cd %t && %swiftc_driver_plain -driver-use-frontend-path %S/Inputs/filelists/check-filelist-abc.py -emit-library ./a.swift ./b.swift ./c.swift -module-name main -driver-use-filelists -output-file-map=%S/Inputs/filelists/output.json -force-single-frontend-invocation -num-threads 1 -embed-bitcode 2>&1 | FileCheck -check-prefix=CHECK-WMO-THREADED %s)
+// RUN: mkdir %t/tmp/
+// RUN: (cd %t && env TMPDIR="%t/tmp/" %swiftc_driver_plain -driver-use-frontend-path %S/Inputs/filelists/check-filelist-abc.py -c ./a.swift ./b.swift ./c.swift -module-name main -driver-use-filelists -output-file-map=%S/Inputs/filelists/output.json -force-single-frontend-invocation -num-threads 1 -save-temps 2>&1 | FileCheck -check-prefix=CHECK-WMO-THREADED %s)
+// RUN: ls %t/tmp/sources-* %t/tmp/outputs-*
 
 // CHECK-NOT: Handled
 // CHECK-WMO-THREADED: Handled all
