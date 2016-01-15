@@ -141,9 +141,7 @@ bb5:
   return undef : $()
 }
 
-// All of the SSA values in the given function besides %6 can be resolved to
-// (%0, %1). Because %6 has multiple SSA values and there is nothing tricky we
-// can do here, just bail.
+// All of the SSA values in the given function can be resolved to %0.
 //
 // CHECK-LABEL: @test_multiple_pred_same_rcid@
 // CHECK: RESULT #0: 0 = 0
