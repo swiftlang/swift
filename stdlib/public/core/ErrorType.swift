@@ -12,6 +12,7 @@
 
 // The protocol for error values that can be thrown.
 // TODO: API review
+@swift3_migration(renamed="ErrorProtocol")
 public protocol ErrorType {
   var _domain: String { get }
   var _code: Int { get }

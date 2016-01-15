@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// A generator that produces one or fewer instances of `Element`.
+@swift3_migration(renamed="IteratorOverOne")
 public struct GeneratorOfOne<Element> : GeneratorType, SequenceType {
   @available(*, unavailable, renamed="Element")
   public typealias T = Element
@@ -67,6 +68,7 @@ public struct CollectionOfOne<Element> : CollectionType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
+  @swift3_migration(renamed="iterator")
   public func generate() -> GeneratorOfOne<Element> {
     return GeneratorOfOne(element)
   }

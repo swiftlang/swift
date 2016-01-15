@@ -21,6 +21,7 @@
 /// `LazyCollectionType`s.
 ///
 /// - See Also: `LazySequenceType`, `LazyCollection`
+@swift3_migration(renamed="LazyCollectionProtocol")
 public protocol LazyCollectionType
   : CollectionType, LazySequenceType {
   /// A `CollectionType` that can contain the same elements as this one,

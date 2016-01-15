@@ -508,6 +508,7 @@ extension ${Self} : _ArrayType {
 
   /// Construct a ${Self} of `count` elements, each initialized to
   /// `repeatedValue`.
+  @swift3_migration(renamed="init(repeating:length:)")
   @_semantics("array.init")
   public init(count: Int, repeatedValue: Element) {
     var p: UnsafeMutablePointer<Element>
@@ -724,6 +725,7 @@ extension ${Self} : _ArrayType {
   /// - Requires: `i <= count`.
   ///
   /// - Complexity: O(`self.count`).
+  @swift3_migration(renamed="insert(_:at:)")
   public mutating func insert(newElement: Element, atIndex i: Int) {
     _checkIndex(i)
     self.replaceRange(i..<i, with: CollectionOfOne(newElement))
@@ -734,6 +736,7 @@ extension ${Self} : _ArrayType {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
+  @swift3_migration(renamed="removeAt(_:)")
   public mutating func removeAtIndex(index: Int) -> Element {
     let result = self[index]
     self.replaceRange(index..<(index + 1), with: EmptyCollection())
@@ -745,6 +748,7 @@ extension ${Self} : _ArrayType {
   /// - Postcondition: `capacity == 0` iff `keepCapacity` is `false`.
   ///
   /// - Complexity: O(`self.count`).
+  @swift3_migration(renamed="removeAll(keepingCapacity:)")
   public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
     if !keepCapacity {
       _buffer = _Buffer()
@@ -965,6 +969,7 @@ extension ${Self} {
   ///
   /// - Complexity: O(`subRange.count`) if `subRange.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
+  @swift3_migration(renamed="replaceSubrange(_:with:)")
   @_semantics("array.mutate_unknown")
   public mutating func replaceRange<
     C: CollectionType where C.Generator.Element == _Buffer.Element

@@ -92,6 +92,7 @@ public postfix func ++ <T : _Incrementable> (inout i: T) -> T {
 /// Represents a discrete value in a series, where a value's
 /// successor, if any, is reachable by applying the value's
 /// `successor()` method.
+@swift3_migration(renamed="ForwardIndex")
 public protocol ForwardIndexType : _Incrementable {
   /// A type that can represent the number of steps between pairs of
   /// `Self` values where one value is reachable from the other.
@@ -268,6 +269,7 @@ extension ForwardIndexType {
 
 /// An *index* that can step backwards via application of its
 /// `predecessor()` method.
+@swift3_migration(renamed="BidirectionalIndex")
 public protocol BidirectionalIndexType : ForwardIndexType {
   /// Return the previous consecutive value in a discrete sequence.
   ///
@@ -356,6 +358,7 @@ extension _RandomAccessAmbiguity {
 
 /// An *index* that can be offset by an arbitrary number of positions,
 /// and can measure the distance to any reachable value, in O(1).
+@swift3_migration(renamed="RandomAccessIndex")
 public protocol RandomAccessIndexType : BidirectionalIndexType, Strideable,
   _RandomAccessAmbiguity {
 

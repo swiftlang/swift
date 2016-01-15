@@ -30,6 +30,7 @@ internal func _abstract(file: StaticString = __FILE__, line: UInt = __LINE__) {
 ///
 /// - seealso:
 ///   - `struct AnySequence<S : SequenceType>`
+@swift3_migration(renamed="AnyIterator")
 public struct AnyGenerator<Element> : GeneratorType {
   @available(*, unavailable, renamed="Element")
   public typealias T = Element
@@ -271,6 +272,7 @@ public struct AnySequence<Element> : SequenceType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
+  @swift3_migration(renamed="iterator")
   public func generate() -> AnyGenerator<Element> {
     return _box.generate()
   }
@@ -292,6 +294,8 @@ extension AnySequence {
 
 % for Kind in ['Sequence'] + [t + 'Collection' for t in traversals]:
 extension Any${Kind} {
+
+  @swift3_migration(renamed="underestimatedLength", message = "becomes a property")
   public func underestimateCount() -> Int {
     return _box._underestimateCount()
   }
@@ -561,6 +565,7 @@ internal class _AnyCollectionBox<Element> : _AnyCollectionBoxBase<Element> {
 ///
 /// This protocol can be considered an implementation detail of the
 /// `===` and `!==` implementations for these types.
+@swift3_migration(renamed="AnyCollectionProtocol")
 public protocol AnyCollectionType : CollectionType {
   /// Identifies the underlying collection stored by `self`. Instances
   /// copied from one another have the same `_underlyingCollectionID`.
@@ -643,6 +648,7 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionType {
   /// Returns a *generator* over the elements of this *collection*.
   ///
   /// - Complexity: O(1).
+  @swift3_migration(renamed="iterator")
   public func generate() -> AnyGenerator<Element> {
     return _box.generate()
   }

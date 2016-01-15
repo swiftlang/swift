@@ -243,6 +243,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// This value may be nontrivial to compute; it is usually a good
   /// idea to store this information in the "value" area when
   /// an instance is created.
+  @swift3_migration(renamed="capacity")
   public var allocatedElementCount: Int {
     return (_allocatedByteCount &- _My._elementOffset) / strideof(Element)
   }

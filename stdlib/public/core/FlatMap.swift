@@ -18,7 +18,9 @@ extension LazySequenceType {
   ///
   /// - Complexity: O(1)
   @warn_unused_result
-  public func flatMap<Intermediate: SequenceType>(
+  public func flatMap<
+    @swift3_migration(renamed="SegmentOfResult") Intermediate: SequenceType
+  >(
     transform: (Elements.Generator.Element) -> Intermediate
   ) -> LazySequence<
     FlattenSequence<LazyMapSequence<Elements, Intermediate>>> {
@@ -34,7 +36,9 @@ extension LazyCollectionType {
   ///
   /// - Complexity: O(1)
   @warn_unused_result
-  public func flatMap<Intermediate: CollectionType>(
+  public func flatMap<
+    @swift3_migration(renamed="SegmentOfResult") Intermediate: CollectionType
+  >(
     transform: (Elements.Generator.Element) -> Intermediate
   ) -> LazyCollection<
     FlattenCollection<
@@ -54,7 +58,7 @@ extension LazyCollectionType where Elements.Index : BidirectionalIndexType
   /// - Complexity: O(1)
   @warn_unused_result
   public func flatMap<
-    Intermediate: CollectionType
+    @swift3_migration(renamed="SegmentOfResult") Intermediate: CollectionType
     where Intermediate.Index : BidirectionalIndexType
   >(
     transform: (Elements.Generator.Element) -> Intermediate

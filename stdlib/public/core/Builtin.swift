@@ -246,6 +246,8 @@ public func unsafeDowncast<T : AnyObject>(x: AnyObject) -> T {
 ///   than an `unsafeBitCast` because it's more restrictive, and
 ///   because checking is still performed in debug builds.
 @inline(__always)
+@available(*, deprecated, message="Will be removed in Swift 3. Use Optional.unsafelyUnwrapped property instead.")
+@swift3_migration(message="Optional.unsafelyUnwrapped { get }")
 @warn_unused_result
 public func unsafeUnwrap<T>(nonEmpty: T?) -> T {
   if let x = nonEmpty {

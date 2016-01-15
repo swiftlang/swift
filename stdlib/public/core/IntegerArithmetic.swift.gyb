@@ -35,6 +35,7 @@ public protocol _IntegerArithmeticType {
 }
 
 /// The common requirements for types that support integer arithmetic.
+@swift3_migration(renamed="IntegerArithmetic")
 public protocol IntegerArithmeticType : _IntegerArithmeticType, Comparable {
   // Checked arithmetic functions.  Specific implementations in
   // FixedPoint.swift.gyb support static checking for integer types.
@@ -91,6 +92,7 @@ public func ${op}= <T : _IntegerArithmeticType>(inout lhs: T, rhs: T) {
 /// - `x - 0 == x`
 /// - `-x == 0 - x`
 /// - `-(-x) == x`
+@swift3_migration(renamed="SignedNumber")
 public protocol SignedNumberType : Comparable, IntegerLiteralConvertible {
   /// Return the result of negating `x`.
   @warn_unused_result

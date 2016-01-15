@@ -21,6 +21,7 @@
 /// Only three types provided by Swift, `Bool`, `DarwinBoolean`, and `ObjCBool`,
 /// conform to `BooleanType`. Expanding this set to include types that
 /// represent more than simple boolean values is discouraged.
+@swift3_migration(renamed="Boolean")
 public protocol BooleanType {
   /// The value of `self`, expressed as a `Bool`.
   var boolValue: Bool { get }

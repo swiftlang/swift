@@ -20,6 +20,7 @@
 /// A generator that never produces an element.
 ///
 /// - SeeAlso: `EmptyCollection<Element>`.
+@swift3_migration(renamed="EmptyIterator")
 public struct EmptyGenerator<Element> : GeneratorType, SequenceType {
   @available(*, unavailable, renamed="Element")
   public typealias T = Element
@@ -60,6 +61,7 @@ public struct EmptyCollection<Element> : CollectionType {
   /// Returns an empty *generator*.
   ///
   /// - Complexity: O(1).
+  @swift3_migration(renamed="iterator")
   public func generate() -> EmptyGenerator<Element> {
     return EmptyGenerator()
   }

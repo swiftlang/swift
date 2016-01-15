@@ -87,6 +87,7 @@ public protocol MutableIndexable {
 ///          return IndexingGenerator(self)
 ///        }
 ///      }
+@swift3_migration(renamed="CollectionDefaultIterator")
 public struct IndexingGenerator<Elements : Indexable>
  : GeneratorType, SequenceType {
   
@@ -125,6 +126,7 @@ public struct IndexingGenerator<Elements : Indexable>
 ///     for i in startIndex..<endIndex {
 ///       let x = self[i]
 ///     }
+@swift3_migration(renamed="Collection")
 public protocol CollectionType : Indexable, SequenceType {
   /// A type that provides the *sequence*'s iteration interface and
   /// encapsulates its iteration state.
@@ -132,11 +134,13 @@ public protocol CollectionType : Indexable, SequenceType {
   /// By default, a `CollectionType` satisfies `SequenceType` by
   /// supplying an `IndexingGenerator` as its associated `Generator`
   /// type.
+  @swift3_migration(renamed="Iterator")
   typealias Generator: GeneratorType = IndexingGenerator<Self>
 
   // FIXME: Needed here so that the Generator is properly deduced from
   // a custom generate() function.  Otherwise we get an
   // IndexingGenerator. <rdar://problem/21539115>
+  @swift3_migration(renamed="iterator")
   func generate() -> Generator
   
   // FIXME: should be constrained to CollectionType
@@ -186,6 +190,7 @@ public protocol CollectionType : Indexable, SequenceType {
   ///
   /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
   ///   O(N) otherwise.
+  @swift3_migration(renamed="length")
   var count: Index.Distance { get }
   
   // The following requirement enables dispatching for indexOf when
@@ -274,6 +279,7 @@ extension CollectionType {
   /// `self`, *nondestructively*.
   ///
   /// - Complexity: O(N).
+  @swift3_migration(renamed="underestimatedLength", message = "becomes a property")
   public func underestimateCount() -> Int {
     return numericCast(count)
   }
@@ -428,6 +434,7 @@ extension CollectionType {
   ///   The default value is `false`.
   ///
   /// - Requires: `maxSplit >= 0`
+  @swift3_migration(renamed="split(_:omitEmptySubsequences:isSeparator:)")
   @warn_unused_result
   public func split(
     maxSplit: Int = Int.max,
@@ -491,6 +498,7 @@ extension CollectionType where Generator.Element : Equatable {
   ///   The default value is `false`.
   ///
   /// - Requires: `maxSplit >= 0`
+  @swift3_migration(renamed="split(_:maxSplits:omitEmptySubsequences:)")
   @warn_unused_result
   public func split(
     separator: Generator.Element,
@@ -648,6 +656,7 @@ public func last<C: CollectionType where C.Index: BidirectionalIndexType>(
 ///     a[i] = x
 ///     let y = x
 ///
+@swift3_migration(renamed="MutableCollection")
 public protocol MutableCollectionType : MutableIndexable, CollectionType {
   // FIXME: should be constrained to MutableCollectionType
   // (<rdar://problem/20715009> Implement recursive protocol
@@ -759,6 +768,8 @@ public func indices<
 /// A *generator* that adapts a *collection* `C` and any *sequence* of
 /// its `Index` type to present the collection's elements in a
 /// permuted order.
+@available(*, deprecated, message="PermitationGenerator will be removed in Swift 3")
+@swift3_migration(message="Removed in Swift 3")
 public struct PermutationGenerator<
   C: CollectionType, Indices: SequenceType
   where C.Index == Indices.Generator.Element
@@ -793,6 +804,8 @@ public struct PermutationGenerator<
 ///
 ///      x[i..<j] = someExpression
 ///      x[i..<j].mutatingMethod()
+@available(*, deprecated, message="MutableSliceable will be removed in Swift 3")
+@swift3_migration(message="Removed in Swift 3")
 public protocol MutableSliceable : CollectionType, MutableCollectionType {
   subscript(_: Range<Index>) -> SubSequence { get set }
 }

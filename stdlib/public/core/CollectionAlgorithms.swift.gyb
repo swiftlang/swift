@@ -217,6 +217,7 @@ ${sortDocCommentForComparable}
 ${sortIsUnstableForComparable}
   ///
 ${orderingRequirementForComparable}
+  @swift3_migration(renamed="sorted()")
   @warn_unused_result(${'mutable_variant="sortInPlace"' if Self == 'MutableCollectionType' else ''})
   public func sort() -> [Generator.Element] {
     var result = ContiguousArray(self)
@@ -231,6 +232,7 @@ ${sortDocCommentForPredicate}
 ${sortIsUnstableForPredicate}
   ///
 ${orderingRequirementForPredicate}
+  @swift3_migration(renamed="sorted")
   @warn_unused_result(${'mutable_variant="sortInPlace"' if Self == 'MutableCollectionType' else ''})
   public func sort(
     @noescape isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
@@ -258,6 +260,7 @@ ${sortInPlaceDocCommentForComparable}
 ${sortIsUnstableForComparable}
   ///
 ${orderingRequirementForComparable}
+  @swift3_migration(renamed="sort")
   public mutating func sortInPlace() {
     let didSortUnsafeBuffer: Void? =
       _withUnsafeMutableBufferPointerIfSupported {
@@ -279,6 +282,7 @@ ${sortInPlaceDocCommentForPredicate}
 ${sortIsUnstableForPredicate}
   ///
 ${orderingRequirementForPredicate}
+  @swift3_migration(renamed="sort")
   public mutating func sortInPlace(
     @noescape isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
   ) {

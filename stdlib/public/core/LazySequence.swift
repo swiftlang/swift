@@ -127,6 +127,7 @@
 ///   [We don't recommend that you use `map` this way, because it
 ///   creates and discards an array. `sum` would be better implemented
 ///   using `reduce`].
+@swift3_migration(renamed="LazySequenceProtocol")
 public protocol LazySequenceType : SequenceType {
   /// A `SequenceType` that can contain the same elements as this one,
   /// possibly with a simpler type.
@@ -148,6 +149,7 @@ public protocol LazySequenceType : SequenceType {
   /// just returns `self`.
   var elements: Elements {get} 
   
+  @available(*, deprecated, message="Will be removed in Swift 3")
   var array: [Generator.Element] {get}
 }
 

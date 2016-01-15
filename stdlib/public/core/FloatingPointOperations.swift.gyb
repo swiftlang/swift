@@ -34,6 +34,7 @@ public enum FloatingPointClassification {
 }
 
 /// A set of common requirements for Swift's floating point types.
+@swift3_migration(renamed="FloatingPoint")
 public protocol FloatingPointType : Strideable {
   typealias _BitsType
 

@@ -57,6 +57,7 @@ public func assert(
 ///   optimizer may assume that it *would* evaluate to `true`. Failure
 ///   to satisfy that assumption in -Ounchecked builds is a serious
 ///   programming error.
+@swift3_migration(renamed="require")
 @_transparent
 public func precondition(
   @autoclosure condition: () -> Bool,
@@ -120,6 +121,7 @@ public func assertionFailure(
 /// * In -Ounchecked builds, the optimizer may assume that this
 ///   function will never be called. Failure to satisfy that assumption
 ///   is a serious programming error.
+@swift3_migration(renamed="requirementFailure")
 @_transparent @noreturn
 public func preconditionFailure(
   @autoclosure message: () -> String = String(),

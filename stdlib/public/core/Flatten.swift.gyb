@@ -17,6 +17,7 @@
 ///
 /// - Note: This is the `GeneratorType` used by `FlattenSequence`,
 ///   `FlattenCollection`, and `BidirectionalFlattenCollection`.
+@swift3_migration(renamed="FlattenIterator")
 public struct FlattenGenerator<
   Base : GeneratorType where Base.Element : SequenceType
 > : GeneratorType, SequenceType {
@@ -251,6 +252,7 @@ public struct ${Collection}<
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
+  @swift3_migration(renamed="iterator")
   public func generate() -> FlattenGenerator<Base.Generator> {
     return FlattenGenerator(_base.generate())
   }
@@ -281,6 +283,7 @@ public struct ${Collection}<
     return position._innerCollection![position._inner!]
   }
 
+  @swift3_migration(renamed="underestimatedLength", message="Becomes a property")
   public func underestimateCount() -> Int {
     // To return any estimate of the number of elements, we have to start
     // evaluating the collections.  That is a bad default for `flatMap()`, so

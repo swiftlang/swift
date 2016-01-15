@@ -15,6 +15,7 @@
 ///
 /// - Note: This is the associated `Generator` of `LazyFilterSequence`
 /// and `LazyFilterCollection`.
+@swift3_migration(renamed="LazyFilterIterator")
 public struct LazyFilterGenerator<
   Base : GeneratorType
 > : GeneratorType, SequenceType {
@@ -64,6 +65,7 @@ public struct LazyFilterSequence<Base : SequenceType>
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
+  @swift3_migration(renamed="iterator")
   public func generate() -> LazyFilterGenerator<Base.Generator> {
     return LazyFilterGenerator(
       base.generate(), whereElementsSatisfy: _include)
@@ -215,6 +217,7 @@ public struct LazyFilterCollection<
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
+  @swift3_migration(renamed="iterator")
   public func generate() -> LazyFilterGenerator<Base.Generator> {
     return LazyFilterGenerator(
       _base.generate(), whereElementsSatisfy: _predicate)

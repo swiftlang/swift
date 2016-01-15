@@ -16,6 +16,8 @@
 
 /// A `RandomAccessIndexType` that has two possible values.  Used as
 /// the `Index` type for `CollectionOfOne<T>`.
+@swift3_migration(message="Bit is deprecated as of Swift 3. Use Int instead.")
+@available(*, deprecated, message="Bit is deprecated as of Swift 3. Use Int instead.")
 public enum Bit : Int, Comparable, RandomAccessIndexType, _Reflectable {
 
   public typealias Distance = Int

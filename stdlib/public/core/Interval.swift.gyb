@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// An interval over a `Comparable` type.
+@swift3_migration(renamed="Interval")
 public protocol IntervalType {
   /// The type of the `Interval`'s endpoints.
   typealias Bound : Comparable

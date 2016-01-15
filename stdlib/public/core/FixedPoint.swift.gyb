@@ -60,6 +60,7 @@ public protocol _IntegerType
 }
 
 /// A set of common requirements for Swift's integer types.
+@swift3_migration(renamed="Integer")
 public protocol IntegerType : _IntegerType, RandomAccessIndexType {
 }
 
@@ -77,6 +78,7 @@ public protocol _SignedIntegerType : _IntegerType, SignedNumberType {
 }
 
 /// A set of common requirements for Swift's signed integer types.
+@swift3_migration(renamed="SignedInteger")
 public protocol SignedIntegerType : _SignedIntegerType, IntegerType {
   /// Represent this number using Swift's widest native signed integer
   /// type.
@@ -98,6 +100,7 @@ public protocol _DisallowMixedSignArithmetic : _IntegerType {
 }
 
 /// A set of common requirements for Swift's unsigned integer types.
+@swift3_migration(renamed="UnsignedInteger")
 public protocol UnsignedIntegerType : _DisallowMixedSignArithmetic, IntegerType {
 
   /// Represent this number using Swift's widest native unsigned

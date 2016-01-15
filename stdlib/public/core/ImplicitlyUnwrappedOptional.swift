@@ -25,6 +25,7 @@ public enum ImplicitlyUnwrappedOptional<Wrapped>
   public typealias T = Wrapped
 
   /// Construct a `nil` instance.
+  @available(*, deprecated, message="Parameterless initializer will be removed in Swift 3. Use nil literal instead.")
   public init() { self = .None }
 
   /// Construct a non-`nil` instance that stores `some`.
@@ -48,6 +49,7 @@ public enum ImplicitlyUnwrappedOptional<Wrapped>
   }
 
   /// If `self == nil`, returns `nil`.  Otherwise, returns `f(self!)`.
+  @available(*, deprecated, message="Unaccessible. Will be removed in Swift 3")
   @warn_unused_result
   public func map<U>(@noescape f: (Wrapped) throws -> U)
       rethrows -> ImplicitlyUnwrappedOptional<U> {
@@ -60,6 +62,7 @@ public enum ImplicitlyUnwrappedOptional<Wrapped>
   }
 
   /// Returns `nil` if `self` is `nil`, `f(self!)` otherwise.
+  @available(*, deprecated, message="Unaccessible. Will be removed in Swift 3")
   @warn_unused_result
   public func flatMap<U>(
     @noescape f: (Wrapped) throws -> ImplicitlyUnwrappedOptional<U>

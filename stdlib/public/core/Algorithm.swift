@@ -149,11 +149,14 @@ public func startsWith<
 ///
 /// - Note: Idiomatic usage is to call `enumerate` instead of
 ///   constructing an `EnumerateGenerator` directly.
+@swift3_migration(renamed="EnumeratedIterator")
 public struct EnumerateGenerator<
   Base : GeneratorType
 > : GeneratorType, SequenceType {
   /// The type of element returned by `next()`.
+  @swift3_migration(message="index => offset")
   public typealias Element = (index: Int, element: Base.Element)
+
   var base: Base
   var count: Int = 0
 

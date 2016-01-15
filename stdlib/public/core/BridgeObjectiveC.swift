@@ -338,8 +338,9 @@ internal var _nilNativeObject: AnyObject? {
 /// This type does not carry an owner pointer unlike the other C*Pointer types
 /// because it only needs to reference the results of inout conversions, which
 /// already have writeback-scoped lifetime.
-public struct AutoreleasingUnsafeMutablePointer<Memory /* TODO : class */>
-  : Equatable, NilLiteralConvertible, _PointerType {
+public struct AutoreleasingUnsafeMutablePointer<
+  @swift3_migration(renamed="Pointee") Memory /* TODO : class */
+> : Equatable, NilLiteralConvertible, _PointerType {
 
   @available(*, unavailable, renamed="Memory")
   public typealias T = Memory
@@ -359,6 +360,7 @@ public struct AutoreleasingUnsafeMutablePointer<Memory /* TODO : class */>
 
   /// Access the underlying raw memory, getting and
   /// setting values.
+  @swift3_migration(renamed="pointee")
   public var memory: Memory {
     /// Retrieve the value the pointer points to.
     @_transparent get {
@@ -407,6 +409,8 @@ public struct AutoreleasingUnsafeMutablePointer<Memory /* TODO : class */>
   }
 
   /// Initialize to a null pointer.
+  @available(*, deprecated, message="init() will be removed in Swift 3. Use NilLiteralConvertible syntax instead")
+  @swift3_migration(message="Removed in Swift 3")
   @_transparent public
   init() {
     self._rawValue = _nilRawPointer
