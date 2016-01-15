@@ -38,7 +38,7 @@ func checkUnicodeScalarViewIteration(
     expectedScalars: [UInt32], _ str: String
 ) {
   do {
-    var us = str.unicodeScalars
+    let us = str.unicodeScalars
     var i = us.startIndex
     let end = us.endIndex
     var decoded: [UInt32] = []
@@ -50,7 +50,7 @@ func checkUnicodeScalarViewIteration(
     expectEqual(expectedScalars, decoded)
   }
   do {
-    var us = str.unicodeScalars
+    let us = str.unicodeScalars
     let start = us.startIndex
     var i = us.endIndex
     var decoded: [UInt32] = []
