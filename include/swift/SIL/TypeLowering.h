@@ -533,9 +533,6 @@ class TypeConverter {
   
   /// The set of recursive types we've already diagnosed.
   llvm::DenseSet<NominalTypeDecl *> RecursiveNominalTypes;
-  
-  /// ArchetypeBuilder used for lowering types in generic function contexts.
-  Optional<ArchetypeBuilder> GenericArchetypes;
 
   /// The current generic context signature.
   CanGenericSignature CurGenericContext;
@@ -618,7 +615,8 @@ public:
   /// Lowers a Swift type to a SILType, and returns the SIL TypeLowering
   /// for that type.
   const TypeLowering &getTypeLowering(Type t, unsigned uncurryLevel = 0) {
-    return getTypeLowering(AbstractionPattern(t), t, uncurryLevel);
+    AbstractionPattern pattern(CurGenericContext, t->getCanonicalType());
+    return getTypeLowering(pattern, t, uncurryLevel);
   }
 
   /// Lowers a Swift type to a SILType according to the abstraction
@@ -782,12 +780,6 @@ public:
   /// Pop a generic function context. See GenericContextScope for an RAII
   /// interface to this function. There must be an active generic context.
   void popGenericContext(CanGenericSignature sig);
-  
-  /// Return the archetype builder for the current generic context. Fails if no
-  /// generic context has been pushed.
-  ArchetypeBuilder &getArchetypes() {
-    return *GenericArchetypes;
-  }
   
   // Map a type involving context archetypes out of its context into a
   // dependent type.
