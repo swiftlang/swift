@@ -292,7 +292,7 @@ func testSimpleEnum() {
 
 enum SR510: String {
     case Thing = "thing"
-    case Bob = {"test"} // expected-error {{not a proper raw value expression}}
+    case Bob = {"test"} // expected-error {{raw value for enum case must be a literal}}
 }
 
 
