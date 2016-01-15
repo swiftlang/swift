@@ -2104,6 +2104,13 @@ struct GenericMetadata {
   const void *getMetadataTemplate() const {
     return reinterpret_cast<const void *>(this + 1);
   }
+
+  /// Return the nominal type descriptor for the template metadata
+  const NominalTypeDescriptor *getTemplateDescription() const {
+    auto bytes = reinterpret_cast<const uint8_t *>(getMetadataTemplate());
+    auto metadata = reinterpret_cast<const Metadata *>(bytes + AddressPoint);
+    return metadata->getNominalTypeDescriptor();
+  }
 };
 
 /// \brief The control structure of a generic protocol conformance.
@@ -2169,6 +2176,24 @@ public:
     }
 
     return DirectType;
+  }
+ 
+  const GenericMetadata *getGenericPattern() const {
+    switch (Flags.getTypeKind()) {
+    case TypeMetadataRecordKind::Universal:
+      return nullptr;
+
+    case TypeMetadataRecordKind::UniqueGenericPattern:
+      break;
+        
+    case TypeMetadataRecordKind::UniqueDirectClass:
+    case TypeMetadataRecordKind::UniqueIndirectClass:
+    case TypeMetadataRecordKind::UniqueDirectType:
+    case TypeMetadataRecordKind::NonuniqueDirectType:
+      assert(false && "not generic metadata pattern");
+    }
+    
+    return GenericPattern;
   }
   
   /// Get the canonical metadata for the type referenced by this record, or

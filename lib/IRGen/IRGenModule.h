@@ -794,7 +794,9 @@ public:
   Address getAddrOfObjCISAMask();
 
   StringRef mangleType(CanType type, SmallVectorImpl<char> &buffer);
-  
+ 
+  bool hasMetadataPattern(NominalTypeDecl *theDecl);
+ 
   // Get the ArchetypeBuilder for the currently active generic context. Crashes
   // if there is no generic context.
   ArchetypeBuilder &getContextArchetypes();

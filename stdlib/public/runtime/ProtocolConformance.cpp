@@ -608,18 +608,16 @@ swift::_searchConformancesByMangledTypeName(const llvm::StringRef typeName) {
   for (; sectionIdx < endSectionIdx; ++sectionIdx) {
     auto &section = C.SectionsToScan[sectionIdx];
     for (const auto &record : section) {
-      if (auto metadata = record.getCanonicalTypeMetadata()) {
-        auto ntd = metadata->getNominalTypeDescriptor();
+      if (auto metadata = record.getCanonicalTypeMetadata())
+        foundMetadata = _matchMetadataByMangledTypeName(typeName, metadata, nullptr);
+      else if (auto pattern = record.getGenericPattern())
+        foundMetadata = _matchMetadataByMangledTypeName(typeName, nullptr, pattern);
 
-        if (ntd == nullptr)
-          continue;
-
-        if (typeName == ntd->Name) {
-          foundMetadata = metadata;
-          break;
-        }
-      }
+      if (foundMetadata != nullptr)
+        break;
     }
+    if (foundMetadata != nullptr)
+      break;
   }
 
   pthread_mutex_unlock(&C.SectionsToScanLock);

@@ -220,25 +220,50 @@ const Metadata *TypeMetadataRecord::getCanonicalTypeMetadata() const {
   }
 }
 
+// returns the type metadata for the type named by typeNode
+const Metadata *
+swift::_matchMetadataByMangledTypeName(const llvm::StringRef typeName,
+                                       const Metadata *metadata,
+                                       const GenericMetadata *pattern) {
+  const NominalTypeDescriptor *ntd = nullptr;
+  const Metadata *foundMetadata = nullptr;
+
+  if (metadata != nullptr)
+    ntd = metadata->getNominalTypeDescriptor();
+  else if (pattern != nullptr)
+    ntd = pattern->getTemplateDescription();
+
+  if (ntd == nullptr || ntd->Name != typeName)
+    return nullptr;
+
+  if (pattern != nullptr) {
+    if (!ntd->GenericParams.hasGenericParams())
+      foundMetadata = swift_getResilientMetadata(const_cast<GenericMetadata *>(pattern));
+  } else {
+    foundMetadata = metadata;
+  }
+
+  return foundMetadata;
+}
+
 // returns the type metadata for the type named by typeName
 static const Metadata *
 _searchTypeMetadataRecords(const TypeMetadataState &T,
                            const llvm::StringRef typeName) {
   unsigned sectionIdx = 0;
   unsigned endSectionIdx = T.SectionsToScan.size();
+  const Metadata *foundMetadata = nullptr;
 
   for (; sectionIdx < endSectionIdx; ++sectionIdx) {
     auto &section = T.SectionsToScan[sectionIdx];
     for (const auto &record : section) {
-      if (auto metadata = record.getCanonicalTypeMetadata()) {
-        auto ntd = metadata->getNominalTypeDescriptor();
+      if (auto metadata = record.getCanonicalTypeMetadata())
+        foundMetadata = _matchMetadataByMangledTypeName(typeName, metadata, nullptr);
+      else if (auto pattern = record.getGenericPattern())
+        foundMetadata = _matchMetadataByMangledTypeName(typeName, nullptr, pattern);
 
-        assert(ntd != nullptr);
-
-        if (typeName == ntd->Name) {
-          return metadata;
-        }
-      }
+      if (foundMetadata != nullptr)
+        return foundMetadata;
     }
   }
 

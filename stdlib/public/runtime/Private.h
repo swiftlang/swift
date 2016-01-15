@@ -112,6 +112,11 @@ namespace swift {
   void installCommonValueWitnesses(ValueWitnessTable *vwtable);
 
   const Metadata *
+  _matchMetadataByMangledTypeName(const llvm::StringRef metadataNameRef,
+                                  const Metadata *metadata,
+                                  const GenericMetadata *pattern);
+
+  const Metadata *
   _searchConformancesByMangledTypeName(const llvm::StringRef typeName);
 
 #if SWIFT_OBJC_INTEROP

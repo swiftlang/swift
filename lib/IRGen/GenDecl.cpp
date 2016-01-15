@@ -666,10 +666,8 @@ void IRGenModule::addProtocolConformanceRecord(
 }
 
 static bool
-typeHasExplicitProtocolConformance(CanType type) {
-  auto conformances =
-    type->getNominalOrBoundGenericNominal()->getAllConformances();
-
+hasExplicitProtocolConformance(NominalTypeDecl *decl) {
+  auto conformances = decl->getAllConformances();
   for (auto conformance : conformances) {
     // inherited protocols do not emit explicit conformance records
     // TODO any special handling required for Specialized conformances?
@@ -697,8 +695,10 @@ void IRGenModule::addRuntimeResolvableType(CanType type) {
   // Don't emit type metadata records for types that can be found in the protocol
   // conformance table as the runtime will search both tables when resolving a
   // type by name.
-  if (!typeHasExplicitProtocolConformance(type))
-    RuntimeResolvableTypes.push_back(type);
+  if (auto nom = type->getAnyNominal()) {
+    if (!hasExplicitProtocolConformance(nom))
+      RuntimeResolvableTypes.push_back(type);
+  }
 }
 
 void IRGenModule::emitGlobalLists() {
@@ -1793,6 +1793,34 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
   return {gotEquivalent, DirectOrGOT::GOT};
 }
 
+/// If true, we lazily initialize metadata at runtime because the layout
+/// is only partially known. Otherwise, we can emit a direct reference a
+/// constant metadata symbol.
+bool
+IRGenModule::hasMetadataPattern(NominalTypeDecl *theDecl) {
+  assert(theDecl != nullptr);
+  // Protocols must be special-cased in a few places.
+  assert(!isa<ProtocolDecl>(theDecl));
+
+  // For classes, we already computed this when we did the layout.
+  // FIXME: Try not to call this for classes of other modules, by referencing
+  // the metadata accessor instead.
+  if (auto *theClass = dyn_cast<ClassDecl>(theDecl))
+    return irgen::getClassHasMetadataPattern(*this, theClass);
+
+  // Ok, we have a value type. If it is generic, it is always initialized
+  // at runtime.
+  if (theDecl->isGenericContext())
+    return true;
+
+  // If the type is not fixed-size, its size depends on resilient types,
+  // and the metadata is initialized at runtime.
+  if (!getTypeInfoForUnlowered(theDecl->getDeclaredType()).isFixedSize())
+    return true;
+
+  return false;
+}
+
 namespace {
 struct TypeEntityInfo {
   ProtocolConformanceFlags flags;
@@ -1802,17 +1830,21 @@ struct TypeEntityInfo {
 } // end anonymous namespace
 
 static TypeEntityInfo
-getTypeEntityInfo(IRGenModule &IGM, CanType conformingType) {
+getTypeEntityInfo(IRGenModule &IGM,
+                  CanType conformingType,
+                  bool allowUnboundGenericTypes) {
   TypeMetadataRecordKind typeKind;
   Optional<LinkEntity> entity;
   llvm::Type *defaultTy, *defaultPtrTy;
 
-  if (auto bgt = dyn_cast<BoundGenericType>(conformingType)) {
+  auto nom = conformingType->getAnyNominal();
+  if (IGM.hasMetadataPattern(nom)) {
+    assert(allowUnboundGenericTypes || isa<BoundGenericType>(conformingType));
     // Conformances for generics are represented by referencing the metadata
     // pattern for the generic type.
     typeKind = TypeMetadataRecordKind::UniqueGenericPattern;
     entity = LinkEntity::forTypeMetadata(
-                         bgt->getDecl()->getDeclaredType()->getCanonicalType(),
+                         nom->getDeclaredType()->getCanonicalType(),
                          TypeMetadataAddress::AddressPoint,
                          /*isPattern*/ true);
     defaultTy = IGM.TypeMetadataPatternStructTy;
@@ -1964,7 +1996,8 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
                   LinkEntity::forProtocolDescriptor(conformance->getProtocol()),
                   getPointerAlignment(), ProtocolDescriptorStructTy);
     auto typeEntity = getTypeEntityInfo(*this,
-                                        conformance->getType()->getCanonicalType());
+                                        conformance->getType()->getCanonicalType(),
+                                        /*allowUnboundGenericTypes*/ false);
     auto flags = typeEntity.flags
         .withConformanceKind(ProtocolConformanceReferenceKind::WitnessTable);
 
@@ -2039,11 +2072,8 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
 
   SmallVector<llvm::Constant *, 8> elts;
   for (auto type : RuntimeResolvableTypes) {
-    // Type metadata records for generic patterns are never emitted at
-    // compile time.
-    assert(!isa<BoundGenericType>(type));
-
-    auto typeEntity = getTypeEntityInfo(*this, type);
+    auto typeEntity = getTypeEntityInfo(*this, type,
+                                        /*allowUnboundGenericTypes*/ true);
     auto typeRef = getAddrOfLLVMVariableOrGOTEquivalent(
             typeEntity.entity, getPointerAlignment(), typeEntity.defaultTy);
 
@@ -2203,9 +2233,9 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
   if (!section.empty())
     var->setSection(section);
 
-  // Remove this test if we eventually support unbound generic types
-  if (!isPattern)
-    addRuntimeResolvableType(concreteType);
+  // Keep type metadata around for all types, although the runtime can currently
+  // only perform name lookup of non-generic types.
+  addRuntimeResolvableType(concreteType);
 
   // For metadata patterns, we're done.
   if (isPattern)
