@@ -5645,7 +5645,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
       break;
     }
-    
+
     // FIXME: Avoid full check in these cases?
     DeclContext *DC = typeParam->getDeclContext();
     switch (DC->getContextKind()) {
@@ -5670,7 +5670,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
     case DeclContextKind::ExtensionDecl:
       llvm_unreachable("not yet implemented");
-    
+
     case DeclContextKind::AbstractClosureExpr:
       llvm_unreachable("cannot have type params");
 
@@ -5691,7 +5691,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     }
     break;
   }
-  
+
   case DeclKind::Enum:
   case DeclKind::Struct:
   case DeclKind::Class: {
@@ -5757,8 +5757,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     if (proto->hasType())
       return;
     proto->computeType();
-    
-    
+
+
     auto gp = proto->getGenericParams();
 
     // Resolve the inheritance clauses for each of the associated
@@ -5828,7 +5828,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     ValidatedTypes.insert(proto);
     break;
   }
-      
+
   case DeclKind::Var:
   case DeclKind::Param: {
     auto VD = cast<VarDecl>(D);
@@ -5846,7 +5846,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         if (PBD->isInvalid() || !parentPattern->hasType()) {
           parentPattern->setType(ErrorType::get(Context));
           setBoundVarsTypeError(parentPattern, Context);
-          
+
           // If no type has been set for the initializer, we need to diagnose
           // the failure.
           if (VD->getParentInitializer() &&
@@ -5854,7 +5854,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
             diagnose(parentPattern->getLoc(), diag::identifier_init_failure,
                      parentPattern->getBoundName());
           }
-          
+
           return;
         }
       } else if (VD->isSelfParameter()) {
@@ -5868,7 +5868,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
           }
         } else {
           D->setType(ErrorType::get(Context));
-        }      
+        }
       } else {
         // FIXME: This case is hit when code completion occurs in a function
         // parameter list. Previous parameters are definitely in scope, but
@@ -5948,6 +5948,20 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
               makeFinal(Context, VD);
             }
           }
+        } else if (auto S = contextType->getStructOrBoundGenericStruct()) {
+          // A struct property can not have the struct's type as type
+          // arguments. In other words, "struct X { let s: X<X> }" is invalid.
+          if (auto VDBTy = VD->getType()->getAs<BoundGenericType>()) {
+            if (auto VDBS = VDBTy->getStructOrBoundGenericStruct()) {
+              auto VDIF = VDBS->getDeclaredInterfaceType();
+              if (VDIF->isEqual(S->getDeclaredInterfaceType())) {
+                for (auto ARGTy : VDBTy->getGenericArgs()) {
+                  if (contextType->isEqual(ARGTy))
+                    diagnose(S, diag::pattern_used_in_type, S->getName());
+                }
+              }
+            }
+          }
         }
       }
 
@@ -5971,7 +5985,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
     break;
   }
-      
+
   case DeclKind::Func: {
     if (D->hasType())
       return;
