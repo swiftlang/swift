@@ -1217,7 +1217,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         // deallocation).
         CGNode *CapturedByDeinit = ConGraph->getContentNode(AddrNode);
         CapturedByDeinit = ConGraph->getContentNode(CapturedByDeinit);
-        if (isArrayOrArrayStorage(OpV)) {
+        if (deinitIsKnownToNotCapture(OpV)) {
           CapturedByDeinit = ConGraph->getContentNode(CapturedByDeinit);
         }
         ConGraph->setEscapesGlobal(CapturedByDeinit);
@@ -1363,15 +1363,32 @@ analyzeSelectInst(SelectInst *SI, ConnectionGraph *ConGraph) {
   }
 }
 
-bool EscapeAnalysis::isArrayOrArrayStorage(SILValue V) {
+bool EscapeAnalysis::deinitIsKnownToNotCapture(SILValue V) {
   for (;;) {
+    // The deinit of an array buffer does not capture the array elements.
     if (V.getType().getNominalOrBoundGenericNominal() == ArrayType)
       return true;
 
-    if (!isProjection(V.getDef()))
-      return false;
+    // The deinit of a box does not capture its content.
+    if (V.getType().is<SILBoxType>())
+      return true;
 
-    V = dyn_cast<SILInstruction>(V.getDef())->getOperand(0);
+    if (isa<FunctionRefInst>(V))
+      return true;
+
+    // Check all operands of a partial_apply
+    if (auto *PAI = dyn_cast<PartialApplyInst>(V)) {
+      for (Operand &Op : PAI->getAllOperands()) {
+        if (isPointer(Op.get().getDef()) && !deinitIsKnownToNotCapture(Op.get()))
+          return false;
+      }
+      return true;
+    }
+    if (isProjection(V.getDef())) {
+      V = dyn_cast<SILInstruction>(V.getDef())->getOperand(0);
+      continue;
+    }
+    return false;
   }
 }
 

@@ -683,8 +683,8 @@ private:
   template<class SelectInst>
   void analyzeSelectInst(SelectInst *SI, ConnectionGraph *ConGraph);
 
-  /// Returns true if \p V is an Array or the storage reference of an array.
-  bool isArrayOrArrayStorage(SILValue V);
+  /// Returns true if a release of \p V is known to not capture its content.
+  bool deinitIsKnownToNotCapture(SILValue V);
 
   /// Sets all operands and results of \p I as global escaping.
   void setAllEscaping(SILInstruction *I, ConnectionGraph *ConGraph);
