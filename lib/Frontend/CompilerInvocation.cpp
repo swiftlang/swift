@@ -1041,8 +1041,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
   Opts.EmitProfileCoverageMapping |= Args.hasArg(OPT_profile_coverage_mapping);
-  Opts.UseNativeSuperMethod |=
-    Args.hasArg(OPT_use_native_super_method);
   Opts.EnableGuaranteedClosureContexts |=
     Args.hasArg(OPT_enable_guaranteed_closure_contexts);
 
