@@ -1,4 +1,4 @@
-// RUN: echo '#!%swift_driver_plain' > %t.shebang.swift
+// RUN: echo '#'!%swift_driver_plain > %t.shebang.swift
 // RUN: cat %s >> %t.shebang.swift
 // RUN: chmod u+x %t.shebang.swift
 
