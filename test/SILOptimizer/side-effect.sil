@@ -273,13 +273,12 @@ bb0(%0 : $Int32):
 }
 
 // CHECK-LABEL: sil @test_project_box
-// CHECK: <func=,param0=>
-sil @test_project_box : $@convention(thin) (@box Builtin.Int32) -> () {
+// CHECK: <func=,param0=r>
+sil @test_project_box : $@convention(thin) (@box Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $@box Builtin.Int32):
   %a = project_box %0 : $@box Builtin.Int32
-
-  %r = tuple()
-  return %r : $()
+  %l = load %a : $*Builtin.Int32
+  return %l : $Builtin.Int32
 }
 
 // CHECK-LABEL: sil @projections
