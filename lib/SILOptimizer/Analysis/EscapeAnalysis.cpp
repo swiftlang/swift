@@ -1217,7 +1217,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         // deallocation).
         CGNode *CapturedByDeinit = ConGraph->getContentNode(AddrNode);
         CapturedByDeinit = ConGraph->getContentNode(CapturedByDeinit);
-        if (isArrayOrArrayStorage(OpV)) {
+        if (deinitIsKnownToNotCapture(OpV)) {
           CapturedByDeinit = ConGraph->getContentNode(CapturedByDeinit);
         }
         ConGraph->setEscapesGlobal(CapturedByDeinit);
@@ -1363,15 +1363,32 @@ analyzeSelectInst(SelectInst *SI, ConnectionGraph *ConGraph) {
   }
 }
 
-bool EscapeAnalysis::isArrayOrArrayStorage(SILValue V) {
+bool EscapeAnalysis::deinitIsKnownToNotCapture(SILValue V) {
   for (;;) {
+    // The deinit of an array buffer does not capture the array elements.
     if (V.getType().getNominalOrBoundGenericNominal() == ArrayType)
       return true;
 
-    if (!isProjection(V.getDef()))
-      return false;
+    // The deinit of a box does not capture its content.
+    if (V.getType().is<SILBoxType>())
+      return true;
 
-    V = dyn_cast<SILInstruction>(V.getDef())->getOperand(0);
+    if (isa<FunctionRefInst>(V))
+      return true;
+
+    // Check all operands of a partial_apply
+    if (auto *PAI = dyn_cast<PartialApplyInst>(V)) {
+      for (Operand &Op : PAI->getAllOperands()) {
+        if (isPointer(Op.get().getDef()) && !deinitIsKnownToNotCapture(Op.get()))
+          return false;
+      }
+      return true;
+    }
+    if (isProjection(V.getDef())) {
+      V = dyn_cast<SILInstruction>(V.getDef())->getOperand(0);
+      continue;
+    }
+    return false;
   }
 }
 
@@ -1503,9 +1520,18 @@ bool EscapeAnalysis::mergeCalleeGraph(FullApplySite FAS,
     // of the apply site.
     SILValue CallerArg = (Idx < numCallerArgs ? FAS.getArgument(Idx) :
                           FAS.getCallee());
-    if (CGNode *CalleeNd = CalleeGraph->getNode(Callee->getArgument(Idx), this)) {
-      Callee2CallerMapping.add(CalleeNd, CallerGraph->getNode(CallerArg, this));
-    }
+    CGNode *CalleeNd = CalleeGraph->getNode(Callee->getArgument(Idx), this);
+    if (!CalleeNd)
+      continue;
+
+    CGNode *CallerNd = CallerGraph->getNode(CallerArg, this);
+    // There can be the case that we see a callee argument as pointer but not
+    // the caller argument. E.g. if the callee argument has a @convention(c)
+    // function type and the caller passes a function_ref.
+    if (!CallerNd)
+      continue;
+
+    Callee2CallerMapping.add(CalleeNd, CallerNd);
   }
 
   // Map the return value.

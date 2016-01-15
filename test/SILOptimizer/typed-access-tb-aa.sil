@@ -926,3 +926,17 @@ bb0(%0 : $*Builtin.Int64):
   %8 = load %0 : $*Builtin.Int64
   return %8 : $Builtin.Int64
 }
+
+// CHECK-LABEL: @test_project_box
+// CHECK:       PAIR #10.
+// CHECK-NEXT:  (0):   %2 = project_box %0 : $@box Builtin.Int32
+// CHECK-NEXT:  (0):   %3 = project_box %1 : $@box Builtin.Int64
+// CHECK-NEXT:  NoAlias
+sil @test_project_box : $@convention(thin) (@box Builtin.Int32, @box Builtin.Int64) -> () {
+bb0(%0 : $@box Builtin.Int32, %1 : $@box Builtin.Int64):
+  %2 = project_box %0 : $@box Builtin.Int32
+  %3 = project_box %1 : $@box Builtin.Int64
+
+  %r = tuple()
+  return %r : $()
+}

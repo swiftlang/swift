@@ -4342,7 +4342,7 @@ namespace {
     void destructiveProjectDataForLoad(IRGenFunction &IGF,
                                        SILType T,
                                        Address enumAddr) const override {
-      emitDestructiveProjectEnumDataCall(IGF, T, enumAddr.getAddress());
+      emitDestructiveProjectEnumDataCall(IGF, T, enumAddr);
     }
 
     void storeTag(IRGenFunction &IGF,
@@ -4351,14 +4351,14 @@ namespace {
                   EnumElementDecl *Case) const override {
       emitDestructiveInjectEnumTagCall(IGF, T,
                                        getTagIndex(Case),
-                                       enumAddr.getAddress());
+                                       enumAddr);
     }
 
     llvm::Value *
     emitIndirectCaseTest(IRGenFunction &IGF, SILType T,
                          Address enumAddr,
                          EnumElementDecl *Case) const override {
-      llvm::Value *tag = emitGetEnumTagCall(IGF, T, enumAddr.getAddress());
+      llvm::Value *tag = emitGetEnumTagCall(IGF, T, enumAddr);
       llvm::Value *expectedTag = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
                                                         getTagIndex(Case));
       return IGF.Builder.CreateICmpEQ(tag, expectedTag);
@@ -4371,7 +4371,7 @@ namespace {
                                                llvm::BasicBlock*>> dests,
                             llvm::BasicBlock *defaultDest) const override {
       // Switch on the tag value.
-      llvm::Value *tag = emitGetEnumTagCall(IGF, T, enumAddr.getAddress());
+      llvm::Value *tag = emitGetEnumTagCall(IGF, T, enumAddr);
 
       // Create a map of the destination blocks for quicker lookup.
       llvm::DenseMap<EnumElementDecl*,llvm::BasicBlock*> destMap(dests.begin(),
@@ -4426,33 +4426,33 @@ namespace {
                         SILType T)
     const override {
       emitAssignWithCopyCall(IGF, T,
-                             dest.getAddress(), src.getAddress());
+                             dest, src);
     }
 
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
                         SILType T)
     const override {
       emitAssignWithTakeCall(IGF, T,
-                             dest.getAddress(), src.getAddress());
+                             dest, src);
     }
 
     void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
                             SILType T)
     const override {
       emitInitializeWithCopyCall(IGF, T,
-                                 dest.getAddress(), src.getAddress());
+                                 dest, src);
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
                             SILType T)
     const override {
       emitInitializeWithTakeCall(IGF, T,
-                                 dest.getAddress(), src.getAddress());
+                                 dest, src);
     }
 
     void destroy(IRGenFunction &IGF, Address addr, SILType T)
     const override {
-      emitDestroyCall(IGF, T, addr.getAddress());
+      emitDestroyCall(IGF, T, addr);
     }
     
     void getSchema(ExplosionSchema &schema) const override {
@@ -4602,14 +4602,14 @@ namespace {
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                          Address src,
                                          SILType T) const override {
-      return emitGetExtraInhabitantIndexCall(IGF, T, src.getAddress());
+      return emitGetExtraInhabitantIndexCall(IGF, T, src);
     }
 
     void storeExtraInhabitant(IRGenFunction &IGF,
                               llvm::Value *index,
                               Address dest,
                               SILType T) const override {
-      emitStoreExtraInhabitantCall(IGF, T, index, dest.getAddress());
+      emitStoreExtraInhabitantCall(IGF, T, index, dest);
     }
 
     APInt

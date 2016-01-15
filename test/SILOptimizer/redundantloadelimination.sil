@@ -897,3 +897,19 @@ bb10:                                             // Preds: bb7 bb8 bb9
   dealloc_stack %1 : $*TwoField  // id: %28
   return %27 : $Int                               // id: %29
 }
+
+// CHECK-LABEL: sil @test_project_box
+// CHECK: [[PB:%[0-9]*]] = project_box %0
+// CHECK: [[LD:%[0-9]*]] = load [[PB]]
+// CHECK: [[TP:%[0-9]*]] = tuple ([[LD]] : $Builtin.Int32, [[LD]] : $Builtin.Int32)
+// CHECK: return [[TP]]
+sil @test_project_box : $@convention(thin) (@box Builtin.Int32) -> (Builtin.Int32, Builtin.Int32) {
+bb0(%0 : $@box Builtin.Int32):
+  %2 = project_box %0 : $@box Builtin.Int32
+  %3 = project_box %0 : $@box Builtin.Int32
+  %4 = load %2 : $*Builtin.Int32
+  %5 = load %3 : $*Builtin.Int32
+
+  %r = tuple(%4 : $Builtin.Int32, %5 : $Builtin.Int32)
+  return %r : $(Builtin.Int32, Builtin.Int32)
+}

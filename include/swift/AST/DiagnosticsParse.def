@@ -632,8 +632,10 @@ ERROR(untyped_pattern_ellipsis,none,
       "'...' cannot be applied to a subpattern which is not explicitly typed", ())
 ERROR(non_func_decl_pattern_init,none,
       "default argument is only permitted for a non-curried function parameter",())
-WARNING(var_not_allowed_in_pattern, none,
-      "Use of '%select{var|let}0' binding here is deprecated and will be removed in a future version of Swift", (unsigned))
+ERROR(var_not_allowed_in_pattern, none,
+      "Use of 'var' binding here is not allowed", ())
+WARNING(let_on_param_is_redundant, none,
+      "'let' keyword is unnecessary; function parameters are immutable by default", (unsigned))
 ERROR(var_pattern_in_var,none,
       "'%select{var|let}0' cannot appear nested inside another 'var' or "
       "'let' pattern", (unsigned))

@@ -774,12 +774,12 @@ OperandValueArrayRef CondBranchInst::getFalseArgs() const {
   return Operands.asValueArray().slice(1 + NumTrueArgs, NumFalseArgs);
 }
 
-SILValue CondBranchInst::getArgForDestBB(SILBasicBlock *DestBB,
-                                         SILArgument *Arg) const {
+SILValue CondBranchInst::getArgForDestBB(const SILBasicBlock *DestBB,
+                                         const SILArgument *Arg) const {
   return getArgForDestBB(DestBB, Arg->getIndex());
 }
 
-SILValue CondBranchInst::getArgForDestBB(SILBasicBlock *DestBB,
+SILValue CondBranchInst::getArgForDestBB(const SILBasicBlock *DestBB,
                                          unsigned ArgIndex) const {
   // If TrueBB and FalseBB equal, we cannot find an arg for this DestBB so
   // return an empty SILValue.

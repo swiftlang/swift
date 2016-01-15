@@ -108,3 +108,64 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.Word):
   %5 = tuple(%1 : $Builtin.Word, %4 : $(Builtin.Word, Builtin.NativeObject, Builtin.NativeObject), %1 : $Builtin.Word)
   return undef : $()
 }
+
+// All of the SSA values in the given function besides %6 can be resolved to
+// (%0, %1). Because %6 has multiple SSA values and there is nothing tricky we
+// can do here, just bail.
+//
+// CHECK-LABEL: @test_single_pred_rc_id@
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+// CHECK: RESULT #2: 2 = 0
+// CHECK: RESULT #3: 3 = 1
+// CHECK: RESULT #4: 4 = 1
+// CHECK: RESULT #5: 5 = 0
+// CHECK: RESULT #6: 6 = 6
+sil @test_single_pred_rc_id : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  br bb1(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject)
+
+bb1(%2 : $Builtin.NativeObject, %3 : $Builtin.NativeObject):
+  cond_br undef, bb2(%3 : $Builtin.NativeObject), bb3(%2 : $Builtin.NativeObject)
+
+bb2(%4 : $Builtin.NativeObject):
+  br bb4(%4 : $Builtin.NativeObject)
+
+bb3(%5 : $Builtin.NativeObject):
+  br bb4(%5 : $Builtin.NativeObject)
+
+bb4(%6 : $Builtin.NativeObject):
+  cond_br undef, bb4(%6 : $Builtin.NativeObject), bb5
+
+bb5:
+  return undef : $()
+}
+
+// All of the SSA values in the given function can be resolved to %0.
+//
+// CHECK-LABEL: @test_multiple_pred_same_rcid@
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 0
+// CHECK: RESULT #2: 2 = 0
+// CHECK: RESULT #3: 3 = 0
+// CHECK: RESULT #4: 4 = 0
+// CHECK: RESULT #5: 5 = 0
+sil @test_multiple_pred_same_rcid : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  br bb1(%0 : $Builtin.NativeObject, %0 : $Builtin.NativeObject)
+
+bb1(%2 : $Builtin.NativeObject, %3 : $Builtin.NativeObject):
+  cond_br undef, bb2(%3 : $Builtin.NativeObject), bb3(%2 : $Builtin.NativeObject)
+
+bb2(%4 : $Builtin.NativeObject):
+  br bb4(%4 : $Builtin.NativeObject)
+
+bb3(%5 : $Builtin.NativeObject):
+  br bb4(%5 : $Builtin.NativeObject)
+
+bb4(%6 : $Builtin.NativeObject):
+  br bb5
+
+bb5:
+  return undef : $()
+}

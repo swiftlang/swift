@@ -94,6 +94,13 @@ struct ProjectionIndex {
       Aggregate = REA->getOperand();
       break;
     }
+    case ValueKind::ProjectBoxInst: {
+      ProjectBoxInst *PBI = cast<ProjectBoxInst>(V);
+      // A box has only a single payload.
+      Index = 0;
+      Aggregate = PBI->getOperand();
+      break;
+    }
     case ValueKind::TupleElementAddrInst: {
       TupleElementAddrInst *TEA = cast<TupleElementAddrInst>(V);
       Index = TEA->getFieldNo();
@@ -149,6 +156,7 @@ enum class NewProjectionKind : unsigned {
   Index = PointerIntEnumIndexKindValue<2, NewProjectionKind>::value,
   Class = PointerIntEnumIndexKindValue<3, NewProjectionKind>::value,
   Enum = PointerIntEnumIndexKindValue<4, NewProjectionKind>::value,
+  Box = PointerIntEnumIndexKindValue<5, NewProjectionKind>::value,
   LastIndexKind = Enum,
 };
 
@@ -170,6 +178,7 @@ static inline bool isCastNewProjectionKind(NewProjectionKind Kind) {
   case NewProjectionKind::Index:
   case NewProjectionKind::Class:
   case NewProjectionKind::Enum:
+  case NewProjectionKind::Box:
     return false;
   }
 }
@@ -248,6 +257,9 @@ public:
       return BaseType.getFieldType(getVarDecl(BaseType), M);
     case NewProjectionKind::Enum:
       return BaseType.getEnumElementType(getEnumElementDecl(BaseType), M);
+    case NewProjectionKind::Box:
+      return SILType::getPrimitiveAddressType(BaseType.castTo<SILBoxType>()->
+                                                getBoxedType());
     case NewProjectionKind::Tuple:
       return BaseType.getTupleElementType(getIndex());
     case NewProjectionKind::Upcast:
@@ -294,6 +306,7 @@ public:
     case NewProjectionKind::BitwiseCast:
     case NewProjectionKind::Index:
     case NewProjectionKind::Tuple:
+    case NewProjectionKind::Box:
       llvm_unreachable("NewProjectionKind that does not have a value decl?");
     }
   }
@@ -369,7 +382,7 @@ public:
   /// Returns true if this instruction projects from an object type into an
   /// address subtype.
   static bool isObjectToAddressProjection(SILInstruction *I) {
-    return isa<RefElementAddrInst>(I);
+    return isa<RefElementAddrInst>(I) || isa<ProjectBoxInst>(I);
   }
 
   /// Is this cast which only allows for equality?
@@ -390,6 +403,7 @@ public:
     case NewProjectionKind::Index:
     case NewProjectionKind::Class:
     case NewProjectionKind::Enum:
+    case NewProjectionKind::Box:
       return false;
     }
   }
@@ -411,6 +425,7 @@ public:
     case NewProjectionKind::RefCast:
     case NewProjectionKind::Tuple:
     case NewProjectionKind::Upcast:
+    case NewProjectionKind::Box:
       return false;
     }
   }
@@ -638,6 +653,7 @@ enum class ProjectionKind : unsigned {
   Index,
   Class,
   Enum,
+  Box,
   LastProjectionKind = Enum,
 };
 
@@ -725,6 +741,7 @@ public:
     case ValueKind::StructElementAddrInst:
     case ValueKind::TupleElementAddrInst:
     case ValueKind::RefElementAddrInst:
+    case ValueKind::ProjectBoxInst:
     case ValueKind::UncheckedTakeEnumDataAddrInst:
       return true;
     default:
@@ -742,6 +759,7 @@ public:
     case ValueKind::StructElementAddrInst:
     case ValueKind::TupleElementAddrInst:
     case ValueKind::RefElementAddrInst:
+    case ValueKind::ProjectBoxInst:
     case ValueKind::UncheckedTakeEnumDataAddrInst:
     default:
       return false;
@@ -805,6 +823,7 @@ public:
       return true;
     case ProjectionKind::Tuple:
     case ProjectionKind::Index:
+    case ProjectionKind::Box:
       return false;
     }
   }
@@ -817,6 +836,7 @@ public:
     switch (getKind()) {
     case ProjectionKind::Tuple:
     case ProjectionKind::Index:
+    case ProjectionKind::Box:
       return true;
     case ProjectionKind::Struct:
     case ProjectionKind::Class:
@@ -890,6 +910,7 @@ private:
   explicit Projection(TupleElementAddrInst *TEA);
   explicit Projection(IndexAddrInst *SEA);
   explicit Projection(RefElementAddrInst *REA);
+  explicit Projection(ProjectBoxInst *PBI);
   explicit Projection(UncheckedTakeEnumDataAddrInst *UTEDAI);
   explicit Projection(StructExtractInst *SEI);
   explicit Projection(TupleExtractInst *TEI);

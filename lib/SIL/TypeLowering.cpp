@@ -219,9 +219,23 @@ namespace {
     // Dependent types should be contextualized before visiting.
 
     RetTy visitGenericTypeParamType(CanGenericTypeParamType type) {
+      if (auto genericSig = M.Types.getCurGenericContext()) {
+        if (genericSig->requiresClass(type, *M.getSwiftModule())) {
+          return asImpl().handleReference(type);
+        } else {
+          return asImpl().handleAddressOnly(type);
+        }
+      }
       llvm_unreachable("should have substituted dependent type into context");
     }
     RetTy visitDependentMemberType(CanDependentMemberType type) {
+      if (auto genericSig = M.Types.getCurGenericContext()) {
+        if (genericSig->requiresClass(type, *M.getSwiftModule())) {
+          return asImpl().handleReference(type);
+        } else {
+          return asImpl().handleAddressOnly(type);
+        }
+      }
       llvm_unreachable("should have substituted dependent type into context");
     }
 
@@ -384,8 +398,6 @@ namespace {
 }
 
 static LoweredTypeKind classifyType(CanType type, SILModule &M) {
-  if (type->hasTypeParameter())
-    type = M.Types.getArchetypes().substDependentType(type)->getCanonicalType();
   return TypeClassifier(M).visit(type);
 }
 
@@ -1216,8 +1228,6 @@ TypeConverter::TypeConverter(SILModule &m)
 }
 
 TypeConverter::~TypeConverter() {
-  assert(!GenericArchetypes.hasValue() && "generic context was never popped?!");
-
   // The bump pointer allocator destructor will deallocate but not destroy all
   // our independent TypeLowerings.
   for (auto &ti : IndependentTypes) {
@@ -1371,7 +1381,7 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
   CanType substType = origSubstType->getCanonicalType();
   auto key = getTypeKey(origType, substType, uncurryLevel);
   
-  assert(!key.isDependent() || GenericArchetypes.hasValue()
+  assert((!key.isDependent() || CurGenericContext)
          && "dependent type outside of generic context?!");
   
   if (auto existing = find(key))
@@ -1595,9 +1605,6 @@ TypeConverter::getTypeLoweringForUncachedLoweredType(TypeKey key) {
   insert(key, nullptr);
 
   CanType contextType = key.SubstType;
-  if (contextType->hasTypeParameter())
-    contextType = getArchetypes().substDependentType(contextType)
-      ->getCanonicalType();
   auto *theInfo = LowerType(*this, key.SubstType,
                             key.isDependent()).visit(contextType);
   insert(key, theInfo);
@@ -2207,16 +2214,10 @@ void TypeConverter::pushGenericContext(CanGenericSignature sig) {
     return;
   
   // GenericFunctionTypes shouldn't nest.
-  assert(!GenericArchetypes.hasValue() && "already in generic context?!");
   assert(DependentTypes.empty() && "already in generic context?!");
   assert(!CurGenericContext && "already in generic context!");
 
   CurGenericContext = sig;
-  
-  // Prepare the ArchetypeBuilder with the generic signature.
-  GenericArchetypes.emplace(*M.getSwiftModule(), M.getASTContext().Diags);
-  if (GenericArchetypes->addGenericSignature(sig, false))
-    llvm_unreachable("error adding generic signature to archetype builder?!");
 }
 
 void TypeConverter::popGenericContext(CanGenericSignature sig) {
@@ -2224,7 +2225,6 @@ void TypeConverter::popGenericContext(CanGenericSignature sig) {
   if (!sig)
     return;
 
-  assert(GenericArchetypes.hasValue() && "not in generic context?!");
   assert(CurGenericContext == sig && "unpaired push/pop");
   
   // Erase our cached TypeLowering objects and associated mappings for dependent
@@ -2241,7 +2241,6 @@ void TypeConverter::popGenericContext(CanGenericSignature sig) {
   }
   DependentTypes.clear();
   DependentBPA.Reset();
-  GenericArchetypes.reset();
   CurGenericContext = nullptr;
 }
 

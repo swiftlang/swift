@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -use-native-super-method -parse-stdlib -emit-silgen -verify %s | FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -emit-silgen -verify %s | FileCheck %s
 
 import Swift
 

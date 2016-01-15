@@ -1,9 +1,11 @@
-// RUN: echo '#!%swift_driver_plain' > %t.shebang.swift
+// This file is also used by shebang-direct.swift.
+
+// RUN: echo '#!/usr/bin/env' 'swift ' > %t.shebang.swift
 // RUN: cat %s >> %t.shebang.swift
 // RUN: chmod u+x %t.shebang.swift
 
-// RUN: %t.shebang.swift | FileCheck -check-prefix=NONE %s
-// RUN: %t.shebang.swift a b c | FileCheck -check-prefix=THREE-ARGS %s
+// RUN: env PATH=$(dirname %swift_driver_plain) %t.shebang.swift | FileCheck -check-prefix=NONE %s
+// RUN: env PATH=$(dirname %swift_driver_plain) %t.shebang.swift a b c | FileCheck -check-prefix=THREE-ARGS %s
 
 // REQUIRES: swift_interpreter
 

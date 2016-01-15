@@ -1899,27 +1899,8 @@ namespace {
     SILModule &TheSILModule;
     Module *TheASTModule;
     TypeSubstitutionMap &Subs;
-    CanGenericSignature Generics;
 
     ASTContext &getASTContext() { return TheSILModule.getASTContext(); }
-
-    class GenericsRAII {
-      SILTypeSubstituter &Self;
-      GenericContextScope Scope;
-      CanGenericSignature OldGenerics;
-    public:
-      GenericsRAII(SILTypeSubstituter &self, CanGenericSignature generics)
-        : Self(self),
-          Scope(self.TheSILModule.Types, generics),
-          OldGenerics(self.Generics) {
-        if (generics) self.Generics = generics;
-      }
-
-      ~GenericsRAII() {
-        Self.Generics = OldGenerics;
-      }
-    };
-
 
   public:
     SILTypeSubstituter(SILModule &silModule, Module *astModule,
@@ -1933,7 +1914,8 @@ namespace {
     CanSILFunctionType visitSILFunctionType(CanSILFunctionType origType,
                                             bool dropGenerics = false)
     {
-      GenericsRAII scope(*this, origType->getGenericSignature());
+      GenericContextScope scope(TheSILModule.Types,
+                                origType->getGenericSignature());
 
       SILResultInfo substResult = subst(origType->getResult());
 
@@ -2003,7 +1985,9 @@ namespace {
       assert(!isa<AnyFunctionType>(origType));
       assert(!isa<LValueType>(origType) && !isa<InOutType>(origType));
 
-      AbstractionPattern abstraction(Generics, origType);
+      CanGenericSignature genericSig =
+          TheSILModule.Types.getCurGenericContext();
+      AbstractionPattern abstraction(genericSig, origType);
 
       assert(TheSILModule.Types.getLoweredType(abstraction, origType)
                .getSwiftRValueType() == origType);

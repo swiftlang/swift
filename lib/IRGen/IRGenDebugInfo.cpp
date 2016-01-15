@@ -625,7 +625,7 @@ IRGenDebugInfo::createParameterTypes(CanSILFunctionType FnTy,
                                      DeclContext *DeclCtx) {
   SmallVector<llvm::Metadata *, 16> Parameters;
 
-  GenericsRAII scope(*this, FnTy->getGenericSignature());
+  GenericContextScope scope(IGM, FnTy->getGenericSignature());
 
   // The function return type is the first element in the list.
   createParameterType(Parameters, FnTy->getSemanticResultSILType(),
@@ -1164,9 +1164,10 @@ llvm::DINodeArray IRGenDebugInfo::getTupleElements(
     unsigned Flags, DeclContext *DeclContext, unsigned &SizeInBits) {
   SmallVector<llvm::Metadata *, 16> Elements;
   unsigned OffsetInBits = 0;
+  auto genericSig = IGM.SILMod->Types.getCurGenericContext();
   for (auto ElemTy : TupleTy->getElementTypes()) {
     auto &elemTI =
-      IGM.getTypeInfoForUnlowered(AbstractionPattern(CurGenerics,
+      IGM.getTypeInfoForUnlowered(AbstractionPattern(genericSig,
                                                   ElemTy->getCanonicalType()),
                                   ElemTy);
     DebugTypeInfo DbgTy(ElemTy, elemTI, DeclContext);

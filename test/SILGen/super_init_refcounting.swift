@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -use-native-super-method -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
 class Foo {
   init() {}

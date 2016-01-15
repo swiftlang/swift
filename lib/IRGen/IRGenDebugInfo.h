@@ -110,23 +110,6 @@ class IRGenDebugInfo {
   /// Used by pushLoc.
   SmallVector<std::pair<Location, const SILDebugScope *>, 8> LocationStack;
 
-  // FIXME: move this to something more local in type generation.
-  CanGenericSignature CurGenerics;
-  class GenericsRAII {
-    IRGenDebugInfo &Self;
-    GenericContextScope Scope;
-    CanGenericSignature OldGenerics;
-  public:
-    GenericsRAII(IRGenDebugInfo &self, CanGenericSignature generics)
-      : Self(self), Scope(self.IGM, generics), OldGenerics(self.CurGenerics) {
-      if (generics) self.CurGenerics = generics;
-    }
-
-    ~GenericsRAII() {
-      Self.CurGenerics = OldGenerics;
-    }
-  };
-
 public:
   IRGenDebugInfo(const IRGenOptions &Opts, ClangImporter &CI, IRGenModule &IGM,
                  llvm::Module &M, SourceFile *SF);

@@ -766,6 +766,8 @@ ConfigParserState swift::operator!(ConfigParserState Result) {
 StringRef swift::parseDeclName(StringRef name,
                                SmallVectorImpl<StringRef> &argumentLabels,
                                bool &isFunctionName) {
+  if (name.empty()) return "";
+
   if (name.back() != ')') {
     isFunctionName = false;
     if (Lexer::isIdentifier(name) && name != "_")

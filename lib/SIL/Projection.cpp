@@ -91,6 +91,15 @@ NewProjection::NewProjection(SILInstruction *I) : Value() {
            REAI->getType());
     break;
   }
+  case ValueKind::ProjectBoxInst: {
+    auto *PBI = cast<ProjectBoxInst>(I);
+    Value = ValueTy(NewProjectionKind::Box, (unsigned)0);
+    assert(getKind() == NewProjectionKind::Box);
+    assert(getIndex() == 0);
+    assert(getType(PBI->getOperand().getType(), PBI->getModule()) ==
+           PBI->getType());
+    break;
+  }
   case ValueKind::TupleExtractInst: {
     auto *TEI = cast<TupleExtractInst>(I);
     Value = ValueTy(NewProjectionKind::Tuple, TEI->getFieldNo());
@@ -198,6 +207,8 @@ NewProjection::createObjectProjection(SILBuilder &B, SILLocation Loc,
     return B.createUncheckedEnumData(Loc, Base, getEnumElementDecl(BaseTy));
   case NewProjectionKind::Class:
     return nullptr;
+  case NewProjectionKind::Box:
+    return nullptr;
   case NewProjectionKind::Upcast:
     return B.createUpcast(Loc, Base, getCastType(BaseTy));
   case NewProjectionKind::RefCast:
@@ -237,6 +248,8 @@ NewProjection::createAddressProjection(SILBuilder &B, SILLocation Loc,
                                              getEnumElementDecl(BaseTy));
   case NewProjectionKind::Class:
     return B.createRefElementAddr(Loc, Base, getVarDecl(BaseTy));
+  case NewProjectionKind::Box:
+    return B.createProjectBox(Loc, Base);
   case NewProjectionKind::Upcast:
     return B.createUpcast(Loc, Base, getCastType(BaseTy));
   case NewProjectionKind::RefCast:
@@ -287,6 +300,18 @@ void NewProjection::getFirstLevelProjections(
             X.verify(Mod););
       Out.push_back(P);
     }
+    return;
+  }
+
+  if (auto Box = Ty.getAs<SILBoxType>()) {
+    NewProjection P(NewProjectionKind::Box, (unsigned)0);
+    DEBUG(NewProjectionPath X(Ty);
+          assert(X.getMostDerivedType(Mod) == Ty);
+          X.append(P);
+          assert(X.getMostDerivedType(Mod) == SILType::getPrimitiveAddressType(
+                                                Box->getBoxedType()));
+          X.verify(Mod););
+    Out.push_back(P);
     return;
   }
 }
@@ -767,6 +792,9 @@ Projection::addressProjectionForInstruction(SILInstruction *I) {
   case ValueKind::RefElementAddrInst:
     assert(isAddrProjection(I) && "isAddrProjection out of sync");
     return Projection(cast<RefElementAddrInst>(I));
+  case ValueKind::ProjectBoxInst:
+    assert(isAddrProjection(I) && "isAddrProjection out of sync");
+    return Projection(cast<ProjectBoxInst>(I));
   case ValueKind::UncheckedTakeEnumDataAddrInst:
     assert(isAddrProjection(I) && "isAddrProjection out of sync");
     return Projection(cast<UncheckedTakeEnumDataAddrInst>(I));
@@ -851,6 +879,11 @@ Projection::Projection(RefElementAddrInst *REA)
       Index(getIndexForValueDecl(Decl)), Kind(unsigned(ProjectionKind::Class)) {
 }
 
+Projection::Projection(ProjectBoxInst *PBI)
+    : Type(PBI->getType()), Decl(nullptr),
+      Index(0), Kind(unsigned(ProjectionKind::Box)) {
+}
+
 /// UncheckedTakeEnumDataAddrInst always have an index of 0 since enums only
 /// have one payload.
 Projection::Projection(UncheckedTakeEnumDataAddrInst *UTEDAI)
@@ -897,6 +930,8 @@ createValueProjection(SILBuilder &B, SILLocation Loc, SILValue Base) const {
                                      cast<EnumElementDecl>(getDecl()));
   case ProjectionKind::Class:
     return nullptr;
+  case ProjectionKind::Box:
+    return nullptr;
   }
 }
 
@@ -928,6 +963,8 @@ createAddrProjection(SILBuilder &B, SILLocation Loc, SILValue Base) const {
                                              cast<EnumElementDecl>(getDecl()));
   case ProjectionKind::Class:
     return B.createRefElementAddr(Loc, Base, cast<VarDecl>(getDecl()));
+  case ProjectionKind::Box:
+    return B.createProjectBox(Loc, Base);
   }
 }
 
@@ -952,7 +989,9 @@ SILValue Projection::getOperandForAggregate(SILInstruction *I) const {
       }
       break;
     case ProjectionKind::Class:
-      // There is no SIL instruction to create a class by aggregating values.
+    case ProjectionKind::Box:
+      // There is no SIL instruction to create a class or box by aggregating
+      // values.
       break;
   }
   return SILValue();
@@ -986,6 +1025,13 @@ void Projection::getFirstLevelAddrProjections(
     }
     return;
   }
+
+  if (auto Box = Ty.getAs<SILBoxType>()) {
+    Out.push_back(Projection(ProjectionKind::Box,
+                    SILType::getPrimitiveAddressType(Box->getBoxedType()),
+                    nullptr, 0));
+    return;
+  }
 }
 
 void Projection::getFirstLevelProjections(
@@ -1011,6 +1057,13 @@ void Projection::getFirstLevelProjections(
       Out.push_back(Projection(ProjectionKind::Class, Ty.getFieldType(V, Mod),
                                V, getIndexForValueDecl(V)));
     }
+    return;
+  }
+
+  if (auto Box = Ty.getAs<SILBoxType>()) {
+    Out.push_back(Projection(ProjectionKind::Box,
+                    SILType::getPrimitiveObjectType(Box->getBoxedType()),
+                    nullptr, 0));
     return;
   }
 }

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil  %s -use-native-super-method | FileCheck %s
+// RUN: %target-swift-frontend -emit-sil  %s | FileCheck %s
 
 class Parent {
   @inline(never)

@@ -200,3 +200,7 @@ func OutputStreamTest(message: String, inout to: OutputStreamType) {
   print(message, &to)  // expected-error {{'print' is unavailable: Please use the 'toStream' label for the target stream: 'print((...), toStream: &...)'}}
 }
 
+// expected-note@+1{{'T' has been explicitly marked unavailable here}}
+struct UnavailableGenericParam<@available(*, unavailable, message="nope") T> {
+  func f(t: T) { } // expected-error{{'T' is unavailable: nope}}
+}

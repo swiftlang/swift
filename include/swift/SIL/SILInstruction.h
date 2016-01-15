@@ -3916,11 +3916,13 @@ public:
 
   /// Returns the argument on the cond_br terminator that will be passed to
   /// DestBB in A.
-  SILValue getArgForDestBB(SILBasicBlock *DestBB, SILArgument *A) const;
+  SILValue getArgForDestBB(const SILBasicBlock *DestBB,
+                           const SILArgument *A) const;
 
   /// Returns the argument on the cond_br terminator that will be passed as the
   /// \p Index argument to DestBB.
-  SILValue getArgForDestBB(SILBasicBlock *DestBB, unsigned ArgIndex) const;
+  SILValue getArgForDestBB(const SILBasicBlock *DestBB,
+                           unsigned ArgIndex) const;
 
   void swapSuccessors();
 

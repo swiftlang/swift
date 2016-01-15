@@ -294,3 +294,20 @@ bb4:
 // CHECK: return [[RESULT]]
   return %15 : $Int
 }
+
+// Test cases where the only use is a debug_value_addr
+// CHECK-LABEL: sil @no_real_uses
+sil @no_real_uses : $@convention(thin) () -> () {
+// CHECK: bb0
+bb0:
+  // CHECK-NOT: alloc_stack
+  %0 = alloc_stack $Builtin.Int32
+  // CHECK-NOT: debug_value_addr
+  debug_value_addr %0 : $*Builtin.Int32, let, name "x", argno 1
+  // CHECK-NOT: dealloc_stack
+  dealloc_stack %0 : $*Builtin.Int32
+  // CHECK: [[VAL:%.*]] = tuple ()
+  %1 = tuple ()
+  // CHECK: return [[VAL]]
+  return %1 : $()
+}
