@@ -244,6 +244,18 @@ findDominatingNonPayloadedEdge(SILBasicBlock *IncomingEdgeBB,
   return false;
 }
 
+static SILValue allIncomingValuesEqual(
+    llvm::SmallVectorImpl<std::pair<SILBasicBlock *,
+                                    SILValue >> &IncomingValues) {
+  SILValue First = stripRCIdentityPreservingInsts(IncomingValues[0].second);
+  if (std::all_of(std::next(IncomingValues.begin()), IncomingValues.end(),
+                     [&First](std::pair<SILBasicBlock *, SILValue> P) -> bool {
+                       return stripRCIdentityPreservingInsts(P.second) == First;
+                     }))
+    return First;
+  return SILValue();
+}
+
 /// Return the underlying SILValue after stripping off SILArguments that cannot
 /// affect RC identity.
 ///
@@ -301,11 +313,16 @@ SILValue RCIdentityFunctionInfo::stripRCIdentityPreservingArgs(SILValue V,
 
   unsigned IVListSize = IncomingValues.size();
 
-  // If we only have one incoming value, just return the identity root of that
-  // incoming value. There can be no loop problems.
-  if (IVListSize == 1) {
-    return IncomingValues[0].second;
-  }
+  assert(IVListSize != 1 && "Should have been handled in "
+         "stripRCIdentityPreservingInsts");
+
+  // Ok, we have multiple predecessors. See if all of them are the same
+  // value. If so, just return that value.
+  //
+  // This returns a SILValue to save a little bit of compile time since we
+  // already compute that value here.
+  if (SILValue V = allIncomingValuesEqual(IncomingValues))
+    return V;
 
   // Ok, we have multiple predecessors. First find the first non-payloaded enum.
   llvm::SmallVector<SILBasicBlock *, 8> NoPayloadEnumBBs;
