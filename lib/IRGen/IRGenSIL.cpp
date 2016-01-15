@@ -1616,15 +1616,7 @@ void IRGenSILFunction::visitAllocGlobalInst(AllocGlobalInst *i) {
   // buffer.
   Address addr = IGM.getAddrOfSILGlobalVariable(var, ti,
                                                 NotForDefinition);
-
-  if (ti.isFixedSize(ResilienceExpansion::Maximal)) {
-    // If the type is fixed-size in this resilience domain, we know
-    // at compile time if it fits in the buffer or not.
-    emitAllocateBuffer(*this, loweredTy, addr);
-  } else {
-    // Otherwise, we call the value witness dynamically.
-    emitAllocateBufferCall(*this, loweredTy, addr);
-  }
+  (void) ti.allocateBuffer(*this, addr, loweredTy);
 }
 
 void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
@@ -1651,17 +1643,8 @@ void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
   }
 
   // Otherwise, the static storage for the global consists of a fixed-size
-  // buffer.
-  if (ti.isFixedSize(ResilienceExpansion::Maximal)) {
-    // If the type is fixed-size in this resilience domain, we know
-    // at compile time if it fits in the buffer or not.
-    addr = emitProjectBuffer(*this, loweredTy, addr);
-  } else {
-    // Otherwise, we call the value witness dynamically.
-    llvm::Value *metadata = emitTypeMetadataRefForLayout(loweredTy);
-    llvm::Value *value = emitProjectBufferCall(*this, metadata, addr);
-    addr = ti.getAddressForPointer(value);
-  }
+  // buffer; project it.
+  addr = ti.projectBuffer(*this, addr, loweredTy);
   
   setLoweredAddress(SILValue(i, 0), addr);
 }
@@ -4236,21 +4219,26 @@ void IRGenSILFunction::visitIndexRawPointerInst(swift::IndexRawPointerInst *i) {
 void IRGenSILFunction::visitAllocValueBufferInst(
                                           swift::AllocValueBufferInst *i) {
   Address buffer = getLoweredAddress(i->getOperand());
-  Address value = emitAllocateBuffer(*this, i->getValueType(), buffer);
+  auto valueType = i->getValueType();
+  Address value =
+    getTypeInfo(valueType).allocateBuffer(*this, buffer, valueType);
   setLoweredAddress(SILValue(i, 0), value);
 }
 
 void IRGenSILFunction::visitProjectValueBufferInst(
                                           swift::ProjectValueBufferInst *i) {
   Address buffer = getLoweredAddress(i->getOperand());
-  Address value = emitProjectBuffer(*this, i->getValueType(), buffer);
+  auto valueType = i->getValueType();
+  Address value =
+    getTypeInfo(valueType).projectBuffer(*this, buffer, valueType);
   setLoweredAddress(SILValue(i, 0), value);
 }
 
 void IRGenSILFunction::visitDeallocValueBufferInst(
                                           swift::DeallocValueBufferInst *i) {
   Address buffer = getLoweredAddress(i->getOperand());
-  emitDeallocateBuffer(*this, i->getValueType(), buffer);
+  auto valueType = i->getValueType();
+  getTypeInfo(valueType).deallocateBuffer(*this, buffer, valueType);
 }
 
 void IRGenSILFunction::visitInitExistentialAddrInst(swift::InitExistentialAddrInst *i) {
@@ -4269,43 +4257,9 @@ void IRGenSILFunction::visitInitExistentialAddrInst(swift::InitExistentialAddrIn
   if (tryDeferFixedSizeBufferInitialization(*this, i, srcTI, i, buffer, ""))
     return;
   
-  // Compute basic layout information about the type.  If we have a
-  // concrete type, we need to know how it packs into a fixed-size
-  // buffer.  If we don't, we need a value witness table.
-  
-  
-  FixedPacking packing;
-  bool needValueWitnessToAllocate;
-  if (!isa<FixedTypeInfo>(srcTI)) {
-    packing = (FixedPacking) -1;
-    needValueWitnessToAllocate = true;
-  } else {
-    packing = srcTI.getFixedPacking(IGM);
-    needValueWitnessToAllocate = false;
-  }
-
-  // Project down to the destination fixed-size buffer.
-  Address address = [&]{
-    // If the type is provably empty, we're done.
-    if (srcTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
-      assert(packing == FixedPacking::OffsetZero);
-      return buffer;
-    }
-    
-      // Otherwise, allocate if necessary.
-
-    if (needValueWitnessToAllocate) {
-      // If we're using a witness-table to do this, we need to emit a
-      // value-witness call to allocate the fixed-size buffer.
-      return Address(emitAllocateBufferCall(*this, i->getLoweredConcreteType(),
-                                            buffer),
-                     Alignment(1));
-    } else {
-      // Otherwise, allocate using what we know statically about the type.
-      return emitAllocateBuffer(*this, i->getLoweredConcreteType(), buffer);
-    }
-  }();
-  
+  // Allocate in the destination fixed-size buffer.
+  Address address =
+    srcTI.allocateBuffer(*this, buffer, i->getLoweredConcreteType());  
   setLoweredAddress(SILValue(i, 0), address);
 }
 

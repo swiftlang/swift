@@ -97,9 +97,6 @@ bb0:
   // CHECK: [[VALUE:%.*]] = call %swift.opaque* [[allocateBuffer]]([[BUFFER]]* @otherGlobal, %swift.type* [[METADATA]])
   alloc_global @otherGlobal
 
-  // CHECK: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
-  // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[METADATA_ADDR]], [[INT]] -1
-  // CHECK: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
   // CHECK: [[WITNESS_PTR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 2
   // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_PTR]]
   // CHECK: [[projectBuffer:%.*]] = bitcast i8* [[WITNESS]] to %swift.opaque* ([[BUFFER]]*, %swift.type*)*

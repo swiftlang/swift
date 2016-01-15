@@ -68,25 +68,6 @@ void TypeInfo::initialize(IRGenFunction &IGF, Address dest, Address src,
   }
 }
 
-Address TypeInfo::initializeBufferWithTake(IRGenFunction &IGF,
-                                           Address destBuffer,
-                                           Address srcAddr,
-                                           SILType T) const {
-  Address destAddr = emitAllocateBuffer(IGF, T, destBuffer);
-  initializeWithTake(IGF, destAddr, srcAddr, T);
-  return destAddr;
-}
-
-Address TypeInfo::initializeBufferWithCopy(IRGenFunction &IGF,
-                                           Address destBuffer,
-                                           Address srcAddr,
-                                           SILType T) const {
-  Address destAddr = emitAllocateBuffer(IGF, T, destBuffer);
-  initializeWithCopy(IGF, destAddr, srcAddr, T);
-  return destAddr;
-}
-
-
 bool TypeInfo::isSingleRetainablePointer(ResilienceExpansion expansion,
                                          ReferenceCounting *refcounting) const {
   return false;

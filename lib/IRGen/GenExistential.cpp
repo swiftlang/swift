@@ -334,7 +334,8 @@ public:
     Address srcBuffer = layout.projectExistentialBuffer(IGF, src);
     Address destBuffer = layout.projectExistentialBuffer(IGF, dest);
     emitInitializeBufferWithCopyOfBufferCall(IGF, metadata,
-                                             destBuffer, srcBuffer);
+                                             destBuffer,
+                                             srcBuffer);
   }
 
   void initializeWithTake(IRGenFunction &IGF,
@@ -349,7 +350,8 @@ public:
     Address srcBuffer = layout.projectExistentialBuffer(IGF, src);
     Address destBuffer = layout.projectExistentialBuffer(IGF, dest);
     emitInitializeBufferWithTakeOfBufferCall(IGF, metadata,
-                                             destBuffer, srcBuffer);
+                                             destBuffer,
+                                             srcBuffer);
   }
 
   void destroy(IRGenFunction &IGF, Address addr, SILType T) const {
@@ -1524,7 +1526,9 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
         emitProjectBufferCall(IGF, destMetadata, destBuffer);
       llvm::Value *srcObject =
         emitProjectBufferCall(IGF, destMetadata, srcBuffer);
-      emitAssignWithCopyCall(IGF, destMetadata, destObject, srcObject);
+      emitAssignWithCopyCall(IGF, destMetadata,
+                             Address(destObject, Alignment(1)),
+                             Address(srcObject, Alignment(1)));
       IGF.Builder.CreateBr(doneBB);
     }
 
@@ -1559,7 +1563,8 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
       // witness table from the source metadata if we can't use a
       // protocol witness table.
       emitInitializeBufferWithCopyOfBufferCall(IGF, srcMetadata,
-                                               destBuffer, srcBuffer);
+                                               destBuffer,
+                                               srcBuffer);
       IGF.Builder.CreateBr(doneBB);
     }
 
@@ -1848,7 +1853,8 @@ void irgen::emitMetatypeOfOpaqueExistential(IRGenFunction &IGF, Address addr,
 
   // Project the buffer and apply the 'typeof' value witness.
   Address buffer = existLayout.projectExistentialBuffer(IGF, addr);
-  llvm::Value *object = emitProjectBufferCall(IGF, metadata, buffer);
+  llvm::Value *object =
+    emitProjectBufferCall(IGF, metadata, buffer);
   llvm::Value *dynamicType =
     IGF.Builder.CreateCall(IGF.IGM.getGetDynamicTypeFn(),
                            {object, metadata});
@@ -1984,7 +1990,8 @@ irgen::emitIndirectExistentialProjectionWithMetadata(IRGenFunction &IGF,
 
     llvm::Value *metadata = layout.loadMetadataRef(IGF, base);
     Address buffer = layout.projectExistentialBuffer(IGF, base);
-    llvm::Value *object = emitProjectBufferCall(IGF, metadata, buffer);
+    llvm::Value *object =
+      emitProjectBufferCall(IGF, metadata, buffer);
 
     // If we are projecting into an opened archetype, capture the
     // witness tables.
