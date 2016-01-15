@@ -55,4 +55,3 @@ def getGenericArgString(genericArgs=None, genericConstraints=None):
 
 def getGenericConstraintString(genericArgs=None, genericConstraints=None):
   return _getGenericArgStrings(genericArgs, genericConstraints)[1]
-

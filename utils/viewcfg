@@ -55,7 +55,7 @@ class Block:
         self.succs = None
         self.lastLine = None
         self.index = Block.currentIndex
-        Block.currentIndex +=  1
+        Block.currentIndex += 1
         if preds is not None:
             for pred in re.split("[, %]", preds):
                 canPred = pred.strip()

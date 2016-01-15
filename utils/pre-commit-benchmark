@@ -208,10 +208,10 @@ def compareScores(key, score1, score2, runs):
     while r < runs:
         row.append("0.0")
 
-    row.append("%.2f" % abs(bestscore1-bestscore2))
+    row.append("%.2f" % abs(bestscore1 - bestscore2))
     Num=float(bestscore1)
     Den=float(bestscore2)
-    row.append(("%.2f" % (Num/Den)) if Den > 0 else "*")
+    row.append(("%.2f" % (Num / Den)) if Den > 0 else "*")
     return row
 
 def compareTimingsFiles(file1, file2):
@@ -227,7 +227,7 @@ def compareTimingsFiles(file1, file2):
         print("comparing ", file1, "vs", file2, "=", end='')
         print(file1, "/", file2)
 
-    rows =  [["benchmark"]]
+    rows = [["benchmark"]]
     for i in range(0,runs):
         rows[0].append("baserun%d" % i)
     for i in range(0,runs):

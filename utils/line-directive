@@ -43,7 +43,7 @@ def _make_line_map(filename, stream=None):
     for i, l in enumerate(input.readlines()):
         m = line_pattern.match(l)
         if m:
-            result.append((i+1, m.group(2), int(m.group(1))))
+            result.append((i + 1, m.group(2), int(m.group(1))))
     return result
 
 _line_maps = {}
@@ -60,7 +60,7 @@ def map_line(filename, line_num):
     map = fline_map(filename)
     index = bisect.bisect_left(map, (line_num,'',0))
     base = map[index - 1]
-    return base[1], base[2] + (line_num - base[0]-1)
+    return base[1], base[2] + (line_num - base[0] - 1)
 
 def run():
     if len(sys.argv) <= 1:

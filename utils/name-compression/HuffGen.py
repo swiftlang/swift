@@ -48,8 +48,10 @@ class Node:
   def getMaxEncodingLength(self):
     """ Return the length of the longest possible encoding word"""
     v = 0
-    if self.left:  v = max(v, 1 + self.left .getMaxEncodingLength())
-    if self.right: v = max(v, 1 + self.right.getMaxEncodingLength())
+    if self.left:
+      v = max(v, 1 + self.left .getMaxEncodingLength())
+    if self.right:
+      v = max(v, 1 + self.right.getMaxEncodingLength())
     return v
 
   def generate_decoder(self, depth):
@@ -63,8 +65,10 @@ class Node:
 
     T = """{0}if ((tailbits & 1) == {1}) {{\n{0} tailbits/=2;\n{2}\n{0}}}"""
     sb = ""
-    if self.left:  sb += T.format(space, 0, self.left .generate_decoder(depth + 1)) + "\n"
-    if self.right: sb += T.format(space, 1, self.right.generate_decoder(depth + 1))
+    if self.left:
+      sb += T.format(space, 0, self.left .generate_decoder(depth + 1)) + "\n"
+    if self.right:
+      sb += T.format(space, 1, self.right.generate_decoder(depth + 1))
     return sb
 
   def generate_encoder(self, stack):
@@ -73,7 +77,7 @@ class Node:
     """
     if self.val:
       sb = "if (ch == '" + str(self.val) +"') {"
-      sb += "/*" +  "".join(map(str, reversed(stack))) + "*/ "
+      sb += "/*" + "".join(map(str, reversed(stack))) + "*/ "
       # Encode the bit stream as a numeric value. Updating the APInt in one go
       # is much faster than inserting one bit at a time.
       numeric_val = 0
@@ -84,8 +88,10 @@ class Node:
       sb += "return; }\n"
       return sb
     sb = ""
-    if (self.left):  sb += self.left .generate_encoder(stack + [0])
-    if (self.right): sb += self.right.generate_encoder(stack + [1])
+    if self.left:
+      sb += self.left .generate_encoder(stack + [0])
+    if self.right:
+      sb += self.right.generate_encoder(stack + [1])
     return sb
 
 # Only accept these characters into the tree.
@@ -132,4 +138,3 @@ print "std::pair<char, unsigned> variable_decode(uint64_t tailbits) {\n", nodes[
 print "void variable_encode(uint64_t &bits, uint64_t &num_bits, char ch) {\n", nodes[0].generate_encoder([]),"assert(false);\n}"
 print "} // namespace"
 print "#endif /* SWIFT_MANGLER_HUFFMAN_H */"
-

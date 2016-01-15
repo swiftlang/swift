@@ -531,9 +531,8 @@ the number of parallel build jobs to use""",
         args.build_cmark = True
 
     # Build LLDB if any LLDB-related options were specified.
-    if (args.lldb_build_variant is not None or
-        args.lldb_assertions is not None):
-       args.build_lldb = True
+    if (args.lldb_build_variant is not None or args.lldb_assertions is not None):
+        args.build_lldb = True
 
     # Set the default build variant.
     if args.build_variant is None:
@@ -805,4 +804,3 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-
