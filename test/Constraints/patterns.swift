@@ -167,8 +167,8 @@ default: break
 
 // FIXME: rdar://problem/23378003
 // These will eventually become errors.
-for (var x) in 0...100 {} // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{6-9=}}
-for var x in 0...100 {}  // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{5-9=}}
+for (var x) in 0...100 {} // expected-error {{Use of 'var' binding here is not allowed}} {{6-9=}}
+for var x in 0...100 {}  // expected-error {{Use of 'var' binding here is not allowed}} {{5-9=}}
 
 for (let x) in 0...100 {} // expected-error {{'let' pattern is already in an immutable context}}
 
