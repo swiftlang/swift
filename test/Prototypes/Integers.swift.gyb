@@ -25,7 +25,6 @@ import Swift
 # Utility code for later in this template
 #
 from math import log
-from string import maketrans
   
 # Number of bits in the Builtin.Word type
 word_bits = int(WORD_BITS) # int(CMAKE_SIZEOF_VOID_P) * 8
@@ -478,7 +477,8 @@ public func ${x.nonMaskingOperator} <
   if _slowPath(rhs <= -T.bitWidth) {
     return overshift${'RL'['R' in x.name]}
   }
-  return lhs ${x.operator.translate(maketrans('<>', '><'))} -rhs
+  % unicode_maketrans = {ord(c): ord(t) for c, t in zip('<>', '><')}
+  return lhs ${x.operator.translate(unicode_maketrans)} -rhs
 }
 
 @_transparent
