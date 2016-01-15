@@ -1820,6 +1820,7 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
   SourceLoc endOfIncrementLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr, FS->getIncrement().getPtrOrNull()->getEndLoc());
     
   diagnostic
+   .fixItRemoveChars(loopVarDecl->getLoc(), loopVar->getLoc())
    .fixItReplaceChars(loopPatternEnd, startValue->getStartLoc(), " in ")
    .fixItReplaceChars(FS->getFirstSemicolonLoc(), endValue->getStartLoc(), " ..< ")
    .fixItRemoveChars(FS->getSecondSemicolonLoc(), endOfIncrementLoc);
