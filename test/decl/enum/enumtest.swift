@@ -290,5 +290,9 @@ func testSimpleEnum() {
   let _ : SimpleEnum=.X    // expected-error {{'=' must have consistent whitespace on both sides}}
 }
 
+enum SR510: String {
+    case Thing = "thing"
+    case Bob = {"test"} // expected-error {{not a proper raw value expression}}
+}
 
 
