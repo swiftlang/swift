@@ -3086,7 +3086,7 @@ static bool isSettable(const AbstractStorageDecl *decl) {
 bool VarDecl::isSettable(const DeclContext *UseDC,
                          const DeclRefExpr *base) const {
 
-  if (!isUserAssignable())
+  if (isClosureCapture())
       return false;
     
   // If this is a 'var' decl, then we're settable if we have storage or a
@@ -3313,8 +3313,8 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
   // If it isn't a 'let', don't touch it.
   if (!isLet()) return;
 
-  // Don't suggest mutability if the var isn't user assignable at all.
-  if (!isUserAssignable()) return;
+  // Similarly, if it is a closure capture, don't touch it.
+  if (isClosureCapture()) return;
 
   // If this is the 'self' argument of a non-mutating method in a value type,
   // suggest adding 'mutating' to the method.
