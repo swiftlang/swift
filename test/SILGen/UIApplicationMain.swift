@@ -18,7 +18,7 @@ class MyDelegate : UIApplicationDelegate {}
 // Ensure that we coexist with normal references to the functions we
 // implicitly reference in the synthesized main.
 func foo(x: AnyObject.Type) -> String {
-  return NSStringFromClass(x)
+  return String(x)
 }
 func bar() {
   UIApplicationMain(0, nil, nil, nil)

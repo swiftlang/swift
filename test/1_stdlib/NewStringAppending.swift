@@ -32,7 +32,7 @@ func hexAddr(x: AnyObject?) -> String {
 }
 
 func repr(x: NSString) -> String {
-  return "\(NSStringFromClass(object_getClass(x)))\(hexAddr(x)) = \"\(x)\""
+  return "\(String(object_getClass(x)))\(hexAddr(x)) = \"\(x)\""
 }
 
 func repr(x: _StringCore) -> String {

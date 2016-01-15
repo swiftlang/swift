@@ -156,8 +156,8 @@ func archive() {
 func unarchive() {
   // FIXME: Pre-instantiate the generic classes that were archived, since
   // the ObjC runtime doesn't know how.
-  NSStringFromClass(Foo<NSNumber>.self)
-  NSStringFromClass(Foo<NSString>.self)
+  String(Foo<NSNumber>.self)
+  String(Foo<NSString>.self)
 
   // Read in the data from stdin, where the archiver process should have
   // written it.

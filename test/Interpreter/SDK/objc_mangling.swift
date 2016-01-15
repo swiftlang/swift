@@ -26,7 +26,7 @@ func checkClassName(cls: AnyClass, _ name: String, _ mangled: String)
   // Look up by unmangled name should work.
   // Look up by mangled name should also work.
   for query in [name, mangled] {
-    let cls2 = NSClassFromString(query)
+    let cls2 = String(query)
     assert(cls === cls2)
     assert(object_getClass(cls) === object_getClass(cls2))
   }
