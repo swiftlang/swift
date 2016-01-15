@@ -1,4 +1,5 @@
 add_swift_library(swiftParse
+  Confusables.cpp.gyb
   Lexer.cpp
   Parser.cpp
   ParseDecl.cpp
