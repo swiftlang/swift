@@ -43,10 +43,22 @@ ParserResult<GenericParamList> Parser::parseGenericParameters(SourceLoc LAngleLo
   SmallVector<GenericTypeParamDecl *, 4> GenericParams;
   bool Invalid = false;
   do {
+    // Note that we're parsing a declaration.
+    StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
+                                    StructureMarkerKind::Declaration);
+
+    // Parse attributes.
+    DeclAttributes attributes;
+    if (Tok.hasComment())
+      attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
+    bool foundCCTokenInAttr;
+    parseDeclAttributeList(attributes, foundCCTokenInAttr);
+
     // Parse the name of the parameter.
     Identifier Name;
     SourceLoc NameLoc;
-    if (parseIdentifier(Name, NameLoc, diag::expected_generics_parameter_name)) {
+    if (parseIdentifier(Name, NameLoc,
+                        diag::expected_generics_parameter_name)) {
       Invalid = true;
       break;
     }
@@ -82,6 +94,9 @@ ParserResult<GenericParamList> Parser::parseGenericParameters(SourceLoc LAngleLo
     if (!Inherited.empty())
       Param->setInherited(Context.AllocateCopy(Inherited));
     GenericParams.push_back(Param);
+
+    // Attach attributes.
+    Param->getAttrs() = attributes;
 
     // Add this parameter to the scope.
     addToScope(Param);
