@@ -1171,6 +1171,15 @@ static bool diagnoseAvailability(Type ty, IdentTypeRepr *IdType, SourceLoc Loc,
       return true;
   }
 
+  if (auto *GPT = dyn_cast<GenericTypeParamType>(ty.getPointer())) {
+    if (auto GP = GPT->getDecl()) {
+      if (checkTypeDeclAvailability(GP, IdType, Loc, DC, TC,
+                                    AllowPotentiallyUnavailableProtocol)) {
+        return true;
+      }
+    }
+  }
+
   // Look through substituted types to diagnose when the original
   // type is marked unavailable.
   if (auto *ST = dyn_cast<SubstitutedType>(ty.getPointer())) {
