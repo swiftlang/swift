@@ -22,56 +22,56 @@
 #endif
 
 #ifndef ERROR
-#  define ERROR(ID,Category,Options,Text,Signature)   \
-  DIAG(ERROR,ID,Category,Options,Text,Signature)
+#  define ERROR(ID,Options,Text,Signature)   \
+  DIAG(ERROR,ID,Options,Text,Signature)
 #endif
 
 #ifndef WARNING
-#  define WARNING(ID,Category,Options,Text,Signature) \
-  DIAG(WARNING,ID,Category,Options,Text,Signature)
+#  define WARNING(ID,Options,Text,Signature) \
+  DIAG(WARNING,ID,Options,Text,Signature)
 #endif
 
 #ifndef NOTE
-#  define NOTE(ID,Category,Options,Text,Signature) \
-  DIAG(NOTE,ID,Category,Options,Text,Signature)
+#  define NOTE(ID,Options,Text,Signature) \
+  DIAG(NOTE,ID,Options,Text,Signature)
 #endif
 
 //==============================================================================
 // Lexing and Parsing diagnostics
 //==============================================================================
 
-NOTE(opening_brace,parsing,none,
+NOTE(opening_brace,none,
      "to match this opening '{'", ())
-NOTE(opening_bracket,parsing,none,
+NOTE(opening_bracket,none,
      "to match this opening '['", ())
-NOTE(opening_paren,parsing,none,
+NOTE(opening_paren,none,
      "to match this opening '('", ())
-NOTE(opening_angle,parsing,none,
+NOTE(opening_angle,none,
      "to match this opening '<'", ())
 
-ERROR(extra_rbrace,parsing,none,
+ERROR(extra_rbrace,none,
       "extraneous '}' at top level", ())
 
-ERROR(unexpected_config_block_terminator,parsing,none,
+ERROR(unexpected_config_block_terminator,none,
       "unexpected configuration block terminator", ())
-ERROR(expected_build_configuration_expression,parsing,none,
+ERROR(expected_build_configuration_expression,none,
       "expected a build configuration expression to follow the #if clause", ())
-ERROR(extra_tokens_config_directive,parsing,none,
+ERROR(extra_tokens_config_directive,none,
       "extra tokens at the end of the build configuration directive", ())
 
-ERROR(unexpected_line_directive,parsing,none,
+ERROR(unexpected_line_directive,none,
       "parameterless closing #line directive "
       "without prior opening #line directive", ())
-ERROR(expected_line_directive_number,parsing,none,
+ERROR(expected_line_directive_number,none,
       "expected starting line number for #line directive", ())
-ERROR(expected_line_directive_name,parsing,none,
+ERROR(expected_line_directive_name,none,
       "expected filename string literal for #line directive", ())
-ERROR(extra_tokens_line_directive,parsing,none,
+ERROR(extra_tokens_line_directive,none,
       "extra tokens at the end of #line directive", ())
-ERROR(line_directive_line_zero,parsing,none,
+ERROR(line_directive_line_zero,none,
       "the line number needs to be greater than zero", ())
 
-WARNING(escaped_parameter_name,parsing,none,
+WARNING(escaped_parameter_name,none,
         "keyword '%0' does not need to be escaped in argument list",
         (StringRef))
 
@@ -79,1175 +79,1175 @@ WARNING(escaped_parameter_name,parsing,none,
 // Lexer diagnostics
 //------------------------------------------------------------------------------
 
-WARNING(lex_nul_character,lexing,none,
+WARNING(lex_nul_character,none,
         "nul character embedded in middle of file", ())
-ERROR(lex_utf16_bom_marker,lexing,none,
+ERROR(lex_utf16_bom_marker,none,
       "input files must be encoded as UTF-8 instead of UTF-16", ())
 
-ERROR(lex_hashbang_not_allowed,lexing,none,
+ERROR(lex_hashbang_not_allowed,none,
       "hashbang line is allowed only in the main file", ())
 
-ERROR(lex_unprintable_ascii_character,lexing,none,
+ERROR(lex_unprintable_ascii_character,none,
       "unprintable ASCII character found in source file", ())
-ERROR(lex_invalid_utf8,lexing,none,
+ERROR(lex_invalid_utf8,none,
       "invalid UTF-8 found in source file", ())
-ERROR(lex_single_quote_string,lexing,none,
+ERROR(lex_single_quote_string,none,
       "single-quoted string literal found, use '\"'", ())
-ERROR(lex_invalid_curly_quote,lexing,none,
+ERROR(lex_invalid_curly_quote,none,
       "unicode curly quote found, replace with '\"'", ())
 
 
-ERROR(lex_unterminated_block_comment,lexing,none,
+ERROR(lex_unterminated_block_comment,none,
       "unterminated '/*' comment", ())
-NOTE(lex_comment_start,lexing,none,
+NOTE(lex_comment_start,none,
      "comment started here", ())
 
 
-ERROR(lex_unterminated_string,lexing,none,
+ERROR(lex_unterminated_string,none,
       "unterminated string literal", ())
-ERROR(lex_invalid_escape,lexing,none,
+ERROR(lex_invalid_escape,none,
        "invalid escape sequence in literal", ())
-ERROR(lex_invalid_u_escape,lexing,none,
+ERROR(lex_invalid_u_escape,none,
       "\\u{...} escape sequence expects between 1 and 8 hex digits", ())
-ERROR(lex_invalid_u_escape_rbrace,lexing,none,
+ERROR(lex_invalid_u_escape_rbrace,none,
       "expected '}' in \\u{...} escape sequence", ())
 
-ERROR(lex_invalid_unicode_scalar,lexing,none,
+ERROR(lex_invalid_unicode_scalar,none,
        "invalid unicode scalar", ())
-ERROR(lex_unicode_escape_braces,lexing,none,
+ERROR(lex_unicode_escape_braces,none,
       "expected hexadecimal code in braces after unicode escape", ())
 
 
-ERROR(lex_invalid_character,lexing,none,
+ERROR(lex_invalid_character,none,
        "invalid character in source file", ())
-ERROR(lex_invalid_identifier_start_character,lexing,none,
+ERROR(lex_invalid_identifier_start_character,none,
        "an identifier cannot begin with this character", ())
-ERROR(lex_expected_digit_in_fp_exponent,lexing,none,
+ERROR(lex_expected_digit_in_fp_exponent,none,
        "expected a digit in floating point exponent", ())
-ERROR(lex_expected_digit_in_int_literal,lexing,none,
+ERROR(lex_expected_digit_in_int_literal,none,
        "expected a digit after integer literal prefix", ())
-ERROR(lex_expected_binary_exponent_in_hex_float_literal,lexing,none,
+ERROR(lex_expected_binary_exponent_in_hex_float_literal,none,
       "hexadecimal floating point literal must end with an exponent", ())
-ERROR(lex_unexpected_block_comment_end,lexing,none,
+ERROR(lex_unexpected_block_comment_end,none,
       "unexpected end of block comment", ())
-ERROR(lex_unary_equal,lexing,none,
+ERROR(lex_unary_equal,none,
       "'=' must have consistent whitespace on both sides", ())
-ERROR(extra_whitespace_period,lexing,none,
+ERROR(extra_whitespace_period,none,
       "extraneous whitespace after '.' is not permitted", ())
-ERROR(lex_editor_placeholder,lexing,none,
+ERROR(lex_editor_placeholder,none,
       "editor placeholder in source file", ())
-WARNING(lex_editor_placeholder_in_playground,lexing,none,
+WARNING(lex_editor_placeholder_in_playground,none,
         "editor placeholder in source file", ())
 
 //------------------------------------------------------------------------------
 // Declaration parsing diagnostics
 //------------------------------------------------------------------------------
 
-ERROR(declaration_same_line_without_semi,decl_parsing,none,
+ERROR(declaration_same_line_without_semi,none,
       "consecutive declarations on a line must be separated by ';'", ())
 
-ERROR(expected_decl,decl_parsing,none,
+ERROR(expected_decl,none,
       "expected declaration", ())
-ERROR(expected_identifier_in_decl,decl_parsing,none,
+ERROR(expected_identifier_in_decl,none,
       "expected identifier in %0 declaration", (StringRef))
-ERROR(expected_identifier_after_case_comma,decl_parsing,none,
+ERROR(expected_identifier_after_case_comma,none,
       "expected identifier after comma in enum 'case' declaration", ())
-ERROR(decl_redefinition,decl_parsing,none,
+ERROR(decl_redefinition,none,
       "%select{declaration|definition}0 conflicts with previous value", 
       (bool))
-ERROR(let_cannot_be_computed_property,decl_parsing,none,
+ERROR(let_cannot_be_computed_property,none,
       "'let' declarations cannot be computed properties", ())
-ERROR(let_cannot_be_observing_property,decl_parsing,none,
+ERROR(let_cannot_be_observing_property,none,
       "'let' declarations cannot be observing properties", ())
-ERROR(let_cannot_be_addressed_property,decl_parsing,none,
+ERROR(let_cannot_be_addressed_property,none,
       "'let' declarations cannot have addressors", ())
-ERROR(disallowed_var_multiple_getset,decl_parsing,none,
+ERROR(disallowed_var_multiple_getset,none,
       "'var' declarations with multiple variables cannot have explicit"
       " getters/setters", ())
 
-ERROR(disallowed_type,decl_parsing,none,
+ERROR(disallowed_type,none,
       "type not allowed here", ())
-ERROR(disallowed_init,decl_parsing,none,
+ERROR(disallowed_init,none,
       "initial value is not allowed here", ())
-ERROR(var_init_self_referential,expr_parsing,none,
+ERROR(var_init_self_referential,none,
       "variable used within its own initial value", ())
-ERROR(disallowed_enum_element,decl_parsing,none,
+ERROR(disallowed_enum_element,none,
       "enum 'case' is not allowed outside of an enum", ())
-ERROR(decl_inner_scope,decl_parsing,none,
+ERROR(decl_inner_scope,none,
       "declaration is only valid at file scope", ())
 
-ERROR(decl_not_static,decl_parsing,none,
+ERROR(decl_not_static,none,
       "declaration cannot be marked %0", (StaticSpellingKind))
 
-ERROR(cskeyword_not_attribute,decl_parsing,none,
+ERROR(cskeyword_not_attribute,none,
       "'%0' is a declaration modifier, not an attribute", (StringRef))
 
-ERROR(decl_already_static,decl_parsing,none,
+ERROR(decl_already_static,none,
       "%0 specified twice", (StaticSpellingKind))
 
-ERROR(enum_case_dot_prefix,decl_parsing,none,
+ERROR(enum_case_dot_prefix,none,
       "extraneous '.' in enum 'case' declaration", ())
 
 
 // Variable getters/setters
-ERROR(static_var_decl_global_scope,decl_parsing,none,
+ERROR(static_var_decl_global_scope,none,
       "%select{ERROR|static properties|class properties}0 may only be declared on a type",
       (StaticSpellingKind))
-ERROR(computed_property_no_accessors, decl_parsing, none,
+ERROR(computed_property_no_accessors, none,
       "computed property must have accessors specified", ())
-ERROR(expected_getset_in_protocol,decl_parsing,none,
+ERROR(expected_getset_in_protocol,none,
       "expected get or set in a protocol property", ())
-ERROR(computed_property_missing_type,decl_parsing,none,
+ERROR(computed_property_missing_type,none,
       "computed property must have an explicit type", ())
-ERROR(getset_nontrivial_pattern,decl_parsing,none,
+ERROR(getset_nontrivial_pattern,none,
       "getter/setter can only be defined for a single variable", ())
-ERROR(expected_rbrace_in_getset,decl_parsing,none,
+ERROR(expected_rbrace_in_getset,none,
       "expected '}' at end of variable get/set clause", ())
-ERROR(duplicate_property_accessor,decl_parsing,none,
+ERROR(duplicate_property_accessor,none,
       "duplicate definition of %0", (StringRef))
-NOTE(previous_accessor,decl_parsing,none,
+NOTE(previous_accessor,none,
      "previous definition of %0 is here", (StringRef))
-ERROR(conflicting_property_addressor,decl_parsing,none,
+ERROR(conflicting_property_addressor,none,
       "%select{variable|subscript}0 already has a "
       "%select{addressor|mutable addressor}1", (unsigned, unsigned))
-ERROR(expected_accessor_name,decl_parsing,none,
+ERROR(expected_accessor_name,none,
       "expected %select{GETTER|setter|willSet|didSet}0 parameter name",
       (unsigned))
-ERROR(expected_rparen_set_name,decl_parsing,none,
+ERROR(expected_rparen_set_name,none,
       "expected ')' after setter parameter name",())
-ERROR(expected_rparen_willSet_name,decl_parsing,none,
+ERROR(expected_rparen_willSet_name,none,
       "expected ')' after willSet parameter name",())
-ERROR(expected_rparen_didSet_name,decl_parsing,none,
+ERROR(expected_rparen_didSet_name,none,
       "expected ')' after didSet parameter name",())
-ERROR(expected_lbrace_accessor,decl_parsing,PointsToFirstBadToken,
+ERROR(expected_lbrace_accessor,PointsToFirstBadToken,
       "expected '{' to start %0 definition", (StringRef))
-ERROR(expected_accessor_kw,decl_parsing,none,
+ERROR(expected_accessor_kw,none,
       "expected 'get', 'set', 'willSet', or 'didSet' keyword to "
       "start an accessor definition",())
-ERROR(var_set_without_get,decl_parsing,none,
+ERROR(var_set_without_get,none,
       "variable with a setter must also have a getter", ())
-ERROR(observingproperty_with_getset,decl_parsing,none,
+ERROR(observingproperty_with_getset,none,
       "%select{willSet|didSet}0 variable may not also have a "
       "%select{get|set}1 specifier", (unsigned, unsigned))
-ERROR(observingproperty_without_mutableaddress,decl_parsing,none,
+ERROR(observingproperty_without_mutableaddress,none,
       "%select{willSet|didSet}0 variable with addressor must provide a "
       "'mutableAddress' accessor", (unsigned))
-ERROR(observingproperty_in_subscript,decl_parsing,none,
+ERROR(observingproperty_in_subscript,none,
       "%select{willSet|didSet}0 is not allowed in subscripts", (unsigned))
-ERROR(getset_init,decl_parsing,none,
+ERROR(getset_init,none,
       "variable with getter/setter cannot have an initial value", ())
-ERROR(getset_cannot_be_implied,decl_parsing,none,
+ERROR(getset_cannot_be_implied,none,
       "variable with implied type cannot have implied getter/setter", ())
-ERROR(mutableaddressor_without_address,decl_parsing,none,
+ERROR(mutableaddressor_without_address,none,
       "%select{variable|subscript}0 must provide either a getter or "
       "'address' if it provides 'mutableAddress'", (unsigned))
-ERROR(mutableaddressor_with_setter,decl_parsing,none,
+ERROR(mutableaddressor_with_setter,none,
       "%select{variable|subscript}0 cannot provide both 'mutableAddress' "
       " and a setter", (unsigned))
-ERROR(addressor_with_getter,decl_parsing,none,
+ERROR(addressor_with_getter,none,
       "%select{variable|subscript}0 cannot provide both 'address' and "
       "a getter", (unsigned))
-ERROR(addressor_with_setter,decl_parsing,none,
+ERROR(addressor_with_setter,none,
       "%select{variable|subscript}0 cannot provide both 'address' and "
       "a setter; use an ordinary getter instead", (unsigned))
 
 // Import
-ERROR(decl_expected_module_name,decl_parsing,none,
+ERROR(decl_expected_module_name,none,
       "expected module name in import declaration", ())
 
 // Extension
-ERROR(expected_lbrace_extension,decl_parsing,PointsToFirstBadToken,
+ERROR(expected_lbrace_extension,PointsToFirstBadToken,
       "expected '{' in extension", ())
-ERROR(expected_rbrace_extension,decl_parsing,none,
+ERROR(expected_rbrace_extension,none,
       "expected '}' at end of extension", ())
-ERROR(extension_type_expected,decl_parse,none,
+ERROR(extension_type_expected,none,
       "expected type name in extension declaration", ())
 
 // TypeAlias
-ERROR(expected_equal_in_typealias,decl_parsing,PointsToFirstBadToken,
+ERROR(expected_equal_in_typealias,PointsToFirstBadToken,
       "expected '=' in typealias declaration", ())
-ERROR(expected_type_in_typealias,decl_parsing,PointsToFirstBadToken,
+ERROR(expected_type_in_typealias,PointsToFirstBadToken,
       "expected type in typealias declaration", ())
 
 // Func
-ERROR(func_decl_nonglobal_operator,decl_parsing,none,
+ERROR(func_decl_nonglobal_operator,none,
       "operators are only allowed at global scope", ())
-ERROR(func_decl_without_paren,decl_parsing,PointsToFirstBadToken,
+ERROR(func_decl_without_paren,PointsToFirstBadToken,
       "expected '(' in argument list of function declaration", ())
-ERROR(static_func_decl_global_scope,decl_parsing,none,
+ERROR(static_func_decl_global_scope,none,
       "%select{ERROR|static methods|class methods}0 may only be declared on a type",
       (StaticSpellingKind))
-ERROR(func_decl_expected_arrow,decl_parsing,none,
+ERROR(func_decl_expected_arrow,none,
       "expected '->' after function parameter tuple", ())
 
 // Enum
-ERROR(expected_lbrace_enum,decl_parsing,PointsToFirstBadToken,
+ERROR(expected_lbrace_enum,PointsToFirstBadToken,
       "expected '{' in enum", ())
-ERROR(expected_rbrace_enum,decl_parsing,none,
+ERROR(expected_rbrace_enum,none,
       "expected '}' at end of enum", ())
 
 // Struct
-ERROR(expected_lbrace_struct,decl_parsing,PointsToFirstBadToken,
+ERROR(expected_lbrace_struct,PointsToFirstBadToken,
       "expected '{' in struct", ())
-ERROR(expected_rbrace_struct,decl_parsing,none,
+ERROR(expected_rbrace_struct,none,
       "expected '}' in struct", ())
 
 // Class
-ERROR(expected_lbrace_class,decl_parsing,PointsToFirstBadToken,
+ERROR(expected_lbrace_class,PointsToFirstBadToken,
       "expected '{' in class", ())
-ERROR(expected_rbrace_class,decl_parsing,none,
+ERROR(expected_rbrace_class,none,
       "expected '}' in class", ())
 
 // Protocol
-ERROR(generic_arguments_protocol,decl_parsing,PointsToFirstBadToken,
+ERROR(generic_arguments_protocol,PointsToFirstBadToken,
       "protocols do not allow generic parameters; use associated types instead",
       ())
-ERROR(expected_lbrace_protocol,decl_parsing,PointsToFirstBadToken,
+ERROR(expected_lbrace_protocol,PointsToFirstBadToken,
       "expected '{' in protocol type", ())
-ERROR(expected_rbrace_protocol,decl_parsing,none,
+ERROR(expected_rbrace_protocol,none,
       "expected '}' in protocol", ())
-ERROR(protocol_setter_name,decl_parsing,none,
+ERROR(protocol_setter_name,none,
       "setter in a protocol cannot have a name", ())
-ERROR(protocol_method_with_body,decl_parsing,none,
+ERROR(protocol_method_with_body,none,
       "protocol methods may not have bodies", ())
-ERROR(protocol_init_with_body,decl_parsing,none,
+ERROR(protocol_init_with_body,none,
       "protocol initializers may not have bodies", ())
 
 // Subscripting
-ERROR(subscript_decl_wrong_scope,decl_parsing,none,
+ERROR(subscript_decl_wrong_scope,none,
       "'subscript' functions may only be declared within a type", ())
-ERROR(expected_lparen_subscript,decl_parsing,PointsToFirstBadToken,
+ERROR(expected_lparen_subscript,PointsToFirstBadToken,
       "expected '(' for subscript parameters", ())
-ERROR(expected_arrow_subscript,decl_parsing,PointsToFirstBadToken,
+ERROR(expected_arrow_subscript,PointsToFirstBadToken,
       "expected '->' for subscript element type", ())
-ERROR(expected_type_subscript,type_parsing,PointsToFirstBadToken,
+ERROR(expected_type_subscript,PointsToFirstBadToken,
       "expected subscripting element type", ())
-ERROR(expected_lbrace_subscript,decl_parsing,PointsToFirstBadToken,
+ERROR(expected_lbrace_subscript,PointsToFirstBadToken,
       "expected '{' in subscript to specify getter and setter implementation",
       ())
-ERROR(expected_lbrace_subscript_protocol,decl_parsing,PointsToFirstBadToken,
+ERROR(expected_lbrace_subscript_protocol,PointsToFirstBadToken,
       "subscript in protocol must have explicit { get } or "
       "{ get set } specifier", ())
-ERROR(subscript_without_get,decl_parsing,none,
+ERROR(subscript_without_get,none,
       "subscript declarations must have a getter", ())
-ERROR(subscript_static,decl_parsing,none,
+ERROR(subscript_static,none,
       "subscript cannot be marked %0", (StaticSpellingKind))
 
 // initializer
-ERROR(initializer_decl_wrong_scope,decl_parsing,none,
+ERROR(initializer_decl_wrong_scope,none,
       "initializers may only be declared within a type", ())
-ERROR(expected_lparen_initializer,decl_parsing,PointsToFirstBadToken,
+ERROR(expected_lparen_initializer,PointsToFirstBadToken,
       "expected '(' for initializer parameters", ())
 
 // Destructor
-ERROR(destructor_decl_outside_class,decl_parsing,none,
+ERROR(destructor_decl_outside_class,none,
       "deinitializers may only be declared within a class", ())
-ERROR(expected_lbrace_destructor,decl_parsing,PointsToFirstBadToken,
+ERROR(expected_lbrace_destructor,PointsToFirstBadToken,
       "expected '{' for deinitializer", ())
-ERROR(opened_destructor_expected_rparen,attribute_parsing,none,
+ERROR(opened_destructor_expected_rparen,none,
       "expected ')' to close parameter list", ())
-ERROR(destructor_params,decl_parsing,none,
+ERROR(destructor_params,none,
       "no parameter clause allowed on deinitializer", ())
 
 // Operator
-ERROR(operator_decl_inner_scope,decl_parsing,none,
+ERROR(operator_decl_inner_scope,none,
       "'operator' may only be declared at file scope", ())
-ERROR(expected_operator_name_after_operator,decl_parsing,PointsToFirstBadToken,
+ERROR(expected_operator_name_after_operator,PointsToFirstBadToken,
       "expected operator name in operator declaration", ())
-ERROR(identifier_when_expecting_operator,decl_parsing,PointsToFirstBadToken,
+ERROR(identifier_when_expecting_operator,PointsToFirstBadToken,
       "%0 is considered to be an identifier, not an operator", (Identifier))
 
-ERROR(operator_decl_no_fixity,decl_parsing,none,
+ERROR(operator_decl_no_fixity,none,
       "operator must be declared as 'prefix', 'postfix', or 'infix'", ())
-ERROR(expected_lbrace_after_operator,decl_parsing,PointsToFirstBadToken,
+ERROR(expected_lbrace_after_operator,PointsToFirstBadToken,
       "expected '{' after operator name in 'operator' declaration", ())
-ERROR(expected_operator_attribute,decl_parsing,none,
+ERROR(expected_operator_attribute,none,
       "expected operator attribute identifier in 'operator' declaration body", ())
-ERROR(unknown_prefix_operator_attribute,decl_parsing,none,
+ERROR(unknown_prefix_operator_attribute,none,
       "'%0' is not a valid prefix operator attribute", (StringRef))
-ERROR(unknown_postfix_operator_attribute,decl_parsing,none,
+ERROR(unknown_postfix_operator_attribute,none,
       "'%0' is not a valid postfix operator attribute", (StringRef))
-ERROR(unknown_infix_operator_attribute,decl_parsing,none,
+ERROR(unknown_infix_operator_attribute,none,
       "'%0' is not a valid infix operator attribute", (StringRef))
-ERROR(operator_associativity_redeclared,decl_parsing,none,
+ERROR(operator_associativity_redeclared,none,
       "'associativity' for infix operator declared multiple times", ())
-ERROR(expected_infix_operator_associativity,decl_parsing,none,
+ERROR(expected_infix_operator_associativity,none,
       "expected identifier after 'associativity' in 'operator' declaration body", ())
-ERROR(unknown_infix_operator_associativity,decl_parsing,none,
+ERROR(unknown_infix_operator_associativity,none,
       "'%0' is not a valid infix operator associativity; must be 'none', 'left', or 'right'", (StringRef))
-ERROR(operator_precedence_redeclared,decl_parsing,none,
+ERROR(operator_precedence_redeclared,none,
       "'precedence' for infix operator declared multiple times", ())
-ERROR(operator_assignment_redeclared,decl_parsing,none,
+ERROR(operator_assignment_redeclared,none,
       "'assignment' for infix operator declared multiple times", ())
-ERROR(expected_infix_operator_precedence,decl_parsing,none,
+ERROR(expected_infix_operator_precedence,none,
       "expected integer literal after 'precedence' in 'operator' declaration body", ())
-ERROR(invalid_infix_operator_precedence,decl_parsing,none,
+ERROR(invalid_infix_operator_precedence,none,
       "'precedence' must be in the range of 0 to 255", ())
 
 // SIL
-ERROR(inout_not_attribute, decl_parsing, none,
+ERROR(inout_not_attribute, none,
       "@inout is no longer an attribute", ())
-ERROR(only_allowed_in_sil, decl_parsing,none,
+ERROR(only_allowed_in_sil,none,
       "'%0' only allowed in SIL modules", (StringRef))
-ERROR(expected_sil_type, decl_parsing,none,
+ERROR(expected_sil_type,none,
       "expected type in SIL code", ())
-ERROR(expected_sil_colon_value_ref,decl_parsing,none,
+ERROR(expected_sil_colon_value_ref,none,
       "expected ':' before type in SIL value reference", ())
-ERROR(expected_sil_value_name,decl_parsing,none,
+ERROR(expected_sil_value_name,none,
       "expected SIL value name", ())
-ERROR(expected_sil_value_name_result_number,decl_parsing,none,
+ERROR(expected_sil_value_name_result_number,none,
       "expected result number in SIL value name", ())
-ERROR(invalid_sil_value_name_result_number,decl_parsing,none,
+ERROR(invalid_sil_value_name_result_number,none,
       "invalid result number in SIL value", ())
-ERROR(expected_sil_type_kind, decl_parsing,none,
+ERROR(expected_sil_type_kind,none,
       "expected SIL type to %0", (StringRef))
-ERROR(expected_sil_constant, decl_parsing,none,
+ERROR(expected_sil_constant,none,
       "expected constant in SIL code", ())
-ERROR(referenced_value_no_accessor, decl_parsing,none,
+ERROR(referenced_value_no_accessor,none,
       "referenced declaration has no %select{getter|setter}0", (unsigned))
 
 // SIL Values
-ERROR(sil_value_redefinition, decl_parsing,none,
+ERROR(sil_value_redefinition,none,
       "redefinition of value '%0'", (StringRef))
-ERROR(sil_value_use_type_mismatch, decl_parsing,none,
+ERROR(sil_value_use_type_mismatch,none,
       "value '%0' defined with mismatching type %1 (expected %2)", (StringRef, Type, Type))
-ERROR(sil_value_def_type_mismatch, decl_parsing,none,
+ERROR(sil_value_def_type_mismatch,none,
       "value '%0' used with mismatching type %1 (expected %2)", (StringRef, Type, Type))
-ERROR(sil_use_of_undefined_value, decl_parsing,none,
+ERROR(sil_use_of_undefined_value,none,
       "use of undefined value '%0'", (StringRef))
-NOTE(sil_prior_reference,parsing,none,
+NOTE(sil_prior_reference,none,
      "prior reference was here", ())
 
 
 // SIL Instructions
-ERROR(expected_sil_instr_start_of_line,decl_parsing,none,
+ERROR(expected_sil_instr_start_of_line,none,
       "SIL instructions must be at the start of a line", ())
-ERROR(expected_equal_in_sil_instr,decl_parsing,none,
+ERROR(expected_equal_in_sil_instr,none,
       "expected '=' in SIL instruction", ())
-ERROR(expected_sil_instr_opcode,decl_parsing,none,
+ERROR(expected_sil_instr_opcode,none,
       "expected SIL instruction opcode", ())
-ERROR(expected_tok_in_sil_instr,decl_parsing,none,
+ERROR(expected_tok_in_sil_instr,none,
       "expected '%0' in SIL instruction", (StringRef))
-ERROR(sil_string_no_encoding,decl_parsing,none,
+ERROR(sil_string_no_encoding,none,
       "string_literal instruction requires an encoding", ())
-ERROR(sil_string_invalid_encoding,decl_parsing,none,
+ERROR(sil_string_invalid_encoding,none,
       "unknown string literal encoding '%0'", (StringRef))
-ERROR(expected_tuple_type_in_tuple,decl_parsing,none,
+ERROR(expected_tuple_type_in_tuple,none,
       "tuple instruction requires a tuple type", ())
-ERROR(sil_tuple_inst_wrong_value_count,decl_parsing,none,
+ERROR(sil_tuple_inst_wrong_value_count,none,
       "tuple instruction requires %0 values", (unsigned))
-ERROR(sil_tuple_inst_wrong_field,decl_parsing,none,
+ERROR(sil_tuple_inst_wrong_field,none,
       "tuple instruction requires a field number", ())
-ERROR(sil_struct_inst_wrong_field,decl_parsing,none,
+ERROR(sil_struct_inst_wrong_field,none,
       "struct instruction requires a field name", ())
-ERROR(sil_ref_inst_wrong_field,decl_parsing,none,
+ERROR(sil_ref_inst_wrong_field,none,
       "ref_element_addr instruction requires a field name", ())
-ERROR(sil_invalid_instr_operands,decl_parsing,none,
+ERROR(sil_invalid_instr_operands,none,
       "invalid instruction operands", ())
-ERROR(sil_operand_not_address,decl_parsing,none,
+ERROR(sil_operand_not_address,none,
       "%0 operand of '%1' must have address type", (StringRef, StringRef))
-ERROR(sil_operand_not_unowned_address,decl_parsing,none,
+ERROR(sil_operand_not_unowned_address,none,
       "%0 operand of '%1' must have address of [unowned] type",
       (StringRef, StringRef))
-ERROR(sil_operand_not_weak_address,decl_parsing,none,
+ERROR(sil_operand_not_weak_address,none,
       "%0 operand of '%1' must have address of [weak] type",
       (StringRef, StringRef))
-ERROR(sil_integer_literal_not_integer_type,decl_parsing,none,
+ERROR(sil_integer_literal_not_integer_type,none,
       "integer_literal instruction requires a 'Builtin.Int<n>' type", ())
-ERROR(sil_float_literal_not_float_type,decl_parsing,none,
+ERROR(sil_float_literal_not_float_type,none,
       "float_literal instruction requires a 'Builtin.FP<n>' type", ())
-ERROR(sil_substitutions_on_non_polymorphic_type,decl_parsing,none,
+ERROR(sil_substitutions_on_non_polymorphic_type,none,
       "apply of non-polymorphic function cannot have substitutions", ())
-ERROR(sil_witness_method_not_protocol,decl_parsing,none,
+ERROR(sil_witness_method_not_protocol,none,
       "witness_method is not a protocol method", ())
-ERROR(sil_witness_method_type_does_not_conform,decl_parsing,none,
+ERROR(sil_witness_method_type_does_not_conform,none,
       "witness_method type does not conform to protocol", ())
-ERROR(sil_member_decl_not_found,decl_parsing,none,
+ERROR(sil_member_decl_not_found,none,
       "member not found in method instructions", ())
-ERROR(sil_member_decl_type_mismatch, decl_parsing,none,
+ERROR(sil_member_decl_type_mismatch,none,
       "member defined with mismatching type %0 (expected %1)", (Type, Type))
-ERROR(sil_substitution_mismatch,decl_parsing,none,
+ERROR(sil_substitution_mismatch,none,
       "substitution conformances dont match archetype", ())
-ERROR(sil_missing_substitutions,decl_parsing,none,
+ERROR(sil_missing_substitutions,none,
       "missing substitutions", ())
-ERROR(sil_too_many_substitutions,decl_parsing,none,
+ERROR(sil_too_many_substitutions,none,
       "too many substitutions", ())
-ERROR(sil_dbg_unknown_key,decl_parsing,none,
+ERROR(sil_dbg_unknown_key,none,
       "unknown key '%0' in debug variable declaration", (StringRef))
 
 // SIL Basic Blocks
-ERROR(expected_sil_block_name, decl_parsing,none,
+ERROR(expected_sil_block_name,none,
       "expected basic block name or '}'", ())
-ERROR(expected_sil_block_colon, decl_parsing,none,
+ERROR(expected_sil_block_colon,none,
       "expected ':' after basic block name", ())
-ERROR(sil_undefined_basicblock_use, decl_parsing,none,
+ERROR(sil_undefined_basicblock_use,none,
       "use of undefined basic block %0", (Identifier))
-ERROR(sil_basicblock_redefinition, decl_parsing,none,
+ERROR(sil_basicblock_redefinition,none,
       "redefinition of basic block %0", (Identifier))
-ERROR(sil_basicblock_arg_rparen, decl_parsing,none,
+ERROR(sil_basicblock_arg_rparen,none,
       "expected ')' in basic block argument list", ())
 
 // SIL Functions
-ERROR(expected_sil_function_name, decl_parsing,none,
+ERROR(expected_sil_function_name,none,
       "expected SIL function name", ())
-ERROR(expected_sil_rbrace, decl_parsing,none,
+ERROR(expected_sil_rbrace,none,
       "expected '}' at the end of a sil body", ())
-ERROR(expected_sil_function_type, decl_parsing, none,
+ERROR(expected_sil_function_type, none,
       "sil function expected to have SIL function type", ())
 
 // SIL Stage
-ERROR(expected_sil_stage_name, decl_parsing, none,
+ERROR(expected_sil_stage_name, none,
       "expected 'raw' or 'canonical' after 'sil_stage'", ())
-ERROR(multiple_sil_stage_decls, decl_parsing, none,
+ERROR(multiple_sil_stage_decls, none,
       "sil_stage declared multiple times", ())
 
 // SIL VTable
-ERROR(expected_sil_vtable_colon, decl_parsing,none,
+ERROR(expected_sil_vtable_colon,none,
       "expected ':' in a vtable entry", ())
-ERROR(sil_vtable_func_not_found, decl_parsing,none,
+ERROR(sil_vtable_func_not_found,none,
       "sil function not found %0", (Identifier))
-ERROR(sil_vtable_class_not_found, decl_parsing,none,
+ERROR(sil_vtable_class_not_found,none,
       "sil class not found %0", (Identifier))
 
 // SIL Global
-ERROR(sil_global_variable_not_found, decl_parsing,none,
+ERROR(sil_global_variable_not_found,none,
       "sil global not found %0", (Identifier))
 
 // SIL Witness Table
-ERROR(expected_sil_witness_colon, decl_parsing,none,
+ERROR(expected_sil_witness_colon,none,
       "expected ':' in a witness table", ())
-ERROR(expected_sil_witness_lparen, decl_parsing,none,
+ERROR(expected_sil_witness_lparen,none,
       "expected '(' in a witness table", ())
-ERROR(expected_sil_witness_rparen, decl_parsing,none,
+ERROR(expected_sil_witness_rparen,none,
       "expected ')' in a witness table", ())
-ERROR(sil_witness_func_not_found, decl_parsing,none,
+ERROR(sil_witness_func_not_found,none,
       "sil function not found %0", (Identifier))
-ERROR(sil_witness_protocol_not_found, decl_parsing,none,
+ERROR(sil_witness_protocol_not_found,none,
       "sil protocol not found %0", (Identifier))
-ERROR(sil_witness_assoc_not_found, decl_parsing,none,
+ERROR(sil_witness_assoc_not_found,none,
       "sil associated type decl not found %0", (Identifier))
-ERROR(sil_witness_protocol_conformance_not_found, decl_parsing,none,
+ERROR(sil_witness_protocol_conformance_not_found,none,
       "sil protocol conformance not found", ())
 
 // SIL Coverage Map
-ERROR(sil_coverage_func_not_found, decl_parsing, none,
+ERROR(sil_coverage_func_not_found, none,
       "sil function not found %0", (Identifier))
-ERROR(sil_coverage_invalid_hash, decl_parsing, none,
+ERROR(sil_coverage_invalid_hash, none,
       "expected coverage hash", ())
-ERROR(sil_coverage_expected_lbrace, decl_parsing, none,
+ERROR(sil_coverage_expected_lbrace, none,
       "expected '{' in coverage map", ())
-ERROR(sil_coverage_expected_loc, decl_parsing, none,
+ERROR(sil_coverage_expected_loc, none,
       "expected line:column pair", ())
-ERROR(sil_coverage_expected_arrow, decl_parsing, none,
+ERROR(sil_coverage_expected_arrow, none,
       "expected '->' after start location", ())
-ERROR(sil_coverage_expected_colon, decl_parsing, none,
+ERROR(sil_coverage_expected_colon, none,
       "expected ':' after source range", ())
-ERROR(sil_coverage_invalid_counter, decl_parsing, none,
+ERROR(sil_coverage_invalid_counter, none,
       "expected counter expression, id, or 'zero'", ())
-ERROR(sil_coverage_expected_rparen, decl_parsing, none,
+ERROR(sil_coverage_expected_rparen, none,
       "expected ')' to end counter expression", ())
-ERROR(sil_coverage_invalid_operator, decl_parsing, none,
+ERROR(sil_coverage_invalid_operator, none,
       "expected '+' or '-'", ())
 
 //------------------------------------------------------------------------------
 // Type parsing diagnostics
 //------------------------------------------------------------------------------
 
-ERROR(expected_type,type_parsing,PointsToFirstBadToken,
+ERROR(expected_type,PointsToFirstBadToken,
       "expected type", ())
-ERROR(expected_init_value,expr_parsing,PointsToFirstBadToken,
+ERROR(expected_init_value,PointsToFirstBadToken,
       "expected initial value after '='", ())
 
 // Named types
-ERROR(expected_identifier_in_dotted_type,expr_parsing,PointsToFirstBadToken,
+ERROR(expected_identifier_in_dotted_type,PointsToFirstBadToken,
       "expected identifier in dotted type", ())
-ERROR(expected_identifier_for_type,expr_parsing,PointsToFirstBadToken,
+ERROR(expected_identifier_for_type,PointsToFirstBadToken,
       "expected identifier for type name", ())
-ERROR(expected_rangle_generic_arg_list,type_parsing,PointsToFirstBadToken,
+ERROR(expected_rangle_generic_arg_list,PointsToFirstBadToken,
       "expected '>' to complete generic argument list", ())
 
 
 // Function types
-ERROR(expected_type_function_result,type_parsing,PointsToFirstBadToken,
+ERROR(expected_type_function_result,PointsToFirstBadToken,
       "expected type for function result", ())
-ERROR(generic_non_function,type_parsing,PointsToFirstBadToken,
+ERROR(generic_non_function,PointsToFirstBadToken,
       "only syntactic function types can be generic", ())
-ERROR(rethrowing_function_type,type_parsing,PointsToFirstBadToken,
+ERROR(rethrowing_function_type,PointsToFirstBadToken,
       "only function declarations may be marked 'rethrows'", ())
-ERROR(throws_after_function_result,type_parsing,none,
+ERROR(throws_after_function_result,none,
       "'throws' may only occur before '->'", ())
-ERROR(rethrows_after_function_result,type_parsing,none,
+ERROR(rethrows_after_function_result,none,
       "'rethrows' may only occur before '->'", ())
-ERROR(throw_in_function_type,type_parsing,none,
+ERROR(throw_in_function_type,none,
       "expected throwing specifier; did you mean 'throws'?", ())
 
 // Enum Types
-ERROR(expected_expr_enum_case_raw_value,type_parsing,PointsToFirstBadToken,
+ERROR(expected_expr_enum_case_raw_value,PointsToFirstBadToken,
       "expected expression after '=' in 'case'", ())
-ERROR(nonliteral_enum_case_raw_value,type_parsing,PointsToFirstBadToken,
+ERROR(nonliteral_enum_case_raw_value,PointsToFirstBadToken,
       "raw value for enum case must be a literal", ())
 
 // Collection Types
-ERROR(new_array_syntax,type_parsing,none,
+ERROR(new_array_syntax,none,
       "array types are now written with the brackets around the element type",
       ())
-ERROR(expected_rbracket_array_type,type_parsing,PointsToFirstBadToken,
+ERROR(expected_rbracket_array_type,PointsToFirstBadToken,
       "expected ']' in array type", ())
-ERROR(expected_element_type,type_parsing,PointsToFirstBadToken,
+ERROR(expected_element_type,PointsToFirstBadToken,
       "expected element type", ())
-ERROR(expected_dictionary_value_type,type_parsing,PointsToFirstBadToken,
+ERROR(expected_dictionary_value_type,PointsToFirstBadToken,
       "expected dictionary value type", ())
-ERROR(expected_rbracket_dictionary_type,type_parsing,PointsToFirstBadToken,
+ERROR(expected_rbracket_dictionary_type,PointsToFirstBadToken,
       "expected ']' in dictionary type", ())
 
 // Tuple Types
-ERROR(expected_rparen_tuple_type_list,type_parsing,none,
+ERROR(expected_rparen_tuple_type_list,none,
       "expected ')' at end of tuple list", ())
-ERROR(multiple_ellipsis_in_tuple,type_parsing,none,
+ERROR(multiple_ellipsis_in_tuple,none,
       "only a single element can be variadic", ())
-ERROR(tuple_type_init,pattern_parsing,none,
+ERROR(tuple_type_init,none,
       "default argument not permitted in a tuple type", ())
-ERROR(protocol_method_argument_init,type_parsing,none,
+ERROR(protocol_method_argument_init,none,
       "default argument not permitted in a protocol method", ())
-ERROR(protocol_init_argument_init,type_parsing,none,
+ERROR(protocol_init_argument_init,none,
       "default argument not permitted in a protocol initializer", ())
 
 // Protocol Types
-ERROR(expected_langle_protocol,type_parsing,PointsToFirstBadToken,
+ERROR(expected_langle_protocol,PointsToFirstBadToken,
       "expected '<' in protocol composition type", ())
-ERROR(expected_rangle_protocol,type_parsing,PointsToFirstBadToken,
+ERROR(expected_rangle_protocol,PointsToFirstBadToken,
       "expected '>' to complete protocol composition type", ())
 
 //------------------------------------------------------------------------------
 // Pattern parsing diagnostics
 //------------------------------------------------------------------------------
 
-ERROR(expected_pattern,pattern_parsing,PointsToFirstBadToken,
+ERROR(expected_pattern,PointsToFirstBadToken,
       "expected pattern", ())
-ERROR(expected_pattern_is_keyword,pattern_parsing,none,
+ERROR(expected_pattern_is_keyword,none,
       "keyword '%0' cannot be used as an identifier", (StringRef))
-ERROR(expected_rparen_tuple_pattern_list,pattern_parsing,none,
+ERROR(expected_rparen_tuple_pattern_list,none,
       "expected ')' at end of tuple pattern", ())
-ERROR(untyped_pattern_ellipsis,pattern_parsing,none,
+ERROR(untyped_pattern_ellipsis,none,
       "'...' cannot be applied to a subpattern which is not explicitly typed", ())
-ERROR(non_func_decl_pattern_init,pattern_parsing,none,
+ERROR(non_func_decl_pattern_init,none,
       "default argument is only permitted for a non-curried function parameter",())
-ERROR(var_not_allowed_in_pattern,pattern_parsing, none,
+ERROR(var_not_allowed_in_pattern, none,
       "Use of 'var' binding here is not allowed", ())
-WARNING(let_on_param_is_redundant,pattern_parsing, none,
+WARNING(let_on_param_is_redundant, none,
       "'let' keyword is unnecessary; function parameters are immutable by default", (unsigned))
-ERROR(var_pattern_in_var,pattern_parsing,none,
+ERROR(var_pattern_in_var,none,
       "'%select{var|let}0' cannot appear nested inside another 'var' or "
       "'let' pattern", (unsigned))
-ERROR(let_pattern_in_immutable_context,pattern_parsing,none,
+ERROR(let_pattern_in_immutable_context,none,
       "'let' pattern is already in an immutable context", ())
-ERROR(inout_must_have_type,pattern_parsing,none,
+ERROR(inout_must_have_type,none,
       "'inout' arguments must have a type specified", ())
-ERROR(inout_must_appear_before_param,pattern_parsing,none,
+ERROR(inout_must_appear_before_param,none,
       "'inout' must appear before the parameter name", ())
-ERROR(expected_rparen_parameter,decl_parsing,PointsToFirstBadToken,
+ERROR(expected_rparen_parameter,PointsToFirstBadToken,
       "expected ')' in parameter", ())
-ERROR(expected_parameter_type,decl_parsing,PointsToFirstBadToken,
+ERROR(expected_parameter_type,PointsToFirstBadToken,
       "expected parameter type following ':'", ())
-ERROR(multiple_parameter_ellipsis,decl_parsing,none,
+ERROR(multiple_parameter_ellipsis,none,
       "only a single variadic parameter '...' is permitted", ())
-ERROR(parameter_vararg_default,decl_parsing,none,
+ERROR(parameter_vararg_default,none,
       "variadic parameter cannot have a default value", ())
-ERROR(parameter_inout_var_let,decl_parsing,none,
+ERROR(parameter_inout_var_let,none,
       "parameter may not have multiple 'inout', 'var', or 'let' specifiers",
       ())
 
-WARNING(parameter_extraneous_double_up,decl_parsing,none,
+WARNING(parameter_extraneous_double_up,none,
         "extraneous duplicate parameter name; %0 already has an argument "
         "label", (Identifier))
-WARNING(parameter_extraneous_empty_name,decl_parsing,none,
+WARNING(parameter_extraneous_empty_name,none,
         "extraneous '_' in parameter: %0 has no keyword argument name",
         (Identifier))
-ERROR(parameter_operator_keyword_argument,decl_parsing,none,
+ERROR(parameter_operator_keyword_argument,none,
       "%select{operator|closure}0 cannot have keyword arguments", (bool))
 
-ERROR(parameter_unnamed,decl_parsing,none,
+ERROR(parameter_unnamed,none,
       "unnamed parameters must be written with the empty name '_'", ())
 
-WARNING(parameter_curry_syntax_removed,decl_parsing,none,
+WARNING(parameter_curry_syntax_removed,none,
         "curried function declaration syntax will be removed in a future version of Swift; use a single parameter list", ())
 
 //------------------------------------------------------------------------------
 // Statement parsing diagnostics
 //------------------------------------------------------------------------------
-ERROR(expected_stmt,stmt_parsing,none,
+ERROR(expected_stmt,none,
       "expected statement", ())
-ERROR(illegal_top_level_stmt,stmt_parsing,none,
+ERROR(illegal_top_level_stmt,none,
       "statements are not allowed at the top level", ())
-ERROR(illegal_top_level_expr,stmt_parsing,none,
+ERROR(illegal_top_level_expr,none,
       "expressions are not allowed at the top level", ())
-ERROR(illegal_semi_stmt,stmt_parsing,none,
+ERROR(illegal_semi_stmt,none,
       "';' statements are not allowed", ())
-ERROR(statement_begins_with_closure,stmt_parsing,none,
+ERROR(statement_begins_with_closure,none,
       "statement cannot begin with a closure expression", ())
-ERROR(statement_same_line_without_semi,stmt_parsing,none,
+ERROR(statement_same_line_without_semi,none,
       "consecutive statements on a line must be separated by ';'", ())
-ERROR(brace_stmt_invalid,stmt_parsing,none,
+ERROR(brace_stmt_invalid,none,
       "braced block of statements is an unused closure", ())
-ERROR(invalid_label_on_stmt,stmt_parsing,none,
+ERROR(invalid_label_on_stmt,none,
       "labels are only valid on loops, if, and switch statements", ())
 
-NOTE(discard_result_of_closure,stmt_parsing,none,
+NOTE(discard_result_of_closure,none,
      "explicitly discard the result of the closure by assigning to '_'", ())
 
 // Assignment statement
-ERROR(expected_expr_assignment,stmt_parsing,none,
+ERROR(expected_expr_assignment,none,
       "expected expression in assignment", ())
 
 // Brace Statement
-ERROR(expected_rbrace_in_brace_stmt,stmt_parsing,none,
+ERROR(expected_rbrace_in_brace_stmt,none,
       "expected '}' at end of brace statement", ())
 
 /// #if Statement
-ERROR(expected_close_to_config_stmt,stmt_parsing,none,
+ERROR(expected_close_to_config_stmt,none,
       "expected #else or #endif at end of configuration block", ())
-ERROR(expected_close_after_else,stmt_parsing,none,
+ERROR(expected_close_after_else,none,
       "further conditions after #else are unreachable", ())
 
 /// Associatedtype Statement
-WARNING(typealias_inside_protocol,stmt_parsing,none,
+WARNING(typealias_inside_protocol,none,
         "use of 'typealias' to declare associated types is deprecated; use 'associatedtype' instead", ())
-ERROR(associatedtype_outside_protocol,stmt_parsing,none,
+ERROR(associatedtype_outside_protocol,none,
       "associated types can only be defined in a protocol; define a type or introduce a 'typealias' to satisfy an associated type requirement", ())
 
 // Return Statement
-ERROR(expected_expr_return,stmt_parsing,PointsToFirstBadToken,
+ERROR(expected_expr_return,PointsToFirstBadToken,
       "expected expression in 'return' statement", ())
-WARNING(unindented_code_after_return,stmt_parsing,none,
+WARNING(unindented_code_after_return,none,
         "expression following 'return' is treated as an argument of "
         "the 'return'", ())
-NOTE(indent_expression_to_silence,stmt_parsing,none,
+NOTE(indent_expression_to_silence,none,
      "indent the expression to silence this warning", ())
 
 // Throw Statement
-ERROR(expected_expr_throw,stmt_parsing,PointsToFirstBadToken,
+ERROR(expected_expr_throw,PointsToFirstBadToken,
       "expected expression in 'throw' statement", ())
 
 // Defer Statement
-ERROR(expected_lbrace_after_defer,stmt_parsing,PointsToFirstBadToken,
+ERROR(expected_lbrace_after_defer,PointsToFirstBadToken,
       "expected '{' after 'defer'", ())
 
 // If/While/Guard Conditions
-ERROR(expected_expr_conditional_letbinding,stmt_parsing,none,
+ERROR(expected_expr_conditional_letbinding,none,
       "expected 'let' or 'var' in conditional", ())
-ERROR(expected_expr_conditional_letbinding_bool_conditions,stmt_parsing,none,
+ERROR(expected_expr_conditional_letbinding_bool_conditions,none,
       "expected 'let' or 'var' in conditional; "
       "use '&&' to join boolean conditions", ())
-ERROR(expected_expr_conditional_var,stmt_parsing,PointsToFirstBadToken,
+ERROR(expected_expr_conditional_var,PointsToFirstBadToken,
       "expected expression after '=' in conditional binding", ())
-ERROR(expected_expr_conditional_where,stmt_parsing,PointsToFirstBadToken,
+ERROR(expected_expr_conditional_where,PointsToFirstBadToken,
       "expected expression in conditional binding 'where' clause", ())
-ERROR(conditional_var_initializer_required,stmt_parsing,none,
+ERROR(conditional_var_initializer_required,none,
       "variable binding in a condition requires an initializer", ())
-ERROR(wrong_condition_case_location,stmt_parsing,none,
+ERROR(wrong_condition_case_location,none,
       "pattern matching binding is spelled with 'case %0', not '%0 case'",
       (StringRef))
-ERROR(where_end_of_binding_use_letvar,stmt_parsing,none,
+ERROR(where_end_of_binding_use_letvar,none,
       "binding ended by previous 'where' clause; "
       "use '%0' to introduce a new one", (StringRef))
-ERROR(comma_should_be_where,stmt_parsing,none,
+ERROR(comma_should_be_where,none,
       "boolean condition requires 'where' to separate it from variable binding",
       ())
 
 // If Statement
-ERROR(expected_condition_if,stmt_parsing,PointsToFirstBadToken,
+ERROR(expected_condition_if,PointsToFirstBadToken,
       "expected expression, var, or let in 'if' condition", ())
-ERROR(missing_condition_after_if,stmt_parsing,none,
+ERROR(missing_condition_after_if,none,
       "missing condition in an 'if' statement", ())
-ERROR(expected_lbrace_after_if,stmt_parsing,PointsToFirstBadToken,
+ERROR(expected_lbrace_after_if,PointsToFirstBadToken,
       "expected '{' after 'if' condition", ())
-ERROR(expected_lbrace_after_else,stmt_parsing,PointsToFirstBadToken,
+ERROR(expected_lbrace_after_else,PointsToFirstBadToken,
       "expected '{' after 'else'", ())
 
 // Guard Statement
-ERROR(expected_condition_guard,stmt_parsing,PointsToFirstBadToken,
+ERROR(expected_condition_guard,PointsToFirstBadToken,
       "expected expression, var, let or case in 'guard' condition", ())
-ERROR(missing_condition_after_guard,stmt_parsing,none,
+ERROR(missing_condition_after_guard,none,
       "missing condition in an 'guard' statement", ())
-ERROR(expected_else_after_guard,stmt_parsing,PointsToFirstBadToken,
+ERROR(expected_else_after_guard,PointsToFirstBadToken,
       "expected 'else' after 'guard' condition", ())
-ERROR(expected_lbrace_after_guard,stmt_parsing,PointsToFirstBadToken,
+ERROR(expected_lbrace_after_guard,PointsToFirstBadToken,
       "expected '{' after 'guard' else", ())
-ERROR(bound_var_guard_body,expr_parsing,none,
+ERROR(bound_var_guard_body,none,
       "variable declared in 'guard' condition is not usable in its body", ())
 
 // While Statement
-ERROR(expected_condition_while,stmt_parsing,PointsToFirstBadToken,
+ERROR(expected_condition_while,PointsToFirstBadToken,
       "expected expression, var, or let in 'while' condition", ())
-ERROR(missing_condition_after_while,stmt_parsing,none,
+ERROR(missing_condition_after_while,none,
       "missing condition in a 'while' statement", ())
-ERROR(expected_lbrace_after_while,stmt_parsing,PointsToFirstBadToken,
+ERROR(expected_lbrace_after_while,PointsToFirstBadToken,
       "expected '{' after 'while' condition", ())
 
 // Repeat/While Statement
-ERROR(expected_lbrace_after_repeat,stmt_parsing,PointsToFirstBadToken,
+ERROR(expected_lbrace_after_repeat,PointsToFirstBadToken,
       "expected '{' after 'repeat'", ())
-ERROR(expected_while_after_repeat_body,stmt_parsing,PointsToFirstBadToken,
+ERROR(expected_while_after_repeat_body,PointsToFirstBadToken,
       "expected 'while' after body of 'repeat' statement", ())
-ERROR(expected_expr_repeat_while,stmt_parsing,PointsToFirstBadToken,
+ERROR(expected_expr_repeat_while,PointsToFirstBadToken,
       "expected expression in 'repeat-while' condition", ())
 
-ERROR(do_while_now_repeat_while,stmt_parsing,none,
+ERROR(do_while_now_repeat_while,none,
       "'do-while' statement is not allowed; use 'repeat-while' instead", ())
 
 // Do/Catch Statement
-ERROR(expected_lbrace_after_do,stmt_parsing,PointsToFirstBadToken,
+ERROR(expected_lbrace_after_do,PointsToFirstBadToken,
       "expected '{' after 'do'", ())
-ERROR(expected_lbrace_after_catch,stmt_parsing,PointsToFirstBadToken,
+ERROR(expected_lbrace_after_catch,PointsToFirstBadToken,
       "expected '{' after 'catch' pattern", ())
-ERROR(expected_catch_where_expr,stmt_parsing,PointsToFirstBadToken,
+ERROR(expected_catch_where_expr,PointsToFirstBadToken,
       "expected expression for 'where' guard of 'catch'", ())
 
 // C-Style For Stmt
-ERROR(expected_init_for_stmt,stmt_parsing,PointsToFirstBadToken,
+ERROR(expected_init_for_stmt,PointsToFirstBadToken,
       "expected initialization in a 'for' statement", ())
-ERROR(missing_init_for_stmt,stmt_parsing,none,
+ERROR(missing_init_for_stmt,none,
       "missing initialization in a 'for' statement", ())
-ERROR(expected_semi_for_stmt,stmt_parsing,PointsToFirstBadToken,
+ERROR(expected_semi_for_stmt,PointsToFirstBadToken,
       "expected ';' in 'for' statement", ())
-ERROR(expected_cond_for_stmt,stmt_parsing,none,
+ERROR(expected_cond_for_stmt,none,
       "expected condition in 'for' statement", ())
-ERROR(expected_rparen_for_stmt,stmt_parsing,none,
+ERROR(expected_rparen_for_stmt,none,
       "expected ')' in 'for' statement", ())
-ERROR(expected_lbrace_after_for,stmt_parsing,none,
+ERROR(expected_lbrace_after_for,none,
       "expected '{' in 'for' statement", ())
-ERROR(expected_var_decl_for_stmt,stmt_parsing,PointsToFirstBadToken,
+ERROR(expected_var_decl_for_stmt,PointsToFirstBadToken,
       "expected var declaration in a 'for' statement", ())
 
 // For-each Stmt
-ERROR(expected_foreach_in,stmt_parsing,none,
+ERROR(expected_foreach_in,none,
       "expected 'in' after for-each pattern", ())
-ERROR(expected_foreach_container,stmt_parsing,none,
+ERROR(expected_foreach_container,none,
       "expected SequenceType expression for for-each loop", ())
-ERROR(expected_foreach_lbrace,stmt_parsing,none,
+ERROR(expected_foreach_lbrace,none,
       "expected '{' to start the body of for-each loop", ())
-ERROR(expected_foreach_where_expr,stmt_parsing,PointsToFirstBadToken,
+ERROR(expected_foreach_where_expr,PointsToFirstBadToken,
       "expected expression in 'where' guard of 'for/in'", ())
 
 // Switch Stmt
-ERROR(expected_switch_expr,stmt_parsing,PointsToFirstBadToken,
+ERROR(expected_switch_expr,PointsToFirstBadToken,
       "expected expression in 'switch' statement", ())
-ERROR(expected_lbrace_after_switch,stmt_parsing,PointsToFirstBadToken,
+ERROR(expected_lbrace_after_switch,PointsToFirstBadToken,
       "expected '{' after 'switch' subject expression", ())
-ERROR(expected_rbrace_switch,stmt_parsing,none,
+ERROR(expected_rbrace_switch,none,
       "expected '}' at end of 'switch' statement", ())
-ERROR(case_outside_of_switch,stmt_parsing,none,
+ERROR(case_outside_of_switch,none,
       "'%0' label can only appear inside a 'switch' statement", (StringRef))
-ERROR(stmt_in_switch_not_covered_by_case,stmt_parsing,none,
+ERROR(stmt_in_switch_not_covered_by_case,none,
       "all statements inside a switch must be covered by a 'case' or 'default'",
       ())
-ERROR(case_after_default,stmt_parsing,none,
+ERROR(case_after_default,none,
       "additional 'case' blocks cannot appear after the 'default' block of a 'switch'",
       ())
 
-ERROR(empty_switch_stmt,stmt_parsing,none,
+ERROR(empty_switch_stmt,none,
       "'switch' statement body must have at least one 'case' or 'default' block",
       ())
 
 // Case Stmt
-ERROR(expected_case_where_expr,stmt_parsing,PointsToFirstBadToken,
+ERROR(expected_case_where_expr,PointsToFirstBadToken,
       "expected expression for 'where' guard of 'case'", ())
-ERROR(expected_case_colon,stmt_parsing,PointsToFirstBadToken,
+ERROR(expected_case_colon,PointsToFirstBadToken,
       "expected ':' after '%0'", (StringRef))
-ERROR(default_with_where,stmt_parsing,none,
+ERROR(default_with_where,none,
       "'default' cannot be used with a 'where' guard expression",
       ())
-ERROR(var_binding_with_multiple_case_patterns,stmt_parsing,none,
+ERROR(var_binding_with_multiple_case_patterns,none,
       "'case' labels with multiple patterns cannot declare variables",
       ())
-ERROR(case_stmt_without_body,stmt_parsing,none,
+ERROR(case_stmt_without_body,none,
       "%select{'case'|'default'}0 label in a 'switch' should have at least one "
       "executable statement", (bool))
 
 // 'try' on statements
-ERROR(try_on_stmt,stmt_parsing,none,
+ERROR(try_on_stmt,none,
       "'try' cannot be used with '%0'", (StringRef))
-ERROR(try_on_return_throw,stmt_parsing,none,
+ERROR(try_on_return_throw,none,
       "'try' must be placed on the %select{returned|thrown}0 expression",
       (bool))
-ERROR(try_on_var_let,stmt_parsing,none,
+ERROR(try_on_var_let,none,
       "'try' must be placed on the initial value expression", ())
 
 //------------------------------------------------------------------------------
 // Expression parsing diagnostics
 //------------------------------------------------------------------------------
 
-ERROR(expected_expr,expr_parsing,none,
+ERROR(expected_expr,none,
       "expected expression", ())
-ERROR(expected_separator,expr_parsing,PointsToFirstBadToken,
+ERROR(expected_separator,PointsToFirstBadToken,
       "expected '%0' separator", (StringRef))
-ERROR(unexpected_separator,expr_parsing,none,
+ERROR(unexpected_separator,none,
       "unexpected '%0' separator", (StringRef))
 
-ERROR(expected_expr_after_operator,expr_parsing,none,
+ERROR(expected_expr_after_operator,none,
       "expected expression after operator", ())
-ERROR(expected_expr_after_unary_operator,expr_parsing,none,
+ERROR(expected_expr_after_unary_operator,none,
       "expected expression after unary operator", ())
-ERROR(expected_prefix_operator,expr_parsing,none,
+ERROR(expected_prefix_operator,none,
       "unary operator cannot be separated from its operand", ())
-ERROR(expected_operator_ref,expr_parsing,none,
+ERROR(expected_operator_ref,none,
       "expected operator name in operator reference", ())
-ERROR(invalid_postfix_operator,expr_parsing,none,
+ERROR(invalid_postfix_operator,none,
       "operator with postfix spacing cannot start a subexpression", ())
 
-ERROR(expected_member_name,expr_parsing,PointsToFirstBadToken,
+ERROR(expected_member_name,PointsToFirstBadToken,
       "expected member name following '.'", ())
-ERROR(expected_dollar_numeric,expr_parsing,none,
+ERROR(expected_dollar_numeric,none,
       "expected numeric value following '$'", ())
-ERROR(dollar_numeric_too_large,expr_parsing,none,
+ERROR(dollar_numeric_too_large,none,
       "numeric value following '$' is too large", ())
-ERROR(numeric_literal_numeric_member,expr_parsing,none,
+ERROR(numeric_literal_numeric_member,none,
    "expected named member of numeric literal", ())
 
-ERROR(anon_closure_arg_not_in_closure,expr_parsing,none,
+ERROR(anon_closure_arg_not_in_closure,none,
       "anonymous closure argument not contained in a closure", ())
-ERROR(anon_closure_arg_in_closure_with_args,expr_parsing,none,
+ERROR(anon_closure_arg_in_closure_with_args,none,
       "anonymous closure arguments cannot be used inside a closure that has "
       "explicit arguments", ())
-ERROR(expected_closure_parameter_name,expr_parsing,none,
+ERROR(expected_closure_parameter_name,none,
       "expected the name of a closure parameter", ())
-ERROR(expected_capture_specifier,expr_parsing,none,
+ERROR(expected_capture_specifier,none,
       "expected 'weak', 'unowned', or no specifier in capture list", ())
-ERROR(expected_capture_specifier_name,attribute_parsing,none,
+ERROR(expected_capture_specifier_name,none,
       "expected name of in closure capture list", ())
-ERROR(expected_init_capture_specifier,attribute_parsing,none,
+ERROR(expected_init_capture_specifier,none,
       "expected initializer for closure capture specifier", ())
-ERROR(expected_capture_list_end_rsquare,attribute_parsing,none,
+ERROR(expected_capture_list_end_rsquare,none,
       "expected ']' at end of capture list", ())
-ERROR(cannot_capture_fields,attribute_parsing,none,
+ERROR(cannot_capture_fields,none,
       "fields may only be captured by assigning to a specific name", ())
 
-ERROR(expected_closure_result_type,expr_parsing,none,
+ERROR(expected_closure_result_type,none,
       "expected closure result type after '->'", ())
-ERROR(expected_closure_in,expr_parsing,none,
+ERROR(expected_closure_in,none,
    "expected 'in' after the closure signature", ())
-ERROR(unexpected_tokens_before_closure_in,expr_parsing,none,
+ERROR(unexpected_tokens_before_closure_in,none,
    "unexpected tokens prior to 'in'", ())
-ERROR(expected_closure_rbrace,expr_parsing,none,
+ERROR(expected_closure_rbrace,none,
       "expected '}' at end of closure", ())
 
-WARNING(trailing_closure_excess_newlines,expr_parsing,none,
+WARNING(trailing_closure_excess_newlines,none,
         "trailing closure is separated from call site by multiple newlines", ())
-NOTE(trailing_closure_call_here,expr_parsing,none,
+NOTE(trailing_closure_call_here,none,
      "parsing trailing closure for this call", ())
 
-ERROR(string_literal_no_atsign,expr_parsing,none,
+ERROR(string_literal_no_atsign,none,
       "string literals in Swift are not preceded by an '@' sign", ())
 
-ERROR(invalid_float_literal_missing_leading_zero,expr_parsing,none,
+ERROR(invalid_float_literal_missing_leading_zero,none,
       "'.%0' is not a valid floating point literal; it must be written '0.%0'",
       (StringRef))
-ERROR(availability_query_outside_if_stmt_guard, expr_parsing, none,
+ERROR(availability_query_outside_if_stmt_guard, none,
       "#available may only be used as condition of an 'if', 'guard'"
       " or 'while' statement", ())
 
-ERROR(expected_identifier_after_dot_expr,expr_parsing,none,
+ERROR(expected_identifier_after_dot_expr,none,
       "expected identifier after '.' expression", ())
 
-ERROR(expected_identifier_after_super_dot_expr,expr_parsing,
+ERROR(expected_identifier_after_super_dot_expr,
       PointsToFirstBadToken,
       "expected identifier or 'init' after super '.' expression", ())
-ERROR(expected_dot_or_subscript_after_super,expr_parsing,PointsToFirstBadToken,
+ERROR(expected_dot_or_subscript_after_super,PointsToFirstBadToken,
       "expected '.' or '[' after 'super'", ())
-ERROR(super_in_closure_with_capture,expr_parsing,none,
+ERROR(super_in_closure_with_capture,none,
       "using 'super' in a closure where 'self' is explicitly captured is "
       "not yet supported", ())
-NOTE(super_in_closure_with_capture_here,expr_parsing,none,
+NOTE(super_in_closure_with_capture_here,none,
      "'self' explicitly captured here", ())
 
 // Tuples and parenthesized expressions
-ERROR(expected_expr_in_expr_list,expr_parsing,none,
+ERROR(expected_expr_in_expr_list,none,
       "expected expression in list of expressions", ())
-ERROR(expected_expr_in_collection_literal,expr_parsing,none,
+ERROR(expected_expr_in_collection_literal,none,
       "expected expression in container literal", ())
-ERROR(expected_key_in_dictionary_literal,expr_parsing,none,
+ERROR(expected_key_in_dictionary_literal,none,
       "expected key expression in dictionary literal", ())
-ERROR(expected_value_in_dictionary_literal,expr_parsing,none,
+ERROR(expected_value_in_dictionary_literal,none,
       "expected value in dictionary literal", ())
-ERROR(expected_colon_in_dictionary_literal,expr_parsing,none,
+ERROR(expected_colon_in_dictionary_literal,none,
       "expected ':' in dictionary literal", ())
-ERROR(expected_rparen_expr_list,expr_parsing,none,
+ERROR(expected_rparen_expr_list,none,
       "expected ')' in expression list", ())
-ERROR(expected_rsquare_expr_list,expr_parsing,none,
+ERROR(expected_rsquare_expr_list,none,
       "expected ']' in expression list", ())
 
 // Array literal expressions
-ERROR(expected_rsquare_array_expr,expr_parsing,PointsToFirstBadToken,
+ERROR(expected_rsquare_array_expr,PointsToFirstBadToken,
       "expected ']' in container literal expression", ())
 
 // Object literal expressions
-ERROR(expected_identifier_after_l_square_lit,expr_parsing,none,
+ERROR(expected_identifier_after_l_square_lit,none,
       "expected identifier after '[#' in object literal expression", ())
-ERROR(expected_arg_list_in_object_literal,expr_parsing,none,
+ERROR(expected_arg_list_in_object_literal,none,
       "expected argument list in object literal", ())
-ERROR(expected_r_square_lit_after_object_literal,expr_parsing,none,
+ERROR(expected_r_square_lit_after_object_literal,none,
       "expected '#]' at end of object literal expression", ())
 
 // If expressions
-ERROR(expected_expr_after_if_question,expr_parsing,none,
+ERROR(expected_expr_after_if_question,none,
       "expected expression after '?' in ternary expression", ())
-ERROR(expected_colon_after_if_question,expr_parsing,none,
+ERROR(expected_colon_after_if_question,none,
       "expected ':' after '? ...' in ternary expression", ())
-ERROR(expected_expr_after_if_colon,expr_parsing,none,
+ERROR(expected_expr_after_if_colon,none,
       "expected expression after '? ... :' in ternary expression", ())
 
 // Cast expressions
-ERROR(expected_type_after_is,expr_parsing,none,
+ERROR(expected_type_after_is,none,
       "expected type after 'is'", ())
-ERROR(expected_type_after_as,expr_parsing,none,
+ERROR(expected_type_after_as,none,
       "expected type after 'as'", ())
 
 // Extra tokens in string interpolation like in " >> \( $0 } ) << "
-ERROR(string_interpolation_extra,expr_parsing,none,
+ERROR(string_interpolation_extra,none,
       "extra tokens after interpolated string expression", ())
 
 //------------------------------------------------------------------------------
 // Attribute-parsing diagnostics
 //------------------------------------------------------------------------------
-ERROR(expected_attribute_name,attribute_parsing,none,
+ERROR(expected_attribute_name,none,
       "expected an attribute name", ())
-ERROR(unknown_attribute,attribute_parsing,none,
+ERROR(unknown_attribute,none,
       "unknown attribute '%0'", (StringRef))
-ERROR(duplicate_attribute,attribute_parsing,none,
+ERROR(duplicate_attribute,none,
       "duplicate %select{attribute|modifier}0", (bool))
-NOTE(previous_attribute,parsing,none,
+NOTE(previous_attribute,none,
      "%select{attribute|modifier}0 already specified here", (bool))
 
-ERROR(cannot_combine_attribute,attribute_parsing,none,
+ERROR(cannot_combine_attribute,none,
       "attribute '%0' cannot be combined with this attribute", (StringRef))
-ERROR(expected_in_attribute_list,attribute_parsing,none,
+ERROR(expected_in_attribute_list,none,
       "expected ']' or ',' in attribute list", ())
 
-ERROR(type_attribute_applied_to_decl,attribute_parsing,none,
+ERROR(type_attribute_applied_to_decl,none,
       "attribute can only be applied to types, not declarations", ())
-ERROR(decl_attribute_applied_to_type,attribute_parsing,none,
+ERROR(decl_attribute_applied_to_type,none,
       "attribute can only be applied to declarations, not types", ())
 
-ERROR(attr_expected_lparen,attribute_parsing,none,
+ERROR(attr_expected_lparen,none,
 "expected '(' in '%0' %select{attribute|modifier}1", (StringRef, bool))
 
-ERROR(attr_expected_rparen,attribute_parsing,none,
+ERROR(attr_expected_rparen,none,
 "expected ')' in '%0' %select{attribute|modifier}1", (StringRef, bool))
 
-ERROR(attr_expected_comma,attribute_parsing,none,
+ERROR(attr_expected_comma,none,
 "expected ',' in '%0' %select{attribute|modifier}1", (StringRef, bool))
 
-ERROR(attr_expected_string_literal,attribute_parsing,none,
+ERROR(attr_expected_string_literal,none,
 "expected string literal in '%0' attribute", (StringRef))
 
-ERROR(alignment_must_be_positive_integer,attribute_parsing,none,
+ERROR(alignment_must_be_positive_integer,none,
       "alignment value must be a positive integer literal", ())
 
-ERROR(swift_native_objc_runtime_base_must_be_identifier,attribute_parsing,none,
+ERROR(swift_native_objc_runtime_base_must_be_identifier,none,
       "@_swift_native_objc_runtime_base class name must be an identifier", ())
 
-ERROR(attr_interpolated_string,attribute_parsing,none,
+ERROR(attr_interpolated_string,none,
 "%0 cannot be an interpolated string literal", (StringRef))
 
-ERROR(attr_only_at_non_local_scope, attribute_parsing, none,
+ERROR(attr_only_at_non_local_scope, none,
       "attribute '%0' can only be used in a non-local scope", (StringRef))
 
-ERROR(attr_expected_equal_separator,attribute_parsing,none,
+ERROR(attr_expected_equal_separator,none,
       "expected '=' following '%0' argument of '%1'",
       (StringRef, StringRef))
 
-ERROR(attr_expected_string_literal_arg,attribute_parsing,none,
+ERROR(attr_expected_string_literal_arg,none,
       "expected string literal for '%0' argument of '%1'",
       (StringRef, StringRef))
 
-ERROR(attr_duplicate_argument,attribute_parsing,none,
+ERROR(attr_duplicate_argument,none,
       "duplicate '%0' argument", (StringRef))
 
 // accessibility
-ERROR(attr_accessibility_expected_set,attribute_parsing,none,
+ERROR(attr_accessibility_expected_set,none,
       "expected 'set' as subject of '%0' modifier", (StringRef))
 
 // availability
-ERROR(attr_availability_platform,attribute_parsing,none,
+ERROR(attr_availability_platform,none,
       "expected platform name or '*' for '%0' attribute", (StringRef))
-ERROR(attr_availability_unavailable_deprecated,attribute_parsing,none,
+ERROR(attr_availability_unavailable_deprecated,none,
       "'%0' attribute cannot be both unconditionally 'unavailable' and "
       "'deprecated'", (StringRef))
 
-WARNING(attr_availability_unknown_platform,attribute_parsing,none,
+WARNING(attr_availability_unknown_platform,none,
 "unknown platform '%0' for attribute '%1'", (StringRef, StringRef))
 
-ERROR(attr_availability_expected_option,attribute_parsing,none,
+ERROR(attr_availability_expected_option,none,
       "expected '%0' option such as 'unavailable', 'introduced', 'deprecated', "
       "'obsoleted', 'message', or 'renamed'", (StringRef))
 
-ERROR(attr_availability_expected_equal,attribute_parsing,none,
+ERROR(attr_availability_expected_equal,none,
       "expected '=' after '%1' in '%0' attribute", (StringRef, StringRef))
 
-ERROR(attr_availability_expected_version,attribute_parsing,none,
+ERROR(attr_availability_expected_version,none,
       "expected version number in '%0' attribute", (StringRef))
 
-ERROR(attr_availability_renamed, attribute_parsing, none,
+ERROR(attr_availability_renamed, none,
       "@availability has been renamed to @available", ())
 
 // autoclosure
-ERROR(attr_autoclosure_expected_r_paren,attribute_parsing,PointsToFirstBadToken,
+ERROR(attr_autoclosure_expected_r_paren,PointsToFirstBadToken,
       "expected ')' in @autoclosure", ())
 
 // convention
-ERROR(convention_attribute_expected_lparen,attribute_parsing,none,
+ERROR(convention_attribute_expected_lparen,none,
       "expected '(' after 'convention' attribute", ())
-ERROR(convention_attribute_expected_name,attribute_parsing,none,
+ERROR(convention_attribute_expected_name,none,
       "expected convention name identifier in 'convention' attribute", ())
-ERROR(convention_attribute_expected_rparen,attribute_parsing,none,
+ERROR(convention_attribute_expected_rparen,none,
       "expected ')' after convention name for 'convention' attribute", ())
 
 // objc
-ERROR(attr_objc_missing_colon,attribute_parsing,none,
+ERROR(attr_objc_missing_colon,none,
       "missing ':' after selector piece in @objc attribute", ())
-ERROR(attr_objc_expected_rparen,attribute_parsing,none,
+ERROR(attr_objc_expected_rparen,none,
       "expected ')' after name for @objc", ())
-ERROR(attr_objc_empty_name,attribute_parsing,none,
+ERROR(attr_objc_empty_name,none,
       "expected name within parentheses of @objc attribute", ())
 
 // opened
-ERROR(opened_attribute_expected_lparen,attribute_parsing,none,
+ERROR(opened_attribute_expected_lparen,none,
       "expected '(' after 'opened' attribute", ())
-ERROR(opened_attribute_id_value,attribute_parsing,none,
+ERROR(opened_attribute_id_value,none,
       "known id for 'opened' attribute must be a UUID string", ())
-ERROR(opened_attribute_expected_rparen,attribute_parsing,none,
+ERROR(opened_attribute_expected_rparen,none,
       "expected ')' after id value for 'opened' attribute", ())
 
 // inline
-ERROR(inline_attribute_expect_option,attribute_parsing,none,
+ERROR(inline_attribute_expect_option,none,
       "expected '%0' option such as 'never'", (StringRef))
-ERROR(inline_attribute_unknown_option,attribute_parsing,none,
+ERROR(inline_attribute_unknown_option,none,
       "unknown option '%0' for attribute '%1'", (StringRef, StringRef))
 
 // effects
-ERROR(effects_attribute_expect_option,attribute_parsing,none,
+ERROR(effects_attribute_expect_option,none,
       "expected '%0' option (readnone, readonly, readwrite)", (StringRef))
-ERROR(effects_attribute_unknown_option,attribute_parsing,none,
+ERROR(effects_attribute_unknown_option,none,
       "unknown option '%0' for attribute '%1'", (StringRef, StringRef))
 
 // swift3_migration
-ERROR(attr_swift3_migration_label,attribute_parsing,none,
+ERROR(attr_swift3_migration_label,none,
       "expected 'renamed' or 'message' in 'swift3_migration' attribute", ())
-WARNING(warn_attr_swift3_migration_unknown_label,attribute_parsing,none,
+WARNING(warn_attr_swift3_migration_unknown_label,none,
         "expected 'renamed' or 'message' in 'swift3_migration' attribute", ())
-ERROR(attr_swift3_migration_expected_rparen,attribute_parsing,none,
+ERROR(attr_swift3_migration_expected_rparen,none,
       "expected ')' after name for 'swift3_migration' attribute", ())
-ERROR(attr_bad_swift_name,attribute_parsing,none,
+ERROR(attr_bad_swift_name,none,
       "ill-formed Swift name '%0'", (StringRef))
 
 
 // unowned
-ERROR(attr_unowned_invalid_specifier,attribute_parsing,none,
+ERROR(attr_unowned_invalid_specifier,none,
       "expected 'safe' or 'unsafe'", ())
-ERROR(attr_unowned_expected_rparen,attribute_parsing,none,
+ERROR(attr_unowned_expected_rparen,none,
       "expected ')' after specifier for 'unowned'", ())
 
 // warn_unused_result
-WARNING(attr_warn_unused_result_expected_name,attribute_parsing,none,
+WARNING(attr_warn_unused_result_expected_name,none,
         "expected parameter 'message' or 'mutable_variant'", ())
-WARNING(attr_warn_unused_result_duplicate_parameter,attribute_parsing,none,
+WARNING(attr_warn_unused_result_duplicate_parameter,none,
       "duplicate '%0' parameter; previous value will be ignored", (StringRef))
-ERROR(attr_warn_unused_result_expected_eq,attribute_parsing,none,
+ERROR(attr_warn_unused_result_expected_eq,none,
       "expected '=' following '%0' parameter", (StringRef))
-ERROR(attr_warn_unused_result_expected_string,attribute_parsing,none,
+ERROR(attr_warn_unused_result_expected_string,none,
       "expected a string following '=' for '%0' parameter", (StringRef))
-WARNING(attr_warn_unused_result_unknown_parameter,attribute_parsing,none,
+WARNING(attr_warn_unused_result_unknown_parameter,none,
         "unknown parameter '%0' in 'warn_unused_result' attribute", (StringRef))
-ERROR(attr_warn_unused_result_expected_rparen,attribute_parsing,none,
+ERROR(attr_warn_unused_result_expected_rparen,none,
       "expected ')' after 'warn_unused_result' attribute", ())
 
 //------------------------------------------------------------------------------
 // Generics parsing diagnostics
 //------------------------------------------------------------------------------
-ERROR(expected_rangle_generics_param,parsing,PointsToFirstBadToken,
+ERROR(expected_rangle_generics_param,PointsToFirstBadToken,
       "expected '>' to complete generic parameter list", ())
-ERROR(expected_generics_parameter_name,parsing,PointsToFirstBadToken,
+ERROR(expected_generics_parameter_name,PointsToFirstBadToken,
       "expected an identifier to name generic parameter", ())
-ERROR(expected_generics_type_restriction,parsing,none,
+ERROR(expected_generics_type_restriction,none,
       "expected a type name or protocol composition restricting %0",
       (Identifier))
-ERROR(requires_single_equal,parsing,none,
+ERROR(requires_single_equal,none,
       "use '==' for same-type requirements rather than '='", ())
-ERROR(expected_requirement_delim,parsing,none,
+ERROR(expected_requirement_delim,none,
       "expected ':' or '==' to indicate a conformance or same-type requirement",
       ())
-ERROR(invalid_class_requirement,decl_parsing,none,
+ERROR(invalid_class_requirement,none,
       "'class' requirement only applies to protocols", ())
-ERROR(redundant_class_requirement,decl_parsing,none,
+ERROR(redundant_class_requirement,none,
       "redundant 'class' requirement", ())
-ERROR(late_class_requirement,decl_parsing,none,
+ERROR(late_class_requirement,none,
       "'class' must come first in the requirement list", ())
 
 //------------------------------------------------------------------------------
 // Build configuration parsing diagnostics
 //------------------------------------------------------------------------------
-ERROR(unsupported_build_config_binary_expression,parsing,none,
+ERROR(unsupported_build_config_binary_expression,none,
       "expected '&&' or '||' expression", ())
-ERROR(unsupported_build_config_unary_expression,parsing,none,
+ERROR(unsupported_build_config_unary_expression,none,
       "expected unary '!' expression", ())
-ERROR(unsupported_target_config_expression,parsing,none,
+ERROR(unsupported_target_config_expression,none,
       "unexpected target configuration expression (expected 'os' or 'arch')",())
-ERROR(unsupported_target_config_runtime_argument,parsing,none,
+ERROR(unsupported_target_config_runtime_argument,none,
       "unexpected argument for the '_runtime' target configuration, "
       "expected '_Native' or '_ObjC'", ())
-ERROR(unsupported_target_config_argument,parsing,none,
+ERROR(unsupported_target_config_argument,none,
       "unexpected target configuration expression argument: expected %0",
       (StringRef))
-ERROR(unsupported_config_conditional_expression_type,parsing,none,
+ERROR(unsupported_config_conditional_expression_type,none,
       "unexpected configuration expression type", ())
-ERROR(unsupported_config_integer,parsing,none,
+ERROR(unsupported_config_integer,none,
       "'%0' is not a valid configuration option, use '%1'",
       (StringRef, StringRef))
-ERROR(compiler_version_component_not_number,parsing,none,
+ERROR(compiler_version_component_not_number,none,
       "compiler version component is not a number", ())
-ERROR(compiler_version_too_many_components,parsing,none,
+ERROR(compiler_version_too_many_components,none,
 			"compiler version must not have more than five components", ())
-WARNING(unused_compiler_version_component,parsing,none,
+WARNING(unused_compiler_version_component,none,
 			"the second version component is not used for comparison", ())
-ERROR(empty_compiler_version_component,parsing,none,
+ERROR(empty_compiler_version_component,none,
 			"found empty compiler version component", ())
-ERROR(compiler_version_component_out_of_range,parsing,none,
+ERROR(compiler_version_component_out_of_range,none,
       "compiler version component out of range: must be in [0, %0]",
       (unsigned))
-ERROR(empty_compiler_version_string,parsing,none,
+ERROR(empty_compiler_version_string,none,
       "compiler version requirement is empty", ())
-ERROR(cannot_combine_compiler_version,parsing,none,
+ERROR(cannot_combine_compiler_version,none,
       "cannot combine _compiler_version with binary operators", ())
-WARNING(unknown_build_config,parsing,none,
+WARNING(unknown_build_config,none,
       "unknown %0 for build configuration '%1'",
       (StringRef, StringRef))
 
 //------------------------------------------------------------------------------
 // Availability query parsing diagnostics
 //------------------------------------------------------------------------------
-ERROR(avail_query_expected_condition,parsing,PointsToFirstBadToken,
+ERROR(avail_query_expected_condition,PointsToFirstBadToken,
       "expected availability condition", ())
-ERROR(avail_query_expected_platform_name,parsing,PointsToFirstBadToken,
+ERROR(avail_query_expected_platform_name,PointsToFirstBadToken,
       "expected platform name", ())
 
-ERROR(avail_query_expected_version_number,parsing,PointsToFirstBadToken,
+ERROR(avail_query_expected_version_number,PointsToFirstBadToken,
       "expected version number", ())
-ERROR(avail_query_expected_rparen,parsing,PointsToFirstBadToken,
+ERROR(avail_query_expected_rparen,PointsToFirstBadToken,
       "expected ')' in availability query", ())
 
-ERROR(avail_query_unrecognized_platform_name,parsing,
+ERROR(avail_query_unrecognized_platform_name,
       PointsToFirstBadToken, "unrecognized platform name %0", (Identifier))
 
-ERROR(avail_query_disallowed_operator,parsing, PointsToFirstBadToken,
+ERROR(avail_query_disallowed_operator, PointsToFirstBadToken,
       "'%0' cannot be used in an availability condition", (StringRef))
 
-ERROR(avail_query_version_comparison_not_needed,parsing,
+ERROR(avail_query_version_comparison_not_needed,
       none,"version comparison not needed", ())
 
-ERROR(availability_query_wildcard_required, parsing, none,
+ERROR(availability_query_wildcard_required, none,
       "must handle potential future platforms with '*'", ())
 
-ERROR(availability_query_repeated_platform, parsing, none,
+ERROR(availability_query_repeated_platform, none,
       "version for '%0' already specified", (StringRef))
 
 #ifndef DIAG_NO_UNDEF

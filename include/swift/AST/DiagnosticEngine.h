@@ -399,7 +399,10 @@ namespace swift {
     bool showDiagnosticsAfterFatalError = false;
 
     /// \brief Don't emit any warnings
-    bool ignoreAllWarnings = false;
+    bool suppressWarnings = false;
+
+    /// \brief Emit all warnings as errors
+    bool warningsAsErrors = false;
 
     /// \brief Whether a fatal error has occurred
     bool fatalErrorOccurred = false;
@@ -411,7 +414,7 @@ namespace swift {
     Behavior previousBehavior = Behavior::Unspecified;
 
     /// \brief Track settable, per-diagnostic state that we store
-    std::vector<Behavior> perDiagnosticState;
+    std::vector<Behavior> perDiagnosticBehavior;
 
   public:
     DiagnosticState();
@@ -428,8 +431,12 @@ namespace swift {
     }
 
     /// \brief Whether to skip emitting warnings
-    void setIgnoreAllWarnings(bool val) { ignoreAllWarnings = val; }
-    bool getIgnoreAllWarnings() const { return ignoreAllWarnings; }
+    void setSuppressWarnings(bool val) { suppressWarnings = val; }
+    bool getSuppressWarnings() const { return suppressWarnings; }
+
+    /// \brief Whether to treat warnings as errors
+    void setWarningsAsErrors(bool val) { warningsAsErrors = val; }
+    bool getWarningsAsErrors() const { return warningsAsErrors; }
 
     void resetHadAnyError() {
       anyErrorOccurred = false;
@@ -438,7 +445,7 @@ namespace swift {
 
     /// Set per-diagnostic behavior
     void setDiagnosticBehavior(DiagID id, Behavior behavior) {
-      perDiagnosticState[(unsigned)id] = behavior;
+      perDiagnosticBehavior[(unsigned)id] = behavior;
     }
 
   private:
@@ -461,6 +468,7 @@ namespace swift {
     /// emitting diagnostics.
     SmallVector<DiagnosticConsumer *, 2> Consumers;
 
+    /// \brief Tracks diagnostic behaviors and state
     DiagnosticState state;
 
     /// \brief The currently active diagnostic, if there is one.
@@ -498,9 +506,15 @@ namespace swift {
     }
 
     /// \brief Whether to skip emitting warnings
-    void setIgnoreAllWarnings(bool val) { state.setIgnoreAllWarnings(val); }
-    bool getIgnoreAllWarnings() const {
-      return state.getIgnoreAllWarnings();
+    void setSuppressWarnings(bool val) { state.setSuppressWarnings(val); }
+    bool getSuppressWarnings() const {
+      return state.getSuppressWarnings();
+    }
+
+    /// \brief Whether to treat warnings as errors
+    void setWarningsAsErrors(bool val) { state.setWarningsAsErrors(val); }
+    bool getWarningsAsErrors() const {
+      return state.getWarningsAsErrors();
     }
 
     void ignoreDiagnostic(DiagID id) {

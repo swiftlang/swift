@@ -147,6 +147,13 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
       }
     }
   }
+
+  // Check for conflicting warning control flags
+  if (Args.hasArg(options::OPT_suppress_warnings) &&
+      Args.hasArg(options::OPT_warnings_as_errors)) {
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-warnings-as-errors", "-suppress-warnings");
+  }
 }
 
 static void computeArgsHash(SmallString<32> &out, const DerivedArgList &args) {
