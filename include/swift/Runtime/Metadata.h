@@ -2104,6 +2104,13 @@ struct GenericMetadata {
   const void *getMetadataTemplate() const {
     return reinterpret_cast<const void *>(this + 1);
   }
+
+  /// Return the nominal type descriptor for the template metadata
+  const NominalTypeDescriptor *getTemplateDescription() const {
+    auto bytes = reinterpret_cast<const uint8_t *>(getMetadataTemplate());
+    auto metadata = reinterpret_cast<const Metadata *>(bytes + AddressPoint);
+    return metadata->getNominalTypeDescriptor();
+  }
 };
 
 /// \brief The control structure of a generic protocol conformance.
@@ -2123,6 +2130,75 @@ struct GenericWitnessTable {
                              void * const *instantiationArgs)> Instantiator;
 
   void *PrivateData[swift::NumGenericMetadataPrivateDataWords];
+};
+
+/// The structure of a type metadata record.
+///
+/// This contains enough static information to recover type metadata from a
+/// name. It is only emitted for types that do not have an explicit protocol
+/// conformance record. 
+///
+/// This structure is notionally a subtype of a protocol conformance record
+/// but as we cannot change the conformance record layout we have to make do
+/// with some duplicated code.
+struct TypeMetadataRecord {
+private:
+  // Some description of the type that is resolvable at runtime.
+  union {
+    /// A direct reference to the metadata.
+    RelativeDirectPointer<Metadata> DirectType;
+
+    /// The generic metadata pattern for an unbound generic type.
+    RelativeDirectPointer<GenericMetadata> GenericPattern;
+  };
+
+  /// Flags describing the type metadata record.
+  TypeMetadataRecordFlags Flags;
+  
+public:
+  TypeMetadataRecordKind getTypeKind() const {
+    return Flags.getTypeKind();
+  }
+  
+  const Metadata *getDirectType() const {
+    switch (Flags.getTypeKind()) {
+    case TypeMetadataRecordKind::Universal:
+      return nullptr;
+
+    case TypeMetadataRecordKind::UniqueDirectType:
+    case TypeMetadataRecordKind::NonuniqueDirectType:
+    case TypeMetadataRecordKind::UniqueDirectClass:
+      break;
+        
+    case TypeMetadataRecordKind::UniqueIndirectClass:
+    case TypeMetadataRecordKind::UniqueGenericPattern:
+      assert(false && "not direct type metadata");
+    }
+
+    return DirectType;
+  }
+ 
+  const GenericMetadata *getGenericPattern() const {
+    switch (Flags.getTypeKind()) {
+    case TypeMetadataRecordKind::Universal:
+      return nullptr;
+
+    case TypeMetadataRecordKind::UniqueGenericPattern:
+      break;
+        
+    case TypeMetadataRecordKind::UniqueDirectClass:
+    case TypeMetadataRecordKind::UniqueIndirectClass:
+    case TypeMetadataRecordKind::UniqueDirectType:
+    case TypeMetadataRecordKind::NonuniqueDirectType:
+      assert(false && "not generic metadata pattern");
+    }
+    
+    return GenericPattern;
+  }
+  
+  /// Get the canonical metadata for the type referenced by this record, or
+  /// return null if the record references a generic or universal type.
+  const Metadata *getCanonicalTypeMetadata() const;
 };
 
 /// The structure of a protocol conformance record.
@@ -2177,7 +2253,7 @@ public:
     return Flags;
   }
   
-  ProtocolConformanceTypeKind getTypeKind() const {
+  TypeMetadataRecordKind getTypeKind() const {
     return Flags.getTypeKind();
   }
   ProtocolConformanceReferenceKind getConformanceKind() const {
@@ -2186,16 +2262,16 @@ public:
   
   const Metadata *getDirectType() const {
     switch (Flags.getTypeKind()) {
-    case ProtocolConformanceTypeKind::Universal:
+    case TypeMetadataRecordKind::Universal:
       return nullptr;
 
-    case ProtocolConformanceTypeKind::UniqueDirectType:
-    case ProtocolConformanceTypeKind::NonuniqueDirectType:
+    case TypeMetadataRecordKind::UniqueDirectType:
+    case TypeMetadataRecordKind::NonuniqueDirectType:
       break;
         
-    case ProtocolConformanceTypeKind::UniqueDirectClass:
-    case ProtocolConformanceTypeKind::UniqueIndirectClass:
-    case ProtocolConformanceTypeKind::UniqueGenericPattern:
+    case TypeMetadataRecordKind::UniqueDirectClass:
+    case TypeMetadataRecordKind::UniqueIndirectClass:
+    case TypeMetadataRecordKind::UniqueGenericPattern:
       assert(false && "not direct type metadata");
     }
 
@@ -2205,15 +2281,15 @@ public:
   // FIXME: This shouldn't exist
   const ClassMetadata *getDirectClass() const {
     switch (Flags.getTypeKind()) {
-    case ProtocolConformanceTypeKind::Universal:
+    case TypeMetadataRecordKind::Universal:
       return nullptr;
-    case ProtocolConformanceTypeKind::UniqueDirectClass:
+    case TypeMetadataRecordKind::UniqueDirectClass:
       break;
         
-    case ProtocolConformanceTypeKind::UniqueDirectType:
-    case ProtocolConformanceTypeKind::NonuniqueDirectType:
-    case ProtocolConformanceTypeKind::UniqueGenericPattern:
-    case ProtocolConformanceTypeKind::UniqueIndirectClass:
+    case TypeMetadataRecordKind::UniqueDirectType:
+    case TypeMetadataRecordKind::NonuniqueDirectType:
+    case TypeMetadataRecordKind::UniqueGenericPattern:
+    case TypeMetadataRecordKind::UniqueIndirectClass:
       assert(false && "not direct class object");
     }
 
@@ -2224,16 +2300,16 @@ public:
   
   const ClassMetadata * const *getIndirectClass() const {
     switch (Flags.getTypeKind()) {
-    case ProtocolConformanceTypeKind::Universal:
+    case TypeMetadataRecordKind::Universal:
       return nullptr;
 
-    case ProtocolConformanceTypeKind::UniqueIndirectClass:
+    case TypeMetadataRecordKind::UniqueIndirectClass:
       break;
         
-    case ProtocolConformanceTypeKind::UniqueDirectType:
-    case ProtocolConformanceTypeKind::UniqueDirectClass:
-    case ProtocolConformanceTypeKind::NonuniqueDirectType:
-    case ProtocolConformanceTypeKind::UniqueGenericPattern:
+    case TypeMetadataRecordKind::UniqueDirectType:
+    case TypeMetadataRecordKind::UniqueDirectClass:
+    case TypeMetadataRecordKind::NonuniqueDirectType:
+    case TypeMetadataRecordKind::UniqueGenericPattern:
       assert(false && "not indirect class object");
     }
     
@@ -2242,16 +2318,16 @@ public:
   
   const GenericMetadata *getGenericPattern() const {
     switch (Flags.getTypeKind()) {
-    case ProtocolConformanceTypeKind::Universal:
+    case TypeMetadataRecordKind::Universal:
       return nullptr;
 
-    case ProtocolConformanceTypeKind::UniqueGenericPattern:
+    case TypeMetadataRecordKind::UniqueGenericPattern:
       break;
         
-    case ProtocolConformanceTypeKind::UniqueDirectClass:
-    case ProtocolConformanceTypeKind::UniqueIndirectClass:
-    case ProtocolConformanceTypeKind::UniqueDirectType:
-    case ProtocolConformanceTypeKind::NonuniqueDirectType:
+    case TypeMetadataRecordKind::UniqueDirectClass:
+    case TypeMetadataRecordKind::UniqueIndirectClass:
+    case TypeMetadataRecordKind::UniqueDirectType:
+    case TypeMetadataRecordKind::NonuniqueDirectType:
       assert(false && "not generic metadata pattern");
     }
     
@@ -2817,7 +2893,12 @@ const WitnessTable *swift_conformsToProtocol(const Metadata *type,
 extern "C"
 void swift_registerProtocolConformances(const ProtocolConformanceRecord *begin,
                                         const ProtocolConformanceRecord *end);
-  
+
+/// Register a block of type metadata records dynamic lookup.
+extern "C"
+void swift_registerTypeMetadataRecords(const TypeMetadataRecord *begin,
+                                       const TypeMetadataRecord *end);
+
 /// Return the type name for a given type metadata.
 std::string nameForMetadata(const Metadata *type,
                             bool qualified = true);

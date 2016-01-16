@@ -52,13 +52,13 @@ void ProtocolConformanceRecord::dump() const {
   };
 
   switch (auto kind = getTypeKind()) {
-    case ProtocolConformanceTypeKind::Universal:
+    case TypeMetadataRecordKind::Universal:
       printf("universal");
       break;
-    case ProtocolConformanceTypeKind::UniqueDirectType:
-    case ProtocolConformanceTypeKind::NonuniqueDirectType:
+    case TypeMetadataRecordKind::UniqueDirectType:
+    case TypeMetadataRecordKind::NonuniqueDirectType:
       printf("%s direct type ",
-             kind == ProtocolConformanceTypeKind::UniqueDirectType
+             kind == TypeMetadataRecordKind::UniqueDirectType
              ? "unique" : "nonunique");
       if (auto ntd = getDirectType()->getNominalTypeDescriptor()) {
         printf("%s", ntd->Name);
@@ -66,16 +66,16 @@ void ProtocolConformanceRecord::dump() const {
         printf("<structural type>");
       }
       break;
-    case ProtocolConformanceTypeKind::UniqueDirectClass:
+    case TypeMetadataRecordKind::UniqueDirectClass:
       printf("unique direct class %s",
              class_getName(getDirectClass()));
       break;
-    case ProtocolConformanceTypeKind::UniqueIndirectClass:
+    case TypeMetadataRecordKind::UniqueIndirectClass:
       printf("unique indirect class %s",
              class_getName(*getIndirectClass()));
       break;
       
-    case ProtocolConformanceTypeKind::UniqueGenericPattern:
+    case TypeMetadataRecordKind::UniqueGenericPattern:
       printf("unique generic type %s", symbolName(getGenericPattern()));
       break;
   }
@@ -100,13 +100,13 @@ void ProtocolConformanceRecord::dump() const {
 const Metadata *ProtocolConformanceRecord::getCanonicalTypeMetadata()
 const {
   switch (getTypeKind()) {
-  case ProtocolConformanceTypeKind::UniqueDirectType:
+  case TypeMetadataRecordKind::UniqueDirectType:
     // Already unique.
     return getDirectType();
-  case ProtocolConformanceTypeKind::NonuniqueDirectType:
+  case TypeMetadataRecordKind::NonuniqueDirectType:
     // Ask the runtime for the unique metadata record we've canonized.
     return swift_getForeignTypeMetadata((ForeignTypeMetadata*)getDirectType());
-  case ProtocolConformanceTypeKind::UniqueIndirectClass:
+  case TypeMetadataRecordKind::UniqueIndirectClass:
     // The class may be ObjC, in which case we need to instantiate its Swift
     // metadata. The class additionally may be weak-linked, so we have to check
     // for null.
@@ -114,15 +114,15 @@ const {
       return swift_getObjCClassMetadata(ClassMetadata);
     return nullptr;
       
-  case ProtocolConformanceTypeKind::UniqueDirectClass:
+  case TypeMetadataRecordKind::UniqueDirectClass:
     // The class may be ObjC, in which case we need to instantiate its Swift
     // metadata.
     if (auto *ClassMetadata = getDirectClass())
       return swift_getObjCClassMetadata(ClassMetadata);
     return nullptr;
       
-  case ProtocolConformanceTypeKind::UniqueGenericPattern:
-  case ProtocolConformanceTypeKind::Universal:
+  case TypeMetadataRecordKind::UniqueGenericPattern:
+  case TypeMetadataRecordKind::Universal:
     // The record does not apply to a single type.
     return nullptr;
   }
@@ -564,7 +564,7 @@ recur:
       // An accessor function might still be necessary even if the witness table
       // can be shared.
       } else if (record.getTypeKind()
-                   == ProtocolConformanceTypeKind::UniqueGenericPattern
+                   == TypeMetadataRecordKind::UniqueGenericPattern
                  && record.getConformanceKind()
                    == ProtocolConformanceReferenceKind::WitnessTable) {
 
@@ -593,4 +593,34 @@ recur:
   // Start over with our newly-populated cache.
   type = origType;
   goto recur;
+}
+
+const Metadata *
+swift::_searchConformancesByMangledTypeName(const llvm::StringRef typeName) {
+  auto &C = Conformances.get();
+  const Metadata *foundMetadata = nullptr;
+
+  pthread_mutex_lock(&C.SectionsToScanLock);
+
+  unsigned sectionIdx = 0;
+  unsigned endSectionIdx = C.SectionsToScan.size();
+
+  for (; sectionIdx < endSectionIdx; ++sectionIdx) {
+    auto &section = C.SectionsToScan[sectionIdx];
+    for (const auto &record : section) {
+      if (auto metadata = record.getCanonicalTypeMetadata())
+        foundMetadata = _matchMetadataByMangledTypeName(typeName, metadata, nullptr);
+      else if (auto pattern = record.getGenericPattern())
+        foundMetadata = _matchMetadataByMangledTypeName(typeName, nullptr, pattern);
+
+      if (foundMetadata != nullptr)
+        break;
+    }
+    if (foundMetadata != nullptr)
+      break;
+  }
+
+  pthread_mutex_unlock(&C.SectionsToScanLock);
+
+  return foundMetadata;
 }

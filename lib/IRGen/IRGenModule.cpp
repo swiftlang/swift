@@ -278,6 +278,14 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
   ProtocolConformanceRecordPtrTy
     = ProtocolConformanceRecordTy->getPointerTo(DefaultAS);
 
+  TypeMetadataRecordTy
+    = createStructType(*this, "swift.type_metadata_record", {
+      RelativeAddressTy,
+      Int32Ty
+    });
+  TypeMetadataRecordPtrTy
+    = TypeMetadataRecordTy->getPointerTo(DefaultAS);
+
   FixedBufferTy = nullptr;
   for (unsigned i = 0; i != MaxNumValueWitnesses; ++i)
     ValueWitnessTys[i] = nullptr;
