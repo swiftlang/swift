@@ -119,7 +119,10 @@ namespace swift {
   const Metadata *
   _searchConformancesByMangledTypeName(const llvm::StringRef typeName);
 
+#if SWIFT_OBJC_INTEROP
   Demangle::NodePointer _swift_buildDemanglingForMetadata(const Metadata *type);
+#endif
+
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_PRIVATE_H */

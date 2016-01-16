@@ -4,8 +4,8 @@
 #include "Private.h"
 
 #if SWIFT_OBJC_INTEROP
+
 #include <objc/runtime.h>
-#endif
 
 // Build a demangled type tree for a nominal type.
 static Demangle::NodePointer
@@ -227,3 +227,5 @@ Demangle::NodePointer swift::_swift_buildDemanglingForMetadata(const Metadata *t
   // Not a type.
   return nullptr;
 }
+
+#endif
