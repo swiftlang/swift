@@ -1,0 +1,34 @@
+// RUN: %swift -parse -target %target-triple %s -fixit-all -emit-fixits-path %t.remap -swift3-migration -enable-source-import -sdk %S/../Inputs/clang-importer-sdk -I %S/../Inputs/clang-importer-sdk/swift-modules -enable-infer-default-arguments
+// RUN: c-arcmt-test %t.remap | arcmt-test -verify-transformed-files %s.result
+
+// REQUIRES: objc_interop
+
+import Foundation
+import AppKit
+
+func dropDefaultedNil(array: NSArray, sel: Selector,
+       body: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)?) {
+  array.makeObjectsPerform(sel, withObject: nil)
+  array.makeObjectsPerform(sel, withObject: nil, withObject: nil)
+  array.enumerateObjectsRandomly()
+  array.enumerateObjectsRandomly(block: body)
+}
+
+func dropDefaultedOptionSet(array: NSArray) {
+  array.enumerateObjects { obj, idx, stop in print("foo") }
+  array.enumerateObjects(usingBlock: { obj, idx, stop in print("foo") })
+  array.enumerateObjectsWhileOrderingPizza(true, usingBlock: { obj, idx, stop in print("foo") })
+}
+
+func dropDefaultedWithoutRename(domain: String, code: Int, array: NSArray) {
+  array.enumerateObjectsHaphazardly()
+  array.optionallyEnumerateObjects(body: { obj, idx, stop in print("foo") })
+}
+
+func dontDropUnnamedSetterArg(str: NSString) {
+  str.setTextColor(nil) // don't drop this
+}
+
+func renameTrailingClosure(array: NSArray) {
+  array.enumerateObjects { _, _, _ in print("foo") }
+}

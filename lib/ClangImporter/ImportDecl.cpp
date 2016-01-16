@@ -5016,6 +5016,19 @@ canSkipOverTypedef(ClangImporter::Implementation &Impl,
   return UnderlyingDecl;
 }
 
+bool ClangImporter::Implementation::shouldTrySwift3Migration(
+       Decl *swiftDecl, const clang::NamedDecl *clangDecl) {
+  // Never map subscript declarations.
+  if (isa<SubscriptDecl>(swiftDecl)) return false;
+
+  if (auto typedefDecl = dyn_cast<clang::TypedefNameDecl>(clangDecl)) {
+    // Don't map special typedefs.
+    if (getSpecialTypedefKind(typedefDecl)) return false;
+  }
+
+  return isa<ValueDecl>(swiftDecl);
+}
+
 /// Import Clang attributes as Swift attributes.
 void ClangImporter::Implementation::importAttributes(
     const clang::NamedDecl *ClangDecl,
@@ -5254,36 +5267,36 @@ void ClangImporter::Implementation::importAttributes(
 
   // Add the swift3_migration attribute to the given declaration, if
   // appropriate.
-  if (!isa<SubscriptDecl>(MappedDecl)) {
-    if (auto valueDecl = dyn_cast<ValueDecl>(MappedDecl)) {
-      // Import the name as we would for Swift 3.
-      ImportNameOptions options;
-      auto swift3Name = importFullName(ClangDecl, options, nullptr, nullptr,
-                                       /*omitNeedlessWords=*/true);
+  if (shouldTrySwift3Migration(MappedDecl, ClangDecl)) {
+    auto valueDecl = cast<ValueDecl>(MappedDecl);
 
-      // If we ended up importing an initializer name, but we're referring to
-      // the factory method version, import again with the initializer mapping
-      // suppressed.
-      if (swift3Name.Imported.getBaseName() == SwiftContext.Id_init &&
-          !isa<ConstructorDecl>(valueDecl)) {
-        options |= ImportNameFlags::SuppressFactoryMethodAsInit;
-        swift3Name = importFullName(ClangDecl, options, nullptr, nullptr,
-                                    /*omitNeedlessWords=*/true);
-      }
+    // Import the name as we would for Swift 3.
+    ImportNameOptions options;
+    auto swift3Name = importFullName(ClangDecl, options, nullptr, nullptr,
+                                     /*omitNeedlessWords=*/true);
 
-      // If the Swift 3 name differs from the name of the declaration, add the
-      // swift3_migration attribute with the rename.
-      if (swift3Name.Imported &&
-          swift3Name.Imported != valueDecl->getFullName()) {
-        MappedDecl->getAttrs().add(new (SwiftContext) Swift3MigrationAttr(
-                                                        SourceLoc(),
-                                                        SourceLoc(),
-                                                        SourceLoc(),
-                                                        swift3Name.Imported,
-                                                        "",
-                                                        SourceLoc(),
-                                                        /*implicit=*/true));
-      }
+    // If we ended up importing an initializer name, but we're referring to
+    // the factory method version, import again with the initializer mapping
+    // suppressed.
+    if (swift3Name.Imported.getBaseName() == SwiftContext.Id_init &&
+        !isa<ConstructorDecl>(valueDecl)) {
+      options |= ImportNameFlags::SuppressFactoryMethodAsInit;
+      swift3Name = importFullName(ClangDecl, options, nullptr, nullptr,
+                                  /*omitNeedlessWords=*/true);
+    }
+
+    // If the Swift 3 name differs from the name of the declaration, add the
+    // swift3_migration attribute with the rename.
+    if (swift3Name.Imported &&
+        swift3Name.Imported != valueDecl->getFullName()) {
+      MappedDecl->getAttrs().add(new (SwiftContext) Swift3MigrationAttr(
+                                                      SourceLoc(),
+                                                      SourceLoc(),
+                                                      SourceLoc(),
+                                                      swift3Name.Imported,
+                                                      "",
+                                                      SourceLoc(),
+                                                      /*implicit=*/true));
     }
   }
 }
@@ -5881,7 +5894,8 @@ void ClangImporter::Implementation::loadAllConformances(
 }
 
 Optional<MappedTypeNameKind>
-ClangImporter::Implementation::getSpecialTypedefKind(clang::TypedefNameDecl *decl) {
+ClangImporter::Implementation::getSpecialTypedefKind(
+    const clang::TypedefNameDecl *decl) {
   auto iter = SpecialTypedefNames.find(decl->getCanonicalDecl());
   if (iter == SpecialTypedefNames.end())
     return None;

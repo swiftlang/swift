@@ -905,6 +905,11 @@ public:
   static EnumKind classifyEnum(clang::Preprocessor &pp,
                                const clang::EnumDecl *decl);
 
+  /// Determine whether we should attempt to add the swift3_migration
+  /// attribute.
+  bool shouldTrySwift3Migration(Decl *swiftDecl,
+                                const clang::NamedDecl *clangDecl);
+
   /// Import attributes from the given Clang declaration to its Swift
   /// equivalent.
   ///
@@ -1209,7 +1214,7 @@ public:
   /// that it has performed some non-trivial mapping of its underlying type
   /// based on the name of the typedef.
   Optional<MappedTypeNameKind>
-  getSpecialTypedefKind(clang::TypedefNameDecl *decl);
+  getSpecialTypedefKind(const clang::TypedefNameDecl *decl);
 
   /// \brief Look up a name, accepting only typedef results.
   const clang::TypedefNameDecl *lookupTypedef(clang::DeclarationName);
