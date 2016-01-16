@@ -41,10 +41,6 @@ namespace swift {
     /// Language features
     ///
 
-    /// \brief If true, all types are treated as resilient unless declared
-    /// @_fixed_layout.
-    bool EnableResilience = false;
-
     /// \brief Disable API availability checking.
     bool DisableAvailabilityChecking = false;
     

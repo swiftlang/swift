@@ -1346,7 +1346,7 @@ bool AbstractStorageDecl::hasFixedLayout() const {
 
   // Must use resilient access patterns.
   assert(getDeclContext()->isModuleScopeContext());
-  return false;
+  return !getDeclContext()->getParentModule()->isResilienceEnabled();
 }
 
 
@@ -1870,7 +1870,7 @@ bool NominalTypeDecl::hasFixedLayout() const {
     return true;
 
   // Otherwise, access via indirect "resilient" interfaces.
-  return false;
+  return !getParentModule()->isResilienceEnabled();
 }
 
 /// Provide the set of parameters to a generic type, or null if

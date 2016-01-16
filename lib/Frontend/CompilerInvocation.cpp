@@ -149,6 +149,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
   Opts.DelayedFunctionBodyParsing |= Args.hasArg(OPT_delayed_function_body_parsing);
   Opts.EnableTesting |= Args.hasArg(OPT_enable_testing);
+  Opts.EnableResilience |= Args.hasArg(OPT_enable_resilience);
 
   Opts.PrintStats |= Args.hasArg(OPT_print_stats);
   Opts.PrintClangStats |= Args.hasArg(OPT_print_clang_stats);
@@ -704,13 +705,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableExperimentalPatterns |=
     Args.hasArg(OPT_enable_experimental_patterns);
-
-  Opts.EnableResilience = false;
-  if (auto A = Args.getLastArg(OPT_enable_resilience,
-                               OPT_disable_resilience)) {
-    Opts.EnableResilience
-      = A->getOption().matches(OPT_enable_resilience);
-  }
 
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);

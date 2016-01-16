@@ -225,7 +225,6 @@ static void addImplicitConformances(
 
 /// Check that the declaration attributes are ok.
 static void validateAttributes(TypeChecker &TC, Decl *D);
-static void validateFixedLayoutAttribute(TypeChecker &TC, ValueDecl *D);
 
 void TypeChecker::resolveSuperclass(ClassDecl *classDecl) {
   IterativeTypeChecker ITC(*this);
@@ -5726,7 +5725,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
     checkInheritanceClause(D);
     validateAttributes(*this, D);
-    validateFixedLayoutAttribute(*this, nominal);
 
     // Mark a class as @objc. This must happen before checking its members.
     if (auto CD = dyn_cast<ClassDecl>(nominal)) {
@@ -5887,10 +5885,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       if (auto setter = VD->getSetter())
         validateDecl(setter);
     }
-
-    // If this is a global variable, propagate @_fixed_layout from the module
-    // to the decl.
-    validateFixedLayoutAttribute(*this, VD);
 
     // Synthesize accessors as necessary.
     maybeAddAccessorsToVariable(VD, *this);
@@ -6846,32 +6840,6 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   // Create an empty body for the default constructor. The type-check of the
   // constructor body will introduce default initializations of the members.
   ctor->setBody(BraceStmt::create(Context, SourceLoc(), { }, SourceLoc()));
-}
-
-static void validateFixedLayoutAttribute(TypeChecker &TC,
-                                         ValueDecl *D) {
-  assert(isa<NominalTypeDecl>(D) || isa<VarDecl>(D));
-
-  // FIXME: Add a per-module serialized HasFixedLayout flag to establish
-  // a default convention for decls which do not specify @_fixed_layout,
-  // which would let us remove this function.
-
-  // Non-global stored properties don't need this.
-  if (isa<VarDecl>(D) &&
-      !D->getDeclContext()->isModuleScopeContext()) {
-    return;
-  }
-
-  DeclAttributes &Attrs = D->getAttrs();
-
-  if (Attrs.hasAttribute<FixedLayoutAttr>() ||
-      TC.Context.LangOpts.EnableResilience)
-    return;
-
-  // Since -enable-resilience should not change how we call into
-  // existing compiled modules, make all value types @_fixed_layout
-  // when the frontend is not run with the -enable-resilience flag.
-  Attrs.add(new (TC.Context) FixedLayoutAttr(/*IsImplicit*/ true));
 }
 
 static void validateAttributes(TypeChecker &TC, Decl *D) {

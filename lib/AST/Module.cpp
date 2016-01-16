@@ -338,7 +338,8 @@ void SourceLookupCache::invalidate() {
 
 ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
   : TypeDecl(DeclKind::Module, &ctx, name, SourceLoc(), { }),
-    DeclContext(DeclContextKind::Module, nullptr) {
+    DeclContext(DeclContextKind::Module, nullptr),
+    Flags({0, 0, 0}) {
   ctx.addDestructorCleanup(*this);
   setImplicit();
   setType(ModuleType::get(this));
@@ -399,8 +400,8 @@ DerivedFileUnit &Module::getDerivedFileUnit() const {
 }
 
 VarDecl *Module::getDSOHandle() {
-  if (DSOHandleAndFlags.getPointer())
-    return DSOHandleAndFlags.getPointer();
+  if (DSOHandle)
+    return DSOHandle;
 
   auto unsafeMutablePtr = getASTContext().getUnsafeMutablePointerDecl();
   if (!unsafeMutablePtr)
@@ -423,7 +424,7 @@ VarDecl *Module::getDSOHandle() {
   handleVar->getAttrs().add(
     new (ctx) SILGenNameAttr("__dso_handle", /*Implicit=*/true));
   handleVar->setAccessibility(Accessibility::Internal);
-  DSOHandleAndFlags.setPointer(handleVar);
+  DSOHandle = handleVar;
   return handleVar;
 }
 

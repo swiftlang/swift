@@ -52,7 +52,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 234; // swift3_migration attribute added
+const uint16_t VERSION_MINOR = 235; // IsResilient module flag added
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -439,7 +439,8 @@ namespace options_block {
     SDK_PATH = 1,
     XCC,
     IS_SIB,
-    IS_TESTABLE
+    IS_TESTABLE,
+    IS_RESILIENT
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -459,6 +460,10 @@ namespace options_block {
 
   using IsTestableLayout = BCRecordLayout<
     IS_TESTABLE
+  >;
+
+  using IsResilientLayout = BCRecordLayout<
+    IS_RESILIENT
   >;
 }
 
