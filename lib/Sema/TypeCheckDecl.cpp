@@ -7088,17 +7088,6 @@ void TypeChecker::fixAbstractFunctionNames(InFlightDiagnostic &diag,
       targetArgStr += ' ';
       diag.fixItInsert(param->getLoc(), targetArgStr);
     }
-
-    // Find the location to update or insert.
-    SourceLoc loc = func->getLoc();
-    
-    StringRef replacement;
-    if (targetArg.empty())
-      replacement = "_";
-    else
-      replacement = targetArg.str();
-
-    diag.fixItInsert(loc, replacement);
   }
   
   // FIXME: Update the AST accordingly.
