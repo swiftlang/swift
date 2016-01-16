@@ -491,6 +491,12 @@ also build for tvOS, but disallow tests that require an tvos device""",
 also build for Apple watchos, but disallow tests that require an watchOS device""",
         action="store_true")
 
+    parser.add_argument("--swift-analyze-code-coverage",
+        help="enable code coverage analysis in Swift",
+        action="store_const",
+        const=True,
+        dest="swift_analyze_code_coverage")
+
     parser.add_argument("--build-subdir",
         help="""
 name of the directory under $SWIFT_BUILD_ROOT where the build products will be
@@ -525,6 +531,10 @@ the number of parallel build jobs to use""",
         '--darwin-xcrun-toolchain',
         '--cmake',
     ]))
+
+    # Code coverage analysis disabled by default.
+    if args.swift_analyze_code_coverage is None:
+        args.swift_analyze_code_coverage = False
 
     # Build cmark if any cmark-related options were specified.
     if (args.cmark_build_variant is not None):
@@ -685,6 +695,8 @@ the number of parallel build jobs to use""",
         swift_build_dir_label = args.swift_build_variant
         if args.swift_assertions:
             swift_build_dir_label += "Assert"
+        if args.swift_analyze_code_coverage:
+            swift_build_dir_label += "Coverage"
 
         swift_stdlib_build_dir_label = args.swift_stdlib_build_variant
         if args.swift_stdlib_assertions:
@@ -756,6 +768,7 @@ the number of parallel build jobs to use""",
         "--llvm-enable-assertions", str(args.llvm_assertions).lower(),
         "--swift-enable-assertions", str(args.swift_assertions).lower(),
         "--swift-stdlib-enable-assertions", str(args.swift_stdlib_assertions).lower(),
+        "--swift-analyze-code-coverage", str(args.swift_analyze_code_coverage).lower(),
         "--cmake-generator", args.cmake_generator,
         "--build-jobs", str(args.build_jobs),
         "--workspace", SWIFT_SOURCE_ROOT
