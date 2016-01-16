@@ -23,6 +23,7 @@ add_swift_library(swiftSema
   MiscDiagnostics.cpp
   OverloadChoice.cpp
   PlaygroundTransform.cpp
+  Swift3Migration.cpp
   TypeChecker.cpp
   TypeCheckAttr.cpp
   TypeCheckConstraints.cpp

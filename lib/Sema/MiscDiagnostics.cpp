@@ -310,7 +310,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         }
 
         // Check whether there are needless words that could be omitted.
-        TC.checkOmitNeedlessWords(Call);
+        TC.checkRenaming(Call,
+                         TypeChecker::ApplyRenamingKind::OmitNeedlessWords);
       }
       
       // If we have an assignment expression, scout ahead for acceptable _'s.
@@ -2338,9 +2339,21 @@ static bool hasExtraneousDefaultArguments(AbstractFunctionDecl *afd,
   return !ranges.empty();
 }
 
-void TypeChecker::checkOmitNeedlessWords(ApplyExpr *apply) {
-  if (!Context.LangOpts.WarnOmitNeedlessWords)
-    return;
+Expr *TypeChecker::checkRenaming(ApplyExpr *apply, ApplyRenamingKind kind) {
+  Diag<DeclName, DeclName> renameDiag;
+  switch (kind) {
+  case ApplyRenamingKind::OmitNeedlessWords:
+    if (!Context.LangOpts.WarnOmitNeedlessWords)
+      return nullptr;
+    renameDiag = diag::omit_needless_words;
+    break;
+
+  case ApplyRenamingKind::Swift3Migration:
+    if (!Context.LangOpts.Swift3Migration)
+      return nullptr;
+    renameDiag = diag::swift3_migration_rename;
+    break;
+  }
 
   // Find the callee.
   ApplyExpr *innermostApply = apply;
@@ -2351,19 +2364,31 @@ void TypeChecker::checkOmitNeedlessWords(ApplyExpr *apply) {
     ++numApplications;
   }
   if (numApplications != 1)
-    return;
+    return nullptr;
 
   DeclRefExpr *fnRef
     = dyn_cast<DeclRefExpr>(innermostApply->getFn()->getValueProvidingExpr());
   if (!fnRef)
-    return;
+    return nullptr;
 
   auto *afd = dyn_cast<AbstractFunctionDecl>(fnRef->getDecl());
   if (!afd)
-    return;
+    return nullptr;
 
-  // Determine whether the callee has any needless words in it.
-  auto newName = ::omitNeedlessWords(afd);
+  // Determine whether the callee has a new name.
+  Optional<DeclName> newName;
+  switch (kind) {
+  case ApplyRenamingKind::OmitNeedlessWords:
+    newName = ::omitNeedlessWords(afd);
+    break;
+
+  case ApplyRenamingKind::Swift3Migration:
+    if (auto attr = afd->getAttrs().getAttribute<Swift3MigrationAttr>()) {
+      if (attr->getRenamed() && attr->getRenamed() != afd->getFullName())
+        newName = attr->getRenamed();
+    }
+    break;
+  }
 
   bool renamed;
   if (!newName) {
@@ -2382,7 +2407,7 @@ void TypeChecker::checkOmitNeedlessWords(ApplyExpr *apply) {
                                     removedArgs);
 
   if (!renamed && !anyExtraneousDefaultArgs)
-    return;
+    return nullptr;
 
   // Make sure to apply the fix at the right application level.
   auto name = afd->getFullName();
@@ -2398,8 +2423,7 @@ void TypeChecker::checkOmitNeedlessWords(ApplyExpr *apply) {
     arg = argParen->getSubExpr();
 
   InFlightDiagnostic diag
-    = renamed ? diagnose(fnRef->getLoc(), diag::omit_needless_words,
-                         name, *newName)
+    = renamed ? diagnose(fnRef->getLoc(), renameDiag, name, *newName)
               : diagnose(fnRef->getLoc(), diag::extraneous_default_args_in_call,
                          name);
 
@@ -2454,6 +2478,8 @@ void TypeChecker::checkOmitNeedlessWords(ApplyExpr *apply) {
   for (auto extraneous : removedDefaultArgRanges) {
     diag.fixItRemoveChars(extraneous.Start, extraneous.End);
   }
+
+  return fnRef;
 }
 
 void TypeChecker::checkOmitNeedlessWords(MemberRefExpr *memberRef) {

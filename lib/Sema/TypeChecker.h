@@ -1774,9 +1774,17 @@ public:
   /// Check for needless words in the name of the given variable.
   void checkOmitNeedlessWords(VarDecl *var);
 
-  /// Check for needless words in the name of the function/constructor being
-  /// called.
-  void checkOmitNeedlessWords(ApplyExpr *apply);
+  /// The kind of renaming we are performing to an application.
+  enum class ApplyRenamingKind {
+    OmitNeedlessWords,
+    Swift3Migration,
+  };
+
+  /// Check for renaming of the entity being called.
+  ///
+  /// Returns the expression that directly referenced a declaration that was
+  /// renamed, signalling that the rename has been performed.
+  Expr *checkRenaming(ApplyExpr *apply, ApplyRenamingKind kind);
 
   /// Check for needless words in the member reference.
   void checkOmitNeedlessWords(MemberRefExpr *memberRef);
@@ -1817,6 +1825,9 @@ public:
   /// The unescaped message to display to the user.
   const StringRef Message;
 };
+
+/// Perform basic migration to Swift 3.
+void migrateToSwift3(TypeChecker &tc, SourceFile &sf);
 
 } // end namespace swift
 
