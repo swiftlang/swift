@@ -2367,12 +2367,16 @@ Expr *TypeChecker::checkRenaming(ApplyExpr *apply, ApplyRenamingKind kind) {
   if (numApplications != 1)
     return nullptr;
 
-  DeclRefExpr *fnRef
-    = dyn_cast<DeclRefExpr>(innermostApply->getFn()->getValueProvidingExpr());
-  if (!fnRef)
+  ValueDecl *decl;
+  auto fnRef = innermostApply->getFn()->getValueProvidingExpr();
+  if (auto declRef = dyn_cast<DeclRefExpr>(fnRef))
+    decl = declRef->getDecl();
+  else if (auto ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(fnRef))
+    decl = ctorRef->getDecl();
+  else
     return nullptr;
 
-  auto *afd = dyn_cast<AbstractFunctionDecl>(fnRef->getDecl());
+  auto *afd = dyn_cast<AbstractFunctionDecl>(decl);
   if (!afd)
     return nullptr;
 

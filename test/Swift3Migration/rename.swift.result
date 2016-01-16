@@ -8,6 +8,10 @@ struct A< Element> {
 
   
   func bar(wibble x: Int, wonka y: Int) { }
+
+  init(other y: B) {
+    self.init(b: y)
+  }
 }
 
 

@@ -8,6 +8,10 @@ struct X<@swift3_migration(renamed="Element") T> {
 
   @swift3_migration(renamed="bar(wibble:wonka:)")
   func foo(x: Int, y: Int) { }
+
+  init(other y: Y) {
+    self.init(withY: y)
+  }
 }
 
 @swift3_migration(renamed="B")
