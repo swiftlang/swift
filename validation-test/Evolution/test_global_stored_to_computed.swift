@@ -15,9 +15,9 @@
 // RUN: %target-build-swift %t/after/global_stored_to_computed.o %t/after/main.o -o %t/after_after
 
 // RUN: %target-run %t/before_before
-// RXUN: %target-run %t/before_after
-// RXUN: %target-run %t/after_before
-// RXUN: %target-run %t/after_after
+// RUN: %target-run %t/before_after
+// RUN: %target-run %t/after_before
+// RUN: %target-run %t/after_after
 
 import StdlibUnittest
 import global_stored_to_computed
