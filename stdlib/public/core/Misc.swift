@@ -90,7 +90,7 @@ func _getTypeByMangledName(
   -> Any.Type?
 
 /// Lookup a class given a name. Until the demangled encoding of type
-/// names is stablized, this is limited to top-level class names (Foo.bar).
+/// names is stabilized, this is limited to top-level class names (Foo.bar).
 @warn_unused_result
 public // SPI(Foundation)
 func _typeByName(name: String) -> Any.Type? {
