@@ -121,6 +121,19 @@ namespace {
         return {true, E};
       }
 
+      // Constructor references.
+      if (auto ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(E)) {
+        fixSimpleReference(ctorRef->getLoc(), ctorRef->getDecl());
+        return {true, E};
+      }
+
+      // Dynamic member references.
+      if (auto dynamicRef = dyn_cast<DynamicMemberRefExpr>(E)) {
+        fixSimpleReference(dynamicRef->getNameLoc(),
+                           dynamicRef->getMember().getDecl());
+        return {true, E};
+      }
+
       return {true, E};
     }
   };

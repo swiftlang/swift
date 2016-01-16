@@ -32,3 +32,12 @@ func dontDropUnnamedSetterArg(str: NSString) {
 func renameTrailingClosure(array: NSArray) {
   array.enumerateObjectsWithNullableBlock { _, _, _ in print("foo") }
 }
+
+func useAnyObject(obj: AnyObject, body: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)?) {
+  obj.enumerateObjectsWithOptions([], usingBlock: { obj, idx, stop in print("foo") })
+  obj.enumerateObjectsRandomlyWithBlock(nil)
+  obj.enumerateObjectsRandomlyWithBlock(body)
+  obj.enumerateObjectsRandomlyWithBlock?(nil)
+  obj.enumerateObjectsRandomlyWithBlock?(body)
+  _ = obj.makingHoney
+}

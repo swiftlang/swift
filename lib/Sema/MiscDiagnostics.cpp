@@ -2364,17 +2364,30 @@ Expr *TypeChecker::checkRenaming(ApplyExpr *apply, ApplyRenamingKind kind) {
     innermostApply = fnApply;
     ++numApplications;
   }
-  if (numApplications != 1)
-    return nullptr;
-
   ValueDecl *decl;
   auto fnRef = innermostApply->getFn()->getValueProvidingExpr();
-  if (auto declRef = dyn_cast<DeclRefExpr>(fnRef))
-    decl = declRef->getDecl();
-  else if (auto ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(fnRef))
-    decl = ctorRef->getDecl();
-  else
+  if (numApplications == 1) {
+    if (auto declRef = dyn_cast<DeclRefExpr>(fnRef))
+      decl = declRef->getDecl();
+    else if (auto ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(fnRef))
+      decl = ctorRef->getDecl();
+    else
+      return nullptr;
+  } else if (numApplications == 0) {
+    if (auto force = dyn_cast<ForceValueExpr>(fnRef))
+      fnRef = force->getSubExpr()->getValueProvidingExpr();
+    if (auto bind = dyn_cast<BindOptionalExpr>(fnRef))
+      fnRef = bind->getSubExpr()->getValueProvidingExpr();
+    if (auto open = dyn_cast<OpenExistentialExpr>(fnRef))
+      fnRef = open->getSubExpr();
+
+    if (auto dynamicRef = dyn_cast<DynamicMemberRefExpr>(fnRef))
+      decl = dynamicRef->getMember().getDecl();
+    else
+      return nullptr;
+  } else {
     return nullptr;
+  }
 
   auto *afd = dyn_cast<AbstractFunctionDecl>(decl);
   if (!afd)
