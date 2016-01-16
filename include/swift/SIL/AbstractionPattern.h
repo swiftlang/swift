@@ -280,9 +280,10 @@ class AbstractionPattern {
     return hasStoredObjCMethod();
   }
 
-  void initSwiftType(CanGenericSignature signature, CanType origType) {
+  void initSwiftType(CanGenericSignature signature, CanType origType,
+                     Kind kind = Kind::Type) {
     assert(signature || !origType->hasTypeParameter());
-    TheKind = unsigned(Kind::Type);
+    TheKind = unsigned(kind);
     OrigType = origType;
     GenericSig = CanGenericSignature();
     if (origType->hasTypeParameter())
@@ -292,20 +293,16 @@ class AbstractionPattern {
   void initClangType(CanGenericSignature signature,
                      CanType origType, const clang::Type *clangType,
                      Kind kind = Kind::ClangType) {
-    TheKind = unsigned(kind);
-    OrigType = origType;
+    initSwiftType(signature, origType, kind);
     ClangType = clangType;
-    GenericSig = signature;
   }
 
   void initObjCMethod(CanGenericSignature signature,
                       CanType origType, const clang::ObjCMethodDecl *method,
                       Kind kind, EncodedForeignErrorInfo errorInfo) {
-    TheKind = unsigned(kind);
-    OrigType = origType;
+    initSwiftType(signature, origType, kind);
     ObjCMethod = method;
     OtherData = errorInfo.getOpaqueValue();
-    GenericSig = signature;
   }
 
   AbstractionPattern() {}
@@ -332,6 +329,12 @@ public:
 
   static AbstractionPattern getInvalid() {
     return AbstractionPattern(Kind::Invalid);
+  }
+
+  bool hasGenericSignature() const {
+    return (getKind() == Kind::Type ||
+            hasStoredClangType() ||
+            hasStoredObjCMethod());
   }
 
   CanGenericSignature getGenericSignature() const {
