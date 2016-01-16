@@ -532,11 +532,11 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F, GeneratorF
   Type selfMetatypeType = MetatypeType::get(SelfInterfaceType,
                                             MetatypeRepresentation::Thick);
 
-  // If 'self' is a metatype, make it @thick, but not inside selfMetatypeType.
+  // If 'self' is a metatype, make it @thin or @thick as needed, but not inside
+  // selfMetatypeType.
   if (auto metatype = selfType->getAs<MetatypeType>())
     if (!metatype->hasRepresentation())
-      selfType = MetatypeType::get(metatype->getInstanceType(),
-                                   MetatypeRepresentation::Thick);
+      selfType = SGM.getLoweredType(metatype).getSwiftRValueType();
 
   // Create the SILFunctionType for the callback.
   SILParameterInfo params[] = {
