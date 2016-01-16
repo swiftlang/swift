@@ -37,11 +37,16 @@
 from __future__ import print_function
 
 import subprocess
-import numpy
 import re
 import os
 import sys
 import argparse
+import math
+
+
+# Calculate the population standard deviation
+def pstdev(l):
+    return (sum((x - sum(l) / float(len(l))) ** 2 for x in l) / len(l)) ** 0.5
 
 
 class SwiftBenchHarness:
@@ -348,8 +353,8 @@ class TestResults:
     self.minimum = min(self.samples)
     self.maximum = max(self.samples)
     self.avg = sum(self.samples)/len(self.samples)
-    self.std = numpy.std(self.samples)
-    self.err = self.std/numpy.sqrt(len(self.samples))
+    self.std = pstdev(self.samples)
+    self.err = self.std / math.sqrt(len(self.samples))
     self.int_min = self.avg - self.err*1.96
     self.int_max = self.avg + self.err*1.96
   def Print(self):
