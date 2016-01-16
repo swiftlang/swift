@@ -1,9 +1,11 @@
-// RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-build-swift -c -emit-module -emit-library -module-name superclass_methods -emit-module-path %t/superclass_methods.swiftmodule -Xfrontend -enable-resilience -D BEFORE %S/Inputs/superclass_methods.swift -o %t/libsuperclass_methods.dylib
-// RUN: %target-build-swift %s -I %t -Xfrontend -lsuperclass_methods -L %t -Xfrontend -enable-resilience -o %t/main
-// RUN: %t/main | FileCheck --check-prefix=BEFORE %s
-// RUN: %target-build-swift -c -emit-module -emit-library -module-name superclass_methods -emit-module-path %t/superclass_methods.swiftmodule -Xfrontend -enable-resilience -D AFTER %S/Inputs/superclass_methods.swift -o %t/libsuperclass_methods.dylib
-// RUN: %t/main | FileCheck --check-prefix=AFTER %s
+// RUN: rm -rf %t && mkdir -p %t/before && mkdir -p %t/after
+// RUN: %target-build-swift -emit-module -emit-library -module-name superclass_methods -emit-module-path %t/superclass_methods.swiftmodule -Xfrontend -enable-resilience -D BEFORE %S/Inputs/superclass_methods.swift -o %t/before/superclass_methods.o
+// RUN: %target-build-swift -c %s -I %t -Xfrontend -enable-resilience -o %t/main.o
+// RUN: %target-build-swift %t/before/superclass_methods.o %t/main.o -o %t/before/main
+// RUN: %t/before/main | FileCheck --check-prefix=BEFORE %s
+// RUN: %target-build-swift -emit-module -emit-library -module-name superclass_methods -emit-module-path %t/superclass_methods.swiftmodule -Xfrontend -enable-resilience -D AFTER %S/Inputs/superclass_methods.swift -o %t/after/superclass_methods.o
+// RUN: %target-build-swift %t/after/superclass_methods.o %t/main.o -o %t/after/main -v
+// RUN: %t/after/main | FileCheck --check-prefix=AFTER %s
 
 import superclass_methods
 
