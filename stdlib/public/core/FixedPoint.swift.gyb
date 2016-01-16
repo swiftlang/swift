@@ -244,8 +244,10 @@ public struct ${Self}
   /// byte order if necessary.
   @_transparent public
   init(bigEndian value: ${Self}) {
-#if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
+#if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64) || arch(powerpc64le)
     self = ${Self}(Builtin.int_bswap_${BuiltinName}(value._value) )
+#elseif arch(powerpc64)
+    self = value
 #else
     _UnsupportedArchitectureError()
 #endif
@@ -255,8 +257,10 @@ public struct ${Self}
   /// byte order if necessary.
   @_transparent public
   init(littleEndian value: ${Self}) {
-#if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
+#if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64) || arch(powerpc64le)
     self = value
+#elseif arch(powerpc64)
+    self = ${Self}(Builtin.int_bswap_${BuiltinName}(value._value) )
 #else
     _UnsupportedArchitectureError()
 #endif
@@ -278,8 +282,10 @@ public struct ${Self}
   /// Returns the big-endian representation of the integer, changing the
   /// byte order if necessary.
   public var bigEndian: ${Self} {
-#if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
+#if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64) || arch(powerpc64le)
     return ${Self}(Builtin.int_bswap_${BuiltinName}(_value))
+#elseif arch(powerpc64)
+    return self
 #else
     _UnsupportedArchitectureError()
 #endif
@@ -287,8 +293,10 @@ public struct ${Self}
   /// Returns the little-endian representation of the integer, changing the
   /// byte order if necessary.
   public var littleEndian: ${Self} {
-#if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
+#if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64) || arch(powerpc64le)
     return self
+#elseif arch(powerpc64)
+    return ${Self}(Builtin.int_bswap_${BuiltinName}(_value))
 #else
     _UnsupportedArchitectureError()
 #endif

@@ -858,7 +858,7 @@ public protocol FloatingPointInterchangeType: FloatingPointType {
 
 extension FloatingPointInterchangeType {
   public init(littleEndian encoding: BitPattern) {
-#if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
+#if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64) || arch(powerpc64le)
     self = unsafeBitCast(encoding, Self.self)
 #else
     _UnsupportedArchitectureError()
@@ -868,7 +868,7 @@ extension FloatingPointInterchangeType {
     fatalError("TODO: with low-level generic integer type support for bswap.")
   }
   public var littleEndian: BitPattern {
-#if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
+#if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64) || arch(powerpc64le)
     return unsafeBitCast(self, BitPattern.self)
 #else
     _UnsupportedArchitectureError()

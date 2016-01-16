@@ -32,7 +32,7 @@ func testAnonEnum() {
   a = AnonConst2
 #if arch(i386) || arch(arm)
   _ = a as CUnsignedLongLong
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
   _ = a as CUnsignedLong
 #else
   __portMe()

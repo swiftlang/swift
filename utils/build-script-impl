@@ -30,7 +30,7 @@ umask 0022
 # need to change any of these, you should do so on trunk or in a branch.
 #
 
-LLVM_TARGETS_TO_BUILD="X86;ARM;AArch64"
+LLVM_TARGETS_TO_BUILD="X86;ARM;AArch64;PowerPC"
 
 #
 # End of configurable options.
@@ -220,6 +220,12 @@ function set_deployment_target_based_options() {
             ;;
         freebsd-x86_64)
             SWIFT_HOST_VARIANT_ARCH="x86_64"
+            ;;
+        linux-powerpc64)
+            SWIFT_HOST_VARIANT_ARCH="powerpc64"
+            ;;
+        linux-powerpc64le)
+            SWIFT_HOST_VARIANT_ARCH="powerpc64le"
             ;;
         macosx-* | iphoneos-* | iphonesimulator-* | \
           appletvos-* | appletvsimulator-* | \
@@ -753,6 +759,16 @@ case "$(uname -s -m)" in
             "linux-aarch64"
         )
         ;;
+    Linux\ ppc64)
+        NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
+            "linux-powerpc64"
+        )
+        ;;
+    Linux\ ppc64le)
+        NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
+            "linux-powerpc64le"
+        )
+        ;;
     Darwin\ x86_64)
         NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
             "macosx-x86_64"
@@ -816,6 +832,16 @@ case "$(uname -s -m)" in
     Linux\ aarch64)
         STDLIB_DEPLOYMENT_TARGETS=(
             "linux-aarch64"
+        )
+        ;;
+    Linux\ ppc64)
+        STDLIB_DEPLOYMENT_TARGETS=(
+            "linux-powerpc64"
+        )
+        ;;
+    Linux\ ppc64le)
+        STDLIB_DEPLOYMENT_TARGETS=(
+            "linux-powerpc64le"
         )
         ;;
     Darwin\ x86_64)
