@@ -76,11 +76,6 @@ namespace irgen {
   void emitMetatypeRef(IRGenFunction &IGF, CanMetatypeType type,
                        Explosion &explosion);
 
-  /// If true, we lazily initialize metadata at runtime because the layout
-  /// is only partially known. Otherwise, we can emit a direct reference a
-  /// constant metadata symbol.
-  bool hasMetadataPattern(IRGenModule &IGM, NominalTypeDecl *theDecl);
-
   /// Emit a reference to a compile-time constant piece of type metadata, or
   /// return a null pointer if the type's metadata cannot be represented by a
   /// constant.
