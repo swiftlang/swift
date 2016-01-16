@@ -814,11 +814,11 @@ StringTests.test("toInt") {
   }
 
   testConvertabilityOfStringWithModification(Int.min) {
-    $0[2]++; ()  // underflow by lots
+    $0[2] += 1; ()  // underflow by lots
   }
 
   testConvertabilityOfStringWithModification(Int.max) {
-    $0[1]++; ()  // overflow by lots
+    $0[1] += 1; ()  // overflow by lots
   }
 
   // Test values lower than min.
