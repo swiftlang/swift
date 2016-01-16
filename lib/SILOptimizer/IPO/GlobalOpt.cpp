@@ -346,7 +346,7 @@ static bool isAvailabilityCheck(SILBasicBlock *BB) {
   if (!F || !F->hasSemanticsAttrs())
     return false;
 
-  return F->hasSemanticsAttrsThatStartsWith("availability");
+  return F->hasSemanticsAttrThatStartsWith("availability");
 }
 
 /// Returns true if there are any availability checks along the dominator tree

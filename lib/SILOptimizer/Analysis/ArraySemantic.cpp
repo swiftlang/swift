@@ -111,7 +111,7 @@ swift::ArraySemanticsCall::ArraySemanticsCall(ValueBase *V,
   if (auto *AI = dyn_cast<ApplyInst>(V))
     if (auto *Fn = AI->getCalleeFunction())
       if ((MatchPartialName &&
-           Fn->hasSemanticsAttrsThatStartsWith(SemanticStr)) ||
+           Fn->hasSemanticsAttrThatStartsWith(SemanticStr)) ||
           (!MatchPartialName && Fn->hasSemanticsAttr(SemanticStr))) {
         SemanticsCall = AI;
         // Need a 'self' argument otherwise this is not a semantic call that
