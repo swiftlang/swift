@@ -5,8 +5,9 @@ import itertools
 traversal_options = [ 'Forward', 'Bidirectional', 'RandomAccess' ]
 base_kind_options = [ 'Defaulted', 'Minimal' ]
 mutable_options = [ False, True ]
-for traversal, base_kind, mutable in itertools.product(
-    traversal_options, base_kind_options, mutable_options):
+for traversal, base_kind, mutable in itertools.product(traversal_options,
+                                                       base_kind_options,
+                                                       mutable_options):
     # Test Slice<Base> and MutableSlice<Base> of various collections using value
     # types as elements.
     wrapper_types = [ 'Slice', 'MutableSlice' ] if mutable else [ 'Slice' ]

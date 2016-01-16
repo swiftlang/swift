@@ -400,9 +400,9 @@ functionList = [
 
 #  ("sourcekitd_send_request",
 
-   ("sourcekitd_send_request_sync",
-    [Object],
-    c_object_p),
+  ("sourcekitd_send_request_sync",
+  	[Object],
+  	c_object_p),
 
   # ("sourcekitd_set_interrupted_connection_handler",
 
@@ -426,8 +426,8 @@ functionList = [
   	c_char_p),
 
   ("sourcekitd_variant_array_apply_f",
-    [Variant, callbacks['array_applier'], py_object],
-    c_bool),
+  	[Variant, callbacks['array_applier'], py_object],
+  	c_bool),
 
 
   ("sourcekitd_variant_array_get_bool",
@@ -459,8 +459,8 @@ functionList = [
   	c_bool),
 
   ("sourcekitd_variant_dictionary_apply_f",
-    [Variant, callbacks['dictionary_applier'], py_object],
-    c_bool),
+  	[Variant, callbacks['dictionary_applier'], py_object],
+  	c_bool),
 
   ("sourcekitd_variant_dictionary_get_bool",
   	[Variant, UIdent],
@@ -501,7 +501,7 @@ functionList = [
   ("sourcekitd_variant_uid_get_value",
   	[Variant],
   	c_object_p),
-  ]
+]
 
 
 class LibsourcekitdError(Exception):

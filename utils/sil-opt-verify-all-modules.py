@@ -52,7 +52,7 @@ def get_verify_build_dir_commands(build_dir, toolchain_name='XcodeDefault'):
 
 
 def get_verify_resource_dir_modules_commands(
-    resource_dir, sil_opt, toolchain_name):
+        resource_dir, sil_opt, toolchain_name):
     print("================================================================")
     print("Resource dir: " + resource_dir)
     print("sil-opt path: " + sil_opt)

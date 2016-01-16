@@ -142,6 +142,7 @@ class Trie:
   def generateHeader(self):
     return "// Returns the index of the longest substring in \p str that's shorter than \p n.\n" +\
            "int matchStringSuffix(const char* str, int n) {"
+
   def generateFooter(self):
     return "return -1; \n}"
 

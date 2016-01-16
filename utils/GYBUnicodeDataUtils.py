@@ -257,8 +257,9 @@ class UnicodeTrieGenerator(object):
 
         # An array of BMP data blocks.
         self.BMP_data = [
-            [ -1 for i in range(0, 1 << self.BMP_data_offset_bits) ]
-                for i in range(0, 1 << self.BMP_first_level_index_bits) ]
+            [-1 for i in range(0, 1 << self.BMP_data_offset_bits)]
+            for i in range(0, 1 << self.BMP_first_level_index_bits)
+        ]
 
         # A mapping from supp first-level index to an index of the second-level
         # lookup table.
@@ -268,13 +269,15 @@ class UnicodeTrieGenerator(object):
         # table is a mapping from a supp second-level index to supp data block
         # index.
         self.supp_lookup2 = [
-            [ j for j in range(i << self.supp_second_level_index_bits, (i + 1) << self.supp_second_level_index_bits) ]
-                for i in range(0, self.supp_first_level_index_max + 1) ]
+            [j for j in range(i << self.supp_second_level_index_bits, (i + 1) << self.supp_second_level_index_bits)]
+            for i in range(0, self.supp_first_level_index_max + 1)
+        ]
 
         # An array of supp data blocks.
         self.supp_data = [
-            [ -1 for i in range(0, 1 << self.supp_data_offset_bits) ]
-                for i in range(0, (self.supp_first_level_index_max + 1) * (1 << self.supp_second_level_index_bits)) ]
+            [-1 for i in range(0, 1 << self.supp_data_offset_bits)]
+            for i in range(0, (self.supp_first_level_index_max + 1) * (1 << self.supp_second_level_index_bits))
+        ]
 
     def splat(self, value):
         for i in range(0, len(self.BMP_data)):
@@ -602,4 +605,3 @@ def get_grapheme_cluster_break_tests_as_unicode_scalars(grapheme_break_test_file
                 result += [ test ]
 
     return result
-

@@ -104,4 +104,3 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
 
 if __name__ == "__main__":
     sys.exit(main())
-
