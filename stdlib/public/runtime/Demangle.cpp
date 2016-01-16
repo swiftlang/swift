@@ -4,8 +4,8 @@
 #include "Private.h"
 
 #if SWIFT_OBJC_INTEROP
-
 #include <objc/runtime.h>
+#endif
 
 // Build a demangled type tree for a nominal type.
 static Demangle::NodePointer
@@ -25,7 +25,10 @@ _buildDemanglingForNominalType(Demangle::Node::Kind boundGenericKind,
                  typeBytes + sizeof(void*) * description->GenericParams.Offset);
     for (unsigned i = 0, e = description->GenericParams.NumPrimaryParams;
          i < e; ++i, ++genericParam) {
-      typeParams->addChild(_swift_buildDemanglingForMetadata(*genericParam));
+      auto demangling = _swift_buildDemanglingForMetadata(*genericParam);
+      if (demangling == nullptr)
+        return nullptr;
+      typeParams->addChild(demangling);
     }
 
     auto genericNode = NodeFactory::create(boundGenericKind);
@@ -224,5 +227,3 @@ Demangle::NodePointer swift::_swift_buildDemanglingForMetadata(const Metadata *t
   // Not a type.
   return nullptr;
 }
-
-#endif
