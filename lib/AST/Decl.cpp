@@ -1335,14 +1335,18 @@ bool AbstractStorageDecl::hasFixedLayout() const {
   if (getFormalAccess() != Accessibility::Public)
     return true;
 
+  // Check for an explicit @_fixed_layout attribute.
+  if (getAttrs().hasAttribute<FixedLayoutAttr>())
+    return true;
+
   // If we're in a nominal type, just query the type.
   auto nominal = getDeclContext()->isNominalTypeOrNominalTypeExtensionContext();
   if (nominal)
     return nominal->hasFixedLayout();
 
-  // FIXME: Must use resilient access patterns.
+  // Must use resilient access patterns.
   assert(getDeclContext()->isModuleScopeContext());
-  return true;
+  return false;
 }
 
 

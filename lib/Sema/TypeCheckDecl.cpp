@@ -224,8 +224,8 @@ static void addImplicitConformances(
 }
 
 /// Check that the declaration attributes are ok.
-static void validateAttributes(TypeChecker &TC, Decl *VD);
-static void validateFixedLayoutAttribute(TypeChecker &TC, NominalTypeDecl *D);
+static void validateAttributes(TypeChecker &TC, Decl *D);
+static void validateFixedLayoutAttribute(TypeChecker &TC, ValueDecl *D);
 
 void TypeChecker::resolveSuperclass(ClassDecl *classDecl) {
   IterativeTypeChecker ITC(*this);
@@ -5888,6 +5888,10 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         validateDecl(setter);
     }
 
+    // If this is a global variable, propagate @_fixed_layout from the module
+    // to the decl.
+    validateFixedLayoutAttribute(*this, VD);
+
     // Synthesize accessors as necessary.
     maybeAddAccessorsToVariable(VD, *this);
 
@@ -6845,11 +6849,20 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
 }
 
 static void validateFixedLayoutAttribute(TypeChecker &TC,
-                                         NominalTypeDecl *D) {
-  DeclAttributes &Attrs = D->getAttrs();
+                                         ValueDecl *D) {
+  assert(isa<NominalTypeDecl>(D) || isa<VarDecl>(D));
 
-  // FIXME: Add a per-module serialized HasFixedLayout flag, instead of
-  // giving every decl this attribute.
+  // FIXME: Add a per-module serialized HasFixedLayout flag to establish
+  // a default convention for decls which do not specify @_fixed_layout,
+  // which would let us remove this function.
+
+  // Non-global stored properties don't need this.
+  if (isa<VarDecl>(D) &&
+      !D->getDeclContext()->isModuleScopeContext()) {
+    return;
+  }
+
+  DeclAttributes &Attrs = D->getAttrs();
 
   if (Attrs.hasAttribute<FixedLayoutAttr>() ||
       TC.Context.LangOpts.EnableResilience)

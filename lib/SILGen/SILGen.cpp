@@ -907,6 +907,15 @@ void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
 void SILGenModule::visitVarDecl(VarDecl *vd) {
   if (vd->hasStorage())
     addGlobalVariable(vd);
+
+  if (vd->getStorageKind() == AbstractStorageDecl::StoredWithTrivialAccessors) {
+    // If the global variable has storage, it might also have synthesized
+    // accessors. Emit them here, since they won't appear anywhere else.
+    if (auto getter = vd->getGetter())
+      emitFunction(getter);
+    if (auto setter = vd->getSetter())
+      emitFunction(setter);
+  }
 }
 
 void SILGenModule::visitIfConfigDecl(IfConfigDecl *ICD) {

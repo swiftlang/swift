@@ -7,3 +7,5 @@ public struct EmptyResilientStruct {
 }
 
 public var emptyGlobal = EmptyResilientStruct()
+
+@_fixed_layout public var fixedLayoutGlobal = EmptyResilientStruct()

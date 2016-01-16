@@ -33,13 +33,17 @@ const bool IsImplicit = true;
 /// decl is specified, the new decl is inserted next to the hint.
 static void addMemberToContextIfNeeded(Decl *D, DeclContext *DC,
                                        Decl *Hint = nullptr) {
-  if (auto *ntd = dyn_cast<NominalTypeDecl>(DC))
+  if (auto *ntd = dyn_cast<NominalTypeDecl>(DC)) {
     ntd->addMember(D, Hint);
-  else if (auto *ed = dyn_cast<ExtensionDecl>(DC))
+  } else if (auto *ed = dyn_cast<ExtensionDecl>(DC)) {
     ed->addMember(D, Hint);
-  else
+  } else if (isa<SourceFile>(DC)) {
+    auto *mod = DC->getParentModule();
+    mod->getDerivedFileUnit().addDerivedDecl(cast<FuncDecl>(D));
+  } else {
     assert((isa<AbstractFunctionDecl>(DC) || isa<FileUnit>(DC)) &&
            "Unknown declcontext");
+  }
 }
 
 static ParamDecl *getParamDeclAtIndex(FuncDecl *fn, unsigned index) {

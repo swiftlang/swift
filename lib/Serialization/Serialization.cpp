@@ -3693,6 +3693,18 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
           .push_back({ getStableFixity(OD->getKind()), addDeclRef(D) });
       }
 
+      // If this is a global variable, force the accessors to be
+      // serialized.
+      if (auto VD = dyn_cast<VarDecl>(D)) {
+        if (VD->getGetter())
+          addDeclRef(VD->getGetter());
+        if (VD->getSetter())
+          addDeclRef(VD->getSetter());
+      }
+
+      // If this nominal type has assocaited top-level decls for a
+      // derived conformance (for example, ==), force them to be
+      // serialized.
       if (auto IDC = dyn_cast<IterableDeclContext>(D)) {
         addOperatorsAndTopLevel(*this, IDC->getMembers(),
                                 operatorMethodDecls, topLevelDecls,
