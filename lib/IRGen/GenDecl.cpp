@@ -1839,9 +1839,14 @@ getTypeEntityInfo(IRGenModule &IGM,
 
   auto nom = conformingType->getAnyNominal();
   if (IGM.hasMetadataPattern(nom)) {
-    assert(allowUnboundGenericTypes || isa<BoundGenericType>(conformingType));
-    // Conformances for generics are represented by referencing the metadata
-    // pattern for the generic type.
+    // Conformances for generics, concrete subclasses of generics, and
+    // resiliently-sized types are represented by referencing the
+    // metadata pattern.
+    //
+    // FIXME: this is wrong if the conforming type is a resilient type from
+    // another module. In that case, we don't know if we require runtime
+    // metadata instantiation or not, and instead, we need a way to reference
+    // the metadata accessor function from the conformance table.
     typeKind = TypeMetadataRecordKind::UniqueGenericPattern;
     entity = LinkEntity::forTypeMetadata(
                          nom->getDeclaredType()->getCanonicalType(),
@@ -1871,7 +1876,7 @@ getTypeEntityInfo(IRGenModule &IGM,
       defaultTy = IGM.TypeMetadataStructTy;
       defaultPtrTy = IGM.TypeMetadataPtrTy;
     }
-  } else if (auto nom = conformingType->getNominalOrBoundGenericNominal()) {
+  } else {
     // Metadata for Clang types should be uniqued like foreign classes.
     if (nom->hasClangNode()) {
       typeKind = TypeMetadataRecordKind::NonuniqueDirectType;
@@ -1889,9 +1894,6 @@ getTypeEntityInfo(IRGenModule &IGM,
       defaultTy = IGM.TypeMetadataStructTy;
       defaultPtrTy = IGM.TypeMetadataPtrTy;
     }
-  } else {
-    // TODO: Universal and/or structural conformances
-    llvm_unreachable("unhandled protocol conformance");
   }
 
   auto flags = ProtocolConformanceFlags().withTypeKind(typeKind);

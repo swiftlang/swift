@@ -18,7 +18,11 @@ var ResilientClassTestSuite = TestSuite("ResilientClass")
 
 // Concrete class with resilient stored property
 
-public class ClassWithResilientProperty {
+protocol ProtocolWithResilientProperty {
+  var s: Size { get }
+}
+
+public class ClassWithResilientProperty : ProtocolWithResilientProperty {
   public let p: Point
   public let s: Size
   public let color: Int32
@@ -28,6 +32,10 @@ public class ClassWithResilientProperty {
     self.s = s
     self.color = color
   }
+}
+
+@inline(never) func getS(p: ProtocolWithResilientProperty) -> Size {
+  return p.s
 }
 
 ResilientClassTestSuite.test("ClassWithResilientProperty") {
@@ -42,7 +50,11 @@ ResilientClassTestSuite.test("ClassWithResilientProperty") {
   expectEqual(c.s.h, 40)
   expectEqual(c.color, 50)
   expectTrue(_typeByName("main.ClassWithResilientProperty")
-    == ClassWithResilientProperty.self)
+             == ClassWithResilientProperty.self)
+
+  // Make sure the conformance works
+  expectEqual(getS(c).w, 30)
+  expectEqual(getS(c).h, 40)
 }
 
 
