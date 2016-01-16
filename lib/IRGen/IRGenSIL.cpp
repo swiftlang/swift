@@ -1607,9 +1607,11 @@ void IRGenSILFunction::visitAllocGlobalInst(AllocGlobalInst *i) {
   SILType loweredTy = var->getLoweredType();
   auto &ti = getTypeInfo(loweredTy);
 
-  // If the type is universally fixed-size, we allocated storage for it
-  // statically, and there's nothing to do.
-  if (ti.isFixedSize(ResilienceExpansion::Minimal))
+  auto expansion = IGM.getResilienceExpansionForLayout(var);
+
+  // If the global is fixed-size in all resilience domains that can see it,
+  // we allocated storage for it statically, and there's nothing to do.
+  if (ti.isFixedSize(expansion))
     return;
 
   // Otherwise, the static storage for the global consists of a fixed-size
@@ -1625,9 +1627,11 @@ void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
   assert(loweredTy == i->getType().getObjectType());
   auto &ti = getTypeInfo(loweredTy);
   
-  // If the variable is empty in all resilience domains, don't
-  // actually emit a symbol for the global at all, just return undef.
-  if (ti.isKnownEmpty(ResilienceExpansion::Minimal)) {
+  auto expansion = IGM.getResilienceExpansionForLayout(var);
+
+  // If the variable is empty in all resilience domains that can see it,
+  // don't actually emit a symbol for the global at all, just return undef.
+  if (ti.isKnownEmpty(expansion)) {
     setLoweredAddress(SILValue(i, 0), ti.getUndefAddress());
     return;
   }
@@ -1635,9 +1639,9 @@ void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
   Address addr = IGM.getAddrOfSILGlobalVariable(var, ti,
                                                 NotForDefinition);
 
-  // If the type is universally fixed-size, we allocated storage for it
-  // statically, and there's nothing to do.
-  if (ti.isFixedSize(ResilienceExpansion::Minimal)) {
+  // If the global is fixed-size in all resilience domains that can see it,
+  // we allocated storage for it statically, and there's nothing to do.
+  if (ti.isFixedSize(expansion)) {
     setLoweredAddress(SILValue(i, 0), addr);
     return;
   }

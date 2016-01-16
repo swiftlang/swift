@@ -526,6 +526,7 @@ public:
   bool isResilient(Decl *decl, ResilienceExpansion expansion);
   ResilienceExpansion getResilienceExpansionForAccess(NominalTypeDecl *decl);
   ResilienceExpansion getResilienceExpansionForLayout(NominalTypeDecl *decl);
+  ResilienceExpansion getResilienceExpansionForLayout(SILGlobalVariable *var);
 
   SpareBitVector getSpareBitsForType(llvm::Type *scalarTy, Size size);
   

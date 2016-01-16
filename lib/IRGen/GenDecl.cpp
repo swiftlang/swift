@@ -1467,6 +1467,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
                                                 const TypeInfo &ti,
                                                 ForDefinition_t forDefinition) {
   LinkEntity entity = LinkEntity::forSILGlobalVariable(var);
+  ResilienceExpansion expansion = getResilienceExpansionForLayout(var);
 
   llvm::Type *storageType;
   Size fixedSize;
@@ -1475,7 +1476,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
   // If the type has a fixed size, allocate static storage. Otherwise, allocate
   // a fixed-size buffer and possibly heap-allocate a payload at runtime if the
   // runtime size of the type does not fit in the buffer.
-  if (ti.isFixedSize(ResilienceExpansion::Minimal)) {
+  if (ti.isFixedSize(expansion)) {
     auto &fixedTI = cast<FixedTypeInfo>(ti);
 
     storageType = fixedTI.getStorageType();
@@ -2814,6 +2815,15 @@ IRGenModule::getResilienceExpansionForLayout(NominalTypeDecl *decl) {
     return ResilienceExpansion::Maximal;
 
   return getResilienceExpansionForAccess(decl);
+}
+
+// The most general resilience expansion which has knowledge of the global
+// variable's layout.
+ResilienceExpansion
+IRGenModule::getResilienceExpansionForLayout(SILGlobalVariable *global) {
+  if (hasPublicVisibility(global->getLinkage()))
+    return ResilienceExpansion::Minimal;
+  return ResilienceExpansion::Maximal;
 }
 
 llvm::Constant *IRGenModule::
