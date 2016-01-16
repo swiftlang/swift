@@ -2778,6 +2778,12 @@ public:
 
   /// \brief Does this declaration expose a fixed layout to all resilience
   /// domains?
+  ///
+  /// For structs, this means clients can assume the number and order of
+  /// stored properties will not change.
+  ///
+  /// For enums, this means clients can assume the number and order of
+  /// cases will not change.
   bool hasFixedLayout() const;
 
   /// \brief Does this declaration expose a fixed layout to the given
@@ -4012,6 +4018,20 @@ public:
   /// Determine how this storage declaration should actually be accessed.
   AccessStrategy getAccessStrategy(AccessSemantics semantics,
                                    AccessKind accessKind) const;
+
+  /// \brief Does this declaration expose a fixed layout to all resilience
+  /// domains?
+  ///
+  /// Roughly speaking, this means we can make assumptions about whether
+  /// the storage is stored or computed, and if stored, the precise access
+  /// pattern to be used.
+  bool hasFixedLayout() const;
+
+  /// \brief Does this declaration expose a fixed layout to the given
+  /// module?
+  bool hasFixedLayout(ModuleDecl *M) const {
+    return (hasFixedLayout() || M == getModuleContext());
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

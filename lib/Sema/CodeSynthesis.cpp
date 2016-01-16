@@ -681,16 +681,16 @@ static void createPropertyStoreOrCallSuperclassSetter(FuncDecl *accessor,
 /// accessor as transparent, since in this case we just want it for abstraction
 /// purposes (i.e., to make access to the variable uniform and to be able to
 /// put the getter in a vtable).
+///
+/// If the storage is for a global stored property or a stored property of a
+/// resilient type, we are synthesizing accessors to present a resilient
+/// interface to the storage and they should not be transparent.
 static void maybeMarkTransparent(FuncDecl *accessor,
                                  AbstractStorageDecl *storage,
                                  TypeChecker &TC) {
-  auto *NTD = storage->getDeclContext()
+  auto *nominal = storage->getDeclContext()
       ->isNominalTypeOrNominalTypeExtensionContext();
-
-  // FIXME: resilient global variables
-  if (!NTD ||
-      NTD->hasFixedLayout() ||
-      (isa<ClassDecl>(NTD) && NTD->getClangDecl()))
+  if (nominal && nominal->hasFixedLayout())
     accessor->getAttrs().add(new (TC.Context) TransparentAttr(IsImplicit));
 }
 
@@ -819,17 +819,21 @@ void swift::addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
     TC.typeCheckDecl(setter, false);
   }
 
-  // We've added some members to our containing type, add them to the
-  // members list.
-  addMemberToContextIfNeeded(getter, storage->getDeclContext());
-  if (setter)
-    addMemberToContextIfNeeded(setter, storage->getDeclContext());
+  auto *DC = storage->getDeclContext();
 
-  // Always add a materializeForSet when we're creating trivial
-  // accessors for a mutable stored property.  We only do this when we
-  // need to be able to access something polymorphically, and we always
-  // want a materializeForSet in such situations.
-  if (setter) {
+  // We've added some members to our containing context, add them to
+  // the right list.
+  addMemberToContextIfNeeded(getter, DC);
+  if (setter)
+    addMemberToContextIfNeeded(setter, DC);
+
+  // If we're creating trivial accessors for a stored property of a
+  // nominal type, the stored property is either witnessing a
+  // protocol requirement or the nominal type is resilient. In both
+  // cases, we need to expose a materializeForSet.
+  //
+  // Global stored properties don't get a materializeForSet.
+  if (setter && DC->isNominalTypeOrNominalTypeExtensionContext()) {
     FuncDecl *materializeForSet = addMaterializeForSet(storage, TC);
     synthesizeMaterializeForSet(materializeForSet, storage, TC);
     TC.typeCheckDecl(materializeForSet, false);
@@ -1281,10 +1285,18 @@ void swift::maybeAddMaterializeForSet(AbstractStorageDecl *storage,
 }
 
 void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
-  if (var->getGetter() || var->isBeingTypeChecked() || isa<ParamDecl>(var))
+  // If we've already synthesized accessors or are currently in the process
+  // of doing so, don't proceed.
+  if (var->getGetter() || var->isBeingTypeChecked())
     return;
 
-  // Lazy properties get accessors.
+  // Local variables don't get accessors.
+  if(var->getDeclContext()->isLocalContext())
+    return;
+
+  assert(!var->hasAccessorFunctions());
+
+  // Lazy properties require special handling.
   if (var->getAttrs().hasAttribute<LazyAttr>()) {
     var->setIsBeingTypeChecked();
 
@@ -1306,41 +1318,35 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
     addMemberToContextIfNeeded(getter, var->getDeclContext());
     addMemberToContextIfNeeded(setter, var->getDeclContext());
     return;
-
   }
-  // Stored properties in SIL mode don't get auto-synthesized accessors.
-  bool isInSILMode = false;
-  if (auto sourceFile = var->getDeclContext()->getParentSourceFile())
-    isInSILMode = sourceFile->Kind == SourceFileKind::SIL;
 
-  auto nominal = var->getDeclContext()->isNominalTypeOrNominalTypeExtensionContext();
-  if (var->hasAccessorFunctions() ||
-      var->isImplicit() ||
-      nominal == nullptr)
+  // Implicit properties don't get accessors.
+  if (var->isImplicit())
     return;
 
-  // Non-NSManaged class instance variables get accessors, because it affects
-  // vtable layout.
-  if (isa<ClassDecl>(nominal)) {
+  // NSManaged properties on classes require special handling.
+  if (var->getDeclContext()->isClassOrClassExtensionContext()) {
     if (var->getAttrs().hasAttribute<NSManagedAttr>()) {
       var->setIsBeingTypeChecked();
       convertNSManagedStoredVarToComputed(var, TC);
       var->setIsBeingTypeChecked(false);
-    } else if (!isInSILMode) {
-      var->setIsBeingTypeChecked();
-      addTrivialAccessorsToStorage(var, TC);
-      var->setIsBeingTypeChecked(false);
+      return;
     }
+  } else {
+    // Fixed-layout properties don't get accessors.
+    if (var->hasFixedLayout())
+      return;
   }
 
-  // Public instance variables of resilient structs get accessors.
-  if (auto structDecl = dyn_cast<StructDecl>(nominal)) {
-    if (!structDecl->hasFixedLayout() && !isInSILMode) {
-      var->setIsBeingTypeChecked();
-      addTrivialAccessorsToStorage(var, TC);
-      var->setIsBeingTypeChecked(false);
-    }
-  }
+  // Stored properties in SIL mode don't get accessors.
+  if (auto sourceFile = var->getDeclContext()->getParentSourceFile())
+    if (sourceFile->Kind == SourceFileKind::SIL)
+      return;
+
+  // Everything else gets accessors.
+  var->setIsBeingTypeChecked();
+  addTrivialAccessorsToStorage(var, TC);
+  var->setIsBeingTypeChecked(false);
 }
 
 /// \brief Create an implicit struct or class constructor.
