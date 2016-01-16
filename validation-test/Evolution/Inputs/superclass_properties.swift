@@ -1,3 +1,11 @@
+public func getVersion() -> Int {
+#if BEFORE
+  return 0
+#else
+  return 1
+#endif
+}
+
 public class Base {
   public init() {}
   public var property: String {
