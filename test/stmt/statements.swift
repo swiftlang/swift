@@ -266,7 +266,7 @@ func RepeatWhileStmt1() {
 }
 
 func RepeatWhileStmt2() {
-  repeat // expected-error {{expected '{' after 'repeat'}}
+  repeat // expected-error {{expected '{' after 'repeat'}} expected-error {{expected 'while' after body of 'repeat' statement}}
 }
 
 func RepeatWhileStmt4() {

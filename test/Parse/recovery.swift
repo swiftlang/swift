@@ -131,6 +131,12 @@ func missingControllingExprInRepeatWhile() {
   } while { true }() // expected-error{{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{10-10=;}}
 }
 
+// SR-165
+func missingWhileInRepeat() {
+  repeat {
+  } // expected-error {{expected 'while' after body of 'repeat' statement}}
+}
+
 // expected-note @+1 {{in call to function 'acceptsClosure'}}
 func acceptsClosure<T>(t: T) -> Bool { return true }
 
