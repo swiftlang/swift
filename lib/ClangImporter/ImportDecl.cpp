@@ -1102,18 +1102,12 @@ StringRef ClangImporter::Implementation::getCFTypeName(
 
   if (auto pointee = CFPointeeInfo::classifyTypedef(decl)) {
     auto name = decl->getName();
-    if (pointee.isRecord()) {
+    if (pointee.isRecord() || pointee.isTypedef()) {
       auto resultName = getImportedCFTypeName(name);
       if (secondaryName && name != resultName)
         *secondaryName = name;
 
       return resultName;
-    }
-
-    if (pointee.isTypedef() && secondaryName) {
-      StringRef otherName = getImportedCFTypeName(name);
-      if (otherName != name) 
-        *secondaryName = otherName;
     }
 
     return name;

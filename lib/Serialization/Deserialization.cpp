@@ -1051,6 +1051,8 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
     if (!isType)
       pathTrace.addType(filterTy);
 
+    bool retrying = false;
+    retry:
     M->lookupQualified(ModuleType::get(M), name,
                        NL_QualifiedDefault | NL_KnownNoDependency,
                        /*typeResolver=*/nullptr, values);
