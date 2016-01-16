@@ -418,6 +418,19 @@ bb0(%0 : $*Interval):
   return %4 : $(Builtin.Int32)
 }
 
+// CHECK-LABEL: sil @project_box_test
+// CHECK: project_box %0 : $@box Builtin.Int32
+// CHECK-NOT: project_box
+// CHECK: return
+sil @project_box_test : $(@box Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $@box Builtin.Int32):
+  %1 = project_box %0 : $@box Builtin.Int32
+  %2 = project_box %0 : $@box Builtin.Int32
+  %3 = function_ref @sadd_with_address : $@convention(thin) (@inout Builtin.Int32, @inout Builtin.Int32) -> (Builtin.Int32)
+  %4 = apply %3(%1, %2) : $@convention(thin) (@inout Builtin.Int32, @inout Builtin.Int32) -> (Builtin.Int32)
+  return %4 : $(Builtin.Int32)
+}
+
 sil @tuple_function : $@convention(thin) ((Builtin.Int32, Builtin.Int32), (Builtin.Int32, Builtin.Int32)) -> (Builtin.Int32)
 
 // CHECK-LABEL: tuple_test
