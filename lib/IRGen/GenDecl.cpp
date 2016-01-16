@@ -1750,19 +1750,19 @@ getTypeEntityForProtocolConformanceRecord(IRGenModule &IGM,
     = ProtocolConformanceReferenceKind::WitnessTable;
 
   auto conformingType = conformance->getType()->getCanonicalType();
-  if (auto bgt = dyn_cast<BoundGenericType>(conformingType)) {
+  auto conformingNominal = conformingType->getAnyNominal();
+  if (hasMetadataPattern(IGM, conformingNominal)) {
     // Conformances for generics are represented by referencing the metadata
     // pattern for the generic type.
     typeKind = ProtocolConformanceTypeKind::UniqueGenericPattern;
     entity = LinkEntity::forTypeMetadata(
-                         bgt->getDecl()->getDeclaredType()->getCanonicalType(),
+                         conformingNominal->getDeclaredType()->getCanonicalType(),
                          TypeMetadataAddress::AddressPoint,
                          /*isPattern*/ true);
     defaultTy = IGM.TypeMetadataPatternStructTy;
     defaultPtrTy = IGM.TypeMetadataPatternPtrTy;
-  } else if (auto ct = dyn_cast<ClassType>(conformingType)) {
-    auto clas = ct->getDecl();
-    if (clas->isForeign()) {
+  } else if (auto classDecl = dyn_cast<ClassDecl>(conformingNominal)) {
+    if (classDecl->isForeign()) {
       typeKind = ProtocolConformanceTypeKind::NonuniqueDirectType;
       entity = LinkEntity::forForeignTypeMetadataCandidate(conformingType);
       defaultTy = IGM.TypeMetadataStructTy;
@@ -1772,19 +1772,19 @@ getTypeEntityForProtocolConformanceRecord(IRGenModule &IGM,
       // reference the class object, which is totally wrong for ObjC interop.
 
       typeKind = ProtocolConformanceTypeKind::UniqueDirectClass;
-      if (hasKnownSwiftMetadata(IGM, clas))
+      if (hasKnownSwiftMetadata(IGM, classDecl))
         entity = LinkEntity::forTypeMetadata(
                          conformingType,
                          TypeMetadataAddress::AddressPoint,
                          /*isPattern*/ false);
       else
-        entity = LinkEntity::forObjCClass(clas);
+        entity = LinkEntity::forObjCClass(classDecl);
       defaultTy = IGM.TypeMetadataStructTy;
       defaultPtrTy = IGM.TypeMetadataPtrTy;
     }
-  } else if (auto nom = conformingType->getNominalOrBoundGenericNominal()) {
+  } else if (conformingNominal) {
     // Metadata for Clang types should be uniqued like foreign classes.
-    if (nom->hasClangNode()) {
+    if (conformingNominal->hasClangNode()) {
       typeKind = ProtocolConformanceTypeKind::NonuniqueDirectType;
       entity = LinkEntity::forForeignTypeMetadataCandidate(conformingType);
       defaultTy = IGM.TypeMetadataStructTy;

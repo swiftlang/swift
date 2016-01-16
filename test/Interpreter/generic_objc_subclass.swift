@@ -15,6 +15,10 @@ import ObjCClasses
   func calculatePrice() -> Int
 }
 
+protocol PP {
+  func calculateTaxes() -> Int
+}
+
 class A<T> : HasHiddenIvars, P {
   var first: Int = 16
   var second: T? = nil
@@ -81,7 +85,7 @@ class B : A<(Int, Int)> {
 
 class BB : B {}
 
-class C : A<(Int, Int)> {
+class C : A<(Int, Int)>, PP {
   @nonobjc override var description: String {
     return "Invisible Chicken"
   }
@@ -89,14 +93,20 @@ class C : A<(Int, Int)> {
   override func calculatePrice() -> Int {
     return 650
   }
+
+  func calculateTaxes() -> Int {
+    return 110
+  }
 }
 
 // CHECK: 400
 // CHECK: 400
 // CHECK: 650
+// CHECK: 110
 print((BB() as P).calculatePrice())
 print((B() as P).calculatePrice())
 print((C() as P).calculatePrice())
+print((C() as PP).calculateTaxes())
 
 // CHECK: Salmon
 // CHECK: Grilled artichokes

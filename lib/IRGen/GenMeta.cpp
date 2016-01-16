@@ -190,7 +190,7 @@ static void emitPolymorphicParametersFromArray(IRGenFunction &IGF,
 /// If true, we lazily initialize metadata at runtime because the layout
 /// is only partially known. Otherwise, we can emit a direct reference a
 /// constant metadata symbol.
-static bool hasMetadataPattern(IRGenModule &IGM, NominalTypeDecl *theDecl) {
+bool irgen::hasMetadataPattern(IRGenModule &IGM, NominalTypeDecl *theDecl) {
   // Protocols must be special-cased in a few places.
   assert(!isa<ProtocolDecl>(theDecl));
 
