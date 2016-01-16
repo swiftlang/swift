@@ -1101,18 +1101,12 @@ StringRef ClangImporter::Implementation::getCFTypeName(
 
   if (auto pointee = CFPointeeInfo::classifyTypedef(decl)) {
     auto name = decl->getName();
-    if (pointee.isRecord()) {
+    if (pointee.isRecord() || pointee.isTypedef()) {
       auto resultName = getImportedCFTypeName(name);
       if (secondaryName && name != resultName)
         *secondaryName = name;
 
       return resultName;
-    }
-
-    if (pointee.isTypedef() && secondaryName) {
-      StringRef otherName = getImportedCFTypeName(name);
-      if (otherName != name) 
-        *secondaryName = otherName;
     }
 
     return name;
@@ -1408,13 +1402,14 @@ namespace {
                 return nullptr;
 
               // If there is an alias (i.e., that doesn't have "Ref"),
-              // create that separate typedef.
+              // use that as the name of the typedef later; create a separate
+              // typedef for the one with "Ref".
               if (importedName.Alias) {
                 auto aliasWithoutRef =
                   Impl.createDeclWithClangNode<TypeAliasDecl>(
                     Decl,
                     Impl.importSourceLoc(Decl->getLocStart()),
-                    importedName.Alias.getBaseName(),
+                    Name,
                     Impl.importSourceLoc(Decl->getLocation()),
                     TypeLoc::withoutLoc(SwiftType),
                     DC);
@@ -1422,6 +1417,7 @@ namespace {
                 aliasWithoutRef->computeType();
                 SwiftType = aliasWithoutRef->getDeclaredType();
                 NameMapping = MappedTypeNameKind::DefineOnly;
+                Name = importedName.Alias.getBaseName();
 
                 // Store this alternative declaration.
                 alternateDecl = aliasWithoutRef;
