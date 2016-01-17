@@ -30,6 +30,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
@@ -305,11 +306,16 @@ Type TypeChecker::resolveTypeInContext(
       continue;
 
     // Search the type of this context and its supertypes.
-    Type superClassOfFromType;
-    int traversedClassHierarchyDepth = 0;
+    llvm::SmallPtrSet<const NominalTypeDecl *, 8> visited;
     for (auto fromType = resolver->resolveTypeOfContext(parentDC);
          fromType;
-         fromType = superClassOfFromType) {
+         fromType = getSuperClassOf(fromType)) {
+      // If we hit circularity, we will diagnose at some point in typeCheckDecl().
+      // However we have to explicitly guard against that here because we get
+      // called as part of validateDecl().
+      if (!visited.insert(fromType->getAnyNominal()).second)
+        break;
+
       // If the nominal type declaration of the context type we're looking at
       // matches the owner's nominal type declaration, this is how we found
       // the member type declaration. Substitute the type we're coming from as
@@ -338,14 +344,6 @@ Type TypeChecker::resolveTypeInContext(
           conformance) {
         return conformance->getTypeWitness(assocType, this).getReplacement();
       }
-      superClassOfFromType = getSuperClassOf(fromType);
-      /// FIXME: Avoid the possibility of an infinite loop by fixing the root
-      ///        cause instead (incomplete circularity detection).
-      assert(fromType.getPointer() != superClassOfFromType.getPointer() &&
-             "Infinite loop due to circular class inheritance.");
-      assert(traversedClassHierarchyDepth++ <= 16384 &&
-             "Infinite loop due to circular class inheritance?");
-      (void) traversedClassHierarchyDepth;
     }
   }
 
