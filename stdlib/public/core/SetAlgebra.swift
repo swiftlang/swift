@@ -47,7 +47,7 @@
 ///   - `x.isStrictSubsetOf(y)` iff `x.isSubsetOf(y) && x != y`
 public protocol SetAlgebraType : Equatable, ArrayLiteralConvertible {
   /// A type for which `Self` provides a containment test.
-  typealias Element
+  associatedtype Element
   
   /// Creates an empty set.
   ///

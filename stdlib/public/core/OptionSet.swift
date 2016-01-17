@@ -34,7 +34,7 @@ public protocol OptionSetType : SetAlgebraType, RawRepresentable {
   // constrained extension
   
   /// An `OptionSet`'s `Element` type is normally `Self`.
-  typealias Element = Self
+  associatedtype Element = Self
 
   // FIXME: This initializer should just be the failable init from
   // RawRepresentable. Unfortunately, current language limitations

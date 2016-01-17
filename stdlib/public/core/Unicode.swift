@@ -44,7 +44,7 @@ public protocol UnicodeCodecType {
 
   /// A type that can hold [code unit](http://www.unicode.org/glossary/#code_unit) values for this
   /// encoding.
-  typealias CodeUnit
+  associatedtype CodeUnit
 
   init()
 
