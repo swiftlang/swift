@@ -28,6 +28,8 @@ public func print(
   separator: String = " ",
   terminator: String = "\n"
 ) {
+  // Adhoc fix for 'crash at hook(output.left)' in cygwin
+  let _playgroundPrintHook : ((String)->Void)? = {_ in () }
   if let hook = _playgroundPrintHook {
     var output = _TeeStream(left: "", right: _Stdout())
     _print(
