@@ -1060,12 +1060,11 @@ bool ArchetypeBuilder::addAbstractTypeParamRequirements(
   // diagnosing it if this is the first such occurrence.
   auto markRecursive = [&](AssociatedTypeDecl *assocType,
                            ProtocolDecl *proto,
-                           SourceLoc loc ) {
-    if (!pa->isRecursive() && !assocType->isRecursive()) {
+                           SourceLoc loc) {
+    if (!pa->isRecursive() && !assocType->isRecursive())
       Diags.diagnose(assocType->getLoc(),
                      diag::recursive_requirement_reference);
-      assocType->setIsRecursive();
-    }
+    assocType->setIsRecursive();
     pa->setIsRecursive();
 
     // FIXME: Drop this protocol.

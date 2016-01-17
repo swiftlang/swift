@@ -2170,9 +2170,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                                     defaultDefinitionID);
     declOrOffset = assocType;
 
+    assocType->setArchetype(getType(archetypeID)->castTo<ArchetypeType>());
     assocType->computeType();
     assocType->setAccessibility(cast<ProtocolDecl>(DC)->getFormalAccess());
-    assocType->setArchetype(getType(archetypeID)->castTo<ArchetypeType>());
     if (isImplicit)
       assocType->setImplicit();
 
