@@ -157,9 +157,6 @@ class ExplicitSelfRequiredTest {
   }
 }
 
-// expected-warning@+2 {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{57-60=}}
-// expected-warning@+1 {{Use of 'let' binding here is deprecated and will be removed in a future version of Swift}} {{64-68=}}
-var testClosureArgumentPatterns: (Int, Int) -> Int = { (var x, let y) in x+y+1 }
 
 class SomeClass {
   var field : SomeClass?

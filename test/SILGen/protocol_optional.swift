@@ -9,11 +9,9 @@
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}optionalMethodGeneric{{.*}} : $@convention(thin) <T where T : P1> (@owned T) -> ()
-func optionalMethodGeneric<T : P1>(t t : T) {
-  var t = t
+func optionalMethodGeneric<T : P1>(var t t : T) {
   // CHECK: bb0([[T:%[0-9]+]] : $T):
-  // CHECK: [[TBOX:%[0-9]+]] = alloc_box $T
-  // CHECK-NEXT: strong_retain [[T]]
+  // CHECK-NEXT: [[TBOX:%[0-9]+]] = alloc_box $T
   // CHECK-NEXT: store [[T]] to [[TBOX]]#1 : $*T
   // CHECK-NEXT: [[OPT_BOX:%[0-9]+]] = alloc_box $Optional<Int -> ()>
   // CHECK-NEXT: [[T:%[0-9]+]] = load [[TBOX]]#1 : $*T
@@ -24,11 +22,9 @@ func optionalMethodGeneric<T : P1>(t t : T) {
 }
 
 // CHECK-LABEL: sil hidden @_TF17protocol_optional23optionalPropertyGeneric{{.*}} : $@convention(thin) <T where T : P1> (@owned T) -> ()
-func optionalPropertyGeneric<T : P1>(t t : T) {
-  var t = t
+func optionalPropertyGeneric<T : P1>(var t t : T) {
   // CHECK: bb0([[T:%[0-9]+]] : $T):
-  // CHECK: [[TBOX:%[0-9]+]] = alloc_box $T
-  // CHECK: strong_retain [[T]]
+  // CHECK-NEXT: [[TBOX:%[0-9]+]] = alloc_box $T
   // CHECK-NEXT: store [[T]] to [[TBOX]]#1 : $*T
   // CHECK-NEXT: [[OPT_BOX:%[0-9]+]] = alloc_box $Optional<Int>
   // CHECK-NEXT: [[T:%[0-9]+]] = load [[TBOX]]#1 : $*T
@@ -39,11 +35,9 @@ func optionalPropertyGeneric<T : P1>(t t : T) {
 }
 
 // CHECK-LABEL: sil hidden @_TF17protocol_optional24optionalSubscriptGeneric{{.*}} : $@convention(thin) <T where T : P1> (@owned T) -> ()
-func optionalSubscriptGeneric<T : P1>(t t : T) {
-  var t = t
+func optionalSubscriptGeneric<T : P1>(var t t : T) {
   // CHECK: bb0([[T:%[0-9]+]] : $T):
-  // CHECK: [[TBOX:%[0-9]+]] = alloc_box $T
-  // CHECK-NEXT: strong_retain [[T]]
+  // CHECK-NEXT: [[TBOX:%[0-9]+]] = alloc_box $T
   // CHECK-NEXT: store [[T]] to [[TBOX]]#1 : $*T
   // CHECK-NEXT: [[OPT_BOX:%[0-9]+]] = alloc_box $Optional<Int>
   // CHECK-NEXT: [[T:%[0-9]+]] = load [[TBOX]]#1 : $*T

@@ -48,9 +48,9 @@ func sortResultIgnored<
   mutableCollection: MC,
   array: [Int]
 ) {
-  var sequence = sequence // expected-warning {{was never mutated; consider changing to 'let' constant}}
-  var mutableCollection = mutableCollection // expected-warning {{was never mutated; consider changing to 'let' constant}}
-  var array = array // expected-warning {{was never mutated; consider changing to 'let' constant}}
+  var sequence = sequence // expected-warning {{variable 'sequence' was never mutated; consider changing to 'let' constant}}
+  var mutableCollection = mutableCollection // expected-warning {{variable 'mutableCollection' was never mutated; consider changing to 'let' constant}}
+  var array = array // expected-warning {{variable 'array' was never mutated; consider changing to 'let' constant}}
 
   sequence.sort() // expected-warning {{result of call to 'sort()' is unused}}
   sequence.sort { $0 < $1 } // expected-warning {{result of call to 'sort' is unused}}

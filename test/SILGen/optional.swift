@@ -23,14 +23,12 @@ func testCall(f: (() -> ())?) {
 // CHECK-NEXT: enum $Optional<()>, #Optional.None!enumelt
 // CHECK-NEXT: br bb2
 
-func testAddrOnlyCallResult<T>(f: (() -> T)?) {
-  var f = f
+func testAddrOnlyCallResult<T>(var f: (()->T)?) {
   var x = f?()
 }
 // CHECK-LABEL: sil hidden @{{.*}}testAddrOnlyCallResult{{.*}} : $@convention(thin) <T> (@owned Optional<() -> T>) -> ()
 // CHECK:    bb0([[T0:%.*]] : $Optional<() -> T>):
-// CHECK: [[F:%.*]] = alloc_box $Optional<() -> T>, var, name "f"
-// CHECK-NEXT: retain_value [[T0]]
+// CHECK-NEXT: [[F:%.*]] = alloc_box $Optional<() -> T>, var, name "f"
 // CHECK-NEXT: store [[T0]] to [[F]]#1
 // CHECK-NEXT: [[X:%.*]] = alloc_box $Optional<T>, var, name "x"
 // CHECK-NEXT: [[TEMP:%.*]] = init_enum_data_addr [[X]]
@@ -52,9 +50,8 @@ func testAddrOnlyCallResult<T>(f: (() -> T)?) {
 // CHECK-NEXT: br bb2
 //   Continuation block.
 // CHECK:    bb2
-// CHECK-NEXT: strong_release [[X]]#0
-// CHECK-NEXT: strong_release [[F]]#0
-// CHECK-NEXT: release_value
+// CHECK-NEXT: strong_release [[X]]
+// CHECK-NEXT: strong_release [[F]]
 // CHECK-NEXT: [[T0:%.*]] = tuple ()
 // CHECK-NEXT: return [[T0]] : $()
 
@@ -87,7 +84,6 @@ func tuple_bind(x: (Int, String)?) -> String? {
 // rdar://21883752 - We were crashing on this function because the deallocation happened
 // out of scope.
 // CHECK-LABEL: sil hidden @_TF8optional16crash_on_deallocFTGVs10DictionarySiGSaSi___T_
-func crash_on_dealloc(dict : [Int : [Int]] = [:]) {
-  var dict = dict
+func crash_on_dealloc(var dict : [Int : [Int]] = [:]) {
   dict[1]?.append(2)
 }

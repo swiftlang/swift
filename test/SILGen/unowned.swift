@@ -37,7 +37,7 @@ _ = AddressOnly(x: C(), p: X())
 // CHECK: }
 
 // CHECK-LABEL:    sil hidden @_TF7unowned5test0FT1cCS_1C_T_ : $@convention(thin) (@owned C) -> () {
-func test0(c c: C) {
+func test0(let c c: C) {
 // CHECK:    bb0(%0 : $C):
 
   var a: A

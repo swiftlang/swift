@@ -312,9 +312,10 @@ trailingclosure2(x: 5) { return 5 }
 
 func trailingclosure3(x x: Int, f: (() -> Int)!) {
   var f = f
-  _ = f
   f = nil
+  _ = f
 }
+
 trailingclosure3(x: 5) { return 5 }
 
 func trailingclosure4(f f: () -> Int) {}

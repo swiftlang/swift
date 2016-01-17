@@ -20,7 +20,7 @@ extension TestSuite {
     Collection.SubSequence == Collection,
     CollectionWithEquatableElement.Generator.Element : Equatable
   >(
-    testNamePrefix: String = "",
+    var testNamePrefix: String = "",
     makeCollection: ([Collection.Generator.Element]) -> Collection,
     wrapValue: (OpaqueValue<Int>) -> Collection.Generator.Element,
     extractValue: (Collection.Generator.Element) -> OpaqueValue<Int>,
@@ -33,8 +33,6 @@ extension TestSuite {
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1
   ) {
-
-    var testNamePrefix = testNamePrefix
 
     // Don't run the same tests twice.
     if checksAdded.value.contains(__FUNCTION__) {
@@ -152,7 +150,7 @@ extension TestSuite {
     CollectionWithEquatableElement.SubSequence == CollectionWithEquatableElement,
     CollectionWithEquatableElement.Generator.Element : Equatable
   >(
-    testNamePrefix: String = "",
+    var testNamePrefix: String = "",
     makeCollection: ([Collection.Generator.Element]) -> Collection,
     wrapValue: (OpaqueValue<Int>) -> Collection.Generator.Element,
     extractValue: (Collection.Generator.Element) -> OpaqueValue<Int>,
@@ -165,8 +163,6 @@ extension TestSuite {
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1
   ) {
-
-    var testNamePrefix = testNamePrefix
 
     // Don't run the same tests twice.
     if checksAdded.value.contains(__FUNCTION__) {
@@ -298,7 +294,7 @@ extension TestSuite {
     CollectionWithEquatableElement.SubSequence == CollectionWithEquatableElement,
     CollectionWithEquatableElement.Generator.Element : Equatable
   >(
-    testNamePrefix: String = "",
+    var testNamePrefix: String = "",
     makeCollection: ([Collection.Generator.Element]) -> Collection,
     wrapValue: (OpaqueValue<Int>) -> Collection.Generator.Element,
     extractValue: (Collection.Generator.Element) -> OpaqueValue<Int>,
@@ -311,8 +307,6 @@ extension TestSuite {
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1
   ) {
-
-    var testNamePrefix = testNamePrefix
 
     // Don't run the same tests twice.
     if checksAdded.value.contains(__FUNCTION__) {

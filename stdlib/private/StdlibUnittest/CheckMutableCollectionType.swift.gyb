@@ -98,7 +98,6 @@ extension TestSuite {
     outOfBoundsSubscriptOffset: Int = 1,
     withUnsafeMutableBufferPointerIsSupported: Bool
   ) {
-
     var testNamePrefix = testNamePrefix
 
     if checksAdded.value.contains(__FUNCTION__) {
@@ -404,7 +403,6 @@ self.test("\(testNamePrefix).sort/${'Predicate' if predicate else 'WhereElementI
     outOfBoundsSubscriptOffset: Int = 1,
     withUnsafeMutableBufferPointerIsSupported: Bool
   ) {
-
     var testNamePrefix = testNamePrefix
 
     if checksAdded.value.contains(__FUNCTION__) {
@@ -523,7 +521,6 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
     outOfBoundsSubscriptOffset: Int = 1,
     withUnsafeMutableBufferPointerIsSupported: Bool
   ) {
-
     var testNamePrefix = testNamePrefix
 
     if checksAdded.value.contains(__FUNCTION__) {

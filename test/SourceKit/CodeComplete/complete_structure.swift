@@ -110,8 +110,7 @@ func test8() {
 // FIXME: should the ( go inside the name here?
 // S1_INNER_0: {name:S1}(
 
-func test9(x: Int) {
-  var x = x
+func test9(var x: Int) {
   #^INT_INNER_0,x^#
 }
 // INT_INNER_0: {name:x+}

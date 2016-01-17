@@ -9,8 +9,7 @@ func getInt() -> Int { return zero }
 // CHECK:   [[X:%.*]] = alloc_box $Builtin.Int64
 // CHECK:   [[Y:%.*]] = alloc_box $Builtin.Int64
 // CHECK:   copy_addr [[X]]#1 to [initialization] [[Y]]#1 : $*Builtin.Int64
-func init_var_from_lvalue(x: Int) {
-  var x = x
+func init_var_from_lvalue(var x: Int) {
   var y = x
 }
 
@@ -18,8 +17,7 @@ func init_var_from_lvalue(x: Int) {
 // CHECK:   [[X:%.*]] = alloc_box $Builtin.Int64
 // CHECK:   [[Y:%.*]] = alloc_box $Builtin.Int64
 // CHECK:   copy_addr [[Y]]#1 to [[X]]#1
-func assign_var_from_lvalue(inout x: Int, y: Int) {
-  var y = y
+func assign_var_from_lvalue(inout x: Int, var y: Int) {
   x = y
 }
 
@@ -45,8 +43,7 @@ func init_var_from_computed_lvalue() {
 // CHECK:   [[Y_VAL:%.*]] = load [[Y]]#1
 // CHECK:   [[SETTER:%.*]] = function_ref @_TF21copy_lvalue_peepholess8computedBi64_
 // CHECK:   apply [[SETTER]]([[Y_VAL]])
-func assign_computed_from_lvalue(y: Int) {
-  var y = y
+func assign_computed_from_lvalue(var y: Int) {
   computed = y
 }
 

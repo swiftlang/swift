@@ -60,14 +60,13 @@ func test_property(x: ErrorType) -> String {
 // CHECK:         strong_release %0
 // CHECK:         return [[RESULT]]
 
-func test_property_of_lvalue(x: ErrorType) -> String {
-  var x = x
+func test_property_of_lvalue(var x: ErrorType) -> String {
   return x._domain
 }
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials23test_property_of_lvalueFPs9ErrorType_SS
 // CHECK:         [[VAR:%.*]] = alloc_box $ErrorType
-// CHECK:         store %0 to [[VAR]]#1
-// CHECK-NEXT:    [[VALUE_BOX:%.*]] = load [[VAR]]#1
+// CHECK-NEXT:    store %0 to [[VAR]]
+// CHECK-NEXT:    [[VALUE_BOX:%.*]] = load [[VAR]]
 // CHECK-NEXT:    strong_retain [[VALUE_BOX]]
 // CHECK-NEXT:    [[VALUE:%.*]] = open_existential_box [[VALUE_BOX]] : $ErrorType to $*[[VALUE_TYPE:@opened\(.*\) ErrorType]]
 // CHECK-NEXT:    [[COPY:%.*]] = alloc_stack $[[VALUE_TYPE]]
@@ -77,8 +76,7 @@ func test_property_of_lvalue(x: ErrorType) -> String {
 // CHECK-NEXT:    destroy_addr [[COPY]]
 // CHECK-NEXT:    dealloc_stack [[COPY]]
 // CHECK-NEXT:    strong_release [[VALUE_BOX]]
-// CHECK-NEXT:    strong_release [[VAR]]#0
-// CHECK-NEXT:    strong_release %0
+// CHECK-NEXT:    strong_release [[VAR]]
 // CHECK-NEXT:    return [[RESULT]]
 
 extension ErrorType {
@@ -104,8 +102,7 @@ func plusOneErrorType() -> ErrorType { }
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials31test_open_existential_semanticsFTPs9ErrorType_PS0___T_
 // GUARANTEED-LABEL: sil hidden @_TF18boxed_existentials31test_open_existential_semanticsFTPs9ErrorType_PS0___T_
 func test_open_existential_semantics(guaranteed: ErrorType,
-                                     _ immediate: ErrorType) {
-  var immediate = immediate
+                                     var _ immediate: ErrorType) {
   // CHECK: [[IMMEDIATE_BOX:%.*]] = alloc_box $ErrorType
   // GUARANTEED: [[IMMEDIATE_BOX:%.*]] = alloc_box $ErrorType
 
@@ -167,8 +164,7 @@ func test_open_existential_semantics(guaranteed: ErrorType,
 
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials14erasure_to_anyFTPs9ErrorType_PS0___P_
 // CHECK:       bb0([[OUT:%.*]] : $*protocol<>, [[GUAR:%.*]] : $ErrorType,
-func erasure_to_any(guaranteed: ErrorType, _ immediate: ErrorType) -> Any {
-  var immediate = immediate
+func erasure_to_any(guaranteed: ErrorType, var _ immediate: ErrorType) -> Any {
   // CHECK:       [[IMMEDIATE_BOX:%.*]] = alloc_box $ErrorType
   if true {
     // CHECK-NOT: retain [[GUAR]]

@@ -301,7 +301,6 @@ extension TestSuite {
     outOfBoundsIndexOffset: Int = 1,
     outOfBoundsSubscriptOffset: Int = 1
   ) {
-
     var testNamePrefix = testNamePrefix
 
     if checksAdded.value.contains(__FUNCTION__) {
@@ -840,9 +839,7 @@ self.test("\(testNamePrefix).popFirst()/slice/empty/semantics") {
     outOfBoundsIndexOffset: Int = 1,
     outOfBoundsSubscriptOffset: Int = 1
   ) {
-
     var testNamePrefix = testNamePrefix
-
     if checksAdded.value.contains(__FUNCTION__) {
       return
     }
@@ -1190,7 +1187,6 @@ self.test("\(testNamePrefix).suffix/semantics") {
     outOfBoundsIndexOffset: Int = 1,
     outOfBoundsSubscriptOffset: Int = 1
   ) {
-
     var testNamePrefix = testNamePrefix
 
     if checksAdded.value.contains(__FUNCTION__) {

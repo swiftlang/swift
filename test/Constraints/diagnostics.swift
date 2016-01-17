@@ -441,7 +441,6 @@ zip(numbers, numbers).filter { $0.2 > 1 }  // expected-error {{value of tuple ty
 
 // <rdar://problem/20868864> QoI: Cannot invoke 'function' with an argument list of type 'type'
 func foo20868864(callback: ([String]) -> ()) { }
-
 func rdar20868864(s: String) {
   var s = s
   foo20868864 { (strings: [String]) in

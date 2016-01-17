@@ -4,8 +4,10 @@ struct Bool {}
 var false_ = Bool()
 
 // CHECK-LABEL: sil hidden @_TF13auto_closures17call_auto_closure
-func call_auto_closure(@autoclosure x: () -> Bool) -> Bool {
-  // CHECK: [[RET:%.*]] = apply
+func call_auto_closure(@autoclosure var x: () -> Bool) -> Bool {
+  // CHECK: [[XBOX:%.*]] = alloc_box $@callee_owned () -> Bool
+  // CHECK: [[XLOAD:%.*]] = load [[XBOX]]
+  // CHECK: [[RET:%.*]] = apply [[XLOAD]]()
   // CHECK: return [[RET]]
   return x()
 }

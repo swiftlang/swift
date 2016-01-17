@@ -21,8 +21,7 @@ func &&&&&(lhs: BooleanType, @autoclosure rhs: () -> BooleanType) -> Bool {
   return lhs.boolValue ? rhs().boolValue : false
 }
 
-func call_me(input: Int64) -> Void {
-  var input = input
+func call_me(var input: Int64) -> Void {
 // rdar://problem/14627460
 // An autoclosure should have a line number in the debug info and a scope line of 0.
 // CHECK-DAG: !DISubprogram({{.*}}linkageName: "_TFF11autoclosure7call_meFVs5Int64T_u_KT_Ps11BooleanType_",{{.*}} line: [[@LINE+3]],{{.*}} isLocal: false, isDefinition: true

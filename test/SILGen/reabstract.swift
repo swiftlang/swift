@@ -45,15 +45,14 @@ struct Box<T> {
 
 func notFun(inout c: C, i: Int) {}
 
-func testInoutOpaque(c: C, i: Int) {
-  var c = c
+func testInoutOpaque(var c: C, i: Int) {
   let box = Box(t: notFun)
   box.t(&c, i: i)
 }
 
 // CHECK-LABEL: sil hidden @_TF10reabstract15testInoutOpaqueFTCS_1C1iSi_T_
 // CHECK:         function_ref @_TF10reabstract6notFunFTRCS_1C1iSi_T_
-// CHECK:         thin_to_thick_function
+// CHECK:         thin_to_thick_function %8
 // CHECK:         function_ref @_TTRXFo_lC10reabstract1CdSi_dT__XFo_lS0_iSi_iT__
 // CHECK:         partial_apply
 // CHECK:         store

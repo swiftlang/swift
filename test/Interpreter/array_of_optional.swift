@@ -15,7 +15,7 @@ func main() {
 		switch item {
 			case .None:
 			print("None")
-			case .Some(let v):
+			case .Some(var v):
 			print(v)
 		}
 	}

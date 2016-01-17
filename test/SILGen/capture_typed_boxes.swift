@@ -1,14 +1,12 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
-func foo(x: Int) -> () -> Int {
-  var x = x
+func foo(var x: Int) -> () -> Int {
   return { x }
 }
 // CHECK-LABEL: sil shared @_TFF19capture_typed_boxes3fooFSiFT_SiU_FT_Si : $@convention(thin) (@owned @box Int) -> Int {
 // CHECK:       bb0(%0 : $@box Int):
 
-func closure(f: Int -> Int) -> Int {
-  var f = f
+func closure(var f: Int -> Int) -> Int {
   func bar(x: Int) -> Int {
     return f(x)
   }
@@ -18,8 +16,7 @@ func closure(f: Int -> Int) -> Int {
 // CHECK-LABEL: sil shared @_TFF19capture_typed_boxes7closureFFSiSiSiL_3barfSiSi : $@convention(thin) (Int, @owned @box @callee_owned (Int) -> Int) -> Int {
 // CHECK:       bb0(%0 : $Int, %1 : $@box @callee_owned (Int) -> Int):
 
-func closure_generic<T>(f: T -> T, x: T) -> T {
-  var f = f
+func closure_generic<T>(var f: T -> T, x: T) -> T {
   func bar(x: T) -> T {
     return f(x)
   }

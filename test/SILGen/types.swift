@@ -23,13 +23,12 @@ struct S {
 
   // CHECK-LABEL: sil hidden  @{{.*}}foo{{.*}} : $@convention(method) (Int, @inout S) -> ()
   mutating
-  func foo(x x: Int) {
-    var x = x
+  func foo(var x x: Int) {
     // CHECK: bb0([[X:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $*S):
     member = x
-    // CHECK: [[THIS_LOCAL:%[0-9]+]] = alloc_box $S
     // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Int
-    // CHECK: [[MEMBER:%[0-9]+]] = struct_element_addr [[THIS_LOCAL]]#1 : $*S, #S.member
+    // CHECK: [[THIS_LOCAL_ADDR:%[0-9]+]] = alloc_box $S
+    // CHECK: [[MEMBER:%[0-9]+]] = struct_element_addr [[THIS_LOCAL_ADDR]]#1 : $*S, #S.member
     // CHECK: copy_addr [[XADDR]]#1 to [[MEMBER]]
   }
 

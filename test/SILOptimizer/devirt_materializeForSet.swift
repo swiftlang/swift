@@ -38,8 +38,7 @@ public func test1(bf: BaseFoo) {
 }
 
 @inline(never)
-public func test2(f: Foo) {
-  var f = f
+public func test2(var f: Foo) {
   f.bar = "test2"
   print(f.bar)
 }

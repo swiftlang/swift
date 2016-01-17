@@ -143,10 +143,7 @@ class SomeGeneric<T> {
 }
 
 // CHECK-LABEL: sil hidden @_TF9functions5calls{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64, Builtin.Int64) -> ()
-func calls(i: Int, j: Int, k: Int) {
-  var i = i
-  var j = j
-  var k = k
+func calls(var i:Int, var j:Int, var k:Int) {
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int64):
   // CHECK: [[IADDR:%[0-9]+]] = alloc_box $Builtin.Int64
   // CHECK: [[JADDR:%[0-9]+]] = alloc_box $Builtin.Int64

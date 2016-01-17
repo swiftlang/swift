@@ -62,9 +62,9 @@ func countIf<
 func equal<R1 : GeneratorType, R2 : GeneratorType where R1.Element : Eq,
                                            R1.Element == R2.Element>
        (range1 : R1, range2 : R2) -> Bool {
-
   var range1 = range1
   var range2 = range2
+
   var e1 = range1.next()
   var e2 = range2.next()
     
@@ -80,7 +80,7 @@ func equal<R1 : GeneratorType, R2 : GeneratorType where R1.Element : Eq,
 
 func equalIf<R1 : GeneratorType, R2 : GeneratorType>
        (range1 : R1, range2 : R2,
-        predicate : (R1.Element, R2.Element) -> Bool) -> Bool {
+        predicate : (R1.Element, R2.Element)-> Bool) -> Bool {
   var range1 = range1
   var range2 = range2
   var e1 = range1.next()

@@ -22,8 +22,7 @@ func local_valtype() {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime20local_valtype_branch
-func local_valtype_branch(a: Bool) {
-    var a = a
+func local_valtype_branch(var a: Bool) {
     // CHECK: [[A:%[0-9]+]] = alloc_box $Bool
 
     if a { return }
@@ -109,6 +108,7 @@ func local_valtype_branch(a: Bool) {
     }
     // CHECK: release [[X]]
     // CHECK: [[EPILOG]]:
+    // CHECK: release [[A]]
     // CHECK: return
 }
 
@@ -126,12 +126,12 @@ func reftype_return() -> Ref {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime11reftype_arg
-func reftype_arg(a: Ref) {
-    var a = a
+func reftype_arg(var a: Ref) {
     // CHECK: bb0([[A:%[0-9]+]] : $Ref):
     // CHECK: [[AADDR:%[0-9]+]] = alloc_box $Ref
-    // CHECK: store [[A]] to [[AADDR]]
-    // CHECK: release [[AADDR]]
+    // CHECK-NOT: retain [[A]]
+    // CHECK: store [[A]] to [[AADDR]]#1
+    // CHECK: release [[AADDR]]#0
     // CHECK: return
 }
 
@@ -182,8 +182,7 @@ func reftype_call_arg() {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime21reftype_call_with_arg
-func reftype_call_with_arg(a: Ref) {
-    var a = a
+func reftype_call_with_arg(var a: Ref) {
     // CHECK: bb0([[A1:%[0-9]+]] : $Ref):
     // CHECK: [[AADDR:%[0-9]+]] = alloc_box $Ref
     // CHECK: store [[A1]] to [[AADDR]]
@@ -198,14 +197,13 @@ func reftype_call_with_arg(a: Ref) {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime16reftype_reassign
-func reftype_reassign(inout a: Ref, b: Ref) {
-    var b = b
+func reftype_reassign(inout a: Ref, var b: Ref) {
     // CHECK: bb0([[AADDR:%[0-9]+]] : $*Ref, [[B1:%[0-9]+]] : $Ref):
     // CHECK: [[A_LOCAL:%[0-9]+]] = alloc_box $Ref
     // CHECK: copy_addr [[AADDR]] to [initialization] [[A_LOCAL]]
     // CHECK: [[BADDR:%[0-9]+]] = alloc_box $Ref
     a = b
-    // CHECK: copy_addr [[BADDR]]#1 to [[A_LOCAL]]
+    // CHECK: copy_addr [[BADDR]]#1 to [[A_LOCAL]]#1
     // CHECK: release
 
     // CHECK: return
@@ -342,24 +340,22 @@ class RefWithProp {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime23logical_lvalue_lifetimeFTCS_11RefWithPropSiVS_3Val_T_ : $@convention(thin) (@owned RefWithProp, Int, Val) -> () {
-func logical_lvalue_lifetime(r: RefWithProp, _ i: Int, _ v: Val) {
-  var i = i
-  var v = v
-  var r = r
-  // CHECK: [[IADDR:%[0-9]+]] = alloc_box $Int
-  // CHECK: [[VADDR:%[0-9]+]] = alloc_box $Val
+func logical_lvalue_lifetime(var r: RefWithProp, var _ i: Int, var _ v: Val) {
   // CHECK: [[RADDR:%[0-9]+]] = alloc_box $RefWithProp
+  // CHECK: [[IADDR:%[0-9]+]] = alloc_box $Int
+  // CHECK: store %1 to [[IADDR]]#1
+  // CHECK: [[VADDR:%[0-9]+]] = alloc_box $Val
 
   // -- Reference types need to be retained as property method args.
   r.int_prop = i
-  // CHECK: [[R1:%[0-9]+]] = load [[RADDR]]
+  // CHECK: [[R1:%[0-9]+]] = load [[RADDR]]#1
   // CHECK: strong_retain [[R1]]
   // CHECK: [[SETTER_METHOD:%[0-9]+]] = class_method {{.*}} : $RefWithProp, #RefWithProp.int_prop!setter.1 : (RefWithProp) -> (Int) -> () , $@convention(method) (Int, @guaranteed RefWithProp) -> ()
   // CHECK: apply [[SETTER_METHOD]]({{.*}}, [[R1]])
   // CHECK: strong_release [[R1]]
 
   r.aleph_prop.b = v
-  // CHECK: [[R2:%[0-9]+]] = load [[RADDR]]
+  // CHECK: [[R2:%[0-9]+]] = load [[RADDR]]#1
   // CHECK: strong_retain [[R2]]
   // CHECK: [[STORAGE:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
   // CHECK: [[ALEPH_PROP_TEMP:%[0-9]+]] = alloc_stack $Aleph
@@ -421,16 +417,15 @@ class Foo<T> {
 
   }
 
-  init(chi: Int) {
-    var chi = chi
+  init(var chi:Int) {
     z = Foo<T>.makeT()
 
   // -- initializing entry point
   // CHECK-LABEL: sil hidden @_TFC8lifetime3Fooc{{.*}} :
     // CHECK: bb0([[CHI:%[0-9]+]] : $Int, [[THISIN:%[0-9]+]] : $Foo<T>):
-    // CHECK: [[THIS:%[0-9]+]] = mark_uninitialized
     // CHECK: [[CHIADDR:%[0-9]+]] = alloc_box $Int
-    // CHECK: store [[CHI]] to [[CHIADDR]]
+    // CHECK: store [[CHI]] to [[CHIADDR]]#1
+    // CHECK: [[THIS:%[0-9]+]] = mark_uninitialized
 
     // CHECK: ref_element_addr {{.*}}, #Foo.z
 
@@ -612,20 +607,20 @@ class B { init(y:Int) {} }
 class D : B {
   // CHECK-LABEL: sil hidden @_TFC8lifetime1Dc{{.*}} : $@convention(method) (Int, Int, @owned D) -> @owned D
   // CHECK: bb0([[X:%[0-9]+]] : $Int, [[Y:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $D):
-  init(x: Int, y: Int) {
-    var x = x
-    var y = y
+  init(var x:Int, var y:Int) {
     // CHECK: [[THISADDR1:%[0-9]+]] = alloc_box $D
     // CHECK: [[THISADDR:%[0-9]+]] = mark_uninitialized [derivedself] [[THISADDR1]]
-    // CHECK: store [[THIS]] to [[THISADDR]]
     // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Int
+    // CHECK: store [[X]] to [[XADDR]]#1
     // CHECK: [[YADDR:%[0-9]+]] = alloc_box $Int
+    // CHECK: store [[Y]] to [[YADDR]]#1
+    // CHECK: store [[THIS]] to [[THISADDR]]
 
     super.init(y: y)
     // CHECK: [[THIS1:%[0-9]+]] = load [[THISADDR]]
     // CHECK: [[THIS1_SUP:%[0-9]+]] = upcast [[THIS1]] : ${{.*}} to $B
-    // CHECK: [[SUPER_CTOR:%[0-9]+]] = super_method %12 : $D, #B.init!initializer.1
-    // CHECK: [[Y:%[0-9]+]] = load [[YADDR]]
+    // CHECK: [[SUPER_CTOR:%[0-9]+]] = super_method %10 : $D, #B.init!initializer.1 : B.Type -> (y: Int) -> B
+    // CHECK: [[Y:%[0-9]+]] = load [[YADDR]]#1
     // CHECK: [[THIS2_SUP:%[0-9]+]] = apply [[SUPER_CTOR]]([[Y]], [[THIS1_SUP]])
     // CHECK: [[THIS2:%[0-9]+]] = unchecked_ref_cast [[THIS2_SUP]] : $B to $D
     // CHECK: [[THIS1:%[0-9]+]] = load [[THISADDR]]
@@ -636,11 +631,10 @@ class D : B {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime8downcast
-func downcast(b: B) {
-  var b = b
+func downcast(var b: B) {
   // CHECK: [[BADDR:%[0-9]+]] = alloc_box $B
   (b as! D).foo()
-  // CHECK: [[B:%[0-9]+]] = load [[BADDR]]
+  // CHECK: [[B:%[0-9]+]] = load [[BADDR]]#1
   // CHECK: retain [[B]]
   // CHECK: [[D:%[0-9]+]] = unconditional_checked_cast [[B]] : {{.*}} to $D
   // CHECK: apply {{.*}}([[D]])

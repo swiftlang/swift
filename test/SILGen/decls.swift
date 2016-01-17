@@ -79,10 +79,8 @@ func tuple_patterns() {
 // CHECK: [[X:%[0-9]+]] = alloc_box $Int
 // CHECK-NEXT: store %0 to [[X]]
 // CHECK-NEXT: [[Y:%[0-9]+]] = alloc_box $Int
-// CHECK-NEXT: store %1 to [[Y]]
-func simple_arguments(x: Int, y: Int) -> Int {
-  var x = x
-  var y = y
+// CHECK-NEXT: store %1 to [[Y]]#1
+func simple_arguments(var x: Int, var y: Int) -> Int {
   return x+y
 }
 
@@ -103,8 +101,8 @@ func curried_arguments(x: Int)(y: Int) -> Int {
 // CHECK: [[UNIT:%[0-9]+]] = tuple ()
 // CHECK: [[TUPLE:%[0-9]+]] = tuple (%0 : $Int, %1 : $Float, [[UNIT]] : $())
 // CHECK: [[XADDR:%[0-9]+]] = alloc_box $(Int, Float, ())
-func tuple_argument(x: (Int, Float, ())) {
-  var x = x
+// CHECK: store [[TUPLE]] to [[XADDR]]#1
+func tuple_argument(var x: (Int, Float, ())) {
 }
 
 // CHECK-LABEL: sil hidden @_TF5decls14inout_argument
@@ -112,8 +110,7 @@ func tuple_argument(x: (Int, Float, ())) {
 // CHECK: [[X_LOCAL:%[0-9]+]] = alloc_box $Int
 // CHECK: [[YADDR:%[0-9]+]] = alloc_box $Int
 // CHECK: copy_addr [[YADDR]]#1 to [[X_LOCAL]]#1
-func inout_argument(inout x: Int, y: Int) {
-  var y = y
+func inout_argument(inout x: Int, var y: Int) {
   x = y
 }
 
@@ -130,8 +127,7 @@ func load_from_global() -> Int {
 }
 
 // CHECK-LABEL: sil hidden @_TF5decls15store_to_global
-func store_to_global(x: Int) {
-  var x = x
+func store_to_global(var x: Int) {
   global = x
   // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Int
   // CHECK: [[ACCESSOR:%[0-9]+]] = function_ref @_TF5declsau6globalSi

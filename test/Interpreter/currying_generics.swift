@@ -14,8 +14,7 @@ func concat(x: String, _ y: String, _ z: String) -> String {
 }
 
 @inline(never)
-public func test_concat_closure(x: Int) -> String {
-  var x = x
+public func test_concat_closure(var x: Int) -> String {
   let insult = curry(concat)("one ")(" two ")
   var gs = insult(" three ")
   if (x > 0) {
@@ -53,8 +52,7 @@ func compose(x: P, _ y: P, _ z: P) -> Int32 {
 
 
 @inline(never)
-public func test_compose_closure(x: Int) -> Int32 {
-  var x = x
+public func test_compose_closure(var x:Int) -> Int32 {
   let insult = curry(compose)(CP(1))(CP(2))
   var gs = insult(CP(3))
   if (x > 0) {

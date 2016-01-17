@@ -13,8 +13,7 @@ func foo<B : Runcible>(x: B) {
 }
 
 // CHECK-LABEL: sil hidden @_TF15generic_witness3bar{{.*}} : $@convention(thin) (@in Runcible) -> ()
-func bar(x: Runcible) {
-  var x = x
+func bar(var x: Runcible) {
   // CHECK: [[BOX:%.*]] = alloc_box $Runcible
   // CHECK: [[TEMP:%.*]] = alloc_stack $Runcible
   // CHECK: [[EXIST:%.*]] = open_existential_addr [[TEMP]] : $*Runcible to $*[[OPENED:@opened(.*) Runcible]]

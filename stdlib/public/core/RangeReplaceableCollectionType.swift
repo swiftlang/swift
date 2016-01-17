@@ -481,8 +481,8 @@ public func +<
     S : CollectionType
     where S.Generator.Element == C.Generator.Element
 >(lhs: C, rhs: S) -> C {
-  var lhs = lhs
   // FIXME: what if lhs is a reference type?  This will mutate it.
+  var lhs = lhs
   lhs.reserveCapacity(lhs.count + numericCast(rhs.count))
   lhs.appendContentsOf(rhs)
   return lhs
@@ -494,8 +494,8 @@ public func +<
     RRC2 : RangeReplaceableCollectionType 
     where RRC1.Generator.Element == RRC2.Generator.Element
 >(lhs: RRC1, rhs: RRC2) -> RRC1 {
-  var lhs = lhs
   // FIXME: what if lhs is a reference type?  This will mutate it.
+  var lhs = lhs
   lhs.reserveCapacity(lhs.count + numericCast(rhs.count))
   lhs.appendContentsOf(rhs)
   return lhs

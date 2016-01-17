@@ -107,13 +107,8 @@ public:
     
     /// InVarOrLetPattern has this value when parsing a pattern in which bound
     /// variables are implicitly immutable, but allowed to be marked mutable by
-    /// using a 'var' pattern.
+    /// using a 'var' pattern.  This happens in for-each loop patterns.
     IVOLP_ImplicitlyImmutable,
-
-    /// InVarOrLetPattern has this value when parsing a pattern where variables
-    /// must always be immutable, so you cannot mark a pattern as mutable with
-    /// 'var'. This happens in for-each patterns.
-    IVOLP_AlwaysImmutable,
     
     /// When InVarOrLetPattern has this value, bound variables are mutable, and
     /// nested let/var patterns are not permitted. This happens when parsing a

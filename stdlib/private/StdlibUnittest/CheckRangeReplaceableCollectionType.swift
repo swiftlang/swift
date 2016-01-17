@@ -361,7 +361,6 @@ extension TestSuite {
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1
   ) {
-
     var testNamePrefix = testNamePrefix
 
     if checksAdded.value.contains(__FUNCTION__) {
@@ -1123,7 +1122,6 @@ self.test("\(testNamePrefix).OperatorPlus") {
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1
   ) {
-
     var testNamePrefix = testNamePrefix
 
     if checksAdded.value.contains(__FUNCTION__) {
@@ -1250,7 +1248,6 @@ self.test("\(testNamePrefix).removeLast(n: Int)/whereIndexIsBidirectional/remove
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1
   ) {
-
     var testNamePrefix = testNamePrefix
 
     if checksAdded.value.contains(__FUNCTION__) {

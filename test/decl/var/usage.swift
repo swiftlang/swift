@@ -12,11 +12,9 @@ func basicTests() -> Int {
   return y
 }
 
-// expected-warning@+2 {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{41-45=}}
-// expected-warning@+1 {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{54-58=}}
-func mutableParameter(a : Int, h : Int, var i : Int, var j: Int, 
-       var g : Int) -> Int { // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{8-12=}}
-  g += 1
+func mutableParameter(a : Int, h : Int, var i : Int, j: Int, g: Int) -> Int { // expected-warning {{'var' parameters are deprecated and will be removed in Swift 3}}
+  i += 1
+  var j = j
   swap(&i, &j)
   return i+g
 }
@@ -100,10 +98,13 @@ func testSubscript() -> [Int] {
 }
 
 
-func testTuple(var x : Int) -> Int { // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{16-19=}}
+func testTuple(x : Int) -> Int {
+  var x = x
   var y : Int  // Ok, stored by a tuple
   
   (x, y) = (1,2)
+  _ = x
+  _ = y
   return y
 }
   
@@ -163,8 +164,10 @@ protocol Fooable {
   mutating func mutFoo()
   func immutFoo()
 }
-func testOpenExistential(var x: Fooable, // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{26-29=}}
+func testOpenExistential(x: Fooable,
                          y: Fooable) {
+  var x = x
+  let y = y
   x.mutFoo()
   y.immutFoo()
 }
@@ -173,58 +176,24 @@ func testOpenExistential(var x: Fooable, // expected-warning {{Use of 'var' bind
 func couldThrow() throws {}
 
 func testFixitsInStatementsWithPatterns(a : Int?) {
-  // FIXME: rdar://problem/23378003
-  // This will eventually be an error.
-  if var b = a,    // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{6-9=let}}
-      var b2 = a {  // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{7-10=let}}
-    b = 1
-    b2 = 1
+  if var b = a,    // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}} {{6-9=let}}
+      var b2 = a {   // expected-warning {{variable 'b2' was never mutated; consider changing to 'let' constant}} {{7-10=let}}
     _ = b
     _ = b2
   }
-
-  var g = [1,2,3].generate()
-  // FIXME: rdar://problem/23378003
-  // This will eventually be an error.
-  while var x = g.next() { // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{9-12=let}}
-    x = 0
-    _ = x
-  }
-
-  // FIXME: rdar://problem/23378003
-  // This will eventually be an error.
-  guard var y = Optional.Some(1) else { // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{9-12=let}}
-    return
-  }
-  y = 0
-  _ = y
-
-  // FIXME: rdar://problem/23378003
-  // This will eventually be an error.
-  for var b in [42] {   // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{7-11=}}
-    b = 42
-    _ = b
-  }
-
-  for let b in [42] {   // expected-error {{'let' pattern is already in an immutable context}} {{7-11=}}
+  
+  for var b in [42] {   // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}} {{7-10=let}}
     _ = b
   }
 
   do {
     try couldThrow()
-  // FIXME: rdar://problem/23378003
-  // This will eventually be an error.
-  } catch var err {  // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{11-14=let}}
-    // expected-warning@-1 {{variable 'err' was never mutated; consider changing to 'let' constant}}
+  } catch var err {  // expected-warning {{variable 'err' was never mutated; consider changing to 'let' constant}} {{11-14=let}}
     _ = err
   }
 
   switch a {
-    // FIXME: rdar://problem/23378003
-    // This will eventually be an error.
-    case var b: // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{10-13=let}}
-      // expected-warning@-1 {{variable 'b' was never mutated; consider changing to 'let' constant}}
-      _ = b
+    case var b: _ = b  // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}} {{10-13=let}}
   }
 }
 

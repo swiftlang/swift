@@ -8,7 +8,7 @@ enum TrivialGeneric<T, U> {
 
 func unwrapTrivialGeneric<T, U>(tg: TrivialGeneric<T, U>) -> (T, U) {
   switch tg {
-  case .x(let t, let u):
+  case .x(var t, var u):
     return (t, u)
   }
 }
@@ -20,6 +20,6 @@ func wrapTrivialGeneric<T, U>(t: T, u: U) -> TrivialGeneric<T, U> {
 // CHECK-DAG: !DICompositeType(tag: DW_TAG_union_type, name: "TrivialGeneric", {{.*}}identifier: "_TtGO12generic_enum14TrivialGenericVs5Int64SS_"
 var tg : TrivialGeneric<Int64, String> = .x(23, "skidoo")
 switch tg {
-case .x(let t, let u):
+case .x(var t, var u):
   markUsed("\(t) \(u)")
 }

@@ -431,7 +431,7 @@ class D2 : D1 {}
 class E : C {}
 
 // CHECK-LABEL: sil hidden @_TF6switch16test_isa_class_1FT1xCS_1B_T_
-func test_isa_class_1(x x: B) {
+func test_isa_class_1(let x x: B) {
   // CHECK: strong_retain %0
   switch x {
   // CHECK:   checked_cast_br [[X:%.*]] : $B to $D1, [[IS_D1:bb[0-9]+]], [[IS_NOT_D1:bb[0-9]+]]
@@ -600,7 +600,7 @@ func test_union_1(u u: MaybePair) {
     b()
 
   // CHECK: [[IS_RIGHT]]([[STR:%.*]] : $String):
-  case let .Right:
+  case var .Right:
   // CHECK:   release_value [[STR]] : $String
   // CHECK:   function_ref @_TF6switch1cFT_T_
   // CHECK:   br [[CONT]]
@@ -841,9 +841,9 @@ enum Generic<T, U> {
 // Check that switching over a generic instance generates verified SIL.
 func test_union_generic_instance(u u: Generic<Int, String>) {
   switch u {
-  case .Foo(let x):
+  case .Foo(var x):
     a()
-  case .Bar(let y):
+  case .Bar(var y):
     b()
   }
   c()

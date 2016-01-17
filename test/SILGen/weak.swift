@@ -11,8 +11,7 @@ struct A {
 }
 
 // CHECK:    sil hidden @_TF4weak5test0FT1cCS_1C_T_ : $@convention(thin) (@owned C) -> () {
-func test0(c c: C) {
-  var c = c
+func test0(var c c: C) {
 // CHECK:    bb0(%0 : $C):
 // CHECK:      [[C:%.*]] = alloc_box $C
 
