@@ -1453,7 +1453,6 @@ extension TestSuite {
     checksAdded: Box<Set<String>> = Box([]),
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all
   ) {
-
     var testNamePrefix = testNamePrefix
 
     if checksAdded.value.contains(__FUNCTION__) {

@@ -74,7 +74,6 @@ let _ = 1["1"]  // expected-error {{ambiguous use of 'subscript'}}
 // rdar://17687826 - QoI: error message when reducing to an untyped dictionary isn't helpful
 let squares = [ 1, 2, 3 ].reduce([:]) { (dict, n) in // expected-error {{expression type '[_ : _]' is ambiguous without more context}}
   var dict = dict
-
   dict[n] = n * n
   return dict
 }

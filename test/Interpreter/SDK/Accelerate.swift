@@ -7,8 +7,7 @@
 import Accelerate
 
 extension vU1024: IntegerLiteralConvertible, CustomStringConvertible, Equatable {
-  public init(integerLiteral: Int) {
-    var integerLiteral = integerLiteral
+  public init(var integerLiteral: Int) {
     self.init()
     memcpy(&self, &integerLiteral, sizeof(Int.self))
   }
@@ -33,34 +32,27 @@ extension vU1024: IntegerLiteralConvertible, CustomStringConvertible, Equatable 
 }
 
 extension Int {
-  init(_ u1024: vU1024) {
-    var u1024 = u1024
+  init(var _ u1024: vU1024) {
     // NB: Doesn't overflow check
     self.init()
     memcpy(&self, &u1024, sizeof(Int.self))
   }
 }
 
-func *(x: vU1024, y: vU1024) -> vU1024 {
-  var x = x
-  var y = y
+func *(var x: vU1024, var y: vU1024) -> vU1024 {
   var result = vU1024()
   vU1024HalfMultiply(&x, &y, &result)
   return result
 }
 
-func quorem(x: vU1024, _ y: vU1024) -> (vU1024, vU1024) {
-  var x = x
-  var y = y
+func quorem(var x: vU1024, var _ y: vU1024) -> (vU1024, vU1024) {
   var quo = vU1024()
   var rem = vU1024()
   vU1024Divide(&x, &y, &quo, &rem)
   return (quo, rem)
 }
 
-public func ==(x: vU1024, y: vU1024) -> Bool {
-  var x = x
-  var y = y
+public func ==(var x: vU1024, var y: vU1024) -> Bool {
   return memcmp(&x, &y, sizeof(vU1024.self)) == 0
 }
 

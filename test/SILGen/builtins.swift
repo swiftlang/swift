@@ -64,13 +64,12 @@ func move_gen<T>(x: Builtin.RawPointer) -> T {
 }
 
 // CHECK-LABEL: sil hidden @_TF8builtins11destroy_pod
-func destroy_pod(x: Builtin.RawPointer) {
-  var x = x
-  // CHECK: [[X:%[0-9]+]] = alloc_box
+func destroy_pod(var x: Builtin.RawPointer) {
+  // CHECK: %1 = alloc_box
   // CHECK-NOT: pointer_to_address
   // CHECK-NOT: destroy_addr
   // CHECK-NOT: release
-  // CHECK: release [[X]] : $@box
+  // CHECK: release %1 : $@box
   // CHECK-NOT: release
   return Builtin.destroy(Builtin.Int64, x)
   // CHECK: return
@@ -91,9 +90,7 @@ func destroy_gen<T>(x: Builtin.RawPointer, _: T) {
 }
 
 // CHECK-LABEL: sil hidden @_TF8builtins10assign_pod
-func assign_pod(x: Builtin.Int64, y: Builtin.RawPointer) {
-  var x = x
-  var y = y
+func assign_pod(var x: Builtin.Int64, var y: Builtin.RawPointer) {
   // CHECK: alloc_box
   // CHECK: alloc_box
   // CHECK-NOT: alloc_box
@@ -116,10 +113,8 @@ func assign_obj(x: Builtin.NativeObject, y: Builtin.RawPointer) {
 }
 
 // CHECK-LABEL: sil hidden @_TF8builtins12assign_tuple
-func assign_tuple(x: (Builtin.Int64, Builtin.NativeObject),
-                  y: Builtin.RawPointer) {
-  var x = x
-  var y = y
+func assign_tuple(var x: (Builtin.Int64, Builtin.NativeObject),
+                  var y: Builtin.RawPointer) {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*(Builtin.Int64, Builtin.NativeObject)
   // CHECK: assign {{%.*}} to [[ADDR]]
   // CHECK: release 

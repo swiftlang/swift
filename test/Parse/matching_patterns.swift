@@ -25,18 +25,17 @@ case 1 + 2:
 case square(9):
   ()
 
-// 'let' patterns.
+// 'var' and 'let' patterns.
+case var a:
+  a = 1
 case let a:
   a = 1         // expected-error {{cannot assign}}
-case let (let b): // expected-error {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
-  print(b)
-
-// 'var' patterns (not allowed)
-case var a: // expected-error {{Use of 'var' binding here is not allowed}} {{6-9=let}}
+case var var a: // expected-error {{'var' cannot appear nested inside another 'var' or 'let' pattern}}
   a += 1
-case var let a: // expected-error {{Use of 'var' binding here is not allowed}} {{6-9=let}}
-  // expected-error@-1 {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
+case var let a: // expected-error {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
   print(a, terminator: "")
+case var (var b): // expected-error {{'var' cannot appear nested inside another 'var'}}
+  b += 1
 
 // 'Any' pattern.
 case _:
@@ -48,7 +47,7 @@ case 1 + (_): // expected-error{{'_' can only appear in a pattern or on the left
 }
 
 switch (x,x) {
-case (let a, let a): // expected-error {{definition conflicts with previous value}} expected-note {{previous definition of 'a' is here}}
+case (var a, var a): // expected-error {{definition conflicts with previous value}} expected-note {{previous definition of 'a' is here}}
   fallthrough
 case _:
   ()
@@ -300,22 +299,19 @@ func +++(x: (Int,Int,Int), y: (Int,Int,Int)) -> (Int,Int,Int) {
 }
 
 switch t {
-case (_, let a, 3):
-  var a = a
+case (_, var a, 3):
   a += 1
-case let (_, b, 3):
-  var b = b
+case var (_, b, 3):
   b += 1
-case let (_, let c, 3): // expected-error{{'let' cannot appear nested inside another 'var' or 'let' pattern}}
-  var c = c
+case var (_, var c, 3): // expected-error{{'var' cannot appear nested inside another 'var'}}
   c += 1
 case (1, 2, 3):
   ()
 
 // patterns in expression-only positions are errors.
-case +++(_, let d, 3): // expected-error{{invalid pattern}}
+case +++(_, var d, 3): // expected-error{{invalid pattern}}
   ()
-case (_, let e, 3) +++ (1, 2, 3): // expected-error{{invalid pattern}}
+case (_, var e, 3) +++ (1, 2, 3): // expected-error{{invalid pattern}}
   ()
 }
 

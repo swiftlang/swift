@@ -922,7 +922,7 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
   // matching pattern.
   if (patternResult.isNull()) {
     llvm::SaveAndRestore<decltype(P.InVarOrLetPattern)>
-      T(P.InVarOrLetPattern, Parser::IVOLP_AlwaysImmutable);
+      T(P.InVarOrLetPattern, Parser::IVOLP_InMatchingPattern);
     patternResult = P.parseMatchingPattern(isExprBasic);
   }
 
@@ -1247,8 +1247,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
       if (BindingKind == BK_Case) {
         // In our recursive parse, remember that we're in a matching pattern.
         llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
-          T(InVarOrLetPattern, IVOLP_AlwaysImmutable);
-
+          T(InVarOrLetPattern, IVOLP_InMatchingPattern);
         ThePattern = parseMatchingPattern(/*isExprBasic*/ true);
       } else if (BindingKind == BK_LetCase || BindingKind == BK_VarCase) {
         // Recover from the 'if let case' typo gracefully.
@@ -1266,14 +1265,9 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
         }
       } else {
         // Otherwise, this is an implicit optional binding "if let".
-
-        // In our recursive parse, remember that we're in a var/let pattern.
-        llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
-          T(InVarOrLetPattern, IVOLP_AlwaysImmutable);
-
-        ThePattern = parseMatchingPatternAsLetOrVar(BindingKind == BK_Let,
-                                                    VarLoc,
-                                                    /*isExprBasic*/ true);
+        ThePattern =
+          parseMatchingPatternAsLetOrVar(BindingKind == BK_Let, VarLoc,
+                                         /*isExprBasic*/ true);
         // The let/var pattern is part of the statement.
         if (Pattern *P = ThePattern.getPtrOrNull())
           P->setImplicit();
@@ -2320,10 +2314,9 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc,
     // if desired by using a 'var' pattern.
     assert(InVarOrLetPattern == IVOLP_NotInVarOrLet &&
            "for-each loops cannot exist inside other patterns");
-
-    InVarOrLetPattern = IVOLP_AlwaysImmutable;
+    InVarOrLetPattern = IVOLP_ImplicitlyImmutable;
     pattern = parseTypedPattern();
-    assert(InVarOrLetPattern == IVOLP_AlwaysImmutable);
+    assert(InVarOrLetPattern == IVOLP_ImplicitlyImmutable);
     InVarOrLetPattern = IVOLP_NotInVarOrLet;
   }
   

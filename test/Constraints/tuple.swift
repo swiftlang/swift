@@ -96,14 +96,14 @@ class C {
 func testLValue(c: C) {
   var c = c
   c.f(c)
-  
+
   let x = c
   c = x
 }
 
 
 // <rdar://problem/21444509> Crash in TypeChecker::coercePatternToType
-func invalidPatternCrash(k : Int) {
+func invalidPatternCrash(let k : Int) {
   switch k {
   case (k, cph_: k) as UInt8:  // expected-error {{tuple pattern cannot match values of the non-tuple type 'UInt8'}} expected-warning {{cast from 'Int' to unrelated type 'UInt8' always fails}}
     break

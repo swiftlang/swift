@@ -3,8 +3,7 @@
 // RUN: %complete-test -raw -hide-none -tok=INT_OPERATORS %s | FileCheck %s -check-prefix=RAW
 
 let xxxx = 1
-func test1(x: Int) {
-  var x = x
+func test1(var x: Int) {
   x#^INT_OPERATORS^#
 }
 // CHECK: .
@@ -12,8 +11,7 @@ func test1(x: Int) {
 // CHECK: +
 // CHECK: ++
 
-func test2(x: Int) {
-  var x = x
+func test2(var x: Int) {
   #^INT_OPERATORS_INNER,x^#
 }
 // INNER: x.

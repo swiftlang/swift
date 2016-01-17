@@ -276,7 +276,7 @@ func RepeatWhileStmt4() {
 
 func brokenSwitch(x: Int) -> Int {
   switch x {
-  case .Blah(let rep): // expected-error{{enum case 'Blah' not found in type 'Int'}}
+  case .Blah(var rep): // expected-error{{enum case 'Blah' not found in type 'Int'}}
     return rep
   }
 }

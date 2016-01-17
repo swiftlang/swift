@@ -89,11 +89,9 @@ func tuple_patterns() {
 // CHECK-NEXT: [[PBX:%.*]] = project_box [[X]]
 // CHECK-NEXT: store %0 to [[PBX]]
 // CHECK-NEXT: [[Y:%[0-9]+]] = alloc_box $Int
-// CHECK-NEXT: [[PBY:%.*]] = project_box [[Y]]
+// CHECK-NEXT: [[PBY:%[0-9]+]] = project_box [[Y]]
 // CHECK-NEXT: store %1 to [[PBY]]
-func simple_arguments(x: Int, y: Int) -> Int {
-  var x = x
-  var y = y
+func simple_arguments(var x: Int, var y: Int) -> Int {
   return x+y
 }
 
@@ -102,8 +100,9 @@ func simple_arguments(x: Int, y: Int) -> Int {
 // CHECK: [[UNIT:%[0-9]+]] = tuple ()
 // CHECK: [[TUPLE:%[0-9]+]] = tuple (%0 : $Int, %1 : $Float, [[UNIT]] : $())
 // CHECK: [[XADDR:%[0-9]+]] = alloc_box $(Int, Float, ())
-func tuple_argument(x: (Int, Float, ())) {
-  var x = x
+// CHECK: [[PBX:%[0-9]+]] = project_box [[XADDR]]
+// CHECK: store [[TUPLE]] to [[PBX]]
+func tuple_argument(var x: (Int, Float, ())) {
 }
 
 // CHECK-LABEL: sil hidden @_TF5decls14inout_argument
@@ -111,10 +110,9 @@ func tuple_argument(x: (Int, Float, ())) {
 // CHECK: [[X_LOCAL:%[0-9]+]] = alloc_box $Int
 // CHECK: [[PBX:%.*]] = project_box [[X_LOCAL]]
 // CHECK: [[YADDR:%[0-9]+]] = alloc_box $Int
-// CHECK: [[PBY:%.*]] = project_box [[YADDR]]
+// CHECK: [[PBY:%[0-9]+]] = project_box [[YADDR]]
 // CHECK: copy_addr [[PBY]] to [[PBX]]
-func inout_argument(inout x: Int, y: Int) {
-  var y = y
+func inout_argument(inout x: Int, var y: Int) {
   x = y
 }
 
@@ -131,8 +129,7 @@ func load_from_global() -> Int {
 }
 
 // CHECK-LABEL: sil hidden @_TF5decls15store_to_global
-func store_to_global(x: Int) {
-  var x = x
+func store_to_global(var x: Int) {
   global = x
   // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Int
   // CHECK: [[PBX:%.*]] = project_box [[XADDR]]

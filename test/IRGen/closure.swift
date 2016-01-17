@@ -6,23 +6,23 @@
 
 // CHECK: [[METADATA:@.*]] = private constant %swift.full_boxmetadata { void (%swift.refcounted*)* [[DESTROY:@objectdestroy.1]], i8** null, %swift.type { i64 64 }, i32 16 }
 
-func a(i i: Int) -> (Int) -> Int {
+func a(var i i: Int) -> (Int) -> Int {
   return { x in i }
 }
 
 // -- Closure entry point
-// CHECK: define linkonce_odr hidden i64 @[[CLOSURE1:_TFF7closure1aFT1iSi_FSiSiU_FSiSi]](i64, i64)
+// CHECK: define linkonce_odr hidden i64 @_TTSf2n_i___TFF7closure1aFT1iSi_FSiSiU_FSiSi(i64, i64)
 
 protocol Ordinable {
   func ord() -> Int
 }
 
-func b<T : Ordinable>(seq seq: T) -> (Int) -> Int {
+func b<T : Ordinable>(var seq seq: T) -> (Int) -> Int {
   return { i in i + seq.ord() }
 }
 
 // -- partial_apply stub
-// CHECK: define internal i64 @_TPA_[[CLOSURE1]](i64, %swift.refcounted*) {{.*}} {
+// CHECK: define internal i64 @_TPA__TTSf2n_i___TFF7closure1aFT1iSi_FSiSiU_FSiSi(i64, %swift.refcounted*)
 // CHECK: }
 
 // -- Closure entry point
@@ -48,7 +48,7 @@ func b<T : Ordinable>(seq seq: T) -> (Int) -> Int {
 
 // -- <rdar://problem/14443343> Boxing of tuples with generic elements
 // CHECK: define hidden { i8*, %swift.refcounted* } @_TF7closure14captures_tupleu0_rFT1xTxq___FT_Txq__(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T, %swift.type* %U)
-func captures_tuple<T, U>(x x: (T, U)) -> () -> (T, U) {
+func captures_tuple<T, U>(var x x: (T, U)) -> () -> (T, U) {
   // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getTupleTypeMetadata2(%swift.type* %T, %swift.type* %U, i8* null, i8** null)
   // CHECK-NOT: @swift_getTupleTypeMetadata2
   // CHECK: [[BOX:%.*]] = call { %swift.refcounted*, %swift.opaque* } @swift_allocBox(%swift.type* [[METADATA]])

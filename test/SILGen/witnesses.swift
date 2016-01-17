@@ -2,9 +2,7 @@
 
 infix operator <~> {}
 
-func archetype_method<T: X>(x x: T, y: T) -> T {
-  var x = x
-  var y = y
+func archetype_method<T: X>(var x x: T, var y: T) -> T {
   return x.selfTypes(x: y)
 }
 // CHECK-LABEL: sil hidden @_TF9witnesses16archetype_method{{.*}} : $@convention(thin) <T where T : X> (@out T, @in T, @in T) -> () {
@@ -12,8 +10,7 @@ func archetype_method<T: X>(x x: T, y: T) -> T {
 // CHECK:         apply [[METHOD]]<T>({{%.*}}, {{%.*}}, {{%.*}}) : $@convention(witness_method) <τ_0_0 where τ_0_0 : X> (@out τ_0_0, @in τ_0_0, @inout τ_0_0) -> ()
 // CHECK:       }
 
-func archetype_generic_method<T: X>(x x: T, y: Loadable) -> Loadable {
-  var x = x
+func archetype_generic_method<T: X>(var x x: T, y: Loadable) -> Loadable {
   return x.generic(x: y)
 }
 // CHECK-LABEL: sil hidden @_TF9witnesses24archetype_generic_method{{.*}} : $@convention(thin) <T where T : X> (@in T, Loadable) -> Loadable {

@@ -30,8 +30,7 @@ func test3() -> NSObject {
 
 // Normal message send with argument, no transfers.
 // CHECK-LABEL: sil hidden  @_TF26objc_ownership_conventions5test5
-func test5(g: Gizmo) {
-  var g = g
+func test5(var g: Gizmo) {
   Gizmo.inspect(g)
   // CHECK:      [[CLASS:%.*]] = metatype $@thick Gizmo.Type
   // CHECK-NEXT: [[METHOD:%.*]] = class_method [volatile] [[CLASS]] : {{.*}}, #Gizmo.inspect!1.foreign
@@ -44,8 +43,7 @@ func test5(g: Gizmo) {
 }
 // The argument to consume is __attribute__((ns_consumed)).
 // CHECK-LABEL: sil hidden  @_TF26objc_ownership_conventions5test6
-func test6(g: Gizmo) {
-  var g = g
+func test6(var g: Gizmo) {
   Gizmo.consume(g)
   // CHECK:      [[CLASS:%.*]] = metatype $@thick Gizmo.Type
   // CHECK-NEXT: [[METHOD:%.*]] = class_method [volatile] [[CLASS]] : {{.*}}, #Gizmo.consume!1.foreign
@@ -58,8 +56,7 @@ func test6(g: Gizmo) {
 }
 // fork is __attribute__((ns_consumes_self)).
 // CHECK-LABEL: sil hidden  @_TF26objc_ownership_conventions5test7
-func test7(g: Gizmo) {
-  var g = g
+func test7(var g: Gizmo) {
   g.fork()
   // CHECK:      [[G:%.*]] = load
   // CHECK-NEXT: retain [[G]]
@@ -111,7 +108,7 @@ func test9(g: Gizmo) -> Gizmo {
 }
 
 // CHECK-LABEL: sil hidden @_TF26objc_ownership_conventions6test10
-func test10(g: Gizmo) -> AnyClass {
+func test10(let g: Gizmo) -> AnyClass {
   // CHECK: bb0([[G:%[0-9]+]] : $Gizmo):
   // CHECK:      strong_retain [[G]]
   // CHECK-NEXT: [[NS_G:%[0-9]+]] = upcast [[G:%[0-9]+]] : $Gizmo to $NSObject
@@ -131,7 +128,7 @@ func test10(g: Gizmo) -> AnyClass {
 }
 
 // CHECK-LABEL: sil hidden @_TF26objc_ownership_conventions6test11
-func test11(g: Gizmo) -> AnyClass {
+func test11(let g: Gizmo) -> AnyClass {
   // CHECK: bb0([[G:%[0-9]+]] : $Gizmo):
   // CHECK: strong_retain [[G]]
   // CHECK: [[NS_G:%[0-9]+]] = upcast [[G:%[0-9]+]] : $Gizmo to $NSObject

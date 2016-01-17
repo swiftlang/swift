@@ -557,10 +557,9 @@ struct _ParentProcess {
       }
       if readfds.isset(_childStdout.fd) || errorfds.isset(_childStdout.fd) {
         _childStdout.read()
-        while let line = _childStdout.getline() {
-          var standardOut = line
-          if let index = findSubstring(standardOut, _stdlibUnittestStreamPrefix) {
-            let controlMessage = standardOut[index..<standardOut.endIndex]._split(";")
+        while var line = _childStdout.getline() {
+          if let index = findSubstring(line, _stdlibUnittestStreamPrefix) {
+            let controlMessage = line[index..<line.endIndex]._split(";")
             switch controlMessage[1] {
             case "expectCrash":
               stdoutSeenCrashDelimiter = true
@@ -571,24 +570,23 @@ struct _ParentProcess {
             default:
               fatalError("unexpected message")
             }
-            standardOut = standardOut[standardOut.startIndex..<index]
-            if standardOut.isEmpty {
+            line = line[line.startIndex..<index]
+            if line.isEmpty {
               continue
             }
           }
           if stdoutSeenCrashDelimiter {
-            capturedCrashStdout.append(standardOut)
+            capturedCrashStdout.append(line)
           }
-          print("out>>> \(standardOut)")
+          print("out>>> \(line)")
         }
         continue
       }
       if readfds.isset(_childStderr.fd) || errorfds.isset(_childStderr.fd) {
         _childStderr.read()
-        while let line = _childStderr.getline() {
-          var standardErr = line
-          if let index = findSubstring(standardErr, _stdlibUnittestStreamPrefix) {
-            let controlMessage = standardErr[index..<standardErr.endIndex]._split(";")
+        while var line = _childStderr.getline() {
+          if let index = findSubstring(line, _stdlibUnittestStreamPrefix) {
+            let controlMessage = line[index..<line.endIndex]._split(";")
             switch controlMessage[1] {
             case "expectCrash":
               stderrSeenCrashDelimiter = true
@@ -597,15 +595,15 @@ struct _ParentProcess {
             default:
               fatalError("unexpected message")
             }
-            standardErr = standardErr[standardErr.startIndex..<index]
-            if standardErr.isEmpty {
+            line = line[line.startIndex..<index]
+            if line.isEmpty {
               continue
             }
           }
           if stderrSeenCrashDelimiter {
-            capturedCrashStderr.append(standardErr)
+            capturedCrashStderr.append(line)
           }
-          print("err>>> \(standardErr)")
+          print("err>>> \(line)")
         }
         continue
       }

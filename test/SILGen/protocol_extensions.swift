@@ -550,12 +550,11 @@ func testExistentialsGetters(p1: P1) {
 
 // CHECK-LABEL: sil hidden @_TF19protocol_extensions22testExistentialSetters
 // CHECK: bb0([[P:%[0-9]+]] : $*P1, [[B:%[0-9]+]] : $Bool):
-func testExistentialSetters(p1: P1, b: Bool) {
-  var p1 = p1
+func testExistentialSetters(var p1: P1, b: Bool) {
   // CHECK: [[PBOX:%[0-9]+]] = alloc_box $P1
-  // CHECK-NEXT: [[PB:%.*]] = project_box [[PBOX]]
-  // CHECK-NEXT: copy_addr [[P]] to [initialization] [[PB]] : $*P1
-  // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[PB]] : $*P1 to $*@opened([[UUID:".*"]]) P1
+  // CHECK: [[PBP:%[0-9]+]] = project_box [[PBOX]]
+  // CHECK-NEXT: copy_addr [take] [[P]] to [initialization] [[PBP]] : $*P1
+  // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[PBP]] : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: [[GETTER:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P1s5prop2Sb
   // CHECK: apply [[GETTER]]<@opened([[UUID]]) P1>([[B]], [[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, @inout τ_0_0) -> ()
   // CHECK-NOT: deinit_existential_addr
@@ -581,16 +580,15 @@ struct HasAP1 {
 
 // CHECK-LABEL: sil hidden @_TF19protocol_extensions29testLogicalExistentialSetters
 // CHECK: bb0([[HASP1:%[0-9]+]] : $*HasAP1, [[B:%[0-9]+]] : $Bool)
-func testLogicalExistentialSetters(hasAP1: HasAP1, _ b: Bool) {
-  var hasAP1 = hasAP1
+func testLogicalExistentialSetters(var hasAP1: HasAP1, _ b: Bool) {
   // CHECK: [[HASP1_BOX:%[0-9]+]] = alloc_box $HasAP1
-  // CHECK-NEXT: [[PB:%.*]] = project_box [[HASP1_BOX]]
-  // CHECK-NEXT: copy_addr [[HASP1]] to [initialization] [[PB]] : $*HasAP1
+  // CHECK: [[PBHASP1:%[0-9]+]] = project_box [[HASP1_BOX]]
+  // CHECK-NEXT: copy_addr [take] [[HASP1]] to [initialization] [[PBHASP1]] : $*HasAP1
   // CHECK: [[P1_COPY:%[0-9]+]] = alloc_stack $P1
   // CHECK-NEXT: [[HASP1_COPY:%[0-9]+]] = alloc_stack $HasAP1
   // CHECK-NEXT: copy_addr [[PB]] to [initialization] [[HASP1_COPY]] : $*HasAP1
   // CHECK: [[SOMEP1_GETTER:%[0-9]+]] = function_ref @_TFV19protocol_extensions6HasAP1g6someP1PS_2P1_ : $@convention(method) (@out P1, @in_guaranteed HasAP1) -> ()
-  // CHECK: [[RESULT:%[0-9]+]] = apply [[SOMEP1_GETTER]]([[P1_COPY]], [[HASP1_COPY]]) : $@convention(method) (@out P1, @in_guaranteed HasAP1) -> ()
+  // CHECK: [[RESULT:%[0-9]+]] = apply [[SOMEP1_GETTER]]([[P1_COPY]], %7) : $@convention(method) (@out P1, @in_guaranteed HasAP1) -> ()
   // CHECK: [[P1_OPENED:%[0-9]+]] = open_existential_addr [[P1_COPY]] : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: [[PROP2_SETTER:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P1s5prop2Sb : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, @inout τ_0_0) -> ()
   // CHECK: apply [[PROP2_SETTER]]<@opened([[UUID]]) P1>([[B]], [[P1_OPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, @inout τ_0_0) -> ()
@@ -605,8 +603,7 @@ func plusOneP1() -> P1 {}
 
 // CHECK-LABEL: sil hidden @_TF19protocol_extensions38test_open_existential_semantics_opaque
 func test_open_existential_semantics_opaque(guaranteed: P1,
-                                            immediate: P1) {
-  var immediate = immediate
+                                            var immediate: P1) {
   // CHECK: [[IMMEDIATE_BOX:%.*]] = alloc_box $P1
   // CHECK: [[PB:%.*]] = project_box [[IMMEDIATE_BOX]]
   // CHECK: [[VALUE:%.*]] = open_existential_addr %0
@@ -645,8 +642,7 @@ func plusOneCP1() -> CP1 {}
 
 // CHECK-LABEL: sil hidden @_TF19protocol_extensions37test_open_existential_semantics_class
 func test_open_existential_semantics_class(guaranteed: CP1,
-                                           immediate: CP1) {
-  var immediate = immediate
+                                           var immediate: CP1) {
   // CHECK: [[IMMEDIATE_BOX:%.*]] = alloc_box $CP1
   // CHECK: [[PB:%.*]] = project_box [[IMMEDIATE_BOX]]
 

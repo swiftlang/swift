@@ -157,9 +157,6 @@ class ExplicitSelfRequiredTest {
   }
 }
 
-// expected-error@+2 {{Use of 'var' binding here is not allowed}} {{57-60=}}
-// expected-warning@+1 {{'let' keyword is unnecessary; function parameters are immutable by default}} {{64-68=}}
-var testClosureArgumentPatterns: (Int, Int) -> Int = { (var x, let y) in x+y+1 }
 
 class SomeClass {
   var field : SomeClass?

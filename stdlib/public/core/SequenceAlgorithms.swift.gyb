@@ -74,19 +74,16 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
     @noescape isOrderedBefore: (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> ${GElement}? {
-    var minResult: ${GElement}? = nil
-    for e in GeneratorSequence(generate()) {
-      if let currentMinResult = minResult {
+    var g = generate()
+    guard var result = g.next() else { return nil }
+    for e in GeneratorSequence(g) {
 %   if preds:
-        if try isOrderedBefore(e, currentMinResult) { minResult = e }
+      if try isOrderedBefore(e, result) { result = e }
 %   else:
-      if e < currentMinResult { minResult = e }
+      if e < result { result = e }
 %   end
-      } else {
-        minResult = e
-      }
     }
-    return minResult
+    return result
   }
 
   /// Returns the maximum element in `self` or `nil` if the sequence is empty.
@@ -99,19 +96,16 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
     @noescape isOrderedBefore: (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> ${GElement}? {
-    var maxResult: ${GElement}? = nil
-    for e in GeneratorSequence(generate()) {
-      if let currentMaxResult = maxResult {
+    var g = generate()
+    guard var result = g.next() else { return nil }
+    for e in GeneratorSequence(g) {
 %   if preds:
-        if try isOrderedBefore(currentMaxResult, e) { maxResult = e }
+      if try isOrderedBefore(result, e) { result = e }
 %   else:
-        if e > currentMaxResult { maxResult = e }
+      if e > result { result = e }
 %   end
-      } else {
-        maxResult = e
-      }
     }
-    return maxResult
+    return result
   }
 }
 

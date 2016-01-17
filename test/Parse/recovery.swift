@@ -567,9 +567,9 @@ func testMultiPatternConditionRecovery(x: Int?) {
     _ = z
   }
 
-  // expected-error@+1 {{binding ended by previous 'where' clause; use 'let' to introduce a new one}} {{30-30=let }}
-  if let y = x where y == 0, z = x {
-    _ = z
+  // expected-error@+1 {{binding ended by previous 'where' clause; use 'var' to introduce a new one}} {{30-30=var }}
+  if var y = x where y == 0, z = x {
+    z = y; y = z
   }
 
   // <rdar://problem/20883210> QoI: Following a "let" condition with boolean condition spouts nonsensical errors

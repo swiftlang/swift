@@ -204,15 +204,13 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       param.LetVarInOutLoc = consumeToken();
       param.SpecifierKind = ParsedParameter::InOut;
     } else if (Tok.is(tok::kw_let)) {
-      diagnose(Tok.getLoc(), diag::let_on_param_is_redundant,
-               Tok.is(tok::kw_let)).fixItRemove(Tok.getLoc());
       param.LetVarInOutLoc = consumeToken();
       param.SpecifierKind = ParsedParameter::Let;
     } else if (Tok.is(tok::kw_var)) {
-      diagnose(Tok.getLoc(), diag::var_not_allowed_in_pattern)
+      diagnose(Tok.getLoc(), diag::var_parameter_not_allowed)
         .fixItRemove(Tok.getLoc());
       param.LetVarInOutLoc = consumeToken();
-      param.SpecifierKind = ParsedParameter::Let;
+      param.SpecifierKind = ParsedParameter::Var;
     }
 
     // Redundant specifiers are fairly common, recognize, reject, and recover
@@ -778,44 +776,32 @@ ParserResult<Pattern> Parser::parsePattern() {
       consumeToken(tok::code_complete);
     }
     return nullptr;
-
+    
   case tok::kw_var:
   case tok::kw_let: {
-    bool isLetKeyword = Tok.is(tok::kw_let);
-    bool alwaysImmutable = InVarOrLetPattern == IVOLP_AlwaysImmutable;
-    bool implicitlyImmutable = InVarOrLetPattern == IVOLP_ImplicitlyImmutable;
+    bool isLet = Tok.is(tok::kw_let);
     SourceLoc varLoc = consumeToken();
-
+    
     // 'var' and 'let' patterns shouldn't nest.
     if (InVarOrLetPattern == IVOLP_InLet ||
         InVarOrLetPattern == IVOLP_InVar)
-      diagnose(varLoc, diag::var_pattern_in_var, unsigned(isLetKeyword));
-
-    if (isLetKeyword) {
-      // 'let' isn't valid inside an implicitly immutable or always
-      // immutable context.
-      if (alwaysImmutable || implicitlyImmutable)
-        diagnose(varLoc, diag::let_pattern_in_immutable_context)
-          .fixItRemove(varLoc);
-    } else {
-      // In an always immutable context, `var` is not allowed.
-      if (alwaysImmutable)
-        diagnose(varLoc, diag::var_not_allowed_in_pattern)
-          .fixItRemove(varLoc);
-    }
+      diagnose(varLoc, diag::var_pattern_in_var, unsigned(isLet));
+    
+    // 'let' isn't valid inside an implicitly immutable context, but var is.
+    if (isLet && InVarOrLetPattern == IVOLP_ImplicitlyImmutable)
+      diagnose(varLoc, diag::let_pattern_in_immutable_context);
     
     // In our recursive parse, remember that we're in a var/let pattern.
     llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
-    T(InVarOrLetPattern, isLetKeyword ? IVOLP_InLet : IVOLP_InVar);
+    T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
     
     ParserResult<Pattern> subPattern = parsePattern();
     if (subPattern.hasCodeCompletion())
       return makeParserCodeCompletionResult<Pattern>();
     if (subPattern.isNull())
       return nullptr;
-    return makeParserResult(new (Context) VarPattern(varLoc,
-      isLetKeyword || alwaysImmutable,
-      subPattern.get()));
+    return makeParserResult(new (Context) VarPattern(varLoc, isLet,
+                                                     subPattern.get()));
   }
       
   default:
@@ -1003,10 +989,6 @@ ParserResult<Pattern> Parser::parseMatchingPatternAsLetOrVar(bool isLet,
   // 'let' isn't valid inside an implicitly immutable context, but var is.
   if (isLet && InVarOrLetPattern == IVOLP_ImplicitlyImmutable)
     diagnose(varLoc, diag::let_pattern_in_immutable_context);
-
-  if (!isLet && InVarOrLetPattern == IVOLP_AlwaysImmutable)
-    diagnose(varLoc, diag::var_not_allowed_in_pattern)
-      .fixItReplace(varLoc, "let");
 
   // In our recursive parse, remember that we're in a var/let pattern.
   llvm::SaveAndRestore<decltype(InVarOrLetPattern)>

@@ -10,8 +10,7 @@ func rdar16016713(r: Range) {
 }
 
 // CHECK-LABEL: sil hidden @_TF10multi_file26lazyPropertiesAreNotStored
-func lazyPropertiesAreNotStored(container: LazyContainer) {
-  var container = container
+func lazyPropertiesAreNotStored(var container: LazyContainer) {
   // CHECK: {{%[0-9]+}} = function_ref @_TFV10multi_file13LazyContainerg7lazyVarSi : $@convention(method) (@inout LazyContainer) -> Int
   markUsed(container.lazyVar)
 }

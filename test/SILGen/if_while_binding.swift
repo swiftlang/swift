@@ -33,42 +33,37 @@ func if_no_else() {
 // CHECK-LABEL: sil hidden @_TF16if_while_binding13if_else_chainFT_T_ : $@convention(thin) () -> () {
 func if_else_chain() {
   // CHECK:   [[FOO:%.*]] = function_ref @_TF16if_while_binding3foo
-  // CHECK:   [[XVAL:%.*]] = apply [[FOO]]()
-  // CHECK:   switch_enum [[XVAL]] : $Optional<String>, case #Optional.Some!enumelt.1: [[YESX:bb[0-9]+]], default [[NOX:bb[0-9]+]]
+  // CHECK-NEXT:   [[OPT_RES:%.*]] = apply [[FOO]]()
+  // CHECK-NEXT:   switch_enum [[OPT_RES]] : $Optional<String>, case #Optional.Some!enumelt.1: [[YESX:bb[0-9]+]], default [[NOX:bb[0-9]+]]
   if let x = foo() {
-  // CHECK: [[YESX]]([[XVAL:%[0-9]+]] : $String):
-  // CHECK:   debug_value [[XVAL]] : $String, let, name "x"
-  // CHECK:   [[A:%.*]] = function_ref @_TF16if_while_binding1aFSST_
-  // CHECK:   retain_value [[XVAL]]
-  // CHECK:   apply [[A]]([[XVAL]])
-  // CHECK:   release_value [[XVAL]]
+  // CHECK: [[YESX]]([[VAL:%[0-9]+]] : $String):
+  // CHECK:   debug_value [[VAL]] : $String, let, name "x"
+  // CHECK:   [[A:%.*]] = function_ref @_TF16if_while_binding
+  // CHECK:   retain_value [[VAL]]
+  // CHECK:   apply [[A]]([[VAL]])
+  // CHECK:   release_value [[VAL]]
   // CHECK:   br [[CONT_X:bb[0-9]+]]
     a(x)
   // CHECK: [[NOX]]:
-  // CHECK:   [[BAR:%.*]] = function_ref  @_TF16if_while_binding3barFT_GSqSS_
-  // CHECK:   [[YVAL:%[0-9]+]] = apply [[BAR]]()
-  // CHECK:   switch_enum [[YVAL]] : $Optional<String>, case #Optional.Some!enumelt.1: [[YESY:bb[0-9]+]], default [[NOY:bb[0-9]+]]
-  } else if let y = bar() {
-  // CHECK: [[YESY]]([[YVAL:%[0-9]+]] : $String):
-  // CHECK:   debug_value [[YVAL]] : $String
-  // CHECK:   [[B:%[0-9]+]] = function_ref @_TF16if_while_binding1bFSST_
-  // CHECK:   retain_value [[YVAL]]
-  // CHECK:   [[BRET:%[0-9]+]] = apply [[B]]([[YVAL]])
-  // CHECK:   release_value [[YVAL]] : $String
+  // CHECK:   alloc_box $String, var, name "y"
+  // CHECK:   switch_enum {{.*}} : $Optional<String>, case #Optional.Some!enumelt.1: [[YESY:bb[0-9]+]], default [[ELSE1:bb[0-9]+]]
+    // CHECK: [[ELSE1]]:
+    // CHECK:   dealloc_box {{.*}} $@box String
+    // CHECK:   br [[ELSE:bb[0-9]+]]
+  } else if var y = bar() {
+  // CHECK: [[YESY]]([[VAL:%[0-9]+]] : $String):
   // CHECK:   br [[CONT_Y:bb[0-9]+]]
     b(y)
   } else {
-  // CHECK: [[NOY]]:
-    // CHECK: [[C:%[0-9]+]] = function_ref @_TF16if_while_binding1cFSST_
+    // CHECK: [[ELSE]]:
+    // CHECK: function_ref if_while_binding.c
     c("")
-    // CHECK:   br [[CONT_Y:bb[0-9]+]]
+    // CHECK:   br [[CONT_Y]]
   }
 
   // CHECK: [[CONT_Y]]:
   //   br [[CONT_X]]
   // CHECK: [[CONT_X]]:
-  // CHECK:  tuple ()
-  // CHECK:  return
 }
 
 // CHECK-LABEL: sil hidden @_TF16if_while_binding10while_loopFT_T_ : $@convention(thin) () -> () {
@@ -154,104 +149,94 @@ func while_loop_multi() {
 
 // CHECK-LABEL: sil hidden @_TF16if_while_binding8if_multiFT_T_
 func if_multi() {
-  // CHECK: [[FOO:%[0-9]+]] = function_ref @_TF16if_while_binding3fooFT_GSqSS_
-  // CHECK: [[AVAL:%[0-9]+]] = apply [[FOO]]()
-  // CHECK: switch_enum [[AVAL]] : $Optional<String>, case #Optional.Some!enumelt.1: [[YESA:bb[0-9]+]], default [[DONE:bb[0-9]+]]
+  // CHECK:   switch_enum {{.*}}, case #Optional.Some!enumelt.1: [[CHECKBUF2:bb.*]], default [[IF_DONE:bb[0-9]+]]
 
-  // CHECK: [[YESA]]([[AVAL:%[0-9]+]] : $String):
-  // CHECK:   debug_value [[AVAL]]
-  // CHECK:   [[BAR:%[0-9]+]] = function_ref @_TF16if_while_binding3barFT_GSqSS_
-  // CHECK:   [[BVAL:%[0-9]+]] = apply [[BAR]]()
-  // CHECK:   switch_enum [[BVAL]] : $Optional<String>, case #Optional.Some!enumelt.1: [[YESB:bb[0-9]+]], default [[NOB:bb[0-9]+]]
+  // CHECK: [[CHECKBUF2]]([[A:%[0-9]+]] : $String):
+  // CHECK:   debug_value [[A]] : $String, let, name "a"
+  // CHECK:   [[B:%[0-9]+]] = alloc_box $String, var, name "b"
+  // CHECK:   [[PB:%[0-9]+]] = project_box [[B]]
+  // CHECK:   switch_enum {{.*}}, case #Optional.Some!enumelt.1: [[IF_BODY:bb.*]], default [[IF_EXIT1a:bb[0-9]+]]
 
-  // CHECK: [[NOB]]:
-  // CHECK:   release_value [[AVAL]]
-  // CHECK:   br [[DONE]]
-  if let a = foo(), let b = bar() {
-    // CHECK: [[YESB]]([[BVAL:%[0-9]+]] : $String):
-    // CHECK:   debug_value [[BVAL]]
-    // CHECK:   debug_value [[AVAL]]
-    // CHECK:   release_value [[BVAL]]
-    // CHECK:   release_value [[AVAL]]
-    // CHECK:   br [[DONE]]
+  // CHECK: [[IF_EXIT1a]]:
+  // CHECK:   dealloc_box {{.*}} $@box String
+  // CHECK:   release_value [[A]]
+  // CHECK:   br [[IF_DONE]]
+
+  // CHECK: [[IF_BODY]]([[BVAL:%[0-9]+]] : $String):
+  if let a = foo(), var b = bar() {
+    // CHECK:   store [[BVAL]] to [[PB]] : $*String
+    // CHECK:   debug_value {{.*}} : $String, let, name "c"
+    // CHECK:   strong_release [[B]]
+    // CHECK:   release_value [[A]]
+    // CHECK:   br [[IF_DONE]]
     let c = a
   }
-  // CHECK: [[DONE]]:
+  // CHECK: [[IF_DONE]]:
   // CHECK-NEXT:   tuple ()
   // CHECK-NEXT:   return
 }
 
 // CHECK-LABEL: sil hidden @_TF16if_while_binding13if_multi_elseFT_T_
 func if_multi_else() {
-  // CHECK: [[FOO:%[0-9]+]] = function_ref @_TF16if_while_binding3fooFT_GSqSS_
-  // CHECK: [[AVAL:%[0-9]+]] = apply [[FOO]]()
-  // CHECK: switch_enum [[AVAL]] : $Optional<String>, case #Optional.Some!enumelt.1: [[YESA:bb[0-9]+]], default [[ELSE:bb[0-9]+]]
+  // CHECK:   switch_enum {{.*}}, case #Optional.Some!enumelt.1: [[CHECKBUF2:bb.*]], default [[ELSE:bb[0-9]+]]
+  // CHECK: [[CHECKBUF2]]([[A:%[0-9]+]] : $String):
+  // CHECK:   debug_value [[A]] : $String, let, name "a"
+  // CHECK:   [[B:%[0-9]+]] = alloc_box $String, var, name "b"
+  // CHECK:   [[PB:%[0-9]+]] = project_box [[B]]
+  // CHECK:   switch_enum {{.*}}, case #Optional.Some!enumelt.1: [[IF_BODY:bb.*]], default [[IF_EXIT1a:bb[0-9]+]]
+  
+    // CHECK: [[IF_EXIT1a]]:
+    // CHECK:   dealloc_box {{.*}} $@box String
+    // CHECK:   release_value [[A]]
+    // CHECK:   br [[ELSE]]
 
-  // CHECK: [[YESA]]([[AVAL:%[0-9]+]] : $String):
-  // CHECK:   debug_value [[AVAL]]
-  // CHECK:   [[BAR:%[0-9]+]] = function_ref @_TF16if_while_binding3barFT_GSqSS_
-  // CHECK:   [[BVAL:%[0-9]+]] = apply [[BAR]]()
-  // C/HECK:   switch_enum [[BVAL]] : $Optional<String>, case #Optional.Some!enumelt.1: [[YESB:bb[0-9]+]], default [NOB:bb[0-9]+]]
-
-  // CHECK: [[NOB]]:
-  // CHECK:   release_value [[AVAL]]
-  // C/HECK:   br [[ELSE]]
-
-  // CHECK: [[YESB]]([[BVAL:%[0-9]+]] : $String):
-  // CHECK:   debug_value [[BVAL]]
-  // CHECK:   debug_value [[AVAL]]
-  // CHECK:   release_value [[BVAL]]
-  // CHECK:   release_value [[AVAL]]
-  // CHECK:   br [[DONE:bb[0-9]+]]
-
-  // CHECK: [[ELSE]]:
-  // Integer literal construction stuff ...
-  // CHECK:   br [[DONE]]
-  if let a = foo(), let b = bar() {
+  // CHECK: [[IF_BODY]]([[BVAL:%[0-9]+]] : $String):
+  if let a = foo(), var b = bar() {
+    // CHECK:   store [[BVAL]] to [[PB]] : $*String
+    // CHECK:   debug_value {{.*}} : $String, let, name "c"
+    // CHECK:   strong_release [[B]]
+    // CHECK:   release_value [[A]]
+    // CHECK:   br [[IF_DONE:bb[0-9]+]]
     let c = a
   } else {
     let d = 0
+    // CHECK: [[ELSE]]:
+    // CHECK:   debug_value {{.*}} : $Int, let, name "d"
+    // CHECK:   br [[IF_DONE]]
  }
-  // CHECK: [[DONE]]:
+  // CHECK: [[IF_DONE]]:
   // CHECK-NEXT:   tuple ()
   // CHECK-NEXT:   return
 }
 
 // CHECK-LABEL: sil hidden @_TF16if_while_binding14if_multi_whereFT_T_
 func if_multi_where() {
-  // CHECK: [[FOO:%[0-9]+]] = function_ref @_TF16if_while_binding3foo
-  // CHECK: [[AVAL:%[0-9]+]] = apply [[FOO]]()
-  // CHECK: switch_enum {{.*}}, case #Optional.Some!enumelt.1: [[YESA:bb.*]], default [[DONE:bb[0-9]+]]
+  // CHECK:   switch_enum {{.*}}, case #Optional.Some!enumelt.1: [[CHECKBUF2:bb.*]], default [[ELSE:bb[0-9]+]]
+  // CHECK: [[CHECKBUF2]]([[A:%[0-9]+]] : $String):
+  // CHECK:   debug_value [[A]] : $String, let, name "a"
+  // CHECK:   [[BBOX:%[0-9]+]] = alloc_box $String, var, name "b"
+  // CHECK:   [[PB:%[0-9]+]] = project_box [[BBOX]]
+  // CHECK:   switch_enum {{.*}}, case #Optional.Some!enumelt.1: [[CHECK_WHERE:bb.*]], default [[IF_EXIT1a:bb[0-9]+]]
+  // CHECK: [[IF_EXIT1a]]:
+  // CHECK:   dealloc_box {{.*}} $@box String
+  // CHECK:   release_value [[A]]
+  // CHECK:   br [[ELSE]]
 
-  // CHECK: [[YESA]]([[AVAL:%[0-9]+]] : $String):
-  // CHECK:   debug_value [[AVAL]]
-  // CHECK:   [[BAR:%[0-9]+]] = function_ref @_TF16if_while_binding3bar
-  // CHECK:   [[BVAL:%[0-9]+]] = apply [[BAR]]()
-  // CHECK:   switch_enum [[BVAL]] : $Optional<String>, case #Optional.Some!enumelt.1: [[YESB:bb[0-9]+]], default [[NOB:bb[0-9]+]]
-
-  // CHECK: [[NOB]]:
-  // CHECK:   release_value [[AVAL]]
-  // CHECK:   br [[DONE]]
-
-  // CHECK: [[YESB]]([[BVAL:%[0-9]+]] : $String):
-  // CHECK: debug_value [[BVAL]]
-  // Check where condition ...
-  // CHECK: cond_br %{{[0-9]+}}, [[WHEREYES:bb[0-9]+]], [[WHERENO:bb[0-9]+]]
-
-  // CHECK: [[WHERENO]]:
-  // CHECK:   release_value [[BVAL]]
-  // CHECK:   release_value [[AVAL]]
-  // CHECK:   br [[DONE]]
-
-  if let a = foo(), let b = bar() where a == b {
-    // CHECK: [[WHEREYES]]:
-    // CHECK:   debug_value [[AVAL]]
-    // CHECK:   release_value [[BVAL]]
-    // CHECK:   release_value [[AVAL]]
-    // CHECK:   br [[DONE]]
+  // CHECK: [[CHECK_WHERE]]([[B:%[0-9]+]] : $String):
+  // CHECK:   function_ref Swift.Bool._getBuiltinLogicValue () -> Builtin.Int1
+  // CHECK:   cond_br {{.*}}, [[IF_BODY:bb[0-9]+]], [[IF_EXIT3:bb[0-9]+]]
+  // CHECK: [[IF_EXIT3]]:
+  // CHECK:   strong_release [[BBOX]]
+  // CHECK:   release_value [[A]]
+  // CHECK:   br [[IF_DONE:bb[0-9]+]]
+  if let a = foo(), var b = bar() where a == b {
+    // CHECK: [[IF_BODY]]:
+    // CHECK:   strong_release [[BBOX]]
+    // CHECK:   release_value [[A]]
+    // CHECK:   br [[IF_DONE]]
     let c = a
   }
-  // CHECK: [[DONE]]:
+  // CHECK: [[IF_DONE]]:
   // CHECK-NEXT:   tuple ()
   // CHECK-NEXT:   return
 }
