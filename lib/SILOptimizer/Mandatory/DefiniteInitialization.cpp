@@ -1087,6 +1087,15 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
     noteUninitializedMembers(Use);
     return;
   }
+  
+  if (isa<PartialApplyInst>(Inst) && TheMemory.isClassInitSelf()) {
+    if (!shouldEmitError(Inst)) return;
+    
+    diagnose(Module, Inst->getLoc(), diag::self_closure_use_uninit);
+    noteUninitializedMembers(Use);
+    return;
+  }
+ 
 
   Diag<StringRef, bool> DiagMessage;
   if (isa<MarkFunctionEscapeInst>(Inst)) {

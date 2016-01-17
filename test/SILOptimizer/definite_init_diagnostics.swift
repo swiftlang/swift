@@ -1181,12 +1181,12 @@ class WS: PMI {
 
 // <rdar://problem/23013334> DI QoI: Diagnostic claims that property is being used when it actually isn't
 class r23013334 {
-  var B: Int
+  var B: Int   // expected-note {{'self.B' not initialized}}
   var A: String
   
   init(A: String) throws {
     self.A = A
-    self.A.withCString { cString -> () in  // expected-error {{variable 'self.B' captured by a closure before being initialized}}
+    self.A.withCString { cString -> () in  // expected-error {{'self' captured by a closure before all members were initialized}}
 
       print(self.A)
       return ()
@@ -1196,3 +1196,21 @@ class r23013334 {
   }
   
 }
+
+class r23013334Derived : rdar16119509_Base {
+  var B: Int   // expected-note {{'self.B' not initialized}}
+  var A: String
+  
+  init(A: String) throws {
+    self.A = A
+    self.A.withCString { cString -> () in  // expected-error {{'self' captured by a closure before all members were initialized}}
+      
+      print(self.A)
+      return ()
+    }
+    
+    self.B = 0
+  }
+
+}
+
