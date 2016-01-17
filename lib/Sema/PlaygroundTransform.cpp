@@ -29,6 +29,7 @@
 #include "swift/Subsystems.h"
 #include "TypeChecker.h"
 
+#include <cstdio>
 #include <forward_list>
 #include <random>
 

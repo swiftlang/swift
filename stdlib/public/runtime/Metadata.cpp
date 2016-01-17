@@ -45,6 +45,8 @@
 #include <objc/runtime.h>
 #endif
 
+#include <cstdio>
+
 #if defined(__APPLE__) && defined(VM_MEMORY_SWIFT_METADATA)
 #define VM_TAG_FOR_SWIFT_METADATA VM_MAKE_TAG(VM_MEMORY_SWIFT_METADATA)
 #else
