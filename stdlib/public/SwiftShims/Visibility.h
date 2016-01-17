@@ -27,6 +27,8 @@
 // valid in ELF shared objects, and leaving them relocatable at load time
 // defeats the purpose of the relative references.
 # define SWIFT_RUNTIME_EXPORT __attribute__((visibility("protected")))
+#elif __CYGWIN__
+# define SWIFT_RUNTIME_EXPORT 
 #else
 // __dllexport/__dllimport for Windows?
 # error "Unimplemented object format"

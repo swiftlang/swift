@@ -20,8 +20,15 @@ endif()
 # Acknowledge that the following sources are known.
 set(LLVM_OPTIONAL_SOURCES
     Remangle.cpp
+    CygwinPort.cpp
     swift_sections.S)
 
+set(swift_runtime_port_sources)
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN")
+  set(swift_runtime_port_sources
+      CygwinPort.cpp)
+endif()
+    
 set(swift_runtime_objc_sources)
 set(swift_runtime_unicode_normalization_sources)
 if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
@@ -53,6 +60,7 @@ add_swift_library(swiftRuntime IS_STDLIB IS_STDLIB_CORE
   ${swift_runtime_sources}
   ${swift_runtime_objc_sources}
   ${swift_runtime_leaks_sources}
+  ${swift_runtime_port_sources}
   C_COMPILE_FLAGS ${swift_runtime_compile_flags}
   INSTALL_IN_COMPONENT stdlib)
 

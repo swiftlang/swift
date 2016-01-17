@@ -49,6 +49,8 @@ using namespace Demangle;
 #define SWIFT_TYPE_METADATA_SECTION "__swift2_types"
 #elif defined(__ELF__)
 #define SWIFT_TYPE_METADATA_SECTION ".swift2_type_metadata_start"
+#elif defined(__CYGWIN__)
+#define SWIFT_TYPE_METADATA_SECTION ".sw2tymd"
 #endif
 
 // Type Metadata Cache.
@@ -176,6 +178,26 @@ static int _addImageTypeMetadataRecords(struct dl_phdr_info *info,
   dlclose(handle);
   return 0;
 }
+#elif defined(__CYGWIN__)
+static int _addImageTypeMetadataRecords(struct dl_phdr_info *info,
+                                        size_t size, void * /*data*/) {
+  void *handle;
+  if (!info->dlpi_name || info->dlpi_name[0] == '\0') {
+    handle = dlopen(nullptr, RTLD_LAZY);
+  } else
+    handle = dlopen(info->dlpi_name, RTLD_LAZY | RTLD_NOLOAD);
+
+  unsigned long recordsSize;
+  const uint8_t *records =
+    _swift_getSectionDataPE(handle, SWIFT_TYPE_METADATA_SECTION,
+                           &recordsSize);
+
+  if (records) {
+    _addImageTypeMetadataRecordsBlock(records, recordsSize);
+  }
+  dlclose(handle);
+  return 0;
+}
 #endif
 
 static void _initializeCallbacksToInspectDylib() {
@@ -190,6 +212,8 @@ static void _initializeCallbacksToInspectDylib() {
   // FIXME: Find a way to have this continue to happen after.
   // rdar://problem/19045112
   dl_iterate_phdr(_addImageTypeMetadataRecords, nullptr);
+#elif defined(__CYGWIN__)
+  _swift_dl_iterate_phdr(_addImageTypeMetadataRecords, nullptr);
 #else
 # error No known mechanism to inspect dynamic libraries on this platform.
 #endif

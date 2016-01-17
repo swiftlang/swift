@@ -25,6 +25,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeRefinementContext.h"
+#include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/SourceManager.h"
@@ -1018,6 +1019,12 @@ int frontend_main(ArrayRef<const char *>Args,
   if (Invocation.parseArgs(Args, Instance.getDiags(), workingDirectory)) {
     return 1;
   }
+
+  // Setting DWARF Version depend on platform
+  IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
+  IRGenOpts.DWARFVersion = swift::GenericDWARFVersion;
+  if (Invocation.getLangOptions().Target.isWindowsCygwinEnvironment())
+    IRGenOpts.DWARFVersion = swift::CygwinDWARFVersion;
 
   if (Invocation.getFrontendOptions().PrintHelp ||
       Invocation.getFrontendOptions().PrintHelpHidden) {
