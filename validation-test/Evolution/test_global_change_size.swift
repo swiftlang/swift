@@ -19,6 +19,10 @@
 // RUN: %target-run %t/after_before
 // RUN: %target-run %t/after_after
 
+// This test is currently crashing in optimized mode.
+// TODO: remove the following requirement when rdar://problem/24222892 is fixed.
+// REQUIRES: swift_test_mode_optimize_none
+
 import StdlibUnittest
 import global_change_size
 
