@@ -5673,10 +5673,15 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       //
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeParam)) {
         if (!assocType->hasType()) {
-          assert(nominal->isInvalid() &&
-                 "We should only get here in the case of a malformed protocol");
           // Otherwise, fallback to setting it to error type.
-          assocType->setType(Context.TheErrorType);
+          if (nominal->isInvalid()) {
+            assocType->setType(Context.TheErrorType);
+          } else {
+            // Otherwise, we're in a recursive type checking situation, and
+            // the archetype for this AssocType may still be set.  Compute a
+            // type even though we don't have it yet.
+            assocType->computeType();
+          }
         }
       }
       if (!typeParam->hasAccessibility())
