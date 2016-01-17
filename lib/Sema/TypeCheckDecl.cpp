@@ -5658,10 +5658,27 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
     case DeclContextKind::NominalTypeDecl: {
       auto nominal = cast<NominalTypeDecl>(DC);
+      
       typeCheckDecl(nominal, true);
-      if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeParam))
-        if (!assocType->hasType())
-          assocType->computeType();
+      
+      // If this is an associated type that still has no type, then our type
+      // check of the nominal protocol type failed because it was invalid.  This
+      // happens in various cases where sema of the protocol gives up on the
+      // invalid protocol decl.  Install a type so that downstream things won't
+      // die due to getType() crashing on it.
+      //
+      // TODO: This is all really gross.  If type checking the protocol is what
+      // is supposed to set up the archetype for the associated types, then it
+      // should guarantee that it happens.
+      //
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeParam)) {
+        if (!assocType->hasType()) {
+          assert(nominal->isInvalid() &&
+                 "We should only get here in the case of a malformed protocol");
+          // Otherwise, fallback to setting it to error type.
+          assocType->setType(Context.TheErrorType);
+        }
+      }
       if (!typeParam->hasAccessibility())
         typeParam->setAccessibility(nominal->getFormalAccess());
       break;
@@ -5798,9 +5815,9 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         if (!archetype)
           return;
 
+        assocType->setArchetype(archetype);
         if (!assocType->hasType())
           assocType->computeType();
-        assocType->setArchetype(archetype);
       }
     }
 
