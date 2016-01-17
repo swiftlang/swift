@@ -1179,5 +1179,20 @@ class WS: PMI {
   }
 }
 
+// <rdar://problem/23013334> DI QoI: Diagnostic claims that property is being used when it actually isn't
+class r23013334 {
+  var B: Int
+  var A: String
+  
+  init(A: String) throws {
+    self.A = A
+    self.A.withCString { cString -> () in  // expected-error {{variable 'self.B' captured by a closure before being initialized}}
 
-
+      print(self.A)
+      return ()
+    }
+    
+    self.B = 0
+  }
+  
+}

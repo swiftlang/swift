@@ -1235,6 +1235,11 @@ collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
         // always fine, even if self is uninitialized.
         continue;
     }
+    
+    // If this is a partial application of self, then this is an escape point
+    // for it.
+    if (isa<PartialApplyInst>(User))
+      Kind = DIUseKind::Escape;
 
     Uses.push_back(DIMemoryUse(User, Kind, 0, TheMemory.NumElements));
   }
