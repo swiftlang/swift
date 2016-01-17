@@ -27,10 +27,12 @@ class SourceKitError(Exception):
         return "%s (%s)" % (self.msg, self.kind)
 
 def syntax_annotate_text(text):
-    req = { 'key.request': capi.UIdent('source.request.editor.open'),
-            'key.sourcetext': text,
-            'key.name': "annotate-source-text",
-            'key.enablesyntaxmap': True }
+    req = {
+        'key.request': capi.UIdent('source.request.editor.open'),
+        'key.sourcetext': text,
+        'key.name': "annotate-source-text",
+        'key.enablesyntaxmap': True
+    }
     resp = request_sync(req)
     return resp.get_payload().to_python_object()
 

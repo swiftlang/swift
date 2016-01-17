@@ -92,10 +92,10 @@ def main_preset():
     preset_args = get_preset_options(
         args.preset_substitutions, args.preset_file_names, args.preset)
 
-    build_script_args = [ sys.argv[0] ]
+    build_script_args = [sys.argv[0]]
     build_script_args += preset_args
     if args.distcc:
-        build_script_args += [ "--distcc" ]
+        build_script_args += ["--distcc"]
 
     print_with_argv0(
         "using preset '" + args.preset + "', which expands to " +
@@ -792,7 +792,7 @@ the number of parallel build jobs to use""",
     if args.build_foundation:
         build_script_impl_args += [
             "--foundation-build-type", args.foundation_build_variant
-        ]   
+        ]
     build_script_impl_args += build_script_impl_inferred_args
 
     # If we have extra_swift_args, combine all of them together and then add
@@ -803,7 +803,7 @@ the number of parallel build jobs to use""",
     build_script_impl_args += args.build_script_impl_args
 
     # Unset environment variables that might affect how tools behave.
-    for v in [ 'MAKEFLAGS', 'SDKROOT', 'MACOSX_DEPLOYMENT_TARGET', 'IPHONEOS_DEPLOYMENT_TARGET' ]:
+    for v in ['MAKEFLAGS', 'SDKROOT', 'MACOSX_DEPLOYMENT_TARGET', 'IPHONEOS_DEPLOYMENT_TARGET']:
         os.environ.pop(v, None)
 
     check_call(build_script_impl_args)
@@ -824,8 +824,8 @@ def main():
         return 1
 
     # Determine if we are invoked in the preset mode and dispatch accordingly.
-    if any([ (opt.startswith("--preset") or opt == "--show-presets")
-             for opt in sys.argv[1:] ]):
+    if any([(opt.startswith("--preset") or opt == "--show-presets")
+            for opt in sys.argv[1:]]):
         return main_preset()
     else:
         return main_normal()

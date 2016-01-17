@@ -98,7 +98,7 @@ def lower_passlist():
         p.SpeculativeDevirtualizer,
         p.FunctionSignatureOpts,
     ])
-        
+
 def normal_passpipelines():
     result = []
 
@@ -106,23 +106,23 @@ def normal_passpipelines():
     x.addPass(ssapass_passlist('high'))
     result.append(x)
 
-    x = ppipe.PassPipeline('EarlyLoopOpt', {'name' : 'run_n_times', 'count' : 1})
+    x = ppipe.PassPipeline('EarlyLoopOpt', {'name': 'run_n_times', 'count': 1})
     x.addPass(highlevel_loopopt_passlist())
     result.append(x)
 
-    x = ppipe.PassPipeline('MidLevelOpt', {'name' : 'run_n_times', 'count' : 2})
+    x = ppipe.PassPipeline('MidLevelOpt', {'name': 'run_n_times', 'count': 2})
     x.addPass(ssapass_passlist('mid'))
     result.append(x)
 
-    x = ppipe.PassPipeline('Lower', {'name' : 'run_to_fixed_point'})
+    x = ppipe.PassPipeline('Lower', {'name': 'run_to_fixed_point'})
     x.addPass(lower_passlist())
     result.append(x)
 
-    x = ppipe.PassPipeline('LowLevel', {'name' : 'run_n_times', 'count' : 1})
+    x = ppipe.PassPipeline('LowLevel', {'name': 'run_n_times', 'count': 1})
     x.addPass(ssapass_passlist('low'))
     result.append(x)
 
-    x = ppipe.PassPipeline('LateLoopOpt', {'name' : 'run_n_times', 'count' : 1})
+    x = ppipe.PassPipeline('LateLoopOpt', {'name': 'run_n_times', 'count': 1})
     x.addPass([lowlevel_loopopt_passlist(), p.DeadFunctionElimination])
     result.append(x)
 
