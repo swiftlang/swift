@@ -343,7 +343,7 @@ func testUnrelatedThrowsInRethrows(fn: () throws -> Void) rethrows {
   throw SomeError.Badness // expected-error {{a function declared 'rethrows' may only throw if its parameter does}}
 }
 
-
+// <rdar://problem/24221830> Bogus "no calls to throwing functions" warning in derived throwing init
 class B24221830 {}
 class r24221830 : B24221830 {
   var B: Int
