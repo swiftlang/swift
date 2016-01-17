@@ -2701,7 +2701,14 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
 
   ParserResult<TypeRepr> UnderlyingTy;
   if (WantDefinition || Tok.is(tok::equal)) {
-    if (parseToken(tok::equal, diag::expected_equal_in_typealias)) {
+    if (Tok.is(tok::colon)) {
+      // It is a common mistake to write "typealias A : Int" instead of = Int.
+      // Recognize this and produce a fixit.
+      diagnose(Tok, diag::expected_equal_in_typealias)
+        .fixItReplace(Tok.getLoc(), "=");
+      consumeToken(tok::colon);
+    
+    } else if (parseToken(tok::equal, diag::expected_equal_in_typealias)) {
       Status.setIsParseError();
       return Status;
     }
