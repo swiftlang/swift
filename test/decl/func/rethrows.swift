@@ -342,3 +342,15 @@ func testUnrelatedThrowsInRethrows(fn: () throws -> Void) rethrows {
   try raise() // expected-error {{call can throw, but the error is not handled; a function declared 'rethrows' may only throw if its parameter does}}
   throw SomeError.Badness // expected-error {{a function declared 'rethrows' may only throw if its parameter does}}
 }
+
+
+class B24221830 {}
+class r24221830 : B24221830 {
+  var B: Int
+  
+  init(A: String) throws {
+    self.B = 0
+  }
+  
+}
+

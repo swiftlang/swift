@@ -1382,7 +1382,8 @@ private:
 
     // Warn about 'try' expressions that weren't actually needed.
     if (!Flags.has(ContextFlags::HasTryThrowSite)) {
-      TC.diagnose(E->getTryLoc(), diag::no_throw_in_try);
+      if (!E->isImplicit())
+        TC.diagnose(E->getTryLoc(), diag::no_throw_in_try);
 
     // Diagnose all the call sites within a single unhandled 'try'
     // at the same time.
