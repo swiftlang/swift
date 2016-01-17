@@ -802,6 +802,11 @@ ERROR(expected_lbrace_after_catch,PointsToFirstBadToken,
       "expected '{' after 'catch' pattern", ())
 ERROR(expected_catch_where_expr,PointsToFirstBadToken,
       "expected expression for 'where' guard of 'catch'", ())
+ERROR(docatch_not_trycatch,PointsToFirstBadToken,
+      "the 'do' keyword is used to specify a 'catch' region",
+      ())
+
+
 
 // C-Style For Stmt
 ERROR(expected_init_for_stmt,PointsToFirstBadToken,

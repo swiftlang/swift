@@ -450,3 +450,20 @@ class
 case, // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{expected pattern}}
 case  // expected-error {{expected identifier after comma in enum 'case' declaration}} expected-error {{expected identifier in enum 'case' declaration}} expected-error {{enum 'case' is not allowed outside of an enum}} expected-error {{expected pattern}}
 // NOTE: EOF is important here to properly test a code path that used to crash the parser
+
+
+// <rdar://problem/21080671> QoI: try/catch (instead of do/catch) creates silly diagnostics
+func f21080671() {
+  try {  // expected-error {{the 'do' keyword is used to specify a 'catch' region}} {{3-6=do}}
+  } catch { }
+
+  
+  try {  // expected-error {{the 'do' keyword is used to specify a 'catch' region}} {{3-6=do}}
+    f21080671()
+  } catch let x as Int {
+  } catch {
+    
+  }
+
+}
+

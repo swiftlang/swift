@@ -1812,7 +1812,8 @@ ParserResult<Stmt> Parser::parseStmtRepeat(LabeledStmtInfo labelInfo) {
   SourceLoc whileLoc;
 
   if (!consumeIf(tok::kw_while, whileLoc)) {
-    diagnose(body.getPtrOrNull()->getEndLoc(), diag::expected_while_after_repeat_body);
+    diagnose(body.getPtrOrNull()->getEndLoc(),
+             diag::expected_while_after_repeat_body);
     return body;
   }
 

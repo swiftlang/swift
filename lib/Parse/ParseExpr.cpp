@@ -401,6 +401,25 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
                                         trySuffix->getLoc()));
       break;
     default:
+      // If this is a simple "try expr" situation, where the expr is a closure
+      // literal, and the next token is a 'catch', then the user wrote
+      // try/catch instead of do/catch.  Emit a fixit hint to rewrite to the
+      // correct do/catch construct.
+      if (Tok.is(tok::kw_catch) && isa<ClosureExpr>(sub.get())) {
+        diagnose(tryLoc, diag::docatch_not_trycatch)
+          .fixItReplace(tryLoc, "do");
+        
+        // Eat all of the catch clauses, so we don't trip over them in error
+        // recovery.
+        while (Tok.is(tok::kw_catch)) {
+          ParserResult<CatchStmt> clause = parseStmtCatch();
+          if (clause.hasCodeCompletion() && clause.isNull())
+            break;
+        }
+
+        return makeParserResult(new (Context) ErrorExpr(tryLoc));
+      }
+        
       sub = makeParserResult(new (Context) TryExpr(tryLoc, sub.get()));
       break;
     }
