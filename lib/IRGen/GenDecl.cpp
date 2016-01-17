@@ -1840,15 +1840,6 @@ getTypeEntityInfo(IRGenModule &IGM,
 
   auto nom = conformingType->getAnyNominal();
   if (IGM.hasMetadataPattern(nom)) {
-    // This assert is to maintain the convention that the protocol conformance
-    // record path only emits generic patterns for bound generic types. It may
-    // be safe to remove this check.
-    //
-    // (The type metadata record path emits patterns for unbound generic types
-    // in order to allow the runtime to dynamically instantiate a generic type
-    // that was not bound at compile time.)
-    assert(allowUnboundGenericTypes || isa<BoundGenericType>(conformingType));
-
     // Conformances for generics, concrete subclasses of generics, and
     // resiliently-sized types are represented by referencing the
     // metadata pattern.
