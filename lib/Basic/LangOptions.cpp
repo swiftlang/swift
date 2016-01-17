@@ -101,6 +101,8 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     addTargetConfigOption("os", "Linux");
   else if (triple.isOSFreeBSD())
     addTargetConfigOption("os", "FreeBSD");
+  else if (triple.isOSWindows())
+    addTargetConfigOption("os", "Windows");
   else {
     UnsupportedOS = true;
   }

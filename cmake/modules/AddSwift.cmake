@@ -162,6 +162,8 @@ function(_add_variant_link_flags
     list(APPEND result "-lpthread" "-ldl")
   elseif("${sdk}" STREQUAL "FREEBSD")
     list(APPEND result "-lpthread")
+  elseif("${sdk}" STREQUAL "CYGWIN")
+    # No extra libraries required.
   else()
     list(APPEND result "-lobjc")
   endif()
