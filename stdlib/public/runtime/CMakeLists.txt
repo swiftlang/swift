@@ -32,6 +32,12 @@ if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
 else()
 endif()
 
+set(swift_runtime_port_sources)
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN")
+  set(swift_runtime_port_sources
+      CygwinPort.cpp)
+endif()
+
 add_swift_library(swiftRuntime IS_STDLIB IS_STDLIB_CORE
   Casting.cpp
   Demangle.cpp
@@ -48,6 +54,7 @@ add_swift_library(swiftRuntime IS_STDLIB IS_STDLIB_CORE
   SwiftObject.cpp
   ${swift_runtime_objc_sources}
   ${swift_runtime_leaks_sources}
+  ${swift_runtime_port_sources}
   C_COMPILE_FLAGS ${swift_runtime_compile_flags}
   INSTALL_IN_COMPONENT stdlib)
 

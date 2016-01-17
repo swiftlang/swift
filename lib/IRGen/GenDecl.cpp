@@ -1881,6 +1881,9 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
   case llvm::Triple::ELF:
     sectionName = ".swift2_protocol_conformances";
     break;
+  case llvm::Triple::COFF:  // for cygwin
+    sectionName = ".sw2prtc";
+    break;
   default:
     llvm_unreachable("Don't know how to emit protocol conformances for "
                      "the selected object format.");
