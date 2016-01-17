@@ -72,6 +72,9 @@ ERROR(could_not_find_value_member,none,
 ERROR(could_not_find_type_member,none,
       "type %0 has no member %1", (Type, DeclName))
 
+NOTE(did_you_mean_raw_type,none,
+     "did you mean to specify a raw type on the enum declaration?", ())
+
 ERROR(expected_argument_in_contextual_member,none,
       "contextual member %0 expects argument of type %1", (Identifier, Type))
 ERROR(unexpected_argument_in_contextual_member,none,

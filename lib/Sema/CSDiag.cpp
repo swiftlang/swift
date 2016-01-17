@@ -2284,6 +2284,13 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
       diagnose(loc, diag::could_not_find_value_member,
                baseObjTy, memberName)
         .highlight(baseRange).highlight(nameLoc);
+      
+      // Check for a few common cases that can cause missing members.
+      if (baseObjTy->is<EnumType>() && memberName.isSimpleName("rawValue")) {
+        auto loc = baseObjTy->castTo<EnumType>()->getDecl()->getNameLoc();
+        if (loc.isValid())
+          diagnose(loc, diag::did_you_mean_raw_type);
+      }
     }
     return;
   }

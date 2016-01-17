@@ -296,3 +296,10 @@ enum SR510: String {
 }
 
 
+// <rdar://problem/21269142> Diagnostic should say why enum has no .rawValue member
+enum E21269142 {  // expected-note {{did you mean to specify a raw type on the enum declaration?}}
+  case Foo
+}
+
+print(E21269142.Foo.rawValue)  // expected-error {{value of type 'E21269142' has no member 'rawValue'}}
+
