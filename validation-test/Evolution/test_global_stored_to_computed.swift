@@ -33,8 +33,8 @@ GlobalStoredToComputed.test("ChangeStoredToComputed") {
     expectEqual(globalStoredToComputed, 0)
     increment(&globalStoredToComputed)
     expectEqual(globalStoredToComputed, 1)
-    globalStoredToComputed = 0xdeadbeef
-    expectEqual(globalStoredToComputed, 0xdeadbeef)
+    globalStoredToComputed = 0xbadf00d
+    expectEqual(globalStoredToComputed, 0xbadf00d)
   }
 }
 

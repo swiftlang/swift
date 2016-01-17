@@ -29,8 +29,8 @@ var globalChangeEmptyToNonEmpty = ChangeEmptyToNonEmpty()
 GlobalChangeSizeTest.test("ChangeEmptyToNonEmpty") {
   do {
     expectEqual(globalChangeEmptyToNonEmpty.property, 0)
-    globalChangeEmptyToNonEmpty.property = 0xdeadbeef
-    expectEqual(globalChangeEmptyToNonEmpty.property, 0xdeadbeef)
+    globalChangeEmptyToNonEmpty.property = 0xbadf00d
+    expectEqual(globalChangeEmptyToNonEmpty.property, 0xbadf00d)
   }
 }
 
