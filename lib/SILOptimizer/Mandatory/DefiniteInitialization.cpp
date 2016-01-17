@@ -1221,8 +1221,7 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
 
     if (AI && CMI) {
       // TODO: Could handle many other members more specifically.
-      auto *Decl = CMI->getMember().getDecl();
-      Method = dyn_cast<FuncDecl>(Decl);
+      Method = dyn_cast<FuncDecl>(CMI->getMember().getDecl());
     }
   }
 
@@ -1235,12 +1234,40 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
 
     // If this is a direct/devirt method application, check the location info.
     if (auto *Fn = cast<ApplyInst>(Inst)->getCalleeFunction()) {
-      if (Fn->hasLocation()) {
-        auto SILLoc = Fn->getLocation();
-        Method = SILLoc.getAsASTNode<FuncDecl>();
+      if (Fn->hasLocation())
+        Method = Fn->getLocation().getAsASTNode<FuncDecl>();
+    }
+  }
+  
+  // If this is part of a call to a witness method for a non-class-bound
+  // protocol in a root class, then we could have a store to a temporary whose
+  // address is passed into an apply.  Look through this pattern.
+  if (auto *SI = dyn_cast<StoreInst>(Inst)) {
+    if (SI->getSrc() == TheMemory.MemoryInst &&
+        isa<AllocStackInst>(SI->getDest()) &&
+        TheMemory.isClassInitSelf()) {
+      ApplyInst *TheApply = nullptr;
+      // Check to see if the address of the alloc_stack is only passed to one
+      // apply_inst.
+      for (auto UI : SI->getDest()->getUses()) {
+        if (auto *ApplyUser = dyn_cast<ApplyInst>(UI->getUser())) {
+          if (!TheApply && UI->getOperandNumber() == 1) {
+            TheApply = ApplyUser;
+          } else {
+            TheApply = nullptr;
+            break;
+          }
+        }
+      }
+      
+      if (TheApply) {
+        if (auto *Fn = TheApply->getCalleeFunction())
+          if (Fn->hasLocation())
+            Method = Fn->getLocation().getAsASTNode<FuncDecl>();
       }
     }
   }
+  
 
   // If we were able to find a method call, emit a diagnostic about the method.
   if (Method) {
