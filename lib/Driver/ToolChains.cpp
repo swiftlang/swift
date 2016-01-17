@@ -1112,6 +1112,7 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
         Twine("@") + OutputInfo.getPrimaryOutputFilename()));
   }
 
+#if !defined(__CYGWIN__)
   // Add the linker script that coalesces protocol conformance sections.
   Arguments.push_back("-Xlinker");
   Arguments.push_back("-T");
@@ -1119,6 +1120,7 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   // FIXME: This should also query the abi type (i.e. gnueabihf)
   Arguments.push_back(context.Args.MakeArgString(
     Twine(RuntimeLibPath) + "/" + getTriple().getArchName() + "/swift.ld"));
+#endif
 
   // This should be the last option, for convenience in checking output.
   Arguments.push_back("-o");
