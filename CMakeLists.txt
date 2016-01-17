@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 2.8.12)
+cmake_policy(SET CMP0054 NEW)
 
 # Add path for custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH
@@ -436,6 +437,19 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
   set(SWIFT_HOST_VARIANT_ARCH "x86_64")
 
   set(SWIFT_PRIMARY_VARIANT_SDK_default "FREEBSD")
+  set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
+elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN")
+  configure_sdk_unix(CYGWIN "Cygwin" "windows" "cygwin" "x86_64" "x86_64-unknown-windows-cygnus")
+
+#  set(CMAKE_EXECUTABLE_FORMAT "ELF")
+
+  set(SWIFT_HOST_VARIANT "windows" CACHE STRING
+      "Deployment OS for Swift host tools (the compiler) [windows].")
+
+  set(SWIFT_HOST_VARIANT_SDK "CYGWIN")
+  set(SWIFT_HOST_VARIANT_ARCH "x86_64")
+  
+  set(SWIFT_PRIMARY_VARIANT_SDK_default "CYGWIN")
   set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   # Set defaults.

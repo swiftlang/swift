@@ -20,6 +20,12 @@
 #define _WITH_GETLINE
 #endif
 
+#if defined(__CYGWIN__)
+#include <stdio.h>
+typedef  void *locale_t;
+#define uselocale(x)  nullptr
+#endif
+
 #include <sys/resource.h>
 #include <sys/errno.h>
 #include <unistd.h>
@@ -29,11 +35,13 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <xlocale.h>
+//#include <xlocale.h>
 #include <limits>
 #include "llvm/ADT/StringExtras.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Basic/Lazy.h"
+
+extern "C" long double fmodl(long double, long double);
 
 static uint64_t uint64ToStringImpl(char *Buffer, uint64_t Value,
                                    int64_t Radix, bool Uppercase,
@@ -98,7 +106,7 @@ extern "C" uint64_t swift_uint64ToString(char *Buffer, intptr_t BufferLength,
                             /*Negative=*/false);
 }
 
-#if defined(__APPLE__) || defined(__FreeBSD__)
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__CYGWIN__)
 static inline locale_t getCLocale() {
   // On these platforms convenience functions from xlocale.h interpret nullptr
   // as C locale.
@@ -130,7 +138,7 @@ static int swift_snprintf_l(char *Str, size_t StrSize, locale_t Locale,
 
   va_list Args;
   va_start(Args, Format);
-  int Result = std::vsnprintf(Str, StrSize, Format, Args);
+  int Result = vsnprintf(Str, StrSize, Format, Args);
   va_end(Args);
 
   uselocale(OldLocale);
@@ -321,11 +329,11 @@ __mulodi4(di_int a, di_int b, int* overflow)
 template <typename T>
 static const char *_swift_stdlib_strtoX_clocale_impl(
     const char * nptr, T* outResult, T huge,
-    T (*posixImpl)(const char *, char **, locale_t)
+    T (*posixImpl)(const char *, char **)
 ) {
   char *EndPtr;
   errno = 0;
-  const auto result = posixImpl(nptr, &EndPtr, getCLocale());
+  const auto result = posixImpl(nptr, &EndPtr);
   *outResult = result;
   if (result == huge || result == -huge || result == 0.0 || result == -0.0) {
       if (errno == ERANGE)
@@ -337,19 +345,19 @@ static const char *_swift_stdlib_strtoX_clocale_impl(
 extern "C" const char *_swift_stdlib_strtold_clocale(
   const char * nptr, void *outResult) {
   return _swift_stdlib_strtoX_clocale_impl(
-    nptr, static_cast<long double*>(outResult), HUGE_VALL, strtold_l);
+    nptr, static_cast<long double*>(outResult), HUGE_VALL, strtold);
 }
 
 extern "C" const char *_swift_stdlib_strtod_clocale(
     const char * nptr, double *outResult) {
   return _swift_stdlib_strtoX_clocale_impl(
-    nptr, outResult, HUGE_VAL, strtod_l);
+    nptr, outResult, HUGE_VAL, strtod);
 }
 
 extern "C" const char *_swift_stdlib_strtof_clocale(
     const char * nptr, float *outResult) {
   return _swift_stdlib_strtoX_clocale_impl(
-    nptr, outResult, HUGE_VALF, strtof_l);
+    nptr, outResult, HUGE_VALF, strtof);
 }
 
 extern "C" void _swift_stdlib_flockfile_stdout() {

@@ -23,6 +23,7 @@
 #include "llvm/ADT/StringRef.h"
 #include <functional>
 #include <vector>
+#include <cstdio>
 #include <cstdlib>
 
 using namespace swift;

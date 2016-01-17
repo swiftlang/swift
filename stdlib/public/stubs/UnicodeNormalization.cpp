@@ -91,7 +91,7 @@ private:
     for (unsigned char c = 0; c < 128; ++c) {
       UErrorCode ErrorCode = U_ZERO_ERROR;
       intptr_t NumCollationElts = 0;
-      uint16_t Buffer[1];
+      UChar Buffer[1];
       Buffer[0] = c;
 
       UCollationElements *CollationIterator =
@@ -129,8 +129,8 @@ int32_t _swift_stdlib_unicode_compare_utf16_utf16(const uint16_t *LeftString,
                                                   const uint16_t *RightString,
                                                   int32_t RightLength) {
   return ucol_strcoll(GetRootCollator(),
-    LeftString, LeftLength,
-    RightString, RightLength);
+    (const UChar *)LeftString, LeftLength,
+    (const UChar *)RightString, RightLength);
 }
 
 /// Compares the strings via the Unicode Collation Algorithm on the root locale.
@@ -148,7 +148,7 @@ int32_t _swift_stdlib_unicode_compare_utf8_utf16(const char *LeftString,
   UErrorCode ErrorCode = U_ZERO_ERROR;
 
   uiter_setUTF8(&LeftIterator, LeftString, LeftLength);
-  uiter_setString(&RightIterator, RightString, RightLength);
+  uiter_setString(&RightIterator, (const UChar *)RightString, RightLength);
 
   uint32_t Diff = ucol_strcollIter(GetRootCollator(),
     &LeftIterator, &RightIterator, &ErrorCode);
@@ -201,7 +201,7 @@ static intptr_t hashChunk(const UCollator *Collator, intptr_t HashState,
                           const uint16_t *Str, uint32_t Length,
                           UErrorCode *ErrorCode) {
   UCollationElements *CollationIterator = ucol_openElements(
-    Collator, Str, Length, ErrorCode);
+    Collator, (const UChar *)Str, Length, ErrorCode);
   while (U_SUCCESS(*ErrorCode)) {
     intptr_t Elem = ucol_next(CollationIterator, ErrorCode);
     // Ignore zero valued collation elements. They don't participate in the
@@ -275,8 +275,8 @@ int32_t _swift_stdlib_unicode_strToUpper(uint16_t *Destination,
                                          const uint16_t *Source,
                                          int32_t SourceLength) {
   UErrorCode ErrorCode = U_ZERO_ERROR;
-  uint32_t OutputLength = u_strToUpper(Destination, DestinationCapacity,
-                                       Source, SourceLength,
+  uint32_t OutputLength = u_strToUpper((UChar *)Destination, DestinationCapacity,
+                                       (const UChar *)Source, SourceLength,
                                        "", &ErrorCode);
   if (U_FAILURE(ErrorCode) && ErrorCode != U_BUFFER_OVERFLOW_ERROR) {
     swift::crash("u_strToUpper: Unexpected error uppercasing unicode string.");
@@ -294,8 +294,8 @@ int32_t _swift_stdlib_unicode_strToLower(uint16_t *Destination,
                                          const uint16_t *Source,
                                          int32_t SourceLength) {
   UErrorCode ErrorCode = U_ZERO_ERROR;
-  uint32_t OutputLength = u_strToLower(Destination, DestinationCapacity,
-                                       Source, SourceLength,
+  uint32_t OutputLength = u_strToLower((UChar *)Destination, DestinationCapacity,
+                                       (const UChar *)Source, SourceLength,
                                        "", &ErrorCode);
   if (U_FAILURE(ErrorCode) && ErrorCode != U_BUFFER_OVERFLOW_ERROR) {
     swift::crash("u_strToLower: Unexpected error lowercasing unicode string.");
