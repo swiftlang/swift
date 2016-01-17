@@ -4373,46 +4373,50 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
   // Re-write the single-expression closure to return '()'
   assert(closureExpr->hasSingleExpressionBody());
   
-  auto member = closureExpr->getBody()->getElement(0);
+  // Transform the ClosureExpr representation into the "expr + return ()" rep
+  // if it isn't already.
+  if (!closureExpr->isVoidConversionClosure()) {
+    
+    auto member = closureExpr->getBody()->getElement(0);
+    
+    // A single-expression body contains a single return statement.
+    auto returnStmt = cast<ReturnStmt>(member.get<Stmt *>());
+    auto singleExpr = returnStmt->getResult();
+    auto voidExpr = TupleExpr::createEmpty(tc.Context,
+                                           singleExpr->getStartLoc(),
+                                           singleExpr->getEndLoc(),
+                                           /*implicit*/true);
+    returnStmt->setResult(voidExpr);
+
+    // For l-value types, reset to the object type. This might not be strictly
+    // necessary any more, but it's probably still a good idea.
+    if (singleExpr->getType()->getAs<LValueType>())
+      singleExpr->setType(singleExpr->getType()->getLValueOrInOutObjectType());
+
+    tc.checkIgnoredExpr(singleExpr);
+
+    SmallVector<ASTNode, 2> elements;
+    elements.push_back(singleExpr);
+    elements.push_back(returnStmt);
+    
+    auto braceStmt = BraceStmt::create(tc.Context,
+                                       closureExpr->getStartLoc(),
+                                       elements,
+                                       closureExpr->getEndLoc(),
+                                       /*implicit*/true);
+    
+    closureExpr->setImplicit();
+    closureExpr->setIsVoidConversionClosure();
+    closureExpr->setBody(braceStmt, /*isSingleExpression*/true);
+  }
   
-  // A single-expression body contains a single return statement.
-  auto returnStmt = dyn_cast<ReturnStmt>(member.get<Stmt *>());
-  auto singleExpr = returnStmt->getResult();
-  auto voidExpr = TupleExpr::createEmpty(tc.Context,
-                                         singleExpr->getStartLoc(),
-                                         singleExpr->getEndLoc(),
-                                         /*implicit*/true);
-  returnStmt->setResult(voidExpr);
-
-  // For l-value types, reset to the object type. This might not be strictly
-  // necessary any more, but it's probably still a good idea.
-  if (singleExpr->getType()->getAs<LValueType>())
-    singleExpr->setType(singleExpr->getType()->getLValueOrInOutObjectType());
-
-  tc.checkIgnoredExpr(singleExpr);
-
-  SmallVector<ASTNode, 2> elements;
-  elements.push_back(singleExpr);
-  elements.push_back(returnStmt);
-  
-  auto braceStmt = BraceStmt::create(tc.Context,
-                                     closureExpr->getStartLoc(),
-                                     elements,
-                                     closureExpr->getEndLoc(),
-                                     /*implicit*/true);
-  
-  closureExpr->setImplicit();
-  closureExpr->setIsVoidConversionClosure();
-  closureExpr->setBody(braceStmt, /*isSingleExpression*/true);
-
+  // Finally, compute the proper type for the closure.
   auto fnType = closureExpr->getType()->getAs<FunctionType>();
   Type inputType = fnType->getInput();
-  Type resultType = voidExpr->getType();
   auto newClosureType = FunctionType::get(inputType,
-                                          resultType,
+                                          tc.Context.TheEmptyTupleType,
                                           fnType->getExtInfo());
   closureExpr->setType(newClosureType);
-  
   return closureExpr;
 }
 
