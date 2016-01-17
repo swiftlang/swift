@@ -20,3 +20,16 @@ struct Y { };
 
 X<Y>(withY: Y()).foo(1, y: 2)
 
+protocol P {
+  @swift3_migration(renamed="Assoc")
+  typealias AssocType
+
+  @swift3_migration(renamed="generateAssoc()")
+  func getAssoc() -> AssocType
+}
+
+struct ConformsToP : P {
+  func getAssoc() -> Int { return 0 }
+}
+
+let someInt: ConformsToP.AssocType = 0

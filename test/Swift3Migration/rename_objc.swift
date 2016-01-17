@@ -41,3 +41,12 @@ func useAnyObject(obj: AnyObject, body: ((AnyObject!, Int, UnsafeMutablePointer<
   obj.enumerateObjectsRandomlyWithBlock?(body)
   _ = obj.makingHoney
 }
+
+@objc protocol P {
+  @swift3_migration(renamed="newProtoFunc(_:b:c:)")
+  func protoFunc(x: Int, y: Int, z: Int)
+}
+
+class ConformsToP : NSObject, P {
+  func protoFunc(x: Int, y: Int, z: Int) { }
+}

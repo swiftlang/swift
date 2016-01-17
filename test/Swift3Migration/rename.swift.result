@@ -20,3 +20,16 @@ struct B { };
 
 A<B>(b: B()).bar(wibble: 1, wonka: 2)
 
+protocol P {
+  
+  typealias Assoc
+
+  
+  func generateAssoc() -> Assoc
+}
+
+struct ConformsToP : P {
+  func generateAssoc() -> Int { return 0 }
+}
+
+let someInt: ConformsToP.Assoc = 0

@@ -1548,6 +1548,25 @@ ConformanceChecker::getReferencedAssociatedTypes(ValueDecl *req) {
   return assocTypes;
 }
 
+/// If the requirement has a swift3_migration attribute but the
+/// witness does not, clone the attribute to the witness.
+static void addSwift3MigrationAttr(ASTContext &ctx, ValueDecl *requirement,
+                                   ValueDecl *witness) {
+  if (!witness) return;
+
+  if (auto attr = requirement->getAttrs().getAttribute<Swift3MigrationAttr>()) {
+    if (!witness->getAttrs().hasAttribute<Swift3MigrationAttr>()) {
+      auto newAttr = new (ctx) Swift3MigrationAttr(SourceLoc(), SourceLoc(),
+                                                   SourceLoc(),
+                                                   attr->getRenamed(),
+                                                   attr->getMessage(),
+                                                   SourceLoc(),
+                                                   /*implicit=*/true);
+      witness->getAttrs().add(newAttr);
+    }
+  }
+}
+
 void ConformanceChecker::recordWitness(ValueDecl *requirement,
                                        const RequirementMatch &match) {
   // If we already recorded this witness, don't do so again.
@@ -1589,10 +1608,13 @@ void ConformanceChecker::recordWitness(ValueDecl *requirement,
   Conformance->setWitness(requirement, witness);
 
   // Synthesize accessors for the protocol witness table to use.
-  if (auto storage = dyn_cast<AbstractStorageDecl>(witness.getDecl()))
+  if (auto storage = dyn_cast<AbstractStorageDecl>(witness.getDecl())) {
     TC.synthesizeWitnessAccessorsForStorage(
                                         cast<AbstractStorageDecl>(requirement),
                                         storage);
+  }
+
+  addSwift3MigrationAttr(TC.Context, requirement, match.Witness);
 }
 
 void ConformanceChecker::recordOptionalWitness(ValueDecl *requirement) {
@@ -1771,6 +1793,8 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
   // Note whether this witness was deduced or defaulted.
   if (wasDeducedOrDefaulted)
     Conformance->addDefaultDefinition(assocType);
+
+  addSwift3MigrationAttr(TC.Context, assocType, typeDecl);
 }
 
 namespace {
