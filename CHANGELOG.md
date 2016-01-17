@@ -1,6 +1,16 @@
 Latest
 ------
 
+* Associated types in protocols can now be specified with a new 'associatedtype'
+  declaration, to replace the use of 'typealias':
+
+    protocol P {
+      associatedtype Ty
+    }
+
+  The typealias keyword is still allowed (but deprecated and produces a warning)
+  in Swift 2.2. This warning will become an error in Swift 3.
+
 * The ++ and -- operators have been deprecated, and are slated to be removed in
   Swift 3.0.  As a replacement, please use "x += 1" on integer or floating point
   types, and "x = x.successor()" on Index types.
