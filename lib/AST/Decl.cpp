@@ -2171,6 +2171,11 @@ SourceRange AssociatedTypeDecl::getSourceRange() const {
   return SourceRange(KeywordLoc, endLoc);
 }
 
+void AssociatedTypeDecl::setIsRecursive() {
+  AssociatedTypeDeclBits.Recursive = true;
+  overwriteType(ErrorType::get(this->getASTContext()));
+}
+
 EnumDecl::EnumDecl(SourceLoc EnumLoc,
                      Identifier Name, SourceLoc NameLoc,
                      MutableArrayRef<TypeLoc> Inherited,
