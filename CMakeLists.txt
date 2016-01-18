@@ -154,7 +154,7 @@ option(SWIFT_AST_VERIFIER
     "Enable the AST verifier in the built compiler, and run it on every compilation"
     TRUE)
 
-option(SWIFT_VERIFY_ALL
+option(SWIFT_SIL_VERIFY_ALL
     "Run SIL verification after each transform when building Swift files in the build process"
     FALSE)
 
