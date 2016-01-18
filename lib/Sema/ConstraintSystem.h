@@ -1033,6 +1033,8 @@ struct MemberLookupResult {
     /// only have an rvalue base.  This is more specific than the former one.
     UR_MutatingGetterOnRValue,
     
+    /// The member is inaccessible (e.g. a private member in another file).
+    UR_Inaccessible,
   };
   
   /// This is a list of considered, but rejected, candidates, along with a
@@ -2106,9 +2108,14 @@ public:
   /// perform a lookup into the specified base type to find a candidate list.
   /// The list returned includes the viable candidates as well as the unviable
   /// ones (along with reasons why they aren't viable).
+  ///
+  /// If includeInaccessibleMembers is set to true, this burns compile time to
+  /// try to identify and classify inaccessible members that may be being
+  /// referenced.
   MemberLookupResult performMemberLookup(ConstraintKind constraintKind,
                                          DeclName memberName, Type baseTy,
-                                         ConstraintLocator *memberLocator);
+                                         ConstraintLocator *memberLocator,
+                                         bool includeInaccessibleMembers);
 
 private:
 

@@ -41,7 +41,7 @@
 NOTE(type_declared_here,none,
      "type declared here", ())
 NOTE(decl_declared_here,none,
-     "%0 declared here", (Identifier))
+     "%0 declared here", (DeclName))
 NOTE(extended_type_declared_here,none,
      "extended type declared here", ())
 
@@ -96,6 +96,9 @@ ERROR(could_not_use_member_on_existential,none,
       " constraint instead",
       (Type, DeclName))
 
+ERROR(candidate_inaccessible,none,
+      "%0 is inaccessible due to '%select{private|internal|PUBLIC}1' "
+      "protection level", (DeclName, Accessibility))
 
 ERROR(cannot_pass_rvalue_mutating_subelement,none,
       "cannot use mutating member on immutable value: %0",

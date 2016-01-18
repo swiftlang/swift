@@ -218,6 +218,9 @@ enum class NameLookupFlags {
   DynamicLookup = 0x04,
   /// Whether we're only looking for types.
   OnlyTypes = 0x08,
+  /// Whether to ignore access control for this lookup, allowing inaccessible
+  /// results to be returned.
+  IgnoreAccessibility = 0x10,
 };
 
 /// A set of options that control name lookup.

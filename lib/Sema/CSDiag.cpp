@@ -2195,7 +2195,8 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
   
   MemberLookupResult result =
     CS->performMemberLookup(constraint->getKind(), constraint->getMember(),
-                            baseTy, constraint->getLocator());
+                            baseTy, constraint->getLocator(),
+                            /*includeInaccessibleMembers*/true);
 
   switch (result.OverallResult) {
   case MemberLookupResult::Unsolved:
@@ -2341,6 +2342,16 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
       assert(baseExpr && "Cannot have a mutation failure without a base");
       diagnoseSubElementFailure(baseExpr, loc, *CS,
                                 diagIDsubelt, diagIDmember);
+      return;
+    }
+        
+    case MemberLookupResult::UR_Inaccessible: {
+      auto decl = result.UnviableCandidates[0].first;
+      diagnose(nameLoc, diag::candidate_inaccessible, decl->getName(),
+               decl->getFormalAccess());
+      for (auto cand : result.UnviableCandidates)
+        diagnose(cand.first, diag::decl_declared_here, memberName);
+        
       return;
     }
     }
@@ -3488,7 +3499,8 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   
   MemberLookupResult result =
     CS->performMemberLookup(ConstraintKind::ValueMember, subscriptName,
-                            baseType, locator);
+                            baseType, locator,
+                            /*includeInaccessibleMembers*/true);
 
   
   switch (result.OverallResult) {
@@ -4616,7 +4628,8 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
   MemberLookupResult result =
     CS->performMemberLookup(memberConstraint->getKind(),
                             memberConstraint->getMember(),
-                            baseObjTy, memberConstraint->getLocator());
+                            baseObjTy, memberConstraint->getLocator(),
+                            /*includeInaccessibleMembers*/true);
 
   switch (result.OverallResult) {
   case MemberLookupResult::Unsolved:

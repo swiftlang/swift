@@ -849,7 +849,7 @@ namespace {
               TC.diagnose(NTD->getLoc(), diag::type_declared_here);
 
               TC.diagnose(D->getLoc(), diag::decl_declared_here,
-                          D->getName());
+                          D->getFullName());
 
               return { false, DRE };
             }
@@ -929,7 +929,7 @@ namespace {
             }
           }
           TC.diagnose(capturedDecl->getLoc(), diag::decl_declared_here,
-                      capturedDecl->getName());
+                      capturedDecl->getFullName());
         }
         return false;
       };

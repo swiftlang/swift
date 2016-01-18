@@ -2688,10 +2688,14 @@ getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
 /// perform a lookup into the specified base type to find a candidate list.
 /// The list returned includes the viable candidates as well as the unviable
 /// ones (along with reasons why they aren't viable).
+///
+/// If includeInaccessibleMembers is set to true, this burns compile time to
+/// try to identify and classify inaccessible members that may be being
+/// referenced.
 MemberLookupResult ConstraintSystem::
-performMemberLookup(ConstraintKind constraintKind,
-                    DeclName memberName, Type baseTy,
-                    ConstraintLocator *memberLocator) {
+performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
+                    Type baseTy, ConstraintLocator *memberLocator,
+                    bool includeInaccessibleMembers) {
   Type baseObjTy = baseTy->getRValueType();
 
   // Dig out the instance type and figure out what members of the instance type
@@ -3113,6 +3117,34 @@ retry_after_fail:
     goto retry_after_fail;
   }
 
+  // If we have no viable or unviable candidates, and we're generating,
+  // diagnostics, rerun the query with inaccessible members included, so we can
+  // include them in the unviable candidates list.
+  if (result.ViableCandidates.empty() && result.UnviableCandidates.empty() &&
+      includeInaccessibleMembers) {
+    NameLookupOptions lookupOptions = defaultMemberLookupOptions;
+    
+    // Ignore accessibility so we get candidates that might have been missed
+    // before.
+    lookupOptions |= NameLookupFlags::IgnoreAccessibility;
+    
+    if (isa<AbstractFunctionDecl>(DC))
+      lookupOptions |= NameLookupFlags::KnownPrivate;
+    
+    auto lookup = TC.lookupMember(DC, baseObjTy->getCanonicalType(),
+                                  memberName, lookupOptions);
+    for (auto cand : lookup) {
+      // If the result is invalid, skip it.
+      TC.validateDecl(cand, true);
+      if (cand->isInvalid()) {
+        result.markErrorAlreadyDiagnosed();
+        return result;
+      }
+      
+      result.addUnviable(cand, MemberLookupResult::UR_Inaccessible);
+    }
+  }
+  
   return result;
 }
 
@@ -3138,7 +3170,8 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
 
   MemberLookupResult result =
     performMemberLookup(constraint.getKind(), constraint.getMember(),
-                        baseTy, constraint.getLocator());
+                        baseTy, constraint.getLocator(),
+                        /*includeInaccessibleMembers*/false);
   
   DeclName name = constraint.getMember();
   Type memberTy = constraint.getSecondType();

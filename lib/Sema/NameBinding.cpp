@@ -253,7 +253,7 @@ void NameBinder::addImport(
 
       if (decls.size() == 1)
         diagnose(decls.front(), diag::decl_declared_here,
-                 decls.front()->getName());
+                 decls.front()->getFullName());
     }
   }
 }
