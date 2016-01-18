@@ -321,6 +321,11 @@ mapParsedParameters(Parser &parser,
     
     if (argNameLoc.isInvalid() && paramNameLoc.isInvalid())
       param->setImplicit();
+
+    // If we parsed a colon but have no type, then we already diagnosed this
+    // as a parse error.
+    if (paramInfo.ColonLoc.isValid() && !paramInfo.Type)
+      param->setInvalid();
     
     // If a type was provided, create the type for the parameter.
     if (auto type = paramInfo.Type) {
@@ -329,6 +334,13 @@ mapParsedParameters(Parser &parser,
         type = new (ctx) InOutTypeRepr(type, paramInfo.LetVarInOutLoc);
 
       param->getTypeLoc() = TypeLoc(type);
+    } else if (paramContext != Parser::ParameterContextKind::Closure) {
+      // Non-closure parameters require a type.
+      if (!param->isInvalid())
+        parser.diagnose(param->getLoc(), diag::missing_parameter_type);
+      
+      param->getTypeLoc() = TypeLoc::withoutLoc(ErrorType::get(ctx));
+      param->setInvalid();
     } else if (specifierKind == Parser::ParsedParameter::InOut) {
       parser.diagnose(paramInfo.LetVarInOutLoc, diag::inout_must_have_type);
       paramInfo.LetVarInOutLoc = SourceLoc();
