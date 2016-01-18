@@ -4556,7 +4556,7 @@ bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
                KnownProtocolKind::FileReferenceLiteralConvertible)) {
     plainName = "file reference";
     importModule = "Foundation";
-    importDefaultTypeName = "NSURL";
+    importDefaultTypeName = Ctx.getSwiftName(KnownFoundationEntity::NSURL);
   }
 
   // Emit the diagnostic.

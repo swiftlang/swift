@@ -142,12 +142,16 @@ static Type getObjectiveCClassType(TypeChecker &TC,
 
 Type TypeChecker::getNSObjectType(DeclContext *dc) {
   return getObjectiveCClassType(*this, NSObjectType, Context.Id_ObjectiveC,
-                                Context.Id_NSObject, dc);
+                                Context.getSwiftId(
+                                  KnownFoundationEntity::NSObject),
+                                dc);
 }
 
 Type TypeChecker::getNSErrorType(DeclContext *dc) {
   return getObjectiveCClassType(*this, NSObjectType, Context.Id_Foundation,
-                                Context.Id_NSError, dc);
+                                Context.getSwiftId(
+                                  KnownFoundationEntity::NSError),
+                                dc);
 }
 
 Type TypeChecker::getBridgedToObjC(const DeclContext *dc, Type type) {
@@ -611,7 +615,8 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
       comp->overwriteIdentifier(tc.Context.getIdentifier(RemappedTy));
 
       // HACK: 'NSUInteger' suggests both 'UInt' and 'Int'.
-      if (TypeName == "NSUInteger") {
+      if (TypeName
+            == tc.Context.getSwiftName(KnownFoundationEntity::NSUInteger)) {
         tc.diagnose(L, diag::note_remapped_type, "UInt")
           .fixItReplace(R, "UInt");
       }
@@ -2613,7 +2618,8 @@ static bool isBridgedToObjectiveCClass(DeclContext *dc, Type type) {
   // Allow anything that isn't bridged to NSNumber.
   // FIXME: This feels like a hack, but we don't have the right predicate
   // anywhere.
-  return classDecl->getName().str() != "NSNumber";
+  return classDecl->getName().str()
+            != ctx.getSwiftName(KnownFoundationEntity::NSNumber);
 }
 
 bool TypeChecker::isRepresentableInObjC(
@@ -3360,7 +3366,8 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
     StdlibTypeNames.clear();
     StdlibTypeNames.push_back(Context.getIdentifier("Selector"));
     StdlibTypeNames.push_back(Context.getIdentifier("ObjCBool"));
-    StdlibTypeNames.push_back(Context.getIdentifier("NSZone"));
+    StdlibTypeNames.push_back(
+      Context.getSwiftId(KnownFoundationEntity::NSZone));
     lookupAndAddLibraryTypes(*this, ObjCModule, StdlibTypeNames,
                              ObjCMappedTypes);
   }
@@ -3376,7 +3383,8 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
   Identifier ID_Foundation = Context.Id_Foundation;
   if (auto FoundationModule = Context.getLoadedModule(ID_Foundation)) {
     StdlibTypeNames.clear();
-    StdlibTypeNames.push_back(Context.getIdentifier("NSErrorPointer"));
+    StdlibTypeNames.push_back(
+      Context.getSwiftId(KnownFoundationEntity::NSErrorPointer));
     lookupAndAddLibraryTypes(*this, FoundationModule, StdlibTypeNames,
                              ObjCMappedTypes);
   }

@@ -235,7 +235,8 @@ namespace {
 
         if (superclass->hasClangNode()) {
           // As a special case, assume NSObject has a fixed layout.
-          if (superclass->getName() != IGM.Context.Id_NSObject) {
+          if (superclass->getName() !=
+                IGM.Context.getSwiftId(KnownFoundationEntity::NSObject)) {
             // If the superclass was imported from Objective-C, its size is
             // not known at compile time. However, since the field offset
             // vector only stores offsets of stored properties defined in
@@ -1808,7 +1809,8 @@ ClassDecl *irgen::getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *C) {
   // FIXME: If the root class specifies its own runtime ObjC base class,
   // assume that that base class ultimately inherits NSObject.
   if (C->getAttrs().hasAttribute<SwiftNativeObjCRuntimeBaseAttr>())
-    return IGM.getObjCRuntimeBaseClass(IGM.Context.Id_NSObject);
+    return IGM.getObjCRuntimeBaseClass(
+             IGM.Context.getSwiftId(KnownFoundationEntity::NSObject));
   
   return IGM.getObjCRuntimeBaseClass(IGM.Context.Id_SwiftObject);
 }

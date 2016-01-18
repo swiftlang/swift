@@ -330,7 +330,10 @@ namespace {
             pointee->getDecl()->getName() == "_NSZone") {
           Identifier Id_ObjectiveC = Impl.SwiftContext.Id_ObjectiveC;
           Module *objCModule = Impl.SwiftContext.getLoadedModule(Id_ObjectiveC);
-          Type wrapperTy = Impl.getNamedSwiftType(objCModule, "NSZone");
+          Type wrapperTy = Impl.getNamedSwiftType(
+                             objCModule,
+                             Impl.SwiftContext.getSwiftName(
+                               KnownFoundationEntity::NSZone));
           if (wrapperTy)
             return wrapperTy;
         }
@@ -722,11 +725,14 @@ namespace {
         }
 
         if (imported->hasName() &&
-            imported->getName().str() == "NSString") {
+            imported->getName()
+              == Impl.SwiftContext.getSwiftId(KnownFoundationEntity::NSString)){
           return { importedType, ImportHint::NSString };
         }
 
-        if (imported->hasName() && imported->getName().str() == "NSArray") {
+        if (imported->hasName() &&
+            imported->getName()
+              == Impl.SwiftContext.getSwiftId(KnownFoundationEntity::NSArray)) {
           // If we have type arguments, import them.
           ArrayRef<clang::QualType> typeArgs = type->getTypeArgs();
           if (typeArgs.size() == 1) {
@@ -742,7 +748,10 @@ namespace {
           return { importedType, ImportHint(ImportHint::NSArray, Type()) };
         }
 
-        if (imported->hasName() && imported->getName().str() == "NSDictionary") {
+        if (imported->hasName() &&
+            imported->getName()
+              == Impl.SwiftContext.getSwiftId(
+                   KnownFoundationEntity::NSDictionary)) {
           // If we have type arguments, import them.
           ArrayRef<clang::QualType> typeArgs = type->getTypeArgs();
           if (typeArgs.size() == 2) {
@@ -769,7 +778,9 @@ namespace {
                    ImportHint(ImportHint::NSDictionary, Type(), Type()) };
         }
 
-        if (imported->hasName() && imported->getName().str() == "NSSet") {
+        if (imported->hasName() &&
+            imported->getName()
+              == Impl.SwiftContext.getSwiftId(KnownFoundationEntity::NSSet)) {
           // If we have type arguments, import them.
           ArrayRef<clang::QualType> typeArgs = type->getTypeArgs();
           if (typeArgs.size() == 1) {
@@ -953,7 +964,8 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
       return Type();
 
     // FIXME: Avoid string comparison by caching this identifier.
-    if (elementClass->getName().str() != "NSError")
+    if (elementClass->getName().str() !=
+          impl.SwiftContext.getSwiftName(KnownFoundationEntity::NSError))
       return Type();
 
     Module *foundationModule = impl.tryLoadFoundationModule();
@@ -962,7 +974,10 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
           != elementClass->getModuleContext()->getName())
       return Type();
 
-    return impl.getNamedSwiftType(foundationModule, "NSErrorPointer");
+    return impl.getNamedSwiftType(
+            foundationModule,
+            impl.SwiftContext.getSwiftName(
+              KnownFoundationEntity::NSErrorPointer));
   };
   if (Type result = maybeImportNSErrorPointer())
     return result;

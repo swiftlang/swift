@@ -84,12 +84,12 @@ static Pattern *createTypedNamedPattern(VarDecl *decl) {
   return P;
 }
 
-template <size_t A, size_t B>
+#ifndef NDEBUG
 static bool verifyNameMapping(MappedTypeNameKind NameMapping,
-                              const char (&left)[A], const char (&right)[B]) {
-  return NameMapping == MappedTypeNameKind::DoNothing ||
-         strcmp(left, right) != 0;
+                              StringRef left, StringRef right) {
+  return NameMapping == MappedTypeNameKind::DoNothing || left != right;
 }
+#endif
 
 /// \brief Map a well-known C type to a swift type from the standard library.
 ///
