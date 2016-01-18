@@ -1831,9 +1831,7 @@ struct TypeEntityInfo {
 } // end anonymous namespace
 
 static TypeEntityInfo
-getTypeEntityInfo(IRGenModule &IGM,
-                  CanType conformingType,
-                  bool allowUnboundGenericTypes) {
+getTypeEntityInfo(IRGenModule &IGM, CanType conformingType) {
   TypeMetadataRecordKind typeKind;
   Optional<LinkEntity> entity;
   llvm::Type *defaultTy, *defaultPtrTy;
@@ -1999,8 +1997,7 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
                   LinkEntity::forProtocolDescriptor(conformance->getProtocol()),
                   getPointerAlignment(), ProtocolDescriptorStructTy);
     auto typeEntity = getTypeEntityInfo(*this,
-                                        conformance->getType()->getCanonicalType(),
-                                        /*allowUnboundGenericTypes*/ false);
+                                        conformance->getType()->getCanonicalType());
     auto flags = typeEntity.flags
         .withConformanceKind(ProtocolConformanceReferenceKind::WitnessTable);
 
@@ -2075,8 +2072,7 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
 
   SmallVector<llvm::Constant *, 8> elts;
   for (auto type : RuntimeResolvableTypes) {
-    auto typeEntity = getTypeEntityInfo(*this, type,
-                                        /*allowUnboundGenericTypes*/ true);
+    auto typeEntity = getTypeEntityInfo(*this, type);
     auto typeRef = getAddrOfLLVMVariableOrGOTEquivalent(
             typeEntity.entity, getPointerAlignment(), typeEntity.defaultTy);
 
