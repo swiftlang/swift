@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend %s -parse-as-library -O -emit-sil | FileCheck %s
 //
-// Test specualtive devirtualization.
+// Test speculative devirtualization.
 
 // Test MaxNumSpeculativeTargets.
 // rdar:23228386
