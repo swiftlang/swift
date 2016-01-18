@@ -34,7 +34,6 @@ add_swift_library(swiftIRGen
   SwiftTargetInfo.cpp
   StructLayout.cpp
   TypeLayoutVerifier.cpp
-  UnimplementedTypeInfo.cpp
   LINK_LIBRARIES
     swiftAST
     swiftLLVMPasses
