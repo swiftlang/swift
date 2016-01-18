@@ -63,8 +63,8 @@ class SILPassManager {
   llvm::DenseMap<SILFunction *, CompletedPasses> CompletedPassesMap;
 
   /// Set to true when a pass invalidates an analysis.
-  bool currentPassHasInvalidated = false;
-  
+  bool CurrentPassHasInvalidated = false;
+
 public:
   /// C'tor. It creates and registers all analysis passes, which are defined
   /// in Analysis.def.
@@ -108,7 +108,7 @@ public:
       if (!AP->isLocked())
         AP->invalidate(K);
 
-    currentPassHasInvalidated = true;
+    CurrentPassHasInvalidated = true;
 
     // Assume that all functions have changed. Clear all masks of all functions.
     CompletedPassesMap.clear();
@@ -122,7 +122,7 @@ public:
       if (!AP->isLocked())
         AP->invalidate(F, K);
     
-    currentPassHasInvalidated = true;
+    CurrentPassHasInvalidated = true;
     // Any change let all passes run again.
     CompletedPassesMap[F].reset();
   }
