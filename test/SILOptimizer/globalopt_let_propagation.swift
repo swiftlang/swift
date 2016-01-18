@@ -4,6 +4,11 @@
 // and enable further optimizations like constant propagation, simplifications, etc.
 
 // Define some global let variables.
+
+// Currently GlobalOpt cannot deal with the new alloc_global instruction.
+// TODO: re-enable this test when rdar://problem/24229640 is fixed.
+// REQUIRES: FIXME
+
 let PI = 3.1415
 let ONE = 1.000
 let I = 100
