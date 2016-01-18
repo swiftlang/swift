@@ -228,6 +228,7 @@ getBuiltinGenericFunction(Identifier Id,
                                TypeLoc::withoutLoc(ResBodyType), DC);
     
   func->setInterfaceType(InterfaceType);
+  func->setGenericSignature(Sig);
   func->setImplicit();
   func->setAccessibility(Accessibility::Public);
 
