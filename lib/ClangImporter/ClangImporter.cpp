@@ -1171,6 +1171,13 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
     DeprecatedAsUnavailableMessage =
       "APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift";
   }
+
+  // Prepopulate the set of module prefixes.
+  // FIXME: Hard-coded list should move into the module map language.
+  if (OmitNeedlessWords) {
+    ModulePrefixes["Foundation"] = "NS";
+    ModulePrefixes["ObjectiveC"] = "NS";
+  }
 }
 
 
@@ -2000,6 +2007,15 @@ considerErrorImport(ClangImporter::Implementation &importer,
   return None;
 }
 
+/// Determine whether we are allowed to strip the module prefix from
+/// an entity with the given name.
+static bool canStripModulePrefix(StringRef name) {
+  if (auto known = getKnownFoundationEntity(name))
+    return !nameConflictsWithStandardLibrary(*known);
+
+  return true;
+}
+
 auto ClangImporter::Implementation::importFullName(
        const clang::NamedDecl *D,
        ImportNameOptions options,
@@ -2429,6 +2445,29 @@ auto ClangImporter::Implementation::importFullName(
         method->hasRelatedResultType(),
         method->isInstanceMethod(),
         omitNeedlessWordsScratch);
+    }
+
+    // Check whether the module in which the declaration resides has a
+    // module prefix. If so, strip that prefix off when present.
+    if (D->getDeclContext()->getRedeclContext()->isFileContext() &&
+        D->getDeclName().getNameKind() == clang::DeclarationName::Identifier) {
+      std::string moduleName;
+      if (auto module = D->getImportedOwningModule())
+        moduleName = module->getTopLevelModuleName();
+      else
+        moduleName = D->getASTContext().getLangOpts().CurrentModule;
+      auto prefixPos = ModulePrefixes.find(moduleName);
+      if (prefixPos != ModulePrefixes.end() &&
+          canStripModulePrefix(baseName) &&
+          baseName.startswith(prefixPos->second)) {
+        // Strip off the prefix.
+        baseName = baseName.substr(prefixPos->second.size());
+
+        // If the result is a value, lowercase it.
+        if (isa<clang::ValueDecl>(D))
+          baseName = camel_case::toLowercaseWord(baseName,
+                                                 omitNeedlessWordsScratch);
+      }
     }
   }
 
