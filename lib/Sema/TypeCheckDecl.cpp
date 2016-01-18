@@ -2215,16 +2215,24 @@ static void checkBridgedFunctions(TypeChecker &TC) {
   #include "swift/SIL/BridgedTypes.def"
   
   if (Module *module = TC.Context.getLoadedModule(ID_Foundation)) {
-    checkObjCBridgingFunctions(TC, module, "NSArray",
+    checkObjCBridgingFunctions(TC, module,
+                               TC.Context.getSwiftName(
+                                 KnownFoundationEntity::NSArray),
                                "_convertNSArrayToArray",
                                "_convertArrayToNSArray");
-    checkObjCBridgingFunctions(TC, module, "NSDictionary",
+    checkObjCBridgingFunctions(TC, module,
+                               TC.Context.getSwiftName(
+                                 KnownFoundationEntity::NSDictionary),
                                "_convertNSDictionaryToDictionary",
                                "_convertDictionaryToNSDictionary");
-    checkObjCBridgingFunctions(TC, module, "NSSet",
+    checkObjCBridgingFunctions(TC, module,
+                               TC.Context.getSwiftName(
+                                 KnownFoundationEntity::NSSet),
                                "_convertNSSetToSet",
                                "_convertSetToNSSet");
-    checkObjCBridgingFunctions(TC, module, "NSError",
+    checkObjCBridgingFunctions(TC, module,
+                               TC.Context.getSwiftName(
+                                 KnownFoundationEntity::NSError),
                                "_convertNSErrorToErrorType",
                                "_convertErrorTypeToNSError");
   }

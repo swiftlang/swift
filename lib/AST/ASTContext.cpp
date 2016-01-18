@@ -37,6 +37,7 @@
 #include "llvm/Support/Allocator.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringSwitch.h"
 #include <algorithm>
 #include <memory>
 
@@ -2274,6 +2275,25 @@ bool ASTContext::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
                                     Impl.ObjCUnsatisfiedOptReqs.end());
 
   return anyDiagnosed;
+}
+
+Optional<KnownFoundationEntity> swift::getKnownFoundationEntity(StringRef name){
+  return llvm::StringSwitch<Optional<KnownFoundationEntity>>(name)
+#define FOUNDATION_ENTITY(Name) .Case(#Name, KnownFoundationEntity::Name)
+#include "swift/AST/KnownFoundationEntities.def"
+    .Default(None);
+}
+
+StringRef ASTContext::getSwiftName(KnownFoundationEntity kind) {
+  StringRef objcName;
+  switch (kind) {
+#define FOUNDATION_ENTITY(Name) case KnownFoundationEntity::Name:  \
+    objcName = #Name;                                             \
+    break;
+#include "swift/AST/KnownFoundationEntities.def"
+  }
+
+  return objcName;
 }
 
 void ASTContext::dumpArchetypeContext(ArchetypeType *archetype,
