@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -149,7 +149,7 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
     lastProcessed.setInt(true);
 
     // If we have conformances we can load, do so.
-    // FIXME: This could be more lazy.
+    // FIXME: This could be lazier.
     auto loader = nominal->takeConformanceLoader();
     if (loader.first) {
       SmallVector<ProtocolConformance *, 2> conformances;
@@ -179,7 +179,7 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
     lastProcessed.setPointer(next);
 
     // If we have conformances we can load, do so.
-    // FIXME: This could be more lazy.
+    // FIXME: This could be lazier.
     auto loader = next->takeConformanceLoader();
     if (loader.first) {
       SmallVector<ProtocolConformance *, 2> conformances;
@@ -487,10 +487,14 @@ void ConformanceLookupTable::addProtocols(NominalTypeDecl *nominal,
 void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
                                                        DeclContext *dc, 
                                                        LazyResolver *resolver) {
-  // Note: recursive type-checking implies that that AllConformances
+  // Note: recursive type-checking implies that AllConformances
   // may be reallocated during this traversal, so pay the lookup cost
   // during each iteration.
   for (unsigned i = 0; i != AllConformances[dc].size(); ++i) {
+    /// FIXME: Avoid the possibility of an infinite loop by fixing the root
+    ///        cause instead (incomplete circularity detection).
+    assert(i <= 16384 &&
+           "Infinite loop due to circular protocol inheritance?");
     ConformanceEntry *conformanceEntry = AllConformances[dc][i];
     ProtocolDecl *conformingProtocol = conformanceEntry->getProtocol();
 
@@ -543,7 +547,7 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
                                    bool &diagnoseSuperseded) {
   // If one entry is fixed and the other is not, we have our answer.
   if (lhs->isFixed() != rhs->isFixed()) {
-    // If the non-fixed conformance is not replacable, we have a failure to
+    // If the non-fixed conformance is not replaceable, we have a failure to
     // diagnose.
     diagnoseSuperseded = (lhs->isFixed() &&
                           !isReplaceable(rhs->getRankingKind())) ||

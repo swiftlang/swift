@@ -44,7 +44,7 @@ func doit(inout local: C) {
   // CHECK-NEXT: 5. global[0] == 2
 
   // This assignment structurally changes 'global' while a
-  // simultaneous modification is occuring to it.  This is
+  // simultaneous modification is occurring to it.  This is
   // allowed to have unspecified behavior but not to crash.
   global.append(C(3))
   print("6. local == \(local)")

@@ -7,12 +7,15 @@ class C1 : Prot {
     subscript (index i: Float) -> Int { get }
 }
 
+extension cake.C1Alias {
+}
+
 enum MyEnum : Int {
     case Blah
 }
 
 protocol Prot {
-    typealias Element
+    associatedtype Element
     var p: Int { get }
     func foo()
 }
@@ -172,192 +175,184 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 170,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 180,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.ref.typealias,
+    key.name: "C1Alias",
+    key.usr: "s:4cake7C1Alias",
+    key.offset: 185,
+    key.length: 7
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 198,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 175,
+    key.offset: 203,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 184,
+    key.offset: 212,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 194,
+    key.offset: 222,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 199,
+    key.offset: 227,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 207,
+    key.offset: 235,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 216,
+    key.offset: 244,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 227,
-    key.length: 9
+    key.offset: 255,
+    key.length: 14
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 237,
+    key.offset: 270,
     key.length: 7
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 249,
+    key.offset: 282,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 253,
+    key.offset: 286,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 256,
+    key.offset: 289,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 262,
+    key.offset: 295,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 272,
+    key.offset: 305,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 277,
+    key.offset: 310,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 286,
+    key.offset: 319,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "Prot",
     key.usr: "s:P4cake4Prot",
-    key.offset: 296,
+    key.offset: 329,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 301,
+    key.offset: 334,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 307,
+    key.offset: 340,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 312,
+    key.offset: 345,
     key.length: 7
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 323,
+    key.offset: 356,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 333,
+    key.offset: 366,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 338,
+    key.offset: 371,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 350,
+    key.offset: 383,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 355,
+    key.offset: 388,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 362,
+    key.offset: 395,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "Prot",
     key.usr: "s:P4cake4Prot",
-    key.offset: 367,
+    key.offset: 400,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 373,
+    key.offset: 406,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 378,
+    key.offset: 411,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.ref.class,
     key.name: "C1",
     key.usr: "s:C4cake2C1",
-    key.offset: 383,
+    key.offset: 416,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 386,
+    key.offset: 419,
     key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 392,
-    key.length: 2
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 395,
-    key.length: 7
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 406,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 411,
-    key.length: 2
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 414,
-    key.length: 7
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
@@ -370,53 +365,78 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
     key.length: 7
   },
   {
-    key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 437,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
     key.offset: 439,
-    key.length: 2
+    key.length: 3
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 437,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 439,
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 444,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 443,
-    key.length: 2
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.argument,
     key.offset: 447,
-    key.length: 1
+    key.length: 7
   },
   {
-    key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 449,
-    key.length: 2
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 447,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 449,
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 458,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 453,
+    key.offset: 461,
+    key.length: 7
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 470,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 472,
+    key.length: 2
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 470,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 472,
+    key.length: 2
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 476,
+    key.length: 2
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 480,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 482,
+    key.length: 2
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 480,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 482,
+    key.length: 2
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 486,
     key.length: 2
   }
 ]
@@ -443,7 +463,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.length: 23,
         key.conforms: [
           {
-            key.kind: source.lang.swift.ref.typealias,
+            key.kind: source.lang.swift.ref.associatedtype,
             key.name: "Element",
             key.usr: "s:P4cake4Prot7Element"
           }
@@ -512,10 +532,27 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
     ]
   },
   {
+    key.kind: source.lang.swift.decl.extension.class,
+    key.offset: 170,
+    key.length: 26,
+    key.conforms: [
+      {
+        key.kind: source.lang.swift.ref.protocol,
+        key.name: "Prot1",
+        key.usr: "s:P4cake5Prot1"
+      }
+    ],
+    key.extends: {
+      key.kind: source.lang.swift.ref.typealias,
+      key.name: "C1Alias",
+      key.usr: "s:4cake7C1Alias"
+    }
+  },
+  {
     key.kind: source.lang.swift.decl.enum,
     key.name: "MyEnum",
     key.usr: "s:O4cake6MyEnum",
-    key.offset: 170,
+    key.offset: 198,
     key.length: 35,
     key.inherits: [
       {
@@ -529,7 +566,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.kind: source.lang.swift.decl.enumelement,
         key.name: "Blah",
         key.usr: "s:FO4cake6MyEnum4BlahFMS0_S0_",
-        key.offset: 194,
+        key.offset: 222,
         key.length: 9
       }
     ]
@@ -538,28 +575,28 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
     key.kind: source.lang.swift.decl.protocol,
     key.name: "Prot",
     key.usr: "s:P4cake4Prot",
-    key.offset: 207,
-    key.length: 77,
+    key.offset: 235,
+    key.length: 82,
     key.entities: [
       {
-        key.kind: source.lang.swift.decl.typealias,
+        key.kind: source.lang.swift.decl.associatedtype,
         key.name: "Element",
         key.usr: "s:P4cake4Prot7Element",
-        key.offset: 227,
-        key.length: 17
+        key.offset: 255,
+        key.length: 22
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "p",
         key.usr: "s:vP4cake4Prot1pSi",
-        key.offset: 249,
+        key.offset: 282,
         key.length: 18
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "foo()",
         key.usr: "s:FP4cake4Prot3fooFT_T_",
-        key.offset: 272,
+        key.offset: 305,
         key.length: 10
       }
     ]
@@ -571,7 +608,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.description: "Self.Element == Int"
       }
     ],
-    key.offset: 286,
+    key.offset: 319,
     key.length: 62,
     key.extends: {
       key.kind: source.lang.swift.ref.protocol,
@@ -583,7 +620,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "extfoo()",
         key.usr: "s:Fe4cakeRxS_4Protwx7ElementzSirS0_6extfooFT_T_",
-        key.offset: 333,
+        key.offset: 366,
         key.length: 13
       }
     ]
@@ -610,21 +647,21 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.description: "T2.Element == T1.Element"
       }
     ],
-    key.offset: 350,
+    key.offset: 383,
     key.length: 106,
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
         key.keyword: "x",
         key.name: "ix",
-        key.offset: 443,
+        key.offset: 476,
         key.length: 2
       },
       {
         key.kind: source.lang.swift.decl.var.local,
         key.keyword: "y",
         key.name: "iy",
-        key.offset: 453,
+        key.offset: 486,
         key.length: 2
       }
     ]

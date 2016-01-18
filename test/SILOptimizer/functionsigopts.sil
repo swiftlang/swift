@@ -1,0 +1,500 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -function-signature-opts %s | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -function-signature-opts %s | FileCheck -check-prefix=CHECK-NEGATIVE %s
+
+import Builtin
+import Swift
+
+// We do this check separately to ensure that this does not occur anywhere in
+// the output for the file. (Maybe this is an interesting enough feature to add to FileCheck?).
+
+// CHECK-NEGATIVE-NOT: sil [fragile] @_TTSf4d_n__dead_arg_no_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+// CHECK-NEGATIVE-NOT: sil [fragile] @_TTSf4g__owned_to_guaranteed_multibb_callee_with_release_not_in_exit : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+
+sil [fragile] @user : $@convention(thin) (Builtin.NativeObject) -> ()
+sil [fragile] @create_object : $@convention(thin) () -> Builtin.NativeObject
+
+// CHECK-LABEL: sil [fragile] @dead_arg_no_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+// CHECK-NOT: function_ref @_TTSf4d_n__dead_arg_no_callsites
+sil [fragile] @dead_arg_no_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %2 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
+  %4 = tuple()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil [fragile] [thunk] @dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+// CHECK: bb0
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref @_TTSf4d_n__dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject) -> ()
+// CHECK-NEXT: apply
+// CHECK-NEXT: return
+sil [fragile] @dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  debug_value %0 : $Builtin.NativeObject // debug_value of a dead arg should also be deleted.
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %2 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
+  %4 = tuple()
+  return %4 : $()
+}
+
+// CHECK-NOT: sil hidden [fragile] @private_dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+sil private [fragile] @private_dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %2 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
+  %4 = tuple()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil [fragile] @dead_arg_callsite_1 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+// CHECK: bb0
+// CHECK: [[OPT_FUN:%[0-9]+]] = function_ref @_TTSf4d_n__dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject) -> ()
+// CHECK-NEXT: apply [[OPT_FUN]](
+// CHECK: [[PRIV_OPT_FUN:%[0-9]+]] = function_ref @_TTSf4d_n__private_dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject) -> ()
+// CHECK-NEXT: apply [[PRIV_OPT_FUN]]
+sil [fragile] @dead_arg_callsite_1 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  %2 = function_ref @dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> ()
+  %3 = apply %2(%0, %1) : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> ()
+  %4 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+
+  // This ensures that %0 is not dead in this function. We don't want to specialize this.
+  apply %4(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  %5 = function_ref @private_dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> ()
+  %6 = apply %5(%0, %1) : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> ()
+  %7 = tuple()
+  return %7 : $()
+}
+
+// This test makes sure we can look up an already specialized callee instead of regenerating one.
+// CHECK-LABEL: sil [fragile] @dead_arg_callsite_2 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+// CHECK: [[OPT_FUN:%[0-9]+]] = function_ref @_TTSf4d_n__dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject) -> ()
+// CHECK-NEXT: apply [[OPT_FUN]](
+sil [fragile] @dead_arg_callsite_2 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  %2 = function_ref @dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> ()
+  %3 = apply %2(%0, %1) : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> ()
+  %4 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  // This ensures that %0 is not dead in this function. We don't want to specialize this.
+  apply %4(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  %5 = tuple()
+  return %5 : $()
+}
+
+// This test case verifies we can specialize functions called through thin_to_thick_function.
+// CHECK-LABEL: sil [fragile] @dead_arg_obfuscated_callsite : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+// CHECK: [[OPT_FUN:%[0-9]+]] = function_ref @_TTSf4d_n__dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject) -> ()
+// CHECK-NEXT: apply [[OPT_FUN]](
+sil [fragile] @dead_arg_obfuscated_callsite : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  %2 = function_ref @dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> ()
+  %3 = thin_to_thick_function %2 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () to $@callee_owned (Builtin.NativeObject, Builtin.NativeObject) -> ()
+  %4 = apply %3(%0, %1) : $@callee_owned (Builtin.NativeObject, Builtin.NativeObject) -> ()
+  %5 = tuple()
+  return %5 : $()
+}
+
+//========================================
+// @owned => @guaranteed with error result
+
+// CHECK-LABEL: sil [fragile] [thunk] @owned_to_guaranteed_with_error_result : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorType) {
+// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_TTSf4g_n__owned_to_guaranteed_with_error_result : $@convention(thin) (@guaranteed Builtin.NativeObject, Int)
+// CHECK: try_apply [[FUNC_REF]]({{.*}}, normal bb1, error bb2
+// CHECK: bb1([[NORMRET:%[0-9]+]] : $Int):
+// CHECK-NEXT: release_value
+// CHECK-NEXT: return [[NORMRET]]
+// CHECK: bb2([[THROW:%[0-9]+]] : $ErrorType):
+// CHECK-NEXT: release_value
+// CHECK-NEXT: throw [[THROW]]
+sil [fragile] @owned_to_guaranteed_with_error_result : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorType) {
+bb0(%0 : $Builtin.NativeObject, %1 : $Int):
+  %f1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %f1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  release_value %0 : $Builtin.NativeObject
+  return %1 : $Int
+
+bb2:
+  release_value %0 : $Builtin.NativeObject
+  throw undef : $ErrorType
+}
+
+// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_with_error_caller : $@convention(thin) (Builtin.NativeObject, Int) -> (Int, @error ErrorType) {
+// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_TTSf4g_n__owned_to_guaranteed_with_error_result : $@convention(thin) (@guaranteed Builtin.NativeObject, Int)
+// CHECK: try_apply [[FUNC_REF]]({{.*}}, normal bb1, error bb2
+// CHECK: bb1([[NORMRET:%[0-9]+]] : $Int):
+// CHECK-NEXT: release_value
+// CHECK-NEXT: return [[NORMRET]]
+// CHECK: bb2([[THROW:%[0-9]+]] : $ErrorType):
+// CHECK-NEXT: release_value
+// CHECK-NEXT: throw [[THROW]]
+sil [fragile] @owned_to_guaranteed_with_error_caller : $@convention(thin) (Builtin.NativeObject, Int) -> (Int, @error ErrorType) {
+bb0(%0 : $Builtin.NativeObject, %1 : $Int):
+  %f1 = function_ref @owned_to_guaranteed_with_error_result : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorType)
+  try_apply %f1(%0, %1) : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorType), normal bb1, error bb2
+
+bb1(%a1 : $Int):
+  return %a1 : $Int
+
+bb2(%a2 : $ErrorType):
+  throw %a2 : $ErrorType
+}
+
+// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_with_nothrow_caller : $@convention(thin) (Builtin.NativeObject, Int) -> Int {
+// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_TTSf4g_n__owned_to_guaranteed_with_error_result : $@convention(thin) (@guaranteed Builtin.NativeObject, Int)
+// CHECK: [[NORMRET:%[0-9]+]] = apply [nothrow] [[FUNC_REF]]
+// CHECK-NEXT: release_value
+// CHECK-NEXT: return [[NORMRET]]
+sil [fragile] @owned_to_guaranteed_with_nothrow_caller : $@convention(thin) (Builtin.NativeObject, Int) -> Int {
+bb0(%0 : $Builtin.NativeObject, %1 : $Int):
+  %f1 = function_ref @owned_to_guaranteed_with_error_result : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorType)
+  %r1 = apply [nothrow] %f1(%0, %1) : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorType)
+  return %r1 : $Int
+}
+
+//======================
+// @owned => @guaranteed
+
+// We should optimize this call.
+// CHECK-LABEL: sil [fragile] [thunk] @owned_to_guaranteed_simple_singlebb_callee : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_TTSf4g__owned_to_guaranteed_simple_singlebb_callee : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+// CHECK: apply [[FUNC_REF]]
+// CHECK-NOT: fix_lifetime
+// CHECK: release_value
+sil [fragile] @owned_to_guaranteed_simple_singlebb_callee : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  release_value %0 : $Builtin.NativeObject
+  %2 = tuple()
+  return %2 : $()
+}
+
+// Callee to make sure we handle multiple callees properly.
+// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_simple_singlebb_caller1 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK-NOT: fix_lifetime
+// CHECK: release_value
+sil [fragile] @owned_to_guaranteed_simple_singlebb_caller1 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @owned_to_guaranteed_simple_singlebb_callee : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_simple_singlebb_caller2 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK-NOT: fix_lifetime
+// CHECK: release_value
+sil [fragile] @owned_to_guaranteed_simple_singlebb_caller2 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @owned_to_guaranteed_simple_singlebb_callee : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %2 = tuple()
+  return %2 : $()
+}
+
+// We should not optimize this call due to the user.
+// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_sideeffectblock_singlebb_callee
+// CHECK-NOT: @guaranteed
+sil [fragile] @owned_to_guaranteed_sideeffectblock_singlebb_callee : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  release_value %0 : $Builtin.NativeObject
+  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  %2 = tuple()
+  return %2 : $()
+}
+
+// We should be able to optimize this callee since the release is in the exit
+// BB. Additionally this test makes sure that we delete dead parameters before
+// invalidating the owned argument -> release map.
+// CHECK-LABEL: sil [fragile] [thunk] @owned_to_guaranteed_multibb_callee_with_release_in_exit : $@convention(thin) (Builtin.Int1, @owned Builtin.NativeObject) -> () {
+// CHECK-NOT: fix_lifetime
+// CHECK: release_value %1 : $Builtin.NativeObject
+sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_in_exit : $@convention(thin) (Builtin.Int1, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.NativeObject):
+  %9999 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %9999(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb2
+
+bb2:
+  strong_release %1 : $Builtin.NativeObject
+  %2 = tuple()
+  return %2 : $()
+}
+
+// In this case the release is not in the exit, so we cannot specialize.
+// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_not_in_exit : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-NOT: @guaranteed
+sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_not_in_exit : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_release %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb2
+
+bb2:
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil [fragile] [thunk] @owned_to_guaranteed_simple_singlebb_multiple_arg_callee : $@convention(thin) (Builtin.Int1, @owned Builtin.NativeObject, Builtin.Int1) -> () {
+sil [fragile] @owned_to_guaranteed_simple_singlebb_multiple_arg_callee : $@convention(thin) (Builtin.Int1, @owned Builtin.NativeObject, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.NativeObject, %2 : $Builtin.Int1):
+  %9999 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %9999(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
+  cond_br %0, bb1, bb2
+
+bb1:
+  cond_br %2, bb2, bb3
+
+bb2:
+  br bb3
+
+bb3:
+  release_value %1 : $Builtin.NativeObject
+  %3 = tuple()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil [fragile] [thunk] @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+// CHECK: bb0([[INPUT_PTR1:%.*]] : $Builtin.NativeObject, [[INPUT_PTR2:%.*]] : $Builtin.NativeObject):
+// CHECK: release_value [[INPUT_PTR1]] : $Builtin.NativeObject
+// CHECK: release_value [[INPUT_PTR2]] : $Builtin.NativeObject
+sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  %9999 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %9999(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %9999(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb2
+
+bb2:
+  strong_release %1 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [fragile] [thunk] @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+// CHECK: bb0([[INPUT_PTR1:%.*]] : $Builtin.NativeObject, [[INPUT_PTR2:%.*]] : $Builtin.NativeObject):
+// CHECK: release_value [[INPUT_PTR1]] : $Builtin.NativeObject
+// CHECK: release_value [[INPUT_PTR2]] : $Builtin.NativeObject
+sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  %9999 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %9999(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %9999(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
+  %2 = function_ref @create_object : $@convention(thin) () -> Builtin.NativeObject
+  %3 = apply %2() : $@convention(thin) () -> Builtin.NativeObject
+  cond_br undef, bb1(%3 : $Builtin.NativeObject), bb2(%3 : $Builtin.NativeObject)
+
+bb1(%4 : $Builtin.NativeObject):
+  br bb2(%4 : $Builtin.NativeObject)
+
+bb2(%5 : $Builtin.NativeObject):
+  strong_release %5 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %1 : $Builtin.NativeObject
+  %6 = tuple()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_simple_singlebb_multiple_arg_caller : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+// CHECK: bb0([[INPUT_PTR_1:%.*]] : $Builtin.NativeObject, [[INPUT_PTR_2:%.*]] : $Builtin.NativeObject):
+// CHECK: [[SINGLEBB_MULTIPLEARG_CALLEE:%.*]] = function_ref @_TTSf4n_g_n__owned_to_guaranteed_simple_singlebb_multiple_arg_callee : $@convention(thin) (Builtin.Int1, @guaranteed Builtin.NativeObject, Builtin.Int1) -> ()
+// CHECK: apply [[SINGLEBB_MULTIPLEARG_CALLEE]]({{%.*}}, [[INPUT_PTR_1]], {{%.*}})
+// CHECK: release_value [[INPUT_PTR_1]]
+// CHECK: [[MULTIBB_RELEASENOTINEXIT_CALLEE:%.*]] = function_ref @owned_to_guaranteed_multibb_callee_with_release_not_in_exit : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+// CHECK: apply [[MULTIBB_RELEASENOTINEXIT_CALLEE]]([[INPUT_PTR_1]])
+// CHECK: [[MULTIBB_RELEASEINEXIT_CALLEE:%.*]] = function_ref @_TTSf4d_g__owned_to_guaranteed_multibb_callee_with_release_in_exit : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+// CHECK: apply [[MULTIBB_RELEASEINEXIT_CALLEE]]([[INPUT_PTR_1]])
+// CHECK-NEXT: release_value [[INPUT_PTR_1]] : $Builtin.NativeObject
+// CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS1:%.*]] = function_ref @_TTSf4g_g__owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1 : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+// CHECK: apply [[MULTIBB_RELEASEINEXIT_TWOARGS1]]([[INPUT_PTR_1]], [[INPUT_PTR_2]])
+// CHECK: release_value [[INPUT_PTR_1]]
+// CHECK: release_value [[INPUT_PTR_2]]
+// CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS1:%.*]] = function_ref @_TTSf4g_g__owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1 : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+// CHECK: apply [[MULTIBB_RELEASEINEXIT_TWOARGS1]]([[INPUT_PTR_2]], [[INPUT_PTR_1]])
+// CHECK: release_value [[INPUT_PTR_2]]
+// CHECK: release_value [[INPUT_PTR_1]]
+
+// CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS2:%.*]] = function_ref @_TTSf4g_g__owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2 : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+// CHECK: apply [[MULTIBB_RELEASEINEXIT_TWOARGS2]]([[INPUT_PTR_2]], [[INPUT_PTR_1]])
+// CHECK: release_value [[INPUT_PTR_2]]
+// CHECK: release_value [[INPUT_PTR_1]]
+// CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS2:%.*]] = function_ref @_TTSf4g_g__owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2 : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+// CHECK: apply [[MULTIBB_RELEASEINEXIT_TWOARGS2]]([[INPUT_PTR_1]], [[INPUT_PTR_2]])
+// CHECK: release_value [[INPUT_PTR_1]]
+// CHECK: release_value [[INPUT_PTR_2]]
+
+sil [fragile] @owned_to_guaranteed_simple_singlebb_multiple_arg_caller : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  %2 = function_ref @owned_to_guaranteed_simple_singlebb_multiple_arg_callee : $@convention(thin) (Builtin.Int1, @owned Builtin.NativeObject, Builtin.Int1) -> ()
+  %3 = integer_literal $Builtin.Int1, 0
+  %4 = integer_literal $Builtin.Int1, 0
+  apply %2(%3, %0, %4) : $@convention(thin) (Builtin.Int1, @owned Builtin.NativeObject, Builtin.Int1) -> ()
+  %5 = function_ref @owned_to_guaranteed_multibb_callee_with_release_not_in_exit : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %5(%0) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %6 = integer_literal $Builtin.Int1, 0
+  %7 = function_ref @owned_to_guaranteed_multibb_callee_with_release_in_exit : $@convention(thin) (Builtin.Int1, @owned Builtin.NativeObject) -> ()
+  apply %7(%6, %0) : $@convention(thin) (Builtin.Int1, @owned Builtin.NativeObject) -> ()
+  %8 = function_ref @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> ()
+  apply %8(%0, %1) : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> ()
+  apply %8(%1, %0) : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> ()
+  %9 = function_ref @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> ()
+  apply %9(%1, %0) : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> ()
+  apply %9(%0, %1) : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> ()
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We should remove the array semantic from specialized calls.
+
+// CHECK-LABEL: sil [fragile] [thunk] [_semantics "array.foobar"] @array_semantic : $@convention(method) (@owned Builtin.NativeObject) -> () {
+// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_TTSf4g__array_semantic : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+// CHECK: apply [[FUNC_REF]]
+// CHECK: release_value
+sil [fragile] [_semantics "array.foobar"] @array_semantic : $@convention(method) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  release_value %0 : $Builtin.NativeObject
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [fragile] @array_semantic_caller : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_TTSf4g__array_semantic : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+// CHECK: apply [[FUNC_REF]]
+// CHECK: release_value
+sil [fragile] @array_semantic_caller : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @array_semantic : $@convention(method) (@owned Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(method) (@owned Builtin.NativeObject) -> ()
+  %2 = tuple()
+  return %2 : $()
+}
+
+// Make sure that we are processing in bottom up order. This test
+// works since the default order in which the SIL Parser places
+// SILFunctions into the SILModule is the order in which the function
+// is parsed. Thus if we are just processing in that order, s3 will
+// call s2 instead of s2 with the dead argument.
+//
+// CHECK-LABEL: sil [fragile] @s3 : $@convention(thin) (Builtin.Int32) -> () {
+// CHECK: [[FUN:%.*]] = function_ref @_TTSf4d__s2
+// CHECK: apply [[FUN]](
+sil [fragile] @s3 : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %1 = function_ref @s2 : $@convention(thin) (Builtin.Int32) -> ()
+  apply %1(%0) : $@convention(thin) (Builtin.Int32) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [fragile] [thunk] @s2 : $@convention(thin) (Builtin.Int32) -> () {
+sil [fragile] @s2 : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %1 = function_ref @s1 : $@convention(thin) (Builtin.Int32) -> ()
+  apply %1(%0) : $@convention(thin) (Builtin.Int32) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [fragile] [thunk] @s1 : $@convention(thin) (Builtin.Int32) -> () {
+sil [fragile] @s1 : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Check that we specialized this function by removing the dead argument and
+// copied everything appropriately.
+
+// CHECK-LABEL: sil [fragile] @_TTSf4d_n__dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0([[INPUT_ARG:%[0-9]+]] : $Builtin.NativeObject):
+// CHECK-NEXT: cond_br undef, bb1, bb2
+// CHECK: bb1:
+// CHECK-NEXT: br bb3
+// CHECK: bb2:
+// CHECK-NEXT: br bb3
+// CHECK: bb3:
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref @user
+// CHECK-NEXT: apply
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+
+// CHECK-LABEL: sil private [fragile] @_TTSf4d_n__private_dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0(
+
+// CHECK-LABEL: sil [fragile] @_TTSf4g_n__owned_to_guaranteed_with_error_result : $@convention(thin) (@guaranteed Builtin.NativeObject, Int) -> (Int, @error ErrorType) {
+// CHECK-NOT: release
+// CHECK: throw
+
+// CHECK-LABEL: sil [fragile] @_TTSf4g__owned_to_guaranteed_simple_singlebb_callee : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+
+// CHECK-LABEL: sil [fragile] @_TTSf4d_g__owned_to_guaranteed_multibb_callee_with_release_in_exit : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK-NEXT:  function_ref user
+// CHECK-NEXT:  function_ref @user
+// CHECK-NEXT:  apply
+// CHECK-NEXT:  cond_br undef, bb1, bb2
+// CHECK: bb1:
+// CHECK-NEXT:  br bb2
+// CHECK: bb2:
+// CHECK-NEXT:  tuple
+// CHECK-NEXT:  return
+
+
+// Check that we have remove the array semantic attribute from the specialized
+// function.
+// Also make sure we have change the calling convention to freestanding from
+// method because we have changed the self argument.
+
+// CHECK-LABEL: sil [fragile] @_TTSf4g__array_semantic : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK: bb0(%0 : $Builtin.NativeObject)
+// CHECK-NEXT:  function_ref user
+// CHECK-NEXT:  function_ref @user
+// CHECK-NEXT:  apply
+// CHECK-NEXT:  tuple
+// CHECK-NEXT:  return
+

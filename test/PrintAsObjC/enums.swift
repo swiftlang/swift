@@ -26,6 +26,28 @@ import Foundation
   @objc func acceptPlainEnum(_: NSMalformedEnumMissingTypedef) {}
 }
 
+// CHECK-LABEL: typedef SWIFT_ENUM_NAMED(NSInteger, ObjcEnumNamed, "EnumNamed") {
+// CHECK-NEXT:   ObjcEnumNamedA = 0,
+// CHECK-NEXT:   ObjcEnumNamedB = 1,
+// CHECK-NEXT:   ObjcEnumNamedC = 2,
+// CHECK-NEXT: };
+
+@objc(ObjcEnumNamed) enum EnumNamed: Int {
+  case A, B, C
+}
+
+// CHECK-LABEL: typedef SWIFT_ENUM(NSInteger, EnumWithNamedConstants) {
+// CHECK-NEXT:   kEnumA SWIFT_COMPILE_NAME("A") = 0,
+// CHECK-NEXT:   kEnumB SWIFT_COMPILE_NAME("B") = 1,
+// CHECK-NEXT:   kEnumC SWIFT_COMPILE_NAME("C") = 2,
+// CHECK-NEXT: };
+
+@objc enum EnumWithNamedConstants: Int {
+  @objc(kEnumA) case A
+  @objc(kEnumB) case B
+  @objc(kEnumC) case C
+}
+
 // CHECK-LABEL: typedef SWIFT_ENUM(unsigned int, ExplicitValues) {
 // CHECK-NEXT:   ExplicitValuesZim = 0,
 // CHECK-NEXT:   ExplicitValuesZang = 219,

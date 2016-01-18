@@ -1,8 +1,8 @@
-//===-------------- LoopInfo.cpp - SIL Loop Analysis -----*- C++ -*--------===//
+//===--- LoopInfo.cpp - SIL Loop Analysis -----------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -35,6 +35,51 @@ SILLoopInfo::SILLoopInfo(SILFunction *F, DominanceInfo *DT) {
   LI.analyze(*DT);
 }
 
+bool SILLoop::canDuplicate(SILInstruction *I) const {
+  // The dealloc_stack of an alloc_stack must be in the loop, otherwise the
+  // dealloc_stack will be fed by a phi node of two alloc_stacks.
+  if (auto *Alloc = dyn_cast<AllocStackInst>(I)) {
+    for (auto *UI : Alloc->getUses()) {
+      if (auto *Dealloc = dyn_cast<DeallocStackInst>(UI->getUser())) {
+        if (!contains(Dealloc->getParent()))
+          return false;
+      }
+    }
+    return true;
+  }
+
+  // CodeGen can't build ssa for objc methods.
+  if (auto *Method = dyn_cast<MethodInst>(I)) {
+    if (Method->getMember().isForeign) {
+      for (auto *UI : Method->getUses()) {
+        if (!contains(UI->getUser()))
+          return false;
+      }
+    }
+    return true;
+  }
+
+  // We can't have a phi of two openexistential instructions of different UUID.
+  SILInstruction *OEI = dyn_cast<OpenExistentialAddrInst>(I);
+  if (OEI || (OEI = dyn_cast<OpenExistentialRefInst>(I)) ||
+      (OEI = dyn_cast<OpenExistentialMetatypeInst>(I))) {
+    for (auto *UI : OEI->getUses())
+      if (!contains(UI->getUser()))
+        return false;
+    return true;
+  }
+
+  if (auto *Dealloc = dyn_cast<DeallocStackInst>(I)) {
+    // The matching alloc_stack must be in the loop.
+    if (auto *Alloc = dyn_cast<AllocStackInst>(Dealloc->getOperand()))
+        return contains(Alloc->getParent());
+    return false;
+  }
+
+  assert(I->isTriviallyDuplicatable() &&
+         "Code here must match isTriviallyDuplicatable in SILInstruction");
+  return true;
+}
 
 void SILLoopInfo::verify() const {
   llvm::DenseSet<const SILLoop*> Loops;

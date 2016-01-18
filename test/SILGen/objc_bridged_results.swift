@@ -8,7 +8,6 @@ import Foundation
 func testNonnull(obj: Test) -> [AnyObject] {
   // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nonnullArray!getter.1.foreign : Test -> () -> [AnyObject] , $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
-  // CHECK: strong_retain_autoreleased [[COCOA_VAL]]
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TF10Foundation22_convertNSArrayToArray
   // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<AnyObject>([[COCOA_VAL]]) : $@convention(thin) <τ_0_0> (@owned Optional<NSArray>) -> @owned Array<τ_0_0>
   // CHECK: strong_release %0 : $Test
@@ -20,7 +19,6 @@ func testNonnull(obj: Test) -> [AnyObject] {
 func testNullable(obj: Test) -> [AnyObject]? {
   // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nullableArray!getter.1.foreign : Test -> () -> [AnyObject]? , $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
-  // CHECK: strong_retain_autoreleased [[COCOA_VAL]]
   
   // CHECK: [[IS_NON_NIL:%[0-9]+]] = select_enum [[COCOA_VAL]] : $Optional<NSArray>
   // CHECK: cond_br [[IS_NON_NIL]], [[CASE_NON_NIL:[^, ]+]], [[CASE_NIL:[^, ]+]]
@@ -47,7 +45,6 @@ func testNullable(obj: Test) -> [AnyObject]? {
 func testNullUnspecified(obj: Test) -> [AnyObject]! {
   // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nullUnspecifiedArray!getter.1.foreign : Test -> () -> [AnyObject]! , $@convention(objc_method) (Test) -> @autoreleased ImplicitlyUnwrappedOptional<NSArray>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@convention(objc_method) (Test) -> @autoreleased ImplicitlyUnwrappedOptional<NSArray>
-  // CHECK: strong_retain_autoreleased [[COCOA_VAL]]
   // CHECK: [[IS_NON_NIL:%[0-9]+]] = select_enum [[COCOA_VAL]] : $ImplicitlyUnwrappedOptional<NSArray>
   // CHECK: cond_br [[IS_NON_NIL]], [[CASE_NON_NIL:[^, ]+]], [[CASE_NIL:[^, ]+]]
 
@@ -74,7 +71,6 @@ func testNullUnspecified(obj: Test) -> [AnyObject]! {
 func testNonnullDictionary(obj: Test) -> [NSObject: AnyObject] {
   // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nonnullDictionary!getter.1.foreign : Test -> () -> [NSObject : AnyObject] , $@convention(objc_method) (Test) -> @autoreleased Optional<NSDictionary>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSDictionary>
-  // CHECK: strong_retain_autoreleased [[COCOA_VAL]]
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TF10Foundation32_convertNSDictionaryToDictionary
   // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<NSObject, AnyObject>([[COCOA_VAL]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : NSObject, τ_0_0 : Hashable, τ_0_1 : AnyObject> (@owned Optional<NSDictionary>) -> @owned Dictionary<τ_0_0, τ_0_1>
   // CHECK: strong_release %0 : $Test
@@ -86,7 +82,6 @@ func testNonnullDictionary(obj: Test) -> [NSObject: AnyObject] {
 func testNonnullSet(obj: Test) -> Set<NSObject> {
   // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nonnullSet!getter.1.foreign : Test -> () -> Set<NSObject> , $@convention(objc_method) (Test) -> @autoreleased Optional<NSSet>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSSet>
-  // CHECK: strong_retain_autoreleased [[COCOA_VAL]]
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TF10Foundation18_convertNSSetToSet
   // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<NSObject>([[COCOA_VAL]]) : $@convention(thin) <τ_0_0 where τ_0_0 : NSObject, τ_0_0 : Hashable> (@owned Optional<NSSet>) -> @owned Set<τ_0_0>
   // CHECK: strong_release %0 : $Test
@@ -98,7 +93,6 @@ func testNonnullSet(obj: Test) -> Set<NSObject> {
 func testNonnullString(obj: Test) -> String {
   // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nonnullString!getter.1.foreign : Test -> () -> String , $@convention(objc_method) (Test) -> @autoreleased Optional<NSString>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSString>
-  // CHECK: strong_retain_autoreleased [[COCOA_VAL]]
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @swift_NSStringToString : $@convention(thin) (@owned Optional<NSString>) -> @owned String
   // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]([[COCOA_VAL]]) : $@convention(thin) (@owned Optional<NSString>) -> @owned String
   // CHECK: strong_release %0 : $Test
@@ -112,9 +106,8 @@ func testNonnullString(obj: Test) -> String {
 // not to crash trying to generate the thunk.
 // CHECK-LABEL: sil hidden @_TF20objc_bridged_results20testNonnullSubscriptFCSo4TestGSaPs9AnyObject__
 func testNonnullSubscript(obj: Test) -> [AnyObject] {
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.subscript!getter.1.foreign : Test -> (Int) -> [AnyObject] , $@convention(objc_method) (Int, Test) -> @autoreleased Optional<NSArray>
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.subscript!getter.1.foreign : (Test) -> (Int) -> [AnyObject] , $@convention(objc_method) (Int, Test) -> @autoreleased Optional<NSArray>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]({{%[0-9]+}}, %0) : $@convention(objc_method) (Int, Test) -> @autoreleased Optional<NSArray>
-  // CHECK: strong_retain_autoreleased [[COCOA_VAL]]
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TF10Foundation22_convertNSArrayToArray
   // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<AnyObject>([[COCOA_VAL]]) : $@convention(thin) <τ_0_0> (@owned Optional<NSArray>) -> @owned Array<τ_0_0>
   // CHECK: strong_release %0 : $Test

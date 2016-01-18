@@ -18,7 +18,7 @@ func lazyPropertiesAreNotStored(container: LazyContainer) {
 
 // CHECK-LABEL: sil hidden @_TF10multi_file29lazyRefPropertiesAreNotStored
 func lazyRefPropertiesAreNotStored(container: LazyContainerClass) {
-  // CHECK: {{%[0-9]+}} = class_method %0 : $LazyContainerClass, #LazyContainerClass.lazyVar!getter.1 : LazyContainerClass -> () -> Int , $@convention(method) (@guaranteed LazyContainerClass) -> Int
+  // CHECK: {{%[0-9]+}} = class_method %0 : $LazyContainerClass, #LazyContainerClass.lazyVar!getter.1 : (LazyContainerClass) -> () -> Int , $@convention(method) (@guaranteed LazyContainerClass) -> Int
   markUsed(container.lazyVar)
 }
 
@@ -33,7 +33,7 @@ func finalVarsAreDevirtualized(obj: FinalPropertyClass) {
 // rdar://18448869
 // CHECK-LABEL: sil hidden @_TF10multi_file34finalVarsDontNeedMaterializeForSetFCS_27ObservingPropertyFinalClassT_
 func finalVarsDontNeedMaterializeForSet(obj: ObservingPropertyFinalClass) {
-  obj.foo++
+  obj.foo += 1
   // CHECK: function_ref @_TFC10multi_file27ObservingPropertyFinalClassg3fooSi
   // CHECK: function_ref @_TFC10multi_file27ObservingPropertyFinalClasss3fooSi
 }

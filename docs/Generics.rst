@@ -579,7 +579,7 @@ OrderedCollection>) are just sugar for a where clause.  For example, the
 above find() signature is equivalent to::
 
   func find<C where C : OrderedCollection, C.Element : Comparable>(
-         collection : C, value : C.Element)-> Int
+         collection : C, value : C.Element) -> Int
 
 Note that find<C> is shorthand for (and equivalent to) find<C : Any>, since
 every type conforms to the Any protocol composition.
@@ -594,7 +594,7 @@ lets us describe an iteration of values of some given value type::
     func next() -> Element
   }
 
-Now, we want to express the notion of an enumerable collection, which provides a
+Now, we want to express the notion of an enumerable collection, which provides
 iteration, which we do by adding requirements into the protocol::
 
   protocol EnumerableCollection : Collection {
@@ -814,7 +814,7 @@ because code like this::
 
 will essentially parse the type as::
 
-  identifier operator Int operator
+  identifier operator identifier operator
 
 and verify that the operators are '<' and '>', respectively. Cases
 involving <> are more interesting, because the type of::

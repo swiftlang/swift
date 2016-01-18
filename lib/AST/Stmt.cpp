@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -165,7 +165,7 @@ SourceLoc DeferStmt::getEndLoc() const {
   return tempDecl->getBody()->getEndLoc();
 }
 
-/// Dig the original users's body of the defer out for AST fidelity.
+/// Dig the original user's body of the defer out for AST fidelity.
 BraceStmt *DeferStmt::getBodyAsWritten() const {
   return tempDecl->getBody();
 }
@@ -248,7 +248,7 @@ bool DoCatchStmt::isSyntacticallyExhaustive() const {
 }
 
 void LabeledConditionalStmt::setCond(StmtCondition e) {
-  // When set set a condition into a Conditional Statement, inform each of the
+  // When set a condition into a Conditional Statement, inform each of the
   // variables bound in any patterns that this is the owning statement for the
   // pattern.
   for (auto &elt : e)

@@ -24,10 +24,10 @@ func throwingFunc() throws -> Bool { return true }
 
 // CHECK-LABEL: sil hidden @_TF19existential_erasure5PQtoPFT_T_ : $@convention(thin) () -> () {
 func PQtoP() {
-  // CHECK: [[PQ_PAYLOAD:%.*]] = open_existential_addr [[PQ:%.*]]#1 : $*protocol<P, Q> to $*[[OPENED_TYPE:@opened(.*) protocol<P, Q>]]
-  // CHECK: [[P_PAYLOAD:%.*]] = init_existential_addr [[P:%.*]]#1 : $*P, $[[OPENED_TYPE]]
+  // CHECK: [[PQ_PAYLOAD:%.*]] = open_existential_addr [[PQ:%.*]] : $*protocol<P, Q> to $*[[OPENED_TYPE:@opened(.*) protocol<P, Q>]]
+  // CHECK: [[P_PAYLOAD:%.*]] = init_existential_addr [[P:%.*]] : $*P, $[[OPENED_TYPE]]
   // CHECK: copy_addr [take] [[PQ_PAYLOAD]] to [initialization] [[P_PAYLOAD]]
-  // CHECK: deinit_existential_addr [[PQ]]#1
+  // CHECK: deinit_existential_addr [[PQ]]
   // CHECK-NOT: destroy_addr [[P]]
   // CHECK-NOT: destroy_addr [[P_PAYLOAD]]
   // CHECK-NOT: destroy_addr [[PQ]]
@@ -43,20 +43,20 @@ func openExistentialToP1(p: P) throws {
 // CHECK: bb0(%0 : $*P):
 // CHECK:   [[OPEN:%.*]] = open_existential_addr %0 : $*P to $*[[OPEN_TYPE:@opened\(.*\) P]]
 // CHECK:   [[RESULT:%.*]] = alloc_stack $P
-// CHECK:   [[RESULT_ADDR:%.*]] = init_existential_addr [[RESULT]]#1 : $*P, $[[OPEN_TYPE]]
+// CHECK:   [[RESULT_ADDR:%.*]] = init_existential_addr [[RESULT]] : $*P, $[[OPEN_TYPE]]
 // CHECK:   [[METHOD:%.*]] = witness_method $[[OPEN_TYPE]], #P.downgrade!1, [[OPEN]]
 // CHECK:   [[FUNC:%.*]] = function_ref @_TF19existential_erasure12throwingFuncFzT_Sb
 // CHECK:   try_apply [[FUNC]]()
 //
 // CHECK: bb1([[SUCCESS:%.*]] : $Bool):
 // CHECK:   apply [[METHOD]]<[[OPEN_TYPE]]>([[RESULT_ADDR]], [[SUCCESS]], [[OPEN]])
-// CHECK:   dealloc_stack [[RESULT]]#0
+// CHECK:   dealloc_stack [[RESULT]]
 // CHECK:   destroy_addr %0
 // CHECK:   return
 //
 // CHECK: bb2([[FAILURE:%.*]] : $ErrorType):
-// CHECK:   deinit_existential_addr [[RESULT]]#1
-// CHECK:   dealloc_stack [[RESULT]]#0
+// CHECK:   deinit_existential_addr [[RESULT]]
+// CHECK:   dealloc_stack [[RESULT]]
 // CHECK:   destroy_addr %0
 // CHECK:   throw [[FAILURE]]
 //
@@ -68,18 +68,18 @@ func openExistentialToP2(p: P) throws {
 // CHECK: bb0(%0 : $*P):
 // CHECK:   [[OPEN:%.*]] = open_existential_addr %0 : $*P to $*[[OPEN_TYPE:@opened\(.*\) P]]
 // CHECK:   [[RESULT:%.*]] = alloc_stack $P
-// CHECK:   [[RESULT_ADDR:%.*]] = init_existential_addr [[RESULT]]#1 : $*P, $[[OPEN_TYPE]]
+// CHECK:   [[RESULT_ADDR:%.*]] = init_existential_addr [[RESULT]] : $*P, $[[OPEN_TYPE]]
 // CHECK:   [[METHOD:%.*]] = witness_method $[[OPEN_TYPE]], #P.upgrade!1, [[OPEN]]
 // CHECK:   try_apply [[METHOD]]<[[OPEN_TYPE]]>([[RESULT_ADDR]], [[OPEN]])
 //
 // CHECK: bb1
-// CHECK:  dealloc_stack [[RESULT]]#0
+// CHECK:  dealloc_stack [[RESULT]]
 // CHECK:  destroy_addr %0
 // CHECK:  return
 //
 // CHECK: bb2([[FAILURE:%.*]]: $ErrorType):
-// CHECK:  deinit_existential_addr [[RESULT]]#1
-// CHECK:  dealloc_stack [[RESULT]]#0
+// CHECK:  deinit_existential_addr [[RESULT]]
+// CHECK:  dealloc_stack [[RESULT]]
 // CHECK:  destroy_addr %0
 // CHECK:  throw [[FAILURE]]
 //

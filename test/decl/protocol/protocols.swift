@@ -24,8 +24,8 @@ protocol Test2 {
   var title: String = "The Art of War" { get } // expected-error{{initial value is not allowed here}} expected-error {{property in protocol must have explicit { get } or { get set } specifier}}
   static var title2: String = "The Art of War" // expected-error{{initial value is not allowed here}} expected-error {{property in protocol must have explicit { get } or { get set } specifier}} expected-error {{static stored properties not yet supported in generic types}}
 
-  typealias mytype
-  typealias mybadtype = Int
+  associatedtype mytype
+  associatedtype mybadtype = Int
 }
 
 func test1() {
@@ -114,7 +114,7 @@ protocol disallownesto { enum O {} } // expected-error {{type not allowed here}}
 //===----------------------------------------------------------------------===//
 
 protocol SimpleAssoc {
-  typealias Associated // expected-note{{protocol requires nested type 'Associated'}}
+  associatedtype Associated // expected-note{{protocol requires nested type 'Associated'}}
 }
 
 struct IsSimpleAssoc : SimpleAssoc {
@@ -124,7 +124,7 @@ struct IsSimpleAssoc : SimpleAssoc {
 struct IsNotSimpleAssoc : SimpleAssoc {} // expected-error{{type 'IsNotSimpleAssoc' does not conform to protocol 'SimpleAssoc'}}
 
 protocol StreamWithAssoc {
-  typealias Element
+  associatedtype Element
   func get() -> Element // expected-note{{protocol requires function 'get()' with type '() -> Element'}}
 }
 
@@ -150,7 +150,7 @@ struct StreamTypeWithInferredAssociatedTypes : StreamWithAssoc {
 }
 
 protocol SequenceViaStream {
-  typealias SequenceStreamTypeType : GeneratorType // expected-note{{protocol requires nested type 'SequenceStreamTypeType'}}
+  associatedtype SequenceStreamTypeType : GeneratorType // expected-note{{protocol requires nested type 'SequenceStreamTypeType'}}
   func generate() -> SequenceStreamTypeType
 }
 
@@ -183,7 +183,7 @@ struct NotSequence : SequenceViaStream { // expected-error{{type 'NotSequence' d
 }
 
 protocol GetATuple {
-  typealias Tuple
+  associatedtype Tuple
   func getATuple() -> Tuple
 }
 
@@ -249,7 +249,7 @@ func existentialSequence(e: SequenceType) { // expected-error{{has Self or assoc
 }
 
 protocol HasSequenceAndStream {
-  typealias R : GeneratorType, SequenceType
+  associatedtype R : GeneratorType, SequenceType
   func getR() -> R
 }
 
@@ -270,7 +270,7 @@ protocol IntIntSubscriptable {
 }
 
 protocol IntSubscriptable {
-  typealias Element
+  associatedtype Element
   subscript (i: Int) -> Element { get }
 }
 
@@ -415,7 +415,7 @@ class DoesntConformToObjCProtocol : ObjCProtocol { // expected-error{{type 'Does
 
 // <rdar://problem/16079878>
 protocol P1 {
-  typealias Assoc // expected-note 2{{protocol requires nested type 'Assoc'}}
+  associatedtype Assoc // expected-note 2{{protocol requires nested type 'Assoc'}}
 }
 
 protocol P2 {

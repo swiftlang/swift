@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -73,6 +73,49 @@ inline IsBitwiseTakable_t &operator&=(IsBitwiseTakable_t &l, IsBitwiseTakable_t 
   return (l = (l & r));
 }
 
+/// The kind of reference counting implementation a heap object uses.
+enum class ReferenceCounting : unsigned char {
+  /// The object uses native Swift reference counting.
+  Native,
+  
+  /// The object uses ObjC reference counting.
+  ///
+  /// When ObjC interop is enabled, native Swift class objects are also ObjC
+  /// reference counting compatible. Swift non-class heap objects are never
+  /// ObjC reference counting compatible.
+  ///
+  /// Blocks are always ObjC reference counting compatible.
+  ObjC,
+  
+  /// The object uses _Block_copy/_Block_release reference counting.
+  ///
+  /// This is a strict subset of ObjC; all blocks are also ObjC reference
+  /// counting compatible. The block is assumed to have already been moved to
+  /// the heap so that _Block_copy returns the same object back.
+  Block,
+  
+  /// The object has an unknown reference counting implementation.
+  ///
+  /// This uses maximally-compatible reference counting entry points in the
+  /// runtime.
+  Unknown,
+  
+  /// Cases prior to this one are binary-compatible with Unknown reference
+  /// counting.
+  LastUnknownCompatible = Unknown,
+
+  /// The object has an unknown reference counting implementation and
+  /// the reference value may contain extra bits that need to be masked.
+  ///
+  /// This uses maximally-compatible reference counting entry points in the
+  /// runtime, with a masking layer on top. A bit inside the pointer is used
+  /// to signal native Swift refcounting.
+  Bridge,
+  
+  /// The object uses ErrorType's reference counting entry points.
+  Error,
+};
+
 /// Whether or not an object should be emitted on the heap.
 enum OnHeap_t : unsigned char {
   NotOnHeap,
@@ -93,27 +136,11 @@ enum class ExtraData : unsigned char {
   Last_ExtraData = Block
 };
 
-/// ResilienceScope - The compiler is often able to pursue
-/// optimizations based on its knowledge of the implementation of some
-/// language structure.  However, optimizations which affect
-/// cross-component interfaces are not necessarily sound in the face
-/// of differing compiler versions and API changes that make types
-/// fragile.  The "resilience scope" is the breadth of the code
-/// affected by the answer to a question being asked.
-///
-/// TODO: maybe deployment versions should factor in here.  If a
-/// question is being asked vis-a-vis the implementation of a subject
-/// structure that is unavailable in any revision for which the object
-/// structure is resilient, is there any reason not to answer as if
-/// the subject structure were universally fragile?
-enum class ResilienceScope {
-  /// Component scope means the decision has to be consistent within
-  /// the current component only.
-  Component,
-
-  /// Universal scope means that the decision has to be consistent
-  /// across all possible clients who could see this declaration.
-  Universal
+/// Given that we have metadata for a type, is it for exactly the
+/// specified type, or might it be a subtype?
+enum IsExact_t : bool {
+  IsInexact = false,
+  IsExact = true
 };
 
 /// Destructor variants.

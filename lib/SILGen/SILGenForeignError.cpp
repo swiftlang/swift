@@ -1,8 +1,8 @@
-//===--- SILGenError.cpp - Error-handling code emission -------------------===//
+//===--- SILGenForeignError.cpp - Error-handling code emission ------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -213,8 +213,6 @@ SILValue SILGenFunction::
 emitBridgeReturnValueForForeignError(SILLocation loc,
                                      SILValue result,
                                      SILFunctionTypeRepresentation repr,
-                                     AbstractionPattern origNativeType,
-                                     CanType substNativeType,
                                      SILType bridgedType,
                                      SILValue foreignErrorSlot,
                                const ForeignErrorConvention &foreignError) {
@@ -242,8 +240,7 @@ emitBridgeReturnValueForForeignError(SILLocation loc,
       bridgedType.getSwiftRValueType().getAnyOptionalObjectType(optKind);
     ManagedValue bridgedResult =
       emitNativeToBridgedValue(loc, emitManagedRValueWithCleanup(result),
-                               repr, origNativeType, substNativeType,
-                               bridgedObjectType);
+                               repr, bridgedObjectType);
 
     auto someResult =
       B.createOptionalSome(loc, bridgedResult.forward(*this), optKind,
@@ -260,8 +257,7 @@ emitBridgeReturnValueForForeignError(SILLocation loc,
     // The actual result value just needs to be bridged normally.
     ManagedValue bridgedValue =
       emitNativeToBridgedValue(loc, emitManagedRValueWithCleanup(result),
-                               repr, origNativeType, substNativeType,
-                               bridgedType.getSwiftRValueType());
+                               repr, bridgedType.getSwiftRValueType());
     return bridgedValue.forward(*this);
   }
   }

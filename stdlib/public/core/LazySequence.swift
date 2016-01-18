@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -47,7 +47,7 @@
 ///       /// - Complexity: O(N)
 ///       func scan<ResultElement>(
 ///         initial: ResultElement,
-///         @noescape combine: (ResultElement, Generator.Element)->ResultElement
+///         @noescape combine: (ResultElement, Generator.Element) -> ResultElement
 ///       ) -> [ResultElement] {
 ///         var result = [initial]
 ///         for x in self {
@@ -70,7 +70,7 @@
 ///       }
 ///       private var nextElement: ResultElement? // The next result of next().
 ///       private var base: Base                  // The underlying generator.
-///       private let combine: (ResultElement, Base.Element)->ResultElement
+///       private let combine: (ResultElement, Base.Element) -> ResultElement
 ///     }
 ///     
 ///     struct LazyScanSequence<Base: SequenceType, ResultElement>
@@ -83,7 +83,7 @@
 ///       private let initial: ResultElement
 ///       private let base: Base
 ///       private let combine:
-///         (ResultElement, Base.Generator.Element)->ResultElement
+///         (ResultElement, Base.Generator.Element) -> ResultElement
 ///     }
 ///
 /// and finally, we can give all lazy sequences a lazy `scan` method:
@@ -101,7 +101,7 @@
 ///       /// - Complexity: O(1)
 ///       func scan<ResultElement>(
 ///         initial: ResultElement,
-///         combine: (ResultElement, Generator.Element)->ResultElement
+///         combine: (ResultElement, Generator.Element) -> ResultElement
 ///       ) -> LazyScanSequence<Self, ResultElement> {
 ///         return LazyScanSequence(
 ///           initial: initial, base: self, combine: combine)
@@ -132,7 +132,7 @@ public protocol LazySequenceType : SequenceType {
   /// possibly with a simpler type.
   ///
   /// - See also: `elements`
-  typealias Elements: SequenceType = Self
+  associatedtype Elements: SequenceType = Self
 
   /// A sequence containing the same elements as this one, possibly with
   /// a simpler type.

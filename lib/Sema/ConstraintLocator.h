@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -51,7 +51,7 @@ namespace constraints {
 /// to indicate constraints on its argument or result type.
 class ConstraintLocator : public llvm::FoldingSetNode {
 public:
-  /// \brief Describes the kind of a a particular path element, e.g.,
+  /// \brief Describes the kind of a particular path element, e.g.,
   /// "tuple element", "call result", "base of member lookup", etc.
   enum PathElementKind : unsigned char {
     /// \brief The argument of function application.
@@ -116,7 +116,7 @@ public:
     Load,
     /// The candidate witness during protocol conformance checking.
     Witness,
-    /// This is refering to a type produced by opening a generic type at the
+    /// This is referring to a type produced by opening a generic type at the
     /// base of the locator.
     OpenedGeneric,
   };

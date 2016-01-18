@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -84,7 +84,13 @@ private:
     // consistent metadata layout between generic superclasses and concrete
     // subclasses.
     if (Type superclass = theClass->getSuperclass()) {
-      addClassMembers(superclass->getClassOrBoundGenericClass());
+      ClassDecl *superclassDecl = superclass->getClassOrBoundGenericClass();
+      // Skip superclass fields if superclass is resilient.
+      // FIXME: Needs runtime support to ensure the field offset vector is
+      // populated correctly.
+      if (!IGM.isResilient(superclassDecl, ResilienceExpansion::Maximal)) {
+        addClassMembers(superclass->getClassOrBoundGenericClass());
+      }
     }
 
     // Add a reference to the parent class, if applicable.
@@ -212,7 +218,7 @@ private:
                       unsigned uncurryLevel) {
     SILDeclRef declRef(fn, kind, explosionLevel, uncurryLevel);
     // If the method overrides something, we don't need a new entry.
-    if (declRef.getOverriddenVTableEntry())
+    if (declRef.getNextOverriddenVTableEntry())
       return;
 
     // Both static and non-static functions go in the metadata.

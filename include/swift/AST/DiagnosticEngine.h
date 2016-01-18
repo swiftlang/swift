@@ -1,8 +1,8 @@
-//===- DiagnosticEngine.h - Diagnostic Display Engine -----------*- C++ -*-===//
+//===--- DiagnosticEngine.h - Diagnostic Display Engine ---------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -18,18 +18,8 @@
 #ifndef SWIFT_BASIC_DIAGNOSTICENGINE_H
 #define SWIFT_BASIC_DIAGNOSTICENGINE_H
 
-#include "swift/Basic/LLVM.h"
-#include "swift/AST/Identifier.h"
-#include "swift/AST/Type.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Basic/DiagnosticConsumer.h"
-#include "swift/Basic/SourceLoc.h"
-#include "clang/Basic/VersionTuple.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/StringRef.h"
-#include <string>
-#include <utility>
 
 namespace swift {
   class Decl;
@@ -388,6 +378,84 @@ namespace swift {
       return fixItReplaceChars(Start, End, {});
     }
   };
+
+  /// \brief Class to track, map, and remap diagnostic severity and fatality
+  ///
+  class DiagnosticState {
+  public:
+    /// \brief Describes the current behavior to take with a diagnostic
+    enum class Behavior : uint8_t {
+      Unspecified,
+      Ignore,
+      Note,
+      Warning,
+      Error,
+      Fatal,
+    };
+
+  private:
+    /// \brief Whether we should continue to emit diagnostics, even after a
+    /// fatal error
+    bool showDiagnosticsAfterFatalError = false;
+
+    /// \brief Don't emit any warnings
+    bool suppressWarnings = false;
+
+    /// \brief Emit all warnings as errors
+    bool warningsAsErrors = false;
+
+    /// \brief Whether a fatal error has occurred
+    bool fatalErrorOccurred = false;
+
+    /// \brief Whether any error diagnostics have been emitted.
+    bool anyErrorOccurred = false;
+
+    /// \brief Track the previous emitted Behavior, useful for notes
+    Behavior previousBehavior = Behavior::Unspecified;
+
+    /// \brief Track settable, per-diagnostic state that we store
+    std::vector<Behavior> perDiagnosticBehavior;
+
+  public:
+    DiagnosticState();
+
+    /// \brief Figure out the Behavior for the given diagnostic, taking current
+    /// state such as fatality into account.
+    Behavior determineBehavior(DiagID);
+
+    bool hadAnyError() const { return anyErrorOccurred; }
+    bool hasFatalErrorOccurred() const { return fatalErrorOccurred; }
+
+    void setShowDiagnosticsAfterFatalError(bool val = true) {
+      showDiagnosticsAfterFatalError = val;
+    }
+
+    /// \brief Whether to skip emitting warnings
+    void setSuppressWarnings(bool val) { suppressWarnings = val; }
+    bool getSuppressWarnings() const { return suppressWarnings; }
+
+    /// \brief Whether to treat warnings as errors
+    void setWarningsAsErrors(bool val) { warningsAsErrors = val; }
+    bool getWarningsAsErrors() const { return warningsAsErrors; }
+
+    void resetHadAnyError() {
+      anyErrorOccurred = false;
+      fatalErrorOccurred = false;
+    }
+
+    /// Set per-diagnostic behavior
+    void setDiagnosticBehavior(DiagID id, Behavior behavior) {
+      perDiagnosticBehavior[(unsigned)id] = behavior;
+    }
+
+  private:
+    // Make the state movable only
+    DiagnosticState(const DiagnosticState &) = delete;
+    const DiagnosticState &operator=(const DiagnosticState &) = delete;
+
+    DiagnosticState(DiagnosticState &&) = default;
+    DiagnosticState &operator=(DiagnosticState &&) = default;
+  };
     
   /// \brief Class responsible for formatting diagnostics and presenting them
   /// to the user.
@@ -400,19 +468,8 @@ namespace swift {
     /// emitting diagnostics.
     SmallVector<DiagnosticConsumer *, 2> Consumers;
 
-    /// HadAnyError - True if any error diagnostics have been emitted.
-    bool HadAnyError;
-
-    enum class FatalErrorState {
-      None,
-      JustEmitted,
-      Fatal
-    };
-
-    /// Sticky flag set to \c true when a fatal error is emitted.
-    FatalErrorState FatalState = FatalErrorState::None;
-
-    bool ShowDiagnosticsAfterFatalError = false;
+    /// \brief Tracks diagnostic behaviors and state
+    DiagnosticState state;
 
     /// \brief The currently active diagnostic, if there is one.
     Optional<Diagnostic> ActiveDiagnostic;
@@ -434,25 +491,38 @@ namespace swift {
     
   public:
     explicit DiagnosticEngine(SourceManager &SourceMgr)
-      : SourceMgr(SourceMgr), HadAnyError(false), ActiveDiagnostic() {
+      : SourceMgr(SourceMgr), ActiveDiagnostic() {
     }
 
     /// hadAnyError - return true if any *error* diagnostics have been emitted.
-    bool hadAnyError() const {
-      return HadAnyError;
-    }
+    bool hadAnyError() const { return state.hadAnyError(); }
 
     bool hasFatalErrorOccurred() const {
-      return FatalState != FatalErrorState::None;
+      return state.hasFatalErrorOccurred();
     }
 
-    void setShowDiagnosticsAfterFatalError(bool Val = true) {
-      ShowDiagnosticsAfterFatalError = Val;
+    void setShowDiagnosticsAfterFatalError(bool val = true) {
+      state.setShowDiagnosticsAfterFatalError(val);
+    }
+
+    /// \brief Whether to skip emitting warnings
+    void setSuppressWarnings(bool val) { state.setSuppressWarnings(val); }
+    bool getSuppressWarnings() const {
+      return state.getSuppressWarnings();
+    }
+
+    /// \brief Whether to treat warnings as errors
+    void setWarningsAsErrors(bool val) { state.setWarningsAsErrors(val); }
+    bool getWarningsAsErrors() const {
+      return state.getWarningsAsErrors();
+    }
+
+    void ignoreDiagnostic(DiagID id) {
+      state.setDiagnosticBehavior(id, DiagnosticState::Behavior::Ignore);
     }
 
     void resetHadAnyError() {
-      HadAnyError = false;
-      FatalState = FatalErrorState::None;
+      state.resetHadAnyError();
     }
 
     /// \brief Add an additional DiagnosticConsumer to receive diagnostics.
@@ -582,10 +652,7 @@ namespace swift {
 
     /// \returns true if diagnostic is marked with PointsToFirstBadToken
     /// option.
-    bool isDiagnosticPointsToFirstBadToken(DiagID ID) const;
-
-    /// \returns true if diagnostic is marked as fatal.
-    bool isDiagnosticFatal(DiagID ID) const;
+    bool isDiagnosticPointsToFirstBadToken(DiagID id) const;
 
   private:
     /// \brief Flush the active diagnostic.

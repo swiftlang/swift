@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -22,7 +22,7 @@ template class llvm::DominatorTreeBase<SILBasicBlock>;
 template class llvm::DominatorBase<SILBasicBlock>;
 template class llvm::DomTreeNodeBase<SILBasicBlock>;
 
-/// Compute the immmediate-dominators map.
+/// Compute the immediate-dominators map.
 DominanceInfo::DominanceInfo(SILFunction *F)
     : DominatorTreeBase(/*isPostDom*/ false) {
       assert(!F->isExternalDeclaration() &&
@@ -64,11 +64,11 @@ void DominanceInfo::verify() const {
   }
 }
 
-/// Compute the immmediate-post-dominators map.
+/// Compute the immediate-post-dominators map.
 PostDominanceInfo::PostDominanceInfo(SILFunction *F)
   : DominatorTreeBase(/*isPostDom*/ true) {
   assert(!F->isExternalDeclaration() &&
-         "Can not construct a post dominator tree for a declaration");
+         "Cannot construct a post dominator tree for a declaration");
   recalculate(*F);
 }
 

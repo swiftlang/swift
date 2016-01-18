@@ -51,7 +51,7 @@ bb0(%0 : $SwiftGizmo):
   %1 = ref_element_addr %0 : $SwiftGizmo, #SwiftGizmo.x      // user: %2
   %2 = load %1 : $*X                              // users: %4, %3
   strong_retain %2 : $X                           // id: %3
-  autorelease_return %2 : $X                      // id: %4
+  return %2 : $X                                  // id: %4
 }
 
 sil @_TToFC12objc_dealloc10SwiftGizmos1xC12objc_dealloc1X : $@convention(objc_method) (X, SwiftGizmo) -> () {

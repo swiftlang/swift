@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -49,7 +49,7 @@ public struct _ArrayBuffer<Element> : _ArrayBufferType {
   var deferredTypeCheckMask : Int { return 1 }
   
   /// Returns an `_ArrayBuffer<U>` containing the same elements,
-  /// deffering checking each element's `U`-ness until it is accessed.
+  /// deferring checking each element's `U`-ness until it is accessed.
   ///
   /// - Requires: `U` is a class or `@objc` existential derived from `Element`.
   @warn_unused_result
@@ -175,7 +175,7 @@ extension _ArrayBuffer {
         element is Element,
         "Down-casted Array element failed to match the target type")
     }
-    else  {
+    else {
       let ns = _nonNative
       _precondition(
         ns.objectAtIndex(index) is Element,
@@ -201,7 +201,6 @@ extension _ArrayBuffer {
   /// Copy the given subRange of this buffer into uninitialized memory
   /// starting at target.  Return a pointer past-the-end of the
   /// just-initialized memory.
-  @inline(never) // The copy loop blocks retain release matching.
   public func _uninitializedCopy(
     subRange: Range<Int>, target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element> {
@@ -225,7 +224,7 @@ extension _ArrayBuffer {
     var result = target
     for _ in subRange {
       result.initialize(result.memory)
-      ++result
+      result += 1
     }
     return result
   }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -19,6 +19,7 @@
 
 #include "Initialization.h"
 #include "RValue.h"
+#include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/Basic/Fallthrough.h"
@@ -30,6 +31,20 @@ using namespace Lowering;
 static unsigned getTupleSize(CanType t) {
   if (TupleType *tt = dyn_cast<TupleType>(t))
     return tt->getNumElements();
+  return 1;
+}
+
+static unsigned getRValueSize(AbstractionPattern pattern, CanType formalType) {
+  if (pattern.isTuple()) {
+    unsigned count = 0;
+    auto formalTupleType = cast<TupleType>(formalType);
+    for (auto i : indices(formalTupleType.getElementTypes())) {
+      count += getRValueSize(pattern.getTupleElementType(i),
+                             formalTupleType.getElementType(i));
+    }
+    return count;
+  }
+
   return 1;
 }
 
@@ -279,7 +294,7 @@ public:
 /// RValue) into an initialization. The RValue will have one scalar ManagedValue
 /// for each exploded tuple element in the RValue, so this needs to make the
 /// shape of the initialization match the available elements.  This can be done
-/// one one of two ways:
+/// one of two ways:
 ///
 ///  1) recursively scalarize down the initialization on demand if the type of
 ///     the RValue is tuple type and the initialization supports it.
@@ -311,7 +326,7 @@ static void copyOrInitValuesInto(Initialization *init,
 
   if (auto Address = init->getAddressOrNull()) {
     if (isa<GlobalAddrInst>(Address) &&
-      gen.getTypeLowering(type).getLoweredType().isTrivial(gen.SGM.M)) {
+        gen.getTypeLowering(type).getLoweredType().isTrivial(gen.SGM.M)) {
       // Implode tuples in initialization of globals if they are
       // of trivial types.
       implodeTuple = true;
@@ -391,6 +406,10 @@ RValue::RValue(SILGenFunction &gen, Expr *expr, ManagedValue v)
 
 RValue::RValue(CanType type)
   : type(type), elementsToBeAdded(getTupleSize(type)) {
+}
+
+RValue::RValue(AbstractionPattern pattern, CanType type)
+  : type(type), elementsToBeAdded(getRValueSize(pattern, type)) {
 }
 
 void RValue::addElement(RValue &&element) & {

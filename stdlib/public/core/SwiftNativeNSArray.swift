@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -38,7 +38,7 @@ internal func _isValidArraySubscript(index: Int, _ count: Int) -> Bool {
 /// An `NSArray` with Swift-native reference counting and contiguous
 /// storage.
 class _SwiftNativeNSArrayWithContiguousStorage
-  : _SwiftNativeNSArray { // provides NSArray inheritance and native refcounting
+  : _SwiftNativeNSArray { // Provides NSArray inheritance and native refcounting
 
   // Operate on our contiguous storage
   internal func withUnsafeBufferOfObjects<R>(
@@ -194,7 +194,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
           let storage: HeapBufferStorage = unsafeDowncast(objects.storage!)
           _destroyBridgedStorage(storage)
         }
-        continue // try again
+        continue // Try again
       }
       
       defer { _fixLifetime(self) }

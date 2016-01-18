@@ -1,34 +1,46 @@
 set(sources
-  module.map
-  )
+    Glibc.swift
+    Misc.c
+)
+
 set(output_dir "${SWIFTLIB_DIR}/glibc")
 
-set(commands
-    COMMAND ${CMAKE_COMMAND} "-E" "make_directory" "${output_dir}")
-set(outputs)
-foreach(input ${sources})
-  list(APPEND commands
-      COMMAND
-        "${CMAKE_COMMAND}" "-E" "copy_if_different"
-        "${CMAKE_CURRENT_SOURCE_DIR}/${input}"
-        "${output_dir}/${input}")
-  list(APPEND outputs "${output_dir}/${input}")
-endforeach()
-# Put the output dir itself last so that it isn't considered the primary output.
-list(APPEND outputs "${output_dir}")
+# Set correct paths to glibc headers
+set(GLIBC_INCLUDE_PATH "/usr/include")
+if(CMAKE_LIBRARY_ARCHITECTURE)
+  set(GLIBC_ARCH_INCLUDE_PATH "${GLIBC_INCLUDE_PATH}/${CMAKE_LIBRARY_ARCHITECTURE}")
+else()
+  set(GLIBC_ARCH_INCLUDE_PATH "${GLIBC_INCLUDE_PATH}")
+endif()
+if (NOT EXISTS "${GLIBC_ARCH_INCLUDE_PATH}/sys")
+  message(FATAL_ERROR "Glibc headers were not found.")
+endif()
+
+# Generate module.map
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+configure_file(module.map.in "${CMAKE_CURRENT_BINARY_DIR}/module.map" @ONLY)
+endif()
+if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+configure_file(module.freebsd.map.in "${CMAKE_CURRENT_BINARY_DIR}/module.map" @ONLY)
+endif()
+
 add_custom_command_target(unused_var
-    ${commands}
+    COMMAND
+        "${CMAKE_COMMAND}" "-E" "make_directory" "${output_dir}"
+    COMMAND
+        "${CMAKE_COMMAND}" "-E" "copy_if_different"
+        "${CMAKE_CURRENT_BINARY_DIR}/module.map"
+        "${output_dir}/module.map"
     CUSTOM_TARGET_NAME "copy_glibc_module"
-    OUTPUT "${outputs}"
-    DEPENDS "${sources}"
+    OUTPUT "${output_dir}/module.map" "${output_dir}"
+    DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/module.map"
     COMMENT "Copying Glibc module to ${output_dir}")
 
 swift_install_in_component(stdlib
-    FILES ${sources}
+    FILES "${output_dir}/module.map"
     DESTINATION "lib/swift/glibc")
 
 add_swift_library(swiftGlibc IS_SDK_OVERLAY
-  Glibc.swift
-  FILE_DEPENDS copy_glibc_module "${SWIFTLIB_DIR}/glibc"
-  INSTALL_IN_COMPONENT stdlib-experimental)
-
+    ${sources}
+    FILE_DEPENDS copy_glibc_module "${output_dir}"
+    INSTALL_IN_COMPONENT stdlib-experimental)

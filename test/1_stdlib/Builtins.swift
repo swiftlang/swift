@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -119,8 +119,8 @@ var NoisyDeathCount = 0
 protocol P {}
 
 class Noisy : P {
-  init() { ++NoisyLifeCount }
-  deinit { ++NoisyDeathCount }
+  init() { NoisyLifeCount += 1 }
+  deinit { NoisyDeathCount += 1}
 }
 
 struct Large : P {
@@ -275,6 +275,16 @@ tests.test("_isPOD") {
   expectTrue(_isPOD(Int.self))
   expectFalse(_isPOD(X.self))
   expectFalse(_isPOD(P.self))
+}
+
+tests.test("_isOptional") {
+  expectTrue(_isOptional(Optional<Int>.self))
+  expectTrue(_isOptional(Optional<X>.self))
+  expectTrue(_isOptional(Optional<P>.self))
+  expectTrue(_isOptional(ImplicitlyUnwrappedOptional<P>.self))
+  expectFalse(_isOptional(Int.self))
+  expectFalse(_isOptional(X.self))
+  expectFalse(_isOptional(P.self))
 }
 
 runAllTests()

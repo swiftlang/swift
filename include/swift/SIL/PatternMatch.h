@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -370,7 +370,6 @@ UNARY_OP_MATCH_WITH_ARG_MATCHER(DeinitExistentialAddrInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(ProjectBlockStorageInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongRetainInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongReleaseInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongRetainAutoreleasedInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongRetainUnownedInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(UnownedRetainInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(UnownedReleaseInst)
@@ -383,7 +382,6 @@ UNARY_OP_MATCH_WITH_ARG_MATCHER(DeallocBoxInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(DestroyAddrInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(CondFailInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(ReturnInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(AutoreleaseReturnInst)
 #undef UNARY_OP_MATCH_WITH_ARG_MATCHER
 
 //===----------------------------------------------------------------------===//
@@ -693,7 +691,7 @@ using BuiltinApplyTy = typename Apply_match<BuiltinValueKind, Tys...>::Ty;
 /// Matcher for any of the builtin checked conversions.
 template <typename T0>
 inline typename OneOf_match<BuiltinApplyTy<T0>, BuiltinApplyTy<T0>>::Ty
-m_CheckedConversion(const T0 &Op0)  {
+m_CheckedConversion(const T0 &Op0) {
   return m_USCheckedConversion(Op0) || m_SUCheckedConversion(Op0);
 }
 

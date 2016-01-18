@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -164,7 +164,7 @@ ${comment}
   ///
   /// - Precondition: The memory is not initialized.
   ///
-  /// - Postcondition: The memory is initalized; the value should eventually
+  /// - Postcondition: The memory is initialized; the value should eventually
   ///   be destroyed or moved from to avoid leaks.
   public func initialize(newvalue: Memory) {
     Builtin.initialize(newvalue, _rawValue)
@@ -210,8 +210,10 @@ ${comment}
     _debugPrecondition(
       source < self || source >= self + count,
       "${Self}.assignBackwardFrom non-preceding overlapping range; use assignFrom instead")
-    for var i = count; --i >= 0; {
+    var i = count-1
+    while i >= 0 {
       self[i] = source[i]
+      i -= 1
     }
   }
 
@@ -357,7 +359,7 @@ ${comment}
 
 #if _runtime(_ObjC)
   /// Return the result of invoking body.  If self was converted from
-  /// nil, passes nil as the argument.  Otherwise, passes the address
+  /// `nil`, passes `nil` as the argument.  Otherwise, passes the address
   /// of a `Memory` which is written into buffer before this method returns.
   @_transparent public
   func _withBridgeObject<U : AnyObject, R>(
@@ -444,7 +446,7 @@ ${MirrorDecl} {
     return "\(selfType)(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
   }
 
-  var quickLookObject: PlaygroundQuickLook? { return .Some(.Text(summary)) }
+  var quickLookObject: PlaygroundQuickLook? { return .Text(summary) }
 }
 
 ${MirrorConformance}

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -94,7 +94,7 @@ public struct _StringBuffer {
     let inputStream = input.generate()
     guard let (utf16Count, isAscii) = UTF16.measure(encoding, input: inputStream,
         repairIllFormedSequences: repairIllFormedSequences) else {
-      return (.None, true)
+      return (nil, true)
     }
 
     // Allocate storage
@@ -106,18 +106,20 @@ public struct _StringBuffer {
     if isAscii {
       var p = UnsafeMutablePointer<UTF8.CodeUnit>(result.start)
       let sink: (UTF32.CodeUnit) -> Void = {
-        (p++).memory = UTF8.CodeUnit($0)
+        p.memory = UTF8.CodeUnit($0)
+        p += 1
       }
       let hadError = transcode(
         encoding, UTF32.self, input.generate(), sink,
         stopOnError: true)
-      _sanityCheck(!hadError, "string can not be ASCII if there were decoding errors")
+      _sanityCheck(!hadError, "string cannot be ASCII if there were decoding errors")
       return (result, hadError)
     }
     else {
       var p = result._storage.baseAddress
       let sink: (UTF16.CodeUnit) -> Void = {
-        (p++).memory = $0
+        p.memory = $0
+        p += 1
       }
       let hadError = transcode(
         encoding, UTF16.self, input.generate(), sink,
@@ -184,7 +186,7 @@ public struct _StringBuffer {
   /// Attempt to claim unused capacity in the buffer.
   ///
   /// Operation succeeds if there is sufficient capacity, and either:
-  /// - the buffer is uniquely-refereced, or
+  /// - the buffer is uniquely-referenced, or
   /// - `oldUsedEnd` points to the end of the currently used capacity.
   ///
   /// - parameter subRange: Range of the substring that the caller tries
@@ -231,7 +233,7 @@ public struct _StringBuffer {
   }
 
   var _anyObject: AnyObject? {
-    return _storage.storage != nil ? .Some(_storage.storage!) : .None
+    return _storage.storage != nil ? _storage.storage! : nil
   }
 
   var _storage: _Storage

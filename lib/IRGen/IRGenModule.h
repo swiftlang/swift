@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -85,6 +85,7 @@ namespace swift {
   class IRGenOptions;
   class NormalProtocolConformance;
   class ProtocolConformance;
+  class TypeMetadataRecord;
   class ProtocolCompositionType;
   class ProtocolDecl;
   struct SILDeclRef;
@@ -204,7 +205,10 @@ public:
   /// Emit the protocol conformance records needed by each IR module.
   void emitProtocolConformances();
 
-  /// Emit everthing which is reachable from already emitted IR.
+  /// Emit type metadata records for types without explicit protocol conformance.
+  void emitTypeMetadataRecords();
+
+  /// Emit everything which is reachable from already emitted IR.
   void emitLazyDefinitions();
   
   void addLazyFunction(SILFunction *f) {
@@ -322,6 +326,9 @@ public:
   /// Does the current target require Objective-C interoperation?
   bool ObjCInterop = true;
 
+  /// Should we add value names to local IR values?
+  bool EnableValueNames = false;
+
   llvm::Type *VoidTy;                  /// void (usually {})
   llvm::IntegerType *Int1Ty;           /// i1
   llvm::IntegerType *Int8Ty;           /// i8
@@ -382,15 +389,21 @@ public:
   llvm::PointerType *ObjCBlockPtrTy;   /// %objc_block*
   llvm::StructType *ProtocolConformanceRecordTy;
   llvm::PointerType *ProtocolConformanceRecordPtrTy;
+  llvm::StructType *TypeMetadataRecordTy;
+  llvm::PointerType *TypeMetadataRecordPtrTy;
   llvm::PointerType *ErrorPtrTy;       /// %swift.error*
   llvm::StructType *OpenedErrorTripleTy; /// { %swift.opaque*, %swift.type*, i8** }
   llvm::PointerType *OpenedErrorTriplePtrTy; /// { %swift.opaque*, %swift.type*, i8** }*
-  
+
   unsigned InvariantMetadataID; /// !invariant.load
   unsigned DereferenceableID;   /// !dereferenceable
   llvm::MDNode *InvariantNode;
   
   llvm::CallingConv::ID RuntimeCC;     /// lightweight calling convention
+
+  llvm::FunctionType *getAssociatedTypeMetadataAccessFunctionTy();
+  llvm::FunctionType *getAssociatedTypeWitnessTableAccessFunctionTy();
+  llvm::StructType *getGenericWitnessTableCacheTy();
 
   /// Get the bit width of an integer type for the target platform.
   unsigned getBuiltinIntegerWidth(BuiltinIntegerType *t);
@@ -408,21 +421,47 @@ public:
     return getPointerAlignment();
   }
 
-  llvm::Type *getReferenceType(ReferenceCounting refcounting);
+  llvm::Type *getReferenceType(ReferenceCounting style);
+
+  static bool isUnownedReferenceAddressOnly(ReferenceCounting style) {
+    switch (style) {
+    case ReferenceCounting::Native:
+      return false;
+
+    case ReferenceCounting::Unknown:
+    case ReferenceCounting::ObjC:
+    case ReferenceCounting::Block:
+      return true;
+
+    case ReferenceCounting::Bridge:
+    case ReferenceCounting::Error:
+      llvm_unreachable("unowned references to this type are not supported");
+    }
+  }
   
   /// Return the spare bit mask to use for types that comprise heap object
   /// pointers.
   const SpareBitVector &getHeapObjectSpareBits() const;
 
   const SpareBitVector &getFunctionPointerSpareBits() const;
-  SpareBitVector getWeakReferenceSpareBits() const;
   const SpareBitVector &getWitnessTablePtrSpareBits() const;
 
+  SpareBitVector getWeakReferenceSpareBits() const;
   Size getWeakReferenceSize() const { return PtrSize; }
   Alignment getWeakReferenceAlignment() const { return getPointerAlignment(); }
 
+  SpareBitVector getUnownedReferenceSpareBits(ReferenceCounting style) const;
+  unsigned getUnownedExtraInhabitantCount(ReferenceCounting style);
+  APInt getUnownedExtraInhabitantValue(unsigned bits, unsigned index,
+                                       ReferenceCounting syle);
+  APInt getUnownedExtraInhabitantMask(ReferenceCounting style);
+
   llvm::Type *getFixedBufferTy();
   llvm::Type *getValueWitnessTy(ValueWitness index);
+
+  llvm::Constant *emitDirectRelativeReference(llvm::Constant *target,
+                                              llvm::Constant *base,
+                                              ArrayRef<unsigned> baseIndices);
 
   void unimplemented(SourceLoc, StringRef Message);
   LLVM_ATTRIBUTE_NORETURN
@@ -434,6 +473,9 @@ private:
   llvm::Type *FixedBufferTy;          /// [N x i8], where N == 3 * sizeof(void*)
 
   llvm::Type *ValueWitnessTys[MaxNumValueWitnesses];
+  llvm::FunctionType *AssociatedTypeMetadataAccessFunctionTy = nullptr;
+  llvm::FunctionType *AssociatedTypeWitnessTableAccessFunctionTy = nullptr;
+  llvm::StructType *GenericWitnessTableCacheTy = nullptr;
   
   llvm::DenseMap<llvm::Type *, SpareBitVector> SpareBitsForTypes;
   
@@ -470,7 +512,7 @@ public:
   unsigned getExplosionSize(SILType T);
   llvm::PointerType *isSingleIndirectValue(SILType T);
   llvm::PointerType *requiresIndirectResult(SILType T);
-  bool isPOD(SILType type, ResilienceScope scope);
+  bool isPOD(SILType type, ResilienceExpansion expansion);
   clang::CanQual<clang::Type> getClangType(CanType type);
   clang::CanQual<clang::Type> getClangType(SILType type);
   clang::CanQual<clang::Type> getClangType(SILParameterInfo param);
@@ -481,7 +523,10 @@ public:
     return *ClangASTContext;
   }
 
-  bool isResilient(Decl *decl, ResilienceScope scope);
+  bool isResilient(Decl *decl, ResilienceExpansion expansion);
+  ResilienceExpansion getResilienceExpansionForAccess(NominalTypeDecl *decl);
+  ResilienceExpansion getResilienceExpansionForLayout(NominalTypeDecl *decl);
+  ResilienceExpansion getResilienceExpansionForLayout(SILGlobalVariable *var);
 
   SpareBitVector getSpareBitsForType(llvm::Type *scalarTy, Size size);
   
@@ -514,6 +559,7 @@ public:
                                 ArrayRef<FieldTypeInfo> fieldTypes,
                                 llvm::Function *fn);
   llvm::Constant *emitProtocolConformances();
+  llvm::Constant *emitTypeMetadataRecords();
 
   llvm::Constant *getOrCreateHelperFunction(StringRef name,
                                             llvm::Type *resultType,
@@ -551,6 +597,8 @@ private:
   SmallVector<llvm::WeakVH, 4> ObjCCategories;
   /// List of protocol conformances to generate records for.
   SmallVector<NormalProtocolConformance *, 4> ProtocolConformances;
+  /// List of nominal types to generate type metadata records for.
+  SmallVector<CanType, 4> RuntimeResolvableTypes;
   /// List of ExtensionDecls corresponding to the generated
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
@@ -618,11 +666,14 @@ public:                             \
 private:                            \
   llvm::Constant *Id##Fn = nullptr;
 #include "RuntimeFunctions.def"
+  
+  llvm::Constant *FixLifetimeFn = nullptr;
 
   mutable Optional<SpareBitVector> HeapPointerSpareBits;
   
 //--- Generic ---------------------------------------------------------------
 public:
+  llvm::Constant *getFixLifetimeFn();
   
   /// The constructor.
   ///
@@ -712,6 +763,7 @@ public:
   llvm::Function *getAddrOfSILFunction(SILFunction *f,
                                        ForDefinition_t forDefinition);
   Address getAddrOfSILGlobalVariable(SILGlobalVariable *var,
+                                     const TypeInfo &ti,
                                      ForDefinition_t forDefinition);
   llvm::Function *getAddrOfWitnessTableAccessFunction(
                                            const NormalProtocolConformance *C,
@@ -726,10 +778,26 @@ public:
                                                ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfWitnessTable(const NormalProtocolConformance *C,
                                         llvm::Type *definitionTy = nullptr);
+  llvm::Constant *
+  getAddrOfGenericWitnessTableCache(const NormalProtocolConformance *C,
+                                    ForDefinition_t forDefinition);
+  llvm::Function *
+  getAddrOfGenericWitnessTableInstantiationFunction(
+                                    const NormalProtocolConformance *C);
+  llvm::Function *getAddrOfAssociatedTypeMetadataAccessFunction(
+                                           const NormalProtocolConformance *C,
+                                           AssociatedTypeDecl *associatedType);
+  llvm::Function *getAddrOfAssociatedTypeWitnessTableAccessFunction(
+                                           const NormalProtocolConformance *C,
+                                           AssociatedTypeDecl *associatedType,
+                                           ProtocolDecl *requiredProtocol);
+
   Address getAddrOfObjCISAMask();
 
   StringRef mangleType(CanType type, SmallVectorImpl<char> &buffer);
-  
+ 
+  bool hasMetadataPattern(NominalTypeDecl *theDecl);
+ 
   // Get the ArchetypeBuilder for the currently active generic context. Crashes
   // if there is no generic context.
   ArchetypeBuilder &getContextArchetypes();
@@ -755,6 +823,7 @@ private:
                                        llvm::Type *defaultType);
 
   void emitLazyPrivateDefinitions();
+  void addRuntimeResolvableType(CanType type);
 
 //--- Global context emission --------------------------------------------------
 public:

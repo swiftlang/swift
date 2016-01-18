@@ -116,7 +116,3 @@ func +(_ a: String,  // expected-warning{{extraneous '_' in parameter: 'a' has n
        b b: Double) { } // expected-error{{operator cannot have keyword arguments}} {{8-10=}}
 
 func +(a: Double, b: String)(_ c: Int)(d e: Int) { } // okay; expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-
-// # is being removed
-func pound(#a: Int, // expected-error{{'#' has been removed from Swift; double up 'a a' to make the argument label the same as the parameter name}}{{12-13=a }}
-           #b: Int) { } // expected-error{{'#' has been removed from Swift; 'b' already has an argument label}}{{12-13=}}

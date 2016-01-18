@@ -41,7 +41,7 @@ func count<R : GeneratorType where R.Element : Eq>
   var result = 0
   for x in GeneratorSequence(range) {
     if x == value {
-      ++result
+      result += 1
     }
   }
   return result
@@ -53,7 +53,7 @@ func countIf<
   var result = 0
   for x in GeneratorSequence(range) {
     if predicate(x) {
-      ++result
+      result += 1
     }
   }
   return result
@@ -80,7 +80,7 @@ func equal<R1 : GeneratorType, R2 : GeneratorType where R1.Element : Eq,
 
 func equalIf<R1 : GeneratorType, R2 : GeneratorType>
        (range1 : R1, range2 : R2,
-        predicate : (R1.Element, R2.Element)-> Bool) -> Bool {
+        predicate : (R1.Element, R2.Element) -> Bool) -> Bool {
   var range1 = range1
   var range2 = range2
   var e1 = range1.next()

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -17,7 +17,6 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/ResilienceExpansion.h"
 
 namespace swift {
 
@@ -34,17 +33,19 @@ enum class OperatorFixity {
   Postfix
 };
 
-/// Defined in include/swift/SIL/Mangle.h
-class SpecializationManglerBase;
   
-/// A class for mangling declarations.
+/// A class for mangling declarations. The Mangler accumulates name fragments
+/// with the mangleXXX methods, and the final string is constructed with the
+/// `finalize` method, after which the Mangler should not be used.
 class Mangler {
   struct ArchetypeInfo {
     unsigned Depth;
     unsigned Index;
   };
 
-  raw_ostream &Buffer;
+  llvm::SmallVector<char, 128> Storage;
+  llvm::raw_svector_ostream Buffer;
+
   llvm::DenseMap<const void *, unsigned> Substitutions;
   llvm::DenseMap<const ArchetypeType *, ArchetypeInfo> Archetypes;
   CanGenericSignature CurGenericSignature;
@@ -55,8 +56,6 @@ class Mangler {
   bool DWARFMangling;
   /// If enabled, non-ASCII names are encoded in modified Punycode.
   bool UsePunycode;
-
-  friend class SpecializationManglerBase;
 
 public:
   enum BindGenerics : unsigned {
@@ -88,49 +87,48 @@ public:
     ~ContextStack() { M.ArchetypesDepth = OldDepth; }
   };
 
+  /// Finish the mangling of the symbol and return the mangled name.
+  std::string finalize();
+
+  /// Finish the mangling of the symbol and write the mangled name into
+  /// \p stream.
+  void finalize(llvm::raw_ostream &stream);
+
   void setModuleContext(ModuleDecl *M) { Mod = M; }
 
   /// \param DWARFMangling - use the 'Qq' mangling format for
   /// archetypes and the 'a' mangling for alias types.
   /// \param usePunycode - emit modified Punycode instead of UTF-8.
-  Mangler(raw_ostream &buffer, bool DWARFMangling = false, 
+  Mangler(bool DWARFMangling = false,
           bool usePunycode = true)
-    : Buffer(buffer), DWARFMangling(DWARFMangling), UsePunycode(usePunycode) {}
+    : Buffer(Storage), DWARFMangling(DWARFMangling), UsePunycode(usePunycode) {}
   void mangleContextOf(const ValueDecl *decl, BindGenerics shouldBind);
   void mangleContext(const DeclContext *ctx, BindGenerics shouldBind);
   void mangleModule(const ModuleDecl *module);
   void mangleDeclName(const ValueDecl *decl);
-  void mangleDeclType(const ValueDecl *decl, ResilienceExpansion expansion,
-                      unsigned uncurryingLevel);
+  void mangleDeclType(const ValueDecl *decl, unsigned uncurryingLevel);
 
-  void mangleEntity(const ValueDecl *decl, ResilienceExpansion expansion,
-                    unsigned uncurryingLevel);
+  void mangleEntity(const ValueDecl *decl, unsigned uncurryingLevel);
   void mangleConstructorEntity(const ConstructorDecl *ctor, bool isAllocating,
-                               ResilienceExpansion kind,
                                unsigned uncurryingLevel);
   void mangleDestructorEntity(const DestructorDecl *decl, bool isDeallocating);
   void mangleIVarInitDestroyEntity(const ClassDecl *decl, bool isDestroyer);
   void mangleAccessorEntity(AccessorKind kind, AddressorKind addressorKind,
-                            const AbstractStorageDecl *decl,
-                            ResilienceExpansion expansion);
+                            const AbstractStorageDecl *decl);
   void mangleAddressorEntity(const ValueDecl *decl);
   void mangleGlobalGetterEntity(ValueDecl *decl);
   void mangleDefaultArgumentEntity(const DeclContext *ctx, unsigned index);
   void mangleInitializerEntity(const VarDecl *var);
   void mangleClosureEntity(const SerializedAbstractClosureExpr *closure,
-                           ResilienceExpansion explosion,
                            unsigned uncurryingLevel);
   void mangleClosureEntity(const AbstractClosureExpr *closure,
-                           ResilienceExpansion explosion,
                            unsigned uncurryingLevel);
   void mangleNominalType(const NominalTypeDecl *decl,
-                         ResilienceExpansion expansion,
                          BindGenerics shouldBind,
                          CanGenericSignature extGenericSig = nullptr,
                          const GenericParamList *extGenericParams = nullptr);
   void mangleProtocolDecl(const ProtocolDecl *protocol);
-  void mangleType(Type type, ResilienceExpansion expansion,
-                  unsigned uncurryingLevel);
+  void mangleType(Type type, unsigned uncurryingLevel);
   void mangleDirectness(bool isIndirect);
   void mangleProtocolName(const ProtocolDecl *protocol);
   void mangleProtocolConformance(const ProtocolConformance *conformance);
@@ -140,14 +138,30 @@ public:
 
   void mangleDeclTypeForDebugger(const ValueDecl *decl);
   void mangleTypeForDebugger(Type decl, const DeclContext *DC);
-  void mangleGenericSignature(const GenericSignature *sig,
-                              ResilienceExpansion expansion);
+  void mangleGenericSignature(const GenericSignature *sig);
 
   void mangleFieldOffsetFull(const ValueDecl *decl, bool isIndirect);
   void mangleTypeMetadataFull(CanType ty, bool isPattern);
   void mangleTypeFullMetadataFull(CanType ty);
   void mangleGlobalVariableFull(const VarDecl *decl);
-  
+
+  /// Adds the string \p S into the mangled name.
+  void append(StringRef S);
+
+  /// Adds the char \p C into the mangled name.
+  void append(char C);
+
+  /// Add the already mangled symbol \p Name as an identifier. (using the
+  /// length prefix).
+  void mangleIdentifierSymbol(StringRef Name);
+
+  /// Add the already mangled symbol \p Name. This gives the mangler the
+  /// opportunity to decode \p Name before adding it to the mangled name.
+  void appendSymbol(StringRef Name);
+
+  /// Mangle the integer \p Nat into the name.
+  void mangleNatural(const APInt &Nat);
+
   /// Mangles globalinit_token and globalinit_func, which are used to
   /// initialize global variables.
   /// \param decl The global variable or one of the global variables of a
@@ -162,8 +176,7 @@ public:
                         bool isOperator=false);
   void resetArchetypesDepth() { ArchetypesDepth = 0; }
 private:
-  void mangleFunctionType(AnyFunctionType *fn, ResilienceExpansion expansion,
-                          unsigned uncurryingLevel);
+  void mangleFunctionType(AnyFunctionType *fn, unsigned uncurryingLevel);
   void mangleProtocolList(ArrayRef<ProtocolDecl*> protocols);
   void mangleProtocolList(ArrayRef<Type> protocols);
   void mangleIdentifier(Identifier ident,
@@ -181,13 +194,12 @@ private:
     assert(DWARFMangling &&
            "sugared types are only legal when mangling for the debugger");
     auto *BlandTy = cast<T>(type.getPointer())->getSinglyDesugaredType();
-    mangleType(BlandTy, ResilienceExpansion::Minimal, 0);
+    mangleType(BlandTy, 0);
   }
 
   void mangleGenericSignatureParts(ArrayRef<GenericTypeParamType *> params,
                                    unsigned initialParamDepth,
-                                   ArrayRef<Requirement> requirements,
-                                   ResilienceExpansion expansion);
+                                   ArrayRef<Requirement> requirements);
   Type getDeclTypeForMangling(const ValueDecl *decl,
                               ArrayRef<GenericTypeParamType *> &genericParams,
                               unsigned &initialParamIndex,
@@ -197,8 +209,7 @@ private:
   void mangleGenericParamIndex(GenericTypeParamType *paramTy);
   void mangleAssociatedTypeName(DependentMemberType *dmt,
                                 bool canAbbreviate);
-  void mangleConstrainedType(CanType type,
-                             ResilienceExpansion expansion);
+  void mangleConstrainedType(CanType type);
   CanGenericSignature getCanonicalSignatureOrNull(GenericSignature *sig,
                                                   ModuleDecl &M);
 };

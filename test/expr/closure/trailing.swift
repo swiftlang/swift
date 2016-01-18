@@ -83,7 +83,7 @@ func labeledArgumentAndTrailingClosure() {
 
   // Trailing closure binds to last parameter, always.
  takeTwoFuncsWithDefaults { "Hello, " + $0 }
-  takeTwoFuncsWithDefaults { $0 + 1 } // expected-error {{cannot convert value of type '_ -> Int' to expected argument type '(String -> String)?'}} 
+  takeTwoFuncsWithDefaults { $0 + 1 } // expected-error {{cannot convert value of type '(_) -> Int' to expected argument type '(String -> String)?'}} 
   takeTwoFuncsWithDefaults(f1: {$0 + 1 })
 }
 

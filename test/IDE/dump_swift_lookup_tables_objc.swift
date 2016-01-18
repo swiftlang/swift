@@ -6,34 +6,19 @@
 
 // REQUIRES: objc_interop
 
-// CHECK:      Base -> full name mappings:
-// CHECK-NEXT:   CCItem --> CCItem
-// CHECK-NEXT:   CCItemRef --> CCItemRef
-// CHECK-NEXT:   CFTypeRef --> CFTypeRef
-// CHECK-NEXT:   NSAccessibility --> NSAccessibility
-// CHECK-NEXT:   NSError --> NSError
-// CHECK-NEXT:   NSErrorImports --> NSErrorImports
-// CHECK-NEXT:   SNCollision --> SNCollision
-// CHECK-NEXT:   SNCollisionProtocol --> SNCollisionProtocol
-// CHECK-NEXT:   SomeClass --> SomeClass
-// CHECK-NEXT:   SomeProtocol --> SomeProtocol
-// CHECK-NEXT:   UIActionSheet --> UIActionSheet
-// CHECK-NEXT:   __CCItem --> __CCItem
-// CHECK-NEXT:   accessibilityFloat --> accessibilityFloat()
-// CHECK-NEXT:   categoryMethodWithX --> categoryMethodWithX(_:y:), categoryMethodWithX(_:y:z:)
-// CHECK-NEXT:   doubleProperty --> doubleProperty{{$}}
-// CHECK-NEXT:   extensionMethodWithX --> extensionMethodWithX(_:y:)
-// CHECK-NEXT:   floatProperty --> floatProperty{{$}}
-// CHECK-NEXT:   init --> init(float:), init(withDefault:), init(double:), init(withTry:), init(uint8:), init(title:delegate:cancelButtonTitle:destructiveButtonTitle:)
-// CHECK-NEXT:   instanceMethodWithX --> instanceMethodWithX(_:y:z:)
-// CHECK-NEXT:   method --> method()
-// CHECK-NEXT:   methodWithFloat --> methodWithFloat(_:)
-// CHECK-NEXT:   objectAtIndexedSubscript --> objectAtIndexedSubscript(_:)
-// CHECK-NEXT:   protoInstanceMethodWithX --> protoInstanceMethodWithX(_:y:)
-// CHECK-NEXT:   setAccessibilityFloat --> setAccessibilityFloat(_:)
-// CHECK-NEXT:   subscript --> subscript()
+// CHECK-LABEL: <<Foundation lookup table>>
+// CHECK: Categories:{{.*}}NSValue(NSValueCreation){{.*}}
 
-// CHECK:      Full name -> entry mappings:
+// CHECK-LABEL: <<ObjectiveC lookup table>>
+// CHECK-NEXT: Base name -> entry mappings:
+// CHECK-NOT: lookup table
+// CHECK:   NSObject:
+// CHECK-NEXT:     TU: NSObject
+// CHECK-NEXT:   NSObjectProtocol:
+// CHECK-NEXT:     TU: NSObject
+
+// CHECK-LABEL: <<Bridging header lookup table>>
+// CHECK-NEXT:      Base name -> entry mappings:
 // CHECK-NEXT:   CCItem:
 // CHECK-NEXT:     TU: CCItemRef
 // CHECK-NEXT:   CCItemRef:
@@ -50,6 +35,10 @@
 // CHECK-NEXT:     TU: SNCollision{{$}}
 // CHECK-NEXT:   SNCollisionProtocol:
 // CHECK-NEXT:     TU: SNCollision{{$}}
+// CHECK-NEXT:   SWIFT_ENUM:
+// CHECK-NEXT:     TU: Macro
+// CHECK-NEXT:   SWIFT_NAME:
+// CHECK-NEXT:     TU: Macro
 // CHECK-NEXT:   SomeClass:
 // CHECK-NEXT:     TU: SNSomeClass
 // CHECK-NEXT:   SomeProtocol:
@@ -58,52 +47,48 @@
 // CHECK-NEXT:     TU: UIActionSheet
 // CHECK-NEXT:   __CCItem:
 // CHECK-NEXT:     TU: __CCItem
-// CHECK-NEXT:   accessibilityFloat():
+// CHECK-NEXT:   __swift:
+// CHECK-NEXT:     TU: __swift
+// CHECK-NEXT:   accessibilityFloat:
 // CHECK-NEXT:     NSAccessibility: -[NSAccessibility accessibilityFloat]
-// CHECK-NEXT:   categoryMethodWithX(_:y:):
-// CHECK-NEXT:     SNSomeClass: -[SNSomeClass categoryMethodWithX:y:]
-// CHECK-NEXT:   categoryMethodWithX(_:y:z:):
-// CHECK-NEXT:     SNSomeClass: -[SNSomeClass categoryMethodWithX:y:z:]
+// CHECK-NEXT:   categoryMethodWithX:
+// CHECK-NEXT:     SNSomeClass: -[SNSomeClass categoryMethodWithX:y:], -[SNSomeClass categoryMethodWithX:y:z:]
 // CHECK-NEXT:   doubleProperty:
 // CHECK-NEXT:     SNSomeClass: SNSomeClass.doubleProperty
-// CHECK-NEXT:   extensionMethodWithX(_:y:):
+// CHECK-NEXT:   extensionMethodWithX:
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass extensionMethodWithX:y:]
 // CHECK-NEXT:   floatProperty:
 // CHECK-NEXT:     SNSomeClass: SNSomeClass.floatProperty
-// CHECK-NEXT:   init(andReturnError:):
-// CHECK-NEXT:     NSErrorImports: -[NSErrorImports initAndReturnError:]
-// CHECK-NEXT:   init(double:):
-// CHECK-NEXT:     SNSomeClass: +[SNSomeClass someClassWithDouble:]
-// CHECK-NEXT:   init(float:):
-// CHECK-NEXT:     SNSomeClass: -[SNSomeClass initWithFloat:]
-// CHECK-NEXT:     NSErrorImports: -[NSErrorImports initWithFloat:error:]
-// CHECK-NEXT:   init(title:delegate:cancelButtonTitle:destructiveButtonTitle:):
+// CHECK-NEXT:   init:
+// CHECK-NEXT:     SNSomeClass: -[SNSomeClass initWithFloat:], -[SNSomeClass initWithDefault], +[SNSomeClass someClassWithDouble:], +[SNSomeClass someClassWithTry:], +[SNSomeClass buildWithUnsignedChar:]
 // CHECK-NEXT:     UIActionSheet: -[UIActionSheet initWithTitle:delegate:cancelButtonTitle:destructiveButtonTitle:otherButtonTitles:]
-// CHECK-NEXT:   init(uint8:):
-// CHECK-NEXT:     SNSomeClass: +[SNSomeClass buildWithUnsignedChar:]
-// CHECK-NEXT:   init(withDefault:):
-// CHECK-NEXT:     SNSomeClass: -[SNSomeClass initWithDefault]
-// CHECK-NEXT:   init(withTry:):
-// CHECK-NEXT:     SNSomeClass: +[SNSomeClass someClassWithTry:]
-// CHECK-NEXT:   instanceMethodWithX(_:y:z:):
+// CHECK-NEXT:     NSErrorImports: -[NSErrorImports initAndReturnError:], -[NSErrorImports initWithFloat:error:]
+// CHECK-NEXT:   instanceMethodWithX:
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass instanceMethodWithX:Y:Z:]
-// CHECK-NEXT:   method():
+// CHECK-NEXT:   method:
 // CHECK-NEXT:     NSErrorImports: -[NSErrorImports methodAndReturnError:]
-// CHECK-NEXT:   methodWithFloat(_:):
+// CHECK-NEXT:   methodWithFloat:
 // CHECK-NEXT:     NSErrorImports: -[NSErrorImports methodWithFloat:error:]
-// CHECK-NEXT:   objectAtIndexedSubscript(_:):
+// CHECK-NEXT:   objectAtIndexedSubscript:
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass objectAtIndexedSubscript:]
-// CHECK-NEXT:   protoInstanceMethodWithX(_:y:):
+// CHECK-NEXT:   optSetter:
+// CHECK-NEXT:     SNCollision: SNCollision.optSetter
+// CHECK-NEXT:   protoInstanceMethodWithX:
 // CHECK-NEXT:     SNSomeProtocol: -[SNSomeProtocol protoInstanceMethodWithX:y:]
-// CHECK-NEXT:   setAccessibilityFloat(_:):
+// CHECK-NEXT:   reqSetter:
+// CHECK-NEXT:     SNCollision: SNCollision.reqSetter
+// CHECK-NEXT:   setAccessibilityFloat:
 // CHECK-NEXT:     NSAccessibility: -[NSAccessibility setAccessibilityFloat:]
-// CHECK-NEXT:   subscript():
+// CHECK-NEXT:   subscript:
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass objectAtIndexedSubscript:]
 
-// CHECK-OMIT-NEEDLESS-WORDS: Base -> full name mappings:
-// CHECK-OMIT-NEEDLESS-WORDS:   instanceMethodWithX --> instanceMethodWithX(_:y:z:)
-// CHECK-OMIT-NEEDLESS-WORDS:   methodWith --> methodWith(_:)
+// CHECK: Categories: SNSomeClass(), SNSomeClass(Category1)
 
-// CHECK-OMIT-NEEDLESS-WORDS: Full name -> entry mappings:
-// CHECK-OMIT-NEEDLESS-WORDS:   methodWith(_:):
+// CHECK-OMIT-NEEDLESS-WORDS: <<ObjectiveC lookup table>>
+// CHECK-OMIT-NEEDLESS-WORDS-NOT: lookup table
+// CHECK-OMIT-NEEDLESS-WORDS: respondsTo:
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT:     -[NSObject respondsToSelector:]
+
+// CHECK-OMIT-NEEDLESS-WORDS: Base name -> entry mappings:
+// CHECK-OMIT-NEEDLESS-WORDS:   methodWith:
 // CHECK-OMIT-NEEDLESS-WORDS:     NSErrorImports: -[NSErrorImports methodWithFloat:error:]

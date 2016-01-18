@@ -1,8 +1,8 @@
-//===--- Concurrent.h - Concurrent Data Structures  ------------*- C++ -*--===//
+//===--- Concurrent.h - Concurrent Data Structures  -------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -145,7 +145,7 @@ template <class KeyTy, class ValueTy> struct ConcurrentMapNode {
 /// The method findOrAllocateNode searches the binary tree in search of the
 /// exact Key value. If it finds an edge that points to NULL that should
 /// contain the value then it tries to compare and swap the new node into
-/// place. If it looses the race to a different thread it de-allocates
+/// place. If it loses the race to a different thread it de-allocates
 /// the node and starts the search again since the new node should
 /// be placed (or found) on the new link. See findOrAllocateNode for more
 /// details.
@@ -164,7 +164,7 @@ public:
   /// accelerating the search of the same value again and again.
   std::atomic<NodeTy *> LastSearch;
 
-  /// Search a for a node with key value \p. If the node does not exist then
+  /// Search for a node with key value \p. If the node does not exist then
   /// allocate a new bucket and add it to the tree.
   ConcurrentList<ValueTy> &findOrAllocateNode(KeyTy Key) {
     // Try looking at the last node we searched.

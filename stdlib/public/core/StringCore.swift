@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -121,7 +121,9 @@ public struct _StringCore {
       var src = UnsafeMutablePointer<UTF8.CodeUnit>(srcStart)
       let srcEnd = src + count
       while (src != srcEnd) {
-        dest++.memory = UTF16.CodeUnit(src++.memory)
+        dest.memory = UTF16.CodeUnit(src.memory)
+        dest += 1
+        src += 1
       }
     }
     else {
@@ -130,7 +132,9 @@ public struct _StringCore {
       var src = UnsafeMutablePointer<UTF16.CodeUnit>(srcStart)
       let srcEnd = src + count
       while (src != srcEnd) {
-        dest++.memory = UTF8.CodeUnit(src++.memory)
+        dest.memory = UTF8.CodeUnit(src.memory)
+        dest += 1
+        src += 1
       }
     }
   }
@@ -174,7 +178,7 @@ public struct _StringCore {
   public init() {
     self._baseAddress = _emptyStringBase
     self._countAndFlags = 0
-    self._owner = .None
+    self._owner = nil
     _invariantCheck()
   }
 
@@ -237,7 +241,7 @@ public struct _StringCore {
     return UnsafeMutablePointer(_baseAddress)
   }
 
-  /// the native _StringBuffer, if any, or .None.
+  /// the native _StringBuffer, if any, or `nil`.
   public var nativeBuffer: _StringBuffer? {
     if !hasCocoaBuffer {
       return _owner.map {
@@ -248,7 +252,7 @@ public struct _StringCore {
   }
 
 #if _runtime(_ObjC)
-  /// the Cocoa String buffer, if any, or .None.
+  /// the Cocoa String buffer, if any, or `nil`.
   public var cocoaBuffer: _CocoaStringType? {
     if hasCocoaBuffer {
       return _owner.map {
@@ -618,13 +622,15 @@ extension _StringCore : RangeReplaceableCollectionType {
       if _fastPath(elementWidth == 1) {
         var dst = rangeStart
         for u in newElements {
-          dst++.memory = UInt8(u & 0xFF)
+          dst.memory = UInt8(u & 0xFF)
+          dst += 1
         }
       }
       else {
         var dst = UnsafeMutablePointer<UTF16.CodeUnit>(rangeStart)
         for u in newElements {
-          dst++.memory = u
+          dst.memory = u
+          dst += 1
         }
       }
 

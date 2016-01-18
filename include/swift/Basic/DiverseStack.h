@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -29,7 +29,7 @@ namespace swift {
 
 template <class T> class DiverseStackImpl;
 
-/// DiverseStack - A stack of heterogenously-typed objects.
+/// DiverseStack - A stack of heterogeneously-typed objects.
 ///
 /// \tparam T - A common base class of the objects on the stack; must
 ///   provide an allocated_size() const method.

@@ -4,6 +4,14 @@
 import SwiftExperimental
 import StdlibUnittest
 
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 var ExperimentalTestSuite = TestSuite("Experimental")
 
 ExperimentalTestSuite.test("ComposeOperator/SmokeTest") {
@@ -38,8 +46,8 @@ ExperimentalTestSuite.test("ComposeOperator/CountCalls") {
 
   var aCalled = 0
   var bCalled = 0
-  func a(_: A) -> B { ++aCalled; return B() }
-  func b(_: B) -> C { ++bCalled; return C() }
+  func a(_: A) -> B { aCalled += 1; return B() }
+  func b(_: B) -> C { bCalled += 1; return C() }
 
   var result = b ∘ a
   expectEqual(0, aCalled)
@@ -56,8 +64,8 @@ struct C {}
 
 var aCalled = 0
 var bCalled = 0
-func a(_: A) -> B { ++aCalled; return B() }
-func b(_: B) -> C { ++bCalled; return C() }
+func a(_: A) -> B { aCalled += 1; return B() }
+func b(_: B) -> C { bCalled += 1; return C() }
 
 ExperimentalTestSuite.test("ComposeOperator/CountCalls/Workaround") {
   var result = b ∘ a

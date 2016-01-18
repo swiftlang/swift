@@ -1,7 +1,18 @@
 #!/usr/bin/env python
-
-# update-dependencies.py simulates a Swift compilation for the purposes of
-# dependency analysis. That means it has two tasks:
+# update-dependencies.py - Fake build for dependency analysis -*- python -*-
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See http://swift.org/LICENSE.txt for license information
+# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+#
+# ----------------------------------------------------------------------------
+#
+# Simulates a Swift compilation for the purposes of dependency analysis.
+# That means this has two tasks:
 #
 # 1. Update the main output of the compilation job.
 # 2. Update the associated dependencies file, in case anything changed.
@@ -13,6 +24,10 @@
 # the old dependencies (if present).
 #
 # If invoked in non-primary-file mode, it only creates the output file.
+#
+# ----------------------------------------------------------------------------
+
+from __future__ import print_function
 
 import os
 import shutil
@@ -37,6 +52,6 @@ with open(outputFile, 'a'):
     os.utime(outputFile, None)
 
 if primaryFile:
-  print "Handled", os.path.basename(primaryFile)
+  print("Handled", os.path.basename(primaryFile))
 else:
-  print "Produced", os.path.basename(outputFile)
+  print("Produced", os.path.basename(outputFile))

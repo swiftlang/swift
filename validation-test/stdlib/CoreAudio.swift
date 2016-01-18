@@ -5,6 +5,15 @@
 // UNSUPPORTED: OS=watchos
 
 import StdlibUnittest
+
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 import CoreAudio
 
 // Used in tests below.
@@ -26,7 +35,7 @@ let ablHeaderSize = 8
 #endif
 
 CoreAudioTestSuite.test("UnsafeBufferPointer.init(_: AudioBuffer)") {
-  if true {
+  do {
     let audioBuffer = AudioBuffer(
       mNumberChannels: 0, mDataByteSize: 0, mData: nil)
     let result: UnsafeBufferPointer<Float> = UnsafeBufferPointer(audioBuffer)
@@ -34,7 +43,7 @@ CoreAudioTestSuite.test("UnsafeBufferPointer.init(_: AudioBuffer)") {
     expectEqual(0, result.count)
   }
 
-  if true {
+  do {
     let audioBuffer = AudioBuffer(
       mNumberChannels: 2, mDataByteSize: 1024,
       mData: UnsafeMutablePointer<Void>(bitPattern: 0x1234_5678))
@@ -47,7 +56,7 @@ CoreAudioTestSuite.test("UnsafeBufferPointer.init(_: AudioBuffer)") {
 }
 
 CoreAudioTestSuite.test("UnsafeMutableBufferPointer.init(_: AudioBuffer)") {
-  if true {
+  do {
     let audioBuffer = AudioBuffer(
       mNumberChannels: 0, mDataByteSize: 0, mData: nil)
     let result: UnsafeMutableBufferPointer<Float> =
@@ -56,7 +65,7 @@ CoreAudioTestSuite.test("UnsafeMutableBufferPointer.init(_: AudioBuffer)") {
     expectEqual(0, result.count)
   }
 
-  if true {
+  do {
     let audioBuffer = AudioBuffer(
       mNumberChannels: 2, mDataByteSize: 1024,
       mData: UnsafeMutablePointer<Void>(bitPattern: 0x1234_5678))
@@ -71,7 +80,7 @@ CoreAudioTestSuite.test("UnsafeMutableBufferPointer.init(_: AudioBuffer)") {
 
 CoreAudioTestSuite.test(
   "AudioBuffer.init(_: UnsafeMutableBufferPointer, numberOfChannels: Int)") {
-  if true {
+  do {
     // NULL pointer.
     let buffer = UnsafeMutableBufferPointer<Float>(start: nil, count: 0)
     let result = AudioBuffer(buffer, numberOfChannels: 2)
@@ -79,7 +88,7 @@ CoreAudioTestSuite.test(
     expectEqual(0, result.mDataByteSize)
     expectEqual(nil, result.mData)
   }
-  if true {
+  do {
     // Non-NULL pointer.
     let buffer = UnsafeMutableBufferPointer<Float>(
       start: UnsafeMutablePointer<Float>(bitPattern: 0x1234_5678), count: 0)
@@ -129,12 +138,12 @@ CoreAudioTestSuite.test("AudioBufferList.sizeInBytes(maximumBuffers: Int)/trap/o
 }
 
 CoreAudioTestSuite.test("AudioBufferList.allocate(maximumBuffers: Int)") {
-  if true {
+  do {
     let ablPtrWrapper = AudioBufferList.allocate(maximumBuffers: 1)
     expectEqual(1, ablPtrWrapper.count)
     free(ablPtrWrapper.unsafeMutablePointer)
   }
-  if true {
+  do {
     let ablPtrWrapper = AudioBufferList.allocate(maximumBuffers: 16)
     expectEqual(16, ablPtrWrapper.count)
     free(ablPtrWrapper.unsafeMutablePointer)
@@ -161,13 +170,13 @@ CoreAudioTestSuite.test(
   "UnsafeMutableAudioBufferListPointer.init(_: UnsafeMutablePointer<AudioBufferList>)," +
   "UnsafeMutableAudioBufferListPointer.unsafePointer," +
   "UnsafeMutableAudioBufferListPointer.unsafeMutablePointer") {
-  if true {
+  do {
     let ablPtrWrapper = UnsafeMutableAudioBufferListPointer(nil)
     expectEqual(nil, ablPtrWrapper.unsafePointer)
     expectEqual(nil, ablPtrWrapper.unsafeMutablePointer)
   }
 
-  if true {
+  do {
     let ablPtrWrapper = UnsafeMutableAudioBufferListPointer(
       UnsafeMutablePointer<AudioBufferList>(bitPattern: 0x1234_5678))
     expectEqual(
@@ -208,7 +217,7 @@ CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.subscript(_: Int)")
   // the subscript has a nonmutating setter.
   let ablPtrWrapper = UnsafeMutableAudioBufferListPointer(ablPtr)
 
-  if true {
+  do {
     // Test getter.
     let audioBuffer = AudioBuffer(
       mNumberChannels: 2, mDataByteSize: 1024,
@@ -223,7 +232,7 @@ CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.subscript(_: Int)")
     expectEqual(audioBuffer.mData, ablPtrWrapper[0].mData)
   }
 
-  if true {
+  do {
     // Test setter.
     let audioBuffer = AudioBuffer(
       mNumberChannels: 5, mDataByteSize: 256,

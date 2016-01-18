@@ -13,7 +13,7 @@ if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
   list(APPEND swift_stdlib_unittest_framework_depends
     Foundation)
 endif()
-if(SWIFT_HOST_VARIANT STREQUAL "linux")
+if(SWIFT_HOST_VARIANT STREQUAL "linux" OR SWIFT_HOST_VARIANT STREQUAL "freebsd")
   list(APPEND swift_stdlib_unittest_module_depends
     Glibc)
 endif()
@@ -40,7 +40,7 @@ add_swift_library(swiftStdlibUnittest SHARED IS_STDLIB
   LifetimeTracked.swift
   ${swift_stdlib_unittest_platform_sources}
 
-  # Can not serialize StdlibUnittest because of:
+  # Cannot serialize StdlibUnittest because of:
   # <rdar://problem/18917405> Compiling StdlibUnittest with -sil-serialize-all
   # crashes in SIL serializer
   #
@@ -48,7 +48,6 @@ add_swift_library(swiftStdlibUnittest SHARED IS_STDLIB
 
   PRIVATE_LINK_LIBRARIES ${swift_stdlib_unittest_private_link_libraries}
   SWIFT_MODULE_DEPENDS ${swift_stdlib_unittest_module_depends}
-  SWIFT_COMPILE_FLAGS -Xfrontend -sil-serialize-all
   FRAMEWORK_DEPENDS ${swift_stdlib_unittest_framework_depends}
   INSTALL_IN_COMPONENT stdlib-experimental)
 

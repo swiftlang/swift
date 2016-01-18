@@ -533,6 +533,10 @@ func f22490787() {
   }
 }
 
-
+// <rdar://problem/23942743> [QoI] Bad diagnostic when errors inside enum constructor
+enum r23942743 {
+  case Tomato(cloud: String)
+}
+let _ = .Tomato(cloud: .None)  // expected-error {{reference to member 'Tomato' cannot be resolved without a contextual type}}
 
 

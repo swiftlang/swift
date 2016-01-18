@@ -1,8 +1,8 @@
-//===- CodeCompletionResultBuilder.h - Bulid completion results -----------===//
+//===--- CodeCompletionResultBuilder.h - Build completion results ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -267,7 +267,7 @@ public:
   void addSimpleNamedParameter(StringRef name) {
     CurrentNestingLevel++;
     addSimpleChunk(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin);
-    // Use internal, since we don't want the name to be outisde the placeholder.
+    // Use internal, since we don't want the name to be outside the placeholder.
     addChunkWithText(
         CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName,
         name);
@@ -293,7 +293,7 @@ public:
     if (!Name.empty()) {
       StringRef NameStr = Name.str();
 
-      // 'self' is a keyword, we can not allow to insert it into the source
+      // 'self' is a keyword, we cannot allow to insert it into the source
       // buffer.
       bool IsAnnotation = (NameStr == "self");
 

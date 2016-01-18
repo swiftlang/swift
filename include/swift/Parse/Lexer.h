@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -240,6 +240,15 @@ public:
     restoreState(S);
   }
 
+  /// \brief Retrieve the Token referred to by \c Loc.
+  ///
+  /// \param SM The source manager in which the given source location
+  /// resides.
+  ///
+  /// \param Loc The source location of the beginning of a token.
+  static Token getTokenAtLocation(const SourceManager &SM, SourceLoc Loc);
+
+
   /// \brief Retrieve the source location that points just past the
   /// end of the token referred to by \c Loc.
   ///
@@ -255,8 +264,9 @@ public:
   /// resides.
   ///
   /// \param SR The source range
-  static CharSourceRange getCharSourceRangeFromSourceRange(const SourceManager &SM,
-                                                           const SourceRange &SR) {
+  static CharSourceRange
+  getCharSourceRangeFromSourceRange(const SourceManager &SM,
+                                    const SourceRange &SR) {
     return CharSourceRange(SM, SR.Start, getLocForEndOfToken(SM, SR.End));
   }
 
@@ -298,6 +308,10 @@ public:
   /// non-operator identifier. Return tok::identifier if the string is not a
   /// reserved word.
   static tok kindOfIdentifier(StringRef Str, bool InSILMode);
+
+  /// \brief Determines if the given string is a valid operator identifier,
+  /// without escaping characters.
+  static bool isOperator(StringRef string);
 
   SourceLoc getLocForStartOfBuffer() const {
     return SourceLoc(llvm::SMLoc::getFromPointer(BufferStart));
@@ -424,7 +438,6 @@ private:
   void tryLexEditorPlaceholder();
   const char *findEndOfCurlyQuoteStringLiteral(const char*);
 };
-  
   
 } // end namespace swift
 

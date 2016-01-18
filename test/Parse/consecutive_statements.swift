@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
 func statement_starts() {
-  var f : Int-> ()
+  var f : Int -> ()
   f = { (x : Int) -> () in }
 
   f(0)

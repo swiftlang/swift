@@ -12,6 +12,7 @@
 - (id)objectAtIndexedSubscript:(int)idx;
 
 @property Baz_Class *baz_Class_Property1;
+@property (getter=get_baz_Class_Property2) Baz_Class *baz_Class_Property2;
 
 @end
 

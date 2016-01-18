@@ -15,7 +15,6 @@ declare void @objc_release(%objc_object*)
 declare %swift.refcounted* @swift_allocObject(%swift.heapmetadata* , i64, i64) nounwind
 declare void @swift_release(%swift.refcounted* nocapture)
 declare void @swift_retain(%swift.refcounted* ) nounwind
-declare void @swift_fixLifetime(%swift.refcounted* ) nounwind
 declare %swift.bridge* @swift_bridgeObjectRetain(%swift.bridge*)
 declare void @swift_bridgeObjectRelease(%swift.bridge*)
 declare void @swift_retainUnowned(%swift.refcounted*)
@@ -23,6 +22,11 @@ declare void @swift_retainUnowned(%swift.refcounted*)
 declare void @user(%swift.refcounted *) nounwind
 declare void @user_objc(%objc_object*) nounwind
 declare void @unknown_func()
+
+define private void @__swift_fixLifetime(%swift.refcounted*) noinline nounwind {
+entry:
+  ret void
+}
 
 ; CHECK-LABEL: @trivial_objc_canonicalization(
 ; CHECK-NEXT: entry:
@@ -142,7 +146,7 @@ define void @objc_retain_release_opt(%objc_object* %P, i32* %IP) {
 define void @swift_fixLifetimeTest(%swift.refcounted* %A) {
   tail call void @swift_retain(%swift.refcounted* %A)
   call void @user(%swift.refcounted* %A) nounwind
-  call void @swift_fixLifetime(%swift.refcounted* %A)
+  call void @__swift_fixLifetime(%swift.refcounted* %A)
   tail call void @swift_release(%swift.refcounted* %A) nounwind
   ret void
 }
@@ -183,17 +187,17 @@ define i32 @move_retain_across_load(%swift.refcounted* %A, i32* %ptr) {
 }
 
 ; CHECK-LABEL: @move_retain_but_not_release_across_objc_fix_lifetime
-; CHECK: call void @swift_fixLifetime
+; CHECK: call void @__swift_fixLifetime
 ; CHECK-NEXT: tail call void @swift_retain
 ; CHECK-NEXT: call void @user
-; CHECK-NEXT: call void @swift_fixLifetime
+; CHECK-NEXT: call void @__swift_fixLifetime
 ; CHECK-NEXT: call void @swift_release
 ; CHECK-NEXT: ret
 define void @move_retain_but_not_release_across_objc_fix_lifetime(%swift.refcounted* %A) {
   tail call void @swift_retain(%swift.refcounted* %A)
-  call void @swift_fixLifetime(%swift.refcounted* %A) nounwind
+  call void @__swift_fixLifetime(%swift.refcounted* %A) nounwind
   call void @user(%swift.refcounted* %A) nounwind
-  call void @swift_fixLifetime(%swift.refcounted* %A) nounwind
+  call void @__swift_fixLifetime(%swift.refcounted* %A) nounwind
   tail call void @swift_release(%swift.refcounted* %A) nounwind
   ret void
 }
@@ -230,7 +234,7 @@ define void @dont_optimize_retain_unowned(%swift.refcounted* %A) {
   %value = bitcast %swift.refcounted* %A to i64**
 
   %L1 = load i64*, i64** %value, align 8
-  ; Use of a potential garbabe address from a load of %A.
+  ; Use of a potential garbage address from a load of %A.
   %L2 = load i64, i64* %L1, align 8
 
   tail call void @swift_release(%swift.refcounted* %A)

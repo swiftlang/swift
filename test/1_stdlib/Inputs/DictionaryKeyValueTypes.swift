@@ -428,7 +428,7 @@ struct TestBridgedValueTy : CustomStringConvertible, _ObjectiveCBridgeable {
   }
 
   func _bridgeToObjectiveC() -> TestObjCValueTy {
-    TestBridgedValueTy.bridgeOperations++
+    TestBridgedValueTy.bridgeOperations += 1
     return TestObjCValueTy(value)
   }
 
@@ -436,7 +436,7 @@ struct TestBridgedValueTy : CustomStringConvertible, _ObjectiveCBridgeable {
     x: TestObjCValueTy,
     inout result: TestBridgedValueTy?
   ) {
-    TestBridgedValueTy.bridgeOperations++
+    TestBridgedValueTy.bridgeOperations += 1
     result = TestBridgedValueTy(x.value)
   }
 
@@ -637,7 +637,7 @@ func slurpFastEnumerationFromSwift(
     for i in 0..<returnedCount {
       let value: AnyObject = state.itemsPtr[i]!
       sink(value)
-      ++itemsReturned
+      itemsReturned += 1
     }
     if maxItems != nil && itemsReturned >= maxItems! {
       return
@@ -681,7 +681,7 @@ func slurpFastEnumerationFromSwift(
       let value: AnyObject = d.objectForKey(key)!
       let kv = (key, value)
       sink(kv)
-      ++itemsReturned
+      itemsReturned += 1
     }
     if maxItems != nil && itemsReturned >= maxItems! {
       return
@@ -791,7 +791,7 @@ func _checkArrayFastEnumerationImpl(
   expected: [Int],
   _ a: NSArray,
   _ makeEnumerator: () -> NSFastEnumeration,
-  _ useEnumerator: (NSArray, NSFastEnumeration, (AnyObject)->()) -> Void,
+  _ useEnumerator: (NSArray, NSFastEnumeration, (AnyObject) -> ()) -> Void,
   _ convertValue: (AnyObject) -> Int
 ) {
   let expectedContentsWithoutIdentity =
@@ -924,7 +924,7 @@ func _checkSetFastEnumerationImpl(
   expected: [Int],
   _ s: NSSet,
   _ makeEnumerator: () -> NSFastEnumeration,
-  _ useEnumerator: (NSSet, NSFastEnumeration, (AnyObject)->()) -> Void,
+  _ useEnumerator: (NSSet, NSFastEnumeration, (AnyObject) -> ()) -> Void,
   _ convertMember: (AnyObject) -> Int
 ) {
   let expectedContentsWithoutIdentity =
@@ -999,7 +999,7 @@ func slurpFastEnumerationFromSwift(
     for i in 0..<returnedCount {
       let value: AnyObject = state.itemsPtr[i]!
       sink(value)
-      ++itemsReturned
+      itemsReturned += 1
     }
     if maxItems != nil && itemsReturned >= maxItems! {
       return
@@ -1142,7 +1142,7 @@ func _checkDictionaryFastEnumerationImpl(
   expected: [(Int, Int)],
   _ d: NSDictionary,
   _ makeEnumerator: () -> NSFastEnumeration,
-  _ useEnumerator: (NSDictionary, NSFastEnumeration, (AnyObjectTuple2)->()) -> Void,
+  _ useEnumerator: (NSDictionary, NSFastEnumeration, (AnyObjectTuple2) -> ()) -> Void,
   _ convertKey: (AnyObject) -> Int,
   _ convertValue: (AnyObject) -> Int
 ) {

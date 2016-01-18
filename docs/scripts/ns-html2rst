@@ -1,14 +1,18 @@
 #!/usr/bin/env python
-import sys, re, subprocess
+from __future__ import print_function
+
+import re
+import subprocess
+import sys
 
 def run():
     if len(sys.argv) > 1:
-        print """
+        print("""
 ns-html2rst - Convert Cocoa HTML documentation into ReST
 
 usage: nshtml2rst < NSString.html > NSString.rst
-        """
-        exit(0)
+        """)
+        sys.exit(0)
 
     html = sys.stdin.read()
 
@@ -16,20 +20,20 @@ usage: nshtml2rst < NSString.html > NSString.rst
     html = re.sub(
         r'<div\s+class="declaration">(.*?)</div>', 
         r'<pre>\1</pre>', 
-        html, flags=re.MULTILINE|re.DOTALL)
+        html, flags=re.MULTILINE | re.DOTALL)
 
     # Strip all attributes from <pre>...</pre> containing class="..."
     # The resulting classes confound ReST
     html = re.sub(
         r'<pre\s[^>]*class=[^>]*>(.*?)</pre>', 
         r'<pre>\1</pre>', 
-        html, flags=re.MULTILINE|re.DOTALL)
+        html, flags=re.MULTILINE | re.DOTALL)
 
     # Remove links from <code>...</code>, which doesn't have a rendering in ReST
     html = re.sub(
         r'<code>(.*?)<a[^>]*?>(.*?)</a>(.*?)</code>', 
         r'<code>\1\2\3</code>', 
-        html, flags=re.MULTILINE|re.DOTALL)
+        html, flags=re.MULTILINE | re.DOTALL)
 
     # Let pandoc do most of the hard work
     p = subprocess.Popen(
@@ -43,7 +47,7 @@ usage: nshtml2rst < NSString.html > NSString.rst
     # bogus heading level nesting.  Just fix up the one we know about
     # so that ReST doesn't complain later.
     rst = re.sub("(^|\n)('+)($|\n)", 
-                 lambda m: m.group(1) + len(m.group(2))*'^' +m.group(3), 
+                 lambda m: m.group(1) + len(m.group(2)) * '^' + m.group(3),
                  rst, flags=re.MULTILINE)
 
     sys.stdout.write(rst)

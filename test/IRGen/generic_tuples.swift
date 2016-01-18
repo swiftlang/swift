@@ -17,9 +17,9 @@ func dup<T>(x: T) -> (T, T) {
 // CHECK:    define hidden void @_TF14generic_tuples3dup{{.*}}(<{}>* noalias nocapture sret
 // CHECK:    entry:
 //   Allocate a local variable for 'x'.
-// CHECK-NEXT: alloca %swift.type*, align 8
 // CHECK-NEXT: [[XBUF:%.*]] = alloca [[BUFFER:.*]], align 8
-// CHECK-NEXT: store %swift.type*
+// CHECK-NEXT: [[XBUFLIFE:%.*]] = bitcast {{.*}} [[XBUF]]
+// CHECK-NEXT: call void @llvm.lifetime.start({{.*}} [[XBUFLIFE]])
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[TYPE]]* %T to i8***
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
 // CHECK-NEXT: [[T_VALUE:%.*]] = load i8**, i8*** [[T1]], align 8

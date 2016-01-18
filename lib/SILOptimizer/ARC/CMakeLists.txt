@@ -1,0 +1,12 @@
+set(ARC_SOURCES
+  ARC/ARCBBState.cpp
+  ARC/ARCRegionState.cpp
+  ARC/ARCLoopOpts.cpp
+  ARC/ARCSequenceOpts.cpp
+  ARC/GlobalARCPairingAnalysis.cpp
+  ARC/GlobalARCSequenceDataflow.cpp
+  ARC/GlobalLoopARCSequenceDataflow.cpp
+  ARC/RCStateTransition.cpp
+  ARC/RCStateTransitionVisitors.cpp  
+  ARC/RefCountState.cpp
+  PARENT_SCOPE)

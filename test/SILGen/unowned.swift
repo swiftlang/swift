@@ -72,7 +72,7 @@ func unowned_local() -> C {
   // CHECK: [[c:%.*]] = apply
   let c = C()
 
-  // CHECK: [[uc:%.*]] = alloc_box $@sil_unowned C  // let uc
+  // CHECK: [[uc:%.*]] = alloc_box $@sil_unowned C, let, name "uc"
   // CHECK-NEXT: [[tmp1:%.*]] = ref_to_unowned [[c]] : $C to $@sil_unowned C
   // CHECK-NEXT: unowned_retain [[tmp1]]
   // CHECK-NEXT: store [[tmp1]] to [[uc]]#1
@@ -96,10 +96,10 @@ func test_unowned_let_capture(aC : C) {
 
 // CHECK-LABEL: sil shared @_TFF7unowned24test_unowned_let_captureFCS_1CT_U_FT_Si : $@convention(thin) (@owned @sil_unowned C) -> Int {
 // CHECK: bb0([[ARG:%.*]] : $@sil_unowned C):
-// CHECK-NEXT:   debug_value %0 : $@sil_unowned C // let bC, argno: 1
+// CHECK-NEXT:   debug_value %0 : $@sil_unowned C, let, name "bC", argno 1
 // CHECK-NEXT:   strong_retain_unowned [[ARG]] : $@sil_unowned C
 // CHECK-NEXT:   [[UNOWNED_ARG:%.*]] = unowned_to_ref [[ARG]] : $@sil_unowned C to $C
-// CHECK-NEXT:   [[FUN:%.*]] = class_method [[UNOWNED_ARG]] : $C, #C.f!1 : C -> () -> Int , $@convention(method) (@guaranteed C) -> Int
+// CHECK-NEXT:   [[FUN:%.*]] = class_method [[UNOWNED_ARG]] : $C, #C.f!1 : (C) -> () -> Int , $@convention(method) (@guaranteed C) -> Int
 // CHECK-NEXT:   [[RESULT:%.*]] = apply [[FUN]]([[UNOWNED_ARG]]) : $@convention(method) (@guaranteed C) -> Int
 // CHECK-NEXT:   strong_release [[UNOWNED_ARG]]
 // CHECK-NEXT:   unowned_release [[ARG]] : $@sil_unowned C

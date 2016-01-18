@@ -10,29 +10,24 @@ and frameworks, and is memory safe (by default).
 Although inspired by Objective-C and many other languages, Swift is not itself a
 C-derived language. As a complete and independent language, Swift packages core
 features like flow control, data structures, and functions, with high-level
-constructs like objects, protocols, closures, and generics.  Swift embraces
+constructs like objects, protocols, closures, and generics. Swift embraces
 modules, eliminating the need for headers and the code duplication they entail.
 
 
 ## Documentation
 
-To read the documentation, start by installing the 
-[Sphinx](http://sphinx-doc.org) documentation generator tool (just run 
+To read the documentation, start by installing the
+[Sphinx](http://sphinx-doc.org) documentation generator tool (just run
 `easy_install -U Sphinx` from the command line and you're good to go). Once you
- have that, you can build the Swift documentation by going into `docs` and 
-typing `make`.  This compiles the `.rst` files in the `docs` directory into 
+ have that, you can build the Swift documentation by going into `docs` and
+typing `make`. This compiles the `.rst` files in the `docs` directory into
 HTML in the `docs/_build/html` directory.
-
-Once built, the best place to start is with the Swift white paper, which gives a
-tour of the language (in `docs/_build/html/whitepaper/index.html`).
-Another potentially useful document is `docs/LangRef`, which gives a low level
-tour of how the language works from the implementation perspective.
 
 Many of the docs are out of date, but you can see some historical design
 documents in the `docs` directory.
 
 Another source of documentation is the standard library itself, located in
-`stdlib`.  Much of the language is actually implemented in the library
+`stdlib`. Much of the language is actually implemented in the library
 (including `Int`), and the standard library gives some examples of what can be
 expressed today.
 
@@ -40,7 +35,7 @@ expressed today.
 ## Getting Started
 
 These instructions give the most direct path to a working Swift
-development environment.  Options for doing things differently are
+development environment. Options for doing things differently are
 discussed below.
 
 
@@ -53,7 +48,7 @@ For OS X, you need [the latest Xcode](https://developer.apple.com/xcode/download
 
 For Ubuntu, you'll need the following development dependencies:
 
-    sudo apt-get install git cmake ninja-build clang uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config
+    sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config
 
 Note: LLDB currently requires at least swig-1.3.40 but will successfully build
 with version 2 shipped with Ubuntu.
@@ -61,37 +56,25 @@ with version 2 shipped with Ubuntu.
 If you are building on Ubuntu 14.04 LTS, you'll need to upgrade your clang
 compiler for C++14 support and create a symlink:
 
-     sudo apt-get install clang-3.6
-     sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-3.6 100
-     sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-3.6 100
+    sudo apt-get install clang-3.6
+    sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-3.6 100
+    sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-3.6 100
 
 ### Getting Sources for Swift and Related Projects
 
-For those checking out sources as read-only:
+**Via HTTPS**  For those checking out sources as read-only, HTTPS works best:
 
-     git clone https://github.com/apple/swift.git swift
-     git clone https://github.com/apple/swift-llvm.git llvm
-     git clone https://github.com/apple/swift-clang.git clang
-     git clone https://github.com/apple/swift-lldb.git lldb
-     git clone https://github.com/apple/swift-cmark.git cmark
-     git clone https://github.com/apple/swift-llbuild.git llbuild
-     git clone https://github.com/apple/swift-package-manager.git swiftpm
-     git clone https://github.com/apple/swift-corelibs-xctest.git
-     git clone https://github.com/apple/swift-corelibs-foundation.git
+    git clone https://github.com/apple/swift.git
+    cd swift
+    ./utils/update-checkout --clone
 
-For those who plan on regularly making direct commits, cloning over
-SSH may provide a better experience (which requires uploading 
-SSH keys to GitHub):
+**Via SSH**  For those who plan on regularly making direct commits,
+cloning over SSH may provide a better experience (which requires
+uploading SSH keys to GitHub):
 
-     git clone git@github.com:apple/swift.git swift
-     git clone git@github.com:apple/swift-llvm.git llvm
-     git clone git@github.com:apple/swift-clang.git clang
-     git clone git@github.com:apple/swift-lldb.git lldb
-     git clone git@github.com:apple/swift-cmark.git cmark
-     git clone git@github.com:apple/swift-llbuild.git llbuild
-     git clone git@github.com:apple/swift-package-manager.git swiftpm
-     git clone git@github.com:apple/swift-corelibs-xctest.git
-     git clone git@github.com:apple/swift-corelibs-foundation.git
+    git clone git@github.com:apple/swift.git
+    cd swift
+    ./utils/update-checkout --clone-with-ssh
 
 [CMake](http://cmake.org) is the core infrastructure used to configure builds of
 Swift and its companion projects; at least version 2.8.12.2 is required. Your
@@ -107,11 +90,11 @@ for building Swift and is the default configuration generated by CMake. If
 you're on OS X or don't install it as part of your Linux distribution, clone
 it next to the other projects and it will be bootstrapped automatically:
 
-    git clone https://github.com/martine/ninja.git
+    git clone https://github.com/ninja-build/ninja.git
 
 or
 
-    git clone git@github.com:martine/ninja.git
+    git clone git@github.com:ninja-build/ninja.git
 
 You can also install CMake and Ninja on OS X using a third-party
 packaging tool like [Homebrew](http://brew.sh)…

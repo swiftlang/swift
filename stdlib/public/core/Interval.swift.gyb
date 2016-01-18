@@ -1,8 +1,8 @@
-//===--- Interval.swift.gyb ----------------------------------*- swift -*--===//
+//===--- Interval.swift.gyb -----------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -13,7 +13,7 @@
 /// An interval over a `Comparable` type.
 public protocol IntervalType {
   /// The type of the `Interval`'s endpoints.
-  typealias Bound : Comparable
+  associatedtype Bound : Comparable
 
   /// Returns `true` iff the interval contains `value`.
   @warn_unused_result
@@ -204,8 +204,8 @@ public func ~= <I: IntervalType>(pattern: I, value: I.Bound) -> Bool {
 %import gyb
 %TBoilerplate = gyb.parseTemplate("../common/MirrorBoilerplate.gyb")
 
-%Boilerplate = gyb.executeTemplate(TBoilerplate,\
-%                                  introspecteeType='T',\
+%Boilerplate = gyb.executeTemplate(TBoilerplate,
+%                                  introspecteeType='T',
 %                                  disposition='Struct')
 
 internal struct _IntervalMirror<
@@ -226,6 +226,6 @@ internal struct _IntervalMirror<
   internal var summary: String { return _value.description }
 
   internal var quickLookObject: PlaygroundQuickLook? {
-    return .Some(.Text(summary))
+    return .Text(summary)
   }
 }

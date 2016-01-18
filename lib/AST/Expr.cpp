@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -286,6 +286,7 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     LEAF_LVALUE_EXPR(DiscardAssignment)
     LEAF_LVALUE_EXPR(DynamicLookup)
     LEAF_LVALUE_EXPR(OpaqueValue)
+    LEAF_LVALUE_EXPR(EditorPlaceholder)
 
     COMPLETE_PHYSICAL_LVALUE_EXPR(AnyTry, getSubExpr())
     PARTIAL_PHYSICAL_LVALUE_EXPR(BindOptional, getSubExpr())
@@ -841,13 +842,6 @@ StringLiteralExpr::StringLiteralExpr(StringRef Val, SourceRange Range,
       unicode::isSingleExtendedGraphemeCluster(Val);
 }
 
-void DeclRefExpr::setDeclRef(ConcreteDeclRef ref) {
-  if (auto spec = getSpecInfo())
-    spec->D = ref;
-  else
-    DOrSpecialized = ref;
-}
-
 void DeclRefExpr::setSpecialized() {
   if (isSpecialized())
     return;
@@ -899,6 +893,7 @@ bool OverloadSetRefExpr::hasBaseObject() const {
 }
 
 SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
+  assert(elements.size() & 1 && "even number of elements in sequence");
   void *Buffer = ctx.Allocate(sizeof(SequenceExpr) +
                               elements.size() * sizeof(Expr*),
                               alignof(SequenceExpr));
@@ -1064,14 +1059,11 @@ RebindSelfInConstructorExpr::getCalledConstructor(bool &isChainToSuper) const {
   return otherCtorRef;
 }
 
-void AbstractClosureExpr::setParams(Pattern *P) {
-  ParamPattern = P;
+void AbstractClosureExpr::setParameterList(ParameterList *P) {
+  parameterList = P;
   // Change the DeclContext of any parameters to be this closure.
-  if (P) {
-    P->forEachVariable([&](VarDecl *VD) {
-      VD->setDeclContext(this);
-    });
-  }
+  if (P)
+    P->setDeclContextOfParamDecls(this);
 }
 
 

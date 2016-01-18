@@ -1,8 +1,8 @@
-//===--- SILDeclRef.h - Defines the SILDeclRef struct ---------*- C++ -*---===//
+//===--- SILDeclRef.h - Defines the SILDeclRef struct -----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -44,6 +44,23 @@ namespace swift {
   class SILModule;
   class SILLocation;
   class AnyFunctionRef;
+
+/// How a method is dispatched.
+enum class MethodDispatch {
+  // The method implementation can be referenced statically.
+  Static,
+  // The method implementation uses class_method dispatch.
+  Class,
+};
+
+/// Get the method dispatch mechanism for a method.
+MethodDispatch getMethodDispatch(AbstractFunctionDecl *method);
+
+/// True if calling the given method or property should use ObjC dispatch.
+bool requiresObjCDispatch(ValueDecl *vd);
+
+/// True if the entry point is natively foreign.
+bool requiresForeignToNativeThunk(ValueDecl *vd);
 
 enum ForDefinition_t : bool {
   NotForDefinition = false,
@@ -217,8 +234,7 @@ struct SILDeclRef {
   ///
   /// If 'prefix' is non-empty, it will be used in place of the standard '_T'
   /// prefix.
-  llvm::StringRef mangle(llvm::SmallVectorImpl<char> &buffer,
-                         StringRef prefix = {}) const;
+  std::string mangle(StringRef prefix = {}) const;
 
   /// True if the SILDeclRef references a function.
   bool isFunc() const {
@@ -253,7 +269,7 @@ struct SILDeclRef {
   /// \brief True if the function has __always inline attribute.
   bool isAlwaysInline() const;
   
-  /// \return True if the function has a effects attribute.
+  /// \return True if the function has an effects attribute.
   bool hasEffectsAttribute() const;
 
   /// \return the effects kind of the function.
@@ -341,7 +357,11 @@ struct SILDeclRef {
   /// Return a SILDeclRef to the declaration whose vtable entry this declaration
   /// overrides. This may be different from "getOverridden" because some
   /// declarations do not always have vtable entries.
-  SILDeclRef getOverriddenVTableEntry() const;
+  SILDeclRef getNextOverriddenVTableEntry() const;
+
+  /// Return a SILDeclRef referring to the ultimate base class's declaration,
+  /// which must be used with getConstantOverrideInfo.
+  SILDeclRef getBaseOverriddenVTableEntry() const;
 
   /// True if the referenced entity is some kind of thunk.
   bool isThunk() const;

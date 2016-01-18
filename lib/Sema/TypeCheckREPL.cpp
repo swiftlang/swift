@@ -1,8 +1,8 @@
-//===--- TypeCheckREPL.cpp - Type Checking for the REPL -----------------===//
+//===--- TypeCheckREPL.cpp - Type Checking for the REPL -------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -166,7 +166,7 @@ struct PatternBindingPrintLHS : public ASTVisitor<PatternBindingPrintLHS> {
     ResultString += ")";
   }
   void visitNamedPattern(NamedPattern *P) {
-    ResultString += P->getBodyName().str();
+    ResultString += P->getBoundName().str();
   }
   void visitAnyPattern(AnyPattern *P) {
     ResultString += "_";
@@ -222,31 +222,23 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   if (requirePrintDecls())
     return;
 
+  TopLevelCodeDecl *newTopLevel = new (Context) TopLevelCodeDecl(&SF);
+
   // Build function of type T->() which prints the operand.
-  VarDecl *Arg = new (Context) ParamDecl(/*isLet=*/true,
+  auto *Arg = new (Context) ParamDecl(/*isLet=*/true,
                                          SourceLoc(), Identifier(),
                                          Loc, Context.getIdentifier("arg"),
-                                         E->getType(), /*DC*/ nullptr);
-  Pattern *ParamPat = new (Context) NamedPattern(Arg);
-  ParamPat = new (Context) TypedPattern(ParamPat,
-                                        TypeLoc::withoutLoc(Arg->getType()));
-  TuplePatternElt elt{ParamPat};
-  ParamPat = TuplePattern::create(Context, SourceLoc(), elt, SourceLoc());
-  TC.typeCheckPattern(ParamPat, Arg->getDeclContext(),
-                      TR_ImmediateFunctionInput);
+                                         E->getType(), /*DC*/ newTopLevel);
+  auto params = ParameterList::createWithoutLoc(Arg);
 
-  TopLevelCodeDecl *newTopLevel = new (Context) TopLevelCodeDecl(&SF);
   unsigned discriminator = TLC.claimNextClosureDiscriminator();
 
   ClosureExpr *CE =
-      new (Context) ClosureExpr(ParamPat, SourceLoc(), SourceLoc(), SourceLoc(),
+      new (Context) ClosureExpr(params, SourceLoc(), SourceLoc(), SourceLoc(),
                                 TypeLoc(), discriminator, newTopLevel);
 
-  Type ParamTy = ParamPat->getType();
-  ParamTy = ParamTy->getRelabeledType(TC.Context, { Identifier() });
-  Type FuncTy = FunctionType::get(ParamTy, TupleType::getEmpty(Context));
-  CE->setType(FuncTy);
-
+  CE->setType(ParameterList::getFullType(TupleType::getEmpty(Context), params));
+  
   // Convert the pattern to a string we can print.
   llvm::SmallString<16> PrefixString;
   PrefixString += "// ";

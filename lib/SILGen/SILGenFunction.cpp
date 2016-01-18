@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -28,9 +28,9 @@
 using namespace swift;
 using namespace Lowering;
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // SILGenFunction Class implementation
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F)
   : SGM(SGM), F(F),
@@ -55,9 +55,9 @@ SILGenFunction::~SILGenFunction() {
   freeWritebackStack();
 }
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Function emission
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 // Get the __FUNCTION__ name for a declaration.
 DeclName SILGenModule::getMagicFunctionName(DeclContext *dc) {
@@ -146,8 +146,10 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
                                  constant.uncurryLevel + 1);
       // If the function is fully uncurried and natively foreign, reference its
       // foreign entry point.
-      if (!next.isCurried && vd->hasClangNode())
-        next = next.asForeign();
+      if (!next.isCurried) {
+        if (requiresForeignToNativeThunk(vd))
+          next = next.asForeign();
+      }
       
       // Preserve whether the curry thunks lead to a direct reference to the
       // method implementation.
@@ -161,6 +163,8 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
       SGM.emitForeignToNativeThunk(constant);
     } else if (constant.isNativeToForeignThunk()) {
       SGM.emitNativeToForeignThunk(constant);
+    } else if (constant.kind == SILDeclRef::Kind::EnumElement) {
+      SGM.emitEnumConstructor(cast<EnumElementDecl>(constant.getDecl()));
     }
   }
 
@@ -199,11 +203,6 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
 }
 
 ManagedValue SILGenFunction::emitFunctionRef(SILLocation loc,
-                                             SILDeclRef constant) {
-  return emitFunctionRef(loc, constant, getConstantInfo(constant));
-}
-
-ManagedValue SILGenFunction::emitFunctionRef(SILLocation loc,
                                              SILDeclRef constant,
                                              SILConstantInfo constantInfo) {
   // If the function has captures, apply them.
@@ -221,8 +220,28 @@ ManagedValue SILGenFunction::emitFunctionRef(SILLocation loc,
 
 void SILGenFunction::emitCaptures(SILLocation loc,
                                   AnyFunctionRef TheClosure,
+                                  CaptureEmission purpose,
                                   SmallVectorImpl<ManagedValue> &capturedArgs) {
   auto captureInfo = SGM.Types.getLoweredLocalCaptures(TheClosure);
+  // For boxed captures, we need to mark the contained variables as having
+  // escaped for DI diagnostics.
+  SmallVector<SILValue, 2> escapesToMark;
+  
+  // Partial applications take ownership of the context parameters, so we'll
+  // need to pass ownership rather than merely guaranteeing parameters.
+  bool canGuarantee;
+  switch (purpose) {
+  case CaptureEmission::PartialApplication:
+    canGuarantee = false;
+    break;
+  case CaptureEmission::ImmediateApplication:
+    canGuarantee = true;
+    break;
+  }
+  // TODO: Or we always retain them when guaranteed contexts aren't enabled.
+  if (!SGM.M.getOptions().EnableGuaranteedClosureContexts)
+    canGuarantee = false;
+  
   for (auto capture : captureInfo.getCaptures()) {
     auto *vd = capture.getDecl();
 
@@ -234,11 +253,18 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       // let declarations.
       auto Entry = VarLocs[vd];
 
-      // Non-address-only constants are passed at +1.
       auto &tl = getTypeLowering(vd->getType()->getReferenceStorageReferent());
       SILValue Val = Entry.value;
 
       if (!Val.getType().isAddress()) {
+        // Our 'let' binding can guarantee the lifetime for the callee,
+        // if we don't need to do anything more to it.
+        if (canGuarantee && !vd->getType()->is<ReferenceStorageType>()) {
+          auto guaranteed = ManagedValue::forUnmanaged(Val);
+          capturedArgs.push_back(guaranteed);
+          break;
+        }
+      
         // Just retain a by-val let.
         B.emitRetainValueOperation(loc, Val);
       } else {
@@ -247,20 +273,15 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         Val = emitLoad(loc, Val, tl, SGFContext(), IsNotTake).forward(*this);
       }
 
-      // Use an RValue to explode Val if it is a tuple.
-      RValue RV(*this, loc, vd->getType()->getCanonicalType(),
-                ManagedValue::forUnmanaged(Val));
-
       // If we're capturing an unowned pointer by value, we will have just
       // loaded it into a normal retained class pointer, but we capture it as
       // an unowned pointer.  Convert back now.
       if (vd->getType()->is<ReferenceStorageType>()) {
         auto type = getTypeLowering(vd->getType()).getLoweredType();
-        auto val = std::move(RV).forwardAsSingleStorageValue(*this, type,loc);
-        capturedArgs.push_back(emitManagedRValueWithCleanup(val));
-      } else {
-        std::move(RV).getAll(capturedArgs);
+        Val = emitConversionFromSemanticValue(loc, Val, type);
       }
+      
+      capturedArgs.push_back(emitManagedRValueWithCleanup(Val));
       break;
     }
 
@@ -283,26 +304,41 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 
       // If this is a boxed variable, we can use it directly.
       if (vl.box) {
-        B.createStrongRetain(loc, vl.box);
-        capturedArgs.push_back(emitManagedRValueWithCleanup(vl.box));
-        capturedArgs.push_back(ManagedValue::forLValue(vl.value));
+        // We can guarantee our own box to the callee.
+        if (canGuarantee) {
+          capturedArgs.push_back(ManagedValue::forUnmanaged(vl.box));
+        } else {
+          B.createStrongRetain(loc, vl.box);
+          capturedArgs.push_back(emitManagedRValueWithCleanup(vl.box));
+        }
+        escapesToMark.push_back(vl.value);
       } else {
         // Address only 'let' values are passed by box.  This isn't great, in
         // that a variable captured by multiple closures will be boxed for each
         // one.  This could be improved by doing an "isCaptured" analysis when
-        // emitting address-only let constants, and emit them into a alloc_box
+        // emitting address-only let constants, and emit them into an alloc_box
         // like a variable instead of into an alloc_stack.
+        //
+        // TODO: This might not be profitable anymore with guaranteed captures,
+        // since we could conceivably forward the copied value into the
+        // closure context and pass it down to the partially applied function
+        // in-place.
         AllocBoxInst *allocBox =
           B.createAllocBox(loc, vl.value.getType().getObjectType());
         auto boxAddress = SILValue(allocBox, 1);
         B.createCopyAddr(loc, vl.value, boxAddress, IsNotTake,IsInitialization);
         capturedArgs.push_back(emitManagedRValueWithCleanup(SILValue(allocBox, 0)));
-        capturedArgs.push_back(ManagedValue::forLValue(boxAddress));
       }
 
       break;
     }
     }
+  }
+  
+  // Mark box addresses as captured for DI purposes. The values must have
+  // been fully initialized before we close over them.
+  if (!escapesToMark.empty()) {
+    B.createMarkFunctionEscape(loc, escapesToMark);
   }
 }
 
@@ -345,10 +381,10 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   }
 
   SmallVector<ManagedValue, 4> capturedArgs;
-  emitCaptures(loc, TheClosure, capturedArgs);
+  emitCaptures(loc, TheClosure, CaptureEmission::PartialApplication,
+               capturedArgs);
 
-  // Currently all capture arguments are captured at +1.
-  // TODO: Ideally this would be +0.
+  // The partial application takes ownership of the context parameters.
   SmallVector<SILValue, 4> forwardedArgs;
   for (auto capture : capturedArgs)
     forwardedArgs.push_back(capture.forward(*this));
@@ -371,7 +407,7 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(fd);
 
   Type resultTy = fd->getResultType();
-  emitProlog(fd, fd->getBodyParamPatterns(), resultTy);
+  emitProlog(fd, fd->getParameterLists(), resultTy);
   prepareEpilog(resultTy, fd->isBodyThrowing(), CleanupLocation(fd));
 
   emitProfilerIncrement(fd->getBody());
@@ -383,7 +419,7 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
 void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(ace);
 
-  emitProlog(ace, ace->getParams(), ace->getResultType());
+  emitProlog(ace, ace->getParameters(), ace->getResultType());
   prepareEpilog(ace->getResultType(), ace->isBodyThrowing(),
                 CleanupLocation(ace));
   if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
@@ -422,10 +458,10 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                                                    MetatypeRepresentation::ObjC);
     ProtocolDecl *anyObjectProtocol =
       getASTContext().getProtocol(KnownProtocolKind::AnyObject);
-    auto mainClassAnyObjectConformance =
+    auto mainClassAnyObjectConformance = ProtocolConformanceRef(
       SGM.M.getSwiftModule()->lookupConformance(mainClassTy, anyObjectProtocol,
                                                 nullptr)
-        .getPointer();
+        .getPointer());
     CanType anyObjectTy = anyObjectProtocol
       ->getDeclaredTypeInContext()
       ->getCanonicalType();
@@ -578,8 +614,6 @@ static void forwardCaptureArgs(SILGenFunction &gen,
     SILType boxTy = SILType::getPrimitiveObjectType(
         SILBoxType::get(ty.getSwiftRValueType()));
     addSILArgument(boxTy, vd);
-    // Forward the captured value address.
-    addSILArgument(ty, vd);
     break;
   }
 
@@ -599,23 +633,16 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
                                        bool direct,
                                        ArrayRef<SILValue> curriedArgs,
                                        ArrayRef<Substitution> curriedSubs) {
-  // For a foreign function, reference the native thunk.
-  if (next.isForeign)
+  if (next.isForeign || next.isCurried || !next.hasDecl() || direct)
     return gen.emitGlobalFunctionRef(loc, next.asForeign(false));
-
-  // If the fully-uncurried reference is to a native dynamic class method, emit
-  // the dynamic dispatch.
-  auto fullyAppliedMethod = !next.isCurried && !next.isForeign && !direct &&
-    next.hasDecl();
 
   auto constantInfo = gen.SGM.Types.getConstantInfo(next);
   SILValue thisArg;
   if (!curriedArgs.empty())
       thisArg = curriedArgs.back();
 
-  if (fullyAppliedMethod &&
-      isa<AbstractFunctionDecl>(next.getDecl()) &&
-      gen.getMethodDispatch(cast<AbstractFunctionDecl>(next.getDecl()))
+  if (isa<AbstractFunctionDecl>(next.getDecl()) &&
+      getMethodDispatch(cast<AbstractFunctionDecl>(next.getDecl()))
         == MethodDispatch::Class) {
     SILValue thisArg = curriedArgs.back();
 
@@ -630,15 +657,17 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
 
   // If the fully-uncurried reference is to a generic method, look up the
   // witness.
-  if (fullyAppliedMethod &&
-      constantInfo.SILFnType->getRepresentation()
+  if (constantInfo.SILFnType->getRepresentation()
         == SILFunctionTypeRepresentation::WitnessMethod) {
     auto thisType = curriedSubs[0].getReplacement()->getCanonicalType();
     assert(isa<ArchetypeType>(thisType) && "no archetype for witness?!");
     SILValue OpenedExistential;
     if (!cast<ArchetypeType>(thisType)->getOpenedExistentialType().isNull())
       OpenedExistential = thisArg;
-    return gen.B.createWitnessMethod(loc, thisType, nullptr, next,
+    auto protocol =
+      next.getDecl()->getDeclContext()->isProtocolOrProtocolExtensionContext();
+    auto conformance = ProtocolConformanceRef(protocol);
+    return gen.B.createWitnessMethod(loc, thisType, conformance, next,
                                      constantInfo.getSILType(),
                                      OpenedExistential);
   }
@@ -672,7 +701,7 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
       --paramCount;
 
     // Forward the curried formal arguments.
-    auto forwardedPatterns = fd->getBodyParamPatterns().slice(0, paramCount);
+    auto forwardedPatterns = fd->getParameterLists().slice(0, paramCount);
     for (auto *paramPattern : reversed(forwardedPatterns))
       bindParametersForForwarding(paramPattern, curriedArgs);
 
@@ -725,7 +754,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value) {
   Loc.markAutoGenerated();
 
   // Override location for __FILE__ __LINE__ etc. to an invalid one so that we
-  // don't put extra strings into the defaut argument generator function that
+  // don't put extra strings into the default argument generator function that
   // is not going to be ever used anyway.
   overrideLocationForMagicIdentifiers = SourceLoc();
 
@@ -817,8 +846,8 @@ SILGenBuilder::createInitExistentialAddr(SILLocation Loc,
                                    SILValue Existential,
                                    CanType FormalConcreteType,
                                    SILType LoweredConcreteType,
-                                   ArrayRef<ProtocolConformance*> Conformances){
-  for (auto *conformance : Conformances)
+                                ArrayRef<ProtocolConformanceRef> Conformances) {
+  for (auto conformance : Conformances)
     SGM.useConformance(conformance);
 
   return SILBuilder::createInitExistentialAddr(Loc, Existential,
@@ -831,8 +860,8 @@ InitExistentialMetatypeInst *
 SILGenBuilder::createInitExistentialMetatype(SILLocation loc,
                                              SILValue metatype,
                                              SILType existentialType,
-                                   ArrayRef<ProtocolConformance*> conformances){
-  for (auto *conformance : conformances)
+                                ArrayRef<ProtocolConformanceRef> conformances) {
+  for (auto conformance : conformances)
     SGM.useConformance(conformance);
 
   return SILBuilder::createInitExistentialMetatype(loc, metatype,
@@ -845,8 +874,8 @@ SILGenBuilder::createInitExistentialRef(SILLocation Loc,
                                         SILType ExistentialType,
                                         CanType FormalConcreteType,
                                         SILValue Concrete,
-                                  ArrayRef<ProtocolConformance*> Conformances) {
-  for (auto *conformance : Conformances)
+                                ArrayRef<ProtocolConformanceRef> Conformances) {
+  for (auto conformance : Conformances)
     SGM.useConformance(conformance);
 
   return SILBuilder::createInitExistentialRef(Loc, ExistentialType,
@@ -859,8 +888,8 @@ SILGenBuilder::createAllocExistentialBox(SILLocation Loc,
                                          SILType ExistentialType,
                                          CanType ConcreteType,
                                          SILType ConcreteLoweredType,
-                                 ArrayRef<ProtocolConformance *> Conformances) {
-  for (auto *conformance : Conformances)
+                                ArrayRef<ProtocolConformanceRef> Conformances) {
+  for (auto conformance : Conformances)
     SGM.useConformance(conformance);
 
   return SILBuilder::createAllocExistentialBox(Loc, ExistentialType,

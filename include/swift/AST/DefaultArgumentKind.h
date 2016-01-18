@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -17,10 +17,16 @@
 #ifndef SWIFT_DEFAULTARGUMENTKIND_H
 #define SWIFT_DEFAULTARGUMENTKIND_H
 
+namespace llvm {
+class StringRef;
+}
+
 namespace swift {
 
+class Expr;
+
 /// Describes the kind of default argument a tuple pattern element has.
-enum class DefaultArgumentKind {
+enum class DefaultArgumentKind : unsigned {
   /// No default argument.
   None,
   /// A normal default argument.
@@ -38,7 +44,21 @@ enum class DefaultArgumentKind {
   Function,
   /// The __DSO_HANDLE__ default argument, which is expanded at the call site.
   DSOHandle,
+  /// The "nil" literal.
+  Nil,
+  /// An empty array literal.
+  EmptyArray,
+  /// An empty dictionary literal.
+  EmptyDictionary,
 };
+
+/// Retrieve the spelling of this default argument in source code, or
+/// an empty string if it has none.
+llvm::StringRef getDefaultArgumentSpelling(DefaultArgumentKind kind);
+
+/// Infer a default argument kind from an expression, if the
+/// expression is the canonical way to spell that default argument.
+DefaultArgumentKind inferDefaultArgumentKind(Expr *expr);
 
 } // end namespace swift
 

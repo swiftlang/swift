@@ -216,9 +216,9 @@ case (1, let b): // let bindings
 // var bindings are not allowed in cases.
 // FIXME: rdar://problem/23378003
 // This will eventually be an error.
-case (1, var b): // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{10-13=let}}
+case (1, var b): // expected-error {{Use of 'var' binding here is not allowed}} {{10-13=let}}
   ()
-case (var a, 2): // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{7-10=let}}
+case (var a, 2): // expected-error {{Use of 'var' binding here is not allowed}} {{7-10=let}}
   ()
 
 case (let a, 2), (1, let b): // expected-error {{'case' labels with multiple patterns cannot declare variables}}
@@ -261,3 +261,11 @@ func enumElementSyntaxOnTuple() {
   }
 }
 
+// sr-176
+enum Whatever { case Thing }
+func f0(values: [Whatever]) {
+    switch value { // expected-error {{use of unresolved identifier 'value'}}
+    case .Thing: // Ok. Don't emit diagnostics about enum case not found in type <<error type>>.
+        break
+    }
+}

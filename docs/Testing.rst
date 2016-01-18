@@ -200,7 +200,7 @@ code for the target that is not the build machine:
 * ``%target-jit-run``: run a Swift program on the target machine using a JIT
   compiler.
 
-* ``%target-swiftc_driver``: FIXME
+* ``%target-swiftc_driver``: run ``swiftc`` for the target.
 
 * ``%target-sil-opt``: run ``sil-opt`` for the target.
 
@@ -212,15 +212,13 @@ code for the target that is not the build machine:
   arguments*: like ``%target-swift-ide-test``, but allows to specify command
   line parameters to use a mock SDK.
 
-* ``%target-swiftc_driver``: FIXME.
-
 * ``%target-swift-autolink-extract``: run ``swift-autolink-extract`` for the
   target to extract its autolink flags on platforms that support them (when the
   autolink-extract feature flag is set)
 
 * ``%target-clang``: run the system's ``clang++`` for the target.
 
-  If you want to run the ``clang`` executable that was built alongside 
+  If you want to run the ``clang`` executable that was built alongside
   Swift, use ``%clang`` instead.
 
 * ``%target-ld``: run ``ld`` configured with flags pointing to the standard
@@ -229,6 +227,30 @@ code for the target that is not the build machine:
 * ``%target-cc-options``: the clang flags to setup the target with the right
   architecture and platform version.
 
+* ``%target-triple``: a triple composed of the ``%target-cpu``, the vendor,
+  the ``%target-os``, and the operating system version number. Possible values
+  include ``i386-apple-ios7.0`` or ``armv7k-apple-watchos2.0``.
+
+* ``%target-cpu``: the target CPU instruction set (``i386``, ``x86_64``,
+  ``armv7``, ``armv7k``, ``arm64``).
+
+* ``%target-os``: the target operating system (``macosx``, ``darwin``,
+  ``linux``, ``freebsd``).
+
+* ``%target-object-format``: the platform's object format (``elf``, ``macho``,
+  ``coff``).
+
+* ``%target-runtime``: the platform's Swift runtime (objc, native).
+
+* ``%target-ptrsize``: the pointer size of the target (32, 64).
+
+* ``%target-swiftmodule-name`` and ``%target-swiftdoc-name``: the basename of
+  swiftmodule and swiftdoc files for a framework compiled for the target (for
+  example, ``arm64.swiftmodule`` and ``arm64.swiftdoc``).
+
+* ``%target-sdk-name``: only for Apple platforms: ``xcrun``-style SDK name
+  (``macosx``, ``iphoneos``, ``iphonesimulator``).
+
 Always use ``%target-*`` substitutions unless you have a good reason.  For
 example, an exception would be a test that checks how the compiler handles
 mixing module files for incompatible platforms (that test would need to compile
@@ -236,33 +258,53 @@ Swift code for two different platforms that are known to be incompatible).
 
 When you can't use ``%target-*`` substitutions, you can use:
 
-* ``%swift_driver_plain``: FIXME.
-* ``%swiftc_driver_plain``: FIXME.
-* ``%swift_driver``: FIXME.
-* ``%swiftc_driver``: FIXME.
-* ``%sil-opt``: FIXME.
-* ``%sil-extract``: FIXME.
-* ``%lldb-moduleimport-test``: FIXME.
-* ``%swift-ide-test_plain``: FIXME.
-* ``%swift-ide-test``: FIXME.
-* ``%llvm-opt``: FIXME.
-* ``%swift``: FIXME.
-* ``%clang-include-dir``: FIXME.
-* ``%clang-importer-sdk``: FIXME.
+* ``%swift_driver_plain``: run ``swift`` for the build machine.
+
+* ``%swift_driver``: like ``%swift_driver_plain`` with ``-module-cache-path``
+  set to a temporary directory used by the test suite, and using the
+  ``SWIFT_TEST_OPTIONS`` environment variable if available.
+
+* ``%swiftc_driver``: like ``%target-swiftc_driver`` for the build machine.
+
+* ``%swiftc_driver_plain``: like ``%swiftc_driver``, but does not set the
+  ``-module-cache-path`` to a temporary directory used by the test suite,
+  and does not respect the ``SWIFT_TEST_OPTIONS`` environment variable.
+
+* ``%sil-opt``: like ``%target-sil-opt`` for the build machine.
+
+* ``%sil-extract``: run ``%target-sil-extract`` for the build machine.
+
+* ``%lldb-moduleimport-test``: run ``lldb-moduleimport-test`` for the build
+  machine in order simulate importing LLDB importing modules from the
+  ``__apple_ast`` section in Mach-O files. See
+  ``tools/lldb-moduleimport-test/`` for details.
+
+* ``%swift-ide-test``: like ``%target-swift-ide-test`` for the build machine.
+
+* ``%swift-ide-test_plain``: like ``%swift-ide-test``, but does not set the
+  ``-module-cache-path`` or ``-completion-cache-path`` to temporary directories
+  used by the test suite.
+
+* ``%swift``: like ``%target-swift-frontend`` for the build machine.
+
+* ``%clang``: run the locally-built ``clang``. To run ``clang++`` for the
+  target, use ``%target-clang``.
 
 Other substitutions:
 
-* ``%leaks-runner``: FIXME.
-* ``%clang_apinotes``: FIXME.
-* ``%clang``: FIXME.
-* ``%target-triple``: FIXME, possible values.
-* ``%target-cpu``: FIXME, possible values.
-* ``%target-os``: FIXME, possible values.
-* ``%target-object-format``: the platform's object format (elf, macho, coff).
-* ``%target-runtime``: the platform's Swift runtime (objc, native).
-* ``%target-ptrsize``: the pointer size of the target (32, 64).
-* ``%sdk``: FIXME.
-* ``%gyb``: FIXME.
+* ``%clang-include-dir``: absolute path of the directory where the Clang
+  include headers are stored on Linux build machines.
+
+* ``%clang-importer-sdk``: FIXME.
+
+* ``%clang_apinotes``: run ``clang -cc1apinotes`` using the locally-built
+  clang.
+
+* ``%sdk``: only for Apple platforms: the ``SWIFT_HOST_VARIANT_SDK`` specified
+  by tools/build-script. Possible values include ``IOS`` or ``TVOS_SIMULATOR``.
+
+* ``%gyb``: run ``gyb``, a boilerplate generation script. For details see
+  ``utils/gyb``.
 
 * ``%platform-module-dir``: absolute path of the directory where the standard
   library module file for the target platform is stored.  For example,
@@ -271,12 +313,8 @@ Other substitutions:
 * ``%platform-sdk-overlay-dir``: absolute path of the directory where the SDK
   overlay module files for the target platform are stored.
 
-* ``%target-swiftmodule-name`` and ``%target-swiftdoc-name``: the basename of
-  swiftmodule and swiftdoc files for a framework compiled for the target (for
-  example, ``arm64.swiftmodule`` and ``arm64.swiftdoc``).
-
-* ``%target-sdk-name``: only for Apple platforms: ``xcrun``-style SDK name
-  (``macosx``, ``iphoneos``, ``iphonesimulator``).
+* ``%{python}``: run the same Python interpreter that's being used to run the
+  current ``lit`` test.
 
 When writing a test where output (or IR, SIL) depends on the bitness of the
 target CPU, use this pattern::
@@ -319,7 +357,7 @@ CPU=i386_or_x86_64`` to ``REQUIRES: CPU=x86_64``.
 ``swift_test_mode_optimize[_unchecked|none]_<CPUNAME>`` to specify a test mode
 plus cpu configuration.
 
-``optimized_stdlib_<CPUNAME>``` to specify a optimized stdlib plus cpu
+``optimized_stdlib_<CPUNAME>``` to specify an optimized stdlib plus cpu
 configuration.
 
 Feature ``REQUIRES: executable_test``

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -41,10 +41,6 @@ namespace swift {
     /// Language features
     ///
 
-    /// \brief If true, all types are treated as resilient unless declared
-    /// @_fixed_layout.
-    bool EnableResilience = false;
-
     /// \brief Disable API availability checking.
     bool DisableAvailabilityChecking = false;
     
@@ -73,12 +69,6 @@ namespace swift {
     /// \brief Enable features useful for running playgrounds.
     // FIXME: This should probably be limited to the particular SourceFile.
     bool Playground = false;
-
-    /// Whether to delay adding enum protocol conformances during code
-    /// completion. This isn't completely correct with multiple files but is
-    /// currently necessary to get reasonable performance.
-    // FIXME: remove this when rdar://20047340 is fixed.
-    bool EnableCodeCompletionDelayedEnumConformanceHack = false;
 
     /// \brief Keep comments during lexing and attach them to declarations.
     bool AttachCommentsToDecls = false;
@@ -130,7 +120,7 @@ namespace swift {
     /// This is for testing purposes.
     std::string DebugForbidTypecheckPrefix;
 
-    /// Number of paralellel processes performing AST verification.
+    /// Number of parallel processes performing AST verification.
     unsigned ASTVerifierProcessCount = 1U;
 
     /// ID of the current process for the purposes of AST verification.
@@ -150,10 +140,19 @@ namespace swift {
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;
-    
-    /// Don't mangle the Self type as part of declaration manglings.
-    bool DisableSelfTypeMangling = true;
-    
+
+    /// Whether we're omitting needless words when importing Objective-C APIs.
+    ///
+    /// The vast majority of the logic for omitting needless words is
+    /// centralized in the Clang importer. However, there are a few
+    /// places elsewhere in the compiler that specifically reference
+    /// Objective-C entities whose names are affected by
+    /// omit-needless-words.
+    bool OmitNeedlessWords = false;
+
+    /// Enable the Swift 3 migration via Fix-Its.
+    bool Swift3Migration = false;
+
     /// Sets the target we are building for and updates configuration options
     /// to match.
     ///

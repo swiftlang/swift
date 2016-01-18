@@ -173,7 +173,7 @@ a new hidden stored property to each class that directly defines failing
 initializers. The bit is set if this slice of the instance has been
 initialized.
 
-Note that unlike partailDeinit, if a class does not have failing initializers,
+Note that unlike partialDeinit, if a class does not have failing initializers,
 it does not need this bit, even if its initializer delegates to a failing
 initializer in a superclass.
 

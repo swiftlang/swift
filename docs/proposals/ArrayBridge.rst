@@ -4,7 +4,7 @@
 ..
 .. This source file is part of the Swift.org open source project
 ..
-.. Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+.. Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 .. Licensed under Apache License v2.0 with Runtime Library Exception
 ..
 .. See http://swift.org/LICENSE.txt for license information
@@ -34,11 +34,11 @@ Being "great for Cocoa" means this must work and be efficient::
   var a = [cocoaObject1, cocoaObject2]
   someCocoaObject.takesAnNSArray(a)
 
-  func processViews(views: AnyObject[]) { ... }
+  func processViews(views: [AnyObject]) { ... }
   var b = someNSWindow.views // views is an NSArray
   processViews(b)
 
-  var c: AnyObject[] = someNSWindow.views
+  var c: [AnyObject] = someNSWindow.views
 
 Being "great For C" means that an array created in Swift must have
 C-like performance and be representable as a base pointer and
@@ -47,18 +47,18 @@ length, for interaction with C APIs, at zero cost.
 Proposed Solution
 =================
 
-``Array<T>``, a.k.a. ``T[]``, is notionally an ``enum`` with two
+``Array<T>``, a.k.a. ``[T]``, is notionally an ``enum`` with two
 cases; call them ``Native`` and ``Cocoa``.  The ``Native`` case stores
 a ``ContiguousArray``, which has a known, contiguous buffer
 representation and O(1) access to the address of any element.  The
 ``Cocoa`` case stores an ``NSArray``.
 
 ``NSArray`` bridges bidirectionally in O(1) [#copy]_ to
-``AnyObject[]``.  It also implicitly converts in to ``T[]``, where T
+``[AnyObject]``.  It also implicitly converts in to ``[T]``, where T
 is any class declared to be ``@objc``.  No dynamic check of element
 types is ever performed for arrays of ``@objc`` elements; instead we
 simply let ``objc_msgSend`` fail when ``T``\ 's API turns out to be
-unsupported by the object.  Any ``T[]``, where T is an ``@objc``
+unsupported by the object.  Any ``[T]``, where T is an ``@objc``
 class, converts implicitly to NSArray.
 
 Optimization
@@ -92,7 +92,7 @@ fold this to "0" iff ``T`` is known to be a protocol other than
 AnyObject, if it is known to be a non-\ ``@objc`` class, or if it is
 known to be any struct, enum or tuple.  Otherwise, the builtin is left
 alone, and if it reaches IRGen, IRGen should conservatively fold it to
-"1".  In the common case where ``Array<T>`` is inlined and
+"1".  In the common case where ``Array<Element>`` is inlined and
 specialized, this will allow us to eliminate all of the overhead in
 the important C cases.
 
@@ -114,7 +114,7 @@ We considered an approach where conversions between ``NSArray`` and
 native Swift ``Array`` were entirely manual and quickly ruled it out
 as failing to satisfy the requirements.
 
-We considered another promising proposal that would make ``T[]`` a
+We considered another promising proposal that would make ``[T]`` a
 (hand-rolled) existential wrapper type.  Among other things, we felt
 this approach would expose multiple array types too prominently and
 would tend to "bless" an inappropriately-specific protocol as the

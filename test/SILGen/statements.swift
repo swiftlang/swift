@@ -93,13 +93,13 @@ func nested_if_merge_ret(x: Int, y: Bool, z: Bool) -> Int {
     if (z) {
       bar(x);
     }
-    return 1;
+    return 1
   } else {
     if (z) {
       foo(x, y);
     }
   }
-  return 2;
+  return 2
 }
 
 // CHECK-LABEL: sil hidden  @_TF10statements19nested_if_merge_ret
@@ -119,7 +119,7 @@ func loop_with_break(x: Int, _ y: Bool, _ z: Bool) -> Int {
   while (x > 2) {
    if (y) {
      bar(x);
-     break;
+     break
    }
   }
 }
@@ -130,7 +130,7 @@ func loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
   while (x > 2) {
     if (y) {
      bar(x);
-     continue;
+     continue
     }
     loop_with_break(x, y, z);
   }
@@ -143,7 +143,7 @@ func do_loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
   repeat {
     if (x < 42) {
      bar(x);
-     continue;
+     continue
     }
     loop_with_break(x, y, z);
   }
@@ -161,15 +161,15 @@ func for_loops1(x: Int, c: Bool) {
     markUsed(i)
   }
   
-  for ; x < 40;  {
+  for ; x < 40;  { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
    markUsed(x)
-   ++x
+   x += 1
   }
   
-  for var i = 0; i < 100; ++i {
+  for var i = 0; i < 100; i += 1 { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   }
   
-  for let i = 0; i < 100; i {
+  for let i = 0; i < 100; i { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   }
 }
 
@@ -515,7 +515,7 @@ func defer_mutable(x: Int) {
   var x = x
   // CHECK: [[BOX:%.*]] = alloc_box $Int
   // CHECK-NOT: [[BOX]]#0
-  // CHECK: function_ref @_TFF10statements13defer_mutableFSiT_L_6$deferfT_T_ : $@convention(thin) (@inout Int) -> ()
+  // CHECK: function_ref @_TFF10statements13defer_mutableFSiT_L_6$deferfT_T_ : $@convention(thin) (@inout_aliasable Int) -> ()
   // CHECK-NOT: [[BOX]]#0
   // CHECK: strong_release [[BOX]]#0
   defer { _ = x }
@@ -564,12 +564,12 @@ func testRequireExprPattern(a : Int) {
 
 // CHECK-LABEL: sil hidden @_TF10statements20testRequireOptional1FGSqSi_Si
 // CHECK: bb0(%0 : $Optional<Int>):
-// CHECK-NEXT:   debug_value %0 : $Optional<Int>  // let a
+// CHECK-NEXT:   debug_value %0 : $Optional<Int>, let, name "a"
 // CHECK-NEXT:   switch_enum %0 : $Optional<Int>, case #Optional.Some!enumelt.1: bb1, default bb2
 func testRequireOptional1(a : Int?) -> Int {
 
   // CHECK: bb1(%3 : $Int):
-  // CHECK-NEXT:   debug_value %3 : $Int  // let t
+  // CHECK-NEXT:   debug_value %3 : $Int, let, name "t"
   // CHECK-NEXT:   return %3 : $Int
   guard let t = a else { abort() }
 
@@ -583,14 +583,14 @@ func testRequireOptional1(a : Int?) -> Int {
 
 // CHECK-LABEL: sil hidden @_TF10statements20testRequireOptional2FGSqSS_SS
 // CHECK: bb0(%0 : $Optional<String>):
-// CHECK-NEXT:   debug_value %0 : $Optional<String>  // let a
+// CHECK-NEXT:   debug_value %0 : $Optional<String>, let, name "a"
 // CHECK-NEXT:   retain_value %0 : $Optional<String>
 // CHECK-NEXT:   switch_enum %0 : $Optional<String>, case #Optional.Some!enumelt.1: bb1, default bb2
 func testRequireOptional2(a : String?) -> String {
   guard let t = a else { abort() }
 
   // CHECK:  bb1(%4 : $String):
-  // CHECK-NEXT:   debug_value %4 : $String  // let t
+  // CHECK-NEXT:   debug_value %4 : $String, let, name "t"
   // CHECK-NEXT:   release_value %0 : $Optional<String>
   // CHECK-NEXT:   return %4 : $String
 
@@ -608,24 +608,24 @@ enum MyOpt<T> {
 
 // CHECK-LABEL: sil hidden @_TF10statements28testAddressOnlyEnumInRequire
 // CHECK: bb0(%0 : $*T, %1 : $*MyOpt<T>):
-// CHECK-NEXT: debug_value_addr %1 : $*MyOpt<T>  // let a
-// CHECK-NEXT: %3 = alloc_stack $T  // let t
+// CHECK-NEXT: debug_value_addr %1 : $*MyOpt<T>, let, name "a"
+// CHECK-NEXT: %3 = alloc_stack $T, let, name "t"
 // CHECK-NEXT: %4 = alloc_stack $MyOpt<T>
-// CHECK-NEXT: copy_addr %1 to [initialization] %4#1 : $*MyOpt<T>
-// CHECK-NEXT: switch_enum_addr %4#1 : $*MyOpt<T>, case #MyOpt.Some!enumelt.1: bb2, default bb1
+// CHECK-NEXT: copy_addr %1 to [initialization] %4 : $*MyOpt<T>
+// CHECK-NEXT: switch_enum_addr %4 : $*MyOpt<T>, case #MyOpt.Some!enumelt.1: bb2, default bb1
 func testAddressOnlyEnumInRequire<T>(a : MyOpt<T>) -> T {
   // CHECK:  bb1:
-  // CHECK-NEXT:   dealloc_stack %4#0
-  // CHECK-NEXT:   dealloc_stack %3#0
+  // CHECK-NEXT:   dealloc_stack %4
+  // CHECK-NEXT:   dealloc_stack %3
   // CHECK-NEXT:   br bb3
   guard let t = a else { abort() }
 
   // CHECK:    bb2:
-  // CHECK-NEXT:     %10 = unchecked_take_enum_data_addr %4#1 : $*MyOpt<T>, #MyOpt.Some!enumelt.1
-  // CHECK-NEXT:     copy_addr [take] %10 to [initialization] %3#1 : $*T
-  // CHECK-NEXT:     dealloc_stack %4#0
-  // CHECK-NEXT:     copy_addr [take] %3#1 to [initialization] %0 : $*T
-  // CHECK-NEXT:     dealloc_stack %3#0
+  // CHECK-NEXT:     %10 = unchecked_take_enum_data_addr %4 : $*MyOpt<T>, #MyOpt.Some!enumelt.1
+  // CHECK-NEXT:     copy_addr [take] %10 to [initialization] %3 : $*T
+  // CHECK-NEXT:     dealloc_stack %4
+  // CHECK-NEXT:     copy_addr [take] %3 to [initialization] %0 : $*T
+  // CHECK-NEXT:     dealloc_stack %3
   // CHECK-NEXT:     destroy_addr %1 : $*MyOpt<T>
   // CHECK-NEXT:     tuple ()
   // CHECK-NEXT:     return
@@ -667,7 +667,7 @@ func test_as_pattern(y : BaseClass) -> DerivedClass {
 
 
   // CHECK: bb{{.*}}([[PTR:%[0-9]+]] : $DerivedClass):
-  // CHECK-NEXT: debug_value [[PTR]] : $DerivedClass  // let result
+  // CHECK-NEXT: debug_value [[PTR]] : $DerivedClass, let, name "result"
   // CHECK-NEXT: strong_release %0 : $BaseClass
   // CHECK-NEXT: return [[PTR]] : $DerivedClass
   return result
@@ -676,7 +676,7 @@ func test_as_pattern(y : BaseClass) -> DerivedClass {
 func let_else_tuple_binding(a : (Int, Int)?) -> Int {
 
   // CHECK: bb0(%0 : $Optional<(Int, Int)>):
-  // CHECK-NEXT:   debug_value %0 : $Optional<(Int, Int)>  // let a
+  // CHECK-NEXT:   debug_value %0 : $Optional<(Int, Int)>, let, name "a"
   // CHECK-NEXT:   switch_enum %0 : $Optional<(Int, Int)>, case #Optional.Some!enumelt.1: bb1, default bb2
 
   guard let (x, y) = a else { }
@@ -685,9 +685,9 @@ func let_else_tuple_binding(a : (Int, Int)?) -> Int {
 
   // CHECK: bb1(%3 : $(Int, Int)):
   // CHECK-NEXT:   %4 = tuple_extract %3 : $(Int, Int), 0
-  // CHECK-NEXT:   debug_value %4 : $Int  // let x
+  // CHECK-NEXT:   debug_value %4 : $Int, let, name "x"
   // CHECK-NEXT:   %6 = tuple_extract %3 : $(Int, Int), 1
-  // CHECK-NEXT:   debug_value %6 : $Int  // let y
+  // CHECK-NEXT:   debug_value %6 : $Int, let, name "y"
   // CHECK-NEXT:   return %4 : $Int
 }
 

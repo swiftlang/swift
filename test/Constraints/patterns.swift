@@ -167,8 +167,8 @@ default: break
 
 // FIXME: rdar://problem/23378003
 // These will eventually become errors.
-for (var x) in 0...100 {} // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{6-9=}}
-for var x in 0...100 {}  // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{5-9=}}
+for (var x) in 0...100 {} // expected-error {{Use of 'var' binding here is not allowed}} {{6-9=}}
+for var x in 0...100 {}  // expected-error {{Use of 'var' binding here is not allowed}} {{5-9=}}
 
 for (let x) in 0...100 {} // expected-error {{'let' pattern is already in an immutable context}}
 
@@ -176,5 +176,52 @@ var (let y) = 42  // expected-error {{'let' cannot appear nested inside another 
 let (var z) = 42  // expected-error {{'var' cannot appear nested inside another 'var' or 'let' pattern}}
 
 
+// Crash when re-typechecking EnumElementPattern.
+// FIXME: This should actually type-check -- the diagnostics are bogus. But
+// at least we don't crash anymore.
 
+protocol PP {
+  associatedtype E
+}
 
+struct A<T> : PP {
+  typealias E = T
+}
+
+extension PP {
+  func map<T>(f: Self.E -> T) -> T {}
+}
+
+enum EE {
+  case A
+  case B
+}
+
+func good(a: A<EE>) -> Int {
+  return a.map {
+    switch $0 {
+    case .A:
+      return 1
+    default:
+      return 2
+    }
+  }
+}
+
+func bad(a: A<EE>) {
+  a.map { // expected-error {{generic parameter 'T' could not be inferred}}
+    let _: EE = $0
+    return 1
+  }
+}
+
+func ugly(a: A<EE>) {
+  a.map { // expected-error {{generic parameter 'T' could not be inferred}}
+    switch $0 {
+    case .A:
+      return 1
+    default:
+      return 2
+    }
+  }
+}

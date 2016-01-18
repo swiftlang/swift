@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -27,6 +27,13 @@
 using namespace swift;
 using namespace camel_case;
 
+bool swift::canBeArgumentLabel(StringRef identifier) {
+  if (identifier == "var" || identifier == "let" || identifier == "inout")
+    return false;
+
+  return true;
+}
+
 PrepositionKind swift::getPrepositionKind(StringRef word) {
 #define DIRECTIONAL_PREPOSITION(Word)           \
   if (word.equals_lower(#Word))                 \
@@ -47,9 +54,6 @@ PartOfSpeech swift::getPartOfSpeech(StringRef word) {
 #define VERB(Word)                              \
   if (word.equals_lower(#Word))                 \
     return PartOfSpeech::Verb;
-#define AUXILIARY_VERB(Word)                    \
-  if (word.equals_lower(#Word))                 \
-    return PartOfSpeech::AuxiliaryVerb;
 #include "PartsOfSpeech.def"
 
   // Identify gerunds, which always end in "ing".
@@ -664,7 +668,6 @@ static StringRef omitNeedlessWords(StringRef name,
         break;
 
       case PartOfSpeech::Unknown:
-      case PartOfSpeech::AuxiliaryVerb:
         // Assume it's a noun or adjective; don't strip anything.
         break;
       }
@@ -696,23 +699,6 @@ static StringRef omitNeedlessWords(StringRef name,
   return name;
 }
 
-/// Determine whether the given word indicates a boolean result.
-static bool nameIndicatesBooleanResult(StringRef name) {
-  for (auto word: camel_case::getWords(name)) {
-    // Auxiliary verbs indicate Boolean results.
-    if (getPartOfSpeech(word) == PartOfSpeech::AuxiliaryVerb)
-      return true;
-
-    // Words that end in "s" indicate either Boolean results---it
-    // could be a verb in the present continuous tense---or some kind
-    // of plural, for which "is" would be inappropriate anyway.
-    if (word.back() == 's')
-      return true;
-  }
-
-  return false;
-}
-
 /// A form of toLowercaseWord that also lowercases acronyms.
 static StringRef toLowercaseWordAndAcronym(StringRef string,
                                            StringScratchSpace &scratch) {
@@ -723,12 +709,19 @@ static StringRef toLowercaseWordAndAcronym(StringRef string,
   if (!clang::isUppercase(string[0]))
     return string;
 
-  // Lowercase until we hit the end there is an uppercase letter
-  // followed by a non-uppercase letter.
+  // Lowercase until we hit the an uppercase letter followed by a
+  // non-uppercase letter.
   llvm::SmallString<32> scratchStr;
   for (unsigned i = 0, n = string.size(); i != n; ++i) {
     // If the next character is not uppercase, stop.
     if (i < n - 1 && !clang::isUppercase(string[i+1])) {
+      // If the next non-uppercase character was alphanumeric, we should
+      // still lowercase the character we're on.
+      if (!clang::isLetter(string[i+1])) {
+        scratchStr.push_back(clang::toLowercase(string[i]));
+        ++i;
+      }
+
       scratchStr.append(string.substr(i));
       break;
     }
@@ -798,16 +791,6 @@ bool swift::omitNeedlessWords(StringRef &baseName,
       }
     }
 
-    // Boolean properties should start with "is", unless their
-    // first word already implies a Boolean result.
-    if (resultType.isBoolean() && isProperty &&
-        !nameIndicatesBooleanResult(baseName)) {
-      SmallString<32> newName("is");
-      camel_case::appendSentenceCase(newName, baseName);
-      baseName = scratch.copyString(newName);
-      anyChanges = true;
-    }
-
     return lowercaseAcronymsForReturn();
   }
 
@@ -857,7 +840,6 @@ bool swift::omitNeedlessWords(StringRef &baseName,
           break;
 
         case PartOfSpeech::Unknown:
-        case PartOfSpeech::AuxiliaryVerb:
           ++nameWordRevIter;
           break;
         }

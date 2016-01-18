@@ -1,8 +1,8 @@
-//===- DiagnosticEngine.h - Diagnostic Display Engine -----------*- C++ -*-===//
+//===--- DiagnosticEngine.cpp - Diagnostic Display Engine -------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -28,8 +28,10 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/raw_ostream.h"
+
 using namespace swift;
 
+namespace {
 enum class DiagnosticOptions {
   /// No options.
   none,
@@ -45,29 +47,54 @@ enum class DiagnosticOptions {
   /// After a fatal error subsequent diagnostics are suppressed.
   Fatal,
 };
-
 struct StoredDiagnosticInfo {
-  /// \brief The kind of diagnostic we're dealing with.
-  DiagnosticKind Kind;
+  DiagnosticKind kind : 2;
+  bool pointsToFirstBadToken : 1;
+  bool isFatal : 1;
 
-  DiagnosticOptions Options;
-
-  // FIXME: Category
-  
-  /// \brief Text associated with the diagnostic
-  const char *Text;
+  StoredDiagnosticInfo(DiagnosticKind k, bool firstBadToken, bool fatal)
+      : kind(k), pointsToFirstBadToken(firstBadToken), isFatal(fatal) {}
+  StoredDiagnosticInfo(DiagnosticKind k, DiagnosticOptions opts)
+      : StoredDiagnosticInfo(k,
+                             opts == DiagnosticOptions::PointsToFirstBadToken,
+                             opts == DiagnosticOptions::Fatal) {}
 };
 
-static StoredDiagnosticInfo StoredDiagnosticInfos[] = {
-#define ERROR(ID,Category,Options,Text,Signature) \
-  { DiagnosticKind::Error, DiagnosticOptions::Options, Text },
-#define WARNING(ID,Category,Options,Text,Signature) \
-  { DiagnosticKind::Warning, DiagnosticOptions::Options, Text },
-#define NOTE(ID,Category,Options,Text,Signature) \
-  { DiagnosticKind::Note, DiagnosticOptions::Options, Text },
+// Reproduce the DiagIDs, as we want both the size and access to the raw ids
+// themselves.
+enum LocalDiagID : uint32_t {
+#define DIAG(KIND, ID, Options, Text, Signature) ID,
 #include "swift/AST/DiagnosticsAll.def"
-  { DiagnosticKind::Error, DiagnosticOptions::none, "<not a diagnostic>" }
+  NumDiags
 };
+}
+
+// TODO: categorization
+static StoredDiagnosticInfo storedDiagnosticInfos[] = {
+#define ERROR(ID, Options, Text, Signature)                                    \
+  StoredDiagnosticInfo(DiagnosticKind::Error, DiagnosticOptions::Options),
+#define WARNING(ID, Options, Text, Signature)                                  \
+  StoredDiagnosticInfo(DiagnosticKind::Warning, DiagnosticOptions::Options),
+#define NOTE(ID, Options, Text, Signature)                                     \
+  StoredDiagnosticInfo(DiagnosticKind::Note, DiagnosticOptions::Options),
+#include "swift/AST/DiagnosticsAll.def"
+};
+static_assert(sizeof(storedDiagnosticInfos) / sizeof(StoredDiagnosticInfo) ==
+                  LocalDiagID::NumDiags,
+              "array size mismatch");
+
+static const char *diagnosticStrings[] = {
+#define ERROR(ID, Options, Text, Signature) Text,
+#define WARNING(ID, Options, Text, Signature) Text,
+#define NOTE(ID, Options, Text, Signature) Text,
+#include "swift/AST/DiagnosticsAll.def"
+    "<not a diagnostic>",
+};
+
+DiagnosticState::DiagnosticState() {
+  // Initialize our per-diagnostic state to default
+  perDiagnosticBehavior.resize(LocalDiagID::NumDiags, Behavior::Unspecified);
+}
 
 static CharSourceRange toCharSourceRange(SourceManager &SM, SourceRange SR) {
   return CharSourceRange(SM, SR.Start, Lexer::getLocForEndOfToken(SM, SR.End));
@@ -175,15 +202,7 @@ void InFlightDiagnostic::flush() {
 }
 
 bool DiagnosticEngine::isDiagnosticPointsToFirstBadToken(DiagID ID) const {
-  const StoredDiagnosticInfo &StoredInfo =
-      StoredDiagnosticInfos[(unsigned) ID];
-  return StoredInfo.Options == DiagnosticOptions::PointsToFirstBadToken;
-}
-
-bool DiagnosticEngine::isDiagnosticFatal(DiagID ID) const {
-  const StoredDiagnosticInfo &StoredInfo =
-      StoredDiagnosticInfos[(unsigned) ID];
-  return StoredInfo.Options == DiagnosticOptions::Fatal;
+  return storedDiagnosticInfos[(unsigned) ID].pointsToFirstBadToken;
 }
 
 /// \brief Skip forward to one of the given delimiters.
@@ -443,9 +462,86 @@ static void formatDiagnosticText(StringRef InText,
     (void)Result;
     assert(ArgIndex < Args.size() && "Out-of-range argument index");
     InText = InText.substr(Length);
-    
+
     // Convert the argument to a string.
     formatDiagnosticArgument(Modifier, ModifierArguments, Args, ArgIndex, Out);
+  }
+}
+
+static DiagnosticKind toDiagnosticKind(DiagnosticState::Behavior behavior) {
+  switch (behavior) {
+  case DiagnosticState::Behavior::Unspecified:
+    llvm_unreachable("unspecified behavior");
+  case DiagnosticState::Behavior::Ignore:
+    llvm_unreachable("trying to map an ignored diagnostic");
+  case DiagnosticState::Behavior::Error:
+  case DiagnosticState::Behavior::Fatal:
+    return DiagnosticKind::Error;
+  case DiagnosticState::Behavior::Note:
+    return DiagnosticKind::Note;
+  case DiagnosticState::Behavior::Warning:
+    return DiagnosticKind::Warning;
+  }
+}
+
+DiagnosticState::Behavior DiagnosticState::determineBehavior(DiagID id) {
+  auto set = [this](DiagnosticState::Behavior lvl) {
+    if (lvl == Behavior::Fatal) {
+      fatalErrorOccurred = true;
+      anyErrorOccurred = true;
+    } else if (lvl == Behavior::Error) {
+      anyErrorOccurred = true;
+    }
+
+    previousBehavior = lvl;
+    return lvl;
+  };
+
+  // We determine how to handle a diagnostic based on the following rules
+  //   1) If current state dictates a certain behavior, follow that
+  //   2) If the user provided a behavior for this specific diagnostic, follow
+  //      that
+  //   3) If the user provided a behavior for this diagnostic's kind, follow
+  //      that
+  //   4) Otherwise remap the diagnostic kind
+
+  auto diagInfo = storedDiagnosticInfos[(unsigned)id];
+  bool isNote = diagInfo.kind == DiagnosticKind::Note;
+
+  //   1) If current state dictates a certain behavior, follow that
+
+  // Notes relating to ignored diagnostics should also be ignored
+  if (previousBehavior == Behavior::Ignore && isNote)
+    return set(Behavior::Ignore);
+
+  // Suppress diagnostics when in a fatal state, except for follow-on notes
+  if (fatalErrorOccurred)
+    if (!showDiagnosticsAfterFatalError && !isNote)
+      return set(Behavior::Ignore);
+
+  //   2) If the user provided a behavior for this specific diagnostic, follow
+  //      that
+
+  if (perDiagnosticBehavior[(unsigned)id] != Behavior::Unspecified)
+    return set(perDiagnosticBehavior[(unsigned)id]);
+
+  //   3) If the user provided a behavior for this diagnostic's kind, follow
+  //      that
+  if (diagInfo.kind == DiagnosticKind::Warning) {
+    if (suppressWarnings)
+      return set(Behavior::Ignore);
+    if (warningsAsErrors)
+      return set(Behavior::Error);
+  }
+
+  //   4) Otherwise remap the diagnostic kind
+  switch (diagInfo.kind) {
+  case DiagnosticKind::Note:
+    return set(Behavior::Note);
+  case DiagnosticKind::Error:
+    return set(diagInfo.isFatal ? Behavior::Fatal : Behavior::Error);
+  case DiagnosticKind::Warning:
+    return set(Behavior::Warning);
   }
 }
 
@@ -467,33 +563,9 @@ void DiagnosticEngine::emitTentativeDiagnostics() {
 }
 
 void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
-  const StoredDiagnosticInfo &StoredInfo
-    = StoredDiagnosticInfos[(unsigned)diagnostic.getID()];
-
-  if (FatalState != FatalErrorState::None) {
-    bool shouldIgnore = true;
-    if (StoredInfo.Kind == DiagnosticKind::Note)
-      shouldIgnore = (FatalState == FatalErrorState::Fatal);
-    else
-      FatalState = FatalErrorState::Fatal;
-
-    if (shouldIgnore && !ShowDiagnosticsAfterFatalError) {
-      return;
-    }
-  }
-
-  // Check whether this is an error.
-  switch (StoredInfo.Kind) {
-  case DiagnosticKind::Error:
-    HadAnyError = true;
-    if (isDiagnosticFatal(diagnostic.getID()))
-      FatalState = FatalErrorState::JustEmitted;
-    break;
-    
-  case DiagnosticKind::Note:
-  case DiagnosticKind::Warning:
-    break;
-  }
+  auto behavior = state.determineBehavior(diagnostic.getID());
+  if (behavior == DiagnosticState::Behavior::Ignore)
+    return;
 
   // Figure out the source location.
   SourceLoc loc = diagnostic.getLoc();
@@ -502,12 +574,6 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     // If a declaration was provided instead of a location, and that declaration
     // has a location we can point to, use that location.
     loc = decl->getLoc();
-    // With an implicit parameter try to point to its type.
-    if (loc.isInvalid() && isa<ParamDecl>(decl)) {
-      if (auto Pat =
-            cast<ParamDecl>(decl)->getParamParentPattern())
-        loc = Pat->getLoc();
-    }
 
     if (loc.isInvalid()) {
       // There is no location we can point to. Pretty-print the declaration
@@ -564,6 +630,7 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
             case DeclContextKind::Initializer:
             case DeclContextKind::AbstractClosureExpr:
             case DeclContextKind::AbstractFunctionDecl:
+            case DeclContextKind::SubscriptDecl:
               break;
             }
 
@@ -618,7 +685,8 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
   llvm::SmallString<256> Text;
   {
     llvm::raw_svector_ostream Out(Text);
-    formatDiagnosticText(StoredInfo.Text, diagnostic.getArgs(), Out);
+    formatDiagnosticText(diagnosticStrings[(unsigned)diagnostic.getID()],
+                         diagnostic.getArgs(), Out);
   }
 
   // Pass the diagnostic off to the consumer.
@@ -627,7 +695,8 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
   Info.Ranges = diagnostic.getRanges();
   Info.FixIts = diagnostic.getFixIts();
   for (auto &Consumer : Consumers) {
-    Consumer->handleDiagnostic(SourceMgr, loc, StoredInfo.Kind, Text, Info);
+    Consumer->handleDiagnostic(SourceMgr, loc, toDiagnosticKind(behavior), Text,
+                               Info);
   }
 }
 

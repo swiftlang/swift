@@ -1,8 +1,8 @@
-//===-- DemangleNodes.def - Demangling Tree Metaprogramming -----*- C++ -*-===//
+//===--- DemangleNodes.def - Demangling Tree Metaprogramming ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -30,6 +30,8 @@ NODE(ArchetypeRef)
 NODE(ArgumentTuple)
 NODE(AssociatedType)
 NODE(AssociatedTypeRef)
+NODE(AssociatedTypeMetadataAccessor)
+NODE(AssociatedTypeWitnessTableAccessor)
 NODE(AutoClosureType)
 NODE(BoundGenericClass)
 NODE(BoundGenericEnum)
@@ -49,8 +51,6 @@ NODE(DependentGenericSameTypeRequirement)
 NODE(DependentGenericType)
 NODE(DependentMemberType)
 NODE(DependentGenericParamType)
-NODE(DependentProtocolWitnessTableGenerator)
-NODE(DependentProtocolWitnessTableTemplate)
 CONTEXT_NODE(Destructor)
 CONTEXT_NODE(DidSet)
 NODE(Directness)
@@ -71,6 +71,8 @@ NODE(FunctionSignatureSpecializationParamKind)
 NODE(FunctionSignatureSpecializationParamPayload)
 NODE(FunctionType)
 NODE(Generics)
+NODE(GenericProtocolWitnessTable)
+NODE(GenericProtocolWitnessTableInstantiationFunction)
 NODE(GenericSpecialization)
 NODE(GenericSpecializationParam)
 NODE(GenericType)
@@ -128,6 +130,7 @@ NODE(QualifiedArchetype)
 NODE(ReabstractionThunk)
 NODE(ReabstractionThunkHelper)
 NODE(ReturnType)
+NODE(SILBoxType)
 NODE(SelfTypeRef)
 CONTEXT_NODE(Setter)
 NODE(SpecializationPassID)

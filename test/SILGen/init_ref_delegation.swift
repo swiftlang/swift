@@ -64,10 +64,10 @@ struct S2 {
     // CHECK:   [[X_META:%[0-9]+]] = metatype $@thin X.Type
     // CHECK:   [[X:%[0-9]+]] = apply [[X_INIT]]([[X_META]]) : $@convention(thin) (@thin X.Type) -> X
     // CHECK:   [[X_BOX:%[0-9]+]] = alloc_stack $X
-    // CHECK:   store [[X]] to [[X_BOX]]#1 : $*X
-    // CHECK:   [[SELF_BOX1:%[0-9]+]] = apply [[S2_DELEG_INIT]]<X>([[X_BOX]]#1, [[S2_META]]) : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin S2.Type) -> S2
+    // CHECK:   store [[X]] to [[X_BOX]] : $*X
+    // CHECK:   [[SELF_BOX1:%[0-9]+]] = apply [[S2_DELEG_INIT]]<X>([[X_BOX]], [[S2_META]]) : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin S2.Type) -> S2
     // CHECK:   assign [[SELF_BOX1]] to [[SELF]] : $*S2
-    // CHECK:   dealloc_stack [[X_BOX]]#0 : $*@local_storage X
+    // CHECK:   dealloc_stack [[X_BOX]] : $*X
     // CHECK:   [[SELF_BOX4:%[0-9]+]] = load [[SELF]] : $*S2
     self.init(t: X())
     // CHECK:   strong_release [[SELF_BOX]]#0 : $@box S2

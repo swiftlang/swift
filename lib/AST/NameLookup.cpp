@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -71,6 +71,9 @@ bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
       // A.init are in the chain. Make sure we still remove A.init from the
       // set in this case.
       if (decl->getFullName().getBaseName() == ctx.Id_init) {
+        /// FIXME: Avoid the possibility of an infinite loop by fixing the root
+        ///        cause instead (incomplete circularity detection).
+        assert(decl != overrides && "Circular class inheritance?");
         decl = overrides;
         continue;
       }
@@ -421,8 +424,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           localVal.visit(AFD->getBody());
           if (!Results.empty())
             return;
-          for (Pattern *P : AFD->getBodyParamPatterns())
-            localVal.checkPattern(P, DeclVisibilityKind::FunctionParameter);
+          for (auto *PL : AFD->getParameterLists())
+            localVal.checkParameterList(PL);
           if (!Results.empty())
             return;
         }
@@ -468,8 +471,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             localVal.visit(CE->getBody());
             if (!Results.empty())
               return;
-            localVal.checkPattern(CE->getParams(),
-                                  DeclVisibilityKind::FunctionParameter);
+            localVal.checkParameterList(CE->getParameters());
             if (!Results.empty())
               return;
           }
@@ -508,8 +510,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
       // Check the generic parameters for something with the given name.
       if (GenericParams) {
         namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-        localVal.checkGenericParams(GenericParams,
-                                    DeclVisibilityKind::GenericParameter);
+        localVal.checkGenericParams(GenericParams);
 
         if (!Results.empty())
           return;
@@ -579,8 +580,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
         if (dcGenericParams) {
           namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-          localVal.checkGenericParams(dcGenericParams,
-                                      DeclVisibilityKind::GenericParameter);
+          localVal.checkGenericParams(dcGenericParams);
 
           if (!Results.empty())
             return;
@@ -698,7 +698,7 @@ public:
   /// Update a lookup table with members from newly-added extensions.
   void updateLookupTable(NominalTypeDecl *nominal);
 
-  /// \brief Add the given member to the lookup tabke.
+  /// \brief Add the given member to the lookup table.
   void addMember(Decl *members);
 
   /// \brief Add the given members to the lookup table.

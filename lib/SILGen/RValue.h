@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -77,20 +77,26 @@ public:
     return *this;
   }
   
-  /// Create a RValue from a single value. If the value is of tuple type, it
+  /// Create an RValue from a single value. If the value is of tuple type, it
   /// will be exploded.
   ///
   /// \param expr - the expression which yielded this r-value; its type
   ///   will become the substituted formal type of this r-value
   RValue(SILGenFunction &gen, Expr *expr, ManagedValue v);
 
-  /// Create a RValue from a single value. If the value is of tuple type, it
+  /// Create an RValue from a single value. If the value is of tuple type, it
   /// will be exploded.
   RValue(SILGenFunction &gen, SILLocation l, CanType type, ManagedValue v);
 
   /// Construct an RValue from a pre-exploded set of
   /// ManagedValues. Used to implement the extractElement* methods.
   RValue(ArrayRef<ManagedValue> values, CanType type);
+  
+  /// Create an RValue to which values will be subsequently added using
+  /// addElement(), with the level of tuple expansion in the input specified
+  /// by the abstraction pattern. The RValue will not be complete until all
+  /// the elements have been added.
+  explicit RValue(AbstractionPattern pattern, CanType type);
   
   /// Create an RValue to which values will be subsequently added using
   /// addElement(). The RValue will not be complete until all the elements have

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -973,66 +973,6 @@ struct SpecificConstraint {
   ConstraintKind Kind;
 };
 
-/// Abstract class implemented by clients that want to be involved in
-/// the process of opening dependent types to type variables.
-class DependentTypeOpener {
-public:
-  virtual ~DependentTypeOpener() { }
-
-  /// Directly map a generic type parameter to a type, or return null if
-  /// the type parameter should be opened.
-  virtual Type mapGenericTypeParamType(GenericTypeParamType *param) {
-    return Type();
-  }
-
-  /// Directly map a dependent member type to a type, or return null if
-  /// the dependent member type should be opened.
-  virtual Type mapDependentMemberType(DependentMemberType *memberType) {
-    return Type();
-  }
-
-  /// Invoked when a generic type parameter is opened to a type variable.
-  ///
-  /// \param param The generic type parameter.
-  ///
-  /// \param typeVar The type variable to which the generic parameter was
-  /// opened.
-  ///
-  /// \param replacementType If the caller sets this to a non-null type, the
-  /// type variable will be bound directly to this type.
-  virtual void openedGenericParameter(GenericTypeParamType *param,
-                                      TypeVariableType *typeVar,
-                                      Type &replacementType) { }
-
-  /// Invoked when an associated type reference is opened to a type
-  /// variable to determine how the associated type should be resolved.
-  ///
-  /// \param baseType The type of the base of the reference.
-  ///
-  /// \param baseTypeVar The type variable to which the base type was
-  /// opened.
-  ///
-  /// \param assocType The associated type being opened.
-  ///
-  /// \param memberTypeVar The type variable representing the
-  /// dependent member type.
-  ///
-  /// \param replacementType If the caller sets this to a non-null type, the
-  /// member type variable will be bound directly to this type.
-  ///
-  /// \returns true if the constraint system should introduce a
-  /// constraint that specifies that the member type is in fact a the
-  /// named member of the base's type variable.
-  virtual bool shouldBindAssociatedType(Type baseType,
-                                        TypeVariableType *baseTypeVar,
-                                        AssociatedTypeDecl *assocType,
-                                        TypeVariableType *memberTypeVar,
-                                        Type &replacementType) { 
-    return true;
-  }
-};
-
-
 /// An intrusive, doubly-linked list of constraints.
 typedef llvm::ilist<Constraint> ConstraintList;
 
@@ -1052,7 +992,7 @@ struct MemberLookupResult {
     Unsolved,
     
     /// This result indicates that the member reference is erroneous, but was
-    /// already dianosed.  Don't emit another error.
+    /// already diagnosed.  Don't emit another error.
     ErrorAlreadyDiagnosed,
     
     /// This result indicates that the lookup produced candidate lists,
@@ -1093,6 +1033,8 @@ struct MemberLookupResult {
     /// only have an rvalue base.  This is more specific than the former one.
     UR_MutatingGetterOnRValue,
     
+    /// The member is inaccessible (e.g. a private member in another file).
+    UR_Inaccessible,
   };
   
   /// This is a list of considered, but rejected, candidates, along with a
@@ -1605,7 +1547,7 @@ public:
   /// \brief Whether we should be recording failures.
   bool shouldRecordFailures() {
     // FIXME: It still makes sense to record failures when there are fixes
-    // present, but they shold be less desirable.
+    // present, but they should be less desirable.
     if (!Fixes.empty())
       return false;
 
@@ -1846,17 +1788,13 @@ public:
   ///
   /// \param dc The declaration context in which the type occurs.
   ///
-  /// \param skipProtocolSelfConstraint Whether to skip the constraint on a
-  /// protocol's 'Self' type.
-  ///
   /// \returns The opened type.
   Type openType(Type type, ConstraintLocatorBuilder locator,
-                DeclContext *dc = nullptr,
-                bool skipProtocolSelfConstraint = false,
-                DependentTypeOpener *opener = nullptr) {
+                DeclContext *dc = nullptr) {
     llvm::DenseMap<CanType, TypeVariableType *> replacements;
-    return openType(type, locator, replacements, dc, skipProtocolSelfConstraint,
-                    opener);
+    return openType(type, locator, replacements, dc,
+                    /*skipProtocolSelfConstraint=*/false,
+                    /*minOpeningDepth=*/0);
   }
 
   /// \brief "Open" the given type by replacing any occurrences of generic
@@ -1872,8 +1810,9 @@ public:
   /// \param skipProtocolSelfConstraint Whether to skip the constraint on a
   /// protocol's 'Self' type.
   ///
-  /// \param opener Abstract class that assists in opening dependent
-  /// types.
+  /// \param minOpeningDepth Whether to skip generic parameters from generic
+  /// contexts that we're inheriting context archetypes from. See the comment
+  /// on openGeneric().
   ///
   /// \returns The opened type, or \c type if there are no archetypes in it.
   Type openType(Type type,
@@ -1881,7 +1820,7 @@ public:
                 llvm::DenseMap<CanType, TypeVariableType *> &replacements,
                 DeclContext *dc = nullptr,
                 bool skipProtocolSelfConstraint = false,
-                DependentTypeOpener *opener = nullptr);
+                unsigned minOpeningDepth = 0);
 
   /// \brief "Open" the given binding type by replacing any occurrences of
   /// archetypes (including those implicit in unbound generic types) with
@@ -1893,16 +1832,34 @@ public:
   ///
   /// \param type The type to open.
   /// \returns The opened type, or \c type if there are no archetypes in it.
-  Type openBindingType(Type type, ConstraintLocatorBuilder locator,
-                       DeclContext *dc = nullptr);
+  Type openBindingType(Type type, ConstraintLocatorBuilder locator);
 
   /// Open the generic parameter list and its requirements, creating
   /// type variables for each of the type parameters.
+  ///
+  /// Note: when a generic declaration is nested inside a generic function, the
+  /// generic parameters of the outer function do not appear in the inner type's
+  /// generic signature.
+  ///
+  /// Eg,
+  ///
+  /// func foo<T>() {
+  ///   func g() -> T {} // type is () -> T
+  /// }
+  ///
+  /// class Foo<T> {
+  ///   func g() -> T {} // type is <T> Foo<T> -> () -> T
+  /// }
+  ///
+  /// Instead, the outer parameters can appear as free variables in the nested
+  /// declaration's signature, but they do not have to, so they might not be
+  /// substituted at all. Since the inner declaration inherits the context
+  /// archetypes of the outer function we do not need to open them here.
   void openGeneric(DeclContext *dc,
                    ArrayRef<GenericTypeParamType *> params,
                    ArrayRef<Requirement> requirements,
                    bool skipProtocolSelfConstraint,
-                   DependentTypeOpener *opener,
+                   unsigned minOpeningDepth,
                    ConstraintLocatorBuilder locator,
                    llvm::DenseMap<CanType, TypeVariableType *> &replacements);
 
@@ -1931,8 +1888,7 @@ public:
                           bool isTypeReference,
                           bool isSpecialized,
                           ConstraintLocatorBuilder locator,
-                          const DeclRefExpr *base = nullptr,
-                          DependentTypeOpener *opener = nullptr);
+                          const DeclRefExpr *base = nullptr);
 
   /// Replace the 'Self' type in the archetype with the appropriate
   /// type variable, if needed.
@@ -1960,7 +1916,8 @@ public:
                           bool isDynamicResult,
                           ConstraintLocatorBuilder locator,
                           const DeclRefExpr *base = nullptr,
-                          DependentTypeOpener *opener = nullptr);
+                          llvm::DenseMap<CanType, TypeVariableType *>
+                            *replacements = nullptr);
 
   /// \brief Add a new overload set to the list of unresolved overload
   /// sets.
@@ -2050,7 +2007,7 @@ public:
     /// Indicates we're matching an operator parameter.
     TMF_ApplyingOperatorParameter = 0x4,
     
-    /// Indicates we're unwrapping an optional type for an value-to-optional
+    /// Indicates we're unwrapping an optional type for a value-to-optional
     /// conversion.
     TMF_UnwrappingOptional = 0x8,
     
@@ -2151,9 +2108,14 @@ public:
   /// perform a lookup into the specified base type to find a candidate list.
   /// The list returned includes the viable candidates as well as the unviable
   /// ones (along with reasons why they aren't viable).
+  ///
+  /// If includeInaccessibleMembers is set to true, this burns compile time to
+  /// try to identify and classify inaccessible members that may be being
+  /// referenced.
   MemberLookupResult performMemberLookup(ConstraintKind constraintKind,
                                          DeclName memberName, Type baseTy,
-                                         ConstraintLocator *memberLocator);
+                                         ConstraintLocator *memberLocator,
+                                         bool includeInaccessibleMembers);
 
 private:
 
@@ -2275,7 +2237,7 @@ public:
   /// \returns true if an error occurred, false otherwise.
   bool simplify(bool ContinueAfterFailures = false);
 
-  /// \brief Simplify the given constaint.
+  /// \brief Simplify the given constraint.
   SolutionKind simplifyConstraint(const Constraint &constraint);
 
 private:
@@ -2368,9 +2330,14 @@ public:
   ///
   /// \param convertType the contextual type to which the
   /// expression should be converted, if any.
+  /// \param discardedExpr if true, the result of the expression
+  /// is contextually ignored.
+  /// \param skipClosures if true, don't descend into bodies of
+  /// non-single expression closures.
   Expr *applySolution(Solution &solution, Expr *expr,
                       Type convertType, bool discardedExpr,
-                      bool suppressDiagnostics);
+                      bool suppressDiagnostics,
+                      bool skipClosures);
 
   /// \brief Apply a given solution to the expression to the top-level
   /// expression, producing a fully type-checked expression.
@@ -2399,7 +2366,7 @@ public:
   }
   
   /// \brief Reorder the disjunctive clauses for a given expression to
-  /// increase the likelyhood that a favored constraint will be be successfully
+  /// increase the likelihood that a favored constraint will be successfully
   /// resolved before any others.
   void optimizeConstraints(Expr *e);
   
@@ -2512,7 +2479,7 @@ public:
   /// \param prevArgIdx The argument that the \c argIdx should have preceded.
   virtual void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx);
 
-  /// Indicates that the arguments need to be relabed to match the parameters.
+  /// Indicates that the arguments need to be relabeled to match the parameters.
   ///
   /// \returns true to indicate that this should cause a failure, false
   /// otherwise.

@@ -1,8 +1,8 @@
-//===--- MetadataCache.h - Implements the metadata cache -------*- C++ -*--===//
+//===--- MetadataCache.h - Implements the metadata cache --------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -201,7 +201,7 @@ public:
     // Build the new cache entry.
     // For some cache types this call may re-entrantly perform additional
     // cache lookups.
-    // Notice that the entry is completly constructed before it is inserted
+    // Notice that the entry is completely constructed before it is inserted
     // into the map, and that only one entry can be constructed at once
     // because of the lock above.
     Entry *entry = entryBuilder();

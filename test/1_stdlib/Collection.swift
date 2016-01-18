@@ -1,5 +1,19 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift --stdlib-unittest-in-process | tee %t.txt
+// RUN: FileCheck %s < %t.txt
+// note: remove the --stdlib-unittest-in-process once all the FileCheck tests
+// have been converted to StdlibUnittest
 // REQUIRES: executable_test
+
+import StdlibUnittest
+
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
+var CollectionTests = TestSuite("CollectionTests")
 
 struct X : CollectionType {
   typealias Element = String.CharacterView.Generator.Element
@@ -45,7 +59,7 @@ func isPalindrome0<
 >(seq: S) -> Bool {
   typealias Index = S.Index
 
-  var a = seq.indices
+  let a = seq.indices
   var i = seq.indices
   var ir = i.lazy.reverse()
   var b = ir.generate()
@@ -111,12 +125,14 @@ func isPalindrome2<
   var b = seq.startIndex, e = seq.endIndex
 
   while (b != e) {
-    if (b == --e) { 
+    e = e.predecessor()
+    if (b == e) {
       break
     }
-    if seq[b++] != seq[e] {
+    if seq[b] != seq[e] {
       return false
     }
+    b = b.successor()
   }
   return true
 }
@@ -200,5 +216,38 @@ func testIsEmptyFirstLast() {
 }
 testIsEmptyFirstLast()
 
+/// A `CollectionType` that vends just the default implementations for
+/// `CollectionType` methods.
+struct CollectionOnly<T: CollectionType> : CollectionType {
+  var base: T
+
+  var startIndex: T.Index {
+    return base.startIndex
+  }
+
+  var endIndex: T.Index {
+    return base.endIndex
+  }
+
+  func generate() -> T.Generator {
+    return base.generate()
+  }
+
+  subscript(position: T.Index) -> T.Generator.Element {
+    return base[position]
+  }
+}
+
 // CHECK: all done.
 print("all done.")
+
+CollectionTests.test("first/performance") {
+  // accessing `first` should not perform duplicate work on lazy collections
+  var log: [Int] = []
+  let col_ = (0..<10).lazy.filter({ log.append($0); return (2..<8).contains($0) })
+  let col = CollectionOnly(base: col_)
+  expectEqual(2, col.first)
+  expectEqual([0, 1, 2], log)
+}
+
+runAllTests()

@@ -14,28 +14,28 @@ bb0(%0 : $Optional<() -> ()>):
   %3 = alloc_stack $Optional<()>
   %4 = alloc_stack $()
   %5 = alloc_stack $Optional<() -> ()>
-  copy_addr %1#1 to [initialization] %5#1 : $*Optional<() -> ()>
+  copy_addr %1#1 to [initialization] %5 : $*Optional<() -> ()>
   // function_ref Swift._doesOptionalHaveValue <A>(v : @inout Swift.Optional<A>) -> Builtin.Int1
   %7 = function_ref @_TFs22_doesOptionalHaveValueU__FT1vRGSqQ___Bi1_ : $@convention(thin) <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1
-  // CHECK: apply %{{[0-9]+}}<() -> ()>(%{{[0-9]+}}#1) : $@convention(thin) <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1
-  %8 = apply %7<() -> ()>(%5#1) : $@convention(thin) <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1
+  // CHECK: apply %{{[0-9]+}}<() -> ()>(%{{[0-9]+}}) : $@convention(thin) <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1
+  %8 = apply %7<() -> ()>(%5) : $@convention(thin) <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1
   br bb1
 
 bb1:
-  destroy_addr %5#1 : $*Optional<() -> ()>
-  dealloc_stack %5#0 : $*@local_storage Optional<() -> ()>
-  dealloc_stack %4#0 : $*@local_storage ()
+  destroy_addr %5 : $*Optional<() -> ()>
+  dealloc_stack %5 : $*Optional<() -> ()>
+  dealloc_stack %4 : $*()
   br bb3
 
 bb3:
   %27 = function_ref @_TFs26_injectNothingIntoOptionalU__FT_GSqQ__ : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>) -> ()
-  // CHECK: apply %{{[0-9]+}}<()>(%{{[0-9]+}}#1) : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>) -> ()
-  %28 = apply %27<()>(%3#1) : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>) -> ()
+  // CHECK: apply %{{[0-9]+}}<()>(%{{[0-9]+}}) : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>) -> ()
+  %28 = apply %27<()>(%3) : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>) -> ()
   br bb4
 
 bb4:
-  %30 = load %3#1 : $*Optional<()>
-  dealloc_stack %3#0 : $*@local_storage Optional<()>
+  %30 = load %3 : $*Optional<()>
+  dealloc_stack %3 : $*Optional<()>
   strong_release %1#0 : $@box Optional<() -> ()>
   %33 = tuple ()
   return %33 : $()

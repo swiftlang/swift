@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
 protocol Observer {
-    typealias Value
+    associatedtype Value
     
     func onNext(item: Value) -> Void
     func onCompleted() -> Void
@@ -9,7 +9,7 @@ protocol Observer {
 }
 
 protocol Observable {
-    typealias Value
+    associatedtype Value
 
     func subscribe<O: Observer where O.Value == Value>(observer: O) -> Any
 }
@@ -50,7 +50,7 @@ class Subject<T>: Observer, Observable {
             observer.onError(error)
         }
         
-        return self;
+        return self
     }
 }
 
@@ -64,7 +64,7 @@ struct X<T> {
 }
 
 protocol P {
-    typealias A
+    associatedtype A
     
     func onNext(item: A) -> Void
 }
@@ -78,5 +78,5 @@ struct IP<T> : P {
 
     func onNext(item: A) { _onNext(item) }
 
-    var _onNext: (A)->()
+    var _onNext: (A) -> ()
 }

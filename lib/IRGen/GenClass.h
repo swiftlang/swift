@@ -1,8 +1,8 @@
-//===--- GenStruct.h - Swift IR generation for classes ------------*- C++ -*-===//
+//===--- GenClass.h - Swift IR generation for classes -----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -58,7 +58,7 @@ namespace irgen {
   
   llvm::Constant *emitClassPrivateData(IRGenModule &IGM, ClassDecl *theClass);
   void emitGenericClassPrivateDataTemplate(IRGenModule &IGM,
-                                      ClassDecl *cls,
+                                      ClassDecl *theClass,
                                       llvm::SmallVectorImpl<llvm::Constant*> &fields,
                                       Size &metaclassOffset,
                                       Size &classRODataOffset,
@@ -96,19 +96,12 @@ namespace irgen {
   /// does not have fixed layout. For resilient classes this does not
   /// correspond to the runtime alignment of instances of the class.
   llvm::Constant *tryEmitClassConstantFragileInstanceSize(IRGenModule &IGM,
-                                                   ClassDecl *Class);
+                                                   ClassDecl *theClass);
   /// Emit the constant fragile instance alignment mask of the class, or null if
   /// the class does not have fixed layout. For resilient classes this does not
   /// correspond to the runtime alignment of instances of the class.
   llvm::Constant *tryEmitClassConstantFragileInstanceAlignMask(IRGenModule &IGM,
-                                                        ClassDecl *Class);
-
-  /// Emit the constant fragile byte offset for the field in the class, or null
-  /// if the field does not have fixed layout. For resilient classes this does
-  /// not correspond to the runtime offset of the field.
-  llvm::Constant *tryEmitClassConstantFragileFieldOffset(IRGenModule &IGM,
-                                                         ClassDecl *theClass,
-                                                         VarDecl *field);
+                                                        ClassDecl *theClass);
   
   /// What reference counting mechanism does a class use?
   ReferenceCounting getReferenceCountingForClass(IRGenModule &IGM,
@@ -117,7 +110,9 @@ namespace irgen {
   /// What isa-encoding mechanism does a type use?
   IsaEncoding getIsaEncodingForType(IRGenModule &IGM, CanType type);
   
-  ClassDecl *getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *C);
+  ClassDecl *getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *theClass);
+
+  bool getClassHasMetadataPattern(IRGenModule &IGM, ClassDecl *theClass);
 } // end namespace irgen
 } // end namespace swift
 

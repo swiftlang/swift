@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -33,8 +33,7 @@ using namespace Lowering;
 SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
                                            SILConstantInfo constantInfo) {
   // Mangle the constant with a _TTD header.
-  llvm::SmallString<32> name;
-  constant.mangle(name, "_TTD");
+  auto name = constant.mangle("_TTD");
 
   auto F = M.getOrCreateFunction(constant.getDecl(), name, SILLinkage::Shared,
                             constantInfo.getSILType().castTo<SILFunctionType>(),
@@ -63,8 +62,7 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   // TODO: If we allocated a new vtable slot for the derived method, then
   // further derived methods would potentially need multiple thunks, and we
   // would need to mangle the base method into the symbol as well.
-  llvm::SmallString<32> name;
-  derived.mangle(name, "_TTV");
+  auto name = derived.mangle("_TTV");
 
   // If we already emitted this thunk, reuse it.
   // TODO: Allocating new vtable slots for derived methods with different ABIs
@@ -136,47 +134,6 @@ bool SILGenModule::requiresObjCMethodEntryPoint(ConstructorDecl *constructor) {
   return constructor->isObjC();
 }
 
-bool SILGenModule::requiresObjCDispatch(ValueDecl *vd) {
-  // Final functions never require ObjC dispatch.
-  if (vd->isFinal())
-    return false;
-
-  // If the decl is an @objc protocol requirement, then the only witness is
-  // objc.
-  if (auto *proto = dyn_cast<ProtocolDecl>(vd->getDeclContext()))
-    if (proto->isObjC())
-      return true;
-
-  if (auto *fd = dyn_cast<FuncDecl>(vd)) {
-    // If a function has an associated Clang node, it's foreign and only has
-    // an ObjC entry point.
-    if (vd->hasClangNode())
-      return true;
-
-    // Property accessors should be generated alongside the property.
-    if (fd->isGetterOrSetter())
-      return requiresObjCDispatch(fd->getAccessorStorageDecl());
-
-    return fd->getAttrs().hasAttribute<DynamicAttr>();
-  }
-  if (auto *cd = dyn_cast<ConstructorDecl>(vd)) {
-    // If a function has an associated Clang node, it's foreign and only has
-    // an ObjC entry point.
-    if (vd->hasClangNode())
-      return true;
-    
-    return cd->getAttrs().hasAttribute<DynamicAttr>();
-  }
-  if (auto *asd = dyn_cast<AbstractStorageDecl>(vd))
-    return asd->requiresObjCGetterAndSetter();
-
-  return vd->getAttrs().hasAttribute<DynamicAttr>();
-}
-
-bool SILGenModule::requiresObjCSuperDispatch(ValueDecl *vd) {
-  return requiresObjCDispatch(vd);
-}
-
 namespace {
 
 /// An ASTVisitor for populating SILVTable entries from ClassDecl members.
@@ -232,7 +189,7 @@ public:
     // Try to find an overridden entry.
     // NB: Mutates vtableEntries in-place
     // FIXME: O(n^2)
-    if (auto overridden = member.getOverriddenVTableEntry()) {
+    if (auto overridden = member.getNextOverriddenVTableEntry()) {
       for (SILVTable::Pair &entry : vtableEntries) {
         SILDeclRef ref = overridden;
 
@@ -352,6 +309,11 @@ public:
 
   /// Emit SIL functions for all the members of the type.
   void emitType() {
+    // Force type lowering to lower the type, so that we have a chance to
+    // check for infinite value types even if there are no other references
+    // to this type.
+    SGM.Types.getTypeLowering(theType->getDeclaredTypeInContext());
+
     // Start building a vtable if this is a class.
     if (auto theClass = dyn_cast<ClassDecl>(theType))
       genVTable.emplace(SGM, theClass);
@@ -413,10 +375,7 @@ public:
   }
 
   void visitEnumCaseDecl(EnumCaseDecl *ecd) {}
-  void visitEnumElementDecl(EnumElementDecl *ued) {
-    assert(isa<EnumDecl>(theType));
-    SGM.emitEnumConstructor(ued);
-  }
+  void visitEnumElementDecl(EnumElementDecl *ued) {}
 
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
     // Emit initializers for static variables.

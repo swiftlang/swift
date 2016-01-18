@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -393,9 +393,9 @@ void sourcekitd::enableLogging(StringRef LoggerName) {
   Logger::enableLogging(LoggerName, LogLevel);
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // Public API
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 static llvm::sys::Mutex GlobalInitMtx;
 static unsigned gInitRefCount = 0;
@@ -452,9 +452,9 @@ sourcekitd_response_description_copy(sourcekitd_response_t resp) {
   return strdup(Desc.c_str());
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // Variant API
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 #define VAR_FN(var, name) ((var).data[0] ? \
                             ((VariantFunctions*)(var).data[0])->name : nullptr)

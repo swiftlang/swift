@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -123,7 +123,7 @@ struct X : D {
 // Here's a generic function that uses our dispatching distance
 func sort<T: F>(x: T) {
   // In here, we don't know whether T is an R or just a plain F, or
-  // whether it has its own specialized impelementation of
+  // whether it has its own specialized implementation of
   distance(x, x)
 }
 // CHECK-NEXT: F

@@ -1,3 +1,4 @@
+add_subdirectory(ABI)
 add_subdirectory(AST)
 add_subdirectory(ASTSectionImporter)
 add_subdirectory(Basic)
@@ -18,7 +19,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   add_subdirectory(SwiftDemangle)
 endif()
 add_subdirectory(SIL)
-add_subdirectory(SILAnalysis)
 add_subdirectory(SILGen)
-add_subdirectory(SILPasses)
+add_subdirectory(SILOptimizer)
 

@@ -1,8 +1,8 @@
-//===--- EnumPayload.cpp - Payload management for 'enum' Types -----------===//
+//===--- EnumPayload.cpp - Payload management for 'enum' Types ------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -77,11 +77,10 @@ EnumPayload EnumPayload::fromBitPattern(IRGenModule &IGM,
   return result;
 }
 
-template<typename Fn /* void(LazyValue &payloadValue,
-                             unsigned payloadBitWidth,
-                             unsigned payloadValueOffset,
-                             unsigned valueBitWidth,
-                             unsigned valueOffset) */>
+// Fn: void(LazyValue &payloadValue, unsigned payloadBitWidth,
+//          unsigned payloadValueOffset, unsigned valueBitWidth,
+//          unsigned valueOffset)
+template<typename Fn>
 static void withValueInPayload(IRGenFunction &IGF,
                                const EnumPayload &payload,
                                llvm::Type *valueType,
@@ -632,6 +631,39 @@ EnumPayload::emitApplyOrMask(IRGenFunction &IGF, APInt mask) {
     v = IGF.Builder.CreateOr(v, maskConstant);
     v = IGF.Builder.CreateBitOrPointerCast(v, payloadTy);
     pv = v;
+  }
+}
+
+void
+EnumPayload::emitApplyOrMask(IRGenFunction &IGF,
+                             EnumPayload mask) {
+  unsigned count = PayloadValues.size();
+  assert(count == mask.PayloadValues.size());
+
+  auto &DL = IGF.IGM.DataLayout;
+  for (unsigned i = 0; i < count; i++ ) {
+    auto payloadTy = getPayloadType(PayloadValues[i]);
+    unsigned size = DL.getTypeSizeInBits(payloadTy);
+
+    auto payloadIntTy = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), size);
+
+    if (mask.PayloadValues[i].is<llvm::Type *>()) {
+      // We're ORing with zero, do nothing
+    } else if (PayloadValues[i].is<llvm::Type *>()) {
+      PayloadValues[i] = mask.PayloadValues[i];
+    } else {
+      auto v1 = IGF.Builder.CreateBitOrPointerCast(
+          PayloadValues[i].get<llvm::Value *>(),
+          payloadIntTy);
+
+      auto v2 = IGF.Builder.CreateBitOrPointerCast(
+          mask.PayloadValues[i].get<llvm::Value *>(),
+          payloadIntTy);
+
+      PayloadValues[i] = IGF.Builder.CreateBitOrPointerCast(
+          IGF.Builder.CreateOr(v1, v2),
+          payloadTy);
+    }
   }
 }
 

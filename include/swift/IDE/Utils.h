@@ -1,8 +1,8 @@
-//===- Utils.h - Misc utilities -------------------------------------------===//
+//===--- Utils.h - Misc utilities -----------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -54,7 +54,7 @@ struct SourceCompleteResult {
   // The text to use as the indent string when auto indenting the next line.
   // This will contain the exactly what the client typed (any whitespaces and
   // tabs) and can be used to indent subsequent lines. It does not include
-  // the current indent level, IDE clients should insert the currect indentation
+  // the current indent level, IDE clients should insert the correct indentation
   // with spaces or tabs to account for the current indent level. The indent
   // prefix will contain the leading space characters of the line that
   // contained the '{', '(' or '[' character that was unbalanced.
@@ -123,6 +123,10 @@ void getLocationInfoForClangNode(ClangNode ClangNode,
 
 Optional<std::pair<unsigned, unsigned>> parseLineCol(StringRef LineCol);
 
+Type getTypeFromMangledTypename(ASTContext &Ctx,
+                                const char *mangled_typename,
+                                std::string &error);
+
 class XMLEscapingPrinter : public StreamPrinter {
   public:
   XMLEscapingPrinter(raw_ostream &OS) : StreamPrinter(OS){};
@@ -179,7 +183,6 @@ private:
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                bool IsOpenBracket) override;
 };
-
 } // namespace ide
 
 class ArchetypeTransformer {

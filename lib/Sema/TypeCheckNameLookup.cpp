@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -239,6 +239,8 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
     subOptions |= NL_KnownNonCascadingDependency;
   if (options.contains(NameLookupFlags::DynamicLookup))
     subOptions |= NL_DynamicLookup;
+  if (options.contains(NameLookupFlags::IgnoreAccessibility))
+    subOptions |= NL_IgnoreAccessibility;
 
   // Dig out the type that we'll actually be looking into, and determine
   // whether it is a nominal type.

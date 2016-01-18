@@ -1,4 +1,4 @@
-@import ObjectiveC;
+@import Foundation;
 
 #define SWIFT_NAME(X) __attribute__((swift_name(#X)))
 
@@ -38,13 +38,19 @@ SWIFT_NAME(SomeProtocol)
 @interface SNSomeClass (Category1) <SNSomeProtocol>
 - (void)categoryMethodWithX:(float)x y:(float)y;
 - (void)categoryMethodWithX:(float)x y:(float)y z:(float)z;
-- (object)objectAtIndexedSubscript:(NSInteger)index;
+- (id)objectAtIndexedSubscript:(NSInteger)index;
 @end
 
 @interface SNCollision
 @end
 
 @protocol SNCollision
+@property (readonly,nonnull) id reqSetter;
+- (void)setReqSetter:(nonnull id)bar;
+
+@property (readonly,nonnull) id optSetter;
+@optional
+- (void)setOptSetter:(nonnull id)bar;
 @end
 
 @protocol NSAccessibility

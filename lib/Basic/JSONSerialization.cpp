@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -207,8 +207,7 @@ void Output::scalarString(StringRef &S, bool MustQuote) {
           // Convert the current character into hexadecimal digits.
           Stream << llvm::hexdigit((c >> 4) & 0xF);
           Stream << llvm::hexdigit((c >> 0) & 0xF);
-        }
-        else {
+        } else {
           // This isn't a control character, so we don't need to escape it.
           // As a result, emit it directly; if it's part of a multi-byte UTF8
           // representation, all bytes will be emitted in this fashion.

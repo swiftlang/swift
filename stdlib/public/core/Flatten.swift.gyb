@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -144,11 +144,18 @@ public struct ${Index}<
   /// - Requires: The previous value is representable.
   public func predecessor() -> ${Index} {
     var prevOuter = _outer
-    var prevInnerCollection = _innerCollection ?? _base[--prevOuter]
+    var prevInnerCollection : BaseElements.Generator.Element
+    if let ic = _innerCollection {
+      prevInnerCollection = ic
+    } else {
+      prevOuter._predecessorInPlace()
+      prevInnerCollection = _base[prevOuter]
+    }
     var prevInner = _inner ?? prevInnerCollection.endIndex
 
     while prevInner == prevInnerCollection.startIndex {
-      prevInnerCollection = _base[--prevOuter]
+      prevOuter._predecessorInPlace()
+      prevInnerCollection = _base[prevOuter]
       prevInner = prevInnerCollection.endIndex
     }
 
@@ -217,6 +224,14 @@ public func == <BaseElements> (
 /// * `c.flatten()` does not create new storage
 /// * `c.flatten().map(f)` maps eagerly and returns a new array
 /// * `c.lazy.flatten().map(f)` maps lazily and returns a `LazyMapCollection`
+///
+/// - Note: The performance of accessing `startIndex`, `first`, any methods
+///   that depend on `startIndex`, or of advancing a `${Collection}Index`
+///   depends on how many empty subcollections are found in the base
+///   collection, and may not offer the usual performance given by
+///   `CollectionType` or `${traversal}IndexType`. Be aware, therefore, that
+///   general operations on `${Collection}` instances may not have the
+///   documented complexity.
 ///
 /// - See also: `FlattenSequence`
 public struct ${Collection}<

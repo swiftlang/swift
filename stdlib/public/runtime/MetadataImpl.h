@@ -1,8 +1,8 @@
-//===--- MetadataImpl.h - Metadata implementation routines -----*- C++ -*--===//
+//===--- MetadataImpl.h - Metadata implementation routines ------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -276,6 +276,21 @@ struct SwiftUnownedRetainableBox :
   static void release(HeapObject *obj) {
     swift_unownedRelease(obj);
   }
+
+#if SWIFT_OBJC_INTEROP
+  // The implementation from RetainableBoxBase is valid when interop is
+  // disabled.
+  static constexpr unsigned numExtraInhabitants = 1;
+
+  static void storeExtraInhabitant(HeapObject **dest, int index) {
+    assert(index == 0);
+    *dest = nullptr;
+  }
+
+  static int getExtraInhabitantIndex(const HeapObject * const *src) {
+    return (*src == nullptr ? 0 : -1);
+  }
+#endif
 };
 
 /// CRTP base class for weak reference boxes.
@@ -377,17 +392,39 @@ struct ObjCRetainableBox : RetainableBoxBase<ObjCRetainableBox, void*> {
 
 /// A box implementation class for unowned Objective-C object pointers.
 struct ObjCUnownedRetainableBox
-    : RetainableBoxBase<ObjCUnownedRetainableBox, void*> {
-  static constexpr unsigned numExtraInhabitants =
-    swift_getHeapObjectExtraInhabitantCount();
+    : WeakRetainableBoxBase<ObjCUnownedRetainableBox, UnownedReference> {
 
-  static void *retain(void *obj) {
-    swift_unknownUnownedRetain(obj);
-    return obj;
+  static constexpr unsigned numExtraInhabitants = 1;
+  static void storeExtraInhabitant(UnownedReference *dest, int index) {
+    assert(index == 0);
+    dest->Value = nullptr;
+  }
+  static int getExtraInhabitantIndex(const UnownedReference *src) {
+    return (src->Value == nullptr ? 0 : -1);
   }
 
-  static void release(void *obj) {
-    swift_unknownUnownedRelease(obj);
+  static void destroy(UnownedReference *ref) {
+    swift_unknownUnownedDestroy(ref);
+  }
+  static UnownedReference *initializeWithCopy(UnownedReference *dest,
+                                              UnownedReference *src) {
+    swift_unknownUnownedCopyInit(dest, src);
+    return dest;
+  }
+  static UnownedReference *initializeWithTake(UnownedReference *dest,
+                                              UnownedReference *src) {
+    swift_unknownUnownedTakeInit(dest, src);
+    return dest;
+  }
+  static UnownedReference *assignWithCopy(UnownedReference *dest,
+                                          UnownedReference *src) {
+    swift_unknownUnownedCopyAssign(dest, src);
+    return dest;
+  }
+  static UnownedReference *assignWithTake(UnownedReference *dest,
+                                          UnownedReference *src) {
+    swift_unknownUnownedTakeAssign(dest, src);
+    return dest;
   }
 };
 

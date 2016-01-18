@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -49,7 +49,7 @@
 // parameter of the base with a concrete type, the derived class can override
 // methods in the base that involved generic types. In the derived class, a
 // method override that involves substituted types will have a different
-// SIL lowering than the base method. In this case, the overriden vtable entry
+// SIL lowering than the base method. In this case, the overridden vtable entry
 // will point to a thunk which transforms parameters and results and invokes
 // the derived method.
 //
@@ -141,18 +141,18 @@ namespace {
   };
 };
 
-static ArrayRef<ProtocolConformance*>
+static ArrayRef<ProtocolConformanceRef>
 collectExistentialConformances(Module *M, Type fromType, Type toType) {
   assert(!fromType->isAnyExistentialType());
   
   SmallVector<ProtocolDecl *, 4> protocols;
   toType->getAnyExistentialTypeProtocols(protocols);
   
-  SmallVector<ProtocolConformance *, 4> conformances;
+  SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : protocols) {
     ProtocolConformance *conformance =
-    M->lookupConformance(fromType, proto, nullptr).getPointer();
-    conformances.push_back(conformance);
+      M->lookupConformance(fromType, proto, nullptr).getPointer();
+    conformances.push_back(ProtocolConformanceRef(proto, conformance));
   }
   
   return M->getASTContext().AllocateCopy(conformances);
@@ -200,7 +200,7 @@ static ManagedValue emitTransformExistential(SILGenFunction &SGF,
         ->getInstanceType();
   }
 
-  ArrayRef<ProtocolConformance *> conformances =
+  ArrayRef<ProtocolConformanceRef> conformances =
       collectExistentialConformances(SGF.SGM.M.getSwiftModule(),
                                      fromInstanceType,
                                      toInstanceType);
@@ -640,6 +640,7 @@ static ManagedValue manageParam(SILGenFunction &gen,
       return gen.emitManagedBufferWithCleanup(copy);
     }
   case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
     return ManagedValue::forLValue(paramValue);
   case ParameterConvention::Indirect_In:
     return gen.emitManagedBufferWithCleanup(paramValue);
@@ -649,18 +650,16 @@ static ManagedValue manageParam(SILGenFunction &gen,
   llvm_unreachable("bad parameter convention");
 }
 
-static void collectParams(SILGenFunction &gen,
-                          SILLocation loc,
-                          SmallVectorImpl<ManagedValue> &params,
-                          bool allowPlusZero) {
+void SILGenFunction::collectThunkParams(SILLocation loc,
+                                        SmallVectorImpl<ManagedValue> &params,
+                                        bool allowPlusZero) {
   auto paramTypes =
-    gen.F.getLoweredFunctionType()->getParametersWithoutIndirectResult();
+    F.getLoweredFunctionType()->getParametersWithoutIndirectResult();
   for (auto param : paramTypes) {
-    auto paramTy = gen.F.mapTypeIntoContext(param.getSILType());
-    auto paramValue = new (gen.SGM.M) SILArgument(gen.F.begin(),
-                                                  paramTy);
-                                      
-    params.push_back(manageParam(gen, loc, paramValue, param, allowPlusZero));
+    auto paramTy = F.mapTypeIntoContext(param.getSILType());
+    auto paramValue = new (SGM.M) SILArgument(F.begin(), paramTy);
+    auto paramMV = manageParam(*this, loc, paramValue, param, allowPlusZero);
+    params.push_back(paramMV);
   }
 }
 
@@ -761,7 +760,7 @@ namespace {
         if (outputTupleType) {
           // The input is exploded and the output is not. Translate values
           // and store them to a result tuple in memory.
-          assert(outputOrigType.isOpaque() &&
+          assert(outputOrigType.isTypeParameter() &&
                  "Output is not a tuple and is not opaque?");
 
           auto output = claimNextOutputType();
@@ -786,7 +785,7 @@ namespace {
         if (inputTupleType) {
           // The input is exploded and the output is not. Translate values
           // and store them to a result tuple in memory.
-          assert(inputOrigType.isOpaque() &&
+          assert(inputOrigType.isTypeParameter() &&
                  "Input is not a tuple and is not opaque?");
 
           return translateAndExplodeOutOf(inputOrigType,
@@ -985,7 +984,7 @@ namespace {
                                   AbstractionPattern outputOrigType,
                                   CanTupleType outputSubstType,
                                   ManagedValue inputTupleAddr) {
-      assert(inputOrigType.isOpaque());
+      assert(inputOrigType.isTypeParameter());
       assert(outputOrigType.matchesTuple(outputSubstType));
       assert(!inputSubstType->hasInOut() &&
              !outputSubstType->hasInOut());
@@ -1032,7 +1031,7 @@ namespace {
                                  CanTupleType outputSubstType,
                                  TemporaryInitialization &tupleInit) {
       assert(inputOrigType.matchesTuple(inputSubstType));
-      assert(outputOrigType.isOpaque());
+      assert(outputOrigType.isTypeParameter());
       assert(!inputSubstType->hasInOut() &&
              !outputSubstType->hasInOut());
       assert(inputSubstType->getNumElements() ==
@@ -1123,6 +1122,10 @@ namespace {
                             input, *temp.get());
         Outputs.push_back(temp->getManagedAddress());
         return;
+      }
+      case ParameterConvention::Indirect_InoutAliasable: {
+        llvm_unreachable("abstraction difference in aliasable argument not "
+                         "allowed");
       }
       }
 
@@ -1237,10 +1240,7 @@ static SILValue getThunkResult(SILGenFunction &gen,
   if (!fTy->hasIndirectResult()) {
     switch (fTy->getResult().getConvention()) {
     case ResultConvention::Owned:
-      break;
     case ResultConvention::Autoreleased:
-      innerResultValue =
-        gen.B.createStrongRetainAutoreleased(loc, innerResultValue);
       break;
     case ResultConvention::UnownedInnerPointer:
       // FIXME: We can't reasonably lifetime-extend an inner-pointer result
@@ -1308,7 +1308,7 @@ static SILValue getThunkResult(SILGenFunction &gen,
 /// \param inputOrigType Abstraction pattern of function value being thunked
 /// \param inputSubstType Formal AST type of function value being thunked
 /// \param outputOrigType Abstraction pattern of the thunk
-/// \param outputSubstType Formal AST type of the thuk
+/// \param outputSubstType Formal AST type of the thunk
 static void buildThunkBody(SILGenFunction &gen, SILLocation loc,
                            AbstractionPattern inputOrigType,
                            CanAnyFunctionType inputSubstType,
@@ -1330,7 +1330,7 @@ static void buildThunkBody(SILGenFunction &gen, SILLocation loc,
   SmallVector<ManagedValue, 8> params;
   // TODO: Could accept +0 arguments here when forwardFunctionArguments/
   // emitApply can.
-  collectParams(gen, loc, params, /*allowPlusZero*/ false);
+  gen.collectThunkParams(loc, params, /*allowPlusZero*/ false);
 
   ManagedValue fnValue = params.pop_back_val();
   auto fnType = fnValue.getType().castTo<SILFunctionType>();
@@ -1410,7 +1410,10 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   auto genericSig = F.getLoweredFunctionType()->getGenericSignature();
   if (generics) {
     for (auto archetype : generics->getAllNestedArchetypes()) {
-      subs.push_back({ archetype, archetype, { } });
+      SmallVector<ProtocolConformanceRef, 4> conformances;
+      for (auto proto : archetype->getConformsTo())
+        conformances.push_back(ProtocolConformanceRef(proto));
+      subs.push_back({ archetype, getASTContext().AllocateCopy(conformances) });
     }
   }
 
@@ -1678,7 +1681,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef derived,
   }
 
   SmallVector<ManagedValue, 8> thunkArgs;
-  collectParams(*this, loc, thunkArgs, /*allowPlusZero*/ true);
+  collectThunkParams(loc, thunkArgs, /*allowPlusZero*/ true);
 
   SmallVector<ManagedValue, 8> substArgs;
   // If the thunk and implementation share an indirect result type, use it
@@ -1821,7 +1824,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   SmallVector<ManagedValue, 8> origParams;
   // TODO: Should be able to accept +0 values here, once
   // forwardFunctionArguments/emitApply are able to.
-  collectParams(*this, loc, origParams, /*allowPlusZero*/ false);
+  collectThunkParams(loc, origParams, /*allowPlusZero*/ false);
   
   // Handle special abstraction differences in "self".
   // If the witness is a free function, drop it completely.

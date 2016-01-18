@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -97,9 +97,10 @@ public:
 
   /// Should we use a pass pipeline passed in via a json file? Null by default.
   StringRef ExternalPassPipelineFilename;
-
-  /// Use super_method for native super method calls instead of function_ref.
-  bool UseNativeSuperMethod = false;
+  
+  /// Emit captures and function contexts using +0 caller-guaranteed ARC
+  /// conventions.
+  bool EnableGuaranteedClosureContexts = false;
 };
 
 } // end namespace swift

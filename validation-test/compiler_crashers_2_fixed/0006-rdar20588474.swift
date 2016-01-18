@@ -36,7 +36,7 @@ extension Q_SequenceDefaultsType {
     var g = self.generate()
     while let element = g.next() {
       p.initialize(element)
-      ++p
+      p += 1
     }
   }
 
@@ -130,7 +130,7 @@ public struct Q_IndexingGenerator<C: Q_IndexableType> : GeneratorType {
       return nil
     }
     let ret = elements[pos]
-    ++pos
+    pos += 1
     return ret
   }
 }

@@ -369,7 +369,7 @@ func renamedRangeReplaceableCollectionTypeMethods(c: DefaultedForwardRangeReplac
 }
 
 func renamedAnyGenerator<G : GeneratorType>(g: G) {
-  _ = anyGenerator(g) // expected-error {{'anyGenerator' has been renamed to 'AnyGenerator'}}
-  _ = anyGenerator { 1 } // expected-error {{'anyGenerator' has been renamed to 'AnyGenerator'}}
+  _ = anyGenerator(g) // expected-warning {{'anyGenerator' is deprecated: renamed to 'AnyGenerator'}} expected-note {{use 'AnyGenerator' instead}}
+  _ = anyGenerator { 1 } // expected-warning {{'anyGenerator' is deprecated: renamed to 'AnyGenerator'}} expected-note {{use 'AnyGenerator' instead}}
 }
 

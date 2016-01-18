@@ -1,8 +1,8 @@
-//===-- Frontend.cpp - frontend utility methods ---------------------------===//
+//===--- Frontend.cpp - frontend utility methods --------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -69,6 +69,12 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   if (Invocation.getDiagnosticOptions().ShowDiagnosticsAfterFatalError) {
     Diagnostics.setShowDiagnosticsAfterFatalError();
   }
+  if (Invocation.getDiagnosticOptions().SuppressWarnings) {
+    Diagnostics.setSuppressWarnings(true);
+  }
+  if (Invocation.getDiagnosticOptions().WarningsAsErrors) {
+    Diagnostics.setWarningsAsErrors(true);
+  }
 
   // If we are asked to emit a module documentation file, configure lexing and
   // parsing to remember comments.
@@ -81,7 +87,10 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
 
   if (Invocation.getFrontendOptions().EnableSourceImport) {
     bool immediate = Invocation.getFrontendOptions().actionIsImmediate();
-    Context->addModuleLoader(SourceLoader::create(*Context, !immediate,
+    bool enableResilience = Invocation.getFrontendOptions().EnableResilience;
+    Context->addModuleLoader(SourceLoader::create(*Context,
+                                                  !immediate,
+                                                  enableResilience,
                                                   DepTracker));
   }
   
@@ -220,6 +229,8 @@ Module *CompilerInstance::getMainModule() {
     MainModule = Module::create(ID, *Context);
     if (Invocation.getFrontendOptions().EnableTesting)
       MainModule->setTestingEnabled();
+    if (Invocation.getFrontendOptions().EnableResilience)
+      MainModule->setResilienceEnabled();
   }
   return MainModule;
 }

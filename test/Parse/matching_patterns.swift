@@ -32,11 +32,9 @@ case let (let b): // expected-error {{'let' cannot appear nested inside another 
   print(b)
 
 // 'var' patterns (not allowed)
-// FIXME: rdar://problem/23378003
-// This will eventually be an error.
-case var a: // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{6-9=let}}
+case var a: // expected-error {{Use of 'var' binding here is not allowed}} {{6-9=let}}
   a += 1
-case var let a: // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{6-9=let}}
+case var let a: // expected-error {{Use of 'var' binding here is not allowed}} {{6-9=let}}
   // expected-error@-1 {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
   print(a, terminator: "")
 
@@ -209,13 +207,13 @@ case let .Payload(x):
 case let .Payload(name: x):
   acceptInt(x)
   acceptString("\(x)")
-case let .Payload((name: x)): // expected-error {{label is not allowed on single element tuple pattern}} expected-note {{remove the parentheses to make this a type annotation}} {{19-20=}} {{27-28=}} expected-note {{remove the label to make this a tuple pattern}} {{20-25=}}
+case let .Payload((name: x)):
   acceptInt(x)
   acceptString("\(x)")
-case .Payload(let (name: x)): // expected-error {{label is not allowed on single element tuple pattern}} expected-note {{remove the parentheses to make this a type annotation}} {{19-20=}} {{27-28=}} expected-note {{remove the label to make this a tuple pattern}} {{20-25=}}
+case .Payload(let (name: x)):
   acceptInt(x)
   acceptString("\(x)")
-case .Payload(let (name: x)): // expected-error {{label is not allowed on single element tuple pattern}} expected-note {{remove the parentheses to make this a type annotation}} {{19-20=}} {{27-28=}} expected-note {{remove the label to make this a tuple pattern}} {{20-25=}}
+case .Payload(let (name: x)):
   acceptInt(x)
   acceptString("\(x)")
 case .Payload(let x):
@@ -356,9 +354,6 @@ case (_?)?: break
 
 
 // <rdar://problem/20365753> Bogus diagnostic "refutable pattern match can fail"
-// expected-error @+3 {{label is not allowed on single element tuple pattern}}
-// expected-note @+2 {{remove the parentheses to make this a type annotation}} {{5-6=}} {{26-27=}}
-// expected-note @+1 {{remove the label to make this a tuple pattern}} {{6-21=}}
 let (responseObject: Int?) = op1
 // expected-error @-1 2 {{expected ',' separator}} {{25-25=,}} {{25-25=,}}
 // expected-error @-2 {{expected pattern}}

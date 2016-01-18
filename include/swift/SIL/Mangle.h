@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -26,8 +26,6 @@ namespace swift {
 
 class AbstractClosureExpr;
 
-namespace Mangle {
-
 enum class SpecializationKind : uint8_t {
   Generic,
   FunctionSignature,
@@ -40,7 +38,7 @@ class SpecializationManglerBase {
 protected:
   SpecializationKind Kind;
   SpecializationPass Pass;
-  Mangler &M;
+  Mangle::Mangler &M;
   SILFunction *Function;
 
 public:
@@ -57,34 +55,34 @@ public:
 
 protected:
   SpecializationManglerBase(SpecializationKind K, SpecializationPass P,
-                            Mangler &M, SILFunction *F)
+                            Mangle::Mangler &M, SILFunction *F)
       : Kind(K), Pass(P), M(M), Function(F) {}
 
-  llvm::raw_ostream &getBuffer() { return M.Buffer; }
   SILFunction *getFunction() const { return Function; }
-  Mangler &getMangler() const { return M; }
+  Mangle::Mangler &getMangler() const { return M; }
 
   void mangleKind() {
     switch (Kind) {
     case SpecializationKind::Generic:
-      M.Buffer << "g";
+      M.append("g");
       break;
     case SpecializationKind::FunctionSignature:
-      M.Buffer << "f";
+      M.append("f");
       break;
     }
   }
 
   void manglePass() {
-    M.Buffer << encodeSpecializationPass(Pass);
+    M.append(encodeSpecializationPass(Pass));
   }
 
   void mangleSpecializationPrefix() {
-    M.Buffer << "_TTS";
+    M.append("_TTS");
   }
 
   void mangleFunctionName() {
-    M.Buffer << "_" << Function->getName();
+    M.append("_");
+    M.appendSymbol(Function->getName());
   }
 };
 
@@ -112,8 +110,8 @@ public:
   }
 
 protected:
-  SpecializationMangler(SpecializationKind K, SpecializationPass P, Mangler &M,
-                        SILFunction *F)
+  SpecializationMangler(SpecializationKind K, SpecializationPass P,
+                        Mangle::Mangler &M, SILFunction *F)
       : SpecializationManglerBase(K, P, M, F) {}
 };
 
@@ -125,7 +123,7 @@ class GenericSpecializationMangler :
   ArrayRef<Substitution> Subs;
 
 public:
-  GenericSpecializationMangler(Mangler &M, SILFunction *F,
+  GenericSpecializationMangler(Mangle::Mangler &M, SILFunction *F,
                                ArrayRef<Substitution> Subs)
     : SpecializationMangler(SpecializationKind::Generic,
                             SpecializationPass::GenericSpecializer,
@@ -148,7 +146,8 @@ class FunctionSignatureSpecializationMangler
     Unmodified=0,
     ConstantProp=1,
     ClosureProp=2,
-    InOutToValue=3,
+    BoxToValue=3,
+    BoxToStack=4,
     First_Option=0, Last_Option=31,
 
     // Option Set Space. 12 bits (i.e. 12 option).
@@ -164,14 +163,15 @@ class FunctionSignatureSpecializationMangler
 
 public:
   FunctionSignatureSpecializationMangler(SpecializationPass Pass,
-                                         Mangler &M, SILFunction *F);
+                                         Mangle::Mangler &M, SILFunction *F);
   void setArgumentConstantProp(unsigned ArgNo, LiteralInst *LI);
   void setArgumentClosureProp(unsigned ArgNo, PartialApplyInst *PAI);
   void setArgumentClosureProp(unsigned ArgNo, ThinToThickFunctionInst *TTTFI);
   void setArgumentDead(unsigned ArgNo);
   void setArgumentOwnedToGuaranteed(unsigned ArgNo);
   void setArgumentSROA(unsigned ArgNo);
-  void setArgumentInOutToValue(unsigned ArgNo);
+  void setArgumentBoxToValue(unsigned ArgNo);
+  void setArgumentBoxToStack(unsigned ArgNo);
 
 private:
   void mangleSpecialization();
@@ -182,7 +182,6 @@ private:
                       NullablePtr<SILInstruction> Inst);
 };
 
-} // end namespace Mangle
 } // end namespace swift
 
 #endif

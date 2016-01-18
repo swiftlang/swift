@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -54,9 +54,8 @@ enum class TypeMetadataAddress {
 /// the information necessary to distinguish specific implementations
 /// of the declaration from each other.
 ///
-/// For example, functions may be exploded or uncurried at different
-/// levels, each of which potentially creates a different top-level
-/// function.
+/// For example, functions may be uncurried at different levels, each of
+/// which potentially creates a different top-level function.
 class LinkEntity {
   /// ValueDecl*, SILFunction*, or TypeBase*, depending on Kind.
   void *Pointer;
@@ -71,8 +70,7 @@ class LinkEntity {
     KindShift = 0, KindMask = 0xFF,
 
     // These fields appear in decl kinds.
-    ExplosionLevelShift = 8, ExplosionLevelMask = 0xFF00,
-    UncurryLevelShift = 16, UncurryLevelMask = 0xFF0000,
+    UncurryLevelShift = 8, UncurryLevelMask = 0xFF00,
 
     // This field appears in the ValueWitness kind.
     ValueWitnessShift = 8, ValueWitnessMask = 0xFF00,
@@ -83,6 +81,9 @@ class LinkEntity {
     // These fields appear in the TypeMetadata kind.
     MetadataAddressShift = 8, MetadataAddressMask = 0x0300,
     IsPatternShift = 10, IsPatternMask = 0x0400,
+
+    // This field appears in associated type access function kinds.
+    AssociatedTypeIndexShift = 8, AssociatedTypeIndexMask = ~KindMask,
   };
 #define LINKENTITY_SET_FIELD(field, value) (value << field##Shift)
 #define LINKENTITY_GET_FIELD(value, field) ((value & field##Mask) >> field##Shift)
@@ -127,6 +128,8 @@ class LinkEntity {
     /// A SIL global variable. The pointer is a SILGlobalVariable*.
     SILGlobalVariable,
 
+    // These next few are protocol-conformance kinds.
+
     /// A direct protocol witness table. The secondary pointer is a
     /// ProtocolConformance*.
     DirectProtocolWitnessTable,
@@ -134,14 +137,25 @@ class LinkEntity {
     /// A witness accessor function. The secondary pointer is a
     /// ProtocolConformance*.
     ProtocolWitnessTableAccessFunction,
+
+    /// A generic protocol witness table cache.  The secondary pointer is a
+    /// ProtocolConformance*.
+    GenericProtocolWitnessTableCache,
+
+    /// The instantiation function for a generic protocol witness table.
+    /// The secondary pointer is a ProtocolConformance*.
+    GenericProtocolWitnessTableInstantiationFunction,
     
-    /// A dependent protocol witness table instantiation function. The
-    /// secondary pointer is a ProtocolConformance*.
-    DependentProtocolWitnessTableGenerator,
-    
-    /// A template for dependent protocol witness table instantiation. The
-    /// secondary pointer is a ProtocolConformance*.
-    DependentProtocolWitnessTableTemplate,
+    /// A function which returns the type metadata for the associated type
+    /// of a protocol.  The secondary pointer is a ProtocolConformance*.
+    /// The index of the associated type declaration is stored in the data.
+    AssociatedTypeMetadataAccessFunction,
+
+    /// A function which returns the witness table for a protocol-constrained
+    /// associated type of a protocol.  The secondary pointer is a
+    /// ProtocolConformance*.  The primary pointer is a ProtocolDecl*.
+    /// The index of the associated type declaration is stored in the data.
+    AssociatedTypeWitnessTableAccessFunction,
 
     // These are both type kinds and protocol-conformance kinds.
 
@@ -212,14 +226,11 @@ class LinkEntity {
       && k <= Kind::ProtocolWitnessTableLazyCacheVariable;
   }
 
-  void setForDecl(Kind kind, 
-                  ValueDecl *decl, ResilienceExpansion explosionKind,
-                  unsigned uncurryLevel) {
+  void setForDecl(Kind kind, ValueDecl *decl, unsigned uncurryLevel) {
     assert(isDeclKind(kind));
     Pointer = decl;
     SecondaryPointer = nullptr;
     Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind))
-         | LINKENTITY_SET_FIELD(ExplosionLevel, unsigned(explosionKind))
          | LINKENTITY_SET_FIELD(UncurryLevel, uncurryLevel);
   }
 
@@ -238,6 +249,43 @@ class LinkEntity {
     Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind));
   }
 
+  void setForProtocolConformanceAndAssociatedType(Kind kind,
+                                                  const ProtocolConformance *c,
+                                                  AssociatedTypeDecl *associate,
+                                   ProtocolDecl *associatedProtocol = nullptr) {
+    assert(isProtocolConformanceKind(kind));
+    Pointer = associatedProtocol;
+    SecondaryPointer = const_cast<void*>(static_cast<const void*>(c));
+    Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind)) |
+           LINKENTITY_SET_FIELD(AssociatedTypeIndex,
+                                getAssociatedTypeIndex(c, associate));
+  }
+
+  // We store associated types using their index in their parent protocol
+  // in order to avoid bloating LinkEntity out to three key pointers.
+  static unsigned getAssociatedTypeIndex(const ProtocolConformance *conformance,
+                                         AssociatedTypeDecl *associate) {
+    assert(conformance->getProtocol() == associate->getProtocol());
+    unsigned result = 0;
+    for (auto requirement : associate->getProtocol()->getMembers()) {
+      if (requirement == associate) return result;
+      if (isa<AssociatedTypeDecl>(requirement)) result++;
+    }
+    llvm_unreachable("didn't find associated type in protocol?");
+  }
+
+  static AssociatedTypeDecl *
+  getAssociatedTypeByIndex(const ProtocolConformance *conformance,
+                           unsigned index) {
+    for (auto requirement : conformance->getProtocol()->getMembers()) {
+      if (auto associate = dyn_cast<AssociatedTypeDecl>(requirement)) {
+        if (index == 0) return associate;
+        index--;
+      }
+    }
+    llvm_unreachable("didn't find associated type in protocol?");
+  }
+
   void setForType(Kind kind, CanType type) {
     assert(isTypeKind(kind));
     Pointer = type.getPointer();
@@ -252,16 +300,14 @@ public:
     assert(!isFunction(decl));
 
     LinkEntity entity;
-    entity.setForDecl(Kind::Other, decl, ResilienceExpansion(0), 0);
+    entity.setForDecl(Kind::Other, decl, 0);
     return entity;
   }
 
   static LinkEntity forWitnessTableOffset(ValueDecl *decl,
-                                          ResilienceExpansion explosionKind,
                                           unsigned uncurryLevel) {
     LinkEntity entity;
-    entity.setForDecl(Kind::WitnessTableOffset, decl,
-                      explosionKind, uncurryLevel);
+    entity.setForDecl(Kind::WitnessTableOffset, decl, uncurryLevel);
     return entity;
   }
 
@@ -276,20 +322,19 @@ public:
 
   static LinkEntity forObjCClass(ClassDecl *decl) {
     LinkEntity entity;
-    entity.setForDecl(Kind::ObjCClass, decl, ResilienceExpansion::Minimal, 0);
+    entity.setForDecl(Kind::ObjCClass, decl, 0);
     return entity;
   }
 
   static LinkEntity forObjCMetaclass(ClassDecl *decl) {
     LinkEntity entity;
-    entity.setForDecl(Kind::ObjCMetaclass, decl, ResilienceExpansion::Minimal, 0);
+    entity.setForDecl(Kind::ObjCMetaclass, decl, 0);
     return entity;
   }
 
   static LinkEntity forSwiftMetaclassStub(ClassDecl *decl) {
     LinkEntity entity;
-    entity.setForDecl(Kind::SwiftMetaclassStub,
-                      decl, ResilienceExpansion::Minimal, 0);
+    entity.setForDecl(Kind::SwiftMetaclassStub, decl, 0);
     return entity;
   }
 
@@ -325,15 +370,13 @@ public:
   
   static LinkEntity forNominalTypeDescriptor(NominalTypeDecl *decl) {
     LinkEntity entity;
-    entity.setForDecl(Kind::NominalTypeDescriptor,
-                      decl, ResilienceExpansion::Minimal, 0);
+    entity.setForDecl(Kind::NominalTypeDescriptor, decl, 0);
     return entity;
   }
   
   static LinkEntity forProtocolDescriptor(ProtocolDecl *decl) {
     LinkEntity entity;
-    entity.setForDecl(Kind::ProtocolDescriptor,
-                      decl, ResilienceExpansion::Minimal, 0);
+    entity.setForDecl(Kind::ProtocolDescriptor, decl, 0);
     return entity;
   }
 
@@ -390,6 +433,22 @@ public:
   }
 
   static LinkEntity
+  forGenericProtocolWitnessTableCache(const ProtocolConformance *C) {
+    LinkEntity entity;
+    entity.setForProtocolConformance(Kind::GenericProtocolWitnessTableCache, C);
+    return entity;
+  }
+
+  static LinkEntity
+  forGenericProtocolWitnessTableInstantiationFunction(
+                                      const ProtocolConformance *C) {
+    LinkEntity entity;
+    entity.setForProtocolConformance(
+                     Kind::GenericProtocolWitnessTableInstantiationFunction, C);
+    return entity;
+  }
+
+  static LinkEntity
   forProtocolWitnessTableLazyAccessFunction(const ProtocolConformance *C,
                                             CanType type) {
     LinkEntity entity;
@@ -404,6 +463,26 @@ public:
     LinkEntity entity;
     entity.setForProtocolConformanceAndType(
              Kind::ProtocolWitnessTableLazyCacheVariable, C, type);
+    return entity;
+  }
+
+  static LinkEntity
+  forAssociatedTypeMetadataAccessFunction(const ProtocolConformance *C,
+                                          AssociatedTypeDecl *associate) {
+    LinkEntity entity;
+    entity.setForProtocolConformanceAndAssociatedType(
+                     Kind::AssociatedTypeMetadataAccessFunction, C, associate);
+    return entity;
+  }
+
+  static LinkEntity
+  forAssociatedTypeWitnessTableAccessFunction(const ProtocolConformance *C,
+                                              AssociatedTypeDecl *associate,
+                                              ProtocolDecl *associateProtocol) {
+    LinkEntity entity;
+    entity.setForProtocolConformanceAndAssociatedType(
+                Kind::AssociatedTypeWitnessTableAccessFunction, C, associate,
+                                                      associateProtocol);
     return entity;
   }
 
@@ -436,11 +515,19 @@ public:
     assert(isProtocolConformanceKind(getKind()));
     return reinterpret_cast<ProtocolConformance*>(SecondaryPointer);
   }
-  
-  ResilienceExpansion getResilienceExpansion() const {
-    assert(isDeclKind(getKind()));
-    return ResilienceExpansion(LINKENTITY_GET_FIELD(Data, ExplosionLevel));
+
+  AssociatedTypeDecl *getAssociatedType() const {
+    assert(getKind() == Kind::AssociatedTypeMetadataAccessFunction ||
+           getKind() == Kind::AssociatedTypeWitnessTableAccessFunction);
+    return getAssociatedTypeByIndex(getProtocolConformance(),
+                              LINKENTITY_GET_FIELD(Data, AssociatedTypeIndex));
   }
+
+  ProtocolDecl *getAssociatedProtocol() const {
+    assert(getKind() == Kind::AssociatedTypeWitnessTableAccessFunction);
+    return reinterpret_cast<ProtocolDecl*>(Pointer);
+  }
+
   unsigned getUncurryLevel() const {
     return LINKENTITY_GET_FIELD(Data, UncurryLevel);
   }

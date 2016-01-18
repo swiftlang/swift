@@ -59,8 +59,7 @@ struct X4 {
 
 struct Y1 {
   var stored: Int
-  // FIXME: diagnostic spew is horrible here
-  subscript(_: i, j: Int) -> Int { // expected-error 3{{use of undeclared type 'i'}}
+  subscript(_: i, j: Int) -> Int { // expected-error {{use of undeclared type 'i'}}
     get {
       return stored + j
     }
@@ -127,7 +126,7 @@ struct A4 {
 }
 
 struct A5 {
-  subscript(i : Int) -> Int // expected-error {{expected '{' for subscripting}}
+  subscript(i : Int) -> Int // expected-error {{expected '{' in subscript to specify getter and setter implementation}}
 }
 
 struct A6 {
@@ -155,7 +154,7 @@ struct A7b {
 }
 
 struct A8 {
-  subscript(i : Int) -> Int // expected-error{{expected '{' for subscripting}}
+  subscript(i : Int) -> Int // expected-error{{expected '{' in subscript to specify getter and setter implementation}}
     get { // expected-error{{expected declaration}}
       return stored
     }

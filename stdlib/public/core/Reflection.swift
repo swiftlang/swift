@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -175,7 +175,7 @@ func _dumpWithMirror<TargetStream : OutputStreamType>(
     inout _ targetStream: TargetStream
 ) {
   if maxItemCounter <= 0 { return }
-  --maxItemCounter
+  maxItemCounter -= 1
 
   for _ in 0..<indent { print(" ", terminator: "", toStream: &targetStream) }
 
@@ -407,7 +407,7 @@ struct _ClassMirror : _MirrorType {
 #if _runtime(_ObjC)
     return _getClassPlaygroundQuickLook(data)
 #else
-    return .None
+    return nil
 #endif
   }
   var disposition: _MirrorDisposition { return .Class }

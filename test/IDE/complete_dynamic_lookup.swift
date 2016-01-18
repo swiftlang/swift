@@ -139,6 +139,7 @@ protocol Bar { func bar() }
 // DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule[swift_ide_test]:      base1_Property2[#Base?#]{{; name=.+$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule[baz_clang_module]: baz_Class_InstanceFunc1!()[#Void#]{{; name=.+$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule[baz_clang_module]:    baz_Class_Property1[#Baz_Class!?#]{{; name=.+$}}
+// DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule[baz_clang_module]:    baz_Class_Property2[#Baz_Class!?#]{{; name=.+$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule[baz_clang_module]: baz_Protocol_InstanceFunc1!()[#Void#]{{; name=.+$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule[foo_swift_module]: foo_Nested1_ObjcInstanceFunc1!()[#Void#]{{; name=.+$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule[foo_swift_module]:    foo_Nested1_Property1[#Int?#]{{; name=.+$}}

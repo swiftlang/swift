@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -56,6 +56,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ExprHandle.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 using namespace swift;
 
@@ -117,10 +118,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     SetParentRAII SetParent(Walker, T);
     return inherited::visit(T);
   }
-
-  /***************************************************************************/
-  /********************************** Decls **********************************/
-  /***************************************************************************/
+  
+  bool visit(ParameterList *PL) {
+    return inherited::visit(PL);
+  }
+  
+  //===--------------------------------------------------------------------===//
+  //                                 Decls
+  //===--------------------------------------------------------------------===//
 
   bool visitImportDecl(ImportDecl *ID) {
     return false;
@@ -220,10 +225,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitSubscriptDecl(SubscriptDecl *SD) {
-    if (Pattern *NewPattern = doIt(SD->getIndices()))
-      SD->setIndices(NewPattern);
-    else
-      return true;
+    visit(SD->getIndices());
     return doIt(SD->getElementTypeLoc());
   }
 
@@ -231,8 +233,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 #ifndef NDEBUG
     PrettyStackTraceDecl debugStack("walking into body of", AFD);
 #endif
-    if (Walker.shouldWalkIntoFunctionGenericParams() &&
-        AFD->getGenericParams()) {
+    if (AFD->getGenericParams() &&
+        Walker.shouldWalkIntoFunctionGenericParams()) {
 
       // Visit generic params
       for (auto &P : AFD->getGenericParams()->getParams()) {
@@ -247,25 +249,20 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       // Visit param conformance
       for (auto &Req : AFD->getGenericParams()->getRequirements()) {
         switch (Req.getKind()) {
-        case RequirementKind::SameType:
+        case RequirementReprKind::SameType:
           if (doIt(Req.getFirstTypeLoc()) || doIt(Req.getSecondTypeLoc()))
             return true;
           break;
-        case RequirementKind::Conformance:
-          if (doIt(Req.getSubjectLoc()))
+        case RequirementReprKind::TypeConstraint:
+          if (doIt(Req.getSubjectLoc()) || doIt(Req.getConstraintLoc()))
             return true;
-          break;
-        case RequirementKind::WitnessMarker:
           break;
         }
       }
     }
 
-    for (auto &P : AFD->getBodyParamPatterns()) {
-      if (Pattern *NewPattern = doIt(P))
-        P = NewPattern;
-      else
-        return true;
+    for (auto PL : AFD->getParameterLists()) {
+      visit(PL);
     }
 
     if (auto *FD = dyn_cast<FuncDecl>(AFD))
@@ -312,9 +309,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return false;
   }
 
-  /***************************************************************************/
-  /********************************** Exprs **********************************/
-  /***************************************************************************/
+  //===--------------------------------------------------------------------===//
+  //                                  Exprs
+  //===--------------------------------------------------------------------===//
 
   // A macro for handling the "semantic expressions" that are common
   // on sugared expression nodes like string interpolation.  The
@@ -631,10 +628,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitClosureExpr(ClosureExpr *expr) {
-    if (Pattern *Pat = doIt(expr->getParams()))
-      expr->setParams(Pat);
-    else
-      return nullptr;
+    visit(expr->getParameters());
 
     if (expr->hasExplicitResultType())
       if (doIt(expr->getExplicitResultTypeLoc()))
@@ -824,12 +818,13 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
   
   Expr *visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
+    HANDLE_SEMANTIC_EXPR(E);
     return E;
   }
 
-  /***************************************************************************/
-  /***************************** Everything Else *****************************/
-  /***************************************************************************/
+  //===--------------------------------------------------------------------===//
+  //                           Everything Else
+  //===--------------------------------------------------------------------===//
 
 #define STMT(Id, Parent) Stmt *visit##Id##Stmt(Id##Stmt *S);
 #include "swift/AST/StmtNodes.def"
@@ -839,7 +834,32 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
 #define TYPEREPR(Id, Parent) bool visit##Id##TypeRepr(Id##TypeRepr *T);
 #include "swift/AST/TypeReprNodes.def"
-
+  
+  bool visitParameterList(ParameterList *PL) {
+    if (!Walker.walkToParameterListPre(PL))
+      return false;
+    
+    for (auto P : *PL) {
+      // Walk each parameter's decl and typeloc and default value.
+      if (doIt(P))
+        return true;
+      
+      // Don't walk into the type if the decl is implicit, or if the type is
+      // implicit.
+      if (!P->isImplicit() && !P->isTypeLocImplicit() &&
+          doIt(P->getTypeLoc()))
+        return true;
+      
+      if (auto *E = P->getDefaultValue()) {
+        auto res = doIt(E->getExpr());
+        if (!res) return true;
+        E->setExpr(res, E->alreadyChecked());
+      }
+    }
+    
+    return Walker.walkToParameterListPost(PL);
+  }
+  
 public:
   Traversal(ASTWalker &walker) : Walker(walker) {}
 
@@ -1306,14 +1326,6 @@ Pattern *Traversal::visitTuplePattern(TuplePattern *P) {
       element.setPattern(newField);
     else
       return nullptr;
-
-    if (auto handle = element.getInit()) {
-      if (auto init = doIt(handle->getExpr())) {
-        handle->setExpr(init, handle->alreadyChecked());
-      } else {
-        return nullptr;
-      }
-    }
   }
   return P;
 }

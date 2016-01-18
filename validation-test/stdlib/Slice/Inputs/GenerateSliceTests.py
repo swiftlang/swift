@@ -5,8 +5,9 @@ import itertools
 traversal_options = [ 'Forward', 'Bidirectional', 'RandomAccess' ]
 base_kind_options = [ 'Defaulted', 'Minimal' ]
 mutable_options = [ False, True ]
-for traversal, base_kind, mutable in itertools.product(
-    traversal_options, base_kind_options, mutable_options):
+for traversal, base_kind, mutable in itertools.product(traversal_options,
+                                                       base_kind_options,
+                                                       mutable_options):
     # Test Slice<Base> and MutableSlice<Base> of various collections using value
     # types as elements.
     wrapper_types = [ 'Slice', 'MutableSlice' ] if mutable else [ 'Slice' ]
@@ -19,8 +20,8 @@ for traversal, base_kind, mutable in itertools.product(
         ]:
             Base = '%s%s%sCollection' % (base_kind, traversal, 'Mutable' if mutable else '')
             testFilename = WrapperType + '_Of_' + Base + '_' + name + '.swift'
-            testFile = open(testFilename + '.gyb', 'w')
-            testFile.write("""
+            with open(testFilename + '.gyb', 'w') as testFile:
+                testFile.write("""
 //// Automatically Generated From validation-test/stdlib/Inputs/GenerateSliceTests.py
 //////// Do Not Edit Directly!
 // -*- swift -*-
@@ -34,6 +35,14 @@ for traversal, base_kind, mutable in itertools.product(
 // REQUIRES: optimized_stdlib
 
 import StdlibUnittest
+
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
 
 var SliceTests = TestSuite("CollectionType")
 
@@ -61,9 +70,3 @@ runAllTests()
     prefix=prefix,
     suffix=suffix
 ))
-            testFile.close()
-
-
-
-
-

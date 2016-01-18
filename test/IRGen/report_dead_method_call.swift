@@ -9,7 +9,7 @@
 // The -disable-access-control option let us "call" methods, which are removed
 // by dead method elimination.
 
-// CHECK: fatal error: call of removed method
+// CHECK: fatal error: call of deleted method
 
 private protocol PrivateProto {
 	func abc()

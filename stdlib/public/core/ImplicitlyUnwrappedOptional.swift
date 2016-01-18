@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -59,7 +59,7 @@ public enum ImplicitlyUnwrappedOptional<Wrapped>
     }
   }
 
-  /// Returns `nil` if `self` is nil, `f(self!)` otherwise.
+  /// Returns `nil` if `self` is `nil`, `f(self!)` otherwise.
   @warn_unused_result
   public func flatMap<U>(
     @noescape f: (Wrapped) throws -> ImplicitlyUnwrappedOptional<U>
@@ -92,6 +92,17 @@ extension ImplicitlyUnwrappedOptional : CustomStringConvertible {
     case .None:
       return "nil"
     }
+  }
+}
+
+/// Directly conform to CustomDebugStringConvertible to support
+/// optional printing. Implementation of that feature relies on
+/// _isOptional thus cannot distinguish ImplicitlyUnwrappedOptional
+/// from Optional. When conditional conformance is available, this
+/// outright conformance can be removed.
+extension ImplicitlyUnwrappedOptional : CustomDebugStringConvertible {
+  public var debugDescription: String {
+    return description
   }
 }
 

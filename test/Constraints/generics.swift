@@ -43,7 +43,7 @@ func foo<T : P>(arg: T) -> T {
 
 // Associated types and metatypes
 protocol SomeProtocol {
-  typealias SomeAssociated
+  associatedtype SomeAssociated
 }
 
 func generic_metatypes<T : SomeProtocol>(x: T)
@@ -101,7 +101,7 @@ func foo2(p1: P1) -> P2 {
 
 // <rdar://problem/14005696>
 protocol BinaryMethodWorkaround {
-  typealias MySelf
+  associatedtype MySelf
 }
 
 protocol Squigglable : BinaryMethodWorkaround {
@@ -142,12 +142,12 @@ func test16078944 <T: ForwardIndexType>(lhs: T, args: T) -> Int {
 class r22409190ManagedBuffer<Value, Element> {
   final var value: Value { get {} set {}}
   func withUnsafeMutablePointerToElements<R>(
-    body: (UnsafeMutablePointer<Element>)->R) -> R {
+    body: (UnsafeMutablePointer<Element>) -> R) -> R {
   }
 }
 class MyArrayBuffer<Element>: r22409190ManagedBuffer<UInt, Element> {
   deinit {
-    self.withUnsafeMutablePointerToElements { elems->Void in
+    self.withUnsafeMutablePointerToElements { elems -> Void in
       elems.destroy(self.value)  // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Int'}}
     }
   }
@@ -171,3 +171,15 @@ func r22459135() {
     }
   }
 }
+
+
+// <rdar://problem/19710848> QoI: Friendlier error message for "[] as Set"
+_ = [] as Set  // expected-error {{generic parameter 'Element' could not be inferred}}
+
+
+//<rdar://problem/22509125> QoI: Error when unable to infer generic archetype lacks greatness
+func r22509125<T>(a : T?) { // expected-note {{in call to function 'r22509125'}}
+  r22509125(nil) // expected-error {{generic parameter 'T' could not be inferred}}
+}
+
+

@@ -3,17 +3,25 @@
 
 import StdlibUnittest
 
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 var FailableInitTestSuite = TestSuite("FailableInit")
 
 class Canary {
   static var count: Int = 0
 
   init() {
-    Canary.count++
+    Canary.count += 1
   }
 
   deinit {
-    Canary.count--
+    Canary.count -= 1
   }
 }
 

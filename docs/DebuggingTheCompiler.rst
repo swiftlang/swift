@@ -136,7 +136,7 @@ and check for the function name in the breakpoint condition::
 
     (lldb) br set -c 'hasName("_TFC3nix1Xd")' -f SILFunction.cpp -l 91
 
-Sometimes you want to know which optimization does insert, remove or move a
+Sometimes you may want to know which optimization inserts, removes or moves a
 certain instruction. To find out, set a breakpoint in
 ``ilist_traits<SILInstruction>::addNodeToList`` or
 ``ilist_traits<SILInstruction>::removeNodeFromList``, which are defined in

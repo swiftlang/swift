@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -131,6 +131,15 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
     Types(*new TypeConverter(*this))
 {
   dispatcher.addGenModule(SF, this);
+
+  // If the command line contains an explicit request about whether to add
+  // LLVM value names, honor it.  Otherwise, add value names only if the
+  // final result is textual LLVM assembly.
+  if (Opts.HasValueNamesSetting) {
+    EnableValueNames = Opts.ValueNames;
+  } else {
+    EnableValueNames = (Opts.OutputKind == IRGenOutputKind::LLVMAssembly);
+  }
   
   VoidTy = llvm::Type::getVoidTy(getLLVMContext());
   Int1Ty = llvm::Type::getInt1Ty(getLLVMContext());
@@ -268,6 +277,14 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
     });
   ProtocolConformanceRecordPtrTy
     = ProtocolConformanceRecordTy->getPointerTo(DefaultAS);
+
+  TypeMetadataRecordTy
+    = createStructType(*this, "swift.type_metadata_record", {
+      RelativeAddressTy,
+      Int32Ty
+    });
+  TypeMetadataRecordPtrTy
+    = TypeMetadataRecordTy->getPointerTo(DefaultAS);
 
   FixedBufferTy = nullptr;
   for (unsigned i = 0; i != MaxNumValueWitnesses; ++i)
@@ -623,19 +640,6 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
       LLVMUsed.push_back(casted);
     }
   }
-}
-
-// FIXME: This should just be the implementation of
-// llvm::array_pod_sort_comparator. The only difference is that it uses
-// std::less instead of operator<.
-template <typename T>
-static int pointerPODSortComparator(T * const *lhs, T * const *rhs) {
-  std::less<T *> lt;
-  if (lt(*lhs, *rhs))
-    return -1;
-  if (lt(*rhs, *lhs))
-    return -1;
-  return 0;
 }
 
 static bool replaceModuleFlagsEntry(llvm::LLVMContext &Ctx,

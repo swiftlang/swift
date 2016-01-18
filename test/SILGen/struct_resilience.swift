@@ -14,20 +14,20 @@ func functionWithResilientTypes(s: Size, f: Size -> Size) -> Size {
 // CHECK:         copy_addr %1 to [initialization] [[OTHER_SIZE_BOX:%.*]]#1 : $*Size
   var s2 = s
 
-// CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]]#1 : $*Size
+// CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*Size
 // CHECK:         [[FN:%.*]] = function_ref @_TFV16resilient_struct4Sizeg1wSi : $@convention(method) (@in_guaranteed Size) -> Int
-// CHECK:         [[RESULT:%.*]] = apply [[FN]]([[SIZE_BOX]]#1)
+// CHECK:         [[RESULT:%.*]] = apply [[FN]]([[SIZE_BOX]])
 // CHECK:         [[FN:%.*]] = function_ref @_TFV16resilient_struct4Sizes1wSi : $@convention(method) (Int, @inout Size) -> ()
 // CHECK:         apply [[FN]]([[RESULT]], [[OTHER_SIZE_BOX]]#1)
   s2.w = s.w
 
-// CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]]#1 : $*Size
+// CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*Size
 // CHECK:         [[FN:%.*]] = function_ref @_TFV16resilient_struct4Sizeg1hSi : $@convention(method) (@in_guaranteed Size) -> Int
-// CHECK:         [[RESULT:%.*]] = apply [[FN]]([[SIZE_BOX]]#1)
+// CHECK:         [[RESULT:%.*]] = apply [[FN]]([[SIZE_BOX]])
   _ = s.h
 
-// CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]]#1 : $*Size
-// CHECK:         apply %2(%0, [[SIZE_BOX]]#1)
+// CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*Size
+// CHECK:         apply %2(%0, [[SIZE_BOX]])
 // CHECK:         return
   return f(s)
 }
@@ -67,13 +67,44 @@ func functionWithFixedLayoutOfResilientTypes(r: Rectangle, f: Rectangle -> Recta
 
 public struct MySize {
 
+  // Static computed property
+
+// CHECK-LABEL: sil @_TZFV17struct_resilience6MySizeg10expirationSi : $@convention(thin) (@thin MySize.Type) -> Int
+// CHECK-LABEL: sil @_TZFV17struct_resilience6MySizes10expirationSi : $@convention(thin) (Int, @thin MySize.Type) -> ()
+// CHECK-LABEL: sil @_TZFV17struct_resilience6MySizem10expirationSi : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @thin MySize.Type) -> (Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout MySize.Type, @thick MySize.Type.Type) -> ()>)
+  public static var expiration: Int {
+    get { return copyright + 70 }
+    set { copyright = newValue - 70 }
+  }
+
+  // Instance computed property
+
+// CHECK-LABEL: sil @_TFV17struct_resilience6MySizeg1dSi : $@convention(method) (@in_guaranteed MySize) -> Int
+// CHECK-LABEL: sil @_TFV17struct_resilience6MySizes1dSi : $@convention(method) (Int, @inout MySize) -> ()
+// CHECK-LABEL: sil @_TFV17struct_resilience6MySizem1dSi : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout MySize) -> (Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout MySize, @thick MySize.Type) -> ()>)
+  public var d: Int {
+    get { return 0 }
+    set { }
+  }
+
+  // Instance stored property
+
 // CHECK-LABEL: sil @_TFV17struct_resilience6MySizeg1wSi : $@convention(method) (@in_guaranteed MySize) -> Int
 // CHECK-LABEL: sil @_TFV17struct_resilience6MySizes1wSi : $@convention(method) (Int, @inout MySize) -> ()
 // CHECK-LABEL: sil @_TFV17struct_resilience6MySizem1wSi : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout MySize) -> (Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout MySize, @thick MySize.Type) -> ()>)
   public var w: Int
 
+  // Read-only instance stored property
+
 // CHECK-LABEL: sil @_TFV17struct_resilience6MySizeg1hSi : $@convention(method) (@in_guaranteed MySize) -> Int
   public let h: Int
+
+  // Static stored property
+
+// CHECK-LABEL: sil @_TZFV17struct_resilience6MySizeg9copyrightSi : $@convention(thin) (@thin MySize.Type) -> Int
+// CHECK-LABEL: sil @_TZFV17struct_resilience6MySizes9copyrightSi : $@convention(thin) (Int, @thin MySize.Type) -> ()
+// CHECK-LABEL: sil @_TZFV17struct_resilience6MySizem9copyrightSi : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @thin MySize.Type) -> (Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout MySize.Type, @thick MySize.Type.Type) -> ()>)
+  public static var copyright: Int = 0
 }
 
 // CHECK-LABEL: sil @_TF17struct_resilience28functionWithMyResilientTypesFTVS_6MySize1fFS0_S0__S0_ : $@convention(thin) (@out MySize, @in MySize, @owned @callee_owned (@out MySize, @in MySize) -> ()) -> ()
@@ -95,8 +126,8 @@ public func functionWithMyResilientTypes(s: MySize, f: MySize -> MySize) -> MySi
 // CHECK:         [[RESULT:%.*]] = load [[RESULT_ADDR]] : $*Int
   _ = s.h
 
-// CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]]#1 : $*MySize
-// CHECK:         apply %2(%0, [[SIZE_BOX]]#1)
+// CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*MySize
+// CHECK:         apply %2(%0, [[SIZE_BOX]])
 // CHECK:         return
   return f(s)
 }

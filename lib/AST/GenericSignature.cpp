@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -255,6 +255,21 @@ GenericSignature::getCanonicalManglingSignature(ModuleDecl &M) const {
       depTypes.push_back(depTy);
       return;
     }
+
+    case RequirementKind::Superclass: {
+      assert(std::find(depTypes.begin(), depTypes.end(),
+                       depTy) != depTypes.end()
+             && "didn't see witness marker first?");
+      // Organize conformance constraints, sifting out the base class
+      // requirement.
+      auto &depConstraints = constraints[depTy];
+
+      auto constraintType = type.get<Type>()->getCanonicalType();
+      assert(depConstraints.baseClass.isNull()
+              && "multiple base class constraints?!");
+      depConstraints.baseClass = constraintType;
+      return;
+    }
       
     case RequirementKind::Conformance: {
       assert(std::find(depTypes.begin(), depTypes.end(),
@@ -265,14 +280,8 @@ GenericSignature::getCanonicalManglingSignature(ModuleDecl &M) const {
       auto &depConstraints = constraints[depTy];
       
       auto constraintType = type.get<Type>()->getCanonicalType();
-      if (constraintType->isExistentialType()) {
-        depConstraints.protocols.push_back(constraintType);
-      } else {
-        assert(depConstraints.baseClass.isNull()
-               && "multiple base class constraints?!");
-        depConstraints.baseClass = constraintType;
-      }
-        
+      assert(constraintType->isExistentialType());
+      depConstraints.protocols.push_back(constraintType);
       return;
     }
     
@@ -315,7 +324,7 @@ GenericSignature::getCanonicalManglingSignature(ModuleDecl &M) const {
       const auto &depConstraints = foundConstraints->second;
       
       if (depConstraints.baseClass)
-        minimalRequirements.push_back(Requirement(RequirementKind::Conformance,
+        minimalRequirements.push_back(Requirement(RequirementKind::Superclass,
                                                   depTy,
                                                   depConstraints.baseClass));
       
@@ -389,10 +398,6 @@ GenericSignature::getSubstitutionMap(ArrayRef<Substitution> args) const {
   }
   
   // Seed the type map with pre-existing substitutions.
-  for (auto sub : args) {
-    subs[sub.getArchetype()] = sub.getReplacement();
-  }
-  
   for (auto depTy : getAllDependentTypes()) {
     auto replacement = args.front().getReplacement();
     args = args.slice(1);

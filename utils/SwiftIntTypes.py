@@ -2,7 +2,7 @@
 ##
 ## This source file is part of the Swift.org open source project
 ##
-## Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+## Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 ## Licensed under Apache License v2.0 with Runtime Library Exception
 ##
 ## See http://swift.org/LICENSE.txt for license information
@@ -78,7 +78,7 @@ def all_integer_type_names():
     return [self_ty.stdlib_name for self_ty in all_integer_types(0)]
 
 def all_real_number_type_names():
-    return ['Float', 'Double'] #FIXME , 'Float80' Revert until I figure out a test failure  # Float80 for i386 & x86_64
+    return ['Float', 'Double'] # FIXME , 'Float80' Revert until I figure out a test failure  # Float80 for i386 & x86_64
 
 def all_numeric_type_names():
     return all_integer_type_names() + all_real_number_type_names()
@@ -102,4 +102,3 @@ def all_integer_assignment_operator_names():
     
 def all_integer_or_real_assignment_operator_names():
     return ['=', '*=', '/=', '%=', '+=', '-=']
-    

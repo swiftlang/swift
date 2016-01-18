@@ -218,11 +218,11 @@ func != <T>(lhs : T, rhs : NoneType) -> Bool { // expected-error{{invalid redecl
 }
 
 // <rdar://problem/15082356>
-func &&(lhs: BooleanType, @autoclosure rhs: ()->BooleanType) -> Bool { // expected-note{{previously declared}}
+func &&(lhs: BooleanType, @autoclosure rhs: () -> BooleanType) -> Bool { // expected-note{{previously declared}}
   return lhs.boolValue && rhs().boolValue
 }
 
-func &&(lhs: BooleanType, @autoclosure rhs: ()->BooleanType) -> Bool { // expected-error{{invalid redeclaration of '&&'}}
+func &&(lhs: BooleanType, @autoclosure rhs: () -> BooleanType) -> Bool { // expected-error{{invalid redeclaration of '&&'}}
   return lhs.boolValue || rhs().boolValue
 }
 

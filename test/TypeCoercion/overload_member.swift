@@ -41,8 +41,8 @@ func test_method_overload_coerce(a: A, inout x: X, inout y: Y, z: Z) {
 }
 
 func test_method_value_coerce(a: A) {
-  var _ : (X) -> X = a.f;
-  var _ : (A) -> (X) -> X = A.f;
+  var _ : (X) -> X = a.f
+  var _ : (A) -> (X) -> X = A.f
 }
 
 func test_static_method_overload(a: A, x: X, y: Y) {
@@ -62,8 +62,8 @@ func test_static_method_overload_coerce(a: A, inout x: X, inout y: Y, z: Z) {
 }
 
 func test_static_method_value_coerce(a: A) {
-  var _ : (X) -> X = A.sf;
-  var _ : (Y) -> Y = A.sf;
+  var _ : (X) -> X = A.sf
+  var _ : (Y) -> Y = A.sf
 }
 
 func test_mixed_overload(a: A, x: X, y: Y) {
@@ -87,10 +87,10 @@ func test_mixed_overload_coerce(a: A, inout x: X, y: Y, z: Z) {
 }
 
 func test_mixed_method_value_coerce(a: A) {
-  var _ : (X) -> X = a.mixed;
-  var _ : (Y) -> Y = A.mixed;
+  var _ : (X) -> X = a.mixed
+  var _ : (Y) -> Y = A.mixed
   var _ : (Y) -> Y = a.mixed; // expected-error{{cannot convert value of type '(x: X) -> X' to specified type '(Y) -> Y'}}
-  var _ : (A) -> (X) -> X = A.mixed;
+  var _ : (A) -> (X) -> X = A.mixed
 }
 
 extension A {
@@ -118,9 +118,9 @@ extension A {
   }
 
   func test_method_value_coerce() {
-    var _ : (X) -> X = f;
-    var _ : (A) -> (X) -> X = A.f;
-    var _ : (A) -> (X) -> X = A.f;
+    var _ : (X) -> X = f
+    var _ : (A) -> (X) -> X = A.f
+    var _ : (A) -> (X) -> X = A.f
   }
 
   func test_mixed_overload_coerce(inout x x: X, y: Y, z: Z) {
@@ -129,10 +129,10 @@ extension A {
   }
 
   func test_mixed_method_value_coerce() {
-    var _ : (X) -> X = mixed;
+    var _ : (X) -> X = mixed
     var _ : (Y) -> Y = mixed; // expected-error{{cannot convert value of type '(x: X) -> X' to specified type '(Y) -> Y'}}
     var _ : (Y) -> Y = mixed; // expected-error{{cannot convert value of type '(x: X) -> X' to specified type '(Y) -> Y'}}
-    var _ : (A) -> (X) -> X = A.mixed;
+    var _ : (A) -> (X) -> X = A.mixed
   }
 
   class func test_method_overload_static(x x: X, y: Y, z: Z) {
@@ -171,12 +171,12 @@ extension A {
   }
 
   class func test_mixed_method_value_coerce_static() {
-    var _ : (Y) -> Y = mixed;
-    var _ : (A) -> (X) -> X = mixed;
+    var _ : (Y) -> Y = mixed
+    var _ : (A) -> (X) -> X = mixed
   }
 }
 
-var clams : X; 
+var clams : X
 
 struct WeirdIvarLookupBehavior { 
   var clams : Y

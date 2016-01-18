@@ -26,14 +26,6 @@ public enum _GenericObjCError : ErrorType {
   case NilError
 }
 
-/// An intrinsic used by the runtime to create an error when an
-/// Objective-C API indicates failure but produces a nil error.
-@warn_unused_result
-@_silgen_name("swift_allocNilObjCError")
-public func _allocNilObjCError() -> ErrorType {
-  return _GenericObjCError.NilError
-}
-
 /// An internal protocol to represent Swift error enums that map to standard
 /// Cocoa NSError domains.
 public protocol _ObjectiveCBridgeableErrorType : ErrorType {
@@ -61,7 +53,7 @@ public func _stdlib_bridgeNSErrorToErrorType<
   }
 }
 
-/// Helper protocol for _BridgedNSError, which used used to provide
+/// Helper protocol for _BridgedNSError, which used to provide
 /// default implementations.
 public protocol __BridgedNSError : RawRepresentable, ErrorType {
   static var _NSErrorDomain: String { get }

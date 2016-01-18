@@ -1,8 +1,8 @@
-//===--- SILBasicBlock.cpp - Basic blocks for high-level SIL code ----------==//
+//===--- SILBasicBlock.cpp - Basic blocks for high-level SIL code ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -37,18 +37,25 @@ SILBasicBlock::SILBasicBlock(SILFunction *parent, SILBasicBlock *afterBB)
   }
 }
 SILBasicBlock::~SILBasicBlock() {
-  // Notify the delete handlers that the instructions in this block are
-  // being deleted.
-  for (auto I = begin(), E = end(); I != E; ++I) {
-    getModule().notifyDeleteHandlers(&*I);
-  }
-
   // Invalidate all of the basic block arguments.
   for (auto *Arg : BBArgList) {
     getModule().notifyDeleteHandlers(Arg);
   }
 
+  dropAllReferences();
+
+  // Notify the delete handlers that the instructions in this block are
+  // being deleted.
+  auto &M = getModule();
+  for (auto I = begin(), E = end(); I != E;) {
+    auto Inst = &*I;
+    ++I;
+    M.notifyDeleteHandlers(Inst);
+    erase(Inst);
+  }
+
   // iplist's destructor is going to destroy the InstList.
+  InstList.clearAndLeakNodesUnsafely();
 }
 
 int SILBasicBlock::getDebugID() {
@@ -86,7 +93,9 @@ void SILBasicBlock::remove(SILInstruction *I) {
 void SILBasicBlock::erase(SILInstruction *I) {
   // Notify the delete handlers that this instruction is going away.
   getModule().notifyDeleteHandlers(&*I);
+  auto *F = getParent();
   InstList.erase(I);
+  F->getModule().deallocateInst(I);
 }
 
 /// This method unlinks 'self' from the containing SILFunction and deletes it.

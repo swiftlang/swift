@@ -1,8 +1,8 @@
-//===--- Validation.h - Validation / errors for serialization ---*- c++ -*-===//
+//===--- Validation.h - Validation / errors for serialization ---*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -84,6 +84,7 @@ namespace serialization {
     struct {
       unsigned IsSIB : 1;
       unsigned IsTestable : 1;
+      unsigned IsResilient : 1;
     } Bits;
   public:
     ExtendedValidationInfo() : Bits() {}
@@ -108,6 +109,10 @@ namespace serialization {
     bool isTestable() const { return Bits.IsTestable; }
     void setIsTestable(bool val) {
       Bits.IsTestable = val;
+    }
+    bool isResilient() const { return Bits.IsResilient; }
+    void setIsResilient(bool val) {
+      Bits.IsResilient = val;
     }
   };
 

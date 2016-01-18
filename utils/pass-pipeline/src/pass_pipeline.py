@@ -1,11 +1,7 @@
-
-import sys
-import json
-import itertools
-
 class Pass(object):
     def __init__(self, name):
         self.name = name
+
     def __repr__(self):
         return "<pass name=%s>" % self.name
 

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -18,7 +18,7 @@ stringSubscriptComment = """
   /// different interpretations in different libraries and system
   /// components.  The correct interpretation should be selected
   /// according to the use case and the APIs involved, so `String`
-  /// can not be subscripted with an integer.
+  /// cannot be subscripted with an integer.
   ///
   /// Swift provides several different ways to access the character
   /// data stored inside strings.
@@ -38,7 +38,7 @@ stringSubscriptComment = """
   ///   Use this API when you are performing low-level manipulation
   ///   of character data.
   ///
-  /// - `String.chracters` is a collection of extended grapheme
+  /// - `String.characters` is a collection of extended grapheme
   ///   clusters, which are an approximation of user-perceived
   ///   characters.
   ///
@@ -98,7 +98,7 @@ ${stringSubscriptComment}
   ///   Unicode scalars in the string.  Use this API when you are
   ///   performing low-level manipulation of character data.
   ///
-  /// - `String.chracters.count` property returns the number of
+  /// - `String.characters.count` property returns the number of
   ///   extended grapheme clusters.  Use this API to count the
   ///   number of user-perceived characters in the string.
   @available(

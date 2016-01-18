@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -23,14 +23,15 @@ var nextTrackedSerialNumber = 0
 
 final class Tracked : ForwardIndexType, CustomStringConvertible {
   required init(_ value: Int) {
-    ++trackedCount
-    serialNumber = ++nextTrackedSerialNumber
+    trackedCount += 1
+    nextTrackedSerialNumber += 1
+    serialNumber = nextTrackedSerialNumber
     self.value = value
   }
   
   deinit {
     assert(serialNumber > 0, "double destruction!")
-    --trackedCount
+    trackedCount -= 1
     serialNumber = -serialNumber
   }
 

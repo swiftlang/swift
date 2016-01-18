@@ -90,7 +90,7 @@ func existential_metatype_from_thin() -> Any.Type {
 // CHECK:      [[T0:%.*]] = function_ref @_TFV9metatypes10SomeStructC
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thin SomeStruct.Type
 // CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
-// CHECK-NEXT: debug_value [[T2]] : $SomeStruct  // let s
+// CHECK-NEXT: debug_value [[T2]] : $SomeStruct, let, name "s"
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thin SomeStruct.Type
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thick SomeStruct.Type
 // CHECK-NEXT: [[T2:%.*]] = init_existential_metatype [[T1]] : $@thick SomeStruct.Type, $@thick Any.Type

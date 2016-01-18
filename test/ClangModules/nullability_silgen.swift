@@ -2,7 +2,7 @@
 
 // REQUIRES: objc_interop
 
-import nullability;
+import nullability
 
 // null_resettable properties.
 // CHECK-LABEL: sil hidden @_TF18nullability_silgen18testNullResettable

@@ -22,3 +22,5 @@ EnumErrorType.test("default codes") {
   expectEqual(a._code, 0)
   expectEqual(b._code, 1)
 }
+
+runAllTests()

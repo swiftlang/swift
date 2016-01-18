@@ -115,7 +115,7 @@ enum A012_AttachToEntities {
   ///     f0() // WOW!
   ///     f0() // WOW!
   func f0() {}
-// CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test9CodeBlock2f0FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>This is how you use this code.</Para></Abstract><Discussion><CodeListing><zCodeLineNumbered><![CDATA[f0() // WOW!]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[f0() // WOW!]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[f0() // WOW!]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>]
+// CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test9CodeBlock2f0FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>This is how you use this code.</Para></Abstract><Discussion><CodeListing language="swift"><zCodeLineNumbered><![CDATA[f0() // WOW!]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[f0() // WOW!]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[f0() // WOW!]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>]
 }
 
 @objc class EmptyComments {
@@ -378,7 +378,7 @@ func f0(x: Int, y: Int, z: Int) {}
           var z = 3
   */
   func f1() {}
-// CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f1()</Name><USR>s:FC14swift_ide_test20IndentedBlockComment2f1FT_T_</USR><Declaration>func f1()</Declaration><Abstract><Para>Brief.</Para></Abstract><Discussion><Para>First paragraph line. Second paragraph line.</Para><Para>Now for a code sample:</Para><CodeListing><zCodeLineNumbered><![CDATA[var x = 1]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// var y = 2]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[var z = 3]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>]
+// CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f1()</Name><USR>s:FC14swift_ide_test20IndentedBlockComment2f1FT_T_</USR><Declaration>func f1()</Declaration><Abstract><Para>Brief.</Para></Abstract><Discussion><Para>First paragraph line. Second paragraph line.</Para><Para>Now for a code sample:</Para><CodeListing language="swift"><zCodeLineNumbered><![CDATA[var x = 1]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// var y = 2]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[var z = 3]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>]
   /**
                         Hugely indented brief.
 
@@ -392,7 +392,7 @@ func f0(x: Int, y: Int, z: Int) {}
                             var z = 3
   */
   func f2() {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f2()</Name><USR>s:FC14swift_ide_test20IndentedBlockComment2f2FT_T_</USR><Declaration>func f2()</Declaration><Abstract><Para>Hugely indented brief.</Para></Abstract><Discussion><Para>First paragraph line. Second paragraph line.</Para><Para>Now for a code sample:</Para><CodeListing><zCodeLineNumbered><![CDATA[var x = 1]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// var y = 2]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[var z = 3]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f2()</Name><USR>s:FC14swift_ide_test20IndentedBlockComment2f2FT_T_</USR><Declaration>func f2()</Declaration><Abstract><Para>Hugely indented brief.</Para></Abstract><Discussion><Para>First paragraph line. Second paragraph line.</Para><Para>Now for a code sample:</Para><CodeListing language="swift"><zCodeLineNumbered><![CDATA[var x = 1]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// var y = 2]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[var z = 3]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>]
 }
 
 @objc class MultiLineBrief {
@@ -405,3 +405,20 @@ func f0(x: Int, y: Int, z: Int) {}
   func f0() {}
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test14MultiLineBrief2f0FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Brief first line. Brief after softbreak.</Para></Abstract><Discussion><Para>Some paragraph text.</Para></Discussion></Function>]
 }
+
+/// Brief.
+///
+/// ```
+/// thisIsASwiftCodeExample()
+/// ```
+func codeListingWithDefaultLanguage() {}
+// CHECK: DocCommentAsXML=[<Function file="{{.*}} line="{{.*}}" column="{{.*}}"><Name>codeListingWithDefaultLanguage()</Name><USR>s:F14swift_ide_test30codeListingWithDefaultLanguageFT_T_</USR><Declaration>func codeListingWithDefaultLanguage()</Declaration><Abstract><Para>Brief.</Para></Abstract><Discussion><CodeListing language="swift"><zCodeLineNumbered><![CDATA[thisIsASwiftCodeExample()]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>] CommentXMLValid
+
+
+/// Brief.
+///
+/// ```c++
+/// Something::Something::create();
+/// ```
+func codeListingWithOtherLanguage() {}
+// CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>codeListingWithOtherLanguage()</Name><USR>s:F14swift_ide_test28codeListingWithOtherLanguageFT_T_</USR><Declaration>func codeListingWithOtherLanguage()</Declaration><Abstract><Para>Brief.</Para></Abstract><Discussion><CodeListing language="c++"><zCodeLineNumbered><![CDATA[Something::Something::create();]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>]

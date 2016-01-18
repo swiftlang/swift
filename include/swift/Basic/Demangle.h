@@ -1,8 +1,8 @@
-//===--- Demangle.h - Interface to Swift symbol demangling -------*- C++ -*-==//
+//===--- Demangle.h - Interface to Swift symbol demangling ------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -78,7 +78,8 @@ enum class FunctionSigSpecializationParamKind : unsigned {
   ConstantPropFloat = 3,
   ConstantPropString = 4,
   ClosureProp = 5,
-  InOutToValue = 6,
+  BoxToValue = 6,
+  BoxToStack = 7,
 
   // Option Set Flags use bits 6-31. This gives us 26 bits to use for option
   // flags.
@@ -89,7 +90,7 @@ enum class FunctionSigSpecializationParamKind : unsigned {
 
 /// The pass that caused the specialization to occur. We use this to make sure
 /// that two passes that generate similar changes do not yield the same
-/// mangling. This currently can not happen, so this is just a safety measure
+/// mangling. This currently cannot happen, so this is just a safety measure
 /// that creates separate name spaces.
 enum class SpecializationPass : uint8_t {
   AllocBoxToStack,
@@ -101,7 +102,7 @@ enum class SpecializationPass : uint8_t {
 };
 
 static inline char encodeSpecializationPass(SpecializationPass Pass) {
-  return char(uint8_t(Pass)) + 48;
+  return char(uint8_t(Pass)) + '0';
 }
 
 enum class ValueWitnessKind {

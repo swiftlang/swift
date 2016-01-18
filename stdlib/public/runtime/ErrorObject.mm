@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -313,23 +313,6 @@ swift::swift_bridgeErrorTypeToNSError(SwiftError *errorObject) {
   return _swift_bridgeErrorTypeToNSError(errorObject);
 }
 
-SwiftError *
-swift::swift_convertNSErrorToErrorType(id errorObject) {
-  // The fast path is that we have a real error object.
-  if (errorObject) return reinterpret_cast<SwiftError*>(errorObject);
-
-  // Unlike Objective-C, we can't just propagate nil errors around.
-  auto allocNilError =
-    (SwiftError*(*)()) dlsym(RTLD_DEFAULT, "swift_allocNilObjCError");
-  assert(allocNilError && "didn't link Foundation overlay?");
-  return allocNilError();
-}
-
-id swift::swift_convertErrorTypeToNSError(SwiftError *errorObject) {
-  assert(errorObject && "bridging a nil error!");
-  return swift_bridgeErrorTypeToNSError(errorObject);
-}
-
 bool
 swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
                                     OpaqueValue *src,
@@ -380,6 +363,7 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
   }
   // Not a class.
   case MetadataKind::Enum:
+  case MetadataKind::Optional:
   case MetadataKind::Existential:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:

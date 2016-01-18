@@ -2,7 +2,7 @@
 ;
 ; This source file is part of the Swift.org open source project
 ;
-; Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+; Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 ; Licensed under Apache License v2.0 with Runtime Library Exception
 ;
 ; See http://swift.org/LICENSE.txt for license information
@@ -64,12 +64,12 @@
                     "index_addr" "index_raw_pointer" "to")
 		  'words) . font-lock-keyword-face)
    ;; SIL Instructions - Reference Counting.
-   `(,(regexp-opt '("strong_retain" "strong_retain_autoreleased"
+   `(,(regexp-opt '("strong_retain"
                     "strong_release" "strong_retain_unowned"
                     "unowned_retain" "unowned_release"
                     "ref_to_unmanaged" "unmanaged_to_ref"
                     "load_weak" "store_weak" "fix_lifetime" "mark_dependence"
-                    "strong_unpin" "strong_pin")
+                    "strong_unpin" "strong_pin" "is_unique" "is_unique_or_pinned")
 		  'words) . font-lock-keyword-face)
    ;; Literals
    `(,(regexp-opt '("function_ref"
@@ -137,10 +137,10 @@
    `(,(regexp-opt '("cond_fail")
 		  'words) . font-lock-keyword-face)
    ;; Terminators
-   `(,(regexp-opt '("unreachable" "return" "autorelease_return" "br"
+   `(,(regexp-opt '("unreachable" "return" "br"
                     "cond_br" "switch_value" "switch_enum"
                     "switch_enum_addr" "dynamic_method_br"
-                    "checked_cast_br" "throw")
+                    "checked_cast_br" "throw" "checked_cast_addr_br")
                   'words) . font-lock-keyword-face)
    ;; Blocks
    `(,(regexp-opt '("project_block_storage" "init_block_storage_header"
@@ -162,7 +162,7 @@
 (unless sil-mode-syntax-table
     (progn
       (setq sil-mode-syntax-table (make-syntax-table))
-      (mapcar (function (lambda (n)
+      (mapc (function (lambda (n)
                           (modify-syntax-entry (aref n 0)
                                                (aref n 1)
                                                sil-mode-syntax-table)))

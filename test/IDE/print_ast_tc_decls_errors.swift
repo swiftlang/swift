@@ -21,7 +21,7 @@ protocol FooProtocol {}
 protocol BarProtocol {}
 protocol BazProtocol { func baz() }
 protocol QuxProtocol {
-  typealias Qux
+  associatedtype Qux
 }
 
 class FooProtocolImpl : FooProtocol {}
@@ -168,27 +168,30 @@ typealias Typealias1 = FooNonExistentProtocol // expected-error {{use of undecla
 // NO-TYREPR: {{^}}typealias Typealias1 = <<error type>>{{$}}
 // TYREPR: {{^}}typealias Typealias1 = FooNonExistentProtocol{{$}}
 
+// sr-197
+func foo(bar: Typealias1<Int>) {} // Should not generate error "cannot specialize non-generic type '<<error type>>'"
+
 // Associated types.
 
 protocol AssociatedType1 {
 // CHECK-LABEL: AssociatedType1 {
 
-  typealias AssociatedTypeDecl1 : FooProtocol = FooClass
-// CHECK: {{^}}  typealias AssociatedTypeDecl1 : FooProtocol = FooClass{{$}}
+  associatedtype AssociatedTypeDecl1 : FooProtocol = FooClass
+// CHECK: {{^}}  associatedtype AssociatedTypeDecl1 : FooProtocol = FooClass{{$}}
 
-  typealias AssociatedTypeDecl2 : BazProtocol = FooClass
-// CHECK: {{^}}  typealias AssociatedTypeDecl2 : BazProtocol = FooClass{{$}}
+  associatedtype AssociatedTypeDecl2 : BazProtocol = FooClass
+// CHECK: {{^}}  associatedtype AssociatedTypeDecl2 : BazProtocol = FooClass{{$}}
 
-  typealias AssociatedTypeDecl3 : FooNonExistentProtocol // expected-error {{use of undeclared type 'FooNonExistentProtocol'}}
-// NO-TYREPR: {{^}}  typealias AssociatedTypeDecl3 : <<error type>>{{$}}
-// TYREPR: {{^}}  typealias AssociatedTypeDecl3 : FooNonExistentProtocol{{$}}
+  associatedtype AssociatedTypeDecl3 : FooNonExistentProtocol // expected-error {{use of undeclared type 'FooNonExistentProtocol'}}
+// NO-TYREPR: {{^}}  associatedtype AssociatedTypeDecl3 : <<error type>>{{$}}
+// TYREPR: {{^}}  associatedtype AssociatedTypeDecl3 : FooNonExistentProtocol{{$}}
 
-  typealias AssociatedTypeDecl4 : FooNonExistentProtocol, BarNonExistentProtocol // expected-error {{use of undeclared type 'FooNonExistentProtocol'}} expected-error {{use of undeclared type 'BarNonExistentProtocol'}}
-// NO-TYREPR: {{^}}  typealias AssociatedTypeDecl4 : <<error type>>, <<error type>>{{$}}
-// TYREPR: {{^}}  typealias AssociatedTypeDecl4 : FooNonExistentProtocol, BarNonExistentProtocol{{$}}
+  associatedtype AssociatedTypeDecl4 : FooNonExistentProtocol, BarNonExistentProtocol // expected-error {{use of undeclared type 'FooNonExistentProtocol'}} expected-error {{use of undeclared type 'BarNonExistentProtocol'}}
+// NO-TYREPR: {{^}}  associatedtype AssociatedTypeDecl4 : <<error type>>, <<error type>>{{$}}
+// TYREPR: {{^}}  associatedtype AssociatedTypeDecl4 : FooNonExistentProtocol, BarNonExistentProtocol{{$}}
 
-  typealias AssociatedTypeDecl5 : FooClass
-// CHECK: {{^}}  typealias AssociatedTypeDecl5 : FooClass{{$}}
+  associatedtype AssociatedTypeDecl5 : FooClass
+// CHECK: {{^}}  associatedtype AssociatedTypeDecl5 : FooClass{{$}}
 }
 
 //===---
@@ -201,7 +204,7 @@ var topLevelVar1 = 42
 
 // CHECK: class C1
 class C1 {
-  // CHECK: init(data: )
+  // CHECK: init(data: <<error type>>)
   init(data:) // expected-error {{expected parameter type following ':'}}
 }
 

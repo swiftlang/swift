@@ -37,10 +37,10 @@ Consider::
   }
 
   var w = Window()
-  w.title += " (parenthesized remark)”
+  w.title += " (parenthesized remark)"
 
 What do we do with this?  Since ``+=`` has an ``inout`` first
-argument, we detect this situation statically (hopefully one day we’ll
+argument, we detect this situation statically (hopefully one day we'll
 have a better error message): 
 
 ::
@@ -53,7 +53,7 @@ Great.  Now what about this? [#append]_ ::
 
   w.title.append(" (fool the compiler)")
 
-Today, we allow it, but since there’s no way to implement the
+Today, we allow it, but since there's no way to implement the
 write-back onto ``w.title``, the changes are silently dropped.
 
 Unsatisfying Approaches
@@ -101,14 +101,14 @@ Otherwise, it is considered **read-only**.
 
 The implicit ``self`` parameter of a struct or enum method is semantically an
 ``inout`` parameter if and only if the method is attributed with
-``mutating``.  Read-only methods do not “write back” onto their target
+``mutating``.  Read-only methods do not "write back" onto their target
 objects.
 
 A program that applies the ``mutating`` to a method of a
 class—or of a protocol attributed with ``@class_protocol``—is
 ill-formed.  [Note: it is logically consistent to think of all methods
 of classes as read-only, even though they may in fact modify instance
-variables, because they never “write back” onto the source reference.]
+variables, because they never "write back" onto the source reference.]
 
 Mutating Operations
 -------------------

@@ -2,8 +2,23 @@
 
 import re
 
-from pygments.lexer import Lexer, RegexLexer, include, bygroups, using, this, do_insertions
-from pygments.token import *
+from pygments.lexer import (
+    RegexLexer,
+    bygroups,
+    include,
+)
+from pygments.token import (
+    Comment,
+    Generic,
+    Keyword,
+    Name,
+    Number,
+    Operator,
+    Punctuation,
+    String,
+    Text,
+    Whitespace,
+)
 
 __all__ = ['SwiftLexer', 'SwiftConsoleLexer']
 
@@ -52,7 +67,7 @@ class SwiftLexer(RegexLexer):
             (r'\b(return|break)\b', Keyword.Reserved),
 
             (r'[\^\*!%&<>+=/?-]|\.{2}', Operator),
-            (r'\$([0-9]+)', Name.Variable),   #Tokens
+            (r'\$([0-9]+)', Name.Variable),   # Tokens
             (r'[\[\]\(\)\{\}\|:;,.#]', Punctuation),
             (r'[0-9]+\.[0-9]+', Number.Float),
             (r'0x[0-9a-fA-F]+', Number.Hex),

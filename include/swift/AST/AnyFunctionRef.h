@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -61,10 +61,10 @@ public:
     getCaptureInfo().getLocalCaptures(Result);
   }
 
-  ArrayRef<Pattern *> getBodyParamPatterns() const {
+  ArrayRef<ParameterList *> getParameterLists() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
-      return AFD->getBodyParamPatterns();
-    return TheFunction.get<AbstractClosureExpr *>()->getParamPatterns();
+      return AFD->getParameterLists();
+    return TheFunction.get<AbstractClosureExpr *>()->getParameterLists();
   }
   
   bool hasType() const {

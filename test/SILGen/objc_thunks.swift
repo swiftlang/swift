@@ -15,7 +15,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozit7typical{{.*}} : $@convention(method) (Int, @owned Gizmo, @guaranteed Hoozit) -> @owned Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = apply [[NATIVE]]([[X]], [[Y]], [[THIS]]) {{.*}} line:[[@LINE-7]]:8:auto_gen
   // CHECK-NEXT:   strong_release [[THIS]] : $Hoozit // {{.*}}
-  // CHECK-NEXT:   autorelease_return [[RES]] : $Gizmo // {{.*}} line:[[@LINE-9]]:8:auto_gen
+  // CHECK-NEXT:   return [[RES]] : $Gizmo // {{.*}} line:[[@LINE-9]]:8:auto_gen
   // CHECK-NEXT: }
 
   // NS_CONSUMES_SELF by inheritance
@@ -48,7 +48,6 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozit7copyFoo{{.*}} : $@convention(method) (@guaranteed Hoozit) -> @owned Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = apply [[NATIVE]]([[THIS]])
   // CHECK:        release [[THIS]]
-  // CHECK-NOT:    autorelease_return
   // CHECK-NEXT:   return [[RES]]
   // CHECK-NEXT: }
 
@@ -61,7 +60,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   [[GETIMPL:%.*]] = function_ref @_TFC11objc_thunks6Hoozitg15typicalPropertyCSo5Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = apply [[GETIMPL]](%0)
   // CHECK-NEXT:   strong_release %0
-  // CHECK-NEXT:   autorelease_return [[RES]] : $Gizmo
+  // CHECK-NEXT:   return [[RES]] : $Gizmo
   // CHECK-NEXT: }
   
   // CHECK-LABEL: sil hidden [transparent] @_TFC11objc_thunks6Hoozitg15typicalPropertyCSo5Gizmo : $@convention(method) (@guaranteed Hoozit) -> @owned Gizmo
@@ -132,7 +131,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozitg10roPropertyCSo5Gizmo : $@convention(method) (@guaranteed Hoozit) -> @owned Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = apply [[NATIVE]]([[THIS]])
   // CHECK-NEXT:   release [[THIS]] : $Hoozit
-  // CHECK-NEXT:   autorelease_return [[RES]] : $Gizmo
+  // CHECK-NEXT:   return [[RES]] : $Gizmo
   // CHECK-NEXT: }
 
   // -- no setter
@@ -173,7 +172,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozitg14copyRWPropertyCSo5Gizmo : $@convention(method) (@guaranteed Hoozit) -> @owned Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = apply [[NATIVE]]([[THIS]])
   // CHECK-NEXT:   release [[THIS]]
-  // CHECK-NOT:    autorelease_return
+  // CHECK-NOT:    return
   // CHECK-NEXT:   return [[RES]]
   // CHECK-NEXT: }
 
@@ -218,7 +217,7 @@ class Hoozit : Gizmo {
   // CHECK: [[NATIVE:%[0-9]+]] = function_ref @_TFC11objc_thunks6Hoozitg9subscript{{.*}} : $@convention(method) (Int, @guaranteed Hoozit) -> @owned Hoozit
   // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[NATIVE]]([[I]], [[SELF]]) : $@convention(method) (Int, @guaranteed Hoozit) -> @owned Hoozit
   // CHECK-NEXT: strong_release [[SELF]]
-  // CHECK-NEXT: autorelease_return [[RESULT]] : $Hoozit
+  // CHECK-NEXT: return [[RESULT]] : $Hoozit
   get {
     return self
   }
@@ -267,7 +266,7 @@ class Wotsit<T> : Gizmo {
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   [[BRIDGE:%.*]] = function_ref @swift_StringToNSString : $@convention(thin) (@owned String) -> @owned NSString
   // CHECK-NEXT:   [[NSRESULT:%.*]] = apply [[BRIDGE]]([[RESULT]]) : $@convention(thin) (@owned String) -> @owned NSString
-  // CHECK-NEXT:   autorelease_return [[NSRESULT]] : $NSString
+  // CHECK-NEXT:   return [[NSRESULT]] : $NSString
   // CHECK-NEXT: }
   override var description : String {
     return "Hello, world."
@@ -401,7 +400,7 @@ func registerAnsible() {
 
 // FIXME: would be nice if we didn't need to re-abstract as much here.
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_oGSQFT_T___dT__XFdCb_dGSQbT_T___dT__ : $@convention(c) (@inout @block_storage @callee_owned (@owned ImplicitlyUnwrappedOptional<() -> ()>) -> (), ImplicitlyUnwrappedOptional<@convention(block) () -> ()>) -> ()
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_oGSQFT_T___dT__XFdCb_dGSQbT_T___dT__ : $@convention(c) (@inout_aliasable @block_storage @callee_owned (@owned ImplicitlyUnwrappedOptional<() -> ()>) -> (), ImplicitlyUnwrappedOptional<@convention(block) () -> ()>) -> ()
 // CHECK: [[HEAP_BLOCK_IUO:%.*]] = copy_block %1
 // CHECK: select_enum [[HEAP_BLOCK_IUO]]
 // CHECK: bb1:

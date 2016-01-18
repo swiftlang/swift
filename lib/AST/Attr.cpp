@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -358,6 +358,32 @@ void DeclAttribute::print(ASTPrinter &Printer,
     // Not printed.
     return;
 
+  case DAK_Swift3Migration: {
+    auto attr = cast<Swift3MigrationAttr>(this);
+    Printer << "@swift3_migration(";
+
+    bool printedAny = false;
+    auto printSeparator = [&] {
+      if (printedAny) Printer << ", ";
+      else printedAny = true;
+    };
+
+    if (attr->getRenamed()) {
+      printSeparator();
+      Printer << "renamed=\"" << attr->getRenamed() << "\"";
+    }
+
+    if (!attr->getMessage().empty()) {
+      printSeparator();
+      Printer << "message=\"";
+      Printer << attr->getMessage();
+      Printer << "\"";
+    }
+
+    Printer << ")";
+    break;
+  }
+
   case DAK_SynthesizedProtocol:
     // Not printed.
     return;
@@ -475,6 +501,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "<<ObjC bridged>>";
   case DAK_SynthesizedProtocol:
     return "<<synthesized protocol>>";
+  case DAK_Swift3Migration:
+    return "swift3_migration";
   case DAK_WarnUnusedResult:
     return "warn_unused_result";
   }

@@ -1,5 +1,5 @@
 public protocol Prot {
-  typealias Element
+  associatedtype Element
   var p : Int { get }
   func foo()
 }
@@ -22,3 +22,9 @@ public extension Prot where Self.Element == Int {
 public enum MyEnum : Int {
   case Blah
 }
+
+protocol Prot1 {}
+
+typealias C1Alias = C1
+
+extension C1Alias : Prot1 {}

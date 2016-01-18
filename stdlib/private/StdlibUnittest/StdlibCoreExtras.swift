@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -14,7 +14,7 @@ import SwiftPrivate
 import SwiftPrivateDarwinExtras
 #if os(OSX) || os(iOS)
 import Darwin
-#elseif os(Linux)
+#elseif os(Linux) || os(FreeBSD)
 import Glibc
 #endif
 
@@ -57,8 +57,8 @@ func findSubstring(string: String, _ substring: String) -> String.Index? {
       }
       if needle[needleIndex] == haystack[matchIndex] {
         // keep advancing through both the string and search string on match
-        ++matchIndex
-        ++needleIndex
+        matchIndex = matchIndex.successor()
+        needleIndex = needleIndex.successor()
       } else {
         // no match, go back to finding a starting match in the string.
         break

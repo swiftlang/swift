@@ -5,7 +5,7 @@
 // specialized version fo myDictionaryBridge.
 // <rdar://problem/17821040>
 
-// A miminized version of _dictionaryBridgeToObjectiveC in the stdlib 
+// A minimized version of _dictionaryBridgeToObjectiveC in the stdlib 
 public func myDictionaryBridge<
     SrcType, DestType
 >(

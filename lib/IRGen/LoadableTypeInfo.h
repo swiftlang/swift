@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -113,7 +113,7 @@ public:
   virtual void consume(IRGenFunction &IGF, Explosion &explosion) const = 0;
 
   /// Fix the lifetime of the source explosion by creating opaque calls to
-  /// swift_keepAlive for all reference types in the explosion.
+  /// swift_fixLifetime for all reference types in the explosion.
   virtual void fixLifetime(IRGenFunction &IGF, Explosion &explosion) const = 0;
   
   /// Pack the source explosion into an enum payload.
@@ -129,7 +129,7 @@ public:
                                      Explosion &targetExplosion,
                                      unsigned offset) const = 0;
 
-  /// Load a a reference counted pointer from an address.
+  /// Load a reference counted pointer from an address.
   /// Return the loaded pointer value.
   virtual LoadedRef loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc,
                                       Address addr) const;

@@ -1,8 +1,8 @@
-//===- SourceEntityWalker.cpp - Routines for semantic source info ---------===//
+//===--- SourceEntityWalker.cpp - Routines for semantic source info -------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -460,7 +460,7 @@ bool SourceEntityWalker::visitSubscriptReference(ValueDecl *D,
                                                  CharSourceRange Range,
                                                  bool IsOpenBracket) {
   // Most of the clients treat subscript reference the same way as a
-  // regular reference when called on the open open bracket and
+  // regular reference when called on the open bracket and
   // ignore the closing one.
   return IsOpenBracket ? visitDeclReference(D, Range, nullptr, Type()) : true;
 }

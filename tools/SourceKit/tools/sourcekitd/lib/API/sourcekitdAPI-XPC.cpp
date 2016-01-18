@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -200,9 +200,9 @@ void sourcekitd::printRequestObject(sourcekitd_object_t Obj, raw_ostream &OS) {
   SKDObjectPrinter(OS).visit(Obj);
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // Internal API
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 ResponseBuilder::ResponseBuilder() {
   Impl = xpc_dictionary_create(nullptr, nullptr, 0);
@@ -412,9 +412,9 @@ sourcekitd::createErrorRequestCancelled() {
   return CustomXPCData::createErrorRequestCancelled("").getXObj();
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // Public API
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 sourcekitd_uid_t
 sourcekitd_uid_get_from_cstr(const char *string) {
@@ -438,9 +438,9 @@ sourcekitd_uid_get_string_ptr(sourcekitd_uid_t uid) {
   return UID.getName().begin();
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // Public Request API
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 static inline const char *strFromUID(sourcekitd_uid_t uid) {
   return UIdentFromSKDUID(uid).c_str();
@@ -572,9 +572,9 @@ sourcekitd_request_description_copy(sourcekitd_object_t obj) {
   return strdup(Desc.c_str());
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // Public Response API
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 void
 sourcekitd_response_dispose(sourcekitd_response_t obj) {
@@ -643,9 +643,9 @@ sourcekitd_response_get_value(sourcekitd_response_t resp) {
   return variantFromXPCObject(resp);
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // Variant functions
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 #define XPC_OBJ(var) ((xpc_object_t)(var).data[1])
 

@@ -229,7 +229,7 @@ DictionaryTestSuite.test("COW.Fast.SubscriptWithKeyDoesNotReallocate") {
   assert(d[30]! == 1030)
   assert(d[40]! == 2040)
 
-  if true {
+  do {
     var d2: [MinimalHashableValue : OpaqueValue<Int>] = [:]
     MinimalHashableValue.timesEqualEqualWasCalled = 0
     MinimalHashableValue.timesHashValueWasCalled = 0
@@ -283,7 +283,7 @@ DictionaryTestSuite.test("COW.Slow.SubscriptWithKeyDoesNotReallocate") {
   assert(d[TestKeyTy(30)]!.value == 1030)
   assert(d[TestKeyTy(40)]!.value == 2040)
 
-  if true {
+  do {
     var d2: [MinimalHashableClass : OpaqueValue<Int>] = [:]
     MinimalHashableClass.timesEqualEqualWasCalled = 0
     MinimalHashableClass.timesHashValueWasCalled = 0
@@ -299,7 +299,7 @@ DictionaryTestSuite.test("COW.Slow.SubscriptWithKeyDoesNotReallocate") {
 
 
 DictionaryTestSuite.test("COW.Fast.UpdateValueForKeyDoesNotReallocate") {
-  if true {
+  do {
     var d1 = getCOWFastDictionary()
     var identity1 = unsafeBitCast(d1, Int.self)
 
@@ -314,7 +314,7 @@ DictionaryTestSuite.test("COW.Fast.UpdateValueForKeyDoesNotReallocate") {
     assert(d1[10]! == 2010)
   }
 
-  if true {
+  do {
     var d1 = getCOWFastDictionary()
     var identity1 = unsafeBitCast(d1, Int.self)
 
@@ -344,7 +344,7 @@ DictionaryTestSuite.test("COW.Fast.UpdateValueForKeyDoesNotReallocate") {
     _fixLifetime(d2)
   }
 
-  if true {
+  do {
     var d1 = getCOWFastDictionary()
     var identity1 = unsafeBitCast(d1, Int.self)
 
@@ -374,7 +374,7 @@ DictionaryTestSuite.test("COW.Fast.UpdateValueForKeyDoesNotReallocate") {
 }
 
 DictionaryTestSuite.test("COW.Slow.AddDoesNotReallocate") {
-  if true {
+  do {
     var d1 = getCOWSlowDictionary()
     var identity1 = unsafeBitCast(d1, Int.self)
 
@@ -391,7 +391,7 @@ DictionaryTestSuite.test("COW.Slow.AddDoesNotReallocate") {
     assert(d1[TestKeyTy(10)]!.value == 2010)
   }
 
-  if true {
+  do {
     var d1 = getCOWSlowDictionary()
     var identity1 = unsafeBitCast(d1, Int.self)
 
@@ -421,7 +421,7 @@ DictionaryTestSuite.test("COW.Slow.AddDoesNotReallocate") {
     _fixLifetime(d2)
   }
 
-  if true {
+  do {
     var d1 = getCOWSlowDictionary()
     var identity1 = unsafeBitCast(d1, Int.self)
 
@@ -456,7 +456,7 @@ DictionaryTestSuite.test("COW.Fast.IndexForKeyDoesNotReallocate") {
   var identity1 = unsafeBitCast(d, Int.self)
 
   // Find an existing key.
-  if true {
+  do {
     var foundIndex1 = d.indexForKey(10)!
     assert(identity1 == unsafeBitCast(d, Int.self))
 
@@ -469,13 +469,13 @@ DictionaryTestSuite.test("COW.Fast.IndexForKeyDoesNotReallocate") {
   }
 
   // Try to find a key that is not present.
-  if true {
+  do {
     var foundIndex1 = d.indexForKey(1111)
     assert(foundIndex1 == nil)
     assert(identity1 == unsafeBitCast(d, Int.self))
   }
 
-  if true {
+  do {
     var d2: [MinimalHashableValue : OpaqueValue<Int>] = [:]
     MinimalHashableValue.timesEqualEqualWasCalled = 0
     MinimalHashableValue.timesHashValueWasCalled = 0
@@ -493,7 +493,7 @@ DictionaryTestSuite.test("COW.Slow.IndexForKeyDoesNotReallocate") {
   var identity1 = unsafeBitCast(d, Int.self)
 
   // Find an existing key.
-  if true {
+  do {
     var foundIndex1 = d.indexForKey(TestKeyTy(10))!
     assert(identity1 == unsafeBitCast(d, Int.self))
 
@@ -506,13 +506,13 @@ DictionaryTestSuite.test("COW.Slow.IndexForKeyDoesNotReallocate") {
   }
 
   // Try to find a key that is not present.
-  if true {
+  do {
     var foundIndex1 = d.indexForKey(TestKeyTy(1111))
     assert(foundIndex1 == nil)
     assert(identity1 == unsafeBitCast(d, Int.self))
   }
 
-  if true {
+  do {
     var d2: [MinimalHashableClass : OpaqueValue<Int>] = [:]
     MinimalHashableClass.timesEqualEqualWasCalled = 0
     MinimalHashableClass.timesHashValueWasCalled = 0
@@ -527,7 +527,7 @@ DictionaryTestSuite.test("COW.Slow.IndexForKeyDoesNotReallocate") {
 
 
 DictionaryTestSuite.test("COW.Fast.RemoveAtIndexDoesNotReallocate") {
-  if true {
+  do {
     var d = getCOWFastDictionary()
     var identity1 = unsafeBitCast(d, Int.self)
 
@@ -545,7 +545,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAtIndexDoesNotReallocate") {
     assert(d.indexForKey(10) == nil)
   }
 
-  if true {
+  do {
     var d1 = getCOWFastDictionary()
     var identity1 = unsafeBitCast(d1, Int.self)
 
@@ -570,7 +570,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAtIndexDoesNotReallocate") {
 }
 
 DictionaryTestSuite.test("COW.Slow.RemoveAtIndexDoesNotReallocate") {
-  if true {
+  do {
     var d = getCOWSlowDictionary()
     var identity1 = unsafeBitCast(d, Int.self)
 
@@ -588,7 +588,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveAtIndexDoesNotReallocate") {
     assert(d.indexForKey(TestKeyTy(10)) == nil)
   }
 
-  if true {
+  do {
     var d1 = getCOWSlowDictionary()
     var identity1 = unsafeBitCast(d1, Int.self)
 
@@ -612,7 +612,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveAtIndexDoesNotReallocate") {
 
 
 DictionaryTestSuite.test("COW.Fast.RemoveValueForKeyDoesNotReallocate") {
-  if true {
+  do {
     var d1 = getCOWFastDictionary()
     var identity1 = unsafeBitCast(d1, Int.self)
 
@@ -628,7 +628,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveValueForKeyDoesNotReallocate") {
     _fixLifetime(d1)
   }
 
-  if true {
+  do {
     var d1 = getCOWFastDictionary()
     var identity1 = unsafeBitCast(d1, Int.self)
 
@@ -650,7 +650,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveValueForKeyDoesNotReallocate") {
 }
 
 DictionaryTestSuite.test("COW.Slow.RemoveValueForKeyDoesNotReallocate") {
-  if true {
+  do {
     var d1 = getCOWSlowDictionary()
     var identity1 = unsafeBitCast(d1, Int.self)
 
@@ -666,7 +666,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveValueForKeyDoesNotReallocate") {
     _fixLifetime(d1)
   }
 
-  if true {
+  do {
     var d1 = getCOWSlowDictionary()
     var identity1 = unsafeBitCast(d1, Int.self)
 
@@ -689,14 +689,14 @@ DictionaryTestSuite.test("COW.Slow.RemoveValueForKeyDoesNotReallocate") {
 
 
 DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
-  if true {
+  do {
     var d = getCOWFastDictionary()
     let originalCapacity = d._variantStorage.native.capacity
     assert(d.count == 3)
     assert(d[10]! == 1010)
 
     d.removeAll()
-    // We can not assert that identity changed, since the new buffer of smaller
+    // We cannot assert that identity changed, since the new buffer of smaller
     // size can be allocated at the same address as the old one.
     var identity1 = unsafeBitCast(d, Int.self)
     assert(d._variantStorage.native.capacity < originalCapacity)
@@ -709,7 +709,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     assert(d[10] == nil)
   }
 
-  if true {
+  do {
     var d = getCOWFastDictionary()
     var identity1 = unsafeBitCast(d, Int.self)
     let originalCapacity = d._variantStorage.native.capacity
@@ -729,7 +729,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     assert(d[10] == nil)
   }
 
-  if true {
+  do {
     var d1 = getCOWFastDictionary()
     var identity1 = unsafeBitCast(d1, Int.self)
     assert(d1.count == 3)
@@ -750,7 +750,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     _fixLifetime(d2)
   }
 
-  if true {
+  do {
     var d1 = getCOWFastDictionary()
     var identity1 = unsafeBitCast(d1, Int.self)
     let originalCapacity = d1._variantStorage.native.capacity
@@ -775,14 +775,14 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
 }
 
 DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
-  if true {
+  do {
     var d = getCOWSlowDictionary()
     let originalCapacity = d._variantStorage.native.capacity
     assert(d.count == 3)
     assert(d[TestKeyTy(10)]!.value == 1010)
 
     d.removeAll()
-    // We can not assert that identity changed, since the new buffer of smaller
+    // We cannot assert that identity changed, since the new buffer of smaller
     // size can be allocated at the same address as the old one.
     var identity1 = unsafeBitCast(d, Int.self)
     assert(d._variantStorage.native.capacity < originalCapacity)
@@ -795,7 +795,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     assert(d[TestKeyTy(10)] == nil)
   }
 
-  if true {
+  do {
     var d = getCOWSlowDictionary()
     var identity1 = unsafeBitCast(d, Int.self)
     let originalCapacity = d._variantStorage.native.capacity
@@ -815,7 +815,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     assert(d[TestKeyTy(10)] == nil)
   }
 
-  if true {
+  do {
     var d1 = getCOWSlowDictionary()
     var identity1 = unsafeBitCast(d1, Int.self)
     assert(d1.count == 3)
@@ -836,7 +836,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     _fixLifetime(d2)
   }
 
-  if true {
+  do {
     var d1 = getCOWSlowDictionary()
     var identity1 = unsafeBitCast(d1, Int.self)
     let originalCapacity = d1._variantStorage.native.capacity
@@ -1082,18 +1082,18 @@ DictionaryTestSuite.test("deleteChainCollisionRandomized") {
 }
 
 DictionaryTestSuite.test("init(dictionaryLiteral:)") {
-  if true {
+  do {
     var empty = Dictionary<Int, Int>()
     assert(empty.count == 0)
     assert(empty[1111] == nil)
   }
-  if true {
+  do {
     var d = Dictionary(dictionaryLiteral: (10, 1010))
     assert(d.count == 1)
     assert(d[10]! == 1010)
     assert(d[1111] == nil)
   }
-  if true {
+  do {
     var d = Dictionary(dictionaryLiteral: 
         (10, 1010), (20, 1020))
     assert(d.count == 2)
@@ -1101,7 +1101,7 @@ DictionaryTestSuite.test("init(dictionaryLiteral:)") {
     assert(d[20]! == 1020)
     assert(d[1111] == nil)
   }
-  if true {
+  do {
     var d = Dictionary(dictionaryLiteral: 
         (10, 1010), (20, 1020), (30, 1030))
     assert(d.count == 3)
@@ -1110,7 +1110,7 @@ DictionaryTestSuite.test("init(dictionaryLiteral:)") {
     assert(d[30]! == 1030)
     assert(d[1111] == nil)
   }
-  if true {
+  do {
     var d = Dictionary(dictionaryLiteral: 
         (10, 1010), (20, 1020), (30, 1030), (40, 1040))
     assert(d.count == 4)
@@ -1120,7 +1120,7 @@ DictionaryTestSuite.test("init(dictionaryLiteral:)") {
     assert(d[40]! == 1040)
     assert(d[1111] == nil)
   }
-  if true {
+  do {
     var d: Dictionary<Int, Int> = [ 10: 1010, 20: 1020, 30: 1030 ]
     assert(d.count == 3)
     assert(d[10]! == 1010)
@@ -1339,7 +1339,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.DictionaryIsCopied") {
   assert(isCocoaDictionary(d))
 
   // Find an existing key.
-  if true {
+  do {
     var kv = d[d.indexForKey(TestObjCKeyTy(10))!]
     assert(kv.0 == TestObjCKeyTy(10))
     assert(kv.1.value == 1010)
@@ -1351,7 +1351,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.DictionaryIsCopied") {
   assert(nsd[TestObjCKeyTy(10)] == nil)
 
   // Find an existing key, again.
-  if true {
+  do {
     var kv = d[d.indexForKey(TestObjCKeyTy(10))!]
     assert(kv.0 == TestObjCKeyTy(10))
     assert(kv.1.value == 1010)
@@ -1364,7 +1364,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.DictionaryIsCopied") {
   assert(isNativeDictionary(d))
 
   // Find an existing key.
-  if true {
+  do {
     var kv = d[d.indexForKey(TestBridgedKeyTy(10))!]
     assert(kv.0 == TestBridgedKeyTy(10))
     assert(kv.1.value == 1010)
@@ -1376,7 +1376,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.DictionaryIsCopied") {
   assert(nsd[TestBridgedKeyTy(10)] == nil)
 
   // Find an existing key, again.
-  if true {
+  do {
     var kv = d[d.indexForKey(TestBridgedKeyTy(10))!]
     assert(kv.0 == TestBridgedKeyTy(10))
     assert(kv.1.value == 1010)
@@ -1476,7 +1476,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.IndexForKey") {
   assert(isCocoaDictionary(d))
 
   // Find an existing key.
-  if true {
+  do {
     var kv = d[d.indexForKey(TestObjCKeyTy(10))!]
     assert(kv.0 == TestObjCKeyTy(10))
     assert(kv.1.value == 1010)
@@ -1501,7 +1501,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.IndexForKey") {
   assert(isNativeDictionary(d))
 
   // Find an existing key.
-  if true {
+  do {
     var kv = d[d.indexForKey(TestBridgedKeyTy(10))!]
     assert(kv.0 == TestBridgedKeyTy(10))
     assert(kv.1.value == 1010)
@@ -1726,7 +1726,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithKey") {
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.UpdateValueForKey") {
   // Insert a new key-value pair.
-  if true {
+  do {
     var d = getBridgedVerbatimDictionary()
     var identity1 = unsafeBitCast(d, Int.self)
     assert(isCocoaDictionary(d))
@@ -1746,7 +1746,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.UpdateValueForKey") {
   }
 
   // Overwrite a value in existing binding.
-  if true {
+  do {
     var d = getBridgedVerbatimDictionary()
     var identity1 = unsafeBitCast(d, Int.self)
     assert(isCocoaDictionary(d))
@@ -1768,7 +1768,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.UpdateValueForKey") {
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.UpdateValueForKey") {
   // Insert a new key-value pair.
-  if true {
+  do {
     var d = getBridgedNonverbatimDictionary()
     var identity1 = unsafeBitCast(d, Int.self)
     assert(isNativeDictionary(d))
@@ -1788,7 +1788,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.UpdateValueForKey") {
   }
 
   // Overwrite a value in existing binding.
-  if true {
+  do {
     var d = getBridgedNonverbatimDictionary()
     var identity1 = unsafeBitCast(d, Int.self)
     assert(isNativeDictionary(d))
@@ -1849,7 +1849,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAtIndex") {
 
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveValueForKey") {
-  if true {
+  do {
     var d = getBridgedVerbatimDictionary()
     var identity1 = unsafeBitCast(d, Int.self)
     assert(isCocoaDictionary(d))
@@ -1872,7 +1872,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveValueForKey") {
     assert(identity2 == unsafeBitCast(d, Int.self))
   }
 
-  if true {
+  do {
     var d1 = getBridgedVerbatimDictionary()
     var identity1 = unsafeBitCast(d1, Int.self)
 
@@ -1908,7 +1908,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveValueForKey") {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveValueForKey") {
-  if true {
+  do {
     var d = getBridgedNonverbatimDictionary()
     var identity1 = unsafeBitCast(d, Int.self)
     assert(isNativeDictionary(d))
@@ -1931,7 +1931,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveValueForKey") {
     assert(identity2 == unsafeBitCast(d, Int.self))
   }
 
-  if true {
+  do {
     var d1 = getBridgedNonverbatimDictionary()
     var identity1 = unsafeBitCast(d1, Int.self)
 
@@ -1968,7 +1968,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveValueForKey") {
 
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
-  if true {
+  do {
     var d = getBridgedVerbatimDictionary([:])
     var identity1 = unsafeBitCast(d, Int.self)
     assert(isCocoaDictionary(d))
@@ -1979,7 +1979,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     assert(d.count == 0)
   }
 
-  if true {
+  do {
     var d = getBridgedVerbatimDictionary()
     var identity1 = unsafeBitCast(d, Int.self)
     assert(isCocoaDictionary(d))
@@ -1994,7 +1994,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     assert(d[TestObjCKeyTy(10)] == nil)
   }
 
-  if true {
+  do {
     var d = getBridgedVerbatimDictionary()
     var identity1 = unsafeBitCast(d, Int.self)
     assert(isCocoaDictionary(d))
@@ -2009,7 +2009,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     assert(d[TestObjCKeyTy(10)] == nil)
   }
 
-  if true {
+  do {
     var d1 = getBridgedVerbatimDictionary()
     var identity1 = unsafeBitCast(d1, Int.self)
     assert(isCocoaDictionary(d1))
@@ -2029,7 +2029,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     assert(d2[TestObjCKeyTy(10)] == nil)
   }
 
-  if true {
+  do {
     var d1 = getBridgedVerbatimDictionary()
     var identity1 = unsafeBitCast(d1, Int.self)
     assert(isCocoaDictionary(d1))
@@ -2051,7 +2051,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
-  if true {
+  do {
     var d = getBridgedNonverbatimDictionary([:])
     var identity1 = unsafeBitCast(d, Int.self)
     assert(isNativeDictionary(d))
@@ -2062,7 +2062,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
     assert(d.count == 0)
   }
 
-  if true {
+  do {
     var d = getBridgedNonverbatimDictionary()
     var identity1 = unsafeBitCast(d, Int.self)
     assert(isNativeDictionary(d))
@@ -2077,7 +2077,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
     assert(d[TestBridgedKeyTy(10)] == nil)
   }
 
-  if true {
+  do {
     var d = getBridgedNonverbatimDictionary()
     var identity1 = unsafeBitCast(d, Int.self)
     assert(isNativeDictionary(d))
@@ -2092,7 +2092,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
     assert(d[TestBridgedKeyTy(10)] == nil)
   }
 
-  if true {
+  do {
     var d1 = getBridgedNonverbatimDictionary()
     var identity1 = unsafeBitCast(d1, Int.self)
     assert(isNativeDictionary(d1))
@@ -2112,7 +2112,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
     assert(d2[TestBridgedKeyTy(10)] == nil)
   }
 
-  if true {
+  do {
     var d1 = getBridgedNonverbatimDictionary()
     var identity1 = unsafeBitCast(d1, Int.self)
     assert(isNativeDictionary(d1))
@@ -2199,7 +2199,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_Empty") {
   assert(isCocoaDictionary(d))
 
   var gen = d.generate()
-  // Can not write code below because of
+  // Cannot write code below because of
   // <rdar://problem/16811736> Optional tuples are broken as optionals regarding == comparison
   // assert(gen.next() == .None)
   assert(gen.next() == nil)
@@ -2217,7 +2217,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
   assert(isNativeDictionary(d))
 
   var gen = d.generate()
-  // Can not write code below because of
+  // Cannot write code below because of
   // <rdar://problem/16811736> Optional tuples are broken as optionals regarding == comparison
   // assert(gen.next() == .None)
   assert(gen.next() == nil)
@@ -2392,7 +2392,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
     var identity2 = unsafeBitCast(d2, Int.self)
     assert(isCocoaDictionary(d2))
 
-    if true {
+    do {
       let eq1 = (d1 == d2)
       assert(eq1 == expectedEq)
 
@@ -2414,7 +2414,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
     assert(identity2 != unsafeBitCast(d2, Int.self))
     identity2 = unsafeBitCast(d2, Int.self)
 
-    if true {
+    do {
       let eq1 = (d1 == d2)
       assert(eq1 == expectedEq)
 
@@ -2876,7 +2876,7 @@ DictionaryTestSuite.test("BridgingRoundtrip") {
 // NSDictionary -> Dictionary implicit conversion.
 //===---
 
-DictionaryTestSuite.test("NSDictionaryToDictionaryCoversion") {
+DictionaryTestSuite.test("NSDictionaryToDictionaryConversion") {
   let keys = [ 10, 20, 30 ].map { TestObjCKeyTy($0) }
   let values = [ 1010, 1020, 1030 ].map { TestObjCValueTy($0) }
 
@@ -2892,7 +2892,7 @@ DictionaryTestSuite.test("NSDictionaryToDictionaryCoversion") {
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
 }
 
-DictionaryTestSuite.test("DictionaryToNSDictionaryCoversion") {
+DictionaryTestSuite.test("DictionaryToNSDictionaryConversion") {
   var d = Dictionary<TestObjCKeyTy, TestObjCValueTy>(minimumCapacity: 32)
   d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
   d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
@@ -2956,7 +2956,7 @@ DictionaryTestSuite.test("DictionaryUpcastBridgedEntryPoint") {
   d[TestBridgedKeyTy(20)] = TestBridgedValueTy(1020)
   d[TestBridgedKeyTy(30)] = TestBridgedValueTy(1030)
 
-  if true {
+  do {
     var dOO: Dictionary<NSObject, AnyObject> = _dictionaryBridgeToObjectiveC(d)
 
     assert(dOO.count == 3)
@@ -2970,7 +2970,7 @@ DictionaryTestSuite.test("DictionaryUpcastBridgedEntryPoint") {
     assert((v! as! TestBridgedValueTy).value == 1030)
   }
 
-  if true {
+  do {
     var dOV: Dictionary<NSObject, TestBridgedValueTy>
       = _dictionaryBridgeToObjectiveC(d)
 
@@ -2985,7 +2985,7 @@ DictionaryTestSuite.test("DictionaryUpcastBridgedEntryPoint") {
     assert(v!.value == 1030)
   }
 
-  if true {
+  do {
     var dVO: Dictionary<TestBridgedKeyTy, AnyObject>
       = _dictionaryBridgeToObjectiveC(d)
 
@@ -3007,7 +3007,7 @@ DictionaryTestSuite.test("DictionaryUpcastBridged") {
   d[TestBridgedKeyTy(20)] = TestBridgedValueTy(1020)
   d[TestBridgedKeyTy(30)] = TestBridgedValueTy(1030)
 
-  if true {
+  do {
     var dOO: Dictionary<NSObject, AnyObject> = d
 
     assert(dOO.count == 3)
@@ -3021,7 +3021,7 @@ DictionaryTestSuite.test("DictionaryUpcastBridged") {
     assert((v! as! TestBridgedValueTy).value == 1030)
   }
 
-  if true {
+  do {
     var dOV: Dictionary<NSObject, TestBridgedValueTy> = d
 
     assert(dOV.count == 3)
@@ -3035,7 +3035,7 @@ DictionaryTestSuite.test("DictionaryUpcastBridged") {
     assert(v!.value == 1030)
   }
 
-  if true {
+  do {
     var dVO: Dictionary<TestBridgedKeyTy, AnyObject> = d
 
     assert(dVO.count == 3)
@@ -3163,7 +3163,7 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCEntryPoint") {
   // Successful downcast.
   let dCV: Dictionary<TestObjCKeyTy, TestBridgedValueTy>
     = _dictionaryBridgeFromObjectiveC(d)
-  if true {
+  do {
     assert(dCV.count == 3)
     var v = dCV[TestObjCKeyTy(10)]
     assert(v!.value == 1010)
@@ -3178,7 +3178,7 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCEntryPoint") {
   // Successful downcast.
   let dVC: Dictionary<TestBridgedKeyTy, TestObjCValueTy>
     = _dictionaryBridgeFromObjectiveC(d)
-  if true {
+  do {
     assert(dVC.count == 3)
     var v = dVC[TestBridgedKeyTy(10)]
     assert(v!.value == 1010)
@@ -3193,7 +3193,7 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCEntryPoint") {
   // Successful downcast.
   let dVV: Dictionary<TestBridgedKeyTy, TestBridgedValueTy>
         = _dictionaryBridgeFromObjectiveC(d)
-  if true {
+  do {
     assert(dVV.count == 3)
     var v = dVV[TestBridgedKeyTy(10)]
     assert(v!.value == 1010)
@@ -3214,7 +3214,7 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveC") {
 
   // Successful downcast.
   let dCV = d as! Dictionary<TestObjCKeyTy, TestBridgedValueTy>
-  if true {
+  do {
     assert(dCV.count == 3)
     var v = dCV[TestObjCKeyTy(10)]
     assert(v!.value == 1010)
@@ -3228,7 +3228,7 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveC") {
 
   // Successful downcast.
   let dVC = d as! Dictionary<TestBridgedKeyTy, TestObjCValueTy>
-  if true {
+  do {
     assert(dVC.count == 3)
     var v = dVC[TestBridgedKeyTy(10)]
     assert(v!.value == 1010)
@@ -3242,7 +3242,7 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveC") {
 
   // Successful downcast.
   let dVV = d as! Dictionary<TestBridgedKeyTy, TestBridgedValueTy>
-  if true {
+  do {
     assert(dVV.count == 3)
     var v = dVV[TestBridgedKeyTy(10)]
     assert(v!.value == 1010)
@@ -3457,11 +3457,11 @@ func getMockDictionaryWithCustomCount(count count: Int)
 }
 
 DictionaryDerivedAPIs.test("isEmpty") {
-  if true {
+  do {
     var empty = Dictionary<Int, Int>()
     expectTrue(empty.isEmpty)
   }
-  if true {
+  do {
     var d = getDerivedAPIsDictionary()
     expectFalse(d.isEmpty)
   }
@@ -3472,26 +3472,26 @@ func callGenericIsEmpty<C : CollectionType>(collection: C) -> Bool {
 }
 
 DictionaryDerivedAPIs.test("isEmpty/ImplementationIsCustomized") {
-  if true {
+  do {
     var d = getMockDictionaryWithCustomCount(count: 0)
     MockDictionaryWithCustomCount.timesCountWasCalled = 0
     expectTrue(d.isEmpty)
     expectEqual(1, MockDictionaryWithCustomCount.timesCountWasCalled)
   }
-  if true {
+  do {
     var d = getMockDictionaryWithCustomCount(count: 0)
     MockDictionaryWithCustomCount.timesCountWasCalled = 0
     expectTrue(callGenericIsEmpty(d))
     expectEqual(1, MockDictionaryWithCustomCount.timesCountWasCalled)
   }
 
-  if true {
+  do {
     var d = getMockDictionaryWithCustomCount(count: 4)
     MockDictionaryWithCustomCount.timesCountWasCalled = 0
     expectFalse(d.isEmpty)
     expectEqual(1, MockDictionaryWithCustomCount.timesCountWasCalled)
   }
-  if true {
+  do {
     var d = getMockDictionaryWithCustomCount(count: 4)
     MockDictionaryWithCustomCount.timesCountWasCalled = 0
     expectFalse(callGenericIsEmpty(d))
@@ -3500,12 +3500,12 @@ DictionaryDerivedAPIs.test("isEmpty/ImplementationIsCustomized") {
 }
 
 DictionaryDerivedAPIs.test("keys") {
-  if true {
+  do {
     var empty = Dictionary<Int, Int>()
     var keys = Array(empty.keys)
     expectTrue(equalsUnordered(keys, []))
   }
-  if true {
+  do {
     var d = getDerivedAPIsDictionary()
     var keys = Array(d.keys)
     expectTrue(equalsUnordered(keys, [ 10, 20, 30 ]))
@@ -3513,12 +3513,12 @@ DictionaryDerivedAPIs.test("keys") {
 }
 
 DictionaryDerivedAPIs.test("values") {
-  if true {
+  do {
     var empty = Dictionary<Int, Int>()
     var values = Array(empty.values)
     expectTrue(equalsUnordered(values, []))
   }
-  if true {
+  do {
     var d = getDerivedAPIsDictionary()
 
     var values = Array(d.values)
@@ -3540,7 +3540,7 @@ class ObjCThunksHelper : NSObject {
   }
 
   dynamic func acceptArrayBridgedNonverbatim(array: [TestBridgedValueTy]) {
-    // Can not check elements because doing so would bridge them.
+    // Cannot check elements because doing so would bridge them.
     expectEqual(3, array.count)
   }
 
@@ -3565,7 +3565,7 @@ class ObjCThunksHelper : NSObject {
   dynamic func acceptDictionaryBridgedNonverbatim(
       d: [TestBridgedKeyTy : TestBridgedValueTy]) {
     expectEqual(3, d.count)
-    // Can not check elements because doing so would bridge them.
+    // Cannot check elements because doing so would bridge them.
   }
 
   dynamic func returnDictionaryBridgedVerbatim() ->
@@ -3590,11 +3590,11 @@ class ObjCThunksHelper : NSObject {
 ObjCThunks.test("Array/Accept") {
   var helper = ObjCThunksHelper()
 
-  if true {
+  do {
     helper.acceptArrayBridgedVerbatim(
         [ TestObjCValueTy(10), TestObjCValueTy(20), TestObjCValueTy(30) ])
   }
-  if true {
+  do {
     TestBridgedValueTy.bridgeOperations = 0
     helper.acceptArrayBridgedNonverbatim(
         [ TestBridgedValueTy(10), TestBridgedValueTy(20),
@@ -3606,13 +3606,13 @@ ObjCThunks.test("Array/Accept") {
 ObjCThunks.test("Array/Return") {
   var helper = ObjCThunksHelper()
 
-  if true {
+  do {
     let a = helper.returnArrayBridgedVerbatim()
     expectEqual(10, a[0].value)
     expectEqual(20, a[1].value)
     expectEqual(30, a[2].value)
   }
-  if true {
+  do {
     TestBridgedValueTy.bridgeOperations = 0
     let a = helper.returnArrayBridgedNonverbatim()
     expectEqual(0, TestBridgedValueTy.bridgeOperations)
@@ -3628,13 +3628,13 @@ ObjCThunks.test("Array/Return") {
 ObjCThunks.test("Dictionary/Accept") {
   var helper = ObjCThunksHelper()
 
-  if true {
+  do {
     helper.acceptDictionaryBridgedVerbatim(
         [ TestObjCKeyTy(10): TestObjCValueTy(1010),
           TestObjCKeyTy(20): TestObjCValueTy(1020),
           TestObjCKeyTy(30): TestObjCValueTy(1030) ])
   }
-  if true {
+  do {
     TestBridgedKeyTy.bridgeOperations = 0
     TestBridgedValueTy.bridgeOperations = 0
     helper.acceptDictionaryBridgedNonverbatim(
@@ -3649,14 +3649,14 @@ ObjCThunks.test("Dictionary/Accept") {
 ObjCThunks.test("Dictionary/Return") {
   var helper = ObjCThunksHelper()
 
-  if true {
+  do {
     let d = helper.returnDictionaryBridgedVerbatim()
     expectEqual(3, d.count)
     expectEqual(1010, d[TestObjCKeyTy(10)]!.value)
     expectEqual(1020, d[TestObjCKeyTy(20)]!.value)
     expectEqual(1030, d[TestObjCKeyTy(30)]!.value)
   }
-  if true {
+  do {
     TestBridgedKeyTy.bridgeOperations = 0
     TestBridgedValueTy.bridgeOperations = 0
     let d = helper.returnDictionaryBridgedNonverbatim()
@@ -3737,7 +3737,7 @@ DictionaryTestSuite.test(
 //===---
 
 DictionaryTestSuite.test("misc") {
-  if true {
+  do {
     // Dictionary literal
     var dict = [ "Hello": 1, "World": 2 ]
 
@@ -3758,7 +3758,7 @@ DictionaryTestSuite.test("misc") {
     expectEmpty(dict["Universe"])
   }
 
-  if true {
+  do {
     // Dictionaries with other types
     var d = [ 1.2: 1, 2.6: 2 ]
     d[3.3] = 3
@@ -3767,7 +3767,7 @@ DictionaryTestSuite.test("misc") {
     expectOptionalEqual(3, d[3.3])
   }
 
-  if true {
+  do {
     var d = Dictionary<String, Int>(minimumCapacity: 13)
     d["one"] = 1
     d["two"] = 2
@@ -3806,13 +3806,13 @@ DictionaryTestSuite.test("dropsBridgedCache") {
   // implementation.
   // This test will only fail in address sanitizer.
   var dict = [0:10]
-  if true {
+  do {
     var bridged: NSDictionary = dict
     expectEqual(10, bridged[0] as! Int)
   }
 
   dict[0] = 11
-  if true {
+  do {
     var bridged: NSDictionary = dict
     expectEqual(11, bridged[0] as! Int)
   }
@@ -3843,13 +3843,13 @@ DictionaryTestSuite.test("getObjects:andKeys:") {
 
 DictionaryTestSuite.test("popFirst") {
   // Empty
-  if true {
+  do {
     var d = [Int: Int]()
     let popped = d.popFirst()
     expectEmpty(popped)
   }
 
-  if true {
+  do {
     var popped = [(Int, Int)]()
     var d: [Int: Int] = [
       1010: 1010,

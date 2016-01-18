@@ -3,7 +3,7 @@
 func markUsed<T>(t: T) {}
 
 protocol AProtocol {
-  func f() -> String;
+  func f() -> String
 }
 class AClass : AProtocol {
   func f() -> String { return "A" }
@@ -45,7 +45,7 @@ struct Wrapper<T: AProtocol> {
 }
 
 // CHECK: !DILocalVariable(name: "f", {{.*}}, line: [[@LINE+1]], type: !"_TtFQq_F12generic_args5applyu0_rFTx1fFxq__q_Qq0_F12generic_args5applyu0_rFTx1fFxq__q_")
-func apply<T, U> (x: T, f: (T)->(U)) -> U {
+func apply<T, U> (x: T, f: (T) -> (U)) -> U {
   return f(x)
 }
 

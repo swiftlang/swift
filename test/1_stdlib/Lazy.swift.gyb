@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -17,6 +17,13 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
+
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
 
 var LazyTestSuite = TestSuite("Lazy")
 
@@ -209,7 +216,7 @@ struct SequenceWithCustomUnderestimateCount : SequenceType {
   }
 
   func underestimateCount() -> Int {
-    ++SequenceWithCustomUnderestimateCount.timesUnderestimateCountWasCalled
+    SequenceWithCustomUnderestimateCount.timesUnderestimateCountWasCalled += 1
     return _data.underestimateCount()
   }
 
@@ -400,7 +407,7 @@ func expectSequencePassthrough<
     _ = s._copyToNativeArrayBuffer()
   }
   
-  SequenceLog._initializeTo.expectIncrement(baseType) { ()->Void in
+  SequenceLog._initializeTo.expectIncrement(baseType) { () -> Void in
     let buf = UnsafeMutablePointer<S.Generator.Element>.alloc(count)
   
     let end = s._initializeTo(buf)
@@ -486,8 +493,8 @@ tests.test("LazyMapSequence") {
 
   var calls = 0
   var mapped = base.map {
-    (x: OpaqueValue<Int>)->OpaqueValue<Double> in
-    ++calls
+    (x: OpaqueValue<Int>) -> OpaqueValue<Double> in
+    calls += 1
     return OpaqueValue(Double(x.value) / 2.0)
   }
 
@@ -528,8 +535,8 @@ tests.test("LazyMapCollection/${traversal}") {
 
   var calls = 0
   var mapped = base.map {
-    (x: OpaqueValue<Int>)->OpaqueValue<Double> in
-    ++calls
+    (x: OpaqueValue<Int>) -> OpaqueValue<Double> in
+    calls += 1
     return OpaqueValue(Double(x.value) / 2.0)
   }
   expectEqual(0, calls)
@@ -595,7 +602,7 @@ tests.test("ReverseCollection") {
   // Check that the reverse collection is still eager
   do {
     var calls = 0
-    _ = r.reverse().map { _ in ++calls }
+    _ = r.reverse().map { _ in calls += 1 }
     expectEqual(r.count, calls)
   }
   
@@ -606,7 +613,7 @@ tests.test("ReverseCollection") {
   // Check that the reverse collection is still eager
   do {
     var calls = 0
-    _ = "foobar".characters.reverse().map { _ in ++calls }
+    _ = "foobar".characters.reverse().map { _ in calls += 1 }
     expectEqual("foobar".characters.count, calls)
   }
 }
@@ -635,7 +642,7 @@ tests.test("ReverseCollection/Lazy") {
     ExpectType<LazyReversedBase>.test(reversed)
     
     var calls = 0
-    let reversedAndMapped = reversed.map { (x)->Int in ++calls; return x }
+    let reversedAndMapped = reversed.map { (x) -> Int in calls += 1; return x }
     expectEqual(0, calls)
     checkRandomAccessCollection(0...11, reversedAndMapped)
     expectNotEqual(0, calls)
@@ -657,7 +664,7 @@ tests.test("ReverseCollection/Lazy") {
     ExpectType<LazyReversedBase>.test(reversed)
     
     var calls = 0
-    let reversedAndMapped = reversed.map { (x)->Character in ++calls; return x }
+    let reversedAndMapped = reversed.map { (x) -> Character in calls += 1; return x }
     expectEqual(0, calls)
     checkBidirectionalCollection("raboof".characters, reversedAndMapped)
     expectNotEqual(0, calls)
@@ -695,7 +702,7 @@ tests.test("LazyFilterSequence") {
 
   var calls = 0
   var filtered = MinimalSequence(elements: base).lazy.filter {
-    x in ++calls;
+    x in calls += 1;
     return x.value % 2 == 0
   }
   expectEqual(calls, 0, "filtering was eager!")
@@ -710,7 +717,7 @@ tests.test("LazyFilterSequence") {
   }
   expectEqual(100, calls)
 
-  // check that it works when the first element doesn't satify the predicate
+  // Check that it works when the first element doesn't satisfy the predicate
   let odds = 1.stride(to: 100, by: 2).map(OpaqueValue.init)
   filtered =
     MinimalSequence(elements: base).lazy.filter { $0.value % 2 != 0 }
@@ -721,7 +728,7 @@ tests.test("LazyFilterSequence") {
   // Try again using explicit construction
   filtered = LazyFilterSequence(
     MinimalSequence(elements: base),
-    whereElementsSatisfy: { x in ++calls; return x.value % 2 == 0})
+    whereElementsSatisfy: { x in calls += 1; return x.value % 2 == 0})
   
   expectEqual(100, calls)
 
@@ -759,7 +766,7 @@ tests.test("LazyFilterCollection") {
 
   var calls = 0
   let filtered = base.lazy.filter {
-    x in ++calls;
+    x in calls += 1;
     return x.value % 2 == 0
   }
   expectEqual(calls, 0, "filtering was eager!")
@@ -821,7 +828,7 @@ do {
         elements: data.map { MinimalSequence(elements: $0) })
       let flattened = base.flatten()
       var calls = 0
-      _ = flattened.map { _ in ++calls }
+      _ = flattened.map { _ in calls += 1 }
       expectEqual(
         expected.count, calls,
         "unexpected laziness in \(flattened.dynamicType)")
@@ -835,7 +842,7 @@ do {
 
       let flattened = base.flatten()
       var calls = 0
-      _ = flattened.map { _ in ++calls }
+      _ = flattened.map { _ in calls += 1 }
       expectEqual(0, calls, "unexpected eagerness in \(flattened.dynamicType)")
     }
     
@@ -850,7 +857,7 @@ do {
 
       // Checking that flatten doesn't introduce laziness
       var calls = 0
-      _ = flattened.map { _ in ++calls }
+      _ = flattened.map { _ in calls += 1 }
       expectLE(
         expected.count, calls,
         "unexpected laziness in \(flattened.dynamicType)")
@@ -865,7 +872,7 @@ do {
       let flattened = base.flatten()
     
       var calls = 0
-      _ = flattened.map { _ in ++calls }
+      _ = flattened.map { _ in calls += 1 }
       expectEqual(0, calls, "unexpected eagerness in \(flattened.dynamicType)")
     }
   % end

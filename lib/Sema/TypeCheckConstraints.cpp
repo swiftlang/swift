@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -46,9 +46,9 @@
 using namespace swift;
 using namespace constraints;
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Type variable implementation.
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 #pragma mark Type variable implementation
 
 void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
@@ -185,7 +185,7 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
 
     // If there aren't any more inputs, we can use a default argument.
     if (fromNext == fromLast) {
-      if (elt2.hasInit()) {
+      if (elt2.hasDefaultArg()) {
         sources[i] = TupleShuffleExpr::DefaultInitialize;
         continue;
       }
@@ -239,9 +239,9 @@ bool constraints::hasTrailingClosure(const ConstraintLocatorBuilder &locator) {
   return false;
 }
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // High-level entry points.
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 static unsigned getNumArgs(ValueDecl *value) {
   if (!isa<FuncDecl>(value)) return ~0U;
@@ -281,6 +281,153 @@ static bool matchesDeclRefKind(ValueDecl *value, DeclRefKind refKind) {
   llvm_unreachable("bad declaration reference kind");
 }
 
+static bool containsDeclRefKind(LookupResult &lookupResult,
+                                DeclRefKind refKind) {
+  for (auto candidate : lookupResult) {
+    ValueDecl *D = candidate.Decl;
+    if (!D || !D->hasType())
+      continue;
+    if (matchesDeclRefKind(D, refKind))
+      return true;
+  }
+  return false;
+}
+
+/// Emit a diagnostic with a fixit hint for an invalid binary operator, showing
+/// how to split it according to splitCandidate.
+static void diagnoseBinOpSplit(UnresolvedDeclRefExpr *UDRE,
+                               std::pair<unsigned, bool> splitCandidate,
+                               Diag<Identifier, Identifier, bool> diagID,
+                               TypeChecker &TC) {
+
+  unsigned splitLoc = splitCandidate.first;
+  bool isBinOpFirst = splitCandidate.second;
+  StringRef nameStr = UDRE->getName().str();
+  auto startStr = nameStr.substr(0, splitLoc);
+  auto endStr = nameStr.drop_front(splitLoc);
+
+  // One valid split found, it is almost certainly the right answer.
+  auto diag = TC.diagnose(UDRE->getLoc(), diagID,
+                          TC.Context.getIdentifier(startStr),
+                          TC.Context.getIdentifier(endStr), isBinOpFirst);
+  // Highlight the whole operator.
+  diag.highlight(UDRE->getLoc());
+  // Insert whitespace on the left if the binop is at the start, or to the
+  // right if it is end.
+  if (isBinOpFirst)
+    diag.fixItInsert(UDRE->getLoc(), " ");
+  else
+    diag.fixItInsertAfter(UDRE->getLoc(), " ");
+
+  // Insert a space between the operators.
+  diag.fixItInsert(UDRE->getLoc().getAdvancedLoc(splitLoc), " ");
+}
+
+/// If we failed lookup of a binary operator, check to see it to see if
+/// it is a binary operator juxtaposed with a unary operator (x*-4) that
+/// needs whitespace.  If so, emit specific diagnostics for it and return true,
+/// otherwise return false.
+static bool diagnoseOperatorJuxtaposition(UnresolvedDeclRefExpr *UDRE,
+                                    DeclContext *DC,
+                                    TypeChecker &TC) {
+  Identifier name = UDRE->getName();
+  StringRef nameStr = name.str();
+  if (!name.isOperator() || nameStr.size() < 2)
+    return false;
+
+  bool isBinOp = UDRE->getRefKind() == DeclRefKind::BinaryOperator;
+
+  // If this is a binary operator, relex the token, to decide whether it has
+  // whitespace around it or not.  If it does "x +++ y", then it isn't likely to
+  // be a case where a space was forgotten.
+  if (isBinOp) {
+    auto tok = Lexer::getTokenAtLocation(TC.Context.SourceMgr, UDRE->getLoc());
+    if (tok.getKind() != tok::oper_binary_unspaced)
+      return false;
+  }
+
+  // Okay, we have a failed lookup of a multicharacter operator. Check to see if
+  // lookup succeeds if part is split off, and record the matches found.
+  //
+  // In the case of a binary operator, the bool indicated is false if the
+  // first half of the split is the unary operator (x!*4) or true if it is the
+  // binary operator (x*+4).
+  std::vector<std::pair<unsigned, bool>> WorkableSplits;
+
+  // Check all the potential splits.
+  for (unsigned splitLoc = 1, e = nameStr.size(); splitLoc != e; ++splitLoc) {
+    // For it to be a valid split, the start and end section must be valid
+    // operators, splitting a unicode code point isn't kosher.
+    auto startStr = nameStr.substr(0, splitLoc);
+    auto endStr = nameStr.drop_front(splitLoc);
+    if (!Lexer::isOperator(startStr) || !Lexer::isOperator(endStr))
+      continue;
+
+    auto startName = TC.Context.getIdentifier(startStr);
+    auto endName = TC.Context.getIdentifier(endStr);
+
+    // Perform name lookup for the first and second pieces.  If either fail to
+    // be found, then it isn't a valid split.
+    NameLookupOptions LookupOptions = defaultUnqualifiedLookupOptions;
+    if (isa<AbstractFunctionDecl>(DC))
+      LookupOptions |= NameLookupFlags::KnownPrivate;
+    auto startLookup = TC.lookupUnqualified(DC, startName, UDRE->getLoc(),
+                                       LookupOptions);
+    if (!startLookup) continue;
+    auto endLookup = TC.lookupUnqualified(DC, endName, UDRE->getLoc(),
+                                          LookupOptions);
+    if (!endLookup) continue;
+
+    // If the overall operator is a binary one, then we're looking at
+    // juxtaposed binary and unary operators.
+    if (isBinOp) {
+      // Look to see if the candidates found could possibly match.
+      if (containsDeclRefKind(startLookup, DeclRefKind::PostfixOperator) &&
+          containsDeclRefKind(endLookup, DeclRefKind::BinaryOperator))
+        WorkableSplits.push_back({ splitLoc, false });
+
+      if (containsDeclRefKind(startLookup, DeclRefKind::BinaryOperator) &&
+          containsDeclRefKind(endLookup, DeclRefKind::PrefixOperator))
+        WorkableSplits.push_back({ splitLoc, true });
+    } else {
+      // Otherwise, it is two of the same kind, e.g. "!!x" or "!~x".
+      if (containsDeclRefKind(startLookup, UDRE->getRefKind()) &&
+          containsDeclRefKind(endLookup, UDRE->getRefKind()))
+        WorkableSplits.push_back({ splitLoc, false });
+    }
+  }
+
+  switch (WorkableSplits.size()) {
+  case 0:
+    // No splits found, can't produce this diagnostic.
+    return false;
+  case 1:
+    // One candidate: produce an error with a fixit on it.
+    if (isBinOp)
+      diagnoseBinOpSplit(UDRE, WorkableSplits[0],
+                         diag::unspaced_binary_operator_fixit, TC);
+    else
+      TC.diagnose(UDRE->getLoc().getAdvancedLoc(WorkableSplits[0].first),
+                  diag::unspaced_unary_operator);
+    return true;
+
+  default:
+    // Otherwise, we have to produce a series of notes listing the various
+    // options.
+    TC.diagnose(UDRE->getLoc(), isBinOp ? diag::unspaced_binary_operator :
+                diag::unspaced_unary_operator)
+      .highlight(UDRE->getLoc());
+
+    if (isBinOp) {
+      for (auto candidateSplit : WorkableSplits)
+        diagnoseBinOpSplit(UDRE, candidateSplit,
+                           diag::unspaced_binary_operators_candidate, TC);
+    }
+    return true;
+  }
+}
+
+
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression.  Context is the DeclContext used
 /// for the lookup.
@@ -297,8 +444,14 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   auto Lookup = lookupUnqualified(DC, Name, Loc, LookupOptions);
 
   if (!Lookup) {
-    diagnose(Loc, diag::use_unresolved_identifier, Name)
-      .highlight(Loc);
+    // If we failed lookup of an operator, check to see it to see if it is
+    // because two operators are juxtaposed e.g. (x*-4) that needs whitespace.
+    // If so, emit specific diagnostics for it.
+    if (!diagnoseOperatorJuxtaposition(UDRE, DC, *this)) {
+      diagnose(Loc, diag::use_unresolved_identifier, Name,
+               UDRE->getName().isOperator())
+        .highlight(Loc);
+    }
     return new (Context) ErrorExpr(Loc);
   }
 
@@ -653,10 +806,9 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   TypeResolutionOptions options;
   options |= TR_AllowUnspecifiedTypes;
   options |= TR_AllowUnboundGenerics;
-  options |= TR_ImmediateFunctionInput;
   options |= TR_InExpression;
   bool hadParameterError = false;
-  if (TC.typeCheckPattern(closure->getParams(), DC, options)) {
+  if (TC.typeCheckParameterList(closure->getParameters(), DC, options)) {
     closure->setType(ErrorType::get(TC.Context));
 
     // If we encounter an error validating the parameter list, don't bail.
@@ -693,33 +845,7 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
 /// as expressions due to the parser not knowing which identifiers are
 /// type names.
 TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
-  // Fold T[] into an array, it isn't a subscript on a metatype.
-  if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
-    auto *TyExpr = dyn_cast<TypeExpr>(SE->getBase());
-    if (!TyExpr) return nullptr;
-    
-    // We don't fold subscripts with indexes, just an empty subscript.
-    TupleExpr *Indexes = dyn_cast<TupleExpr>(SE->getIndex());
-    if (!Indexes || Indexes->getNumElements() != 0)
-      return nullptr;
 
-    auto *InnerTypeRepr = TyExpr->getTypeRepr();
-    assert(!TyExpr->isImplicit() && InnerTypeRepr &&
-           "SubscriptExpr doesn't work on implicit TypeExpr's, "
-           "the TypeExpr should have been built correctly in the first place");
-
-    auto *NewTypeRepr =
-      new (TC.Context) ArrayTypeRepr(InnerTypeRepr, nullptr,
-                                     Indexes->getSourceRange(),
-                                     /*OldSyntax=*/true);
-
-    TC.diagnose(Indexes->getStartLoc(), diag::new_array_syntax)
-      .fixItInsert(SE->getStartLoc(), "[")
-      .fixItRemove(Indexes->getStartLoc());
-
-    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
-  }
-  
   // Fold 'T.Type' or 'T.Protocol' into a metatype when T is a TypeExpr.
   if (auto *MRE = dyn_cast<UnresolvedDotExpr>(E)) {
     auto *TyExpr = dyn_cast<TypeExpr>(MRE->getBase());
@@ -845,10 +971,9 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       return nullptr;
 
     auto *NewTypeRepr =
-      new (TC.Context) ArrayTypeRepr(TyExpr->getTypeRepr(), nullptr,
+      new (TC.Context) ArrayTypeRepr(TyExpr->getTypeRepr(), 
                                      SourceRange(AE->getLBracketLoc(),
-                                                 AE->getRBracketLoc()),
-                                     /*OldSyntax=*/false);
+                                                 AE->getRBracketLoc()));
     return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
 
   }
@@ -1188,8 +1313,9 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   // Apply the solution to the expression.
   auto &solution = viable[0];
   bool isDiscarded = options.contains(TypeCheckExprFlags::IsDiscarded);
+  bool skipClosures = options.contains(TypeCheckExprFlags::SkipMultiStmtClosures);
   auto result = cs.applySolution(solution, expr, convertType, isDiscarded,
-                                 suppressDiagnostics);
+                                 suppressDiagnostics, skipClosures);
   if (!result) {
     // Failure already diagnosed, above, as part of applying the solution.
     return true;
@@ -1234,10 +1360,23 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
+  const Type originalType = expr->getType();
+  const bool needClearType = originalType && originalType->is<ErrorType>();
+  const auto recoverOriginalType = [&] () {
+    if (needClearType)
+      expr->setType(originalType);
+  };
+
+  // If the previous checking gives the expr error type, clear the result and
+  // re-check.
+  if (needClearType)
+    expr->setType(Type());
   if (solveForExpression(expr, dc, /*convertType*/Type(),
                          allowFreeTypeVariables, listener, cs, viable,
-                         TypeCheckExprFlags::SuppressDiagnostics))
+                         TypeCheckExprFlags::SuppressDiagnostics)) {
+    recoverOriginalType();
     return None;
+  }
 
   // Get the expression's simplified type.
   auto &solution = viable[0];
@@ -1247,6 +1386,8 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   assert(!exprType->hasTypeVariable() &&
          "free type variable with FreeTypeVariableBinding::GenericParameters?");
 
+  // Recover the original type if needed.
+  recoverOriginalType();
   return exprType;
 }
 
@@ -1435,10 +1576,9 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       InitType = solution.simplifyType(tc, InitType);
 
       // Convert the initializer to the type of the pattern.
+      // ignoreTopLevelInjection = Binding->isConditional()
       expr = solution.coerceToType(expr, InitType, Locator,
-                                   false
-                                   /*ignoreTopLevelInjection=
-                                     Binding->isConditional()*/);
+                                   false /* ignoreTopLevelInjection */);
       if (!expr) {
         return nullptr;
       }
@@ -1454,6 +1594,9 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       TypeResolutionOptions options;
       options |= TR_OverrideType;
       options |= TR_InExpression;
+      if (isa<EditorPlaceholderExpr>(expr->getSemanticsProvidingExpr())) {
+        options |= TR_EditorPlaceholder;
+      }
       if (tc.coercePatternToType(pattern, DC, patternType, options)) {
         return nullptr;
       }
@@ -1566,6 +1709,9 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
     /// The type of the initializer.
     Type InitType;
 
+    /// The type of the sequence.
+    Type SequenceType;
+
   public:
     explicit BindingListener(ForEachStmt *stmt) : Stmt(stmt) { }
 
@@ -1581,12 +1727,23 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         return true;
       }
 
+      SequenceType =
+        cs.createTypeVariable(Locator, /*options=*/TVO_MustBeMaterializable);
       cs.addConstraint(ConstraintKind::Conversion, expr->getType(),
+                       SequenceType, Locator);
+      cs.addConstraint(ConstraintKind::ConformsTo, SequenceType,
                        sequenceProto->getDeclaredType(), Locator);
+
+      auto generatorLocator =
+        cs.getConstraintLocator(Locator,
+                                ConstraintLocator::SequenceGeneratorType);
+      auto elementLocator =
+        cs.getConstraintLocator(generatorLocator,
+                                ConstraintLocator::GeneratorElementType);
 
       // Collect constraints from the element pattern.
       auto pattern = Stmt->getPattern();
-      InitType = cs.generateConstraints(pattern, Locator);
+      InitType = cs.generateConstraints(pattern, elementLocator);
       if (!InitType)
         return true;
       
@@ -1619,13 +1776,10 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       
         // Determine the generator type of the sequence.
         generatorType = cs.createTypeVariable(Locator, /*options=*/0);
-        cs.addConstraint(
-          Constraint::create(cs, ConstraintKind::TypeMember,
-                             expr->getType(), generatorType,
-                             tc.Context.Id_Generator,
-                             cs.getConstraintLocator(
-                               Locator,
-                               ConstraintLocator::SequenceGeneratorType)));
+        cs.addConstraint(Constraint::create(
+                           cs, ConstraintKind::TypeMember,
+                           SequenceType, generatorType,
+                           tc.Context.Id_Generator, generatorLocator));
 
         // Determine the element type of the generator.
         // FIXME: Should look up the type witness.
@@ -1633,31 +1787,30 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         cs.addConstraint(Constraint::create(
                            cs, ConstraintKind::TypeMember,
                            generatorType, elementType,
-                           tc.Context.Id_Element,
-                           cs.getConstraintLocator(
-                             Locator,
-                             ConstraintLocator::GeneratorElementType)));
+                           tc.Context.Id_Element, elementLocator));
       }
       
 
       // Add a conversion constraint between the element type of the sequence
       // and the type of the element pattern.
       cs.addConstraint(ConstraintKind::Conversion, elementType, InitType,
-                       Locator);
+                       elementLocator);
       
       Stmt->setSequence(expr);
       return false;
     }
 
     virtual Expr *appliedSolution(Solution &solution, Expr *expr) {
-      // Figure out what type the constraints decided on.
+      // Figure out what types the constraints decided on.
       auto &cs = solution.getConstraintSystem();
       auto &tc = cs.getTypeChecker();
       InitType = solution.simplifyType(tc, InitType);
+      SequenceType = solution.simplifyType(tc, SequenceType);
 
-      // Force the sequence to be materializable.
-      // FIXME: work this into the constraint system
-      expr = tc.coerceToMaterializable(expr);
+      // Perform any necessary conversions of the sequence (e.g. [T]! -> [T]).
+      if (tc.convertToType(expr, SequenceType, cs.DC)) {
+        return nullptr;
+      }
 
       // Apply the solution to the iteration pattern as well.
       Pattern *pattern = Stmt->getPattern();
@@ -1839,10 +1992,7 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
     // If the pattern didn't get a type, it's because we ran into some
     // unknown types along the way. We'll need to check the initializer.
     auto init = elt.getInitializer();
-    if (typeCheckBinding(pattern, init, dc)) {
-      hadError = true;
-      continue;
-    }
+    hadError |= typeCheckBinding(pattern, init, dc);
     elt.setPattern(pattern);
     elt.setInitializer(init);
     hadAnyFalsable |= pattern->isRefutablePattern();
@@ -2109,9 +2259,9 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc) {
   return false;
 }
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Debugging
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 #pragma mark Debugging
 
 void Solution::dump() const {
@@ -2303,7 +2453,7 @@ void ConstraintSystem::print(raw_ostream &out) {
       case OverloadChoiceKind::DeclViaUnwrappedOptional:
         if (choice.getBaseType())
           out << choice.getBaseType()->getString() << ".";
-        out << choice.getDecl()->getName().str() << ": "
+        out << choice.getDecl()->getName() << ": "
           << resolved->BoundType->getString() << " == "
           << resolved->ImpliedType->getString() << "\n";
         break;
@@ -2575,7 +2725,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   return CheckedCastKind::ValueCast;
 }
 
-/// If the expression is a an implicit call to _forceBridgeFromObjectiveC or
+/// If the expression is an implicit call to _forceBridgeFromObjectiveC or
 /// _conditionallyBridgeFromObjectiveC, returns the argument of that call.
 static Expr *lookThroughBridgeFromObjCCall(ASTContext &ctx, Expr *expr) {
   auto call = dyn_cast<CallExpr>(expr);

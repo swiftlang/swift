@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -79,7 +79,8 @@ func _convertDarwinBooleanToBool(x: DarwinBoolean) -> Bool {
 @_transparent
 @warn_unused_result
 public func && <T : BooleanType>(
-  lhs: T, @autoclosure rhs: () -> DarwinBoolean
+  lhs: T,
+  @autoclosure rhs: () -> DarwinBoolean
 ) -> Bool {
   return lhs.boolValue ? rhs().boolValue : false
 }
@@ -87,7 +88,8 @@ public func && <T : BooleanType>(
 @_transparent
 @warn_unused_result
 public func || <T : BooleanType>(
-  lhs: T, @autoclosure rhs: () -> DarwinBoolean
+  lhs: T,
+  @autoclosure rhs: () -> DarwinBoolean
 ) -> Bool {
   return lhs.boolValue ? true : rhs().boolValue
 }
@@ -145,36 +147,96 @@ public var stderr : UnsafeMutablePointer<FILE> {
 
 @warn_unused_result
 @_silgen_name("_swift_Darwin_open") 
-func _swift_Darwin_open(path: UnsafePointer<CChar>,
-  _ oflag: CInt, _ mode: mode_t) -> CInt
+func _swift_Darwin_open(
+  path: UnsafePointer<CChar>,
+  _ oflag: CInt,
+  _ mode: mode_t
+) -> CInt
 
 @warn_unused_result
 @_silgen_name("_swift_Darwin_openat")
 func _swift_Darwin_openat(fd: CInt,
   _ path: UnsafePointer<CChar>,
-  _ oflag: CInt, _ mode: mode_t) -> CInt
+  _ oflag: CInt,
+  _ mode: mode_t
+) -> CInt
 
 @warn_unused_result
-public func open(path: UnsafePointer<CChar>, _ oflag: CInt) -> CInt {
+public func open(
+  path: UnsafePointer<CChar>,
+  _ oflag: CInt
+) -> CInt {
   return _swift_Darwin_open(path, oflag, 0)
 }
 
 @warn_unused_result
-public func open(path: UnsafePointer<CChar>, _ oflag: CInt,
-  _ mode: mode_t) -> CInt {
+public func open(
+  path: UnsafePointer<CChar>,
+  _ oflag: CInt,
+  _ mode: mode_t
+) -> CInt {
   return _swift_Darwin_open(path, oflag, mode)
 }
 
 @warn_unused_result
-public func openat(fd: CInt, _ path: UnsafePointer<CChar>,
-  _ oflag: CInt) -> CInt {
+public func openat(
+  fd: CInt,
+  _ path: UnsafePointer<CChar>,
+  _ oflag: CInt
+) -> CInt {
   return _swift_Darwin_openat(fd, path, oflag, 0)
 }
 
 @warn_unused_result
-public func openat(fd: CInt, _ path: UnsafePointer<CChar>,
-  _ oflag: CInt, _ mode: mode_t) -> CInt {
+public func openat(
+  fd: CInt,
+  _ path: UnsafePointer<CChar>,
+  _ oflag: CInt,
+  _ mode: mode_t
+) -> CInt {
   return _swift_Darwin_openat(fd, path, oflag, mode)
+}
+
+@warn_unused_result
+@_silgen_name("_swift_Darwin_fcntl")
+internal func _swift_Darwin_fcntl(
+  fd: CInt,
+  _ cmd: CInt,
+  _ value: CInt
+) -> CInt
+
+@warn_unused_result
+@_silgen_name("_swift_Darwin_fcntlPtr")
+internal func _swift_Darwin_fcntlPtr(
+  fd: CInt,
+  _ cmd: CInt,
+  _ ptr: UnsafeMutablePointer<Void>
+) -> CInt
+
+@warn_unused_result
+public func fcntl(
+  fd: CInt,
+  _ cmd: CInt
+) -> CInt {
+  return _swift_Darwin_fcntl(fd, cmd, 0)
+}
+
+@warn_unused_result
+public func fcntl(
+  fd: CInt,
+  _ cmd: CInt,
+  _ value: CInt
+) -> CInt {
+  return _swift_Darwin_fcntl(fd, cmd, value)
+}
+
+@warn_unused_result
+public func fcntl(
+  fd: CInt,
+  _ cmd: CInt,
+  _ ptr: UnsafeMutablePointer<Void>
+) -> CInt {
+  return _swift_Darwin_fcntlPtr(fd, cmd, ptr)
 }
 
 public var S_IFMT: mode_t   { return mode_t(0o170000) }

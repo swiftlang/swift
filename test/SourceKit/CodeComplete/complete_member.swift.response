@@ -13,7 +13,7 @@
     },
     {
       key.kind: source.lang.swift.decl.function.method.instance,
-      key.name: "fooInstanceFunc1(a:)",
+      key.name: "fooInstanceFunc1(:)",
       key.sourcetext: "fooInstanceFunc1(<#T##a: Int##Int#>)",
       key.description: "fooInstanceFunc1(a: Int)",
       key.typename: "Double",

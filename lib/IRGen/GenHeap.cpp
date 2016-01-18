@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -24,6 +24,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/IRGenOptions.h"
 
 #include "Explosion.h"
 #include "GenProto.h"
@@ -33,7 +34,6 @@
 #include "IRGenModule.h"
 #include "HeapTypeInfo.h"
 #include "IndirectTypeInfo.h"
-#include "UnownedTypeInfo.h"
 #include "WeakTypeInfo.h"
 
 #include "GenHeap.h"
@@ -383,16 +383,28 @@ TypeConverter::createUnmanagedStorageType(llvm::Type *valueType) {
 namespace {
   /// A type implementation for an [unowned] reference to an object
   /// with a known-Swift reference count.
-  class SwiftUnownedReferenceTypeInfo
-    : public SingleScalarTypeInfo<SwiftUnownedReferenceTypeInfo,
-                                  UnownedTypeInfo> {
+  class NativeUnownedReferenceTypeInfo
+    : public SingleScalarTypeInfo<NativeUnownedReferenceTypeInfo,
+                                  LoadableTypeInfo> {
+    llvm::Type *ValueType;
   public:
-    SwiftUnownedReferenceTypeInfo(llvm::Type *type,
-                                  const SpareBitVector &spareBits,
-                                  Size size, Alignment alignment)
-      : SingleScalarTypeInfo(type, size, spareBits, alignment) {}
+    NativeUnownedReferenceTypeInfo(llvm::Type *valueType,
+                                   llvm::Type *unownedType,
+                                   SpareBitVector &&spareBits,
+                                   Size size, Alignment alignment)
+      : SingleScalarTypeInfo(unownedType, size, std::move(spareBits),
+                             alignment, IsNotPOD, IsFixedSize),
+        ValueType(valueType) {}
 
     enum { IsScalarPOD = false };
+
+    llvm::Type *getScalarType() const {
+      return ValueType;
+    }
+
+    Address projectScalar(IRGenFunction &IGF, Address addr) const {
+      return IGF.Builder.CreateBitCast(addr, ValueType->getPointerTo());
+    }
 
     void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {
       IGF.emitNativeUnownedRetain(value);
@@ -406,45 +418,46 @@ namespace {
       IGF.emitFixLifetime(value);
     }
     
-    // Unowned types have the same spare bits as strong heap object refs.
-    
-    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
-      return true;
-    }
-
     unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
-      return getHeapObjectExtraInhabitantCount(IGM);
+      return IGM.getUnownedExtraInhabitantCount(ReferenceCounting::Native);
     }
 
     APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
                                        unsigned bits,
                                        unsigned index) const override {
-      return getHeapObjectFixedExtraInhabitantValue(IGM, bits, index, 0);
+      return IGM.getUnownedExtraInhabitantValue(bits, index,
+                                                ReferenceCounting::Native);
     }
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
-                                         SILType T)
-    const override {
-      return getHeapObjectExtraInhabitantIndex(IGF, src);
+                                         SILType T) const override {    
+      return IGF.getUnownedExtraInhabitantIndex(src,
+                                                ReferenceCounting::Native);
     }
 
     void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
                               Address dest, SILType T) const override {
-      return storeHeapObjectExtraInhabitant(IGF, index, dest);
+      return IGF.storeUnownedExtraInhabitant(index, dest,
+                                             ReferenceCounting::Native);
+    }
+
+    APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
+      return IGM.getUnownedExtraInhabitantMask(ReferenceCounting::Native);
+
     }
   };
 
   /// A type implementation for a [weak] reference to an object
   /// with a known-Swift reference count.
-  class SwiftWeakReferenceTypeInfo
-    : public IndirectTypeInfo<SwiftWeakReferenceTypeInfo,
+  class NativeWeakReferenceTypeInfo
+    : public IndirectTypeInfo<NativeWeakReferenceTypeInfo,
                               WeakTypeInfo> {
     llvm::Type *ValueType;
   public:
-    SwiftWeakReferenceTypeInfo(llvm::Type *valueType,
-                               llvm::Type *weakType,
-                               Size size, Alignment alignment,
-                               SpareBitVector &&spareBits)
+    NativeWeakReferenceTypeInfo(llvm::Type *valueType,
+                                llvm::Type *weakType,
+                                Size size, Alignment alignment,
+                                SpareBitVector &&spareBits)
       : IndirectTypeInfo(weakType, size, alignment, std::move(spareBits)),
         ValueType(valueType) {}
 
@@ -511,23 +524,6 @@ namespace {
   };
 }
 
-const UnownedTypeInfo *
-TypeConverter::createSwiftUnownedStorageType(llvm::Type *valueType) {
-  return new SwiftUnownedReferenceTypeInfo(valueType,
-                                           IGM.getHeapObjectSpareBits(),
-                                           IGM.getPointerSize(),
-                                           IGM.getPointerAlignment());
-}
-
-const WeakTypeInfo *
-TypeConverter::createSwiftWeakStorageType(llvm::Type *valueType) {
-  return new SwiftWeakReferenceTypeInfo(valueType,
-                                    IGM.WeakReferencePtrTy->getElementType(),
-                                        IGM.getWeakReferenceSize(),
-                                        IGM.getWeakReferenceAlignment(),
-                                        IGM.getWeakReferenceSpareBits());
-}
-
 SpareBitVector IRGenModule::getWeakReferenceSpareBits() const {
   // The runtime needs to be able to freely manipulate live weak
   // references without worrying about us mucking around with their
@@ -536,57 +532,144 @@ SpareBitVector IRGenModule::getWeakReferenceSpareBits() const {
                                      false);
 }
 
+SpareBitVector
+IRGenModule::getUnownedReferenceSpareBits(ReferenceCounting style) const {
+  // If unknown references don't exist, we can just use the same rules as
+  // regular pointers.
+  if (!ObjCInterop) {
+    assert(style == ReferenceCounting::Native);
+    return getHeapObjectSpareBits();
+  }
+
+  // Otherwise, we have to be conservative (even with native
+  // reference-counting) in order to interoperate with code that might
+  // be working more generically with the memory/type.
+  return SpareBitVector::getConstant(getPointerSize().getValueInBits(), false);
+}
+
+unsigned IRGenModule::getUnownedExtraInhabitantCount(ReferenceCounting style) {
+  if (!ObjCInterop) {
+    assert(style == ReferenceCounting::Native);
+    return getHeapObjectExtraInhabitantCount(*this);
+  }
+
+  return 1;
+}
+
+APInt IRGenModule::getUnownedExtraInhabitantValue(unsigned bits, unsigned index,
+                                                  ReferenceCounting style) {
+  if (!ObjCInterop) {
+    assert(style == ReferenceCounting::Native);
+    return getHeapObjectFixedExtraInhabitantValue(*this, bits, index, 0);
+  }
+
+  assert(index == 0);
+  return APInt(bits, 0);
+}
+
+APInt IRGenModule::getUnownedExtraInhabitantMask(ReferenceCounting style) {
+  return APInt::getAllOnesValue(getPointerSize().getValueInBits());
+}
+
+llvm::Value *IRGenFunction::getUnownedExtraInhabitantIndex(Address src,
+                                                ReferenceCounting style) {
+  if (!IGM.ObjCInterop) {
+    assert(style == ReferenceCounting::Native);
+    return getHeapObjectExtraInhabitantIndex(*this, src);
+  }
+
+  assert(src.getAddress()->getType() == IGM.UnownedReferencePtrTy);
+  src = Builder.CreateStructGEP(src, 0, Size(0));
+  llvm::Value *ptr = Builder.CreateLoad(src);
+  llvm::Value *isNull = Builder.CreateIsNull(ptr);
+  llvm::Value *result =
+    Builder.CreateSelect(isNull, Builder.getInt32(0),
+                         llvm::ConstantInt::getSigned(IGM.Int32Ty, -1));
+  return result;
+}
+
+void IRGenFunction::storeUnownedExtraInhabitant(llvm::Value *index,
+                                                Address dest,
+                                                ReferenceCounting style) {
+  if (!IGM.ObjCInterop) {
+    assert(style == ReferenceCounting::Native);
+    return storeHeapObjectExtraInhabitant(*this, index, dest);
+  }
+
+  // Since there's only one legal extra inhabitant, it has to have
+  // the null pattern.
+  assert(dest.getAddress()->getType() == IGM.UnownedReferencePtrTy);
+  dest = Builder.CreateStructGEP(dest, 0, Size(0));
+  llvm::Value *null = llvm::ConstantPointerNull::get(IGM.RefCountedPtrTy);
+  Builder.CreateStore(null, dest);
+}
+
 namespace {
   /// A type implementation for an [unowned] reference to an object
   /// that is not necessarily a Swift object.
   class UnknownUnownedReferenceTypeInfo :
-      public SingleScalarTypeInfo<UnknownUnownedReferenceTypeInfo,
-                                  UnownedTypeInfo> {
+      public IndirectTypeInfo<UnknownUnownedReferenceTypeInfo, FixedTypeInfo> {
   public:
-    UnknownUnownedReferenceTypeInfo(llvm::Type *type,
-                                    const SpareBitVector &spareBits,
+    UnknownUnownedReferenceTypeInfo(llvm::Type *unownedType,
+                                    SpareBitVector &&spareBits,
                                     Size size, Alignment alignment)
-      : SingleScalarTypeInfo(type, size, spareBits, alignment) {}
-
-    enum { IsScalarPOD = false };
-
-    void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {
-      IGF.emitUnknownUnownedRetain(value);
+      : IndirectTypeInfo(unownedType, size, std::move(spareBits), alignment,
+                         IsNotPOD, IsNotBitwiseTakable, IsFixedSize) {
     }
 
-    void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const {
-      IGF.emitUnknownUnownedRelease(value);
+    void assignWithCopy(IRGenFunction &IGF, Address dest,
+                        Address src, SILType type) const override {
+      IGF.emitUnknownUnownedCopyAssign(dest, src);
     }
 
-    void emitScalarFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
-      IGF.emitFixLifetime(value);
+    void initializeWithCopy(IRGenFunction &IGF, Address dest,
+                            Address src, SILType type) const override {
+      IGF.emitUnknownUnownedCopyInit(dest, src);
     }
+
+    void assignWithTake(IRGenFunction &IGF, Address dest,
+                        Address src, SILType type) const override {
+      IGF.emitUnknownUnownedTakeAssign(dest, src);
+    }
+
+    void initializeWithTake(IRGenFunction &IGF, Address dest,
+                            Address src, SILType type) const override {
+      IGF.emitUnknownUnownedTakeInit(dest, src);
+    }
+
+    void destroy(IRGenFunction &IGF, Address addr,
+                 SILType type) const override {
+      IGF.emitUnknownUnownedDestroy(addr);
+    }
+
+    // Unowned types have the same extra inhabitants as normal pointers.
+    // They do not, however, necessarily have any spare bits.
     
-    // Unowned types have the same spare bits as strong unknown object refs.
-    
-    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
-      return true;
-    }
-
     unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
-      return getHeapObjectExtraInhabitantCount(IGM);
+      return IGM.getUnownedExtraInhabitantCount(ReferenceCounting::Unknown);
     }
 
     APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
                                        unsigned bits,
                                        unsigned index) const override {
-      return getHeapObjectFixedExtraInhabitantValue(IGM, bits, index, 0);
+      return IGM.getUnownedExtraInhabitantValue(bits, index,
+                                                ReferenceCounting::Unknown);
     }
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
-                                         SILType T)
-    const override {
-      return getHeapObjectExtraInhabitantIndex(IGF, src);
+                                         SILType T) const override {
+      return IGF.getUnownedExtraInhabitantIndex(src,
+                                                ReferenceCounting::Unknown);
     }
 
     void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
                               Address dest, SILType T) const override {
-      return storeHeapObjectExtraInhabitant(IGF, index, dest);
+      return IGF.storeUnownedExtraInhabitant(index, dest,
+                                             ReferenceCounting::Unknown);
+    }
+
+    APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
+      return IGM.getUnownedExtraInhabitantMask(ReferenceCounting::Unknown);
     }
   };
 
@@ -669,21 +752,53 @@ namespace {
   };
 }
 
-const UnownedTypeInfo *
-TypeConverter::createUnknownUnownedStorageType(llvm::Type *valueType) {
-  return new UnknownUnownedReferenceTypeInfo(valueType,
-                                             IGM.getHeapObjectSpareBits(),
-                                             IGM.getPointerSize(),
-                                             IGM.getPointerAlignment());
+const TypeInfo *TypeConverter::createUnownedStorageType(llvm::Type *valueType,
+                                                      ReferenceCounting style) {
+  auto &&spareBits = IGM.getUnownedReferenceSpareBits(style);
+  switch (style) {
+  case ReferenceCounting::Native:
+    return new NativeUnownedReferenceTypeInfo(valueType,
+                                  IGM.UnownedReferencePtrTy->getElementType(),
+                                              std::move(spareBits),
+                                              IGM.getPointerSize(),
+                                              IGM.getPointerAlignment());
+  case ReferenceCounting::ObjC:
+  case ReferenceCounting::Block:
+  case ReferenceCounting::Unknown:
+    return new UnknownUnownedReferenceTypeInfo(
+                                  IGM.UnownedReferencePtrTy->getElementType(),
+                                               std::move(spareBits),
+                                               IGM.getPointerSize(),
+                                               IGM.getPointerAlignment());
+  case ReferenceCounting::Bridge:
+  case ReferenceCounting::Error:
+    llvm_unreachable("not supported!");
+  }
+  llvm_unreachable("bad reference-counting style");
 }
 
-const WeakTypeInfo *
-TypeConverter::createUnknownWeakStorageType(llvm::Type *valueType) {
-  return new UnknownWeakReferenceTypeInfo(valueType,
+const WeakTypeInfo *TypeConverter::createWeakStorageType(llvm::Type *valueType,
+                                                      ReferenceCounting style) {
+  switch (style) {
+  case ReferenceCounting::Native:
+    return new NativeWeakReferenceTypeInfo(valueType,
+                                    IGM.WeakReferencePtrTy->getElementType(),
+                                           IGM.getWeakReferenceSize(),
+                                           IGM.getWeakReferenceAlignment(),
+                                           IGM.getWeakReferenceSpareBits());
+  case ReferenceCounting::ObjC:
+  case ReferenceCounting::Block:
+  case ReferenceCounting::Unknown:
+    return new UnknownWeakReferenceTypeInfo(valueType,
                                       IGM.WeakReferencePtrTy->getElementType(),
-                                          IGM.getWeakReferenceSize(),
-                                          IGM.getWeakReferenceAlignment(),
-                                          IGM.getWeakReferenceSpareBits());
+                                            IGM.getWeakReferenceSize(),
+                                            IGM.getWeakReferenceAlignment(),
+                                            IGM.getWeakReferenceSpareBits());
+  case ReferenceCounting::Bridge:
+  case ReferenceCounting::Error:
+    llvm_unreachable("not supported!");
+  }
+  llvm_unreachable("bad reference-counting style");
 }
 
 /// Does the given value superficially not require reference-counting?
@@ -748,8 +863,9 @@ static llvm::Value *emitLoadWeakLikeCall(IRGenFunction &IGF,
                                          llvm::Constant *fn,
                                          llvm::Value *addr,
                                          llvm::Type *resultType) {
-  assert(addr->getType() == IGF.IGM.WeakReferencePtrTy &&
-         "address is not of a weak reference");
+  assert((addr->getType() == IGF.IGM.WeakReferencePtrTy ||
+          addr->getType() == IGF.IGM.UnownedReferencePtrTy) &&
+         "address is not of a weak or unowned reference");
 
   // Instead of casting the output, we cast the function type.
   // This tends to produce less IR, but might be evil.
@@ -775,8 +891,9 @@ static void emitStoreWeakLikeCall(IRGenFunction &IGF,
                                   llvm::Constant *fn,
                                   llvm::Value *addr,
                                   llvm::Value *value) {
-  assert(addr->getType() == IGF.IGM.WeakReferencePtrTy &&
-         "address is not of a weak reference");
+  assert((addr->getType() == IGF.IGM.WeakReferencePtrTy ||
+          addr->getType() == IGF.IGM.UnownedReferencePtrTy) &&
+         "address is not of a weak or unowned reference");
 
   // Instead of casting the inputs, we cast the function type.
   // This tends to produce less IR, but might be evil.
@@ -941,13 +1058,37 @@ DEFINE_BINARY_OPERATION(UnownedAssign, void, llvm::Value *, Address)
 DEFINE_BINARY_OPERATION(UnownedLoadStrong, llvm::Value *, Address, llvm::Type *)
 DEFINE_BINARY_OPERATION(UnownedTakeStrong, llvm::Value *, Address, llvm::Type *)
 DEFINE_UNARY_OPERATION(UnownedDestroy, void, Address)
-DEFINE_UNARY_OPERATION(StrongRetainUnowned, void, llvm::Value *)
-DEFINE_UNARY_OPERATION(StrongRetainAndUnownedRelease, void, llvm::Value *)
-DEFINE_UNARY_OPERATION(UnownedRetain, void, llvm::Value *)
-DEFINE_UNARY_OPERATION(UnownedRelease, void, llvm::Value *)
 
 #undef DEFINE_UNARY_OPERATION
 #undef DEFINE_BINARY_OPERATION
+
+void IRGenFunction::emitUnownedRetain(llvm::Value *value,
+                                      ReferenceCounting style) {
+  assert(style == ReferenceCounting::Native &&
+         "only native references support scalar unowned reference-counting");
+  emitNativeUnownedRetain(value);
+}
+
+void IRGenFunction::emitUnownedRelease(llvm::Value *value,
+                                       ReferenceCounting style) {
+  assert(style == ReferenceCounting::Native &&
+         "only native references support scalar unowned reference-counting");
+  emitNativeUnownedRelease(value);
+}
+
+void IRGenFunction::emitStrongRetainUnowned(llvm::Value *value,
+                                            ReferenceCounting style) {
+  assert(style == ReferenceCounting::Native &&
+         "only native references support scalar unowned reference-counting");
+  emitNativeStrongRetainUnowned(value);
+}
+
+void IRGenFunction::emitStrongRetainAndUnownedRelease(llvm::Value *value,
+                                                      ReferenceCounting style) {
+  assert(style == ReferenceCounting::Native &&
+         "only native references support scalar unowned reference-counting");
+  emitNativeStrongRetainAndUnownedRelease(value);
+}
 
 /// Emit a release of a live value.
 void IRGenFunction::emitNativeStrongRelease(llvm::Value *value) {
@@ -957,12 +1098,14 @@ void IRGenFunction::emitNativeStrongRelease(llvm::Value *value) {
 
 void IRGenFunction::emitNativeUnownedInit(llvm::Value *value,
                                           Address dest) {
+  dest = Builder.CreateStructGEP(dest, 0, Size(0));
   Builder.CreateStore(value, dest);
   emitNativeUnownedRetain(value);
 }
 
 void IRGenFunction::emitNativeUnownedAssign(llvm::Value *value,
                                             Address dest) {
+  dest = Builder.CreateStructGEP(dest, 0, Size(0));
   auto oldValue = Builder.CreateLoad(dest);
   Builder.CreateStore(value, dest);
   emitNativeUnownedRetain(value);
@@ -971,6 +1114,7 @@ void IRGenFunction::emitNativeUnownedAssign(llvm::Value *value,
 
 llvm::Value *IRGenFunction::emitNativeUnownedLoadStrong(Address src,
                                                         llvm::Type *type) {
+  src = Builder.CreateStructGEP(src, 0, Size(0));
   llvm::Value *value = Builder.CreateLoad(src);
   value = Builder.CreateBitCast(value, type);
   emitNativeStrongRetainUnowned(value);
@@ -979,6 +1123,7 @@ llvm::Value *IRGenFunction::emitNativeUnownedLoadStrong(Address src,
 
 llvm::Value *IRGenFunction::emitNativeUnownedTakeStrong(Address src,
                                                         llvm::Type *type) {
+  src = Builder.CreateStructGEP(src, 0, Size(0));
   llvm::Value *value = Builder.CreateLoad(src);
   value = Builder.CreateBitCast(value, type);
   emitNativeStrongRetainAndUnownedRelease(value);
@@ -986,22 +1131,29 @@ llvm::Value *IRGenFunction::emitNativeUnownedTakeStrong(Address src,
 }
 
 void IRGenFunction::emitNativeUnownedDestroy(Address ref) {
+  ref = Builder.CreateStructGEP(ref, 0, Size(0));
   llvm::Value *value = Builder.CreateLoad(ref);
   emitNativeUnownedRelease(value);
 }
 
 void IRGenFunction::emitNativeUnownedCopyInit(Address dest, Address src) {
+  src = Builder.CreateStructGEP(src, 0, Size(0));
+  dest = Builder.CreateStructGEP(dest, 0, Size(0));
   llvm::Value *newValue = Builder.CreateLoad(src);
   Builder.CreateStore(newValue, dest);
   emitNativeUnownedRetain(newValue);
 }
 
 void IRGenFunction::emitNativeUnownedTakeInit(Address dest, Address src) {
+  src = Builder.CreateStructGEP(src, 0, Size(0));
+  dest = Builder.CreateStructGEP(dest, 0, Size(0));
   llvm::Value *newValue = Builder.CreateLoad(src);
   Builder.CreateStore(newValue, dest);
 }
 
 void IRGenFunction::emitNativeUnownedCopyAssign(Address dest, Address src) {
+  src = Builder.CreateStructGEP(src, 0, Size(0));
+  dest = Builder.CreateStructGEP(dest, 0, Size(0));
   llvm::Value *newValue = Builder.CreateLoad(src);
   llvm::Value *oldValue = Builder.CreateLoad(dest);
   Builder.CreateStore(newValue, dest);
@@ -1010,15 +1162,47 @@ void IRGenFunction::emitNativeUnownedCopyAssign(Address dest, Address src) {
 }
 
 void IRGenFunction::emitNativeUnownedTakeAssign(Address dest, Address src) {
+  src = Builder.CreateStructGEP(src, 0, Size(0));
+  dest = Builder.CreateStructGEP(dest, 0, Size(0));
   llvm::Value *newValue = Builder.CreateLoad(src);
   llvm::Value *oldValue = Builder.CreateLoad(dest);
   Builder.CreateStore(newValue, dest);
   emitNativeUnownedRelease(oldValue);
 }
 
+llvm::Constant *IRGenModule::getFixLifetimeFn() {
+  if (FixLifetimeFn)
+    return FixLifetimeFn;
+  
+  // Generate a private stub function for the LLVM ARC optimizer to recognize.
+  auto fixLifetimeTy = llvm::FunctionType::get(VoidTy, RefCountedPtrTy,
+                                               /*isVarArg*/ false);
+  auto fixLifetime = llvm::Function::Create(fixLifetimeTy,
+                                         llvm::GlobalValue::PrivateLinkage,
+                                         "__swift_fixLifetime",
+                                         &Module);
+  assert(fixLifetime->getName().equals("__swift_fixLifetime")
+         && "fixLifetime symbol name got mangled?!");
+  // Don't inline the function, so it stays as a signal to the ARC passes.
+  // The ARC passes will remove references to the function when they're
+  // no longer needed.
+  fixLifetime->addAttribute(llvm::AttributeSet::FunctionIndex,
+                            llvm::Attribute::NoInline);
+  
+  // Give the function an empty body.
+  auto entry = llvm::BasicBlock::Create(LLVMContext, "", fixLifetime);
+  llvm::ReturnInst::Create(LLVMContext, entry);
+  
+  FixLifetimeFn = fixLifetime;
+  return fixLifetime;
+}
+
 /// Fix the lifetime of a live value. This communicates to the LLVM level ARC
 /// optimizer not to touch this value.
 void IRGenFunction::emitFixLifetime(llvm::Value *value) {
+  // If we aren't running the LLVM ARC optimizer, we don't need to emit this.
+  if (!IGM.Opts.Optimize || IGM.Opts.DisableLLVMARCOpts)
+    return;
   if (doesNotRequireRefCounting(value)) return;
   emitUnaryRefCountCall(*this, IGM.getFixLifetimeFn(), value);
 }
@@ -1031,12 +1215,6 @@ void IRGenFunction::emitUnknownStrongRetain(llvm::Value *value) {
 void IRGenFunction::emitUnknownStrongRelease(llvm::Value *value) {
   if (doesNotRequireRefCounting(value)) return;
   emitUnaryRefCountCall(*this, IGM.getUnknownReleaseFn(), value);
-}
-
-// FIXME: irrevocably broken
-void IRGenFunction::emitUnknownStrongRetainAndUnownedRelease(llvm::Value *ref) {
-  emitUnknownStrongRetain(ref);
-  emitUnknownUnownedRelease(ref);
 }
 
 void IRGenFunction::emitBridgeStrongRetain(llvm::Value *value) {
@@ -1074,21 +1252,10 @@ void IRGenFunction::emitNativeUnpin(llvm::Value *value) {
   call->setDoesNotThrow();
 }
 
-llvm::Value *IRGenFunction::emitLoadNativeRefcountedPtr(Address addr) {
+llvm::Value *IRGenFunction::emitLoadRefcountedPtr(Address addr,
+                                                  ReferenceCounting style) {
   Address src =
-    Builder.CreateBitCast(addr, IGM.RefCountedPtrTy->getPointerTo());
-  return Builder.CreateLoad(src);
-}
-
-llvm::Value *IRGenFunction::emitLoadUnknownRefcountedPtr(Address addr) {
-  Address src =
-    Builder.CreateBitCast(addr, IGM.UnknownRefCountedPtrTy->getPointerTo());
-  return Builder.CreateLoad(src);
-}
-
-llvm::Value *IRGenFunction::emitLoadBridgeRefcountedPtr(Address addr) {
-  Address src =
-    Builder.CreateBitCast(addr, IGM.BridgeObjectPtrTy->getPointerTo());
+    Builder.CreateBitCast(addr, IGM.getReferenceType(style)->getPointerTo());
   return Builder.CreateLoad(src);
 }
 
@@ -1315,14 +1482,14 @@ const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   auto &fixedTI = cast<FixedTypeInfo>(eltTI);
 
   // For empty types, we don't really need to allocate anything.
-  if (fixedTI.isKnownEmpty()) {
+  if (fixedTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
     if (!EmptyBoxTI)
       EmptyBoxTI = new EmptyBoxTypeInfo(IGM);
     return EmptyBoxTI;
   }
 
   // We can share box info for all similarly-shaped POD types.
-  if (fixedTI.isPOD(ResilienceScope::Component)) {
+  if (fixedTI.isPOD(ResilienceExpansion::Maximal)) {
     auto stride = fixedTI.getFixedStride();
     auto align = fixedTI.getFixedAlignment();
     auto foundPOD = PODBoxTI.find({stride.getValue(),align.getValue()});
@@ -1336,7 +1503,7 @@ const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   }
 
   // We can share box info for all single-refcounted types.
-  if (fixedTI.isSingleSwiftRetainablePointer(ResilienceScope::Component)) {
+  if (fixedTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
     if (!SwiftRetainablePointerBoxTI)
       SwiftRetainablePointerBoxTI
         = new SingleRefcountedBoxTypeInfo(IGM, ReferenceCounting::Native);
@@ -1408,9 +1575,6 @@ DEFINE_COPY_OP(NativeWeakCopyInit)
 DEFINE_COPY_OP(NativeWeakCopyAssign)
 DEFINE_COPY_OP(NativeWeakTakeInit)
 DEFINE_COPY_OP(NativeWeakTakeAssign)
-DEFINE_VALUE_OP(UnknownStrongRetainUnowned) // FIXME: irrevocably broken
-DEFINE_VALUE_OP(UnknownUnownedRelease)      // FIXME: irrevocably broken
-DEFINE_VALUE_OP(UnknownUnownedRetain)       // FIXME: irrevocably broken
 DEFINE_LOAD_WEAK_OP(UnknownUnownedLoadStrong)
 DEFINE_LOAD_WEAK_OP(UnknownUnownedTakeStrong)
 DEFINE_STORE_WEAK_OP(UnknownUnownedInit)

@@ -355,29 +355,29 @@ Finalization models built around calling a method on the
 finalized object (such as Objective-C's :code:`-dealloc`)
 suffer from a number of limitations and problems:
 
-  - Since the method receives a pointer to the object being
-    deallocated, the implementation must guard against
-    attempts to resurrect the object.  This may complicate
-    and/or slow down the system's basic reference-management
-    logic, which tends to be quite important for performance.
+- Since the method receives a pointer to the object being
+  deallocated, the implementation must guard against
+  attempts to resurrect the object.  This may complicate
+  and/or slow down the system's basic reference-management
+  logic, which tends to be quite important for performance.
 
-  - Since the method receives a pointer to the object being
-    deallocated, the implementation must leave the object at
-    least a minimally valid state until the user code is
-    complete.  For example, the instance variables of a
-    subclass cannot be destroyed until a later phase of
-    destruction, because a superclass finalizer might invoke
-    subclass behavior.  (This assumes that the dynamic type
-    of the object does not change during destruction, which
-    is an alternative that brings its own problems.)
+- Since the method receives a pointer to the object being
+  deallocated, the implementation must leave the object at
+  least a minimally valid state until the user code is
+  complete.  For example, the instance variables of a
+  subclass cannot be destroyed until a later phase of
+  destruction, because a superclass finalizer might invoke
+  subclass behavior.  (This assumes that the dynamic type
+  of the object does not change during destruction, which
+  is an alternative that brings its own problems.)
 
-  - Finalization code must be inherent to the object; other
-    objects cannot request that code be run when the object
-    is deallocated.  For example, an object that registers
-    itself to observe a certain event source must explicitly
-    deregister itself in a finalizer; the event source cannot
-    simply automatically drop the object when it is
-    deallocated.
+- Finalization code must be inherent to the object; other
+  objects cannot request that code be run when the object
+  is deallocated.  For example, an object that registers
+  itself to observe a certain event source must explicitly
+  deregister itself in a finalizer; the event source cannot
+  simply automatically drop the object when it is
+  deallocated.
 
 Optimization
 ------------
@@ -402,15 +402,15 @@ Proposal Overview
 
 Looking at these use-cases, there are two main thrusts:
 
-  - There is a general need to set up back references to objects.
-    These references must be designed for convenient use by non-expert
-    users.
+- There is a general need to set up back references to objects.
+  These references must be designed for convenient use by non-expert
+  users.
 
-  - There are a number of more sophisticated use cases which require
-    notification or interruption of deallocation; these can be used in
-    the implementation of higher-level abstractions like weak caches.
-    Here it is reasonable to expect more user expertise, such that
-    power and flexibility should take priority over ease of use.
+- There are a number of more sophisticated use cases which require
+  notification or interruption of deallocation; these can be used in
+  the implementation of higher-level abstractions like weak caches.
+  Here it is reasonable to expect more user expertise, such that
+  power and flexibility should take priority over ease of use.
 
 The second set of use cases should addressed by library types working
 on top of basic runtime support.
@@ -439,11 +439,11 @@ variable-like declaration of reference type :code:`T`.  For
 type-system purposes, the variables behaves like a normal
 variable of type :code:`Optional<T>`, except:
 
-  - it does not maintain a +1 reference count invariant and
+- it does not maintain a +1 reference count invariant and
 
-  - loading from the variable after the current referent (if present)
-    has started destruction will result in a :code:`Nothing` value,
-    indistinguishable from the normal case.
+- loading from the variable after the current referent (if present)
+  has started destruction will result in a :code:`Nothing` value,
+  indistinguishable from the normal case.
 
 The semantics are quite similar to weak references in other
 environments (particularly Objective-C) except that the change in
@@ -485,10 +485,10 @@ designed without first having a solid error-handling design.
 type-system purposes, the variable behaves exactly like a normal
 variable of type :code:`T`, except:
 
-  - it does not maintain a +1 reference count invariant and
+- it does not maintain a +1 reference count invariant and
 
-  - loading from the variable after the referent has started
-    destruction causes an assertion failure.
+- loading from the variable after the referent has started
+  destruction causes an assertion failure.
 
 This is a refinement of :code:`weak` focused more narrowly on the case
 of a back reference with relatively tight validity invariants.  This
@@ -498,32 +498,32 @@ references; see below.
 This name isn't really optimal.  We've considered several different
 candidates:
 
-  - :code:`weak` is a poor choice because our semantics are very
-    different from weak references in other environments where it's
-    valid to access a cleared reference.  Plus, we need to expose
-    those semantics, so the name is claimed.
+- :code:`weak` is a poor choice because our semantics are very
+  different from weak references in other environments where it's
+  valid to access a cleared reference.  Plus, we need to expose
+  those semantics, so the name is claimed.
 
-  - :code:`backref` is strongly evocative of the major use case in the
-    static reference graph; this would encourage users to use it for
-    back references and to consider alternatives for other cases, both
-    of which I like.  The latter also makes the husk-leaking
-    implementation (see below) more palatable.  It also contrasts very
-    well with :code:`weak`.  However, its evocativeness makes it
-    unwieldy to use for local reference-counting optimizations.
+- :code:`backref` is strongly evocative of the major use case in the
+  static reference graph; this would encourage users to use it for
+  back references and to consider alternatives for other cases, both
+  of which I like.  The latter also makes the husk-leaking
+  implementation (see below) more palatable.  It also contrasts very
+  well with :code:`weak`.  However, its evocativeness makes it
+  unwieldy to use for local reference-counting optimizations.
 
-  - :code:`dangling` is more general than :code:`backref`, but it has
-    such strong negative associations that it wouldn't be unreasonable
-    for users to assume that it's unsafe (with all the pursuant
-    debugging difficulties) based on the name alone.  I don't think
-    we want to discourage a feature that can help users build tighter
-    invariants on their classes.
+- :code:`dangling` is more general than :code:`backref`, but it has
+  such strong negative associations that it wouldn't be unreasonable
+  for users to assume that it's unsafe (with all the pursuant
+  debugging difficulties) based on the name alone.  I don't think
+  we want to discourage a feature that can help users build tighter
+  invariants on their classes.
 
-  - :code:`unowned` is somewhat cleaner-looking, and it isn't as tied
-    to a specific use case, but it does not contrast with :code:`weak`
-    *at all*; only someone with considerable exposure to weak
-    references would understand why we named each one the way we did,
-    and even they are likely to roll their eyes at us.  But it's okay
-    for a working proposal.
+- :code:`unowned` is somewhat cleaner-looking, and it isn't as tied
+  to a specific use case, but it does not contrast with :code:`weak`
+  *at all*; only someone with considerable exposure to weak
+  references would understand why we named each one the way we did,
+  and even they are likely to roll their eyes at us.  But it's okay
+  for a working proposal.
 
 Asserting and Uncheckable
 .........................
@@ -716,7 +716,7 @@ One complication with extending :code:`weak` to value types is that
 generally the implementing type will need to be different from the
 underlying value type.  Probably the best solution would be to hide
 the use of the implementing type from the type system outside of the
-well-formedness checks for the variable; SIL-gen would lower the field
+wellformedness checks for the variable; SIL-gen would lower the field
 to its implementing type using the appropriate protocol conformances.
 
 As long as we have convenient optional back-references, though, we
@@ -857,19 +857,19 @@ become laborious and redundant, and a different mechanism is called for.
 In the following discussion, a *var-or-member expression* is an
 expression which is semantically constrained to be one of:
 
-   - A reference to a local variable-like declaration from an
-     enclosing context.
+- A reference to a local variable-like declaration from an
+  enclosing context.
 
-   - A member access thereof, possibly recursively.
+- A member access thereof, possibly recursively.
 
 Such expressions have two useful traits:
 
-  - They always end in an identifier which on some level meaningfully
-    identifies the object.
+- They always end in an identifier which on some level meaningfully
+  identifies the object.
 
-  - Evaluating them is relatively likely (but not guaranteed) to not
-    have interesting side effects, and so we feel less bad about
-    apparently shifting their evaluation around.
+- Evaluating them is relatively likely (but not guaranteed) to not
+  have interesting side effects, and so we feel less bad about
+  apparently shifting their evaluation around.
 
 Decorated Capture References
 ----------------------------
@@ -1141,7 +1141,7 @@ The library should definitely provide the following types:
   will preserve the weakness of the reference.
 
   In keeping with our design for :code:`unowned`, I think this type
-  should should actually be an alias to either
+  should actually be an alias to either
   :code:`SafeUnownedReference<T>` or :code:`UnsafeUnownedReference<T>`
   depending on the current component's build settings.  The choice
   would be exported in binary modules, but for cleanliness we would

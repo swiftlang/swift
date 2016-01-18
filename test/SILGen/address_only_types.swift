@@ -30,8 +30,8 @@ func address_only_ignored_argument(_: Unloadable) {
 // CHECK-LABEL: sil hidden @_TF18address_only_types30address_only_curried_arguments
 func address_only_curried_arguments(x: Unloadable)(y: Unloadable) {
   // CHECK: bb0([[YARG:%[0-9]+]] : $*Unloadable, [[XARG:%[0-9]+]] : $*Unloadable):
-  // CHECK-NEXT: debug_value_addr [[YARG]] : $*Unloadable  // let y
-  // CHECK-NEXT: debug_value_addr [[XARG]] : $*Unloadable  // let x
+  // CHECK-NEXT: debug_value_addr [[YARG]] : $*Unloadable, let, name "y"
+  // CHECK-NEXT: debug_value_addr [[XARG]] : $*Unloadable, let, name "x"
   // CHECK-NEXT: destroy_addr [[XARG]]
   // CHECK-NEXT: destroy_addr [[YARG]]
   // CHECK-NEXT: tuple
@@ -41,8 +41,8 @@ func address_only_curried_arguments(x: Unloadable)(y: Unloadable) {
 // CHECK-LABEL: sil hidden @_TF18address_only_types41address_only_curried_arguments_and_return
 func address_only_curried_arguments_and_return(x: Unloadable)(y: Unloadable) -> Unloadable {
   // CHECK: bb0([[RET:%[0-9]+]] : $*Unloadable, [[YARG:%[0-9]+]] : $*Unloadable, [[XARG:%[0-9]+]] : $*Unloadable):
-  // CHECK-NEXT: debug_value_addr [[YARG]] : $*Unloadable  // let y
-  // CHECK-NEXT: debug_value_addr [[XARG]] : $*Unloadable  // let x
+  // CHECK-NEXT: debug_value_addr [[YARG]] : $*Unloadable, let, name "y"
+  // CHECK-NEXT: debug_value_addr [[XARG]] : $*Unloadable, let, name "x"
   // CHECK-NEXT: copy_addr [take] [[XARG]] to [initialization] [[RET]]
   // CHECK-NEXT: destroy_addr [[YARG]]
   // CHECK-NEXT: tuple
@@ -53,8 +53,8 @@ func address_only_curried_arguments_and_return(x: Unloadable)(y: Unloadable) -> 
 // CHECK-LABEL: sil hidden @_TF18address_only_types19address_only_return
 func address_only_return(x: Unloadable, y: Int) -> Unloadable {
   // CHECK: bb0([[RET:%[0-9]+]] : $*Unloadable, [[XARG:%[0-9]+]] : $*Unloadable, [[YARG:%[0-9]+]] : $Builtin.Int64):
-  // CHECK-NEXT: debug_value_addr [[XARG]] : $*Unloadable  // let x
-  // CHECK-NEXT: debug_value [[YARG]] : $Builtin.Int64  // let y
+  // CHECK-NEXT: debug_value_addr [[XARG]] : $*Unloadable, let, name "x"
+  // CHECK-NEXT: debug_value [[YARG]] : $Builtin.Int64, let, name "y"
   // CHECK-NEXT: copy_addr [take] [[XARG]] to [initialization] [[RET]]
   // CHECK-NEXT: [[VOID:%[0-9]+]] = tuple ()
   // CHECK-NEXT: return [[VOID]]
@@ -64,8 +64,8 @@ func address_only_return(x: Unloadable, y: Int) -> Unloadable {
 // CHECK-LABEL: sil hidden @_TF18address_only_types27address_only_curried_return
 func address_only_curried_return(x: Unloadable)(y: Int) -> Unloadable {
   // CHECK: bb0([[RET:%[0-9]+]] : $*Unloadable, [[YARG:%[0-9]+]] : $Builtin.Int64, [[XADDR:%[0-9]+]] : $*Unloadable):
-  // CHECK-NEXT: debug_value [[YARG]] : $Builtin.Int64  // let y
-  // CHECK-NEXT: debug_value_addr [[XADDR]] : $*Unloadable  // let x
+  // CHECK-NEXT: debug_value [[YARG]] : $Builtin.Int64, let, name "y"
+  // CHECK-NEXT: debug_value_addr [[XADDR]] : $*Unloadable, let, name "x"
   // CHECK-NEXT: copy_addr [take] [[XADDR]] to [initialization] [[RET]]
   // CHECK-NEXT: [[VOID:%[0-9]+]] = tuple ()
   // CHECK-NEXT: return [[VOID]]
@@ -139,9 +139,9 @@ func address_only_call_1_ignore_return() {
   some_address_only_function_1()
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF18address_only_types28some_address_only_function_1FT_PS_10Unloadable_
   // CHECK: [[TEMP:%[0-9]+]] = alloc_stack $Unloadable
-  // CHECK: apply [[FUNC]]([[TEMP]]#1)
-  // CHECK: destroy_addr [[TEMP]]#1
-  // CHECK: dealloc_stack [[TEMP]]#0
+  // CHECK: apply [[FUNC]]([[TEMP]])
+  // CHECK: destroy_addr [[TEMP]]
+  // CHECK: dealloc_stack [[TEMP]]
   // CHECK: return
 }
 
@@ -153,8 +153,8 @@ func address_only_call_2(x: Unloadable) {
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF18address_only_types28some_address_only_function_2
   // CHECK: [[X_CALL_ARG:%[0-9]+]] = alloc_stack $Unloadable
   // CHECK: copy_addr [[XARG]] to [initialization] [[X_CALL_ARG]]
-  // CHECK: apply [[FUNC]]([[X_CALL_ARG]]#1)
-  // CHECK: dealloc_stack [[X_CALL_ARG]]#0
+  // CHECK: apply [[FUNC]]([[X_CALL_ARG]])
+  // CHECK: dealloc_stack [[X_CALL_ARG]]
   // CHECK: return
 }
 
@@ -165,9 +165,9 @@ func address_only_call_1_in_2() {
   // CHECK: [[FUNC2:%[0-9]+]] = function_ref @_TF18address_only_types28some_address_only_function_2
   // CHECK: [[FUNC1:%[0-9]+]] = function_ref @_TF18address_only_types28some_address_only_function_1
   // CHECK: [[TEMP:%[0-9]+]] = alloc_stack $Unloadable
-  // CHECK: apply [[FUNC1]]([[TEMP]]#1)
-  // CHECK: apply [[FUNC2]]([[TEMP]]#1)
-  // CHECK: dealloc_stack [[TEMP]]#0
+  // CHECK: apply [[FUNC1]]([[TEMP]])
+  // CHECK: apply [[FUNC2]]([[TEMP]])
+  // CHECK: dealloc_stack [[TEMP]]
   // CHECK: return
 }
 
@@ -177,12 +177,12 @@ func address_only_materialize() -> Int {
   return some_address_only_function_1().foo()
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF18address_only_types28some_address_only_function_1
   // CHECK: [[TEMP:%[0-9]+]] = alloc_stack $Unloadable
-  // CHECK: apply [[FUNC]]([[TEMP]]#1)
-  // CHECK: [[TEMP_PROJ:%[0-9]+]] = open_existential_addr [[TEMP]]#1 : $*Unloadable to $*[[OPENED:@opened(.*) Unloadable]]
+  // CHECK: apply [[FUNC]]([[TEMP]])
+  // CHECK: [[TEMP_PROJ:%[0-9]+]] = open_existential_addr [[TEMP]] : $*Unloadable to $*[[OPENED:@opened(.*) Unloadable]]
   // CHECK: [[FOO_METHOD:%[0-9]+]] = witness_method $[[OPENED]], #Unloadable.foo!1
   // CHECK: [[RET:%[0-9]+]] = apply [[FOO_METHOD]]<[[OPENED]]>([[TEMP_PROJ]])
   // CHECK: destroy_addr [[TEMP_PROJ]]
-  // CHECK: dealloc_stack [[TEMP]]#0
+  // CHECK: dealloc_stack [[TEMP]]
   // CHECK: return [[RET]]
 }
 
@@ -193,9 +193,9 @@ func address_only_assignment_from_temp(inout dest: Unloadable) {
   // CHECK: copy_addr [[DEST]] to [initialization] [[DEST_LOCAL]]#1
   dest = some_address_only_function_1()
   // CHECK: [[TEMP:%[0-9]+]] = alloc_stack $Unloadable
-  // CHECK: copy_addr [take] [[TEMP]]#1 to [[DEST_LOCAL]]#1 :
-  // CHECK-NOT: destroy_addr [[TEMP]]#1
-  // CHECK: dealloc_stack [[TEMP]]#0
+  // CHECK: copy_addr [take] [[TEMP]] to [[DEST_LOCAL]]#1 :
+  // CHECK-NOT: destroy_addr [[TEMP]]
+  // CHECK: dealloc_stack [[TEMP]]
   // CHECK: copy_addr [[DEST_LOCAL]]#1 to [[DEST]]
   // CHECK: release [[DEST_LOCAL]]#0
 }
@@ -229,8 +229,8 @@ func address_only_assignment_from_temp_to_property() {
   global_prop = some_address_only_function_1()
   // CHECK: [[TEMP:%[0-9]+]] = alloc_stack $Unloadable
   // CHECK: [[SETTER:%[0-9]+]] = function_ref @_TF18address_only_typess11global_propPS_10Unloadable_
-  // CHECK: apply [[SETTER]]([[TEMP]]#1)
-  // CHECK: dealloc_stack [[TEMP]]#0
+  // CHECK: apply [[SETTER]]([[TEMP]])
+  // CHECK: dealloc_stack [[TEMP]]
 }
 
 // CHECK-LABEL: sil hidden @_TF18address_only_types43address_only_assignment_from_lv_to_property
@@ -240,8 +240,8 @@ func address_only_assignment_from_lv_to_property(v: Unloadable) {
   // CHECK: [[TEMP:%[0-9]+]] = alloc_stack $Unloadable
   // CHECK: copy_addr [[VARG]] to [initialization] [[TEMP]]
   // CHECK: [[SETTER:%[0-9]+]] = function_ref @_TF18address_only_typess11global_propPS_10Unloadable_
-  // CHECK: apply [[SETTER]]([[TEMP]]#1)
-  // CHECK: dealloc_stack [[TEMP]]#0
+  // CHECK: apply [[SETTER]]([[TEMP]])
+  // CHECK: dealloc_stack [[TEMP]]
   global_prop = v
 }
 

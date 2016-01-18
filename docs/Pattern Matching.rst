@@ -354,7 +354,7 @@ imperative language — in contrast to, say, a functional language where
 you're in an expression and you need to produce a value — there's a
 colorable argument that non-exhaustive matches should be okay.  I
 dislike this, however, and propose that it should be an error to
-make an non-exhaustive switch; people who want non-exhaustive matches
+make a non-exhaustive switch; people who want non-exhaustive matches
 can explicitly put in default cases.
 Exhaustiveness actually isn't that difficult to check, at least over
 ADTs.  It's also really the behavior that I would expect from the
@@ -689,13 +689,13 @@ interpreted according to what is found:
   value must match the named type (according to the rules below for
   'is' patterns).  It is okay for this to be trivially true.
 
-  In addition, there must be an non-empty arguments clause, and each
+  In addition, there must be a non-empty arguments clause, and each
   element in the clause must have an identifier.  For each element,
   the identifier must correspond to a known property of the named
   type, and the value of that property must satisfy the element
   pattern.
 
-- If the name resolves to a enum element, then the dynamic type
+- If the name resolves to an enum element, then the dynamic type
   of the matched value must match the enum type as discussed above,
   and the value must be of the specified element.  There must be
   an arguments clause if and only if the element has a value type.

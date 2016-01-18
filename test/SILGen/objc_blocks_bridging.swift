@@ -73,10 +73,10 @@ func callBlocks(x: Foo,
 ) -> (Int, String, String?, String?) {
   // CHECK: [[FOO:%.*]] =  class_method [volatile] %0 : $Foo, #Foo.foo!1.foreign
   // CHECK: [[F_BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage
-  // CHECK: [[F_BLOCK_CAPTURE:%.*]] = project_block_storage [[F_BLOCK_STORAGE]]#1
+  // CHECK: [[F_BLOCK_CAPTURE:%.*]] = project_block_storage [[F_BLOCK_STORAGE]]
   // CHECK: store %1 to [[F_BLOCK_CAPTURE]]
   // CHECK: [[F_BLOCK_INVOKE:%.*]] = function_ref @_TTRXFo_dSi_dSi_XFdCb_dSi_dSi_
-  // CHECK: [[F_STACK_BLOCK:%.*]] = init_block_storage_header [[F_BLOCK_STORAGE]]#1 : {{.*}}, invoke [[F_BLOCK_INVOKE]]
+  // CHECK: [[F_STACK_BLOCK:%.*]] = init_block_storage_header [[F_BLOCK_STORAGE]] : {{.*}}, invoke [[F_BLOCK_INVOKE]]
   // CHECK: [[F_BLOCK:%.*]] = copy_block [[F_STACK_BLOCK]]
   // CHECK: apply [[FOO]]([[F_BLOCK]]
 
@@ -115,14 +115,14 @@ func clearDraggingItemImageComponentsProvider(x: NSDraggingItem) {
 // CHECK:         [[CONVERT:%.*]] = function_ref @_TF10Foundation22_convertArrayToNSArray
 // CHECK:         [[CONVERTED:%.*]] = apply [[CONVERT]]
 // CHECK:         [[OPTIONAL:%.*]] = enum $Optional<NSArray>, #Optional.Some!enumelt.1, [[CONVERTED]]
-// CHECK:         autorelease_return [[OPTIONAL]]
+// CHECK:         return [[OPTIONAL]]
 
 // CHECK-LABEL: sil hidden @{{.*}}bridgeNonnullBlockResult{{.*}}
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__oSS_XFdCb__aGSqCSo8NSString__
 // CHECK:         [[CONVERT:%.*]] = function_ref @swift_StringToNSString
 // CHECK:         [[BRIDGED:%.*]] = apply [[CONVERT]]
 // CHECK:         [[OPTIONAL_BRIDGED:%.*]] = enum $Optional<NSString>, #Optional.Some!enumelt.1, [[BRIDGED]]
-// CHECK:         autorelease_return [[OPTIONAL_BRIDGED]]
+// CHECK:         return [[OPTIONAL_BRIDGED]]
 func bridgeNonnullBlockResult() {
   nonnullStringBlockResult { return "test" }
 }

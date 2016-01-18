@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -85,10 +85,10 @@ public typealias Any = protocol<>
 ///       @objc func getCValue() -> Int { return 42 }
 ///     }
 ///
-///     // If x has a method @objc getValue()->Int, call it and
-///     // return the result.  Otherwise, return nil.
+///     // If x has a method @objc getValue() -> Int, call it and
+///     // return the result.  Otherwise, return `nil`.
 ///     func getCValue1(x: AnyObject) -> Int? {
-///       if let f: ()->Int = x.getCValue { // <===
+///       if let f: () -> Int = x.getCValue { // <===
 ///         return f()
 ///       }
 ///       return nil
@@ -134,7 +134,7 @@ public protocol AnyObject : class {}
 ///     }
 ///
 ///     // If x has an @objc cValue: Int, return its value.
-///     // Otherwise, return nil.
+///     // Otherwise, return `nil`.
 ///     func getCValue(x: AnyClass) -> Int? {
 ///       return x.cValue // <===
 ///     }
@@ -142,6 +142,10 @@ public protocol AnyObject : class {}
 /// - SeeAlso: `AnyObject`
 public typealias AnyClass = AnyObject.Type
 
+/// Returns true iff `lhs` and `rhs` are references to the same object
+/// instance (in other words, are identical pointers).
+///
+/// - SeeAlso: `Equatable`, `==`
 @warn_unused_result
 public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   switch (lhs, rhs) {
@@ -327,7 +331,7 @@ public protocol Hashable : Equatable {
 }
 
 public protocol _SinkType {}
-@available(*, unavailable, message="SinkType has been removed. Use (T)->() closures directly instead.")
+@available(*, unavailable, message="SinkType has been removed. Use (T) -> () closures directly instead.")
 public typealias SinkType = _SinkType
 
 //===----------------------------------------------------------------------===//
@@ -447,4 +451,3 @@ infix operator  |= { associativity right precedence 90 assignment }
 // example of how this operator is used, and how its use can be hidden
 // from users.
 infix operator ~> { associativity left precedence 255 }
-

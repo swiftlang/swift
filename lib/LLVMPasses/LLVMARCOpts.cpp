@@ -1,8 +1,8 @@
-//===--- Passes.cpp - LLVM Reference Counting Optimizations ---------------===//
+//===--- LLVMARCOpts.cpp - LLVM Reference Counting Optimizations ----------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -553,8 +553,8 @@ static DtorKind analyzeDestructor(Value *P) {
 
   // FIXME: Would like to abstract the dtor slot (#0) out from this to somewhere
   // unified.
-  enum { DTorSlotOfHeapMeatadata = 0 };
-  Function *DtorFn =dyn_cast<Function>(CS->getOperand(DTorSlotOfHeapMeatadata));
+  enum { DTorSlotOfHeapMetadata = 0 };
+  Function *DtorFn =dyn_cast<Function>(CS->getOperand(DTorSlotOfHeapMetadata));
   if (DtorFn == 0 || DtorFn->mayBeOverridden() || DtorFn->hasExternalLinkage())
     return DtorKind::Unknown;
 
@@ -594,7 +594,7 @@ static DtorKind analyzeDestructor(Value *P) {
       case RT_BridgeRetain:          // x = swift_bridgeRetain(y)
       case RT_Retain: {      // swift_retain(obj)
 
-        // Ignore retains of the "self" object, no ressurection is possible.
+        // Ignore retains of the "self" object, no resurrection is possible.
         Value *ThisRetainedObject = cast<CallInst>(I).getArgOperand(0);
         if (ThisRetainedObject->stripPointerCasts() ==
             ThisObject->stripPointerCasts())
@@ -856,7 +856,7 @@ static bool performLocalRetainUnownedOpt(CallInst *Retain, BasicBlock &BB,
 }
 
 /// Removes redundant check_unowned calls if they check the same reference and
-/// there is no instruction inbetween which could decrement the reference count.
+/// there is no instruction in between which could decrement the reference count.
 static void performRedundantCheckUnownedRemoval(BasicBlock &BB) {
   DenseSet<Value *> checkedValues;
   for (BasicBlock::iterator BBI = BB.begin(), E = BB.end(); BBI != E; ) {

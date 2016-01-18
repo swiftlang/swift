@@ -14,6 +14,15 @@ function(_list_add_string_suffix input_list suffix result_var_name)
   set("${result_var_name}" "${result}" PARENT_SCOPE)
 endfunction()
 
+function(_list_escape_for_shell input_list result_var_name)
+  set(result "")
+  foreach(element ${input_list})
+    string(REPLACE " " "\\ " element "${element}")
+    set(result "${result}${element} ")
+  endforeach()
+  set("${result_var_name}" "${result}" PARENT_SCOPE)
+endfunction()
+
 function(add_dependencies_multiple_targets)
   cmake_parse_arguments(
       ADMT # prefix
@@ -152,7 +161,7 @@ function(_add_variant_link_flags
   if("${sdk}" STREQUAL "LINUX")
     list(APPEND result "-lpthread" "-ldl")
   elseif("${sdk}" STREQUAL "FREEBSD")
-    # No extra libraries required.
+    list(APPEND result "-lpthread")
   else()
     list(APPEND result "-lobjc")
   endif()
@@ -1090,18 +1099,19 @@ function(_add_swift_library_single target name)
     set(PLIST_INFO_BUILD_VERSION)
   endif()
 
-  # On Linux add the linker script that coalesces protocol conformance
-  # sections. This wouldn't be necessary if the link was done by the swift
-  # binary: rdar://problem/19007002
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+  # On Linux and FreeBSD add the linker script that coalesces protocol
+  # conformance sections. This wouldn't be necessary if the link was done by
+  # the swift binary: rdar://problem/19007002
+  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux" OR
+     "${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
     list(APPEND link_flags
         "-Xlinker" "-T"
         "-Xlinker" "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}/swift.ld")
   endif()
 
   # Convert variables to space-separated strings.
-  string(REPLACE ";" " " c_compile_flags "${c_compile_flags}")
-  string(REPLACE ";" " " link_flags "${link_flags}")
+  _list_escape_for_shell("${c_compile_flags}" c_compile_flags)
+  _list_escape_for_shell("${link_flags}" link_flags)
 
   # Set compilation and link flags.
   set_property(TARGET "${target}" APPEND_STRING PROPERTY
@@ -1435,6 +1445,12 @@ function(add_swift_library name)
           "${SWIFTLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${CMAKE_STATIC_LIBRARY_PREFIX}${name}${CMAKE_STATIC_LIBRARY_SUFFIX}")
       endif()
 
+      # Cache universal libraries for dependency purposes
+      set(UNIVERSAL_LIBRARY_NAMES_${SWIFT_SDK_${sdk}_LIB_SUBDIR}
+        ${UNIVERSAL_LIBRARY_NAMES_${SWIFT_SDK_${sdk}_LIB_SUBDIR}}
+        ${UNIVERSAL_LIBRARY_NAME}
+        CACHE INTERNAL "UNIVERSAL_LIBRARY_NAMES_${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
+
       set(lipo_target "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
       _add_swift_lipo_target(
           ${lipo_target}
@@ -1602,14 +1618,12 @@ function(_add_swift_executable_single name)
       "${SWIFTEXE_SINGLE_ARCHITECTURE}"
       "${CMAKE_BUILD_TYPE}"
       "${LLVM_ENABLE_ASSERTIONS}"
-      FALSE
       c_compile_flags)
   _add_variant_link_flags(
       "${SWIFTEXE_SINGLE_SDK}"
       "${SWIFTEXE_SINGLE_ARCHITECTURE}"
       "${CMAKE_BUILD_TYPE}"
       "${LLVM_ENABLE_ASSERTIONS}"
-      FALSE
       link_flags)
 
   list(APPEND link_flags
@@ -1669,8 +1683,8 @@ function(_add_swift_executable_single name)
   llvm_update_compile_flags("${name}")
 
   # Convert variables to space-separated strings.
-  string(REPLACE ";" " " c_compile_flags "${c_compile_flags}")
-  string(REPLACE ";" " " link_flags "${link_flags}")
+  _list_escape_for_shell("${c_compile_flags}" c_compile_flags)
+  _list_escape_for_shell("${link_flags}" link_flags)
 
   set_property(TARGET ${name} APPEND_STRING PROPERTY
       COMPILE_FLAGS " ${c_compile_flags}")
@@ -1836,38 +1850,4 @@ function(add_swift_executable name)
       ${SWIFTEXE_EXCLUDE_FROM_ALL_FLAG}
       ${SWIFTEXE_DONT_STRIP_NON_MAIN_SYMBOLS_FLAG}
       ${SWIFTEXE_DISABLE_ASLR_FLAG})
-endfunction()
-
-function(add_swift_llvm_loadable_module name)
-  add_llvm_loadable_module(${name} ${ARGN})
-  set(sdk "${SWIFT_HOST_VARIANT_SDK}")
-  set(arch "${SWIFT_HOST_VARIANT_ARCH}")
-
-  # Determine compiler flags.
-  set(c_compile_flags)
-  _add_variant_c_compile_flags(
-      "${sdk}"
-      "${arch}"
-      "${CMAKE_BUILD_TYPE}"
-      "${LLVM_ENABLE_ASSERTIONS}"
-      FALSE
-      c_compile_flags)
-
-  set(link_flags)
-  _add_variant_link_flags(
-      "${sdk}"
-      "${arch}"
-      "${CMAKE_BUILD_TYPE}"
-      "${LLVM_ENABLE_ASSERTIONS}"
-      FALSE
-      link_flags)
-
-  # Convert variables to space-separated strings.
-  string(REPLACE ";" " " c_compile_flags "${c_compile_flags}")
-  string(REPLACE ";" " " link_flags "${link_flags}")
-
-  set_property(TARGET ${name} APPEND_STRING PROPERTY
-      COMPILE_FLAGS " ${c_compile_flags}")
-  set_property(TARGET ${name} APPEND_STRING PROPERTY
-      LINK_FLAGS " ${link_flags}")
 endfunction()

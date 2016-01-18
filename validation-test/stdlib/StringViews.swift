@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -14,6 +14,14 @@
 
 import Swift
 import StdlibUnittest
+
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
 
 // CHECK: testing...
 print("testing...")
@@ -275,7 +283,7 @@ tests.test("index-mapping/utf16-to-unicode-scalar") {
     summer.utf16.endIndex.samePositionIn(summer.unicodeScalars)!)
 }
 
-//===--- To UTF16 ----------------------------------------------------------===//
+//===--- To UTF16 ---------------------------------------------------------===//
 tests.test("index-mapping/character-to-utf16") {
   expectEqualSequence(
     [
@@ -490,7 +498,7 @@ tests.test("index-mapping/utf16-to-unicode-scalar") {
     summer.utf16.endIndex.samePositionIn(summer.unicodeScalars)!)
 }
 
-//===--- To Character -------------------------------------------------===//
+//===--- To Character -----------------------------------------------------===//
 tests.test("index-mapping/unicode-scalar-to-character") {
   let winterUnicodeScalarCharacters: [Character?] = [
     "🏂", "☃", "❅", "❆", "❄︎", nil, "⛄️", nil, "❄️", nil,
@@ -536,7 +544,7 @@ tests.test("index-mapping/utf8-to-character") {
   expectEqualSequence(
     winterUtf8Characters,
     winter.utf8.indices.map {
-      (i:String.UTF8Index)->Character? in i.samePositionIn(winter).map {
+      (i:String.UTF8Index) -> Character? in i.samePositionIn(winter).map {
         winter[$0]
       }
     }, sameValue: ==)

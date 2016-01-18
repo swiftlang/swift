@@ -15,17 +15,17 @@ class A {
 
   convenience init() {
     printAtDepth("Starting A.init()")
-    ++depth
+    depth += 1
     self.init(int:5)
-    --depth
+    depth -= 1
     printAtDepth("Ending A.init()")
   }
 
   convenience init(int i:Int) {
     printAtDepth("Starting A.init withInt(\(i))")
-    ++depth
+    depth += 1
     self.init(int:i, string:"hello")
-    --depth
+    depth -= 1
     printAtDepth("Ending A.init withInt(\(i))")
   }
 
@@ -46,18 +46,18 @@ class B : A {
 
   convenience override init(int i:Int, string: String) {
     printAtDepth("Starting B.init withInt(\(i)) string(\(string))")
-    ++depth
+    depth += 1
     self.init(int: i, string:string, double:3.14159)
-    --depth
+    depth -= 1
     printAtDepth("Ending B.init withInt(\(i)) string(\(string))")
   }
 
   init(int i:Int, string: String, double:Double) {
     printAtDepth("Starting B.init withInt(\(i)) string(\(string)) double(\(double))")
     self.double = double
-    ++depth
+    depth += 1
     super.init(int: i, string: string)
-    --depth
+    depth -= 1
     printAtDepth("Ending B.init withInt(\(i)) string(\(string)) double(\(double))")
   }
 
@@ -69,9 +69,9 @@ class B : A {
 class C : B {
   override init(int i:Int, string: String, double: Double) {
     printAtDepth("Starting C.init withInt(\(i)) string(\(string)) double(\(double))")
-    ++depth
+    depth += 1
     super.init(int: i, string: string, double: double)
-    --depth
+    depth -= 1
     printAtDepth("Ending C.init withInt(\(i)) string(\(string)) double(\(double))")
   }
 

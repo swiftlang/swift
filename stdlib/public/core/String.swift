@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -145,7 +145,7 @@ extension String {
     if let stringBuffer = stringBufferOptional {
       return String(_storage: stringBuffer)
     } else {
-      return .None
+      return nil
     }
   }
 
@@ -208,7 +208,7 @@ extension String : _BuiltinUTF16StringLiteralConvertible {
   public init(
     _builtinUTF16StringLiteral start: Builtin.RawPointer,
     numberOfCodeUnits: Builtin.Word
-  )  {
+  ) {
     self = String(
       _StringCore(
         baseAddress: COpaquePointer(start),
@@ -272,7 +272,7 @@ extension String {
     Encoding: UnicodeCodecType
   >(encoding: Encoding.Type) -> Int {
     var codeUnitCount = 0
-    let output: (Encoding.CodeUnit) -> Void = { _ in ++codeUnitCount }
+    let output: (Encoding.CodeUnit) -> Void = { _ in codeUnitCount += 1 }
     self._encode(encoding, output: output)
     return codeUnitCount
   }
@@ -310,7 +310,7 @@ extension String {
 @_silgen_name("swift_stdlib_compareNSStringDeterministicUnicodeCollation")
 public func _stdlib_compareNSStringDeterministicUnicodeCollation(
   lhs: AnyObject, _ rhs: AnyObject
-)-> Int32
+) -> Int32
 #endif
 
 extension String : Equatable {
@@ -355,7 +355,7 @@ extension String {
       compare = self._core.count - rhs._core.count
     }
     // This efficiently normalizes the result to -1, 0, or 1 to match the
-    // behaviour of NSString's compare function.
+    // behavior of NSString's compare function.
     return (compare > 0 ? 1 : 0) - (compare < 0 ? 1 : 0)
   }
 #endif

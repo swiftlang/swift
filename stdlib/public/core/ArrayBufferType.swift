@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -14,7 +14,7 @@
 /// `_ArrayBufferType`.  This buffer does not provide value semantics.
 public protocol _ArrayBufferType : MutableCollectionType {
   /// The type of elements stored in the buffer.
-  typealias Element
+  associatedtype Element
 
   /// Create an empty buffer.
   init()
@@ -35,7 +35,7 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// If this buffer is backed by a uniquely-referenced mutable
   /// `_ContiguousArrayBuffer` that can be grown in-place to allow the `self`
   /// buffer store `minimumCapacity` elements, returns that buffer.
-  /// Otherwise, returns nil.
+  /// Otherwise, returns `nil`.
   ///
   /// - Note: The result's firstElementAddress may not match ours, if we are a
   ///   _SliceBuffer.
@@ -159,11 +159,13 @@ extension _ArrayBufferType {
       // Assign over the original subRange
       var i = newValues.startIndex
       for j in subRange {
-        elements[j] = newValues[i++]
+        elements[j] = newValues[i]
+        i._successorInPlace()
       }
       // Initialize the hole left by sliding the tail forward
       for j in oldTailIndex..<newTailIndex {
-        (elements + j).initialize(newValues[i++])
+        (elements + j).initialize(newValues[i])
+        i._successorInPlace()
       }
       _expectEnd(i, newValues)
     }
@@ -172,7 +174,9 @@ extension _ArrayBufferType {
       var i = subRange.startIndex
       var j = newValues.startIndex
       for _ in 0..<newCount {
-        elements[i++] = newValues[j++]
+        elements[i] = newValues[j]
+        i._successorInPlace()
+        j._successorInPlace()
       }
       _expectEnd(j, newValues)
 
@@ -189,15 +193,15 @@ extension _ArrayBufferType {
         // part of the tail.
         newTailStart.moveAssignFrom(oldTailStart, count: shrinkage)
 
-        //  slide the rest of the tail back
+        // Slide the rest of the tail back
         oldTailStart.moveInitializeFrom(
           oldTailStart + shrinkage, count: tailCount - shrinkage)
       }
-      else {                      // tail fits within erased elements
+      else {                      // Tail fits within erased elements
         // Assign over the start of the replaced range with the tail
         newTailStart.moveAssignFrom(oldTailStart, count: tailCount)
 
-        // destroy elements remaining after the tail in subRange
+        // Destroy elements remaining after the tail in subRange
         (newTailStart + tailCount).destroy(shrinkage - tailCount)
       }
     }

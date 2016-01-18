@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -119,7 +119,7 @@ class SourceFile::LookupCache {
       Members.shrink_and_clear();
     }
 
-    decltype(Members)::const_iterator begin() const  { return Members.begin(); }
+    decltype(Members)::const_iterator begin() const { return Members.begin(); }
     decltype(Members)::const_iterator end() const { return Members.end(); }
     decltype(Members)::const_iterator find(DeclName Name) const {
       return Members.find(Name);
@@ -338,7 +338,8 @@ void SourceLookupCache::invalidate() {
 
 ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
   : TypeDecl(DeclKind::Module, &ctx, name, SourceLoc(), { }),
-    DeclContext(DeclContextKind::Module, nullptr) {
+    DeclContext(DeclContextKind::Module, nullptr),
+    Flags({0, 0, 0}) {
   ctx.addDestructorCleanup(*this);
   setImplicit();
   setType(ModuleType::get(this));
@@ -399,8 +400,8 @@ DerivedFileUnit &Module::getDerivedFileUnit() const {
 }
 
 VarDecl *Module::getDSOHandle() {
-  if (DSOHandleAndFlags.getPointer())
-    return DSOHandleAndFlags.getPointer();
+  if (DSOHandle)
+    return DSOHandle;
 
   auto unsafeMutablePtr = getASTContext().getUnsafeMutablePointerDecl();
   if (!unsafeMutablePtr)
@@ -423,7 +424,7 @@ VarDecl *Module::getDSOHandle() {
   handleVar->getAttrs().add(
     new (ctx) SILGenNameAttr("__dso_handle", /*Implicit=*/true));
   handleVar->setAccessibility(Accessibility::Internal);
-  DSOHandleAndFlags.setPointer(handleVar);
+  DSOHandle = handleVar;
   return handleVar;
 }
 
@@ -458,6 +459,7 @@ void Module::lookupMember(SmallVectorImpl<ValueDecl*> &results,
   case DeclContextKind::Initializer:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::SubscriptDecl:
     llvm_unreachable("This context does not support lookup.");
 
   case DeclContextKind::FileUnit:
@@ -703,33 +705,31 @@ ArrayRef<Substitution> BoundGenericType::getSubstitutions(
     if (!type)
       type = ErrorType::get(module->getASTContext());
 
-    SmallVector<ProtocolConformance *, 4> conformances;
-    if (type->is<TypeVariableType>() || type->isTypeParameter()) {
+    SmallVector<ProtocolConformanceRef, 4> conformances;
+    for (auto proto : archetype->getConformsTo()) {
       // If the type is a type variable or is dependent, just fill in null
-      // conformances. FIXME: It seems like we should record these as
-      // requirements (?).
-      conformances.assign(archetype->getConformsTo().size(), nullptr);
-    } else {
-      // Find the conformances.
-      for (auto proto : archetype->getConformsTo()) {
+      // conformances.
+      if (type->is<TypeVariableType>() || type->isTypeParameter()) {
+        conformances.push_back(ProtocolConformanceRef(proto));
+
+      // Otherwise, find the conformances.
+      } else {
         auto conforms = module->lookupConformance(type, proto, resolver);
         switch (conforms.getInt()) {
         case ConformanceKind::Conforms:
-          conformances.push_back(conforms.getPointer());
+          conformances.push_back(
+                         ProtocolConformanceRef(proto, conforms.getPointer()));
           break;
         case ConformanceKind::UncheckedConforms:
-          conformances.push_back(nullptr);
-          break;
         case ConformanceKind::DoesNotConform:
-          conformances.push_back(nullptr);
+          conformances.push_back(ProtocolConformanceRef(proto));
           break;
         }
       }
     }
 
     // Record this substitution.
-    resultSubstitutions[index] = {archetype, type,
-                                  ctx.AllocateCopy(conformances)};
+    resultSubstitutions[index] = {type, ctx.AllocateCopy(conformances)};
     ++index;
   }
 
@@ -909,6 +909,11 @@ LookupConformanceResult Module::lookupConformance(Type type,
       auto substitutions = type->gatherAllSubstitutions(this, substitutionsVec,
                                                         resolver,
                                                         explicitConformanceDC);
+      
+      for (auto sub : substitutions) {
+        if (sub.getReplacement()->is<ErrorType>())
+          return { nullptr, ConformanceKind::DoesNotConform };
+      }
 
       // Create the specialized conformance entry.
       auto result = ctx.getSpecializedConformance(type, conformance,
@@ -1530,7 +1535,7 @@ bool SourceFile::walk(ASTWalker &walker) {
   return false;
 }
 
-StringRef SourceFile::getFilename() const  {
+StringRef SourceFile::getFilename() const {
   if (BufferID == -1)
     return "";
   SourceManager &SM = getASTContext().SourceMgr;

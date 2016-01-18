@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -73,6 +73,7 @@ public struct _DisabledRangeIndex_ {
 /// Replace `i` with its `successor()` and return the updated value of
 /// `i`.
 @_transparent
+@available(*, deprecated, message="it will be removed in Swift 3")
 public prefix func ++ <T : _Incrementable> (inout i: T) -> T {
   i._successorInPlace()
   return i
@@ -81,6 +82,7 @@ public prefix func ++ <T : _Incrementable> (inout i: T) -> T {
 /// Replace `i` with its `successor()` and return the original
 /// value of `i`.
 @_transparent
+@available(*, deprecated, message="it will be removed in Swift 3")
 public postfix func ++ <T : _Incrementable> (inout i: T) -> T {
   let ret = i
   i._successorInPlace()
@@ -96,11 +98,11 @@ public protocol ForwardIndexType : _Incrementable {
   ///
   /// Reachability is defined by the ability to produce one value from
   /// the other via zero or more applications of `successor`.
-  typealias Distance : _SignedIntegerType = Int
+  associatedtype Distance : _SignedIntegerType = Int
 
   // See the implementation of Range for an explanation of this
   // associated type
-  typealias _DisabledRangeIndex = _DisabledRangeIndex_
+  associatedtype _DisabledRangeIndex = _DisabledRangeIndex_
 
   /// Performs a range check in O(1), or a no-op when a range check is not
   /// implementable in O(1).
@@ -214,8 +216,10 @@ extension ForwardIndexType {
     _precondition(n >= 0,
         "Only BidirectionalIndexType can be advanced by a negative amount")
     var p = self
-    for var i: Distance = 0; i != n; ++i {
-      ++p
+    var i : Distance = 0
+    while i != n {
+      p._successorInPlace()
+      i = i + 1
     }
     return p
   }
@@ -227,8 +231,11 @@ extension ForwardIndexType {
     _precondition(n >= 0,
         "Only BidirectionalIndexType can be advanced by a negative amount")
     var p = self
-    for var i: Distance = 0; i != n && p != limit; ++i {
-      ++p
+    var i : Distance = 0
+    while i != n {
+      if p == limit { break }
+      p._successorInPlace()
+      i = i + 1
     }
     return p
   }
@@ -248,8 +255,8 @@ extension ForwardIndexType {
     var p = self
     var count: Distance = 0
     while p != end {
-      ++count
-      ++p
+      count += 1
+      p._successorInPlace()
     }
     return count
   }
@@ -288,8 +295,10 @@ extension BidirectionalIndexType {
       return _advanceForward(n)
     }
     var p = self
-    for var i: Distance = n; i != 0; ++i {
-      --p
+    var i: Distance = n
+    while i != 0 {
+      p._predecessorInPlace()
+      i._successorInPlace()
     }
     return p
   }
@@ -300,8 +309,10 @@ extension BidirectionalIndexType {
       return _advanceForward(n, limit)
     }
     var p = self
-    for var i: Distance = n; i != 0 && p != limit; ++i {
-      --p
+    var i: Distance = n
+    while i != 0 && p != limit {
+      p._predecessorInPlace()
+      i._successorInPlace()
     }
     return p
   }
@@ -310,6 +321,7 @@ extension BidirectionalIndexType {
 /// Replace `i` with its `predecessor()` and return the updated value
 /// of `i`.
 @_transparent
+@available(*, deprecated, message="it will be removed in Swift 3")
 public prefix func -- <T : BidirectionalIndexType> (inout i: T) -> T {
   i._predecessorInPlace()
   return i
@@ -319,6 +331,7 @@ public prefix func -- <T : BidirectionalIndexType> (inout i: T) -> T {
 /// Replace `i` with its `predecessor()` and return the original
 /// value of `i`.
 @_transparent
+@available(*, deprecated, message="it will be removed in Swift 3")
 public postfix func -- <T : BidirectionalIndexType> (inout i: T) -> T {
   let ret = i
   i._predecessorInPlace()
@@ -331,13 +344,13 @@ public postfix func -- <T : BidirectionalIndexType> (inout i: T) -> T {
 /// Used to force conformers of RandomAccessIndexType to implement
 /// `advancedBy` methods and `distanceTo`.
 public protocol _RandomAccessAmbiguity {
-  typealias Distance : _SignedIntegerType = Int
+  associatedtype Distance : _SignedIntegerType = Int
 }
 
 extension _RandomAccessAmbiguity {
   @warn_unused_result
   public func advancedBy(n: Distance) -> Self {
-    fatalError("advancedBy(n) not implememented")
+    fatalError("advancedBy(n) not implemented")
   }
 }
 

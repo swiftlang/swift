@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 process_count=17
-process_id_max=$(($process_count - 1))
+process_id_max=$((process_count - 1))
 
 for id in $(seq 0 $process_id_max); do
 

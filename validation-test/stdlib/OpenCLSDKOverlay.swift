@@ -97,7 +97,7 @@ tests.test("clSetKernelArgsListAPPLE") {
   //
   var i = 0
   var count = DATA_SIZE
-  for i in 0..<count {
+  for i = 0; i < count; i++ {
     data[i] = Float(rand()) / Float(RAND_MAX)
   }
   
@@ -132,7 +132,7 @@ tests.test("clSetKernelArgsListAPPLE") {
   // Create the compute program from the source buffer
   //
   program = KernelSource.withCString {
-    (s: UnsafePointer<CChar>)->cl_program in
+    (s: UnsafePointer<CChar>) -> cl_program in
     var s = s
     return withUnsafeMutablePointer(&s) {
       return clCreateProgramWithSource(context, 1, $0, nil, &err)
@@ -246,7 +246,7 @@ tests.test("clSetKernelArgsListAPPLE") {
   for(i = 0; i < count; i++)
   {
     if(results[i] == data[i] * data[i]){
-      correct++
+      correct += 1
     }
   }
   

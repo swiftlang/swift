@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -85,7 +85,7 @@ public:
 
   //*** Allocation Routines ************************************************/
 
-  void *operator new(size_t bytes, ASTContext &C,
+  void *operator new(size_t bytes, const ASTContext &C,
                      unsigned Alignment = alignof(TypeRepr));
 
   // Make placement new and vanilla new/delete illegal for TypeReprs.
@@ -98,7 +98,7 @@ public:
   void dump() const;
 
   /// Clone the given type representation.
-  TypeRepr *clone(ASTContext &ctx) const;
+  TypeRepr *clone(const ASTContext &ctx) const;
 
   /// Visit the top-level types in the given type representation,
   /// which includes the types referenced by \c IdentTypeReprs either
@@ -392,23 +392,15 @@ private:
 ///   [Foo]
 /// \endcode
 class ArrayTypeRepr : public TypeRepr {
-  // FIXME: Tail allocation. Use bits to determine whether Base/Size are
-  // available.
   TypeRepr *Base;
-  llvm::PointerIntPair<ExprHandle *, 1, bool> SizeAndOldSyntax;
   SourceRange Brackets;
 
 public:
-  ArrayTypeRepr(TypeRepr *Base, ExprHandle *Size, SourceRange Brackets,
-                bool OldSyntax)
-    : TypeRepr(TypeReprKind::Array), Base(Base),
-      SizeAndOldSyntax(Size, OldSyntax), Brackets(Brackets) { }
+  ArrayTypeRepr(TypeRepr *Base, SourceRange Brackets)
+    : TypeRepr(TypeReprKind::Array), Base(Base), Brackets(Brackets) { }
 
   TypeRepr *getBase() const { return Base; }
-  ExprHandle *getSize() const { return SizeAndOldSyntax.getPointer(); }
   SourceRange getBrackets() const { return Brackets; }
-
-  bool usesOldSyntax() const { return SizeAndOldSyntax.getInt(); }
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Array;
@@ -416,20 +408,8 @@ public:
   static bool classof(const ArrayTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const {
-    if (usesOldSyntax())
-      return Base->getStartLoc();
-
-    return Brackets.Start;
-  }
-  SourceLoc getEndLocImpl() const {
-    // This test is necessary because the type Int[4][2] is represented as
-    // ArrayTypeRepr(ArrayTypeRepr(Int, 2), 4), so the range needs to cover both
-    // sets of brackets.
-    if (usesOldSyntax() && isa<ArrayTypeRepr>(Base))
-      return Base->getEndLoc();
-    return Brackets.End;
-  }
+  SourceLoc getStartLocImpl() const { return Brackets.Start; }
+  SourceLoc getEndLocImpl() const { return Brackets.End; }
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
@@ -781,10 +761,8 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::ProtocolComposition:
   case TypeReprKind::Tuple:
   case TypeReprKind::Fixed:
-    return true;
-
   case TypeReprKind::Array:
-    return !cast<ArrayTypeRepr>(this)->usesOldSyntax();
+    return true;
   }
   llvm_unreachable("bad TypeRepr kind");
 }

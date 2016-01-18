@@ -4,6 +4,13 @@
 import SwiftPrivate
 import StdlibUnittest
 
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 _setOverrideOSVersion(.OSX(major: 10, minor: 9, bugFix: 3))
 _setTestSuiteFailedCallback() { print("abort()") }
 
@@ -331,7 +338,7 @@ AssertionsTestSuite.test("expectFailure/UXPass")
     return ()
   }
 }
-// CHECK: [ RUN      ] Assertions.expectFailure/UXPass (XFAIL: [Custom(reason: test)])
+// CHECK: [ RUN      ] Assertions.expectFailure/UXPass ({{X}}FAIL: [Custom(reason: test)])
 // CHECK-NEXT: out>>> check failed at {{.*}}/stdlib/StdlibUnittest.swift, line
 // CHECK: out>>> expected: 1 (of type Swift.Int)
 // CHECK: out>>> actual: 2 (of type Swift.Int)
@@ -355,7 +362,7 @@ AssertionsTestSuite.test("expectFailure/XFail")
     return ()
   }
 }
-// CHECK: [ RUN      ] Assertions.expectFailure/XFail (XFAIL: [Custom(reason: test)])
+// CHECK: [ RUN      ] Assertions.expectFailure/XFail ({{X}}FAIL: [Custom(reason: test)])
 // CHECK-NEXT: out>>> check failed at {{.*}}/stdlib/StdlibUnittest.swift, line
 // CHECK: out>>> expected: true
 // CHECK: out>>> running `body` should produce an expected failure
@@ -386,7 +393,7 @@ AssertionsTestSuite.test("expectFailure/AfterFailure/XFail")
     return ()
   }
 }
-// CHECK: [ RUN      ] Assertions.expectFailure/AfterFailure/XFail (XFAIL: [Custom(reason: test)])
+// CHECK: [ RUN      ] Assertions.expectFailure/AfterFailure/XFail ({{X}}FAIL: [Custom(reason: test)])
 // CHECK-NEXT: out>>> check failed at {{.*}}/stdlib/StdlibUnittest.swift, line
 // CHECK: out>>> expected: 1 (of type Swift.Int)
 // CHECK: out>>> actual: 2 (of type Swift.Int)
@@ -419,7 +426,7 @@ AssertionsTestSuite.test("expectCrashLater/UXPass")
   expectCrashLater()
   _blackHole(array[0])
 }
-// CHECK: [ RUN      ] Assertions.expectCrashLater/UXPass (XFAIL: [Custom(reason: test)])
+// CHECK: [ RUN      ] Assertions.expectCrashLater/UXPass ({{X}}FAIL: [Custom(reason: test)])
 // CHECK: err>>> CRASHED: SIG{{.*}}
 // CHECK: [   UXPASS ] Assertions.expectCrashLater/UXPass
 
@@ -435,7 +442,7 @@ AssertionsTestSuite.test("expectCrashLater/XFail")
   .code {
   expectCrashLater()
 }
-// CHECK: [ RUN      ] Assertions.expectCrashLater/XFail (XFAIL: [Custom(reason: test)])
+// CHECK: [ RUN      ] Assertions.expectCrashLater/XFail ({{X}}FAIL: [Custom(reason: test)])
 // CHECK: expecting a crash, but the test did not crash
 // CHECK: [    XFAIL ] Assertions.expectCrashLater/XFail
 

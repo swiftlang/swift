@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -1520,7 +1520,8 @@ self.test("\(testNamePrefix).dropFirst/semantics/equivalence") {
     let s1 = makeWrappedSequence([1010, 2020, 3030, 4040].map(OpaqueValue.init))
     let s2 = makeWrappedSequence([1010, 2020, 3030, 4040].map(OpaqueValue.init))
 
-    let result1 = s1.dropFirst(1).dropFirst(1)
+    let result0 = s1.dropFirst(1)
+    let result1 = result0.dropFirst(1)
     let result2 = s2.dropFirst(2)
 
     expectEqualSequence(
@@ -1611,7 +1612,8 @@ self.test("\(testNamePrefix).prefix/semantics/equivalence") {
   let s2 = makeWrappedSequence(expected)
 
   let prefixedOnce = s1.prefix(3)
-  let prefixedTwice = s2.prefix(3).prefix(3)
+  let temp = s2.prefix(3)
+  let prefixedTwice = temp.prefix(3)
 
   expectEqualSequence(prefixedOnce, prefixedTwice) {
     extractValue($0).value == extractValue($1).value
@@ -1649,7 +1651,8 @@ self.test("\(testNamePrefix).suffix/semantics/equivalence") {
   let s2 = makeWrappedSequence(expected)
 
   let prefixedOnce = s1.suffix(3)
-  let prefixedTwice = s2.suffix(3).prefix(3)
+  let temp = s2.suffix(3)
+  let prefixedTwice = temp.prefix(3)
 
   expectEqualSequence(prefixedOnce, prefixedTwice) {
     extractValue($0).value == extractValue($1).value

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -16,7 +16,7 @@ import SwiftPrivateDarwinExtras
 
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux)
+#elseif os(Linux) || os(FreeBSD)
 import Glibc
 #endif
 
@@ -87,7 +87,7 @@ public struct SourceLocStack {
 }
 
 %{
-  TRACE = '''@autoclosure _ message: ()->String = "",
+  TRACE = '''@autoclosure _ message: () -> String = "",
     showFrame: Bool = true,
     stackTrace: SourceLocStack = SourceLocStack(),  
     file: String = __FILE__, line: UInt = __LINE__'''
@@ -166,7 +166,7 @@ public func expectationFailure(
 }
 
 public func expectEqual<T>(
-  expected: T, _ actual: T, ${TRACE}, sameValue equal: (T,T)->Bool
+  expected: T, _ actual: T, ${TRACE}, sameValue equal: (T,T) -> Bool
 ) {
   if !equal(expected, actual) {
     expectationFailure(
@@ -186,7 +186,7 @@ public func expectNotEqual<T : Equatable>(expected: T, _ actual: T, ${TRACE}) {
   }
 }
 
-// Can not write a sane set of overloads using generics because of:
+// Cannot write a sane set of overloads using generics because of:
 // <rdar://problem/17015923> Array->NSArray implicit conversion insanity
 public func expectOptionalEqual<T : Equatable>(
   expected: T, _ actual: T?, ${TRACE}
@@ -195,7 +195,7 @@ public func expectOptionalEqual<T : Equatable>(
 }
 
 public func expectOptionalEqual<T>(
-  expected: T, _ actual: T?, ${TRACE}, sameValue equal: (T,T)->Bool
+  expected: T, _ actual: T?, ${TRACE}, sameValue equal: (T,T) -> Bool
 ) {
   if (actual == nil) || !equal(expected, actual!) {
     expectationFailure(
@@ -477,15 +477,17 @@ struct _ParentProcess {
 
   internal var _runTestsInProcess: Bool
   internal var _filter: String?
+  internal var _args: [String]
 
-  init(runTestsInProcess: Bool, filter: String?) {
+  init(runTestsInProcess: Bool, args: [String], filter: String?) {
     self._runTestsInProcess = runTestsInProcess
     self._filter = filter
+    self._args = args
   }
 
   mutating func _spawnChild() {
-    let (pid, childStdinFD, childStdoutFD, childStderrFD) =
-      spawnChild([ "--stdlib-unittest-run-child" ])
+    let params = [ "--stdlib-unittest-run-child" ] + _args
+    let (pid, childStdinFD, childStdoutFD, childStderrFD) = spawnChild(params)
     _pid = pid
     _childStdin = _FDOutputStream(fd: childStdinFD)
     _childStdout = _FDInputStream(fd: childStdoutFD)
@@ -756,17 +758,58 @@ struct _ParentProcess {
   }
 }
 
-public func runAllTests() {
-  struct PersistentState {
-    static var runAllTestsWasCalled: Bool = false
-  }
+// Track repeated calls to runAllTests() and/or runNoTests().
+// Complain if a file runs no tests without calling runNoTests().
+struct PersistentState {
+  static var runAllTestsWasCalled: Bool = false
+  static var runNoTestsWasCalled: Bool = false
+  static var ranSomething: Bool = false
+  static var complaintInstalled = false
 
+  static func complainIfNothingRuns() {
+    if !complaintInstalled {
+      complaintInstalled = true
+      atexit {
+        if !PersistentState.ranSomething {
+          print("Ran no tests and runNoTests() was not called. Aborting. ")
+          print("Did you forget to call runAllTests()?")
+          _testSuiteFailedCallback()
+        }
+      }
+    }
+  }
+}
+
+
+// Call runNoTests() if you want to deliberately run no tests.
+public func runNoTests() {
   if PersistentState.runAllTestsWasCalled {
-    print("runAllTests() called twice.  It is not allowed, aborting.")
+    print("runNoTests() called after runAllTests(). Aborting.")
+    _testSuiteFailedCallback()
+    return
+  }
+  if PersistentState.runNoTestsWasCalled {
+    print("runNoTests() called twice. Aborting.")
+    _testSuiteFailedCallback()
+    return
+  }
+  PersistentState.runNoTestsWasCalled = true
+  PersistentState.ranSomething = true
+}
+
+public func runAllTests() {
+  if PersistentState.runNoTestsWasCalled {
+    print("runAllTests() called after runNoTests(). Aborting.")
+    _testSuiteFailedCallback()
+    return
+  }
+  if PersistentState.runAllTestsWasCalled {
+    print("runAllTests() called twice. Aborting.")
     _testSuiteFailedCallback()
     return
   }
   PersistentState.runAllTestsWasCalled = true
+  PersistentState.ranSomething = true
 
 #if _runtime(_ObjC)
   autoreleasepool {
@@ -782,11 +825,14 @@ public func runAllTests() {
   } else {
     var runTestsInProcess: Bool = false
     var filter: String? = nil
-    for var i = 0; i < Process.arguments.count; {
+    var args = [String]()
+    var i = 0
+    i += 1 // Skip the name of the executable.
+    while i < Process.arguments.count {
       let arg = Process.arguments[i]
       if arg == "--stdlib-unittest-in-process" {
         runTestsInProcess = true
-        ++i
+        i += 1
         continue
       }
       if arg == "--stdlib-unittest-filter" {
@@ -807,12 +853,14 @@ public func runAllTests() {
         return
       }
 
-      // FIXME: skipping unrecognized parameters.
-      ++i
+      // Pass through unparsed arguments to the child process.
+      args.append(Process.arguments[i])
+
+      i += 1
     }
 
     var parent = _ParentProcess(
-      runTestsInProcess: runTestsInProcess, filter: filter)
+      runTestsInProcess: runTestsInProcess, args: args, filter: filter)
     parent.run()
   }
 }
@@ -825,6 +873,7 @@ public class TestSuite {
       "test suite with the same name already exists")
     _allTestSuites.append(self)
     _testSuiteNameToIndex[name] = _allTestSuites.count - 1
+    PersistentState.complainIfNothingRuns()
   }
 
   public func test(
@@ -853,6 +902,7 @@ public class TestSuite {
   }
 
   func _runTest(testName: String) {
+    PersistentState.ranSomething = true
     for r in _allResettables {
       r.reset()
     }
@@ -985,6 +1035,7 @@ public enum OSVersion : CustomStringConvertible {
   case TVOSSimulator
   case watchOSSimulator
   case Linux
+  case FreeBSD
 
   public var description: String {
     switch self {
@@ -1004,6 +1055,8 @@ public enum OSVersion : CustomStringConvertible {
       return "watchOSSimulator"
     case Linux:
       return "Linux"
+    case FreeBSD:
+      return "FreeBSD"
     }
   }
 }
@@ -1036,22 +1089,22 @@ func _getOSVersion() -> OSVersion {
   return .watchOSSimulator
 #elseif os(Linux)
   return .Linux
+#elseif os(FreeBSD)
+  return .FreeBSD
 #else
-  let productName = _stdlib_getSystemVersionPlistProperty("ProductName")!
   let productVersion = _stdlib_getSystemVersionPlistProperty("ProductVersion")!
   let (major, minor, bugFix) = _parseDottedVersionTriple(productVersion)
-  switch productName {
-  case "Mac OS X":
-    return .OSX(major: major, minor: minor, bugFix: bugFix)
-  case "iPhone OS":
-    return .iOS(major: major, minor: minor, bugFix: bugFix)
-  case "Apple TVOS":
-    return .TVOS(major: major, minor: minor, bugFix: bugFix)
-  case "Watch OS":
-    return .watchOS(major: major, minor: minor, bugFix: bugFix)
-  default:
-    fatalError("could not determine OS version")
-  }
+  #if os(OSX)
+  return .OSX(major: major, minor: minor, bugFix: bugFix)
+  #elseif os(iOS)
+  return .iOS(major: major, minor: minor, bugFix: bugFix)
+  #elseif os(tvOS)
+  return .TVOS(major: major, minor: minor, bugFix: bugFix)
+  #elseif os(watchOS)
+  return .watchOS(major: major, minor: minor, bugFix: bugFix)
+  #else
+  fatalError("could not determine OS version")
+  #endif
 #endif
 }
 
@@ -1106,6 +1159,8 @@ public enum TestRunPredicate : CustomStringConvertible {
   case watchOSSimulatorAny(/*reason:*/ String)
 
   case LinuxAny(reason: String)
+
+  case FreeBSDAny(reason: String)
 
   public var description: String {
     switch self {
@@ -1174,6 +1229,9 @@ public enum TestRunPredicate : CustomStringConvertible {
 
     case LinuxAny(reason: let reason):
       return "LinuxAny(*, reason: \(reason))"
+
+    case FreeBSDAny(reason: let reason):
+      return "FreeBSDAny(*, reason: \(reason))"
     }
   }
 
@@ -1405,6 +1463,14 @@ public enum TestRunPredicate : CustomStringConvertible {
       default:
         return false
       }
+
+    case FreeBSDAny:
+      switch _getRunningOSVersion() {
+      case .FreeBSD:
+        return true
+      default:
+        return false
+      }
     }
   }
 }
@@ -1477,7 +1543,7 @@ public func checkHashable<
   Instances: CollectionType where Instances.Generator.Element : Hashable
 >(
   instances: Instances,
-  equalityOracle: (Instances.Index, Instances.Index)->Bool,
+  equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   ${TRACE}
 ) {
   checkEquatable(instances, oracle: equalityOracle, ${trace})
@@ -1498,9 +1564,9 @@ public func checkHashable<T : Hashable>(
     [lhs, rhs], equalityOracle: { expectedEqual || $0 == $1 }, ${trace})
 }
 
-% for inc, protocol, op, successor, end in (
-%  ('inc', '_Incrementable', '++', 'successor', 'end'),
-%  ('dec', 'BidirectionalIndexType', '--', 'predecessor', 'start')):
+% for inc, protocol, successor, end in (
+%  ('inc', '_Incrementable', 'successor', 'end'),
+%  ('dec', 'BidirectionalIndexType', 'predecessor', 'start')):
 
 /// Test that the elements of `instances` satisfy
 /// ${'some of ' if inc == 'dec' else ''}the semantic
@@ -1516,7 +1582,7 @@ public func check${inc.capitalize()}rementable<
   where Instances.Generator.Element : ${protocol}
 >(
   instances: Instances,
-  equalityOracle: (Instances.Index, Instances.Index)->Bool,
+  equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   ${end}Index: Instances.Generator.Element, ${TRACE}
 ) {
   checkEquatable(instances, oracle: equalityOracle, ${trace})
@@ -1529,16 +1595,6 @@ public func check${inc.capitalize()}rementable<
       // Which is the same as if we apply _${successor}InPlace
       var j = i
       j._${successor}InPlace()
-      expectEqual(j, next, ${trace})
-
-      // Post-${inc}rement works
-      j = i
-      expectEqual(j${op}, i, ${trace})
-      expectEqual(j, next, ${trace})
-
-      // Pre-${inc}rement works
-      j = i
-      expectEqual(${op}j, next, ${trace})
       expectEqual(j, next, ${trace})
     }
   }
@@ -1735,10 +1791,10 @@ internal func _checkIncrementalAdvance<
   Instances: CollectionType where Instances.Generator.Element : ForwardIndexType
 >(
   instances: Instances,
-  equalityOracle: (Instances.Index, Instances.Index)->Bool,
+  equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   limit: Instances.Generator.Element,
   sign: Instances.Generator.Element.Distance, // 1 or -1
-  next: (Instances.Generator.Element)->Instances.Generator.Element,
+  next: (Instances.Generator.Element) -> Instances.Generator.Element,
   ${TRACE}
 ) {
   for i in instances {
@@ -1769,7 +1825,7 @@ public func checkForwardIndex<
   Instances: CollectionType where Instances.Generator.Element : ForwardIndexType
 >(
   instances: Instances,
-  equalityOracle: (Instances.Index, Instances.Index)->Bool,
+  equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   endIndex: Instances.Generator.Element, ${TRACE}
 ) {
   typealias Index = Instances.Generator.Element
@@ -1795,7 +1851,7 @@ public func checkBidirectionalIndex<
   where Instances.Generator.Element : BidirectionalIndexType
 >(
   instances: Instances,
-  equalityOracle: (Instances.Index, Instances.Index)->Bool,
+  equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   startIndex: Instances.Generator.Element, 
   endIndex: Instances.Generator.Element,
   ${TRACE}
@@ -1919,15 +1975,16 @@ public func checkSequence<
 
   // Check that _initializeTo does the right thing if we can do so
   // without destroying the sequence.
-  sequence._preprocessingPass { (sequence)->Void in 
+  sequence._preprocessingPass { (sequence) -> Void in 
     var count = 0
-    for _ in sequence { ++count }
+    for _ in sequence { count += 1 }
     let buf = UnsafeMutablePointer<S.Generator.Element>.alloc(count)
     let end = sequence._initializeTo(buf)
     expectTrue(end == buf + count, "_initializeTo returned the wrong value")
     var j = expected.startIndex
     for i in 0..<(end - buf) {
-      expectTrue(sameValue(expected[j++], buf[i]))
+      expectTrue(sameValue(expected[j], buf[i]))
+      j = j.successor()
     }
     buf.destroy(end - buf)
     buf.dealloc(count)
@@ -2012,12 +2069,12 @@ public func check${traversal}Collection<
     var i = i
     if n < 0 {
       for _ in 0 ..< -(n.toIntMax()) {
-        --i
+        i -= 1
       }
     }
     else {
       for _ in 0..<n.toIntMax() {
-        ++i
+        i += 1
       }
     }
     return i
@@ -2063,9 +2120,9 @@ public func check${traversal}Collection<
       for i in 0..<allIndices.count-1 {
         let successor1 = allIndices[i].successor()
         var successor2 = allIndices[i]
-        successor2++
+        successor2 = successor2.successor()
         var successor3 = allIndices[i]
-        ++successor3
+        successor3 = successor3.successor()
         for s in [ successor1, successor2, successor3 ] {
           expectEqual(allIndices[i + 1], s, ${trace})
           expectEqual(
@@ -2076,9 +2133,9 @@ public func check${traversal}Collection<
       for i in 1..<allIndices.count {
         let predecessor1 = allIndices[i].predecessor()
         var predecessor2 = allIndices[i]
-        predecessor2--
+        predecessor2 = predecessor2.predecessor()
         var predecessor3 = allIndices[i]
-        --predecessor3
+        predecessor3 = predecessor3.predecessor()
         for p in [ predecessor1, predecessor2, predecessor3 ] {
           expectEqual(allIndices[i - 1], p, ${trace})
           expectEqual(
@@ -2087,8 +2144,8 @@ public func check${traversal}Collection<
       }
       for i in 1..<allIndices.count {
         var index = allIndices[i]
-        --index
-        ++index
+        index = index.predecessor()
+        index = index.successor()
         expectEqual(allIndices[i], index, ${trace})
         expectEqual(
           expectedArray[i], collection[index], ${trace}, sameValue: sameValue)
@@ -2159,29 +2216,29 @@ public func checkSliceableWithBidirectionalIndex<
   var start = sliceable.startIndex
   for startNumericIndex in 0...expectedArray.count {
     if start != sliceable.endIndex {
-      ++start
-      --start
-      ++start
-      --start
+      start = start.successor()
+      start = start.predecessor()
+      start = start.successor()
+      start = start.predecessor()
     }
     var end = start
     for endNumericIndex in startNumericIndex...expectedArray.count {
       if end != sliceable.endIndex {
-        ++end
-        --end
-        ++end
-        --end
+        end = end.successor()
+        end = end.predecessor()
+        end = end.successor()
+        end = end.predecessor()
       }
       let expectedSlice = expectedArray[startNumericIndex..<endNumericIndex]
       let slice = sliceable[start..<end]
       checkBidirectionalCollection(expectedSlice, slice, ${trace})
 
       if end != sliceable.endIndex {
-        ++end
+        end = end.successor()
       }
     }
     if start != sliceable.endIndex {
-      ++start
+      start = start.successor()
     }
   }
 }
@@ -2202,8 +2259,8 @@ public func checkRangeReplaceable<
 where
   C.Generator.Element : Equatable, C.Generator.Element == N.Generator.Element
 >(
-  makeCollection: ()->C,
-  _ makeNewValues: (Int)->N
+  makeCollection: () -> C,
+  _ makeNewValues: (Int) -> N
 ) {
   typealias A = C
 
@@ -2286,7 +2343,7 @@ public func expectEqualSequence<
   Actual: SequenceType
   where Expected.Generator.Element == Actual.Generator.Element
 >(expected: Expected, _ actual: Actual, ${TRACE},
-  sameValue: (Expected.Generator.Element, Expected.Generator.Element)->Bool) {
+  sameValue: (Expected.Generator.Element, Expected.Generator.Element) -> Bool) {
   
   if !expected.elementsEqual(actual, isEquivalent: sameValue) {
     expectationFailure("expected elements: \"\(expected)\"\n"
@@ -2505,10 +2562,11 @@ public struct MinimalGenerator<T> : GeneratorType {
       if isConsumed {
         expectUnreachable("next() was called on a consumed generator")
       }
-      ++_privateState.returnedNilCounter
+      _privateState.returnedNilCounter += 1
       return nil
     }
-    return _sharedState.data[_sharedState.i++]
+    defer { _sharedState.i += 1 }
+    return _sharedState.data[_sharedState.i]
   }
 
   public var isConsumed: Bool {
@@ -2548,7 +2606,7 @@ public enum UnderestimateCountBehavior {
 }
 
 public protocol StrictSequenceType : SequenceType {
-  typealias Element
+  associatedtype Element
   init(base: MinimalSequence<Element>)
   var base: MinimalSequence<Element> { get }
 }
@@ -2762,7 +2820,8 @@ public struct _CollectionState : Equatable, Hashable {
   }
 
   internal init(newRootStateForElementCount count: Int) {
-    self._id = _CollectionState._nextUnusedState++
+    self._id = _CollectionState._nextUnusedState
+    _CollectionState._nextUnusedState += 1
     self._elementsLastMutatedStateIds =
       Array(Repeat(count: count, repeatedValue: self._id))
   }
@@ -2818,7 +2877,8 @@ internal struct _CollectionStateTransition {
     previousState: _CollectionState,
     operation: _CollectionOperation
   ) {
-    let nextStateId = _CollectionState._nextUnusedState++
+    let nextStateId = _CollectionState._nextUnusedState
+    _CollectionState._nextUnusedState += 1
     let newElementStates = operation._applyTo(
       previousState._elementsLastMutatedStateIds, nextStateId: nextStateId)
     let nextState = _CollectionState(
@@ -3087,7 +3147,7 @@ extension MinimalBidirectionalIndex : _MinimalIndexType {
 %   StrictIndexType = 'Strict{}IndexType'.format(Traversal)
 
 public protocol ${StrictIndexType} : ${Traversal}IndexType {
-  typealias Base : ${Traversal}IndexType
+  associatedtype Base : ${Traversal}IndexType
   init(_ base: Base)
   var base: Base { get set }
 
@@ -3135,11 +3195,11 @@ public struct ${DefaultedIndex}: ${StrictIndexType} {
   }
 
   public func logSuccessor() {
-    ${DefaultedIndex}.timesSuccessorCalled.value++
+    ${DefaultedIndex}.timesSuccessorCalled.value += 1
   }
 
   public func logPredecessor() {
-    ${DefaultedIndex}.timesPredecessorCalled.value++
+    ${DefaultedIndex}.timesPredecessorCalled.value += 1
   }
 
 % if Traversal == 'RandomAccess':
@@ -3293,7 +3353,7 @@ extension MinimalRandomAccessIndex : _MinimalIndexType {
 %     Index = 'Minimal%sIndex' % traversal
 
 public protocol ${Protocol} : ${'MutableCollectionType' if mutable else 'CollectionType'} {
-  typealias Element
+  associatedtype Element
   init(base: ${Self}<Element>)
 %     if mutable:
   var base: ${Self}<Element> { get set }
@@ -3427,7 +3487,7 @@ public struct ${Self}<T> : ${'MutableCollectionType' if mutable else 'Collection
 %   Index = 'Minimal%sIndex' % traversal
 
 public protocol ${Protocol} : RangeReplaceableCollectionType {
-  typealias Element
+  associatedtype Element
   init(base: ${Self}<Element>)
   var base: ${Self}<Element> { get set }
 }
@@ -3689,7 +3749,7 @@ public func == (
   lhs: MinimalEquatableValue,
   rhs: MinimalEquatableValue
 ) -> Bool {
-  ++MinimalEquatableValue.timesEqualEqualWasCalled
+  MinimalEquatableValue.timesEqualEqualWasCalled += 1
   return lhs.value == rhs.value
 }
 
@@ -3718,7 +3778,7 @@ public struct ${Self} : Equatable, Hashable {
   }
 
   public var hashValue: Int {
-    ++${Self}.timesHashValueWasCalled
+    ${Self}.timesHashValueWasCalled += 1
     return value.hashValue
   }
 }
@@ -3727,7 +3787,7 @@ public func == (
   lhs: ${Self},
   rhs: ${Self}
 ) -> Bool {
-  ++${Self}.timesEqualEqualWasCalled
+  ${Self}.timesEqualEqualWasCalled += 1
   return lhs.value == rhs.value
 }
 
@@ -3764,7 +3824,7 @@ public func == (
   lhs: MinimalComparableValue,
   rhs: MinimalComparableValue
 ) -> Bool {
-  ++MinimalComparableValue.timesEqualEqualWasCalled.value
+  MinimalComparableValue.timesEqualEqualWasCalled.value += 1
   return MinimalComparableValue.equalImpl.value(lhs.value, rhs.value)
 }
 
@@ -3772,7 +3832,7 @@ public func < (
   lhs: MinimalComparableValue,
   rhs: MinimalComparableValue
 ) -> Bool {
-  ++MinimalComparableValue.timesLessWasCalled.value
+  MinimalComparableValue.timesLessWasCalled.value += 1
   return MinimalComparableValue.lessImpl.value(lhs.value, rhs.value)
 }
 

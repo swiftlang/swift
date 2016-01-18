@@ -34,7 +34,7 @@ struct AnyStream<T : SequenceType> {
     func next() -> Element? {
       let result = (index, elements.next())
       if result.1 == nil { return .None }
-      ++index
+      index += 1
       return (result.0, result.1!)
     }
   }

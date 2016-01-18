@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -49,7 +49,7 @@ public struct _FDInputStream {
       _buffer.reserveCapacity(minFree - bufferFree)
       while bufferFree < minFree {
         _buffer.append(0)
-        ++bufferFree
+        bufferFree += 1
       }
     }
     let readResult: __swift_ssize_t = _buffer.withUnsafeMutableBufferPointer {

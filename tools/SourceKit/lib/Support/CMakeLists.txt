@@ -7,11 +7,11 @@ set(SourceKitSupport_sources
   UIDRegistry.cpp
 )
 
-if (APPLE)
+if(APPLE)
   list(APPEND SourceKitSupport_sources
     Concurrency-Mac.cpp
   )
-endif (APPLE)
+endif()
 
 add_sourcekit_library(SourceKitSupport
   ${SourceKitSupport_sources}

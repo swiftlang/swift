@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -75,6 +75,14 @@ static SILValue stripSinglePredecessorArgs(SILValue V) {
     TermInst *PredTI = Pred->getTerminator();
 
     // And attempt to find our matching argument.
+    //
+    // *NOTE* We can only strip things here if we know that there is no semantic
+    // change in terms of upcasts/downcasts/enum extraction since this is used
+    // by other routines here. This means that we can only look through
+    // cond_br/br.
+    //
+    // For instance, routines that use stripUpcasts() do not want to strip off a
+    // downcast that results from checked_cast_br.
     if (auto *BI = dyn_cast<BranchInst>(PredTI)) {
       V = BI->getArg(A->getIndex());
       continue;
@@ -149,6 +157,7 @@ SILValue SILValue::stripAddressProjections() {
     case ValueKind::StructElementAddrInst:
     case ValueKind::TupleElementAddrInst:
     case ValueKind::RefElementAddrInst:
+    case ValueKind::ProjectBoxInst:
     case ValueKind::UncheckedTakeEnumDataAddrInst:
       V = cast<SILInstruction>(V.getDef())->getOperand(0);
       continue;
@@ -210,11 +219,11 @@ void Operand::hoistAddressProjections(SILInstruction *InsertBefore,
   while (true) {
     SILValue Incoming = stripSinglePredecessorArgs(V);
 
-    // Forward the incoming arg from a single predeccessor.
+    // Forward the incoming arg from a single predecessor.
     if (V != Incoming) {
       if (V == get()) {
         // If we are the operand itself set the operand to the incoming
-        // arugment.
+        // argument.
         set(Incoming);
         V = Incoming;
       } else {

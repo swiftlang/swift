@@ -15,18 +15,3 @@ public typealias SKColor = UIColor
   override init() { _sanityCheckFailure("don't touch me") }
   @objc func _copyImageData() -> NSData! { return nil }
 }
-
-extension SKNode {
-  public subscript (name: String) -> [SKNode] {
-    // Note: Don't stomp on objectForKeyedSubscript:
-    @objc(_swiftObjectForKeyedSubscript:) get {
-       var nodes = [SKNode]()
-       enumerateChildNodesWithName(name) { node, stop in
-         nodes.append(node)
-       }
-
-       return nodes
-    }
-  }
-}
-

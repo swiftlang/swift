@@ -2,17 +2,17 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 //
 //  This file implements declaration name demangling in Swift.
 //
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/Fallthrough.h"
@@ -577,6 +577,18 @@ private:
         DEMANGLE_CHILD_OR_RETURN(witnessTable, ProtocolConformance);
         return witnessTable;
       }
+      if (Mangled.nextIf('G')) {
+        auto witnessTable =
+            NodeFactory::create(Node::Kind::GenericProtocolWitnessTable);
+        DEMANGLE_CHILD_OR_RETURN(witnessTable, ProtocolConformance);
+        return witnessTable;
+      }
+      if (Mangled.nextIf('I')) {
+        auto witnessTable = NodeFactory::create(
+            Node::Kind::GenericProtocolWitnessTableInstantiationFunction);
+        DEMANGLE_CHILD_OR_RETURN(witnessTable, ProtocolConformance);
+        return witnessTable;
+      }
       if (Mangled.nextIf('l')) {
         auto accessor =
           NodeFactory::create(Node::Kind::LazyProtocolWitnessTableAccessor);
@@ -597,17 +609,20 @@ private:
         DEMANGLE_CHILD_OR_RETURN(tableTemplate, ProtocolConformance);
         return tableTemplate;
       }
-      if (Mangled.nextIf('D')) {
-        auto tableGenerator = NodeFactory::create(
-            Node::Kind::DependentProtocolWitnessTableGenerator);
-        DEMANGLE_CHILD_OR_RETURN(tableGenerator, ProtocolConformance);
-        return tableGenerator;
+      if (Mangled.nextIf('t')) {
+        auto accessor = NodeFactory::create(
+            Node::Kind::AssociatedTypeMetadataAccessor);
+        DEMANGLE_CHILD_OR_RETURN(accessor, ProtocolConformance);
+        DEMANGLE_CHILD_OR_RETURN(accessor, DeclName);
+        return accessor;
       }
-      if (Mangled.nextIf('d')) {
-        auto tableTemplate = NodeFactory::create(
-            Node::Kind::DependentProtocolWitnessTableTemplate);
-        DEMANGLE_CHILD_OR_RETURN(tableTemplate, ProtocolConformance);
-        return tableTemplate;
+      if (Mangled.nextIf('T')) {
+        auto accessor = NodeFactory::create(
+            Node::Kind::AssociatedTypeWitnessTableAccessor);
+        DEMANGLE_CHILD_OR_RETURN(accessor, ProtocolConformance);
+        DEMANGLE_CHILD_OR_RETURN(accessor, DeclName);
+        DEMANGLE_CHILD_OR_RETURN(accessor, ProtocolName);
+        return accessor;
       }
       return nullptr;
     }
@@ -784,7 +799,12 @@ private:
         if (!demangleFuncSigSpecializationClosureProp(param))
           return nullptr;
       } else if (Mangled.nextIf("i_")) {
-        auto result = FUNCSIGSPEC_CREATE_PARAM_KIND(InOutToValue);
+        auto result = FUNCSIGSPEC_CREATE_PARAM_KIND(BoxToValue);
+        if (!result)
+          return nullptr;
+        param->addChild(result);
+      } else if (Mangled.nextIf("k_")) {
+        auto result = FUNCSIGSPEC_CREATE_PARAM_KIND(BoxToStack);
         if (!result)
           return nullptr;
         param->addChild(result);
@@ -1878,6 +1898,16 @@ private:
       type_application->addChild(type_list);
       return type_application;
     }
+    if (c == 'X') {
+      if (Mangled.nextIf('b')) {
+        NodePointer type = demangleType();
+        if (!type)
+          return nullptr;
+        NodePointer boxType = NodeFactory::create(Node::Kind::SILBoxType);
+        boxType->addChild(type);
+        return boxType;
+      }
+    }
     if (c == 'K') {
       return demangleFunctionType(Node::Kind::AutoClosureType);
     }
@@ -2326,6 +2356,7 @@ private:
     case Node::Kind::QualifiedArchetype:
     case Node::Kind::ReturnType:
     case Node::Kind::SelfTypeRef:
+    case Node::Kind::SILBoxType:
     case Node::Kind::Structure:
     case Node::Kind::TupleElementName:
     case Node::Kind::Type:
@@ -2336,6 +2367,8 @@ private:
 
     case Node::Kind::Allocator:
     case Node::Kind::ArgumentTuple:
+    case Node::Kind::AssociatedTypeMetadataAccessor:
+    case Node::Kind::AssociatedTypeWitnessTableAccessor:
     case Node::Kind::AutoClosureType:
     case Node::Kind::CFunctionPointer:
     case Node::Kind::Constructor:
@@ -2347,8 +2380,6 @@ private:
     case Node::Kind::DependentGenericParamCount:
     case Node::Kind::DependentGenericConformanceRequirement:
     case Node::Kind::DependentGenericSameTypeRequirement:
-    case Node::Kind::DependentProtocolWitnessTableGenerator:
-    case Node::Kind::DependentProtocolWitnessTableTemplate:
     case Node::Kind::Destructor:
     case Node::Kind::DidSet:
     case Node::Kind::DirectMethodReferenceAttribute:
@@ -2365,6 +2396,8 @@ private:
     case Node::Kind::FunctionSignatureSpecializationParamPayload:
     case Node::Kind::FunctionType:
     case Node::Kind::Generics:
+    case Node::Kind::GenericProtocolWitnessTable:
+    case Node::Kind::GenericProtocolWitnessTableInstantiationFunction:
     case Node::Kind::GenericSpecialization:
     case Node::Kind::GenericSpecializationParam:
     case Node::Kind::GenericType:
@@ -2634,7 +2667,8 @@ unsigned NodePrinter::printFunctionSigSpecializationParam(NodePointer pointer,
   unsigned V = firstChild->getIndex();
   auto K = FunctionSigSpecializationParamKind(V);
   switch (K) {
-  case FunctionSigSpecializationParamKind::InOutToValue:
+  case FunctionSigSpecializationParamKind::BoxToValue:
+  case FunctionSigSpecializationParamKind::BoxToStack:
     print(pointer->getChild(Idx++));
     return Idx;
   case FunctionSigSpecializationParamKind::ConstantPropFunction:
@@ -2838,10 +2872,10 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     assert((pointer->getNumChildren() == 2 || pointer->getNumChildren() == 3)
            && "Extension expects 2 or 3 children.");
     if (Options.QualifyEntities && Options.DisplayExtensionContexts) {
-      Printer << "ext.";
+      Printer << "(extension in ";
       // Print the module where extension is defined.
       print(pointer->getChild(0), true);
-      Printer << ".";
+      Printer << "):";
     }
     print(pointer->getChild(1), asContext);
     if (pointer->getNumChildren() == 3)
@@ -3099,8 +3133,11 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
       return;
 
     switch (FunctionSigSpecializationParamKind(raw)) {
-    case FunctionSigSpecializationParamKind::InOutToValue:
-      Printer << "Value Promoted from InOut";
+    case FunctionSigSpecializationParamKind::BoxToValue:
+      Printer << "Value Promoted from Box";
+      break;
+    case FunctionSigSpecializationParamKind::BoxToStack:
+      Printer << "Stack Promoted from Box";
       break;
     case FunctionSigSpecializationParamKind::ConstantPropFunction:
       Printer << "Constant Propagated Function";
@@ -3145,14 +3182,6 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::PostfixOperator:
     Printer << pointer->getText() << " postfix";
     return;
-  case Node::Kind::DependentProtocolWitnessTableGenerator:
-    Printer << "dependent protocol witness table generator for ";
-    print(pointer->getFirstChild());
-    return;
-  case Node::Kind::DependentProtocolWitnessTableTemplate:
-    Printer << "dependent protocol witness table template for ";
-    print(pointer->getFirstChild());
-    return;
   case Node::Kind::LazyProtocolWitnessTableAccessor:
     Printer << "lazy protocol witness table accessor for type ";
     print(pointer->getChild(0));
@@ -3171,6 +3200,14 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     return;
   case Node::Kind::ProtocolWitnessTable:
     Printer << "protocol witness table for ";
+    print(pointer->getFirstChild());
+    return;
+  case Node::Kind::GenericProtocolWitnessTable:
+    Printer << "generic protocol witness table for ";
+    print(pointer->getFirstChild());
+    return;
+  case Node::Kind::GenericProtocolWitnessTableInstantiationFunction:
+    Printer << "instantiation function for generic protocol witness table for ";
     print(pointer->getFirstChild());
     return;
   case Node::Kind::ProtocolWitness: {
@@ -3259,6 +3296,20 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     Printer << "lazy cache variable for type metadata for ";
     print(pointer->getChild(0));
     return;
+  case Node::Kind::AssociatedTypeMetadataAccessor:
+    Printer << "associated type metadata accessor for ";
+    print(pointer->getChild(1));
+    Printer << " in ";
+    print(pointer->getChild(0));
+    return;
+  case Node::Kind::AssociatedTypeWitnessTableAccessor:
+    Printer << "associated type witness table accessor for ";
+    print(pointer->getChild(1));
+    Printer << " : ";
+    print(pointer->getChild(2));
+    Printer << " in ";
+    print(pointer->getChild(0));
+    return;
   case Node::Kind::NominalTypeDescriptor:
     Printer << "nominal type descriptor for ";
     print(pointer->getChild(0));
@@ -3293,6 +3344,12 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::ObjCBlock: {
     Printer << "@convention(block) ";
     printFunctionType(pointer);
+    return;
+  }
+  case Node::Kind::SILBoxType: {
+    Printer << "@box ";
+    NodePointer type = pointer->getChild(0);
+    print(type);
     return;
   }
   case Node::Kind::Metatype: {

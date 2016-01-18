@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -50,18 +50,6 @@ SILUndef *SILUndef::get(SILType Ty, SILModule *M) {
   return Entry;
 }
 
-static FormalLinkage
-getGenericClauseLinkage(ArrayRef<GenericTypeParamDecl *> params) {
-  FormalLinkage result = FormalLinkage::Top;
-  for (auto &param : params) {
-    for (auto proto : param->getConformingProtocols(nullptr))
-      result ^= getTypeLinkage(CanType(proto->getDeclaredType()));
-    if (auto superclass = param->getSuperclass())
-      result ^= getTypeLinkage(superclass->getCanonicalType());
-  }
-  return result;
-}
-
 FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
   const DeclContext *fileContext = D->getDeclContext()->getModuleScopeContext();
 
@@ -98,15 +86,11 @@ FormalLinkage swift::getTypeLinkage(CanType type) {
     CanType type = CanType(_type);
 
     // For any nominal type reference, look at the type declaration.
-    if (auto nominal = type->getAnyNominal()) {
+    if (auto nominal = type->getAnyNominal())
       result ^= getDeclLinkage(nominal);
 
-    // For polymorphic function types, look at the generic parameters.
-    // FIXME: findIf should do this, once polymorphic function types can be
-    // canonicalized and re-formed properly.
-    } else if (auto polyFn = dyn_cast<PolymorphicFunctionType>(type)) {
-      result ^= getGenericClauseLinkage(polyFn->getGenericParameters());
-    }
+    assert(!isa<PolymorphicFunctionType>(type) &&
+           "Don't expect a polymorphic function type here");
 
     return false; // continue searching
   });

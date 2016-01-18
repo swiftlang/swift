@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -15,6 +15,7 @@
 #include "ManagedValue.h"
 #include "Scope.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/Basic/Fallthrough.h"
 
 using namespace swift;
@@ -28,13 +29,13 @@ SILValue SILGenFunction::emitSelfDecl(VarDecl *selfDecl) {
   SILLocation PrologueLoc(selfDecl);
   PrologueLoc.markAsPrologue();
   unsigned ArgNo = 1; // Hardcoded for destructors.
-  B.createDebugValue(PrologueLoc, selfValue, ArgNo);
+  B.createDebugValue(PrologueLoc, selfValue, {selfDecl->isLet(), ArgNo});
   return selfValue;
 }
 
 namespace {
 
-/// Cleanup that writes back to a inout argument on function exit.
+/// Cleanup that writes back to an inout argument on function exit.
 class CleanupWriteBackToInOut : public Cleanup {
   VarDecl *var;
   SILValue inoutAddr;
@@ -51,7 +52,10 @@ public:
                          IsNotTake, IsNotInitialization);
   }
 };
+} // end anonymous namespace
 
+  
+namespace {
 class StrongReleaseCleanup : public Cleanup {
   SILValue box;
 public:
@@ -60,7 +64,10 @@ public:
     gen.B.emitStrongReleaseAndFold(l, box);
   }
 };
+} // end anonymous namespace
 
+
+namespace {
 class EmitBBArguments : public CanTypeVisitor<EmitBBArguments,
                                               /*RetTy*/ ManagedValue>
 {
@@ -96,9 +103,10 @@ public:
       // An unowned parameter is passed at +0, like guaranteed, but it isn't
       // kept alive by the caller, so we need to retain and manage it
       // regardless.
-      return std::move(gen.emitManagedRetain(loc, arg));
+      return gen.emitManagedRetain(loc, arg);
 
     case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_InoutAliasable:
       // An inout parameter is +0 and guaranteed, but represents an lvalue.
       return ManagedValue::forLValue(arg);
 
@@ -198,12 +206,14 @@ public:
     }
   }
 };
+} // end anonymous namespace
 
-/// A visitor for traversing a pattern, creating
-/// SILArguments, and binding variables to the argument names.
-struct ArgumentInitVisitor :
-  public PatternVisitor<ArgumentInitVisitor, /*RetTy=*/ void>
-{
+  
+namespace {
+
+/// A helper for creating SILArguments and binding variables to the argument
+/// names.
+struct ArgumentInitHelper {
   SILGenFunction &gen;
   SILFunction &f;
   SILGenBuilder &initB;
@@ -213,7 +223,7 @@ struct ArgumentInitVisitor :
   ArrayRef<SILParameterInfo> parameters;
   unsigned ArgNo = 0;
 
-  ArgumentInitVisitor(SILGenFunction &gen, SILFunction &f)
+  ArgumentInitHelper(SILGenFunction &gen, SILFunction &f)
     : gen(gen), f(f), initB(gen.B),
       parameters(f.getLoweredFunctionType()->getParameters()) {
     // If we have an out parameter, skip it.
@@ -228,7 +238,6 @@ struct ArgumentInitVisitor :
 
     // Create an RValue by emitting destructured arguments into a basic block.
     CanType canTy = ty->getCanonicalType();
-
     return EmitBBArguments(gen, parent, l, /*functionArgs*/ true,
                            parameters).visit(canTy);
   }
@@ -255,7 +264,7 @@ struct ArgumentInitVisitor :
       if (isa<BuiltinUnsafeValueBufferType>(objectType)) {
         // FIXME: mark a debug location?
         gen.VarLocs[vd] = SILGenFunction::VarLoc::get(address);
-        gen.B.createDebugValueAddr(loc, address, ArgNo);
+        gen.B.createDebugValueAddr(loc, address, {vd->isLet(), ArgNo});
         return;
       }
 
@@ -277,9 +286,9 @@ struct ArgumentInitVisitor :
       // argument if we're responsible for it.
       gen.VarLocs[vd] = SILGenFunction::VarLoc::get(argrv.getValue());
       if (argrv.getType().isAddress())
-        gen.B.createDebugValueAddr(loc, argrv.getValue(), ArgNo);
+        gen.B.createDebugValueAddr(loc, argrv.getValue(), {vd->isLet(), ArgNo});
       else
-        gen.B.createDebugValue(loc, argrv.getValue(), ArgNo);
+        gen.B.createDebugValue(loc, argrv.getValue(), {vd->isLet(), ArgNo});
     } else {
       // If the variable is mutable, we need to copy or move the argument
       // value to local mutable memory.
@@ -294,142 +303,54 @@ struct ArgumentInitVisitor :
         argrv.copyInto(gen, initVar->getAddress(), loc);
 
       initVar->finishInitialization(gen);
-
     }
   }
 
-  // Paren, Typed, and Var patterns are no-ops. Just look through them.
-  void visitParenPattern(ParenPattern *P) {
-    visit(P->getSubPattern());
-  }
-  void visitTypedPattern(TypedPattern *P) {
-    visit(P->getSubPattern());
-  }
-  void visitVarPattern(VarPattern *P) {
-    visit(P->getSubPattern());
-  }
-
-  void visitTuplePattern(TuplePattern *P) {
-    // Destructure tuples into their elements.
-    for (size_t i = 0, size = P->getNumElements(); i < size; ++i)
-      visit(P->getElement(i).getPattern());
-  }
-
-  void visitAnyPattern(AnyPattern *P) {
-    llvm_unreachable("unnamed parameters should have a ParamDecl");
-  }
-
-  void visitNamedPattern(NamedPattern *P) {
+  void emitParam(ParamDecl *PD) {
     ++ArgNo;
-    auto PD = P->getDecl();
-    if (!PD->hasName()) {
-      // A value bound to _ is unused and can be immediately released.
-      Scope discardScope(gen.Cleanups, CleanupLocation(P));
-      makeArgument(P->getType(), &*f.begin(), PD);
-      // Popping the scope destroys the value.
-    } else {
-      makeArgumentIntoBinding(P->getType(), &*f.begin(), PD);
+    if (PD->hasName()) {
+      makeArgumentIntoBinding(PD->getType(), &*f.begin(), PD);
+      return;
     }
-  }
-
-#define PATTERN(Id, Parent)
-#define REFUTABLE_PATTERN(Id, Parent) \
-  void visit##Id##Pattern(Id##Pattern *) { \
-    llvm_unreachable("pattern not valid in argument binding"); \
-  }
-#include "swift/AST/PatternNodes.def"
-};
-
-// Unlike the ArgumentInitVisitor, this visitor generates arguments but leaves
-// them destructured instead of storing them to lvalues so that the
-// argument set can be easily forwarded to another function.
-class ArgumentForwardVisitor
-  : public PatternVisitor<ArgumentForwardVisitor>
-{
-  SILGenFunction &gen;
-  SmallVectorImpl<SILValue> &args;
-public:
-  ArgumentForwardVisitor(SILGenFunction &gen,
-                         SmallVectorImpl<SILValue> &args)
-    : gen(gen), args(args) {}
-
-  void makeArgument(Type ty, VarDecl *varDecl) {
-    assert(ty && "no type?!");
-    // Destructure tuple arguments.
-    if (TupleType *tupleTy = ty->getAs<TupleType>()) {
-      for (auto fieldType : tupleTy->getElementTypes())
-        makeArgument(fieldType, varDecl);
-    } else {
-      SILValue arg =
-        new (gen.F.getModule()) SILArgument(gen.F.begin(),
-                                            gen.getLoweredType(ty),
-                                            varDecl);
-      args.push_back(arg);
-    }
-  }
-
-  void visitParenPattern(ParenPattern *P) {
-    visit(P->getSubPattern());
-  }
-  void visitVarPattern(VarPattern *P) {
-    visit(P->getSubPattern());
-  }
-
-  void visitTypedPattern(TypedPattern *P) {
-    // FIXME: work around a bug in visiting the "self" argument of methods
-    if (auto NP = dyn_cast<NamedPattern>(P->getSubPattern()))
-      makeArgument(P->getType(), NP->getDecl());
+    
+    ManagedValue argrv = makeArgument(PD->getType(), &*f.begin(), PD);
+    // Emit debug information for the argument.
+    SILLocation loc(PD);
+    loc.markAsPrologue();
+    if (argrv.getType().isAddress())
+      gen.B.createDebugValueAddr(loc, argrv.getValue(), {PD->isLet(), ArgNo});
     else
-      visit(P->getSubPattern());
-  }
+      gen.B.createDebugValue(loc, argrv.getValue(), {PD->isLet(), ArgNo});
 
-  void visitTuplePattern(TuplePattern *P) {
-    for (auto &elt : P->getElements())
-      visit(elt.getPattern());
+    // A value bound to _ is unused and can be immediately released.
+    Scope discardScope(gen.Cleanups, CleanupLocation(PD));
+    // Popping the scope destroys the value.
   }
-
-  void visitAnyPattern(AnyPattern *P) {
-    llvm_unreachable("unnamed parameters should have a ParamDecl");
-  }
-
-  void visitNamedPattern(NamedPattern *P) {
-    makeArgument(P->getType(), P->getDecl());
-  }
-
-#define PATTERN(Id, Parent)
-#define REFUTABLE_PATTERN(Id, Parent) \
-  void visit##Id##Pattern(Id##Pattern *) {                       \
-    llvm_unreachable("pattern not valid in argument binding");   \
-  }
-#include "swift/AST/PatternNodes.def"
 };
-
 } // end anonymous namespace
 
-void SILGenFunction::bindParametersForForwarding(Pattern *pattern,
-                                     SmallVectorImpl<SILValue> &parameters) {
-  ArgumentForwardVisitor(*this, parameters).visit(pattern);
+  
+static void makeArgument(Type ty, ParamDecl *decl,
+                         SmallVectorImpl<SILValue> &args, SILGenFunction &gen) {
+  assert(ty && "no type?!");
+  
+  // Destructure tuple arguments.
+  if (TupleType *tupleTy = ty->getAs<TupleType>()) {
+    for (auto fieldType : tupleTy->getElementTypes())
+      makeArgument(fieldType, decl, args, gen);
+  } else {
+    auto arg = new (gen.F.getModule()) SILArgument(gen.F.begin(),
+                                                   gen.getLoweredType(ty),decl);
+    args.push_back(arg);
+  }
 }
 
-/// Tuple values captured by a closure are passed as individual arguments to the
-/// SILFunction since SILFunctionType canonicalizes away tuple types.
-static SILValue
-emitReconstitutedConstantCaptureArguments(SILType ty,
-                                          ValueDecl *capture,
-                                          SILGenFunction &gen) {
-  auto TT = ty.getAs<TupleType>();
-  if (!TT)
-    return new (gen.SGM.M) SILArgument(gen.F.begin(), ty, capture);
 
-  SmallVector<SILValue, 4> Elts;
-  for (unsigned i = 0, e = TT->getNumElements(); i != e; ++i) {
-    auto EltTy = ty.getTupleElementType(i);
-    auto EV =
-      emitReconstitutedConstantCaptureArguments(EltTy, capture, gen);
-    Elts.push_back(EV);
+void SILGenFunction::bindParametersForForwarding(const ParameterList *params,
+                                     SmallVectorImpl<SILValue> &parameters) {
+  for (auto param : *params) {
+    makeArgument(param->getType(), param, parameters, *this);
   }
-
-  return gen.B.createTuple(capture, ty, Elts);
 }
 
 static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
@@ -444,10 +365,9 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
 
   case CaptureKind::Constant: {
     auto &lowering = gen.getTypeLowering(VD->getType());
-    // Constant decls are captured by value.  If the captured value is a tuple
-    // value, we need to reconstitute it before sticking it in VarLocs.
+    // Constant decls are captured by value.
     SILType ty = lowering.getLoweredType();
-    SILValue val = emitReconstitutedConstantCaptureArguments(ty, VD, gen);
+    SILValue val = new (gen.SGM.M) SILArgument(gen.F.begin(), ty, VD);
 
     // If the original variable was settable, then Sema will have treated the
     // VarDecl as an lvalue, even in the closure's use.  As such, we need to
@@ -463,23 +383,27 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
     if (auto *AllocStack = dyn_cast<AllocStackInst>(val))
       AllocStack->setArgNo(ArgNo);
     else 
-      gen.B.createDebugValue(Loc, val, ArgNo);
-    if (!lowering.isTrivial())
+      gen.B.createDebugValue(Loc, val, {/*Constant*/true, ArgNo});
+
+    // TODO: Closure contexts should always be guaranteed.
+    if (!gen.SGM.M.getOptions().EnableGuaranteedClosureContexts
+        && !lowering.isTrivial())
       gen.enterDestroyCleanup(val);
     break;
   }
 
   case CaptureKind::Box: {
-    // LValues are captured as two arguments: a retained NativeObject that owns
-    // the captured value, and the address of the value itself.
+    // LValues are captured as a retained @box that owns
+    // the captured value.
     SILType ty = gen.getLoweredType(type).getAddressType();
     SILType boxTy = SILType::getPrimitiveObjectType(
       SILBoxType::get(ty.getSwiftRValueType()));
     SILValue box = new (gen.SGM.M) SILArgument(gen.F.begin(), boxTy, VD);
-    SILValue addr = new (gen.SGM.M) SILArgument(gen.F.begin(), ty, VD);
+    SILValue addr = gen.B.createProjectBox(VD, box);
     gen.VarLocs[VD] = SILGenFunction::VarLoc::get(addr, box);
-    gen.B.createDebugValueAddr(Loc, addr, ArgNo);
-    gen.Cleanups.pushCleanup<StrongReleaseCleanup>(box);
+    gen.B.createDebugValueAddr(Loc, addr, {/*Constant*/false, ArgNo});
+    if (!gen.SGM.M.getOptions().EnableGuaranteedClosureContexts)
+      gen.Cleanups.pushCleanup<StrongReleaseCleanup>(box);
     break;
   }
   case CaptureKind::StorageAddress: {
@@ -487,14 +411,14 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
     SILType ty = gen.getLoweredType(type).getAddressType();
     SILValue addr = new (gen.SGM.M) SILArgument(gen.F.begin(), ty, VD);
     gen.VarLocs[VD] = SILGenFunction::VarLoc::get(addr);
-    gen.B.createDebugValueAddr(Loc, addr, ArgNo);
+    gen.B.createDebugValueAddr(Loc, addr, {/*Constant*/true, ArgNo});
     break;
   }
   }
 }
 
 void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
-                                ArrayRef<Pattern *> paramPatterns,
+                                ArrayRef<ParameterList*> paramPatterns,
                                 Type resultType) {
   unsigned ArgNo =
     emitProlog(paramPatterns, resultType, TheClosure.getAsDeclContext());
@@ -506,7 +430,7 @@ void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
     emitCaptureArguments(*this, capture, ++ArgNo);
 }
 
-unsigned SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
+unsigned SILGenFunction::emitProlog(ArrayRef<ParameterList*> paramLists,
                                     Type resultType, DeclContext *DeclCtx) {
   // If the return type is address-only, emit the indirect return argument.
   const TypeLowering &returnTI = getTypeLowering(resultType);
@@ -521,12 +445,14 @@ unsigned SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
   }
 
   // Emit the argument variables in calling convention order.
-  ArgumentInitVisitor argVisitor(*this, F);
-  for (Pattern *p : reversed(paramPatterns)) {
+  ArgumentInitHelper emitter(*this, F);
+
+  for (ParameterList *paramList : reversed(paramLists)) {
     // Add the SILArguments and use them to initialize the local argument
     // values.
-    argVisitor.visit(p);
+    for (auto &param : *paramList)
+      emitter.emitParam(param);
   }
-  return argVisitor.getNumArgs();
+  return emitter.getNumArgs();
 }
 

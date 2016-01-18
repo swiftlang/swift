@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -111,6 +111,36 @@ bool types::isAfterLLVM(ID Id) {
   case types::TY_dSYM:
   case types::TY_SIB:
   case types::TY_RawSIB:
+  case types::TY_SwiftModuleFile:
+  case types::TY_SwiftModuleDocFile:
+  case types::TY_SerializedDiagnostics:
+  case types::TY_ClangModuleFile:
+  case types::TY_SwiftDeps:
+  case types::TY_Nothing:
+  case types::TY_Remapping:
+    return false;
+  case types::TY_INVALID:
+    llvm_unreachable("Invalid type ID.");
+  }
+}
+
+bool types::isPartOfSwiftCompilation(ID Id) {
+  switch (Id) {
+  case types::TY_Swift:
+  case types::TY_SIL:
+  case types::TY_RawSIL:
+  case types::TY_SIB:
+  case types::TY_RawSIB:
+    return true;
+  case types::TY_Assembly:
+  case types::TY_LLVM_IR:
+  case types::TY_LLVM_BC:
+  case types::TY_Object:
+  case types::TY_Dependencies:
+  case types::TY_ObjCHeader:
+  case types::TY_AutolinkFile:
+  case types::TY_Image:
+  case types::TY_dSYM:
   case types::TY_SwiftModuleFile:
   case types::TY_SwiftModuleDocFile:
   case types::TY_SerializedDiagnostics:

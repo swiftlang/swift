@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -16,7 +16,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/CFG.h"
-#include "swift/SIL/SILModule.h"
 // FIXME: For mapTypeInContext
 #include "swift/AST/ArchetypeBuilder.h"
 #include "llvm/ADT/Optional.h"
@@ -90,7 +89,7 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
     Linkage(unsigned(Linkage)),
     KeepAsPublic(false),
     ForeignBody(false),
-    EK(E) {
+    EffectsKindAttr(E) {
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);
   else
@@ -102,14 +101,29 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
 }
 
 SILFunction::~SILFunction() {
-#ifndef NDEBUG
   // If the function is recursive, a function_ref inst inside of the function
   // will give the function a non-zero ref count triggering the assertion. Thus
   // we drop all instruction references before we erase.
+  // We also need to drop all references if instructions are allocated using
+  // an allocator that may recycle freed memory.
   dropAllReferences();
+
+  auto &M = getModule();
+  for (auto &BB : *this) {
+    for (auto I = BB.begin(), E = BB.end(); I != E;) {
+      auto Inst = &*I;
+      ++I;
+      SILInstruction::destroy(Inst);
+      // TODO: It is only safe to directly deallocate an
+      // instruction if this BB is being removed in scope
+      // of destructing a SILFunction.
+      M.deallocateInst(Inst);
+    }
+    BB.InstList.clearAndLeakNodesUnsafely();
+  }
+
   assert(RefCount == 0 &&
          "Function cannot be deleted while function_ref's still exist");
-#endif
 }
 
 void SILFunction::setDeclContext(Decl *D) {
@@ -151,7 +165,7 @@ ASTContext &SILFunction::getASTContext() const {
 bool SILFunction::shouldOptimize() const {
   if (Module.getStage() == SILStage::Raw)
     return true;
-  return !hasSemanticsString("optimize.sil.never");
+  return !hasSemanticsAttr("optimize.sil.never");
 }
 
 Type SILFunction::mapTypeIntoContext(Type type) const {

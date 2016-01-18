@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -39,10 +39,10 @@ internal struct _CocoaArrayWrapper : CollectionType {
   }
 
   /// Returns a pointer to the first element in the given subRange if
-  /// the subRange is stored contiguously. Otherwise, return nil.
+  /// the subRange is stored contiguously. Otherwise, return `nil`.
   ///
   /// - Note: This method should only be used as an optimization; it
-  ///   is sometimes conservative and may return nil even when
+  ///   is sometimes conservative and may return `nil` even when
   ///   contiguous storage exists, e.g., if array doesn't have a smart
   /// implementation of countByEnumeratingWithState.
   func contiguousStorage(

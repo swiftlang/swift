@@ -7,6 +7,14 @@
 import Foundation
 import StdlibUnittest
 
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 // rdar://problem/18884272
 // Make sure that NSObject conforms to NSObjectProtocol. This
 // particular bug is ridiculously hard to trigger without a complete

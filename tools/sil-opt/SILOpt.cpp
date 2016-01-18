@@ -1,8 +1,8 @@
-//===-- SILOpt.cpp - SIL Optimization Driver ------------------------------===//
+//===--- SILOpt.cpp - SIL Optimization Driver -----------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -23,9 +23,9 @@
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/SILAnalysis/Analysis.h"
-#include "swift/SILPasses/Passes.h"
-#include "swift/SILPasses/PassManager.h"
+#include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/Serialization/SerializationOptions.h"
@@ -90,7 +90,7 @@ static llvm::cl::list<PassKind>
 Passes(llvm::cl::desc("Passes:"),
        llvm::cl::values(
 #define PASS(ID, NAME, DESCRIPTION) clEnumValN(PassKind::ID, NAME, DESCRIPTION),
-#include "swift/SILPasses/Passes.def"
+#include "swift/SILOptimizer/PassManager/Passes.def"
 			clEnumValEnd));
 
 static llvm::cl::opt<bool>

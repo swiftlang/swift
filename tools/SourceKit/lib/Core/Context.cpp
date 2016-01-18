@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -17,9 +17,9 @@
 using namespace SourceKit;
 
 SourceKit::Context::Context(StringRef RuntimeLibPath)
-  : RuntimeLibPath(RuntimeLibPath) {
-  NotificationCtr.reset(new NotificationCenter());
-  SwiftLang = std::move(LangSupport::createSwiftLangSupport(*this));
+  : RuntimeLibPath(RuntimeLibPath),
+    SwiftLang(LangSupport::createSwiftLangSupport(*this)),
+    NotificationCtr(new NotificationCenter()) {
 }
 
 SourceKit::Context::~Context() {

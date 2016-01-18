@@ -1,8 +1,8 @@
-//===--- LibcShims.h - Access to POSIX for Swift's core stdlib -----------===//
+//===--- LibcShims.h - Access to POSIX for Swift's core stdlib ------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -28,7 +28,11 @@ namespace swift { extern "C" {
 
 // This declaration is not universally correct.  We verify its correctness for
 // the current platform in the runtime code.
+#if defined(__linux__) && defined (__arm__)
+typedef      int __swift_ssize_t;
+#else
 typedef long int __swift_ssize_t;
+#endif
 
 // General utilities <stdlib.h>
 // Memory management functions

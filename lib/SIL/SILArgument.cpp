@@ -1,8 +1,8 @@
-//===--- SILArgument.cpp - Arguments for high-level SIL code ---------------==//
+//===--- SILArgument.cpp - Arguments for high-level SIL code --------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -60,6 +60,43 @@ SILModule &SILArgument::getModule() const {
   return getFunction()->getModule();
 }
 
+static SILValue getIncomingValueForPred(const SILBasicBlock *BB,
+                                        const SILBasicBlock *Pred,
+                                        unsigned Index) {
+  const TermInst *TI = Pred->getTerminator();
+
+  switch (TI->getTermKind()) {
+  // TODO: This list is conservative. I think we can probably handle more of
+  // these.
+  case TermKind::UnreachableInst:
+  case TermKind::ReturnInst:
+  case TermKind::ThrowInst:
+  case TermKind::TryApplyInst:
+  case TermKind::SwitchValueInst:
+  case TermKind::SwitchEnumAddrInst:
+  case TermKind::CheckedCastAddrBranchInst:
+  case TermKind::DynamicMethodBranchInst:
+    return SILValue();
+  case TermKind::BranchInst:
+    return cast<const BranchInst>(TI)->getArg(Index);
+  case TermKind::CondBranchInst:
+    return cast<const CondBranchInst>(TI)->getArgForDestBB(BB, Index);
+  case TermKind::CheckedCastBranchInst:
+    return cast<const CheckedCastBranchInst>(TI)->getOperand();
+  case TermKind::SwitchEnumInst:
+    return cast<const SwitchEnumInst>(TI)->getOperand();
+  }
+  llvm_unreachable("Unhandled TermKind?!");
+}
+
+SILValue SILArgument::getSingleIncomingValue() const {
+  const SILBasicBlock *Parent = getParent();
+  const SILBasicBlock *PredBB = Parent->getSinglePredecessor();
+  if (!PredBB)
+    return SILValue();
+  return getIncomingValueForPred(Parent, PredBB, getIndex());
+}
+
 bool SILArgument::getIncomingValues(llvm::SmallVectorImpl<SILValue> &OutArray) {
   SILBasicBlock *Parent = getParent();
 
@@ -68,29 +105,10 @@ bool SILArgument::getIncomingValues(llvm::SmallVectorImpl<SILValue> &OutArray) {
 
   unsigned Index = getIndex();
   for (SILBasicBlock *Pred : getParent()->getPreds()) {
-    TermInst *TI = Pred->getTerminator();
-
-    if (auto *BI = dyn_cast<BranchInst>(TI)) {
-      OutArray.push_back(BI->getArg(Index));
-      continue;
-    }
-
-    if (auto *CBI = dyn_cast<CondBranchInst>(TI)) {
-      OutArray.push_back(CBI->getArgForDestBB(getParent(), this));
-      continue;
-    }
-
-    if (auto *CCBI = dyn_cast<CheckedCastBranchInst>(TI)) {
-      OutArray.push_back(CCBI->getOperand());
-      continue;
-    }
-
-    if (auto *SWEI = dyn_cast<SwitchEnumInst>(TI)) {
-      OutArray.push_back(SWEI->getOperand());
-      continue;
-    }
-    
-    return false;
+    SILValue Value = getIncomingValueForPred(Parent, Pred, Index);
+    if (!Value)
+      return false;
+    OutArray.push_back(Value);
   }
 
   return true;
@@ -105,29 +123,10 @@ bool SILArgument::getIncomingValues(
 
   unsigned Index = getIndex();
   for (SILBasicBlock *Pred : getParent()->getPreds()) {
-    TermInst *TI = Pred->getTerminator();
-
-    if (auto *BI = dyn_cast<BranchInst>(TI)) {
-      OutArray.push_back({Pred, BI->getArg(Index)});
-      continue;
-    }
-
-    if (auto *CBI = dyn_cast<CondBranchInst>(TI)) {
-      OutArray.push_back({Pred, CBI->getArgForDestBB(getParent(), this)});
-      continue;
-    }
-
-    if (auto *CCBI = dyn_cast<CheckedCastBranchInst>(TI)) {
-      OutArray.push_back({Pred, CCBI->getOperand()});
-      continue;
-    }
-
-    if (auto *SWEI = dyn_cast<SwitchEnumInst>(TI)) {
-      OutArray.push_back({Pred, SWEI->getOperand()});
-      continue;
-    }
-
-    return false;
+    SILValue Value = getIncomingValueForPred(Parent, Pred, Index);
+    if (!Value)
+      return false;
+    OutArray.push_back({Pred, Value});
   }
 
   return true;
@@ -155,23 +154,9 @@ SILValue SILArgument::getIncomingValue(unsigned BBIndex) {
       continue;
     }
 
-    TermInst *TI = Pred->getTerminator();
-
-    if (auto *BI = dyn_cast<BranchInst>(TI))
-      return BI->getArg(Index);
-
-    if (auto *CBI = dyn_cast<CondBranchInst>(TI))
-      return CBI->getArgForDestBB(Parent, this);
-
-    if (auto *CCBI = dyn_cast<CheckedCastBranchInst>(TI))
-      return CCBI->getOperand();
-
-    if (auto *SWEI = dyn_cast<SwitchEnumInst>(TI))
-      return SWEI->getOperand();
-
-    // Return an empty SILValue since we ran into something we were unable to
+    // This will return an empty SILValue if we found something we do not
     // understand.
-    return SILValue();
+    return getIncomingValueForPred(Parent, Pred, Index);
   }
 
   return SILValue();
@@ -187,33 +172,10 @@ SILValue SILArgument::getIncomingValue(SILBasicBlock *BB) {
   // that would involve walking the linked list anyways, so we just iterate once
   // over the loop.
 
-  // We use this funky loop since predecessors are stored in a linked list but
-  // we want array like semantics.
-  for (SILBasicBlock *Pred : Parent->getPreds()) {
-    // If BBCount is not BBIndex, continue.
-    if (Pred != BB)
-      continue;
-
-    TermInst *TI = Pred->getTerminator();
-
-    if (auto *BI = dyn_cast<BranchInst>(TI))
-      return BI->getArg(Index);
-
-    if (auto *CBI = dyn_cast<CondBranchInst>(TI))
-      return CBI->getArgForDestBB(Parent, this);
-
-    if (auto *CCBI = dyn_cast<CheckedCastBranchInst>(TI))
-      return CCBI->getOperand();
-
-    if (auto *SWEI = dyn_cast<SwitchEnumInst>(TI))
-      return SWEI->getOperand();
-
-    // Return an empty SILValue since we ran into something we were unable to
-    // understand.
+  auto Target = std::find(Parent->pred_begin(), Parent->pred_end(), BB);
+  if (Target == Parent->pred_end())
     return SILValue();
-  }
-
-  return SILValue();
+  return getIncomingValueForPred(Parent, BB, Index);
 }
 
 bool SILArgument::isSelf() const {

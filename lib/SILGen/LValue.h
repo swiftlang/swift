@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -53,7 +53,7 @@ struct LValueTypeData {
   /// On physical path components, projection yields an address of
   /// this type.  On logical path components, materialize yields an
   /// address of this type, set expects a value of this type, and
-  /// get yields a vlaue of this type.
+  /// get yields a value of this type.
   SILType TypeOfRValue;
 
   LValueTypeData() = default;
@@ -333,6 +333,9 @@ public:
 
   LValue &operator=(const LValue &) = delete;
   LValue &operator=(LValue &&) = default;
+
+  static LValue forValue(ManagedValue value,
+                         CanType substFormalType);
 
   static LValue forAddress(ManagedValue address,
                            AbstractionPattern origFormalType,

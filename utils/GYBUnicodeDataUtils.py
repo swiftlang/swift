@@ -2,7 +2,7 @@
 ##
 ## This source file is part of the Swift.org open source project
 ##
-## Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+## Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 ## Licensed under Apache License v2.0 with Runtime Library Exception
 ##
 ## See http://swift.org/LICENSE.txt for license information
@@ -11,6 +11,7 @@
 ##===----------------------------------------------------------------------===##
 
 import re
+import codecs
 
 class UnicodeProperty(object):
     """Abstract base class for Unicode properties."""
@@ -64,11 +65,11 @@ class GraphemeClusterBreakPropertyTable(UnicodeProperty):
         # values to symbolic values.
         self.symbolic_values = \
             [ None ] * (max(self.numeric_value_table.values()) + 1)
-        for k,v in self.numeric_value_table.iteritems():
+        for k,v in self.numeric_value_table.items():
             self.symbolic_values[v] = k
 
         # Load the data file.
-        with open(grapheme_break_property_file_name, 'rb') as f:
+        with codecs.open(grapheme_break_property_file_name, encoding='utf-8', errors='strict') as f:
             for line in f:
                 # Strip comments.
                 line = re.sub('#.*', '', line)
@@ -248,7 +249,7 @@ class UnicodeTrieGenerator(object):
         # maximum Unicode code point value is not 2^21-1 (0x1fffff), it is
         # 0x10ffff.
         self.supp_first_level_index_max = \
-            0x10ffff >> (self.supp_second_level_index_bits + \
+            0x10ffff >> (self.supp_second_level_index_bits +
                 self.supp_data_offset_bits)
 
         # A mapping from BMP first-level index to BMP data block index.
@@ -256,8 +257,9 @@ class UnicodeTrieGenerator(object):
 
         # An array of BMP data blocks.
         self.BMP_data = [
-            [ -1 for i in range(0, 1 << self.BMP_data_offset_bits) ]
-                for i in range(0, 1 << self.BMP_first_level_index_bits) ]
+            [-1 for i in range(0, 1 << self.BMP_data_offset_bits)]
+            for i in range(0, 1 << self.BMP_first_level_index_bits)
+        ]
 
         # A mapping from supp first-level index to an index of the second-level
         # lookup table.
@@ -267,13 +269,15 @@ class UnicodeTrieGenerator(object):
         # table is a mapping from a supp second-level index to supp data block
         # index.
         self.supp_lookup2 = [
-            [ j for j in range(i << self.supp_second_level_index_bits, (i + 1) << self.supp_second_level_index_bits) ]
-                for i in range(0, self.supp_first_level_index_max + 1) ]
+            [j for j in range(i << self.supp_second_level_index_bits, (i + 1) << self.supp_second_level_index_bits)]
+            for i in range(0, self.supp_first_level_index_max + 1)
+        ]
 
         # An array of supp data blocks.
         self.supp_data = [
-            [ -1 for i in range(0, 1 << self.supp_data_offset_bits) ]
-                for i in range(0, (self.supp_first_level_index_max + 1) * (1 << self.supp_second_level_index_bits)) ]
+            [-1 for i in range(0, 1 << self.supp_data_offset_bits)]
+            for i in range(0, (self.supp_first_level_index_max + 1) * (1 << self.supp_second_level_index_bits))
+        ]
 
     def splat(self, value):
         for i in range(0, len(self.BMP_data)):
@@ -329,7 +333,10 @@ class UnicodeTrieGenerator(object):
                 else:
                     return idx
 
-            return map(map_index, indexes)
+            # NOTE: Python 2's `map` function returns a list. Where Python 3's
+            # `map` function returns an iterator. To work around this the
+            # result of the `map` is explicitly converted to a `list`.
+            return list(map(map_index, indexes))
 
         # If self.BMP_data contains identical data blocks, keep the first one,
         # remove duplicates and change the indexes in self.BMP_lookup to point to
@@ -514,9 +521,9 @@ def get_grapheme_cluster_break_tests_as_UTF8(grapheme_break_test_file_name):
 
         # Match a list of code points.
         for token in line.split(" "):
-            if token == "÷":
+            if token == u"÷":
                 boundaries += [ curr_bytes ]
-            elif token == "×":
+            elif token == u"×":
                 pass
             else:
                 code_point = int(token, 16)
@@ -529,21 +536,21 @@ def get_grapheme_cluster_break_tests_as_UTF8(grapheme_break_test_file_name):
                 # and test separately that we handle ill-formed UTF-8 sequences.
                 if code_point >= 0xd800 and code_point <= 0xdfff:
                     code_point = 0x200b
-                code_point = ('\U%(cp)08x' % { 'cp': code_point }).decode('unicode_escape')
-                as_UTF8_bytes = code_point.encode('utf8')
-                as_UTF8_escaped = ''.join(['\\x%(byte)02x' % { 'byte': ord(byte) } for byte in as_UTF8_bytes])
+                code_point = (b'\U%(cp)08x' % { b'cp': code_point }).decode('unicode_escape', 'strict')
+                as_UTF8_bytes = bytearray(code_point.encode('utf8', 'strict'))
+                as_UTF8_escaped = ''.join(['\\x%(byte)02x' % { 'byte': byte } for byte in as_UTF8_bytes])
                 test += as_UTF8_escaped
                 curr_bytes += len(as_UTF8_bytes)
 
         return (test, boundaries)
 
     # Self-test.
-    assert(_convert_line('÷ 0903 × 0308 ÷ AC01 ÷ # abc') == ('\\xe0\\xa4\\x83\\xcc\\x88\\xea\\xb0\\x81', [ 0, 5, 8 ]))
-    assert(_convert_line('÷ D800 ÷ # abc') == ('\\xe2\\x80\\x8b', [ 0, 3 ]))
+    assert(_convert_line(u'÷ 0903 × 0308 ÷ AC01 ÷ # abc') == ('\\xe0\\xa4\\x83\\xcc\\x88\\xea\\xb0\\x81', [ 0, 5, 8 ]))
+    assert(_convert_line(u'÷ D800 ÷ # abc') == ('\\xe2\\x80\\x8b', [ 0, 3 ]))
 
     result = []
 
-    with open(grapheme_break_test_file_name, 'rb') as f:
+    with codecs.open(grapheme_break_test_file_name, encoding='utf-8', errors='strict') as f:
         for line in f:
             test = _convert_line(line)
             if test:
@@ -598,4 +605,3 @@ def get_grapheme_cluster_break_tests_as_unicode_scalars(grapheme_break_test_file
                 result += [ test ]
 
     return result
-

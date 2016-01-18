@@ -2,7 +2,7 @@
 ;
 ; This source file is part of the Swift.org open source project
 ;
-; Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+; Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 ; Licensed under Apache License v2.0 with Runtime Library Exception
 ;
 ; See http://swift.org/LICENSE.txt for license information
@@ -43,12 +43,13 @@
    ;; Decl and type keywords
    `(,(regexp-opt '("class" "init" "deinit" "extension" "func"
                     "import" "let" "protocol" "static" "struct" "subscript"
-                    "typealias" "enum" "var" "where"
+                    "typealias" "enum" "var" "lazy" "where"
                     "private" "public" "internal" "override" "throws")
                   'words) . font-lock-keyword-face)
    ;; Statements
    `(,(regexp-opt '("if" "guard" "in" "else" "for" "do" "repeat" "while" "return"
-                    "break" "continue" "switch" "case" "throw" "try" "catch")
+                    "break" "continue" "switch" "case" "default"
+                    "throw" "try" "catch")
                   'words) . font-lock-keyword-face)
    ;; Expressions
    `(,(regexp-opt '("new") 'words) . font-lock-keyword-face)

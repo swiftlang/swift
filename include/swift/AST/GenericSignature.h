@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -101,7 +101,7 @@ class GenericSignature : public llvm::FoldingSetNode {
              NumGenericParams };
   }
 
-  /// Retrieve a mutable verison of the requirements.
+  /// Retrieve a mutable version of the requirements.
   MutableArrayRef<Requirement> getRequirementsBuffer() {
     void *genericParams = getGenericParamsBuffer().end();
     return { reinterpret_cast<Requirement *>(genericParams),
@@ -202,9 +202,10 @@ public:
   /// Determine the superclass bound on the given dependent type.
   Type getSuperclassBound(Type type, ModuleDecl &mod);
 
+  using ConformsToArray = SmallVector<ProtocolDecl *, 2>;
   /// Determine the set of protocols to which the given dependent type
   /// must conform.
-  SmallVector<ProtocolDecl *, 2> getConformsTo(Type type, ModuleDecl &mod);
+  ConformsToArray getConformsTo(Type type, ModuleDecl &mod);
 
   /// Determine whether the given dependent type is equal to a concrete type.
   bool isConcreteType(Type type, ModuleDecl &mod);

@@ -91,23 +91,23 @@ func inferSuperclassRequirement2<T : Canidae>(v: U<T>) {}
 // ----------------------------------------------------------------------------
 
 protocol P3 {
-  typealias P3Assoc : P2
+  associatedtype P3Assoc : P2
 }
 
 protocol P4 {
-  typealias P4Assoc : P1
+  associatedtype P4Assoc : P1
 }
 
 protocol PCommonAssoc1 {
-  typealias CommonAssoc
+  associatedtype CommonAssoc
 }
 
 protocol PCommonAssoc2 {
-  typealias CommonAssoc
+  associatedtype CommonAssoc
 }
 
 protocol PAssoc {
-  typealias Assoc
+  associatedtype Assoc
 }
 
 struct Model_P3_P4_Eq<T : P3, U : P4 where T.P3Assoc == U.P4Assoc> { }
@@ -115,13 +115,13 @@ struct Model_P3_P4_Eq<T : P3, U : P4 where T.P3Assoc == U.P4Assoc> { }
 // CHECK-LABEL: .inferSameType1@
 // CHECK-NEXT: Requirements:
 // CHECK-NEXT:   T witness marker
-// CHECK-NEXT:   T : P3 [inferred @ {{.*}}:26]
+// CHECK-NEXT:   T : P3 [inferred @ {{.*}}:30]
 // CHECK-NEXT:   U witness marker
-// CHECK-NEXT:   U : P4 [inferred @ {{.*}}:26]
+// CHECK-NEXT:   U : P4 [inferred @ {{.*}}:30]
 // CHECK-NEXT:   T[.P3].P3Assoc witness marker
-// CHECK-NEXT:   T[.P3].P3Assoc : P1 [protocol @ {{.*}}:13]
-// CHECK-NEXT:   T[.P3].P3Assoc : P2 [protocol @ {{.*}}:13]
-// CHECK-NEXT:   U[.P4].P4Assoc == T[.P3].P3Assoc [inferred @ {{.*}}26]
+// CHECK-NEXT:   T[.P3].P3Assoc : P1 [protocol @ {{.*}}:18]
+// CHECK-NEXT:   T[.P3].P3Assoc : P2 [protocol @ {{.*}}:18]
+// CHECK-NEXT:   U[.P4].P4Assoc == T[.P3].P3Assoc [inferred @ {{.*}}30]
 func inferSameType1<T, U>(x: Model_P3_P4_Eq<T, U>) { }
 
 // CHECK-LABEL: .inferSameType2@
@@ -131,7 +131,7 @@ func inferSameType1<T, U>(x: Model_P3_P4_Eq<T, U>) { }
 // CHECK-NEXT:   U witness marker
 // CHECK-NEXT:   U : P4 [explicit @ {{.*}}requirement_inference.swift:{{.*}}:33]
 // CHECK-NEXT:   T[.P3].P3Assoc witness marker
-// CHECK-NEXT:   T[.P3].P3Assoc : P1 [protocol @ {{.*}}requirement_inference.swift:{{.*}}:13]
+// CHECK-NEXT:   T[.P3].P3Assoc : P1 [protocol @ {{.*}}requirement_inference.swift:{{.*}}:18]
 // CHECK-NEXT:   T[.P3].P3Assoc : P2 [redundant @ {{.*}}requirement_inference.swift:{{.*}}:54]
 // CHECK-NEXT:   U[.P4].P4Assoc == T[.P3].P3Assoc [explicit @ {{.*}}requirement_inference.swift:{{.*}}:68]
 func inferSameType2<T : P3, U : P4 where U.P4Assoc : P2, T.P3Assoc == U.P4Assoc>(_: T) { }
@@ -148,15 +148,15 @@ func inferSameType2<T : P3, U : P4 where U.P4Assoc : P2, T.P3Assoc == U.P4Assoc>
 func inferSameType3<T : PCommonAssoc1 where T.CommonAssoc : P1, T : PCommonAssoc2>(_: T) { }
 
 protocol P5 {
-  typealias Element
+  associatedtype Element
 }
 
 protocol P6 {
-  typealias AssocP6 : P5
+  associatedtype AssocP6 : P5
 }
 
 protocol P7 : P6 {
-  typealias AssocP7: P6
+  associatedtype AssocP7: P6
 }
 
 // CHECK-LABEL: P7.nestedSameType1()@

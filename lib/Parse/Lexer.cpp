@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -523,6 +523,18 @@ bool Lexer::isIdentifier(StringRef string) {
   return p == end;
 }
 
+/// \brief Determines if the given string is a valid operator identifier,
+/// without escaping characters.
+bool Lexer::isOperator(StringRef string) {
+  if (string.empty()) return false;
+  char const *p = string.data(), *end = string.end();
+  if (!advanceIfValidStartOfOperator(p, end))
+    return false;
+  while (p < end && advanceIfValidContinuationOfOperator(p, end));
+  return p == end;
+}
+
+
 tok Lexer::kindOfIdentifier(StringRef Str, bool InSILMode) {
   tok Kind = llvm::StringSwitch<tok>(Str)
 #define KEYWORD(kw) \
@@ -595,30 +607,23 @@ static bool isRightBound(const char *tokEnd, bool isLeftBound) {
 /// lexOperatorIdentifier - Match identifiers formed out of punctuation.
 void Lexer::lexOperatorIdentifier() {
   const char *TokStart = CurPtr-1;
+  CurPtr = TokStart;
+  bool didStart = advanceIfValidStartOfOperator(CurPtr, BufferEnd);
+  assert(didStart && "unexpected operator start");
+  (void) didStart;
+  
+  do {
+    if (CurPtr != BufferEnd && InSILBody &&
+        (*CurPtr == '!' || *CurPtr == '?'))
+      // When parsing SIL body, '!' and '?' are special token and can't be
+      // in the middle of an operator.
+      break;
 
-  // We only allow '.' in a series.
-  if (*TokStart == '.') {
-    while (*CurPtr == '.')
-      ++CurPtr;
-    
-    // Lex ..< as an identifier.
-    if (*CurPtr == '<' && CurPtr-TokStart == 2)
-      ++CurPtr;
-    
-  } else {
-    CurPtr = TokStart;
-    bool didStart = advanceIfValidStartOfOperator(CurPtr, BufferEnd);
-    assert(didStart && "unexpected operator start");
-    (void) didStart;
-    
-    do {
-      if (CurPtr != BufferEnd && InSILBody &&
-          (*CurPtr == '!' || *CurPtr == '?'))
-        // When parsing SIL body, '!' and '?' are special token and can't be
-        // in the middle of an operator.
-        break;
-    } while (advanceIfValidContinuationOfOperator(CurPtr, BufferEnd));
-  }
+    // '.' cannot appear in the middle of an operator unless the operator
+    // started with a '.'.
+    if (*CurPtr == '.' && *TokStart != '.')
+      break;
+  } while (advanceIfValidContinuationOfOperator(CurPtr, BufferEnd));
 
   // Decide between the binary, prefix, and postfix cases.
   // It's binary if either both sides are bound or both sides are not bound.
@@ -631,8 +636,7 @@ void Lexer::lexOperatorIdentifier() {
     switch (TokStart[0]) {
     case '=':
       if (leftBound != rightBound) {
-        auto d = diagnose(TokStart, diag::lex_unary_equal_is_reserved,
-                          leftBound);
+        auto d = diagnose(TokStart, diag::lex_unary_equal);
         if (leftBound)
           d.fixItInsert(getSourceLoc(TokStart), " ");
         else
@@ -644,14 +648,45 @@ void Lexer::lexOperatorIdentifier() {
       if (leftBound == rightBound || leftBound)
         break;
       return formToken(tok::amp_prefix, TokStart);
-    case '.':
+    case '.': {
       if (leftBound == rightBound)
         return formToken(tok::period, TokStart);
       if (rightBound)
         return formToken(tok::period_prefix, TokStart);
-      diagnose(TokStart, diag::lex_unary_postfix_dot_is_reserved);
-      // always emit 'tok::period' to avoid trickle down parse errors
-      return formToken(tok::period, TokStart);
+      
+      // If left bound but not right bound, handle some likely situations.
+      
+      // If there is just some horizontal whitespace before the next token, its
+      // addition is probably incorrect.
+      const char *AfterHorzWhitespace = CurPtr;
+      while (*AfterHorzWhitespace == ' ' || *AfterHorzWhitespace == '\t')
+        ++AfterHorzWhitespace;
+      
+      // First, when we are code completing "x.<ESC>", then make sure to return
+      // a tok::period, since that is what the user is wanting to know about.
+      // FIXME: isRightBound should consider this to be right bound.
+      if (*AfterHorzWhitespace == '\0' &&
+          AfterHorzWhitespace == CodeCompletionPtr) {
+        diagnose(TokStart, diag::expected_member_name);
+        return formToken(tok::period, TokStart);
+      }
+      
+      if (isRightBound(AfterHorzWhitespace, leftBound) &&
+          // Don't consider comments to be this.  A leading slash is probably
+          // either // or /* and most likely occurs just in our testsuite for
+          // expected-error lines.
+          *AfterHorzWhitespace != '/') {
+        diagnose(TokStart, diag::extra_whitespace_period)
+          .fixItRemoveChars(getSourceLoc(CurPtr),
+                            getSourceLoc(AfterHorzWhitespace));
+        return formToken(tok::period, TokStart);
+      }
+
+      // Otherwise, it is probably a missing member.
+      diagnose(TokStart, diag::expected_member_name);
+      //return formToken(tok::unknown, TokStart);
+      return lexImpl();
+    }
     case '?':
       if (leftBound)
         return formToken(tok::question_postfix, TokStart);
@@ -1164,11 +1199,31 @@ void Lexer::lexStringLiteral() {
       if (*TokStart == '\'') {
         // Complain about single-quote string and suggest replacement with
         // double-quoted equivalent.
-        // FIXME: Fixit should replace ['"'] with ["\""] (radar 22709931)
         StringRef orig(TokStart, CurPtr - TokStart);
         llvm::SmallString<32> replacement;
         replacement += '"';
-        replacement += orig.slice(1, orig.size() - 1);
+        std::string str = orig.slice(1, orig.size() - 1).str();
+        std::string quot = "\"";
+        size_t pos = 0;
+        while (pos != str.length()) {
+          if (str.at(pos) == '\\') {
+            if (str.at(pos + 1) == '\'') {
+                // Un-escape escaped single quotes.
+                str.replace(pos, 2, "'");
+                ++pos;
+            } else {
+                // Skip over escaped characters.
+                pos += 2;
+            }
+          } else if (str.at(pos) == '"') {
+            str.replace(pos, 1, "\\\"");
+            // Advance past the newly added ["\""].
+            pos += 2;
+          } else {
+            ++pos;
+          }
+        }
+        replacement += StringRef(str);
         replacement += '"';
         diagnose(TokStart, diag::lex_single_quote_string)
           .fixItReplaceChars(getSourceLoc(TokStart), getSourceLoc(CurPtr),
@@ -1259,9 +1314,13 @@ void Lexer::tryLexEditorPlaceholder() {
     if (Ptr[0] == '<' && Ptr[1] == '#')
       break;
     if (Ptr[0] == '#' && Ptr[1] == '>') {
-      // Found it. Flag it as error for the rest of the compiler pipeline and
-      // lex it as an identifier.
-      diagnose(TokStart, diag::lex_editor_placeholder);
+      // Found it. Flag it as error (or warning, if in playground mode) for the
+      // rest of the compiler pipeline and lex it as an identifier.
+      if (LangOpts.Playground) {
+        diagnose(TokStart, diag::lex_editor_placeholder_in_playground);
+      } else {
+        diagnose(TokStart, diag::lex_editor_placeholder);
+      }
       CurPtr = Ptr+2;
       formToken(tok::identifier, TokStart);
       return;
@@ -1405,7 +1464,7 @@ Restart:
   // Remember the start of the token so we can form the text range.
   const char *TokStart = CurPtr;
   
-  switch (*CurPtr++) {
+  switch ((signed char)*CurPtr++) {
   default: {
     char const *tmp = CurPtr-1;
     if (advanceIfValidStartOfIdentifier(tmp, BufferEnd))
@@ -1640,15 +1699,15 @@ Restart:
   }
 }
 
-SourceLoc Lexer::getLocForEndOfToken(const SourceManager &SM, SourceLoc Loc) {
+Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {
   // Don't try to do anything with an invalid location.
   if (!Loc.isValid())
-    return Loc;
+    return Token();
 
   // Figure out which buffer contains this location.
   int BufferID = SM.findBufferContainingLoc(Loc);
   if (BufferID < 0)
-    return SourceLoc();
+    return Token();
   
   // Use fake language options; language options only affect validity
   // and the exact token produced.
@@ -1661,9 +1720,13 @@ SourceLoc Lexer::getLocForEndOfToken(const SourceManager &SM, SourceLoc Loc) {
   Lexer L(FakeLangOpts, SM, BufferID, nullptr, /*InSILMode=*/ false,
           CommentRetentionMode::ReturnAsTokens);
   L.restoreState(State(Loc));
-  unsigned Length = L.peekNextToken().getLength();
-  return Loc.getAdvancedLoc(Length);
+  return L.peekNextToken();
 }
+
+SourceLoc Lexer::getLocForEndOfToken(const SourceManager &SM, SourceLoc Loc) {
+  return Loc.getAdvancedLocOrInvalid(getTokenAtLocation(SM, Loc).getLength());
+}
+
 
 static SourceLoc getLocForStartOfTokenInBuf(SourceManager &SM,
                                             unsigned BufferID,

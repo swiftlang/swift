@@ -23,7 +23,7 @@ compilation that results from having the entire module available makes
 it possible for the inliner to inline functions that it would
 otherwise not be able to inline in normal separate compilation. Other
 optimizations similarly benefit, for example generic specialization
-(since it has more opportunities for specializae) and function
+(since it has more opportunities for specialize) and function
 signature optimization (since it has more call sites to rewrite).
 
 

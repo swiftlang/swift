@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// A custom trie implementation to quickly retrive Unicode property values.
+// A custom trie implementation to quickly retrieve Unicode property values.
 //
 //===----------------------------------------------------------------------===//
 
@@ -45,7 +45,7 @@ SuppDataBytesOffset = 12817
 import SwiftShims
 
 public // @testable
-enum _GraphemeClusterBreakPropertyValue : Int, CustomStringConvertible {
+enum _GraphemeClusterBreakPropertyValue : Int {
   case Other = 0
   case CR = 1
   case LF = 2
@@ -59,39 +59,6 @@ enum _GraphemeClusterBreakPropertyValue : Int, CustomStringConvertible {
   case T = 10
   case LV = 11
   case LVT = 12
-
-  /// A textual representation of `self`.
-  public // @testable
-  var description: String {
-    switch self {
-    case Other:
-      return "Other"
-    case CR:
-      return "CR"
-    case LF:
-      return "LF"
-    case Control:
-      return "Control"
-    case Extend:
-      return "Extend"
-    case Regional_Indicator:
-      return "Regional_Indicator"
-    case Prepend:
-      return "Prepend"
-    case SpacingMark:
-      return "SpacingMark"
-    case L:
-      return "L"
-    case V:
-      return "V"
-    case T:
-      return "T"
-    case LV:
-      return "LV"
-    case LVT:
-      return "LVT"
-    }
-  }
 }
 
 // It is expensive to convert a raw enum value to an enum, so we use this type

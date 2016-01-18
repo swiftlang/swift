@@ -8,6 +8,13 @@
 import StdlibUnittest
 import SwiftPrivate
 
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 var SliceTests = TestSuite("CollectionType")
 
 //===----------------------------------------------------------------------===//
@@ -16,7 +23,7 @@ var SliceTests = TestSuite("CollectionType")
 
 SliceTests.test("Slice/AssociatedTypes") {
 %for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
-  if true {
+  do {
     typealias Base = Minimal${traversal}Collection<OpaqueValue<Int>>
     typealias ${traversal}Slice = Slice<Base>
     expectSliceType(${traversal}Slice.self)
@@ -129,7 +136,7 @@ SliceTests.test("Slice.subscript(_: Range<Index>)") {
 
 SliceTests.test("MutableSlice/AssociatedTypes") {
 %for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
-  if true {
+  do {
     typealias Base =
       Minimal${traversal}MutableCollection<OpaqueValue<Int>>
     typealias ${traversal}MutableSlice = MutableSlice<Base>

@@ -6,7 +6,7 @@
 // like OpaqueString anyway, so we can just disable the failing
 // configuration
 //
-// Memory allocator specifics also vary across platorms.
+// Memory allocator specifics also vary across platforms.
 // REQUIRES: CPU=x86_64, OS=macosx
 
 import Foundation

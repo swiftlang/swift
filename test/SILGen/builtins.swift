@@ -487,8 +487,8 @@ func reinterpretAddrOnlyToTrivial<T>(t: T) -> Int {
 // CHECK-LABEL: sil hidden @_TF8builtins27reinterpretAddrOnlyLoadable
 func reinterpretAddrOnlyLoadable<T>(a: Int, _ b: T) -> (T, Int) {
   // CHECK: [[BUF:%.*]] = alloc_stack $Int
-  // CHECK: store {{%.*}} to [[BUF]]#1
-  // CHECK: [[RES1:%.*]] = unchecked_addr_cast [[BUF]]#1 : $*Int to $*T
+  // CHECK: store {{%.*}} to [[BUF]]
+  // CHECK: [[RES1:%.*]] = unchecked_addr_cast [[BUF]] : $*Int to $*T
   // CHECK: copy_addr [[RES1]] to [initialization]
   return (Builtin.reinterpretCast(a) as T,
   // CHECK: [[RES:%.*]] = unchecked_addr_cast {{%.*}} : $*T to $*Int
@@ -516,14 +516,6 @@ func castBitPatternFromBridgeObject(bo: Builtin.BridgeObject) -> Builtin.Word {
   return Builtin.castBitPatternFromBridgeObject(bo)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins14markDependence
-// CHECK:         [[T0:%.*]] = mark_dependence %0 : $Pointer on %1 : $ClassProto
-// CHECK-NEXT:    strong_release %1 : $ClassProto
-// CHECK-NEXT:    return [[T0]] : $Pointer
-func markDependence(v: Pointer, _ base: ClassProto) -> Pointer {
-  return Builtin.markDependence(v, base)
-}
-
 // CHECK-LABEL: sil hidden @_TF8builtins8pinUnpin
 // CHECK:       bb0(%0 : $Builtin.NativeObject):
 // CHECK-NEXT:    debug_value
@@ -543,40 +535,6 @@ func pinUnpin(object : Builtin.NativeObject) {
 // CHECK-NEXT:    strong_release %0 : $Builtin.NativeObject
 // CHECK-NEXT:    [[T0:%.*]] = tuple ()
 // CHECK-NEXT:    return [[T0]] : $()
-}
-
-// CHECK-LABEL: sil hidden @_TF8builtins19allocateValueBuffer
-// CHECK:       bb0([[BUFFER:%.*]] : $*Builtin.UnsafeValueBuffer):
-// CHECK-NEXT:     debug_value_addr %0 : $*Builtin.UnsafeValueBuffer // var buffer, argno: 1
-// CHECK-NEXT:    metatype $@thin Int.Type
-// CHECK-NEXT:    [[T0:%.*]] = alloc_value_buffer $Int in [[BUFFER]] : $*Builtin.UnsafeValueBuffer
-// CHECK-NEXT:    [[T1:%.*]] = address_to_pointer [[T0]] : $*Int to $Builtin.RawPointer
-// CHECK-NEXT:    return [[T1]] : $Builtin.RawPointer
-func allocateValueBuffer(inout buffer: Builtin.UnsafeValueBuffer) -> Builtin.RawPointer {
-  return Builtin.allocValueBuffer(&buffer, Int.self)
-}
-
-// CHECK-LABEL: sil hidden @_TF8builtins18projectValueBuffer
-// CHECK:       bb0([[BUFFER:%.*]] : $*Builtin.UnsafeValueBuffer):
-// CHECK-NEXT:    debug_value_addr %0 : $*Builtin.UnsafeValueBuffer // var buffer, argno: 1
-// CHECK-NEXT:    metatype $@thin Int.Type
-// CHECK-NEXT:    [[T0:%.*]] = project_value_buffer $Int in [[BUFFER]] : $*Builtin.UnsafeValueBuffer
-// CHECK-NEXT:    [[T1:%.*]] = address_to_pointer [[T0]] : $*Int to $Builtin.RawPointer
-// CHECK-NEXT:    return [[T1]] : $Builtin.RawPointer
-func projectValueBuffer(inout buffer: Builtin.UnsafeValueBuffer) -> Builtin.RawPointer {
-  return Builtin.projectValueBuffer(&buffer, Int.self)
-}
-
-// CHECK-LABEL: sil hidden @_TF8builtins18deallocValueBuffer
-// CHECK:       bb0([[BUFFER:%.*]] : $*Builtin.UnsafeValueBuffer):
-//CHECK-NEXT:     debug_value_addr %0 : $*Builtin.UnsafeValueBuffer // var buffer, argno: 1
-// CHECK-NEXT:    metatype $@thin Int.Type
-// CHECK-NEXT:    dealloc_value_buffer $Int in [[BUFFER]] : $*Builtin.UnsafeValueBuffer
-// CHECK-NEXT:    tuple ()
-// CHECK-NEXT:    [[T0:%.*]] = tuple ()
-// CHECK-NEXT:    return [[T0]] : $()
-func deallocValueBuffer(inout buffer: Builtin.UnsafeValueBuffer) -> () {
-  Builtin.deallocValueBuffer(&buffer, Int.self)
 }
 
 // ----------------------------------------------------------------------------
@@ -737,7 +695,7 @@ protocol PUnknown {}
 protocol PClass : class {}
 
 // CHECK-LABEL: sil hidden @_TF8builtins19refcast_generic_any
-// CHECK: unchecked_ref_cast_addr  T in %{{.*}}#1 : $*T to AnyObject in %{{.*}}#1 : $*AnyObject
+// CHECK: unchecked_ref_cast_addr  T in %{{.*}} : $*T to AnyObject in %{{.*}} : $*AnyObject
 func refcast_generic_any<T>(o: T) -> AnyObject {
   return Builtin.castReference(o)
 }
@@ -750,7 +708,7 @@ func refcast_class_any(o: A) -> AnyObject {
 }
 
 // CHECK-LABEL: sil hidden @_TF8builtins20refcast_punknown_any
-// CHECK: unchecked_ref_cast_addr PUnknown in %{{.*}}#1 : $*PUnknown to AnyObject in %{{.*}}#1 : $*AnyObject
+// CHECK: unchecked_ref_cast_addr PUnknown in %{{.*}} : $*PUnknown to AnyObject in %{{.*}} : $*AnyObject
 func refcast_punknown_any(o: PUnknown) -> AnyObject {
   return Builtin.castReference(o)
 }
@@ -763,7 +721,7 @@ func refcast_pclass_any(o: PClass) -> AnyObject {
 }
 
 // CHECK-LABEL: sil hidden @_TF8builtins20refcast_any_punknown
-// CHECK: unchecked_ref_cast_addr AnyObject in %{{.*}}#1 : $*AnyObject to PUnknown in %{{.*}}#1 : $*PUnknown
+// CHECK: unchecked_ref_cast_addr AnyObject in %{{.*}} : $*AnyObject to PUnknown in %{{.*}} : $*PUnknown
 func refcast_any_punknown(o: AnyObject) -> PUnknown {
   return Builtin.castReference(o)
 }

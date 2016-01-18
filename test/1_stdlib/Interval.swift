@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -15,6 +15,14 @@
 // XFAIL: interpret
 
 import StdlibUnittest
+
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
 
 // Check that the generic parameter is called 'Bound'.
 protocol TestProtocol1 {}
@@ -169,11 +177,11 @@ IntervalTestSuite.test("CustomStringConvertible/CustomDebugStringConvertible") {
   expectEqual("0.0...0.1", String(X(0.0)...X(0.1)))
   
   expectEqual(
-    "HalfOpenInterval(X(0.0)..<X(0.1))",
-    String(reflecting: HalfOpenInterval(X(0.0)..<X(0.1))))
+    "HalfOpenInterval(X(0.0)..<X(0.5))",
+    String(reflecting: HalfOpenInterval(X(0.0)..<X(0.5))))
   expectEqual(
-    "ClosedInterval(X(0.0)...X(0.1))",
-    String(reflecting: ClosedInterval(X(0.0)...X(0.1))))
+    "ClosedInterval(X(0.0)...X(0.5))",
+    String(reflecting: ClosedInterval(X(0.0)...X(0.5))))
 }
 
 IntervalTestSuite.test("rdar12016900") {

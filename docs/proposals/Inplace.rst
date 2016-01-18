@@ -23,12 +23,12 @@ In recent standard library design meetings about the proper API for
 sets, it was decided that the canonical ``Set`` interface should be
 written in terms of methods: [#operators]_ ::
 
-  struct Set<T> {
-    public func contains(x: T) -> Bool                // x ∈ A, A ∋ x
-    public func isSubsetOf(b: Set<T>) -> Bool         // A ⊆ B
-    public func isStrictSubsetOf(b: Set<T>) -> Bool   // A ⊂ B
-    public func isSupersetOf(b: Set<T>) -> Bool       // A ⊇ B
-    public func isStrictSupersetOf(b: Set<T>) -> Bool // A ⊃ B
+  struct Set<Element> {
+    public func contains(x: Element) -> Bool                // x ∈ A, A ∋ x
+    public func isSubsetOf(b: Set<Element>) -> Bool         // A ⊆ B
+    public func isStrictSubsetOf(b: Set<Element>) -> Bool   // A ⊂ B
+    public func isSupersetOf(b: Set<Element>) -> Bool       // A ⊇ B
+    public func isStrictSupersetOf(b: Set<Element>) -> Bool // A ⊃ B
     ...
   }
 
@@ -36,17 +36,17 @@ When we started to look at the specifics, however, we ran into a
 familiar pattern::
    
   ...
-    public func union(b: Set<T>) -> Set<T>              // A ∪ B
-    public mutating func unionInPlace(b: Set<T>)        // A ∪= B
+    public func union(b: Set<Element>) -> Set<Element>        // A ∪ B
+    public mutating func unionInPlace(b: Set<Element>)        // A ∪= B
 
-    public func intersect(b: Set<T>) -> Set<T>          // A ∩ B
-    public mutating func intersectInPlace(b: Set<T>)    // A ∩= B
+    public func intersect(b: Set<Element>) -> Set<Element>    // A ∩ B
+    public mutating func intersectInPlace(b: Set<Element>)    // A ∩= B
 
-    public func subtract(b: Set<T>) -> Set<T>           // A - B
-    public mutating func subtractInPlace(b: Set<T>)     // A -= B
+    public func subtract(b: Set<Element>) -> Set<Element>     // A - B
+    public mutating func subtractInPlace(b: Set<Element>)     // A -= B
 
-    public func exclusiveOr(b: Set<T>) -> Set<T>        // A ⊕ B
-    public mutating func exclusiveOrInPlace(b: Set<T>)  // A ⊕= B
+    public func exclusiveOr(b: Set<Element>) -> Set<Element>  // A ⊕ B
+    public mutating func exclusiveOrInPlace(b: Set<Element>)  // A ⊕= B
 
 We had seen the same pattern when considering the API for
 ``String``, but in that case, there are no obvious operator
@@ -310,7 +310,7 @@ as though it were written:
 .. parsed-literal::
 
   { 
-    (var y: X)->X in
+    (var y: X) -> X in
     y\ **.=**\ *f*\ (a₀, p₁: a₁, p₂: a₂, …p\ *n*: a\ *n*)
     return y
   }(x)
@@ -344,7 +344,7 @@ as though it were written:
 .. parsed-literal::
 
   { 
-    (var y: X)->X in
+    (var y: X) -> X in
     y *op*\ **=**\ *expression*
     return y
   }(x)
@@ -424,7 +424,7 @@ fine::
   foo.=advanced(10)
 
 The alternative would be to say that explicitly-written assignment methods
-cannot work properly for immutable classes and “work” with reference
+cannot work properly for immutable classes and "work" with reference
 semantics on other classes.  We consider this approach indefensible,
 especially when one considers that operators encourage writing
 algorithms that can only work properly with value semantics and will

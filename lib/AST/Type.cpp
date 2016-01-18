@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -721,7 +721,7 @@ static Type getStrippedType(const ASTContext &context, Type type,
       Type eltTy = getStrippedType(context, elt.getType(),
                                    stripLabels, stripDefaultArgs);
       if (anyChanged || eltTy.getPointer() != elt.getType().getPointer() ||
-          (elt.hasInit() && stripDefaultArgs) ||
+          (elt.hasDefaultArg() && stripDefaultArgs) ||
           (elt.hasName() && stripLabels)) {
         if (!anyChanged) {
           elements.reserve(tuple->getNumElements());
@@ -763,38 +763,6 @@ static Type getStrippedType(const ASTContext &context, Type type,
 Type TypeBase::getUnlabeledType(ASTContext &Context) {
   return getStrippedType(Context, Type(this), /*labels=*/true,
                          /*defaultArgs=*/true);
-}
-
-Type TypeBase::getRelabeledType(ASTContext &ctx, 
-                                ArrayRef<Identifier> labels) {
-  if (auto tupleTy = dyn_cast<TupleType>(this)) {
-    assert(labels.size() == tupleTy->getNumElements() && 
-           "Wrong number of labels");
-    SmallVector<TupleTypeElt, 4> elements;
-    unsigned i = 0;
-    bool anyChanged = false;
-    for (const auto &elt : tupleTy->getElements()) {
-      if (elt.getName() != labels[i])
-        anyChanged = true;
-
-      elements.push_back(TupleTypeElt(elt.getType(), labels[i], 
-                                      elt.getDefaultArgKind(), elt.isVararg()));
-      ++i;
-    }
-
-    if (!anyChanged)
-      return this;
-
-    return TupleType::get(elements, ctx);
-  }
-
-  // If there is no label, the type is unchanged.
-  if (labels[0].empty())
-    return this;
-
-  // Create a one-element tuple to capture the label.
-  TupleTypeElt elt(this, labels[0]);
-  return TupleType::get(elt, ctx);  
 }
 
 Type TypeBase::getWithoutDefaultArgs(const ASTContext &Context) {
@@ -954,22 +922,6 @@ TypeDecl *TypeBase::getDirectlyReferencedTypeDecl() const {
   }
 
   return nullptr;
-}
-
-StringRef TypeBase::getInferredDefaultArgString() {
-  if (auto structDecl = getStructOrBoundGenericStruct()) {
-    if (structDecl->getClangDecl()) {
-      for (auto attr : structDecl->getAttrs()) {
-        if (auto synthesizedProto = dyn_cast<SynthesizedProtocolAttr>(attr)) {
-          if (synthesizedProto->getProtocolKind()
-              == KnownProtocolKind::OptionSetType)
-            return "[]";
-        }
-      }
-    }
-  }
-
-  return "nil";
 }
 
 /// \brief Collect the protocols in the existential type T into the given
@@ -1501,7 +1453,7 @@ bool TypeBase::isSpelledLike(Type other) {
       return false;
     for (size_t i = 0, sz = tMe->getNumElements(); i < sz; ++i) {
       auto &myField = tMe->getElement(i), &theirField = tThem->getElement(i);
-      if (myField.hasInit() != theirField.hasInit())
+      if (myField.hasDefaultArg() != theirField.hasDefaultArg())
         return false;
       
       if (myField.getName() != theirField.getName())
@@ -1602,7 +1554,10 @@ bool TypeBase::isSpelledLike(Type other) {
 }
 
 Type TypeBase::getSuperclass(LazyResolver *resolver) {
+  // If this type is either a bound generic type, or a nested type inside a
+  // bound generic type, we will need to fish out the generic parameters.
   Type specializedTy;
+
   ClassDecl *classDecl;
   if (auto classTy = getAs<ClassType>()) {
     classDecl = classTy->getDecl();
@@ -1622,19 +1577,31 @@ Type TypeBase::getSuperclass(LazyResolver *resolver) {
     return nullptr;
   }
 
+  // Get the superclass type. If the class is generic, the superclass type may
+  // contain generic type parameters from the signature of the class.
   Type superclassTy;
   if (classDecl)
     superclassTy = classDecl->getSuperclass();
 
-  if (!specializedTy || !superclassTy)
+  // If there's no superclass, return a null type. If the class is not in a
+  // generic context, return the original superclass type.
+  if (!superclassTy || !classDecl->isGenericContext())
     return superclassTy;
+
+  // The class is defined in a generic context, so its superclass type may refer
+  // to generic parameters of the class or some parent type of the class. Map
+  // it to a contextual type.
 
   // FIXME: Lame to rely on archetypes in the substitution below.
   superclassTy = ArchetypeBuilder::mapTypeIntoContext(classDecl, superclassTy);
 
-  // If the type is specialized, we need to gather all of the substitutions.
-  // We've already dealt with the top level, but continue gathering
-  // specializations from the parent types.
+  // If the type does not bind any generic parameters, return the superclass
+  // type as-is.
+  if (!specializedTy)
+    return superclassTy;
+
+  // If the type is specialized, we need to gather all of the substitutions
+  // for the type and any parent types.
   TypeSubstitutionMap substitutions;
   while (specializedTy) {
     if (auto nominalTy = specializedTy->getAs<NominalType>()) {
@@ -1653,7 +1620,8 @@ Type TypeBase::getSuperclass(LazyResolver *resolver) {
     specializedTy = boundTy->getParent();
   }
 
-  // Perform substitutions into the base type.
+  // Perform substitutions into the superclass type to yield the
+  // substituted superclass type.
   Module *module = classDecl->getModuleContext();
   return superclassTy.subst(module, substitutions, None);
 }
@@ -1851,7 +1819,7 @@ bool TypeBase::canOverride(Type other, bool allowUnsafeParameterOverride,
 /// value.
 bool TupleType::hasAnyDefaultValues() const {
   for (const TupleTypeElt &Elt : Elements)
-    if (Elt.hasInit())
+    if (Elt.hasDefaultArg())
       return true;
   return false;
 }
@@ -1877,7 +1845,7 @@ int TupleType::getElementForScalarInit() const {
   int FieldWithoutDefault = -1;
   for (unsigned i = 0, e = Elements.size(); i != e; ++i) {
     // Ignore fields with a default value.
-    if (Elements[i].hasInit()) continue;
+    if (Elements[i].hasDefaultArg()) continue;
     
     // If we already saw a non-vararg field missing a default value, then we
     // cannot assign a scalar to this tuple.
@@ -2125,7 +2093,7 @@ Type ProtocolCompositionType::get(const ASTContext &C,
     return Protocols.front()->getDeclaredType();
 
   // Form the set of canonical protocol types from the protocol
-  // declarations, and use that to buid the canonical composition type.
+  // declarations, and use that to build the canonical composition type.
   SmallVector<Type, 4> CanProtocolTypes;
   std::transform(Protocols.begin(), Protocols.end(),
                  std::back_inserter(CanProtocolTypes),
@@ -2237,6 +2205,7 @@ const {
   for (auto &reqt : getRequirements()) {
     switch (reqt.getKind()) {
     case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
     case RequirementKind::WitnessMarker:
       // Substituting the parameter eliminates conformance constraints rooted
       // in the parameter.
@@ -2297,9 +2266,12 @@ static Type getMemberForBaseType(Module *module,
   // If the parent is an archetype, extract the child archetype with the
   // given name.
   if (auto archetypeParent = substBase->getAs<ArchetypeType>()) {
-    if (!archetypeParent->hasNestedType(name) &&
-        archetypeParent->getParent()->isSelfDerived()) {
-      return archetypeParent->getParent()->getNestedTypeValue(name);
+    if (!archetypeParent->hasNestedType(name)) {
+      const auto parent = archetypeParent->getParent();
+      if (!parent)
+        return ErrorType::get(module->getASTContext());
+      if (parent->isSelfDerived())
+        return parent->getNestedTypeValue(name);
     }
     
     return archetypeParent->getNestedTypeValue(name);
@@ -2487,6 +2459,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(DeclContext *dc) {
   // Find the superclass type with the context matching that of the member.
   auto ownerNominal = dc->isNominalTypeOrNominalTypeExtensionContext();
   while (!baseTy->is<ErrorType>() &&
+         baseTy->getAnyNominal() &&
          baseTy->getAnyNominal() != ownerNominal) {
     baseTy = baseTy->getSuperclass(resolver);
     assert(baseTy && "Couldn't find appropriate context");
@@ -2517,7 +2490,13 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(DeclContext *dc) {
     }
 
     // Continue looking into the parent.
-    baseTy = baseTy->castTo<NominalType>()->getParent();
+    if (auto nominalTy = baseTy->getAs<NominalType>()) {
+      baseTy = nominalTy->getParent();
+      continue;
+    }
+
+    // We're done.
+    break;
   }
 
   return substitutions;
@@ -3136,4 +3115,100 @@ bool Type::isPrivateStdlibType(bool whitelistProtocols) const {
       return true;
 
   return false;
+}
+
+bool UnownedStorageType::isLoadable(ResilienceExpansion resilience) const {
+  return getReferentType()->usesNativeReferenceCounting(resilience);
+}
+
+static bool doesOpaqueClassUseNativeReferenceCounting(const ASTContext &ctx) {
+  return !ctx.LangOpts.EnableObjCInterop;
+}
+
+static bool usesNativeReferenceCounting(ClassDecl *theClass,
+                                        ResilienceExpansion resilience) {
+  // NOTE: if you change this, change irgen::getReferenceCountingForClass.
+  // TODO: Resilience? there might be some legal avenue of changing this.
+  while (Type supertype = theClass->getSuperclass()) {
+    theClass = supertype->getClassOrBoundGenericClass();
+    assert(theClass);
+  }
+  return !theClass->hasClangNode();
+}
+
+bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
+  assert(allowsOwnership());
+
+  CanType type = getCanonicalType();
+  switch (type->getKind()) {
+#define SUGARED_TYPE(id, parent) case TypeKind::id:
+#define TYPE(id, parent)
+#include "swift/AST/TypeNodes.def"
+    llvm_unreachable("sugared canonical type?");
+
+  case TypeKind::BuiltinNativeObject:
+  case TypeKind::SILBox:
+    return true;
+
+  case TypeKind::BuiltinUnknownObject:
+  case TypeKind::BuiltinBridgeObject:
+    return ::doesOpaqueClassUseNativeReferenceCounting(type->getASTContext());
+
+  case TypeKind::Class:
+    return ::usesNativeReferenceCounting(cast<ClassType>(type)->getDecl(),
+                                         resilience);
+  case TypeKind::BoundGenericClass:
+    return ::usesNativeReferenceCounting(
+                                  cast<BoundGenericClassType>(type)->getDecl(),
+                                         resilience);
+
+  case TypeKind::DynamicSelf:
+    return cast<DynamicSelfType>(type).getSelfType()
+             ->usesNativeReferenceCounting(resilience);
+
+  case TypeKind::Archetype: {
+    auto archetype = cast<ArchetypeType>(type);
+    assert(archetype->requiresClass());
+    if (auto supertype = archetype->getSuperclass())
+      return supertype->usesNativeReferenceCounting(resilience);
+    return ::doesOpaqueClassUseNativeReferenceCounting(type->getASTContext());
+  }
+
+  case TypeKind::Protocol:
+  case TypeKind::ProtocolComposition:
+    return ::doesOpaqueClassUseNativeReferenceCounting(type->getASTContext());
+
+  case TypeKind::UnboundGeneric:
+  case TypeKind::Function:
+  case TypeKind::PolymorphicFunction:
+  case TypeKind::GenericFunction:
+  case TypeKind::SILFunction:
+  case TypeKind::SILBlockStorage:
+  case TypeKind::Error:
+  case TypeKind::Unresolved:
+  case TypeKind::BuiltinInteger:
+  case TypeKind::BuiltinFloat:
+  case TypeKind::BuiltinRawPointer:
+  case TypeKind::BuiltinUnsafeValueBuffer:
+  case TypeKind::BuiltinVector:
+  case TypeKind::Tuple:
+  case TypeKind::Enum:
+  case TypeKind::Struct:
+  case TypeKind::Metatype:
+  case TypeKind::ExistentialMetatype:
+  case TypeKind::Module:
+  case TypeKind::LValue:
+  case TypeKind::InOut:
+  case TypeKind::TypeVariable:
+  case TypeKind::BoundGenericEnum:
+  case TypeKind::BoundGenericStruct:
+  case TypeKind::UnownedStorage:
+  case TypeKind::UnmanagedStorage:
+  case TypeKind::WeakStorage:
+  case TypeKind::GenericTypeParam:
+  case TypeKind::DependentMember:
+    llvm_unreachable("type is not a class reference");
+  }
+
+  llvm_unreachable("Unhandled type kind!");
 }

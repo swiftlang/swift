@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -158,18 +158,18 @@ enum ContextualTypePurpose {
   CTP_DictionaryValue,  ///< DictionaryExpr values should have a specific type.
   CTP_CoerceOperand,    ///< CoerceExpr operand coerced to specific type.
   CTP_AssignSource,     ///< AssignExpr source operand coerced to result type.
-  
+
   CTP_CannotFail,       ///< Conversion can never fail. abort() if it does.
 };
 
-  
+
 
 /// Flags that can be used to control name lookup.
 enum class TypeCheckExprFlags {
   /// Whether we know that the result of the expression is discarded.  This
   /// disables constraints forcing an lvalue result to be loadable.
   IsDiscarded = 0x01,
-  
+
   /// Whether the client wants to disable the structural syntactic restrictions
   /// that we force for style or other reasons.
   DisableStructuralChecks = 0x02,
@@ -183,7 +183,7 @@ enum class TypeCheckExprFlags {
   /// system is not applied to the expression AST, but the ConstraintSystem is
   /// left in-tact.
   AllowUnresolvedTypeVariables = 0x08,
-  
+
   /// If set, the 'convertType' specified to typeCheckExpression should not
   /// produce a conversion constraint, but it should be used to guide the
   /// solution in terms of performance optimizations of the solver, and in terms
@@ -194,8 +194,12 @@ enum class TypeCheckExprFlags {
   /// statement. This should only be used for syntactic restrictions, and should
   /// not affect type checking itself.
   IsExprStmt = 0x20,
+
+  /// If set, this expression is being re-type checked as part of diagnostics,
+  /// and so we should not visit bodies of non-single expression closures.
+  SkipMultiStmtClosures = 0x40,
 };
-  
+
 typedef OptionSet<TypeCheckExprFlags> TypeCheckExprOptions;
 
 inline TypeCheckExprOptions operator|(TypeCheckExprFlags flag1,
@@ -214,6 +218,9 @@ enum class NameLookupFlags {
   DynamicLookup = 0x04,
   /// Whether we're only looking for types.
   OnlyTypes = 0x08,
+  /// Whether to ignore access control for this lookup, allowing inaccessible
+  /// results to be returned.
+  IgnoreAccessibility = 0x10,
 };
 
 /// A set of options that control name lookup.
@@ -297,9 +304,6 @@ enum TypeResolutionFlags : unsigned {
   /// Whether to allow unspecified types within a pattern.
   TR_AllowUnspecifiedTypes = 0x01,
 
-  /// Whether the pattern is variadic.
-  TR_Variadic = 0x02,
-
   /// Whether the given type can override the type of a typed pattern.
   TR_OverrideType = 0x04,
 
@@ -312,23 +316,20 @@ enum TypeResolutionFlags : unsigned {
   /// Whether we are in the input type of a function, or under one level of
   /// tuple type.  This is not set for multi-level tuple arguments.
   TR_FunctionInput = 0x20,
-  
+
   /// Whether this is the immediate input type to a function type,
   TR_ImmediateFunctionInput = 0x40,
-
-  /// Whether we are in the result type of a function type.
-  TR_FunctionResult = 0x80,
 
   /// Whether we are in the result type of a function body that is
   /// known to produce dynamic Self.
   TR_DynamicSelfResult = 0x100,
-  
+
   /// Whether this is a resolution based on a non-inferred type pattern.
   TR_FromNonInferredPattern = 0x200,
-  
+
   /// Whether we are the variable type in a for/in statement.
   TR_EnumerationVariable = 0x400,
-  
+
   /// Whether we are looking only in the generic signature of the context
   /// we're searching, rather than the entire context.
   TR_GenericSignature = 0x800,
@@ -344,13 +345,13 @@ enum TypeResolutionFlags : unsigned {
   /// This affects what sort of dependencies are recorded when resolving the
   /// type.
   TR_InExpression = 0x4000,
-  
+
   /// Whether this type resolution is guaranteed not to affect downstream files.
   TR_KnownNonCascadingDependency = 0x8000,
 
   /// Whether we should allow references to unavailable types.
   TR_AllowUnavailable = 0x10000,
-  
+
   /// Whether this is the payload subpattern of an enum pattern.
   TR_EnumPatternPayload = 0x20000,
 
@@ -365,6 +366,9 @@ enum TypeResolutionFlags : unsigned {
   /// Whether we should resolve only the structure of the resulting
   /// type rather than its complete semantic properties.
   TR_ResolveStructure = 0x100000,
+
+  /// Whether this is the type of an editor placeholder.
+  TR_EditorPlaceholder = 0x200000,
 };
 
 /// Option set describing how type resolution should work.
@@ -380,7 +384,6 @@ static inline TypeResolutionOptions
 withoutContext(TypeResolutionOptions options) {
   options -= TR_ImmediateFunctionInput;
   options -= TR_FunctionInput;
-  options -= TR_FunctionResult;
   options -= TR_EnumCase;
   return options;
 }
@@ -432,10 +435,6 @@ public:
   ASTContext &Context;
   DiagnosticEngine &Diags;
 
-  /// \brief The list of implicitly-defined functions created by the
-  /// type checker.
-  std::vector<AbstractFunctionDecl *> implicitlyDefinedFunctions;
-
   /// \brief The list of function definitions we've encountered.
   std::vector<AbstractFunctionDecl *> definedFunctions;
 
@@ -453,7 +452,7 @@ public:
   /// This can't use CanTypes because typealiases may have more limited types
   /// than their underlying types.
   llvm::DenseMap<Type, Accessibility> TypeAccessibilityCache;
-  
+
   // We delay validation of C and Objective-C type-bridging functions in the
   // standard library until we encounter a declaration that requires one. This
   // flag is set to 'true' once the bridge functions have been checked.
@@ -484,7 +483,7 @@ public:
   ///     use(x)
   ///   }
   /// }
-  
+
   llvm::SmallDenseMap<AnyFunctionRef, SmallVector<AnyFunctionRef, 4>, 4>
     ForwardCapturedFuncs;
 
@@ -516,13 +515,13 @@ private:
 
   /// The \c Swift.UnsafeMutablePointer<T> declaration.
   Optional<NominalTypeDecl *> ArrayDecl;
-  
+
   /// A set of types that can be trivially mapped to Objective-C types.
   llvm::DenseSet<CanType> ObjCMappedTypes;
 
   /// A set of types that can be mapped to C integer types.
   llvm::DenseSet<CanType> CIntegerTypes;
-  
+
   /// The set of expressions currently being analyzed for failures.
   llvm::DenseMap<Expr*, Expr*> DiagnosedExprs;
 
@@ -571,7 +570,7 @@ public:
   void setInImmediateMode(bool InImmediateMode) {
     this->InImmediateMode = InImmediateMode;
   }
-  
+
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(ArgTypes &&...Args) {
     return Diags.diagnose(std::forward<ArgTypes>(Args)...);
@@ -596,12 +595,12 @@ public:
                              bool diagnoseErrors,
                              GenericTypeResolver *resolver,
                              UnsatisfiedDependency *unsatisfiedDependency);
-  
+
   /// Bind an UnresolvedDeclRefExpr by performing name lookup and
   /// returning the resultant expression.  Context is the DeclContext used
   /// for the lookup.
   Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context);
-  
+
   /// \brief Validate the given type.
   ///
   /// Type validation performs name binding, checking of generic arguments,
@@ -695,9 +694,37 @@ public:
                             UnsatisfiedDependency *unsatisfiedDependency
                               = nullptr);
 
-  /// \brief Apply generic arguments to the given type.
+  /// Apply generic arguments to the given type.
   ///
-  /// \param type The unbound generic type to which to apply arguments.
+  /// This function emits diagnostics about an invalid type or the wrong number
+  /// of generic arguments, whereas applyUnboundGenericArguments requires this
+  /// to be in a correct and valid form.
+  ///
+  /// \param type The generic type to which to apply arguments.
+  /// \param loc The source location for diagnostic reporting.
+  /// \param dc The context where the arguments are applied.
+  /// \param generic The arguments to apply with the angle bracket range for
+  /// diagnostics.
+  /// \param isGenericSignature True if we are looking only in the generic
+  /// signature of the context.
+  /// \param resolver The generic type resolver.
+  ///
+  /// \returns A BoundGenericType bound to the given arguments, or null on
+  /// error.
+  ///
+  /// \see applyUnboundGenericArguments
+  Type applyGenericArguments(Type type, SourceLoc loc, DeclContext *dc,
+                             GenericIdentTypeRepr *generic,
+                             bool isGenericSignature,
+                             GenericTypeResolver *resolver);
+
+  /// Apply generic arguments to the given type.
+  ///
+  /// This function requires a valid unbound generic type with the correct
+  /// number of generic arguments given, whereas applyGenericArguments emits
+  /// diagnostics in those cases.
+  ///
+  /// \param unbound The unbound generic type to which to apply arguments.
   /// \param loc The source location for diagnostic reporting.
   /// \param dc The context where the arguments are applied.
   /// \param genericArgs The list of generic arguments to apply to the type.
@@ -707,12 +734,13 @@ public:
   ///
   /// \returns A BoundGenericType bound to the given arguments, or null on
   /// error.
-  Type applyGenericArguments(Type type,
-                             SourceLoc loc,
-                             DeclContext *dc,
-                             MutableArrayRef<TypeLoc> genericArgs,
-                             bool isGenericSignature,
-                             GenericTypeResolver *resolver);
+  ///
+  /// \see applyGenericArguments
+  Type applyUnboundGenericArguments(UnboundGenericType *unbound, SourceLoc loc,
+                                    DeclContext *dc,
+                                    MutableArrayRef<TypeLoc> genericArgs,
+                                    bool isGenericSignature,
+                                    GenericTypeResolver *resolver);
 
   /// \brief Substitute the given base type into the type of the given member,
   /// producing the effective type that the member will have.
@@ -774,13 +802,13 @@ public:
   /// \returns true if a checked cast from \c t1 to \c t2 may succeed, and
   /// false if it will certainly fail, e.g. because the types are unrelated.
   bool checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc);
-  
+
   /// \brief Determine whether a constraint of the given kind can be satisfied
   /// by the two types.
   ///
-  /// \param t1 The first type of the constrant.
+  /// \param t1 The first type of the constraint.
   ///
-  /// \param t2 The second type of the constrant.
+  /// \param t2 The second type of the constraint.
   ///
   /// \param dc The context of the conversion.
   ///
@@ -909,7 +937,7 @@ public:
                       GenericSignature *outerSignature,
                       std::function<bool(ArchetypeBuilder &)> inferRequirements,
                       bool &invalid);
-                        
+
   /// Validate the signature of a generic type.
   ///
   /// \param nominal The generic type.
@@ -986,7 +1014,7 @@ public:
   /// \brief Add the RawOptionSet (todo:, Equatable, and Hashable) methods to an
   /// imported NS_OPTIONS struct.
   void addImplicitStructConformances(StructDecl *ED);
-  
+
   /// \brief Add the RawRepresentable, Equatable, and Hashable methods to an
   /// enum with a raw type.
   void addImplicitEnumConformances(EnumDecl *ED);
@@ -1034,7 +1062,7 @@ public:
   /// \brief Fold the given sequence expression into an (unchecked) expression
   /// tree.
   Expr *foldSequence(SequenceExpr *expr, DeclContext *dc);
-  
+
   /// \brief Type check the given expression.
   ///
   /// \param expr The expression to type-check, which will be modified in
@@ -1069,7 +1097,7 @@ public:
                                TypeCheckExprOptions(), listener);
   }
 
-  
+
   /// \brief Type check the given expression and return its type without
   /// applying the solution.
   ///
@@ -1085,7 +1113,7 @@ public:
   /// \returns the type of \p expr on success, None otherwise.
   /// FIXME: expr may still be modified...
   Optional<Type> getTypeOfExpressionWithoutApplying(
-      Expr *&expr, DeclContext *dc, 
+      Expr *&expr, DeclContext *dc,
       FreeTypeVariableBinding allowFreeTypeVariables =
                               FreeTypeVariableBinding::Disallow,
       ExprTypeCheckListener *listener = nullptr);
@@ -1124,7 +1152,7 @@ public:
   /// \returns true if an error occurred, false otherwise.
   bool typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
                               Diag<> diagnosticForAlwaysTrue);
-  
+
   /// \brief Determine the semantics of a checked cast operation.
   ///
   /// \param fromType       The source type of the cast.
@@ -1140,7 +1168,7 @@ public:
   ///                       of printing diagnostics.
   ///
   /// \returns a CheckedCastKind indicating the semantics of the cast. If the
-  /// cast is invald, Unresolved is returned. If the cast represents an implicit
+  /// cast is invalid, Unresolved is returned. If the cast represents an implicit
   /// conversion, Coercion is returned.
   CheckedCastKind typeCheckCheckedCast(Type fromType,
                                        Type toType,
@@ -1186,7 +1214,7 @@ public:
   /// name lookup information. Must be done before type-checking the pattern.
   Pattern *resolvePattern(Pattern *P, DeclContext *dc,
                           bool isStmtCondition);
-  
+
   /// Type check the given pattern.
   ///
   /// \param P The pattern to type check.
@@ -1201,6 +1229,11 @@ public:
 
   bool typeCheckCatchPattern(CatchStmt *S, DeclContext *dc);
 
+  /// Type check a parameter list.
+  bool typeCheckParameterList(ParameterList *PL, DeclContext *dc,
+                              TypeResolutionOptions options,
+                              GenericTypeResolver *resolver = nullptr);
+  
   /// Coerce a pattern to the given type.
   ///
   /// \param P The pattern, which may be modified by this coercion.
@@ -1216,6 +1249,13 @@ public:
   bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                             Type type);
 
+  /// Coerce the specified parameter list of a ClosureExpr to the specified
+  /// contextual type.
+  ///
+  /// \returns true if an error occurred, false otherwise.
+  bool coerceParameterListToType(ParameterList *P, DeclContext *dc, Type type);
+
+  
   /// Type-check an initialized variable pattern declaration.
   bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC);
   bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber);
@@ -1275,10 +1315,10 @@ public:
   ///
   /// \returns true if an error occurred, false otherwise.
   bool convertToType(Expr *&expr, Type type, DeclContext *dc);
-  
+
   /// \brief Coerce the given expression to an rvalue, if it isn't already.
   Expr *coerceToRValue(Expr *expr);
-  
+
   /// \brief Coerce the given expression to materializable type, if it
   /// isn't already.
   Expr *coerceToMaterializable(Expr *expr);
@@ -1325,7 +1365,7 @@ public:
   ///
   /// \param name The name of the method to call.
   ///
-  /// \param arguments The arguments to 
+  /// \param arguments The arguments to
   ///
   /// \param brokenProtocolDiag Diagnostic to emit if the protocol is broken.
   ///
@@ -1411,7 +1451,7 @@ public:
   ValueDecl *deriveProtocolRequirement(DeclContext *DC,
                                        NominalTypeDecl *TypeDecl,
                                        ValueDecl *Requirement);
-  
+
   /// Derive an implicit type witness for the given associated type in
   /// the conformance of the given nominal type to some known
   /// protocol.
@@ -1445,7 +1485,7 @@ public:
   /// \brief Look up a member type within the given type.
   ///
   /// This routine looks for member types with the given name within the
-  /// given type. 
+  /// given type.
   ///
   /// \param dc The context that needs the member.
   /// \param type The type in which we will look for a member type.
@@ -1481,9 +1521,8 @@ public:
   /// marked as unavailable, either through "unavailable" or "obsoleted=".
   bool diagnoseExplicitUnavailability(const ValueDecl *D,
                                       SourceRange R,
-                                      const DeclContext *DC,
-                                      const Expr *ParentExpr);
-  
+                                      const DeclContext *DC);
+
   /// @}
 
   /// Fix the name of the given function to the target name, attaching
@@ -1573,7 +1612,7 @@ public:
                                           Type T, SourceRange TypeRange);
 
   void fillObjCRepresentableTypeCache(const DeclContext *DC);
-  
+
   ArchetypeBuilder createArchetypeBuilder(Module *mod);
 
   /// \name Availability checking
@@ -1583,7 +1622,7 @@ public:
   /// @{
 
   /// \brief Returns true if the availability of the overriding declaration
-  /// makes it a safe override, given the availability of the base declation.
+  /// makes it a safe override, given the availability of the base declaration.
   bool isAvailabilitySafeForOverride(ValueDecl *override, ValueDecl *base);
 
   /// \brief Returns true if the availability of the witness
@@ -1596,7 +1635,7 @@ public:
                                         VersionRange &requiredRange);
 
   /// Returns an over-approximation of the range of operating system versions
-  /// that could  the passed-in location location could be executing upon for
+  /// that could the passed-in location could be executing upon for
   /// the target platform.
   VersionRange overApproximateOSVersionsAtLocation(SourceLoc loc,
                                                    const DeclContext *DC);
@@ -1682,10 +1721,14 @@ public:
   static const AvailableAttr *getDeprecated(const Decl *D);
 
   /// Emits a diagnostic for a reference to a declaration that is deprecated.
+  /// Callers can provide a lambda that adds additional information (such as a
+  /// fixit hint) to the deprecation diagnostic, if it is emitted.
   void diagnoseDeprecated(SourceRange SourceRange,
                           const DeclContext *ReferenceDC,
                           const AvailableAttr *Attr,
-                          DeclName Name);
+                          DeclName Name,
+              std::function<void(InFlightDiagnostic&)> extraInfoHandler =
+                          [](InFlightDiagnostic&){});
   /// @}
 
   /// If LangOptions::DebugForbidTypecheckPrefix is set and the given decl
@@ -1747,7 +1790,7 @@ public:
 class CleanupIllFormedExpressionRAII {
   ASTContext &Context;
   Expr **expr;
-  
+
 public:
   CleanupIllFormedExpressionRAII(ASTContext &Context, Expr *&expr)
     : Context(Context), expr(&expr) { }

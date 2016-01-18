@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -46,57 +46,55 @@ extension NSCursor : _Reflectable {
 }
 
 struct _NSViewMirror : _MirrorType {
-  static var _views = NSMutableSet()
+  static var _views = Set<NSView>()
 
   var _v : NSView
   
   init(_ v : NSView) { _v = v }
   
-  var value: Any { get { return _v } }
+  var value: Any { return _v }
   
-  var valueType: Any.Type { get { return (_v as Any).dynamicType } }
+  var valueType: Any.Type { return (_v as Any).dynamicType }
   
-  var objectIdentifier: ObjectIdentifier? { get { return .None } }
+  var objectIdentifier: ObjectIdentifier? { return .None }
   
-  var count: Int { get { return 0 } }
+  var count: Int { return 0 }
   
   subscript(_: Int) -> (String, _MirrorType) {
     _preconditionFailure("_MirrorType access out of bounds")
   }
   
-  var summary: String { get { return "" } }
+  var summary: String { return "" }
   
-  var quickLookObject: PlaygroundQuickLook? { get {
-      // adapted from the Xcode QuickLooks implementation
+  var quickLookObject: PlaygroundQuickLook? {
+    // adapted from the Xcode QuickLooks implementation
+    
+    var result: PlaygroundQuickLook? = nil
+    
+    // if you set NSView.needsDisplay, you can get yourself in a recursive scenario where the same view
+    // could need to draw itself in order to get a QLObject for itself, which in turn if your code was
+    // instrumented to log on-draw, would cause yourself to get back here and so on and so forth
+    // until you run out of stack and crash
+    // This code checks that we aren't trying to log the same view recursively - and if so just returns
+    // nil, which is probably a safer option than crashing
+    // FIXME: is there a way to say "cacheDisplayInRect butDoNotRedrawEvenIfISaidSo"?
+    if !_NSViewMirror._views.contains(_v) {
+      _NSViewMirror._views.insert(_v)
       
-      var result: PlaygroundQuickLook? = nil
-      
-      // if you set NSView.needsDisplay, you can get yourself in a recursive scenario where the same view
-      // could need to draw itself in order to get a QLObject for itself, which in turn if your code was
-      // instrumented to log on-draw, would cause yourself to get back here and so on and so forth
-      // until you run out of stack and crash
-      // This code checks that we aren't trying to log the same view recursively - and if so just returns
-      // nil, which is probably a safer option than crashing
-      // FIXME: is there a way to say "cacheDisplayInRect butDoNotRedrawEvenIfISaidSo"?
-      switch _NSViewMirror._views.member(_v) {
-        case nil:
-          _NSViewMirror._views.addObject(_v)
-
-          let bounds = _v.bounds
-          if let b = _v.bitmapImageRepForCachingDisplayInRect(bounds) {
-              _v.cacheDisplayInRect(bounds, toBitmapImageRep: b)
-              result = .Some(.View(b))
-          }
-          
-          _NSViewMirror._views.removeObject(_v)
-        default: ()
+      let bounds = _v.bounds
+      if let b = _v.bitmapImageRepForCachingDisplayInRect(bounds) {
+        _v.cacheDisplayInRect(bounds, toBitmapImageRep: b)
+        result = .Some(.View(b))
       }
       
-      return result
-      
-  } }
+      _NSViewMirror._views.remove(_v)
+    }
+    
+    return result
+    
+  }
   
-  var disposition : _MirrorDisposition { get { return .Aggregate } }
+  var disposition : _MirrorDisposition { return .Aggregate }
 }
 
 extension NSView : _Reflectable {
