@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -I %S/../Inputs -emit-silgen -enable-source-import -parse-as-library -enable-resilience %s | FileCheck %s
+// RUN: %target-swift-frontend -I %S/../Inputs -emit-sil -enable-source-import -parse-as-library -enable-resilience %s -O | FileCheck --check-prefix=CHECK-OPT %s
 
 import resilient_global
 
@@ -33,6 +34,15 @@ public var myEmptyGlobal = MyEmptyStruct()
 // CHECK-LABEL: sil [global_init] @_TF17global_resilienceau19myFixedLayoutGlobalVS_13MyEmptyStruct
 // CHECK:         global_addr @_Tv17global_resilience19myFixedLayoutGlobalVS_13MyEmptyStruct
 // CHECK:         return
+
+// CHECK-OPT-LABEL: sil private @globalinit_{{.*}}_func0
+// CHECK-OPT:     alloc_global @_Tv17global_resilience19myFixedLayoutGlobalVS_13MyEmptyStruct
+// CHECK-OPT:     return
+
+// CHECK-OPT-LABEL: sil [global_init] @_TF17global_resilienceau19myFixedLayoutGlobalVS_13MyEmptyStruct
+// CHECK-OPT:     global_addr @_Tv17global_resilience19myFixedLayoutGlobalVS_13MyEmptyStruct
+// CHECK-OPT:     function_ref @globalinit_{{.*}}_func0
+// CHECK-OPT:     return
 
 // Accessing resilient global from our resilience domain --
 // call the addressor directly

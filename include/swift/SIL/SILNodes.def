@@ -138,7 +138,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(IsUniqueInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
   INST(IsUniqueOrPinnedInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
 
-  INST(AllocGlobalInst, SILInstruction, None, DoesNotRelease)
+  INST(AllocGlobalInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
 
   // Literals
   ABSTRACT_VALUE(LiteralInst, SILInstruction)
