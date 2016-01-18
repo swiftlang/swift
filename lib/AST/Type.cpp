@@ -2131,29 +2131,30 @@ GenericFunctionType::substGenericArgs(Module *M, ArrayRef<Type> args) const {
   
   TypeSubstitutionMap subs;
   for (size_t i = 0, e = args.size(); i != e; ++i) {
-    subs.insert(std::make_pair(params[i], args[i]));
+    CanType param = params[i]->getCanonicalType();
+    subs.insert(std::make_pair(param.getPointer(), args[i]));
   }
-  
+
   Type input = getInput().subst(M, subs, SubstFlags::IgnoreMissing);
   Type result = getResult().subst(M, subs, SubstFlags::IgnoreMissing);
   return FunctionType::get(input, result, getExtInfo());
 }
 
-AnyFunctionType *
-GenericFunctionType::partialSubstGenericArgs(Module *M, ArrayRef<Type> args)
+GenericSignature *
+GenericSignature::partialSubstGenericArgs(Module *M, ArrayRef<Type> args,
+                                          TypeSubstitutionMap &subs)
 const {
   auto params = getGenericParams();
-  
-  // If we're fully applying the generic params, fall through to
-  // substGenericArgs.
+ 
+  // If we're fully applying the generic signature, return null.
   if (args.size() == params.size())
-    return substGenericArgs(M, args);
-  
+    return nullptr;
+
   assert(args.size() < params.size());
   
-  TypeSubstitutionMap subs;
   for (size_t i = 0, e = args.size(); i != e; ++i) {
-    subs.insert(std::make_pair(params[i], args[i]));
+    CanType param = params[i]->getCanonicalType();
+    subs.insert(std::make_pair(param.getPointer(), args[i]));
   }
 
   // Get the slice of the generic parameters and requirements we haven't
@@ -2170,10 +2171,14 @@ const {
     }
     return t.getPointer();
   };
-  
+ 
   auto rootedInAppliedParam = [&](Type t) -> bool {
-    return std::find(appliedParams.begin(), appliedParams.end(), rootType(t))
-             != appliedParams.end();
+    auto root = rootType(t)->getAs<GenericTypeParamType>();
+    for (auto gp : appliedParams) {
+      if (gp->getCanonicalType() == root->getCanonicalType())
+        return true;
+    }
+    return false;
   };
   
   for (auto &reqt : getRequirements()) {
@@ -2207,8 +2212,22 @@ const {
     unappliedReqts.push_back(reqt);
   }
   
-  GenericSignature *sig = GenericSignature::get(unappliedParams,
-                                                unappliedReqts);
+  return GenericSignature::get(unappliedParams, unappliedReqts);
+}
+
+AnyFunctionType *
+GenericFunctionType::partialSubstGenericArgs(Module *M, ArrayRef<Type> args)
+const {
+  auto params = getGenericParams();
+  
+  // If we're fully applying the generic params, fall through to
+  // substGenericArgs.
+  if (args.size() == params.size())
+    return substGenericArgs(M, args);
+
+  TypeSubstitutionMap subs;
+  GenericSignature *sig = getGenericSignature()
+      ->partialSubstGenericArgs(M, args, subs);
   
   Type input = getInput().subst(M, subs, SubstFlags::IgnoreMissing);
   Type result = getResult().subst(M, subs, SubstFlags::IgnoreMissing);
