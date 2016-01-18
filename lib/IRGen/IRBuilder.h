@@ -200,6 +200,19 @@ public:
     return Address(addr, address.getAlignment());
   }
 
+  /// Cast the given address to be a pointer to the given element type,
+  /// preserving the original address space.
+  Address CreateElementBitCast(Address address, llvm::Type *type,
+                               const llvm::Twine &name = "") {
+    // Do nothing if the type doesn't change.
+    auto origPtrType = address.getType();
+    if (origPtrType->getElementType() == type) return address;
+
+    // Otherwise, cast to a pointer to the correct type.
+    auto ptrType = type->getPointerTo(origPtrType->getAddressSpace());
+    return CreateBitCast(address, ptrType, name);
+  }
+
   /// Insert the given basic block after the IP block and move the
   /// insertion point to it.  Only valid if the IP is valid.
   void emitBlock(llvm::BasicBlock *BB);
