@@ -1464,7 +1464,7 @@ Restart:
   // Remember the start of the token so we can form the text range.
   const char *TokStart = CurPtr;
   
-  switch (*CurPtr++) {
+  switch ((signed char)*CurPtr++) {
   default: {
     char const *tmp = CurPtr-1;
     if (advanceIfValidStartOfIdentifier(tmp, BufferEnd))
