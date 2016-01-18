@@ -159,7 +159,7 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
       ->getPointerTo();
   }
   
-  /// unsigned (*getEnumTag)(T *obj, M *self);
+  /// int (*getEnumTag)(T *obj, M *self);
   case ValueWitness::GetEnumTag: {
     llvm::Type *ptrTy = IGM.OpaquePtrTy;
     llvm::Type *metaTy = IGM.TypeMetadataPtrTy;
@@ -183,7 +183,7 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
       ->getPointerTo();
   }
 
-  /// void (*destructiveInjectEnumTag)(T *obj, unsigned tag, M *self);
+  /// void (*destructiveInjectEnumTag)(T *obj, int tag, M *self);
   case ValueWitness::DestructiveInjectEnumTag: {
     llvm::Type *voidTy = IGM.VoidTy;
     llvm::Type *ptrTy = IGM.OpaquePtrTy;

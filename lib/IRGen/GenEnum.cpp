@@ -232,6 +232,11 @@ irgen::EnumImplStrategy::getTagIndex(EnumElementDecl *Case) const {
   llvm_unreachable("couldn't find case");
 }
 
+int
+irgen::EnumImplStrategy::getResilientTagIndex(EnumElementDecl *Case) const {
+  return getTagIndex(Case) - ElementsWithPayload.size();
+}
+
 namespace {
   /// Implementation strategy for singleton enums, with zero or one cases.
   class SingletonEnumImplStrategy final : public EnumImplStrategy {
@@ -285,7 +290,11 @@ namespace {
     llvm::Value *
     emitGetEnumTag(IRGenFunction &IGF, SILType T, Address enumAddr)
     const override {
-      return llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0);
+      // Convert fragile tag index into resilient tag index.
+      // - -1 -- if we have a payload
+      // -  0 -- if there's no payload
+      return llvm::ConstantInt::get(IGF.IGM.Int32Ty,
+          ElementsWithPayload.size() > 0 ? -1 : 0);
     }
 
     llvm::Value *
@@ -693,7 +702,11 @@ namespace {
     const override {
       Explosion value;
       loadAsTake(IGF, enumAddr, value);
-      return value.claimNext();
+
+      // Converting fragile tag index into resilient tag index is
+      // not necessary; there are no payload tags.
+      return IGF.Builder.CreateZExtOrTrunc(value.claimNext(),
+                                           IGF.IGM.Int32Ty);
     }
 
     llvm::Value *emitValueCaseTest(IRGenFunction &IGF,
@@ -888,15 +901,9 @@ namespace {
                                      llvm::StructType *enumTy) override;
 
     // TODO: Support this function also for other enum implementation strategies.
-    int64_t getDiscriminatorIndex(EnumElementDecl *target) const override {
+    int64_t getDiscriminatorIndex(EnumElementDecl *elt) const override {
       // The elements are assigned discriminators in declaration order.
-      // FIXME: using a linear search here is fairly ridiculous.
-      unsigned index = 0;
-      for (auto elt : target->getParentEnum()->getAllElements()) {
-        if (elt == target) break;
-        index++;
-      }
-      return index;
+      return getTagIndex(elt);
     }
 
     // TODO: Support this function also for other enum implementation strategies.
@@ -1401,11 +1408,12 @@ namespace {
       return NumExtraInhabitantTagValues;
     }
 
-    /// Emit a call into the runtime to get the current enum payload tag; this
-    /// is an internal form that returns -1 in the payload case, or an index of
-    /// an empty case.
+    /// Emit a call into the runtime to get the current enum payload tag.
+    /// This returns a tag index in the range
+    /// [-ElementsWithPayload..ElementsWithNoPayload-1].
     llvm::Value *
-    loadPayloadTag(IRGenFunction &IGF, Address enumAddr, SILType T) const {
+    emitGetEnumTag(IRGenFunction &IGF, SILType T, Address enumAddr)
+    const override {
       auto payloadMetadata = emitPayloadMetadataForLayout(IGF, T);
       auto numEmptyCases = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
                                                   ElementsWithNoPayload.size());
@@ -1416,17 +1424,6 @@ namespace {
       return IGF.Builder.CreateCall(
                  IGF.IGM.getGetEnumCaseSinglePayloadFn(),
                  {opaqueAddr, payloadMetadata, numEmptyCases});
-    }
-
-    /// Emit a call into the runtime to get the current enum case; this form
-    /// is used for reflection where we want the payload cases to start at
-    /// zero.
-    llvm::Value *
-    emitGetEnumTag(IRGenFunction &IGF, SILType T, Address enumAddr)
-    const override {
-      auto value = loadPayloadTag(IGF, enumAddr, T);
-      return IGF.Builder.CreateAdd(value,
-                                   llvm::ConstantInt::get(IGF.IGM.Int32Ty, 1));
     }
 
     /// The payload for a single-payload enum is always placed in front and
@@ -1613,19 +1610,15 @@ namespace {
       llvm::BasicBlock *payloadDest = blockForCase(getPayloadElement());
       unsigned extraInhabitantCount = getNumExtraInhabitantTagValues();
 
-      auto elements = getPayloadElement()->getParentEnum()->getAllElements();
+      auto elements = ElementsWithNoPayload;
       auto elti = elements.begin(), eltEnd = elements.end();
-      if (*elti == getPayloadElement())
-        ++elti;
 
-      // Advance the enum element iterator, skipping the payload case.
+      // Advance the enum element iterator.
       auto nextCase = [&]() -> EnumElementDecl* {
         assert(elti != eltEnd);
-        auto result = *elti;
-        ++elti;
-        if (elti != eltEnd && *elti == getPayloadElement())
-          ++elti;
-        return result;
+        Element elt = *elti;
+        elti++;
+        return elt.decl;
       };
       
       // If there are extra tag bits, switch over them first.
@@ -1760,7 +1753,7 @@ namespace {
                            llvm::BasicBlock *defaultDest) const {
       // Create a map of the destination blocks for quicker lookup.
       llvm::DenseMap<EnumElementDecl*,llvm::BasicBlock*> destMap(dests.begin(),
-                                                                  dests.end());
+                                                                 dests.end());
 
       // If there was no default branch in SIL, use an unreachable branch as
       // the default.
@@ -1771,26 +1764,25 @@ namespace {
       }
 
       // Ask the runtime to find the case index.
-      auto caseIndex = loadPayloadTag(IGF, addr, T);
+      auto caseIndex = emitGetEnumTag(IGF, T, addr);
 
       // Switch on the index.
       auto *swi = IGF.Builder.CreateSwitch(caseIndex, defaultDest);
 
-      // Add the payload case.
-      auto payloadCase = destMap.find(getPayloadElement());
-      if (payloadCase != destMap.end())
-        swi->addCase(llvm::ConstantInt::getSigned(IGF.IGM.Int32Ty, -1),
-                     payloadCase->second);
+      auto emitCase = [&](Element elt) {
+        auto tagVal =
+            llvm::ConstantInt::get(IGF.IGM.Int32Ty,
+                                   getResilientTagIndex(elt.decl));
+        auto found = destMap.find(elt.decl);
+        if (found != destMap.end())
+          swi->addCase(tagVal, found->second);
+      };
 
-      // Add the empty cases.
-      unsigned emptyCaseIndex = 0;
-      for (auto &empty : ElementsWithNoPayload) {
-        auto emptyCase = destMap.find(empty.decl);
-        if (emptyCase != destMap.end())
-          swi->addCase(llvm::ConstantInt::get(IGF.IGM.Int32Ty, emptyCaseIndex),
-                       emptyCase->second);
-        ++emptyCaseIndex;
-      }
+      for (auto &elt : ElementsWithPayload)
+        emitCase(elt);
+
+      for (auto &elt : ElementsWithNoPayload)
+        emitCase(elt);
 
       // Emit the unreachable block, if any.
       if (unreachableBB) {
@@ -1835,20 +1827,6 @@ namespace {
     }
 
   private:
-    // Get the index of an enum element among the non-payload cases.
-    unsigned getSimpleElementTagIndex(EnumElementDecl *elt) const {
-      assert(elt != getPayloadElement() && "is payload element");
-      unsigned i = 0;
-      // FIXME: linear search
-      for (auto *enumElt : elt->getParentEnum()->getAllElements()) {
-        if (elt == enumElt)
-          return i;
-        if (enumElt != getPayloadElement())
-          ++i;
-      }
-      llvm_unreachable("element was not a member of enum");
-    }
-
     // Get the payload and extra tag (if any) parts of the discriminator for
     // a no-data case.
     std::pair<APInt, APInt>
@@ -1860,7 +1838,7 @@ namespace {
 
       // Non-payload cases use extra inhabitants, if any, or are discriminated
       // by setting the tag bits.
-      unsigned tagIndex = getSimpleElementTagIndex(elt);
+      unsigned tagIndex = getResilientTagIndex(elt);
       unsigned numExtraInhabitants = getNumExtraInhabitantTagValues();
       APInt payload;
       unsigned extraTagValue;
@@ -2009,7 +1987,7 @@ namespace {
       auto *noPayloadBB = llvm::BasicBlock::Create(C);
 
       // Ask the runtime what case we have.
-      llvm::Value *which = loadPayloadTag(IGF, addr, T);
+      llvm::Value *which = emitGetEnumTag(IGF, T, addr);
 
       // If it's -1 then we have the payload.
       llvm::Value *hasPayload = IGF.Builder.CreateICmpEQ(which,
@@ -2523,13 +2501,13 @@ namespace {
                                 projectExtraTagBits(IGF, enumAddr));
     }
 
+    /// Constructs an enum value using a tag index in the range
+    /// [-ElementsWithPayload..ElementsWithNoPayload-1].
     void emitStoreTag(IRGenFunction &IGF,
                       SILType T,
                       Address enumAddr,
                       llvm::Value *tag) const override {
       llvm::Value *payload = emitPayloadMetadataForLayout(IGF, T);
-      llvm::Value *caseIndex = IGF.Builder.CreateSub(tag,
-          llvm::ConstantInt::getSigned(IGF.IGM.Int32Ty, 1));
       llvm::Value *numEmptyCases = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
                                                 ElementsWithNoPayload.size());
 
@@ -2538,7 +2516,7 @@ namespace {
                                     IGF.IGM.OpaquePtrTy);
 
       IGF.Builder.CreateCall(IGF.IGM.getStoreEnumTagSinglePayloadFn(),
-                             {opaqueAddr, payload, caseIndex, numEmptyCases});
+                             {opaqueAddr, payload, tag, numEmptyCases});
     }
 
     void initializeMetadata(IRGenFunction &IGF,
@@ -2999,7 +2977,8 @@ namespace {
 
       return {destructured.payload, destructured.extraTagBits, tag};
     }
-    
+
+    /// Returns a tag index in the range [0..NumElements-1].
     llvm::Value *
     loadDynamicTag(IRGenFunction &IGF, Address addr, SILType T) const {
       addr = IGF.Builder.CreateBitCast(addr, IGF.IGM.OpaquePtrTy);
@@ -3012,7 +2991,10 @@ namespace {
       
       return call;
     }
-    
+
+    /// Returns a tag index in the range [0..ElementsWithPayload-1]
+    /// if the current case is a payload case, otherwise returns
+    /// an undefined value.
     llvm::Value *
     loadPayloadTag(IRGenFunction &IGF, Address addr, SILType T) const {
       if (TIK >= Fixed) {
@@ -3029,18 +3011,27 @@ namespace {
 
   public:
 
+    /// Returns a tag index in the range
+    /// [-ElementsWithPayload..ElementsWithNoPayload+1].
     llvm::Value *
     emitGetEnumTag(IRGenFunction &IGF, SILType T, Address addr)
     const override {
+      unsigned numPayloadCases = ElementsWithPayload.size();
+      llvm::Constant *payloadCases =
+          llvm::ConstantInt::get(IGF.IGM.Int32Ty, numPayloadCases);
+
       if (TIK < Fixed) {
         // Ask the runtime to extract the dynamically-placed tag.
-        return loadDynamicTag(IGF, addr, T);
+        llvm::Value *tagValue = loadDynamicTag(IGF, addr, T);
+
+        // Convert fragile tag index into resilient tag index.
+        return IGF.Builder.CreateSub(tagValue, payloadCases);
       }
 
       // For fixed-size enums, the currently inhabited case is a function of
       // both the payload tag and the payload value.
       //
-      // Low-numbered payload tags correspond to payload cases. No payload
+      // Low-numbered payload tags correspond to payload cases. No-payload
       // cases are represented with the remaining payload tags.
 
       // Load the fixed-size representation and derive the tags.
@@ -3050,24 +3041,30 @@ namespace {
 
       // Load the payload tag.
       llvm::Value *tagValue = extractPayloadTag(IGF, payload, extraTagBits);
+      tagValue = IGF.Builder.CreateZExtOrTrunc(tagValue, IGF.IGM.Int32Ty);
+
+      // Subtract number of payload cases from the payload tag.
+      //
+      // If we have a payload case, this yields a negative value, which is the
+      // final resilient tag index.
+      //
+      // If we have a no-payload case, this yields a non-negative value, which
+      // is the most significant bits of the current case index.
+      tagValue = IGF.Builder.CreateSub(tagValue, payloadCases);
 
       // If we don't have any no-payload cases, we are done -- the payload tag
       // alone is enough to distinguish between all cases.
       if (ElementsWithNoPayload.empty())
         return tagValue;
 
-      tagValue = IGF.Builder.CreateZExtOrTrunc(tagValue, IGF.IGM.Int32Ty);
-
       // To distinguish between non-payload cases, load the payload value and
       // strip off the spare bits.
       auto OccupiedBits = CommonSpareBits;
       OccupiedBits.flipAll();
 
+      // Load the payload value, to distinguish no-payload cases.
       llvm::Value *payloadValue = payload.emitGatherSpareBits(
           IGF, OccupiedBits, 0, 32);
-
-      llvm::Constant *payloadCases =
-          llvm::ConstantInt::get(IGF.IGM.Int32Ty, ElementsWithPayload.size());
 
       llvm::Value *currentCase;
 
@@ -3075,31 +3072,30 @@ namespace {
       if (numCaseBits >= 32 ||
           getNumCasesPerTag() >= ElementsWithNoPayload.size()) {
         // All no-payload cases have the same payload tag, so we can just use
-        // the payload value to distinguish between no-payload cases.
+        // the payload value to distinguish between them.
+        //
+        // The payload value is a tag index in the range
+        // [0..ElementsWithNoPayload], so we are done.
         currentCase = payloadValue;
       } else {
         // The no-payload cases are distributed between multiple payload tags;
         // combine the payload tag with the payload value.
 
-        // First, subtract number of payload cases from the payload tag to get
-        // the most significant bits of the current case.
-        currentCase = IGF.Builder.CreateSub(tagValue, payloadCases);
-
-        // Now, shift these bits into place.
+        // Shift the most significant bits of the tag value into place.
         llvm::Constant *numCaseBitsVal =
             llvm::ConstantInt::get(IGF.IGM.Int32Ty, numCaseBits);
-        currentCase = IGF.Builder.CreateShl(currentCase, numCaseBitsVal);
+        currentCase = IGF.Builder.CreateShl(tagValue, numCaseBitsVal);
 
         // Add the payload value to the shifted payload tag.
+        //
+        // The result is a tag index in the range [0..ElementsWithNoPayload],
+        // so we are done.
         currentCase = IGF.Builder.CreateOr(currentCase, payloadValue);
       }
 
-      // Now, we have the index of a no-payload case. Add the number of payload
-      // cases back, to get an index of a case.
-      currentCase = IGF.Builder.CreateAdd(currentCase, payloadCases);
-
       // Test if this is a payload or no-payload case.
-      llvm::Value *match = IGF.Builder.CreateICmpUGE(tagValue, payloadCases);
+      llvm::Value *match = IGF.Builder.CreateICmpSGE(tagValue,
+          llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0));
 
       // Return one of the two values we computed based on the above.
       return IGF.Builder.CreateSelect(match, currentCase, tagValue);
@@ -3302,34 +3298,25 @@ namespace {
       if (!defaultDest)
         defaultDest = unreachableBB;
 
-      auto blockForCase = [&](EnumElementDecl *theCase) -> llvm::BasicBlock* {
-        auto found = destMap.find(theCase);
-        if (found == destMap.end())
-          return defaultDest;
-        else
-          return found->second;
-      };
-
       auto *tagSwitch = IGF.Builder.CreateSwitch(tag, unreachableBB,
                                                  NumElements);
 
-      unsigned tagIndex = 0;
-      
-      // Payload tags come first.
-      for (auto &elt : ElementsWithPayload) {
-        auto tagVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty, tagIndex);
-        tagSwitch->addCase(tagVal, blockForCase(elt.decl));
-        ++tagIndex;
-      }
-      
-      // Next come empty tags.
-      for (auto &elt : ElementsWithNoPayload) {
-        auto tagVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty, tagIndex);
-        tagSwitch->addCase(tagVal, blockForCase(elt.decl));
-        ++tagIndex;
-      }
+      auto emitCase = [&](Element elt) {
+        auto tagVal =
+            llvm::ConstantInt::get(IGF.IGM.Int32Ty,
+                                   getTagIndex(elt.decl));
+        auto found = destMap.find(elt.decl);
+        tagSwitch->addCase(tagVal,
+                           (found == destMap.end()
+                            ? defaultDest
+                            : found->second));
+      };
 
-      assert(tagIndex == NumElements);
+      for (auto &elt : ElementsWithPayload)
+        emitCase(elt);
+      
+      for (auto &elt : ElementsWithNoPayload)
+        emitCase(elt);
 
       // Delete the unreachable default block if we didn't use it, or emit it
       // if we did.
@@ -4124,14 +4111,23 @@ namespace {
                       SILType T,
                       Address enumAddr,
                       llvm::Value *tag) const override {
+      llvm::Value *numPayloadCases =
+          llvm::ConstantInt::get(IGF.IGM.Int32Ty,
+                                 ElementsWithPayload.size());
+
       // Use the runtime to initialize dynamic cases.
       if (TIK < Fixed) {
-        // No-payload case indexes start after the payload cases.
+        // Convert resilient tag index into fragile tag index.
+        tag = IGF.Builder.CreateAdd(tag, numPayloadCases);
+
         return storeDynamicTag(IGF, enumAddr, tag, T);
       }
 
       // If there are no empty cases, don't need a conditional.
       if (ElementsWithNoPayload.empty()) {
+        // Convert resilient tag index into fragile tag index.
+        tag = IGF.Builder.CreateAdd(tag, numPayloadCases);
+
         storePayloadTag(IGF, enumAddr, tag, T);
         return;
       }
@@ -4141,23 +4137,24 @@ namespace {
       auto payloadBB = llvm::BasicBlock::Create(C);
       auto endBB = llvm::BasicBlock::Create(C);
 
-      llvm::Value *numPayloadCases =
-          llvm::ConstantInt::get(IGF.IGM.Int32Ty,
-                                 ElementsWithPayload.size());
-      llvm::Value *cond = IGF.Builder.CreateICmpUGE(tag, numPayloadCases);
+      llvm::Value *cond = IGF.Builder.CreateICmpSGE(tag,
+          llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0));
       IGF.Builder.CreateCondBr(cond, noPayloadBB, payloadBB);
 
       IGF.Builder.emitBlock(noPayloadBB);
       {
         ConditionalDominanceScope condition(IGF);
-        llvm::Value *noPayloadTag = IGF.Builder.CreateSub(tag, numPayloadCases);
-        storeNoPayloadTag(IGF, enumAddr, noPayloadTag, T);
+        storeNoPayloadTag(IGF, enumAddr, tag, T);
         IGF.Builder.CreateBr(endBB);
       }
 
       IGF.Builder.emitBlock(payloadBB);
       {
         ConditionalDominanceScope condition(IGF);
+
+        // Convert resilient tag index into fragile tag index.
+        tag = IGF.Builder.CreateAdd(tag, numPayloadCases);
+
         storePayloadTag(IGF, enumAddr, tag, T);
         IGF.Builder.CreateBr(endBB);
       }
@@ -4351,7 +4348,7 @@ namespace {
                   Address enumAddr,
                   EnumElementDecl *Case) const override {
       emitDestructiveInjectEnumTagCall(IGF, T,
-                                       getTagIndex(Case),
+                                       getResilientTagIndex(Case),
                                        enumAddr);
     }
 
@@ -4360,8 +4357,9 @@ namespace {
                          Address enumAddr,
                          EnumElementDecl *Case) const override {
       llvm::Value *tag = emitGetEnumTagCall(IGF, T, enumAddr);
-      llvm::Value *expectedTag = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
-                                                        getTagIndex(Case));
+      llvm::Value *expectedTag =
+          llvm::ConstantInt::get(IGF.IGM.Int32Ty,
+                                 getResilientTagIndex(Case));
       return IGF.Builder.CreateICmpEQ(tag, expectedTag);
     }
 
@@ -4389,29 +4387,20 @@ namespace {
 
       auto *tagSwitch = IGF.Builder.CreateSwitch(tag, defaultDest, NumElements);
 
-      unsigned tagIndex = 0;
-      
-      // Payload tags come first.
-      for (auto &elt : ElementsWithPayload) {
+      auto emitCase = [&](Element elt) {
+        auto tagVal =
+            llvm::ConstantInt::get(IGF.IGM.Int32Ty,
+                                   getResilientTagIndex(elt.decl));
         auto found = destMap.find(elt.decl);
-        if (found != destMap.end()) {
-          auto tagVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty, tagIndex);
+        if (found != destMap.end())
           tagSwitch->addCase(tagVal, found->second);
-        }
-        ++tagIndex;
-      }
+      };
 
-      // Next come empty tags.
-      for (auto &elt : ElementsWithNoPayload) {
-        auto found = destMap.find(elt.decl);
-        if (found != destMap.end()) {
-          auto tagVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty, tagIndex);
-          tagSwitch->addCase(tagVal, found->second);
-        }
-        ++tagIndex;
-      }
+      for (auto &elt : ElementsWithPayload)
+        emitCase(elt);
 
-      assert(tagIndex == NumElements);
+      for (auto &elt : ElementsWithNoPayload)
+        emitCase(elt);
 
       // Delete the unreachable default block if we didn't use it, or emit it
       // if we did.
@@ -4729,6 +4718,11 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
     }
   }
 
+
+  // Resilient tag numbering decreases for payload tags, so reverse the
+  // payload tags if this enum is resilient from any context.
+  if (TC.IGM.isResilient(theEnum, ResilienceExpansion::Minimal))
+    std::reverse(elementsWithPayload.begin(), elementsWithPayload.end());
 
   assert(numElements == elementsWithPayload.size()
            + elementsWithNoPayload.size()

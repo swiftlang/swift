@@ -1165,17 +1165,16 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     auto enumAddr = type.getAddressForPointer(value);
 
     llvm::Value *result = strategy.emitGetEnumTag(IGF, concreteType, enumAddr);
-    result = IGF.Builder.CreateZExtOrTrunc(result, IGF.IGM.Int32Ty);
-
     IGF.Builder.CreateRet(result);
     return;
   }
 
   case ValueWitness::DestructiveProjectEnumData: {
+    auto &strategy = getEnumImplStrategy(IGM, concreteType);
+
     llvm::Value *value = getArg(argv, "value");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
 
-    auto &strategy = getEnumImplStrategy(IGM, concreteType);
     if (strategy.getElementsWithPayload().size() > 0) {
       strategy.destructiveProjectDataForLoad(
           IGF, concreteType,
@@ -1187,14 +1186,17 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   }
 
   case ValueWitness::DestructiveInjectEnumTag: {
+    auto &strategy = getEnumImplStrategy(IGM, concreteType);
+
     llvm::Value *value = getArg(argv, "value");
+
     auto enumTy = type.getStorageType()->getPointerTo();
     value = IGF.Builder.CreateBitCast(value, enumTy);
 
     llvm::Value *tag = getArg(argv, "tag");
+
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
 
-    auto &strategy = getEnumImplStrategy(IGM, concreteType);
     strategy.emitStoreTag(IGF, concreteType,
                           Address(value, type.getBestKnownAlignment()),
                           tag);

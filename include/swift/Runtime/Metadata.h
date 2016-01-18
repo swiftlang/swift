@@ -532,11 +532,14 @@ typedef int getExtraInhabitantIndex(const OpaqueValue *src,
                                     const Metadata *self);
 
 /// Given a valid object of this enum type, extracts the tag value indicating
-/// which case of the enum is inhabited. The tag value can be used to index
-/// into the array returned by the NominalTypeDescriptor's GetCaseTypes
-/// function to get the payload type and check if the payload is indirect.
-typedef unsigned getEnumTag(const OpaqueValue *src,
-                            const Metadata *self);
+/// which case of the enum is inhabited. Returned values are in the range
+/// [-ElementsWithPayload..ElementsWithNoPayload-1].
+///
+/// The tag value can be used to index into the array returned by the
+/// NominalTypeDescriptor's GetCaseTypes function to get the payload type
+/// and check if the payload is indirect.
+typedef int getEnumTag(const OpaqueValue *src,
+                       const Metadata *self);
 
 /// Given a valid object of this enum type, destructively strips the tag
 /// bits, leaving behind a value of the inhabited case payload type.
@@ -548,9 +551,10 @@ typedef void destructiveProjectEnumData(OpaqueValue *src,
 /// Given a valid object of an enum case payload's type, destructively add
 /// the tag bits for the given case, leaving behind a fully-formed value of
 /// the enum type. If the enum case does not have a payload, the initial
-/// state of the value can be undefined.
+/// state of the value can be undefined. The given tag value must be in
+/// the range [-ElementsWithPayload..ElementsWithNoPayload-1].
 typedef void destructiveInjectEnumTag(OpaqueValue *src,
-                                      unsigned tag,
+                                      int tag,
                                       const Metadata *self);
 
 } // end namespace value_witness_types
@@ -1088,7 +1092,7 @@ public:
     getValueWitnesses()->_asXIVWT()->storeExtraInhabitant(value, index, this);
   }
 
-  unsigned vw_getEnumTag(const OpaqueValue *value) const {
+  int vw_getEnumTag(const OpaqueValue *value) const {
     return getValueWitnesses()->_asEVWT()->getEnumTag(value, this);
   }
   void vw_destructiveProjectEnumData(OpaqueValue *value) const {
