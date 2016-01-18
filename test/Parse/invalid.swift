@@ -56,3 +56,11 @@ protocol Animal<Food> {  // expected-error {{protocols do not allow generic para
 }
 
 
+
+// SR-573 - Crash with invalid parameter declaration
+class Starfish {}
+struct Salmon {}
+func f573(s Starfish,  // expected-error {{parameter requires an explicit type}}
+          _ ss: Salmon) -> [Int] {}
+func g573() { f573(Starfish(), Salmon()) }
+
