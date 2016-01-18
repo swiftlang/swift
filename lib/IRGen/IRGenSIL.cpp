@@ -312,6 +312,28 @@ public:
   llvm::SmallDenseMap<Decl *, SmallString<4>, 8> AnonymousVariables;
   unsigned NumAnonVars = 0;
 
+  /// Notes about instructions for which we're supposed to perform some
+  /// sort of non-standard emission.  This enables some really simply local
+  /// peepholing in cases where you can't just do that with the lowered value.
+  ///
+  /// Since emission notes generally change semantics, we enforce that all
+  /// notes must be claimed.
+  ///
+  /// This uses a set because the current peepholes don't need to record any
+  /// extra structure; if you need extra structure, feel free to make it a
+  /// map.  This set is generally very small because claiming a note removes
+  /// it.
+  llvm::SmallPtrSet<SILInstruction *, 4> EmissionNotes;
+
+  void addEmissionNote(SILInstruction *inst) {
+    assert(inst);
+    EmissionNotes.insert(inst);
+  }
+
+  bool claimEmissionNote(SILInstruction *inst) {
+    return EmissionNotes.erase(inst);
+  }
+
   /// Accumulative amount of allocated bytes on the stack. Used to limit the
   /// size for stack promoted objects.
   /// We calculate it on demand, so that we don't have to do it if the
@@ -1423,6 +1445,9 @@ void IRGenSILFunction::emitSILFunction() {
   for (SILBasicBlock &bb : *CurSILFn)
     if (!visitedBlocks.count(&bb))
       LoweredBBs[&bb].bb->eraseFromParent();
+
+  assert(EmissionNotes.empty() &&
+         "didn't claim emission notes for all instructions!");
 }
 
 void IRGenSILFunction::estimateStackSize() {
@@ -1586,6 +1611,9 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
       }
     }
     visit(&I);
+
+    assert(!EmissionNotes.count(&I) &&
+           "didn't claim emission note for instruction!");
   }
   
   assert(Builder.hasPostTerminatorIP() && "SIL bb did not terminate block?!");
@@ -3440,10 +3468,17 @@ void IRGenSILFunction::visitAllocRefDynamicInst(swift::AllocRefDynamicInst *i) {
 }
 
 void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
-  const TypeInfo &type = getTypeInfo(i->getOperand().getType());
+  auto allocatedType = i->getOperand().getType();
+  const TypeInfo &allocatedTI = getTypeInfo(allocatedType);
   Address container = getLoweredContainerOfAddress(i->getOperand());
-  type.deallocateStack(*this, container,
-                       i->getOperand().getType());
+
+  // If the type isn't fixed-size, check whether we added an emission note.
+  // If so, we should deallocate and destroy at the same time.
+  if (!isa<FixedTypeInfo>(allocatedTI) && claimEmissionNote(i)) {
+    allocatedTI.destroyStack(*this, container, allocatedType);
+  } else {
+    allocatedTI.deallocateStack(*this, container, allocatedType);
+  }
 }
 
 void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
@@ -4493,10 +4528,50 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
   }
 }
 
+static DeallocStackInst *
+findPairedDeallocStackForDestroyAddr(DestroyAddrInst *destroyAddr) {
+  // This peephole only applies if the address being destroyed is the
+  // result of an alloc_stack.
+  auto allocStack = dyn_cast<AllocStackInst>(destroyAddr->getOperand());
+  if (!allocStack) return nullptr;
+
+  for (auto inst = destroyAddr->getNextNode(); !isa<TermInst>(inst);
+       inst = inst->getNextNode()) {
+    // If we find a dealloc_stack of the right memory, great.
+    if (auto deallocStack = dyn_cast<DeallocStackInst>(inst))
+      if (deallocStack->getOperand() == allocStack)
+        return deallocStack;
+
+    // Otherwise, if the instruction uses the alloc_stack result, treat it
+    // as interfering.  This assumes that any re-initialization of
+    // the alloc_stack will be obvious in the function.
+    for (auto &operand : inst->getAllOperands())
+      if (operand.get() == allocStack)
+        return nullptr;
+  }
+
+  // If we ran into the terminator, stop; only apply this peephole locally.
+  // TODO: this could use a fancier dominance analysis, maybe.
+  return nullptr;
+}
+
 void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
   SILType addrTy = i->getOperand().getType();
-  Address base = getLoweredAddress(i->getOperand());
   const TypeInfo &addrTI = getTypeInfo(addrTy);
+
+  // Try to fold a destroy_addr of a dynamic alloc_stack into a single
+  // destroyBuffer operation.
+  if (!isa<FixedTypeInfo>(addrTI)) {
+    // If we can find a matching dealloc stack, just set an emission note
+    // on it; that will cause it to destroy the current value.
+    if (auto deallocStack = findPairedDeallocStackForDestroyAddr(i)) {
+      addEmissionNote(deallocStack);
+      return;
+    }
+  }
+
+  // Otherwise, do the normal thing.
+  Address base = getLoweredAddress(i->getOperand());
   addrTI.destroy(*this, base, addrTy);
 }
 

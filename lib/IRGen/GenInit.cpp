@@ -68,6 +68,12 @@ ContainedAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF, SILType T,
   return { alloca, alloca };
 }
 
+void FixedTypeInfo::destroyStack(IRGenFunction &IGF, Address addr,
+                                 SILType T) const {
+  destroy(IGF, addr, T);
+  FixedTypeInfo::deallocateStack(IGF, addr, T);
+}
+
 void FixedTypeInfo::deallocateStack(IRGenFunction &IGF, Address addr,
                                     SILType T) const {
   if (isKnownEmpty(ResilienceExpansion::Maximal))

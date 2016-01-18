@@ -263,6 +263,11 @@ public:
   virtual void deallocateStack(IRGenFunction &IGF, Address addr,
                                SILType T) const = 0;
 
+  /// Destroy the value of a variable of this type, then deallocate its
+  /// memory.
+  virtual void destroyStack(IRGenFunction &IGF, Address addr,
+                            SILType T) const = 0;
+
   /// Copy or take a value out of one address and into another, destroying
   /// old value in the destination.  Equivalent to either assignWithCopy
   /// or assignWithTake depending on the value of isTake.
