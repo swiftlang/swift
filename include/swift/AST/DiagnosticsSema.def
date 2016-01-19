@@ -257,7 +257,7 @@ ERROR(cannot_throw_nil,none,
 ERROR(cannot_convert_raw_initializer_value,none,
       "cannot convert value of type %0 to raw type %1", (Type,Type))
 ERROR(cannot_convert_raw_initializer_value_nil,none,
-      "cannot convert nil to raw type %1", (Type))
+      "cannot convert nil to raw type %0", (Type))
 
 ERROR(cannot_convert_default_arg_value,none,
       "default argument value of type %0 cannot be converted to type %1",
