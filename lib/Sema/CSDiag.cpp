@@ -1686,6 +1686,23 @@ bool CalleeCandidateInfo::diagnoseAnyStructuralArgumentError(Expr *fnExpr,
     if (auto UDE = dyn_cast<UnresolvedDotExpr>(fnExpr))
       if (isa<TypeExpr>(UDE->getBase())) {
         auto baseType = candidates[0].getArgumentType();
+        
+        // If the base is an implicit self type reference, and we're in a
+        // property initializer, then the user wrote something like:
+        //
+        //   class Foo { let val = initFn() }
+        //
+        // which runs in type context, not instance context.  Produce a tailored
+        // diagnostic since this comes up and is otherwise non-obvious what is
+        // going on.
+        if (UDE->getBase()->isImplicit() && isa<Initializer>(CS->DC) &&
+            CS->DC->getParent()->getDeclaredTypeOfContext()->isEqual(baseType)){
+          CS->TC.diagnose(UDE->getLoc(), diag::instance_member_in_initializer,
+                          UDE->getName());
+          return true;
+        }
+        
+        // Otherwise, complain about use of instance value on type.
         CS->TC.diagnose(UDE->getLoc(), diag::instance_member_use_on_type,
                         baseType, UDE->getName())
           .highlight(UDE->getBase()->getSourceRange());

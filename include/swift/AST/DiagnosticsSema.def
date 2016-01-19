@@ -643,6 +643,10 @@ ERROR(argument_out_of_order_named_unnamed,none,
 ERROR(instance_member_use_on_type,none,
       "use of instance member %1 on type %0; "
       "did you mean to use a value of type %0 instead?", (Type, Identifier))
+ERROR(instance_member_in_initializer,none,
+      "cannot use instance member %0 within property initializer; "
+      "property initializers run before 'self' is available", (Identifier))
+
 
 ERROR(missing_argument_named,none,
       "missing argument for parameter %0 in call", (Identifier))

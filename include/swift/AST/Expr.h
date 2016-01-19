@@ -993,7 +993,8 @@ public:
 
   
   /// Return a TypeExpr for a TypeDecl and the specified location.
-  static TypeExpr *createForDecl(SourceLoc Loc, TypeDecl *D);
+  static TypeExpr *createForDecl(SourceLoc Loc, TypeDecl *D,
+                                 bool isImplicit);
   static TypeExpr *createForSpecializedDecl(SourceLoc Loc, TypeDecl *D,
                                             ArrayRef<TypeRepr*> args,
                                             SourceRange angleLocs);
