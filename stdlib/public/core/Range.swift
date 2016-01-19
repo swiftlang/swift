@@ -17,9 +17,9 @@ public struct RangeIterator<
 
   /// Construct an instance that traverses the elements of `bounds`.
   @_transparent
-  internal init(_ bounds: Range<Element>) {
-    self.startIndex = bounds.startIndex
-    self.endIndex = bounds.endIndex
+  internal init(_bounds: Range<Element>) {
+    self.startIndex = _bounds.startIndex
+    self.endIndex = _bounds.endIndex
   }
 
   /// Advance to the next element and return it, or `nil` if no next
@@ -83,8 +83,8 @@ public struct Range<
   /// Construct a range with `startIndex == start` and `endIndex ==
   /// end`.
   @_transparent
-  internal init(start: Element, end: Element) {
-    self.startIndex = start
+  internal init(_start: Element, end: Element) {
+    self.startIndex = _start
     self.endIndex = end
   }
 
@@ -115,7 +115,7 @@ public struct Range<
   ///
   /// - Complexity: O(1).
   public func iterator() -> RangeIterator<Element> {
-    return RangeIterator(self)
+    return RangeIterator(_bounds: self)
   }
 
   /// The range's lower bound.
@@ -153,7 +153,7 @@ public func == <Element>(lhs: Range<Element>, rhs: Range<Element>) -> Bool {
 @warn_unused_result
 public func ..< <Pos : ForwardIndex> (minimum: Pos, maximum: Pos)
   -> Range<Pos> {
-  return Range(start: minimum, end: maximum)
+  return Range(_start: minimum, end: maximum)
 }
 
 /// Forms a closed range that contains both `minimum` and `maximum`.
@@ -162,7 +162,7 @@ public func ..< <Pos : ForwardIndex> (minimum: Pos, maximum: Pos)
 public func ... <Pos : ForwardIndex> (
   minimum: Pos, maximum: Pos
 ) -> Range<Pos> {
-  return Range(start: minimum, end: maximum.successor())
+  return Range(_start: minimum, end: maximum.successor())
 }
 
 //===--- Prefer Ranges to Intervals, and add checking ---------------------===//
@@ -176,7 +176,7 @@ public func ..< <Pos : ForwardIndex where Pos : Comparable> (
   start: Pos, end: Pos
 ) -> Range<Pos> {
   _require(start <= end, "Can't form Range with end < start")
-  return Range(start: start, end: end)
+  return Range(_start: start, end: end)
 }
 
 /// Forms a closed range that contains both `start` and `end`.
@@ -188,7 +188,7 @@ public func ... <Pos : ForwardIndex where Pos : Comparable> (
 ) -> Range<Pos> {
   _require(start <= end, "Can't form Range with end < start")
   _require(end.successor() > end, "Range end index has no valid successor")
-  return Range(start: start, end: end.successor())
+  return Range(_start: start, end: end.successor())
 }
 
 @warn_unused_result
@@ -198,5 +198,22 @@ public func ~= <I : ForwardIndex where I : Comparable> (
   // Intervals can check for containment in O(1).
   return 
     HalfOpenInterval(pattern.startIndex, pattern.endIndex).contains(value)
+}
+
+@available(*, unavailable, renamed="RangeIterator")
+public struct RangeGenerator<Element : ForwardIndex> {}
+
+extension RangeIterator {
+  @available(*, unavailable, message="use the 'iterator()' method on the collection")
+  public init(_ bounds: Range<Element>) {
+    fatalError("unavailable function can't be called")
+  }
+}
+
+extension Range {
+  @available(*, unavailable, message="use the '..<' operator")
+  public init(start: Element, end: Element) {
+    fatalError("unavailable function can't be called")
+  }
 }
 

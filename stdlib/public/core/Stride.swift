@@ -237,3 +237,22 @@ extension Strideable {
   }
 }
 
+@available(*, unavailable, renamed="StrideToIterator")
+public struct StrideToGenerator<Element : Strideable> {}
+
+@available(*, unavailable, renamed="StrideThroughIterator")
+public struct StrideThroughGenerator<Element : Strideable> {}
+
+extension Strideable {
+  @available(*, unavailable, renamed="strideTo")
+  public func stride(to end: Self, by stride: Stride) -> StrideTo<Self> {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="strideThrough")
+  public func stride(
+    through end: Self, by stride: Stride
+  ) -> StrideThrough<Self> {
+    fatalError("unavailable function can't be called")
+  }
+}

@@ -63,6 +63,9 @@ public protocol IteratorProtocol {
 /// A conforming sequence that is not a collection is allowed to
 /// produce an arbitrary sequence of elements from the second iterator.
 public protocol Sequence {
+  //@available(*, unavailable, renamed="Iterator")
+  //typealias Generator = ()
+
   /// A type that provides the *sequence*'s iteration interface and
   /// encapsulates its iteration state.
   typealias Iterator : IteratorProtocol
@@ -638,4 +641,43 @@ public struct IteratorSequence<
 
   internal var _base: Base
 }
+
+@available(*, unavailable, renamed="IteratorProtocol")
+public typealias GeneratorType = IteratorProtocol
+
+@available(*, unavailable, renamed="Sequence")
+public typealias SequenceType = Sequence
+
+extension Sequence {
+  @available(*, unavailable, renamed="iterator()")
+  func generate() -> Iterator {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, message="it became a property 'underestimatedLength'")
+  func underestimateCount() -> Int {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, message="call 'split(_:omitEmptySubsequences:isSeparator:)' and invert the 'allowEmptySlices' argument")
+  func split(maxSplit: Int, allowEmptySlices: Bool,
+    @noescape isSeparator: (Iterator.Element) throws -> Bool
+  ) rethrows -> [SubSequence] {
+    fatalError("unavailable function can't be called")
+  }
+}
+
+extension Sequence where Iterator.Element : Equatable {
+  @available(*, unavailable, message="call 'split(_:omitEmptySubsequences:isSeparator:)' and invert the 'allowEmptySlices' argument")
+  public func split(
+    separator: Iterator.Element,
+    maxSplit: Int = Int.max,
+    allowEmptySlices: Bool = false
+  ) -> [AnySequence<Iterator.Element>] {
+    fatalError("unavailable function can't be called")
+  }
+}
+
+@available(*, unavailable, renamed="IteratorSequence")
+public struct GeneratorSequence<Base : IteratorProtocol> {}
 

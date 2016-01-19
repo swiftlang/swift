@@ -312,3 +312,5 @@ internal struct _TeeStream<
   mutating func _unlock() { left._unlock(); right._unlock() }
 }
 
+@available(*, unavailable, renamed="OutputStream")
+public typealias OutputStreamType = OutputStream

@@ -74,6 +74,9 @@ public struct Zip2Sequence<Sequence1 : Sequence, Sequence2 : Sequence>
   /// sequence, in order.
   public typealias Iterator = Zip2Iterator<Stream1, Stream2>
 
+  @available(*, unavailable, renamed="Iterator")
+  public typealias Generator = Iterator
+
   /// Construct an instance that makes pairs of elements from `sequence1` and
   /// `sequence2`.
   public // @testable

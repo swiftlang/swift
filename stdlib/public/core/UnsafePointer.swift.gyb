@@ -556,6 +556,46 @@ public func += <Pointee>(inout lhs: ${Self}<Pointee>, rhs: Int) {
 public func -= <Pointee>(inout lhs: ${Self}<Pointee>, rhs: Int) {
   lhs = lhs - rhs
 }
+
+extension ${Self} {
+  @available(*, unavailable, renamed="Pointee")
+  public typealias Memory = Pointee
+
+  @available(*, unavailable, message="use 'nil' literal")
+  public init() {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, message="use the '${Self}(allocatingCapacity:)' initializer")
+  public static func alloc(num: Int) -> ${Self} {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="deallocateCapacity")
+  public func dealloc(num: Int) {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="pointee")
+  public var memory: Pointee {
+    get {
+      fatalError("unavailable function can't be called")
+    }
+    set {
+      fatalError("unavailable function can't be called")
+    }
+  }
+
+  @available(*, unavailable, renamed="initializePointee")
+  public func initialize(newvalue: Pointee) {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="take")
+  public func move() -> Pointee {
+    fatalError("unavailable function can't be called")
+  }
+}
 % end # for mutable
 
 /// A byte-sized thing that isn't designed to interoperate with

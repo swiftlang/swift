@@ -81,7 +81,7 @@ extension Collection {
   /// `Range` is half-open, iterating the values of the result produces
   /// all valid subscript arguments for `self`, omitting its `endIndex`.
   public var indices: Range<Index> {
-    return Range(start: startIndex, end: endIndex)
+    return Range(_start: startIndex, end: endIndex)
   }
 }
 

@@ -106,6 +106,9 @@ extension Unsafe${Mutable}BufferPointer : CustomDebugStringConvertible {
 }
 %end
 
+@available(*, unavailable, renamed="UnsafeBufferPointerIterator")
+public struct UnsafeBufferPointerGenerator<Element> {}
+
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:

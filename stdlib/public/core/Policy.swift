@@ -447,3 +447,7 @@ infix operator  |= { associativity right precedence 90 assignment }
 // example of how this operator is used, and how its use can be hidden
 // from users.
 infix operator ~> { associativity left precedence 255 }
+
+@available(*, unavailable, renamed="BitwiseOperations")
+public typealias BitwiseOperationsType = BitwiseOperations
+

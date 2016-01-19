@@ -194,3 +194,15 @@ extension String {
     return scalarSlices.map { String($0) }
   }
 }
+
+extension String {
+  @available(*, unavailable, message="Renamed to init(repeating:length:) and reordered parameters")
+  public init(count: Int, repeatedValue c: Character) {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, message="Renamed to init(repeating:length:) and reordered parameters")
+  public init(count: Int, repeatedValue c: UnicodeScalar) {
+    fatalError("unavailable function can't be called")
+  }
+}

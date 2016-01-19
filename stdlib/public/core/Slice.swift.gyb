@@ -128,3 +128,17 @@ public struct MutableSlice<Base : MutableIndexable> : MutableCollection {
   internal var _endIndex: Index
 }
 
+extension Slice {
+  @available(*, unavailable, message="use the slicing syntax")
+  public init(base: Base, bounds: Range<Index>) {
+    fatalError("unavailable function can't be called")
+  }
+}
+
+extension MutableSlice {
+  @available(*, unavailable, message="use the slicing syntax")
+  public init(base: Base, bounds: Range<Index>) {
+    fatalError("unavailable function can't be called")
+  }
+}
+

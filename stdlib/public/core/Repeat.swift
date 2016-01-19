@@ -58,3 +58,13 @@ public func repeatElement<T>(element: T, count n: Int) -> Repeated<T> {
   return Repeated(_repeating: element, length: n)
 }
 
+@available(*, unavailable, renamed="Repeated")
+public struct Repeat<Element> {}
+
+extension Repeated {
+  @available(*, unavailable, renamed="repeatElement")
+  public init(count: Int, repeatedValue: Element) {
+    fatalError("unavailable function can't be called")
+  }
+}
+

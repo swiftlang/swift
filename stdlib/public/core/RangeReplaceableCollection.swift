@@ -389,3 +389,26 @@ public func +<
   return lhs
 }
 
+@available(*, unavailable, renamed="RangeReplaceableCollection")
+public typealias RangeReplaceableCollectionType = RangeReplaceableCollection
+
+extension RangeReplaceableCollection {
+  @available(*, unavailable, renamed="replaceSubrange")
+  public mutating func replaceRange<
+    C : Collection where C.Iterator.Element == Iterator.Element
+  >(
+    subRange: Range<Index>, with newElements: C
+  ) {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="removeAt")
+  public mutating func removeAtIndex(i: Index) -> Iterator.Element {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="removeSubrange")
+  public mutating func removeRange(subRange: Range<Index>) {
+  }
+}
+

@@ -241,3 +241,7 @@ extension SetAlgebra {
     return ([a] as Self).isDisjointWith([b])
   }
 }
+
+@available(*, unavailable, renamed="SetAlgebra")
+public typealias SetAlgebraType = SetAlgebra
+

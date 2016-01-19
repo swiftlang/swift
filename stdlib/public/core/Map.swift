@@ -58,8 +58,8 @@ public struct LazyMapSequence<Base : Sequence, Element>
 
   /// Create an instance with elements `transform(x)` for each element
   /// `x` of base.
-  internal init(_ base: Base, transform: (Base.Iterator.Element) -> Element) {
-    self._base = base
+  internal init(_base: Base, transform: (Base.Iterator.Element) -> Element) {
+    self._base = _base
     self._transform = transform
   }
   
@@ -117,8 +117,8 @@ public struct LazyMapCollection<Base : Collection, Element>
 
   /// Create an instance with elements `transform(x)` for each element
   /// `x` of base.
-  internal init(_ base: Base, transform: (Base.Iterator.Element) -> Element) {
-    self._base = base
+  internal init(_base: Base, transform: (Base.Iterator.Element) -> Element) {
+    self._base = _base
     self._transform = transform
   }
   
@@ -136,7 +136,7 @@ extension LazySequenceProtocol {
   public func map<U>(
     transform: (Elements.Iterator.Element) -> U
   ) -> LazyMapSequence<Self.Elements, U> {
-    return LazyMapSequence(self.elements, transform: transform)
+    return LazyMapSequence(_base: self.elements, transform: transform)
   }
 }
 
@@ -148,7 +148,24 @@ extension LazyCollectionProtocol {
   public func map<U>(
     transform: (Elements.Iterator.Element) -> U
   ) -> LazyMapCollection<Self.Elements, U> {
-    return LazyMapCollection(self.elements, transform: transform)
+    return LazyMapCollection(_base: self.elements, transform: transform)
+  }
+}
+
+@available(*, unavailable, renamed="LazyMapIterator")
+public struct LazyMapGenerator<Base : IteratorProtocol, Element> {}
+
+extension LazyMapSequence {
+  @available(*, unavailable, message="use '.lazy.map' on the sequence")
+  public init(_ base: Base, transform: (Base.Iterator.Element) -> Element) {
+    fatalError("unavailable function can't be called")
+  }
+}
+
+extension LazyMapCollection {
+  @available(*, unavailable, message="use '.lazy.map' on the collection")
+  public init(_ base: Base, transform: (Base.Iterator.Element) -> Element) {
+    fatalError("unavailable function can't be called")
   }
 }
 

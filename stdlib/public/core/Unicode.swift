@@ -957,3 +957,6 @@ extension UTF16 {
   }
 }
 
+@available(*, unavailable, renamed="UnicodeCodec")
+public typealias UnicodeCodecType = UnicodeCodec
+

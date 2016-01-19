@@ -425,3 +425,41 @@ extension Sequence {
   }
 }
 
+extension Sequence {
+  @available(*, unavailable, renamed="enumerated")
+  public func enumerate() -> EnumeratedSequence<Self> {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="min")
+  public func minElement(
+    @noescape isOrderedBefore: (Iterator.Element, Iterator.Element) throws -> Bool
+  ) rethrows -> Iterator.Element? {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="max")
+  public func maxElement(
+    @noescape isOrderedBefore: (Iterator.Element, Iterator.Element) throws -> Bool
+  ) rethrows -> Iterator.Element? {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="reversed")
+  public func reverse() -> [Iterator.Element] {
+    fatalError("unavailable function can't be called")
+  }
+}
+
+extension Sequence where Iterator.Element : Comparable {
+  @available(*, unavailable, renamed="min")
+  public func minElement() -> Iterator.Element? {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="max")
+  public func maxElement() -> Iterator.Element? {
+    fatalError("unavailable function can't be called")
+  }
+}
+

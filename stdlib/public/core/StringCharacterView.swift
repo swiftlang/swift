@@ -341,3 +341,14 @@ extension String.CharacterView {
   }
 }
 
+extension String.CharacterView {
+  @available(*, unavailable, renamed="replaceSubrange")
+  public mutating func replaceRange<
+    C : Collection where C.Iterator.Element == Character
+  >(
+    subRange: Range<Index>, with newElements: C
+  ) {
+    fatalError("unavailable function can't be called")
+  }
+}
+

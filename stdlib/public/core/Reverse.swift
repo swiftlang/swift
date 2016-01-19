@@ -143,8 +143,8 @@ public struct ReverseCollection<
   /// reverse order.
   ///
   /// - Complexity: O(1)
-  internal init(_ base: Base) {
-    self._base = base
+  internal init(_base: Base) {
+    self._base = _base
   }
 
   /// A type that represents a valid position in the collection.
@@ -173,8 +173,8 @@ public struct ReverseRandomAccessCollection<
   /// reverse order.
   ///
   /// - Complexity: O(1)
-  internal init(_ base: Base) {
-    self._base = base
+  internal init(_base: Base) {
+    self._base = _base
   }
 
   /// A type that represents a valid position in the collection.
@@ -198,7 +198,7 @@ extension Collection where Index : BidirectionalIndex {
   /// - Complexity: O(1)
   @warn_unused_result
   public func reversed() -> ReverseCollection<Self> {
-    return ReverseCollection(self)
+    return ReverseCollection(_base: self)
   }
 }
 
@@ -208,7 +208,7 @@ extension Collection where Index : RandomAccessIndex {
   /// - Complexity: O(1)
   @warn_unused_result
   public func reversed() -> ReverseRandomAccessCollection<Self> {
-    return ReverseRandomAccessCollection(self)
+    return ReverseRandomAccessCollection(_base: self)
   }
 }
 
@@ -221,7 +221,7 @@ where Index : BidirectionalIndex, Elements.Index : BidirectionalIndex {
   public func reversed() -> LazyCollection<
     ReverseCollection<Elements>
   > {
-    return ReverseCollection(elements).lazy
+    return ReverseCollection(_base: elements).lazy
   }
 }
 
@@ -234,7 +234,55 @@ where Index : RandomAccessIndex, Elements.Index : RandomAccessIndex {
   public func reversed() -> LazyCollection<
     ReverseRandomAccessCollection<Elements>
   > {
-    return ReverseRandomAccessCollection(elements).lazy
+    return ReverseRandomAccessCollection(_base: elements).lazy
+  }
+}
+
+extension ReverseCollection {
+  @available(*, unavailable, message="use the 'reversed()' method on the collection")
+  public init(_ base: Base) {
+    fatalError("unavailable function can't be called")
+  }
+}
+
+extension ReverseRandomAccessCollection {
+  @available(*, unavailable, message="use the 'reversed()' method on the collection")
+  public init(_ base: Base) {
+    fatalError("unavailable function can't be called")
+  }
+}
+
+extension Collection where Index : BidirectionalIndex {
+  @available(*, unavailable, renamed="reversed")
+  public func reverse() -> ReverseCollection<Self> {
+    fatalError("unavailable function can't be called")
+  }
+}
+
+extension Collection where Index : RandomAccessIndex {
+  @available(*, unavailable, renamed="reversed")
+  public func reverse() -> ReverseRandomAccessCollection<Self> {
+    fatalError("unavailable function can't be called")
+  }
+}
+
+extension LazyCollectionProtocol
+where Index : BidirectionalIndex, Elements.Index : BidirectionalIndex {
+  @available(*, unavailable, renamed="reversed")
+  public func reverse() -> LazyCollection<
+    ReverseCollection<Elements>
+  > {
+    fatalError("unavailable function can't be called")
+  }
+}
+
+extension LazyCollectionProtocol
+where Index : RandomAccessIndex, Elements.Index : RandomAccessIndex {
+  @available(*, unavailable, renamed="reversed")
+  public func reverse() -> LazyCollection<
+    ReverseRandomAccessCollection<Elements>
+  > {
+    fatalError("unavailable function can't be called")
   }
 }
 

@@ -985,3 +985,45 @@ extension String.Index {
   }
 }
 
+extension String {
+  @available(*, unavailable, renamed="append")
+  public mutating func appendContentsOf(other: String) {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="replaceSubrange")
+  public mutating func replaceRange<
+    C : Collection where C.Iterator.Element == Character
+  >(
+    subRange: Range<Index>, with newElements: C
+  ) {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="replaceSubrange")
+  public mutating func replaceRange(
+    subRange: Range<Index>, with newElements: String
+  ) {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="removeAt")
+  public mutating func removeAtIndex(i: Index) -> Character {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="removeSubrange")
+  public mutating func removeRange(subRange: Range<Index>) {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="lowercased()")
+  public var lowercaseString: String {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="uppercased()")
+  public var uppercaseString: String {
+    fatalError("unavailable function can't be called")
+  }
+}

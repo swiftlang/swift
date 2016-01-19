@@ -130,3 +130,32 @@ public struct UnsafeReference<Object: AnyObject> {
   
   internal unowned(unsafe) var _storage: Object
 }
+
+@available(*, unavailable, renamed="UnsafeReference")
+public struct Unmanaged<Instance : AnyObject> {
+  @available(*, unavailable, message="use the 'UnsafeReference(bitPattern:)' initializer")
+  public static func fromOpaque(value: OpaquePointer) -> UnsafeReference<Instance> {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, message="use the 'OpaquePointer(bitPattern:)' initializer")
+  public func toOpaque() -> OpaquePointer {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, message="use the 'UnsafeReference(withoutRetaining:)' initializer")
+  public static func passRetained(value: Instance) -> UnsafeReference<Instance> {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="object")
+  public func takeUnretainedValue() -> Instance {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="release")
+  public func takeRetainedValue() -> Instance {
+    fatalError("unavailable function can't be called")
+  }
+}
+
