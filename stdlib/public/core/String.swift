@@ -423,6 +423,7 @@ public func <(lhs: String, rhs: String) -> Bool {
 extension String {
 
   /// Append the elements of `other` to `self`.
+  @swift3_migration(renamed="append(_:)")
   public mutating func appendContentsOf(other: String) {
     _core.append(other._core)
   }
@@ -671,6 +672,7 @@ extension String {
   ///
   /// - Complexity: O(`subRange.count`) if `subRange.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
+  @swift3_migration(renamed="replaceSubrange(_:with:)")
   public mutating func replaceRange<
     C: CollectionType where C.Generator.Element == Character
   >(
@@ -687,6 +689,7 @@ extension String {
   ///
   /// - Complexity: O(`subRange.count`) if `subRange.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
+  @swift3_migration(renamed="replaceSubrange(_:with:)")
   public mutating func replaceRange(
     subRange: Range<Index>, with newElements: String
   ) {
@@ -698,6 +701,7 @@ extension String {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
+  @swift3_migration(renamed="insert(_:at:)")
   public mutating func insert(newElement: Character, atIndex i: Index) {
     withMutableCharacters {
       (inout v: CharacterView) in v.insert(newElement, atIndex: i)
@@ -722,6 +726,7 @@ extension String {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
+  @swift3_migration(renamed="removeAt(_:)")
   public mutating func removeAtIndex(i: Index) -> Character {
     return withMutableCharacters {
       (inout v: CharacterView) in v.removeAtIndex(i)
@@ -733,6 +738,7 @@ extension String {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
+  @swift3_migration(renamed="removeSubrange(_:)")
   public mutating func removeRange(subRange: Range<Index>) {
     withMutableCharacters {
       (inout v: CharacterView) in v.removeRange(subRange)
@@ -746,6 +752,7 @@ extension String {
   /// - parameter keepCapacity: If `true`, prevents the release of
   ///   allocated storage, which can be a useful optimization
   ///   when `self` is going to be grown again.
+  @swift3_migration(renamed="removeAll(keepingCapacity:)")
   public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
     withMutableCharacters {
       (inout v: CharacterView) in v.removeAll(keepCapacity: keepCapacity)
@@ -834,6 +841,8 @@ extension String {
     }
   }
 
+  //@swift3_migration(toMethod="lowercased()")
+  @swift3_migration(message="it became a method 'lowercased()'")
   public var lowercaseString: String {
     if self._core.isASCII {
       let length = self._core.count
@@ -872,6 +881,8 @@ extension String {
 #endif
   }
 
+  //@swift3_migration(toMethod="uppercased()")
+  @swift3_migration(message="it became a method 'uppercased()'")
   public var uppercaseString: String {
     if self._core.isASCII {
       let length = self._core.count

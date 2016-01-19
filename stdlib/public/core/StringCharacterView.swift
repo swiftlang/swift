@@ -273,6 +273,7 @@ extension String.CharacterView : RangeReplaceableCollectionType {
   ///
   /// - Complexity: O(`subRange.count`) if `subRange.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
+  @swift3_migration(renamed="replaceSubrange(_:with:)")
   public mutating func replaceRange<
     C: CollectionType where C.Generator.Element == Character
   >(

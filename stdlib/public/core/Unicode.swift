@@ -19,12 +19,15 @@
 /// A unicode scalar value, an indication that no more unicode scalars
 /// are available, or an indication of a decoding error.
 public enum UnicodeDecodingResult {
+  @swift3_migration(renamed="ScalarValue")
   case Result(UnicodeScalar)
   case EmptyInput
   case Error
 
   /// Return true if `self` indicates no more unicode scalars are
   /// available.
+  //@swift3_migration(toProperty="isEmptyInput")
+  @swift3_migration(message="it became a property 'isEmptyInput'")
   @warn_unused_result
   public func isEmptyInput() -> Bool {
     switch self {
@@ -40,6 +43,7 @@ public enum UnicodeDecodingResult {
 ///
 /// Consists of an underlying [code unit](http://www.unicode.org/glossary/#code_unit) and functions to
 /// translate between sequences of these code units and [unicode scalar values](http://www.unicode.org/glossary/#unicode_scalar_value).
+@swift3_migration(renamed="UnicodeCodec")
 public protocol UnicodeCodecType {
 
   /// A type that can hold [code unit](http://www.unicode.org/glossary/#code_unit) values for this
@@ -687,6 +691,7 @@ public struct UTF32 : UnicodeCodecType {
 /// - parameter stopOnError: Causes encoding to stop when an encoding
 ///   error is detected in `input`, if `true`.  Otherwise, U+FFFD
 ///   replacement characters are inserted for each detected error.
+@swift3_migration(renamed="transcode(_:_:_:_:stoppingOnError:)")
 public func transcode<
   Input : GeneratorType,
   InputEncoding : UnicodeCodecType,

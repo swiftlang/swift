@@ -13,6 +13,7 @@
 /// The `GeneratorType` used by `MapSequence` and `MapCollection`.
 /// Produces each element by passing the output of the `Base`
 /// `GeneratorType` through a transform function returning `Element`.
+@swift3_migration(renamed="LazyMapIterator")
 public struct LazyMapGenerator<
   Base : GeneratorType, Element
 > : GeneratorType, SequenceType {
@@ -47,6 +48,7 @@ public struct LazyMapSequence<Base : SequenceType, Element>
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
+  @swift3_migration(renamed="iterator()")
   public func generate() -> LazyMapGenerator<Base.Generator, Element> {
     return LazyMapGenerator(_base: _base.generate(), _transform: _transform)
   }
@@ -55,12 +57,16 @@ public struct LazyMapSequence<Base : SequenceType, Element>
   /// `self`, **nondestructively**.
   ///
   /// - Complexity: O(N).
+  //@swift3_migration(toProperty="underestimatedLength")
+  @swift3_migration(message="it became a property 'underestimatedLength'")
   public func underestimateCount() -> Int {
     return _base.underestimateCount()
   }
 
   /// Create an instance with elements `transform(x)` for each element
   /// `x` of base.
+  @swift3_migration(message="removed in Swift 3, use '.lazy.map' on the sequence")
+  @available(*, deprecated, message="it will be removed in Swift 3, use '.lazy.map' on the sequence")
   public init(_ base: Base, transform: (Base.Generator.Element) -> Element) {
     self._base = base
     self._transform = transform
@@ -105,6 +111,7 @@ public struct LazyMapCollection<Base : CollectionType, Element>
   /// Returns a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
+  @swift3_migration(renamed="iterator()")
   public func generate() -> LazyMapGenerator<Base.Generator, Element> {
     return LazyMapGenerator(_base: _base.generate(), _transform: _transform)
   }
@@ -123,6 +130,8 @@ public struct LazyMapCollection<Base : CollectionType, Element>
 
   /// Create an instance with elements `transform(x)` for each element
   /// `x` of base.
+  @swift3_migration(message="removed in Swift 3, use '.lazy.map' on the collection")
+  @available(*, deprecated, message="it will be removed in Swift 3, use '.lazy.map' on the collection")
   public init(_ base: Base, transform: (Base.Generator.Element) -> Element) {
     self._base = base
     self._transform = transform

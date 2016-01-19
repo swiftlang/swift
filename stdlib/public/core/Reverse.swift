@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+@swift3_migration(renamed="ReverseIndexProtocol")
 public protocol ReverseIndexType : BidirectionalIndexType {
   typealias Base : BidirectionalIndexType
   
@@ -149,6 +150,8 @@ public struct ReverseCollection<
   /// reverse order.
   ///
   /// - Complexity: O(1)
+  @swift3_migration(message="use the 'reversed()' method on the collection")
+  @available(*, deprecated, message="it will be removed in Swift 3.  Use the 'reverse()' method on the collection.")
   public init(_ base: Base) {
     self._base = base
   }
@@ -182,6 +185,8 @@ public struct ReverseRandomAccessCollection<
   /// reverse order.
   ///
   /// - Complexity: O(1)
+  @swift3_migration(message="use the 'reversed()' method on the collection")
+  @available(*, deprecated, message="it will be removed in Swift 3.  Use the 'reverse()' method on the collection.")
   public init(_ base: Base) {
     self._base = base
   }
@@ -194,6 +199,7 @@ public struct ReverseRandomAccessCollection<
   
   /// A type that provides the *sequence*'s iteration interface and
   /// encapsulates its iteration state.
+  @swift3_migration(renamed="Iterator")
   public typealias Generator = IndexingGenerator<
     ReverseRandomAccessCollection
   >
@@ -208,6 +214,7 @@ extension CollectionType where Index : BidirectionalIndexType {
   /// Return the elements of `self` in reverse order.
   ///
   /// - Complexity: O(1)
+  @swift3_migration(renamed="reversed()")
   @warn_unused_result
   public func reverse() -> ReverseCollection<Self> {
     return ReverseCollection(self)
@@ -218,6 +225,7 @@ extension CollectionType where Index : RandomAccessIndexType {
   /// Return the elements of `self` in reverse order.
   ///
   /// - Complexity: O(1)
+  @swift3_migration(renamed="reversed()")
   @warn_unused_result
   public func reverse() -> ReverseRandomAccessCollection<Self> {
     return ReverseRandomAccessCollection(self)
@@ -229,6 +237,7 @@ where Index : BidirectionalIndexType, Elements.Index : BidirectionalIndexType {
   /// Return the elements of `self` in reverse order.
   ///
   /// - Complexity: O(1)
+  @swift3_migration(renamed="reversed()")
   @warn_unused_result
   public func reverse() -> LazyCollection<
     ReverseCollection<Elements>
@@ -242,6 +251,7 @@ where Index : RandomAccessIndexType, Elements.Index : RandomAccessIndexType {
   /// Return the elements of `self` in reverse order.
   ///
   /// - Complexity: O(1)
+  @swift3_migration(renamed="reversed()")
   @warn_unused_result
   public func reverse() -> LazyCollection<
     ReverseRandomAccessCollection<Elements>

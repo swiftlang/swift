@@ -17,6 +17,7 @@ import SwiftShims
 //===----------------------------------------------------------------------===//
 
 /// A target of text streaming operations.
+@swift3_migration(renamed="OutputStream")
 public protocol OutputStreamType {
   mutating func _lock()
   mutating func _unlock()

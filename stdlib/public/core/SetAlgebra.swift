@@ -45,6 +45,7 @@
 ///   - `x.isSubsetOf(y)` iff `y.isSupersetOf(x)`
 ///   - `x.isStrictSupersetOf(y)` iff `x.isSupersetOf(y) && x != y`
 ///   - `x.isStrictSubsetOf(y)` iff `x.isSubsetOf(y) && x != y`
+@swift3_migration(renamed="SetAlgebra")
 public protocol SetAlgebraType : Equatable, ArrayLiteralConvertible {
   /// A type for which `Self` provides a containment test.
   typealias Element

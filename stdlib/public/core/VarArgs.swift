@@ -28,6 +28,7 @@
 ///     func swiftF(x: Int, arguments: CVarArgType...) -> Int {
 ///       return withVaList(arguments) { f(x, $0) }
 ///     }
+@swift3_migration(renamed="CVarArg")
 public protocol CVarArgType {
   // Note: the protocol is public, but its requirement is stdlib-private.
   // That's because there are APIs operating on CVarArgType instances, but
@@ -70,6 +71,8 @@ public func withVaList<R>(args: [CVarArgType],
 }
 
 /// Invoke `f` with a C `va_list` argument derived from `builder`.
+@swift3_migration(message="it will be removed in Swift 3")
+@available(*, deprecated, message="it will be removed in Swift 3")
 public func withVaList<R>(builder: VaListBuilder,
   @noescape _ f: CVaListPointer -> R) -> R {
   let result = f(builder.va_list())
@@ -282,6 +285,8 @@ extension Double : _CVarArgPassedAsDouble, _CVarArgAlignedType {
 
 /// An object that can manage the lifetime of storage backing a
 /// `CVaListPointer`.
+@swift3_migration(message="it will be removed in Swift 3")
+@available(*, deprecated, message="it will be removed in Swift 3")
 final public class VaListBuilder {
 
   func append(arg: CVarArgType) {
@@ -376,6 +381,8 @@ final public class VaListBuilder {
 
 /// An object that can manage the lifetime of storage backing a
 /// `CVaListPointer`.
+@swift3_migration(message="it will be removed in Swift 3")
+@available(*, deprecated, message="it will be removed in Swift 3")
 final public class VaListBuilder {
 
   struct Header {

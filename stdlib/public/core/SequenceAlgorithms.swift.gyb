@@ -35,6 +35,7 @@ extension SequenceType {
   ///     2: 'i'
   ///     3: 'f'
   ///     4: 't'
+  @swift3_migration(renamed="enumerated")
   @warn_unused_result
   public func enumerate() -> EnumerateSequence<Self> {
     return EnumerateSequence(self)
@@ -68,6 +69,7 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
   /// - Complexity: O(`elements.count`).
   ///
   /// ${orderingRequirement}
+  @swift3_migration(renamed="min")
   @warn_unused_result
   public func minElement(
 %   if preds:
@@ -93,6 +95,7 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
   ///
   /// - Complexity: O(`elements.count`).
   ///   ${orderingRequirement}
+  @swift3_migration(renamed="max")
   @warn_unused_result
   public func maxElement(
 %   if preds:
@@ -364,6 +367,7 @@ extension SequenceType {
   /// order.
   ///
   /// Complexity: O(N), where N is the length of `self`.
+  @swift3_migration(renamed="reversed")
   @warn_unused_result
   public func reverse() -> [${GElement}] {
     // FIXME(performance): optimize to 1 pass?  But Array(self) can be

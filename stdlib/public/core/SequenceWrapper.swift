@@ -30,10 +30,13 @@ extension SequenceType
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
+  @swift3_migration(renamed="iterator()")
   public func generate() -> Base.Generator {
     return self._base.generate()
   }
 
+  //@swift3_migration(toProperty="underestimatedLength")
+  @swift3_migration(message="it became a property 'underestimatedLength'")
   public func underestimateCount() -> Int {
     return _base.underestimateCount()
   }

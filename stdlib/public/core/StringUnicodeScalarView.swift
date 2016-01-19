@@ -142,6 +142,7 @@ extension String {
 
     /// A type whose instances can produce the elements of this
     /// sequence, in order.
+    @swift3_migration(renamed="Iterator")
     public struct Generator : GeneratorType {
       init(_ _base: _StringCore) {
         if _base.hasContiguousStorage {
@@ -206,6 +207,7 @@ extension String {
     /// this *sequence*.
     ///
     /// - Complexity: O(1).
+    @swift3_migration(renamed="iterator()")
     @warn_unused_result
     public func generate() -> Generator {
       return Generator(_core)

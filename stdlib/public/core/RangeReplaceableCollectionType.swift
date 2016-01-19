@@ -16,6 +16,7 @@
 
 /// A *collection* that supports replacement of an arbitrary subRange
 /// of elements with the elements of another collection.
+@swift3_migration(renamed="RangeReplaceableCollection")
 public protocol RangeReplaceableCollectionType : CollectionType {
   //===--- Fundamental Requirements ---------------------------------------===//
 
@@ -29,6 +30,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   /// - Complexity: O(`subRange.count`) if
   ///   `subRange.endIndex == self.endIndex` and `newElements.isEmpty`,
   ///   O(`self.count` + `newElements.count`) otherwise.
+  @swift3_migration(renamed="replaceSubrange(_:with:)")
   mutating func replaceRange<
     C : CollectionType where C.Generator.Element == Generator.Element
   >(
@@ -111,6 +113,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
+  @swift3_migration(renamed="insert(_:at:)")
   mutating func insert(newElement: Generator.Element, atIndex i: Index)
 
   /// Insert `newElements` at index `i`.
@@ -127,6 +130,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
+  @swift3_migration(renamed="removeAt(_:)")
   mutating func removeAtIndex(i: Index) -> Generator.Element
 
   /// Customization point for `removeLast()`.  Implement this function if you
@@ -160,6 +164,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
+  @swift3_migration(renamed="removeSubrange(_:)")
   mutating func removeRange(subRange: Range<Index>)
 
   /// Remove all elements.
@@ -171,6 +176,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   ///    when `self` is going to be grown again.
   ///
   /// - Complexity: O(`self.count`).
+  @swift3_migration(renamed="removeAll(keepingCapacity:)")
   mutating func removeAll(keepCapacity keepCapacity: Bool /*= false*/)
 
 }
@@ -199,6 +205,7 @@ extension RangeReplaceableCollectionType {
     }
   }
 
+  @swift3_migration(renamed="insert(_:at:)")
   public mutating func insert(
     newElement: Generator.Element, atIndex i: Index
   ) {
@@ -211,6 +218,7 @@ extension RangeReplaceableCollectionType {
     replaceRange(i..<i, with: newElements)
   }
 
+  @swift3_migration(renamed="removeAt(_:)")
   public mutating func removeAtIndex(index: Index) -> Generator.Element {
     _precondition(!isEmpty, "can't remove from an empty collection")
     let result: Generator.Element = self[index]
@@ -218,6 +226,7 @@ extension RangeReplaceableCollectionType {
     return result
   }
 
+  @swift3_migration(renamed="removeSubrange(_:)")
   public mutating func removeRange(subRange: Range<Index>) {
     replaceRange(subRange, with: EmptyCollection())
   }
@@ -239,6 +248,7 @@ extension RangeReplaceableCollectionType {
     return firstElement
   }
 
+  @swift3_migration(renamed="removeAll(keepingCapacity:)")
   public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
     if !keepCapacity {
       self = Self()

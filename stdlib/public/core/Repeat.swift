@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// A collection whose elements are all identical `Element`s.
+@swift3_migration(renamed="Repeated")
 public struct Repeat<Element> : CollectionType {
 
   @available(*, unavailable, renamed="Element")
@@ -24,6 +25,7 @@ public struct Repeat<Element> : CollectionType {
 
   /// Construct an instance that contains `count` elements having the
   /// value `repeatedValue`.
+  @swift3_migration(renamed="repeatElement")
   public init(count: Int, repeatedValue: Element) {
     self.count = count
     self.repeatedValue = repeatedValue

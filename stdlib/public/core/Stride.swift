@@ -121,6 +121,7 @@ public func -= <T : UnsignedIntegerType>(
 //===----------------------------------------------------------------------===//
 
 /// A `GeneratorType` for `StrideTo<Element>`.
+@swift3_migration(renamed="StrideToIterator")
 public struct StrideToGenerator<Element : Strideable> : GeneratorType {
   @available(*, unavailable, renamed="Element")
   public typealias T = Element
@@ -151,6 +152,7 @@ public struct StrideTo<Element : Strideable> : SequenceType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
+  @swift3_migration(renamed="iterator()")
   public func generate() -> StrideToGenerator<Element> {
     return StrideToGenerator(current: start, end: end, stride: stride)
   }
@@ -173,6 +175,7 @@ extension Strideable {
   /// Return the sequence of values (`self`, `self + stride`, `self +
   /// stride + stride`, ... *last*) where *last* is the last value in
   /// the progression that is less than `end`.
+  @swift3_migration(renamed="strideTo(_:by:)")
   @warn_unused_result
   public func stride(to end: Self, by stride: Stride) -> StrideTo<Self> {
     return StrideTo(start: self, end: end, stride: stride)
@@ -187,6 +190,7 @@ public func stride<
 }
 
 /// A `GeneratorType` for `StrideThrough<Element>`.
+@swift3_migration(renamed="StrideThroughIterator")
 public struct StrideThroughGenerator<Element : Strideable> : GeneratorType {
   @available(*, unavailable, renamed="Element")
   public typealias T = Element
@@ -225,6 +229,7 @@ public struct StrideThrough<Element : Strideable> : SequenceType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
+  @swift3_migration(renamed="iterator()")
   public func generate() -> StrideThroughGenerator<Element> {
     return StrideThroughGenerator(
       current: start, end: end, stride: stride, done: false)
@@ -248,6 +253,7 @@ extension Strideable {
   /// the progression less than or equal to `end`.
   ///
   /// - Note: There is no guarantee that `end` is an element of the sequence.
+  @swift3_migration(renamed="strideThrough(_:by:)")
   @warn_unused_result
   public func stride(
     through end: Self, by stride: Stride

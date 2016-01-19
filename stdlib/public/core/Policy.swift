@@ -269,6 +269,7 @@ public protocol Comparable : Equatable {
 /// -  `x & Self.allZeros == .allZeros`
 /// -  `x & ~Self.allZeros == x`
 /// -  `~x == x ^ ~Self.allZeros`
+@swift3_migration(renamed="BitwiseOperations")
 public protocol BitwiseOperationsType {
   /// Returns the intersection of bits set in `lhs` and `rhs`.
   ///

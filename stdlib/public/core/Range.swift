@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// A generator over the elements of `Range<Element>`.
+@swift3_migration(renamed="RangeIterator")
 public struct RangeGenerator<
   Element : ForwardIndexType
 > : GeneratorType, SequenceType {
@@ -19,6 +20,8 @@ public struct RangeGenerator<
   public typealias T = Element
 
   /// Construct an instance that traverses the elements of `bounds`.
+  @swift3_migration(message="use the 'iterator()' method on the collection")
+  @available(*, deprecated, message="it will be removed in Swift 3.  Use the 'generate()' method on the collection.")
   @_transparent
   public init(_ bounds: Range<Element>) {
     self.startIndex = bounds.startIndex
@@ -35,10 +38,14 @@ public struct RangeGenerator<
   }
 
   /// The lower bound of the remaining range.
+  @swift3_migration(message="removed in Swift 3, no replacement")
+  @available(*, deprecated, message="it will be removed in Swift 3")
   public var startIndex: Element
 
   /// The upper bound of the remaining range; not included in the
   /// generated sequence.
+  @swift3_migration(message="removed in Swift 3, no replacement")
+  @available(*, deprecated, message="it will be removed in Swift 3")
   public var endIndex: Element
 }
 
@@ -88,6 +95,8 @@ public struct Range<
 
   /// Construct a range with `startIndex == start` and `endIndex ==
   /// end`.
+  @swift3_migration(message="use the '..<' operator")
+  @available(*, deprecated, message="it will be removed in Swift 3.  Use the '..<' operator.")
   @_transparent
   public init(start: Element, end: Element) {
     self.startIndex = start

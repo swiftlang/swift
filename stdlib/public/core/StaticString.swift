@@ -83,6 +83,7 @@ public struct StaticString
   ///
   /// If `self` stores a single Unicode scalar value, the value of
   /// `byteSize` is unspecified.
+  @swift3_migration(renamed="lengthInBytes")
   @_transparent
   public var byteSize: Int {
     _precondition(
@@ -130,6 +131,7 @@ public struct StaticString
 
   /// Return a `String` representing the same sequence of Unicode
   /// scalar values as `self` does.
+  @swift3_migration(message="use the 'String(_:)' initializer")
   @_transparent
   public var stringValue: String {
     return withUTF8Buffer {

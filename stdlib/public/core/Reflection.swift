@@ -33,6 +33,7 @@ public struct ObjectIdentifier : Hashable, Comparable {
   /// Convert to a `UInt` that captures the full value of `self`.
   ///
   /// Axiom: `a.uintValue == b.uintValue` iff `a == b`.
+  @swift3_migration(message="use the 'UInt(_:)' initializer")
   public var uintValue: UInt {
     return UInt(Builtin.ptrtoint_Word(value))
   }

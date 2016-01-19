@@ -28,6 +28,7 @@
 /// In the example above, `PackagingOptions.Element` is the same type
 /// as `PackagingOptions`, and instance `a` subsumes instance `b` if
 /// and only if `a.rawValue & b.rawValue == b.rawValue`.
+@swift3_migration(renamed="OptionSet")
 public protocol OptionSetType : SetAlgebraType, RawRepresentable {
   // We can't constrain the associated Element type to be the same as
   // Self, but we can do almost as well with a default and a

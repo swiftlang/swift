@@ -72,6 +72,7 @@ public struct Zip2Sequence<Sequence1 : SequenceType, Sequence2 : SequenceType>
 
   /// A type whose instances can produce the elements of this
   /// sequence, in order.
+  @swift3_migration(renamed="Iterator")
   public typealias Generator = Zip2Generator<Stream1, Stream2>
 
   /// Construct an instance that makes pairs of elements from `sequence1` and
@@ -83,6 +84,7 @@ public struct Zip2Sequence<Sequence1 : SequenceType, Sequence2 : SequenceType>
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
+  @swift3_migration(renamed="iterator()")
   public func generate() -> Generator {
     return Generator(
       _sequence1.generate(),
