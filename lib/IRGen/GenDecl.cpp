@@ -1881,7 +1881,7 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
   case llvm::Triple::ELF:
     sectionName = ".swift2_protocol_conformances";
     break;
-  case llvm::Triple::COFF:  // for cygwin
+  case llvm::Triple::COFF:
     sectionName = ".sw2prtc";
     break;
   default:

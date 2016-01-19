@@ -166,7 +166,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "CYGWIN")
-  execute_process( COMMAND "cygpath" "-u" "$ENV{SYSTEMROOT}"
+  execute_process(COMMAND "cygpath" "-u" "$ENV{SYSTEMROOT}"
       OUTPUT_VARIABLE ENV_SYSTEMROOT)
 
   list(APPEND swift_core_link_flags "${ENV_SYSTEMROOT}/system32/psapi.dll")

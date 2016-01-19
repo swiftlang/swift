@@ -1,131 +1,125 @@
+//===--- CygwinPort.cpp - Functions for Cygwin port ----===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// Implementations Cygwin specific functions needed for running Swift.
+//
+//===----------------------------------------------------------------------===//
+
+#include "swift/Runtime/Debug.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <windows.h>
 #include <psapi.h>
-#include <mutex>
 
-struct dl_phdr_info
-{
-	void			 *dlpi_addr;
-	const char       *dlpi_name;
+struct dl_phdr_info {
+  void        *dlpi_addr;
+  const char  *dlpi_name;
 };
 
-int dl_iterate_phdr(int(*callback)(struct dl_phdr_info *info, size_t size, void *data),
-					void *data)
-{
-	DWORD proc_id = GetCurrentProcessId();
-	HANDLE proc_handle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
-									 FALSE, proc_id);
-	if (NULL == proc_handle)
-		return 0;
-
-	int last_ret = 0;
-
-	HMODULE modules[1024];
-	DWORD used_size;
-
-	if (EnumProcessModules(proc_handle, modules, sizeof(modules), &used_size))
-	{
-		for (unsigned int i = 0; i<used_size/sizeof(HMODULE); i++)
-		{
-			char mod_name[MAX_PATH];
-
-			if (GetModuleFileNameExA(proc_handle, modules[i], mod_name,
-									 sizeof(mod_name)))
-			{
-				dl_phdr_info  hdr;
-				hdr.dlpi_name = mod_name;
-				hdr.dlpi_addr = modules[i];
-
-				last_ret = callback(&hdr, sizeof(hdr), data);
-				if (last_ret != 0)
-					break;
-			}
-		}
-	}
-
-	CloseHandle(proc_handle);
-
-	return  last_ret;
+static void swift_systemCallFailure(const char *caller,
+                                    const char *FunctionName) {
+  swift::fatalError("Win32 system call '%s' failed at '%s'\n", FunctionName,
+                    caller);
 }
 
-uint8_t *getSectionDataPE(void *handle, const char *section_name,
-                          unsigned long *section_size)
-{
-	unsigned char *pe = (unsigned char *)handle;
+int swift_dl_iterate_phdr(int(*Callback)(struct dl_phdr_info *info, size_t size,
+                                         void *data),
+                          void *data) {
+  DWORD ProcId = GetCurrentProcessId();
+  HANDLE ProcHandle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
+                                   FALSE, ProcId);
+  if (NULL == ProcHandle) {
+    swift_systemCallFailure("swift_dl_iterate_phdr", "OpenProcess");
+    return 0;		
+  }
 
-	int nt_headers_offset = pe[0x3C];
+  int LastRet = 0;
 
-	bool  assert1 = pe[nt_headers_offset] == 'P' && pe[nt_headers_offset + 1] == 'E';
-	if (assert1 == false)
-	{
-		return  nullptr;
-	}
+  HMODULE modules[1024];
+  DWORD NeededSize;
 
-	unsigned char *coff = pe + nt_headers_offset + 4;
+  BOOL ret = EnumProcessModules(ProcHandle, modules, sizeof(modules),
+                                &NeededSize);
 
-	int16_t    NumberOfSections = *(int16_t *)(coff + 2);
+  if (ret == FALSE || sizeof(modules) < NeededSize) {
+    swift_systemCallFailure("swift_dl_iterate_phdr", "EnumProcessModules");
+    CloseHandle(ProcHandle);
+    return  0;
+  }
 
-	// SizeOfOptionalHeader
-	int16_t SizeOfOptionalHeader = *(int16_t *)(coff + 16);
+  for (unsigned int i = 0; i<NeededSize/sizeof(HMODULE); i++) {
+    char ModName[MAX_PATH];
 
-	const int kCoffFileHeaderSize = 20;
-	unsigned char *section_table_base = coff + kCoffFileHeaderSize + SizeOfOptionalHeader;
+    if (GetModuleFileNameExA(ProcHandle, modules[i], ModName,
+                             sizeof(ModName))) {
+      dl_phdr_info  hdr;
+      hdr.dlpi_name = ModName;
+      hdr.dlpi_addr = modules[i];
 
-	// Section Header Record
-	const int kSectionRecordSize = 40;
+      LastRet = Callback(&hdr, sizeof(hdr), data);
+      if (LastRet != 0)
+        break;
+    } else {
+      swift_systemCallFailure("swift_dl_iterate_phdr", "GetModuleFileNameExA");
+    }
+  }
 
-	unsigned char *section_header = section_table_base;
-	for (int i = 0; i < NumberOfSections; i++)
-	{
-		uint32_t  VirtualSize = *(uint32_t *)&section_header[8];
-		uint32_t  VirtualAddress = *(uint32_t *)&section_header[12];
+  CloseHandle(ProcHandle);
 
-		char name_of_this_section[9];
-		memcpy(name_of_this_section, section_header, 8);
-		name_of_this_section[8] = '\0';
-		
-		if (strcmp(section_name, name_of_this_section) == 0)
-		{
-			*section_size = VirtualSize;
-			return  (uint8_t *)handle + VirtualAddress;
-		}
-		section_header += kSectionRecordSize;
-	}
-
-	return  nullptr;
+  return  LastRet;
 }
 
-namespace std {  
+uint8_t *swift_getSectionDataPE(void *Handle, const char *SectionName,
+                                unsigned long *section_size) {
+  unsigned char *PEStart = (unsigned char *)Handle;
 
-static std::unique_lock<std::mutex>* lock_ = nullptr;
-static std::mutex mutex_;
+  int NtHeadersOffset = PEStart[0x3C];
 
-template class function<void()>;
-function<void()> __once_functor;
+  bool  assert1 = PEStart[NtHeadersOffset] == 'P' && 
+                  PEStart[NtHeadersOffset + 1] == 'E';
+  if (assert1 == false) {
+    return  nullptr;
+  }
 
-mutex&  __get_once_mutex()
-{
-	return mutex_;
-}
+  unsigned char *Coff = PEStart + NtHeadersOffset + 4;
 
-void __set_once_functor_lock_ptr(unique_lock<mutex>* __ptr)
-{
-	lock_ = __ptr;
-}
+  int16_t    NumberOfSections = *(int16_t *)(Coff + 2);
 
-extern "C" void __once_proxy()
-{
-	function<void()> once_functor = std::move(__once_functor);
-	unique_lock<mutex> *lock = lock_;
-	if (lock != nullptr)
-	{
-		lock_ = nullptr;
-		lock->unlock();
-	}
+  // SizeOfOptionalHeader
+  int16_t SizeOfOptionalHeader = *(int16_t *)(Coff + 16);
 
-	once_functor();
-}
+  const int kCoffFileHeaderSize = 20;
+  unsigned char *SectionTableBase = Coff + kCoffFileHeaderSize + 
+                                      SizeOfOptionalHeader;
 
+  // Section Header Record
+  const int kSectionRecordSize = 40;
+
+  unsigned char *SectionHeader = SectionTableBase;
+  for (int i = 0; i < NumberOfSections; i++) {
+    uint32_t  VirtualSize = *(uint32_t *)&SectionHeader[8];
+    uint32_t  VirtualAddress = *(uint32_t *)&SectionHeader[12];
+
+    char NameOfThisSection[9];
+    memcpy(NameOfThisSection, SectionHeader, 8);
+    NameOfThisSection[8] = '\0';
+
+    if (strcmp(SectionName, NameOfThisSection) == 0) {
+      *section_size = VirtualSize;
+      return  (uint8_t *)Handle + VirtualAddress;
+    }
+    SectionHeader += kSectionRecordSize;
+  }
+
+  return  nullptr;
 }
