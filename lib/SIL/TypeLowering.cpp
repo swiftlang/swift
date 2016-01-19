@@ -1569,7 +1569,8 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
 
 const TypeLowering &TypeConverter::getTypeLowering(SILType type) {
   auto loweredType = type.getSwiftRValueType();
-  auto key = getTypeKey(AbstractionPattern(loweredType), loweredType, 0);
+  auto key = getTypeKey(AbstractionPattern(getCurGenericContext(), loweredType),
+                        loweredType, 0);
 
   return getTypeLoweringForLoweredType(key);
 }
@@ -1619,7 +1620,6 @@ getTypeLoweringForUncachedLoweredFunctionType(TypeKey key) {
 
   // Construct the SILFunctionType.
   CanType silFnType = getNativeSILFunctionType(M, key.OrigType,
-                                       cast<AnyFunctionType>(key.SubstType),
                                        cast<AnyFunctionType>(key.SubstType));
 
   // Do a cached lookup under yet another key, just so later lookups

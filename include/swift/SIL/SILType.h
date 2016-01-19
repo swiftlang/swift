@@ -554,7 +554,6 @@ NON_SIL_TYPE(LValue)
 
 CanSILFunctionType getNativeSILFunctionType(SILModule &M,
                         Lowering::AbstractionPattern orig,
-                        CanAnyFunctionType subst,
                         CanAnyFunctionType substInterface,
                         SILDeclRef::Kind kind = SILDeclRef::Kind::Func);
 

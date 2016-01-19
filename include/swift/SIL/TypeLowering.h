@@ -705,7 +705,6 @@ public:
   /// given substituted type.
   CanSILFunctionType substFunctionType(CanSILFunctionType origFnType,
                                  CanAnyFunctionType origLoweredType,
-                                 CanAnyFunctionType substLoweredType,
                                  CanAnyFunctionType substLoweredInterfaceType,
                          const Optional<ForeignErrorConvention> &foreignError);
   

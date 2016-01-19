@@ -1832,10 +1832,14 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   if (isFree)
     origParams.pop_back();
 
+  // Open-code certain protocol witness "thunks".
+  if (maybeOpenCodeProtocolWitness(*this, conformance, requirement,
+                                   witness, witnessSubs, origParams))
+    return;
+
   // Get the type of the witness.
   auto witnessInfo = getConstantInfo(witness);
-  CanAnyFunctionType witnessFormalTy = witnessInfo.LoweredType;
-  CanAnyFunctionType witnessSubstTy = witnessFormalTy;
+  CanAnyFunctionType witnessSubstTy = witnessInfo.LoweredType;
   if (!witnessSubs.empty()) {
     witnessSubstTy = cast<FunctionType>(
       cast<PolymorphicFunctionType>(witnessSubstTy)
@@ -1860,7 +1864,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
                                                     requirement);
   CanType reqtSubstInputTy = reqtSubstTy.getInput();
 
-  AbstractionPattern reqtOrigTy(reqtInfo.LoweredType);
+  AbstractionPattern reqtOrigTy(reqtInfo.LoweredInterfaceType);
   AbstractionPattern reqtOrigInputTy = reqtOrigTy.getFunctionInputType();
   // For a free function witness, discard the 'self' parameter of the
   // requirement.
@@ -1868,11 +1872,6 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
     reqtOrigInputTy = reqtOrigInputTy.dropLastTupleElement();
     reqtSubstInputTy = dropLastElement(reqtSubstInputTy);
   }
-
-  // Open-code certain protocol witness "thunks".
-  if (maybeOpenCodeProtocolWitness(*this, conformance, requirement,
-                                   witness, witnessSubs, origParams))
-    return;
 
   // Translate the argument values from the requirement abstraction level to
   // the substituted signature of the witness.
@@ -1937,7 +1936,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   // TODO: Collect forwarding substitutions from outer context of method.
 
   auto witnessResultAddr = witnessSubstResultAddr;
-  AbstractionPattern witnessOrigTy(witnessFormalTy);
+  AbstractionPattern witnessOrigTy(witnessInfo.LoweredInterfaceType);
   if (witnessFTy != witnessSubstFTy) {
     SmallVector<ManagedValue, 8> genParams;
     TranslateArguments(*this, loc,

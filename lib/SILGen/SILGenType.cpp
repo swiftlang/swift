@@ -74,7 +74,7 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   // abstraction pattern of the base.
   auto baseInfo = Types.getConstantInfo(base);
   auto derivedInfo = Types.getConstantInfo(derived);
-  auto basePattern = AbstractionPattern(baseInfo.LoweredType);
+  auto basePattern = AbstractionPattern(baseInfo.LoweredInterfaceType);
   
   auto overrideInfo = M.Types.getConstantOverrideInfo(derived, base);
 
