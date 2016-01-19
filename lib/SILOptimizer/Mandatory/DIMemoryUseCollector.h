@@ -76,18 +76,16 @@ public:
     return MemorySILType.getSwiftRValueType();
   }
 
-  SILValue getAddress() const {
+  SILInstruction *getAddress() const {
     if (isa<MarkUninitializedInst>(MemoryInst) ||
         isa<AllocStackInst>(MemoryInst))
-      return SILValue(MemoryInst, 0);
-    return SILValue(MemoryInst, 1);
+      return MemoryInst;
+    assert(false);
+    return nullptr;
   }
 
-  SILValue getContainer() const {
-    if (isa<MarkUninitializedInst>(MemoryInst) ||
-        isa<AllocStackInst>(MemoryInst))
-      return SILValue();
-    return SILValue(MemoryInst, 0);
+  AllocBoxInst *getContainer() const {
+    return dyn_cast<AllocBoxInst>(MemoryInst);
   }
 
   /// getNumMemoryElements - Return the number of elements, without the extra

@@ -29,7 +29,6 @@ namespace {
   public:
     SILValue visitSILInstruction(SILInstruction *I) { return SILValue(); }
 
-    SILValue visitProjectBoxInst(ProjectBoxInst *PBI);
     SILValue visitTupleExtractInst(TupleExtractInst *TEI);
     SILValue visitStructExtractInst(StructExtractInst *SEI);
     SILValue visitEnumInst(EnumInst *EI);
@@ -127,16 +126,6 @@ SILValue InstSimplifier::visitTupleInst(TupleInst *TI) {
     return Ex0->getOperand();
   }
 
-  return SILValue();
-}
-
-SILValue InstSimplifier::visitProjectBoxInst(ProjectBoxInst *PBI) {
-  // project_box(alloc_box#0) -> alloc_box#1
-  if (auto TheBox = dyn_cast<AllocBoxInst>(PBI->getOperand())) {
-    assert(PBI->getOperand().getResultNumber() == 0
-           && "should only be able to project box result of alloc_box");
-    return TheBox->getAddressResult();
-  }
   return SILValue();
 }
 

@@ -252,8 +252,7 @@ public:
     // it using a box.
     AllocBoxInst *allocBox =
         SGF.B.createAllocBox(decl, lType, {decl->isLet(), ArgNo});
-    auto box = SILValue(allocBox, 0);
-    auto addr = SILValue(allocBox, 1);
+    SILValue addr = SGF.B.createProjectBox(decl, allocBox);
 
     // Mark the memory as uninitialized, so DI will track it for us.
     if (NeedsMarkUninit)
@@ -261,7 +260,7 @@ public:
 
     /// Remember that this is the memory location that we're emitting the
     /// decl to.
-    SGF.VarLocs[decl] = SILGenFunction::VarLoc::get(addr, box);
+    SGF.VarLocs[decl] = SILGenFunction::VarLoc::get(addr, allocBox);
 
     // Push a cleanup to destroy the local variable.  This has to be
     // inactive until the variable is initialized.

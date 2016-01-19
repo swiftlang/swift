@@ -2985,14 +2985,14 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
   // throws, we know to deallocate the uninitialized box.
   if (element->isIndirect() ||
       element->getParentEnum()->isIndirect()) {
-    auto box = B.createAllocBox(loc, payloadTL.getLoweredType());
+    auto *box = B.createAllocBox(loc, payloadTL.getLoweredType());
+    auto *addr = B.createProjectBox(loc, box);
 
     CleanupHandle initCleanup = enterDestroyCleanup(box);
     Cleanups.setCleanupState(initCleanup, CleanupState::Dormant);
     CleanupHandle uninitCleanup = enterDeallocBoxCleanup(*this, box);
 
-    BoxInitialization dest(box, box->getAddressResult(),
-                           uninitCleanup, initCleanup);
+    BoxInitialization dest(box, addr, uninitCleanup, initCleanup);
 
     std::move(payload).forwardInto(*this, origFormalType,
                                    &dest, payloadTL);

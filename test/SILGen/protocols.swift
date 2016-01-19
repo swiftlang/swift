@@ -83,14 +83,15 @@ func use_subscript_archetype_lvalue_get<T : SubscriptableGetSet>(inout generic :
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_archetype_lvalue_get
 // CHECK: bb0(%0 : $*T, %1 : $Int):
 // CHECK: [[INOUTBOX:%[0-9]+]] = alloc_box $T, var, name "generic"
+// CHECK: [[PB:%.*]] = project_box [[INOUTBOX]]
 // CHECK: [[GUARANTEEDSTACK:%[0-9]+]] = alloc_stack $T
-// CHECK: copy_addr [[INOUTBOX]]#1 to [initialization]
+// CHECK: copy_addr [[PB]] to [initialization]
 // CHECK: [[METH:%[0-9]+]] = witness_method $T, #SubscriptableGetSet.subscript!getter.1
 // CHECK-NEXT: [[APPLYRESULT:%[0-9]+]] = apply [[METH]]<T>(%1, [[GUARANTEEDSTACK]])
 // CHECK-NEXT: destroy_addr [[GUARANTEEDSTACK]] : $*T
 // CHECK-NEXT: dealloc_stack [[GUARANTEEDSTACK]] : $*T
-// CHECK-NEXT: copy_addr [[INOUTBOX]]#1 to %0 : $*T
-// CHECK-NEXT: strong_release [[INOUTBOX]]#0 : $@box T
+// CHECK-NEXT: copy_addr [[PB]] to %0 : $*T
+// CHECK-NEXT: strong_release [[INOUTBOX]] : $@box T
 // CHECK: return [[APPLYRESULT]]
 
 
@@ -100,9 +101,10 @@ func use_subscript_archetype_lvalue_set<T : SubscriptableGetSet>(inout generic :
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_archetype_lvalue_set
 // CHECK: bb0(%0 : $*T, %1 : $Int):
 // CHECK: [[INOUTBOX:%[0-9]+]] = alloc_box $T
+// CHECK: [[PB:%.*]] = project_box [[INOUTBOX]]
 // CHECK: [[METH:%[0-9]+]] = witness_method $T, #SubscriptableGetSet.subscript!setter.1
-// CHECK-NEXT: apply [[METH]]<T>(%1, %1, [[INOUTBOX]]#1)
-// CHECK: strong_release [[INOUTBOX]]#0
+// CHECK-NEXT: apply [[METH]]<T>(%1, %1, [[PB]])
+// CHECK: strong_release [[INOUTBOX]]
 
 
 //===----------------------------------------------------------------------===//
@@ -194,9 +196,10 @@ func use_property_archetype_lvalue_set<T : PropertyWithGetterSetter>(inout gener
 // CHECK-LABEL: sil hidden @{{.*}}use_property_archetype_lvalue_set
 // CHECK: bb0(%0 : $*T, %1 : $Int):
 // CHECK: [[INOUTBOX:%[0-9]+]] = alloc_box $T
+// CHECK: [[PB:%.*]] = project_box [[INOUTBOX]]
 // CHECK: [[METH:%[0-9]+]] = witness_method $T, #PropertyWithGetterSetter.b!setter.1
-// CHECK-NEXT: apply [[METH]]<T>(%1, [[INOUTBOX]]#1)
-// CHECK: strong_release [[INOUTBOX]]#0
+// CHECK-NEXT: apply [[METH]]<T>(%1, [[PB]])
+// CHECK: strong_release [[INOUTBOX]]
 
 //===----------------------------------------------------------------------===//
 // Calling Initializers
@@ -381,10 +384,11 @@ func testExistentialPropertyRead<T: ExistentialProperty>(inout t: T) {
 }
 // CHECK-LABEL: sil hidden @_TF9protocols27testExistentialPropertyRead
 // CHECK:      [[T:%.*]] = alloc_box $T
-// CHECK:      copy_addr %0 to [initialization] [[T]]#1 : $*T
+// CHECK:      [[PB:%.*]] = project_box [[T]]
+// CHECK:      copy_addr %0 to [initialization] [[PB]] : $*T
 // CHECK:      [[P_TEMP:%.*]] = alloc_stack $PropertyWithGetterSetter
 // CHECK:      [[T_TEMP:%.*]] = alloc_stack $T
-// CHECK:      copy_addr [[T]]#1 to [initialization] [[T_TEMP]] : $*T
+// CHECK:      copy_addr [[PB]] to [initialization] [[T_TEMP]] : $*T
 // CHECK:      [[P_GETTER:%.*]] = witness_method $T, #ExistentialProperty.p!getter.1 :
 // CHECK-NEXT: apply [[P_GETTER]]<T>([[P_TEMP]], [[T_TEMP]])
 // CHECK-NEXT: destroy_addr [[T_TEMP]]

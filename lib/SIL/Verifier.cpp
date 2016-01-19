@@ -1370,15 +1370,11 @@ public:
   void checkAllocBoxInst(AllocBoxInst *AI) {
     // TODO: Allow the box to be typed, but for staging purposes, only require
     // it when -sil-enable-typed-boxes is enabled.
-    auto boxTy = AI->getType(0).getAs<SILBoxType>();
-    require(boxTy, "first result must be a @box type");
+    auto boxTy = AI->getType().getAs<SILBoxType>();
+    require(boxTy, "alloc_box must have a @box type");
 
-    require(AI->getType(0).isObject(),
-            "first result must be an object");
-    require(AI->getType(1).isAddress(),
-            "second result of alloc_box must be address");
-    requireSameType(boxTy->getBoxedAddressType(), AI->getType(1),
-                    "address type must match box type");
+    require(AI->getType().isObject(),
+            "result of alloc_box must be an object");
   }
 
   void checkDeallocBoxInst(DeallocBoxInst *DI) {

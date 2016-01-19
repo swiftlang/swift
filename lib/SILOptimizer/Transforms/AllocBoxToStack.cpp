@@ -110,14 +110,15 @@ static bool getFinalReleases(AllocBoxInst *ABI,
   auto seenRelease = false;
   SILInstruction *OneRelease = nullptr;
 
-  auto Box = ABI->getContainerResult();
-
   // We'll treat this like a liveness problem where the alloc_box is
   // the def. Each block that has a use of the owning pointer has the
   // value live-in unless it is the block with the alloc_box.
-  for (auto UI : Box.getUses()) {
+  for (auto UI : ABI->getUses()) {
     auto *User = UI->getUser();
     auto *BB = User->getParent();
+
+    if (isa<ProjectBoxInst>(User))
+      continue;
 
     if (BB != DefBB)
       LiveIn.insert(BB);
@@ -149,7 +150,7 @@ static bool getFinalReleases(AllocBoxInst *ABI,
   // release/dealloc.
   for (auto *BB : UseBlocks)
     if (!successorHasLiveIn(BB, LiveIn))
-      if (!addLastRelease(Box, BB, Releases))
+      if (!addLastRelease(ABI, BB, Releases))
         return false;
 
   return true;
@@ -376,7 +377,7 @@ static bool canPromoteAllocBox(AllocBoxInst *ABI,
                              llvm::SmallVectorImpl<Operand *> &PromotedOperands){
   // Scan all of the uses of the address of the box to see if any
   // disqualifies the box from being promoted to the stack.
-  if (auto *User = findUnexpectedBoxUse(ABI->getContainerResult(),
+  if (auto *User = findUnexpectedBoxUse(ABI,
                                         /* examinePartialApply = */ true,
                                         /* inAppliedFunction = */ false,
                                         PromotedOperands)) {
@@ -413,7 +414,11 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
 
   // Replace all uses of the address of the box's contained value with
   // the address of the stack location.
-  ABI->getAddressResult().replaceAllUsesWith(ASI);
+  for (Operand *Use : ABI->getUses()) {
+    if (auto *PBI = dyn_cast<ProjectBoxInst>(Use->getUser())) {
+      PBI->replaceAllUsesWith(ASI);
+    }
+  }
 
   // Check to see if the alloc_box was used by a mark_uninitialized instruction.
   // If so, any uses of the pointer result need to keep using the MUI, not the
@@ -453,7 +458,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
   while (!ABI->use_empty()) {
     auto *User = (*ABI->use_begin())->getUser();
     assert(isa<StrongReleaseInst>(User) || isa<StrongRetainInst>(User) ||
-           isa<DeallocBoxInst>(User));
+           isa<DeallocBoxInst>(User) || isa<ProjectBoxInst>(User));
 
     User->eraseFromParent();
   }
@@ -739,20 +744,29 @@ specializePartialApply(PartialApplyInst *PartialApply,
     // of this box so we must now release it explicitly when the
     // partial_apply is released.
     auto box = cast<AllocBoxInst>(O.get());
-    assert(box->getContainerResult() == O.get() &&
-           "Expected promoted param to be an alloc_box container!");
 
     // If the box address has a MUI, route accesses through it so DI still
     // works.
-    auto promoted = box->getAddressResult();
-    for (auto use : promoted->getUses()) {
-      if (auto MUI = dyn_cast<MarkUninitializedInst>(use->getUser())) {
-        assert(promoted.hasOneUse() && "box value used by mark_uninitialized"
-               " but not exclusively!");
-        promoted = MUI;
-        break;
+    SILInstruction *promoted = nullptr;
+    int numAddrUses = 0;
+    for (Operand *BoxUse : box->getUses()) {
+      if (auto *PBI = dyn_cast<ProjectBoxInst>(BoxUse->getUser())) {
+        for (auto PBIUse : PBI->getUses()) {
+          numAddrUses++;
+          if (auto MUI = dyn_cast<MarkUninitializedInst>(PBIUse->getUser()))
+            promoted = MUI;
+        }
       }
     }
+    assert((!promoted || numAddrUses == 1) &&
+           "box value used by mark_uninitialized but not exclusively!");
+    
+    // We only reuse an existing project_box if it directly follows the
+    // alloc_box. This makes sure that the project_box dominates the
+    // partial_apply.
+    if (!promoted)
+      promoted = getOrCreateProjectBox(box);
+
     Args.push_back(promoted);
 
     // If the partial_apply is dead, insert a release after it.

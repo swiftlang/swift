@@ -39,7 +39,8 @@ bb0(%0 : $Int32, %25: $Bar):
   %1 = struct_extract %0 : $Int32, #Int32._value
   %2 = integer_literal $Builtin.Int32, 0
   %30 = alloc_box $Bool
-  br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32, %25: $Bar, %30#0 : $@box Bool, %30#1 : $*Bool)
+  %30a = project_box %30 : $@box Bool
+  br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32, %25: $Bar, %30 : $@box Bool, %30a : $*Bool)
 
 bb1(%4 : $Builtin.Int32, %5 : $Builtin.Int32, %26: $Bar, %31 : $@box Bool, %32 : $*Bool):
   %24 = class_method %26 : $Bar, #Bar.foo!1 : Bar -> () -> () , $@convention(method) (@guaranteed Bar) -> () // user: %6

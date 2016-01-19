@@ -625,6 +625,20 @@ bool swift::canCastValueToABICompatibleType(SILModule &M,
   return Result.hasValue();
 }
 
+ProjectBoxInst *swift::getOrCreateProjectBox(AllocBoxInst *ABI) {
+  SILBasicBlock::iterator Iter(ABI);
+  Iter++;
+  assert(Iter != ABI->getParent()->end() &&
+         "alloc_box cannot be the last instruction of a block");
+  SILInstruction *NextInst = &*Iter;
+  if (auto *PBI = dyn_cast<ProjectBoxInst>(NextInst)) {
+    if (PBI->getOperand().getDef() == ABI)
+      return PBI;
+  }
+
+  SILBuilder B(NextInst);
+  return B.createProjectBox(ABI->getLoc(), ABI);
+}
 
 //===----------------------------------------------------------------------===//
 //                       String Concatenation Optimizer

@@ -9,7 +9,8 @@ class Foo {
 class Bar: Foo {
   // CHECK-LABEL: sil hidden @_TFC22super_init_refcounting3Barc
   // CHECK:         [[SELF_VAR:%.*]] = alloc_box $Bar
-  // CHECK:         [[SELF_MUI:%.*]] =  mark_uninitialized [derivedself] [[SELF_VAR]]#1
+  // CHECK:         [[PB:%.*]] = project_box [[SELF_VAR]]
+  // CHECK:         [[SELF_MUI:%.*]] =  mark_uninitialized [derivedself] [[PB]]
   // CHECK:         [[ORIG_SELF:%.*]] = load [[SELF_MUI]]
   // CHECK-NOT:     strong_retain [[ORIG_SELF]]
   // CHECK:         [[ORIG_SELF_UP:%.*]] = upcast [[ORIG_SELF]]
@@ -26,7 +27,8 @@ class Bar: Foo {
 extension Foo {
   // CHECK-LABEL: sil hidden @_TFC22super_init_refcounting3Fooc
   // CHECK:         [[SELF_VAR:%.*]] = alloc_box $Foo
-  // CHECK:         [[SELF_MUI:%.*]] =  mark_uninitialized [delegatingself] [[SELF_VAR]]#1
+  // CHECK:         [[PB:%.*]] = project_box [[SELF_VAR]]
+  // CHECK:         [[SELF_MUI:%.*]] =  mark_uninitialized [delegatingself] [[PB]]
   // CHECK:         [[ORIG_SELF:%.*]] = load [[SELF_MUI]]
   // CHECK-NOT:     strong_retain [[ORIG_SELF]]
   // CHECK:         [[SUPER_INIT:%.*]] = class_method
@@ -71,7 +73,8 @@ class Good: Foo {
 
   // CHECK-LABEL: sil hidden @_TFC22super_init_refcounting4Goodc
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box $Good
-  // CHECK:         [[SELF:%.*]] = mark_uninitialized [derivedself] [[SELF_BOX]]#1
+  // CHECK:         [[PB:%.*]] = project_box [[SELF_BOX]]
+  // CHECK:         [[SELF:%.*]] = mark_uninitialized [derivedself] [[PB]]
   // CHECK:         store %0 to [[SELF]]
   // CHECK:         [[SELF_OBJ:%.*]] = load [[SELF]]
   // CHECK:         [[X_ADDR:%.*]] = ref_element_addr [[SELF_OBJ]] : $Good, #Good.x

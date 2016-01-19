@@ -47,7 +47,7 @@ func genericMetatypeFromGenericMetatype<T>(x: GenericMetatype<T>) -> T.Type {
   return x.value
 }
 // CHECK-LABEL: sil hidden @_TF20metatype_abstraction34dynamicMetatypeFromGenericMetatype
-// CHECK:         [[ADDR:%.*]] = struct_element_addr %{{[0-9]+}}#1 : $*GenericMetatype<C>, #GenericMetatype.value
+// CHECK:         [[ADDR:%.*]] = struct_element_addr %{{[0-9]+}} : $*GenericMetatype<C>, #GenericMetatype.value
 // CHECK:         [[META:%.*]] = load [[ADDR]] : $*@thick C.Type
 // CHECK:         return [[META]] : $@thick C.Type
 // CHECK:       }
@@ -88,7 +88,7 @@ func dynamicMetatypeToGeneric(x: C.Type) {
   takeGeneric(x)
 }
 // CHECK-LABEL: sil hidden @_TF20metatype_abstraction32dynamicMetatypeToGenericMetatype
-// CHECK:         [[META:%.*]] = load %{{[0-9]+}}#1 : $*@thick C.Type
+// CHECK:         [[META:%.*]] = load %{{[0-9]+}} : $*@thick C.Type
 // CHECK:         apply {{%.*}}<C>([[META]]) : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> ()
 func dynamicMetatypeToGenericMetatype(x: C.Type) {
   var x = x

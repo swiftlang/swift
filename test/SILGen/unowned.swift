@@ -42,13 +42,15 @@ func test0(c c: C) {
 
   var a: A
 // CHECK:      [[A1:%.*]] = alloc_box $A
-// CHECK:      [[A:%.*]] = mark_uninitialized [var] [[A1]]#1
+// CHECK:      [[PBA:%.*]] = project_box [[A1]]
+// CHECK:      [[A:%.*]] = mark_uninitialized [var] [[PBA]]
 
   unowned var x = c
 // CHECK:      [[X:%.*]] = alloc_box $@sil_unowned C
+// CHECK-NEXT: [[PBX:%.*]] = project_box [[X]]
 // CHECK-NEXT: [[T2:%.*]] = ref_to_unowned %0 : $C  to $@sil_unowned C
 // CHECK-NEXT: unowned_retain [[T2]] : $@sil_unowned C
-// CHECK-NEXT: store [[T2]] to [[X]]#1 : $*@sil_unowned C
+// CHECK-NEXT: store [[T2]] to [[PBX]] : $*@sil_unowned C
 
   a.x = c
 // CHECK-NEXT: [[T1:%.*]] = struct_element_addr [[A]] : $*A, #A.x
@@ -57,7 +59,7 @@ func test0(c c: C) {
 // CHECK-NEXT: assign [[T2]] to [[T1]] : $*@sil_unowned C
 
   a.x = x
-// CHECK-NEXT: [[T2:%.*]] = load [[X]]#1 : $*@sil_unowned C     
+// CHECK-NEXT: [[T2:%.*]] = load [[PBX]] : $*@sil_unowned C     
 // CHECK-NEXT:  strong_retain_unowned  [[T2]] : $@sil_unowned C  
 // CHECK-NEXT:  [[T3:%.*]] = unowned_to_ref [[T2]] : $@sil_unowned C to $C
 // CHECK-NEXT:  [[XP:%.*]] = struct_element_addr [[A]] : $*A, #A.x
@@ -73,17 +75,18 @@ func unowned_local() -> C {
   let c = C()
 
   // CHECK: [[uc:%.*]] = alloc_box $@sil_unowned C, let, name "uc"
+  // CHECK-NEXT: [[PB:%.*]] = project_box [[uc]]
   // CHECK-NEXT: [[tmp1:%.*]] = ref_to_unowned [[c]] : $C to $@sil_unowned C
   // CHECK-NEXT: unowned_retain [[tmp1]]
-  // CHECK-NEXT: store [[tmp1]] to [[uc]]#1
+  // CHECK-NEXT: store [[tmp1]] to [[PB]]
   unowned let uc = c
 
-  // CHECK-NEXT: [[tmp2:%.*]] = load [[uc]]#1
+  // CHECK-NEXT: [[tmp2:%.*]] = load [[PB]]
   // CHECK-NEXT: strong_retain_unowned [[tmp2]]
   // CHECK-NEXT: [[tmp3:%.*]] = unowned_to_ref [[tmp2]]
   return uc
 
-  // CHECK-NEXT: strong_release [[uc]]#0
+  // CHECK-NEXT: strong_release [[uc]]
   // CHECK-NEXT: strong_release [[c]]
   // CHECK-NEXT: return [[tmp3]]
 }

@@ -115,12 +115,13 @@ class ObjCInit {
 func testObjCInit(meta: ObjCInit.Type) {
 // CHECK: bb0([[THICK_META:%[0-9]+]] : $@thick ObjCInit.Type):
 // CHECK:   [[O:%[0-9]+]] = alloc_box $ObjCInit
+// CHECK:   [[PB:%.*]] = project_box [[O]]
 // CHECK:   [[OBJC_META:%[0-9]+]] = thick_to_objc_metatype [[THICK_META]] : $@thick ObjCInit.Type to $@objc_metatype ObjCInit.Type
 // CHECK:   [[OBJ:%[0-9]+]] = alloc_ref_dynamic [objc] [[OBJC_META]] : $@objc_metatype ObjCInit.Type, $ObjCInit
 // CHECK:   [[INIT:%[0-9]+]] = class_method [volatile] [[OBJ]] : $ObjCInit, #ObjCInit.init!initializer.1.foreign : ObjCInit.Type -> () -> ObjCInit , $@convention(objc_method) (@owned ObjCInit) -> @owned ObjCInit
 // CHECK:   [[RESULT_OBJ:%[0-9]+]] = apply [[INIT]]([[OBJ]]) : $@convention(objc_method) (@owned ObjCInit) -> @owned ObjCInit
-// CHECK:   store [[RESULT_OBJ]] to [[O]]#1 : $*ObjCInit
-// CHECK:   strong_release [[O]]#0 : $@box ObjCInit
+// CHECK:   store [[RESULT_OBJ]] to [[PB]] : $*ObjCInit
+// CHECK:   strong_release [[O]] : $@box ObjCInit
 // CHECK:   [[RESULT:%[0-9]+]] = tuple ()
 // CHECK:   return [[RESULT]] : $()
   var o = meta.init()

@@ -715,13 +715,13 @@ In SIL, a single instruction may produce multiple values. Operands that refer
 to multiple-value instructions choose the value by following the ``%name`` with
 ``#`` and the index of the value. For example::
 
-  // alloc_box produces two values--the refcounted pointer %box#0, and the
-  // value address %box#1
-  %box = alloc_box $Int64
-  // Refer to the refcounted pointer
-  strong_retain %box#0 : $@box Int64
+  // alloc_existential_box produces two values--the refcounted pointer %box#0,
+  // and the value address %box#1
+  %box = alloc_existential_box $ErrorType, $MyError
   // Refer to the address
-  store %value to %box#1 : $*Int64
+  store %value to %box#1 : $*MyError
+  // Refer to the refcounted pointer
+  throw %box#0 : $ErrorType
 
 Unlike LLVM IR, SIL instructions that take value operands *only* accept
 value operands. References to literal constants, functions, global variables, or
@@ -1690,15 +1690,13 @@ alloc_box
   sil-instruction ::= 'alloc_box' sil-type (',' debug-var-attr)*
 
   %1 = alloc_box $T
-  // %1 has two values:
-  //   %1#0 has type $@box T
-  //   %1#1 has type $*T
+  //   %1 has type $@box T
 
 Allocates a reference-counted ``@box`` on the heap large enough to hold a value
 of type ``T``, along with a retain count and any other metadata required by the
-runtime.  The result of the instruction is a two-value operand; the first value
-is the reference-counted ``@box`` reference that owns the box, and the second
-value is the address of the value inside the box.
+runtime.  The result of the instruction is the reference-counted ``@box``
+reference that owns the box. The ``project_box`` instruction is used to retrieve
+the address of the value inside the box.
 
 The box will be initialized with a retain count of 1; the storage will be
 uninitialized. The box owns the contained value, and releasing it to a retain
@@ -2741,11 +2739,12 @@ lowers to an uncurried entry point and is curried in the enclosing function::
   entry(%x : $Int):
     // Create a box for the 'x' variable
     %x_box = alloc_box $Int
-    store %x to %x_box#1 : $*Int
+    %x_addr = project_box %x_box : $@box Int
+    store %x to %x_addr : $*Int
 
     // Create the bar closure
     %bar_uncurried = function_ref @bar : $(Int, Int) -> Int
-    %bar = partial_apply %bar_uncurried(%x_box#0, %x_box#1) \
+    %bar = partial_apply %bar_uncurried(%x_box, %x_addr) \
       : $(Int, Builtin.NativeObject, *Int) -> Int
 
     // Apply it

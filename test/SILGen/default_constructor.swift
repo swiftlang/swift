@@ -48,6 +48,7 @@ class F : E { }
 // CHECK-LABEL: sil hidden @_TFC19default_constructor1Fc{{.*}} : $@convention(method) (@owned F) -> @owned F
 // CHECK: bb0([[ORIGSELF:%[0-9]+]] : $F)
 // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_box $F
+// CHECK-NEXT: project_box [[SELF_BOX]]
 // CHECK-NEXT: [[SELF:%[0-9]+]] = mark_uninitialized [derivedself]
 // CHECK-NEXT: store [[ORIGSELF]] to [[SELF]] : $*F
 // CHECK-NEXT: [[SELFP:%[0-9]+]] = load [[SELF]] : $*F
@@ -59,7 +60,7 @@ class F : E { }
 // CHECK-NEXT: store [[ESELFW]] to [[SELF]] : $*F
 // CHECK-NEXT: [[SELFP:%[0-9]+]] = load [[SELF]] : $*F
 // CHECK-NEXT: strong_retain [[SELFP]] : $F
-// CHECK-NEXT: strong_release [[SELF_BOX]]#0 : $@box F
+// CHECK-NEXT: strong_release [[SELF_BOX]] : $@box F
 // CHECK-NEXT: return [[SELFP]] : $F
 
 

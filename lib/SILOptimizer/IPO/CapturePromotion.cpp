@@ -726,9 +726,7 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
   SmallVector<SILInstruction*, 32> Mutations;
   
   // Scan the box for interesting uses.
-  SILValue Box = ABI->getContainerResult();
-  
-  for (Operand *O : Box.getUses()) {
+  for (Operand *O : ABI->getUses()) {
     if (auto *PAI = dyn_cast<PartialApplyInst>(O->getUser())) {
       unsigned OpNo = O->getOperandNumber();
       assert(OpNo != 0 && "Alloc box used as callee of partial apply?");
@@ -778,22 +776,25 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       IM.insert(std::make_pair(PAI, Index));
       continue;
     }
+    if (auto *PBI = dyn_cast<ProjectBoxInst>(O->getUser())) {
+      // Check for mutations of the address component.
+      SILValue Addr = PBI;
+      // If the AllocBox is used by a mark_uninitialized, scan the MUI for
+      // interesting uses.
+      if (Addr.hasOneUse()) {
+        SILInstruction *SingleAddrUser = Addr.use_begin()->getUser();
+        if (isa<MarkUninitializedInst>(SingleAddrUser))
+          Addr = SILValue(SingleAddrUser);
+      }
 
+      for (Operand *AddrOp : Addr.getUses()) {
+        if (!isNonescapingUse(AddrOp, Mutations))
+          return false;
+      }
+      continue;
+    }
     // Verify that this use does not otherwise allow the alloc_box to
     // escape.
-    if (!isNonescapingUse(O, Mutations))
-      return false;
-  }
-  
-  // Check for mutations of the address component.
-  // If the AllocBox is used by a mark_uninitialized, scan the MUI for
-  // interesting uses.
-  SILValue Addr = ABI->getAddressResult();
-  if (Addr.hasOneUse())
-    if (auto MUI = dyn_cast<MarkUninitializedInst>(Addr.use_begin()->getUser()))
-      Addr = SILValue(MUI);
-
-  for (Operand *O : Addr.getUses()) {
     if (!isNonescapingUse(O, Mutations))
       return false;
   }
@@ -906,8 +907,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
     unsigned Index = OpNo - 1 + FirstIndex;
     if (PromotableIndices.count(Index)) {
       SILValue BoxValue = PAI->getOperand(OpNo);
-      assert(isa<AllocBoxInst>(BoxValue) &&
-             BoxValue.getResultNumber() == 0);
+      AllocBoxInst *ABI = cast<AllocBoxInst>(BoxValue.getDef());
 
       SILParameterInfo CPInfo = CalleePInfo[Index];
       assert(CPInfo.getSILType() == BoxValue.getType() &&
@@ -918,13 +918,23 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
 
       // Load and copy from the address value, passing the result as an argument
       // to the new closure.
-      SILValue Addr = cast<AllocBoxInst>(BoxValue)->getAddressResult();
-      // If the address is marked uninitialized, load through the mark, so that
-      // DI can reason about it.
-      if (Addr.hasOneUse())
-        if (auto MUI = dyn_cast<MarkUninitializedInst>(
-                                                   Addr.use_begin()->getUser()))
-          Addr = SILValue(MUI);
+      SILValue Addr;
+      for (Operand *BoxUse : ABI->getUses()) {
+        auto *PBI = dyn_cast<ProjectBoxInst>(BoxUse->getUser());
+          // If the address is marked uninitialized, load through the mark, so
+          // that DI can reason about it.
+        if (PBI && PBI->hasOneUse()) {
+          SILInstruction *PBIUser = PBI->use_begin()->getUser();
+          if (isa<MarkUninitializedInst>(PBIUser))
+            Addr = PBIUser;
+          break;
+        }
+      }
+      // We only reuse an existing project_box if it directly follows the
+      // alloc_box. This makes sure that the project_box dominates the
+      // partial_apply.
+      if (!Addr)
+        Addr = getOrCreateProjectBox(ABI);
 
       auto &typeLowering = M.getTypeLowering(Addr.getType());
       Args.push_back(

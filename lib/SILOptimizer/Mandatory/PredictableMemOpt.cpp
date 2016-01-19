@@ -98,7 +98,9 @@ static unsigned computeSubelement(SILValue Pointer, SILInstruction *RootInst) {
       return SubEltNumber;
     
     auto *Inst = cast<SILInstruction>(Pointer);
-    if (auto *TEAI = dyn_cast<TupleElementAddrInst>(Inst)) {
+    if (auto *PBI = dyn_cast<ProjectBoxInst>(Inst)) {
+      Pointer = PBI->getOperand();
+    } else if (auto *TEAI = dyn_cast<TupleElementAddrInst>(Inst)) {
       SILType TT = TEAI->getOperand().getType();
       
       // Keep track of what subelement is being referenced.

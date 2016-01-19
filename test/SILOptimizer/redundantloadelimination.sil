@@ -243,9 +243,10 @@ sil_global @total : $Int32
 sil @store_promotion : $@convention(thin) (@owned B) -> () {
 bb0(%0 : $B):
   %1 = alloc_box $B
-  %2 = store %0 to %1#1 : $*B
-  %3 = load %1#1 : $*B
-  %4 = load %1#1 : $*B
+  %1a = project_box %1 : $@box B
+  %2 = store %0 to %1a : $*B
+  %3 = load %1a : $*B
+  %4 = load %1a : $*B
   %5 = strong_retain %3 : $B
   %6 = strong_retain %4 : $B
   %7 = tuple()

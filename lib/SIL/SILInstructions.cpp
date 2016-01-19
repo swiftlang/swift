@@ -77,23 +77,11 @@ AllocRefInst::AllocRefInst(SILDebugLocation *Loc, SILType elementType,
     : AllocationInst(ValueKind::AllocRefInst, Loc, elementType),
       StackPromotable(canBeOnStack), ObjC(objc) {}
 
-// alloc_box returns two results: Builtin.NativeObject & LValue[EltTy]
-static SILTypeList *getAllocBoxType(SILType EltTy, SILFunction &F) {
-  SILType boxTy = SILType::getPrimitiveObjectType(
-                                   SILBoxType::get(EltTy.getSwiftRValueType()));
-
-  SILType ResTys[] = {
-    boxTy,
-    EltTy.getAddressType()
-  };
-
-  return F.getModule().getSILTypeList(ResTys);
-}
-
 AllocBoxInst::AllocBoxInst(SILDebugLocation *Loc, SILType ElementType,
                            SILFunction &F, SILDebugVariable Var)
     : AllocationInst(ValueKind::AllocBoxInst, Loc,
-                     getAllocBoxType(ElementType, F)),
+                     SILType::getPrimitiveObjectType(
+                       SILBoxType::get(ElementType.getSwiftRValueType()))),
       VarInfo(Var, reinterpret_cast<char *>(this + 1)) {}
 
 AllocBoxInst *AllocBoxInst::create(SILDebugLocation *Loc, SILType ElementType,

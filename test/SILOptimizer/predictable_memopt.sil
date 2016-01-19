@@ -8,13 +8,15 @@ import Swift
 sil @simple_reg_promotion : $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):                         // CHECK: bb0(%0 : $Int):
   %1 = alloc_box $Int
-  store %0 to %1#1 : $*Int
+  %1a = project_box %1 : $@box Int
+  store %0 to %1a : $*Int
   %3 = alloc_box $Int
-  %4 = load %1#1 : $*Int
-  store %4 to %3#1 : $*Int
-  %6 = load %3#1 : $*Int
-  strong_release %3#0 : $@box Int
-  strong_release %1#0 : $@box Int
+  %3a = project_box %3 : $@box Int
+  %4 = load %1a : $*Int
+  store %4 to %3a : $*Int
+  %6 = load %3a : $*Int
+  strong_release %3 : $@box Int
+  strong_release %1 : $@box Int
   return %6 : $Int
 
   // CHECK-NEXT: return %0 : $Int
@@ -25,16 +27,17 @@ bb0(%0 : $Int):                         // CHECK: bb0(%0 : $Int):
 sil @tuple_reg_promotion : $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):                         // CHECK: bb0(%0 : $Int):
   %1 = alloc_box $(Int, Int)
+  %1a = project_box %1 : $@box (Int, Int)
   
-  %a = tuple_element_addr %1#1 : $*(Int, Int), 0
-  %b = tuple_element_addr %1#1 : $*(Int, Int), 1
+  %a = tuple_element_addr %1a : $*(Int, Int), 0
+  %b = tuple_element_addr %1a : $*(Int, Int), 1
   store %0 to %a : $*Int
   store %0 to %b : $*Int
 
-  %c = load %1#1 : $*(Int, Int)
+  %c = load %1a : $*(Int, Int)
   %d = tuple_extract %c : $(Int, Int), 0
 
-  strong_release %1#0 : $@box (Int, Int)
+  strong_release %1 : $@box (Int, Int)
 
   return %d : $Int
 
@@ -64,21 +67,22 @@ bb0(%0 : $Int):
   // This alloc_stack can't be removed since it is used by an inout call.
   // CHECK: %1 = alloc_box $Int
   %1 = alloc_box $Int
-  %2 = store %0 to %1#1 : $*Int
+  %1a = project_box %1 : $@box Int
+  %2 = store %0 to %1a : $*Int
   
   // This load should be eliminated.
-  %3 = load %1#1 : $*Int
+  %3 = load %1a : $*Int
   %5 = function_ref @takes_Int_inout : $@convention(thin) (@inout Int) -> ()
-  %6 = apply %5(%1#1) : $@convention(thin) (@inout Int) -> ()
+  %6 = apply %5(%1a) : $@convention(thin) (@inout Int) -> ()
   
   // This load is needed in case the callee modifies the allocation.
   // CHECK: [[RES:%[0-9]+]] = load
-  %7 = load %1#1 : $*Int
+  %7 = load %1a : $*Int
   
   // This should use the incoming argument to the function.
   // CHECK: tuple ({{.*}} : $Int, {{.*}} : $Int)
   %8 = tuple (%3 : $Int, %7 : $Int)
-  strong_release %1#0 : $@box Int
+  strong_release %1 : $@box Int
   %11 = return %8 : $(Int, Int)
 }
 
@@ -101,19 +105,20 @@ sil @closure0 : $@convention(thin) (@owned @box Int) -> ()
 sil @closure_test2 : $@convention(thin) (Int) -> Int {
 bb0(%1 : $Int):
   %0 = alloc_box $Int
-  store %1 to %0#1 : $*Int  // CHECK: store
+  %0a = project_box %0 : $@box Int
+  store %1 to %0a : $*Int  // CHECK: store
 
   %5 = function_ref @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
   %6 = function_ref @closure0 : $@convention(thin) (@owned @box Int) -> ()
-  strong_retain %0#0 : $@box Int
-  %8 = partial_apply %6(%0#0) : $@convention(thin) (@owned @box Int) -> ()
+  strong_retain %0 : $@box Int
+  %8 = partial_apply %6(%0) : $@convention(thin) (@owned @box Int) -> ()
   %9 = apply %5(%8) : $@convention(thin) (@callee_owned () -> ()) -> ()
-  strong_release %0#0 : $@box Int
+  strong_release %0 : $@box Int
 
-  store %1 to %0#1 : $*Int // CHECK: store
+  store %1 to %0a : $*Int // CHECK: store
 
   // In an escape region, we should not promote loads.
-  %r = load %0#1 : $*Int // CHECK: load
+  %r = load %0a : $*Int // CHECK: load
   return %r : $Int
 }
 
@@ -128,13 +133,14 @@ sil @getSomeClass : $@convention(thin) () -> @owned SomeClass
 sil @assign_test_trivial : $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):
   %1 = alloc_box $Int
+  %1a = project_box %1 : $@box Int
 
-  store %0 to %1#1 : $*Int
-  store %0 to %1#1 : $*Int
-  store %0 to %1#1 : $*Int
+  store %0 to %1a : $*Int
+  store %0 to %1a : $*Int
+  store %0 to %1a : $*Int
 
-  %2 = load %1#1 : $*Int
-  strong_release %1#0 : $@box Int
+  %2 = load %1a : $*Int
+  strong_release %1 : $@box Int
 
   // Verify that the load got forwarded from an assign.
   return %2 : $Int                        // CHECK: return %0 : $Int
@@ -385,10 +391,12 @@ sil @indirect_enum_box : $@convention(thin) (Int) -> IndirectCase {
 entry(%x : $Int):
   // CHECK: [[BOX:%.*]] = alloc_box $Int
   %b = alloc_box $Int
-  // CHECK: store [[X]] to [[BOX]]
-  store %x to %b#1 : $*Int
-  // CHECK: [[E:%.*]] = enum $IndirectCase, #IndirectCase.X!enumelt.1, [[BOX]]#0 : $@box Int
-  %e = enum $IndirectCase, #IndirectCase.X!enumelt.1, %b#0 : $@box Int
+  // CHECK: [[PB:%.*]] = project_box [[BOX]]
+  %ba = project_box %b : $@box Int
+  // CHECK: store [[X]] to [[PB]]
+  store %x to %ba : $*Int
+  // CHECK: [[E:%.*]] = enum $IndirectCase, #IndirectCase.X!enumelt.1, [[BOX]] : $@box Int
+  %e = enum $IndirectCase, #IndirectCase.X!enumelt.1, %b : $@box Int
   // CHECK: return [[E]]
   return %e : $IndirectCase
 }

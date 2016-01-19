@@ -66,8 +66,9 @@ func test_property_of_lvalue(x: ErrorType) -> String {
 }
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials23test_property_of_lvalueFPs9ErrorType_SS
 // CHECK:         [[VAR:%.*]] = alloc_box $ErrorType
-// CHECK:         store %0 to [[VAR]]#1
-// CHECK-NEXT:    [[VALUE_BOX:%.*]] = load [[VAR]]#1
+// CHECK:         [[PB:%.*]] = project_box [[VAR]]
+// CHECK:         store %0 to [[PB]]
+// CHECK-NEXT:    [[VALUE_BOX:%.*]] = load [[PB]]
 // CHECK-NEXT:    strong_retain [[VALUE_BOX]]
 // CHECK-NEXT:    [[VALUE:%.*]] = open_existential_box [[VALUE_BOX]] : $ErrorType to $*[[VALUE_TYPE:@opened\(.*\) ErrorType]]
 // CHECK-NEXT:    [[COPY:%.*]] = alloc_stack $[[VALUE_TYPE]]
@@ -77,7 +78,7 @@ func test_property_of_lvalue(x: ErrorType) -> String {
 // CHECK-NEXT:    destroy_addr [[COPY]]
 // CHECK-NEXT:    dealloc_stack [[COPY]]
 // CHECK-NEXT:    strong_release [[VALUE_BOX]]
-// CHECK-NEXT:    strong_release [[VAR]]#0
+// CHECK-NEXT:    strong_release [[VAR]]
 // CHECK-NEXT:    strong_release %0
 // CHECK-NEXT:    return [[RESULT]]
 
@@ -107,7 +108,9 @@ func test_open_existential_semantics(guaranteed: ErrorType,
                                      _ immediate: ErrorType) {
   var immediate = immediate
   // CHECK: [[IMMEDIATE_BOX:%.*]] = alloc_box $ErrorType
+  // CHECK: [[PB:%.*]] = project_box [[IMMEDIATE_BOX]]
   // GUARANTEED: [[IMMEDIATE_BOX:%.*]] = alloc_box $ErrorType
+  // GUARANTEED: [[PB:%.*]] = project_box [[IMMEDIATE_BOX]]
 
   // CHECK-NOT: strong_retain %0
   // CHECK: [[VALUE:%.*]] = open_existential_box %0
@@ -124,7 +127,7 @@ func test_open_existential_semantics(guaranteed: ErrorType,
   // GUARANTEED-NOT: strong_release [[GUARANTEED]]
   guaranteed.extensionMethod()
 
-  // CHECK: [[IMMEDIATE:%.*]] = load [[IMMEDIATE_BOX]]#1
+  // CHECK: [[IMMEDIATE:%.*]] = load [[PB]]
   // -- need a retain to guarantee
   // CHECK: strong_retain [[IMMEDIATE]]
   // CHECK: [[VALUE:%.*]] = open_existential_box [[IMMEDIATE]]
@@ -136,7 +139,7 @@ func test_open_existential_semantics(guaranteed: ErrorType,
   //    out.
   // CHECK: strong_release [[IMMEDIATE]]
 
-  // GUARANTEED: [[IMMEDIATE:%.*]] = load [[IMMEDIATE_BOX]]#1
+  // GUARANTEED: [[IMMEDIATE:%.*]] = load [[PB]]
   // -- need a retain to guarantee
   // GUARANTEED: strong_retain [[IMMEDIATE]]
   // GUARANTEED: [[VALUE:%.*]] = open_existential_box [[IMMEDIATE]]
@@ -170,6 +173,7 @@ func test_open_existential_semantics(guaranteed: ErrorType,
 func erasure_to_any(guaranteed: ErrorType, _ immediate: ErrorType) -> Any {
   var immediate = immediate
   // CHECK:       [[IMMEDIATE_BOX:%.*]] = alloc_box $ErrorType
+  // CHECK:       [[PB:%.*]] = project_box [[IMMEDIATE_BOX]]
   if true {
     // CHECK-NOT: retain [[GUAR]]
     // CHECK:     [[FROM_VALUE:%.*]] = open_existential_box [[GUAR:%.*]]
@@ -178,7 +182,7 @@ func erasure_to_any(guaranteed: ErrorType, _ immediate: ErrorType) -> Any {
     // CHECK-NOT: release [[GUAR]]
     return guaranteed
   } else if true {
-    // CHECK:     [[IMMEDIATE:%.*]] = load [[IMMEDIATE_BOX]]
+    // CHECK:     [[IMMEDIATE:%.*]] = load [[PB]]
     // CHECK:     retain [[IMMEDIATE]]
     // CHECK:     [[FROM_VALUE:%.*]] = open_existential_box [[IMMEDIATE]]
     // CHECK:     [[TO_VALUE:%.*]] = init_existential_addr [[OUT]]

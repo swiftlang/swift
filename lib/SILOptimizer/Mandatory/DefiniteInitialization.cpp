@@ -1651,8 +1651,9 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
     // for self.  Make sure we're using its address result, not its refcount
     // result, and make sure that the box gets deallocated (not released)
     // since the pointer it contains will be manually cleaned up.
-    if (isa<AllocBoxInst>(Pointer))
-      Pointer = SILValue(Pointer.getDef(), 1);
+    auto *ABI = dyn_cast<AllocBoxInst>(Release->getOperand(0));
+    if (ABI)
+      Pointer = getOrCreateProjectBox(ABI);
 
     if (!consumed) {
       if (Pointer.getType().isAddress())
@@ -1678,7 +1679,7 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
     }
     
     // dealloc_box the self box if necessary.
-    if (auto *ABI = dyn_cast<AllocBoxInst>(Release->getOperand(0))) {
+    if (ABI) {
       auto DB = B.createDeallocBox(Loc,
                                    ABI->getElementType(),
                                    ABI);

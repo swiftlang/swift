@@ -556,12 +556,13 @@ class AllocBoxInst : public AllocationInst {
 
 public:
 
-  SILType getElementType() const {
-    return getType(1).getObjectType();
-  }
+  /// getType() is ok since this is known to only have one type.
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
-  SILValue getContainerResult() const { return SILValue(this, 0); }
-  SILValue getAddressResult() const { return SILValue(this, 1); }
+  SILType getElementType() const {
+    return SILType::getPrimitiveObjectType(getType().castTo<SILBoxType>()->
+                                           getBoxedType());
+  }
 
   /// Return the underlying variable declaration associated with this
   /// allocation, or null if this is a temporary allocation.

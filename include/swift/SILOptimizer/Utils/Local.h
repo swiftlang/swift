@@ -111,6 +111,11 @@ Optional<SILValue> castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
 bool canCastValueToABICompatibleType(SILModule &M,
                                      SILType SrcTy, SILType DestTy);
 
+/// Returns a project_box if it is the next instruction after \p ABI and
+/// and has \p ABI as operand. Otherwise it creates a new project_box right
+/// after \p ABI and returns it.
+ProjectBoxInst *getOrCreateProjectBox(AllocBoxInst *ABI);
+
 /// Replace an apply with an instruction that produces the same value,
 /// then delete the apply and the instructions that produce its callee
 /// if possible.

@@ -137,7 +137,10 @@ public:
     Value_First,
       /// A normal value, represented as an exploded array of llvm Values.
       Explosion = Value_First,
-    
+
+      /// A @box together with the address of the box value.
+      BoxWithAddress,
+
       /// A value that represents a statically-known function symbol that
       /// can be called directly, represented as a StaticFunction.
       StaticFunction,
@@ -155,6 +158,7 @@ private:
   
   union {
     ContainedAddress address;
+    OwnedAddress boxWithAddress;
     struct {
       ExplosionVector values;
     } explosion;
@@ -196,7 +200,11 @@ public:
     auto Elts = e.claimAll();
     explosion.values.append(Elts.begin(), Elts.end());
   }
-  
+
+  LoweredValue(const OwnedAddress &boxWithAddress)
+  : kind(Kind::BoxWithAddress), boxWithAddress(boxWithAddress)
+  {}
+
   LoweredValue(LoweredValue &&lv)
     : kind(lv.kind)
   {    
@@ -206,6 +214,9 @@ public:
       break;
     case Kind::Explosion:
       ::new (&explosion.values) ExplosionVector(std::move(lv.explosion.values));
+      break;
+    case Kind::BoxWithAddress:
+      ::new (&boxWithAddress) OwnedAddress(std::move(lv.boxWithAddress));
       break;
     case Kind::StaticFunction:
       ::new (&staticFunction) StaticFunction(std::move(lv.staticFunction));
@@ -232,6 +243,9 @@ public:
   bool isValue() const {
     return kind >= Kind::Value_First && kind <= Kind::Value_Last;
   }
+  bool isBoxWithAddress() const {
+    return kind == Kind::BoxWithAddress;
+  }
   
   Address getAddress() const {
     assert(isAddress() && "not an allocated address");
@@ -250,6 +264,11 @@ public:
     Explosion e;
     getExplosion(IGF, e);
     return e;
+  }
+
+  Address getAddressOfBox() const {
+    assert(kind == Kind::BoxWithAddress);
+    return boxWithAddress.getAddress();
   }
 
   llvm::Value *getSingletonExplosion(IRGenFunction &IGF) const;
@@ -271,6 +290,9 @@ public:
       break;
     case Kind::Explosion:
       explosion.values.~ExplosionVector();
+      break;
+    case Kind::BoxWithAddress:
+      boxWithAddress.~OwnedAddress();
       break;
     case Kind::StaticFunction:
       staticFunction.~StaticFunction();
@@ -405,6 +427,11 @@ public:
   void setLoweredExplosion(SILValue v, Explosion &e) {
     assert(v.getType().isObject() && "explosion for address value?!");
     setLoweredValue(v, LoweredValue(e));
+  }
+
+  void setLoweredBox(SILValue v, const OwnedAddress &box) {
+    assert(v.getType().isObject() && "box for address value?!");
+    setLoweredValue(v, LoweredValue(box));
   }
 
   void overwriteLoweredExplosion(SILValue v, Explosion &e) {
@@ -831,6 +858,10 @@ void LoweredValue::getExplosion(IRGenFunction &IGF, Explosion &ex) const {
       ex.add(value);
     break;
 
+  case Kind::BoxWithAddress:
+    ex.add(boxWithAddress.getOwner());
+    break;
+
   case Kind::StaticFunction:
     ex.add(staticFunction.getExplosionValue(IGF));
     break;
@@ -850,6 +881,9 @@ llvm::Value *LoweredValue::getSingletonExplosion(IRGenFunction &IGF) const {
     assert(explosion.values.size() == 1);
     return explosion.values[0];
 
+  case Kind::BoxWithAddress:
+    return boxWithAddress.getOwner();
+      
   case Kind::StaticFunction:
     return staticFunction.getExplosionValue(IGF);
 
@@ -1931,6 +1965,8 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
     break;
   }
       
+  case LoweredValue::Kind::BoxWithAddress:
+    llvm_unreachable("@box isn't a valid callee");
   case LoweredValue::Kind::Address:
     llvm_unreachable("sil address isn't a valid callee");
   }
@@ -2098,6 +2134,8 @@ getPartialApplicationFunction(IRGenSILFunction &IGF,
   switch (lv.kind) {
   case LoweredValue::Kind::Address:
     llvm_unreachable("can't partially apply an address");
+  case LoweredValue::Kind::BoxWithAddress:
+    llvm_unreachable("can't partially apply a @box");
   case LoweredValue::Kind::ObjCMethod:
     llvm_unreachable("objc method partial application shouldn't get here");
 
@@ -3541,15 +3579,10 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
 # else
     "";
 # endif
-  OwnedAddress addr;
 
-  auto boxTy = i->getContainerResult().getType().castTo<SILBoxType>();
-  addr = emitAllocateBox(*this, boxTy, DbgName);
-
-  Explosion box;
-  box.add(addr.getOwner());
-  setLoweredExplosion(SILValue(i, 0), box);
-  setLoweredAddress(SILValue(i, 1), addr.getAddress());
+  auto boxTy = i->getType().castTo<SILBoxType>();
+  OwnedAddress boxWithAddr = emitAllocateBox(*this, boxTy, DbgName);
+  setLoweredBox(i, boxWithAddr);
 
   if (IGM.DebugInfo && Decl) {
     // FIXME: This is a workaround to not produce local variables for
@@ -3562,7 +3595,8 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
 
     DebugTypeInfo DbgTy(Decl, i->getElementType().getSwiftType(), type);
     IGM.DebugInfo->emitVariableDeclaration(
-        Builder, emitShadowCopy(addr.getAddress(), i->getDebugScope(), Name),
+        Builder,
+        emitShadowCopy(boxWithAddr.getAddress(), i->getDebugScope(), Name),
         DbgTy, i->getDebugScope(), Name, 0,
         DbgTy.isImplicitlyIndirect() ? DirectValue : IndirectValue);
   }
@@ -3571,9 +3605,17 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
 void IRGenSILFunction::visitProjectBoxInst(swift::ProjectBoxInst *i) {
   auto boxTy = i->getOperand().getType().castTo<SILBoxType>();
 
-  Explosion box = getLoweredExplosion(i->getOperand());
-  auto addr = emitProjectBox(*this, box.claimNext(), boxTy);
-  setLoweredAddress(SILValue(i,0), addr);
+  const LoweredValue &val = getLoweredValue(i->getOperand());
+  if (val.isBoxWithAddress()) {
+    // The operand is an alloc_box. We can directly reuse the address.
+    setLoweredAddress(i, val.getAddressOfBox());
+  } else {
+    // The slow-path: we have to emit code to get from the box to it's
+    // value address.
+    Explosion box = val.getExplosion(*this);
+    auto addr = emitProjectBox(*this, box.claimNext(), boxTy);
+    setLoweredAddress(i, addr);
+  }
 }
 
 void IRGenSILFunction::visitConvertFunctionInst(swift::ConvertFunctionInst *i) {

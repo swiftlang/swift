@@ -15,23 +15,26 @@ func test0(c c: C) {
   var c = c
 // CHECK:    bb0(%0 : $C):
 // CHECK:      [[C:%.*]] = alloc_box $C
+// CHECK-NEXT: [[PBC:%.*]] = project_box [[C]]
 
   var a: A
 // CHECK:      [[A1:%.*]] = alloc_box $A
-// CHECK:      [[A:%.*]] = mark_uninitialized [var] [[A1]]#1
+// CHECK-NEXT: [[PBA:%.*]] = project_box [[A1]]
+// CHECK:      [[A:%.*]] = mark_uninitialized [var] [[PBA]]
 
   weak var x = c
 // CHECK:      [[X:%.*]] = alloc_box $@sil_weak Optional<C>, var, name "x"
+// CHECK-NEXT: [[PBX:%.*]] = project_box [[X]]
 //   Implicit conversion
-// CHECK-NEXT: [[TMP:%.*]] = load [[C]]#1 : $*C
+// CHECK-NEXT: [[TMP:%.*]] = load [[PBC]] : $*C
 // CHECK-NEXT: strong_retain [[TMP]] : $C
 // CHECK-NEXT: [[OPTVAL:%.*]] = enum $Optional<C>, #Optional.Some!enumelt.1, [[TMP]] : $C
-// CHECK-NEXT: store_weak [[OPTVAL]] to [initialization] [[X]]#1 : $*@sil_weak Optional<C>
+// CHECK-NEXT: store_weak [[OPTVAL]] to [initialization] [[PBX]] : $*@sil_weak Optional<C>
 // CHECK-NEXT: release_value [[OPTVAL]] : $Optional<C>
 
   a.x = c
 //   Implicit conversion
-// CHECK-NEXT: [[TMP:%.*]] = load [[C]]#1 : $*C
+// CHECK-NEXT: [[TMP:%.*]] = load [[PBC]] : $*C
 // CHECK-NEXT: strong_retain [[TMP]] : $C
 // CHECK-NEXT: [[OPTVAL:%.*]] = enum $Optional<C>, #Optional.Some!enumelt.1, [[TMP]] : $C
 
@@ -62,9 +65,10 @@ class CC {
 
   // CHECK-LABEL: sil hidden @_TFC4weak2CCc
   // CHECK:  [[FOO:%.*]] = alloc_box $Optional<CC>
+  // CHECK:  [[PB:%.*]] = project_box [[FOO]]
   // CHECK:  [[X:%.*]] = ref_element_addr %2 : $CC, #CC.x
   // CHECK:  [[VALUE:%.*]] = load_weak [[X]] : $*@sil_weak Optional<CC>
-  // CHECK:  store [[VALUE]] to [[FOO]]#1 : $*Optional<CC>
+  // CHECK:  store [[VALUE]] to [[PB]] : $*Optional<CC>
   init() {
     var foo = x
   }

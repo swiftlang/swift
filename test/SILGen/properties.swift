@@ -10,7 +10,8 @@ func getInt() -> Int { return zero }
 // CHECK: bb0(%0 : $Int):
 func physical_tuple_lvalue(c: Int) {
   var x : (Int, Int)
-  // CHECK: [[XADDR1:%[0-9]+]] = alloc_box $(Int, Int)
+  // CHECK: [[BOX:%[0-9]+]] = alloc_box $(Int, Int)
+  // CHECK: [[XADDR1:%.*]] = project_box [[BOX]]
   // CHECK: [[XADDR:%[0-9]+]] = mark_uninitialized [var] [[XADDR1]]
   x.1 = c
   // CHECK: [[X_1:%[0-9]+]] = tuple_element_addr [[XADDR]] : {{.*}}, 1
@@ -32,11 +33,13 @@ func physical_tuple_rvalue() -> Int {
 func tuple_assignment(inout a: Int, inout b: Int) {
   // CHECK: bb0([[A_ADDR:%[0-9]+]] : $*Int, [[B_ADDR:%[0-9]+]] : $*Int):
   // CHECK: [[A_LOCAL:%.*]] = alloc_box $Int
+  // CHECK: [[PBA:%.*]] = project_box [[A_LOCAL]]
   // CHECK: [[B_LOCAL:%.*]] = alloc_box $Int
-  // CHECK: [[B:%[0-9]+]] = load [[B_LOCAL]]#1
-  // CHECK: [[A:%[0-9]+]] = load [[A_LOCAL]]#1
-  // CHECK: assign [[B]] to [[A_LOCAL]]#1
-  // CHECK: assign [[A]] to [[B_LOCAL]]#1
+  // CHECK: [[PBB:%.*]] = project_box [[B_LOCAL]]
+  // CHECK: [[B:%[0-9]+]] = load [[PBB]]
+  // CHECK: [[A:%[0-9]+]] = load [[PBA]]
+  // CHECK: assign [[B]] to [[PBA]]
+  // CHECK: assign [[A]] to [[PBB]]
   (a, b) = (b, a)
 }
 
@@ -44,13 +47,15 @@ func tuple_assignment(inout a: Int, inout b: Int) {
 func tuple_assignment_2(inout a: Int, inout b: Int, xy: (Int, Int)) {
   // CHECK: bb0([[A_ADDR:%[0-9]+]] : $*Int, [[B_ADDR:%[0-9]+]] : $*Int, [[X:%[0-9]+]] : $Int, [[Y:%[0-9]+]] : $Int):
   // CHECK: [[A_LOCAL:%.*]] = alloc_box $Int
+  // CHECK: [[PBA:%.*]] = project_box [[A_LOCAL]]
   // CHECK: [[B_LOCAL:%.*]] = alloc_box $Int
+  // CHECK: [[PBB:%.*]] = project_box [[B_LOCAL]]
   (a, b) = xy
   // CHECK: [[XY2:%[0-9]+]] = tuple ([[X]] : $Int, [[Y]] : $Int)
   // CHECK: [[X:%[0-9]+]] = tuple_extract [[XY2]] : {{.*}}, 0
   // CHECK: [[Y:%[0-9]+]] = tuple_extract [[XY2]] : {{.*}}, 1
-  // CHECK: assign [[X]] to [[A_LOCAL]]#1
-  // CHECK: assign [[Y]] to [[B_LOCAL]]#1
+  // CHECK: assign [[X]] to [[PBA]]
+  // CHECK: assign [[Y]] to [[PBB]]
 }
 
 class Ref {
@@ -163,8 +168,9 @@ func logical_struct_set(inout value: Val, z: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z:%[0-9]+]] : $Int):
   value.z = z
   // CHECK: [[VAL_LOCAL:%[0-9]+]] = alloc_box $Val
+  // CHECK: [[PB:%.*]] = project_box [[VAL_LOCAL]]
   // CHECK: [[Z_SET_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Vals1z
-  // CHECK: apply [[Z_SET_METHOD]]([[Z]], [[VAL_LOCAL]]#1)
+  // CHECK: apply [[Z_SET_METHOD]]([[Z]], [[PB]])
   // CHECK: return
 }
 
@@ -173,7 +179,8 @@ func logical_struct_in_tuple_set(inout value: (Int, Val), z: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*(Int, Val), [[Z:%[0-9]+]] : $Int):
   value.1.z = z
   // CHECK: [[VAL_LOCAL:%[0-9]+]] = alloc_box $(Int, Val)
-  // CHECK: [[VAL_1:%[0-9]+]] = tuple_element_addr [[VAL_LOCAL]]#1 : {{.*}}, 1
+  // CHECK: [[PB:%.*]] = project_box [[VAL_LOCAL]]
+  // CHECK: [[VAL_1:%[0-9]+]] = tuple_element_addr [[PB]] : {{.*}}, 1
   // CHECK: [[Z_SET_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Vals1z
   // CHECK: apply [[Z_SET_METHOD]]([[Z]], [[VAL_1]])
   // CHECK: return
@@ -184,8 +191,9 @@ func logical_struct_in_reftype_set(inout value: Val, z1: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z1:%[0-9]+]] : $Int):
   value.ref.val_prop.z_tuple.1 = z1
   // CHECK: [[VAL_LOCAL:%[0-9]+]] = alloc_box $Val
+  // CHECK: [[PB:%.*]] = project_box [[VAL_LOCAL]]
   // -- val.ref
-  // CHECK: [[VAL_REF_ADDR:%[0-9]+]] = struct_element_addr [[VAL_LOCAL]]#1 : $*Val, #Val.ref
+  // CHECK: [[VAL_REF_ADDR:%[0-9]+]] = struct_element_addr [[PB]] : $*Val, #Val.ref
   // CHECK: [[VAL_REF:%[0-9]+]] = load [[VAL_REF_ADDR]]
   // -- getters and setters
   // -- val.ref.val_prop
@@ -240,8 +248,9 @@ func tuple_in_logical_struct_set(inout value: Val, z1: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z1:%[0-9]+]] : $Int):
   value.z_tuple.1 = z1
   // CHECK: [[VAL_LOCAL:%[0-9]+]] = alloc_box $Val
+  // CHECK: [[PB:%.*]] = project_box [[VAL_LOCAL]]
   // CHECK: [[Z_TUPLE_MATERIALIZED:%[0-9]+]] = alloc_stack $(Int, Int)
-  // CHECK: [[VAL1:%[0-9]+]] = load [[VAL_LOCAL]]
+  // CHECK: [[VAL1:%[0-9]+]] = load [[PB]]
   // CHECK: retain_value [[VAL1]]
   // CHECK: [[Z_GET_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Valg7z_tupleT
   // CHECK: [[Z_TUPLE:%[0-9]+]] = apply [[Z_GET_METHOD]]([[VAL1]])
@@ -250,7 +259,7 @@ func tuple_in_logical_struct_set(inout value: Val, z1: Int) {
   // CHECK: assign [[Z1]] to [[Z_TUPLE_1]]
   // CHECK: [[Z_TUPLE_MODIFIED:%[0-9]+]] = load [[Z_TUPLE_MATERIALIZED]]
   // CHECK: [[Z_SET_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Vals7z_tupleT
-  // CHECK: apply [[Z_SET_METHOD]]({{%[0-9]+, %[0-9]+}}, [[VAL_LOCAL]]#1)
+  // CHECK: apply [[Z_SET_METHOD]]({{%[0-9]+, %[0-9]+}}, [[PB]])
   // CHECK: dealloc_stack [[Z_TUPLE_MATERIALIZED]]
   // CHECK: return
 }
@@ -319,9 +328,10 @@ func inout_arg(inout x: Int) {}
 func physical_inout(x: Int) {
   var x = x
   // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[PB:%.*]] = project_box [[XADDR]]
   inout_arg(&x)
   // CHECK: [[INOUT_ARG:%[0-9]+]] = function_ref @_TF10properties9inout_arg
-  // CHECK: apply [[INOUT_ARG]]([[XADDR]]#1)
+  // CHECK: apply [[INOUT_ARG]]([[PB]])
 }
 
 
@@ -343,8 +353,9 @@ func val_subscript_set(v: Val, i: Int, x: Float) {
   var v = v
   v[i] = x
   // CHECK: [[VADDR:%[0-9]+]] = alloc_box $Val
+  // CHECK: [[PB:%.*]] = project_box [[VADDR]]
   // CHECK: [[SUBSCRIPT_SET_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Vals9subscript
-  // CHECK: apply [[SUBSCRIPT_SET_METHOD]]([[X]], [[I]], [[VADDR]]#1)
+  // CHECK: apply [[SUBSCRIPT_SET_METHOD]]([[X]], [[I]], [[PB]])
 }
 
 struct Generic<T> {
@@ -455,13 +466,14 @@ struct DidSetWillSetTests: ForceAccessors {
       // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
       // CHECK-NEXT: debug_value %0
       // CHECK-NEXT: [[SELFBOX:%.*]] = alloc_box $DidSetWillSetTests
-      // CHECK-NEXT: copy_addr %1 to [initialization] [[SELFBOX]]#1 : $*DidSetWillSetTests
+      // CHECK-NEXT: [[PB:%.*]] = project_box [[SELFBOX]]
+      // CHECK-NEXT: copy_addr %1 to [initialization] [[PB]] : $*DidSetWillSetTests
 
       takeInt(a)
 
       // CHECK-NEXT: // function_ref properties.takeInt
       // CHECK-NEXT: [[TAKEINTFN:%.*]] = function_ref @_TF10properties7takeInt
-      // CHECK-NEXT: [[FIELDPTR:%.*]] = struct_element_addr [[SELFBOX]]#1 : $*DidSetWillSetTests, #DidSetWillSetTests.a
+      // CHECK-NEXT: [[FIELDPTR:%.*]] = struct_element_addr [[PB]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
       // CHECK-NEXT: [[A:%.*]] = load [[FIELDPTR]] : $*Int
       // CHECK-NEXT: apply [[TAKEINTFN]]([[A]]) : $@convention(thin) (Int) -> ()
 
@@ -470,7 +482,7 @@ struct DidSetWillSetTests: ForceAccessors {
       // CHECK-NEXT: // function_ref properties.takeInt (Swift.Int) -> ()
       // CHECK-NEXT: [[TAKEINTFN:%.*]] = function_ref @_TF10properties7takeInt
       // CHECK-NEXT: apply [[TAKEINTFN]](%0) : $@convention(thin) (Int) -> ()
-      // CHECK-NEXT: copy_addr [[SELFBOX]]#1 to %1 : $*DidSetWillSetTests
+      // CHECK-NEXT: copy_addr [[PB]] to %1 : $*DidSetWillSetTests
     }
 
     didSet {
@@ -479,15 +491,16 @@ struct DidSetWillSetTests: ForceAccessors {
       // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
       // CHECK-NEXT: debug
       // CHECK-NEXT: [[SELFBOX:%.*]] = alloc_box $DidSetWillSetTests
-      // CHECK-NEXT: copy_addr %1 to [initialization] [[SELFBOX:%.*]]#1 : $*DidSetWillSetTests
+      // CHECK-NEXT: [[PB:%.*]] = project_box [[SELFBOX]]
+      // CHECK-NEXT: copy_addr %1 to [initialization] [[PB]] : $*DidSetWillSetTests
 
       takeInt(a)
 
       // CHECK-NEXT: // function_ref properties.takeInt (Swift.Int) -> ()
       // CHECK-NEXT: [[TAKEINTFN:%.*]] = function_ref @_TF10properties7takeInt
-      // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[SELFBOX:%.*]]#1 : $*DidSetWillSetTests, #DidSetWillSetTests.a
+      // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[PB]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
       // CHECK-NEXT: [[A:%.*]] = load [[AADDR]] : $*Int
-      // CHECK-NEXT: apply %5([[A]]) : $@convention(thin) (Int) -> ()
+      // CHECK-NEXT: apply [[TAKEINTFN]]([[A]]) : $@convention(thin) (Int) -> ()
 
       a = zero  // reassign, but don't infinite loop.
 
@@ -495,9 +508,9 @@ struct DidSetWillSetTests: ForceAccessors {
       // CHECK-NEXT: [[ZEROFN:%.*]] = function_ref @_TF10propertiesau4zero
       // CHECK-NEXT: [[ZERORAW:%.*]] = apply [[ZEROFN]]() : $@convention(thin) () -> Builtin.RawPointer
       // CHECK-NEXT: [[ZEROADDR:%.*]] = pointer_to_address [[ZERORAW]] : $Builtin.RawPointer to $*Int
-      // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[SELFBOX:%.*]]#1 : $*DidSetWillSetTests, #DidSetWillSetTests.a
+      // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[PB]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
       // CHECK-NEXT: copy_addr [[ZEROADDR]] to [[AADDR]] : $*Int
-      // CHECK-NEXT: copy_addr [[SELFBOX]]#1 to %1 : $*DidSetWillSetTests
+      // CHECK-NEXT: copy_addr [[PB]] to %1 : $*DidSetWillSetTests
     }
   }
 
@@ -522,22 +535,23 @@ struct DidSetWillSetTests: ForceAccessors {
   // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
   // CHECK-NEXT:   debug_value %0
   // CHECK-NEXT: [[SELFBOX:%.*]] = alloc_box $DidSetWillSetTests
-  // CHECK-NEXT: copy_addr %1 to [initialization] [[SELFBOX]]#1 : $*DidSetWillSetTests
+  // CHECK-NEXT: [[PB:%.*]] = project_box [[SELFBOX]]
+  // CHECK-NEXT: copy_addr %1 to [initialization] [[PB]] : $*DidSetWillSetTests
 
-  // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[SELFBOX:%.*]]#1 : $*DidSetWillSetTests, #DidSetWillSetTests.a
+  // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[PB]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
   // CHECK-NEXT: [[OLDVAL:%.*]] = load [[AADDR]] : $*Int
   // CHECK-NEXT: debug_value [[OLDVAL]] : $Int, let, name "tmp"
 
   // CHECK-NEXT: // function_ref {{.*}}.DidSetWillSetTests.a.willset : Swift.Int
   // CHECK-NEXT: [[WILLSETFN:%.*]] = function_ref @_TFV10properties18DidSetWillSetTestsw1a
-  // CHECK-NEXT:  apply [[WILLSETFN]](%0, [[SELFBOX]]#1) : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
-  // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[SELFBOX:%.*]]#1 : $*DidSetWillSetTests, #DidSetWillSetTests.a
+  // CHECK-NEXT:  apply [[WILLSETFN]](%0, [[PB]]) : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
+  // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[PB]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
   // CHECK-NEXT: assign %0 to [[AADDR]] : $*Int
   // CHECK-NEXT: // function_ref {{.*}}.DidSetWillSetTests.a.didset : Swift.Int
   // CHECK-NEXT: [[DIDSETFN:%.*]] = function_ref @_TFV10properties18DidSetWillSetTestsW1a{{.*}} : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
-  // CHECK-NEXT: apply [[DIDSETFN]]([[OLDVAL]], [[SELFBOX]]#1) : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
+  // CHECK-NEXT: apply [[DIDSETFN]]([[OLDVAL]], [[PB]]) : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
 
-  // CHECK-NEXT: copy_addr [[SELFBOX]]#1 to %1 : $*DidSetWillSetTests
+  // CHECK-NEXT: copy_addr [[PB]] to %1 : $*DidSetWillSetTests
 
 
   // CHECK-LABEL: sil hidden @_TFV10properties18DidSetWillSetTestsC
@@ -605,7 +619,8 @@ func local_observing_property(arg: Int) {
 // CHECK-LABEL: sil hidden @{{.*}}local_observing_property
 // CHECK: bb0([[ARG:%[0-9]+]] : $Int)
 // CHECK: [[BOX:%[0-9]+]] = alloc_box $Int
-// CHECK: store [[ARG]] to [[BOX]]#1
+// CHECK: [[PB:%.*]] = project_box [[BOX]]
+// CHECK: store [[ARG]] to [[PB]]
 
 
 
@@ -1000,8 +1015,9 @@ struct MutatingGetterStruct {
 
   // CHECK-LABEL: sil hidden @_TZFV10properties20MutatingGetterStruct4test
   // CHECK: [[X:%.*]] = alloc_box $MutatingGetterStruct, var, name "x"
-  // CHECK: store {{.*}} to [[X]]#1 : $*MutatingGetterStruct
-  // CHECK: apply {{%.*}}([[X]]#1) : $@convention(method) (@inout MutatingGetterStruct) -> Int
+  // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
+  // CHECK: store {{.*}} to [[PB]] : $*MutatingGetterStruct
+  // CHECK: apply {{%.*}}([[PB]]) : $@convention(method) (@inout MutatingGetterStruct) -> Int
   static func test() {
     var x = MutatingGetterStruct()
     _ = x.write
