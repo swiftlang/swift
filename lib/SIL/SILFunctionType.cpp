@@ -269,12 +269,14 @@ enum class ConventionsKind : uint8_t {
 
       // If the substitution didn't change the type, then a negative
       // response to the above is determinative as well.
-      } else if (origType.getType() == substType) {
+      } else if (origType.getType() == substType &&
+                 !origType.getType()->hasTypeParameter()) {
         return false;
 
       // Otherwise, query specifically for the original type.
       } else {
-        return SILType::isPassedIndirectly(origType.getType(), M);
+        return SILType::isPassedIndirectly(origType.getType(), M,
+                                           origType.getGenericSignature());
       }
     }
 
@@ -518,14 +520,16 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
 
   // If the substitution didn't change the result type, we can use the
   // lowering that we already fetched.
-  } else if (origResultType.getType() == substFormalResultType) {
+  } else if (origResultType.getType() == substFormalResultType &&
+             !origResultType.getType()->hasTypeParameter()) {
     assert(!substResultTL.isReturnedIndirectly());
     hasIndirectResult = false;
 
   // Otherwise, ask whether the original result type was address-only.
   } else {
-    hasIndirectResult =
-      SILType::isReturnedIndirectly(origResultType.getType(), M);
+    hasIndirectResult = SILType::isReturnedIndirectly(
+        origResultType.getType(), M,
+        origResultType.getGenericSignature());
   }
 
   // Okay, with that we can actually construct the result type.

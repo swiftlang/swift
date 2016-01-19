@@ -150,7 +150,8 @@ enum class LoweredTypeKind {
   AddressOnly
 };
 
-static LoweredTypeKind classifyType(CanType type, SILModule &M);
+static LoweredTypeKind classifyType(CanType type, SILModule &M,
+                                    CanGenericSignature sig);
 
 namespace {
   /// A CRTP helper class for doing things that depends on type
@@ -158,9 +159,11 @@ namespace {
   template <class Impl, class RetTy>
   class TypeClassifierBase : public CanTypeVisitor<Impl, RetTy> {
     SILModule &M;
+    CanGenericSignature Sig;
     Impl &asImpl() { return *static_cast<Impl*>(this); }
   protected:
-    TypeClassifierBase(SILModule &M) : M(M) {}
+    TypeClassifierBase(SILModule &M, CanGenericSignature Sig)
+      : M(M), Sig(Sig) {}
 
   public:
     // The subclass should implement:
@@ -218,8 +221,14 @@ namespace {
 
     // Dependent types should be contextualized before visiting.
 
+    CanGenericSignature getGenericSignature() {
+      if (Sig)
+        return Sig;
+      return M.Types.getCurGenericContext();
+    }
+
     RetTy visitGenericTypeParamType(CanGenericTypeParamType type) {
-      if (auto genericSig = M.Types.getCurGenericContext()) {
+      if (auto genericSig = getGenericSignature()) {
         if (genericSig->requiresClass(type, *M.getSwiftModule())) {
           return asImpl().handleReference(type);
         } else {
@@ -229,7 +238,7 @@ namespace {
       llvm_unreachable("should have substituted dependent type into context");
     }
     RetTy visitDependentMemberType(CanDependentMemberType type) {
-      if (auto genericSig = M.Types.getCurGenericContext()) {
+      if (auto genericSig = getGenericSignature()) {
         if (genericSig->requiresClass(type, *M.getSwiftModule())) {
           return asImpl().handleReference(type);
         } else {
@@ -304,6 +313,17 @@ namespace {
       return asImpl().visitAnyEnumType(type, type->getDecl());
     }
     RetTy visitAnyEnumType(CanType type, EnumDecl *D) {
+      // If we're using a generic signature different from
+      // M.Types.getCurGenericContext(), we have to map the
+      // type into context first because the rest of type
+      // lowering doesn't have a generic signature plumbed
+      // through.
+      if (Sig && type->hasTypeParameter()) {
+        auto builder = M.getASTContext().getOrCreateArchetypeBuilder(
+            Sig, M.getSwiftModule());
+        type = builder->substDependentType(type)->getCanonicalType();
+      }
+
       // Consult the type lowering.
       auto &lowering = M.Types.getTypeLowering(type);
       return handleClassificationFromLowering(type, lowering);
@@ -327,6 +347,17 @@ namespace {
     }
 
     RetTy visitAnyStructType(CanType type, StructDecl *D) {
+      // If we're using a generic signature different from
+      // M.Types.getCurGenericContext(), we have to map the
+      // type into context first because the rest of type
+      // lowering doesn't have a generic signature plumbed
+      // through.
+      if (Sig && type->hasTypeParameter()) {
+        auto builder = M.getASTContext().getOrCreateArchetypeBuilder(
+            Sig, M.getSwiftModule());
+        type = builder->substDependentType(type)->getCanonicalType();
+      }
+
       // Consult the type lowering.  This means we implicitly get
       // caching, but that type lowering needs to override this case.
       auto &lowering = M.Types.getTypeLowering(type);
@@ -341,7 +372,7 @@ namespace {
       // SIL lowering to catch unsupported recursive value types.
       bool isAddressOnly = false;
       for (auto eltType : type.getElementTypes()) {
-        switch (classifyType(eltType, M)) {
+        switch (classifyType(eltType, M, Sig)) {
         case LoweredTypeKind::Trivial:
           continue;
         case LoweredTypeKind::AddressOnly:
@@ -380,7 +411,8 @@ namespace {
   class TypeClassifier :
       public TypeClassifierBase<TypeClassifier, LoweredTypeKind> {
   public:
-    TypeClassifier(SILModule &M) : TypeClassifierBase(M) {}
+    TypeClassifier(SILModule &M, CanGenericSignature Sig)
+        : TypeClassifierBase(M, Sig) {}
 
     LoweredTypeKind handleReference(CanType type) {
       return LoweredTypeKind::Reference;
@@ -397,15 +429,17 @@ namespace {
   };
 }
 
-static LoweredTypeKind classifyType(CanType type, SILModule &M) {
-  return TypeClassifier(M).visit(type);
+static LoweredTypeKind classifyType(CanType type, SILModule &M,
+                                    CanGenericSignature sig) {
+  return TypeClassifier(M, sig).visit(type);
 }
 
 /// True if the type, or the referenced type of an address
 /// type, is address-only.  For example, it could be a resilient struct or
 /// something of unknown size.
-bool SILType::isAddressOnly(CanType type, SILModule &M) {
-  return classifyType(type, M) == LoweredTypeKind::AddressOnly;
+bool SILType::isAddressOnly(CanType type, SILModule &M,
+                            CanGenericSignature sig) {
+  return classifyType(type, M, sig) == LoweredTypeKind::AddressOnly;
 }
 
 namespace {
@@ -989,7 +1023,8 @@ namespace {
     IsDependent_t Dependent;
   public:
     LowerType(TypeConverter &TC, CanType OrigType, IsDependent_t Dependent)
-      : TypeClassifierBase(TC.M), TC(TC), OrigType(OrigType),
+      : TypeClassifierBase(TC.M, CanGenericSignature()),
+        TC(TC), OrigType(OrigType),
         Dependent(Dependent) {}
         
     const TypeLowering *handleTrivial(CanType type) {
@@ -1106,7 +1141,8 @@ namespace {
       for (auto field : D->getStoredProperties()) {
         auto substFieldType =
           structType->getTypeOfMember(D->getModuleContext(), field, nullptr);
-        switch (classifyType(substFieldType->getCanonicalType(), TC.M)) {
+        switch (classifyType(substFieldType->getCanonicalType(), TC.M,
+                             CanGenericSignature())) {
         case LoweredTypeKind::AddressOnly:
           isAddressOnly = true;
           break;
@@ -1194,7 +1230,8 @@ namespace {
                               elt->getArgumentInterfaceType())
           ->getCanonicalType();
         
-        switch (classifyType(substEltType->getCanonicalType(), TC.M)) {
+        switch (classifyType(substEltType->getCanonicalType(), TC.M,
+                             CanGenericSignature())) {
         case LoweredTypeKind::AddressOnly:
           isAddressOnly = true;
           break;
@@ -1587,7 +1624,7 @@ getTypeLoweringForUncachedLoweredFunctionType(TypeKey key) {
 
   // Do a cached lookup under yet another key, just so later lookups
   // using the SILType will find the same TypeLowering object.
-  auto loweredKey = getTypeKey(AbstractionPattern(key.OrigType), silFnType, 0);
+  auto loweredKey = getTypeKey(key.OrigType, silFnType, 0);
   auto &lowering = getTypeLoweringForLoweredType(loweredKey);
   insert(key, &lowering);
   return lowering;

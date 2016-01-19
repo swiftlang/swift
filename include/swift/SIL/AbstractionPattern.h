@@ -284,7 +284,9 @@ class AbstractionPattern {
     assert(signature || !origType->hasTypeParameter());
     TheKind = unsigned(Kind::Type);
     OrigType = origType;
-    GenericSig = signature;
+    GenericSig = CanGenericSignature();
+    if (origType->hasTypeParameter())
+      GenericSig = signature;
   }
 
   void initClangType(CanGenericSignature signature,
