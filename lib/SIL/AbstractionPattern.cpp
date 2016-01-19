@@ -45,8 +45,12 @@ AbstractionPattern TypeConverter::getAbstractionPattern(SubscriptDecl *decl) {
 
 AbstractionPattern
 TypeConverter::getIndicesAbstractionPattern(SubscriptDecl *decl) {
-  // TODO: use interface types
-  return AbstractionPattern(decl->getIndicesType());
+  CanGenericSignature genericSig;
+  if (auto sig = decl->getGenericSignatureOfContext())
+    genericSig = sig->getCanonicalSignature();
+  return AbstractionPattern(genericSig,
+                            decl->getIndicesInterfaceType()
+                                ->getCanonicalType());
 }
 
 static const clang::Type *getClangType(const clang::Decl *decl) {
@@ -80,7 +84,13 @@ AbstractionPattern TypeConverter::getAbstractionPattern(VarDecl *var) {
 AbstractionPattern TypeConverter::getAbstractionPattern(EnumElementDecl *decl) {
   assert(decl->hasArgumentType());
   assert(!decl->hasClangNode());
-  return AbstractionPattern(decl->getArgumentType());
+
+  CanGenericSignature genericSig;
+  if (auto sig = decl->getParentEnum()->getGenericSignatureOfContext())
+    genericSig = sig->getCanonicalSignature();
+  return AbstractionPattern(genericSig,
+                            decl->getArgumentInterfaceType()
+                                ->getCanonicalType());
 }
 
 AbstractionPattern::EncodedForeignErrorInfo

@@ -1904,7 +1904,7 @@ getOptionalObjectTypeData(SILGenFunction &gen,
   EnumElementDecl *someDecl = gen.getASTContext().getOptionalSomeDecl(otk);
   
   return {
-    AbstractionPattern(someDecl->getArgumentType()),
+    gen.SGM.M.Types.getAbstractionPattern(someDecl),
     objectTy,
     baseTypeData.TypeOfRValue.getEnumElementType(someDecl, gen.SGM.M),
   };

@@ -2971,7 +2971,8 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
   }
 
   ManagedValue payloadMV;
-  AbstractionPattern origFormalType(element->getArgumentType());
+  AbstractionPattern origFormalType =
+      SGM.M.Types.getAbstractionPattern(element);
   auto &payloadTL = getTypeLowering(origFormalType,
                                     payload.getSubstType());
 
