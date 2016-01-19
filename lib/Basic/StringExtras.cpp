@@ -603,6 +603,13 @@ static StringRef omitNeedlessWords(StringRef name,
       return name;
     }
 
+    // Don't strip just "Error".
+    if (nameWordRevIter != nameWordRevIterBegin) {
+      auto nameWordPrev = std::prev(nameWordRevIter);
+      if (nameWordPrev == nameWordRevIterBegin && *nameWordPrev == "Error")
+        return name;
+    }
+
     switch (role) {
     case NameRole::Property:
       // Always strip off type information.
