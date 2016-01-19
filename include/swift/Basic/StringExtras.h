@@ -285,6 +285,10 @@ enum class NameRole {
   /// The base name of a function or method.
   BaseName,
 
+  /// The base name of a method where the omission type name is the
+  /// 'self' type.
+  BaseNameSelf,
+
   /// The first parameter of a function or method.
   FirstParameter,
 
