@@ -1130,6 +1130,17 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     Arguments.push_back(context.Args.MakeArgString(context.OI.SDKPath));
   }
 
+  // Select the linker to use
+  llvm::SmallString<128> Linker;
+
+  if (const Arg *A = context.Args.getLastArg(options::OPT_use_ld)) {
+    Linker = A->getValue();
+  }
+
+  if (!Linker.empty()) {
+    Arguments.push_back(context.Args.MakeArgString("-fuse-ld=" + Linker));
+  }
+
   // Add the runtime library link path, which is platform-specific and found
   // relative to the compiler.
   // FIXME: Duplicated from CompilerInvocation, but in theory the runtime
