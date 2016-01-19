@@ -515,16 +515,26 @@ static StringRef omitNeedlessWords(StringRef name,
   // name.
   auto nameWordRevIter = nameWords.rbegin(),
     nameWordRevIterBegin = nameWordRevIter,
+    firstMatchingNameWordRevIter = nameWordRevIter,
     nameWordRevIterEnd = nameWords.rend();
   auto typeWordRevIter = typeWords.rbegin(),
     typeWordRevIterEnd = typeWords.rend();
+
+
   bool anyMatches = false;
+  auto matched = [&] {
+    if (anyMatches) return;
+
+    anyMatches = true;
+    firstMatchingNameWordRevIter = nameWordRevIter;
+  };
+
   while (nameWordRevIter != nameWordRevIterEnd &&
          typeWordRevIter != typeWordRevIterEnd) {
     // If the names match, continue.
     auto nameWord = *nameWordRevIter;
     if (matchNameWordToTypeWord(nameWord, *typeWordRevIter)) {
-      anyMatches = true;
+      matched();
       ++nameWordRevIter;
       ++typeWordRevIter;
       continue;
@@ -539,7 +549,7 @@ static StringRef omitNeedlessWords(StringRef name,
       ++nextTypeWordRevIter;
       if (nextTypeWordRevIter != typeWordRevIterEnd &&
           matchNameWordToTypeWord("Index", *nextTypeWordRevIter)) {
-        anyMatches = true;
+        matched();
         ++nameWordRevIter;
         typeWordRevIter = nextTypeWordRevIter;
         ++typeWordRevIter;
@@ -551,7 +561,7 @@ static StringRef omitNeedlessWords(StringRef name,
     if (matchNameWordToTypeWord(nameWord, "Index") &&
         (matchNameWordToTypeWord("Int", *typeWordRevIter) ||
          matchNameWordToTypeWord("Integer", *typeWordRevIter))) {
-      anyMatches = true;
+      matched();
       ++nameWordRevIter;
       ++typeWordRevIter;
       continue;
@@ -560,7 +570,7 @@ static StringRef omitNeedlessWords(StringRef name,
     // Special case: if the word in the name ends in 's', and we have
     // a collection element type, see if this is a plural.
     if (!typeName.CollectionElement.empty() && nameWord.size() > 2 &&
-        nameWord.back() == 's') {
+        nameWord.back() == 's' && role != NameRole::BaseNameSelf) {
       // Check <element name>s.
       auto shortenedNameWord
         = name.substr(0, nameWordRevIter.base().getPosition()-1);
@@ -568,7 +578,7 @@ static StringRef omitNeedlessWords(StringRef name,
         = omitNeedlessWords(shortenedNameWord, typeName.CollectionElement,
                             NameRole::Partial, allPropertyNames, scratch);
       if (shortenedNameWord != newShortenedNameWord) {
-        anyMatches = true;
+        matched();
         unsigned targetSize = newShortenedNameWord.size();
         while (nameWordRevIter.base().getPosition() > targetSize)
           ++nameWordRevIter;
@@ -585,6 +595,14 @@ static StringRef omitNeedlessWords(StringRef name,
         typeWordRevIterEnd = typeWords.rend();
         continue;
       }
+    }
+
+    // If we're matching the base name of a method against the type of
+    // 'Self', and we haven't matched anything yet, skip over words in
+    // the name.
+    if (role == NameRole::BaseNameSelf && !anyMatches) {
+      ++nameWordRevIter;
+      continue;
     }
 
     break;
@@ -614,6 +632,28 @@ static StringRef omitNeedlessWords(StringRef name,
     case NameRole::Property:
       // Always strip off type information.
       name = name.substr(0, nameWordRevIter.base().getPosition());
+      break;
+
+    case NameRole::BaseNameSelf:
+      switch (getPartOfSpeech(*nameWordRevIter)) {
+      case PartOfSpeech::Verb: {
+        // Splice together the parts before and after the matched
+        // type. For example, if we matched "ViewController" in
+        // "dismissViewControllerAnimated", stitch together
+        // "dismissAnimated".
+        SmallString<16> newName =
+          name.substr(0, nameWordRevIter.base().getPosition());
+        newName
+          += name.substr(firstMatchingNameWordRevIter.base().getPosition());
+        name = scratch.copyString(newName);
+        break;
+      }
+
+      case PartOfSpeech::Preposition:
+      case PartOfSpeech::Gerund:
+      case PartOfSpeech::Unknown:
+        return name;
+      }
       break;
 
     case NameRole::BaseName:
@@ -689,6 +729,7 @@ static StringRef omitNeedlessWords(StringRef name,
 
   switch (role) {
   case NameRole::BaseName:
+  case NameRole::BaseNameSelf:
   case NameRole::Property:
     // If we ended up with a keyword for a property name or base name,
     // do nothing.
@@ -783,7 +824,17 @@ bool swift::omitNeedlessWords(StringRef &baseName,
     }
   }
 
-  // Treat zero-parameter methods and properties the same way.
+  // Strip the context type from the base name of a method.
+  if (!isProperty) {
+    StringRef newBaseName = ::omitNeedlessWords(baseName, contextType,
+                                                NameRole::BaseNameSelf,
+                                                nullptr, scratch);
+    if (newBaseName != baseName) {
+      baseName = newBaseName;
+      anyChanges = true;
+    }
+  }
+
   if (paramTypes.empty()) {
     if (resultTypeMatchesContext) {
       StringRef newBaseName = ::omitNeedlessWords(

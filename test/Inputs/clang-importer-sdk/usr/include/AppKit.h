@@ -264,7 +264,7 @@ struct Point3D { double x, y, z; };
 @end
 
 @interface NSViewController ()
-- (void)dismissAnimated:(BOOL)animated;
+- (void)dismissViewControllerAnimated:(BOOL)animated;
 @end
 
 @interface NSScrollView ()
