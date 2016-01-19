@@ -170,6 +170,8 @@ public:
 
   virtual void completeAfterPound(CodeCompletionExpr *E, StmtKind ParentKind) = 0;
 
+  virtual void completeGenericParams(TypeLoc TL) = 0;
+
   /// \brief Signals that the AST for the all the delayed-parsed code was
   /// constructed.  No \c complete*() callbacks will be done after this.
   virtual void doneParsing() = 0;

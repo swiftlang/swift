@@ -2464,9 +2464,17 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   if (Tok.is(tok::kw_where)) {
     SourceLoc whereLoc;
     SmallVector<RequirementRepr, 4> requirements;
-    if (!parseGenericWhereClause(whereLoc, requirements)) {
+    bool firstTypeInComplete;
+    auto whereStatus = parseGenericWhereClause(whereLoc, requirements,
+                                               firstTypeInComplete);
+    if (whereStatus.isSuccess()) {
       trailingWhereClause = TrailingWhereClause::create(Context, whereLoc,
                                                         requirements);
+    } else if (whereStatus.hasCodeCompletion()) {
+      if (CodeCompletion && firstTypeInComplete) {
+        CodeCompletion->completeGenericParams(extendedType.getPtrOrNull());
+      } else
+        return makeParserCodeCompletionResult<ExtensionDecl>();
     }
   }
 

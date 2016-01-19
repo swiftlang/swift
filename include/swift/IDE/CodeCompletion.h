@@ -447,6 +447,7 @@ enum class CompletionKind {
   CallArg,
   ReturnStmtExpr,
   AfterPound,
+  GenericParams,
 };
 
 /// \brief A single code completion result.

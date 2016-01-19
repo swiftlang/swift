@@ -1194,8 +1194,9 @@ public:
   ParserResult<GenericParamList> parseGenericParameters();
   ParserResult<GenericParamList> parseGenericParameters(SourceLoc LAngleLoc);
   ParserResult<GenericParamList> maybeParseGenericParams();
-  bool parseGenericWhereClause(SourceLoc &WhereLoc,
-                               SmallVectorImpl<RequirementRepr> &Requirements);
+  ParserStatus parseGenericWhereClause(SourceLoc &WhereLoc,
+                               SmallVectorImpl<RequirementRepr> &Requirements,
+                                       bool &FirstTypeInComplete);
 
   //===--------------------------------------------------------------------===//
   // Availability Specification Parsing

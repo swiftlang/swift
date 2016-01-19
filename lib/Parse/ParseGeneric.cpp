@@ -107,8 +107,9 @@ ParserResult<GenericParamList> Parser::parseGenericParameters(SourceLoc LAngleLo
   // Parse the optional where-clause.
   SourceLoc WhereLoc;
   SmallVector<RequirementRepr, 4> Requirements;
+  bool FirstTypeInComplete;
   if (Tok.is(tok::kw_where) &&
-      parseGenericWhereClause(WhereLoc, Requirements)) {
+      parseGenericWhereClause(WhereLoc, Requirements, FirstTypeInComplete).isError()) {
     Invalid = true;
   }
   
@@ -178,17 +179,23 @@ ParserResult<GenericParamList> Parser::maybeParseGenericParams() {
 ///
 ///   same-type-requirement:
 ///     type-identifier '==' type
-bool Parser::parseGenericWhereClause(
+ParserStatus Parser::parseGenericWhereClause(
                SourceLoc &WhereLoc,
-               SmallVectorImpl<RequirementRepr> &Requirements) {
+               SmallVectorImpl<RequirementRepr> &Requirements,
+               bool &FirstTypeInComplete) {
+  ParserStatus Status;
   // Parse the 'where'.
   WhereLoc = consumeToken(tok::kw_where);
-  bool Invalid = false;
+  FirstTypeInComplete = false;
   do {
     // Parse the leading type-identifier.
     ParserResult<TypeRepr> FirstType = parseTypeIdentifier();
-    if (FirstType.isNull() || FirstType.hasCodeCompletion()) {
-      Invalid = true;
+    if (FirstType.isNull()) {
+      Status.setIsParseError();
+      if (FirstType.hasCodeCompletion()) {
+        Status.setHasCodeCompletion();
+        FirstTypeInComplete = true;
+      }
       break;
     }
 
@@ -203,8 +210,10 @@ bool Parser::parseGenericWhereClause(
       } else {
         Protocol = parseTypeIdentifier();
       }
-      if (Protocol.isNull() || Protocol.hasCodeCompletion()) {
-        Invalid = true;
+      if (Protocol.isNull()) {
+        Status.setIsParseError();
+        if (Protocol.hasCodeCompletion())
+          Status.setHasCodeCompletion();
         break;
       }
 
@@ -222,8 +231,10 @@ bool Parser::parseGenericWhereClause(
 
       // Parse the second type.
       ParserResult<TypeRepr> SecondType = parseType();
-      if (SecondType.isNull() || SecondType.hasCodeCompletion()) {
-        Invalid = true;
+      if (SecondType.isNull()) {
+        Status.setIsParseError();
+        if (SecondType.hasCodeCompletion())
+          Status.setHasCodeCompletion();
         break;
       }
 
@@ -233,11 +244,11 @@ bool Parser::parseGenericWhereClause(
                                                       SecondType.get()));
     } else {
       diagnose(Tok, diag::expected_requirement_delim);
-      Invalid = true;
+      Status.setIsParseError();
       break;
     }
     // If there's a comma, keep parsing the list.
   } while (consumeIf(tok::comma));
 
-  return Invalid;
+  return Status;
 }
