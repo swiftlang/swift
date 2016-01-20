@@ -810,7 +810,8 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
   // stored property accessor, it may not be synthesized yet.
   bool witnessMutating;
   if (witness)
-    witnessMutating = witness->isMutating();
+    witnessMutating = (requirement->isInstanceMember() &&
+                       witness->isMutating());
   else {
     assert(requirement->isAccessor());
     auto storage = cast<AbstractStorageDecl>(witnessDecl);
