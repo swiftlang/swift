@@ -291,3 +291,26 @@ struct Foo<T>: AddressOnlySubscript {
   }
 }
 
+// Test for materializeForSet vs static properties of structs.
+
+protocol Beverage {
+  static var abv: Int { get set }
+}
+
+struct Beer : Beverage {
+  static var abv: Int {
+    get {
+      return 7
+    }
+    set { }
+  }
+}
+
+struct Wine<Color> : Beverage {
+  static var abv: Int {
+    get {
+      return 14
+    }
+    set { }
+  }
+}
