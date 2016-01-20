@@ -118,6 +118,9 @@ bb0(%0 : $AB):
   %4 = ref_element_addr %0 : $AB, #AB.value       // user: %5
   fix_lifetime %0 : $AB
   %5 = load %4 : $*Int                            // user: %7
+  %22 = function_ref @use_Int : $@convention(thin) (Int) -> ()
+  apply %22(%3) : $@convention(thin) (Int) -> ()
+  apply %22(%5) : $@convention(thin) (Int) -> ()
   return %5 : $Int                               // id: %15
 }
 
