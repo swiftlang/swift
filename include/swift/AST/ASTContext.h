@@ -115,10 +115,6 @@ enum class KnownFoundationEntity {
 /// entity name.
 Optional<KnownFoundationEntity> getKnownFoundationEntity(StringRef name);
 
-/// Determine with the non-prefixed name of the given known Foundation
-/// entity conflicts with the Swift standard library.
-bool nameConflictsWithStandardLibrary(KnownFoundationEntity entity);
-
 /// Callback function used when referring to a type member of a given
 /// type variable.
 typedef std::function<Type(TypeVariableType *, AssociatedTypeDecl *)>
