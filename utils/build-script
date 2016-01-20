@@ -495,7 +495,8 @@ also build for Apple watchos, but disallow tests that require an watchOS device"
         help="enable code coverage analysis in Swift",
         action="store_const",
         const=True,
-        dest="swift_analyze_code_coverage")
+        dest="swift_analyze_code_coverage",
+        default=False)
 
     parser.add_argument("--build-subdir",
         help="""
@@ -531,10 +532,6 @@ the number of parallel build jobs to use""",
         '--darwin-xcrun-toolchain',
         '--cmake',
     ]))
-
-    # Code coverage analysis disabled by default.
-    if args.swift_analyze_code_coverage is None:
-        args.swift_analyze_code_coverage = False
 
     # Build cmark if any cmark-related options were specified.
     if (args.cmark_build_variant is not None):
