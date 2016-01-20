@@ -774,6 +774,9 @@ Finally, classes allow the following changes that do not apply to structs:
 - Changing a class's superclass ``A`` to another class ``B``, *if* class ``B``
   is a subclass of ``A`` *and* class ``B``, along with any superclasses between
   it and class ``A``, were introduced in the latest version of the library.
+- A non-final override of a method, subscript, property, or initializer may be
+  removed; any existing callers should automatically use the superclass
+  implementation.
 
 .. admonition:: TODO
 
@@ -801,8 +804,11 @@ are permitted. In particular:
   be subclasses/overrides that would be broken by the change.
 - ``dynamic`` may not be added to *or* removed from any members. Existing
   clients would not know to invoke the member dynamically.
+- A ``final`` override of a member may *not* be removed; existing clients may
+  be performing a direct call to the implementation instead of using dynamic
+  dispatch.
 
-.. note:: This ties in with the ongoing discussions about
+.. note:: These restrictions tie in with the ongoing discussions about
   "``final``-by-default" and "non-publicly-subclassable-by-default".
 
 
