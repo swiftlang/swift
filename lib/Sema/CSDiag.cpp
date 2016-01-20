@@ -313,7 +313,7 @@ static ParameterList *getParameterList(ValueDecl *decl) {
   return nullptr;
 }
 
-ConcreteDeclRef constraints::resolveLocatorToDecl(
+ResolvedLocator constraints::resolveLocatorToDecl(
    ConstraintSystem &cs,
    ConstraintLocator *locator,
    std::function<Optional<SelectedOverload>(ConstraintLocator *)> findOvlChoice,
@@ -322,7 +322,7 @@ ConcreteDeclRef constraints::resolveLocatorToDecl(
 {
   assert(locator && "Null locator");
   if (!locator->getAnchor())
-    return ConcreteDeclRef();
+    return ResolvedLocator();
 
   ConcreteDeclRef declRef;
   auto anchor = locator->getAnchor();
@@ -401,7 +401,7 @@ ConcreteDeclRef constraints::resolveLocatorToDecl(
 
   // If we didn't find the declaration, we're out of luck.
   if (!declRef)
-    return ConcreteDeclRef();
+    return ResolvedLocator();
 
   // Use the declaration and the path to produce a more specific result.
   // FIXME: This is an egregious hack. We'd be far better off
@@ -426,8 +426,10 @@ ConcreteDeclRef constraints::resolveLocatorToDecl(
       if (!parameterList) break;
         
       unsigned index = path[0].getValue2();
-      if (index < parameterList->size())
-        return parameterList->get(index);
+      if (index < parameterList->size()) {
+        auto param = parameterList->get(index);
+        return ResolvedLocator(ResolvedLocator::ForVar, param);
+      }
       break;
     }
 
@@ -439,13 +441,14 @@ ConcreteDeclRef constraints::resolveLocatorToDecl(
   }
 
   // Otherwise, do the best we can with the declaration we found.
+  if (isa<FuncDecl>(declRef.getDecl()))
+    return ResolvedLocator(ResolvedLocator::ForFunction, declRef);
+  if (isa<ConstructorDecl>(declRef.getDecl()))
+    return ResolvedLocator(ResolvedLocator::ForConstructor, declRef);
+
   // FIXME: Deal with the other interesting cases here, e.g.,
   // subscript declarations.
-  if (isa<FuncDecl>(declRef.getDecl()) ||
-      isa<ConstructorDecl>(declRef.getDecl()))
-    return declRef;
-
-  return ConcreteDeclRef();
+  return ResolvedLocator();
 }
 
 /// Emit a note referring to the target of a diagnostic, e.g., the function
@@ -470,29 +473,32 @@ static void noteTargetOfDiagnostic(ConstraintSystem &cs,
   if (!resolved)
     return;
 
-  auto decl = resolved.getDecl();
-  if (isa<FuncDecl>(decl)) {
-    auto name = decl->getName();
-    cs.getTypeChecker().diagnose(decl,
+  switch (resolved.getKind()) {
+  case ResolvedLocatorKind::Unresolved:
+    // Can't emit any diagnostic here.
+    return;
+
+  case ResolvedLocatorKind::Function: {
+    auto name = resolved.getDecl().getDecl()->getName();
+    cs.getTypeChecker().diagnose(resolved.getDecl().getDecl(),
                                  name.isOperator()? diag::note_call_to_operator
                                                   : diag::note_call_to_func,
-                                 name);
+                                 resolved.getDecl().getDecl()->getName());
     return;
   }
 
-  if (isa<ConstructorDecl>(decl)) {
+  case ResolvedLocatorKind::Constructor:
     // FIXME: Specialize for implicitly-generated constructors.
-    cs.getTypeChecker().diagnose(decl, diag::note_call_to_initializer);
+    cs.getTypeChecker().diagnose(resolved.getDecl().getDecl(),
+                                 diag::note_call_to_initializer);
+    return;
+
+  case ResolvedLocatorKind::Parameter:
+    cs.getTypeChecker().diagnose(resolved.getDecl().getDecl(),
+                                 diag::note_init_parameter,
+                                 resolved.getDecl().getDecl()->getName());
     return;
   }
-
-  if (isa<ParamDecl>(decl)) {
-    cs.getTypeChecker().diagnose(decl, diag::note_init_parameter,
-                                 decl->getName());
-    return;
-  }
-
-  // FIXME: Other decl types too.
 }
 
 /// \brief Determine the number of distinct overload choices in the
