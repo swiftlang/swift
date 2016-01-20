@@ -686,3 +686,13 @@ func r23641896() {
 }
 
 
+// <rdar://problem/23718859> QoI: Incorrectly flattening ((Int,Int)) argument list to (Int,Int) when printing note
+func test17875634() {
+  var match: [(Int, Int)] = []
+  var row = 1
+  var col = 2
+  
+  match.append(row, col)  // expected-error {{extra argument in call}}
+}
+
+
