@@ -230,7 +230,7 @@ struct S2 {
   func xx() -> Int { return self.x + C2.x }
 }
 
-// rdar://problem/19887250
+// Mutating vs non-mutating conflict with static stored property witness - rdar://problem/19887250
 protocol Proto {
   static var name: String {get set}
 }
@@ -238,6 +238,12 @@ struct ProtoAdopter : Proto {
   static var name: String = "name" // no error, even though static setters aren't mutating
 }
 
+// Make sure the logic remains correct if we synthesized accessors for our stored property
+protocol ProtosEvilTwin {
+  static var name: String {get set}
+}
+
+extension ProtoAdopter : ProtosEvilTwin {}
 
 // rdar://18990358
 public struct Foo {
