@@ -24,7 +24,7 @@ func testIntegration() {
 }
 
 func testAuthorizationIsNotCF() {
-  var auth = AuthorizationRef()
+  var auth = AuthorizationRef() // expected-warning {{deprecated}}
   _ = AuthorizationCreate(&auth)
   _ = AuthorizationFree(auth)
 }
