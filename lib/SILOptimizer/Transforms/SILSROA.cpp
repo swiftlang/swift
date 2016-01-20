@@ -47,8 +47,6 @@ class SROAMemoryUseAnalyzer {
   llvm::SmallVector<LoadInst *, 4> Loads;
   // Stores to AI.
   llvm::SmallVector<StoreInst *, 4> Stores;
-  // Dealloc instructions for AI.
-  llvm::SmallVector<DeallocStackInst *, 4> Deallocs;
   // Instructions which extract from aggregates.
   llvm::SmallVector<SILInstruction *, 4> ExtractInsts;
 

@@ -661,8 +661,6 @@ ArrayRef<Substitution> BoundGenericType::getSubstitutions(
     return *known;
 
   // Compute the set of substitutions.
-  llvm::SmallPtrSet<ArchetypeType *, 8> knownArchetypes;
-  SmallVector<ArchetypeType *, 8> archetypeStack;
   TypeSubstitutionMap substitutions;
   auto genericParams = gpContext->getGenericParamsOfContext();
   unsigned index = 0;

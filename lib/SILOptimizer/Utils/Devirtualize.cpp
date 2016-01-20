@@ -347,7 +347,6 @@ getSubstitutionsForCallee(SILModule &M, CanSILFunctionType GenCalleeType,
   // Class F belongs to.
   CanType FSelfClass = GenCalleeType->getSelfParameter().getType();
 
-  SILType FSelfSubstType;
   auto *Module = M.getSwiftModule();
 
   ArrayRef<Substitution> ClassSubs;

@@ -1297,7 +1297,6 @@ public:
     setSelfParam(ArgumentSource(arg, RValue(SGF, apply, superFormalType, super)),
                  apply);
 
-    SILValue superMethod;
     if (constant.isForeign || !canUseStaticDispatch(SGF, constant)) {
       // All Objective-C methods and
       // non-final native Swift methods use dynamic dispatch.

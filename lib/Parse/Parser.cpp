@@ -799,7 +799,6 @@ StringRef swift::parseDeclName(StringRef name,
 
     if (!Lexer::isIdentifier(NextParam))
       return "";
-    Identifier NextParamID;
     if (NextParam == "_")
       argumentLabels.push_back("");
     else

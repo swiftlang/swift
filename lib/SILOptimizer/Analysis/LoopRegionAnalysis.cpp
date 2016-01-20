@@ -159,7 +159,6 @@ LoopRegionFunctionInfo::~LoopRegionFunctionInfo() {
 void LoopRegionFunctionInfo::verify() {
 #ifndef NDEBUG
   llvm::SmallVector<unsigned, 8> UniquePredList;
-  llvm::SmallVector<LoopRegion::SuccessorID, 8> UniqueSuccList;
   for (auto *R : IDToRegionMap) {
     // Make sure that our region has a pred list without duplicates. We do not
     // care if the predecessor list is sorted, just that it is unique.
