@@ -38,7 +38,7 @@ func checkUnicodeScalarViewIteration(
     expectedScalars: [UInt32], _ str: String
 ) {
   do {
-    var us = str.unicodeScalars
+    let us = str.unicodeScalars
     var i = us.startIndex
     let end = us.endIndex
     var decoded: [UInt32] = []
@@ -50,7 +50,7 @@ func checkUnicodeScalarViewIteration(
     expectEqual(expectedScalars, decoded)
   }
   do {
-    var us = str.unicodeScalars
+    let us = str.unicodeScalars
     let start = us.startIndex
     var i = us.endIndex
     var decoded: [UInt32] = []
@@ -814,11 +814,11 @@ StringTests.test("toInt") {
   }
 
   testConvertabilityOfStringWithModification(Int.min) {
-    $0[2]++; ()  // underflow by lots
+    $0[2] += 1; ()  // underflow by lots
   }
 
   testConvertabilityOfStringWithModification(Int.max) {
-    $0[1]++; ()  // overflow by lots
+    $0[1] += 1; ()  // overflow by lots
   }
 
   // Test values lower than min.
