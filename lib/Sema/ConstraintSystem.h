@@ -2232,59 +2232,6 @@ void simplifyLocator(Expr *&anchor,
                      SmallVectorImpl<LocatorPathElt> &targetPath,
                      SourceRange &range);
 
-/// Describes the kind of entity to which a locator was resolved.
-enum class ResolvedLocatorKind : uint8_t {
-  /// The locator could not be resolved.
-  Unresolved,
-  /// The locator refers to a function.
-  Function,
-  /// The locator refers to a constructor.
-  Constructor,
-  /// The locator refers to a parameter of a function.
-  Parameter
-};
-
-/// The entity to which a locator resolved.
-class ResolvedLocator {
-  ResolvedLocatorKind kind;
-  ConcreteDeclRef decl;
-
-public:
-  ResolvedLocator() : kind(ResolvedLocatorKind::Unresolved) { }
-
-  enum ForFunction_t { ForFunction };
-  enum ForConstructor_t { ForConstructor };
-  enum ForVar_t { ForVar };
-  
-  ResolvedLocator(ForFunction_t, ConcreteDeclRef decl)
-    : kind(ResolvedLocatorKind::Function), decl(decl)
-  {
-    assert(isa<FuncDecl>(decl.getDecl()));
-  }
-
-  ResolvedLocator(ForConstructor_t, ConcreteDeclRef decl)
-    : kind(ResolvedLocatorKind::Constructor), decl(decl)
-  {
-    assert(isa<ConstructorDecl>(decl.getDecl()));
-  }
-
-  ResolvedLocator(ForVar_t, ConcreteDeclRef decl)
-    : kind(ResolvedLocatorKind::Parameter), decl(decl)
-  {
-    assert(isa<VarDecl>(decl.getDecl()));
-  }
-  
-  /// Determine the kind of entity to which the locator resolved.
-  ResolvedLocatorKind getKind() const { return kind; }
-
-  /// Retrieve the declaration to which the locator resolved.
-  ConcreteDeclRef getDecl() const { return decl; }
-
-  explicit operator bool() const {
-    return getKind() != ResolvedLocatorKind::Unresolved;
-  }
-};
-
 /// Resolve a locator to the specific declaration it references, if possible.
 ///
 /// \param cs The constraint system in which the locator will be resolved.
@@ -2298,7 +2245,7 @@ public:
 /// \returns the entity to which the locator resolved.
 ///
 /// FIXME: It would be more natural to express the result as a locator.
-ResolvedLocator resolveLocatorToDecl(
+ConcreteDeclRef resolveLocatorToDecl(
                   ConstraintSystem &cs,
                   ConstraintLocator *locator,
                   std::function<Optional<SelectedOverload>(ConstraintLocator *)>
