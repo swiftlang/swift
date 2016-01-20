@@ -654,7 +654,7 @@ class rdar16151899Derived : rdar16151899Base {
     override init() {
         super.init()
         // CHECK: upcast {{.*}} : $rdar16151899Derived to $rdar16151899Base
-        // CHECK-NEXT: super_method {{%[0-9]+}} : $rdar16151899Derived, #rdar16151899Base.init!initializer.1
+        // CHECK: function_ref @_TFC10properties16rdar16151899BasecfT_S0_ : $@convention(method) (@owned rdar16151899Base) -> @owned rdar16151899Base
 
         // This should not be a direct access, it should call the setter in the
         // base.
@@ -718,7 +718,7 @@ class DerivedProperty : BaseProperty {
 // CHECK: sil hidden @_TFC10properties15DerivedProperty24super_property_reference
 // CHECK: bb0(%0 : $DerivedProperty):
 // CHECK:  [[BASEPTR:%[0-9]+]] = upcast %0 : $DerivedProperty to $BaseProperty
-// CHECK:  [[FN:%[0-9]+]] = super_method %0 : $DerivedProperty, #BaseProperty.x!getter.1
+// CHECK:  [[FN:%[0-9]+]] = function_ref @_TFC10properties12BasePropertyg1xSi : $@convention(method) (@guaranteed BaseProperty) -> Int 
 // CHECK:  apply [[FN]]([[BASEPTR]]) : $@convention(method) (@guaranteed BaseProperty) -> Int // user: %7
 
 

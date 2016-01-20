@@ -108,6 +108,13 @@ static CanSILFunctionType getDynamicMethodLoweredType(SILGenFunction &gen,
   return replaceSelfTypeForDynamicLookup(ctx, methodTy, selfTy, methodName);
 }
 
+static bool canUseStaticDispatch(SILGenFunction &gen,
+                                 SILDeclRef constant) {
+  auto *funcDecl = cast<AbstractFunctionDecl>(constant.getDecl());
+  auto thisModule = gen.SGM.M.getSwiftModule();
+  return funcDecl->isFinal() || (thisModule == funcDecl->getModuleContext());
+}
+
 namespace {
 
 /// Abstractly represents a callee, which may be a constant or function value,
@@ -1291,8 +1298,7 @@ public:
                  apply);
 
     SILValue superMethod;
-    auto *funcDecl = cast<AbstractFunctionDecl>(constant.getDecl());
-    if (constant.isForeign || !funcDecl->isFinal()) {
+    if (constant.isForeign || !canUseStaticDispatch(SGF, constant)) {
       // All Objective-C methods and
       // non-final native Swift methods use dynamic dispatch.
       SILValue Input = super.getValue();
@@ -3784,7 +3790,7 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
   while (auto *upcast = dyn_cast<UpcastInst>(self))
     self = upcast->getOperand();
 
-  if (constant.isForeign || !decl->isFinal())
+  if (constant.isForeign || !canUseStaticDispatch(gen, constant))
     return Callee::forSuperMethod(gen, self, constant, substAccessorType,loc);
 
   return Callee::forDirect(gen, constant, substAccessorType, loc);

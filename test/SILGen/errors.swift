@@ -466,7 +466,7 @@ class BaseThrowingInit : HasThrowingInit {
 //   Super delegation.
 // CHECK-NEXT: [[T0:%.*]] = load [[MARKED_BOX]]
 // CHECK-NEXT: [[T2:%.*]] = upcast [[T0]] : $BaseThrowingInit to $HasThrowingInit
-// CHECK-NEXT: [[T3:%[0-9]+]] = super_method [[T0]] : $BaseThrowingInit, #HasThrowingInit.init!initializer.1
+// CHECK: [[T3:%[0-9]+]] = function_ref @_TFC6errors15HasThrowingInitcfzT5valueSi_S0_ : $@convention(method) (Int, @owned HasThrowingInit) -> (@owned HasThrowingInit, @error ErrorType)
 // CHECK-NEXT: apply [[T3]](%0, [[T2]])
 
 // Cleanups for writebacks.
