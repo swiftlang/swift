@@ -633,7 +633,7 @@ public:
   llvm::Constant *getObjCEmptyVTablePtr();
   llvm::Value *getObjCRetainAutoreleasedReturnValueMarker();
   ClassDecl *getObjCRuntimeBaseForSwiftRootClass(ClassDecl *theClass);
-  ClassDecl *getObjCRuntimeBaseClass(Identifier name);
+  ClassDecl *getObjCRuntimeBaseClass(Identifier name, Identifier objcName);
   llvm::Module *getModule() const;
   llvm::Module *releaseModule();
   llvm::AttributeSet getAllocAttrs();
