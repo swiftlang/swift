@@ -239,11 +239,10 @@ ClangImporter::ClangImporter(ASTContext &ctx,
   : ClangModuleLoader(tracker),
     Impl(*new Implementation(ctx, clangImporterOpts))
 {
-  Impl.Retain();
 }
 
 ClangImporter::~ClangImporter() {
-  Impl.Release();
+  delete &Impl;
 }
 
 void ClangImporter::setTypeResolver(LazyResolver &resolver) {
@@ -548,7 +547,8 @@ ClangImporter::create(ASTContext &ctx,
                          sourceBuffer.release());
 
   // Install a Clang module file extension to build Swift name lookup tables.
-  invocation->getFrontendOpts().ModuleFileExtensions.push_back(&importer->Impl);
+  invocation->getFrontendOpts().ModuleFileExtensions.push_back(
+    new Implementation::SwiftNameLookupExtension(importer->Impl));
 
   // Create a compiler instance.
   auto PCHContainerOperations =
@@ -4096,7 +4096,8 @@ void ClangImporter::getMangledName(raw_ostream &os,
 // ---------------------------------------------------------------------------
 
 clang::ModuleFileExtensionMetadata
-ClangImporter::Implementation::getExtensionMetadata() const {
+ClangImporter::Implementation::SwiftNameLookupExtension::
+getExtensionMetadata() const {
   clang::ModuleFileExtensionMetadata metadata;
   metadata.BlockName = "swift.lookup";
   metadata.MajorVersion = SWIFT_LOOKUP_TABLE_VERSION_MAJOR;
@@ -4105,18 +4106,20 @@ ClangImporter::Implementation::getExtensionMetadata() const {
   return metadata;
 }
 
-llvm::hash_code ClangImporter::Implementation::hashExtension(
-                  llvm::hash_code code) const {
+llvm::hash_code
+ClangImporter::Implementation::SwiftNameLookupExtension::hashExtension(
+   llvm::hash_code code) const {
   return llvm::hash_combine(code, StringRef("swift.lookup"),
                             SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
                             SWIFT_LOOKUP_TABLE_VERSION_MINOR,
-                            OmitNeedlessWords,
-                            InferDefaultArguments);
+                            Impl.OmitNeedlessWords,
+                            Impl.InferDefaultArguments);
 }
 
 std::unique_ptr<clang::ModuleFileExtensionWriter>
-ClangImporter::Implementation::createExtensionWriter(clang::ASTWriter &writer) {
-  // Local function to populate the lookup table.
+ClangImporter::Implementation::SwiftNameLookupExtension::createExtensionWriter(
+    clang::ASTWriter &writer) {
+    // Local function to populate the lookup table.
   auto populateTable = [this](clang::Sema &sema, SwiftLookupTable &table) {
     for (auto decl
            : sema.Context.getTranslationUnitDecl()->noload_decls()) {
@@ -4128,11 +4131,11 @@ ClangImporter::Implementation::createExtensionWriter(clang::ASTWriter &writer) {
       if (!named) continue;
 
       // Add this entry to the lookup table.
-      addEntryToLookupTable(sema, table, named);
+      Impl.addEntryToLookupTable(sema, table, named);
     }
 
     // Add macros to the lookup table.
-    addMacrosToLookupTable(sema.Context, sema.getPreprocessor(), table);
+    Impl.addMacrosToLookupTable(sema.Context, sema.getPreprocessor(), table);
   };
 
   return std::unique_ptr<clang::ModuleFileExtensionWriter>(
@@ -4140,7 +4143,7 @@ ClangImporter::Implementation::createExtensionWriter(clang::ASTWriter &writer) {
 }
 
 std::unique_ptr<clang::ModuleFileExtensionReader>
-ClangImporter::Implementation::createExtensionReader(
+ClangImporter::Implementation::SwiftNameLookupExtension::createExtensionReader(
   const clang::ModuleFileExtensionMetadata &metadata,
   clang::ASTReader &reader,
   clang::serialization::ModuleFile &mod,
@@ -4153,13 +4156,13 @@ ClangImporter::Implementation::createExtensionReader(
   assert(metadata.MinorVersion == SWIFT_LOOKUP_TABLE_VERSION_MINOR);
 
   // Check whether we already have an entry in the set of lookup tables.
-  auto &entry = LookupTables[mod.ModuleName];
+  auto &entry = Impl.LookupTables[mod.ModuleName];
   if (entry) return nullptr;
 
   // Local function used to remove this entry when the reader goes away.
   std::string moduleName = mod.ModuleName;
   auto onRemove = [this, moduleName]() {
-    LookupTables.erase(moduleName);
+    Impl.LookupTables.erase(moduleName);
   };
 
   // Create the reader.
