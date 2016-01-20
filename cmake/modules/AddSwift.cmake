@@ -312,7 +312,7 @@ function(_compile_swift_files dependency_target_out_var_name)
   # Don't include libarclite in any build products by default.
   list(APPEND swift_flags "-no-link-objc-runtime")
 
-  if(SWIFT_VERIFY_ALL)
+  if(SWIFT_SIL_VERIFY_ALL)
     list(APPEND swift_flags "-Xfrontend" "-sil-verify-all")
   endif()
 
