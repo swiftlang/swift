@@ -45,8 +45,6 @@ We also intend to provide tools to detect inadvertent changes in interfaces.
 .. warning:: **This document is still in draft stages.** Large additions and
   restructuring are still planned, including:
 
-  * A proper definition for "versioned entity".
-  * Several possible versioned attribute syntaxes, instead of just this one.
   * A discussion of back-dating, and how it usually is not allowed.
   * A brief discussion of the implementation issues for fixed-layout value types with resilient members, and with non-public members.
   * A revisal of the discussion on fixed-layout classes.
@@ -123,34 +121,91 @@ versions.
 Publishing Versioned API
 ========================
 
-A library's API is already marked with the ``public`` attribute. Versioning
-information can be added to any ``public`` entity with the ``@available``
-attribute, this time specifying *only* a version number. This declares when the
-entity was first exposed publicly in the current module.
+A library's API is already marked with the ``public`` attribute, but if a
+client wants to work with multiple releases of the library, the API needs
+versioning information as well. A *versioned entity* represents anything with a
+runtime presence that a client may rely on; its version records when the entity
+was first exposed publicly in its library. Put another way, it is the oldest
+version of the library where the entity may be used.
+  
+- Classes, structs, enums, and protocols may all be versioned entities.
+- Methods, properties, subscripts, and initializers may be versioned entities.
+- Top-level functions, variables, and constants may be versioned entities.
+- Protocol conformances may be versioned entities, despite not explicitly having
+  a declaration in Swift, because a client may depend on them
+  See `New Conformances`_, below.
 
-::
-
-    @available(1.2)
-    public func conjureDemons()
-
-.. admonition:: TODO
-
-    Should this go on ``public`` instead? How does this play with SPI
-    <rdar://problem/18844229>?
-
-Using the same attribute for both publishing and using versioned APIs helps tie
-the feature together and enforces a consistent set of rules. The one difference
-is that code within a library may always use all other entities declared within
-the library (barring their own availability checks), since the entire library
-is shipped as a unit. That is, even if a particular API was introduced in v1.0,
+Code within a library may always use all other entities declared within the
+library (barring their own availability checks), since the entire library is
+shipped as a unit. That is, even if a particular API was introduced in v1.0,
 its (non-public) implementation may refer to APIs introduced in later versions.
 
 Swift libraries are strongly encouraged to use `semantic versioning`_, but this
 is not enforced by the language.
 
-Some ``internal`` entities may also use ``@available``. See `Pinning`_ below.
-
 .. _semantic versioning: http://semver.org
+
+Normally only public entities are treated as versioned. However, in some cases
+it may be useful to version an ``internal`` entity as well. See `Pinning`_ 
+below.
+
+The syntax for marking an entity as versioned has not yet been decided, but the
+rest of this document will use syntax #1 described below.
+
+Syntax #1: Attributes
+~~~~~~~~~~~~~~~~~~~~~
+
+::
+
+    @available(1.2)
+    public func summonDemons()
+
+    @available(1.0) @inlineable(1.2)
+    public func summonElves()
+
+Using the same attribute for both publishing and using versioned APIs helps tie
+the feature together and enforces a consistent set of rules. However, there are
+several other annotations described later in this document that also need
+versioning information, and it may not be obvious what the version number means
+outside the context of ``available``.
+
+
+Syntax #2: Version Blocks
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+::
+
+    #version(1.2)
+    public func summonDemons()
+
+    #version(1.0) {}
+    #version(1.2) { @inlineable }
+    public func summonElves()
+
+Since there are potentially many annotations on a declaration that need
+versioning information, it may make sense to group them together in some way.
+Only certain annotations would support being versioned in this way.
+
+
+Syntax #3: The ``public`` modifier
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+::
+
+    public(1.2) func summonDemons()
+
+    /* @inlineable ?? */
+    public(1.0) func summonElves()
+
+Putting the version on the public modifier is the most concise option. However,
+there's no obvious syntax here for adding versions to other annotations that
+may apply to a declaration.
+
+(Also, at one point there was a proposal to tag API only intended for certain
+clients using a similar syntax: ``public("Foundation")``, for example, for APIs
+only meant to be used by Foundation. These could then be stripped out of the
+public interface for a framework before being widely distributed. But that
+could easily use an alternate syntax.)
 
 
 Supported Evolution
