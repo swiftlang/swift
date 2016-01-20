@@ -692,16 +692,46 @@ unsigned ConstraintGraph::computeConnectedComponents(
 /// edge in the graph.
 static bool shouldContractEdge(ConstraintKind kind) {
   switch (kind) {
-//    case ConstraintKind::Conversion:
     case ConstraintKind::Bind:
     case ConstraintKind::BindParam:
     case ConstraintKind::Equal:
     case ConstraintKind::BindOverload:
+
+    // We currently only allow subtype contractions for the purpose of 
+    // parameter binding constraints.
+    // TODO: We do this because of how inout parameter bindings are handled
+    // for implicit closure parameters. We should consider adjusting our
+    // current approach to unlock more opportunities for subtype contractions.
+    case ConstraintKind::Subtype:
       return true;
 
     default:
       return false;
   }
+}
+
+/// We use this function to determine if a subtype constraint is set
+/// between two (possibly sugared) type variables, one of which is wrapped
+/// in an inout type.
+static bool isStrictInoutSubtypeConstraint(Constraint *constraint) {
+  if (constraint->getKind() != ConstraintKind::Subtype)
+    return false;
+
+  auto t1 = constraint->getFirstType()->getDesugaredType();
+
+  if (auto tt = t1->getAs<TupleType>()) {
+    if (tt->getNumElements() != 1)
+      return false;
+
+    t1 = tt->getElementType(0).getPointer();
+  }
+
+  auto iot = t1->getAs<InOutType>();
+
+  if (!iot)
+    return false;
+
+  return iot->getObjectType()->getAs<TypeVariableType>() == nullptr;
 }
 
 bool ConstraintGraph::contractEdges() {
@@ -716,37 +746,68 @@ bool ConstraintGraph::contractEdges() {
     gatherConstraints(tyvar, constraints);
 
     for (auto constraint : constraints) {
+      auto kind = constraint->getKind();
       // Contract binding edges between type variables.
-      if (shouldContractEdge(constraint->getKind())) {
-        if (auto tyvar1 = constraint->getFirstType()->
-                            getAs<TypeVariableType>()) {
-          if (auto tyvar2 = constraint->getSecondType()->
-                            getAs<TypeVariableType>()) {
+      if (shouldContractEdge(kind)) {
+        auto t1 = constraint->getFirstType()->getDesugaredType();
+        auto t2 = constraint->getSecondType()->getDesugaredType();
 
-            auto rep1 = CS.getRepresentative(tyvar1);
-            auto rep2 = CS.getRepresentative(tyvar2);
+        if (kind == ConstraintKind::Subtype) {
+          if (auto iot1 = t1->getAs<InOutType>()) {
+            t1 = iot1->getObjectType().getPointer();
+          } else {
+            continue;
+          }
+        }
 
-            if (rep1 != rep2 &&
-                ((rep1->getImpl().canBindToLValue() ==
-                  rep2->getImpl().canBindToLValue()) ||
-                  // Allow l-value contractions when binding parameter types.
-                  constraint->getKind() == ConstraintKind::BindParam)) {
-              if (CS.TC.getLangOpts().DebugConstraintSolver) {
-                auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
-                if (CS.solverState)
-                  log.indent(CS.solverState->depth * 2);
+        auto tyvar1 = t1->getAs<TypeVariableType>();
+        auto tyvar2 = t2->getAs<TypeVariableType>();
 
-                log << "Contracting constraint ";
-                constraint->print(log, &CS.getASTContext().SourceMgr);
-                log << "\n";
-              }
+        if (!(tyvar1 && tyvar2))
+          continue;
 
-              // Merge the edges and remove the constraint.
-              removeEdge(constraint);
-              CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
-              didContractEdges = true;
+        // We need to take special care not to directly contract parameter
+        // binding constraints if there is an inout subtype constraint on the
+        // type variable. The constraint solver depends on multiple constraints
+        // being present in this case, so it can generate the appropriate lvalue
+        // wrapper for the argument type.
+        if (kind == ConstraintKind::BindParam) {
+          auto node = tyvar1->getImpl().getGraphNode();
+          auto hasStrictSubtypeConstraint = false;
+
+          for (auto t1Constraint : node->getConstraints()) {
+            if (isStrictInoutSubtypeConstraint(t1Constraint)) {
+              hasStrictSubtypeConstraint = true;
+              break;
             }
           }
+
+          if (hasStrictSubtypeConstraint)
+            continue;
+        }
+
+        auto rep1 = CS.getRepresentative(tyvar1);
+        auto rep2 = CS.getRepresentative(tyvar2);
+
+        if (rep1 != rep2 &&
+            ((rep1->getImpl().canBindToLValue() ==
+              rep2->getImpl().canBindToLValue()) ||
+              // Allow l-value contractions when binding parameter types.
+              constraint->getKind() == ConstraintKind::BindParam)) {
+          if (CS.TC.getLangOpts().DebugConstraintSolver) {
+            auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
+            if (CS.solverState)
+              log.indent(CS.solverState->depth * 2);
+
+            log << "Contracting constraint ";
+            constraint->print(log, &CS.getASTContext().SourceMgr);
+            log << "\n";
+          }
+
+          // Merge the edges and remove the constraint.
+          removeEdge(constraint);
+          CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
+          didContractEdges = true;
         }
       }
     }
