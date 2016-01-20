@@ -994,9 +994,17 @@ private:
     if (auto *storageDecl = dyn_cast<AbstractStorageDecl>(D)) {
       // Use the declaration's availability for the context when checking
       // the bodies of its accessors.
-      if (storageDecl->hasAccessorFunctions()) {
+
+      // HACK: For synthesized trivial accessors we may have not a valid
+      // location for the end of the braces, so in that case we will fall back
+      // to using the range for the storage declaration. The right fix here is
+      // to update AbstractStorageDecl::addTrivialAccessors() to take brace
+      // locations and have callers of that method provide appropriate source
+      // locations.
+      SourceLoc BracesEnd = storageDecl->getBracesRange().End;
+      if (storageDecl->hasAccessorFunctions() && BracesEnd.isValid()) {
         return SourceRange(storageDecl->getStartLoc(),
-                           storageDecl->getBracesRange().End);
+                           BracesEnd);
       }
       
       // For a variable declaration (without accessors) we use the range of the
