@@ -105,6 +105,22 @@ sil @escaped_a_ptr : $@convention(thin) (@out A) -> ()
 sil @escaped_a : $@convention(thin) () -> Builtin.RawPointer
 sil @init_twofield : $@convention(thin) (@thin TwoField.Type) -> TwoField
 
+
+
+// CHECK-LABEL: redundant_load_across_fixlifetime_inst
+// CHECK: load
+// CHECK-NOT: load
+// CHECK: return
+sil hidden @redundant_load_across_fixlifetime_inst : $@convention(thin) (@owned AB) -> Int {
+bb0(%0 : $AB):
+  %2 = ref_element_addr %0 : $AB, #AB.value       // user: %3
+  %3 = load %2 : $*Int                            // user: %6
+  %4 = ref_element_addr %0 : $AB, #AB.value       // user: %5
+  fix_lifetime %0 : $AB
+  %5 = load %4 : $*Int                            // user: %7
+  return %5 : $Int                               // id: %15
+}
+
 // Check that we don't crash if the address is an unchecked_addr_cast.
 // CHECK-LABEL: sil @test_unchecked_addr_cast
 // CHECK-NOT: load
@@ -914,3 +930,5 @@ bb0(%0 : $@box Builtin.Int32):
   %r = tuple(%4 : $Builtin.Int32, %5 : $Builtin.Int32)
   return %r : $(Builtin.Int32, Builtin.Int32)
 }
+
+
