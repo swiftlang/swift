@@ -152,11 +152,12 @@ auto SwiftLookupTable::findOrCreate(StringRef baseName)
   // If there's no reader, we've found all there is to find.
   if (!Reader) return known;
 
-  // Add an entry to the table so we don't look again.
-  known = LookupTable.insert({ baseName, { } }).first;
-
   // Lookup this base name in the module file.
-  (void)Reader->lookup(baseName, known->second);
+  SmallVector<FullTableEntry, 2> results;
+  (void)Reader->lookup(baseName, results);
+
+  // Add an entry to the table so we don't look again.
+  known = LookupTable.insert({ std::move(baseName), std::move(results) }).first;
 
   return known;
 }
