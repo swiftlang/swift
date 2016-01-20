@@ -42,6 +42,11 @@ if "@SWIFT_OPTIMIZED@" == "TRUE":
 if "@SWIFT_HAVE_WORKING_STD_REGEX@" == "FALSE":
     config.available_features.add('broken_std_regex')
 
+if "@SWIFT_ANALYZE_CODE_COVERAGE@" == "TRUE":
+    lit_config.useValgrind = True
+    lit_config.valgrindArgs = [os.path.join(config.swift_src_root,
+                                            "utils/use_profdir.py")]
+
 # Let the main config do the real work.
 if config.test_exec_root is None:
     config.test_exec_root = os.path.dirname(os.path.realpath(__file__))
