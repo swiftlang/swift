@@ -1380,7 +1380,7 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
     Uses.push_back(DIMemoryUse(User, DIUseKind::Escape, 0, 1));
   }
 
-  // The MUI must be used on an project_box or alloc_stack instruction.  Chase
+  // The MUI must be used on a project_box or alloc_stack instruction.  Chase
   // down the box value to see if there are any releases.
   if (isa<AllocStackInst>(MUI->getOperand()))
     return;
