@@ -670,9 +670,6 @@ ERROR(no_accessible_initializers,none,
       (Type))
 ERROR(unbound_generic_parameter,none,
       "generic parameter %0 could not be inferred", (Type))
-ERROR(cannot_bind_generic_parameter_to_type,none,
-      "cannot bind generic parameter to type %0",
-      (Type))
 ERROR(string_index_not_integer,none,
       "String may not be indexed with %0, it has variable size elements",
       (Type))
@@ -1727,8 +1724,6 @@ ERROR(try_assign_rhs_noncovering,none,
       "'" TRY_KIND_SELECT(0) "' following assignment operator does not cover "
       "everything to its right", (unsigned))
 
-ERROR(reference_non_inout,none,
-      "reference to %0 not used to initialize an inout parameter", (Type))
 NOTE(subscript_decl_here,none,
      "subscript operator declared here", ())
 ERROR(condition_broken_proto,none,
@@ -2462,8 +2457,6 @@ ERROR(objc_override_property_name_mismatch,none,
 ERROR(broken_bridged_to_objc_protocol,none,
       "_BridgedToObjectiveC protocol is broken", ())
 
-ERROR(type_not_bridged,none,
-      "%0 is not bridged to Objective-C", (Type))
 ERROR(missing_bridging_function,Fatal,
       "missing '%select{_forceBridgeFromObjectiveC|"
       "_conditionallyBridgeFromObjectiveC}0'", (bool))
