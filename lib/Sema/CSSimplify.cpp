@@ -932,23 +932,10 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     return SolutionKind::Error;
 
   // Result type can be covariant (or equal).
-  switch (matchTypes(func1->getResult(), func2->getResult(), subKind,
+  return matchTypes(func1->getResult(), func2->getResult(), subKind,
                      subFlags,
                      locator.withPathElement(
-                       ConstraintLocator::FunctionResult))) {
-  case SolutionKind::Error:
-    return SolutionKind::Error;
-
-  case SolutionKind::Solved:
-    result = SolutionKind::Solved;
-    break;
-
-  case SolutionKind::Unsolved:
-    result = SolutionKind::Unsolved;
-    break;
-  }
-
-  return result;
+                       ConstraintLocator::FunctionResult));
 }
 
 ConstraintSystem::SolutionKind
