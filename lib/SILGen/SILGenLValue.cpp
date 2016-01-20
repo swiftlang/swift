@@ -804,6 +804,7 @@ namespace {
       if (accessKind == AccessKind::Read ||
           decl->getAttrs().hasAttribute<DynamicAttr>() ||
           !decl->getMaterializeForSetFunc() ||
+          isa<StructDecl>(decl->getDeclContext()) ||
           decl->getDeclContext()->isProtocolExtensionContext()) {
         return std::move(*this).LogicalPathComponent::getMaterialized(gen,
                                                         loc, base, accessKind);
