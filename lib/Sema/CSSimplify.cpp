@@ -932,23 +932,10 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     return SolutionKind::Error;
 
   // Result type can be covariant (or equal).
-  switch (matchTypes(func1->getResult(), func2->getResult(), subKind,
+  return matchTypes(func1->getResult(), func2->getResult(), subKind,
                      subFlags,
                      locator.withPathElement(
-                       ConstraintLocator::FunctionResult))) {
-  case SolutionKind::Error:
-    return SolutionKind::Error;
-
-  case SolutionKind::Solved:
-    result = SolutionKind::Solved;
-    break;
-
-  case SolutionKind::Unsolved:
-    result = SolutionKind::Unsolved;
-    break;
-  }
-
-  return result;
+                       ConstraintLocator::FunctionResult));
 }
 
 ConstraintSystem::SolutionKind
@@ -1239,31 +1226,19 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
         // If the left-hand type variable cannot bind to an lvalue,
         // but we still have an lvalue, fail.
-        if (!typeVar1->getImpl().canBindToLValue()) {
-          if (type2->isLValueType()) {
-            if (shouldRecordFailures()) {
-              recordFailure(getConstraintLocator(locator),
-                            Failure::IsForbiddenLValue, type1, type2);
-            }
-            return SolutionKind::Error;
-          }
+        if (!typeVar1->getImpl().canBindToLValue() &&
+            type2->isLValueType())
+          return SolutionKind::Error;
 
-          // Okay. Bind below.
-        }
+        // Okay. Bind below.
 
         // Check whether the type variable must be bound to a materializable
         // type.
         if (typeVar1->getImpl().mustBeMaterializable()) {
-          if (!type2->isMaterializable()) {
-            if (shouldRecordFailures()) {
-              // TODO: customize error message for closure vs. generic param
-              recordFailure(getConstraintLocator(locator),  
-                            Failure::IsNotMaterializable, type2);
-            }
+          if (!type2->isMaterializable())
             return SolutionKind::Error;
-          } else {
-            setMustBeMaterializableRecursive(type2);
-          }
+
+          setMustBeMaterializableRecursive(type2);
         }
 
         // A constraint that binds any pointer to a void pointer is
@@ -1290,14 +1265,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       if (wantRvalue)
         type1 = type1->getRValueType();
 
-      if (!typeVar2->getImpl().canBindToLValue()) {
-        if (type1->isLValueType()) {
-          if (shouldRecordFailures()) {
-            recordFailure(getConstraintLocator(locator),
-                          Failure::IsForbiddenLValue, type1, type2);
-          }
-          return SolutionKind::Error;
-        }
+      if (!typeVar2->getImpl().canBindToLValue() &&
+          type1->isLValueType()) {
+        return SolutionKind::Error;
         
         // Okay. Bind below.
       }
@@ -1528,11 +1498,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       break;
 
     case TypeKind::LValue:
-      if (kind == TypeMatchKind::BindParamType) {
-        recordFailure(getConstraintLocator(locator),
-                      Failure::IsForbiddenLValue, type1, type2);
+      if (kind == TypeMatchKind::BindParamType)
         return SolutionKind::Error;
-      }
       return matchTypes(cast<LValueType>(desugar1)->getObjectType(),
                         cast<LValueType>(desugar2)->getObjectType(),
                         TypeMatchKind::SameType, subFlags,
@@ -1542,12 +1509,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     case TypeKind::InOut:
       // If the RHS is an inout type, the LHS must be an @lvalue type.
       if (kind == TypeMatchKind::BindParamType ||
-          kind >= TypeMatchKind::OperatorArgumentConversion) {
-        if (shouldRecordFailures())
-          recordFailure(getConstraintLocator(locator),
-                        Failure::IsForbiddenLValue, type1, type2);
+          kind >= TypeMatchKind::OperatorArgumentConversion)
         return SolutionKind::Error;
-      }
+      
       return matchTypes(cast<InOutType>(desugar1)->getObjectType(),
                         cast<InOutType>(desugar2)->getObjectType(),
                         TypeMatchKind::SameType, subFlags,
@@ -2206,14 +2170,8 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType,
   if (isa<AbstractFunctionDecl>(DC))
     lookupOptions |= NameLookupFlags::KnownPrivate;
   auto ctors = TC.lookupConstructors(DC, valueType, lookupOptions);
-  if (!ctors) {
-    // If we are supposed to record failures, do so.
-    if (shouldRecordFailures()) {
-      recordFailure(locator, Failure::NoPublicInitializers, valueType);
-    }
-    
+  if (!ctors)
     return SolutionKind::Error;
-  }
 
   auto &context = getASTContext();
   auto name = context.Id_init;
@@ -3368,11 +3326,6 @@ ConstraintSystem::simplifyBridgedToObjectiveCConstraint(
     increaseScore(SK_UserConversion);
     return SolutionKind::Solved;
   }
-  
-  // Record this failure.
-  recordFailure(constraint.getLocator(),
-                Failure::IsNotBridgedToObjectiveC,
-                baseTy);
   return SolutionKind::Error;
 }
 

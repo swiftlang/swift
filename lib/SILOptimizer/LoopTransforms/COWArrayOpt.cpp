@@ -215,8 +215,7 @@ protected:
       }
 
       // An alloc_box returns its address as the second value.
-      assert((PI.Aggregate == V || PI.Aggregate == SILValue(V, 1)) &&
-             "Expected unary element addr inst.");
+      assert(PI.Aggregate && "Expected unary element addr inst.");
 
       // Recursively check for users after stripping this component from the
       // access path.

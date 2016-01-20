@@ -1113,6 +1113,34 @@ public:
             "project_box result should be address of boxed type");
   }
 
+  void checkProjectExistentialBoxInst(ProjectExistentialBoxInst *PEBI) {
+    SILType operandType = PEBI->getOperand().getType();
+    require(operandType.isObject(),
+            "project_existential_box operand must not be address");
+
+    require(operandType.canUseExistentialRepresentation(F.getModule(),
+                                              ExistentialRepresentation::Boxed),
+            "project_existential_box operand must be boxed existential");
+
+    require(PEBI->getType().isAddress(),
+            "project_existential_box result must be an address");
+
+    if (auto *AEBI = dyn_cast<AllocExistentialBoxInst>(PEBI->getOperand())) {
+      // The lowered type must be the properly-abstracted form of the AST type.
+      SILType exType = AEBI->getExistentialType();
+      auto archetype = ArchetypeType::getOpened(exType.getSwiftRValueType());
+
+      auto loweredTy = F.getModule().Types.getLoweredType(
+                                      Lowering::AbstractionPattern(archetype),
+                                      AEBI->getFormalConcreteType())
+                                        .getAddressType();
+
+      requireSameType(loweredTy, PEBI->getType(),
+              "project_existential_box result should be the lowered "
+              "concrete type of its alloc_existential_box");
+    }
+  }
+  
   void checkDeallocValueBufferInst(DeallocValueBufferInst *I) {
     require(I->getOperand().getType().isAddress(),
             "Operand value should be an address");
@@ -1370,15 +1398,11 @@ public:
   void checkAllocBoxInst(AllocBoxInst *AI) {
     // TODO: Allow the box to be typed, but for staging purposes, only require
     // it when -sil-enable-typed-boxes is enabled.
-    auto boxTy = AI->getType(0).getAs<SILBoxType>();
-    require(boxTy, "first result must be a @box type");
+    auto boxTy = AI->getType().getAs<SILBoxType>();
+    require(boxTy, "alloc_box must have a @box type");
 
-    require(AI->getType(0).isObject(),
-            "first result must be an object");
-    require(AI->getType(1).isAddress(),
-            "second result of alloc_box must be address");
-    requireSameType(boxTy->getBoxedAddressType(), AI->getType(1),
-                    "address type must match box type");
+    require(AI->getType().isObject(),
+            "result of alloc_box must be an object");
   }
 
   void checkDeallocBoxInst(DeallocBoxInst *DI) {
@@ -1821,22 +1845,6 @@ public:
             "alloc_existential_box must be used with a boxed existential "
             "type");
     
-    // The lowered type must be the properly-abstracted form of the AST type.
-    auto archetype = ArchetypeType::getOpened(exType.getSwiftRValueType());
-    
-    auto loweredTy = F.getModule().Types.getLoweredType(
-                                Lowering::AbstractionPattern(archetype),
-                                AEBI->getFormalConcreteType())
-                      .getAddressType();
-    
-    requireSameType(loweredTy, AEBI->getLoweredConcreteType(),
-                    "alloc_existential_box #1 result should be the lowered "
-                    "concrete type at the right abstraction level");
-    require(isLoweringOf(AEBI->getLoweredConcreteType(),
-                         AEBI->getFormalConcreteType()),
-        "alloc_existential_box payload must be a lowering of the formal "
-        "concrete type");
-
     checkExistentialProtocolConformances(exType, AEBI->getConformances());
   }
 

@@ -946,7 +946,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK:       bb1([[RESULT:%.*]] : $Int)
 // CHECK-NEXT:    [[BASE_SELF:%.*]] = upcast %2
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_TFC35definite_init_failable_initializers14ThrowBaseClasscfzT_S0_
-// CHECK-NEXT:    try_apply [[INIT_FN]]([[BASE_SELF]])
+// CHECK:         try_apply [[INIT_FN]]([[BASE_SELF]])
 // CHECK:       bb2([[NEW_SELF:%.*]] : $ThrowBaseClass):
 // CHECK-NEXT:    [[DERIVED_SELF:%.*]] = unchecked_ref_cast [[NEW_SELF]]
 // CHECK-NEXT:    store [[DERIVED_SELF]] to [[SELF_BOX]]
@@ -1012,7 +1012,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK:         store %2 to [[SELF_BOX]]
 // CHECK-NEXT:    [[DERIVED_SELF:%.*]] = upcast %2
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_TFC35definite_init_failable_initializers14ThrowBaseClasscfzT_S0_
-// CHECK-NEXT:    try_apply [[INIT_FN]]([[DERIVED_SELF]])
+// CHECK:    try_apply [[INIT_FN]]([[DERIVED_SELF]])
 // CHECK:       bb1([[NEW_SELF:%.*]] : $ThrowBaseClass):
 // CHECK-NEXT:    [[DERIVED_SELF:%.*]] = unchecked_ref_cast [[NEW_SELF]]
 // CHECK-NEXT:    store [[DERIVED_SELF]] to [[SELF_BOX]]
@@ -1060,7 +1060,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK:       bb1([[RESULT:%.*]] : $Int):
 // CHECK-NEXT:    [[BASE_SELF:%.*]] = upcast %2
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_TFC35definite_init_failable_initializers14ThrowBaseClasscfT6noFailT__S0_
-// CHECK-NEXT:    [[NEW_SELF:%.*]] = apply [[INIT_FN]]([[BASE_SELF]])
+// CHECK:    [[NEW_SELF:%.*]] = apply [[INIT_FN]]([[BASE_SELF]])
 // CHECK-NEXT:    [[DERIVED_SELF:%.*]] = unchecked_ref_cast [[NEW_SELF]]
 // CHECK-NEXT:    store [[DERIVED_SELF]] to [[SELF_BOX]]
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @_TF35definite_init_failable_initializers6unwrapFzSiSi
@@ -1106,7 +1106,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK:       bb1([[RESULT:%.*]] : $Int):
 // CHECK-NEXT:    [[BASE_SELF:%.*]] = upcast %3
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_TFC35definite_init_failable_initializers14ThrowBaseClasscfzT_S0_
-// CHECK-NEXT:    try_apply [[INIT_FN]]([[BASE_SELF]])
+// CHECK:    try_apply [[INIT_FN]]([[BASE_SELF]])
 // CHECK:       bb2([[NEW_SELF:%.*]] : $ThrowBaseClass):
 // CHECK-NEXT:    [[DERIVED_SELF:%.*]] = unchecked_ref_cast [[NEW_SELF]]
 // CHECK-NEXT:    store [[DERIVED_SELF]] to [[SELF_BOX]]

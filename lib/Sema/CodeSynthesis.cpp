@@ -327,7 +327,16 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   
   // materializeForSet is mutating and static if the setter is.
   auto setter = storage->getSetter();
-  materializeForSet->setMutating(setter->isMutating());
+
+  // Open-code the setMutating() calculation since we might run before
+  // the setter has been type checked. Also as a hack, always mark the
+  // setter mutating if we're inside a protocol, because it seems some
+  // things break otherwise -- the root cause should be fixed eventually.
+  materializeForSet->setMutating(
+      setter->getDeclContext()->isProtocolOrProtocolExtensionContext() ||
+      (!setter->getAttrs().hasAttribute<NonMutatingAttr>() &&
+       !storage->isSetterNonMutating()));
+
   materializeForSet->setStatic(setter->isStatic());
 
   // materializeForSet is final if the storage is.

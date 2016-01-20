@@ -308,31 +308,42 @@ mapParsedParameters(Parser &parser,
   auto &ctx = parser.Context;
 
   // Local function to create a pattern for a single parameter.
-  auto createParam = [&](SourceLoc &letVarInOutLoc,
-                        Parser::ParsedParameter::SpecifierKindTy &specifierKind,
-                                Identifier argName, SourceLoc argNameLoc,
-                                Identifier paramName, SourceLoc paramNameLoc,
-                                TypeRepr *type,
-                                const DeclAttributes &Attrs) -> ParamDecl * {
+  auto createParam = [&](Parser::ParsedParameter &paramInfo,
+                         Identifier argName, SourceLoc argNameLoc,
+                         Identifier paramName, SourceLoc paramNameLoc)
+  -> ParamDecl * {
+    auto specifierKind = paramInfo.SpecifierKind;
     bool isLet = specifierKind == Parser::ParsedParameter::Let;
     auto param = new (ctx) ParamDecl(isLet, argNameLoc, argName,
                                      paramNameLoc, paramName, Type(),
                                      parser.CurDeclContext);
-    param->getAttrs() = Attrs;
+    param->getAttrs() = paramInfo.Attrs;
     
     if (argNameLoc.isInvalid() && paramNameLoc.isInvalid())
       param->setImplicit();
+
+    // If we parsed a colon but have no type, then we already diagnosed this
+    // as a parse error.
+    if (paramInfo.ColonLoc.isValid() && !paramInfo.Type)
+      param->setInvalid();
     
-    // If a type was provided, create the typed pattern.
-    if (type) {
+    // If a type was provided, create the type for the parameter.
+    if (auto type = paramInfo.Type) {
       // If 'inout' was specified, turn the type into an in-out type.
       if (specifierKind == Parser::ParsedParameter::InOut)
-        type = new (ctx) InOutTypeRepr(type, letVarInOutLoc);
+        type = new (ctx) InOutTypeRepr(type, paramInfo.LetVarInOutLoc);
 
       param->getTypeLoc() = TypeLoc(type);
+    } else if (paramContext != Parser::ParameterContextKind::Closure) {
+      // Non-closure parameters require a type.
+      if (!param->isInvalid())
+        parser.diagnose(param->getLoc(), diag::missing_parameter_type);
+      
+      param->getTypeLoc() = TypeLoc::withoutLoc(ErrorType::get(ctx));
+      param->setInvalid();
     } else if (specifierKind == Parser::ParsedParameter::InOut) {
-      parser.diagnose(letVarInOutLoc, diag::inout_must_have_type);
-      letVarInOutLoc = SourceLoc();
+      parser.diagnose(paramInfo.LetVarInOutLoc, diag::inout_must_have_type);
+      paramInfo.LetVarInOutLoc = SourceLoc();
       specifierKind = Parser::ParsedParameter::Let;
     }
     return param;
@@ -376,10 +387,8 @@ mapParsedParameters(Parser &parser,
       paramName = param.SecondName;
 
       // Both names were provided, so pass them in directly.
-      result = createParam(param.LetVarInOutLoc, param.SpecifierKind,
-                           argName, param.FirstNameLoc,
-                           paramName, param.SecondNameLoc,
-                           param.Type, param.Attrs);
+      result = createParam(param, argName, param.FirstNameLoc,
+                           paramName, param.SecondNameLoc);
 
       // If the first name is empty and this parameter would not have been
       // an API name by default, complain.
@@ -406,10 +415,8 @@ mapParsedParameters(Parser &parser,
         argName = param.FirstName;
       paramName = param.FirstName;
 
-      result = createParam(param.LetVarInOutLoc, param.SpecifierKind,
-                           argName, SourceLoc(),
-                           param.FirstName, param.FirstNameLoc,
-                           param.Type, param.Attrs);
+      result = createParam(param, argName, SourceLoc(),
+                           param.FirstName, param.FirstNameLoc);
     }
 
     // If this parameter had an ellipsis, check whether it's the last parameter.

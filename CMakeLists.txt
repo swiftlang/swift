@@ -54,7 +54,7 @@ option(SWIFT_INCLUDE_DOCS
     "Create targets for building docs."
     TRUE)
 
-set(SWIFT_VERSION "2.2" CACHE STRING
+set(SWIFT_VERSION "3.0" CACHE STRING
     "The user-visible version of the Swift compiler")
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
@@ -154,7 +154,7 @@ option(SWIFT_AST_VERIFIER
     "Enable the AST verifier in the built compiler, and run it on every compilation"
     TRUE)
 
-option(SWIFT_VERIFY_ALL
+option(SWIFT_SIL_VERIFY_ALL
     "Run SIL verification after each transform when building Swift files in the build process"
     FALSE)
 

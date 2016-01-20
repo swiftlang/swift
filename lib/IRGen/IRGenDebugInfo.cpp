@@ -128,7 +128,7 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
   StringRef Flags = Opts.DWARFDebugFlags;
   unsigned Major, Minor;
   std::tie(Major, Minor) = version::getSwiftNumericVersion();
-  unsigned RuntimeVersion = Major*100 + Minor;
+  unsigned MajorRuntimeVersion = Major;
 
   // No split DWARF on Darwin.
   StringRef SplitName = StringRef();
@@ -136,7 +136,7 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
   // Clang is doing the same thing here.
   TheCU = DBuilder.createCompileUnit(
       Lang, AbsMainFile, Opts.DebugCompilationDir, Producer, IsOptimized,
-      Flags, RuntimeVersion, SplitName,
+      Flags, MajorRuntimeVersion, SplitName,
       Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables
           ? llvm::DIBuilder::LineTablesOnly
           : llvm::DIBuilder::FullDebug);

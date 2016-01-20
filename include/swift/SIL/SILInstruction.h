@@ -556,12 +556,13 @@ class AllocBoxInst : public AllocationInst {
 
 public:
 
-  SILType getElementType() const {
-    return getType(1).getObjectType();
-  }
+  /// getType() is ok since this is known to only have one type.
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
-  SILValue getContainerResult() const { return SILValue(this, 0); }
-  SILValue getAddressResult() const { return SILValue(this, 1); }
+  SILType getElementType() const {
+    return SILType::getPrimitiveObjectType(getType().castTo<SILBoxType>()->
+                                           getBoxedType());
+  }
 
   /// Return the underlying variable declaration associated with this
   /// allocation, or null if this is a temporary allocation.
@@ -587,18 +588,17 @@ public:
 /// value is uninitialized.
 class AllocExistentialBoxInst : public AllocationInst {
   friend class SILBuilder;
-
   CanType ConcreteType;
   ArrayRef<ProtocolConformanceRef> Conformances;
 
   AllocExistentialBoxInst(SILDebugLocation *DebugLoc, SILType ExistentialType,
-                          CanType ConcreteType, SILType ConcreteLoweredType,
+                          CanType ConcreteType,
                           ArrayRef<ProtocolConformanceRef> Conformances,
                           SILFunction *Parent);
 
   static AllocExistentialBoxInst *
   create(SILDebugLocation *DebugLoc, SILType ExistentialType,
-         CanType ConcreteType, SILType ConcreteLoweredType,
+         CanType ConcreteType,
          ArrayRef<ProtocolConformanceRef> Conformances, SILFunction *Parent);
 
 public:
@@ -610,16 +610,9 @@ public:
     return getType(0);
   }
 
-  SILType getLoweredConcreteType() const {
-    return getType(1);
-  }
-
   ArrayRef<ProtocolConformanceRef> getConformances() const {
     return Conformances;
   }
-  
-  SILValue getExistentialResult() const { return SILValue(this, 0); }
-  SILValue getValueAddressResult() const { return SILValue(this, 1); }
   
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }
@@ -3593,6 +3586,20 @@ class ProjectBoxInst :
                  SILValue operand)
       : UnaryInstructionBase(DebugLoc, operand, valueType.getAddressType()) {}
 
+public:
+  SILType getValueType() const { return getType().getObjectType(); }
+};
+
+/// Project out the address of the value in an existential box.
+class ProjectExistentialBoxInst :
+  public UnaryInstructionBase<ValueKind::ProjectExistentialBoxInst,
+                              SILInstruction, /*HasResult*/ true> {
+  friend class SILBuilder;
+  
+  ProjectExistentialBoxInst(SILDebugLocation *DebugLoc, SILType valueType,
+                            SILValue operand)
+      : UnaryInstructionBase(DebugLoc, operand, valueType.getAddressType()) {}
+  
 public:
   SILType getValueType() const { return getType().getObjectType(); }
 };

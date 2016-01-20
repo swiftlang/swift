@@ -80,9 +80,8 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
 
   // Handle the case where the callee of the apply is a load instruction.
   if (LoadInst *LI = dyn_cast<LoadInst>(CalleeValue)) {
-    assert(CalleeValue.getResultNumber() == 0);
-    SILInstruction *ABI = dyn_cast<AllocBoxInst>(LI->getOperand());
-    assert(ABI && LI->getOperand().getResultNumber() == 1);
+    auto *PBI = cast<ProjectBoxInst>(LI->getOperand());
+    auto *ABI = cast<AllocBoxInst>(PBI->getOperand());
 
     // The load instruction must have no more uses left to erase it.
     if (!LI->use_empty())
@@ -91,15 +90,17 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
 
     // Look through uses of the alloc box the load is loading from to find up to
     // one store and up to one strong release.
-    StoreInst *SI = nullptr;
     StrongReleaseInst *SRI = nullptr;
-    for (auto UI = ABI->use_begin(), UE = ABI->use_end(); UI != UE; ++UI) {
-      if (SI == nullptr && isa<StoreInst>(UI.getUser())) {
-        SI = cast<StoreInst>(UI.getUser());
-        assert(SI->getDest() == SILValue(ABI, 1));
-      } else if (SRI == nullptr && isa<StrongReleaseInst>(UI.getUser())) {
-        SRI = cast<StrongReleaseInst>(UI.getUser());
-        assert(SRI->getOperand() == SILValue(ABI, 0));
+    for (Operand *ABIUse : ABI->getUses()) {
+      if (SRI == nullptr && isa<StrongReleaseInst>(ABIUse->getUser())) {
+        SRI = cast<StrongReleaseInst>(ABIUse->getUser());
+      } else if (ABIUse->getUser() != PBI)
+        return;
+    }
+    StoreInst *SI = nullptr;
+    for (Operand *PBIUse : PBI->getUses()) {
+      if (SI == nullptr && isa<StoreInst>(PBIUse->getUser())) {
+        SI = cast<StoreInst>(PBIUse->getUser());
       } else
         return;
     }
@@ -121,6 +122,8 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
       SRI->eraseFromParent();
     }
 
+    assert(PBI->use_empty());
+    PBI->eraseFromParent();
     assert(ABI->use_empty());
     ABI->eraseFromParent();
     if (!CalleeValue.isValid())
@@ -179,10 +182,19 @@ getCalleeFunction(FullApplySite AI, bool &IsThick,
     assert(CalleeValue.getResultNumber() == 0);
     // Conservatively only see through alloc_box; we assume this pass is run
     // immediately after SILGen
-    SILInstruction *ABI = dyn_cast<AllocBoxInst>(LI->getOperand());
+    auto *PBI = dyn_cast<ProjectBoxInst>(LI->getOperand());
+    if (!PBI)
+      return nullptr;
+    auto *ABI = dyn_cast<AllocBoxInst>(PBI->getOperand());
     if (!ABI)
       return nullptr;
-    assert(LI->getOperand().getResultNumber() == 1);
+    // Ensure there are no other uses of alloc_box than the project_box and
+    // retains, releases.
+    for (Operand *ABIUse : ABI->getUses())
+      if (ABIUse->getUser() != PBI &&
+          !isa<StrongRetainInst>(ABIUse->getUser()) &&
+          !isa<StrongReleaseInst>(ABIUse->getUser()))
+        return nullptr;
 
     // Scan forward from the alloc box to find the first store, which
     // (conservatively) must be in the same basic block as the alloc box
@@ -194,15 +206,11 @@ getCalleeFunction(FullApplySite AI, bool &IsThick,
       // making any assumptions
       if (static_cast<SILInstruction*>(I) == LI)
         return nullptr;
-      if ((SI = dyn_cast<StoreInst>(I)) && SI->getDest().getDef() == ABI) {
+      if ((SI = dyn_cast<StoreInst>(I)) && SI->getDest().getDef() == PBI) {
         // We found a store that we know dominates the load; now ensure there
-        // are no other uses of the alloc other than loads, retains, releases
-        // and dealloc stacks
-        for (auto UI = ABI->use_begin(), UE = ABI->use_end(); UI != UE;
-             ++UI)
-          if (UI.getUser() != SI && !isa<LoadInst>(UI.getUser()) &&
-              !isa<StrongRetainInst>(UI.getUser()) &&
-              !isa<StrongReleaseInst>(UI.getUser()))
+        // are no other uses of the project_box except loads.
+        for (Operand *PBIUse : PBI->getUses())
+          if (PBIUse->getUser() != SI && !isa<LoadInst>(PBIUse->getUser()))
             return nullptr;
         // We can conservatively see through the store
         break;

@@ -30,12 +30,14 @@ func curried_function(x: Int)(y: Int) -> Int {
   var y = y
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
   // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Builtin.Int64
+  // CHECK: [[PBX:%.*]] = project_box [[XADDR]]
   // CHECK: [[YADDR:%[0-9]+]] = alloc_box $Builtin.Int64
+  // CHECK: [[PBY:%.*]] = project_box [[YADDR]]
 
   return standalone_function(x, y)
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF9functions19standalone_function{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
-  // CHECK: [[X:%[0-9]+]] = load [[XADDR]]
-  // CHECK: [[Y:%[0-9]+]] = load [[YADDR]]
+  // CHECK: [[X:%[0-9]+]] = load [[PBX]]
+  // CHECK: [[Y:%[0-9]+]] = load [[PBY]]
   // CHECK: apply [[FUNC]]([[X]], [[Y]])
 
   // CHECK: return
@@ -148,9 +150,12 @@ func calls(i: Int, j: Int, k: Int) {
   var j = j
   var k = k
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int64):
-  // CHECK: [[IADDR:%[0-9]+]] = alloc_box $Builtin.Int64
-  // CHECK: [[JADDR:%[0-9]+]] = alloc_box $Builtin.Int64
-  // CHECK: [[KADDR:%[0-9]+]] = alloc_box $Builtin.Int64
+  // CHECK: [[IBOX:%[0-9]+]] = alloc_box $Builtin.Int64
+  // CHECK: [[IADDR:%.*]] = project_box [[IBOX]]
+  // CHECK: [[JBOX:%[0-9]+]] = alloc_box $Builtin.Int64
+  // CHECK: [[JADDR:%.*]] = project_box [[JBOX]]
+  // CHECK: [[KBOX:%[0-9]+]] = alloc_box $Builtin.Int64
+  // CHECK: [[KADDR:%.*]] = project_box [[KBOX]]
 
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF9functions19standalone_function{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
@@ -190,7 +195,8 @@ func calls(i: Int, j: Int, k: Int) {
   generic_curried_function(i)(y: j)
   // -- Use of curried entry points as values.
 
-  // CHECK: [[F1ADDR:%[0-9]+]] = alloc_box $@callee_owned (Builtin.Int64) -> Builtin.Int64
+  // CHECK: [[F1BOX:%[0-9]+]] = alloc_box $@callee_owned (Builtin.Int64) -> Builtin.Int64
+  // CHECK: [[F1ADDR:%.*]] = project_box [[F1BOX]]
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF9functions16curried_function{{.*}} : $@convention(thin) (Builtin.Int64) -> @owned @callee_owned (Builtin.Int64) -> Builtin.Int64
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: [[FUNC_CURRY:%[0-9]+]] = apply [[FUNC]]([[I]])
@@ -201,7 +207,8 @@ func calls(i: Int, j: Int, k: Int) {
   // CHECK: apply [[F1]]([[J]])
   f1(y: j)
 
-  // CHECK: [[F2ADDR:%[0-9]+]] = alloc_box $@callee_owned (Builtin.Int64) -> @owned @callee_owned (Builtin.Int64) -> Builtin.Int64
+  // CHECK: [[F2BOX:%[0-9]+]] = alloc_box $@callee_owned (Builtin.Int64) -> @owned @callee_owned (Builtin.Int64) -> Builtin.Int64
+  // CHECK: [[F2ADDR:%.*]] = project_box [[F2BOX]]
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF9functions16curried_function{{.*}} : $@convention(thin) (Builtin.Int64) -> @owned @callee_owned (Builtin.Int64) -> Builtin.Int64
   // CHECK: [[FUNC_THICK:%[0-9]+]] = thin_to_thick_function [[FUNC]] : ${{.*}} to $@callee_owned (Builtin.Int64) -> @owned @callee_owned (Builtin.Int64) -> Builtin.Int64
   // CHECK: store [[FUNC_THICK]] to [[F2ADDR]]
@@ -239,7 +246,8 @@ func calls(i: Int, j: Int, k: Int) {
 
   // -- Curry 'self' onto method argument lists dispatched using class_method.
 
-  // CHECK: [[CADDR:%[0-9]+]] = alloc_box $SomeClass
+  // CHECK: [[CBOX:%[0-9]+]] = alloc_box $SomeClass
+  // CHECK: [[CADDR:%.*]] = project_box [[CBOX]]
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TFC9functions9SomeClassC{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> @owned SomeClass
   // CHECK: [[META:%[0-9]+]] = metatype $@thick SomeClass.Type
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
@@ -349,11 +357,12 @@ func calls(i: Int, j: Int, k: Int) {
   // -- Curry the projected concrete value in an existential (or its Type)
   // -- onto protocol type methods dispatched using protocol_method.
 
-  // CHECK: [[PADDR:%[0-9]+]] = alloc_box $SomeProtocol
+  // CHECK: [[PBOX:%[0-9]+]] = alloc_box $SomeProtocol
+  // CHECK: [[PADDR:%.*]] = project_box [[PBOX]]
   var p : SomeProtocol = ConformsToSomeProtocol()
 
   // CHECK: [[TEMP:%.*]] = alloc_stack $SomeProtocol
-  // CHECK: copy_addr [[PADDR]]#1 to [initialization] [[TEMP]]
+  // CHECK: copy_addr [[PADDR]] to [initialization] [[TEMP]]
   // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr [[TEMP]] : $*SomeProtocol to $*[[OPENED:@opened(.*) SomeProtocol]]
   // CHECK: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED]], #SomeProtocol.method!1
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
@@ -378,7 +387,8 @@ func calls(i: Int, j: Int, k: Int) {
 
   // -- Use an apply or partial_apply instruction to bind type parameters of a generic.
 
-  // CHECK: [[GADDR:%[0-9]+]] = alloc_box $SomeGeneric<Builtin.Int64>
+  // CHECK: [[GBOX:%[0-9]+]] = alloc_box $SomeGeneric<Builtin.Int64>
+  // CHECK: [[GADDR:%.*]] = project_box [[GBOX]]
   // CHECK: [[CTOR_GEN:%[0-9]+]] = function_ref @_TFC9functions11SomeGenericC{{.*}} : $@convention(thin) <τ_0_0> (@thick SomeGeneric<τ_0_0>.Type) -> @owned SomeGeneric<τ_0_0>
   // CHECK: [[META:%[0-9]+]] = metatype $@thick SomeGeneric<Builtin.Int64>.Type
   // CHECK: apply [[CTOR_GEN]]<Builtin.Int64>([[META]])
@@ -418,7 +428,8 @@ func calls(i: Int, j: Int, k: Int) {
   // SIL-level "thin" function values need to be able to convert to
   // "thick" function values when stored, returned, or passed as arguments.
 
-  // CHECK: [[FADDR:%[0-9]+]] = alloc_box $@callee_owned (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
+  // CHECK: [[FBOX:%[0-9]+]] = alloc_box $@callee_owned (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
+  // CHECK: [[FADDR:%.*]] = project_box [[FBOX]]
   // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @_TF9functions19standalone_function{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[FUNC_THICK:%[0-9]+]] = thin_to_thick_function [[FUNC_THIN]]
   // CHECK: store [[FUNC_THICK]] to [[FADDR]]

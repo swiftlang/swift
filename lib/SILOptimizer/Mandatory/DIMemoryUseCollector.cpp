@@ -432,9 +432,10 @@ namespace {
           // ref_element_addrs.
           collectClassSelfUses();
       } else {
-        if (auto container = TheMemory.getContainer())
-          collectContainerUses(container, TheMemory.getAddress());
-        collectUses(TheMemory.getAddress(), 0);
+        if (auto *ABI = TheMemory.getContainer())
+          collectContainerUses(ABI);
+        else
+          collectUses(TheMemory.getAddress(), 0);
       }
 
       if (!isa<MarkUninitializedInst>(TheMemory.MemoryInst)) {
@@ -453,7 +454,7 @@ namespace {
 
   private:
     void collectUses(SILValue Pointer, unsigned BaseEltNo);
-    void collectContainerUses(SILValue Container, SILValue Pointer);
+    void collectContainerUses(AllocBoxInst *ABI);
     void recordFailureBB(TermInst *TI, SILBasicBlock *BB);
     void recordFailableInitCall(SILInstruction *I);
     void collectClassSelfUses();
@@ -539,32 +540,25 @@ void ElementUseCollector::collectStructElementUses(StructElementAddrInst *SEAI,
   collectUses(SILValue(SEAI, 0), BaseEltNo);
 }
 
-void ElementUseCollector::collectContainerUses(SILValue container,
-                                               SILValue pointer) {
-  auto pointeeType = pointer.getType().getObjectType();
-  for (auto UI : container.getUses()) {
+void ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
+  for (Operand *UI : ABI->getUses()) {
     auto *User = UI->getUser();
 
     // Deallocations and retain/release don't affect the value directly.
     if (isa<DeallocBoxInst>(User))
-      continue;
-    if (isa<DeallocStackInst>(User))
       continue;
     if (isa<StrongRetainInst>(User))
       continue;
     if (isa<StrongReleaseInst>(User))
       continue;
 
-    // TODO: We should consider uses of project_box as equivalent to uses of
-    // the box element. For now, just consider them escapes. We would need
-    // to fix this if we phased out alloc_box's #1 result.
-    //if (isa<ProjectBoxInst>(User)) {
-      // do something smart
-      // continue;
-    //}
+    if (isa<ProjectBoxInst>(User)) {
+      collectUses(User, 0);
+      continue;
+    }
 
     // Other uses of the container are considered escapes of the value.
-    addElementUses(0, pointeeType, User, DIUseKind::Escape);
+    addElementUses(0, ABI->getElementType(), User, DIUseKind::Escape);
   }
 }
 
@@ -1386,20 +1380,18 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
     Uses.push_back(DIMemoryUse(User, DIUseKind::Escape, 0, 1));
   }
 
-  // The MUI must be used on an alloc_box or alloc_stack instruction.  Chase
+  // The MUI must be used on a project_box or alloc_stack instruction.  Chase
   // down the box value to see if there are any releases.
-  auto *AI = cast<AllocationInst>(MUI->getOperand());
-  if (isa<AllocStackInst>(AI))
+  if (isa<AllocStackInst>(MUI->getOperand()))
     return;
 
-  for (auto UI : SILValue(AI, 0).getUses()) {
-    SILInstruction *User = UI->getUser();
+  auto *PBI = cast<ProjectBoxInst>(MUI->getOperand());
+  auto *ABI = cast<AllocBoxInst>(PBI->getOperand());
 
-    if (isa<StrongReleaseInst>(User)) {
+  for (auto UI : ABI->getUses()) {
+    SILInstruction *User = UI->getUser();
+    if (isa<StrongReleaseInst>(User))
       Releases.push_back(User);
-      continue;
-    }
-    assert(0 && "Unknown use of box");
   }
 }
 

@@ -100,6 +100,11 @@ ERROR(candidate_inaccessible,none,
       "%0 is inaccessible due to '%select{private|internal|PUBLIC}1' "
       "protection level", (DeclName, Accessibility))
 
+ERROR(init_candidate_inaccessible,none,
+    "%0 initializer is inaccessible due to '%select{private|internal|PUBLIC}1' "
+      "protection level", (Type, Accessibility))
+
+
 ERROR(cannot_pass_rvalue_mutating_subelement,none,
       "cannot use mutating member on immutable value: %0",
       (StringRef))
@@ -257,7 +262,7 @@ ERROR(cannot_throw_nil,none,
 ERROR(cannot_convert_raw_initializer_value,none,
       "cannot convert value of type %0 to raw type %1", (Type,Type))
 ERROR(cannot_convert_raw_initializer_value_nil,none,
-      "cannot convert nil to raw type %1", (Type))
+      "cannot convert nil to raw type %0", (Type))
 
 ERROR(cannot_convert_default_arg_value,none,
       "default argument value of type %0 cannot be converted to type %1",
@@ -643,6 +648,10 @@ ERROR(argument_out_of_order_named_unnamed,none,
 ERROR(instance_member_use_on_type,none,
       "use of instance member %1 on type %0; "
       "did you mean to use a value of type %0 instead?", (Type, Identifier))
+ERROR(instance_member_in_initializer,none,
+      "cannot use instance member %0 within property initializer; "
+      "property initializers run before 'self' is available", (Identifier))
+
 
 ERROR(missing_argument_named,none,
       "missing argument for parameter %0 in call", (Identifier))
@@ -661,9 +670,6 @@ ERROR(no_accessible_initializers,none,
       (Type))
 ERROR(unbound_generic_parameter,none,
       "generic parameter %0 could not be inferred", (Type))
-ERROR(cannot_bind_generic_parameter_to_type,none,
-      "cannot bind generic parameter to type %0",
-      (Type))
 ERROR(string_index_not_integer,none,
       "String may not be indexed with %0, it has variable size elements",
       (Type))
@@ -1718,8 +1724,6 @@ ERROR(try_assign_rhs_noncovering,none,
       "'" TRY_KIND_SELECT(0) "' following assignment operator does not cover "
       "everything to its right", (unsigned))
 
-ERROR(reference_non_inout,none,
-      "reference to %0 not used to initialize an inout parameter", (Type))
 NOTE(subscript_decl_here,none,
      "subscript operator declared here", ())
 ERROR(condition_broken_proto,none,
@@ -2453,8 +2457,6 @@ ERROR(objc_override_property_name_mismatch,none,
 ERROR(broken_bridged_to_objc_protocol,none,
       "_BridgedToObjectiveC protocol is broken", ())
 
-ERROR(type_not_bridged,none,
-      "%0 is not bridged to Objective-C", (Type))
 ERROR(missing_bridging_function,Fatal,
       "missing '%select{_forceBridgeFromObjectiveC|"
       "_conditionallyBridgeFromObjectiveC}0'", (bool))

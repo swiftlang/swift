@@ -636,6 +636,9 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
                                    bool isSILType, DeclContext *DC,
                                    bool ProduceDiagnostics) {
   TypeResolutionOptions options;
+
+  // Fine to have unbound generic types.
+  options |= TR_AllowUnboundGenerics;
   if (isSILType)
     options |= TR_SILType;
 

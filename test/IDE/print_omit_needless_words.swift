@@ -21,6 +21,9 @@
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t -I %S/../ClangModules/Inputs/custom-modules) -print-module -source-filename %s -module-to-print=CoreCooling -function-definitions=false -prefer-type-repr=true -enable-omit-needless-words -skip-parameter-names -enable-infer-default-arguments > %t.CoreCooling.txt
 // RUN: FileCheck %s -check-prefix=CHECK-CORECOOLING -strict-whitespace < %t.CoreCooling.txt
 
+// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=errors -function-definitions=false -prefer-type-repr=true -enable-omit-needless-words -skip-parameter-names -enable-infer-default-arguments > %t.errors.txt
+// RUN: FileCheck %s -check-prefix=CHECK-ERRORS -strict-whitespace < %t.errors.txt
+
 // Note: SEL -> "Selector"
 // CHECK-FOUNDATION: func makeObjectsPerform(_: Selector)
 
@@ -213,5 +216,6 @@
 // CHECK-APPKIT: func removeGestureRecognizer(_: NSGestureRecognizer)
 // CHECK-APPKIT: func favoriteViewFor(_: NSGestureRecognizer) -> NSView?
 // CHECK-APPKIT: func addLayoutConstraints(_: Set<NSLayoutConstraint>)
-// CHECK-APPKIT: func add(_: NSRect)
-// CHECK-APPKIT: class func conjureRect(_: NSRect)
+
+// Don't drop the 'error'.
+// CHECK-ERRORS: func tryAndReturnError(_: ()) throws

@@ -47,9 +47,9 @@ function(compute_library_subdir result_var_name sdk arch)
   set("${result_var_name}" "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}" PARENT_SCOPE)
 endfunction()
 
-
 function(_add_variant_c_compile_link_flags
-    sdk arch build_type enable_assertions result_var_name)
+    sdk arch build_type enable_assertions analyze_code_coverage
+    result_var_name)
   set(result
     ${${result_var_name}}
     "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}")
@@ -62,13 +62,19 @@ function(_add_variant_c_compile_link_flags
         "-arch" "${arch}"
         "-F" "${SWIFT_SDK_${sdk}_PATH}/../../../Developer/Library/Frameworks"
         "-m${SWIFT_SDK_${sdk}_VERSION_MIN_NAME}-version-min=${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION}")
+
+    if(analyze_code_coverage)
+      list(APPEND result "-fprofile-instr-generate=swift-%p.profraw"
+                         "-fcoverage-mapping")
+    endif()
   endif()
 
   set("${result_var_name}" "${result}" PARENT_SCOPE)
 endfunction()
 
 function(_add_variant_c_compile_flags
-    sdk arch build_type enable_assertions result_var_name)
+    sdk arch build_type enable_assertions analyze_code_coverage
+    result_var_name)
   set(result ${${result_var_name}})
 
   _add_variant_c_compile_link_flags(
@@ -76,6 +82,7 @@ function(_add_variant_c_compile_flags
       "${arch}"
       "${build_type}"
       "${enable_assertions}"
+      FALSE
       result)
 
   is_build_type_optimized("${build_type}" optimized)
@@ -101,6 +108,11 @@ function(_add_variant_c_compile_flags
     list(APPEND result "-UNDEBUG")
   else()
     list(APPEND result "-DNDEBUG")
+  endif()
+
+  if(analyze_code_coverage)
+    list(APPEND result "-fprofile-instr-generate=swift-%p.profraw"
+                       "-fcoverage-mapping")
   endif()
 
   set("${result_var_name}" "${result}" PARENT_SCOPE)
@@ -139,7 +151,8 @@ function(_add_variant_swift_compile_flags
 endfunction()
 
 function(_add_variant_link_flags
-    sdk arch build_type enable_assertions result_var_name)
+    sdk arch build_type enable_assertions analyze_code_coverage
+    result_var_name)
 
   if("${sdk}" STREQUAL "")
     message(FATAL_ERROR "Should specify an SDK")
@@ -156,6 +169,7 @@ function(_add_variant_link_flags
       "${arch}"
       "${build_type}"
       "${enable_assertions}"
+      "${analyze_code_coverage}"
       result)
 
   if("${sdk}" STREQUAL "LINUX")
@@ -298,7 +312,7 @@ function(_compile_swift_files dependency_target_out_var_name)
   # Don't include libarclite in any build products by default.
   list(APPEND swift_flags "-no-link-objc-runtime")
 
-  if(SWIFT_VERIFY_ALL)
+  if(SWIFT_SIL_VERIFY_ALL)
     list(APPEND swift_flags "-Xfrontend" "-sil-verify-all")
   endif()
 
@@ -770,6 +784,11 @@ function(_add_swift_library_single target name)
     endif()
   endif()
 
+  if (SWIFT_COMPILER_VERSION)
+    if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+      set(SWIFTLIB_SINGLE_LINK_FLAGS "${SWIFTLIB_SINGLE_LINK_FLAGS}" "-Xlinker" "-current_version" "-Xlinker" "${SWIFT_COMPILER_VERSION}" "-Xlinker" "-compatibility_version" "-Xlinker" "1")
+    endif()
+  endif()
 
   if(XCODE)
     string(REGEX MATCHALL "/[^/]+" split_path ${CMAKE_CURRENT_SOURCE_DIR})
@@ -1041,18 +1060,21 @@ function(_add_swift_library_single target name)
   else()
     set(build_type "${CMAKE_BUILD_TYPE}")
     set(enable_assertions "${LLVM_ENABLE_ASSERTIONS}")
+    set(analyze_code_coverage "${SWIFT_ANALYZE_CODE_COVERAGE}")
   endif()
   _add_variant_c_compile_flags(
       "${SWIFTLIB_SINGLE_SDK}"
       "${SWIFTLIB_SINGLE_ARCHITECTURE}"
       "${build_type}"
       "${enable_assertions}"
+      "${analyze_code_coverage}"
       c_compile_flags)
   _add_variant_link_flags(
       "${SWIFTLIB_SINGLE_SDK}"
       "${SWIFTLIB_SINGLE_ARCHITECTURE}"
       "${build_type}"
       "${enable_assertions}"
+      "${analyze_code_coverage}"
       link_flags)
 
   # Handle gold linker flags for shared libraries.
@@ -1618,12 +1640,14 @@ function(_add_swift_executable_single name)
       "${SWIFTEXE_SINGLE_ARCHITECTURE}"
       "${CMAKE_BUILD_TYPE}"
       "${LLVM_ENABLE_ASSERTIONS}"
+      "${SWIFT_ANALYZE_CODE_COVERAGE}"
       c_compile_flags)
   _add_variant_link_flags(
       "${SWIFTEXE_SINGLE_SDK}"
       "${SWIFTEXE_SINGLE_ARCHITECTURE}"
       "${CMAKE_BUILD_TYPE}"
       "${LLVM_ENABLE_ASSERTIONS}"
+      "${SWIFT_ANALYZE_CODE_COVERAGE}"
       link_flags)
 
   list(APPEND link_flags

@@ -29,8 +29,9 @@ class Base {}
 func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   var x = x
   // CHECK: [[XBOX:%.*]] = alloc_box $T
+  // CHECK: [[PB:%.*]] = project_box [[XBOX]]
   // -- call x.uid()
-  // CHECK: [[X:%.*]] = load [[XBOX]]
+  // CHECK: [[X:%.*]] = load [[PB]]
   // CHECK: strong_retain [[X]]
   // CHECK: [[X_TMP:%.*]] = alloc_stack
   // CHECK: store [[X]] to [[X_TMP]]
@@ -40,11 +41,11 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // CHECK: strong_release [[X2]]
   // -- call set x.clsid
   // CHECK: [[SET_CLSID:%.*]] = witness_method $T, #UID.clsid!setter.1
-  // CHECK: apply [[SET_CLSID]]<T>([[UID]], [[XBOX]]#1)
+  // CHECK: apply [[SET_CLSID]]<T>([[UID]], [[PB]])
   x.clsid = x.uid()
 
   // -- call x.uid()
-  // CHECK: [[X:%.*]] = load [[XBOX]]
+  // CHECK: [[X:%.*]] = load [[PB]]
   // CHECK: strong_retain [[X]]
   // CHECK: [[X_TMP:%.*]] = alloc_stack
   // CHECK: store [[X]] to [[X_TMP]]
@@ -54,13 +55,13 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // CHECK: strong_release [[X2]]
   // -- call nextCLSID from protocol ext
   // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @_TFE25protocol_class_refinementPS_3UIDs9nextCLSIDSi
-  // CHECK: apply [[SET_NEXTCLSID]]<T>([[UID]], [[XBOX]]#1)
+  // CHECK: apply [[SET_NEXTCLSID]]<T>([[UID]], [[PB]])
   x.nextCLSID = x.uid()
 
   // -- call x.uid()
-  // CHECK: [[X1:%.*]] = load [[XBOX]]
+  // CHECK: [[X1:%.*]] = load [[PB]]
   // CHECK: strong_retain [[X1]]
-  // CHECK: [[X:%.*]] = load [[XBOX]]
+  // CHECK: [[X:%.*]] = load [[PB]]
   // CHECK: strong_retain [[X]]
   // CHECK: [[X_TMP:%.*]] = alloc_stack
   // CHECK: store [[X]] to [[X_TMP]]
@@ -80,8 +81,9 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
 func getBaseObjectUID<T: UID where T: Base>(x: T) -> (Int, Int, Int) {
   var x = x
   // CHECK: [[XBOX:%.*]] = alloc_box $T
+  // CHECK: [[PB:%.*]] = project_box [[XBOX]]
   // -- call x.uid()
-  // CHECK: [[X:%.*]] = load [[XBOX]]
+  // CHECK: [[X:%.*]] = load [[PB]]
   // CHECK: strong_retain [[X]]
   // CHECK: [[X_TMP:%.*]] = alloc_stack
   // CHECK: store [[X]] to [[X_TMP]]
@@ -91,11 +93,11 @@ func getBaseObjectUID<T: UID where T: Base>(x: T) -> (Int, Int, Int) {
   // CHECK: strong_release [[X2]]
   // -- call set x.clsid
   // CHECK: [[SET_CLSID:%.*]] = witness_method $T, #UID.clsid!setter.1
-  // CHECK: apply [[SET_CLSID]]<T>([[UID]], [[XBOX]]#1)
+  // CHECK: apply [[SET_CLSID]]<T>([[UID]], [[PB]])
   x.clsid = x.uid()
 
   // -- call x.uid()
-  // CHECK: [[X:%.*]] = load [[XBOX]]
+  // CHECK: [[X:%.*]] = load [[PB]]
   // CHECK: strong_retain [[X]]
   // CHECK: [[X_TMP:%.*]] = alloc_stack
   // CHECK: store [[X]] to [[X_TMP]]
@@ -105,7 +107,7 @@ func getBaseObjectUID<T: UID where T: Base>(x: T) -> (Int, Int, Int) {
   // CHECK: strong_release [[X2]]
   // -- call nextCLSID from protocol ext
   // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @_TFE25protocol_class_refinementPS_3UIDs9nextCLSIDSi
-  // CHECK: apply [[SET_NEXTCLSID]]<T>([[UID]], [[XBOX]]#1)
+  // CHECK: apply [[SET_NEXTCLSID]]<T>([[UID]], [[PB]])
   x.nextCLSID = x.uid()
   return (x.iid, x.clsid, x.nextCLSID)
 }

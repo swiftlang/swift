@@ -325,7 +325,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         // in-place.
         AllocBoxInst *allocBox =
           B.createAllocBox(loc, vl.value.getType().getObjectType());
-        auto boxAddress = SILValue(allocBox, 1);
+        ProjectBoxInst *boxAddress = B.createProjectBox(loc, allocBox);
         B.createCopyAddr(loc, vl.value, boxAddress, IsNotTake,IsInitialization);
         capturedArgs.push_back(emitManagedRValueWithCleanup(SILValue(allocBox, 0)));
       }
@@ -887,13 +887,11 @@ AllocExistentialBoxInst *
 SILGenBuilder::createAllocExistentialBox(SILLocation Loc,
                                          SILType ExistentialType,
                                          CanType ConcreteType,
-                                         SILType ConcreteLoweredType,
                                 ArrayRef<ProtocolConformanceRef> Conformances) {
   for (auto conformance : Conformances)
     SGM.useConformance(conformance);
 
   return SILBuilder::createAllocExistentialBox(Loc, ExistentialType,
                                                ConcreteType,
-                                               ConcreteLoweredType,
                                                Conformances);
 }

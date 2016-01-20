@@ -434,7 +434,7 @@ namespace llvm {
   template<> struct DenseMapInfo<swift::CanType>
     : public DenseMapInfo<swift::Type> {
     static swift::CanType getEmptyKey() {
-      return swift::CanType(0);
+      return swift::CanType(nullptr);
     }
     static swift::CanType getTombstoneKey() {
       return swift::CanType(llvm::DenseMapInfo<swift::

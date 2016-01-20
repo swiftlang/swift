@@ -2925,7 +2925,7 @@ namespace {
   /// A class for binding type parameters of a generic function.
   class EmitPolymorphicParameters : public PolymorphicConvention {
     IRGenFunction &IGF;
-    GenericParamList *ContextParams;
+    SILFunction &Fn;
 
     struct SourceValue {
       llvm::Value *Value = nullptr;
@@ -2939,7 +2939,7 @@ namespace {
                               SILFunction &Fn)
       : PolymorphicConvention(Fn.getLoweredFunctionType(),
                               *IGF.IGM.SILMod->getSwiftModule()),
-        IGF(IGF), ContextParams(Fn.getContextGenericParams()) {}
+        IGF(IGF), Fn(Fn) {}
 
     void emit(Explosion &in, WitnessMetadata *witnessMetadata,
               const GetParameterFn &getParameter);
@@ -2949,10 +2949,7 @@ namespace {
     void emitWithSourcesBound(Explosion &in);
 
     CanType getTypeInContext(CanType type) const {
-      return ArchetypeBuilder::mapTypeIntoContext(
-                            IGF.IGM.SILMod->getSwiftModule(), ContextParams,
-                            type)
-        ->getCanonicalType();
+      return Fn.mapTypeIntoContext(type)->getCanonicalType();
     }
 
     CanType getArgTypeInContext(unsigned paramIndex) const {
@@ -3040,10 +3037,7 @@ EmitPolymorphicParameters::emitWithSourcesBound(Explosion &in) {
     CanType depTy = ncDepTy->getCanonicalType();
 
     // Get the corresponding context archetype.
-    auto contextTy
-      = ArchetypeBuilder::mapTypeIntoContext(IGF.IGM.SILMod->getSwiftModule(),
-                                             ContextParams, depTy)
-        ->getAs<ArchetypeType>();
+    auto contextTy = getTypeInContext(depTy)->getAs<ArchetypeType>();
     assert(contextTy);
 
     // Derive the appropriate metadata reference.

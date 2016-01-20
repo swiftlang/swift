@@ -1238,6 +1238,7 @@ public:
   void completeCallArg(CallExpr *E) override;
   void completeReturnStmt(CodeCompletionExpr *E) override;
   void completeAfterPound(CodeCompletionExpr *E, StmtKind ParentKind) override;
+  void completeGenericParams(TypeLoc TL) override;
   void addKeywords(CodeCompletionResultSink &Sink);
 
   void doneParsing() override;
@@ -3934,6 +3935,12 @@ void CodeCompletionCallbacksImpl::completeAfterPound(CodeCompletionExpr *E,
   ParentStmtKind = ParentKind;
 }
 
+void CodeCompletionCallbacksImpl::completeGenericParams(TypeLoc TL) {
+  CurDeclContext = P.CurDeclContext;
+  Kind = CompletionKind::GenericParams;
+  ParsedTypeLoc = TL;
+}
+
 void CodeCompletionCallbacksImpl::completeNominalMemberBeginning(
     SmallVectorImpl<StringRef> &Keywords) {
   assert(!InEnumElementRawValue);
@@ -4056,6 +4063,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink) {
   case CompletionKind::UnresolvedMember:
   case CompletionKind::CallArg:
   case CompletionKind::AfterPound:
+  case CompletionKind::GenericParams:
     break;
 
   case CompletionKind::StmtOrExpr:
@@ -4569,6 +4577,17 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::AfterPound: {
     Lookup.addPoundAvailable(ParentStmtKind);
+    break;
+  }
+
+  case CompletionKind::GenericParams: {
+    if (auto NM = ParsedTypeLoc.getType()->getAnyNominal()) {
+      if (auto Params = NM->getGenericParams()) {
+        for (auto GP : Params->getParams()) {
+          Lookup.addGenericTypeParamRef(GP, DeclVisibilityKind::GenericParameter);
+        }
+      }
+    }
     break;
   }
   }

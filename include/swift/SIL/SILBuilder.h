@@ -260,11 +260,11 @@ public:
 
   AllocExistentialBoxInst *
   createAllocExistentialBox(SILLocation Loc, SILType ExistentialType,
-                            CanType ConcreteType, SILType ConcreteLoweredType,
+                            CanType ConcreteType,
                             ArrayRef<ProtocolConformanceRef> Conformances) {
     return insert(AllocExistentialBoxInst::create(
         createSILDebugLocation(Loc), ExistentialType, ConcreteType,
-        ConcreteLoweredType, Conformances, &F));
+        Conformances, &F));
   }
 
   ApplyInst *createApply(SILLocation Loc, SILValue Fn, SILType SubstFnTy,
@@ -1121,6 +1121,12 @@ public:
   ProjectBoxInst *createProjectBox(SILLocation Loc, SILType valueTy,
                                    SILValue boxOperand) {
     return insert(new (F.getModule()) ProjectBoxInst(
+        createSILDebugLocation(Loc), valueTy, boxOperand));
+  }
+  ProjectExistentialBoxInst *createProjectExistentialBox(SILLocation Loc,
+                                                         SILType valueTy,
+                                                         SILValue boxOperand) {
+    return insert(new (F.getModule()) ProjectExistentialBoxInst(
         createSILDebugLocation(Loc), valueTy, boxOperand));
   }
 

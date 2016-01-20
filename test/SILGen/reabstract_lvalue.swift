@@ -13,12 +13,13 @@ func transform(i: Int) -> Double {
 // CHECK-LABEL: sil hidden @_TF17reabstract_lvalue23reabstractFunctionInOutFT_T_ : $@convention(thin) () -> ()
 func reabstractFunctionInOut() {
   // CHECK: [[BOX:%.*]] = alloc_box $@callee_owned (Int) -> Double
+  // CHECK: [[PB:%.*]] = project_box [[BOX]]
   // CHECK: [[ARG:%.*]] = function_ref @_TF17reabstract_lvalue9transformFSiSd
   // CHECK: [[THICK_ARG:%.*]] = thin_to_thick_function [[ARG]]
-  // CHECK: store [[THICK_ARG:%.*]] to [[BOX]]#1
+  // CHECK: store [[THICK_ARG:%.*]] to [[PB]]
   // CHECK: [[FUNC:%.*]] = function_ref @_TF17reabstract_lvalue19consumeGenericInOut
   // CHECK: [[ABSTRACTED_BOX:%.*]] = alloc_stack $@callee_owned (@out Double, @in Int) -> ()
-  // CHECK: [[THICK_ARG:%.*]] = load [[BOX]]#1
+  // CHECK: [[THICK_ARG:%.*]] = load [[PB]]
   // CHECK: strong_retain [[THICK_ARG]]
   // CHECK: [[THUNK1:%.*]] = function_ref @_TTRXFo_dSi_dSd_XFo_iSi_iSd_
   // CHECK: [[ABSTRACTED_ARG:%.*]] = partial_apply [[THUNK1]]([[THICK_ARG]])

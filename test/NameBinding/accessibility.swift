@@ -52,10 +52,10 @@ Foo.a()
 Foo.b()
 Foo.c() // expected-error {{'c' is inaccessible due to 'private' protection level}}
 
-_ = Foo() // expected-error {{'Foo' cannot be constructed because it has no accessible initializers}}
+_ = Foo() // expected-error {{'Foo' initializer is inaccessible due to 'internal' protection level}}
 // TESTABLE-NOT: :[[@LINE-1]]:{{[^:]+}}:
-PrivateInit() // expected-error {{'PrivateInit' cannot be constructed because it has no accessible initializers}}
-// TESTABLE: :[[@LINE-1]]:{{[^:]+}}: error: 'PrivateInit' cannot be constructed because it has no accessible initializers
+_ = PrivateInit() // expected-error {{'PrivateInit' initializer is inaccessible due to 'private' protection level}}
+// TESTABLE: :[[@LINE-1]]:{{[^:]+}}: error: 'PrivateInit' initializer is inaccessible due to 'private' protection level
 
 var s = StructWithPrivateSetter()
 s.x = 42 // expected-error {{cannot assign to property: 'x' setter is inaccessible}}

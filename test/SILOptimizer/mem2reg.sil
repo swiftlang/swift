@@ -54,22 +54,23 @@ bb0(%0 : $Int64):
   %1 = alloc_stack $Int64, var, name "c"               // users: %19, %2
   store %0 to %1 : $*Int64                      // id: %2
   %3 = alloc_box $Int64, var, name "x"                 // users: %16, %11, %6
+  %3a = project_box %3 : $@box Int64
   %4 = integer_literal $Builtin.Int64, 2          // users: %9, %5
   %5 = struct $Int64 (%4 : $Builtin.Int64)        // users: %12, %6
-  store %5 to %3#1 : $*Int64                      // id: %6
+  store %5 to %3a : $*Int64                      // id: %6
   %8 = struct_extract %0 : $Int64, #Int64._value   // user: %9
   %9 = builtin "cmp_sgt_Int64"(%8 : $Builtin.Int64, %4 : $Builtin.Int64) : $Builtin.Int1 // users: %15, %10
   cond_br %9, bb1, bb2                            // id: %10
 
 bb1:                                              // Preds: bb0
-  strong_release %3#0 : $@box Int64    // id: %11
+  strong_release %3 : $@box Int64    // id: %11
   br bb3(%5 : $Int64)                             // id: %12
 
 bb2:                                              // Preds: bb0
   %13 = integer_literal $Builtin.Int64, 5         // user: %14
   %14 = struct $Int64 (%13 : $Builtin.Int64)      // user: %17
   cond_fail %9 : $Builtin.Int1                    // id: %15
-  strong_release %3#0 : $@box Int64    // id: %16
+  strong_release %3 : $@box Int64    // id: %16
   br bb3(%14 : $Int64)                            // id: %17
 
 bb3(%18 : $Int64):                                // Preds: bb2 bb1
@@ -84,22 +85,23 @@ bb0(%0 : $Int64):
   %1 = alloc_stack $Int64, var, name "c"               // users: %19, %2, (%20)
   store %0 to %1 : $*Int64                      // id: %2
   %3 = alloc_box $Int64, var, name "x"                 // users: %16, %11, %6
+  %3a = project_box %3 : $@box Int64
   %4 = integer_literal $Builtin.Int64, 2          // users: %9, %5
   %5 = struct $Int64 (%4 : $Builtin.Int64)        // users: %12, %6
-  store %5 to %3#1 : $*Int64                      // id: %6
+  store %5 to %3a : $*Int64                      // id: %6
   %8 = struct_extract %0 : $Int64, #Int64._value   // user: %9
   %9 = builtin "cmp_sgt_Int64"(%8 : $Builtin.Int64, %4 : $Builtin.Int64) : $Builtin.Int1 // users: %15, %10
   cond_br %9, bb1, bb2                            // id: %10
 
 bb1:                                              // Preds: bb0
-  strong_release %3#0 : $@box Int64    // id: %11
+  strong_release %3 : $@box Int64    // id: %11
   br bb3(%5 : $Int64)                             // id: %12
 
 bb2:                                              // Preds: bb0
   %13 = integer_literal $Builtin.Int64, 5         // user: %14
   %14 = struct $Int64 (%13 : $Builtin.Int64)      // user: %17
   cond_fail %9 : $Builtin.Int1                    // id: %15
-  strong_release %3#0 : $@box Int64    // id: %16
+  strong_release %3 : $@box Int64    // id: %16
   br bb3(%14 : $Int64)                            // id: %17
 
 //CHECK: bb3([[RET:%[0-9]+]] : $Int64):

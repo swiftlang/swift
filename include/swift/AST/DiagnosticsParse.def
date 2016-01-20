@@ -649,6 +649,8 @@ ERROR(expected_rparen_parameter,PointsToFirstBadToken,
       "expected ')' in parameter", ())
 ERROR(expected_parameter_type,PointsToFirstBadToken,
       "expected parameter type following ':'", ())
+ERROR(missing_parameter_type,PointsToFirstBadToken,
+      "parameter requires an explicit type", ())
 ERROR(multiple_parameter_ellipsis,none,
       "only a single variadic parameter '...' is permitted", ())
 ERROR(parameter_vararg_default,none,

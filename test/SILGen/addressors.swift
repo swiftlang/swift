@@ -174,9 +174,10 @@ struct D : Subscriptable {
 // SILGEN:   debug_value [[VALUE]] : $Int32
 // SILGEN:   debug_value [[I]] : $Int32
 // SILGEN:   [[BOX:%.*]] = alloc_box $D
-// SILGEN:   copy_addr [[SELF]] to [initialization] [[BOX]]#1 : $*D     // id: %6
+// SILGEN:   [[PB:%.*]] = project_box [[BOX]]
+// SILGEN:   copy_addr [[SELF]] to [initialization] [[PB]] : $*D
 // SILGEN:   [[T0:%.*]] = function_ref @_TFV10addressors1Dau9subscriptFVs5Int32S1_{{.*}}
-// SILGEN:   [[PTR:%.*]] = apply [[T0]]([[I]], [[BOX]]#1)
+// SILGEN:   [[PTR:%.*]] = apply [[T0]]([[I]], [[PB]])
 // SILGEN:   [[T0:%.*]] = struct_extract [[PTR]] : $UnsafeMutablePointer<Int32>,
 // SILGEN:   [[ADDR:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int32
 // SILGEN:   assign [[VALUE]] to [[ADDR]] : $*Int32

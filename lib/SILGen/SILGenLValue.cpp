@@ -804,6 +804,7 @@ namespace {
       if (accessKind == AccessKind::Read ||
           decl->getAttrs().hasAttribute<DynamicAttr>() ||
           !decl->getMaterializeForSetFunc() ||
+          isa<StructDecl>(decl->getDeclContext()) ||
           decl->getDeclContext()->isProtocolExtensionContext()) {
         return std::move(*this).LogicalPathComponent::getMaterialized(gen,
                                                         loc, base, accessKind);
@@ -1904,7 +1905,7 @@ getOptionalObjectTypeData(SILGenFunction &gen,
   EnumElementDecl *someDecl = gen.getASTContext().getOptionalSomeDecl(otk);
   
   return {
-    AbstractionPattern(someDecl->getArgumentType()),
+    gen.SGM.M.Types.getAbstractionPattern(someDecl),
     objectTy,
     baseTypeData.TypeOfRValue.getEnumElementType(someDecl, gen.SGM.M),
   };

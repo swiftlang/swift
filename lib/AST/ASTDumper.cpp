@@ -952,7 +952,7 @@ namespace {
       OS.indent(Indent) << "(#if_decl\n";
       Indent += 2;
       for (auto &Clause : ICD->getClauses()) {
-        OS.indent(Indent) << (Clause.Cond ? "(#if:\n" : "#else");
+        OS.indent(Indent) << (Clause.Cond ? "(#if:\n" : "\n(#else:\n");
         if (Clause.Cond)
           printRec(Clause.Cond);
         
@@ -960,6 +960,8 @@ namespace {
           OS << '\n';
           printRec(D);
         }
+
+        OS << ')';
       }
     
       Indent -= 2;
@@ -1987,6 +1989,7 @@ public:
   void visitCaptureListExpr(CaptureListExpr *E) {
     printCommon(E, "capture_list");
     for (auto capture : E->getCaptureList()) {
+      OS << '\n';
       Indent += 2;
       printRec(capture.Var);
       printRec(capture.Init);
@@ -2322,7 +2325,7 @@ public:
   void visitNamedTypeRepr(NamedTypeRepr *T) {
     printCommon(T, "type_named");
     if (T->hasName())
-      OS << " id='" << T->getName();
+      OS << " id=" << T->getName();
     if (T->getTypeRepr()) {
       OS << '\n';
       printRec(T->getTypeRepr());

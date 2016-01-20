@@ -754,6 +754,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONETYPE_ONEOPERAND_INST(AllocValueBuffer)
   ONETYPE_ONEOPERAND_INST(ProjectValueBuffer)
   ONETYPE_ONEOPERAND_INST(ProjectBox)
+  ONETYPE_ONEOPERAND_INST(ProjectExistentialBox)
   ONETYPE_ONEOPERAND_INST(DeallocValueBuffer)
 #undef ONETYPE_ONEOPERAND_INST
 #define ONEOPERAND_ONETYPE_INST(ID)           \
@@ -869,7 +870,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       break;
     case ValueKind::AllocExistentialBoxInst:
       ResultVal = Builder.createAllocExistentialBox(Loc, Ty, ConcreteTy,
-                                  SILType::getPrimitiveAddressType(ConcreteTy),
                                   ctxConformances);
       break;
     }

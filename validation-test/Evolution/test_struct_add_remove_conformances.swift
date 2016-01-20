@@ -27,6 +27,18 @@ import struct_add_remove_conformances
 
 var StructAddRemoveConformancesTest = TestSuite("StructAddRemoveConformances")
 
+@inline(never) func workWithPointLike<T>(t: T) {
+  if getVersion() > 0 {
+    var p = t as! PointLike
+    p.x = 30
+    p.y = 40
+    expectEqual(p.x, 30)
+    expectEqual(p.y, 40)
+  } else {
+    expectEqual(t is PointLike, false)
+  }
+}
+
 StructAddRemoveConformancesTest.test("AddRemoveConformance") {
   var t = AddRemoveConformance()
 
@@ -37,15 +49,7 @@ StructAddRemoveConformancesTest.test("AddRemoveConformance") {
     expectEqual(t.y, 20)
   }
 
-  if getVersion() > 0 {
-    var p = t as! PointLike
-    p.x = 30
-    p.y = 40
-    expectEqual(p.x, 30)
-    expectEqual(p.y, 40)
-  } else {
-    expectEqual(t is PointLike, false)
-  }
+  workWithPointLike(t)
 }
 
 #if AFTER

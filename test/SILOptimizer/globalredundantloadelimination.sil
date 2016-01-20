@@ -61,11 +61,12 @@ struct Wrapper {
 sil @tbaa_class_alias_nonclass : $@convention(thin) (@owned B, @inout Agg1) -> () {
 bb0(%0 : $B, %1 : $*Agg1):
   %2 = alloc_box $B
+  %2a = project_box %2 : $@box B
   %3 = load %1 : $*Agg1
   %4 = store %3 to %1 : $*Agg1
-  %5 = load %2#1 : $*B
+  %5 = load %2a : $*B
   %6 = store %3 to %1 : $*Agg1
-  %7 = load %2#1 : $*B
+  %7 = load %2a : $*B
   %8 = strong_retain %5 : $B   //%7 and %5 should really be one load.
   %9 = strong_retain %7 : $B
   %10 = tuple()

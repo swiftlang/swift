@@ -261,6 +261,10 @@ namespace {
       return true;
     }
 
+    bool visitProjectExistentialBoxInst(const ProjectExistentialBoxInst *RHS) {
+      return true;
+    }
+
     bool visitStrongReleaseInst(const StrongReleaseInst *RHS) {
       return true;
     }

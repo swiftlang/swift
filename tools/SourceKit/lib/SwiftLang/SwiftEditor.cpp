@@ -1894,8 +1894,11 @@ class FormatWalker: public ide::SourceEntityWalker {
         // Trailing closures are not considered siblings to other args.
         unsigned EndAdjust = TE->hasTrailingClosure() ? 1 : 0;
         for (unsigned I = 0, N = TE->getNumElements() - EndAdjust; I < N; I ++) {
-          addPair(TE->getElement(I)->getEndLoc(),
-                  FindAlignLoc(TE->getElement(I)->getStartLoc()), tok::comma);
+          auto EleStart = TE->getElementNameLoc(I);
+          if (EleStart.isInvalid()) {
+            EleStart = TE->getElement(I)->getStartLoc();
+          }
+          addPair(TE->getElement(I)->getEndLoc(), EleStart, tok::comma);
         }
       }
 

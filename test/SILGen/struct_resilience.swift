@@ -11,14 +11,14 @@ func functionWithResilientTypes(s: Size, f: Size -> Size) -> Size {
   // Stored properties of resilient structs from outside our resilience
   // domain are accessed through accessors
 
-// CHECK:         copy_addr %1 to [initialization] [[OTHER_SIZE_BOX:%.*]]#1 : $*Size
+// CHECK:         copy_addr %1 to [initialization] [[OTHER_SIZE_BOX:%[0-9]*]] : $*Size
   var s2 = s
 
 // CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*Size
 // CHECK:         [[FN:%.*]] = function_ref @_TFV16resilient_struct4Sizeg1wSi : $@convention(method) (@in_guaranteed Size) -> Int
 // CHECK:         [[RESULT:%.*]] = apply [[FN]]([[SIZE_BOX]])
 // CHECK:         [[FN:%.*]] = function_ref @_TFV16resilient_struct4Sizes1wSi : $@convention(method) (Int, @inout Size) -> ()
-// CHECK:         apply [[FN]]([[RESULT]], [[OTHER_SIZE_BOX]]#1)
+// CHECK:         apply [[FN]]([[RESULT]], [[OTHER_SIZE_BOX]])
   s2.w = s.w
 
 // CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*Size
@@ -42,7 +42,7 @@ func functionWithFixedLayoutTypes(p: Point, f: Point -> Point) -> Point {
   var p2 = p
 
 // CHECK:         [[RESULT:%.*]] = struct_extract %0 : $Point, #Point.x
-// CHECK:         [[DEST:%.*]] = struct_element_addr [[POINT_BOX:%.*]]#1 : $*Point, #Point.x
+// CHECK:         [[DEST:%.*]] = struct_element_addr [[POINT_BOX:%[0-9]*]] : $*Point, #Point.x
 // CHECK:         assign [[RESULT]] to [[DEST]] : $*Int
   p2.x = p.x
 
@@ -113,12 +113,12 @@ public func functionWithMyResilientTypes(s: MySize, f: MySize -> MySize) -> MySi
   // Stored properties of resilient structs from inside our resilience
   // domain are accessed directly
 
-// CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]]#1 : $*MySize
+// CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%[0-9]*]] : $*MySize
   var s2 = s
 
 // CHECK:         [[SRC_ADDR:%.*]] = struct_element_addr %1 : $*MySize, #MySize.w
 // CHECK:         [[SRC:%.*]] = load [[SRC_ADDR]] : $*Int
-// CHECK:         [[DEST_ADDR:%.*]] = struct_element_addr [[SIZE_BOX]]#1 : $*MySize, #MySize.w
+// CHECK:         [[DEST_ADDR:%.*]] = struct_element_addr [[SIZE_BOX]] : $*MySize, #MySize.w
 // CHECK:         assign [[SRC]] to [[DEST_ADDR]] : $*Int
   s2.w = s.w
 

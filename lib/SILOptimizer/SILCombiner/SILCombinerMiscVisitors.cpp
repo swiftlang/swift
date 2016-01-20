@@ -45,14 +45,25 @@ SILCombiner::visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
 
   StoreInst *SingleStore = nullptr;
   StrongReleaseInst *SingleRelease = nullptr;
+  ProjectExistentialBoxInst *SingleProjection = nullptr;
 
   // For each user U of the alloc_existential_box...
   for (auto U : getNonDebugUses(*AEBI)) {
-    // Record stores into the box.
-    if (auto *SI = dyn_cast<StoreInst>(U->getUser())) {
-      // If this is not the only store into the box then bail out.
-      if (SingleStore) return nullptr;
-      SingleStore = SI;
+
+    if (auto *PEBI = dyn_cast<ProjectExistentialBoxInst>(U->getUser())) {
+      if (SingleProjection) return nullptr;
+      SingleProjection = PEBI;
+      for (auto AddrUse : getNonDebugUses(*PEBI)) {
+        // Record stores into the box.
+        if (auto *SI = dyn_cast<StoreInst>(AddrUse->getUser())) {
+          // If this is not the only store into the box then bail out.
+          if (SingleStore) return nullptr;
+          SingleStore = SI;
+          continue;
+        }
+        // If there are other users to the box value address then bail out.
+        return nullptr;
+      }
       continue;
     }
 
@@ -69,6 +80,7 @@ SILCombiner::visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
   }
 
   if (SingleStore && SingleRelease) {
+    assert(SingleProjection && "store without a projection");
     // Release the value that was stored into the existential box. The box
     // is going away so we need to release the stored value now.
     Builder.setInsertionPoint(SingleStore);
@@ -78,6 +90,7 @@ SILCombiner::visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
     // releases the box, and finally, release the box.
     eraseInstFromFunction(*SingleRelease);
     eraseInstFromFunction(*SingleStore);
+    eraseInstFromFunction(*SingleProjection);
     return eraseInstFromFunction(*AEBI);
   }
 

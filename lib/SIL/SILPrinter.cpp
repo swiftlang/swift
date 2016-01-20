@@ -1344,6 +1344,10 @@ public:
   void visitProjectBoxInst(ProjectBoxInst *PBI) {
     *this << "project_box " << getIDAndType(PBI->getOperand());
   }
+  void visitProjectExistentialBoxInst(ProjectExistentialBoxInst *PEBI) {
+    *this << "project_existential_box " << PEBI->getValueType()
+    << " in " << getIDAndType(PEBI->getOperand());
+  }
 
   void visitCondFailInst(CondFailInst *FI) {
     *this << "cond_fail " << getIDAndType(FI->getOperand());

@@ -36,7 +36,7 @@ func test5(g: Gizmo) {
   // CHECK:      [[CLASS:%.*]] = metatype $@thick Gizmo.Type
   // CHECK-NEXT: [[METHOD:%.*]] = class_method [volatile] [[CLASS]] : {{.*}}, #Gizmo.inspect!1.foreign
   // CHECK-NEXT: [[OBJC_CLASS:%[0-9]+]] = thick_to_objc_metatype [[CLASS]] : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
-  // CHECK:      [[V:%.*]] = load %2
+  // CHECK:      [[V:%.*]] = load
   // CHECK:      strong_retain [[V]]
   // CHECK:      [[G:%.*]] = enum $ImplicitlyUnwrappedOptional<Gizmo>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[V]]
   // CHECK-NEXT: apply [[METHOD]]([[G]], [[OBJC_CLASS]])
@@ -50,7 +50,7 @@ func test6(g: Gizmo) {
   // CHECK:      [[CLASS:%.*]] = metatype $@thick Gizmo.Type
   // CHECK-NEXT: [[METHOD:%.*]] = class_method [volatile] [[CLASS]] : {{.*}}, #Gizmo.consume!1.foreign
   // CHECK-NEXT: [[OBJC_CLASS:%.*]] = thick_to_objc_metatype [[CLASS]] : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
-  // CHECK:      [[V:%.*]] = load %2
+  // CHECK:      [[V:%.*]] = load
   // CHECK:      strong_retain [[V]]
   // CHECK:      [[G:%.*]] = enum $ImplicitlyUnwrappedOptional<Gizmo>, #ImplicitlyUnwrappedOptional.Some!
   // CHECK-NEXT: apply [[METHOD]]([[G]], [[OBJC_CLASS]])

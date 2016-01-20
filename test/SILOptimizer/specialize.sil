@@ -167,8 +167,9 @@ bb0(%0 : $*T):
   // function_ref specialize.(getGenericClosure <A>(t : A) -> () -> A).(tmp #1) (())A
   %2 = function_ref @_TFF10specialize17getGenericClosureU__FT1tQ__FT_Q_L_3tmpfT_Q_ : $@convention(thin) <τ_0_0> (@out τ_0_0, @owned @box τ_0_0) -> () // user: %5
   %3 = alloc_box $T                               // users: %4, %5, %5
-  copy_addr %0 to [initialization] %3#1 : $*T     // id: %4
-  %5 = partial_apply %2<T>(%3#0) : $@convention(thin) <τ_0_0> (@out τ_0_0, @owned @box τ_0_0) -> () // user: %7
+  %3a = project_box %3 : $@box T
+  copy_addr %0 to [initialization] %3a : $*T     // id: %4
+  %5 = partial_apply %2<T>(%3) : $@convention(thin) <τ_0_0> (@out τ_0_0, @owned @box τ_0_0) -> () // user: %7
   destroy_addr %0 : $*T                           // id: %6
   return %5 : $@callee_owned (@out T) -> ()       // id: %7
 }
@@ -296,8 +297,9 @@ bb0(%0 : $*U):
   // function_ref test4.(boo <A : test4.P, B>(A) -> (Swift.Int32, B) -> Swift.Int32).(closure #1)
   %2 = function_ref @_TFF5test43booUS_1P___FQ_FTVs5Int32Q0__S1_U_FTS1_Q0__S1_ : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P> (Int32, @in τ_0_1, @owned @box τ_0_0) -> Int32 // user: %5
   %3 = alloc_box $U                               // users: %4, %5, %5
-  copy_addr %0 to [initialization] %3#1 : $*U     // id: %4
-  %5 = partial_apply %2<U, T>(%3#0) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P> (Int32, @in τ_0_1, @owned @box τ_0_0) -> Int32 // user: %7
+  %3a = project_box %3 : $@box U
+  copy_addr %0 to [initialization] %3a : $*U     // id: %4
+  %5 = partial_apply %2<U, T>(%3) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P> (Int32, @in τ_0_1, @owned @box τ_0_0) -> Int32 // user: %7
   destroy_addr %0 : $*U                           // id: %6
   return %5 : $@callee_owned (Int32, @in T) -> Int32 // id: %7
 }
@@ -373,8 +375,9 @@ bb0(%0 : $*T):
   // function_ref test4.(gen1 <A : test4.P>(A) -> (Swift.Int32) -> Swift.Int32).(closure #1)
   %2 = function_ref @_TFF5test44gen1US_1P__FQ_FVs5Int32S1_U_FS1_S1_ : $@convention(thin) <τ_0_0 where τ_0_0 : P> (Int32, @owned @box τ_0_0) -> Int32 // user: %5
   %3 = alloc_box $T                               // users: %4, %5, %5
-  copy_addr %0 to [initialization] %3#1 : $*T     // id: %4
-  %5 = partial_apply %2<T>(%3#0) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (Int32, @owned @box τ_0_0) -> Int32 // user: %7
+  %3a = project_box %3 : $@box T
+  copy_addr %0 to [initialization] %3a : $*T     // id: %4
+  %5 = partial_apply %2<T>(%3) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (Int32, @owned @box τ_0_0) -> Int32 // user: %7
   destroy_addr %0 : $*T                           // id: %6
   return %5 : $@callee_owned (Int32) -> Int32     // id: %7
 }

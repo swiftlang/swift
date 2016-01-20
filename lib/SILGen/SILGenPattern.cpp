@@ -1876,8 +1876,8 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
                   ->getCanonicalType();
 
       eltCMV = emitReabstractedSubobject(SGF, loc, eltCMV, *eltTL,
-                                  AbstractionPattern(elt->getArgumentType()),
-                                         substEltTy);
+                            SGF.SGM.M.Types.getAbstractionPattern(elt),
+                            substEltTy);
     }
 
     const FailureHandler *innerFailure = &outerFailure;

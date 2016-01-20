@@ -19,8 +19,9 @@ func test_concrete_erasure(x: ClericalError) -> ErrorProtocol {
 }
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials21test_concrete_erasureFOS_13ClericalErrorPs13ErrorProtocol_
 // CHECK:         [[EXISTENTIAL:%.*]] = alloc_existential_box $ErrorProtocol, $ClericalError
-// CHECK:         store %0 to [[EXISTENTIAL]]#1 : $*ClericalError
-// CHECK:         return [[EXISTENTIAL]]#0 : $ErrorProtocol
+// CHECK:         [[ADDR:%.*]] = project_existential_box $ClericalError in [[EXISTENTIAL]] : $ErrorProtocol
+// CHECK:         store %0 to [[ADDR]] : $*ClericalError
+// CHECK:         return [[EXISTENTIAL]] : $ErrorProtocol
 
 protocol HairType {}
 
@@ -30,20 +31,22 @@ func test_composition_erasure(x: protocol<HairType, ErrorProtocol>) -> ErrorProt
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials24test_composition_erasureFPs13ErrorProtocolS_8HairType_PS0__
 // CHECK:         [[VALUE_ADDR:%.*]] = open_existential_addr [[OLD_EXISTENTIAL:%.*]] : $*protocol<ErrorProtocol, HairType> to $*[[VALUE_TYPE:@opened\(.*\) protocol<ErrorProtocol, HairType>]]
 // CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $ErrorProtocol, $[[VALUE_TYPE]]
-// CHECK:         copy_addr [[VALUE_ADDR]] to [initialization] [[NEW_EXISTENTIAL]]#1
+// CHECK:         [[ADDR:%.*]] = project_existential_box $[[VALUE_TYPE]] in [[NEW_EXISTENTIAL]] : $ErrorProtocol
+// CHECK:         copy_addr [[VALUE_ADDR]] to [initialization] [[ADDR]]
 // CHECK:         destroy_addr [[OLD_EXISTENTIAL]]
-// CHECK:         return [[NEW_EXISTENTIAL]]#0
+// CHECK:         return [[NEW_EXISTENTIAL]]
 
 protocol HairClass: class {}
 
 func test_class_composition_erasure(x: protocol<HairClass, ErrorProtocol>) -> ErrorProtocol {
   return x
 }
-// CHECK-LABEL: sil hidden @_TF18boxed_existentials30test_class_composition_erasureFPs13ErrorProtocolS_9HairClass_PS0__
-// CHECK:         [[VALUE:%.*]] = open_existential_ref [[OLD_EXISTENTIAL:%.*]] : $protocol<ErrorProtocol, HairClass> to $[[VALUE_TYPE:@opened\(.*\) protocol<ErrorProtocol, HairClass>]]
+// CHECK-LABEL: sil hidden @_TF18boxed_existentials30test_class_composition_erasureFPs13ErrorProtocolS_13HairClassType_PS0__
+// CHECK:         [[VALUE:%.*]] = open_existential_ref [[OLD_EXISTENTIAL:%.*]] : $protocol<ErrorProtocol, HairClassType> to $[[VALUE_TYPE:@opened\(.*\) protocol<ErrorProtocol, HairClassType>]]
 // CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $ErrorProtocol, $[[VALUE_TYPE]]
-// CHECK:         store [[VALUE]] to [[NEW_EXISTENTIAL]]#1
-// CHECK:         return [[NEW_EXISTENTIAL]]#0
+// CHECK:         [[ADDR:%.*]] = project_existential_box $[[VALUE_TYPE]] in [[NEW_EXISTENTIAL]] : $ErrorProtocol
+// CHECK:         store [[VALUE]] to [[ADDR]]
+// CHECK:         return [[NEW_EXISTENTIAL]]
 
 func test_property(x: ErrorProtocol) -> String {
   return x._domain
@@ -66,8 +69,9 @@ func test_property_of_lvalue(x: ErrorProtocol) -> String {
 }
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials23test_property_of_lvalueFPs13ErrorProtocol_SS
 // CHECK:         [[VAR:%.*]] = alloc_box $ErrorProtocol
-// CHECK:         store %0 to [[VAR]]#1
-// CHECK-NEXT:    [[VALUE_BOX:%.*]] = load [[VAR]]#1
+// CHECK:         [[PB:%.*]] = project_box [[VAR]]
+// CHECK:         store %0 to [[PB]]
+// CHECK-NEXT:    [[VALUE_BOX:%.*]] = load [[PB]]
 // CHECK-NEXT:    strong_retain [[VALUE_BOX]]
 // CHECK-NEXT:    [[VALUE:%.*]] = open_existential_box [[VALUE_BOX]] : $ErrorProtocol to $*[[VALUE_TYPE:@opened\(.*\) ErrorProtocol]]
 // CHECK-NEXT:    [[COPY:%.*]] = alloc_stack $[[VALUE_TYPE]]
@@ -77,7 +81,7 @@ func test_property_of_lvalue(x: ErrorProtocol) -> String {
 // CHECK-NEXT:    destroy_addr [[COPY]]
 // CHECK-NEXT:    dealloc_stack [[COPY]]
 // CHECK-NEXT:    strong_release [[VALUE_BOX]]
-// CHECK-NEXT:    strong_release [[VAR]]#0
+// CHECK-NEXT:    strong_release [[VAR]]
 // CHECK-NEXT:    strong_release %0
 // CHECK-NEXT:    return [[RESULT]]
 
@@ -107,7 +111,9 @@ func test_open_existential_semantics(guaranteed: ErrorProtocol,
                                      _ immediate: ErrorProtocol) {
   var immediate = immediate
   // CHECK: [[IMMEDIATE_BOX:%.*]] = alloc_box $ErrorProtocol
+  // CHECK: [[PB:%.*]] = project_box [[IMMEDIATE_BOX]]
   // GUARANTEED: [[IMMEDIATE_BOX:%.*]] = alloc_box $ErrorProtocol
+  // GUARANTEED: [[PB:%.*]] = project_box [[IMMEDIATE_BOX]]
 
   // CHECK-NOT: strong_retain %0
   // CHECK: [[VALUE:%.*]] = open_existential_box %0
@@ -124,7 +130,7 @@ func test_open_existential_semantics(guaranteed: ErrorProtocol,
   // GUARANTEED-NOT: strong_release [[GUARANTEED]]
   guaranteed.extensionMethod()
 
-  // CHECK: [[IMMEDIATE:%.*]] = load [[IMMEDIATE_BOX]]#1
+  // CHECK: [[IMMEDIATE:%.*]] = load [[PB]]
   // -- need a retain to guarantee
   // CHECK: strong_retain [[IMMEDIATE]]
   // CHECK: [[VALUE:%.*]] = open_existential_box [[IMMEDIATE]]
@@ -136,7 +142,7 @@ func test_open_existential_semantics(guaranteed: ErrorProtocol,
   //    out.
   // CHECK: strong_release [[IMMEDIATE]]
 
-  // GUARANTEED: [[IMMEDIATE:%.*]] = load [[IMMEDIATE_BOX]]#1
+  // GUARANTEED: [[IMMEDIATE:%.*]] = load [[PB]]
   // -- need a retain to guarantee
   // GUARANTEED: strong_retain [[IMMEDIATE]]
   // GUARANTEED: [[VALUE:%.*]] = open_existential_box [[IMMEDIATE]]
@@ -170,6 +176,7 @@ func test_open_existential_semantics(guaranteed: ErrorProtocol,
 func erasure_to_any(guaranteed: ErrorProtocol, _ immediate: ErrorProtocol) -> Any {
   var immediate = immediate
   // CHECK:       [[IMMEDIATE_BOX:%.*]] = alloc_box $ErrorProtocol
+  // CHECK:       [[PB:%.*]] = project_box [[IMMEDIATE_BOX]]
   if true {
     // CHECK-NOT: retain [[GUAR]]
     // CHECK:     [[FROM_VALUE:%.*]] = open_existential_box [[GUAR:%.*]]
@@ -178,7 +185,7 @@ func erasure_to_any(guaranteed: ErrorProtocol, _ immediate: ErrorProtocol) -> An
     // CHECK-NOT: release [[GUAR]]
     return guaranteed
   } else if true {
-    // CHECK:     [[IMMEDIATE:%.*]] = load [[IMMEDIATE_BOX]]
+    // CHECK:     [[IMMEDIATE:%.*]] = load [[PB]]
     // CHECK:     retain [[IMMEDIATE]]
     // CHECK:     [[FROM_VALUE:%.*]] = open_existential_box [[IMMEDIATE]]
     // CHECK:     [[TO_VALUE:%.*]] = init_existential_addr [[OUT]]

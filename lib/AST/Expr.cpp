@@ -1178,13 +1178,27 @@ TypeExpr::TypeExpr(Type Ty)
     setType(MetatypeType::get(Ty, Ty->getASTContext()));
 }
 
+// The type of a TypeExpr is always a metatype type.  Return the instance
+// type or null if not set yet.
+Type TypeExpr::getInstanceType() const {
+  if (!getType() || getType()->is<ErrorType>())
+    return Type();
+  
+  return getType()->castTo<MetatypeType>()->getInstanceType();
+}
+
+
 /// Return a TypeExpr for a simple identifier and the specified location.
-TypeExpr *TypeExpr::createForDecl(SourceLoc Loc, TypeDecl *Decl) {
+TypeExpr *TypeExpr::createForDecl(SourceLoc Loc, TypeDecl *Decl,
+                                  bool isImplicit) {
   ASTContext &C = Decl->getASTContext();
   assert(Loc.isValid());
   auto *Repr = new (C) SimpleIdentTypeRepr(Loc, Decl->getName());
   Repr->setValue(Decl);
-  return new (C) TypeExpr(TypeLoc(Repr, Type()));
+  auto result = new (C) TypeExpr(TypeLoc(Repr, Type()));
+  if (isImplicit)
+    result->setImplicit();
+  return result;
 }
 
 TypeExpr *TypeExpr::createForSpecializedDecl(SourceLoc Loc, TypeDecl *D,

@@ -253,22 +253,28 @@ public:
   ///
   /// This is equivalent to, but possibly faster than, calling
   /// M.Types.getTypeLowering(type).isAddressOnly().
-  static bool isAddressOnly(CanType T, SILModule &M);
+  static bool isAddressOnly(CanType T, SILModule &M,
+                            CanGenericSignature Sig
+                               = CanGenericSignature());
 
   /// Return true if this type must be returned indirectly.
   ///
   /// This is equivalent to, but possibly faster than, calling
   /// M.Types.getTypeLowering(type).isReturnedIndirectly().
-  static bool isReturnedIndirectly(CanType type, SILModule &M) {
-    return isAddressOnly(type, M);
+  static bool isReturnedIndirectly(CanType type, SILModule &M,
+                                   CanGenericSignature Sig
+                                      = CanGenericSignature()) {
+    return isAddressOnly(type, M, Sig);
   }
 
   /// Return true if this type must be passed indirectly.
   ///
   /// This is equivalent to, but possibly faster than, calling
   /// M.Types.getTypeLowering(type).isPassedIndirectly().
-  static bool isPassedIndirectly(CanType type, SILModule &M) {
-    return isAddressOnly(type, M);
+  static bool isPassedIndirectly(CanType type, SILModule &M,
+                                 CanGenericSignature Sig
+                                    = CanGenericSignature()) {
+    return isAddressOnly(type, M, Sig);
   }
 
   /// Returns true if this type exposes a fixed layout to the given module's
@@ -548,7 +554,6 @@ NON_SIL_TYPE(LValue)
 
 CanSILFunctionType getNativeSILFunctionType(SILModule &M,
                         Lowering::AbstractionPattern orig,
-                        CanAnyFunctionType subst,
                         CanAnyFunctionType substInterface,
                         SILDeclRef::Kind kind = SILDeclRef::Kind::Func);
 

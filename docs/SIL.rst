@@ -703,7 +703,7 @@ Values and Operands
 
   sil-identifier ::= [A-Za-z_0-9]+
   sil-value-name ::= '%' sil-identifier
-  sil-value ::= sil-value-name ('#' [0-9]+)?
+  sil-value ::= sil-value-name
   sil-value ::= 'undef'
   sil-operand ::= sil-value ':' sil-type
 
@@ -711,17 +711,6 @@ SIL values are introduced with the ``%`` sigil and named by an
 alphanumeric identifier, which references the instruction or basic block
 argument that produces the value.  SIL values may also refer to the keyword
 'undef', which is a value of undefined contents.
-In SIL, a single instruction may produce multiple values. Operands that refer
-to multiple-value instructions choose the value by following the ``%name`` with
-``#`` and the index of the value. For example::
-
-  // alloc_box produces two values--the refcounted pointer %box#0, and the
-  // value address %box#1
-  %box = alloc_box $Int64
-  // Refer to the refcounted pointer
-  strong_retain %box#0 : $@box Int64
-  // Refer to the address
-  store %value to %box#1 : $*Int64
 
 Unlike LLVM IR, SIL instructions that take value operands *only* accept
 value operands. References to literal constants, functions, global variables, or
@@ -1690,15 +1679,13 @@ alloc_box
   sil-instruction ::= 'alloc_box' sil-type (',' debug-var-attr)*
 
   %1 = alloc_box $T
-  // %1 has two values:
-  //   %1#0 has type $@box T
-  //   %1#1 has type $*T
+  //   %1 has type $@box T
 
 Allocates a reference-counted ``@box`` on the heap large enough to hold a value
 of type ``T``, along with a retain count and any other metadata required by the
-runtime.  The result of the instruction is a two-value operand; the first value
-is the reference-counted ``@box`` reference that owns the box, and the second
-value is the address of the value inside the box.
+runtime.  The result of the instruction is the reference-counted ``@box``
+reference that owns the box. The ``project_box`` instruction is used to retrieve
+the address of the value inside the box.
 
 The box will be initialized with a retain count of 1; the storage will be
 uninitialized. The box owns the contained value, and releasing it to a retain
@@ -2741,11 +2728,12 @@ lowers to an uncurried entry point and is curried in the enclosing function::
   entry(%x : $Int):
     // Create a box for the 'x' variable
     %x_box = alloc_box $Int
-    store %x to %x_box#1 : $*Int
+    %x_addr = project_box %x_box : $@box Int
+    store %x to %x_addr : $*Int
 
     // Create the bar closure
     %bar_uncurried = function_ref @bar : $(Int, Int) -> Int
-    %bar = partial_apply %bar_uncurried(%x_box#0, %x_box#1) \
+    %bar = partial_apply %bar_uncurried(%x_box, %x_addr) \
       : $(Int, Builtin.NativeObject, *Int) -> Int
 
     // Apply it
@@ -3275,6 +3263,7 @@ container may use one of several representations:
   containers:
 
   * `alloc_existential_box`_
+  * `project_existential_box`_
   * `open_existential_box`_
   * `dealloc_existential_box`_
 
@@ -3289,8 +3278,9 @@ more expensive ``alloc_existential_box``::
     // The slow general way to form an ErrorProtocol, allocating a box and
     // storing to its value buffer:
     %error1 = alloc_existential_box $ErrorProtocol, $NSError
+    %addr = project_existential_box $NSError in %error1 : $ErrorProtocol
     strong_retain %nserror: $NSError
-    store %nserror to %error1#1 : $NSError
+    store %nserror to %addr : $NSError
 
     // The fast path supported for NSError:
     strong_retain %nserror: $NSError
@@ -3432,7 +3422,7 @@ alloc_existential_box
   // $P must be a protocol or protocol composition type with boxed
   //   representation
   // $T must be an AST type that conforms to P
-  // %1#0 will be of type $P
+  // %1 will be of type $P
   // %1#1 will be of type $*T', where T' is the most abstracted lowering of T
 
 Allocates a boxed existential container of type ``$P`` with space to hold a
@@ -3440,8 +3430,25 @@ value of type ``$T'``. The box is not fully initialized until a valid value
 has been stored into the box. If the box must be deallocated before it is
 fully initialized, ``dealloc_existential_box`` must be used. A fully
 initialized box can be ``retain``-ed and ``release``-d like any
-reference-counted type.  The address ``%0#1`` is dependent on the lifetime of
-the owner reference ``%0#0``.
+reference-counted type.  The ``project_existential_box`` instruction is used
+to retrieve the address of the value inside the container.
+
+project_existential_box
+```````````````````````
+::
+
+  sil-instruction ::= 'project_existential_box' sil-type 'in' sil-operand
+
+  %1 = project_existential_box $T in %0 : $P
+  // %0 must be a value of boxed protocol or protocol composition type $P
+  // $T must be the most abstracted lowering of the AST type for which the box
+  // was allocated
+  // %1 will be of type $*T
+
+Projects the address of the value inside a boxed existential container.
+The address is dependent on the lifetime of the owner reference ``%0``.
+It is undefined behavior if the concrete type ``$T`` is not the same type for
+which the box was allocated with ``alloc_existential_box``.
 
 open_existential_box
 ````````````````````

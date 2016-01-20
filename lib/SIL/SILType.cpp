@@ -443,13 +443,8 @@ OptionalTypeKind SILType::getOptionalTypeKind() const {
 SILType SILType::getAnyOptionalObjectType(SILModule &M,
                                           OptionalTypeKind &OTK) const {
   if (auto objectTy = getSwiftRValueType()->getAnyOptionalObjectType(OTK)) {
-    // Lower the payload type at the abstraction level of Optional's generic
-    // parameter.
-    auto archetype = getNominalOrBoundGenericNominal()->getGenericParams()
-      ->getPrimaryArchetypes()[0];
-    
     auto loweredTy
-      = M.Types.getLoweredType(AbstractionPattern(archetype), objectTy);
+      = M.Types.getLoweredType(AbstractionPattern::getOpaque(), objectTy);
     
     return SILType(loweredTy.getSwiftRValueType(), getCategory());
   }

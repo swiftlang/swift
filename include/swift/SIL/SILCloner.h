@@ -457,7 +457,6 @@ SILCloner<ImplClass>::visitAllocExistentialBoxInst(
     getBuilder().createAllocExistentialBox(getOpLocation(Inst->getLoc()),
                                 getOpType(origExistentialType),
                                 getOpASTType(origFormalType),
-                                getOpType(Inst->getLoweredConcreteType()),
                                 conformances));
 }
 
@@ -1577,6 +1576,16 @@ void SILCloner<ImplClass>::visitProjectBoxInst(ProjectBoxInst *Inst) {
     getBuilder().createProjectBox(getOpLocation(Inst->getLoc()),
                                   getOpType(Inst->getValueType()),
                                   getOpValue(Inst->getOperand())));
+}
+
+template<typename ImplClass>
+void SILCloner<ImplClass>::visitProjectExistentialBoxInst(
+                                            ProjectExistentialBoxInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+      getBuilder().createProjectExistentialBox(getOpLocation(Inst->getLoc()),
+                                               getOpType(Inst->getValueType()),
+                                               getOpValue(Inst->getOperand())));
 }
 
 template<typename ImplClass>

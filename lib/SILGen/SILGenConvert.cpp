@@ -87,10 +87,7 @@ void SILGenFunction::emitInjectOptionalValueInto(SILLocation loc,
                                             someDecl,
                                             loweredPayloadTy.getAddressType());
   
-  CanType formalOptType = optType.getSwiftRValueType();
-  auto archetype = formalOptType->getNominalOrBoundGenericNominal()
-    ->getGenericParams()->getPrimaryArchetypes()[0];
-  AbstractionPattern origType(archetype);
+  AbstractionPattern origType = AbstractionPattern::getOpaque();
 
   // Emit the value into the payload area.
   TemporaryInitialization emitInto(destPayload, CleanupHandle::invalid());
@@ -141,11 +138,8 @@ getOptionalSomeValue(SILLocation loc, ManagedValue value,
   assert(OTK != OTK_None);
   auto someDecl = getASTContext().getOptionalSomeDecl(OTK);
   
-  auto archetype = formalOptType->getNominalOrBoundGenericNominal()
-                        ->getGenericParams()->getPrimaryArchetypes()[0];
-  AbstractionPattern origType(archetype);
+  AbstractionPattern origType = AbstractionPattern::getOpaque();
 
-  
   // Reabstract input value to the type expected by the enum.
   value = emitSubstToOrigValue(loc, value, origType, formalObjectType);
 
@@ -454,14 +448,13 @@ ManagedValue SILGenFunction::emitExistentialErasure(
   }
   case ExistentialRepresentation::Boxed: {
     // Allocate the existential.
-    auto box = B.createAllocExistentialBox(loc,
+    auto *existential = B.createAllocExistentialBox(loc,
                                            existentialTL.getLoweredType(),
                                            concreteFormalType,
-                                           concreteTL.getLoweredType(),
                                            conformances);
-    auto existential = box->getExistentialResult();
-    auto valueAddr = box->getValueAddressResult();
-
+    auto *valueAddr = B.createProjectExistentialBox(loc,
+                                           concreteTL.getLoweredType(),
+                                           existential);
     // Initialize the concrete value in-place.
     InitializationPtr init(
         new ExistentialInitialization(existential, valueAddr, concreteFormalType,

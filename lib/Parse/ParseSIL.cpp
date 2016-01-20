@@ -1246,6 +1246,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("pointer_to_thin_function", ValueKind::PointerToThinFunctionInst)
     .Case("project_block_storage", ValueKind::ProjectBlockStorageInst)
     .Case("project_box", ValueKind::ProjectBoxInst)
+    .Case("project_existential_box", ValueKind::ProjectExistentialBoxInst)
     .Case("project_value_buffer", ValueKind::ProjectValueBufferInst)
     .Case("existential_metatype", ValueKind::ExistentialMetatypeInst)
     .Case("raw_pointer_to_ref", ValueKind::RawPointerToRefInst)
@@ -1826,6 +1827,16 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (parseTypedValueRef(Val, B))
       return true;
     ResultVal = B.createProjectBox(InstLoc, Val);
+    break;
+  }
+      
+  case ValueKind::ProjectExistentialBoxInst: {
+    SILType Ty;
+    if (parseSILType(Ty) ||
+        parseVerbatim("in") ||
+        parseTypedValueRef(Val, B))
+      return true;
+    ResultVal = B.createProjectExistentialBox(InstLoc, Ty, Val);
     break;
   }
       
@@ -3290,22 +3301,13 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         parseASTType(ConcreteFormalTy))
       return true;
     
-    // Lower the type at the abstraction level of the existential.
-    auto archetype
-      = ArchetypeType::getOpened(ExistentialTy.getSwiftRValueType())
-        ->getCanonicalType();
-    
-    SILType LoweredTy = SILMod.Types.getLoweredType(
-                      Lowering::AbstractionPattern(archetype), ConcreteFormalTy)
-      .getAddressType();
-    
     // Collect conformances for the type.
     ArrayRef<ProtocolConformanceRef> conformances
       = collectExistentialConformances(P, ConcreteFormalTy,
                                        ExistentialTy.getSwiftRValueType());
     
     ResultVal = B.createAllocExistentialBox(InstLoc, ExistentialTy,
-                                    ConcreteFormalTy, LoweredTy, conformances);
+                                            ConcreteFormalTy, conformances);
     
     break;
   }

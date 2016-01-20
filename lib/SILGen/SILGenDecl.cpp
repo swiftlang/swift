@@ -252,8 +252,7 @@ public:
     // it using a box.
     AllocBoxInst *allocBox =
         SGF.B.createAllocBox(decl, lType, {decl->isLet(), ArgNo});
-    auto box = SILValue(allocBox, 0);
-    auto addr = SILValue(allocBox, 1);
+    SILValue addr = SGF.B.createProjectBox(decl, allocBox);
 
     // Mark the memory as uninitialized, so DI will track it for us.
     if (NeedsMarkUninit)
@@ -261,7 +260,7 @@ public:
 
     /// Remember that this is the memory location that we're emitting the
     /// decl to.
-    SGF.VarLocs[decl] = SILGenFunction::VarLoc::get(addr, box);
+    SGF.VarLocs[decl] = SILGenFunction::VarLoc::get(addr, allocBox);
 
     // Push a cleanup to destroy the local variable.  This has to be
     // inactive until the variable is initialized.
@@ -701,8 +700,8 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
       ->getCanonicalType();
   
   eltMV = SGF.emitOrigToSubstValue(loc, eltMV,
-                             AbstractionPattern(ElementDecl->getArgumentType()),
-                             substEltTy);
+                    SGF.SGM.M.Types.getAbstractionPattern(ElementDecl),
+                    substEltTy);
 
   // Pass the +1 value down into the sub initialization.
   subInit->copyOrInitValueInto(eltMV, /*is an init*/true, loc, SGF);
@@ -1547,34 +1546,6 @@ SILGenModule::getWitnessTable(ProtocolConformance *conformance) {
   return table;
 }
 
-/// FIXME: This should just be a call down to Types.getLoweredType(), but I
-/// really don't want to thread an old-type/interface-type pair through all
-/// of TypeLowering.
-static SILType
-getWitnessFunctionType(SILModule &M,
-                       AbstractionPattern origRequirementTy,
-                       CanAnyFunctionType witnessSubstTy,
-                       CanAnyFunctionType witnessSubstIfaceTy,
-                       unsigned uncurryLevel) {
-  // Lower the types to uncurry and get ExtInfo.
-  AbstractionPattern origLoweredTy = origRequirementTy;
-  if (auto origFTy = origRequirementTy.getAs<AnyFunctionType>())
-    origLoweredTy =
-      AbstractionPattern(M.Types.getLoweredASTFunctionType(origFTy,
-                                                           uncurryLevel,
-                                                           None));
-  auto witnessLoweredTy
-    = M.Types.getLoweredASTFunctionType(witnessSubstTy, uncurryLevel, None);
-  auto witnessLoweredIfaceTy
-    = M.Types.getLoweredASTFunctionType(witnessSubstIfaceTy, uncurryLevel, None);
-
-  // Convert to SILFunctionType.
-  auto fnTy = getNativeSILFunctionType(M, origLoweredTy,
-                                       witnessLoweredTy,
-                                       witnessLoweredIfaceTy);
-  return SILType::getPrimitiveObjectType(fnTy);
-}
-
 SILFunction *
 SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                                   SILLinkage linkage,
@@ -1582,53 +1553,8 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                                   SILDeclRef witness,
                                   IsFreeFunctionWitness_t isFree,
                                   ArrayRef<Substitution> witnessSubs) {
-  // Get the type of the protocol requirement and the original type of the
-  // witness.
-  // FIXME: Rework for interface types.
   auto requirementInfo = Types.getConstantInfo(requirement);
-  auto requirementTy
-    = cast<PolymorphicFunctionType>(requirementInfo.FormalType);
   unsigned witnessUncurryLevel = witness.uncurryLevel;
-
-  // Substitute the 'self' type into the requirement to get the concrete
-  // witness type.
-  auto witnessSubstTy = cast<AnyFunctionType>(
-    requirementTy
-      ->substGenericArgs(conformance->getDeclContext()->getParentModule(),
-                         conformance->getType())
-      ->getCanonicalType());
-
-  GenericParamList *conformanceParams = conformance->getGenericParams();
-
-  // If the requirement is generic, reparent its generic parameter list to
-  // the generic parameters of the conformance.
-  CanType methodTy = witnessSubstTy.getResult();
-  if (auto pft = dyn_cast<PolymorphicFunctionType>(methodTy)) {
-    auto &reqtParams = pft->getGenericParams();
-    // Preserve the depth of generic arguments by adding an empty outer generic
-    // param list if the conformance is concrete.
-    GenericParamList *outerParams = conformanceParams;
-    if (!outerParams)
-      outerParams = GenericParamList::getEmpty(getASTContext());
-    auto methodParams
-      = reqtParams.cloneWithOuterParameters(getASTContext(), outerParams);
-    methodTy = CanPolymorphicFunctionType::get(pft.getInput(), pft.getResult(),
-                                               methodParams,
-                                               pft->getExtInfo());
-  }
-
-  // If the conformance is generic, its generic parameters apply to
-  // the witness as its outer generic param list.
-  if (conformanceParams) {
-    witnessSubstTy = CanPolymorphicFunctionType::get(witnessSubstTy.getInput(),
-                                                   methodTy,
-                                                   conformanceParams,
-                                                   witnessSubstTy->getExtInfo());
-  } else {
-    witnessSubstTy = CanFunctionType::get(witnessSubstTy.getInput(),
-                                          methodTy,
-                                          witnessSubstTy->getExtInfo());
-  }
 
   // If the witness is a free function, consider the self argument
   // uncurry level.
@@ -1642,8 +1568,8 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
 
   // Work out the interface type for the witness.
   auto reqtIfaceTy
-    = cast<GenericFunctionType>(requirementInfo.FormalInterfaceType);
-  // Substitute the 'self' type into the requirement to get the concrete witness
+    = cast<GenericFunctionType>(requirementInfo.LoweredInterfaceType);
+  // Substitute the 'Self' type into the requirement to get the concrete witness
   // type, leaving the other generic parameters open.
   CanAnyFunctionType witnessSubstIfaceTy = cast<AnyFunctionType>(
     reqtIfaceTy->partialSubstGenericArgs(conformance->getDeclContext()->getParentModule(),
@@ -1651,8 +1577,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                ->getCanonicalType());
 
   // If the conformance is generic, its generic parameters apply to the witness.
-  GenericSignature *sig
-    = conformance->getGenericSignature();
+  GenericSignature *sig = conformance->getGenericSignature();
   if (sig) {
     if (auto gft = dyn_cast<GenericFunctionType>(witnessSubstIfaceTy)) {
       SmallVector<GenericTypeParamType*, 4> allParams(sig->getGenericParams().begin(),
@@ -1663,36 +1588,21 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                                            sig->getRequirements().end());
       allReqts.append(gft->getRequirements().begin(),
                       gft->getRequirements().end());
-      GenericSignature *witnessSig = GenericSignature::get(allParams, allReqts);
-
-      witnessSubstIfaceTy = cast<GenericFunctionType>(
-        GenericFunctionType::get(witnessSig,
-                                 gft.getInput(), gft.getResult(),
-                                 gft->getExtInfo())
-          ->getCanonicalType());
-    } else {
-      assert(isa<FunctionType>(witnessSubstIfaceTy));
-      witnessSubstIfaceTy = cast<GenericFunctionType>(
-        GenericFunctionType::get(sig,
-                                 witnessSubstIfaceTy.getInput(),
-                                 witnessSubstIfaceTy.getResult(),
-                                 witnessSubstIfaceTy->getExtInfo())
-          ->getCanonicalType());
+      sig = GenericSignature::get(allParams, allReqts);
     }
-  }
-  // Lower the witness type with the requirement's abstraction level.
-  // FIXME: We should go through TypeConverter::getLoweredType once we settle
-  // on interface types.
 
-  // SILType witnessSILType = Types.getLoweredType(
-  //                                          AbstractionPattern(requirementTy),
-  //                                          witnessSubstTy,
-  //                                          requirement.uncurryLevel);
-  SILType witnessSILType = getWitnessFunctionType(M,
-                                              AbstractionPattern(requirementTy),
-                                              witnessSubstTy,
-                                              witnessSubstIfaceTy,
-                                              requirement.uncurryLevel);
+    witnessSubstIfaceTy = cast<GenericFunctionType>(
+      GenericFunctionType::get(sig,
+                               witnessSubstIfaceTy.getInput(),
+                               witnessSubstIfaceTy.getResult(),
+                               witnessSubstIfaceTy->getExtInfo())
+        ->getCanonicalType());
+  }
+
+  // Lower the witness type with the requirement's abstraction level.
+  auto witnessSILFnType = getNativeSILFunctionType(M,
+                                                   AbstractionPattern(reqtIfaceTy),
+                                                   witnessSubstIfaceTy);
 
   // Mangle the name of the witness thunk.
   std::string nameBuffer;
@@ -1715,18 +1625,18 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   }
 
   // Collect the context generic parameters for the witness.
-  GenericParamList *witnessContextParams = conformanceParams;
+  GenericParamList *witnessContextParams = conformance->getGenericParams();
   // If the requirement is generic, reparent its parameters to the conformance
   // parameters.
   if (auto reqtParams = requirementInfo.InnerGenericParams) {
     // Preserve the depth of generic arguments by adding an empty outer generic
     // param list if the conformance is concrete.
-    GenericParamList *outerParams = conformanceParams;
-    if (!outerParams)
-      outerParams = GenericParamList::getEmpty(getASTContext());
+    if (!witnessContextParams)
+      witnessContextParams = GenericParamList::getEmpty(getASTContext());
 
     witnessContextParams
-      = reqtParams->cloneWithOuterParameters(getASTContext(), outerParams);
+      = reqtParams->cloneWithOuterParameters(getASTContext(),
+                                             witnessContextParams);
   }
 
   // If the thunked-to function is set to be always inlined, do the
@@ -1740,7 +1650,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     InlineStrategy = AlwaysInline;
 
   auto *f = M.getOrCreateFunction(
-      linkage, nameBuffer, witnessSILType.castTo<SILFunctionType>(),
+      linkage, nameBuffer, witnessSILFnType,
       witnessContextParams, SILLocation(witness.getDecl()), IsNotBare,
       IsTransparent, makeModuleFragile ? IsFragile : IsNotFragile, IsThunk,
       SILFunction::NotRelevant, InlineStrategy);

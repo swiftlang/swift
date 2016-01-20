@@ -493,7 +493,8 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
                                        ResultValues[0]->getType());
     }
 
-    return TypeExpr::createForDecl(Loc, cast<TypeDecl>(ResultValues[0]));
+    return TypeExpr::createForDecl(Loc, cast<TypeDecl>(ResultValues[0]),
+                                   UDRE->isImplicit());
   }
   
   if (AllDeclRefs) {
@@ -555,7 +556,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   if (AllMemberRefs) {
     Expr *BaseExpr;
     if (auto NTD = dyn_cast<NominalTypeDecl>(Base)) {
-      BaseExpr = TypeExpr::createForDecl(Loc, NTD);
+      BaseExpr = TypeExpr::createForDecl(Loc, NTD, /*implicit=*/true);
     } else {
       BaseExpr = new (Context) DeclRefExpr(Base, Loc, /*implicit=*/true);
     }
@@ -852,17 +853,20 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     if (!TyExpr) return nullptr;
     
     auto *InnerTypeRepr = TyExpr->getTypeRepr();
-    assert(!TyExpr->isImplicit() && InnerTypeRepr &&
-           "This doesn't work on implicit TypeExpr's, "
-           "the TypeExpr should have been built correctly in the first place");
 
     if (MRE->getName() == TC.Context.Id_Protocol) {
+      assert(!TyExpr->isImplicit() && InnerTypeRepr &&
+             "This doesn't work on implicit TypeExpr's, "
+             "TypeExpr should have been built correctly in the first place");
       auto *NewTypeRepr =
         new (TC.Context) ProtocolTypeRepr(InnerTypeRepr, MRE->getNameLoc());
       return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
     }
     
     if (MRE->getName() == TC.Context.Id_Type) {
+      assert(!TyExpr->isImplicit() && InnerTypeRepr &&
+             "This doesn't work on implicit TypeExpr's, "
+             "TypeExpr should have been built correctly in the first place");
       auto *NewTypeRepr =
         new (TC.Context) MetatypeTypeRepr(InnerTypeRepr, MRE->getNameLoc());
       return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));

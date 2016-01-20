@@ -195,7 +195,8 @@ class Hoozit : Gizmo {
   // Constructor.
   // CHECK-LABEL: sil hidden @_TFC11objc_thunks6Hoozitc{{.*}} : $@convention(method) (Int, @owned Hoozit) -> @owned Hoozit {
   // CHECK: [[SELF_BOX:%[0-9]+]] = alloc_box $Hoozit
-  // CHECK: [[SELFMUI:%[0-9]+]] = mark_uninitialized [derivedself] [[SELF_BOX]]#1
+  // CHECK: [[PB:%.*]] = project_box [[SELF_BOX]]
+  // CHECK: [[SELFMUI:%[0-9]+]] = mark_uninitialized [derivedself] [[PB]]
   // CHECK: [[GIZMO:%[0-9]+]] = upcast [[SELF:%[0-9]+]] : $Hoozit to $Gizmo
   // CHECK: [[SUPERMETHOD:%[0-9]+]] = super_method [volatile] [[SELF]] : $Hoozit, #Gizmo.init!initializer.1.foreign : Gizmo.Type -> (bellsOn: Int) -> Gizmo! , $@convention(objc_method) (Int, @owned Gizmo) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
   // CHECK-NEXT: [[SELF_REPLACED:%[0-9]+]] = apply [[SUPERMETHOD]](%0, [[X:%[0-9]+]]) : $@convention(objc_method) (Int, @owned Gizmo) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
@@ -286,7 +287,8 @@ extension Hoozit {
   // CHECK-LABEL: sil hidden @_TFC11objc_thunks6Hoozitc{{.*}} : $@convention(method) (Double, @owned Hoozit) -> @owned Hoozit
   convenience init(double d: Double) { 
     // CHECK: [[SELF_BOX:%[0-9]+]] = alloc_box $Hoozit
-    // CHECK: [[SELFMUI:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1
+    // CHECK: [[PB:%.*]] = project_box [[SELF_BOX]]
+    // CHECK: [[SELFMUI:%[0-9]+]] = mark_uninitialized [delegatingself] [[PB]]
     // CHECK: [[X_BOX:%[0-9]+]] = alloc_box $X
     var x = X()
     // CHECK: [[CTOR:%[0-9]+]] = class_method [volatile] [[SELF:%[0-9]+]] : $Hoozit, #Hoozit.init!initializer.1.foreign : Hoozit.Type -> (int: Int) -> Hoozit , $@convention(objc_method) (Int, @owned Hoozit) -> @owned Hoozit
@@ -295,13 +297,13 @@ extension Hoozit {
     // CHECK: [[NONNULL:%[0-9]+]] = is_nonnull [[NEW_SELF]] : $Hoozit
     // CHECK-NEXT: cond_br [[NONNULL]], [[NONNULL_BB:bb[0-9]+]], [[NULL_BB:bb[0-9]+]]
     // CHECK: [[NULL_BB]]:
-    // CHECK-NEXT: strong_release [[X_BOX]]#0 : $@box X
+    // CHECK-NEXT: strong_release [[X_BOX]] : $@box X
     // CHECK-NEXT: br [[EPILOG_BB:bb[0-9]+]]
 
     // CHECK: [[NONNULL_BB]]:
     // CHECK:   [[OTHER_REF:%[0-9]+]] = function_ref @_TF11objc_thunks5otherFT_T_ : $@convention(thin) () -> ()
     // CHECK-NEXT: apply [[OTHER_REF]]() : $@convention(thin) () -> ()
-    // CHECK-NEXT: strong_release [[X_BOX]]#0 : $@box X
+    // CHECK-NEXT: strong_release [[X_BOX]] : $@box X
     // CHECK-NEXT: br [[EPILOG_BB]]
     
     // CHECK: [[EPILOG_BB]]:

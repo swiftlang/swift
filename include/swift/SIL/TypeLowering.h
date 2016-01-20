@@ -442,13 +442,15 @@ class TypeConverter {
   };
 
   struct CachingTypeKey {
+    GenericSignature *Sig;
     AbstractionPattern::CachingKey OrigType;
     CanType SubstType;
     unsigned UncurryLevel;
 
     friend bool operator==(const CachingTypeKey &lhs,
                            const CachingTypeKey &rhs) {
-      return lhs.OrigType == rhs.OrigType
+      return lhs.Sig == rhs.Sig
+          && lhs.OrigType == rhs.OrigType
           && lhs.SubstType == rhs.SubstType
           && lhs.UncurryLevel == rhs.UncurryLevel;
     }
@@ -471,7 +473,12 @@ class TypeConverter {
 
     CachingTypeKey getCachingKey() const {
       assert(isCacheable());
-      return { OrigType.getCachingKey(), SubstType, UncurryLevel };
+      return { (OrigType.hasGenericSignature()
+                   ? OrigType.getGenericSignature()
+                   : nullptr),
+               OrigType.getCachingKey(),
+               SubstType,
+               UncurryLevel };
     }
 
     bool isCacheable() const {
@@ -480,9 +487,6 @@ class TypeConverter {
     
     IsDependent_t isDependent() const {
       if (SubstType->hasTypeParameter())
-        return IsDependent;
-      if (!OrigType.isTypeParameter() &&
-          OrigType.getType()->hasTypeParameter())
         return IsDependent;
       return IsNotDependent;
     }
@@ -700,7 +704,6 @@ public:
   /// given substituted type.
   CanSILFunctionType substFunctionType(CanSILFunctionType origFnType,
                                  CanAnyFunctionType origLoweredType,
-                                 CanAnyFunctionType substLoweredType,
                                  CanAnyFunctionType substLoweredInterfaceType,
                          const Optional<ForeignErrorConvention> &foreignError);
   
@@ -890,17 +893,19 @@ namespace llvm {
 
     // Use the second field because the first field can validly be null.
     static CachingTypeKey getEmptyKey() {
-      return {APCachingKey(), CanTypeInfo::getEmptyKey(), 0};
+      return {nullptr, APCachingKey(), CanTypeInfo::getEmptyKey(), 0};
     }
     static CachingTypeKey getTombstoneKey() {
-      return {APCachingKey(), CanTypeInfo::getTombstoneKey(), 0};
+      return {nullptr, APCachingKey(), CanTypeInfo::getTombstoneKey(), 0};
     }
     static unsigned getHashValue(CachingTypeKey val) {
+      auto hashSig =
+        DenseMapInfo<swift::GenericSignature *>::getHashValue(val.Sig);
       auto hashOrig =
         CachingKeyInfo::getHashValue(val.OrigType);
       auto hashSubst =
         DenseMapInfo<swift::CanType>::getHashValue(val.SubstType);
-      return hash_combine(hashOrig, hashSubst, val.UncurryLevel);
+      return hash_combine(hashSig, hashOrig, hashSubst, val.UncurryLevel);
     }
     static bool isEqual(CachingTypeKey LHS, CachingTypeKey RHS) {
       return LHS == RHS;

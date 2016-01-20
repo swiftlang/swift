@@ -46,6 +46,7 @@ function(add_sourcekit_symbol_exports target_name export_file)
   
     set_property(TARGET ${target_name} APPEND_STRING PROPERTY
                  LINK_FLAGS " -Wl,-exported_symbols_list,${CMAKE_CURRENT_BINARY_DIR}/symbol.exports")
+
     add_dependencies(${target_name} ${target_name}_exports)
   endif()
 endfunction()
@@ -63,17 +64,20 @@ function(add_sourcekit_default_compiler_flags target)
   # Add variant-specific flags.
   set(build_type "${CMAKE_BUILD_TYPE}")
   set(enable_assertions "${LLVM_ENABLE_ASSERTIONS}")
+  set(analyze_code_coverage "${SWIFT_ANALYZE_CODE_COVERAGE}")
   _add_variant_c_compile_flags(
       "${sdk}"
       "${arch}"
       "${build_type}"
       "${enable_assertions}"
+      "${analyze_code_coverage}"
       c_compile_flags)
   _add_variant_link_flags(
       "${sdk}"
       "${arch}"
       "${build_type}"
       "${enable_assertions}"
+      "${analyze_code_coverage}"
       link_flags)
 
   # Convert variables to space-separated strings.
@@ -234,6 +238,11 @@ macro(add_sourcekit_executable name)
       set_target_properties(${name}
         PROPERTIES
         LINK_FLAGS "-Wl,-exported_symbol,_main")
+
+      if(SWIFT_ANALYZE_CODE_COVERAGE)
+        set_property(TARGET "${name}" APPEND_STRING PROPERTY
+            LINK_FLAGS " -fprofile-instr-generate=swift-%p.profraw -fcoverage-mapping")
+      endif()
     endif()
   endif()
   add_sourcekit_default_compiler_flags("${name}")

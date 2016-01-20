@@ -25,41 +25,6 @@ static bool isUnresolvedOrTypeVarType(Type ty) {
   return ty->is<TypeVariableType>() || ty->is<UnresolvedType>();
 }
 
-void Failure::dump(SourceManager *sm) const {
-  dump(sm, llvm::errs());
-}
-
-void Failure::dump(SourceManager *sm, raw_ostream &out) const {
-  out << "(";
-  if (locator) {
-    out << "@";
-    locator->dump(sm, out);
-    out << ": ";
-  }
-
-  switch (getKind()) {
-  case IsNotBridgedToObjectiveC:
-    out << getFirstType().getString() << "is not bridged to Objective-C";
-    break;
-
-  case IsForbiddenLValue:
-    out << "disallowed l-value binding of " << getFirstType().getString()
-        << " and " << getSecondType().getString();
-    break;
-
-  case NoPublicInitializers:
-    out << getFirstType().getString()
-        << " does not have any public initializers";
-    break;
-
-  case IsNotMaterializable:
-    out << getFirstType().getString() << " is not materializable";
-    break;
-  }
-
-  out << ")\n";
-}
-
 /// Given a subpath of an old locator, compute its summary flags.
 static unsigned recomputeSummaryFlags(ConstraintLocator *oldLocator,
                                       ArrayRef<LocatorPathElt> path) {
@@ -489,7 +454,6 @@ ResolvedLocator constraints::resolveLocatorToDecl(
 /// Emit a note referring to the target of a diagnostic, e.g., the function
 /// or parameter being used.
 static void noteTargetOfDiagnostic(ConstraintSystem &cs,
-                                   const Failure *failure,
                                    ConstraintLocator *targetLocator) {
   // If there's no anchor, there's nothing we can do.
   if (!targetLocator->getAnchor())
@@ -499,20 +463,9 @@ static void noteTargetOfDiagnostic(ConstraintSystem &cs,
   auto resolved
     = resolveLocatorToDecl(cs, targetLocator,
         [&](ConstraintLocator *locator) -> Optional<SelectedOverload> {
-          if (!failure) return None;
-          for (auto resolved = failure->getResolvedOverloadSets();
-               resolved; resolved = resolved->Previous) {
-            if (resolved->Locator == locator)
-              return SelectedOverload{resolved->Choice,
-                                      resolved->OpenedFullType,
-                                      // FIXME: opened type?
-                                      Type()};
-          }
-
           return None;
         },
-        [&](ValueDecl *decl,
-            Type openedType) -> ConcreteDeclRef {
+        [&](ValueDecl *decl, Type openedType) -> ConcreteDeclRef {
           return decl;
         });
 
@@ -546,73 +499,6 @@ static void noteTargetOfDiagnostic(ConstraintSystem &cs,
                                  resolved.getDecl().getDecl()->getName());
     return;
   }
-}
-
-/// \brief Emit a diagnostic for the given failure.
-///
-/// \param cs The constraint system in which the diagnostic was generated.
-/// \param failure The failure to emit.
-/// \param expr The expression associated with the failure.
-/// \param useExprLoc If the failure lacks a location, use the one associated
-/// with expr.
-///
-/// \returns true if the diagnostic was emitted successfully.
-static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure,
-                            Expr *expr, bool useExprLoc) {
-  ConstraintLocator *cloc;
-  if (!failure.getLocator() || !failure.getLocator()->getAnchor()) {
-    if (useExprLoc)
-      cloc = cs.getConstraintLocator(expr);
-    else
-      return false;
-  } else {
-    cloc = failure.getLocator();
-  }
-  
-  SourceRange range;
-
-  ConstraintLocator *targetLocator;
-  auto locator = simplifyLocator(cs, cloc, range, &targetLocator);
-  auto &tc = cs.getTypeChecker();
-
-  auto anchor = locator->getAnchor();
-  auto loc = anchor->getLoc();
-  switch (failure.getKind()) {
-  case Failure::IsNotBridgedToObjectiveC:
-    tc.diagnose(loc, diag::type_not_bridged, failure.getFirstType());
-    if (targetLocator)
-      noteTargetOfDiagnostic(cs, &failure, targetLocator);
-    break;
-
-  case Failure::IsForbiddenLValue:
-    // FIXME: Probably better handled by InOutExpr later.
-    if (auto iotTy = failure.getSecondType()->getAs<InOutType>()) {
-      tc.diagnose(loc, diag::reference_non_inout, iotTy->getObjectType())
-        .highlight(range);
-      return true;
-    }
-    // FIXME: diagnose other cases
-    return false;
-    
-  case Failure::NoPublicInitializers: {
-    tc.diagnose(loc, diag::no_accessible_initializers, failure.getFirstType())
-      .highlight(range);
-    if (targetLocator && !useExprLoc)
-      noteTargetOfDiagnostic(cs, &failure, targetLocator);
-    break;
-  }
-
-  case Failure::IsNotMaterializable: {
-    tc.diagnose(loc, diag::cannot_bind_generic_parameter_to_type,
-                failure.getFirstType())
-      .highlight(range);
-    if (!useExprLoc)
-      noteTargetOfDiagnostic(cs, &failure, locator);
-    break;
-  }
-  }
-
-  return true;
 }
 
 /// \brief Determine the number of distinct overload choices in the
@@ -992,6 +878,7 @@ namespace {
   enum CandidateCloseness {
     CC_ExactMatch,              ///< This is a perfect match for the arguments.
     CC_Unavailable,             ///< Marked unavailable with @available.
+    CC_Inaccessible,            ///< Not accessible from the current context.
     CC_NonLValueInOut,          ///< First arg is inout but no lvalue present.
     CC_SelfMismatch,            ///< Self argument mismatches.
     CC_OneArgumentNearMismatch, ///< All arguments except one match, near miss.
@@ -1157,6 +1044,11 @@ namespace {
     /// argument labels don't match up, diagnose that error and return true.
     bool diagnoseAnyStructuralArgumentError(Expr *fnExpr, Expr *argExpr);
     
+    /// Emit a diagnostic and return true if this is an error condition we can
+    /// handle uniformly.  This should be called after filtering the candidate
+    /// list.
+    bool diagnoseSimpleErrors(SourceLoc loc);
+    
     void dump() const LLVM_ATTRIBUTE_USED;
     
   private:
@@ -1198,6 +1090,19 @@ void CalleeCandidateInfo::filterList(ClosenessPredicate predicate) {
         decl.decl->getAttrs().isUnavailable(CS->getASTContext()) &&
         !CS->TC.getLangOpts().DisableAvailabilityChecking)
       declCloseness.first = CC_Unavailable;
+    
+    // Likewise, if the candidate is inaccessible from the scope it is being
+    // accessed from, mark it as inaccessible or a general mismatch.
+    if (!decl.decl->isAccessibleFrom(CS->DC)) {
+      // If this was an exact match, downgrade it to inaccessible, so that
+      // accessible decls that are also an exact match will take precedence.
+      // Otherwise consider it to be a general mismatch so we only list it in
+      // an overload set as a last resort.
+      if (declCloseness.first == CC_ExactMatch)
+        declCloseness.first = CC_Inaccessible;
+      else
+        declCloseness.first = CC_GeneralMismatch;
+    }
     
     closenessList.push_back(declCloseness);
     closeness = std::min(closeness, closenessList.back().first);
@@ -1393,11 +1298,12 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
 
   if (auto TE = dyn_cast<TypeExpr>(fn)) {
     // It's always a metatype type, so use the instance type name.
-    auto instanceType =TE->getType()->castTo<MetatypeType>()->getInstanceType();
+    auto instanceType =TE->getInstanceType();
     
     // TODO: figure out right value for isKnownPrivate
     if (!instanceType->getAs<TupleType>()) {
-      auto ctors = CS->TC.lookupConstructors(CS->DC, instanceType);
+      auto ctors = CS->TC.lookupConstructors(CS->DC, instanceType,
+                                       NameLookupFlags::IgnoreAccessibility);
       for (auto ctor : ctors)
         if (ctor->hasType())
           candidates.push_back({ ctor, 1 });
@@ -1658,9 +1564,23 @@ suggestPotentialOverloads(SourceLoc loc, bool isResult) {
 /// labels don't match up, diagnose that error and return true.
 bool CalleeCandidateInfo::diagnoseAnyStructuralArgumentError(Expr *fnExpr,
                                                              Expr *argExpr) {
+  // If we are invoking a constructor and there are absolutely no candidates,
+  // then they must all be private.
+  if (auto *MTT = fnExpr->getType()->getAs<MetatypeType>()) {
+    if (!MTT->getInstanceType()->is<TupleType>() &&
+        (size() == 0 ||
+         (size() == 1 && isa<ProtocolDecl>(candidates[0].decl)))) {
+      CS->TC.diagnose(fnExpr->getLoc(), diag::no_accessible_initializers,
+                      MTT->getInstanceType());
+      return true;
+    }
+  }
+  
+  
   // TODO: We only handle the situation where there is exactly one candidate
   // here.
-  if (size() != 1) return false;
+  if (size() != 1)
+    return false;
   
   
   auto args = decomposeArgParamType(argExpr->getType());
@@ -1686,6 +1606,23 @@ bool CalleeCandidateInfo::diagnoseAnyStructuralArgumentError(Expr *fnExpr,
     if (auto UDE = dyn_cast<UnresolvedDotExpr>(fnExpr))
       if (isa<TypeExpr>(UDE->getBase())) {
         auto baseType = candidates[0].getArgumentType();
+        
+        // If the base is an implicit self type reference, and we're in a
+        // property initializer, then the user wrote something like:
+        //
+        //   class Foo { let val = initFn() }
+        //
+        // which runs in type context, not instance context.  Produce a tailored
+        // diagnostic since this comes up and is otherwise non-obvious what is
+        // going on.
+        if (UDE->getBase()->isImplicit() && isa<Initializer>(CS->DC) &&
+            CS->DC->getParent()->getDeclaredTypeOfContext()->isEqual(baseType)){
+          CS->TC.diagnose(UDE->getLoc(), diag::instance_member_in_initializer,
+                          UDE->getName());
+          return true;
+        }
+        
+        // Otherwise, complain about use of instance value on type.
         CS->TC.diagnose(UDE->getLoc(), diag::instance_member_use_on_type,
                         baseType, UDE->getName())
           .highlight(UDE->getBase()->getSourceRange());
@@ -1812,7 +1749,35 @@ bool CalleeCandidateInfo::diagnoseAnyStructuralArgumentError(Expr *fnExpr,
   return false;
 }
 
+/// Emit a diagnostic and return true if this is an error condition we can
+/// handle uniformly.  This should be called after filtering the candidate
+/// list.
+bool CalleeCandidateInfo::diagnoseSimpleErrors(SourceLoc loc) {
+  // Handle symbols marked as explicitly unavailable.
+  if (closeness == CC_Unavailable)
+    return CS->TC.diagnoseExplicitUnavailability(candidates[0].decl, loc,
+                                                 CS->DC);
 
+  // Handle symbols that are matches, but are not accessible from the current
+  // scope.
+  if (closeness == CC_Inaccessible) {
+    auto decl = candidates[0].decl;
+    if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
+      CS->TC.diagnose(loc, diag::init_candidate_inaccessible,
+                      CD->getResultType(), decl->getFormalAccess());
+     
+    } else {
+      CS->TC.diagnose(loc, diag::candidate_inaccessible, decl->getName(),
+                      decl->getFormalAccess());
+    }
+    for (auto cand : candidates)
+      CS->TC.diagnose(cand.decl, diag::decl_declared_here, decl->getName());
+    
+    return true;
+  }
+
+  return false;
+}
 
 
 
@@ -3585,13 +3550,10 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
 
     return true;
   }
-  
-  if (calleeInfo.closeness == CC_Unavailable) {
-    if (CS->TC.diagnoseExplicitUnavailability(calleeInfo[0].decl,
-                                              SE->getLoc(), CS->DC))
-      return true;
-    return false;
-  }
+
+  // Diagnose some simple and common errors.
+  if (calleeInfo.diagnoseSimpleErrors(SE->getLoc()))
+    return true;
 
   // If the closest matches all mismatch on self, we either have something that
   // cannot be subscripted, or an ambiguity.
@@ -3792,10 +3754,10 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   }
       
   
-  // Handle uses of unavailable symbols.
-  if (calleeInfo.closeness == CC_Unavailable)
-    return CS->TC.diagnoseExplicitUnavailability(calleeInfo[0].decl,
-                                                 callExpr->getLoc(), CS->DC);
+  // Diagnose some simple and common errors.
+  if (calleeInfo.diagnoseSimpleErrors(callExpr->getLoc()))
+    return true;
+  
   
   // A common error is to apply an operator that only has inout forms (e.g. +=)
   // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
@@ -4702,8 +4664,9 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
   }
 
   case CC_Unavailable:
-    if (CS->TC.diagnoseExplicitUnavailability(candidateInfo[0].decl,
-                                              E->getLoc(), CS->DC))
+  case CC_Inaccessible:
+    // Diagnose some simple and common errors.
+    if (candidateInfo.diagnoseSimpleErrors(E->getLoc()))
       return true;
     return false;
       
@@ -4936,14 +4899,6 @@ void ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
   if (diagnosis.diagnoseConstraintFailure())
     return;
 
-  // If the expression-order diagnostics didn't find any diagnosable problems,
-  // try the unavoidable failures list again, with locator substitutions in
-  // place.  To make sure we emit the error if we have a failure recorded.
-  for (auto failure : unavoidableFailures) {
-    if (diagnoseFailure(*this, *failure, expr, true))
-      return;
-  }
-
   // If no one could find a problem with this expression or constraint system,
   // then it must be well-formed... but is ambiguous.  Handle this by diagnosic
   // various cases that come up.
@@ -4970,7 +4925,7 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
       diagnose(expr->getLoc(), diag::unbound_generic_parameter, archetype);
       
       // Emit a "note, archetype declared here" sort of thing.
-      noteTargetOfDiagnostic(*CS, nullptr, tv->getImpl().getLocator());
+      noteTargetOfDiagnostic(*CS, tv->getImpl().getLocator());
       return;
     }
     continue;
@@ -5037,23 +4992,17 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
 }
 
 bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
-  // If there were any unavoidable failures, emit the first one we can.
-  if (!unavoidableFailures.empty()) {
-    for (auto failure : unavoidableFailures) {
-      if (diagnoseFailure(*this, *failure, expr, false))
-        return true;
-    }
-  }
+  // Attempt to solve again, capturing all states that come from our attempts to
+  // select overloads or bind type variables.
+  //
+  // FIXME: can this be removed?  We need to arrange for recordFixes to be
+  // eliminated.
+  viable.clear();
 
-  // There were no unavoidable failures, so attempt to solve again, capturing
-  // any failures that come from our attempts to select overloads or bind
-  // type variables.
   {
-    viable.clear();
-
     // Set up solver state.
     SolverState state(*this);
-    state.recordFailures = true;
+    state.recordFixes = true;
     this->solverState = &state;
 
     // Solve the system.

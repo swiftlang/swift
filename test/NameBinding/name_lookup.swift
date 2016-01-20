@@ -477,3 +477,11 @@ struct MyStruct {
   func foo() { mod() } // expected-error {{cannot use mutating member on immutable value: 'self' is immutable}}
 }
 
+
+// <rdar://problem/19935319> QoI: poor diagnostic initializing a variable with a non-class func
+class Test19935319 {
+  let i = getFoo()  // expected-error {{cannot use instance member 'getFoo' within property initializer; property initializers run before 'self' is available}}
+  
+  func getFoo() -> Int {}
+}
+

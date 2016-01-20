@@ -2478,13 +2478,14 @@ bb2(%16 : $ErrorProtocol):
 
 // CHECK-LABEL: @simplified_branch_arg_has_result_value_1
 // CHECK: [[B:%[0-9]+]] = alloc_box
-// CHECK: br bb1([[B]]#1 : $*Builtin.Int32)
+// CHECK: [[PB:%[0-9]+]] = project_box [[B]]
+// CHECK: br bb1([[PB]] : $*Builtin.Int32)
 sil @simplified_branch_arg_has_result_value_1 : $@convention(thin) (@in Builtin.Int32) -> Builtin.Int32 {
 entry(%0 : $*Builtin.Int32):
   %b = alloc_box $Builtin.Int32
+  %p = project_box %b : $@box Builtin.Int32
   %i = integer_literal $Builtin.Int32, 0
-  store %i to %b#1 : $*Builtin.Int32
-  %p = project_box %b#0 : $@box Builtin.Int32
+  store %i to %p : $*Builtin.Int32
   br bb1(%p : $*Builtin.Int32)
 
 bb1(%a : $*Builtin.Int32):

@@ -220,9 +220,30 @@ using api_notes::FactoryAsInitKind;
 
 /// \brief Implementation of the Clang importer.
 class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation 
-  : public LazyMemberLoader, public clang::ModuleFileExtension
+  : public LazyMemberLoader
 {
   friend class ClangImporter;
+
+  class SwiftNameLookupExtension : public clang::ModuleFileExtension {
+    Implementation &Impl;
+
+  public:
+    SwiftNameLookupExtension(Implementation &impl) : Impl(impl) { }
+
+    clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
+    llvm::hash_code hashExtension(llvm::hash_code code) const override;
+
+    std::unique_ptr<clang::ModuleFileExtensionWriter>
+    createExtensionWriter(clang::ASTWriter &writer) override;
+
+    std::unique_ptr<clang::ModuleFileExtensionReader>
+    createExtensionReader(const clang::ModuleFileExtensionMetadata &metadata,
+                          clang::ASTReader &reader,
+                          clang::serialization::ModuleFile &mod,
+                          const llvm::BitstreamCursor &stream) override;
+
+  };
+  friend class SwiftNameLookupExtension;
 
 public:
   /// \brief Describes how a particular C enumeration type will be imported
@@ -261,6 +282,16 @@ public:
     "<bridging-header-import>";
 
 private:
+  /// The Swift lookup table for the bridging header.
+  SwiftLookupTable BridgingHeaderLookupTable;
+
+  /// The Swift lookup tables, per module.
+  ///
+  /// Annoyingly, we list this table early so that it gets torn down after
+  /// the underlying Clang instances that reference it
+  /// (through the Swift name lookup module file extension).
+  llvm::StringMap<std::unique_ptr<SwiftLookupTable>> LookupTables;
+
   /// \brief A count of the number of load module operations.
   /// FIXME: Horrible, horrible hack for \c loadModule().
   unsigned ImportCounter = 0;
@@ -291,12 +322,6 @@ private:
   /// The flag is \c true if there has ever been a type resolver assigned, i.e.
   /// if type checking has begun.
   llvm::PointerIntPair<LazyResolver *, 1, bool> typeResolver;
-
-  /// The Swift lookup table for the bridging header.
-  SwiftLookupTable BridgingHeaderLookupTable;
-
-  /// The Swift lookup tables, per module.
-  llvm::StringMap<std::unique_ptr<SwiftLookupTable>> LookupTables;
 
 public:
   /// \brief Mapping of already-imported declarations.
@@ -1278,20 +1303,6 @@ public:
       ASD->setSetterAccessibility(Accessibility::Public);
     return D;
   }
-
-  // Module file extension overrides
-
-  clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
-  llvm::hash_code hashExtension(llvm::hash_code code) const override;
-
-  std::unique_ptr<clang::ModuleFileExtensionWriter>
-  createExtensionWriter(clang::ASTWriter &writer) override;
-
-  std::unique_ptr<clang::ModuleFileExtensionReader>
-  createExtensionReader(const clang::ModuleFileExtensionMetadata &metadata,
-                        clang::ASTReader &reader,
-                        clang::serialization::ModuleFile &mod,
-                        const llvm::BitstreamCursor &stream) override;
 
   /// Find the lookup table that corresponds to the given Clang module.
   ///

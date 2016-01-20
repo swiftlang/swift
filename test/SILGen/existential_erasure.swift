@@ -100,15 +100,16 @@ func errorHandler(e: ErrorProtocol) throws -> ErrorProtocol {
 // CHECK:  debug_value %0 : $ErrorProtocol
 // CHECK:  [[OPEN:%.*]] = open_existential_box %0 : $ErrorProtocol to $*[[OPEN_TYPE:@opened\(.*\) ErrorProtocol]]
 // CHECK:  [[RESULT:%.*]] = alloc_existential_box $ErrorProtocol, $[[OPEN_TYPE]]
+// CHECK:  [[ADDR:%.*]] = project_existential_box $[[OPEN_TYPE]] in [[RESULT]] : $ErrorProtocol
 // CHECK:  [[FUNC:%.*]] = function_ref @_TFE19existential_erasurePs13ErrorProtocol17returnOrThrowSelf
-// CHECK:  try_apply [[FUNC]]<[[OPEN_TYPE]]>([[RESULT]]#1, [[OPEN]])
+// CHECK:  try_apply [[FUNC]]<[[OPEN_TYPE]]>([[ADDR]], [[OPEN]])
 //
 // CHECK: bb1
 // CHECK:  strong_release %0 : $ErrorProtocol
-// CHECK:  return [[RESULT]]#0 : $ErrorProtocol
+// CHECK:  return [[RESULT]] : $ErrorProtocol
 //
 // CHECK: bb2([[FAILURE:%.*]] : $ErrorProtocol):
-// CHECK:  dealloc_existential_box [[RESULT]]#0
+// CHECK:  dealloc_existential_box [[RESULT]]
 // CHECK:  strong_release %0 : $ErrorProtocol
 // CHECK:  throw [[FAILURE]] : $ErrorProtocol
 //

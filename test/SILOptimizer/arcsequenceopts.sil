@@ -342,6 +342,7 @@ bb0(%0 : $@box Builtin.Int32):
 // CHECK-LABEL: @simple_alias_load_use_test : $@convention(thin) (@inout Builtin.Int32) -> () {
 // CHECK: bb0
 // CHECK-NEXT: alloc_box
+// CHECK-NEXT: project_box
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: strong_retain
@@ -353,11 +354,12 @@ bb0(%0 : $@box Builtin.Int32):
 sil @simple_alias_load_use_test : $@convention(thin) (@inout Builtin.Int32) -> () {
 bb0(%0 : $*Builtin.Int32):
   %1 = alloc_box $Builtin.Int32
+  %1a = project_box %1 : $@box Builtin.Int32
   %2 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
-  strong_retain %1#0 : $@box Builtin.Int32
-  apply %2 (%1#0) : $@convention(thin) (@box Builtin.Int32) -> ()
-  %3 = load %1#1 : $*Builtin.Int32
-  strong_release %1#0 : $@box Builtin.Int32
+  strong_retain %1 : $@box Builtin.Int32
+  apply %2 (%1) : $@convention(thin) (@box Builtin.Int32) -> ()
+  %3 = load %1a : $*Builtin.Int32
+  strong_release %1 : $@box Builtin.Int32
   %4 = tuple()
   return %4: $()
 }
@@ -367,6 +369,7 @@ bb0(%0 : $*Builtin.Int32):
 // CHECK-LABEL: @simple_alias_load_use_test_two_release : $@convention(thin) (@inout Builtin.Int32) -> () {
 // CHECK: bb0
 // CHECK-NEXT: alloc_box
+// CHECK-NEXT: project_box
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: strong_retain
@@ -378,13 +381,14 @@ bb0(%0 : $*Builtin.Int32):
 sil @simple_alias_load_use_test_two_release : $@convention(thin) (@inout Builtin.Int32) -> () {
 bb0(%0 : $*Builtin.Int32):
   %1 = alloc_box $Builtin.Int32
+  %1a = project_box %1 : $@box Builtin.Int32
   %2 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
-  strong_retain %1#0 : $@box Builtin.Int32
-  strong_retain %1#0 : $@box Builtin.Int32
-  apply %2 (%1#0) : $@convention(thin) (@box Builtin.Int32) -> ()
-  %3 = load %1#1 : $*Builtin.Int32
-  strong_release %1#0 : $@box Builtin.Int32
-  strong_release %1#0 : $@box Builtin.Int32
+  strong_retain %1 : $@box Builtin.Int32
+  strong_retain %1 : $@box Builtin.Int32
+  apply %2 (%1) : $@convention(thin) (@box Builtin.Int32) -> ()
+  %3 = load %1a : $*Builtin.Int32
+  strong_release %1 : $@box Builtin.Int32
+  strong_release %1 : $@box Builtin.Int32
   %4 = tuple()
   return %4: $()
 }
@@ -474,13 +478,13 @@ bb0(%0 : $Builtin.RawPointer):
   %1 = function_ref @objc_autoreleasePoolPush : $@convention(thin) () -> Builtin.RawPointer
   %2 = function_ref @objc_autoreleasePoolPop : $@convention(thin) (Builtin.RawPointer) -> ()
   %3 = alloc_box $Builtin.Int32
-  strong_retain %3#0 : $@box Builtin.Int32
+  strong_retain %3 : $@box Builtin.Int32
   apply %1() : $@convention(thin) () -> Builtin.RawPointer
-  strong_release %3#0 : $@box Builtin.Int32
-  strong_retain %3#0 : $@box Builtin.Int32
+  strong_release %3 : $@box Builtin.Int32
+  strong_retain %3 : $@box Builtin.Int32
   apply %2(%0) : $@convention(thin) (Builtin.RawPointer) -> ()
-  strong_release %3#0 : $@box Builtin.Int32
-  strong_release %3#0 : $@box Builtin.Int32
+  strong_release %3 : $@box Builtin.Int32
+  strong_release %3 : $@box Builtin.Int32
   %4 = tuple()
   return %4 : $()
 }
@@ -494,13 +498,13 @@ sil @release_can_decrement_other_releases  : $@convention(thin) () -> () {
 bb0:
   %1 = alloc_box $Builtin.Int32
   %2 = alloc_stack $@box Builtin.Int32
-  store %1#0 to %2 : $*@box Builtin.Int32
+  store %1 to %2 : $*@box Builtin.Int32
   %4 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
-  strong_retain %1#0 : $@box Builtin.Int32
+  strong_retain %1 : $@box Builtin.Int32
   %6 = load %2 : $*@box Builtin.Int32
   %7 = apply %4(%6) : $@convention(thin) (@box Builtin.Int32) -> ()
   strong_release %6 : $@box Builtin.Int32
-  strong_release %1#0 : $@box Builtin.Int32
+  strong_release %1 : $@box Builtin.Int32
   dealloc_stack %2 : $*@box Builtin.Int32
   %11 = tuple ()
   return %11 : $()
@@ -1954,12 +1958,12 @@ bb0(%0 : $@box Builtin.Int32):
 sil @alloc_box_returns_at_p1 : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_box $Builtin.Int32
-  strong_retain %0#0 : $@box Builtin.Int32
+  strong_retain %0 : $@box Builtin.Int32
   %3 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
-  apply %3(%0#0) : $@convention(thin) (@box Builtin.Int32) -> ()
-  apply %3(%0#0) : $@convention(thin) (@box Builtin.Int32) -> ()
-  strong_release %0#0 : $@box Builtin.Int32
-  strong_release %0#0 : $@box Builtin.Int32
+  apply %3(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %3(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_release %0 : $@box Builtin.Int32
+  strong_release %0 : $@box Builtin.Int32
   %9999 = tuple()
   return %9999 : $()
 }

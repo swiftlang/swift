@@ -1469,7 +1469,7 @@ Expr *Parser::parseExprIdentifier() {
     E = unresolved;
   } else if (auto TD = dyn_cast<TypeDecl>(D)) {
     if (!hasGenericArgumentList)
-      E = TypeExpr::createForDecl(loc, TD);
+      E = TypeExpr::createForDecl(loc, TD, /*implicit*/false);
     else
       E = TypeExpr::createForSpecializedDecl(loc, TD,
                                              Context.AllocateCopy(args),

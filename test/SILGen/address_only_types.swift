@@ -190,14 +190,15 @@ func address_only_materialize() -> Int {
 func address_only_assignment_from_temp(inout dest: Unloadable) {
   // CHECK: bb0([[DEST:%[0-9]+]] : $*Unloadable):
   // CHECK: [[DEST_LOCAL:%.*]] = alloc_box $Unloadable
-  // CHECK: copy_addr [[DEST]] to [initialization] [[DEST_LOCAL]]#1
+  // CHECK: [[PB:%.*]] = project_box [[DEST_LOCAL]]
+  // CHECK: copy_addr [[DEST]] to [initialization] [[PB]]
   dest = some_address_only_function_1()
   // CHECK: [[TEMP:%[0-9]+]] = alloc_stack $Unloadable
-  // CHECK: copy_addr [take] [[TEMP]] to [[DEST_LOCAL]]#1 :
+  // CHECK: copy_addr [take] [[TEMP]] to [[PB]] :
   // CHECK-NOT: destroy_addr [[TEMP]]
   // CHECK: dealloc_stack [[TEMP]]
-  // CHECK: copy_addr [[DEST_LOCAL]]#1 to [[DEST]]
-  // CHECK: release [[DEST_LOCAL]]#0
+  // CHECK: copy_addr [[PB]] to [[DEST]]
+  // CHECK: release [[DEST_LOCAL]]
 }
 
 // CHECK-LABEL: sil hidden @_TF18address_only_types31address_only_assignment_from_lv
@@ -205,15 +206,17 @@ func address_only_assignment_from_lv(inout dest: Unloadable, v: Unloadable) {
   var v = v
   // CHECK: bb0([[DEST:%[0-9]+]] : $*Unloadable, [[VARG:%[0-9]+]] : $*Unloadable):
   // CHECK: [[DEST_LOCAL:%.*]] = alloc_box $Unloadable
-  // CHECK: copy_addr [[DEST]] to [initialization] [[DEST_LOCAL]]#1
+  // CHECK: [[PB:%.*]] = project_box [[DEST_LOCAL]]
+  // CHECK: copy_addr [[DEST]] to [initialization] [[PB]]
   // CHECK: [[VBOX:%.*]] = alloc_box $Unloadable
-  // CHECK: copy_addr [[VARG]] to [initialization] [[VBOX]]#1
+  // CHECK: [[VPB:%.*]] = project_box [[VBOX]]
+  // CHECK: copy_addr [[VARG]] to [initialization] [[VPB]]
   dest = v
   // FIXME: emit into?
-  // CHECK: copy_addr [[VBOX]]#1 to [[DEST_LOCAL]]#1 :
-  // CHECK: release [[VBOX]]#0
-  // CHECK: copy_addr [[DEST_LOCAL]]#1 to [[DEST]]
-  // CHECK: release [[DEST_LOCAL]]#0
+  // CHECK: copy_addr [[VPB]] to [[PB]] :
+  // CHECK: release [[VBOX]]
+  // CHECK: copy_addr [[PB]] to [[DEST]]
+  // CHECK: release [[DEST_LOCAL]]
 }
 
 var global_prop : Unloadable {
@@ -250,10 +253,11 @@ func address_only_var() -> Unloadable {
   // CHECK: bb0([[RET:%[0-9]+]] : $*Unloadable):
   var x = some_address_only_function_1()
   // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Unloadable
-  // CHECK: apply {{%.*}}([[XBOX]]#1)
+  // CHECK: [[XPB:%.*]] = project_box [[XBOX]]
+  // CHECK: apply {{%.*}}([[XPB]])
   return x
-  // CHECK: copy_addr [[XBOX]]#1 to [initialization] [[RET]]
-  // CHECK: release [[XBOX]]#0
+  // CHECK: copy_addr [[XPB]] to [initialization] [[RET]]
+  // CHECK: release [[XBOX]]
   // CHECK: return
 }
 
