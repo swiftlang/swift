@@ -1,4 +1,8 @@
 
+public enum Optional<T> {
+  case Some(T), None
+}
+
 public struct B {
   public func amIConfused() {}
 }
