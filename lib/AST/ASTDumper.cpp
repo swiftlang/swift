@@ -1989,6 +1989,7 @@ public:
   void visitCaptureListExpr(CaptureListExpr *E) {
     printCommon(E, "capture_list");
     for (auto capture : E->getCaptureList()) {
+      OS << '\n';
       Indent += 2;
       printRec(capture.Var);
       printRec(capture.Init);
