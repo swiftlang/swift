@@ -784,6 +784,11 @@ function(_add_swift_library_single target name)
     endif()
   endif()
 
+  if (SWIFT_COMPILER_VERSION)
+    if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+      set(SWIFTLIB_SINGLE_LINK_FLAGS "${SWIFTLIB_SINGLE_LINK_FLAGS}" "-Xlinker" "-current_version" "-Xlinker" "${SWIFT_COMPILER_VERSION}" "-Xlinker" "-compatibility_version" "-Xlinker" "1")
+    endif()
+  endif()
 
   if(XCODE)
     string(REGEX MATCHALL "/[^/]+" split_path ${CMAKE_CURRENT_SOURCE_DIR})
