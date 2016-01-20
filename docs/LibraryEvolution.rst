@@ -101,7 +101,7 @@ for fallback behavior when the requested library version is not present::
 
     func scareMySiblings() {
       if #available(Magician 1.2) {
-        conjureDemons()
+        summonDemons()
       } else {
         print("BOO!!")
       }
