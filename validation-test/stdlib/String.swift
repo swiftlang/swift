@@ -375,6 +375,11 @@ let comparisonTests = [
   ComparisonTest(.EQ, "\u{fb01}", "\u{fb01}"),
   ComparisonTest(.LT, "fi", "\u{fb01}"),
 
+  // U+1F1E7 REGIONAL INDICATOR SYMBOL LETTER B
+  // \u{1F1E7}\u{1F1E7} Flag of Barbados
+  ComparisonTest(.LT, "\u{1F1E7}", "\u{1F1E7}\u{1F1E7}",
+    xfail: [.ObjC: "https://bugs.swift.org/browse/SR-367"]),
+
   // Test that Unicode collation is performed in deterministic mode.
   //
   // U+0301 COMBINING ACUTE ACCENT
