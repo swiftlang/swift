@@ -3393,7 +3393,7 @@ findDefaultArgsOwner(ConstraintSystem &cs, const Solution &solution,
               
               return decl;
             })) {
-    return resolved.getDecl();
+    return resolved;
   }
 
   return nullptr;
