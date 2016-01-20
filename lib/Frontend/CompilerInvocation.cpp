@@ -47,7 +47,27 @@ static void updateRuntimeLibraryPath(SearchPathOptions &SearchPathOpts,
   llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
   SearchPathOpts.RuntimeLibraryPath = LibPath.str();
 
-  llvm::sys::path::append(LibPath, Triple.getArchName());
+  // The linux provided triple for ARM contains a trailing 'l'
+  // denoting little-endian.  This is not used in the path for
+  // libraries.  LLVM matches these SubArchTypes to the generic
+  // ARMSubArch_v7 (for example) type.  If that is the case,
+  // use the base of the architecture type in the library path.
+  if (Triple.isOSLinux()) {
+    switch(Triple.getSubArch()) {
+    default:
+      llvm::sys::path::append(LibPath, Triple.getArchName());
+      break;
+    case llvm::Triple::SubArchType::ARMSubArch_v7:
+      llvm::sys::path::append(LibPath, "armv7");
+      break;
+    case llvm::Triple::SubArchType::ARMSubArch_v6:
+      llvm::sys::path::append(LibPath, "armv6");
+      break;
+    }
+  } else {
+    llvm::sys::path::append(LibPath, Triple.getArchName());
+  }
+
   SearchPathOpts.RuntimeLibraryImportPath = LibPath.str();
 }
 
