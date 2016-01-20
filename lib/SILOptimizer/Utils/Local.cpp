@@ -2262,7 +2262,8 @@ swift::analyzeStaticInitializer(SILValue V,
     return false;
 
   while (true) {
-    Insns.push_back(I);
+    if (!isa<AllocGlobalInst>(I))
+      Insns.push_back(I);
     if (auto *SI = dyn_cast<StructInst>(I)) {
       // If it is not a struct which is a simple type, bail.
       if (!isSimpleType(SI->getType(), I->getModule()))
