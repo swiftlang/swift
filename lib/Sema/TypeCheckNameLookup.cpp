@@ -239,6 +239,8 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
     subOptions |= NL_KnownNonCascadingDependency;
   if (options.contains(NameLookupFlags::DynamicLookup))
     subOptions |= NL_DynamicLookup;
+  if (options.contains(NameLookupFlags::IgnoreAccessibility))
+    subOptions |= NL_IgnoreAccessibility;
 
   // Dig out the type that we'll actually be looking into, and determine
   // whether it is a nominal type.

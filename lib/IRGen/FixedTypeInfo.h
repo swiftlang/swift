@@ -79,6 +79,7 @@ public:
   ContainedAddress allocateStack(IRGenFunction &IGF, SILType T,
                                  const llvm::Twine &name) const override;
   void deallocateStack(IRGenFunction &IGF, Address addr, SILType T) const override;
+  void destroyStack(IRGenFunction &IGF, Address addr, SILType T) const override;
 
   // We can give these reasonable default implementations.
 

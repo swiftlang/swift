@@ -263,6 +263,11 @@ public:
   virtual void deallocateStack(IRGenFunction &IGF, Address addr,
                                SILType T) const = 0;
 
+  /// Destroy the value of a variable of this type, then deallocate its
+  /// memory.
+  virtual void destroyStack(IRGenFunction &IGF, Address addr,
+                            SILType T) const = 0;
+
   /// Copy or take a value out of one address and into another, destroying
   /// old value in the destination.  Equivalent to either assignWithCopy
   /// or assignWithTake depending on the value of isTake.
@@ -296,6 +301,16 @@ public:
   virtual void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
                                   Address srcAddr, SILType T) const = 0;
 
+  /// Allocate space for an object of this type within an uninitialized
+  /// fixed-size buffer.
+  virtual Address allocateBuffer(IRGenFunction &IGF, Address buffer,
+                                 SILType T) const;
+
+  /// Project the address of an object of this type from an initialized
+  /// fixed-size buffer.
+  virtual Address projectBuffer(IRGenFunction &IGF, Address buffer,
+                                SILType T) const;
+
   /// Perform a "take-initialization" from the given object into an
   /// uninitialized fixed-size buffer, allocating the buffer if necessary.
   /// Returns the address of the value inside the buffer.
@@ -325,6 +340,54 @@ public:
                                            Address destBuffer,
                                            Address srcAddr,
                                            SILType T) const;
+
+  /// Perform a copy-initialization from the given fixed-size buffer
+  /// into an uninitialized fixed-size buffer, allocating the buffer if
+  /// necessary.  Returns the address of the value inside the buffer.
+  ///
+  /// This is equivalent to:
+  ///   auto srcAddress = projectBuffer(IGF, srcBuffer, T);
+  ///   initializeBufferWithCopy(IGF, destBuffer, srcAddress, T);
+  /// but will be more efficient for dynamic types, since it uses a single
+  /// value witness call.
+  virtual Address initializeBufferWithCopyOfBuffer(IRGenFunction &IGF,
+                                                   Address destBuffer,
+                                                   Address srcBuffer,
+                                                   SILType T) const;
+
+  /// Perform a take-initialization from the given fixed-size buffer
+  /// into an uninitialized fixed-size buffer, allocating the buffer if
+  /// necessary and deallocating the destination buffer.  Returns the
+  /// address of the value inside the destination buffer.
+  ///
+  /// This is equivalent to:
+  ///   auto srcAddress = projectBuffer(IGF, srcBuffer, T);
+  ///   initializeBufferWithTake(IGF, destBuffer, srcAddress, T);
+  ///   deallocateBuffer(IGF, srcBuffer, T);
+  /// but may be able to re-use the buffer from the source buffer, and may
+  /// be more efficient for dynamic types, since it uses a single
+  /// value witness call.
+  virtual Address initializeBufferWithTakeOfBuffer(IRGenFunction &IGF,
+                                                   Address destBuffer,
+                                                   Address srcBuffer,
+                                                   SILType T) const;
+
+  /// Destroy an object of this type within an initialized fixed-size buffer
+  /// and deallocate the buffer.
+  ///
+  /// This is equivalent to:
+  ///   auto valueAddr = projectBuffer(IGF, buffer, T);
+  ///   destroy(IGF, valueAddr, T);
+  ///   deallocateBuffer(IGF, buffer, T);
+  /// but will be more efficient for dynamic types, since it uses a single
+  /// value witness call.
+  virtual void destroyBuffer(IRGenFunction &IGF, Address buffer,
+                             SILType T) const;
+
+  /// Deallocate the space for an object of this type within an initialized
+  /// fixed-size buffer.
+  virtual void deallocateBuffer(IRGenFunction &IGF, Address buffer,
+                                SILType T) const;
 
   /// Take-initialize an address from a parameter explosion.
   virtual void initializeFromParams(IRGenFunction &IGF, Explosion &params,

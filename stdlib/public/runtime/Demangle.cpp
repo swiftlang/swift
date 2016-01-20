@@ -25,7 +25,10 @@ _buildDemanglingForNominalType(Demangle::Node::Kind boundGenericKind,
                  typeBytes + sizeof(void*) * description->GenericParams.Offset);
     for (unsigned i = 0, e = description->GenericParams.NumPrimaryParams;
          i < e; ++i, ++genericParam) {
-      typeParams->addChild(_swift_buildDemanglingForMetadata(*genericParam));
+      auto demangling = _swift_buildDemanglingForMetadata(*genericParam);
+      if (demangling == nullptr)
+        return nullptr;
+      typeParams->addChild(demangling);
     }
 
     auto genericNode = NodeFactory::create(boundGenericKind);

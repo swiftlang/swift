@@ -236,7 +236,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
                      << " FnID " << FnID << "\n");
   DEBUG(llvm::dbgs() << "Serialized SIL:\n"; F.dump());
 
-  llvm::SmallVector<IdentifierID, 1> SemanticsIDs;
+  SmallVector<IdentifierID, 1> SemanticsIDs;
   for (auto SemanticAttr : F.getSemanticsAttrs()) {
     SemanticsIDs.push_back(S.addIdentifierRef(Ctx.getIdentifier(SemanticAttr)));
   }

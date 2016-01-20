@@ -8,6 +8,7 @@ add_swift_library(swiftIDE
   SyntaxModel.cpp
   Utils.cpp
   SwiftSourceDocInfo.cpp
+  ReconstructType.cpp
   LINK_LIBRARIES
     swiftFrontend
     swiftClangImporter

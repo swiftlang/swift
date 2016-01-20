@@ -16,7 +16,7 @@ public protocol Strideable : Comparable {
   // FIXME: We'd like to name this type "Distance" but for
   // <rdar://problem/17619038>
   /// A type that can represent the distance between two values of `Self`.
-  typealias Stride : SignedNumber
+  associatedtype Stride : SignedNumber
 
   /// Returns a stride `x` such that `self.advancedBy(x)` approximates
   /// `other`.

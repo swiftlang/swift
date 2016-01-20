@@ -224,8 +224,7 @@ static void addImplicitConformances(
 }
 
 /// Check that the declaration attributes are ok.
-static void validateAttributes(TypeChecker &TC, Decl *VD);
-static void validateFixedLayoutAttribute(TypeChecker &TC, NominalTypeDecl *D);
+static void validateAttributes(TypeChecker &TC, Decl *D);
 
 void TypeChecker::resolveSuperclass(ClassDecl *classDecl) {
   IterativeTypeChecker ITC(*this);
@@ -717,19 +716,16 @@ void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
       continue;
 
     switch (req.getKind()) {
-    case RequirementKind::Conformance: {
+    case RequirementReprKind::TypeConstraint: {
       revertDependentTypeLoc(req.getSubjectLoc());
       revertDependentTypeLoc(req.getConstraintLoc());
       break;
     }
 
-    case RequirementKind::SameType:
+    case RequirementReprKind::SameType:
       revertDependentTypeLoc(req.getFirstTypeLoc());
       revertDependentTypeLoc(req.getSecondTypeLoc());
       break;
-
-    case RequirementKind::WitnessMarker:
-      llvm_unreachable("value witness markers in syntactic requirement?");
     }
   }
 }
@@ -806,7 +802,7 @@ static void finalizeGenericParamList(ArchetypeBuilder &builder,
       continue;
 
     switch (Req.getKind()) {
-    case RequirementKind::Conformance: {
+    case RequirementReprKind::TypeConstraint: {
       revertDependentTypeLoc(Req.getSubjectLoc());
       if (TC.validateType(Req.getSubjectLoc(), dc)) {
         Req.setInvalid();
@@ -821,7 +817,7 @@ static void finalizeGenericParamList(ArchetypeBuilder &builder,
       break;
     }
 
-    case RequirementKind::SameType:
+    case RequirementReprKind::SameType:
       revertDependentTypeLoc(Req.getFirstTypeLoc());
       if (TC.validateType(Req.getFirstTypeLoc(), dc)) {
         Req.setInvalid();
@@ -834,9 +830,6 @@ static void finalizeGenericParamList(ArchetypeBuilder &builder,
         continue;
       }
       break;
-
-    case RequirementKind::WitnessMarker:
-      llvm_unreachable("value witness markers in syntactic requirement?");
     }
   }
 }
@@ -1467,15 +1460,13 @@ void TypeChecker::computeDefaultAccessibility(ExtensionDecl *ED) {
     // from the extended type and have already been checked.
     for (const RequirementRepr &req : genericParams->getTrailingRequirements()){
       switch (req.getKind()) {
-      case RequirementKind::Conformance:
+      case RequirementReprKind::TypeConstraint:
         maxAccess = std::min(getTypeAccess(req.getSubjectLoc()), maxAccess);
         maxAccess = std::min(getTypeAccess(req.getConstraintLoc()), maxAccess);
         break;
-      case RequirementKind::SameType:
+      case RequirementReprKind::SameType:
         maxAccess = std::min(getTypeAccess(req.getFirstTypeLoc()), maxAccess);
         maxAccess = std::min(getTypeAccess(req.getSecondTypeLoc()), maxAccess);
-        break;
-      case RequirementKind::WitnessMarker:
         break;
       }
     }
@@ -1694,19 +1685,17 @@ static void checkGenericParamAccessibility(TypeChecker &TC,
       }
     };
     switch (requirement.getKind()) {
-    case RequirementKind::Conformance:
+    case RequirementReprKind::TypeConstraint:
       checkTypeAccessibility(TC, requirement.getSubjectLoc(), contextAccess,
                              callback);
       checkTypeAccessibility(TC, requirement.getConstraintLoc(), contextAccess,
                              callback);
       break;
-    case RequirementKind::SameType:
+    case RequirementReprKind::SameType:
       checkTypeAccessibility(TC, requirement.getFirstTypeLoc(), contextAccess,
                              callback);
       checkTypeAccessibility(TC, requirement.getSecondTypeLoc(), contextAccess,
                              callback);
-      break;
-    case RequirementKind::WitnessMarker:
       break;
     }
   }
@@ -2226,16 +2215,24 @@ static void checkBridgedFunctions(TypeChecker &TC) {
   #include "swift/SIL/BridgedTypes.def"
   
   if (Module *module = TC.Context.getLoadedModule(ID_Foundation)) {
-    checkObjCBridgingFunctions(TC, module, "NSArray",
+    checkObjCBridgingFunctions(TC, module,
+                               TC.Context.getSwiftName(
+                                 KnownFoundationEntity::NSArray),
                                "_convertNSArrayToArray",
                                "_convertArrayToNSArray");
-    checkObjCBridgingFunctions(TC, module, "NSDictionary",
+    checkObjCBridgingFunctions(TC, module,
+                               TC.Context.getSwiftName(
+                                 KnownFoundationEntity::NSDictionary),
                                "_convertNSDictionaryToDictionary",
                                "_convertDictionaryToNSDictionary");
-    checkObjCBridgingFunctions(TC, module, "NSSet",
+    checkObjCBridgingFunctions(TC, module,
+                               TC.Context.getSwiftName(
+                                 KnownFoundationEntity::NSSet),
                                "_convertNSSetToSet",
                                "_convertSetToNSSet");
-    checkObjCBridgingFunctions(TC, module, "NSError",
+    checkObjCBridgingFunctions(TC, module,
+                               TC.Context.getSwiftName(
+                                 KnownFoundationEntity::NSError),
                                "_convertNSErrorToErrorProtocol",
                                "_convertErrorProtocolToNSError");
   }
@@ -4725,7 +4722,6 @@ public:
 
     UNINTERESTING_ATTR(WarnUnusedResult)
     UNINTERESTING_ATTR(WarnUnqualifiedAccess)
-    UNINTERESTING_ATTR(MigrationId)
 
 #undef UNINTERESTING_ATTR
 
@@ -4777,6 +4773,19 @@ public:
         // Dynamic is inherited.
         Override->getAttrs().add(
                                 new (TC.Context) DynamicAttr(/*implicit*/true));
+    }
+
+    void visitSwift3MigrationAttr(Swift3MigrationAttr *attr) {
+      if (!Override->getAttrs().hasAttribute<Swift3MigrationAttr>()) {
+        // Inherit swift3_migration attribute.
+        Override->getAttrs().add(new (TC.Context) Swift3MigrationAttr(
+                                                    SourceLoc(), SourceLoc(),
+                                                    SourceLoc(),
+                                                    attr->getRenamed(),
+                                                    attr->getMessage(),
+                                                    SourceLoc(),
+                                                    /*implicit=*/true));
+      }
     }
   };
 
@@ -5657,10 +5666,32 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
     case DeclContextKind::NominalTypeDecl: {
       auto nominal = cast<NominalTypeDecl>(DC);
+      
       typeCheckDecl(nominal, true);
-      if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeParam))
-        if (!assocType->hasType())
-          assocType->computeType();
+      
+      // If this is an associated type that still has no type, then our type
+      // check of the nominal protocol type failed because it was invalid.  This
+      // happens in various cases where sema of the protocol gives up on the
+      // invalid protocol decl.  Install a type so that downstream things won't
+      // die due to getType() crashing on it.
+      //
+      // TODO: This is all really gross.  If type checking the protocol is what
+      // is supposed to set up the archetype for the associated types, then it
+      // should guarantee that it happens.
+      //
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeParam)) {
+        if (!assocType->hasType()) {
+          // Otherwise, fallback to setting it to error type.
+          if (nominal->isInvalid()) {
+            assocType->setType(Context.TheErrorType);
+          } else {
+            // Otherwise, we're in a recursive type checking situation, and
+            // the archetype for this AssocType may still be set.  Compute a
+            // type even though we don't have it yet.
+            assocType->computeType();
+          }
+        }
+      }
       if (!typeParam->hasAccessibility())
         typeParam->setAccessibility(nominal->getFormalAccess());
       break;
@@ -5724,7 +5755,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
     checkInheritanceClause(D);
     validateAttributes(*this, D);
-    validateFixedLayoutAttribute(*this, nominal);
 
     // Mark a class as @objc. This must happen before checking its members.
     if (auto CD = dyn_cast<ClassDecl>(nominal)) {
@@ -5798,9 +5828,9 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         if (!archetype)
           return;
 
+        assocType->setArchetype(archetype);
         if (!assocType->hasType())
           assocType->computeType();
-        assocType->setArchetype(archetype);
       }
     }
 
@@ -6842,23 +6872,6 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   ctor->setBody(BraceStmt::create(Context, SourceLoc(), { }, SourceLoc()));
 }
 
-static void validateFixedLayoutAttribute(TypeChecker &TC,
-                                         NominalTypeDecl *D) {
-  DeclAttributes &Attrs = D->getAttrs();
-
-  // FIXME: Add a per-module serialized HasFixedLayout flag, instead of
-  // giving every decl this attribute.
-
-  if (Attrs.hasAttribute<FixedLayoutAttr>() ||
-      TC.Context.LangOpts.EnableResilience)
-    return;
-
-  // Since -enable-resilience should not change how we call into
-  // existing compiled modules, make all value types @_fixed_layout
-  // when the frontend is not run with the -enable-resilience flag.
-  Attrs.add(new (TC.Context) FixedLayoutAttr(/*IsImplicit*/ true));
-}
-
 static void validateAttributes(TypeChecker &TC, Decl *D) {
   DeclAttributes &Attrs = D->getAttrs();
 
@@ -7086,17 +7099,6 @@ void TypeChecker::fixAbstractFunctionNames(InFlightDiagnostic &diag,
       targetArgStr += ' ';
       diag.fixItInsert(param->getLoc(), targetArgStr);
     }
-
-    // Find the location to update or insert.
-    SourceLoc loc = func->getLoc();
-    
-    StringRef replacement;
-    if (targetArg.empty())
-      replacement = "_";
-    else
-      replacement = targetArg.str();
-
-    diag.fixItInsert(loc, replacement);
   }
   
   // FIXME: Update the AST accordingly.

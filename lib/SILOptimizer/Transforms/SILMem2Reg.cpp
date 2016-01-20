@@ -846,6 +846,18 @@ bool MemoryToRegisters::run() {
         continue;
       }
 
+      // Remove write-only AllocStacks.
+      if (isWriteOnlyAllocation(ASI)) {
+        eraseUsesOfInstruction(ASI);
+
+        DEBUG(llvm::dbgs() << "*** Deleting store-only AllocStack: " << *ASI);
+        I++;
+        ASI->eraseFromParent();
+        Changed = true;
+        NumInstRemoved++;
+        continue;
+      }
+
       // For AllocStacks that are only used within a single basic blocks, use
       // the linear sweep to remove the AllocStack.
       if (inSingleBlock) {
@@ -857,18 +869,6 @@ bool MemoryToRegisters::run() {
         ASI->eraseFromParent();
         NumInstRemoved++;
         Changed = true;
-        continue;
-      }
-
-      // Remove write-only AllocStacks.
-      if (isWriteOnlyAllocation(ASI)) {
-        eraseUsesOfInstruction(ASI);
-
-        DEBUG(llvm::dbgs() << "*** Deleting store-only AllocStack: " << *ASI);
-        I++;
-        ASI->eraseFromParent();
-        Changed = true;
-        NumInstRemoved++;
         continue;
       }
 

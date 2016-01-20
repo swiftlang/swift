@@ -93,6 +93,12 @@ public:
   RValue(ArrayRef<ManagedValue> values, CanType type);
   
   /// Create an RValue to which values will be subsequently added using
+  /// addElement(), with the level of tuple expansion in the input specified
+  /// by the abstraction pattern. The RValue will not be complete until all
+  /// the elements have been added.
+  explicit RValue(AbstractionPattern pattern, CanType type);
+  
+  /// Create an RValue to which values will be subsequently added using
   /// addElement(). The RValue will not be complete until all the elements have
   /// been added.
   explicit RValue(CanType type);

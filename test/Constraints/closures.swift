@@ -165,11 +165,12 @@ var _: (Int,Int) -> Int = {$0+$1+$2}  // expected-error {{contextual closure typ
 // Crash when re-typechecking bodies of non-single expression closures
 
 struct CC {}
+// expected-note @+1 {{in call to function 'callCC'}}
 func callCC<U>(f: CC -> U) -> () {}
 
 func typeCheckMultiStmtClosureCrash() {
-  callCC { // expected-error {{cannot invoke 'callCC' with an argument list of type '((CC) -> _)'}}
-    _ = $0 // expected-note@-1 {{expected an argument list of type '(CC -> U)'}}
+  callCC { // expected-error {{generic parameter 'U' could not be inferred}}
+    _ = $0
     return 1
   }
 }

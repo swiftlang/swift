@@ -30,7 +30,7 @@ umask 0022
 # need to change any of these, you should do so on trunk or in a branch.
 #
 
-LLVM_TARGETS_TO_BUILD="X86;ARM;AArch64"
+LLVM_TARGETS_TO_BUILD="X86;ARM;AArch64;PowerPC"
 
 #
 # End of configurable options.
@@ -63,6 +63,7 @@ KNOWN_SETTINGS=(
     build-ninja                 ""               "build the Ninja tool"
     cmark-build-type            "Debug"          "the CMake build variant for CommonMark (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
     lldb-extra-cmake-args       ""               "extra command line args to pass to lldb cmake"
+    lldb-extra-xcodebuild-args  ""               "extra command line args to pass to lldb xcodebuild"
     lldb-test-with-curses       ""               "run test lldb test runner using curses terminal control"
     lldb-no-debugserver         ""               "delete debugserver after building it, and don't try to codesign it"
     lldb-use-system-debugserver ""               "don't try to codesign debugserver, and use the system's debugserver instead"
@@ -219,6 +220,12 @@ function set_deployment_target_based_options() {
             ;;
         freebsd-x86_64)
             SWIFT_HOST_VARIANT_ARCH="x86_64"
+            ;;
+        linux-powerpc64)
+            SWIFT_HOST_VARIANT_ARCH="powerpc64"
+            ;;
+        linux-powerpc64le)
+            SWIFT_HOST_VARIANT_ARCH="powerpc64le"
             ;;
         macosx-* | iphoneos-* | iphonesimulator-* | \
           appletvos-* | appletvsimulator-* | \
@@ -752,6 +759,16 @@ case "$(uname -s -m)" in
             "linux-aarch64"
         )
         ;;
+    Linux\ ppc64)
+        NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
+            "linux-powerpc64"
+        )
+        ;;
+    Linux\ ppc64le)
+        NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
+            "linux-powerpc64le"
+        )
+        ;;
     Darwin\ x86_64)
         NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
             "macosx-x86_64"
@@ -789,15 +806,6 @@ for t in ${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS} ; do
     esac
 done
 
-function is_native_tools_deployment_target() {
-    local deployment_target="$1"
-    for t in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" ; do
-        if [ "${deployment_target}" == "${t}" ] ; then
-            echo 1
-        fi
-    done
-}
-
 function is_cross_tools_deployment_target() {
     local deployment_target="$1"
     for t in "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}" ; do
@@ -824,6 +832,16 @@ case "$(uname -s -m)" in
     Linux\ aarch64)
         STDLIB_DEPLOYMENT_TARGETS=(
             "linux-aarch64"
+        )
+        ;;
+    Linux\ ppc64)
+        STDLIB_DEPLOYMENT_TARGETS=(
+            "linux-powerpc64"
+        )
+        ;;
+    Linux\ ppc64le)
+        STDLIB_DEPLOYMENT_TARGETS=(
+            "linux-powerpc64le"
         )
         ;;
     Darwin\ x86_64)
@@ -1227,7 +1245,7 @@ function cmark_c_flags() {
 }
 
 function swift_c_flags() {
-    # Don’t pass common_cross_c_flags to Swift because CMake code in the Swift
+    # Don't pass common_cross_c_flags to Swift because CMake code in the Swift
     # project is itself aware of cross-compilation for the host tools and
     # standard library.
     echo -n "${COMMON_C_FLAGS}"
@@ -1327,7 +1345,11 @@ if [[ "${BUILD_NINJA}" ]] ; then
           { set +x; } 2>/dev/null
         fi
     fi
-    export PATH="${build_dir}:${PATH}"
+    NINJA_BIN="${build_dir}/ninja"
+    COMMON_CMAKE_OPTIONS=(
+        "${COMMON_CMAKE_OPTIONS[@]}"
+        -DCMAKE_MAKE_PROGRAM=${NINJA_BIN}
+    )
 fi
 
 #
@@ -1724,6 +1746,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                             LLDB_BUILD_DATE="\"${LLDB_BUILD_DATE}\""
                             SYMROOT="${lldb_build_dir}"
                             OBJROOT="${lldb_build_dir}"
+                            ${LLDB_EXTRA_XCODEBUILD_ARGS}
                         )
                         if [[ "${LLDB_NO_DEBUGSERVER}" ]] ; then
                             lldb_xcodebuild_options=(

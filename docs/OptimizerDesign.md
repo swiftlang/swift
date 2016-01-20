@@ -180,7 +180,7 @@ This is an example of the *@_semantics* attribute as used by Swift Array:
 
 Notice that as soon as we inline functions that have the @_semantics attribute
 the attribute is lost and the optimizer can't analyze the content of the
-function. For example, the optimizer can identify the array ‘count' method (that
+function. For example, the optimizer can identify the array 'count' method (that
 returns the size of the array) and can hoist this method out of loops. However,
 as soon as this method is inlined, the code looks to the optimizer like a memory
 read from an undetermined memory location, and the optimizer can't optimize the

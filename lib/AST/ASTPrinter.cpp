@@ -222,6 +222,14 @@ ASTPrinter &ASTPrinter::operator<<(UUID UU) {
   return *this;
 }
 
+ASTPrinter &ASTPrinter::operator<<(DeclName name) {
+  llvm::SmallString<32> str;
+  llvm::raw_svector_ostream os(str);
+  name.print(os);
+  printTextImpl(os.str());
+  return *this;
+}
+
 /// Determine whether to escape the given keyword in the given context.
 static bool escapeKeywordInContext(StringRef keyword, PrintNameContext context){
   switch (context) {
@@ -680,8 +688,7 @@ void PrintAST::printWhereClause(ArrayRef<RequirementRepr> requirements) {
 
   bool isFirst = true;
   for (auto &req : requirements) {
-    if (req.isInvalid() ||
-        req.getKind() == RequirementKind::WitnessMarker)
+    if (req.isInvalid())
       continue;
 
     if (isFirst) {
@@ -698,18 +705,16 @@ void PrintAST::printWhereClause(ArrayRef<RequirementRepr> requirements) {
     }
 
     switch (req.getKind()) {
-    case RequirementKind::Conformance:
+    case RequirementReprKind::TypeConstraint:
       printTypeLoc(req.getSubjectLoc());
       Printer << " : ";
       printTypeLoc(req.getConstraintLoc());
       break;
-    case RequirementKind::SameType:
+    case RequirementReprKind::SameType:
       printTypeLoc(req.getFirstTypeLoc());
       Printer << " == ";
       printTypeLoc(req.getSecondTypeLoc());
       break;
-    case RequirementKind::WitnessMarker:
-      llvm_unreachable("Handled above");
     }
   }
 }
@@ -1388,7 +1393,7 @@ void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
   if (!Options.SkipIntroducerKeywords)
-    Printer << "typealias ";
+    Printer << "associatedtype ";
   recordDeclLoc(decl,
     [&]{
       Printer.printName(decl->getName());
@@ -2833,6 +2838,7 @@ public:
   unsigned getDepthOfRequirement(const Requirement &req) {
     switch (req.getKind()) {
     case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
     case RequirementKind::WitnessMarker:
       return getDepthOfType(req.getFirstType());
 
@@ -2928,6 +2934,7 @@ public:
       visit(req.getFirstType());
       switch (req.getKind()) {
       case RequirementKind::Conformance:
+      case RequirementKind::Superclass:
         Printer << " : ";
         break;
 
@@ -3170,21 +3177,12 @@ public:
   }
 
   void visitTypeVariableType(TypeVariableType *T) {
-    auto Base = T->getBaseBeingSubstituted();
-    
     if (T->getASTContext().LangOpts.DebugConstraintSolver) {
       Printer << "$T" << T->getID();
       return;
     }
     
-    if (T->isEqual(Base) || T->isPrinting) {
-      Printer << "_";
-      return;
-    }
-    
-    llvm::SaveAndRestore<bool> isPrinting(T->isPrinting, true);
-    
-    visit(Base);
+    Printer << "_";
   }
 };
 } // unnamed namespace

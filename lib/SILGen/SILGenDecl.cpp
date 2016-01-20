@@ -1683,12 +1683,11 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   // Lower the witness type with the requirement's abstraction level.
   // FIXME: We should go through TypeConverter::getLoweredType once we settle
   // on interface types.
-  /*
-  SILType witnessSILType = Types.getLoweredType(
-                                              AbstractionPattern(requirementTy),
-                                              witnessSubstTy,
-                                              requirement.uncurryLevel);
-   */
+
+  // SILType witnessSILType = Types.getLoweredType(
+  //                                          AbstractionPattern(requirementTy),
+  //                                          witnessSubstTy,
+  //                                          requirement.uncurryLevel);
   SILType witnessSILType = getWitnessFunctionType(M,
                                               AbstractionPattern(requirementTy),
                                               witnessSubstTy,

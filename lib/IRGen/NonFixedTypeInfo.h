@@ -75,6 +75,12 @@ public:
     IGF.Builder.CreateLifetimeEnd(buffer, getFixedBufferSize(IGF.IGM));
   }
 
+  void destroyStack(IRGenFunction &IGF, Address buffer,
+                    SILType T) const override {
+    emitDestroyBufferCall(IGF, T, buffer);
+    IGF.Builder.CreateLifetimeEnd(buffer, getFixedBufferSize(IGF.IGM));
+  }
+
   llvm::Value *getValueWitnessTable(IRGenFunction &IGF, SILType T) const {
     return IGF.emitValueWitnessTableRefForLayout(T);
   }

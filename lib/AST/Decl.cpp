@@ -640,7 +640,7 @@ GenericParamList::getAsGenericSignatureElements(ASTContext &C,
     
     // Collect conformance requirements declared on the archetype.
     if (auto super = archetype->getSuperclass()) {
-      requirements.push_back(Requirement(RequirementKind::Conformance,
+      requirements.push_back(Requirement(RequirementKind::Superclass,
                                          typeParamTy, super));
     }
     for (auto proto : archetype->getConformsTo()) {
@@ -658,8 +658,8 @@ GenericParamList::getAsGenericSignatureElements(ASTContext &C,
 
     // Add conformance requirements for this associated archetype.
     for (const auto &repr : getRequirements()) {
-      // Handle same-type requirements at last.
-      if (repr.getKind() != RequirementKind::Conformance)
+      // Handle same-type requirements later.
+      if (repr.getKind() != RequirementReprKind::TypeConstraint)
         continue;
 
       // Primary conformance declarations would have already been gathered as
@@ -668,13 +668,21 @@ GenericParamList::getAsGenericSignatureElements(ASTContext &C,
         if (!arch->getParent())
           continue;
 
-      auto depTyOfReqt = getAsDependentType(repr.getSubject(), archetypeMap);
-      if (depTyOfReqt.getPointer() != depTy.getPointer())
+      Type subject = getAsDependentType(repr.getSubject(), archetypeMap);
+      if (subject.getPointer() != depTy.getPointer())
         continue;
 
-      Requirement reqt(RequirementKind::Conformance,
-                       getAsDependentType(repr.getSubject(), archetypeMap),
-                       getAsDependentType(repr.getConstraint(), archetypeMap));
+      Type constraint =
+        getAsDependentType(repr.getConstraint(), archetypeMap);
+
+      RequirementKind kind;
+      if (constraint->getClassOrBoundGenericClass()) {
+        kind = RequirementKind::Superclass;
+      } else {
+        kind = RequirementKind::Conformance;
+      }
+
+      Requirement reqt(kind, subject, constraint);
       requirements.push_back(reqt);
     }
   }
@@ -1198,12 +1206,10 @@ ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC) const {
       if (isPolymorphic(var))
         return AccessSemantics::Ordinary;
 
-      // If the property is defined in a nominal type which must be accessed
-      // resiliently from the current module, we cannot do direct access.
-      auto VarDC = var->getDeclContext();
-      if (auto *nominal = VarDC->isNominalTypeOrNominalTypeExtensionContext())
-        if (!nominal->hasFixedLayout(UseDC->getParentModule()))
-          return AccessSemantics::Ordinary;
+      // If the property does not have a fixed layout from the given context,
+      // we cannot do direct access.
+      if (!var->hasFixedLayout(UseDC->getParentModule()))
+        return AccessSemantics::Ordinary;
 
       // We know enough about the property to perform direct access.
       return AccessSemantics::DirectToStorage;
@@ -1277,8 +1283,8 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
 
     case StoredWithTrivialAccessors:
     case AddressedWithTrivialAccessors: {
-        // If the property is defined in a non-final class or a protocol, the
-        // accessors are dynamically dispatched, and we cannot do direct access.
+      // If the property is defined in a non-final class or a protocol, the
+      // accessors are dynamically dispatched, and we cannot do direct access.
       if (isPolymorphic(this))
         return AccessStrategy::DispatchToAccessor;
 
@@ -1286,16 +1292,14 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
       // from some resilience domain, we cannot do direct access.
       //
       // As an optimization, we do want to perform direct accesses of stored
-      // properties of resilient types in the same resilience domain as the
-      // access.
+      // properties declared inside the same resilience domain as the access
+      // context.
       //
       // This is done by using DirectToStorage semantics above, with the
       // understanding that the access semantics are with respect to the
       // resilience domain of the accessor's caller.
-      auto DC = getDeclContext();
-      if (auto *nominal = DC->isNominalTypeOrNominalTypeExtensionContext())
-        if (!nominal->hasFixedLayout())
-          return AccessStrategy::DirectToAccessor;
+      if (!hasFixedLayout())
+        return AccessStrategy::DirectToAccessor;
 
       if (storageKind == StoredWithObservers ||
           storageKind == StoredWithTrivialAccessors) {
@@ -1323,6 +1327,28 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
   }
   llvm_unreachable("bad access semantics");
 }
+
+bool AbstractStorageDecl::hasFixedLayout() const {
+  // Private and internal variables always have a fixed layout.
+  // TODO: internal variables with availability information need to be
+  // resilient, since they can be used from @_transparent functions.
+  if (getFormalAccess() != Accessibility::Public)
+    return true;
+
+  // Check for an explicit @_fixed_layout attribute.
+  if (getAttrs().hasAttribute<FixedLayoutAttr>())
+    return true;
+
+  // If we're in a nominal type, just query the type.
+  auto nominal = getDeclContext()->isNominalTypeOrNominalTypeExtensionContext();
+  if (nominal)
+    return nominal->hasFixedLayout();
+
+  // Must use resilient access patterns.
+  assert(getDeclContext()->isModuleScopeContext());
+  return !getDeclContext()->getParentModule()->isResilienceEnabled();
+}
+
 
 bool ValueDecl::isDefinition() const {
   switch (getKind()) {
@@ -1834,25 +1860,17 @@ bool NominalTypeDecl::hasFixedLayout() const {
   if (getAttrs().hasAttribute<FixedLayoutAttr>())
     return true;
 
-  if (hasClangNode()) {
-    // Classes imported from Objective-C *never* have a fixed layout.
-    // IRGen needs to use dynamic ivar layout to ensure that subclasses
-    // of Objective-C classes are resilient against base class size
-    // changes.
-    if (isa<ClassDecl>(this))
-      return false;
-
-    // Structs and enums imported from C *always* have a fixed layout.
-    // We know their size, and pass them as values in SIL and IRGen.
+  // Structs and enums imported from C *always* have a fixed layout.
+  // We know their size, and pass them as values in SIL and IRGen.
+  if (hasClangNode())
     return true;
-  }
 
-  // Objective-C enums always have a fixed layout.
+  // @objc enums always have a fixed layout.
   if (isa<EnumDecl>(this) && isObjC())
     return true;
 
   // Otherwise, access via indirect "resilient" interfaces.
-  return false;
+  return !getParentModule()->isResilienceEnabled();
 }
 
 /// Provide the set of parameters to a generic type, or null if

@@ -172,8 +172,6 @@ void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
   SILBuilderWithScope B(T);
 
   switch (T->getTermKind()) {
-  case TermKind::Invalid:
-    llvm_unreachable("Unexpected terminator instruction!");
   // Only Branch and CondBranch may have arguments.
   case TermKind::BranchInst: {
     auto Br = dyn_cast<BranchInst>(T);
@@ -328,8 +326,6 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
   SILBuilderWithScope B(T);
 
   switch (T->getTermKind()) {
-  case TermKind::Invalid:
-    llvm_unreachable("Unexpected terminator instruction!");
   // Only Branch and CondBranch may have arguments.
   case TermKind::BranchInst: {
     auto Br = dyn_cast<BranchInst>(T);

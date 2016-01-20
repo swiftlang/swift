@@ -1155,43 +1155,25 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
     }
 
-  case DAK_MigrationId: {
+  case DAK_Swift3Migration: {
     if (Tok.isNot(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
       return false;
     }
 
-    StringRef ident;
-    StringRef patternId;
-    SourceLoc lParenLoc = consumeToken();
+    SourceLoc lParenLoc = consumeToken(tok::l_paren);
 
-    // If we don't have a string, complain.
-    if (Tok.isNot(tok::string_literal)) {
-      diagnose(Tok, diag::attr_expected_string_literal, AttrName);
-      if (Tok.isNot(tok::r_paren))
-        skipUntil(tok::r_paren);
-      consumeIf(tok::r_paren);
-      return false;
-    }
-
-    // Dig out the string.
-    auto string = getStringLiteralIfNotInterpolated(*this, Loc, Tok,
-                                                    AttrName);
-    consumeToken(tok::string_literal);
-    if (!string)
-      return false;
-    ident = string.getValue();
-    consumeIf(tok::comma);
-
+    DeclName renamed;
+    StringRef message;
     bool invalid = false;
     do {
-      // If we see a closing parenthesis,
+      // If we see a closing parenthesis, we're done.
       if (Tok.is(tok::r_paren))
         break;
 
       if (Tok.isNot(tok::identifier)) {
-        diagnose(Tok, diag::attr_migration_id_expected_name);
+        diagnose(Tok, diag::attr_swift3_migration_label);
         if (Tok.isNot(tok::r_paren))
           skipUntil(tok::r_paren);
         consumeIf(tok::r_paren);
@@ -1202,65 +1184,74 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       // Consume the identifier.
       StringRef name = Tok.getText();
       SourceLoc nameLoc = consumeToken();
-      bool known = (name == "pattern");
 
       // If we don't have the '=', complain.
       SourceLoc equalLoc;
       if (!consumeIf(tok::equal, equalLoc)) {
-        if (known)
-          diagnose(Tok, diag::attr_migration_id_expected_eq, name);
-        else
-          diagnose(Tok, diag::attr_migration_id_unknown_parameter, name);
+        diagnose(Tok, diag::attr_expected_equal_separator, name, AttrName);
+        invalid = true;
         continue;
       }
 
-
       // If we don't have a string, complain.
       if (Tok.isNot(tok::string_literal)) {
-        diagnose(Tok, diag::attr_migration_id_expected_string, name);
-        if (Tok.isNot(tok::r_paren))
-          skipUntil(tok::r_paren);
-        consumeIf(tok::r_paren);
+        diagnose(Tok, diag::attr_expected_string_literal_arg, name, AttrName);
         invalid = true;
         break;
       }
 
       // Dig out the string.
-      auto param_string = getStringLiteralIfNotInterpolated(*this, nameLoc, Tok,
+      auto paramString = getStringLiteralIfNotInterpolated(*this, nameLoc, Tok,
                                                             name.str());
-      consumeToken(tok::string_literal);
-      if (!param_string) {
+      SourceLoc paramLoc = consumeToken(tok::string_literal);
+      if (!paramString) {
+        invalid = true;
         continue;
       }
 
-      if (!known) {
-        diagnose(nameLoc, diag::attr_migration_id_unknown_parameter,
-                 name);
+      if (name == "message") {
+        if (!message.empty())
+          diagnose(nameLoc, diag::attr_duplicate_argument, name);
+
+        message = *paramString;
         continue;
       }
 
-      if (!patternId.empty()) {
-        diagnose(nameLoc, diag::attr_migration_id_duplicate_parameter,
-                 name);
+      if (name == "renamed") {
+        if (renamed)
+          diagnose(nameLoc, diag::attr_duplicate_argument, name);
+
+        // Parse the name.
+        DeclName newName = parseDeclName(Context, *paramString);
+        if (!newName) {
+          diagnose(paramLoc, diag::attr_bad_swift_name, *paramString);
+          continue;
+        }
+
+        renamed = newName;
+        continue;
       }
 
-      patternId = param_string.getValue();
+      diagnose(nameLoc, diag::warn_attr_swift3_migration_unknown_label);
     } while (consumeIf(tok::comma));
 
     // Parse the closing ')'.
     SourceLoc rParenLoc;
-    if (Tok.isNot(tok::r_paren)) {
+    if (invalid && !Tok.is(tok::r_paren)) {
+      skipUntil(tok::r_paren);
+      if (Tok.is(tok::r_paren)) {
+        rParenLoc = consumeToken();
+      } else
+        rParenLoc = Tok.getLoc();
+    } else {
       parseMatchingToken(tok::r_paren, rParenLoc,
-                         diag::attr_migration_id_expected_rparen,
+                         diag::attr_swift3_migration_expected_rparen,
                          lParenLoc);
     }
-    if (Tok.is(tok::r_paren)) {
-      rParenLoc = consumeToken();
-    }
 
-    Attributes.add(new (Context) MigrationIdAttr(AtLoc, Loc, lParenLoc,
-                                                 ident, patternId,
-                                                 rParenLoc, false));
+    Attributes.add(new (Context) Swift3MigrationAttr(AtLoc, Loc, lParenLoc,
+                                                     renamed, message,
+                                                     rParenLoc, false));
     break;
     }
   }
@@ -1704,6 +1695,7 @@ static bool isKeywordPossibleDeclStart(const Token &Tok) {
   case tok::kw_struct:
   case tok::kw_subscript:
   case tok::kw_typealias:
+  case tok::kw_associatedtype:
   case tok::kw_var:
   case tok::pound_if:
   case tok::pound_line:
@@ -2004,6 +1996,10 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       }
       diagnose(Tok, diag::expected_decl);
       return makeParserErrorResult<Decl>();
+  
+    case tok::unknown:
+      consumeToken(tok::unknown);
+      continue;
         
     // Unambiguous top level decls.
     case tok::kw_import:
@@ -2021,6 +2017,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       StaticLoc = SourceLoc();   // we handled static if present.
       break;
     case tok::kw_typealias:
+    case tok::kw_associatedtype:
       DeclResult = parseDeclTypeAlias(!(Flags & PD_DisallowTypeAliasDef),
                                        Flags.contains(PD_InProtocol),
                                       Attributes);
@@ -2667,7 +2664,22 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
 ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
                                                   bool isAssociatedType,
                                                   DeclAttributes &Attributes) {
-  SourceLoc TypeAliasLoc = consumeToken(tok::kw_typealias);
+  SourceLoc TypeAliasLoc;
+    
+  if (isAssociatedType) {
+    if (consumeIf(tok::kw_typealias, TypeAliasLoc)) {
+      diagnose(TypeAliasLoc, diag::typealias_inside_protocol)
+        .fixItReplace(TypeAliasLoc, "associatedtype");
+    } else {
+      TypeAliasLoc = consumeToken(tok::kw_associatedtype);
+    }
+  } else {
+    if (consumeIf(tok::kw_associatedtype, TypeAliasLoc)) {
+      diagnose(TypeAliasLoc, diag::associatedtype_outside_protocol);
+      return makeParserErrorResult<TypeDecl>();
+    }
+    TypeAliasLoc = consumeToken(tok::kw_typealias);
+  }
   
   Identifier Id;
   SourceLoc IdLoc;
@@ -2675,7 +2687,7 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
 
   Status |=
       parseIdentifierDeclName(*this, Id, IdLoc, tok::colon, tok::equal,
-                              diag::expected_identifier_in_decl, "typealias");
+                              diag::expected_identifier_in_decl, isAssociatedType ? "associatedtype" : "typealias");
   if (Status.isError())
     return nullptr;
     
@@ -2689,7 +2701,14 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
 
   ParserResult<TypeRepr> UnderlyingTy;
   if (WantDefinition || Tok.is(tok::equal)) {
-    if (parseToken(tok::equal, diag::expected_equal_in_typealias)) {
+    if (Tok.is(tok::colon)) {
+      // It is a common mistake to write "typealias A : Int" instead of = Int.
+      // Recognize this and produce a fixit.
+      diagnose(Tok, diag::expected_equal_in_typealias)
+        .fixItReplace(Tok.getLoc(), "=");
+      consumeToken(tok::colon);
+    
+    } else if (parseToken(tok::equal, diag::expected_equal_in_typealias)) {
       Status.setIsParseError();
       return Status;
     }
@@ -4386,6 +4405,7 @@ ParserStatus Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     
     // See if there's a raw value expression.
     SourceLoc EqualsLoc;
+    auto NextLoc = peekToken().getLoc();
     ParserResult<Expr> RawValueExpr;
     LiteralExpr *LiteralRawValueExpr = nullptr;
     if (Tok.is(tok::equal)) {
@@ -4400,6 +4420,7 @@ ParserStatus Parser::parseDeclEnumCase(ParseDeclOptions Flags,
         return Status;
       }
       if (RawValueExpr.isNull()) {
+        diagnose(NextLoc, diag::nonliteral_enum_case_raw_value);
         Status.setIsParseError();
         return Status;
       }
@@ -4473,7 +4494,7 @@ bool Parser::parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
             /*AllowSepAfterLast=*/false, ErrorDiag, [&]() -> ParserStatus {
     // If the previous declaration didn't have a semicolon and this new
     // declaration doesn't start a line, complain.
-    if (!previousHadSemi && !Tok.isAtStartOfLine()) {
+    if (!previousHadSemi && !Tok.isAtStartOfLine() && !Tok.is(tok::unknown)) {
       SourceLoc endOfPrevious = getEndOfPreviousLoc();
       diagnose(endOfPrevious, diag::declaration_same_line_without_semi)
         .fixItInsert(endOfPrevious, ";");

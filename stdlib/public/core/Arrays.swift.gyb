@@ -325,9 +325,6 @@ public struct ${Self}<Element>
     return Builtin.castToNativeObject(_buffer.owner)
   }
   
-  // Don't inline copyBuffer - this would inline the copy loop into the current
-  // path preventing retains/releases to be matched across that region.
-  @inline(never)
   static internal func _copyBuffer(inout buffer: _Buffer) {
     let newBuffer = _ContiguousArrayBuffer<Element>(
       length: buffer.length, minimumCapacity: buffer.length)
@@ -895,10 +892,10 @@ extension ${Self} {
 internal struct _InitializeMemoryFromCollection<
   C: Collection
 > : _PointerFunction {
-  func call(rawMemory: UnsafeMutablePointer<C.Iterator.Element>, length: Int) {
+  func call(rawMemory: UnsafeMutablePointer<C.Iterator.Element>, count: Int) {
     var p = rawMemory
     var q = newValues.startIndex
-    for _ in 0..<length {
+    for _ in 0..<count {
       p.initializePointee(newValues[q])
       q = q.successor()
       p += 1
@@ -1079,8 +1076,8 @@ internal func _forceCreateUniqueMutableBufferImpl<_Buffer : _ArrayBufferProtocol
 }
 
 internal protocol _PointerFunction {
-  typealias Element
-  func call(_: UnsafeMutablePointer<Element>, length: Int)
+  associatedtype Element
+  func call(_: UnsafeMutablePointer<Element>, count: Int)
 }
 
 /// Initialize the elements of dest by copying the first headLength
@@ -1132,7 +1129,7 @@ internal func _arrayOutOfPlaceUpdate<
     // Destroy unused source items
     oldStart.deinitializePointee(count: oldLength)
 
-    initializeNewElements.call(newStart, length: newLength)
+    initializeNewElements.call(newStart, count: newLength)
 
     // Move the tail items
     newEnd.moveInitializeFrom(oldStart + oldLength, count: tailLength)
@@ -1149,7 +1146,7 @@ internal func _arrayOutOfPlaceUpdate<
     let headEnd = headStart + headLength
     let newStart = source._uninitializedCopy(headStart..<headEnd,
       target: destStart)
-    initializeNewElements.call(newStart, length: newLength)
+    initializeNewElements.call(newStart, count: newLength)
     let tailStart = headEnd + oldLength
     let tailEnd = source.endIndex
     source._uninitializedCopy(tailStart..<tailEnd, target: newEnd)
@@ -1158,8 +1155,8 @@ internal func _arrayOutOfPlaceUpdate<
 }
 
 internal struct _InitializePointer<T> : _PointerFunction {
-  internal func call(rawMemory: UnsafeMutablePointer<T>, length: Int) {
-    _sanityCheck(length == 1)
+  internal func call(rawMemory: UnsafeMutablePointer<T>, count: Int) {
+    _sanityCheck(count == 1)
     // FIXME: it would be better if we could find a way to move, here
     rawMemory.initializePointee(newValue)
   }
@@ -1173,8 +1170,8 @@ internal struct _InitializePointer<T> : _PointerFunction {
 }
 
 internal struct _IgnorePointer<T> : _PointerFunction {
-  internal func call(_: UnsafeMutablePointer<T>, length: Int) {
-    _sanityCheck(length == 0)
+  internal func call(_: UnsafeMutablePointer<T>, count: Int) {
+    _sanityCheck(count == 0)
   }
 }
 

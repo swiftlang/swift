@@ -184,22 +184,13 @@ struct D : Subscriptable {
 // materializeForSet.
 // SILGEN: sil hidden [transparent] @_TFV10addressors1Dm9subscriptFVs5Int32S1_
 // SILGEN: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[I:%.*]] : $Int32, [[SELF:%.*]] : $*D):
-// SILGEN:   debug_value [[BUFFER]]
-// SILGEN:   debug_value [[I]]
-// SILGEN:   [[BOX:%.*]] = alloc_box $D
-// SILGEN:   copy_addr [[SELF]] to [initialization] [[BOX]]#1 : $*D
 // SILGEN:   [[T0:%.*]] = function_ref @_TFV10addressors1Dau9subscriptFVs5Int32S1_
-// SILGEN:   [[PTR:%.*]] = apply [[T0]]([[I]], [[BOX]]#1)
-// SILGEN:   [[ADDR:%.*]] = struct_extract [[PTR]] : $UnsafeMutablePointer<Int32>,
-// SILGEN:   [[INIT:%.*]] = function_ref @_TFSqC
-// SILGEN:   [[META:%.*]] = metatype $@thin Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>.Type
-// SILGEN:   [[T0:%.*]] = alloc_stack $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>
-// SILGEN:   [[OPT:%.*]] = apply [[INIT]]<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>([[T0]], [[META]])
-// SILGEN:   [[T1:%.*]] = load [[T0]]
-// SILGEN:   [[T2:%.*]] = tuple ([[ADDR]] : $Builtin.RawPointer, [[T1]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>)
-// SILGEN:   dealloc_stack [[T0]]
-// SILGEN:   copy_addr [[BOX]]#1 to [[SELF]]
-// SILGEN:   strong_release [[BOX]]#0
+// SILGEN:   [[PTR:%.*]] = apply [[T0]]([[I]], [[SELF]])
+// SILGEN:   [[ADDR_TMP:%.*]] = struct_extract [[PTR]] : $UnsafeMutablePointer<Int32>,
+// SILGEN:   [[ADDR:%.*]] = pointer_to_address [[ADDR_TMP]]
+// SILGEN:   [[PTR:%.*]] = address_to_pointer [[ADDR]]
+// SILGEN:   [[OPT:%.*]] = enum $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>, #Optional.None!enumelt
+// SILGEN:   [[T2:%.*]] = tuple ([[PTR]] : $Builtin.RawPointer, [[OPT]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>)
 // SILGEN:   return [[T2]] :
 
 func make_int() -> Int32 { return 0 }
@@ -346,31 +337,26 @@ class G {
 // CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
 // CHECK:   [[T1:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 0
 // CHECK:   [[T2:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 1
-// CHECK:   [[TUPLE:%.*]] = tuple ([[T1]] : $UnsafeMutablePointer<Int32>, [[T2]] : $Builtin.NativeObject)
+//   Get the address.
+// CHECK:   [[PTR:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int32>, #UnsafeMutablePointer._rawValue
+// CHECK:   [[ADDR_TMP:%.*]] = pointer_to_address [[PTR]]
+// CHECK:   [[ADDR:%.*]] = mark_dependence [[ADDR_TMP]] : $*Int32 on [[T2]]
 //   Initialize the callback storage with the owner.
 // CHECK:   [[T0:%.*]] = alloc_value_buffer $Builtin.NativeObject in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
-// CHECK:   [[T1:%.*]] = address_to_pointer [[T0]]
-// CHECK:   [[T2:%.*]] = pointer_to_address [[T1]]
-// CHECK:   [[T3:%.*]] = tuple_extract [[TUPLE]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 1
-// CHECK:   store [[T3]] to [[T2]] : $*Builtin.NativeObject
-//   Pull out the address.
-// CHECK:   [[T0:%.*]] = tuple_extract [[TUPLE]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 0
-// CHECK:   [[ADDR_OWNER:%.*]] = tuple_extract [[TUPLE]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 1
-// CHECK:   [[PTR:%.*]] = struct_extract [[T0]] :
+// CHECK:   store [[T2]] to [[T0]] : $*Builtin.NativeObject
+// CHECK:   [[PTR:%.*]] = address_to_pointer [[ADDR]]
 //   Set up the callback.
-// CHECK:   [[T1:%.*]] = function_ref @_TFFC10addressors1Gm5valueVs5Int32U_FTBpRBBRS0_MS0__T_ :
-// CHECK:   [[CALLBACK:%.*]] = enum $Optional<{{.*}}>, #Optional.Some!enumelt.1, [[T1]]
+// CHECK:   [[CALLBACK_FN:%.*]] = function_ref @_TFFC10addressors1Gm5valueVs5Int32U_XfTBpRBBRS0_XMTS0__T_ :
+// CHECK:   [[CALLBACK:%.*]] = enum $Optional<{{.*}}>, #Optional.Some!enumelt.1, [[CALLBACK_FN]]
 //   Epilogue.
 // CHECK:   [[RESULT:%.*]] = tuple ([[PTR]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout G, @thick G.Type) -> ()>)
 // CHECK:   return [[RESULT]]
 
 //   materializeForSet callback for G.value
-// CHECK-LABEL: sil @_TFFC10addressors1Gm5valueVs5Int32U_FTBpRBBRS0_MS0__T_ : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout G, @thick G.Type) -> () {
+// CHECK-LABEL: sil hidden [transparent] @_TFFC10addressors1Gm5valueVs5Int32U_XfTBpRBBRS0_XMTS0__T_ : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout G, @thick G.Type) -> () {
 // CHECK: bb0([[BUFFER:%0]] : $Builtin.RawPointer, [[STORAGE:%1]] : $*Builtin.UnsafeValueBuffer, [[SELF:%2]] : $*G, [[SELFTYPE:%3]] : $@thick G.Type):
 // CHECK:   [[T0:%.*]] = project_value_buffer $Builtin.NativeObject in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
-// CHECK:   [[T1:%.*]] = address_to_pointer [[T0]]
-// CHECK:   [[T2:%.*]] = pointer_to_address [[T1]]
-// CHECK:   [[OWNER:%.*]] = load [[T2]]
+// CHECK:   [[OWNER:%.*]] = load [[T0]]
 // CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
 // CHECK:   dealloc_value_buffer $Builtin.NativeObject in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
 
@@ -469,30 +455,26 @@ class I {
 // CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
 // CHECK:   [[T1:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>), 0
 // CHECK:   [[T2:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>), 1
-// CHECK:   [[TUPLE:%.*]] = tuple ([[T1]] : $UnsafeMutablePointer<Int32>, [[T2]] : $Optional<Builtin.NativeObject>)
+//   Pull out the address.
+// CHECK:   [[PTR:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int32>, #UnsafeMutablePointer._rawValue
+// CHECK:   [[ADDR_TMP:%.*]] = pointer_to_address [[PTR]]
+// CHECK:   [[ADDR:%.*]] = mark_dependence [[ADDR_TMP]] : $*Int32 on [[T2]]
 //   Initialize the callback storage with the owner.
 // CHECK:   [[T0:%.*]] = alloc_value_buffer $Optional<Builtin.NativeObject> in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
-// CHECK:   [[T1:%.*]] = address_to_pointer [[T0]]
-// CHECK:   [[T2:%.*]] = pointer_to_address [[T1]]
-// CHECK:   [[T3:%.*]] = tuple_extract [[TUPLE]] : $(UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>), 1
-// CHECK:   store [[T3]] to [[T2]] : $*Optional<Builtin.NativeObject>
-//   Pull out the address.
-// CHECK:   [[T0:%.*]] = tuple_extract [[TUPLE]] : $(UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>), 0
-// CHECK:   [[PTR:%.*]] = struct_extract [[T0]] :
+// CHECK:   store [[T2]] to [[T0]] : $*Optional<Builtin.NativeObject>
+// CHECK:   [[PTR:%.*]] = address_to_pointer [[ADDR]]
 //   Set up the callback.
-// CHECK:   [[T1:%.*]] = function_ref @_TFFC10addressors1Im5valueVs5Int32U_FTBpRBBRS0_MS0__T_ :
-// CHECK:   [[CALLBACK:%.*]] = enum $Optional<{{.*}}>, #Optional.Some!enumelt.1, [[T1]] 
+// CHECK:   [[CALLBACK_FN:%.*]] = function_ref @_TFFC10addressors1Im5valueVs5Int32U_XfTBpRBBRS0_XMTS0__T_ :
+// CHECK:   [[CALLBACK:%.*]] = enum $Optional<{{.*}}>, #Optional.Some!enumelt.1, [[CALLBACK_FN]] 
 //   Epilogue.
 // CHECK:   [[RESULT:%.*]] = tuple ([[PTR]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout I, @thick I.Type) -> ()>)
 // CHECK:   return [[RESULT]]
 
 //   materializeForSet callback for I.value
-// CHECK-LABEL: sil @_TFFC10addressors1Im5valueVs5Int32U_FTBpRBBRS0_MS0__T_ : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout I, @thick I.Type) -> () {
+// CHECK-LABEL: sil hidden [transparent] @_TFFC10addressors1Im5valueVs5Int32U_XfTBpRBBRS0_XMTS0__T_ : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout I, @thick I.Type) -> () {
 // CHECK: bb0([[BUFFER:%0]] : $Builtin.RawPointer, [[STORAGE:%1]] : $*Builtin.UnsafeValueBuffer, [[SELF:%2]] : $*I, [[SELFTYPE:%3]] : $@thick I.Type):
 // CHECK:   [[T0:%.*]] = project_value_buffer $Optional<Builtin.NativeObject> in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
-// CHECK:   [[T1:%.*]] = address_to_pointer [[T0]]
-// CHECK:   [[T2:%.*]] = pointer_to_address [[T1]]
-// CHECK:   [[OWNER:%.*]] = load [[T2]]
+// CHECK:   [[OWNER:%.*]] = load [[T0]]
 // CHECK:   strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
 // CHECK:   dealloc_value_buffer $Optional<Builtin.NativeObject> in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
 

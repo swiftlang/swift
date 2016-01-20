@@ -8,7 +8,6 @@ func bar() {
   // CHECK:  [[BUFFER:%[0-9]+]] = call %swift.opaque* %projectBuffer
   // CHECK-NEXT:  [[WITNESS_TABLE_ADDR:%[0-9]+]] = getelementptr inbounds [[P_WITNESS_TABLE]], [[P_WITNESS_TABLE]]* %0, i32 0, i32 2
   // CHECK-NEXT:  [[WITNESS_TABLE:%[A-Za-z0-9_-]+]] = load i8**, i8*** [[WITNESS_TABLE_ADDR]]
-  // CHECK-NEXT: store
   // CHECK-NEXT: getelementptr inbounds i8*, i8** [[WITNESS_TABLE]], i32 3
   go().foo()
 }

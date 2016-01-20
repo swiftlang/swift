@@ -403,6 +403,14 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
     configure_sdk_unix(LINUX "Linux" "linux" "linux" "aarch64" "aarch64-unknown-linux-gnu")
     set(SWIFT_HOST_VARIANT_ARCH "aarch64")
     set(SWIFT_PRIMARY_VARIANT_ARCH_default "aarch64")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "ppc64")
+    configure_sdk_unix(LINUX "Linux" "linux" "linux" "powerpc64" "powerpc64-unknown-linux-gnu")
+    set(SWIFT_HOST_VARIANT_ARCH "powerpc64")
+    set(SWIFT_PRIMARY_VARIANT_ARCH_default "powerpc64")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "ppc64le")
+    configure_sdk_unix(LINUX "Linux" "linux" "linux" "powerpc64le" "powerpc64le-unknown-linux-gnu")
+    set(SWIFT_HOST_VARIANT_ARCH "powerpc64le")
+    set(SWIFT_PRIMARY_VARIANT_ARCH_default "powerpc64le")
   else()
     message(FATAL_ERROR "Unknown or unsupported architecture: ${CMAKE_SYSTEM_PROCESSOR}")
   endif()
@@ -579,6 +587,11 @@ endif()
 
 set(SWIFT_PRIMARY_VARIANT_SUFFIX
     "-${SWIFT_SDK_${SWIFT_PRIMARY_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_PRIMARY_VARIANT_ARCH}")
+
+# Clear universal library names to prevent adding duplicates
+foreach(sdk ${SWIFT_SDKS})
+  unset(UNIVERSAL_LIBRARY_NAMES_${SWIFT_SDK_${sdk}_LIB_SUBDIR} CACHE)
+endforeach()
 
 message(STATUS "Building host Swift tools for ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH}")
 message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")

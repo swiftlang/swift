@@ -85,6 +85,7 @@ namespace swift {
   class IRGenOptions;
   class NormalProtocolConformance;
   class ProtocolConformance;
+  class TypeMetadataRecord;
   class ProtocolCompositionType;
   class ProtocolDecl;
   struct SILDeclRef;
@@ -204,6 +205,9 @@ public:
   /// Emit the protocol conformance records needed by each IR module.
   void emitProtocolConformances();
 
+  /// Emit type metadata records for types without explicit protocol conformance.
+  void emitTypeMetadataRecords();
+
   /// Emit everything which is reachable from already emitted IR.
   void emitLazyDefinitions();
   
@@ -322,6 +326,9 @@ public:
   /// Does the current target require Objective-C interoperation?
   bool ObjCInterop = true;
 
+  /// Should we add value names to local IR values?
+  bool EnableValueNames = false;
+
   llvm::Type *VoidTy;                  /// void (usually {})
   llvm::IntegerType *Int1Ty;           /// i1
   llvm::IntegerType *Int8Ty;           /// i8
@@ -382,6 +389,8 @@ public:
   llvm::PointerType *ObjCBlockPtrTy;   /// %objc_block*
   llvm::StructType *ProtocolConformanceRecordTy;
   llvm::PointerType *ProtocolConformanceRecordPtrTy;
+  llvm::StructType *TypeMetadataRecordTy;
+  llvm::PointerType *TypeMetadataRecordPtrTy;
   llvm::PointerType *ErrorPtrTy;       /// %swift.error*
   llvm::StructType *OpenedErrorTripleTy; /// { %swift.opaque*, %swift.type*, i8** }
   llvm::PointerType *OpenedErrorTriplePtrTy; /// { %swift.opaque*, %swift.type*, i8** }*
@@ -517,6 +526,7 @@ public:
   bool isResilient(Decl *decl, ResilienceExpansion expansion);
   ResilienceExpansion getResilienceExpansionForAccess(NominalTypeDecl *decl);
   ResilienceExpansion getResilienceExpansionForLayout(NominalTypeDecl *decl);
+  ResilienceExpansion getResilienceExpansionForLayout(SILGlobalVariable *var);
 
   SpareBitVector getSpareBitsForType(llvm::Type *scalarTy, Size size);
   
@@ -549,6 +559,7 @@ public:
                                 ArrayRef<FieldTypeInfo> fieldTypes,
                                 llvm::Function *fn);
   llvm::Constant *emitProtocolConformances();
+  llvm::Constant *emitTypeMetadataRecords();
 
   llvm::Constant *getOrCreateHelperFunction(StringRef name,
                                             llvm::Type *resultType,
@@ -586,6 +597,8 @@ private:
   SmallVector<llvm::WeakVH, 4> ObjCCategories;
   /// List of protocol conformances to generate records for.
   SmallVector<NormalProtocolConformance *, 4> ProtocolConformances;
+  /// List of nominal types to generate type metadata records for.
+  SmallVector<CanType, 4> RuntimeResolvableTypes;
   /// List of ExtensionDecls corresponding to the generated
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
@@ -782,7 +795,9 @@ public:
   Address getAddrOfObjCISAMask();
 
   StringRef mangleType(CanType type, SmallVectorImpl<char> &buffer);
-  
+ 
+  bool hasMetadataPattern(NominalTypeDecl *theDecl);
+ 
   // Get the ArchetypeBuilder for the currently active generic context. Crashes
   // if there is no generic context.
   ArchetypeBuilder &getContextArchetypes();
@@ -808,6 +823,7 @@ private:
                                        llvm::Type *defaultType);
 
   void emitLazyPrivateDefinitions();
+  void addRuntimeResolvableType(CanType type);
 
 //--- Global context emission --------------------------------------------------
 public:

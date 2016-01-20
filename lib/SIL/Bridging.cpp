@@ -30,7 +30,7 @@ using namespace swift::Lowering;
 
 SILType TypeConverter::getLoweredTypeOfGlobal(VarDecl *var) {
   AbstractionPattern origType = getAbstractionPattern(var);
-  assert(!origType.isOpaque());
+  assert(!origType.isTypeParameter());
   return getLoweredType(origType, origType.getType()).getObjectType();
 }
 

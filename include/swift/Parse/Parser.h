@@ -707,7 +707,7 @@ public:
 
   bool parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                              DeclAttrKind DK);
-  
+
   /// Parse a version tuple of the form x[.y[.z]]. Returns true if there was
   /// an error parsing.
   bool parseVersionTuple(clang::VersionTuple &Version, SourceRange &Range,
@@ -1207,6 +1207,20 @@ public:
   ParserResult<AvailabilitySpec> parseAvailabilitySpec();
   ParserResult<VersionConstraintAvailabilitySpec> parseVersionConstraintSpec();
 };
+
+/// Parse a stringified Swift declaration name, e.g. "init(frame:)".
+StringRef parseDeclName(StringRef name,
+                        SmallVectorImpl<StringRef> &argumentLabels,
+                        bool &isFunctionName);
+
+/// Form a Swift declaration name from its constituent parts.
+DeclName formDeclName(ASTContext &ctx,
+                      StringRef baseName,
+                      ArrayRef<StringRef> argumentLabels,
+                      bool isFunctionName);
+
+/// Parse a stringified Swift declaration name, e.g. "init(frame:)".
+DeclName parseDeclName(ASTContext &ctx, StringRef name);
 
 } // end namespace swift
 

@@ -19,16 +19,16 @@
 // probably not worth trying to write one unique generator - let's
 // just use these helpers manually and write the bulk of each one
 %{
-def getMirrorConformance(Self,Disp = None):
+def getMirrorConformance(Self, Disp=None):
   return gyb.executeTemplate(
-    TMirrorConformance,introspecteeType=Self,disposition=Disp)
+    TMirrorConformance, introspecteeType=Self, disposition=Disp)
 
-def getMirrorBoilerplate(Self,Disp = None):
+def getMirrorBoilerplate(Self, Disp=None):
   return gyb.executeTemplate(
-    TMirrorBoilerplate,introspecteeType=Self,disposition=Disp)
+    TMirrorBoilerplate, introspecteeType=Self, disposition=Disp)
 
-def getMirrorDecl(Self,Disp = None):
-  return gyb.executeTemplate(TMirrorDecl,introspecteeType=Self,disposition=Disp)
+def getMirrorDecl(Self, Disp=None):
+  return gyb.executeTemplate(TMirrorDecl, introspecteeType=Self, disposition=Disp)
 }%
 
 // actual Mirrors

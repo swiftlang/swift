@@ -131,6 +131,13 @@ func missingControllingExprInRepeatWhile() {
   } while { true }() // expected-error{{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{10-10=;}}
 }
 
+// SR-165
+func missingWhileInRepeat() {
+  repeat {
+  } // expected-error {{expected 'while' after body of 'repeat' statement}}
+}
+
+// expected-note @+1 {{in call to function 'acceptsClosure'}}
 func acceptsClosure<T>(t: T) -> Bool { return true }
 
 func missingControllingExprInFor() {
@@ -174,7 +181,7 @@ func missingControllingExprInFor() {
   }
 
   // A trailing closure is not accepted for the condition.
-  for ; acceptsClosure { 42 }; { // expected-error{{does not conform to protocol 'Boolean'}} expected-error{{expression resolves to an unused function}}
+  for ; acceptsClosure { 42 }; { // expected-error{{generic parameter 'T' could not be inferred}} expected-error{{expression resolves to an unused function}}
 // expected-error@-1{{expected ';' in 'for' statement}}
 // expected-error@-2{{braced block}}
   }
@@ -261,7 +268,7 @@ struct ErrorTypeInVarDecl1 {
 }
 
 struct ErrorTypeInVarDecl2 {
-  var v1 : Int. // expected-error {{expected identifier in dotted type}} expected-error {{postfix '.' is reserved}}
+  var v1 : Int. // expected-error {{expected member name following '.'}}
   var v2 : Int
 }
 
@@ -416,7 +423,7 @@ struct MissingInitializer1 {
 //===--- Recovery for expr-postfix.
 
 func exprPostfix1(x : Int) {
-  x. // expected-error {{postfix '.' is reserved}} expected-error {{expected member name following '.'}}
+  x. // expected-error {{expected member name following '.'}}
 }
 
 func exprPostfix2() {
@@ -435,7 +442,7 @@ class ExprSuper1 {
 
 class ExprSuper2 {
   init() {
-    super. // expected-error {{postfix '.' is reserved}} expected-error {{expected identifier or 'init' after super '.' expression}}
+    super. // expected-error {{expected member name following '.'}} expected-error {{expected '.' or '[' after 'super'}}
   }
 }
 
@@ -651,3 +658,11 @@ func r21712891(s : String) -> String {
   return "\(s[a)"  // expected-error 3 {{}}
 }
 
+
+// <rdar://problem/24029542> "Postfix '.' is reserved" error message" isn't helpful
+func postfixDot(a : String) {
+  _ = a.utf8
+  _ = a.   utf8  // expected-error {{extraneous whitespace after '.' is not permitted}} {{9-12=}}
+  _ = a.       // expected-error {{expected member name following '.'}}
+    a.         // expected-error {{expected member name following '.'}}
+}

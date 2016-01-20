@@ -99,7 +99,10 @@ SIMPLE_DECL_ATTR(required, Required,
 SIMPLE_DECL_ATTR(optional, Optional,
                  OnConstructor|OnFunc|OnVar|OnSubscript|DeclModifier, 5)
 
-/// NOTE: 6 is unused.
+DECL_ATTR(swift3_migration, Swift3Migration,
+          OnEnum | OnStruct | OnClass | OnProtocol | OnTypeAlias |
+          OnVar | OnSubscript | OnConstructor | OnFunc | OnEnumElement |
+          OnGenericTypeParam | OnAssociatedType | LongAttribute, 6)
 
 SIMPLE_DECL_ATTR(noreturn, NoReturn, OnFunc, 7)
 
@@ -159,7 +162,7 @@ SIMPLE_DECL_ATTR(nonobjc, NonObjC,
                  OnFunc | OnVar | OnSubscript | OnConstructor, 30)
 
 SIMPLE_DECL_ATTR(_fixed_layout, FixedLayout,
-                 OnClass | OnStruct | OnEnum | UserInaccessible, 31)
+                 OnVar | OnClass | OnStruct | OnEnum | UserInaccessible, 31)
 
 // Non-serialized attributes.
 
@@ -238,8 +241,6 @@ SIMPLE_DECL_ATTR(indirect, Indirect,
 
 SIMPLE_DECL_ATTR(warn_unqualified_access, WarnUnqualifiedAccess,
                  OnFunc /*| OnVar*/ | LongAttribute, 61)
-
-DECL_ATTR(_migration_id, MigrationId, OnAnyDecl, 62)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

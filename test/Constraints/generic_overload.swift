@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
-protocol P1 { typealias Assoc }
-protocol P2 : P1 { typealias Assoc }
+protocol P1 { associatedtype Assoc }
+protocol P2 : P1 { associatedtype Assoc }
 protocol P3 { }
 
 struct X1 : P1 { typealias Assoc = X3 }

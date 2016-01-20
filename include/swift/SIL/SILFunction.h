@@ -135,7 +135,8 @@ private:
 
   /// The function's set of semantics attributes.
   ///
-  /// TODO: Why is this using a std::string? Why don't we use StringRef.
+  /// TODO: Why is this using a std::string? Why don't we use uniqued
+  /// StringRefs?
   llvm::SmallVector<std::string, 1> SemanticsAttrSet;
 
   /// The function's effects attribute.
@@ -353,7 +354,7 @@ public:
   /// specific string.
   ///
   /// TODO: This needs a better name.
-  bool hasSemanticsAttrsThatStartsWith(StringRef S) {
+  bool hasSemanticsAttrThatStartsWith(StringRef S) {
     return count_if(getSemanticsAttrs(), [&S](const std::string &Attr) -> bool {
       return StringRef(Attr).startswith(S);
     });
@@ -380,7 +381,6 @@ public:
     auto Iter =
         std::remove(SemanticsAttrSet.begin(), SemanticsAttrSet.end(), Ref);
     SemanticsAttrSet.erase(Iter);
-    std::sort(SemanticsAttrSet.begin(), SemanticsAttrSet.end());
   }
 
   /// \returns True if the function is optimizable (i.e. not marked as no-opt),

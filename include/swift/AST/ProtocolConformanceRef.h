@@ -36,7 +36,12 @@ namespace swift {
 /// ProtocolConformanceRef allows the efficient recovery of the protocol
 /// even when the conformance is abstract.
 class ProtocolConformanceRef {
-  llvm::PointerUnion<ProtocolDecl*, ProtocolConformance*> Union;
+  using UnionType = llvm::PointerUnion<ProtocolDecl*, ProtocolConformance*>;
+  UnionType Union;
+
+  explicit ProtocolConformanceRef(UnionType value) : Union(value) {
+    assert(value && "cannot construct ProtocolConformanceRef with null");
+  }
 public:
   /// Create an abstract protocol conformance reference.
   explicit ProtocolConformanceRef(ProtocolDecl *proto) : Union(proto) {
@@ -63,6 +68,12 @@ public:
   bool isAbstract() const { return Union.is<ProtocolDecl*>(); }
   ProtocolDecl *getAbstract() const {
     return Union.get<ProtocolDecl*>();
+  }
+
+  using OpaqueValue = void*;
+  OpaqueValue getOpaqueValue() const { return Union.getOpaqueValue(); }
+  static ProtocolConformanceRef getFromOpaqueValue(OpaqueValue value) {
+    return ProtocolConformanceRef(UnionType::getFromOpaqueValue(value));
   }
 
   /// Return the protocol requirement.

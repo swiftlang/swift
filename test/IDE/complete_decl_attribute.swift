@@ -43,9 +43,10 @@ func method(@#^KEYWORD1^#) {}
 @#^KEYWORD2^#
 func method(){}
 
-// KEYWORD2:                  Begin completions, 9 items
+// KEYWORD2:                  Begin completions, 10 items
 // KEYWORD2-NEXT:             Keyword/None:                       available[#Func Attribute#]; name=available{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       objc[#Func Attribute#]; name=objc{{$}}
+// KEYWORD2-NEXT:             Keyword/None:                       swift3_migration[#Func Attribute#]; name=swift3_migration{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       noreturn[#Func Attribute#]; name=noreturn{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       IBAction[#Func Attribute#]; name=IBAction{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       NSManaged[#Func Attribute#]; name=NSManaged{{$}}
@@ -58,9 +59,10 @@ func method(){}
 @#^KEYWORD3^#
 class C {}
 
-// KEYWORD3:                  Begin completions, 7 items
+// KEYWORD3:                  Begin completions, 8 items
 // KEYWORD3-NEXT:             Keyword/None:                       available[#Class Attribute#]; name=available{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       objc[#Class Attribute#]; name=objc{{$}}
+// KEYWORD3-NEXT:             Keyword/None:                       swift3_migration[#Class Attribute#]; name=swift3_migration{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       IBDesignable[#Class Attribute#]; name=IBDesignable{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       UIApplicationMain[#Class Attribute#]; name=UIApplicationMain{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       requires_stored_property_inits[#Class Attribute#]; name=requires_stored_property_inits{{$}}
@@ -70,24 +72,27 @@ class C {}
 
 @#^KEYWORD4^#
 enum E {}
-// KEYWORD4:                  Begin completions, 2 items
+// KEYWORD4:                  Begin completions, 3 items
 // KEYWORD4-NEXT:             Keyword/None:                       available[#Enum Attribute#]; name=available{{$}}
 // KEYWORD4-NEXT:             Keyword/None:                       objc[#Enum Attribute#]; name=objc{{$}}
+// KEYWORD4-NEXT:             Keyword/None:                       swift3_migration[#Enum Attribute#]; name=swift3_migration{{$}}
 // KEYWORD4-NEXT:             End completions
 
 
 @#^KEYWORD5^#
 struct S{}
-// KEYWORD5:                  Begin completions, 1 items
+// KEYWORD5:                  Begin completions, 2 items
 // KEYWORD5-NEXT:             Keyword/None:                       available[#Struct Attribute#]; name=available{{$}}
+// KEYWORD5-NEXT:             Keyword/None:                       swift3_migration[#Struct Attribute#]; name=swift3_migration{{$}}
 // KEYWORD5-NEXT:             End completions
 
 
 @#^KEYWORD_LAST^#
 
-// KEYWORD_LAST:                  Begin completions, 19 items
+// KEYWORD_LAST:                  Begin completions, 20 items
 // KEYWORD_LAST-NEXT:             Keyword/None:                       available[#Declaration Attribute#]; name=available{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       objc[#Declaration Attribute#]; name=objc{{$}}
+// KEYWORD_LAST-NEXT:             Keyword/None:                       swift3_migration[#Declaration Attribute#]; name=swift3_migration{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       noreturn[#Declaration Attribute#]; name=noreturn{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       NSCopying[#Declaration Attribute#]; name=NSCopying{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       IBAction[#Declaration Attribute#]; name=IBAction{{$}}

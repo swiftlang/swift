@@ -68,25 +68,6 @@ void TypeInfo::initialize(IRGenFunction &IGF, Address dest, Address src,
   }
 }
 
-Address TypeInfo::initializeBufferWithTake(IRGenFunction &IGF,
-                                           Address destBuffer,
-                                           Address srcAddr,
-                                           SILType T) const {
-  Address destAddr = emitAllocateBuffer(IGF, T, destBuffer);
-  initializeWithTake(IGF, destAddr, srcAddr, T);
-  return destAddr;
-}
-
-Address TypeInfo::initializeBufferWithCopy(IRGenFunction &IGF,
-                                           Address destBuffer,
-                                           Address srcAddr,
-                                           SILType T) const {
-  Address destAddr = emitAllocateBuffer(IGF, T, destBuffer);
-  initializeWithCopy(IGF, destAddr, srcAddr, T);
-  return destAddr;
-}
-
-
 bool TypeInfo::isSingleRetainablePointer(ResilienceExpansion expansion,
                                          ReferenceCounting *refcounting) const {
   return false;
@@ -879,7 +860,10 @@ void TypeConverter::popGenericContext(CanGenericSignature signature) {
 }
 
 ArchetypeBuilder &TypeConverter::getArchetypes() {
-  return IGM.SILMod->Types.getArchetypes();
+  auto moduleDecl = IGM.SILMod->getSwiftModule();
+  auto genericSig = IGM.SILMod->Types.getCurGenericContext();
+  return *moduleDecl->getASTContext()
+      .getOrCreateArchetypeBuilder(genericSig, moduleDecl);
 }
 
 ArchetypeBuilder &IRGenModule::getContextArchetypes() {
@@ -2037,8 +2021,12 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     if (tuple->getNumElements() == 1)
       return t.getTupleElementType(0);
 
-  // TODO: Consider resilience for structs and enums.
   if (auto structDecl = t.getStructOrBoundGenericStruct()) {
+    // If the struct has to be accessed resiliently from this resilience domain,
+    // we can't assume anything about its layout.
+    if (IGM.isResilient(structDecl, expansion))
+      return SILType();
+
     // C ABI wackiness may cause a single-field struct to have different layout
     // from its field.
     if (structDecl->hasUnreferenceableStorage()
@@ -2056,6 +2044,11 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
   }
 
   if (auto enumDecl = t.getEnumOrBoundGenericEnum()) {
+    // If the enum has to be accessed resiliently from this resilience domain,
+    // we can't assume anything about its layout.
+    if (IGM.isResilient(enumDecl, expansion))
+      return SILType();
+
     auto allCases = enumDecl->getAllElements();
     
     auto theCase = allCases.begin();

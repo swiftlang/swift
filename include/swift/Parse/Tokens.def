@@ -63,6 +63,7 @@ DECL_KEYWORD(protocol)
 DECL_KEYWORD(struct)
 DECL_KEYWORD(subscript)
 DECL_KEYWORD(typealias)
+DECL_KEYWORD(associatedtype)
 DECL_KEYWORD(var)
 
 DECL_KEYWORD(internal)

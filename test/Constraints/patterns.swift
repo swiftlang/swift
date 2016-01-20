@@ -167,8 +167,8 @@ default: break
 
 // FIXME: rdar://problem/23378003
 // These will eventually become errors.
-for (var x) in 0...100 {} // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{6-9=}}
-for var x in 0...100 {}  // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{5-9=}}
+for (var x) in 0...100 {} // expected-error {{Use of 'var' binding here is not allowed}} {{6-9=}}
+for var x in 0...100 {}  // expected-error {{Use of 'var' binding here is not allowed}} {{5-9=}}
 
 for (let x) in 0...100 {} // expected-error {{'let' pattern is already in an immutable context}}
 
@@ -181,7 +181,7 @@ let (var z) = 42  // expected-error {{'var' cannot appear nested inside another 
 // at least we don't crash anymore.
 
 protocol PP {
-  typealias E
+  associatedtype E
 }
 
 struct A<T> : PP {
@@ -209,16 +209,14 @@ func good(a: A<EE>) -> Int {
 }
 
 func bad(a: A<EE>) {
-  a.map { // expected-error {{cannot invoke 'map' with an argument list of type '((EE) -> _)'}}
-  // expected-note@-1 {{expected an argument list of type '(EE -> T)'}}
+  a.map { // expected-error {{generic parameter 'T' could not be inferred}}
     let _: EE = $0
     return 1
   }
 }
 
 func ugly(a: A<EE>) {
-  a.map { // expected-error {{cannot invoke 'map' with an argument list of type '((EE) -> _)'}}
-  // expected-note@-1 {{expected an argument list of type '(EE -> T)'}}
+  a.map { // expected-error {{generic parameter 'T' could not be inferred}}
     switch $0 {
     case .A:
       return 1

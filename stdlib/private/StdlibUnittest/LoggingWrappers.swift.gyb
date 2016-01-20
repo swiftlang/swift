@@ -11,13 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 public protocol Wrapper {
-  typealias Base
+  associatedtype Base
   init(_: Base)
   var base: Base {get set}
 }
 
 public protocol LoggingType : Wrapper {
-  typealias Log : AnyObject
+  associatedtype Log : AnyObject
 }
 
 extension LoggingType {

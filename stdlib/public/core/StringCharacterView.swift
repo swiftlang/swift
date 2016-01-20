@@ -150,7 +150,7 @@ extension String.CharacterView : Collection {
           unicodeScalars[start].value)
       start._successorInPlace()
 
-      for ; start != end; start._successorInPlace() {
+      while start != end {
         // FIXME(performance): consider removing this "fast path".  A branch
         // that is hard to predict could be worse for performance than a few
         // loads from cache to fetch the property 'gcb1'.
@@ -163,6 +163,7 @@ extension String.CharacterView : Collection {
           break
         }
         gcb0 = gcb1
+        start._successorInPlace()
       }
 
       return start._position - startIndexUTF16

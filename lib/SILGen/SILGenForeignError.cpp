@@ -213,8 +213,6 @@ SILValue SILGenFunction::
 emitBridgeReturnValueForForeignError(SILLocation loc,
                                      SILValue result,
                                      SILFunctionTypeRepresentation repr,
-                                     AbstractionPattern origNativeType,
-                                     CanType substNativeType,
                                      SILType bridgedType,
                                      SILValue foreignErrorSlot,
                                const ForeignErrorConvention &foreignError) {
@@ -242,8 +240,7 @@ emitBridgeReturnValueForForeignError(SILLocation loc,
       bridgedType.getSwiftRValueType().getAnyOptionalObjectType(optKind);
     ManagedValue bridgedResult =
       emitNativeToBridgedValue(loc, emitManagedRValueWithCleanup(result),
-                               repr, origNativeType, substNativeType,
-                               bridgedObjectType);
+                               repr, bridgedObjectType);
 
     auto someResult =
       B.createOptionalSome(loc, bridgedResult.forward(*this), optKind,
@@ -260,8 +257,7 @@ emitBridgeReturnValueForForeignError(SILLocation loc,
     // The actual result value just needs to be bridged normally.
     ManagedValue bridgedValue =
       emitNativeToBridgedValue(loc, emitManagedRValueWithCleanup(result),
-                               repr, origNativeType, substNativeType,
-                               bridgedType.getSwiftRValueType());
+                               repr, bridgedType.getSwiftRValueType());
     return bridgedValue.forward(*this);
   }
   }

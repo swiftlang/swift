@@ -283,8 +283,6 @@ void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
   switch (Term->getTermKind()) {
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
-  case TermKind::Invalid:
-    llvm_unreachable("Unexpected terminator kind!");
 
   case TermKind::UnreachableInst:
   case TermKind::SwitchValueInst:
@@ -371,9 +369,6 @@ void DCE::propagateLiveness(SILInstruction *I) {
   }
 
   switch (ValueKindAsTermKind(I->getKind())) {
-  case TermKind::Invalid:
-    llvm_unreachable("Unexpected terminator instruction!");
-
   case TermKind::BranchInst:
   case TermKind::UnreachableInst:
     return;

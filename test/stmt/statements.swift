@@ -266,7 +266,7 @@ func RepeatWhileStmt1() {
 }
 
 func RepeatWhileStmt2() {
-  repeat // expected-error {{expected '{' after 'repeat'}}
+  repeat // expected-error {{expected '{' after 'repeat'}} expected-error {{expected 'while' after body of 'repeat' statement}}
 }
 
 func RepeatWhileStmt4() {
@@ -444,6 +444,23 @@ func for_loop_multi_iter() {
 func r23684220(b: Any) {
   if let _ = b ?? b {} // expected-error {{initializer for conditional binding must have Optional type, not 'Any' (aka 'protocol<>')}}
 }
+
+
+// <rdar://problem/21080671> QoI: try/catch (instead of do/catch) creates silly diagnostics
+func f21080671() {
+  try {  // expected-error {{the 'do' keyword is used to specify a 'catch' region}} {{3-6=do}}
+  } catch { }
+  
+  
+  try {  // expected-error {{the 'do' keyword is used to specify a 'catch' region}} {{3-6=do}}
+    f21080671()
+  } catch let x as Int {
+  } catch {
+  }
+}
+
+
+
 
 // Errors in case syntax
 class

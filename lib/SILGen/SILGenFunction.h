@@ -1083,6 +1083,7 @@ public:
                                        FuncDecl *witness,
                                        ArrayRef<Substitution> witnessSubs,
                                        ArrayRef<ManagedValue> params);
+  void emitMaterializeForSet(FuncDecl *decl);
 
   SILDeclRef getAddressorDeclRef(AbstractStorageDecl *decl,
                                  AccessKind accessKind,
@@ -1347,8 +1348,6 @@ public:
   /// convention.
   ManagedValue emitNativeToBridgedValue(SILLocation loc, ManagedValue v,
                                         SILFunctionTypeRepresentation destRep,
-                                        AbstractionPattern origNativeTy,
-                                        CanType substNativeTy,
                                         CanType bridgedTy);
   
   /// Convert a value received as the result or argument of a function with
@@ -1376,8 +1375,6 @@ public:
   emitBridgeReturnValueForForeignError(SILLocation loc,
                                        SILValue result,
                                        SILFunctionTypeRepresentation repr,
-                                       AbstractionPattern origNativeType,
-                                       CanType substNativeType,
                                        SILType bridgedResultType,
                                        SILValue foreignErrorSlot,
                                  const ForeignErrorConvention &foreignError);

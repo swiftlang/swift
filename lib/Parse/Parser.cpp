@@ -761,3 +761,91 @@ ConfigParserState swift::operator||(ConfigParserState lhs,
 ConfigParserState swift::operator!(ConfigParserState Result) {
   return ConfigParserState(!Result.isConditionActive(), Result.getKind());
 }
+
+/// Parse a stringified Swift declaration name, e.g. "init(frame:)".
+StringRef swift::parseDeclName(StringRef name,
+                               SmallVectorImpl<StringRef> &argumentLabels,
+                               bool &isFunctionName) {
+  if (name.empty()) return "";
+
+  if (name.back() != ')') {
+    isFunctionName = false;
+    if (Lexer::isIdentifier(name) && name != "_")
+      return name;
+
+    return "";
+  }
+
+  isFunctionName = true;
+
+  StringRef BaseName, Parameters;
+  std::tie(BaseName, Parameters) = name.split('(');
+  if (!Lexer::isIdentifier(BaseName) || BaseName == "_")
+    return "";
+
+  if (Parameters.empty())
+    return "";
+  Parameters = Parameters.drop_back(); // ')'
+
+  if (Parameters.empty())
+    return BaseName;
+
+  if (Parameters.back() != ':')
+    return "";
+
+  do {
+    StringRef NextParam;
+    std::tie(NextParam, Parameters) = Parameters.split(':');
+
+    if (!Lexer::isIdentifier(NextParam))
+      return "";
+    Identifier NextParamID;
+    if (NextParam == "_")
+      argumentLabels.push_back("");
+    else
+      argumentLabels.push_back(NextParam);
+  } while (!Parameters.empty());
+
+  return BaseName;
+}
+
+DeclName swift::formDeclName(ASTContext &ctx,
+                             StringRef baseName,
+                             ArrayRef<StringRef> argumentLabels,
+                             bool isFunctionName) {
+  // We cannot import when the base name is not an identifier.
+  if (baseName.empty() || !Lexer::isIdentifier(baseName))
+    return DeclName();
+
+  // Get the identifier for the base name.
+  Identifier baseNameId = ctx.getIdentifier(baseName);
+
+  // For non-functions, just use the base name.
+  if (!isFunctionName) return baseNameId;
+
+  // For functions, we need to form a complete name.
+
+  // Convert the argument names.
+  SmallVector<Identifier, 4> argumentLabelIds;
+  for (auto argName : argumentLabels) {
+    if (argumentLabels.empty() || !Lexer::isIdentifier(argName)) {
+      argumentLabelIds.push_back(Identifier());
+      continue;
+    }
+
+    argumentLabelIds.push_back(ctx.getIdentifier(argName));
+  }
+
+  // Build the result.
+  return DeclName(ctx, baseNameId, argumentLabelIds);
+}
+
+DeclName swift::parseDeclName(ASTContext &ctx, StringRef name) {
+  // Parse the name string.
+  SmallVector<StringRef, 4> argumentLabels;
+  bool isFunctionName;
+  StringRef baseName = parseDeclName(name, argumentLabels, isFunctionName);
+
+  // Form the result.
+  return formDeclName(ctx, baseName, argumentLabels, isFunctionName);
+}

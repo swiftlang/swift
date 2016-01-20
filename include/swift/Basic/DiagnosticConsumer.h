@@ -28,7 +28,7 @@ namespace swift {
 
 /// \brief Describes the kind of diagnostic.
 ///
-enum class DiagnosticKind {
+enum class DiagnosticKind : uint8_t {
   Error,
   Warning,
   Note

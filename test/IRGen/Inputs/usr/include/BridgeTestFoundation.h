@@ -46,7 +46,7 @@ void setBar(NSString *s);
 
 typedef struct __CGImage *CGImageRef;
 
-__attribute__((availability(macosx,introduced=10.10)))
+__attribute__((availability(macosx,introduced=10.51)))
 @interface NSUserNotificationAction : NSObject
 @end
 

@@ -157,7 +157,7 @@ do not have any overriding declarations in the same file:
   func usingE(e: E) {
     e.doSomething() // There is no sub class in the file that declares this class.
                     // The compiler can remove virtual calls to doSomething()
-                    // and directly call A’s doSomething method.
+                    // and directly call A's doSomething method.
   }
 
   func usingF(f: F) -> Int {

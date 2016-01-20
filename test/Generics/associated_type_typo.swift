@@ -4,11 +4,11 @@
 // RUN: FileCheck -check-prefix CHECK-GENERIC %s < %t.dump
 
 protocol P1 {
-  typealias Assoc
+  associatedtype Assoc
 }
 
 protocol P2 {
-  typealias AssocP2 : P1
+  associatedtype AssocP2 : P1
 }
 
 protocol P3 { }

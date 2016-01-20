@@ -7,7 +7,7 @@ compiler and make an effort to optimize and shrink the generated binaries. One
 of the problems that we have today is that swift symbols are mangled into
 extremely long strings. This is especially a problem for libraries, and almost
 half of the size of libswiftCore.dylib (the swift runtime library on x86_64 OSX)
-is string tables. On MacOSX you can use the command ’size -m file.dylib’ to read
+is string tables. On MacOSX you can use the command "size -m file.dylib" to read
 the size of the string table. C++ also suffers from the problem of long names,
 but since we control the Swift ABI we can do better than C++.
 
@@ -99,7 +99,7 @@ the top 63 frequent substrings in our dictionary using two characters (escape + 
 The second escape character encodes a two-character reference that can access 63 x 63 entries in the table.
 Less common substrings can be encoded using this three character sequence (escape + index0 + index1).
 
-One interesting bit of information is that the character ‘Y’ is only used 4
+One interesting bit of information is that the character "Y" is only used 4
 times in the entire standard library! The letter J, and a few other letters are
 also not used very frequently. We use Y and J as escape characters.
 
@@ -107,7 +107,7 @@ The dictionary-based encoding uses the following rules:
 
 1. We use two escape characters that are not frequently used in names (Y and Z).
 These characters are escape character and cannot be used as part of the text
-without escaping. ‘Y’ is encoded as ‘YY’, and ‘Z’ would be encoded as ‘YZ’.
+without escaping. "Y" is encoded as "YY", and "Z" would be encoded as "YZ".
 
 2. The most commonly used sub-strings (calculated as length of substring times
 number of occurrences) is encoded with a single escape character and a
@@ -216,7 +216,7 @@ Error handling
 The compression routines only handle characters that are in the list of valid
 characters.  It is possible to compress every string that uses the valid
 character set. However, now all incoming strings are legal. For example the
-string "Y" is illegal because 'Y' is an escape character and the decoded expects
+string "Y" is illegal because "Y" is an escape character and the decoded expects
 another character to follow the escape character.
 
 There are a few users that will use the compression routines: The

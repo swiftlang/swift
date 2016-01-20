@@ -17,6 +17,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Parse/Parser.h"
 #include "swift/Serialization/BCReadingExtras.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -769,7 +770,7 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
         auto subject = TypeLoc::withoutLoc(getType(rawTypeIDs[0]));
         auto constraint = TypeLoc::withoutLoc(getType(rawTypeIDs[1]));
 
-        requirements.push_back(RequirementRepr::getConformance(subject,
+        requirements.push_back(RequirementRepr::getTypeConstraint(subject,
                                                            SourceLoc(),
                                                            constraint));
         break;
@@ -784,6 +785,7 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
         break;
       }
 
+      case GenericRequirementKind::Superclass:
       case WitnessMarker: {
         // Shouldn't happen where we have requirement representations.
         error();
@@ -863,6 +865,14 @@ void ModuleFile::readGenericRequirements(
         auto constraint = getType(rawTypeIDs[1]);
 
         requirements.push_back(Requirement(RequirementKind::Conformance,
+                                           subject, constraint));
+        break;
+      }
+      case GenericRequirementKind::Superclass: {
+        auto subject = getType(rawTypeIDs[0]);
+        auto constraint = getType(rawTypeIDs[1]);
+
+        requirements.push_back(Requirement(RequirementKind::Superclass,
                                            subject, constraint));
         break;
       }
@@ -1974,6 +1984,22 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         break;
       }
 
+      case decls_block::Swift3Migration_DECL_ATTR: {
+        bool isImplicit;
+        uint64_t renameLength;
+        uint64_t messageLength;
+        serialization::decls_block::Swift3MigrationDeclAttrLayout::readRecord(
+          scratch, isImplicit, renameLength, messageLength);
+        StringRef renameStr = blobData.substr(0, renameLength);
+        StringRef message = blobData.substr(renameLength,
+                                            renameLength + messageLength);
+        DeclName renamed = parseDeclName(getContext(), renameStr);
+        Attr = new (ctx) Swift3MigrationAttr(SourceLoc(), SourceLoc(),
+                                             SourceLoc(), renamed,
+                                             message, SourceLoc(), isImplicit);
+        break;
+      }
+
       case decls_block::WarnUnusedResult_DECL_ATTR: {
         bool isImplicit;
         uint64_t endOfMessageIndex;
@@ -1987,21 +2013,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                               ctx.AllocateCopy(message),
                                               ctx.AllocateCopy(mutableVariant),
                                               SourceLoc(), isImplicit);
-        break;
-      }
-
-      case decls_block::MigrationId_DECL_ATTR: {
-        uint64_t endOfIdentIndex;
-        serialization::decls_block::MigrationIdDeclAttrLayout::readRecord(
-          scratch, endOfIdentIndex);
-
-        StringRef ident = blobData.substr(0, endOfIdentIndex);
-        StringRef pattern = blobData.substr(endOfIdentIndex);
-        Attr = new (ctx) MigrationIdAttr(SourceLoc(), SourceLoc(),
-                                         SourceLoc(),
-                                         ctx.AllocateCopy(ident),
-                                         ctx.AllocateCopy(pattern),
-                                         SourceLoc(), /*isImplicit=*/false);
         break;
       }
 
@@ -2159,9 +2170,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                                     defaultDefinitionID);
     declOrOffset = assocType;
 
+    assocType->setArchetype(getType(archetypeID)->castTo<ArchetypeType>());
     assocType->computeType();
     assocType->setAccessibility(cast<ProtocolDecl>(DC)->getFormalAccess());
-    assocType->setArchetype(getType(archetypeID)->castTo<ArchetypeType>());
     if (isImplicit)
       assocType->setImplicit();
 

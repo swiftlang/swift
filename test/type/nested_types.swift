@@ -12,7 +12,7 @@ extension X {
 
 protocol MyIteratorProtocol {}
 protocol MySequence {
-  typealias Iterator : MyIteratorProtocol
+  associatedtype Iterator : MyIteratorProtocol
   func iterator() -> Iterator
 }
 

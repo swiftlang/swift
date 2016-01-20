@@ -2621,7 +2621,7 @@ public enum UnderestimatedLengthBehavior {
 }
 
 public protocol StrictSequence : Sequence {
-  typealias Element
+  associatedtype Element
   init(base: MinimalSequence<Element>)
   var base: MinimalSequence<Element> { get }
 }
@@ -3163,7 +3163,7 @@ extension MinimalBidirectionalIndex : _MinimalIndex {
 %   StrictIndexType = 'Strict{}Index'.format(Traversal)
 
 public protocol ${StrictIndexType} : ${Traversal}Index {
-  typealias Base : ${Traversal}Index
+  associatedtype Base : ${Traversal}Index
   init(_ base: Base)
   var base: Base { get set }
 
@@ -3369,7 +3369,7 @@ extension MinimalRandomAccessIndex : _MinimalIndex {
 %     Index = 'Minimal%sIndex' % traversal
 
 public protocol ${Protocol} : ${'MutableCollection' if mutable else 'Collection'} {
-  typealias Element
+  associatedtype Element
   init(base: ${Self}<Element>)
 %     if mutable:
   var base: ${Self}<Element> { get set }
@@ -3503,7 +3503,7 @@ public struct ${Self}<T> : ${'MutableCollection' if mutable else 'Collection'} {
 %   Index = 'Minimal%sIndex' % traversal
 
 public protocol ${Protocol} : RangeReplaceableCollection {
-  typealias Element
+  associatedtype Element
   init(base: ${Self}<Element>)
   var base: ${Self}<Element> { get set }
 }

@@ -175,6 +175,8 @@ FileUnit *SerializedModuleLoader::loadAST(
     M.addFile(*fileUnit);
     if (extendedInfo.isTestable())
       M.setTestingEnabled();
+    if (extendedInfo.isResilient())
+      M.setResilienceEnabled();
 
     auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
     err = loadedModuleFile->associateWithFileContext(fileUnit,

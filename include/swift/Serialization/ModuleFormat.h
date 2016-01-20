@@ -52,7 +52,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 232; // no archetype in substitutions
+const uint16_t VERSION_MINOR = 235; // IsResilient module flag added
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -233,7 +233,8 @@ static inline OperatorKind getStableFixity(DeclKind kind) {
 enum GenericRequirementKind : uint8_t {
   Conformance = 0,
   SameType,
-  WitnessMarker
+  WitnessMarker,
+  Superclass
 };
 using GenericRequirementKindField = BCFixed<2>;
 
@@ -438,7 +439,8 @@ namespace options_block {
     SDK_PATH = 1,
     XCC,
     IS_SIB,
-    IS_TESTABLE
+    IS_TESTABLE,
+    IS_RESILIENT
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -458,6 +460,10 @@ namespace options_block {
 
   using IsTestableLayout = BCRecordLayout<
     IS_TESTABLE
+  >;
+
+  using IsResilientLayout = BCRecordLayout<
+    IS_RESILIENT
   >;
 }
 
@@ -1343,18 +1349,19 @@ namespace decls_block {
     BCArray<IdentifierIDField>
   >;
 
+  using Swift3MigrationDeclAttrLayout = BCRecordLayout<
+    Swift3Migration_DECL_ATTR,
+    BCFixed<1>, // implicit flag
+    BCVBR<5>,   // number of bytes in rename string
+    BCVBR<5>,   // number of bytes in message string
+    BCBlob      // rename, followed by message
+  >;
+
   using WarnUnusedResultDeclAttrLayout = BCRecordLayout<
     WarnUnusedResult_DECL_ATTR,
     BCFixed<1>, // implicit flag
     BCVBR<6>,  // index at the end of the message,
     BCBlob     // blob contains the message and mutating-version
-               // strings, separated by the prior index
-  >;
-
-  using MigrationIdDeclAttrLayout = BCRecordLayout<
-    MigrationId_DECL_ATTR,
-    BCVBR<6>,  // index at the end of the ident,
-    BCBlob     // blob contains the ident and pattern
                // strings, separated by the prior index
   >;
 

@@ -117,6 +117,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         MutatingMethod,
         SuperInit,
         SelfInit,
+        SuperMethod,
       };
       unsigned kind : 3;
     };
@@ -149,6 +150,20 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         InvalidPartialApplications.insert({ expr, {1, kind} });
         return;
       }
+
+      // Method references based in super cannot be partially applied,
+      // except for the implicit self parameter, unless the method is final,
+      // in which case a super_method instruction won't be used, just thunks
+      // leading to a function_ref.
+      if (auto call = dyn_cast<CallExpr>(expr))
+        if (auto dotSyntaxCall = dyn_cast<DotSyntaxCallExpr>(call->getFn()))
+          if (dotSyntaxCall->isSuper())
+            if (auto fnDeclRef = dyn_cast<DeclRefExpr>(dotSyntaxCall->getFn()))
+              if (auto fn = dyn_cast<FuncDecl>(fnDeclRef->getDecl()))
+                InvalidPartialApplications.insert({
+                  dotSyntaxCall, {fn->getNaturalArgumentCount() - /*self*/ 1,
+                    PartialApplication::SuperMethod}
+                });
 
       auto fnDeclRef = dyn_cast<DeclRefExpr>(fnExpr);
       if (!fnDeclRef)
@@ -490,7 +505,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       TC.diagnose(DRE->getLoc(), diag::warn_unqualified_access,
                   VD->getName(), VD->getDescriptiveKind(),
                   declParent->getDescriptiveKind(), declParent->getFullName());
-      TC.diagnose(VD, diag::decl_declared_here, VD->getName());
+      TC.diagnose(VD, diag::decl_declared_here, VD->getFullName());
 
       if (VD->getDeclContext()->isTypeContext()) {
         TC.diagnose(DRE->getLoc(), diag::fix_unqualified_access_member)
@@ -1820,6 +1835,7 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
   SourceLoc endOfIncrementLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr, FS->getIncrement().getPtrOrNull()->getEndLoc());
     
   diagnostic
+   .fixItRemoveChars(loopVarDecl->getLoc(), loopVar->getLoc())
    .fixItReplaceChars(loopPatternEnd, startValue->getStartLoc(), " in ")
    .fixItReplaceChars(FS->getFirstSemicolonLoc(), endValue->getStartLoc(), " ..< ")
    .fixItRemoveChars(FS->getSecondSemicolonLoc(), endOfIncrementLoc);

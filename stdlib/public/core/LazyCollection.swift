@@ -27,8 +27,7 @@ public protocol LazyCollectionProtocol
   /// possibly with a simpler type.
   ///
   /// - See also: `elements`
-  typealias Elements: Collection = Self
-
+  associatedtype Elements: Collection = Self
 }
 
 /// When there's no special associated `Elements` type, the `elements`

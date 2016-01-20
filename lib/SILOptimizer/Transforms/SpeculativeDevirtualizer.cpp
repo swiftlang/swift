@@ -377,12 +377,15 @@ static bool tryToSpeculateTarget(FullApplySite AI,
     Subs.erase(RemovedIt, Subs.end());
   }
 
+  // Number of subclasses which cannot be handled by checked_cast_br checks.
+  int NotHandledSubsNum = 0;
   if (Subs.size() > MaxNumSpeculativeTargets) {
     DEBUG(llvm::dbgs() << "Class " << CD->getName() << " has too many ("
                        << Subs.size() << ") subclasses. Performing speculative "
                          "devirtualization only for the first "
                        << MaxNumSpeculativeTargets << " of them.\n");
 
+    NotHandledSubsNum += (Subs.size() - MaxNumSpeculativeTargets);
     Subs.erase(&Subs[MaxNumSpeculativeTargets], Subs.end());
   }
 
@@ -433,9 +436,6 @@ static bool tryToSpeculateTarget(FullApplySite AI,
 
   // TODO: The ordering of checks may benefit from using a PGO, because
   // the most probable alternatives could be checked first.
-
-  // Number of subclasses which cannot be handled by checked_cast_br checks.
-  int NotHandledSubsNum = 0;
 
   for (auto S : Subs) {
     DEBUG(llvm::dbgs() << "Inserting a speculative call for class "

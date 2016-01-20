@@ -19,6 +19,7 @@
 
 #include "Initialization.h"
 #include "RValue.h"
+#include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/Basic/Fallthrough.h"
@@ -30,6 +31,20 @@ using namespace Lowering;
 static unsigned getTupleSize(CanType t) {
   if (TupleType *tt = dyn_cast<TupleType>(t))
     return tt->getNumElements();
+  return 1;
+}
+
+static unsigned getRValueSize(AbstractionPattern pattern, CanType formalType) {
+  if (pattern.isTuple()) {
+    unsigned count = 0;
+    auto formalTupleType = cast<TupleType>(formalType);
+    for (auto i : indices(formalTupleType.getElementTypes())) {
+      count += getRValueSize(pattern.getTupleElementType(i),
+                             formalTupleType.getElementType(i));
+    }
+    return count;
+  }
+
   return 1;
 }
 
@@ -391,6 +406,10 @@ RValue::RValue(SILGenFunction &gen, Expr *expr, ManagedValue v)
 
 RValue::RValue(CanType type)
   : type(type), elementsToBeAdded(getTupleSize(type)) {
+}
+
+RValue::RValue(AbstractionPattern pattern, CanType type)
+  : type(type), elementsToBeAdded(getRValueSize(pattern, type)) {
 }
 
 void RValue::addElement(RValue &&element) & {

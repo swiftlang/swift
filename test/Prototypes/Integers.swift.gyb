@@ -37,7 +37,7 @@ IntLiteral = 'Int%s' % builtinIntLiteralBits
 # 32-bit iOS simulator doesn't have Int128 support, so we stop at
 # double-word.  When we've implemented the arithmetic algorithms
 # for bignum, we can go further.
-fixedBitWidths = [2**x for x in range(3, 8) if 2**x <= 2*word_bits]
+fixedBitWidths = [2 ** x for x in range(3, 8) if 2 ** x <= 2 * word_bits]
 minFixedBits = fixedBitWidths[0]
 maxFixedBits = fixedBitWidths[-1]
   

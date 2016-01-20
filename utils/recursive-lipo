@@ -20,7 +20,7 @@ def merge_file_lists(src_root_dirs, skip_files, skip_subpaths):
     for src_root_dir in src_root_dirs:
         for src_dir, dirs, files in os.walk(src_root_dir):
             rel_dir = os.path.relpath(src_dir, src_root_dir)
-            rel_files = [os.path.join(rel_dir, file) for file in files+dirs
+            rel_files = [os.path.join(rel_dir, file) for file in files + dirs
                         if file not in skip_files]
             file_list.extend(filter(lambda file:
                                     file not in file_list, rel_files))
@@ -94,8 +94,8 @@ def merge_lipo_files(src_root_dirs, file_list, copy_verbatim_subpaths,
 
 def main():
     parser = argparse.ArgumentParser(
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            description="""
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="""
 This script merges and applies 'lipo' to directories. For each file present in
 any source directory, it will create a file in the destination directory.
 

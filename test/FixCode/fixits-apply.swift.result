@@ -38,7 +38,7 @@ func foo() -> Int {
   }
 }
 
-func goo(var e : ErrorProtocol) {}
+func goo(e : ErrorProtocol) {}
 
 struct Test1 : OptionSet {
   init(rawValue: Int) {}

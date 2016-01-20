@@ -213,12 +213,176 @@ public:
 };
 
 template <class Impl, class Base, class FieldImpl_,
+          bool IsFixedSize = std::is_base_of<FixedTypeInfo, Base>::value,
           bool IsLoadable = std::is_base_of<LoadableTypeInfo, Base>::value>
 class RecordTypeInfo;
 
+/// An implementation of RecordTypeInfo for non-fixed-size types
+/// (but not resilient ones where we don't know the complete set of
+/// stored properties).
+///
+/// Override the buffer operations to just delegate to the unique
+/// non-empty field, if there is one.
+template <class Impl, class Base, class FieldImpl>
+class RecordTypeInfo<Impl, Base, FieldImpl,
+                     /*IsFixedSize*/ false, /*IsLoadable*/ false>
+    : public RecordTypeInfoImpl<Impl, Base, FieldImpl> {
+  typedef RecordTypeInfoImpl<Impl, Base, FieldImpl> super;
+
+  /// The index+1 of the unique non-empty field, or zero if there is none.
+  unsigned UniqueNonEmptyFieldIndexPlusOne;
+protected:
+  template <class... As>
+  RecordTypeInfo(ArrayRef<FieldImpl> fields, As&&...args)
+      : super(fields, std::forward<As>(args)...) {
+
+    // Look for a unique non-empty field.
+    UniqueNonEmptyFieldIndexPlusOne = findUniqueNonEmptyField(fields);
+  }
+
+public:
+  using super::getStorageType;
+  Address allocateBuffer(IRGenFunction &IGF, Address buffer,
+                         SILType type) const override {
+    if (auto field = getUniqueNonEmptyField()) {
+      Address address =
+        field->getTypeInfo().allocateBuffer(IGF, buffer,
+                                            field->getType(IGF.IGM, type));
+      return IGF.Builder.CreateElementBitCast(address, getStorageType());
+    } else {
+      return super::allocateBuffer(IGF, buffer, type);
+    }
+  }
+
+  Address projectBuffer(IRGenFunction &IGF, Address buffer,
+                        SILType type) const override {
+    if (auto field = getUniqueNonEmptyField()) {
+      Address address =
+        field->getTypeInfo().projectBuffer(IGF, buffer,
+                                           field->getType(IGF.IGM, type));
+      return IGF.Builder.CreateElementBitCast(address, getStorageType());
+    } else {
+      return super::projectBuffer(IGF, buffer, type);
+    }
+  }
+
+  void destroyBuffer(IRGenFunction &IGF, Address buffer,
+                     SILType type) const override {
+    if (auto field = getUniqueNonEmptyField()) {
+      field->getTypeInfo().destroyBuffer(IGF, buffer,
+                                         field->getType(IGF.IGM, type));
+    } else {
+      super::destroyBuffer(IGF, buffer, type);
+    }
+  }
+
+  void deallocateBuffer(IRGenFunction &IGF, Address buffer,
+                        SILType type) const override {
+    if (auto field = getUniqueNonEmptyField()) {
+      field->getTypeInfo().deallocateBuffer(IGF, buffer,
+                                            field->getType(IGF.IGM, type));
+    } else {
+      super::deallocateBuffer(IGF, buffer, type);
+    }
+  }
+
+  Address initializeBufferWithTake(IRGenFunction &IGF,
+                                   Address destBuffer,
+                                   Address srcAddr,
+                                   SILType type) const override {
+    if (auto field = getUniqueNonEmptyField()) {
+      auto &fieldTI = field->getTypeInfo();
+      Address srcFieldAddr =
+        IGF.Builder.CreateElementBitCast(srcAddr, fieldTI.getStorageType());
+      Address fieldResult =
+        fieldTI.initializeBufferWithTake(IGF, destBuffer, srcFieldAddr,
+                                         field->getType(IGF.IGM, type));
+      return IGF.Builder.CreateElementBitCast(fieldResult, getStorageType());
+    } else {
+      return super::initializeBufferWithTake(IGF, destBuffer, srcAddr, type);
+    }
+  }
+
+  Address initializeBufferWithCopy(IRGenFunction &IGF,
+                                   Address destBuffer,
+                                   Address srcAddr,
+                                   SILType type) const override {
+    if (auto field = getUniqueNonEmptyField()) {
+      auto &fieldTI = field->getTypeInfo();
+      Address srcFieldAddr =
+        IGF.Builder.CreateElementBitCast(srcAddr, fieldTI.getStorageType());
+      Address fieldResult =
+        fieldTI.initializeBufferWithCopy(IGF, destBuffer, srcFieldAddr,
+                                         field->getType(IGF.IGM, type));
+      return IGF.Builder.CreateElementBitCast(fieldResult, getStorageType());
+    } else {
+      return super::initializeBufferWithCopy(IGF, destBuffer, srcAddr, type);
+    }
+  }
+
+  Address initializeBufferWithTakeOfBuffer(IRGenFunction &IGF,
+                                           Address destBuffer,
+                                           Address srcBuffer,
+                                           SILType type) const override {
+    if (auto field = getUniqueNonEmptyField()) {
+      auto &fieldTI = field->getTypeInfo();
+      Address fieldResult =
+        fieldTI.initializeBufferWithTakeOfBuffer(IGF, destBuffer, srcBuffer,
+                                                 field->getType(IGF.IGM, type));
+      return IGF.Builder.CreateElementBitCast(fieldResult, getStorageType());
+    } else {
+      return super::initializeBufferWithTakeOfBuffer(IGF, destBuffer,
+                                                     srcBuffer, type);
+    }
+  }
+
+  Address initializeBufferWithCopyOfBuffer(IRGenFunction &IGF,
+                                           Address destBuffer,
+                                           Address srcBuffer,
+                                           SILType type) const override {
+    if (auto field = getUniqueNonEmptyField()) {
+      auto &fieldTI = field->getTypeInfo();
+      Address fieldResult =
+        fieldTI.initializeBufferWithCopyOfBuffer(IGF, destBuffer, srcBuffer,
+                                                 field->getType(IGF.IGM, type));
+      return IGF.Builder.CreateElementBitCast(fieldResult, getStorageType());
+    } else {
+      return super::initializeBufferWithCopyOfBuffer(IGF, destBuffer,
+                                                     srcBuffer, type);
+    }
+  }
+
+private:
+  /// Scan the given field info
+  static unsigned findUniqueNonEmptyField(ArrayRef<FieldImpl> fields) {
+    unsigned result = 0;
+    for (auto &field : fields) {
+      // Ignore empty fields.
+      if (field.isEmpty()) continue;
+
+      // If we've already found an index, then there isn't a
+      // unique non-empty field.
+      if (result) return 0;
+
+      result = (&field - fields.data()) + 1;
+    }
+
+    return result;
+  }
+
+  const FieldImpl *getUniqueNonEmptyField() const {
+    if (UniqueNonEmptyFieldIndexPlusOne) {
+      return &this->getFields()[UniqueNonEmptyFieldIndexPlusOne - 1];
+    } else {
+      return nullptr;
+    }
+  }
+};
+
 /// An implementation of RecordTypeInfo for non-loadable types. 
 template <class Impl, class Base, class FieldImpl>
-class RecordTypeInfo<Impl, Base, FieldImpl, /*IsLoadable*/ false>
+class RecordTypeInfo<Impl, Base, FieldImpl,
+                     /*IsFixedSize*/ true, /*IsLoadable*/ false>
     : public RecordTypeInfoImpl<Impl, Base, FieldImpl> {
   typedef RecordTypeInfoImpl<Impl, Base, FieldImpl> super;
 protected:
@@ -228,7 +392,8 @@ protected:
 
 /// An implementation of RecordTypeInfo for loadable types. 
 template <class Impl, class Base, class FieldImpl>
-class RecordTypeInfo<Impl, Base, FieldImpl, /*IsLoadable*/ true>
+class RecordTypeInfo<Impl, Base, FieldImpl,
+                     /*IsFixedSize*/ true, /*IsLoadable*/ true>
     : public RecordTypeInfoImpl<Impl, Base, FieldImpl> {
   typedef RecordTypeInfoImpl<Impl, Base, FieldImpl> super;
 

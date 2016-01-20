@@ -267,8 +267,6 @@ public:
 
   void setCodeCompletionFactory(CodeCompletionCallbacksFactory *Factory) {
     CodeCompletionFactory = Factory;
-    if (Factory)
-      LangOpts.EnableCodeCompletionDelayedEnumConformanceHack = true;
   }
 
   CodeCompletionCallbacksFactory *getCodeCompletionFactory() const {

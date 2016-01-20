@@ -11,13 +11,6 @@ import SwiftShims
 
 import resilient_struct
 
-// FIXME: If the type has a known size in this resilience domain,
-// and the sil_global is not externally visible, we don't need to
-// do the buffer song and dance. Need to revisit when globals are
-// accessed directly vs via accessors, since we also want to be
-// able to resiliently turn computed global properties into
-// stored global properties and vice versa.
-
 //
 // Fits inside a buffer's inline storage.
 //
@@ -42,6 +35,14 @@ public struct LargeResilientStruct {
 
 // CHECK: @largeGlobal = global [[BUFFER]] zeroinitializer
 sil_global [let] @largeGlobal : $LargeResilientStruct
+
+//
+// Size is known in this resilience domain, and global is hidden,
+// so allocate it directly.
+//
+
+// CHECK: @fixedGlobal = hidden global %V17global_resilience20LargeResilientStruct zeroinitializer
+sil_global hidden @fixedGlobal : $LargeResilientStruct
 
 //
 // Unknown size -- must call value witness functions for buffer
@@ -84,6 +85,25 @@ bb0:
   return %tuple : $()
 }
 
+// CHECK-LABEL: define void @testFixedGlobal()
+sil @testFixedGlobal : $@convention(thin) () -> () {
+bb0:
+  alloc_global @fixedGlobal
+
+  %addr = global_addr @fixedGlobal : $*LargeResilientStruct
+
+  // CHECK:      load i64, i64* getelementptr inbounds (%V17global_resilience20LargeResilientStruct, %V17global_resilience20LargeResilientStruct* @fixedGlobal, i32 0, i32 0, i32 0)
+  // CHECK-NEXT: load i64, i64* getelementptr inbounds (%V17global_resilience20LargeResilientStruct, %V17global_resilience20LargeResilientStruct* @fixedGlobal, i32 0, i32 1, i32 0)
+  // CHECK-NEXT: load i64, i64* getelementptr inbounds (%V17global_resilience20LargeResilientStruct, %V17global_resilience20LargeResilientStruct* @fixedGlobal, i32 0, i32 2, i32 0)
+  // CHECK-NEXT: load i64, i64* getelementptr inbounds (%V17global_resilience20LargeResilientStruct, %V17global_resilience20LargeResilientStruct* @fixedGlobal, i32 0, i32 3, i32 0)
+  %value = load %addr : $*LargeResilientStruct
+
+  %tuple = tuple ()
+
+  // CHECK: ret void
+  return %tuple : $()
+}
+
 sil @testOtherGlobal : $@convention(thin) () -> () {
 bb0:
   // CHECK: [[METADATA:%.*]] = call %swift.type* @_TMaV16resilient_struct4Size()
@@ -97,9 +117,6 @@ bb0:
   // CHECK: [[VALUE:%.*]] = call %swift.opaque* [[allocateBuffer]]([[BUFFER]]* @otherGlobal, %swift.type* [[METADATA]])
   alloc_global @otherGlobal
 
-  // CHECK: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
-  // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[METADATA_ADDR]], [[INT]] -1
-  // CHECK: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
   // CHECK: [[WITNESS_PTR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 2
   // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_PTR]]
   // CHECK: [[projectBuffer:%.*]] = bitcast i8* [[WITNESS]] to %swift.opaque* ([[BUFFER]]*, %swift.type*)*

@@ -214,7 +214,7 @@ func useNested(ii: Int, hni: HasNested<Int>,
 }
 
 var dfail : Dictionary<Int> // expected-error{{generic type 'Dictionary' specialized with too few type parameters (got 1, but expected 2)}}
-var notgeneric : Int<Float> // expected-error{{cannot specialize non-generic type 'Int'}}
+var notgeneric : Int<Float> // expected-error{{cannot specialize non-generic type 'Int'}}{{21-28=}}
 
 // Check unqualified lookup of inherited types.
 class Foo<T> {
@@ -250,7 +250,7 @@ extension Bar {
   struct Inner2 {
     func f(x: Int) -> Nested {
       return x
-    }    
+    }
   }
   */
 }
@@ -266,7 +266,7 @@ class XArray : ArrayLiteralConvertible {
 
 class YArray : XArray {
   typealias Element = Int
-  required init(arrayLiteral elements: Int...) { 
+  required init(arrayLiteral elements: Int...) {
     super.init()
   }
 }
@@ -295,11 +295,11 @@ class X3 { }
 var x2 : X2<X3> // expected-error{{'X2' requires that 'X3' inherit from 'X1'}}
 
 protocol P {
-  typealias AssocP
+  associatedtype AssocP
 }
 
 protocol Q {
-  typealias AssocQ
+  associatedtype AssocQ
 }
 
 struct X4 : P, Q {

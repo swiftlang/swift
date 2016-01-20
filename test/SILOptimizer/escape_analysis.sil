@@ -318,7 +318,8 @@ bb0(%0 : $Pointer):
 // CHECK-NEXT:    Val %3 Esc: %12,%13,%15, Succ: (%5.1)
 // CHECK-NEXT:    Val %5 Esc: %12,%13,%14, Succ: (%5.1)
 // CHECK-NEXT:    Con %5.1 Esc: %12,%13,%14,%15, Succ: %2
-// CHECK-NEXT:    Con %5.2 Esc: G, Succ: 
+// CHECK-NEXT:    Con %5.2 Esc: A, Succ: (%5.3)
+// CHECK-NEXT:    Con %5.3 Esc: G, Succ: 
 // CHECK-NEXT:    Val %10 Esc: %12,%13, Succ: %3, %5
 // CHECK-NEXT:  End
 sil @test_partial_apply : $@convention(thin) (Int64, @owned X, @owned Y) -> Int64 {
@@ -343,10 +344,12 @@ bb0(%0 : $Int64, %1 : $X, %2 : $Y):
 // CHECK-NEXT:    Arg %0 Esc: G, Succ: 
 // CHECK-NEXT:    Arg %1 Esc: A, Succ: (%1.1)
 // CHECK-NEXT:    Con %1.1 Esc: A, Succ: (%1.2)
-// CHECK-NEXT:    Con %1.2 Esc: G, Succ: 
+// CHECK-NEXT:    Con %1.2 Esc: A, Succ: (%1.3)
+// CHECK-NEXT:    Con %1.3 Esc: G, Succ: 
 // CHECK-NEXT:    Arg %2 Esc: A, Succ: (%2.1)
 // CHECK-NEXT:    Con %2.1 Esc: A, Succ: (%2.2)
-// CHECK-NEXT:    Con %2.2 Esc: G, Succ:
+// CHECK-NEXT:    Con %2.2 Esc: A, Succ: (%2.3)
+// CHECK-NEXT:    Con %2.3 Esc: G, Succ: 
 // CHECK-NEXT:    Val %7 Esc: %8, Succ: %2
 // CHECK-NEXT:  End
 sil @closure1 : $@convention(thin) (@owned X, @owned @box Int64, @owned @box Y) -> Int64 {
@@ -365,7 +368,7 @@ bb0(%0 : $X, %1 : $@box Int64, %2 : $@box Y):
 // CHECK-NEXT:    Arg %0 Esc: G, Succ: 
 // CHECK-NEXT:    Arg %1 Esc: A, Succ: (%1.1)
 // CHECK-NEXT:    Con %1.1 Esc: A, Succ: (%1.2)
-// CHECK-NEXT:    Con %1.2 Esc: G, Succ: (%1.3)
+// CHECK-NEXT:    Con %1.2 Esc: A, Succ: (%1.3)
 // CHECK-NEXT:    Con %1.3 Esc: G, Succ: (%1.4)
 // CHECK-NEXT:    Con %1.4 Esc: G, Succ: %0
 // CHECK-NEXT:  End
@@ -386,7 +389,8 @@ bb0(%0 : $X, %1 : $@box Y):
 // CHECK-NEXT:    Val %1 Esc: G, Succ: (%5.1)
 // CHECK-NEXT:    Val %5 Esc: G, Succ: %1
 // CHECK-NEXT:    Con %5.1 Esc: G, Succ: (%5.2)
-// CHECK-NEXT:    Con %5.2 Esc: G, Succ: 
+// CHECK-NEXT:    Con %5.2 Esc: G, Succ: (%5.3)
+// CHECK-NEXT:    Con %5.3 Esc: G, Succ: 
 // CHECK-NEXT:  End
 sil @test_escaped_box : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
@@ -407,7 +411,8 @@ bb0(%0 : $Int64):
 // CHECK-LABEL: CG of let_box_escape
 // CHECK-NEXT:    Arg %0 Esc: G, Succ: (%0.1)
 // CHECK-NEXT:    Con %0.1 Esc: G, Succ: (%0.2)
-// CHECK-NEXT:    Con %0.2 Esc: G, Succ: 
+// CHECK-NEXT:    Con %0.2 Esc: G, Succ: (%0.3)
+// CHECK-NEXT:    Con %0.3 Esc: G, Succ: 
 // CHECK-NEXT:  End
 sil @let_box_escape : $@convention(thin) (@owned @box Int64) -> Int64 {
 bb0(%0 : $@box Int64):
@@ -447,7 +452,8 @@ bb0(%0 : $Int64):
 // CHECK-LABEL: CG of closure3
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
 // CHECK-NEXT:    Con %0.1 Esc: A, Succ: (%0.2)
-// CHECK-NEXT:    Con %0.2 Esc: G, Succ: 
+// CHECK-NEXT:    Con %0.2 Esc: A, Succ: (%0.3)
+// CHECK-NEXT:    Con %0.3 Esc: G, Succ: 
 // CHECK-NEXT:  End
 sil @closure3 : $@convention(thin) (@owned @box Int64) -> Int64 {
 bb0(%0 : $@box Int64):
@@ -653,6 +659,29 @@ bb2(%5 : $ErrorProtocol):
 
 sil @unknown_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error ErrorProtocol)
 
+// Test that the deinit of a box itself does not capture anything.
+
+// CHECK-LABEL: CG of test_release_of_partial_apply_with_box
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%1.2)
+// CHECK-NEXT:    Val %1 Esc: %5, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: %5, Succ: %0
+// CHECK-NEXT:    Con %1.2 Esc: A, Succ: (%1.3)
+// CHECK-NEXT:    Con %1.3 Esc: G, Succ: 
+// CHECK-NEXT:    Val %4 Esc: %5, Succ: %1
+// CHECK-NEXT:  End
+sil @test_release_of_partial_apply_with_box : $@convention(thin) (@owned Y) -> () {
+bb0(%0 : $Y):
+  %1 = alloc_box $Y
+  store %0 to %1#1 : $*Y
+  %2 = function_ref @take_y_box : $@convention(thin) (@owned @box Y) -> ()
+  %3 = partial_apply %2(%1#0) : $@convention(thin) (@owned @box Y) -> ()
+  strong_release %3 : $@callee_owned () -> ()
+  %5 = tuple ()
+  return %5 : $()
+}
+
+sil @take_y_box : $@convention(thin) (@owned @box Y) -> ()
+
 // Test is an unknown value is merged correctly into the caller graph.
 
 // CHECK-LABEL: CG of store_to_unknown_reference
@@ -726,6 +755,39 @@ entry(%0 : $*Y, %1 : $*Y):
   %r = tuple ()
   return %r : $()
 }
+
+// CHECK-LABEL: CG of take_c_func
+// CHECK-NEXT:    Arg %0 Esc: G, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: G, Succ: 
+// CHECK-NEXT:    Ret  Esc: R, Succ: %0
+// CHECK-NEXT:  End
+sil @take_c_func : $@convention(thin) (@convention(c) () -> ()) -> @convention(c) () -> () {
+bb0(%0 : $@convention(c) () -> ()):
+  %3 = apply %0() : $@convention(c) () -> ()
+  return %0 : $@convention(c) () -> ()
+}
+
+// CHECK-LABEL: CG of c_func
+// CHECK-NEXT:  End
+sil @c_func : $@convention(c) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK-LABEL: CG of pass_c_func
+// CHECK-NEXT:    Val %2 Esc: , Succ: (%2.1)
+// CHECK-NEXT:    Con %2.1 Esc: G, Succ: 
+// CHECK-NEXT:  End
+sil @pass_c_func : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @take_c_func : $@convention(thin) (@convention(c) () -> ()) -> @convention(c) () -> ()
+  %1 = function_ref @c_func : $@convention(c) () -> ()
+  %3 = apply %0(%1) : $@convention(thin) (@convention(c) () -> ()) -> @convention(c) () -> ()
+  %4 = tuple ()
+  return %4 : $()
+}
+
 
 // CHECK-LABEL: CG of test_select_enum
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: 
@@ -871,6 +933,28 @@ bb0(%0 : $*U, %1 : $*T, %2 : $@thick U.Type):
   unchecked_ref_cast_addr  T in %1 : $*T to U in %0 : $*U
   %5 = tuple ()
   return %5 : $()
+}
+
+// CHECK-LABEL: CG of test_pin
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: 
+// CHECK-NEXT:    Ret  Esc: R, Succ: %0
+// CHECK-NEXT:  End
+sil @test_pin : $@convention(thin) (Builtin.NativeObject) -> Optional<Builtin.NativeObject> {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = strong_pin %0 : $Builtin.NativeObject
+  return %1 : $Optional<Builtin.NativeObject>
+}
+
+// CHECK-LABEL: CG of test_unpin
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: A, Succ: (%0.2)
+// CHECK-NEXT:    Con %0.2 Esc: G, Succ: 
+// CHECK-NEXT:  End
+sil @test_unpin : $@convention(thin) (Optional<Builtin.NativeObject>) -> () {
+bb0(%0 : $Optional<Builtin.NativeObject>):
+  strong_unpin %0 : $Optional<Builtin.NativeObject>
+  %2 = tuple ()
+  return %2 : $()
 }
 
 // CHECK-LABEL: CG of arraysemantics_is_native_no_typecheck

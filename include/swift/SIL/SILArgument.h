@@ -91,6 +91,10 @@ public:
   bool getIncomingValues(
       llvm::SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>> &OutArray);
 
+  /// If this SILArgument's parent block has one predecessor, return the
+  /// incoming value from that predecessor. Returns SILValue() otherwise.
+  SILValue getSingleIncomingValue() const;
+
   /// Returns true if this SILArgument is the self argument of its
   /// function. This means that this will return false always for SILArguments
   /// of SILFunctions that do not have self argument and for non-function

@@ -18,12 +18,29 @@
 #include "LocalTypeData.h"
 #include "Fulfillment.h"
 #include "GenMeta.h"
+#include "GenProto.h"
+#include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "swift/AST/IRGenOptions.h"
 #include "swift/SIL/SILModule.h"
 
 using namespace swift;
 using namespace irgen;
+
+LocalTypeDataKey LocalTypeDataKey::getCachingKey() const {
+  return { Type, Kind.getCachingKind() };
+}
+
+LocalTypeDataKind LocalTypeDataKind::getCachingKind() const {
+  // Most local type data kinds are already canonical.
+  if (!isConcreteProtocolConformance()) return *this;
+
+  // Map protocol conformances to their root normal conformance.
+  auto conformance = getConcreteProtocolConformance();
+  return forConcreteProtocolWitnessTable(
+                                     conformance->getRootNormalConformance());
+}
 
 LocalTypeDataCache &IRGenFunction::getOrCreateLocalTypeData() {
   // Lazily allocate it.
@@ -64,13 +81,18 @@ llvm::Value *IRGenFunction::getLocalTypeData(CanType type,
   return LocalTypeData->get(*this, LocalTypeDataCache::getKey(type, kind));
 }
 
-llvm::Value *IRGenFunction::tryGetLocalTypeData(CanType type,
-                                                LocalTypeDataKind kind) {
+llvm::Value *IRGenFunction::tryGetConcreteLocalTypeData(LocalTypeDataKey key) {
   if (!LocalTypeData) return nullptr;
-  return LocalTypeData->tryGet(*this, LocalTypeDataCache::getKey(type, kind));
+  return LocalTypeData->tryGet(*this, key, /*allow abstract*/ false);
 }
 
-llvm::Value *LocalTypeDataCache::tryGet(IRGenFunction &IGF, Key key) {
+llvm::Value *IRGenFunction::tryGetLocalTypeData(LocalTypeDataKey key) {
+  if (!LocalTypeData) return nullptr;
+  return LocalTypeData->tryGet(*this, key);
+}
+
+llvm::Value *LocalTypeDataCache::tryGet(IRGenFunction &IGF, Key key,
+                                        bool allowAbstract) {
   auto it = Map.find(key);
   if (it == Map.end()) return nullptr;
   auto &chain = it->second;
@@ -83,6 +105,10 @@ llvm::Value *LocalTypeDataCache::tryGet(IRGenFunction &IGF, Key key) {
     CacheEntry *cur = next, *curPrev = nextPrev;
     nextPrev = cur;
     next = cur->getNext();
+
+    // Ignore abstract entries if so requested.
+    if (!allowAbstract && cur->getKind() != CacheEntry::Kind::Concrete)
+      continue;
 
     // Ignore unacceptable entries.
     if (!IGF.isActiveDominancePointDominatedBy(cur->DefinitionPoint))
@@ -125,28 +151,10 @@ llvm::Value *LocalTypeDataCache::tryGet(IRGenFunction &IGF, Key key) {
     auto &source = AbstractSources[entry->SourceIndex];
     auto result = entry->follow(IGF, source);
 
-    // Make a new concrete entry at the active definition point.
-
-    // Register with the active ConditionalDominanceScope if necessary.
-    bool isConditional = IGF.isConditionalDominancePoint();
-    if (isConditional) {
-      IGF.registerConditionalLocalTypeDataKey(key);
-    }
-
-    // Allocate the new entry.
-    auto newEntry =
-      new ConcreteCacheEntry(IGF.getActiveDominancePoint(),
-                             isConditional, result);
-
-    // If the active definition point is the same as the old entry's
-    // definition point, delete the old entry.
-    if (best->DefinitionPoint == IGF.getActiveDominancePoint() &&
-        !best->isConditional()) {
-      chain.eraseEntry(bestPrev, best);
-    }
-
-    // Add the new entry to the front of the chain.
-    chain.push_front(newEntry);
+    // Following the path automatically caches at every point along it,
+    // including the end.
+    assert(chain.Root->DefinitionPoint == IGF.getActiveDominancePoint());
+    assert(chain.Root->getKind() == CacheEntry::Kind::Concrete);
 
     return result;
   }
@@ -161,18 +169,46 @@ LocalTypeDataCache::AbstractCacheEntry::follow(IRGenFunction &IGF,
   switch (source.getKind()) {
   case AbstractSource::Kind::TypeMetadata:
     return Path.followFromTypeMetadata(IGF, source.getType(),
-                                       source.getValue(), &source.getCache());  
+                                       source.getValue(), nullptr);
 
-  case AbstractSource::Kind::WitnessTable:
-    return Path.followFromWitnessTable(IGF, source.getProtocol(),
-                                       source.getValue(), &source.getCache());  
+  case AbstractSource::Kind::ProtocolWitnessTable:
+    return Path.followFromWitnessTable(IGF, source.getType(),
+                                       source.getProtocolConformance(),
+                                       source.getValue(), nullptr);
   }
   llvm_unreachable("bad source kind");
 }
 
-void IRGenFunction::setScopedLocalTypeData(CanType type, LocalTypeDataKind kind,
+static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
+                                               LocalTypeDataKey key,
+                                               llvm::Value *data) {
+  // Only if debug info is enabled.
+  if (!IGF.IGM.DebugInfo) return;
+
+  // Only for type metadata.
+  if (key.Kind != LocalTypeDataKind::forTypeMetadata()) return;
+
+  // Only for archetypes, and not for opened archetypes.
+  auto type = dyn_cast<ArchetypeType>(key.Type);
+  if (!type) return;
+  if (type->getOpenedExistentialType()) return;
+
+  // At -O0, create an alloca to keep the type alive.
+  auto name = type->getFullName();
+  if (!IGF.IGM.Opts.Optimize) {
+    auto temp = IGF.createAlloca(data->getType(), IGF.IGM.getPointerAlignment(),
+                                 name);
+    IGF.Builder.CreateStore(data, temp);
+    data = temp.getAddress();
+  }
+
+  // Emit debug info for the metadata.
+  IGF.IGM.DebugInfo->emitTypeMetadata(IGF, data, name);
+}
+
+void IRGenFunction::setScopedLocalTypeData(LocalTypeDataKey key,
                                            llvm::Value *data) {
-  auto key = LocalTypeDataCache::getKey(type, kind);
+  maybeEmitDebugInfoForLocalTypeData(*this, key, data);
 
   // Register with the active ConditionalDominanceScope if necessary.
   bool isConditional = isConditionalDominancePoint();
@@ -184,20 +220,26 @@ void IRGenFunction::setScopedLocalTypeData(CanType type, LocalTypeDataKind kind,
                                          isConditional, key, data);
 }
 
-void IRGenFunction::setUnscopedLocalTypeData(CanType type,
-                                             LocalTypeDataKind kind,
+void IRGenFunction::setUnscopedLocalTypeData(LocalTypeDataKey key,
                                              llvm::Value *data) {
-  getOrCreateLocalTypeData()
-    .addConcrete(DominancePoint::universal(), /*conditional*/ false,
-                 LocalTypeDataCache::getKey(type, kind), data);
+  maybeEmitDebugInfoForLocalTypeData(*this, key, data);
+
+  // This is supportable, but it would require ensuring that we add the
+  // entry after any conditional entries; otherwise the stack discipline
+  // will get messed up.
+  assert(!isConditionalDominancePoint() &&
+         "adding unscoped local type data while in conditional scope");
+  getOrCreateLocalTypeData().addConcrete(DominancePoint::universal(),
+                                         /*conditional*/ false, key, data);
 }
 
-void IRGenFunction::addLocalTypeDataForTypeMetadata(CanType type,
-                                                    IsExact_t isExact,
-                                                    llvm::Value *metadata) {
+void IRGenFunction::bindLocalTypeDataFromTypeMetadata(CanType type,
+                                                      IsExact_t isExact,
+                                                      llvm::Value *metadata) {
   // Remember that we have this type metadata concretely.
   if (isExact) {
-    setScopedLocalTypeData(type, LocalTypeDataKind::forMetatype(), metadata);
+    if (!metadata->hasName()) setTypeMetadataName(IGM, metadata, type);
+    setScopedLocalTypeData(type, LocalTypeDataKind::forTypeMetadata(), metadata);
   }
 
   // Don't bother adding abstract fulfillments at a conditional dominance
@@ -225,7 +267,7 @@ void LocalTypeDataCache::addAbstractForTypeMetadata(IRGenFunction &IGF,
 
   addAbstractForFulfillments(IGF, std::move(fulfillments),
                              [&]() -> AbstractSource {
-    return AbstractSource(AbstractSource::Kind::TypeMetadata, type, metadata);
+    return AbstractSource(type, metadata);
   });
 }
 
@@ -253,7 +295,7 @@ addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
         auto conformsTo = archetype->getConformsTo();
         auto it = std::find(conformsTo.begin(), conformsTo.end(), protocol);
         if (it == conformsTo.end()) continue;
-        localDataKind =LocalTypeDataKind::forArchetypeProtocolWitnessTable(*it);
+        localDataKind = LocalTypeDataKind::forAbstractProtocolWitnessTable(*it);
       } else {
         continue;
       }
@@ -269,7 +311,7 @@ addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
         continue;
       }
 
-      localDataKind = LocalTypeDataKind::forMetatype();
+      localDataKind = LocalTypeDataKind::forTypeMetadata();
     }
 
     // Find the chain for the key.
@@ -284,6 +326,8 @@ addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
         fulfillmentCost = fulfillment.second.Path.cost();
       return *fulfillmentCost;
     };
+
+    bool isConditional = IGF.isConditionalDominancePoint();
 
     bool foundBetter = false;
     for (CacheEntry *cur = chain.Root, *last = nullptr; cur;
@@ -302,8 +346,9 @@ addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
       // If the entry is defined at the current point, (1) we know there
       // won't be a better entry and (2) we should remove it.
       if (cur->DefinitionPoint == IGF.getActiveDominancePoint() &&
-          !cur->isConditional()) {
+          !isConditional) {
         // Splice it out of the chain.
+        assert(!cur->isConditional());
         chain.eraseEntry(last, cur);
         break;
       }
@@ -313,7 +358,6 @@ addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
     // Okay, make a new entry.
 
     // Register with the conditional dominance scope if necessary.
-    bool isConditional = IGF.isConditionalDominancePoint();
     if (isConditional) {
       IGF.registerConditionalLocalTypeDataKey(key);
     }
@@ -329,16 +373,64 @@ addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
   }
 }
 
-void IRGenFunction::unregisterConditionalLocalTypeDataKeys(
-                                             ArrayRef<LocalTypeDataKey> keys) {
-  assert(!keys.empty());
-  assert(LocalTypeData);
-  LocalTypeData->eraseConditional(keys);
+void LocalTypeDataCache::dump() const {
+  auto &out = llvm::errs();
+
+  if (Map.empty()) {
+    out << "(empty)\n";
+    return;
+  }
+
+  for (auto &mapEntry : Map) {
+    out << "(" << mapEntry.first.Type.getPointer()
+        << "," << mapEntry.first.Kind.getRawValue() << ") => [";
+    if (mapEntry.second.Root) out << "\n";
+    for (auto cur = mapEntry.second.Root; cur; cur = cur->getNext()) {
+      out << "  (";
+      if (cur->DefinitionPoint.isUniversal()) out << "universal";
+      else out << cur->DefinitionPoint.as<void>();
+      out << ") ";
+
+      if (cur->isConditional()) out << "conditional ";
+
+      switch (cur->getKind()) {
+      case CacheEntry::Kind::Concrete: {
+        auto entry = static_cast<const ConcreteCacheEntry*>(cur);
+        out << "concrete: " << entry->Value << "\n  ";
+        if (!isa<llvm::Instruction>(entry->Value)) out << "  ";
+        entry->Value->dump();
+        break;
+      }
+
+      case CacheEntry::Kind::Abstract: {
+        auto entry = static_cast<const AbstractCacheEntry*>(cur);
+        out << "abstract: source=" << entry->SourceIndex << "\n";
+        break;
+      }
+      }
+    }
+    out << "]\n";
+  }
+}
+
+IRGenFunction::ConditionalDominanceScope::~ConditionalDominanceScope() {
+  IGF.ConditionalDominance = OldScope;
+
+  // Remove any conditional entries from the chains that were added in this
+  // scope.
+  for (auto &key : RegisteredKeys) {
+    IGF.LocalTypeData->eraseConditional(key);
+  }
 }
 
 void LocalTypeDataCache::eraseConditional(ArrayRef<LocalTypeDataKey> keys) {
   for (auto &key : keys) {
     auto &chain = Map[key];
+
+    // Our ability to simply delete the front of the chain relies on an
+    // assumption that (1) conditional additions always go to the front of
+    // the chain and (2) we never add something unconditionally while in
+    // an unconditional scope.
     assert(chain.Root);
     assert(chain.Root->isConditional());
     chain.eraseEntry(nullptr, chain.Root);

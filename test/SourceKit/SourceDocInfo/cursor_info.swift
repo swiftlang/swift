@@ -72,8 +72,8 @@ public class SubscriptCursorTest {
 
 // RUN: rm -rf %t.tmp
 // RUN: mkdir %t.tmp
-// RUN: %swiftc_driver -emit-module -target x86_64-apple-macosx10.9 -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
-// RUN: %sourcekitd-test -req=cursor -pos=9:8 %s -- -triple x86_64-apple-macosx10.9 -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s | FileCheck -check-prefix=CHECK1 %s
+// RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
+// RUN: %sourcekitd-test -req=cursor -pos=9:8 %s -- -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s | FileCheck -check-prefix=CHECK1 %s
 // CHECK1:      source.lang.swift.ref.var.global (4:5-4:9)
 // CHECK1-NEXT: glob
 // CHECK1-NEXT: s:v11cursor_info4globSi{{$}}
@@ -146,7 +146,7 @@ public class SubscriptCursorTest {
 
 // RUN: %sourcekitd-test -req=cursor -pos=28:24 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK12 %s
 // CHECK12: source.lang.swift.decl.var.local (28:23-28:27)
-// CHECK12: <Declaration>var arg1: <Type usr="s:Si">Int</Type></Declaration>
+// CHECK12: <Declaration>let arg1: <Type usr="s:Si">Int</Type></Declaration>
 
 // RUN: %sourcekitd-test -req=cursor -pos=31:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK13 %s
 // CHECK13: source.lang.swift.decl.function.free (31:6-31:37)

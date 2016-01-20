@@ -265,8 +265,6 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
   // Bridge the result back to ObjC.
   result = gen.emitNativeToBridgedValue(loc, result,
                         SILFunctionTypeRepresentation::CFunctionPointer,
-                        AbstractionPattern(result.getType().getSwiftRValueType()),
-                        result.getType().getSwiftRValueType(),
                         blockTy->getSILResult().getSwiftRValueType());
 
   auto resultVal = result.forward(gen);
@@ -441,8 +439,6 @@ static ManagedValue emitNativeToCBridgedValue(SILGenFunction &gen,
 ManagedValue SILGenFunction::emitNativeToBridgedValue(SILLocation loc,
                                                       ManagedValue v,
                                                 SILFunctionTypeRepresentation destRep,
-                                                AbstractionPattern origNativeTy,
-                                                      CanType substNativeTy,
                                                       CanType loweredBridgedTy){
   switch (getSILFunctionLanguage(destRep)) {
   case SILFunctionLanguage::Swift:
@@ -481,8 +477,6 @@ static void buildBlockToFuncThunkBody(SILGenFunction &gen,
     auto mv = gen.emitManagedRValueWithCleanup(v, tl);
     args.push_back(gen.emitNativeToBridgedValue(loc, mv,
                               SILFunctionTypeRepresentation::Block,
-                              AbstractionPattern(param.getType()),
-                              param.getType(),
                               blockParam.getType()));
   }
 
@@ -698,14 +692,12 @@ static SILValue emitBridgeReturnValue(SILGenFunction &gen,
                                       SILLocation loc,
                                       SILValue result,
                                       SILFunctionTypeRepresentation fnTypeRepr,
-                                      AbstractionPattern origNativeTy,
-                                      CanType substNativeTy,
                                       CanType bridgedTy) {
   Scope scope(gen.Cleanups, CleanupLocation::get(loc));
 
   ManagedValue native = gen.emitManagedRValueWithCleanup(result);
   ManagedValue bridged = gen.emitNativeToBridgedValue(loc, native, fnTypeRepr,
-                                      origNativeTy, substNativeTy, bridgedTy);
+                                      bridgedTy);
   return bridged.forward(gen);
 }
 
@@ -890,9 +882,6 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     SGM.M, SGM.M.getSwiftModule(), subs);
   SILType substSILTy = SILType::getPrimitiveObjectType(substTy);
 
-  CanType substNativeResultType = nativeInfo.LoweredType.getResult();
-  AbstractionPattern origNativeResultType =
-    AbstractionPattern(substNativeResultType);
   CanType bridgedResultType = objcResultTy.getType();
 
   SILValue result;
@@ -909,8 +898,6 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     // Now bridge the return value.
     result = emitBridgeReturnValue(*this, loc, result,
                                    objcFnTy->getRepresentation(),
-                                   origNativeResultType,
-                                   substNativeResultType,
                                    bridgedResultType);
   } else {
     SILBasicBlock *contBB = createBasicBlock();
@@ -931,8 +918,6 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
       SILValue bridgedResult =
         emitBridgeReturnValueForForeignError(loc, nativeResult, 
                                              objcFnTy->getRepresentation(),
-                                             origNativeResultType,
-                                             substNativeResultType,
                                              objcResultTy.getSILType(),
                                              foreignErrorSlot, *foreignError);
       B.createBranch(loc, contBB, bridgedResult);
@@ -1111,8 +1096,6 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
         foreignFnTy->getParameters()[foreignArgIndex++].getSILType();
       args.push_back(emitNativeToBridgedValue(fd, param,
                                 SILFunctionTypeRepresentation::CFunctionPointer,
-                                AbstractionPattern(param.getSwiftType()),
-                                param.getSwiftType(),
                                 foreignArgTy.getSwiftRValueType()));
     }
 

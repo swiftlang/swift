@@ -429,6 +429,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, XCC);
   BLOCK_RECORD(options_block, IS_SIB);
   BLOCK_RECORD(options_block, IS_TESTABLE);
+  BLOCK_RECORD(options_block, IS_RESILIENT);
 
   BLOCK(INPUT_BLOCK);
   BLOCK_RECORD(input_block, IMPORTED_MODULE);
@@ -575,6 +576,11 @@ void Serializer::writeHeader(const SerializationOptions &options) {
       if (M->isTestingEnabled()) {
         options_block::IsTestableLayout IsTestable(Out);
         IsTestable.emit(ScratchRecord);
+      }
+
+      if (M->isResilienceEnabled()) {
+        options_block::IsResilientLayout IsResilient(Out);
+        IsResilient.emit(ScratchRecord);
       }
 
       if (options.SerializeOptionsForDebugging) {
@@ -921,6 +927,7 @@ static uint8_t getRawStableRequirementKind(RequirementKind kind) {
 
   switch (kind) {
   CASE(Conformance)
+  CASE(Superclass)
   CASE(SameType)
   CASE(WitnessMarker)
   }
@@ -973,7 +980,7 @@ bool Serializer::writeGenericParams(const GenericParamList *genericParams,
     llvm::raw_svector_ostream ReqOS(ReqStr);
     next.printAsWritten(ReqOS);
     switch (next.getKind()) {
-    case RequirementKind::Conformance:
+    case RequirementReprKind::TypeConstraint:
       GenericRequirementLayout::emitRecord(
                                       Out, ScratchRecord, abbrCode,
                                       GenericRequirementKind::Conformance,
@@ -981,16 +988,13 @@ bool Serializer::writeGenericParams(const GenericParamList *genericParams,
                                       addTypeRef(next.getConstraint()),
                                       ReqOS.str());
       break;
-    case RequirementKind::SameType:
+    case RequirementReprKind::SameType:
       GenericRequirementLayout::emitRecord(
                                       Out, ScratchRecord, abbrCode,
                                       GenericRequirementKind::SameType,
                                       addTypeRef(next.getFirstType()),
                                       addTypeRef(next.getSecondType()),
                                       ReqOS.str());
-      break;
-    case RequirementKind::WitnessMarker:
-      llvm_unreachable("Can't show up in requirement representations");
       break;
     }
   }
@@ -1726,6 +1730,30 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     return;
   }
 
+  case DAK_Swift3Migration: {
+    auto *theAttr = cast<Swift3MigrationAttr>(DA);
+
+    llvm::SmallString<32> blob;
+
+    unsigned renameLength = 0;
+    if (auto newName = theAttr->getRenamed()) {
+      llvm::raw_svector_ostream os(blob);
+      newName.print(os);
+      renameLength = os.str().size();
+    }
+
+    blob.append(theAttr->getMessage());
+
+    auto abbrCode = DeclTypeAbbrCodes[Swift3MigrationDeclAttrLayout::Code];
+    Swift3MigrationDeclAttrLayout::emitRecord(
+                                        Out, ScratchRecord, abbrCode,
+                                        theAttr->isImplicit(),
+                                        renameLength,
+                                        theAttr->getMessage().size(),
+                                        blob);
+    return;
+  }
+
   case DAK_WarnUnusedResult: {
     auto *theAttr = cast<WarnUnusedResultAttr>(DA);
 
@@ -1739,21 +1767,6 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
                                                theAttr->isImplicit(),
                                                endOfMessageIndex,
                                                blob);
-    return;
-  }
-
-  case DAK_MigrationId: {
-    auto *theAttr = cast<MigrationIdAttr>(DA);
-
-    // Compute the blob.
-    SmallString<128> blob;
-    blob += theAttr->getIdent();
-    uint64_t endOfIdentIndex = blob.size();
-    blob += theAttr->getPatternId();
-    auto abbrCode = DeclTypeAbbrCodes[MigrationIdDeclAttrLayout::Code];
-    MigrationIdDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                          endOfIdentIndex,
-                                          blob);
     return;
   }
   }
@@ -3686,6 +3699,18 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
           .push_back({ getStableFixity(OD->getKind()), addDeclRef(D) });
       }
 
+      // If this is a global variable, force the accessors to be
+      // serialized.
+      if (auto VD = dyn_cast<VarDecl>(D)) {
+        if (VD->getGetter())
+          addDeclRef(VD->getGetter());
+        if (VD->getSetter())
+          addDeclRef(VD->getSetter());
+      }
+
+      // If this nominal type has associated top-level decls for a
+      // derived conformance (for example, ==), force them to be
+      // serialized.
       if (auto IDC = dyn_cast<IterableDeclContext>(D)) {
         addOperatorsAndTopLevel(*this, IDC->getMembers(),
                                 operatorMethodDecls, topLevelDecls,

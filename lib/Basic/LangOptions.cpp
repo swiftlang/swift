@@ -36,7 +36,9 @@ const std::vector<std::string> LangOptions::SupportedArchBuildConfigArguments = 
   "arm",
   "arm64",
   "i386",
-  "x86_64"
+  "x86_64",
+  "powerpc64",
+  "powerpc64le"
 };
 
 bool LangOptions::isOSBuildConfigSupported(llvm::StringRef OSName) {
@@ -114,6 +116,12 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     break;
   case llvm::Triple::ArchType::aarch64:
     addTargetConfigOption("arch", "arm64");
+    break;
+  case llvm::Triple::ArchType::ppc64:
+    addTargetConfigOption("arch", "powerpc64");
+    break;
+  case llvm::Triple::ArchType::ppc64le:
+    addTargetConfigOption("arch", "powerpc64le");
     break;
   case llvm::Triple::ArchType::x86:
     addTargetConfigOption("arch", "i386");

@@ -186,16 +186,13 @@ func rdar19551164b(s: NSString, _ a: NSArray) {
 }
 
 // rdar://problem/19695671
-func takesSet<T: Hashable>(p: Set<T>) {}
-func takesDictionary<K: Hashable, V>(p: Dictionary<K, V>) {}
-func takesArray<T>(t: Array<T>) {}
+func takesSet<T: Hashable>(p: Set<T>) {}  // expected-note {{in call to function 'takesSet'}}
+func takesDictionary<K: Hashable, V>(p: Dictionary<K, V>) {} // expected-note {{in call to function 'takesDictionary'}}
+func takesArray<T>(t: Array<T>) {} // expected-note {{in call to function 'takesArray'}}
 func rdar19695671() {
-  takesSet(NSSet() as! Set) // expected-error{{cannot invoke 'takesSet' with an argument list of type '(Set<_>)'}}
-  // expected-note @-1 {{expected an argument list of type '(Set<T>)'}}
-  takesDictionary(NSDictionary() as! Dictionary) // expected-error{{cannot invoke 'takesDictionary' with an argument list of type '(Dictionary<_, _>)'}}
-  // expected-note @-1 {{expected an argument list of type '(Dictionary<K, V>)'}}
-  takesArray(NSArray() as! Array) // expected-error{{cannot invoke 'takesArray' with an argument list of type '(Array<_>)'}}
-  // expected-note @-1 {{expected an argument list of type '(Array<T>)'}}
+  takesSet(NSSet() as! Set) // expected-error{{generic parameter 'T' could not be inferred}}
+  takesDictionary(NSDictionary() as! Dictionary) // expected-error{{generic parameter 'K' could not be inferred}}
+  takesArray(NSArray() as! Array) // expected-error{{generic parameter 'T' could not be inferred}}
 }
 
 

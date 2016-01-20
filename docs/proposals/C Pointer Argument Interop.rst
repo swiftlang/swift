@@ -141,7 +141,7 @@ known, so a copy-on-write array buffer must be eagerly uniqued prior to the
 address of the array being taken::
 
   func loadFloatsFromData(data: NSData) {
-    var a: Float[] = [0.0, 0.0, 0.0, 0.0]
+    var a: [Float] = [0.0, 0.0, 0.0, 0.0]
     var b = a
 
     // Should only mutate 'b' without affecting 'a', so its backing store

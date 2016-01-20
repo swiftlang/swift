@@ -284,7 +284,9 @@ std::string swift::ide::removeCodeCompletionTokens(
     if (C == '#' && Ptr <= End - 2 && Ptr[1] == '^') {
       do {
         Ptr++;
-      } while(*Ptr != '#');
+      } while (Ptr < End && *Ptr != '#');
+      if (Ptr == End)
+        break;
       continue;
     }
     CleanFile += C;
@@ -443,8 +445,9 @@ CodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   case DeclKind::Module:
     return CodeCompletionDeclKind::Module;
   case DeclKind::TypeAlias:
-  case DeclKind::AssociatedType:
     return CodeCompletionDeclKind::TypeAlias;
+  case DeclKind::AssociatedType:
+    return CodeCompletionDeclKind::AssociatedType;
   case DeclKind::GenericTypeParam:
     return CodeCompletionDeclKind::GenericTypeParam;
   case DeclKind::Enum:
@@ -535,6 +538,9 @@ void CodeCompletionResult::print(raw_ostream &OS) const {
       break;
     case CodeCompletionDeclKind::TypeAlias:
       Prefix.append("[TypeAlias]");
+      break;
+    case CodeCompletionDeclKind::AssociatedType:
+      Prefix.append("[AssociatedType]");
       break;
     case CodeCompletionDeclKind::GenericTypeParam:
       Prefix.append("[GenericTypeParam]");
@@ -3443,8 +3449,7 @@ public:
     }
     std::string Description = TargetName.str() + " Attribute";
 #define DECL_ATTR(KEYWORD, NAME, ...)                                         \
-    if (!StringRef(#KEYWORD).startswith("_") &&                               \
-        !DeclAttribute::isUserInaccessible(DAK_##NAME) &&                     \
+    if (!DeclAttribute::isUserInaccessible(DAK_##NAME) &&                     \
         !DeclAttribute::isDeclModifier(DAK_##NAME) &&                         \
         !DeclAttribute::shouldBeRejectedByParser(DAK_##NAME) &&               \
         (!DeclAttribute::isSilOnly(DAK_##NAME) || IsInSil)) {                 \
@@ -4733,6 +4738,7 @@ void swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
       case CodeCompletionDeclKind::Enum:
       case CodeCompletionDeclKind::Protocol:
       case CodeCompletionDeclKind::TypeAlias:
+      case CodeCompletionDeclKind::AssociatedType:
       case CodeCompletionDeclKind::GenericTypeParam:
         return true;
       case CodeCompletionDeclKind::EnumElement:

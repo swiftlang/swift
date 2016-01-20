@@ -49,7 +49,7 @@ def apply_edits(path):
         if fname not in edits_per_file:
             edits_per_file[fname] = []
         edits_per_file[fname].append((ed[1], ed[2], ed[3]))
-    
+
     for fname, edits in edits_per_file.iteritems():
         print('Updating', fname)
         edits.sort(reverse=True)
@@ -59,7 +59,8 @@ def apply_edits(path):
             offset = ed[0]
             length = ed[1]
             text = ed[2]
-            file_data = file_data[:offset] + str(text) + file_data[offset+length:]
+            file_data = file_data[:offset] + str(text) + \
+                file_data[offset + length:]
         with open(fname, 'w') as f:
             f.write(file_data)
     return 0
@@ -70,7 +71,7 @@ def main():
         description="""Finds all .remap files in a directory and applies their
 edits to the source files.""")
     parser.add_argument("build_dir_path",
-        help="path to index info")
+                        help="path to index info")
 
     args = parser.parse_args()
     return apply_edits(args.build_dir_path)

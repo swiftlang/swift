@@ -19,6 +19,8 @@ func forceStuff(x: float4, y: float3) -> (Float,Float,Float,Float) {
 // armv7-LABEL: define <4 x float> @simd_c_args(<4 x float>)
 // armv7s-LABEL: define <4 x float> @simd_c_args(<4 x float>)
 // armv7k-LABEL: define <4 x float> @simd_c_args(<4 x float>)
+// powerpc64-LABEL: define <4 x float> @simd_c_args(<4 x float>)
+// powerpc64le-LABEL: define <4 x float> @simd_c_args(<4 x float>)
 sil @simd_c_args : $@convention(c) (float4) -> float4 {
 entry(%x : $float4):
   return %x : $float4
@@ -30,6 +32,8 @@ entry(%x : $float4):
 // armv7-LABEL: define <3 x float> @simd_c_args_float3(<4 x i32>)
 // armv7s-LABEL: define <3 x float> @simd_c_args_float3(<4 x i32>)
 // armv7k-LABEL: define <3 x float> @simd_c_args_float3(<4 x i32>)
+// powerpc64-LABEL: define <3 x float> @simd_c_args_float3(<3 x float>)
+// powerpc64le-LABEL: define <3 x float> @simd_c_args_float3(<3 x float>)
 sil @simd_c_args_float3 : $@convention(c) (float3) -> float3 {
 entry(%x : $float3):
 // x86_64: [[COERCE:%.*]] = alloca <3 x float>, align 16
@@ -44,6 +48,8 @@ entry(%x : $float3):
 // armv7-LABEL: define void @simd_native_args(%V4simd6float4* noalias nocapture sret, %V4simd6float4* noalias nocapture dereferenceable({{.*}}))
 // armv7s-LABEL: define void @simd_native_args(%V4simd6float4* noalias nocapture sret, %V4simd6float4* noalias nocapture dereferenceable({{.*}}))
 // armv7k-LABEL: define void @simd_native_args(%V4simd6float4* noalias nocapture sret, %V4simd6float4* noalias nocapture dereferenceable({{.*}}))
+// powerpc64-LABEL: define void @simd_native_args(%V4simd6float4* noalias nocapture sret, %V4simd6float4* noalias nocapture dereferenceable({{.*}}))
+// powerpc64le-LABEL: define void @simd_native_args(%V4simd6float4* noalias nocapture sret, %V4simd6float4* noalias nocapture dereferenceable({{.*}}))
 sil @simd_native_args : $@convention(thin) (float4) -> float4 {
 entry(%x : $float4):
   %f = function_ref @simd_c_args : $@convention(c) (float4) -> float4
@@ -57,6 +63,8 @@ entry(%x : $float4):
 // armv7-LABEL: define { float, float, float } @simd_native_args_float3(float, float, float)
 // armv7s-LABEL: define { float, float, float } @simd_native_args_float3(float, float, float)
 // armv7k-LABEL: define { float, float, float } @simd_native_args_float3(float, float, float)
+// powerpc64-LABEL: define { float, float, float } @simd_native_args_float3(float, float, float)
+// powerpc64le-LABEL: define { float, float, float } @simd_native_args_float3(float, float, float)
 sil @simd_native_args_float3 : $@convention(thin) (float3) -> float3 {
 entry(%x : $float3):
   %f = function_ref @simd_c_args_float3 : $@convention(c) (float3) -> float3

@@ -308,6 +308,18 @@ Runtime.test("typeName") {
   expectEqual("protocol<>.Protocol", _typeName(a.dynamicType))
 }
 
+class SomeSubclass : SomeClass {}
+
+protocol SomeProtocol {}
+class SomeConformingClass : SomeProtocol {}
+
+Runtime.test("typeByName") {
+  expectTrue(_typeByName("a.SomeClass") == SomeClass.self)
+  expectTrue(_typeByName("a.SomeSubclass") == SomeSubclass.self)
+  // name lookup will be via protocol conformance table
+  expectTrue(_typeByName("a.SomeConformingClass") == SomeConformingClass.self)
+}
+
 Runtime.test("demangleName") {
   expectEqual("", _stdlib_demangleName(""))
   expectEqual("abc", _stdlib_demangleName("abc"))
@@ -1494,7 +1506,7 @@ BitTwiddlingTestSuite.test("_isPowerOf2/Int") {
   expectTrue(_isPowerOf2(asInt(1024)))
 #if arch(i386) || arch(arm)
   // Not applicable to 32-bit architectures.
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
   expectTrue(_isPowerOf2(asInt(0x8000_0000)))
 #else
   fatalError("implement")

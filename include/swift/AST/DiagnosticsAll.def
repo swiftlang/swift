@@ -19,18 +19,18 @@
 #endif
 
 #ifndef ERROR
-#  define ERROR(ID,Category,Options,Text,Signature)   \
-  DIAG(ERROR,ID,Category,Options,Text,Signature)
+#  define ERROR(ID,Options,Text,Signature)   \
+  DIAG(ERROR,ID,Options,Text,Signature)
 #endif
 
 #ifndef WARNING
-#  define WARNING(ID,Category,Options,Text,Signature) \
-  DIAG(WARNING,ID,Category,Options,Text,Signature)
+#  define WARNING(ID,Options,Text,Signature) \
+  DIAG(WARNING,ID,Options,Text,Signature)
 #endif
 
 #ifndef NOTE
-#  define NOTE(ID,Category,Options,Text,Signature) \
-  DIAG(NOTE,ID,Category,Options,Text,Signature)
+#  define NOTE(ID,Options,Text,Signature) \
+  DIAG(NOTE,ID,Options,Text,Signature)
 #endif
 
 #define DIAG_NO_UNDEF

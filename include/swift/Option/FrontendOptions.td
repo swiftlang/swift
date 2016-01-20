@@ -28,6 +28,11 @@ def delayed_function_body_parsing :
 def primary_file : Separate<["-"], "primary-file">,
   HelpText<"Produce output for this file, not the whole module">;
 
+def filelist : Separate<["-"], "filelist">,
+  HelpText<"Specify source inputs in a file rather than on the command line">;
+def output_filelist : Separate<["-"], "output-filelist">,
+  HelpText<"Specify outputs in a file rather than on the command line">;
+
 def emit_module_doc : Flag<["-"], "emit-module-doc">,
   HelpText<"Emit a module documentation file based on documentation "
            "comments">;
@@ -176,6 +181,12 @@ def disable_llvm_slp_vectorizer : Flag<["-"], "disable-llvm-slp-vectorizer">,
 def disable_llvm_verify : Flag<["-"], "disable-llvm-verify">,
   HelpText<"Don't run the LLVM IR verifier.">;
 
+def disable_llvm_value_names : Flag<["-"], "disable-llvm-value-names">,
+  HelpText<"Don't add names to local values in LLVM IR">;
+
+def enable_llvm_value_names : Flag<["-"], "enable-llvm-value-names">,
+  HelpText<"Add names to local values in LLVM IR">;
+
 def stack_promotion_checks : Flag<["-"], "emit-stack-promotion-checks">,
   HelpText<"Emit runtime checks for correct stack promotion of objects.">;
 
@@ -191,12 +202,6 @@ def dump_clang_diagnostics : Flag<["-"], "dump-clang-diagnostics">,
 
 def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
   HelpText<"Emit locations during SIL emission">;
-
-def use_native_super_method : Flag<["-"], "use-native-super-method">,
-  HelpText<"Use super_method for super calls in native classes">;
-
-def disable_self_type_mangling : Flag<["-"], "disable-self-type-mangling">,
-  HelpText<"Disable including Self type in method type manglings">;
 
 def enable_experimental_patterns : Flag<["-"], "enable-experimental-patterns">,
   HelpText<"Enable experimental 'switch' pattern matching features">;
@@ -216,6 +221,10 @@ def enable_infer_default_arguments :
 def enable_swift_name_lookup_tables :
   Flag<["-"], "enable-swift-name-lookup-tables">,
   HelpText<"Enable Swift name lookup tables in the Clang importer">;
+
+def swift3_migration :
+  Flag<["-"], "swift3-migration">,
+  HelpText<"Enable Fix-It based migration aids for Swift 3">;
 
 def warn_omit_needless_words :
   Flag<["-"], "Womit-needless-words">,
@@ -292,9 +301,7 @@ def dump_api_path : Separate<["-"], "dump-api-path">,
   HelpText<"The path to output swift interface files for the compiled source files">;
 
 def enable_resilience : Flag<["-"], "enable-resilience">,
-   HelpText<"Treat all types as resilient by default">;
-
-def disable_resilience : Flag<["-"], "disable-resilience">,
-   HelpText<"Treat all types as fixed layout by default">;
+   HelpText<"Compile the library with resilient interfaces for all "
+            "public declarations">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

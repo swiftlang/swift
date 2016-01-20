@@ -18,11 +18,47 @@ bb0(%x : $*T):
   return %0 : $()
 }
 // CHECK:    define void @generic([[OPAQUE]]* noalias nocapture, [[TYPE]]* %T) {{.*}} {
-//  Type metadata.
-// CHECK: alloca
 //   The fixed-size buffer.
 // CHECK:      [[YBUF:%.*]] = alloca [[BUFFER:.*]], align
-// CHECK-NEXT: store %swift.type
+// CHECK-NEXT: [[YBUFLIFE:%.*]] = bitcast [[BUFFER]]* [[YBUF]] to i8*
+// CHECK-NEXT: call void @llvm.lifetime.start(i64 [[BUFFER_SIZE:12|24]], i8* [[YBUFLIFE]])
+//   Allocate it.
+// CHECK-NEXT: [[T0:%.*]] = bitcast [[TYPE]]* %T to i8***
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], {{i32|i64}} -1
+// CHECK-NEXT: [[VWTABLE:%.*]] = load i8**, i8*** [[T1]], align
+// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8*, i8** [[VWTABLE]], i32 5
+// CHECK-NEXT: [[T4:%.*]] = load i8*, i8** [[T3]], align
+// CHECK-NEXT: [[BUFFER_COPY_FN:%.*]] = bitcast i8* [[T4]] to [[OPAQUE]]* ([[BUFFER]]*, [[OPAQUE]]*, [[TYPE]]*)*
+//   Copy 'x' into 'y'.
+// CHECK-NEXT: [[Y:%.*]] = call [[OPAQUE]]* [[BUFFER_COPY_FN]]([[BUFFER]]* [[YBUF]], [[OPAQUE]]* [[X:%.*]], [[TYPE]]* %T)
+//   Destroy and deallocate 'y'.
+// CHECK-NEXT: [[T4:%.*]] = load i8*, i8** [[VWTABLE]], align
+// CHECK-NEXT: [[DESTROY_BUFFER_FN:%.*]] = bitcast i8* [[T4]] to void ([[BUFFER]]*, [[TYPE]]*)*
+// CHECK-NEXT: call void [[DESTROY_BUFFER_FN]]([[BUFFER]]* [[YBUF]], [[TYPE]]* %T)
+// CHECK-NEXT: [[YBUFLIFE:%.*]] = bitcast [[BUFFER]]* [[YBUF]] to i8*
+// CHECK-NEXT: call void @llvm.lifetime.end(i64 [[BUFFER_SIZE]], i8* [[YBUFLIFE]])
+//   Destroy 'x'.
+// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8*, i8** [[VWTABLE]], i32 4
+// CHECK-NEXT: [[T4:%.*]] = load i8*, i8** [[T3]], align
+// CHECK-NEXT: [[DESTROY_FN:%.*]] = bitcast i8* [[T4]] to void ([[OPAQUE]]*, [[TYPE]]*)*
+// CHECK-NEXT: call void [[DESTROY_FN]]([[OPAQUE]]* [[X]], [[TYPE]]* %T)
+//   Return.
+// CHECK-NEXT: ret void
+
+sil @generic_with_reuse : $@convention(thin) <T> (@in T) -> () {
+bb0(%x : $*T):
+  %y = alloc_stack $T
+  copy_addr %x to [initialization] %y : $*T
+  destroy_addr %y : $*T
+  copy_addr [take] %x to [initialization] %y : $*T
+  destroy_addr %y : $*T
+  dealloc_stack %y : $*T
+  %0 = tuple ()
+  return %0 : $()
+}
+// CHECK:    define void @generic_with_reuse([[OPAQUE]]* noalias nocapture, [[TYPE]]* %T) {{.*}} {
+//   The fixed-size buffer.
+// CHECK:      [[YBUF:%.*]] = alloca [[BUFFER:.*]], align
 // CHECK-NEXT: [[YBUFLIFE:%.*]] = bitcast [[BUFFER]]* [[YBUF]] to i8*
 // CHECK-NEXT: call void @llvm.lifetime.start(i64 [[BUFFER_SIZE:12|24]], i8* [[YBUFLIFE]])
 //   Allocate it.
@@ -39,15 +75,17 @@ bb0(%x : $*T):
 // CHECK-NEXT: [[T4:%.*]] = load i8*, i8** [[T3]], align
 // CHECK-NEXT: [[DESTROY_FN:%.*]] = bitcast i8* [[T4]] to void ([[OPAQUE]]*, [[TYPE]]*)*
 // CHECK-NEXT: call void [[DESTROY_FN]]([[OPAQUE]]* [[Y]], [[TYPE]]* %T)
-//   Deallocate 'y'.
-// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8*, i8** [[VWTABLE]], i32 3
+//   Copy 'x' into 'y' again, this time as a take.
+// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8*, i8** [[VWTABLE]], i32 9
 // CHECK-NEXT: [[T4:%.*]] = load i8*, i8** [[T3]], align
-// CHECK-NEXT: [[DEALLOC_FN:%.*]] = bitcast i8* [[T4]] to void ([[BUFFER]]*, [[TYPE]]*)*
-// CHECK-NEXT: call void [[DEALLOC_FN]]([[BUFFER]]* [[YBUF]], [[TYPE]]* %T)
+// CHECK-NEXT: [[TAKE_FN:%.*]] = bitcast i8* [[T4]] to [[OPAQUE]]* ([[OPAQUE]]*, [[OPAQUE]]*, [[TYPE]]*)*
+// CHECK-NEXT: call [[OPAQUE]]* [[TAKE_FN]]([[OPAQUE]]* [[Y]], [[OPAQUE]]* [[X]], [[TYPE]]* %T)
+//   Destroy and deallocate 'y'.
+// CHECK-NEXT: [[T4:%.*]] = load i8*, i8** [[VWTABLE]], align
+// CHECK-NEXT: [[DESTROY_BUFFER_FN:%.*]] = bitcast i8* [[T4]] to void ([[BUFFER]]*, [[TYPE]]*)*
+// CHECK-NEXT: call void [[DESTROY_BUFFER_FN]]([[BUFFER]]* [[YBUF]], [[TYPE]]* %T)
 // CHECK-NEXT: [[YBUFLIFE:%.*]] = bitcast [[BUFFER]]* [[YBUF]] to i8*
 // CHECK-NEXT: call void @llvm.lifetime.end(i64 [[BUFFER_SIZE]], i8* [[YBUFLIFE]])
-//   Destroy 'x'.
-// CHECK-NEXT: call void [[DESTROY_FN]]([[OPAQUE]]* [[X]], [[TYPE]]* %T)
 //   Return.
 // CHECK-NEXT: ret void
 

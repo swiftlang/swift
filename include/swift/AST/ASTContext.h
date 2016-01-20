@@ -99,6 +99,22 @@ enum class AllocationArena {
   ConstraintSolver
 };
 
+/// Lists the set of "known" Foundation entities that are used in the
+/// compiler.
+///
+/// While the names of Foundation types aren't likely to change in
+/// Objective-C, their mapping into Swift can. Therefore, when
+/// referring to names of Foundation entities in Swift, use this enum
+/// and \c ASTContext::getSwiftName or \c ASTContext::getSwiftId.
+enum class KnownFoundationEntity {
+#define FOUNDATION_ENTITY(Name) Name,
+#include "swift/AST/KnownFoundationEntities.def"
+};
+
+/// Retrieve the Foundation entity kind for the given Objective-C
+/// entity name.
+Optional<KnownFoundationEntity> getKnownFoundationEntity(StringRef name);
+
 /// Callback function used when referring to a type member of a given
 /// type variable.
 typedef std::function<Type(TypeVariableType *, AssociatedTypeDecl *)>
@@ -779,6 +795,16 @@ public:
   /// Diagnose any unsatisfied @objc optional requirements of
   /// protocols that conflict with methods.
   bool diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf);
+
+  /// Retrieve the Swift name for the given Foundation entity, where
+  /// "NS" prefix stripping will apply under omit-needless-words.
+  StringRef getSwiftName(KnownFoundationEntity kind);
+
+  /// Retrieve the Swift identifier for the given Foundation entity, where
+  /// "NS" prefix stripping will apply under omit-needless-words.
+  Identifier getSwiftId(KnownFoundationEntity kind) {
+    return getIdentifier(getSwiftName(kind));
+  }
 
   /// Try to dump the context of the given archetype.
   void dumpArchetypeContext(ArchetypeType *archetype,

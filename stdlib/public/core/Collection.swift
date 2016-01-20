@@ -25,7 +25,7 @@ public protocol Indexable {
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
-  typealias Index : ForwardIndex
+  associatedtype Index : ForwardIndex
 
   /// The position of the first element in a non-empty collection.
   ///
@@ -51,7 +51,7 @@ public protocol Indexable {
   // its subscript.  Ideally we'd like to constrain this Element to be the same
   // as Collection.Iterator.Element (see below), but we have no way of
   // expressing it today.
-  typealias _Element
+  associatedtype _Element
 
   /// Returns the element at the given `position`.
   ///
@@ -60,12 +60,12 @@ public protocol Indexable {
 }
 
 public protocol MutableIndexable {
-  typealias Index : ForwardIndex
+  associatedtype Index : ForwardIndex
 
   var startIndex: Index {get}
   var endIndex: Index {get}
 
-  typealias _Element
+  associatedtype _Element
 
   subscript(position: Index) -> _Element {get set}
 }
@@ -117,7 +117,7 @@ public protocol Collection : Indexable, Sequence {
   /// By default, a `Collection` satisfies `Sequence` by
   /// supplying a `CollectionDefaultIterator` as its associated `Iterator`
   /// type.
-  typealias Iterator : IteratorProtocol = CollectionDefaultIterator<Self>
+  associatedtype Iterator : IteratorProtocol = CollectionDefaultIterator<Self>
 
   // FIXME: Needed here so that the Iterator is properly deduced from
   // a custom iterator() function.  Otherwise we get an
@@ -135,7 +135,7 @@ public protocol Collection : Indexable, Sequence {
   ///   `Sequence`, but is restated here with stricter
   ///   constraints: in a `Collection`, the `SubSequence` should
   ///   also be a `Collection`.
-  typealias SubSequence: Indexable, Sequence = Slice<Self>
+  associatedtype SubSequence: Indexable, Sequence = Slice<Self>
 
   /// Returns the element at the given `position`.
   subscript(position: Index) -> Iterator.Element {get}
@@ -627,7 +627,7 @@ public protocol MutableCollection : MutableIndexable, Collection {
   // FIXME: should be constrained to MutableCollection
   // (<rdar://problem/20715009> Implement recursive protocol
   // constraints)
-  typealias SubSequence : Collection /*: MutableCollection*/
+  associatedtype SubSequence : Collection /*: MutableCollection*/
     = MutableSlice<Self>
 
   /// Access the element at `position`.

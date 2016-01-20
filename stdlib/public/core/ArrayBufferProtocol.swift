@@ -14,7 +14,7 @@
 /// `_ArrayBufferProtocol`.  This buffer does not provide value semantics.
 public protocol _ArrayBufferProtocol : MutableCollection {
   /// The type of elements stored in the buffer.
-  typealias Element
+  associatedtype Element
 
   /// Create an empty buffer.
   init()

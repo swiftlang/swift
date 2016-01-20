@@ -4116,12 +4116,7 @@ class TypeVariableType : public TypeBase {
   class Implementation;
   
 public:
-  
-  /// \brief Printing substitutions for type variables may result in recursive
-  /// references to the type variable itself. This flag is used to short-circuit
-  /// such operations.
-  bool isPrinting = false;
-  
+ 
   /// \brief Create a new type variable whose implementation is constructed
   /// with the given arguments.
   template<typename ...Args>

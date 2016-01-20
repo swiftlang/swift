@@ -78,7 +78,7 @@ def get_fixed_point_hash(bit_pattern, src_bits, word_bits):
 
 truncating_bit_pattern_test_template = gyb.parseTemplate("truncating_bit_pattern",
 """
-% from SwiftIntTypes import *
+% from SwiftIntTypes import all_integer_types, should_define_truncating_bit_pattern_init
 
 % for dst_ty in all_integer_types(word_bits):
 %   Dst = dst_ty.stdlib_name
@@ -127,7 +127,7 @@ FixedPoint.test("${Dst}(truncatingBitPattern:)") {
       test_bit_patterns=test_bit_patterns,
       word_bits=32)}
 
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
 
   ${gyb.executeTemplate(
       truncating_bit_pattern_test_template,
@@ -149,7 +149,7 @@ _UnimplementedError()
 
 bit_pattern_test_template = gyb.parseTemplate("bit_pattern",
 """
-% from SwiftIntTypes import *
+% from SwiftIntTypes import all_integer_types
 
 % for dst_ty in all_integer_types(word_bits):
 %   Dst = dst_ty.stdlib_name
@@ -203,7 +203,7 @@ FixedPoint.test("${Dst}(bitPattern: ${Src})") {
       test_bit_patterns=test_bit_patterns,
       word_bits=32)}
 
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
 
   ${gyb.executeTemplate(
       bit_pattern_test_template,
@@ -225,7 +225,7 @@ _UnimplementedError()
 
 hash_value_test_template = gyb.parseTemplate("hash_value",
 """
-% from SwiftIntTypes import *
+% from SwiftIntTypes import all_integer_types
 
 % for self_ty in all_integer_types(word_bits):
 %   Self = self_ty.stdlib_name
@@ -261,7 +261,7 @@ FixedPoint.test("${Self}.hashValue") {
       test_bit_patterns=test_bit_patterns,
       word_bits=32)}
 
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
 
   ${gyb.executeTemplate(
       hash_value_test_template,

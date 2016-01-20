@@ -72,7 +72,7 @@ You can call it as any of::
 
   var x: Float = 0.0
   var p: UnsafeMutablePointer<Float> = nil
-  var a: Float[] = [1.0, 2.0, 3.0]
+  var a: [Float] = [1.0, 2.0, 3.0]
   foo(nil)
   foo(p)
   foo(&x)
@@ -86,7 +86,7 @@ You can call it as any of::
 
   var x: Float = 0.0, y: Int = 0
   var p: UnsafeMutablePointer<Float> = nil, q: UnsafeMutablePointer<Int> = nil
-  var a: Float[] = [1.0, 2.0, 3.0], b: Int = [1, 2, 3]
+  var a: [Float] = [1.0, 2.0, 3.0], b: Int = [1, 2, 3]
   bar(nil)
   bar(p)
   bar(q)

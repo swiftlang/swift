@@ -1,4 +1,6 @@
-%import inspect,os.path,sys
+%import inspect
+%import os.path
+%import sys
 %sys.path = [os.path.split(inspect.getframeinfo(inspect.currentframe()).filename)[0] or '.'] + sys.path
 
 % Base = "%s%s%sCollection" % (base_kind, traversal, 'Mutable' if mutable else '')

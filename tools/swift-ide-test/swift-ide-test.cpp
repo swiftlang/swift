@@ -91,6 +91,7 @@ enum class ActionType {
   CompilerInvocationFromModule,
   GenerateModuleAPIDescription,
   DiffModuleAPI,
+  ReconstructType,
 };
 
 class NullDebuggerClient : public DebuggerClient {
@@ -196,6 +197,9 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
            clEnumValN(ActionType::PrintTypeInterface,
                       "print-type-interface",
                       "Print type-specific interface decl"),
+           clEnumValN(ActionType::ReconstructType,
+                      "reconstruct-type",
+                      "Reconstruct type from mangled name"),
            clEnumValEnd));
 
 static llvm::cl::opt<std::string>
@@ -279,6 +283,11 @@ UseSwiftLookupTables(
   "enable-swift-name-lookup-tables",
   llvm::cl::desc("Use Swift-specific name lookup tables in the importer"),
   llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
+Swift3Migration("swift3-migration",
+                   llvm::cl::desc("Enable Fix-It based migration aids for Swift 3"),
+                   llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
 OmitNeedlessWords("enable-omit-needless-words",
@@ -2231,6 +2240,68 @@ private:
 
 } // unnamed namespace
 
+//===----------------------------------------------------------------------===//
+// Print reconstructed type from mangled names.
+//===----------------------------------------------------------------------===//
+class TypeReconstructWalker : public SourceEntityWalker {
+  ASTContext &Ctx;
+  llvm::raw_ostream &Stream;
+
+public:
+  TypeReconstructWalker(ASTContext &Ctx,llvm::raw_ostream &Stream) : Ctx(Ctx), Stream(Stream) {}
+
+  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
+                          TypeDecl *CtorTyRef, Type T) override {
+    if (T.isNull())
+      return true;
+    T = T->getRValueType();
+    Mangle::Mangler Man(/* DWARFMangling */true);
+    Man.mangleType(T, 0);
+    std::string MangledName(Man.finalize());
+    std::string Error;
+    Type ReconstructedType = getTypeFromMangledTypename(Ctx, MangledName.data(),
+                                                        Error);
+    if (ReconstructedType) {
+      Stream << "reconstructed type from usr for \'" << Range.str() <<"\' is ";
+      Stream << "\'";
+      ReconstructedType->print(Stream);
+      Stream << "\'";
+      Stream << '\n';
+    } else {
+      ReconstructedType = getTypeFromMangledTypename(Ctx, MangledName.data(),
+                                                     Error);
+      Stream << "cannot reconstruct type from usr for \'" << Range.str() << "\'" << '\n';
+    }
+    return true;
+  }
+};
+
+static int doReconstructType(const CompilerInvocation &InitInvok,
+                             StringRef SourceFilename) {
+  CompilerInvocation Invocation(InitInvok);
+  Invocation.addInputFilename(SourceFilename);
+  Invocation.getLangOptions().DisableAvailabilityChecking = false;
+
+  CompilerInstance CI;
+
+  // Display diagnostics to stderr.
+  PrintingDiagnosticConsumer PrintDiags;
+  CI.addDiagnosticConsumer(&PrintDiags);
+  if (CI.setup(Invocation))
+    return 1;
+  CI.performSema();
+  SourceFile *SF = nullptr;
+  for (auto Unit : CI.getMainModule()->getFiles()) {
+    SF = dyn_cast<SourceFile>(Unit);
+    if (SF)
+      break;
+  }
+  assert(SF && "no source file?");
+  TypeReconstructWalker Walker(SF->getASTContext(), llvm::outs());
+  Walker.walk(SF);
+  return 0;
+}
+
 static int doPrintUSRs(const CompilerInvocation &InitInvok,
                        StringRef SourceFilename) {
   CompilerInvocation Invocation(InitInvok);
@@ -2404,6 +2475,9 @@ int main(int argc, char *argv[]) {
     !options::DisableAccessControl;
   InitInvok.getLangOptions().CodeCompleteInitsInPostfixExpr |=
       options::CodeCompleteInitsInPostfixExpr;
+  InitInvok.getLangOptions().Swift3Migration |= options::Swift3Migration;
+  InitInvok.getLangOptions().OmitNeedlessWords |=
+    options::OmitNeedlessWords;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
     options::ObjCForwardDeclarations;
   InitInvok.getClangImporterOptions().OmitNeedlessWords |=
@@ -2604,6 +2678,9 @@ int main(int argc, char *argv[]) {
     ExitCode = doPrintTypeInterface(InitInvok,
                                     options::SourceFilename,
                                     options::LineColumnPair);
+    break;
+  case ActionType::ReconstructType:
+    ExitCode = doReconstructType(InitInvok, options::SourceFilename);
     break;
   }
 

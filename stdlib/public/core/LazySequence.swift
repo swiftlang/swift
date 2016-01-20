@@ -132,7 +132,7 @@ public protocol LazySequenceProtocol : Sequence {
   /// possibly with a simpler type.
   ///
   /// - See also: `elements`
-  typealias Elements: Sequence = Self
+  associatedtype Elements: Sequence = Self
 
   /// A sequence containing the same elements as this one, possibly with
   /// a simpler type.

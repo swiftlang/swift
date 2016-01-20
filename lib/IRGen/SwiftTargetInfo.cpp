@@ -92,6 +92,13 @@ static void configureARM(IRGenModule &IGM, const llvm::Triple &triple,
     "mov\tr7, r7\t\t@ marker for objc_retainAutoreleaseReturnValue";
 }
 
+/// Configures target-specific information for powerpc64 platforms.
+static void configurePowerPC64(IRGenModule &IGM, const llvm::Triple &triple,
+                               SwiftTargetInfo &target) {
+  setToMask(target.PointerSpareBits, 64,
+            SWIFT_ABI_POWERPC64_SWIFT_SPARE_BITS_MASK);
+}
+
 /// Configure a default target.
 SwiftTargetInfo::SwiftTargetInfo(
   llvm::Triple::ObjectFormatType outputObjectFormat,
@@ -136,6 +143,11 @@ SwiftTargetInfo SwiftTargetInfo::get(IRGenModule &IGM) {
 
   case llvm::Triple::aarch64:
     configureARM64(IGM, triple, target);
+    break;
+
+  case llvm::Triple::ppc64:
+  case llvm::Triple::ppc64le:
+    configurePowerPC64(IGM, triple, target);
     break;
 
   default:

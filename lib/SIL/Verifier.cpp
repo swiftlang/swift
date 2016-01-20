@@ -1677,8 +1677,9 @@ public:
             || !isa<ExtensionDecl>(CMI->getMember().getDecl()->getDeclContext()),
             "extension method cannot be dispatched natively");
     
-    /* TODO: We should enforce that ObjC methods are dispatched on ObjC
-       metatypes, but IRGen appears not to care right now.
+    // TODO: We should enforce that ObjC methods are dispatched on ObjC
+    // metatypes, but IRGen appears not to care right now.
+#if 0
     if (auto metaTy = operandType.getAs<AnyMetatypeType>()) {
       bool objcMetatype
         = metaTy->getRepresentation() == MetatypeRepresentation::ObjC;
@@ -1686,7 +1687,7 @@ public:
       require(objcMetatype == objcMethod,
               "objc class methods must be invoked on objc metatypes");
     }
-     */
+#endif
   }
 
   void checkSuperMethodInst(SuperMethodInst *CMI) {

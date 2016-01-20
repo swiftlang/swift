@@ -180,15 +180,15 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       param.LetVarInOutLoc = consumeToken();
       param.SpecifierKind = ParsedParameter::InOut;
     } else if (Tok.is(tok::kw_let)) {
-      diagnose(Tok.getLoc(), diag::var_not_allowed_in_pattern,
+      diagnose(Tok.getLoc(), diag::let_on_param_is_redundant,
                Tok.is(tok::kw_let)).fixItRemove(Tok.getLoc());
       param.LetVarInOutLoc = consumeToken();
       param.SpecifierKind = ParsedParameter::Let;
     } else if (Tok.is(tok::kw_var)) {
-      diagnose(Tok.getLoc(), diag::var_not_allowed_in_pattern,
-               Tok.is(tok::kw_let)).fixItRemove(Tok.getLoc());
+      diagnose(Tok.getLoc(), diag::var_not_allowed_in_pattern)
+        .fixItRemove(Tok.getLoc());
       param.LetVarInOutLoc = consumeToken();
-      param.SpecifierKind = ParsedParameter::Var;
+      param.SpecifierKind = ParsedParameter::Let;
     }
 
     // Redundant specifiers are fairly common, recognize, reject, and recover
@@ -773,8 +773,8 @@ ParserResult<Pattern> Parser::parsePattern() {
     } else {
       // In an always immutable context, `var` is not allowed.
       if (alwaysImmutable)
-        diagnose(varLoc, diag::var_not_allowed_in_pattern, isLetKeyword)
-        .fixItRemove(varLoc);
+        diagnose(varLoc, diag::var_not_allowed_in_pattern)
+          .fixItRemove(varLoc);
     }
     
     // In our recursive parse, remember that we're in a var/let pattern.
@@ -978,7 +978,7 @@ ParserResult<Pattern> Parser::parseMatchingPatternAsLetOrVar(bool isLet,
     diagnose(varLoc, diag::let_pattern_in_immutable_context);
 
   if (!isLet && InVarOrLetPattern == IVOLP_AlwaysImmutable)
-    diagnose(varLoc, diag::var_not_allowed_in_pattern, isLet)
+    diagnose(varLoc, diag::var_not_allowed_in_pattern)
       .fixItReplace(varLoc, "let");
 
   // In our recursive parse, remember that we're in a var/let pattern.

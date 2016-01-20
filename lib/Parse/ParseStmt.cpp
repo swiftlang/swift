@@ -258,6 +258,10 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         skipExtraTopLevelRBraces())
       continue;
 
+    // Eat invalid tokens instead of allowing them to produce downstream errors.
+    if (consumeIf(tok::unknown))
+      continue;
+           
     bool NeedParseErrorRecovery = false;
     ASTNode Result;
 
@@ -1808,10 +1812,9 @@ ParserResult<Stmt> Parser::parseStmtRepeat(LabeledStmtInfo labelInfo) {
   SourceLoc whileLoc;
 
   if (!consumeIf(tok::kw_while, whileLoc)) {
-    diagnose(whileLoc, diag::expected_while_after_repeat_body);
-    if (body.isNonNull())
-      return body;
-    return makeParserError();
+    diagnose(body.getPtrOrNull()->getEndLoc(),
+             diag::expected_while_after_repeat_body);
+    return body;
   }
 
   ParserResult<Expr> condition;

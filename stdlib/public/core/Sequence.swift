@@ -24,7 +24,7 @@
 /// *sequence's* `iterator()` method, rather than by copying.
 public protocol IteratorProtocol {
   /// The type of element traversed by `self`.
-  typealias Element
+  associatedtype Element
 
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
@@ -68,14 +68,14 @@ public protocol Sequence {
 
   /// A type that provides the *sequence*'s iteration interface and
   /// encapsulates its iteration state.
-  typealias Iterator : IteratorProtocol
+  associatedtype Iterator : IteratorProtocol
 
   // FIXME: should be constrained to Sequence
   // (<rdar://problem/20715009> Implement recursive protocol
   // constraints)
 
   /// A type that represents a subsequence of some of the elements.
-  typealias SubSequence
+  associatedtype SubSequence
 
   /// Return an *iterator* over the elements of this *sequence*.
   ///

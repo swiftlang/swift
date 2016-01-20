@@ -583,7 +583,7 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
     // The "availability" semantics attribute is treated like global-init.
     if (Callee->hasSemanticsAttrs() &&
         WhatToInline != InlineSelection::Everything &&
-        Callee->hasSemanticsAttrsThatStartsWith("availability")) {
+        Callee->hasSemanticsAttrThatStartsWith("availability")) {
       return nullptr;
     }
   } else if (Callee->isGlobalInit()) {

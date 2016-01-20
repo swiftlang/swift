@@ -149,8 +149,8 @@ irgen::emitTypeLayoutVerifier(IRGenFunction &IGF,
       
       // Verify that the extra inhabitant representations are consistent.
       
-      /* TODO: Update for EnumPayload implementation changes.
-      
+      // TODO: Update for EnumPayload implementation changes.
+#if 0
       auto xiBuf = IGF.createAlloca(fixedTI->getStorageType(),
                                     fixedTI->getFixedAlignment(),
                                     "extra-inhabitant");
@@ -212,7 +212,7 @@ irgen::emitTypeLayoutVerifier(IRGenFunction &IGF,
                llvm::Twine("extra inhabitant index calculation ")
                  + numberBuf.str());
       }
-       */
+#endif
     }
 
     // TODO: Verify interesting layout properties specific to the kind of type,

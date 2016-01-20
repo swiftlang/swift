@@ -13,7 +13,7 @@
 /// An interval over a `Comparable` type.
 public protocol Interval {
   /// The type of the `Interval`'s endpoints.
-  typealias Bound : Comparable
+  associatedtype Bound : Comparable
 
   /// Returns `true` iff the interval contains `value`.
   @warn_unused_result
@@ -194,8 +194,8 @@ public func ~= <I: Interval>(pattern: I, value: I.Bound) -> Bool {
 %import gyb
 %TBoilerplate = gyb.parseTemplate("../common/MirrorBoilerplate.gyb")
 
-%Boilerplate = gyb.executeTemplate(TBoilerplate,\
-%                                  introspecteeType='T',\
+%Boilerplate = gyb.executeTemplate(TBoilerplate,
+%                                  introspecteeType='T',
 %                                  disposition='Struct')
 
 internal struct _IntervalMirror<

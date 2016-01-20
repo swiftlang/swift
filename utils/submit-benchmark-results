@@ -35,7 +35,7 @@ def capture_with_result(args, include_stderr=False):
     except OSError,e:
         if e.errno == errno.ENOENT:
             sys.exit('no such file or directory: %r when running %s.' % (
-                  args[0], ' '.join(args)))
+                args[0], ' '.join(args)))
         raise
     out,_ = p.communicate()
     return out,p.wait()
@@ -123,7 +123,8 @@ def main():
          'name' : capture(["uname","-n"], include_stderr=True).strip(),
          'os' : capture(["uname","-sr"], include_stderr=True).strip(),
          'uname' : capture(["uname","-a"], include_stderr=True).strip(),
-         } }
+      }
+   }
 
    # FIXME: Record source versions for LLVM, Swift, etc.?
    lnt_results['Run'] = {
@@ -135,7 +136,8 @@ def main():
          'inferred_run_order' : run_order,
          'run_order' : run_order,
          'sw_vers' : capture(['sw_vers'], include_stderr=True).strip(),
-         } }
+      }
+   }
 
    lnt_results['Tests'] = lnt_tests = []
    for test in data['tests']:
@@ -143,7 +145,7 @@ def main():
       code = test['code']
       if code not in ('PASS', 'XPASS', 'FAIL', 'XFAIL'):
          sys.stderr.write("ignoring test %r with result code %r" % (
-               test['name'], code))
+             test['name'], code))
          continue
 
       # Extract the test name, which is encoded as 'suite :: name'.
@@ -179,7 +181,7 @@ def main():
    # Write the results, if requested.
    if opts.output:
       sys.stderr.write('%s: generating report: %r\n' % (
-            timestamp(), opts.output))
+          timestamp(), opts.output))
       with open(opts.output, 'w') as f:
          f.write(lnt_result_data)
 

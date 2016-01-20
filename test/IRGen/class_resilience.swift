@@ -198,8 +198,7 @@ public class MyResilientChild : MyResilientParent {
 // FIXME: we could eliminate the unnecessary isa load by lazily emitting
 // metadata sources in EmitPolymorphicParameters
 
-// CHECK:      [[T_BOX:%.*]] = alloca %swift.type*
-// CHECK:      store {{.*}}, %swift.type** [[T_BOX]]
+// CHECK:      %T = load
 
 // CHECK-NEXT: [[ADDR:%.*]] = getelementptr inbounds %C16class_resilience21ResilientGenericChild, %C16class_resilience21ResilientGenericChild* %0, i32 0, i32 0, i32 0
 // CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ADDR]]

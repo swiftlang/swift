@@ -3683,7 +3683,6 @@ public:
 //===----------------------------------------------------------------------===//
 
 enum class TermKind {
-  Invalid = 0,
 #define TERMINATOR(Id, Parent, MemBehavior, MayRelease) Id,
 #include "SILNodes.def"
 };
@@ -3693,15 +3692,13 @@ struct ValueKindAsTermKind {
 
   ValueKindAsTermKind(ValueKind V) {
     switch (V) {
-#define TERMINATOR(Id, Parent, MemBehavior, MayRelease)                        \
-  case ValueKind::Id:                                                          \
-    K = TermKind::Id;                                                          \
-    break;
-#define VALUE(Id, Parent)                                                      \
-  case ValueKind::Id:                                                          \
-    K = TermKind::Invalid;                                                     \
-    break;
+#define TERMINATOR(Id, Parent, MemBehavior, MayRelease)                 \
+      case ValueKind::Id:                                               \
+        K = TermKind::Id;                                               \
+        break;
 #include "SILNodes.def"
+    default:
+      llvm_unreachable("Not a terminator kind?!");
     }
   }
 
@@ -3919,7 +3916,13 @@ public:
 
   /// Returns the argument on the cond_br terminator that will be passed to
   /// DestBB in A.
-  SILValue getArgForDestBB(SILBasicBlock *DestBB, SILArgument *A);
+  SILValue getArgForDestBB(const SILBasicBlock *DestBB,
+                           const SILArgument *A) const;
+
+  /// Returns the argument on the cond_br terminator that will be passed as the
+  /// \p Index argument to DestBB.
+  SILValue getArgForDestBB(const SILBasicBlock *DestBB,
+                           unsigned ArgIndex) const;
 
   void swapSuccessors();
 

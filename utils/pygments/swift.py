@@ -67,7 +67,7 @@ class SwiftLexer(RegexLexer):
             (r'\b(return|break)\b', Keyword.Reserved),
 
             (r'[\^\*!%&<>+=/?-]|\.{2}', Operator),
-            (r'\$([0-9]+)', Name.Variable),   #Tokens
+            (r'\$([0-9]+)', Name.Variable),   # Tokens
             (r'[\[\]\(\)\{\}\|:;,.#]', Punctuation),
             (r'[0-9]+\.[0-9]+', Number.Float),
             (r'0x[0-9a-fA-F]+', Number.Hex),

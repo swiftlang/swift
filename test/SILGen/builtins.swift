@@ -516,14 +516,6 @@ func castBitPatternFromBridgeObject(bo: Builtin.BridgeObject) -> Builtin.Word {
   return Builtin.castBitPatternFromBridgeObject(bo)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins14markDependence
-// CHECK:         [[T0:%.*]] = mark_dependence %0 : $Pointer on %1 : $ClassProto
-// CHECK-NEXT:    strong_release %1 : $ClassProto
-// CHECK-NEXT:    return [[T0]] : $Pointer
-func markDependence(v: Pointer, _ base: ClassProto) -> Pointer {
-  return Builtin.markDependence(v, base)
-}
-
 // CHECK-LABEL: sil hidden @_TF8builtins8pinUnpin
 // CHECK:       bb0(%0 : $Builtin.NativeObject):
 // CHECK-NEXT:    debug_value
@@ -543,40 +535,6 @@ func pinUnpin(object : Builtin.NativeObject) {
 // CHECK-NEXT:    strong_release %0 : $Builtin.NativeObject
 // CHECK-NEXT:    [[T0:%.*]] = tuple ()
 // CHECK-NEXT:    return [[T0]] : $()
-}
-
-// CHECK-LABEL: sil hidden @_TF8builtins19allocateValueBuffer
-// CHECK:       bb0([[BUFFER:%.*]] : $*Builtin.UnsafeValueBuffer):
-// CHECK-NEXT:     debug_value_addr %0 : $*Builtin.UnsafeValueBuffer, var, name "buffer", argno 1
-// CHECK-NEXT:    metatype $@thin Int.Type
-// CHECK-NEXT:    [[T0:%.*]] = alloc_value_buffer $Int in [[BUFFER]] : $*Builtin.UnsafeValueBuffer
-// CHECK-NEXT:    [[T1:%.*]] = address_to_pointer [[T0]] : $*Int to $Builtin.RawPointer
-// CHECK-NEXT:    return [[T1]] : $Builtin.RawPointer
-func allocateValueBuffer(inout buffer: Builtin.UnsafeValueBuffer) -> Builtin.RawPointer {
-  return Builtin.allocValueBuffer(&buffer, Int.self)
-}
-
-// CHECK-LABEL: sil hidden @_TF8builtins18projectValueBuffer
-// CHECK:       bb0([[BUFFER:%.*]] : $*Builtin.UnsafeValueBuffer):
-// CHECK-NEXT:    debug_value_addr %0 : $*Builtin.UnsafeValueBuffer, var, name "buffer", argno 1
-// CHECK-NEXT:    metatype $@thin Int.Type
-// CHECK-NEXT:    [[T0:%.*]] = project_value_buffer $Int in [[BUFFER]] : $*Builtin.UnsafeValueBuffer
-// CHECK-NEXT:    [[T1:%.*]] = address_to_pointer [[T0]] : $*Int to $Builtin.RawPointer
-// CHECK-NEXT:    return [[T1]] : $Builtin.RawPointer
-func projectValueBuffer(inout buffer: Builtin.UnsafeValueBuffer) -> Builtin.RawPointer {
-  return Builtin.projectValueBuffer(&buffer, Int.self)
-}
-
-// CHECK-LABEL: sil hidden @_TF8builtins18deallocValueBuffer
-// CHECK:       bb0([[BUFFER:%.*]] : $*Builtin.UnsafeValueBuffer):
-//CHECK-NEXT:     debug_value_addr %0 : $*Builtin.UnsafeValueBuffer, var, name "buffer", argno 1
-// CHECK-NEXT:    metatype $@thin Int.Type
-// CHECK-NEXT:    dealloc_value_buffer $Int in [[BUFFER]] : $*Builtin.UnsafeValueBuffer
-// CHECK-NEXT:    tuple ()
-// CHECK-NEXT:    [[T0:%.*]] = tuple ()
-// CHECK-NEXT:    return [[T0]] : $()
-func deallocValueBuffer(inout buffer: Builtin.UnsafeValueBuffer) -> () {
-  Builtin.deallocValueBuffer(&buffer, Int.self)
 }
 
 // ----------------------------------------------------------------------------

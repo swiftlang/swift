@@ -621,10 +621,7 @@ Type Mangler::getDeclTypeForMangling(const ValueDecl *decl,
   }
 
   // Shed the 'self' type and generic requirements from method manglings.
-  if (C.LangOpts.DisableSelfTypeMangling
-      && isMethodDecl(decl)
-      && type && !type->is<ErrorType>()) {
-
+  if (isMethodDecl(decl) && type && !type->is<ErrorType>()) {
     // Drop the Self argument clause from the type.
     type = type->castTo<AnyFunctionType>()->getResult();
 
@@ -650,6 +647,7 @@ Type Mangler::getDeclTypeForMangling(const ValueDecl *decl,
           continue;
 
         case RequirementKind::Conformance:
+        case RequirementKind::Superclass:
           // We don't need the requirement if the constrained type is above the
           // method depth.
           if (!genericParamIsBelowDepth(reqt.getFirstType(), initialParamDepth))
@@ -766,26 +764,28 @@ mangle_requirements:
     case RequirementKind::WitnessMarker:
       break;
         
-    case RequirementKind::Conformance: {
+    case RequirementKind::Conformance:
       if (!didMangleRequirement) {
         Buffer << 'R';
         didMangleRequirement = true;
       }
-      SmallVector<ProtocolDecl *, 2> protocols;
-      if (reqt.getSecondType()->isExistentialType(protocols)
-          && protocols.size() == 1) {
-        // Protocol constraints are the common case, so mangle them more
-        // efficiently.
-        // TODO: We could golf this a little more by assuming the first type
-        // is a dependent type.
-        mangleConstrainedType(reqt.getFirstType()->getCanonicalType());
-        mangleProtocolName(protocols[0]);
-        break;
+      // Protocol constraints are the common case, so mangle them more
+      // efficiently.
+      // TODO: We could golf this a little more by assuming the first type
+      // is a dependent type.
+      mangleConstrainedType(reqt.getFirstType()->getCanonicalType());
+      mangleProtocolName(
+                      reqt.getSecondType()->castTo<ProtocolType>()->getDecl());
+      break;
+
+    case RequirementKind::Superclass:
+      if (!didMangleRequirement) {
+        Buffer << 'R';
+        didMangleRequirement = true;
       }
       mangleConstrainedType(reqt.getFirstType()->getCanonicalType());
       mangleType(reqt.getSecondType()->getCanonicalType(), 0);
       break;
-    }
 
     case RequirementKind::SameType:
       if (!didMangleRequirement) {

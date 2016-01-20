@@ -37,7 +37,8 @@ using namespace swift;
 
 static bool isNSObject(ASTContext &ctx, Type type) {
   if (auto classDecl = type->getClassOrBoundGenericClass()) {
-    return classDecl->getName() == ctx.Id_NSObject &&
+    return classDecl->getName()
+             == ctx.getSwiftId(KnownFoundationEntity::NSObject) &&
            classDecl->getModuleContext()->getName() == ctx.Id_ObjectiveC;
   }
 
@@ -756,7 +757,9 @@ private:
         = { "BOOL", false};
       specialNames[{ID_ObjectiveC, ctx.getIdentifier("Selector")}] 
         = { "SEL", true };
-      specialNames[{ID_ObjectiveC, ctx.getIdentifier("NSZone")}] 
+      specialNames[{ID_ObjectiveC,
+                    ctx.getIdentifier(
+                      ctx.getSwiftName(KnownFoundationEntity::NSZone))}]
         = { "struct _NSZone *", true };
 
       specialNames[{ctx.Id_Darwin, ctx.getIdentifier("DarwinBoolean")}]

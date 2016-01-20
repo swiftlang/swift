@@ -15,7 +15,7 @@
 # FIXME: this table should be moved to a Swift file in stdlib.  Unfortunately,
 # in Swift we don't have a way to statically initialize arrays.
 
-from GYBUnicodeDataUtils import *
+from GYBUnicodeDataUtils import GraphemeClusterBreakPropertyTable, UnicodeTrieGenerator, get_extended_grapheme_cluster_rules_matrix
 
 grapheme_cluster_break_property_table = \
     GraphemeClusterBreakPropertyTable(unicodeGraphemeBreakPropertyFile)

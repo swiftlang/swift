@@ -126,6 +126,10 @@ public:
   /// Whether we should embed the bitcode file.
   IRGenEmbedMode EmbedMode : 2;
 
+  /// Add names to LLVM values.
+  unsigned HasValueNamesSetting : 1;
+  unsigned ValueNames : 1;
+
   /// List of backend command-line options for -embed-bitcode.
   std::vector<uint8_t> CmdArgs;
 
@@ -135,7 +139,8 @@ public:
                    DisableLLVMARCOpts(false), DisableLLVMSLPVectorizer(false),
                    DisableFPElim(true), Playground(false),
                    EmitStackPromotionChecks(false), GenerateProfile(false),
-                   EmbedMode(IRGenEmbedMode::None)
+                   EmbedMode(IRGenEmbedMode::None),
+                   HasValueNamesSetting(false), ValueNames(false)
                    {}
   
   /// Gets the name of the specified output filename.

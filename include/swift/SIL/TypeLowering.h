@@ -481,7 +481,8 @@ class TypeConverter {
     IsDependent_t isDependent() const {
       if (SubstType->hasTypeParameter())
         return IsDependent;
-      if (!OrigType.isOpaque() && OrigType.getType()->hasTypeParameter())
+      if (!OrigType.isTypeParameter() &&
+          OrigType.getType()->hasTypeParameter())
         return IsDependent;
       return IsNotDependent;
     }
@@ -532,9 +533,6 @@ class TypeConverter {
   
   /// The set of recursive types we've already diagnosed.
   llvm::DenseSet<NominalTypeDecl *> RecursiveNominalTypes;
-  
-  /// ArchetypeBuilder used for lowering types in generic function contexts.
-  Optional<ArchetypeBuilder> GenericArchetypes;
 
   /// The current generic context signature.
   CanGenericSignature CurGenericContext;
@@ -616,7 +614,8 @@ public:
   /// Lowers a Swift type to a SILType, and returns the SIL TypeLowering
   /// for that type.
   const TypeLowering &getTypeLowering(Type t, unsigned uncurryLevel = 0) {
-    return getTypeLowering(AbstractionPattern(t), t, uncurryLevel);
+    AbstractionPattern pattern(CurGenericContext, t->getCanonicalType());
+    return getTypeLowering(pattern, t, uncurryLevel);
   }
 
   /// Lowers a Swift type to a SILType according to the abstraction
@@ -668,20 +667,6 @@ public:
   /// Returns the SIL type of a constant reference.
   SILType getConstantType(SILDeclRef constant) {
     return getConstantInfo(constant).getSILType();
-  }
-
-  /// Returns the formal AST type of a constant reference.
-  /// Parameters remain uncurried and unbridged.
-  CanAnyFunctionType getConstantFormalType(SILDeclRef constant)
-  SIL_FUNCTION_TYPE_DEPRECATED {
-    return getConstantInfo(constant).FormalType;
-  }
-
-  /// Returns the lowered AST type of a constant reference.
-  /// Parameters have been uncurried and bridged.
-  CanAnyFunctionType getConstantLoweredType(SILDeclRef constant)
-  SIL_FUNCTION_TYPE_DEPRECATED {
-    return getConstantInfo(constant).LoweredType;
   }
 
   /// Returns the SILFunctionType for the given declaration.
@@ -794,12 +779,6 @@ public:
   /// Pop a generic function context. See GenericContextScope for an RAII
   /// interface to this function. There must be an active generic context.
   void popGenericContext(CanGenericSignature sig);
-  
-  /// Return the archetype builder for the current generic context. Fails if no
-  /// generic context has been pushed.
-  ArchetypeBuilder &getArchetypes() {
-    return *GenericArchetypes;
-  }
   
   // Map a type involving context archetypes out of its context into a
   // dependent type.

@@ -711,7 +711,7 @@ static bool parseSILOptional(bool &Result, SILParser &SP, StringRef Expected) {
 static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
                                  IsThunk_t *isThunk, bool *isGlobalInit,
                                  Inline_t *inlineStrategy, bool *isLet,
-                                 llvm::SmallVectorImpl<std::string> *Semantics,
+                                 SmallVectorImpl<std::string> *Semantics,
                                  EffectsKind *MRK, Parser &P) {
   while (P.consumeIf(tok::l_square)) {
     if (isLet && P.Tok.is(tok::kw_let)) {
@@ -3678,7 +3678,7 @@ bool Parser::parseDeclSIL() {
   IsThunk_t isThunk = IsNotThunk;
   bool isGlobalInit = false;
   Inline_t inlineStrategy = InlineDefault;
-  llvm::SmallVector<std::string, 1> Semantics;
+  SmallVector<std::string, 1> Semantics;
   EffectsKind MRK = EffectsKind::Unspecified;
   if (parseSILLinkage(FnLinkage, *this) ||
       parseDeclSILOptional(&isTransparent, &isFragile, &isThunk, &isGlobalInit,

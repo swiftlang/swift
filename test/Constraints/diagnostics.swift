@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
 protocol P {
-  typealias SomeType
+  associatedtype SomeType
 }
 
 protocol P2 { 
@@ -126,8 +126,7 @@ public func myMap<T, U>(x: T?, @noescape _ f: (T)->U) -> U? {
 // FIXME: poor diagnostic, to be fixed in 20142462. For now, we just want to
 // make sure that it doesn't crash.
 func rdar20142523() {
-  myMap(0..<10, { x in // expected-error{{cannot invoke 'myMap' with an argument list of type '(Range<Int>, (_) -> _)'}}
-    // expected-note @-1 {{overloads for 'myMap' exist with these partially matching parameter lists: (C, (C.Iterator.Element) -> T), (T?, @noescape (T) -> U)}}
+  myMap(0..<10, { x in // expected-error{{ambiguous reference to member '..<'}}
     ()
     return x
   })
@@ -254,7 +253,7 @@ func r18800223(i : Int) {
 
   
   var buttonTextColor: String?
-  _ = (buttonTextColor != nil) ? 42 : {$0}; // expected-error {{unable to infer closure return type in current context}}
+  _ = (buttonTextColor != nil) ? 42 : {$0}; // expected-error {{result values in '? :' expression have mismatching types 'Int' and '(_) -> _'}}
 }
 
 // <rdar://problem/21883806> Bogus "'_' can only appear in a pattern or on the left side of an assignment" is back
@@ -290,8 +289,8 @@ func rdar19804707() {
   knownOps = .BinaryOperator({$1 - $0})
 
   // FIXME: rdar://19804707 - These two statements should be accepted by the type checker.
-  knownOps = .BinaryOperator(){$1 - $0} // expected-error {{type of expression is ambiguous without more context}}
-  knownOps = .BinaryOperator{$1 - $0}   // expected-error {{type of expression is ambiguous without more context}}
+  knownOps = .BinaryOperator(){$1 - $0} // expected-error {{reference to member 'BinaryOperator' cannot be resolved without a contextual type}}
+  knownOps = .BinaryOperator{$1 - $0}   // expected-error {{reference to member 'BinaryOperator' cannot be resolved without a contextual type}}
 }
 
 
@@ -436,8 +435,7 @@ func f20371273() {
 // <rdar://problem/20921068> Swift fails to compile: [0].map() { _ in let r = (1,2).0; return r }
 // FIXME: Should complain about not having a return type annotation in the closure.
 [0].map { _ in let r =  (1,2).0;  return r }
-// expected-error @-1 {{cannot invoke 'map' with an argument list of type '(@noescape (Int) throws -> _)'}}
-// expected-note @-2 {{expected an argument list of type '(@noescape Int throws -> T)'}}
+// expected-error @-1 {{expression type '[_]' is ambiguous without more context}}
 
 // <rdar://problem/21078316> Less than useful error message when using map on optional dictionary type
 func rdar21078316() {
@@ -621,12 +619,14 @@ extension Array {
   }
   
   func h() -> String {
-    return "foo".unavail([0])  // expected-error {{value of type 'String' has no member 'Element'}}
+    return "foo".unavail([0])  // expected-error {{cannot invoke 'unavail' with an argument list of type '([Int])'}}
+    // expected-note @-1 {{expected an argument list of type '(T)'}}
   }
 }
 
 // <rdar://problem/22519983> QoI: Weird error when failing to infer archetype
-func safeAssign<T: RawRepresentable>(inout lhs: T) -> Bool {}  // expected-note {{in call to function 'safeAssign'}}
+func safeAssign<T: RawRepresentable>(inout lhs: T) -> Bool {}
+// expected-note @-1 {{in call to function 'safeAssign'}}
 let a = safeAssign // expected-error {{generic parameter 'T' could not be inferred}}
 
 
@@ -699,4 +699,5 @@ func r23641896() {
   _ = g[12]  // expected-error {{'subscript' is unavailable: cannot subscript String with an Int, see the documentation comment for discussion}}
 
 }
+
 

@@ -50,16 +50,16 @@ We can also distinguish two ways to originally invoke an initializer:
 Either kind of dispatched initialization poses a soundness problem
 because there may not be a sound initializer with any given signature
 in the most-derived class.  In ObjC, initializers are normal instance
-methods and are therefore inherited like normal, but this isn’t really
+methods and are therefore inherited like normal, but this isn't really
 quite right; initialization is different from a normal method in that
-it’s not inherently sensible to require subclasses to provide
+it's not inherently sensible to require subclasses to provide
 initializers at all the signatures that their superclasses provide.
 
 Subobject initializers
 ~~~~~~~~~~~~~~~~~~~~~~
 The defining class of a subobject initializer is central to its
 behavior.  It can be soundly inherited by a class C only if is trivial
-to initialize the ivars of C, but it’s convenient to ignore that and
+to initialize the ivars of C, but it's convenient to ignore that and
 assume that subobjects will always trivially wrap and delegate to
 superclass subobject initializers. 
 
@@ -75,7 +75,7 @@ initializer of a class C if and only if it is defined by C.
 
 Complete object initializers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The defining class of a complete object initializer doesn’t really
+The defining class of a complete object initializer doesn't really
 matter.  In principle, complete object initializers could just as well
 be freestanding functions to which a metatype is passed.  It can make
 sense to inherit a complete object initializer.
@@ -90,11 +90,11 @@ A complete object initializer soundly acts like a complete object
 initializer of a class C if and only if it delegates to an initializer
 which soundly acts like a complete object initializer of C.
 
-These rules are not obvious to check statically because they’re
+These rules are not obvious to check statically because they're
 dependent on the dynamic value of the most-derived class C.  Therefore
 any ability to check them depends on restricting C somehow relative to
 the defining class of the initializer.  Since, statically, we only
-know the defining class of the initializer, we can’t establish
+know the defining class of the initializer, we can't establish
 soundness solely at the definition site; instead we have to prevent
 unsound initializers from being called.
 
@@ -116,7 +116,7 @@ Virtual initializers
 The above condition is not sufficient to make indirect initialization
 sound, because it relies on the ability to simply not use an
 initializer in cases where its delegation behavior isn't known to be
-sound, and we can’t do that to arbitrary code.  For that, we would
+sound, and we can't do that to arbitrary code.  For that, we would
 need true virtual initializers.
 
 A virtual initializer is a contract much more like that of a standard

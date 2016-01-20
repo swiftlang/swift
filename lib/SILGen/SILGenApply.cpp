@@ -177,14 +177,12 @@ private:
   {}
 
   static CanAnyFunctionType getConstantFormalType(SILGenFunction &gen,
-                                                  SILValue selfValue,
                                                   SILDeclRef fn)
   SIL_FUNCTION_TYPE_DEPRECATED {
     return gen.SGM.Types.getConstantInfo(fn.atUncurryLevel(0)).FormalType;
   }
 
   static CanAnyFunctionType getConstantFormalInterfaceType(SILGenFunction &gen,
-                                                  SILValue selfValue,
                                                   SILDeclRef fn) {
     return gen.SGM.Types.getConstantInfo(fn.atUncurryLevel(0))
              .FormalInterfaceType;
@@ -194,9 +192,8 @@ private:
          CanAnyFunctionType substFormalType,
          SILLocation l)
     : kind(Kind::StandaloneFunction), Constant(standaloneFunction),
-      OrigFormalOldType(getConstantFormalType(gen, SILValue(),
-                                              standaloneFunction)),
-      OrigFormalInterfaceType(getConstantFormalInterfaceType(gen, SILValue(),
+      OrigFormalOldType(getConstantFormalType(gen, standaloneFunction)),
+      OrigFormalInterfaceType(getConstantFormalInterfaceType(gen,
                                                            standaloneFunction)),
       SubstFormalType(substFormalType),
       Loc(l)
@@ -210,9 +207,8 @@ private:
          CanAnyFunctionType substFormalType,
          SILLocation l)
     : kind(methodKind), Constant(methodName), SelfValue(selfValue),
-      OrigFormalOldType(getConstantFormalType(gen, selfValue, methodName)),
-      OrigFormalInterfaceType(getConstantFormalInterfaceType(gen, selfValue,
-                                                             methodName)),
+      OrigFormalOldType(getConstantFormalType(gen, methodName)),
+      OrigFormalInterfaceType(getConstantFormalInterfaceType(gen, methodName)),
       SubstFormalType(substFormalType),
       Loc(l)
   {
@@ -1296,10 +1292,7 @@ public:
 
     SILValue superMethod;
     auto *funcDecl = cast<AbstractFunctionDecl>(constant.getDecl());
-
-    auto Opts = SGF.B.getModule().getOptions();
-    if (constant.isForeign ||
-        (Opts.UseNativeSuperMethod && !funcDecl->isFinal())) {
+    if (constant.isForeign || !funcDecl->isFinal()) {
       // All Objective-C methods and
       // non-final native Swift methods use dynamic dispatch.
       SILValue Input = super.getValue();
@@ -2073,7 +2066,7 @@ static unsigned getFlattenedValueCount(AbstractionPattern origType,
 
   // If the original type is opaque and the substituted type is
   // materializable, the count is 1 anyway.
-  if (origType.isOpaque() && substTuple->isMaterializable())
+  if (origType.isTypeParameter() && substTuple->isMaterializable())
     return 1;
 
   // Otherwise, add up the elements.
@@ -2297,7 +2290,7 @@ namespace {
       // materializable, the convention is actually to break it up
       // into materializable chunks.  See the comment in SILType.cpp.
       if (isUnmaterializableTupleType(substArgType)) {
-        assert(origParamType.isOpaque());
+        assert(origParamType.isTypeParameter());
         emitExpanded(std::move(arg), origParamType);
         return;
       }
@@ -2541,8 +2534,8 @@ namespace {
                                          arg.getType(), ctxt);
         break;
       case SILFunctionLanguage::C:
-        value = SGF.emitNativeToBridgedValue(loc, value, Rep, origParamType,
-                                             arg.getType(), param.getType());
+        value = SGF.emitNativeToBridgedValue(loc, value, Rep,
+                                             param.getType());
         break;
       }
       Args.push_back(value);
@@ -2746,7 +2739,7 @@ void ArgEmitter::emitShuffle(Expr *inner,
     // opaque pattern; otherwise, it's a tuple of the de-shuffled
     // tuple elements.
     innerOrigParamType = origParamType;
-    if (!origParamType.isOpaque()) {
+    if (!origParamType.isTypeParameter()) {
       // That "tuple" might not actually be a tuple.
       if (innerElts.size() == 1 && !innerElts[0].hasName()) {
         innerOrigParamType = origInnerElts[0];
@@ -3790,8 +3783,7 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
   while (auto *upcast = dyn_cast<UpcastInst>(self))
     self = upcast->getOperand();
 
-  auto Opts = gen.B.getModule().getOptions();
-  if (constant.isForeign || (Opts.UseNativeSuperMethod && !decl->isFinal()))
+  if (constant.isForeign || !decl->isFinal())
     return Callee::forSuperMethod(gen, self, constant, substAccessorType,loc);
 
   return Callee::forDirect(gen, constant, substAccessorType, loc);

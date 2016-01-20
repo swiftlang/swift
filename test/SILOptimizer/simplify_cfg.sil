@@ -6,6 +6,23 @@ import Swift
 
 sil_stage canonical
 
+///////////////////////
+// Type Declarations //
+///////////////////////
+
+class foo {
+  var a: Int
+   deinit
+  init()
+}
+
+sil @use_foo : $@convention(thin) (@owned foo) -> ()
+
+
+///////////
+// Tests //
+///////////
+
 // CHECK-LABEL: @test_dead_block
 // CHECK-NEXT: bb0:
 // CHECK-NEXT:   unreachable
@@ -20,6 +37,35 @@ bb1:
 
 bb2:
   %5 = struct $Int64 (%4 : $Builtin.Int64)
+  unreachable
+}
+
+// CHECK-LABEL: @release_in_arcinert_termination_block
+// CHECK: bb0
+// CHECK:   unreachable
+// CHECK: }
+sil @release_in_arcinert_termination_block : $(@owned foo) -> () {
+bb0(%0 : $foo):
+  br bb1
+
+bb1:
+  strong_release %0 : $foo
+  unreachable
+}
+
+// CHECK-LABEL: @release_in_nonarcinert_termination_block
+// CHECK: bb0
+// CHECK: strong_release 
+// CHECK: apply 
+// CHECK: unreachable
+sil @release_in_nonarcinert_termination_block : $(@owned foo) -> () {
+bb0(%0 : $foo):
+  br bb1
+
+bb1:
+  strong_release %0 : $foo
+  %1 = function_ref @use_foo : $@convention(thin) (@owned foo) -> ()
+  apply %1(%0) : $@convention(thin) (@owned foo) -> ()
   unreachable
 }
 

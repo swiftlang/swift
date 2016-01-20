@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift -parse-as-library
 
 protocol BaseProto {
-  typealias AssocTy
+  associatedtype AssocTy
 }
 var a: BaseProto.AssocTy = 4 // expected-error{{cannot use associated type 'AssocTy' outside of its protocol}}
 

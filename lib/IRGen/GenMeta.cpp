@@ -171,7 +171,7 @@ static void emitPolymorphicParametersFromArray(IRGenFunction &IGF,
     llvm::Value *metadata = claimNext(IGF.IGM.TypeMetadataPtrTy);
     metadata->setName(archetype->getFullName());
     IGF.setUnscopedLocalTypeData(CanType(archetype),
-                                 LocalTypeDataKind::forMetatype(),
+                                 LocalTypeDataKind::forTypeMetadata(),
                                  metadata);
   }
 
@@ -181,36 +181,10 @@ static void emitPolymorphicParametersFromArray(IRGenFunction &IGF,
       if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
         continue;
       llvm::Value *wtable = claimNext(IGF.IGM.WitnessTablePtrTy);
-      auto key = LocalTypeDataKind::forArchetypeProtocolWitnessTable(protocol);
+      auto key = LocalTypeDataKind::forAbstractProtocolWitnessTable(protocol);
       IGF.setUnscopedLocalTypeData(CanType(archetype), key, wtable);
     }
   }
-}
-
-/// If true, we lazily initialize metadata at runtime because the layout
-/// is only partially known. Otherwise, we can emit a direct reference a
-/// constant metadata symbol.
-static bool hasMetadataPattern(IRGenModule &IGM, NominalTypeDecl *theDecl) {
-  // Protocols must be special-cased in a few places.
-  assert(!isa<ProtocolDecl>(theDecl));
-
-  // For classes, we already computed this when we did the layout.
-  // FIXME: Try not to call this for classes of other modules, by referencing
-  // the metadata accessor instead.
-  if (auto *theClass = dyn_cast<ClassDecl>(theDecl))
-    return getClassHasMetadataPattern(IGM, theClass);
-
-  // Ok, we have a value type. If it is generic, it is always initialized
-  // at runtime.
-  if (theDecl->isGenericContext())
-    return true;
-
-  // If the type is not fixed-size, its size depends on resilient types,
-  // and the metadata is initialized at runtime.
-  if (!IGM.getTypeInfoForUnlowered(theDecl->getDeclaredType()).isFixedSize())
-    return true;
-
-  return false;
 }
 
 /// Attempts to return a constant heap metadata reference for a
@@ -220,7 +194,7 @@ llvm::Constant *irgen::tryEmitConstantTypeMetadataRef(IRGenModule &IGM,
   auto theDecl = type->getAnyNominal();
   assert(theDecl && "emitting constant metadata ref for non-nominal type?");
 
-  if (hasMetadataPattern(IGM, theDecl))
+  if (IGM.hasMetadataPattern(theDecl))
     return nullptr;
 
   if (auto theClass = type->getClassOrBoundGenericClass())
@@ -286,13 +260,13 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
     return emitForeignTypeMetadataRef(IGF, theType);
   }
 
-  bool isPattern = hasMetadataPattern(IGF.IGM, theDecl);
+  bool isPattern = IGF.IGM.hasMetadataPattern(theDecl);
 
   // If this is generic, check to see if we've maybe got a local
   // reference already.
   if (isPattern) {
     if (auto cache = IGF.tryGetLocalTypeData(theType,
-                                             LocalTypeDataKind::forMetatype()))
+                                             LocalTypeDataKind::forTypeMetadata()))
       return cache;
   }
 
@@ -328,7 +302,7 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
     result->setDoesNotThrow();
     result->addAttribute(llvm::AttributeSet::FunctionIndex,
                          llvm::Attribute::ReadNone);
-    IGF.setScopedLocalTypeData(theType, LocalTypeDataKind::forMetatype(),
+    IGF.setScopedLocalTypeData(theType, LocalTypeDataKind::forTypeMetadata(),
                                result);
     return result;
   }
@@ -360,7 +334,7 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
     result->setDoesNotThrow();
     result->addAttribute(llvm::AttributeSet::FunctionIndex,
                          llvm::Attribute::ReadNone);
-    IGF.setScopedLocalTypeData(theType, LocalTypeDataKind::forMetatype(),
+    IGF.setScopedLocalTypeData(theType, LocalTypeDataKind::forTypeMetadata(),
                                result);
     return result;
   }
@@ -393,7 +367,7 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
   IGF.Builder.CreateLifetimeEnd(argsBuffer,
                           IGF.IGM.getPointerSize() * genericArgs.Values.size());
 
-  IGF.setScopedLocalTypeData(theType, LocalTypeDataKind::forMetatype(), result);
+  IGF.setScopedLocalTypeData(theType, LocalTypeDataKind::forTypeMetadata(), result);
   return result;
 }
 
@@ -968,7 +942,7 @@ namespace {
     }
 
     llvm::Value *visitArchetypeType(CanArchetypeType type) {
-      return IGF.getLocalTypeData(type, LocalTypeDataKind::forMetatype());
+      return IGF.getLocalTypeData(type, LocalTypeDataKind::forTypeMetadata());
     }
 
     llvm::Value *visitGenericTypeParamType(CanGenericTypeParamType type) {
@@ -997,12 +971,12 @@ namespace {
 
     /// Try to find the metatype in local data.
     llvm::Value *tryGetLocal(CanType type) {
-      return IGF.tryGetLocalTypeData(type, LocalTypeDataKind::forMetatype());
+      return IGF.tryGetLocalTypeData(type, LocalTypeDataKind::forTypeMetadata());
     }
 
     /// Set the metatype in local data.
     llvm::Value *setLocal(CanType type, llvm::Instruction *metatype) {
-      IGF.setScopedLocalTypeData(type,  LocalTypeDataKind::forMetatype(),
+      IGF.setScopedLocalTypeData(type,  LocalTypeDataKind::forTypeMetadata(),
                                  metatype);
       return metatype;
     }
@@ -1162,7 +1136,7 @@ static llvm::Value *emitCallToTypeMetadataAccessFunction(IRGenFunction &IGF,
                                                  ForDefinition_t shouldDefine) {
   // If we already cached the metadata, use it.
   if (auto local =
-        IGF.tryGetLocalTypeData(type, LocalTypeDataKind::forMetatype()))
+        IGF.tryGetLocalTypeData(type, LocalTypeDataKind::forTypeMetadata()))
     return local;
   
   llvm::Constant *accessor =
@@ -1173,7 +1147,7 @@ static llvm::Value *emitCallToTypeMetadataAccessFunction(IRGenFunction &IGF,
   call->setDoesNotThrow();
   
   // Save the metadata for future lookups.
-  IGF.setScopedLocalTypeData(type, LocalTypeDataKind::forMetatype(), call);
+  IGF.setScopedLocalTypeData(type, LocalTypeDataKind::forTypeMetadata(), call);
   
   return call;
 }
@@ -1400,13 +1374,13 @@ namespace {
     llvm::Value *tryGetLocal(CanType type) {
       return IGF.tryGetLocalTypeDataForLayout(
                                           SILType::getPrimitiveObjectType(type),
-                                          LocalTypeDataKind::forMetatype());
+                                          LocalTypeDataKind::forTypeMetadata());
     }
 
     /// Set the metatype in local data.
     llvm::Value *setLocal(CanType type, llvm::Instruction *metatype) {
       IGF.setScopedLocalTypeDataForLayout(SILType::getPrimitiveObjectType(type),
-                                          LocalTypeDataKind::forMetatype(),
+                                          LocalTypeDataKind::forTypeMetadata(),
                                           metatype);
       return metatype;
     }
@@ -1924,7 +1898,7 @@ namespace {
     
     void addGenericMetadataPattern() {
       NominalTypeDecl *ntd = asImpl().getTarget();
-      if (!hasMetadataPattern(IGM, ntd)) {
+      if (!IGM.hasMetadataPattern(ntd)) {
         // If there are no generic parameters, there's no pattern to link.
         addWord(llvm::ConstantPointerNull::get(IGM.TypeMetadataPatternPtrTy));
         return;
@@ -2512,7 +2486,9 @@ irgen::emitFieldTypeAccessor(IRGenModule &IGM,
   IRGenFunction IGF(IGM, fn);
   auto metadataArrayPtrTy = IGM.TypeMetadataPtrTy->getPointerTo();
 
+  CanType formalType = type->getDeclaredTypeInContext()->getCanonicalType();
   llvm::Value *metadata = IGF.collectParameters().claimNext();
+  setTypeMetadataName(IGM, metadata, formalType);
   
   // Get the address at which the field type vector reference should be
   // cached.
@@ -2561,7 +2537,7 @@ irgen::emitFieldTypeAccessor(IRGenModule &IGM,
   
   // Bind the metadata instance to our local type data so we
   // use it to provide metadata for generic parameters in field types.
-  emitPolymorphicParametersForGenericValueWitness(IGF, type, metadata);
+  IGF.bindLocalTypeDataFromTypeMetadata(formalType, IsExact, metadata);
   
   // Allocate storage for the field vector.
   unsigned allocSize = fieldTypes.size() * IGM.getPointerSize().getValue();
@@ -2727,7 +2703,7 @@ namespace {
                                                fillOp.Protocol);
         } else {
           value = IGF.getLocalTypeData(fillOp.Archetype,
-                                       LocalTypeDataKind::forMetatype());
+                                       LocalTypeDataKind::forTypeMetadata());
         }
         value = IGF.Builder.CreateBitCast(value, IGM.Int8PtrTy);
         auto dest = createPointerSizedGEP(IGF, metadataWords,
@@ -3625,7 +3601,7 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
   // TODO: classes nested within generic types
   llvm::Constant *init;
   bool isPattern;
-  if (hasMetadataPattern(IGM, classDecl)) {
+  if (IGM.hasMetadataPattern(classDecl)) {
     GenericClassMetadataBuilder builder(IGM, classDecl, layout, fieldLayout);
     builder.layout();
     init = builder.getInit();
@@ -3718,7 +3694,7 @@ emitInvariantLoadFromMetadataAtIndex(IRGenFunction &IGF,
                                      llvm::Value *metadata,
                                      int index,
                                      llvm::Type *objectTy,
-                                     const llvm::Twine &suffix = "") {
+                               const Twine &suffix = Twine::createNull()) {
   auto result = emitLoadFromMetadataAtIndex(IGF, metadata, index, objectTy,
                                             suffix);
   IGF.setInvariantLoad(result);
@@ -4127,7 +4103,8 @@ static llvm::Value *emitLoadOfHeapMetadataRef(IRGenFunction &IGF,
 
     auto metadata = IGF.Builder.CreateLoad(Address(slot,
                                                IGF.IGM.getPointerAlignment()));
-    metadata->setName(llvm::Twine(object->getName()) + ".metadata");
+    if (IGF.IGM.EnableValueNames && object->hasName())
+      metadata->setName(llvm::Twine(object->getName()) + ".metadata");
     return metadata;
   }
       
@@ -4491,7 +4468,7 @@ void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
   // TODO: structs nested within generic types
   llvm::Constant *init;
   bool isPattern;
-  if (hasMetadataPattern(IGM, structDecl)) {
+  if (IGM.hasMetadataPattern(structDecl)) {
     GenericStructMetadataBuilder builder(IGM, structDecl);
     builder.layout();
     init = builder.getInit();
@@ -4640,7 +4617,7 @@ void irgen::emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum) {
   llvm::Constant *init;
   
   bool isPattern;
-  if (hasMetadataPattern(IGM, theEnum)) {
+  if (IGM.hasMetadataPattern(theEnum)) {
     GenericEnumMetadataBuilder builder(IGM, theEnum);
     builder.layout();
     init = builder.getInit();

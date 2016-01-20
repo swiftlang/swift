@@ -43,7 +43,7 @@ public protocol UnicodeCodec {
 
   /// A type that can hold [code unit](http://www.unicode.org/glossary/#code_unit) values for this
   /// encoding.
-  typealias CodeUnit
+  associatedtype CodeUnit
 
   init()
 
@@ -704,9 +704,8 @@ public func transcode<
 
   var inputDecoder = inputEncoding.init()
   var hadError = false
-  for var scalar = inputDecoder.decode(&input);
-          !scalar.isEmptyInput;
-          scalar = inputDecoder.decode(&input) {
+  var scalar = inputDecoder.decode(&input)
+  while !scalar.isEmptyInput {
     switch scalar {
     case .ScalarValue(let us):
       OutputEncoding.encode(us, output: output)
@@ -720,6 +719,7 @@ public func transcode<
         hadError = true
       }
     }
+    scalar = inputDecoder.decode(&input)
   }
   return hadError
 }

@@ -52,8 +52,7 @@ public class GenericObjCSubclass<T> : NSCoder {
 // FIXME: we could eliminate the unnecessary isa load by lazily emitting
 // metadata sources in EmitPolymorphicParameters
 
-// CHECK:      [[T_BOX:%.*]] = alloca %swift.type*
-// CHECK:      store {{.*}}, %swift.type** [[T_BOX]]
+// CHECK:         %T = load
 
 // CHECK-32-NEXT: [[ADDR:%.*]] = bitcast %C21class_resilience_objc19GenericObjCSubclass* %0 to %swift.type**
 // CHECK-32-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ADDR]]

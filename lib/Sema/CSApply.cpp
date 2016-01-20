@@ -126,35 +126,36 @@ Type Solution::computeSubstitutions(
       continue;
     
     switch (req.getKind()) {
-    case RequirementKind::Conformance:
-      // If this is a protocol conformance requirement, get the conformance
-      // and record it.
-      if (auto protoType = req.getSecondType()->getAs<ProtocolType>()) {
-        assert(firstArchetype == currentArchetype
-               && "Archetype out-of-sync");
-        ProtocolConformance *conformance = nullptr;
-        Type replacement = currentReplacement;
-        bool conforms = tc.conformsToProtocol(
-                          replacement,
-                          protoType->getDecl(),
-                          getConstraintSystem().DC,
-                          (ConformanceCheckFlags::InExpression|
-                           ConformanceCheckFlags::Used),
-                          &conformance);
-        (void)isOpenedAnyObject;
-        assert((conforms ||
-                firstArchetype->getIsRecursive() ||
-                isOpenedAnyObject(replacement) ||
-                replacement->is<GenericTypeParamType>()) &&
-               "Constraint system missed a conformance?");
-        (void)conforms;
+    case RequirementKind::Conformance: {
+      // Get the conformance and record it.
+      auto protoType = req.getSecondType()->castTo<ProtocolType>();
+      assert(firstArchetype == currentArchetype
+             && "Archetype out-of-sync");
+      ProtocolConformance *conformance = nullptr;
+      Type replacement = currentReplacement;
+      bool conforms = tc.conformsToProtocol(
+                        replacement,
+                        protoType->getDecl(),
+                        getConstraintSystem().DC,
+                        (ConformanceCheckFlags::InExpression|
+                         ConformanceCheckFlags::Used),
+                        &conformance);
+      (void)isOpenedAnyObject;
+      assert((conforms ||
+              firstArchetype->getIsRecursive() ||
+              isOpenedAnyObject(replacement) ||
+              replacement->is<GenericTypeParamType>()) &&
+             "Constraint system missed a conformance?");
+      (void)conforms;
 
-        assert(conformance || replacement->hasDependentProtocolConformances());
-        currentConformances.push_back(
-                    ProtocolConformanceRef(protoType->getDecl(), conformance));
+      assert(conformance || replacement->hasDependentProtocolConformances());
+      currentConformances.push_back(
+                  ProtocolConformanceRef(protoType->getDecl(), conformance));
+      break;
+    }
 
-        break;
-      }
+    case RequirementKind::Superclass:
+      // Superclass requirements aren't recorded in substitutions.
       break;
 
     case RequirementKind::SameType:
@@ -2283,9 +2284,16 @@ namespace {
     }
 
     Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
-      // Dig out the type of the base, which will be the result
-      // type of this expression.
+      // Dig out the type of the base, which will be the result type of this
+      // expression.  If constraint solving resolved this to an UnresolvedType,
+      // then we're in an ambiguity tolerant mode used for diagnostic
+      // generation.  Just leave this as an unresolved member reference.
       Type resultTy = simplifyType(expr->getType());
+      if (resultTy->is<UnresolvedType>()) {
+        expr->setType(resultTy);
+        return expr;
+      }
+
       Type baseTy = resultTy->getRValueType();
       auto &tc = cs.getTypeChecker();
 
@@ -2345,16 +2353,25 @@ namespace {
     llvm::SmallPtrSet<InjectIntoOptionalExpr *, 4>  DiagnosedOptionalInjections;
   private:
 
-    Expr *applyMemberRefExpr(Expr *expr,
-                             Expr *base,
-                             SourceLoc dotLoc,
-                             SourceLoc nameLoc,
-                             bool implicit) {
+    Expr *applyMemberRefExpr(Expr *expr, Expr *base, SourceLoc dotLoc,
+                             SourceLoc nameLoc, bool implicit) {
       // Determine the declaration selected for this overloaded reference.
       auto memberLocator = cs.getConstraintLocator(expr,
                                                    ConstraintLocator::Member);
-      auto selected = getOverloadChoice(memberLocator);
+      auto selectedElt = getOverloadChoiceIfAvailable(memberLocator);
 
+      if (!selectedElt) {
+        // If constraint solving resolved this to an UnresolvedType, then we're
+        // in an ambiguity tolerant mode used for diagnostic generation.  Just
+        // leave this as whatever type of member reference it already is.
+        Type resultTy = simplifyType(expr->getType());
+        assert(resultTy->hasUnresolvedType() &&
+               "Should have a selected member if we got a type");
+        expr->setType(resultTy);
+        return expr;
+      }
+
+      auto selected = *selectedElt;
       switch (selected.choice.getKind()) {
       case OverloadChoiceKind::DeclViaBridge: {
         // Look through an implicitly unwrapped optional.
@@ -2405,14 +2422,12 @@ namespace {
 
       case OverloadChoiceKind::TupleIndex: {
         auto baseTy = base->getType()->getRValueType();
-        if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)) {
+        if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)){
           base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy,
                                          cs.getConstraintLocator(base));
         }
 
-        return new (cs.getASTContext()) TupleElementExpr(
-                                          base,
-                                          dotLoc,
+        return new (cs.getASTContext()) TupleElementExpr(base, dotLoc,
                                           selected.choice.getTupleIndex(),
                                           nameLoc,
                                           simplifyType(expr->getType()));
@@ -4358,46 +4373,50 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
   // Re-write the single-expression closure to return '()'
   assert(closureExpr->hasSingleExpressionBody());
   
-  auto member = closureExpr->getBody()->getElement(0);
+  // Transform the ClosureExpr representation into the "expr + return ()" rep
+  // if it isn't already.
+  if (!closureExpr->isVoidConversionClosure()) {
+    
+    auto member = closureExpr->getBody()->getElement(0);
+    
+    // A single-expression body contains a single return statement.
+    auto returnStmt = cast<ReturnStmt>(member.get<Stmt *>());
+    auto singleExpr = returnStmt->getResult();
+    auto voidExpr = TupleExpr::createEmpty(tc.Context,
+                                           singleExpr->getStartLoc(),
+                                           singleExpr->getEndLoc(),
+                                           /*implicit*/true);
+    returnStmt->setResult(voidExpr);
+
+    // For l-value types, reset to the object type. This might not be strictly
+    // necessary any more, but it's probably still a good idea.
+    if (singleExpr->getType()->getAs<LValueType>())
+      singleExpr->setType(singleExpr->getType()->getLValueOrInOutObjectType());
+
+    tc.checkIgnoredExpr(singleExpr);
+
+    SmallVector<ASTNode, 2> elements;
+    elements.push_back(singleExpr);
+    elements.push_back(returnStmt);
+    
+    auto braceStmt = BraceStmt::create(tc.Context,
+                                       closureExpr->getStartLoc(),
+                                       elements,
+                                       closureExpr->getEndLoc(),
+                                       /*implicit*/true);
+    
+    closureExpr->setImplicit();
+    closureExpr->setIsVoidConversionClosure();
+    closureExpr->setBody(braceStmt, /*isSingleExpression*/true);
+  }
   
-  // A single-expression body contains a single return statement.
-  auto returnStmt = dyn_cast<ReturnStmt>(member.get<Stmt *>());
-  auto singleExpr = returnStmt->getResult();
-  auto voidExpr = TupleExpr::createEmpty(tc.Context,
-                                         singleExpr->getStartLoc(),
-                                         singleExpr->getEndLoc(),
-                                         /*implicit*/true);
-  returnStmt->setResult(voidExpr);
-
-  // For l-value types, reset to the object type. This might not be strictly
-  // necessary any more, but it's probably still a good idea.
-  if (singleExpr->getType()->getAs<LValueType>())
-    singleExpr->setType(singleExpr->getType()->getLValueOrInOutObjectType());
-
-  tc.checkIgnoredExpr(singleExpr);
-
-  SmallVector<ASTNode, 2> elements;
-  elements.push_back(singleExpr);
-  elements.push_back(returnStmt);
-  
-  auto braceStmt = BraceStmt::create(tc.Context,
-                                     closureExpr->getStartLoc(),
-                                     elements,
-                                     closureExpr->getEndLoc(),
-                                     /*implicit*/true);
-  
-  closureExpr->setImplicit();
-  closureExpr->setIsVoidConversionClosure();
-  closureExpr->setBody(braceStmt, /*isSingleExpression*/true);
-
+  // Finally, compute the proper type for the closure.
   auto fnType = closureExpr->getType()->getAs<FunctionType>();
   Type inputType = fnType->getInput();
-  Type resultType = voidExpr->getType();
   auto newClosureType = FunctionType::get(inputType,
-                                          resultType,
+                                          tc.Context.TheEmptyTupleType,
                                           fnType->getExtInfo());
   closureExpr->setType(newClosureType);
-  
   return closureExpr;
 }
 
@@ -5272,10 +5291,22 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     return result;
   }
 
+  // If this is an UnresolvedType in the system, preserve it.
+  if (fn->getType()->is<UnresolvedType>()) {
+    apply->setType(fn->getType());
+    return apply;
+  }
+
   // We have a type constructor.
   auto metaTy = fn->getType()->castTo<AnyMetatypeType>();
   auto ty = metaTy->getInstanceType();
-  
+
+  // If this is an UnresolvedType in the system, preserve it.
+  if (ty->is<UnresolvedType>()) {
+    apply->setType(ty);
+    return apply;
+  }
+
   // If the metatype value isn't a type expression, the user should reference
   // '.init' explicitly, for clarity.
   if (!fn->isTypeReference()) {

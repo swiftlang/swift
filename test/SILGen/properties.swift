@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -use-native-super-method -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module %s | FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module %s | FileCheck %s
 
 var zero: Int = 0
 
@@ -1008,3 +1008,11 @@ struct MutatingGetterStruct {
   }
 }
 
+
+protocol ProtocolWithReadWriteSubscript {
+  subscript(i: Int) -> Int { get set }
+}
+
+struct CrashWithUnnamedSubscript : ProtocolWithReadWriteSubscript {
+  subscript(_: Int) -> Int { get { } set { } }
+}

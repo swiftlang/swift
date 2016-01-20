@@ -9,7 +9,7 @@ func test() {
 // RUN: FileCheck %s < %t
 
 // Swift == 1
-// CHECK-LABEL:  key.name: "abs(x:)",
+// CHECK-LABEL:  key.name: "abs(:)",
 // CHECK-NEXT:   key.sourcetext: "abs(<#T##x: T##T#>)",
 // CHECK-NEXT:   key.description: "abs(x: T)",
 // CHECK-NEXT:   key.typename: "T",
@@ -22,7 +22,7 @@ func test() {
 // CHECK-NEXT: },
 
 // FooHelper.FooHelperExplicit == 1
-// CHECK-LABEL:  key.name: "fooHelperExplicitFrameworkFunc1(a:)",
+// CHECK-LABEL:  key.name: "fooHelperExplicitFrameworkFunc1(:)",
 // CHECK-NEXT:   key.sourcetext: "fooHelperExplicitFrameworkFunc1(<#T##a: Int32##Int32#>)",
 // CHECK-NEXT:   key.description: "fooHelperExplicitFrameworkFunc1(a: Int32)",
 // CHECK-NEXT:   key.typename: "Int32",
