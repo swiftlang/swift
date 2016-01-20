@@ -998,7 +998,7 @@ private:
     unsigned depth = 0;
 
     /// \brief Whether to record failures or not.
-    bool recordFailures = false;
+    bool recordFixes = false;
 
     /// The list of constraints that have been retired along the
     /// current path.
@@ -1265,23 +1265,13 @@ public:
   getConstraintLocator(const ConstraintLocatorBuilder &builder);
 
 public:
-  /// \brief Whether we should be recording failures.
-  bool shouldRecordFailures() {
-    // FIXME: It still makes sense to record failures when there are fixes
-    // present, but they should be less desirable.
-    if (!Fixes.empty())
-      return false;
-
-    return !solverState || solverState->recordFailures ||
-           TC.Context.LangOpts.DebugConstraintSolver;
-  }
 
   /// \brief Whether we should attempt to fix problems.
   bool shouldAttemptFixes() {
     if (!(Options & ConstraintSystemFlags::AllowFixes))
       return false;
 
-    return !solverState || solverState->recordFailures;
+    return !solverState || solverState->recordFixes;
   }
 
   /// \brief Log and record the application of the fix. Return true iff any

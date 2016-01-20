@@ -4997,13 +4997,14 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
   // Attempt to solve again, capturing all states that come from our attempts to
   // select overloads or bind type variables.
   //
-  // FIXME: can this be removed??
+  // FIXME: can this be removed?  We need to arrange for recordFixes to be
+  // eliminated.
   viable.clear();
 
   {
     // Set up solver state.
     SolverState state(*this);
-    state.recordFailures = true;
+    state.recordFixes = true;
     this->solverState = &state;
 
     // Solve the system.
