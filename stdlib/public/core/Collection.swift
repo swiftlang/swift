@@ -87,7 +87,7 @@ public protocol MutableIndexable {
 ///          return IndexingGenerator(self)
 ///        }
 ///      }
-@swift3_migration(renamed="CollectionDefaultIterator")
+@swift3_migration(renamed="IndexingIterator")
 public struct IndexingGenerator<Elements : Indexable>
  : GeneratorType, SequenceType {
   
