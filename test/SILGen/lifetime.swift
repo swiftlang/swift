@@ -636,7 +636,7 @@ class D : B {
     super.init(y: y)
     // CHECK: [[THIS1:%[0-9]+]] = load [[THISADDR]]
     // CHECK: [[THIS1_SUP:%[0-9]+]] = upcast [[THIS1]] : ${{.*}} to $B
-    // CHECK: [[SUPER_CTOR:%[0-9]+]] = super_method %{{[0-9]*}} : $D, #B.init!initializer.1
+    // CHECK: [[SUPER_CTOR:%[0-9]+]] = function_ref @_TFC8lifetime1BcfT1ySi_S0_ : $@convention(method) (Int, @owned B) -> @owned B
     // CHECK: [[Y:%[0-9]+]] = load [[YADDR]]
     // CHECK: [[THIS2_SUP:%[0-9]+]] = apply [[SUPER_CTOR]]([[Y]], [[THIS1_SUP]])
     // CHECK: [[THIS2:%[0-9]+]] = unchecked_ref_cast [[THIS2_SUP]] : $B to $D
