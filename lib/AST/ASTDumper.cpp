@@ -952,7 +952,7 @@ namespace {
       OS.indent(Indent) << "(#if_decl\n";
       Indent += 2;
       for (auto &Clause : ICD->getClauses()) {
-        OS.indent(Indent) << (Clause.Cond ? "(#if:\n" : "#else");
+        OS.indent(Indent) << (Clause.Cond ? "(#if:\n" : "\n(#else:\n");
         if (Clause.Cond)
           printRec(Clause.Cond);
         
@@ -960,6 +960,8 @@ namespace {
           OS << '\n';
           printRec(D);
         }
+
+        OS << ')';
       }
     
       Indent -= 2;
