@@ -805,8 +805,8 @@ public struct PermutationGenerator<
 ///
 ///      x[i..<j] = someExpression
 ///      x[i..<j].mutatingMethod()
-@available(*, deprecated, message="MutableSliceable will be removed in Swift 3")
-@swift3_migration(message="Removed in Swift 3")
+@available(*, deprecated, message="MutableSliceable will be removed in Swift 3.  Use 'CollectionType where SubSequence : MutableCollectionType' instead.")
+@swift3_migration(message="Removed in Swift 3.  Use 'CollectionType where SubSequence : MutableCollectionType' instead.")
 public protocol MutableSliceable : CollectionType, MutableCollectionType {
   subscript(_: Range<Index>) -> SubSequence { get set }
 }
