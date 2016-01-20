@@ -339,10 +339,6 @@ public:
   llvm::SmallDenseMap<const clang::TypedefNameDecl *, MappedTypeNameKind, 16>
     SpecialTypedefNames;
 
-  /// A mapping from module names to the prefixes placed on global names
-  /// in that module, e.g., the Foundation module uses the "NS" prefix.
-  llvm::StringMap<std::string> ModulePrefixes;
-
   /// Is the given identifier a reserved name in Swift?
   static bool isSwiftReservedName(StringRef name);
 
