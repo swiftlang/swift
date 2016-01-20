@@ -49,8 +49,8 @@ public struct ${Self}<@swift3_migration(renamed="Pointee") Memory>
   public var _rawValue : Builtin.RawPointer
 
   /// Construct a null pointer.
-  @swift3_migration(message="use 'nil' instead")
-  @available(*, deprecated, message="use 'nil' literal")
+  @available(*, deprecated, message="init() will be removed in Swift 3.  Use `nil` instead")
+  @swift3_migration(message="use `nil` instead")
   @_transparent
   public init() {
     self._rawValue = _nilRawPointer

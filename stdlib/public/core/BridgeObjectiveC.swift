@@ -409,8 +409,8 @@ public struct AutoreleasingUnsafeMutablePointer<
   }
 
   /// Initialize to a null pointer.
-  @available(*, deprecated, message="init() will be removed in Swift 3. Use NilLiteralConvertible syntax instead")
-  @swift3_migration(message="Removed in Swift 3")
+  @available(*, deprecated, message="init() will be removed in Swift 3.  Use `nil` instead")
+  @swift3_migration(message="use `nil` instead")
   @_transparent public
   init() {
     self._rawValue = _nilRawPointer
