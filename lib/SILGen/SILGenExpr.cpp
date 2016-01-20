@@ -1913,6 +1913,8 @@ RValue RValueEmitter::visitDynamicTypeExpr(DynamicTypeExpr *E, SGFContext C) {
 }
 
 RValue RValueEmitter::visitCaptureListExpr(CaptureListExpr *E, SGFContext C) {
+  // Ensure that weak captures are in a separate scope.
+  DebugScope scope(SGF, CleanupLocation(E));
   // ClosureExpr's evaluate their bound variables.
   for (auto capture : E->getCaptureList()) {
     SGF.visit(capture.Var);
