@@ -1277,11 +1277,12 @@ void swift::maybeAddMaterializeForSet(AbstractStorageDecl *storage,
   } else if (isa<EnumDecl>(container)) {
     return;
 
-  // Structs imported by Clang don't need this, because we can
-  // synthesize it later.
+  // Computed properties of @_fixed_layout structs don't need this, but
+  // resilient structs do, since stored properties can resiliently become
+  // computed or vice versa.
   } else {
-    assert(isa<StructDecl>(container));
-    if (container->hasClangNode())
+    auto *structDecl = cast<StructDecl>(container);
+    if (structDecl->hasFixedLayout())
       return;
   }
 
@@ -1341,10 +1342,9 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
     }
   }
 
-  // Public instance variables of structs get accessors unless they were
-  // imported from Clang.
+  // Public instance variables of resilient structs get accessors.
   if (auto structDecl = dyn_cast<StructDecl>(nominal)) {
-    if (!isInSILMode && !structDecl->hasClangNode()) {
+    if (!structDecl->hasFixedLayout() && !isInSILMode) {
       var->setIsBeingTypeChecked();
       addTrivialAccessorsToStorage(var, TC);
       var->setIsBeingTypeChecked(false);
