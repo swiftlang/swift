@@ -981,6 +981,10 @@ public:
   // Create a TypeExpr with location information.
   TypeExpr(TypeLoc Ty);
 
+  // The type of a TypeExpr is always a metatype type.  Return the instance
+  // type, ErrorType if an error, or null if not set yet.
+  Type getInstanceType() const;
+  
   // Create an implicit TypeExpr, which has no location information.
   static TypeExpr *createImplicit(Type Ty, ASTContext &C) {
     return new (C) TypeExpr(Ty);
