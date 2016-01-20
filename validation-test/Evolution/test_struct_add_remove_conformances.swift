@@ -20,7 +20,6 @@
 // RUN: %target-run %t/after_after
 
 // Requires fixes to @_transparent attribute
-// XFAIL: *
 
 import StdlibUnittest
 import struct_add_remove_conformances
