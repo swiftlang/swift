@@ -183,7 +183,7 @@ namespace {
                               ImportHint hint = ImportHint::None)
       : AbstractType(type), Hint(hint) {}
 
-    /*implicit*/ ImportResult(TypeBase *type = nullptr,
+    /*implicit*/ ImportResult(TypeBase *type,
                               ImportHint hint = ImportHint::None)
       : AbstractType(type), Hint(hint) {}
 
