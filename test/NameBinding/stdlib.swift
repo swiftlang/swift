@@ -1,5 +1,9 @@
 // RUN: %target-parse-verify-swift -parse-stdlib -module-name Swift
 
+enum Optional<T> {
+  case Some(T), None
+}
+
 // <rdar://problem/15593704>
 struct X {
   // This is in parse-stdlib mode with no default literal type.
