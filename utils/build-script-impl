@@ -766,8 +766,8 @@ case "$(uname -s -m)" in
             "freebsd-x86_64"
         )
         ;;
-		
-	CYGWIN_NT-10.0\ x86_64)
+
+    CYGWIN_NT-10.0\ x86_64)
         NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
             "cygwin-x86_64"
         )
@@ -858,7 +858,7 @@ case "$(uname -s -m)" in
         )
         ;;
 
-	CYGWIN_NT-10.0\ x86_64)
+    CYGWIN_NT-10.0\ x86_64)
         NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
             "cygwin-x86_64"
         )

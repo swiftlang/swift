@@ -693,7 +693,7 @@ void IRGenModule::emitAutolinkInfo() {
     }
     break;
   }
-  case llvm::Triple::COFF:  // for cygwin
+  case llvm::Triple::COFF:
   case llvm::Triple::ELF: {
     // Merge the entries into null-separated string.
     llvm::SmallString<64> EntriesString;
