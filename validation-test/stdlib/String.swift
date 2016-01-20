@@ -263,15 +263,38 @@ struct ComparisonTest {
   let lhs: String
   let rhs: String
   let loc: SourceLoc
+  let xfail: Dictionary<FailureCondition, String>
+
+  enum FailureCondition {
+    case None // Not expected to fail
+    case ObjC // Expected to fail with _runtime(_ObjC)
+    case Linux // Expected to fail on Linux
+  }
+
+  var xpass: Bool {
+    return reason.isEmpty
+  }
+
+  var reason: String {
+#if _runtime(_ObjC)
+    if let reason = xfail[.ObjC] { return reason }
+#endif
+#if os(Linux)
+    if let reason = xfail[.Linux] { return reason }
+#endif
+    return ""
+  }
 
   init(
     _ expectedUnicodeCollation: ExpectedComparisonResult,
     _ lhs: String, _ rhs: String,
+    xfail: Dictionary<FailureCondition, String> = [:],
     file: String = __FILE__, line: UInt = __LINE__
     ) {
       self.expectedUnicodeCollation = expectedUnicodeCollation
       self.lhs = lhs
       self.rhs = rhs
+      self.xfail = xfail
       self.loc = SourceLoc(file, line, comment: "test data")
   }
 }
@@ -284,11 +307,14 @@ let comparisonTests = [
   ComparisonTest(.LT, "t", "tt"),
   ComparisonTest(.GT, "t", "Tt"),
   ComparisonTest(.GT, "\u{0}", ""),
-  ComparisonTest(.EQ, "\u{0}", "\u{0}"),
-  // Currently fails:
-  // ComparisonTest(.LT, "\r\n", "t"),
-  // ComparisonTest(.GT, "\r\n", "\n"),
-  // ComparisonTest(.LT, "\u{0}", "\u{0}\u{0}"),
+  ComparisonTest(.EQ, "\u{0}", "\u{0}",
+    xfail: [.ObjC: "https://bugs.swift.org/browse/SR-332"]),
+  ComparisonTest(.LT, "\r\n", "t"),
+  ComparisonTest(.GT, "\r\n", "\n",
+    xfail: [.ObjC: "blocked on rdar://problem/19036555"]),
+  ComparisonTest(.LT, "\u{0}", "\u{0}\u{0}",
+    xfail: [.ObjC : "rdar://problem/19034601",
+      .Linux: "onenull.hasPrefix(twonulls) somehow returns true."]),
 
   // Whitespace
   // U+000A LINE FEED (LF)
@@ -362,7 +388,8 @@ let comparisonTests = [
   //
   // U+0301 and U+0954 don't decompose in the canonical decomposition mapping.
   // U+0341 has a canonical decomposition mapping of U+0301.
-  ComparisonTest(.EQ, "\u{0301}", "\u{0341}"),
+  ComparisonTest(.EQ, "\u{0301}", "\u{0341}",
+    xfail: [.ObjC: "https://bugs.swift.org/browse/SR-243"]),
   ComparisonTest(.LT, "\u{0301}", "\u{0954}"),
   ComparisonTest(.LT, "\u{0341}", "\u{0954}"),
 ]
@@ -409,18 +436,20 @@ func checkHasPrefixHasSuffix(
   expectEqual(expectHasSuffix, lhs.hasSuffix(rhs), stackTrace: stackTrace)
 }
 
-StringTests.test("hasPrefix,hasSuffix") {
-  for test in comparisonTests {
-    checkHasPrefixHasSuffix(test.lhs, test.rhs, test.loc.withCurrentLoc())
-    checkHasPrefixHasSuffix(test.rhs, test.lhs, test.loc.withCurrentLoc())
+for test in comparisonTests {
+  StringTests.test("hasPrefix,hasSuffix:\(test.loc.line)")
+    .xfail(.Custom({ !test.xpass }, reason: test.reason))
+    .code {
+      checkHasPrefixHasSuffix(test.lhs, test.rhs, test.loc.withCurrentLoc())
+      checkHasPrefixHasSuffix(test.rhs, test.lhs, test.loc.withCurrentLoc())
 
-    let fragment = "abc"
-    let combiner = "\u{0301}" // combining acute accent
+      let fragment = "abc"
+      let combiner = "\u{0301}" // combining acute accent
 
-    checkHasPrefixHasSuffix(test.lhs + fragment, test.rhs, test.loc.withCurrentLoc())
-    checkHasPrefixHasSuffix(fragment + test.lhs, test.rhs, test.loc.withCurrentLoc())
-    checkHasPrefixHasSuffix(test.lhs + combiner, test.rhs, test.loc.withCurrentLoc())
-    checkHasPrefixHasSuffix(combiner + test.lhs, test.rhs, test.loc.withCurrentLoc())
+      checkHasPrefixHasSuffix(test.lhs + fragment, test.rhs, test.loc.withCurrentLoc())
+      checkHasPrefixHasSuffix(fragment + test.lhs, test.rhs, test.loc.withCurrentLoc())
+      checkHasPrefixHasSuffix(test.lhs + combiner, test.rhs, test.loc.withCurrentLoc())
+      checkHasPrefixHasSuffix(combiner + test.lhs, test.rhs, test.loc.withCurrentLoc())
   }
 }
 
