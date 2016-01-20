@@ -2193,14 +2193,8 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType,
   if (isa<AbstractFunctionDecl>(DC))
     lookupOptions |= NameLookupFlags::KnownPrivate;
   auto ctors = TC.lookupConstructors(DC, valueType, lookupOptions);
-  if (!ctors) {
-    // If we are supposed to record failures, do so.
-    if (shouldRecordFailures()) {
-      recordFailure(locator, Failure::NoPublicInitializers, valueType);
-    }
-    
+  if (!ctors)
     return SolutionKind::Error;
-  }
 
   auto &context = getASTContext();
   auto name = context.Id_init;

@@ -47,11 +47,6 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
         << " and " << getSecondType().getString();
     break;
 
-  case NoPublicInitializers:
-    out << getFirstType().getString()
-        << " does not have any public initializers";
-    break;
-
   case IsNotMaterializable:
     out << getFirstType().getString() << " is not materializable";
     break;
@@ -593,14 +588,6 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure,
     }
     // FIXME: diagnose other cases
     return false;
-    
-  case Failure::NoPublicInitializers: {
-    tc.diagnose(loc, diag::no_accessible_initializers, failure.getFirstType())
-      .highlight(range);
-    if (targetLocator && !useExprLoc)
-      noteTargetOfDiagnostic(cs, &failure, targetLocator);
-    break;
-  }
 
   case Failure::IsNotMaterializable: {
     tc.diagnose(loc, diag::cannot_bind_generic_parameter_to_type,
@@ -992,6 +979,7 @@ namespace {
   enum CandidateCloseness {
     CC_ExactMatch,              ///< This is a perfect match for the arguments.
     CC_Unavailable,             ///< Marked unavailable with @available.
+    CC_Inaccessible,            ///< Not accessible from the current context.
     CC_NonLValueInOut,          ///< First arg is inout but no lvalue present.
     CC_SelfMismatch,            ///< Self argument mismatches.
     CC_OneArgumentNearMismatch, ///< All arguments except one match, near miss.
@@ -1157,6 +1145,11 @@ namespace {
     /// argument labels don't match up, diagnose that error and return true.
     bool diagnoseAnyStructuralArgumentError(Expr *fnExpr, Expr *argExpr);
     
+    /// Emit a diagnostic and return true if this is an error condition we can
+    /// handle uniformly.  This should be called after filtering the candidate
+    /// list.
+    bool diagnoseSimpleErrors(SourceLoc loc);
+    
     void dump() const LLVM_ATTRIBUTE_USED;
     
   private:
@@ -1198,6 +1191,19 @@ void CalleeCandidateInfo::filterList(ClosenessPredicate predicate) {
         decl.decl->getAttrs().isUnavailable(CS->getASTContext()) &&
         !CS->TC.getLangOpts().DisableAvailabilityChecking)
       declCloseness.first = CC_Unavailable;
+    
+    // Likewise, if the candidate is inaccessible from the scope it is being
+    // accessed from, mark it as inaccessible or a general mismatch.
+    if (!decl.decl->isAccessibleFrom(CS->DC)) {
+      // If this was an exact match, downgrade it to inaccessible, so that
+      // accessible decls that are also an exact match will take precedence.
+      // Otherwise consider it to be a general mismatch so we only list it in
+      // an overload set as a last resort.
+      if (declCloseness.first == CC_ExactMatch)
+        declCloseness.first = CC_Inaccessible;
+      else
+        declCloseness.first = CC_GeneralMismatch;
+    }
     
     closenessList.push_back(declCloseness);
     closeness = std::min(closeness, closenessList.back().first);
@@ -1393,11 +1399,12 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
 
   if (auto TE = dyn_cast<TypeExpr>(fn)) {
     // It's always a metatype type, so use the instance type name.
-    auto instanceType =TE->getType()->castTo<MetatypeType>()->getInstanceType();
+    auto instanceType =TE->getInstanceType();
     
     // TODO: figure out right value for isKnownPrivate
     if (!instanceType->getAs<TupleType>()) {
-      auto ctors = CS->TC.lookupConstructors(CS->DC, instanceType);
+      auto ctors = CS->TC.lookupConstructors(CS->DC, instanceType,
+                                       NameLookupFlags::IgnoreAccessibility);
       for (auto ctor : ctors)
         if (ctor->hasType())
           candidates.push_back({ ctor, 1 });
@@ -1658,9 +1665,23 @@ suggestPotentialOverloads(SourceLoc loc, bool isResult) {
 /// labels don't match up, diagnose that error and return true.
 bool CalleeCandidateInfo::diagnoseAnyStructuralArgumentError(Expr *fnExpr,
                                                              Expr *argExpr) {
+  // If we are invoking a constructor and there are absolutely no candidates,
+  // then they must all be private.
+  if (auto *MTT = fnExpr->getType()->getAs<MetatypeType>()) {
+    if (!MTT->getInstanceType()->is<TupleType>() &&
+        (size() == 0 ||
+         (size() == 1 && isa<ProtocolDecl>(candidates[0].decl)))) {
+      CS->TC.diagnose(fnExpr->getLoc(), diag::no_accessible_initializers,
+                      MTT->getInstanceType());
+      return true;
+    }
+  }
+  
+  
   // TODO: We only handle the situation where there is exactly one candidate
   // here.
-  if (size() != 1) return false;
+  if (size() != 1)
+    return false;
   
   
   auto args = decomposeArgParamType(argExpr->getType());
@@ -1829,7 +1850,35 @@ bool CalleeCandidateInfo::diagnoseAnyStructuralArgumentError(Expr *fnExpr,
   return false;
 }
 
+/// Emit a diagnostic and return true if this is an error condition we can
+/// handle uniformly.  This should be called after filtering the candidate
+/// list.
+bool CalleeCandidateInfo::diagnoseSimpleErrors(SourceLoc loc) {
+  // Handle symbols marked as explicitly unavailable.
+  if (closeness == CC_Unavailable)
+    return CS->TC.diagnoseExplicitUnavailability(candidates[0].decl, loc,
+                                                 CS->DC);
 
+  // Handle symbols that are matches, but are not accessible from the current
+  // scope.
+  if (closeness == CC_Inaccessible) {
+    auto decl = candidates[0].decl;
+    if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
+      CS->TC.diagnose(loc, diag::init_candidate_inaccessible,
+                      CD->getResultType(), decl->getFormalAccess());
+     
+    } else {
+      CS->TC.diagnose(loc, diag::candidate_inaccessible, decl->getName(),
+                      decl->getFormalAccess());
+    }
+    for (auto cand : candidates)
+      CS->TC.diagnose(cand.decl, diag::decl_declared_here, decl->getName());
+    
+    return true;
+  }
+
+  return false;
+}
 
 
 
@@ -3604,13 +3653,10 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
 
     return true;
   }
-  
-  if (calleeInfo.closeness == CC_Unavailable) {
-    if (CS->TC.diagnoseExplicitUnavailability(calleeInfo[0].decl,
-                                              SE->getLoc(), CS->DC))
-      return true;
-    return false;
-  }
+
+  // Diagnose some simple and common errors.
+  if (calleeInfo.diagnoseSimpleErrors(SE->getLoc()))
+    return true;
 
   // If the closest matches all mismatch on self, we either have something that
   // cannot be subscripted, or an ambiguity.
@@ -3811,10 +3857,10 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   }
       
   
-  // Handle uses of unavailable symbols.
-  if (calleeInfo.closeness == CC_Unavailable)
-    return CS->TC.diagnoseExplicitUnavailability(calleeInfo[0].decl,
-                                                 callExpr->getLoc(), CS->DC);
+  // Diagnose some simple and common errors.
+  if (calleeInfo.diagnoseSimpleErrors(callExpr->getLoc()))
+    return true;
+  
   
   // A common error is to apply an operator that only has inout forms (e.g. +=)
   // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
@@ -4721,8 +4767,9 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
   }
 
   case CC_Unavailable:
-    if (CS->TC.diagnoseExplicitUnavailability(candidateInfo[0].decl,
-                                              E->getLoc(), CS->DC))
+  case CC_Inaccessible:
+    // Diagnose some simple and common errors.
+    if (candidateInfo.diagnoseSimpleErrors(E->getLoc()))
       return true;
     return false;
       

@@ -100,6 +100,11 @@ ERROR(candidate_inaccessible,none,
       "%0 is inaccessible due to '%select{private|internal|PUBLIC}1' "
       "protection level", (DeclName, Accessibility))
 
+ERROR(init_candidate_inaccessible,none,
+    "%0 initializer is inaccessible due to '%select{private|internal|PUBLIC}1' "
+      "protection level", (Type, Accessibility))
+
+
 ERROR(cannot_pass_rvalue_mutating_subelement,none,
       "cannot use mutating member on immutable value: %0",
       (StringRef))

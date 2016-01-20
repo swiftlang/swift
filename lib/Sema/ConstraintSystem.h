@@ -365,8 +365,6 @@ public:
     IsNotBridgedToObjectiveC,
     /// \brief The type is not allowed to be an l-value.
     IsForbiddenLValue,
-    /// Type has no public initializers.
-    NoPublicInitializers,
     /// The type is not materializable.
     IsNotMaterializable,
   };
@@ -433,7 +431,6 @@ public:
                      getSecondType());
 
     case IsNotBridgedToObjectiveC:
-    case NoPublicInitializers:
       return Profile(id, locator, kind, resolvedOverloadSets, getFirstType(),
                     value);
     }
