@@ -21,23 +21,25 @@ func make_a_cat() throws -> Cat {
 
 // CHECK: sil hidden @_TF6errors15dont_make_a_cat{{.*}} : $@convention(thin) () -> (@owned Cat, @error ErrorType) {
 // CHECK:      [[BOX:%.*]] = alloc_existential_box $ErrorType, $HomeworkError
+// CHECK-NEXT: [[ADDR:%.*]] = project_existential_box $HomeworkError in [[BOX]] : $ErrorType
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thin HomeworkError.Type
 // CHECK-NEXT: [[T1:%.*]] = enum $HomeworkError, #HomeworkError.TooHard!enumelt
-// CHECK-NEXT: store [[T1]] to [[BOX]]#1
+// CHECK-NEXT: store [[T1]] to [[ADDR]]
 // CHECK-NEXT: builtin "willThrow"
-// CHECK-NEXT: throw [[BOX]]#0
+// CHECK-NEXT: throw [[BOX]]
 func dont_make_a_cat() throws -> Cat {
   throw HomeworkError.TooHard
 }
 
 // CHECK: sil hidden @_TF6errors11dont_return{{.*}} : $@convention(thin) <T> (@out T, @in T) -> @error ErrorType {
 // CHECK:      [[BOX:%.*]] = alloc_existential_box $ErrorType, $HomeworkError
+// CHECK-NEXT: [[ADDR:%.*]] = project_existential_box $HomeworkError in [[BOX]] : $ErrorType
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thin HomeworkError.Type
 // CHECK-NEXT: [[T1:%.*]] = enum $HomeworkError, #HomeworkError.TooMuch!enumelt
-// CHECK-NEXT: store [[T1]] to [[BOX]]#1
+// CHECK-NEXT: store [[T1]] to [[ADDR]]
 // CHECK-NEXT: builtin "willThrow"
 // CHECK-NEXT: destroy_addr %1 : $*T
-// CHECK-NEXT: throw [[BOX]]#0
+// CHECK-NEXT: throw [[BOX]]
 func dont_return<T>(argument: T) throws -> T {
   throw HomeworkError.TooMuch
 }

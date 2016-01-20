@@ -4456,14 +4456,11 @@ void IRGenSILFunction::visitInitBlockStorageHeaderInst(
 }
 
 void IRGenSILFunction::visitAllocExistentialBoxInst(AllocExistentialBoxInst *i){
-  Explosion box;
-  auto projectionAddr =
-    emitBoxedExistentialContainerAllocation(*this, box, i->getExistentialType(),
+  OwnedAddress boxWithAddr =
+    emitBoxedExistentialContainerAllocation(*this, i->getExistentialType(),
                                             i->getFormalConcreteType(),
-                                            i->getLoweredConcreteType(),
                                             i->getConformances());
-  setLoweredExplosion(i->getExistentialResult(), box);
-  setLoweredAddress(i->getValueAddressResult(), projectionAddr);
+  setLoweredBox(i, boxWithAddr);
 }
 
 void IRGenSILFunction::visitDeallocExistentialBoxInst(
@@ -4485,11 +4482,18 @@ void IRGenSILFunction::visitOpenExistentialBoxInst(OpenExistentialBoxInst *i) {
 
 void
 IRGenSILFunction::visitProjectExistentialBoxInst(ProjectExistentialBoxInst *i) {
-  Explosion box = getLoweredExplosion(i->getOperand());
-  auto caddr = emitBoxedExistentialProjection(*this, box,
-                                              i->getOperand().getType(),
-                                              i->getType().getSwiftRValueType());
-  setLoweredAddress(i, caddr.getAddress());
+  const LoweredValue &val = getLoweredValue(i->getOperand());
+  if (val.isBoxWithAddress()) {
+    // The operand is an alloc_existential_box.
+    // We can directly reuse the address.
+    setLoweredAddress(i, val.getAddressOfBox());
+  } else {
+    Explosion box = getLoweredExplosion(i->getOperand());
+    auto caddr = emitBoxedExistentialProjection(*this, box,
+                                                i->getOperand().getType(),
+                                                i->getType().getSwiftRValueType());
+    setLoweredAddress(i, caddr.getAddress());
+  }
 }
 
 void IRGenSILFunction::visitDynamicMethodInst(DynamicMethodInst *i) {

@@ -588,18 +588,17 @@ public:
 /// value is uninitialized.
 class AllocExistentialBoxInst : public AllocationInst {
   friend class SILBuilder;
-
   CanType ConcreteType;
   ArrayRef<ProtocolConformanceRef> Conformances;
 
   AllocExistentialBoxInst(SILDebugLocation *DebugLoc, SILType ExistentialType,
-                          CanType ConcreteType, SILType ConcreteLoweredType,
+                          CanType ConcreteType,
                           ArrayRef<ProtocolConformanceRef> Conformances,
                           SILFunction *Parent);
 
   static AllocExistentialBoxInst *
   create(SILDebugLocation *DebugLoc, SILType ExistentialType,
-         CanType ConcreteType, SILType ConcreteLoweredType,
+         CanType ConcreteType,
          ArrayRef<ProtocolConformanceRef> Conformances, SILFunction *Parent);
 
 public:
@@ -611,16 +610,9 @@ public:
     return getType(0);
   }
 
-  SILType getLoweredConcreteType() const {
-    return getType(1);
-  }
-
   ArrayRef<ProtocolConformanceRef> getConformances() const {
     return Conformances;
   }
-  
-  SILValue getExistentialResult() const { return SILValue(this, 0); }
-  SILValue getValueAddressResult() const { return SILValue(this, 1); }
   
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }

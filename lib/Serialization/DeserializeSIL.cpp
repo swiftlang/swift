@@ -870,7 +870,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       break;
     case ValueKind::AllocExistentialBoxInst:
       ResultVal = Builder.createAllocExistentialBox(Loc, Ty, ConcreteTy,
-                                  SILType::getPrimitiveAddressType(ConcreteTy),
                                   ctxConformances);
       break;
     }

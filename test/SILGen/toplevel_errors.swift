@@ -8,10 +8,11 @@ throw MyError.A
 
 // CHECK: sil @main
 // CHECK: [[ERR:%.*]] = alloc_existential_box $ErrorType, $MyError
+// CHECK: [[ADDR:%.*]] = project_existential_box $MyError in [[ERR]] : $ErrorType
 // CHECK: [[T0:%.*]] = enum $MyError, #MyError.A!enumelt
-// CHECK: store [[T0]] to [[ERR]]#1 : $*MyError
-// CHECK: builtin "willThrow"([[ERR]]#0 : $ErrorType)
-// CHECK: br bb2([[ERR]]#0 : $ErrorType)
+// CHECK: store [[T0]] to [[ADDR]] : $*MyError
+// CHECK: builtin "willThrow"([[ERR]] : $ErrorType)
+// CHECK: br bb2([[ERR]] : $ErrorType)
 
 // CHECK: bb1([[T0:%.*]] : $Int32):
 // CHECK: return [[T0]] : $Int32

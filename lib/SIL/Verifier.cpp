@@ -1126,9 +1126,18 @@ public:
             "project_existential_box result must be an address");
 
     if (auto *AEBI = dyn_cast<AllocExistentialBoxInst>(PEBI->getOperand())) {
-      require(AEBI->getLoweredConcreteType() == PEBI->getType(),
-              "type of project_existential_box does not match with the formal "
-              "type of alloc_existential_box");
+      // The lowered type must be the properly-abstracted form of the AST type.
+      SILType exType = AEBI->getExistentialType();
+      auto archetype = ArchetypeType::getOpened(exType.getSwiftRValueType());
+
+      auto loweredTy = F.getModule().Types.getLoweredType(
+                                      Lowering::AbstractionPattern(archetype),
+                                      AEBI->getFormalConcreteType())
+                                        .getAddressType();
+
+      requireSameType(loweredTy, PEBI->getType(),
+              "project_existential_box result should be the lowered "
+              "concrete type of its alloc_existential_box");
     }
   }
   
@@ -1836,22 +1845,6 @@ public:
             "alloc_existential_box must be used with a boxed existential "
             "type");
     
-    // The lowered type must be the properly-abstracted form of the AST type.
-    auto archetype = ArchetypeType::getOpened(exType.getSwiftRValueType());
-    
-    auto loweredTy = F.getModule().Types.getLoweredType(
-                                Lowering::AbstractionPattern(archetype),
-                                AEBI->getFormalConcreteType())
-                      .getAddressType();
-    
-    requireSameType(loweredTy, AEBI->getLoweredConcreteType(),
-                    "alloc_existential_box #1 result should be the lowered "
-                    "concrete type at the right abstraction level");
-    require(isLoweringOf(AEBI->getLoweredConcreteType(),
-                         AEBI->getFormalConcreteType()),
-        "alloc_existential_box payload must be a lowering of the formal "
-        "concrete type");
-
     checkExistentialProtocolConformances(exType, AEBI->getConformances());
   }
 

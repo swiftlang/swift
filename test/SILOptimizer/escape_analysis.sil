@@ -623,7 +623,9 @@ bb2(%5 : $ErrorType):
 
 // CHECK-LABEL: CG of throwing_func
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: 
-// CHECK-NEXT:    Ret Esc: R, Succ: %0
+// CHECK-NEXT:    Val %3 Esc: G, Succ: (%3.1)
+// CHECK-NEXT:    Con %3.1 Esc: G, Succ: 
+// CHECK-NEXT:    Ret  Esc: R, Succ: %0
 // CHECK-NEXT:  End
 sil @throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error ErrorType) {
 bb0(%0 : $X):
@@ -631,9 +633,10 @@ bb0(%0 : $X):
 
 bb1:
   %2 = alloc_existential_box $ErrorType, $MyError
-  %3 = struct $MyError ()
-  store %3 to %2#1 : $*MyError
-  throw %2#0 : $ErrorType
+  %3 = project_existential_box $MyError in %2 : $ErrorType
+  %4 = struct $MyError ()
+  store %4 to %3 : $*MyError
+  throw %2 : $ErrorType
 
 bb2:
   return %0 : $X
@@ -871,14 +874,16 @@ bb0(%0 : $X):
 
 // CHECK-LABEL: CG of test_unknown_store
 // CHECK-NEXT:    Arg %0 Esc: G, Succ: 
-// CHECK-NEXT:    Con %0.1 Esc: G, Succ: 
+// CHECK-NEXT:    Val %2 Esc: G, Succ: (%2.1)
+// CHECK-NEXT:    Con %2.1 Esc: G, Succ: %0
 // CHECK-NEXT:  End
 sil @test_unknown_store : $@convention(thin) (@owned ErrorClass) -> () {
 bb0(%0 : $ErrorClass):
   %2 = alloc_existential_box $ErrorType, $ErrorClass
-  store %0 to %2#1 : $*ErrorClass
-  %4 = tuple ()
-  return %4 : $()
+  %3 = project_existential_box $ErrorClass in %2 : $ErrorType
+  store %0 to %3 : $*ErrorClass
+  %5 = tuple ()
+  return %5 : $()
 }
 
 // CHECK-LABEL: CG of test_raw_pointer_to_ref

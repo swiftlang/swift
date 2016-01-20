@@ -703,7 +703,7 @@ Values and Operands
 
   sil-identifier ::= [A-Za-z_0-9]+
   sil-value-name ::= '%' sil-identifier
-  sil-value ::= sil-value-name ('#' [0-9]+)?
+  sil-value ::= sil-value-name
   sil-value ::= 'undef'
   sil-operand ::= sil-value ':' sil-type
 
@@ -711,17 +711,6 @@ SIL values are introduced with the ``%`` sigil and named by an
 alphanumeric identifier, which references the instruction or basic block
 argument that produces the value.  SIL values may also refer to the keyword
 'undef', which is a value of undefined contents.
-In SIL, a single instruction may produce multiple values. Operands that refer
-to multiple-value instructions choose the value by following the ``%name`` with
-``#`` and the index of the value. For example::
-
-  // alloc_existential_box produces two values--the refcounted pointer %box#0,
-  // and the value address %box#1
-  %box = alloc_existential_box $ErrorType, $MyError
-  // Refer to the address
-  store %value to %box#1 : $*MyError
-  // Refer to the refcounted pointer
-  throw %box#0 : $ErrorType
 
 Unlike LLVM IR, SIL instructions that take value operands *only* accept
 value operands. References to literal constants, functions, global variables, or
@@ -3289,8 +3278,9 @@ more expensive ``alloc_existential_box``::
     // The slow general way to form an ErrorType, allocating a box and
     // storing to its value buffer:
     %error1 = alloc_existential_box $ErrorType, $NSError
+    %addr = project_existential_box $NSError in %error1 : $ErrorType
     strong_retain %nserror: $NSError
-    store %nserror to %error1#1 : $NSError
+    store %nserror to %addr : $NSError
 
     // The fast path supported for NSError:
     strong_retain %nserror: $NSError
@@ -3432,7 +3422,7 @@ alloc_existential_box
   // $P must be a protocol or protocol composition type with boxed
   //   representation
   // $T must be an AST type that conforms to P
-  // %1#0 will be of type $P
+  // %1 will be of type $P
   // %1#1 will be of type $*T', where T' is the most abstracted lowering of T
 
 Allocates a boxed existential container of type ``$P`` with space to hold a
@@ -3440,8 +3430,8 @@ value of type ``$T'``. The box is not fully initialized until a valid value
 has been stored into the box. If the box must be deallocated before it is
 fully initialized, ``dealloc_existential_box`` must be used. A fully
 initialized box can be ``retain``-ed and ``release``-d like any
-reference-counted type.  The address ``%0#1`` is dependent on the lifetime of
-the owner reference ``%0#0``.
+reference-counted type.  The ``project_existential_box`` instruction is used
+to retrieve the address of the value inside the container.
 
 project_existential_box
 ```````````````````````
@@ -3456,6 +3446,7 @@ project_existential_box
   // %1 will be of type $*T
 
 Projects the address of the value inside a boxed existential container.
+The address is dependent on the lifetime of the owner reference ``%0``.
 It is undefined behavior if the concrete type ``$T`` is not the same type for
 which the box was allocated with ``alloc_existential_box``.
 

@@ -21,10 +21,11 @@ entry(%x : $*T):
   // CHECK: [[BOX:%.*]] = extractvalue { %swift.error*, %swift.opaque* } [[BOX_PAIR]], 0
   // CHECK: [[ADDR:%.*]] = extractvalue { %swift.error*, %swift.opaque* } [[BOX_PAIR]], 1
   %b = alloc_existential_box $ErrorType, $T
+  %p = project_existential_box $T in %b : $ErrorType
   // CHECK: call %swift.opaque* %initializeWithTake(%swift.opaque* [[ADDR]], %swift.opaque* %0, %swift.type* %T)
-  copy_addr [take] %x to [initialization] %b#1 : $*T
+  copy_addr [take] %x to [initialization] %p : $*T
   // CHECK: ret %swift.error* [[BOX]]
-  return %b#0 : $ErrorType
+  return %b : $ErrorType
 }
 
 struct SomeError: ErrorType {
@@ -40,9 +41,10 @@ entry(%x : $SomeError):
   // CHECK: [[OPAQUE_ADDR:%.*]] = extractvalue { %swift.error*, %swift.opaque* } [[BOX_PAIR]], 1
   // CHECK: [[ADDR:%.*]] = bitcast %swift.opaque* [[OPAQUE_ADDR]] to %V17boxed_existential9SomeError*
   %b = alloc_existential_box $ErrorType, $SomeError
-  store %x to %b#1 : $*SomeError
+  %p = project_existential_box $SomeError in %b : $ErrorType
+  store %x to %p : $*SomeError
   // CHECK: ret %swift.error* [[BOX]]
-  return %b#0 : $ErrorType
+  return %b : $ErrorType
 }
 
 // CHECK-LABEL: define void @dealloc_boxed_existential(%swift.error*, %swift.type* %T, i8** %T.ErrorType)

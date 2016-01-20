@@ -19,8 +19,9 @@ func test_concrete_erasure(x: ClericalError) -> ErrorType {
 }
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials21test_concrete_erasureFOS_13ClericalErrorPs9ErrorType_
 // CHECK:         [[EXISTENTIAL:%.*]] = alloc_existential_box $ErrorType, $ClericalError
-// CHECK:         store %0 to [[EXISTENTIAL]]#1 : $*ClericalError
-// CHECK:         return [[EXISTENTIAL]]#0 : $ErrorType
+// CHECK:         [[ADDR:%.*]] = project_existential_box $ClericalError in [[EXISTENTIAL]] : $ErrorType
+// CHECK:         store %0 to [[ADDR]] : $*ClericalError
+// CHECK:         return [[EXISTENTIAL]] : $ErrorType
 
 protocol HairType {}
 
@@ -30,9 +31,10 @@ func test_composition_erasure(x: protocol<HairType, ErrorType>) -> ErrorType {
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials24test_composition_erasureFPs9ErrorTypeS_8HairType_PS0__
 // CHECK:         [[VALUE_ADDR:%.*]] = open_existential_addr [[OLD_EXISTENTIAL:%.*]] : $*protocol<ErrorType, HairType> to $*[[VALUE_TYPE:@opened\(.*\) protocol<ErrorType, HairType>]]
 // CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $ErrorType, $[[VALUE_TYPE]]
-// CHECK:         copy_addr [[VALUE_ADDR]] to [initialization] [[NEW_EXISTENTIAL]]#1
+// CHECK:         [[ADDR:%.*]] = project_existential_box $[[VALUE_TYPE]] in [[NEW_EXISTENTIAL]] : $ErrorType
+// CHECK:         copy_addr [[VALUE_ADDR]] to [initialization] [[ADDR]]
 // CHECK:         destroy_addr [[OLD_EXISTENTIAL]]
-// CHECK:         return [[NEW_EXISTENTIAL]]#0
+// CHECK:         return [[NEW_EXISTENTIAL]]
 
 protocol HairClassType: class {}
 
@@ -42,8 +44,9 @@ func test_class_composition_erasure(x: protocol<HairClassType, ErrorType>) -> Er
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials30test_class_composition_erasureFPs9ErrorTypeS_13HairClassType_PS0__
 // CHECK:         [[VALUE:%.*]] = open_existential_ref [[OLD_EXISTENTIAL:%.*]] : $protocol<ErrorType, HairClassType> to $[[VALUE_TYPE:@opened\(.*\) protocol<ErrorType, HairClassType>]]
 // CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $ErrorType, $[[VALUE_TYPE]]
-// CHECK:         store [[VALUE]] to [[NEW_EXISTENTIAL]]#1
-// CHECK:         return [[NEW_EXISTENTIAL]]#0
+// CHECK:         [[ADDR:%.*]] = project_existential_box $[[VALUE_TYPE]] in [[NEW_EXISTENTIAL]] : $ErrorType
+// CHECK:         store [[VALUE]] to [[ADDR]]
+// CHECK:         return [[NEW_EXISTENTIAL]]
 
 func test_property(x: ErrorType) -> String {
   return x._domain

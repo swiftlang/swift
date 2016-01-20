@@ -2595,13 +2595,14 @@ bb0(%0 : $Int32):
 
 bb1:                                              // Preds: bb0
   %6 = alloc_existential_box $ErrorType, $VendingMachineError // users: %8, %9, %13
+  %6a = project_existential_box $VendingMachineError in %6 : $ErrorType
   %7 = enum $VendingMachineError, #VendingMachineError.OutOfStock!enumelt // user: %8
-  store %7 to %6#1 : $*VendingMachineError        // id: %8
-  debug_value %6#0 : $ErrorType, let, name "error" // id: %9
+  store %7 to %6a : $*VendingMachineError        // id: %8
+  debug_value %6 : $ErrorType, let, name "error" // id: %9
   %10 = float_literal $Builtin.FPIEEE80, 0x3FFF8000000000000000 // 1 // user: %11
   %11 = builtin "fptrunc_FPIEEE80_FPIEEE64"(%10 : $Builtin.FPIEEE80) : $Builtin.FPIEEE64 // user: %12
   %12 = struct $Double (%11 : $Builtin.FPIEEE64)  // user: %14
-  strong_release %6#0 : $ErrorType                // id: %13
+  strong_release %6 : $ErrorType                // id: %13
   br bb3(%12 : $Double)                           // id: %14
 
 bb2:                                              // Preds: bb0

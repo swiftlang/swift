@@ -448,14 +448,13 @@ ManagedValue SILGenFunction::emitExistentialErasure(
   }
   case ExistentialRepresentation::Boxed: {
     // Allocate the existential.
-    auto box = B.createAllocExistentialBox(loc,
+    auto *existential = B.createAllocExistentialBox(loc,
                                            existentialTL.getLoweredType(),
                                            concreteFormalType,
-                                           concreteTL.getLoweredType(),
                                            conformances);
-    auto existential = box->getExistentialResult();
-    auto valueAddr = box->getValueAddressResult();
-
+    auto *valueAddr = B.createProjectExistentialBox(loc,
+                                           concreteTL.getLoweredType(),
+                                           existential);
     // Initialize the concrete value in-place.
     InitializationPtr init(
         new ExistentialInitialization(existential, valueAddr, concreteFormalType,

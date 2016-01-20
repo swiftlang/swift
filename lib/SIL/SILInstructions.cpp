@@ -127,23 +127,11 @@ VarDecl *DebugValueAddrInst::getDecl() const {
   return getLoc().getAsASTNode<VarDecl>();
 }
 
-static SILTypeList *getAllocExistentialBoxType(SILType ExistTy,
-                                               SILType ConcreteTy,
-                                               SILFunction &F) {
-  SILType Tys[] = {
-    ExistTy.getObjectType(),
-    ConcreteTy.getAddressType(),
-  };
-  return F.getModule().getSILTypeList(Tys);
-}
-
 AllocExistentialBoxInst::AllocExistentialBoxInst(
     SILDebugLocation *Loc, SILType ExistentialType, CanType ConcreteType,
-    SILType ConcreteLoweredType, ArrayRef<ProtocolConformanceRef> Conformances,
-    SILFunction *Parent)
+    ArrayRef<ProtocolConformanceRef> Conformances, SILFunction *Parent)
     : AllocationInst(ValueKind::AllocExistentialBoxInst, Loc,
-                     getAllocExistentialBoxType(ExistentialType,
-                                                ConcreteLoweredType, *Parent)),
+                     ExistentialType.getObjectType()),
       ConcreteType(ConcreteType), Conformances(Conformances) {}
 
 static void declareWitnessTable(SILModule &Mod,
@@ -159,7 +147,7 @@ static void declareWitnessTable(SILModule &Mod,
 
 AllocExistentialBoxInst *AllocExistentialBoxInst::create(
     SILDebugLocation *Loc, SILType ExistentialType, CanType ConcreteType,
-    SILType ConcreteLoweredType, ArrayRef<ProtocolConformanceRef> Conformances,
+    ArrayRef<ProtocolConformanceRef> Conformances,
     SILFunction *F) {
   SILModule &Mod = F->getModule();
   void *Buffer = Mod.allocateInst(sizeof(AllocExistentialBoxInst),
@@ -169,7 +157,6 @@ AllocExistentialBoxInst *AllocExistentialBoxInst::create(
   return ::new (Buffer) AllocExistentialBoxInst(Loc,
                                                 ExistentialType,
                                                 ConcreteType,
-                                                ConcreteLoweredType,
                                                 Conformances, F);
 }
 

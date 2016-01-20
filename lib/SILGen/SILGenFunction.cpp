@@ -887,13 +887,11 @@ AllocExistentialBoxInst *
 SILGenBuilder::createAllocExistentialBox(SILLocation Loc,
                                          SILType ExistentialType,
                                          CanType ConcreteType,
-                                         SILType ConcreteLoweredType,
                                 ArrayRef<ProtocolConformanceRef> Conformances) {
   for (auto conformance : Conformances)
     SGM.useConformance(conformance);
 
   return SILBuilder::createAllocExistentialBox(Loc, ExistentialType,
                                                ConcreteType,
-                                               ConcreteLoweredType,
                                                Conformances);
 }

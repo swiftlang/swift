@@ -457,7 +457,6 @@ SILCloner<ImplClass>::visitAllocExistentialBoxInst(
     getBuilder().createAllocExistentialBox(getOpLocation(Inst->getLoc()),
                                 getOpType(origExistentialType),
                                 getOpASTType(origFormalType),
-                                getOpType(Inst->getLoweredConcreteType()),
                                 conformances));
 }
 

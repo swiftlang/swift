@@ -1267,18 +1267,16 @@ sil @existential_box : $@convention(thin) (SomeError) -> () {
 bb0(%0 : $SomeError):
   // CHECK: %1 = alloc_existential_box $ErrorType, $SomeError
   %1 = alloc_existential_box $ErrorType, $SomeError
-  // CHECK: store %0 to %1#1 : $*SomeError
-  store %0 to %1#1 : $*SomeError
-  // CHECK: %3 = project_existential_box $SomeError in %1#0 : $ErrorType
-  %3 = project_existential_box $SomeError in %1#0 : $ErrorType
-  // CHECK: store %0 to %3 : $*SomeError
-  store %0 to %3 : $*SomeError
-  // CHECK: %5 = open_existential_box %1#0 : $ErrorType to $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorType
-  %5 = open_existential_box %1#0 : $ErrorType to $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorType
-  // CHECK: destroy_addr %5 : $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorType
-  destroy_addr %5 : $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorType
-  // CHECK: dealloc_existential_box %1#0 : $ErrorType, $SomeError
-  dealloc_existential_box %1#0 : $ErrorType, $SomeError
+  // CHECK: %2 = project_existential_box $SomeError in %1 : $ErrorType
+  %2 = project_existential_box $SomeError in %1 : $ErrorType
+  // CHECK: store %0 to %2 : $*SomeError
+  store %0 to %2 : $*SomeError
+  // CHECK: %4 = open_existential_box %1 : $ErrorType to $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorType
+  %4 = open_existential_box %1 : $ErrorType to $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorType
+  // CHECK: destroy_addr %4 : $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorType
+  destroy_addr %4 : $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorType
+  // CHECK: dealloc_existential_box %1 : $ErrorType, $SomeError
+  dealloc_existential_box %1 : $ErrorType, $SomeError
   return undef : $()
 }
 

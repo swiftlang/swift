@@ -3301,22 +3301,13 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         parseASTType(ConcreteFormalTy))
       return true;
     
-    // Lower the type at the abstraction level of the existential.
-    auto archetype
-      = ArchetypeType::getOpened(ExistentialTy.getSwiftRValueType())
-        ->getCanonicalType();
-    
-    SILType LoweredTy = SILMod.Types.getLoweredType(
-                      Lowering::AbstractionPattern(archetype), ConcreteFormalTy)
-      .getAddressType();
-    
     // Collect conformances for the type.
     ArrayRef<ProtocolConformanceRef> conformances
       = collectExistentialConformances(P, ConcreteFormalTy,
                                        ExistentialTy.getSwiftRValueType());
     
     ResultVal = B.createAllocExistentialBox(InstLoc, ExistentialTy,
-                                    ConcreteFormalTy, LoweredTy, conformances);
+                                            ConcreteFormalTy, conformances);
     
     break;
   }

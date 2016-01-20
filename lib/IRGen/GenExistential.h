@@ -65,11 +65,9 @@ namespace irgen {
 
   /// Allocate a boxed existential container with uninitialized space to hold a
   /// value of a given type.
-  Address emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
-                                  Explosion &dest,
+  OwnedAddress emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
                                   SILType destType,
                                   CanType formalSrcType,
-                                  SILType loweredSrcType,
                                  ArrayRef<ProtocolConformanceRef> conformances);
   
   /// "Deinitialize" an existential container whose contained value is allocated

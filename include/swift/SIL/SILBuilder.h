@@ -260,11 +260,11 @@ public:
 
   AllocExistentialBoxInst *
   createAllocExistentialBox(SILLocation Loc, SILType ExistentialType,
-                            CanType ConcreteType, SILType ConcreteLoweredType,
+                            CanType ConcreteType,
                             ArrayRef<ProtocolConformanceRef> Conformances) {
     return insert(AllocExistentialBoxInst::create(
         createSILDebugLocation(Loc), ExistentialType, ConcreteType,
-        ConcreteLoweredType, Conformances, &F));
+        Conformances, &F));
   }
 
   ApplyInst *createApply(SILLocation Loc, SILValue Fn, SILType SubstFnTy,

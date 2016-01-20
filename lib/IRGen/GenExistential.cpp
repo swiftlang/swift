@@ -1668,18 +1668,14 @@ Address irgen::emitOpenExistentialBox(IRGenFunction &IGF,
 
 /// Allocate a boxed existential container with uninitialized space to hold a
 /// value of a given type.
-Address irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
-                                  Explosion &dest,
+OwnedAddress irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
                                   SILType destType,
                                   CanType formalSrcType,
-                                  SILType loweredSrcType,
                                 ArrayRef<ProtocolConformanceRef> conformances) {
   // TODO: Non-ErrorType boxed existentials.
   assert(_isErrorType(destType));
 
   auto &destTI = IGF.getTypeInfo(destType).as<ErrorExistentialTypeInfo>();
-  auto &srcTI = IGF.getTypeInfo(loweredSrcType);
-  
   auto srcMetadata = IGF.emitTypeMetadataRef(formalSrcType);
   // Should only be one conformance, for the ErrorType protocol.
   assert(conformances.size() == 1 && destTI.getStoredProtocols().size() == 1);
@@ -1699,11 +1695,13 @@ Address irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
   // Extract the box and value address from the result.
   auto box = IGF.Builder.CreateExtractValue(result, 0);
   auto addr = IGF.Builder.CreateExtractValue(result, 1);
-  dest.add(box);
-  
+
+  auto archetype = ArchetypeType::getOpened(destType.getSwiftRValueType());
+  auto &srcTI = IGF.getTypeInfoForUnlowered(AbstractionPattern(archetype),
+                                            formalSrcType);
   addr = IGF.Builder.CreateBitCast(addr,
                                    srcTI.getStorageType()->getPointerTo());
-  return srcTI.getAddressForPointer(addr);
+  return OwnedAddress(srcTI.getAddressForPointer(addr), box);
 }
 
 /// Deallocate a boxed existential container with uninitialized space to hold a
