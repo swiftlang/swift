@@ -279,7 +279,8 @@ extension CollectionType {
   /// `self`, *nondestructively*.
   ///
   /// - Complexity: O(N).
-  @swift3_migration(renamed="underestimatedLength", message = "becomes a property")
+  //@swift3_migration(toProperty="underestimatedLength")
+  @swift3_migration(message="it became a property 'underestimatedLength'")
   public func underestimateCount() -> Int {
     return numericCast(count)
   }
