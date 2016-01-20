@@ -4866,7 +4866,7 @@ public:
   SourceLoc getAccessorKeywordLoc() const {return AccessorKeywordLoc; }
 
   SourceLoc getStartLoc() const {
-    return StaticLoc.isValid() ? StaticLoc : FuncLoc;
+    return StaticLoc.isValid() && !isAccessor() ? StaticLoc : FuncLoc;
   }
   SourceRange getSourceRange() const;
 
