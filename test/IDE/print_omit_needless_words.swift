@@ -156,10 +156,6 @@
 // "UTF8" initialisms.
 // CHECK-FOUNDATION: init?(utf8String: UnsafePointer<Int8>)
 
-// Lowercasing after prefix stripping.
-// CHECK-FOUNDATION: let globalConstant: String
-// CHECK-FOUNDATION: func globalFunction()
-
 // Note: class method name stripping context type.
 // CHECK-APPKIT: class func red() -> NSColor
 

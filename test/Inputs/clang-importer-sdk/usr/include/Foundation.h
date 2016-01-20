@@ -989,6 +989,3 @@ int variadicFunc2(int A, ...);
 @interface NSString (UTF8)
 -(nullable instancetype)initWithUTF8String:(const char *)bytes;
 @end
-
-extern NSString *NSGlobalConstant;
-extern void NSGlobalFunction(void);
