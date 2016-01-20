@@ -286,6 +286,13 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
   TypeMetadataRecordPtrTy
     = TypeMetadataRecordTy->getPointerTo(DefaultAS);
 
+  FieldRecordTy = createStructType(*this, "swift.field_record", {
+    Int32Ty,           // Flags
+    RelativeAddressTy, // Offset to metadata or mangled name for external type
+    RelativeAddressTy, // Offset to field name
+  });
+  FieldRecordPtrTy = FieldRecordTy->getPointerTo(DefaultAS);
+
   FixedBufferTy = nullptr;
   for (unsigned i = 0; i != MaxNumValueWitnesses; ++i)
     ValueWitnessTys[i] = nullptr;

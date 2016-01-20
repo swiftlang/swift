@@ -2220,6 +2220,49 @@ public:
   const Metadata *getCanonicalTypeMetadata() const;
 };
 
+struct FieldRecord {
+private:
+  FieldRecordFlags Flags;
+
+  union {
+    /// A direct reference to the metadata.
+    RelativeDirectPointer<Metadata> DirectType;
+
+    /// A direct reference to a mangled name which must be
+    /// looked up in another binary image.
+    RelativeDirectPointer<const char> MangledTypeName;
+  };
+
+  RelativeDirectPointer<const char> FieldName;
+
+public:
+  const Metadata *getDirectType() const {
+    assert(isInternal() && "Field does not have an internal type metadata");
+    return DirectType;
+  }
+
+  const char *getTypeMangledName() const {
+    assert(isExternal() && "Field does not have an external type metadata");
+    return MangledTypeName;
+  }
+
+  const char *getFieldName()  const {
+    return FieldName;
+  }
+
+  bool isInternal() const {
+    return Flags.isInternal();
+  }
+
+  bool isExternal() const {
+    return Flags.isExternal();
+  }
+
+  FieldRecordOwnership getOwnership() const {
+    return Flags.getOwnership();
+  }
+};
+
 /// The structure of a protocol conformance record.
 ///
 /// This contains enough static information to recover the witness table for a
