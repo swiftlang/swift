@@ -333,6 +333,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::DestroyAddrInst:
     case ValueKind::ProjectValueBufferInst:
     case ValueKind::ProjectBoxInst:
+    case ValueKind::ProjectExistentialBoxInst:
     case ValueKind::ReleaseValueInst:
     case ValueKind::AutoreleaseValueInst:
     case ValueKind::DynamicMethodBranchInst:

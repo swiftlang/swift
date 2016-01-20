@@ -17,6 +17,7 @@
 #ifndef SWIFT_IRGEN_GENEXISTENTIAL_H
 #define SWIFT_IRGEN_GENEXISTENTIAL_H
 
+#include "Address.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Types.h"
 
@@ -112,12 +113,18 @@ namespace irgen {
                                                  SILType baseTy,
                                                  CanType openedTy);
 
+  /// Project the address of the value inside a boxed existential container.
+  ContainedAddress emitBoxedExistentialProjection(IRGenFunction &IGF,
+                                                  Explosion &base,
+                                                  SILType baseTy,
+                                                  CanType projectedType);
+
   /// Project the address of the value inside a boxed existential container,
   /// and open an archetype to its contained type.
-  Address emitBoxedExistentialProjection(IRGenFunction &IGF,
-                                         Explosion &base,
-                                         SILType baseTy,
-                                         CanArchetypeType openedArchetype);
+  Address emitOpenExistentialBox(IRGenFunction &IGF,
+                                 Explosion &base,
+                                 SILType baseTy,
+                                 CanArchetypeType openedArchetype);
 
   /// Emit the existential metatype of an opaque existential value.
   void emitMetatypeOfOpaqueExistential(IRGenFunction &IGF, Address addr,

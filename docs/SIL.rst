@@ -3274,6 +3274,7 @@ container may use one of several representations:
   containers:
 
   * `alloc_existential_box`_
+  * `project_existential_box`_
   * `open_existential_box`_
   * `dealloc_existential_box`_
 
@@ -3441,6 +3442,22 @@ fully initialized, ``dealloc_existential_box`` must be used. A fully
 initialized box can be ``retain``-ed and ``release``-d like any
 reference-counted type.  The address ``%0#1`` is dependent on the lifetime of
 the owner reference ``%0#0``.
+
+project_existential_box
+```````````````````````
+::
+
+  sil-instruction ::= 'project_existential_box' sil-type 'in' sil-operand
+
+  %1 = project_existential_box $T in %0 : $P
+  // %0 must be a value of boxed protocol or protocol composition type $P
+  // $T must be the most abstracted lowering of the AST type for which the box
+  // was allocated
+  // %1 will be of type $*T
+
+Projects the address of the value inside a boxed existential container.
+It is undefined behavior if the concrete type ``$T`` is not the same type for
+which the box was allocated with ``alloc_existential_box``.
 
 open_existential_box
 ````````````````````

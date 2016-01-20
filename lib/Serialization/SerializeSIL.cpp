@@ -589,6 +589,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                                  PBI->getOperand());
     break;
   }
+  case ValueKind::ProjectExistentialBoxInst: {
+    auto PEBI = cast<ProjectExistentialBoxInst>(&SI);
+    writeOneTypeOneOperandLayout(PEBI->getKind(), 0,
+                                 PEBI->getValueType(),
+                                 PEBI->getOperand());
+    break;
+  }
   case ValueKind::BuiltinInst: {
     // Format: number of substitutions, the builtin name, result type, and
     // a list of values for the arguments. Each value in the list

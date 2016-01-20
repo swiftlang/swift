@@ -1123,6 +1123,12 @@ public:
     return insert(new (F.getModule()) ProjectBoxInst(
         createSILDebugLocation(Loc), valueTy, boxOperand));
   }
+  ProjectExistentialBoxInst *createProjectExistentialBox(SILLocation Loc,
+                                                         SILType valueTy,
+                                                         SILValue boxOperand) {
+    return insert(new (F.getModule()) ProjectExistentialBoxInst(
+        createSILDebugLocation(Loc), valueTy, boxOperand));
+  }
 
   //===--------------------------------------------------------------------===//
   // Unchecked cast helpers

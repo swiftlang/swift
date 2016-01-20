@@ -3598,6 +3598,20 @@ public:
   SILType getValueType() const { return getType().getObjectType(); }
 };
 
+/// Project out the address of the value in an existential box.
+class ProjectExistentialBoxInst :
+  public UnaryInstructionBase<ValueKind::ProjectExistentialBoxInst,
+                              SILInstruction, /*HasResult*/ true> {
+  friend class SILBuilder;
+  
+  ProjectExistentialBoxInst(SILDebugLocation *DebugLoc, SILType valueType,
+                            SILValue operand)
+      : UnaryInstructionBase(DebugLoc, operand, valueType.getAddressType()) {}
+  
+public:
+  SILType getValueType() const { return getType().getObjectType(); }
+};
+
 //===----------------------------------------------------------------------===//
 // Runtime failure
 //===----------------------------------------------------------------------===//

@@ -1615,12 +1615,11 @@ static bool _isErrorType(SILType baseTy) {
 }
 #endif
 
-/// Project the address of the value inside a boxed existential container,
-/// and open an archetype to its contained type.
-Address irgen::emitBoxedExistentialProjection(IRGenFunction &IGF,
+/// Project the address of the value inside a boxed existential container.
+ContainedAddress irgen::emitBoxedExistentialProjection(IRGenFunction &IGF,
                                               Explosion &base,
                                               SILType baseTy,
-                                              CanArchetypeType openedArchetype){
+                                              CanType projectedType) {
   // TODO: Non-ErrorType boxed existentials.
   assert(_isErrorType(baseTy));
   
@@ -1638,11 +1637,24 @@ Address irgen::emitBoxedExistentialProjection(IRGenFunction &IGF,
                          scratch.getAddress(),
                          out.getAddress()});
   // Load the 'out' values.
-  auto &openedTI = IGF.getTypeInfoForLowered(openedArchetype);
+  auto &projectedTI = IGF.getTypeInfoForLowered(projectedType);
   auto projectedPtrAddr = IGF.Builder.CreateStructGEP(out, 0, Size(0));
-  auto projectedPtr = IGF.Builder.CreateLoad(projectedPtrAddr);
-  auto projected = openedTI.getAddressForPointer(projectedPtr);
-  
+  llvm::Value *projectedPtr = IGF.Builder.CreateLoad(projectedPtrAddr);
+  projectedPtr = IGF.Builder.CreateBitCast(projectedPtr,
+                               projectedTI.getStorageType()->getPointerTo());
+  auto projected = projectedTI.getAddressForPointer(projectedPtr);
+  return ContainedAddress(out, projected);
+}
+
+/// Project the address of the value inside a boxed existential container,
+/// and open an archetype to its contained type.
+Address irgen::emitOpenExistentialBox(IRGenFunction &IGF,
+                                      Explosion &base,
+                                      SILType baseTy,
+                                      CanArchetypeType openedArchetype) {
+  ContainedAddress box = emitBoxedExistentialProjection(IGF, base, baseTy,
+                                                        openedArchetype);
+  Address out = box.getContainer();
   auto metadataAddr = IGF.Builder.CreateStructGEP(out, 1,
                                                   IGF.IGM.getPointerSize());
   auto metadata = IGF.Builder.CreateLoad(metadataAddr);
@@ -1651,8 +1663,7 @@ Address irgen::emitBoxedExistentialProjection(IRGenFunction &IGF,
   auto witness = IGF.Builder.CreateLoad(witnessAddr);
   
   IGF.bindArchetype(openedArchetype, metadata, witness);
-  
-  return projected;
+  return box.getAddress();
 }
 
 /// Allocate a boxed existential container with uninitialized space to hold a

@@ -766,6 +766,7 @@ public:
   
   void visitAllocExistentialBoxInst(AllocExistentialBoxInst *i);
   void visitOpenExistentialBoxInst(OpenExistentialBoxInst *i);
+  void visitProjectExistentialBoxInst(ProjectExistentialBoxInst *i);
   void visitDeallocExistentialBoxInst(DeallocExistentialBoxInst *i);
   
   void visitProjectBlockStorageInst(ProjectBlockStorageInst *i);
@@ -4477,10 +4478,18 @@ void IRGenSILFunction::visitOpenExistentialBoxInst(OpenExistentialBoxInst *i) {
   Explosion box = getLoweredExplosion(i->getOperand());
   auto openedArchetype = cast<ArchetypeType>(i->getType().getSwiftRValueType());
 
-  auto addr = emitBoxedExistentialProjection(*this, box,
-                                             i->getOperand().getType(),
-                                             openedArchetype);
+  auto addr = emitOpenExistentialBox(*this, box, i->getOperand().getType(),
+                                     openedArchetype);
   setLoweredAddress(SILValue(i,0), addr);
+}
+
+void
+IRGenSILFunction::visitProjectExistentialBoxInst(ProjectExistentialBoxInst *i) {
+  Explosion box = getLoweredExplosion(i->getOperand());
+  auto caddr = emitBoxedExistentialProjection(*this, box,
+                                              i->getOperand().getType(),
+                                              i->getType().getSwiftRValueType());
+  setLoweredAddress(i, caddr.getAddress());
 }
 
 void IRGenSILFunction::visitDynamicMethodInst(DynamicMethodInst *i) {

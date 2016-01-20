@@ -53,6 +53,26 @@ entry(%b : $ErrorType):
   return undef : $()
 }
 
+// CHECK-LABEL: define {{i[0-9]+}} @project_boxed_existential(%swift.error*)
+sil @project_boxed_existential : $@convention(thin) (@owned ErrorType) -> Int {
+entry(%b : $ErrorType):
+  // CHECK: call void @swift_getErrorValue(%swift.error* %0, i8** {{%.*}}, [[TRIPLE:{ %swift.opaque\*, %swift.type\*, i8\*\* }]]* [[OUT:%.*]])
+  // CHECK: [[OUT_ADDR:%.*]] = getelementptr inbounds {{.*}} [[OUT]], i32 0, i32 0
+  // CHECK: [[ADDR:%.*]] = load {{.*}} [[OUT_ADDR]]
+  // CHECK: [[CADDR:%.*]] = bitcast %swift.opaque* %2 to [[TYPE:%[^*]*]]*
+  %a = project_existential_box $SomeError in %b : $ErrorType
+
+  // CHECK: [[GEP1:%.*]] = getelementptr inbounds [[TYPE]], [[TYPE]]* [[CADDR]], i32 0, i32 1
+  // CHECK: [[GEP2:%.*]] = getelementptr inbounds {{.*}} [[GEP1]], i32 0, i32 0
+  %c = struct_element_addr %a : $*SomeError, #SomeError._code
+
+  // CHECK: [[R:%.*]] = load {{i[0-9]+}}, {{i[0-9]+}}* [[GEP2]]
+  %l = load %c : $*Int
+
+  // CHECK: ret {{i[0-9]+}} [[R]]
+  return %l : $Int
+}
+
 // CHECK-LABEL: define {{i[0-9]+}} @open_boxed_existential(%swift.error*)
 sil @open_boxed_existential : $@convention(thin) (@owned ErrorType) -> Int {
 entry(%b : $ErrorType):

@@ -1113,6 +1113,25 @@ public:
             "project_box result should be address of boxed type");
   }
 
+  void checkProjectExistentialBoxInst(ProjectExistentialBoxInst *PEBI) {
+    SILType operandType = PEBI->getOperand().getType();
+    require(operandType.isObject(),
+            "project_existential_box operand must not be address");
+
+    require(operandType.canUseExistentialRepresentation(F.getModule(),
+                                              ExistentialRepresentation::Boxed),
+            "project_existential_box operand must be boxed existential");
+
+    require(PEBI->getType().isAddress(),
+            "project_existential_box result must be an address");
+
+    if (auto *AEBI = dyn_cast<AllocExistentialBoxInst>(PEBI->getOperand())) {
+      require(AEBI->getLoweredConcreteType() == PEBI->getType(),
+              "type of project_existential_box does not match with the formal "
+              "type of alloc_existential_box");
+    }
+  }
+  
   void checkDeallocValueBufferInst(DeallocValueBufferInst *I) {
     require(I->getOperand().getType().isAddress(),
             "Operand value should be an address");
