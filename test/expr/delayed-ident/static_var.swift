@@ -18,7 +18,7 @@ acceptInOutX1(&(.AnX1))
 
 // Generic struct types
 struct X2<T> {
-  static var AnX2 = X2() // expected-error{{generic parameter 'T' could not be inferred}}
+  static var AnX2 = X2() // expected-error{{static stored properties not yet supported in generic types}}
   static var NotAnX2 = 0 // expected-error {{static stored properties not yet supported in generic types}}
 }
 

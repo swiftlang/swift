@@ -224,9 +224,14 @@ Type TypeChecker::resolveTypeInContext(
         case DeclContextKind::Module:
         case DeclContextKind::FileUnit:
         case DeclContextKind::TopLevelCodeDecl:
-        case DeclContextKind::Initializer:
           break;
 
+        case DeclContextKind::Initializer:
+          // If this is a property initializer, we may be referring to the
+          // type initializing the property.
+          continue;
+
+            
         case DeclContextKind::NominalTypeDecl:
           // If this is our nominal type, return its type within its context.
           // FIXME: Just produce the type structure when TR_ResolveStructure.
