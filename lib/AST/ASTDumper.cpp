@@ -2098,9 +2098,9 @@ public:
     printCommon(E, name) << ' ';
     if (auto checkedCast = dyn_cast<CheckedCastExpr>(E))
       OS << getCheckedCastKindName(checkedCast->getCastKind()) << ' ';
-    OS << "writtenType=";
+    OS << "writtenType='";
     E->getCastTypeLoc().getType().print(OS);
-    OS << '\n';
+    OS << "'\n";
     printRec(E->getSubExpr());
     OS << ')';
   }
