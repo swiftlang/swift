@@ -1285,11 +1285,12 @@ void swift::maybeAddMaterializeForSet(AbstractStorageDecl *storage,
   } else if (isa<EnumDecl>(container)) {
     return;
 
-  // Structs imported by Clang don't need this, because we can
-  // synthesize it later.
+  // Computed properties of @_fixed_layout structs don't need this, but
+  // resilient structs do, since stored properties can resiliently become
+  // computed or vice versa.
   } else {
-    assert(isa<StructDecl>(container));
-    if (container->hasClangNode())
+    auto *structDecl = cast<StructDecl>(container);
+    if (structDecl->hasFixedLayout())
       return;
   }
 
@@ -1303,7 +1304,7 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
     return;
 
   // Local variables don't get accessors.
-  if (var->getDeclContext()->isLocalContext())
+  if(var->getDeclContext()->isLocalContext())
     return;
 
   assert(!var->hasAccessorFunctions());
@@ -1336,29 +1337,17 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
   if (var->isImplicit())
     return;
 
-  auto nominal = var->getDeclContext()->isNominalTypeOrNominalTypeExtensionContext();
-  if (!nominal) {
-    // Fixed-layout global variables don't get accessors.
-    if (var->hasFixedLayout())
-      return;
-
-  // Stored properties in protocols are converted to computed
-  // elsewhere.
-  } else if (isa<ProtocolDecl>(nominal)) {
-    return;
-
   // NSManaged properties on classes require special handling.
-  } else if (isa<ClassDecl>(nominal)) {
+  if (var->getDeclContext()->isClassOrClassExtensionContext()) {
     if (var->getAttrs().hasAttribute<NSManagedAttr>()) {
       var->setIsBeingTypeChecked();
       convertNSManagedStoredVarToComputed(var, TC);
       var->setIsBeingTypeChecked(false);
       return;
     }
-
-  // Stored properties imported from Clang don't get accessors.
-  } else if (isa<StructDecl>(nominal)) {
-    if (nominal->hasClangNode())
+  } else {
+    // Fixed-layout properties don't get accessors.
+    if (var->hasFixedLayout())
       return;
   }
 
