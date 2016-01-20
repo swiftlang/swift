@@ -219,3 +219,6 @@ internal struct _IntervalMirror<
     return .Text(summary)
   }
 }
+
+@available(*, unavailable, renamed="Interval")
+public typealias IntervalType = Interval

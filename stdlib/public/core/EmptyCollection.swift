@@ -71,3 +71,12 @@ public struct EmptyCollection<Element> : Collection {
   }
 }
 
+@available(*, unavailable, renamed="EmptyIterator")
+public struct EmptyGenerator<Element> {}
+
+extension EmptyIterator {
+  @available(*, unavailable, renamed="iterator")
+  public func generate() -> EmptyIterator<Element> {
+    _abstract()
+  }
+}

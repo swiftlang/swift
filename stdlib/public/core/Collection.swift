@@ -720,3 +720,54 @@ internal func _writeBackMutableSlice<
     "Cannot replace a slice of a MutableCollection with a slice of a smaller size")
 }
 
+@available(*, unavailable, message="Bit enum has been deprecated. Please use Int instead.")
+public enum Bit {}
+
+@available(*, unavailable, renamed="CollectionDefaultIterator")
+public struct IndexingGenerator<Elements : Indexable> {}
+
+@available(*, unavailable, renamed="Collection")
+public typealias CollectionType = Collection
+
+extension Collection {
+  @available(*, unavailable, renamed="Iterator")
+  public typealias Generator = Iterator
+
+  @available(*, unavailable, renamed="iterator")
+  public func generate() -> Iterator {
+    _abstract()
+  }
+
+  @available(*, unavailable, message="Removed in Swift 3. Please use underestimatedCount peoperty.")
+  public func underestimateCount() -> Int {
+    _abstract()
+  }
+
+  @available(*, unavailable, message="Please use split(_:omitEmptySubsequences:isSeparator:) instead")
+  public func split(
+    maxSplit: Int = Int.max,
+    allowEmptySlices: Bool = false,
+    @noescape isSeparator: (Iterator.Element) throws -> Bool
+  ) rethrows -> [SubSequence] {
+    _abstract()
+  }
+}
+
+extension Collection where Iterator.Element : Equatable {
+  @available(*, unavailable, message="Please use split(_:maxSplits:omitEmptySubsequences:) instead")
+  public func split(
+    separator: Iterator.Element,
+    maxSplit: Int = Int.max,
+    allowEmptySlices: Bool = false
+  ) -> [SubSequence] {
+    _abstract()
+  }
+}
+@available(*, unavailable, renamed="MutableCollection")
+public typealias MutableCollectionType = MutableCollection
+
+@available(*, unavailable, message="PermutationGenerator has been removed in Swift 3")
+public struct PermutationGenerator<C: Collection> {}
+
+@available(*, unavailable, message="MutableSliceable has been removed in Swift 3")
+public typealias MutableSliceable = Collection

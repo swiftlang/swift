@@ -673,3 +673,33 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionProtocol {
   internal let _box: Box
 }
 % end
+
+@available(*, unavailable, renamed="AnyIterator")
+public struct AnyGenerator<Element> {}
+
+extension AnyIterator {
+  @available(*, unavailable, renamed="iterator")
+  public func generate() -> AnyIterator<Element> {
+    _abstract()
+  }
+}
+
+% for Kind in ['Sequence'] + [t + 'Collection' for t in traversals]:
+extension Any${Kind} {
+
+  @available(*, unavailable, message="Please use underestimatedCount property instead.")
+  public var underestimateCount: Int {
+    _abstract()
+  }
+}
+%end
+
+@available(*, unavailable, renamed="AnyCollectionProtocol")
+public typealias AnyCollectionType = AnyCollectionProtocol
+
+extension AnyCollectionProtocol {
+  @available(*, unavailable, renamed="iterator")
+  public func generate() -> AnyIterator<Iterator.Element> {
+    _abstract()
+  }
+}

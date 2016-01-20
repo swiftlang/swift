@@ -251,3 +251,21 @@ public func _sanityCheckFailure(
   _sanityCheck(false, message, file: file, line: line)
   _conditionallyUnreachable()
 }
+
+
+@available(*, unavailable, renamed="require")
+public func precondition(
+  @autoclosure condition: () -> Bool,
+  @autoclosure _ message: () -> String = String(),
+  file: StaticString = __FILE__, line: UInt = __LINE__
+) {
+  fatalError("This API has been deprecated")
+}
+
+@available(*, unavailable, renamed="requirementFailure")
+public func preconditionFailure(
+  @autoclosure message: () -> String = String(),
+  file: StaticString = __FILE__, line: UInt = __LINE__
+) {
+  fatalError("This API has been deprecated")
+}

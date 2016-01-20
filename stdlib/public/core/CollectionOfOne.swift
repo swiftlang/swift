@@ -78,3 +78,12 @@ public struct CollectionOfOne<Element> : Collection {
   let element: Element
 }
 
+@available(*, unavailable, renamed="IteratorOverOne")
+public struct GeneratorOfOne<Element> {}
+
+extension IteratorOverOne {
+  @available(*, unavailable, renamed="iterator")
+  public func generate() -> IteratorOverOne<Element> {
+    _abstract()
+  }
+}

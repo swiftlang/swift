@@ -557,3 +557,8 @@ public // @testable
 func _isOptional<T>(type: T.Type) -> Bool {
   return Bool(Builtin.isOptional(type))
 }
+
+@available(*, unavailable, message="Removed in Swift 3. Please use Optional.unsafelyUnwrapped instead.")
+public func unsafeUnwrap<T>(nonEmpty: T?) -> T {
+  _abstract()
+}

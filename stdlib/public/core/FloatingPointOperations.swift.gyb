@@ -96,3 +96,6 @@ public protocol FloatingPoint : Strideable {
   // Binary floating point numbers are always canonical.
   // func isCanonical() -> Bool
 }
+
+@available(*, unavailable, renamed="FloatingPoint")
+public typealias FloatingPointType = FloatingPoint

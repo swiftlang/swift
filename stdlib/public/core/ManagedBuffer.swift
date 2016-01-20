@@ -530,3 +530,10 @@ public func isUniquelyReferencedNonObjC<T : AnyObject>(
 ) -> Bool {
   return _isUnique(&object)
 }
+
+extension ManagedBufferPointer {
+  @available(*, unavailable, renamed="capacity")
+  public var allocatedElementCount: Int {
+    _abstract()
+  }
+}

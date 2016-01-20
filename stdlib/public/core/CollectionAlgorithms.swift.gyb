@@ -290,3 +290,39 @@ ${orderingRequirementForPredicate}
   }
 }
 
+
+% for Self in [ 'Sequence', 'MutableCollection' ]:
+extension ${Self} where Self.Iterator.Element : Comparable {
+  @available(*, unavailable, renamed="sorted")
+  public func sort() -> [Iterator.Element] {
+    _abstract()
+  }
+
+  @available(*, unavailable, renamed="sorted")
+  public func sort(
+    @noescape isOrderedBefore: (Iterator.Element, Iterator.Element) -> Bool
+  ) -> [Iterator.Element] {
+    _abstract()
+  }
+}
+%end
+
+extension MutableCollection
+  where
+  Self.Index : RandomAccessIndex,
+  Self.Iterator.Element : Comparable {
+
+  @available(*, unavailable, renamed="sort")
+  public mutating func sortInPlace() {
+    _abstract()
+  }
+}
+
+extension MutableCollection where Self.Index : RandomAccessIndex {
+  @available(*, unavailable, renamed="sort")
+  public mutating func sortInPlace(
+    @noescape isOrderedBefore: (Iterator.Element, Iterator.Element) -> Bool
+  ) {
+    _abstract()
+  }
+}

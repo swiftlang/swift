@@ -180,3 +180,14 @@ extension Sequence where Iterator.Element : Sequence {
   }
 }
 
+@available(*, unavailable, renamed="JoinIterator")
+public struct JoinGenerator<
+  Base : IteratorProtocol where Base.Element : Sequence
+> {}
+
+extension JoinSequence {
+  @available(*, unavailable, renamed="iterator")
+  public func generate() -> JoinIterator<Base.Iterator> {
+    _abstract()
+  }
+}

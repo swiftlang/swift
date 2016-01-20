@@ -225,3 +225,6 @@ public protocol _FileReferenceLiteralConvertible {
 /// destructor may store to memory on destruction.
 public protocol _DestructorSafeContainer {
 }
+
+@available(*, unavailable, renamed="Boolean")
+public typealias BooleanType = Boolean

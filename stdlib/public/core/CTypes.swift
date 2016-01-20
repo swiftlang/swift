@@ -187,3 +187,6 @@ func _memcpy(
     /*alignment:*/ Int32()._value,
     /*volatile:*/ false._value)
 }
+
+@available(*, unavailable, renamed="OpaquePointer")
+public struct COpaquePointer {}

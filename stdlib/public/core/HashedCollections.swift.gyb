@@ -4181,3 +4181,30 @@ extension ${Self} {
   }
 }
 #endif
+
+%end
+
+extension Set {
+  @available(*, unavailable, renamed="removeAt")
+  public mutating func removeAtIndex(index: Index) -> Element {
+    _abstract()
+  }
+
+  @available(*, unavailable, renamed="iterator")
+  public func generate() -> SetIterator<Element> {
+    _abstract()
+  }
+}
+
+
+extension Dictionary {
+  @available(*, unavailable, renamed="removeAt")
+  public mutating func removeAtIndex(index: Index) -> Element {
+    _abstract()
+  }
+
+  @available(*, unavailable, renamed="iterator")
+  public func generate() -> DictionaryIterator<Key, Value> {
+    _abstract()
+  }
+}

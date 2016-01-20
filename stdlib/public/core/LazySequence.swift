@@ -197,3 +197,13 @@ extension LazySequenceProtocol {
   }
 }
 
+
+@available(*, unavailable, renamed="LazyCollectionProtocol")
+public typealias LazySequenceType = LazySequenceProtocol
+
+extension LazySequenceProtocol {
+  @available(*, unavailable, message="Please use Array initializer instead.")
+  public var array: [Iterator.Element] {
+    _abstract()
+  }
+}

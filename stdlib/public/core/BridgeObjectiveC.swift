@@ -487,4 +487,18 @@ internal struct _CocoaFastEnumerationStackBuf {
   }
 }
 
+extension AutoreleasingUnsafeMutablePointer {
+  @available(*, unavailable, renamed="Pointee")
+  public typealias Memory = Pointee
+
+  @available(*, unavailable, renamed="pointee")
+  public var memory: Pointee {
+    _abstract()
+  }
+
+  @available(*, unavailable, message="Removed in Swift 3. Please use nil literal instead.")
+  public init() {
+    _abstract()
+  }
+}
 #endif

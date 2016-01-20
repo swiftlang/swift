@@ -323,3 +323,26 @@ extension LazyCollectionProtocol
 }
 
 % end
+
+@available(*, unavailable, renamed="FlattenIterator")
+public struct FlattenGenerator<
+  Base : IteratorProtocol where Base.Element : Sequence
+> {}
+
+extension FlattenSequence {
+  @available(*, unavailable, renamed="iterator")
+  public func generate() -> FlattenIterator<Base.Iterator> {
+    _abstract()
+  }
+}
+
+% for traversal in ('Forward', 'Bidirectional'):
+%   t = '' if traversal == 'Forward' else traversal
+%   Collection = 'Flatten%sCollection' % t
+extension ${Collection} {
+  @available(*, unavailable, message="Please use underestimatedCount property instead.")
+  public func underestimateCount() -> Int {
+    _abstract()
+  }
+}
+%end

@@ -1361,6 +1361,27 @@ extension ContiguousArray {
   }
 }
 
+%for (Self, a_Self) in arrayTypes:
+extension ${Self} {
+  @available(*, unavailable, message="Please use init(repeating:count:) instead")
+  init(count: Int, repeatedValue: Element) {
+    fatalError("This API has been deprecated")
+  }
+
+  @available(*, unavailable, renamed="removeAt")
+  public mutating func removeAtIndex(index: Int) -> Element {
+    fatalError("This API has been deprecated")
+  }
+
+  @available(*, unavailable, renamed="replaceSubrange")
+  public mutating func replaceRange<
+    C : Collection where C.Iterator.Element == _Buffer.Element
+  >(subRange: Range<Int>, with newElements: C) {
+    fatalError("This API has been deprecated")
+  }
+}
+%end
+
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:

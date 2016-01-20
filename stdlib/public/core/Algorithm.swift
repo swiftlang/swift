@@ -119,3 +119,6 @@ public struct EnumeratedSequence<Base : Sequence> : Sequence {
   }
 }
 
+@available(*, unavailable, renamed="EnumeratedIterator")
+public struct EnumerateGenerator<Base : IteratorProtocol> { }
+

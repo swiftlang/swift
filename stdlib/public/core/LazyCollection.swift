@@ -183,6 +183,9 @@ extension LazyCollectionProtocol {
   }
 }
 
+@available(*, unavailable, renamed="LazyCollectionProtocol")
+public typealias LazyCollectionType = LazyCollectionProtocol
+
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:

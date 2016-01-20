@@ -255,6 +255,23 @@ extension LazyCollectionProtocol {
   }
 }
 
+@available(*, unavailable, renamed="LazyFilterIterator")
+public struct LazyFilterGenerator<Base : IteratorProtocol> {}
+
+extension LazyFilterSequence {
+  @available(*, unavailable, renamed="iterator")
+  public func generate() -> LazyFilterIterator<Base.Iterator> {
+    _abstract()
+  }
+}
+
+extension LazyFilterCollection {
+  @available(*, unavailable, renamed="iterator")
+  public func generate() -> LazyFilterIterator<Base.Iterator> {
+    _abstract()
+  }
+}
+
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:

@@ -153,6 +153,12 @@ public func abs<T : SignedNumber>(x: T) -> T {
   return x~>_abs()
 }
 
+@available(*, unavailable, renamed="IntegerArithmetic")
+public typealias IntegerArithmeticType = IntegerArithmetic
+
+@available(*, unavailable, renamed="SignedNumber")
+public typealias SignedNumberType = SignedNumber
+
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:

@@ -389,3 +389,12 @@ extension RandomAccessIndex {
     return self.advancedBy(n)
   }
 }
+
+@available(*, unavailable, renamed="ForwardIndex")
+public typealias ForwardIndexType = ForwardIndex
+
+@available(*, unavailable, renamed="BidirectionalIndex")
+public typealias BidirectionalIndexType = BidirectionalIndex
+
+@available(*, unavailable, renamed="RandomAccessIndex")
+public typealias RandomAccessIndexType = RandomAccessIndex
