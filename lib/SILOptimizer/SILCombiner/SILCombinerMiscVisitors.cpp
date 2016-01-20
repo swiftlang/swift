@@ -80,7 +80,7 @@ SILCombiner::visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
   }
 
   if (SingleStore && SingleRelease) {
-    assert(SingleProjection && "store without an projection");
+    assert(SingleProjection && "store without a projection");
     // Release the value that was stored into the existential box. The box
     // is going away so we need to release the stored value now.
     Builder.setInsertionPoint(SingleStore);
