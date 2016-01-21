@@ -871,11 +871,7 @@ private:
     // Make a copy of it to be able to correct produce DumpModule.
     std::unique_ptr<llvm::Module> SaveLineModule(CloneModule(LineModule.get()));
     
-    if (!linkLLVMModules(Module, LineModule.get()
-                         // TODO: reactivate the linker mode if it is
-                         // supported in llvm again. Otherwise remove the
-                         // commented code completely.
-                         /*, llvm::Linker::PreserveSource */)) {
+    if (!linkLLVMModules(&Module, std::move(LineModule))) {
       return false;
     }
 
@@ -885,7 +881,7 @@ private:
 
     stripPreviouslyGenerated(*NewModule);
 
-    if (!linkLLVMModules(&DumpModule, SaveLineModule.get()
+    if (!linkLLVMModules(&DumpModule, std::move(SaveLineModule),
                          // TODO: reactivate the linker mode if it is
                          // supported in llvm again. Otherwise remove the
                          // commented code completely.

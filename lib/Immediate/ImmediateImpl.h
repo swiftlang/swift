@@ -38,7 +38,8 @@ bool loadSwiftRuntime(StringRef runtimeLibPath);
 bool tryLoadLibraries(ArrayRef<LinkLibrary> LinkLibraries,
                       SearchPathOptions SearchPathOpts,
                       DiagnosticEngine &Diags);
-bool linkLLVMModules(llvm::Module *Module, llvm::Module *SubModule);
+bool linkLLVMModules(llvm::Module *Module,
+                     std::unique_ptr<llvm::Module> SubModule);
 bool IRGenImportedModules(
     CompilerInstance &CI,
     llvm::Module &Module,
