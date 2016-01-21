@@ -427,15 +427,7 @@ ConcreteDeclRef constraints::resolveLocatorToDecl(
 
     break;
   }
-
-  // Otherwise, do the best we can with the declaration we found.
-  // FIXME: Deal with the other interesting cases here, e.g.,
-  // subscript declarations.
-  if (isa<FuncDecl>(declRef.getDecl()) ||
-      isa<ConstructorDecl>(declRef.getDecl()))
-    return declRef;
-
-  return ConcreteDeclRef();
+  return declRef;
 }
 
 /// Emit a note referring to the target of a diagnostic, e.g., the function
