@@ -1935,7 +1935,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       bool isLegal = true;
       // init_existential instruction used to initialize this alloc_stack.
       InitExistentialAddrInst *FoundIEI = nullptr;
-      for (auto Use: getNonDebugUses(*ASI)) {
+      for (auto Use: getNonDebugUses(ASI)) {
         auto *User = Use->getUser();
         if (isa<ExistentialMetatypeInst>(User) ||
             isa<DestroyAddrInst>(User) ||
@@ -1994,7 +1994,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       // Check if this alloc_stack is only initialized once by means of
       // a single init_existential_ref.
       bool isLegal = true;
-      for (auto Use: getNonDebugUses(*ASRI)) {
+      for (auto Use: getNonDebugUses(ASRI)) {
         auto *User = Use->getUser();
         if (isa<ExistentialMetatypeInst>(User) || isa<StrongReleaseInst>(User))
            continue;

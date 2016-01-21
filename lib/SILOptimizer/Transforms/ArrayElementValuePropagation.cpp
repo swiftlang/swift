@@ -105,7 +105,7 @@ bool ArrayAllocation::mapInitializationStores() {
   if (!UnsafeMutablePointerExtract)
     return false;
   auto *PointerToAddress = dyn_cast_or_null<PointerToAddressInst>(
-      getSingleNonDebugUser(*UnsafeMutablePointerExtract));
+      getSingleNonDebugUser(UnsafeMutablePointerExtract));
   if (!PointerToAddress)
     return false;
 
@@ -129,7 +129,7 @@ bool ArrayAllocation::mapInitializationStores() {
     auto *IndexAddr = dyn_cast<IndexAddrInst>(Inst);
     if (!IndexAddr)
       return false;
-    SI = dyn_cast_or_null<StoreInst>(getSingleNonDebugUser(*IndexAddr));
+    SI = dyn_cast_or_null<StoreInst>(getSingleNonDebugUser(IndexAddr));
     if (!SI || SI->getDest().getDef() != IndexAddr)
       return false;
     auto *Index = dyn_cast<IntegerLiteralInst>(IndexAddr->getIndex());

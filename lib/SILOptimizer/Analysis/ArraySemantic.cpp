@@ -94,7 +94,7 @@ bool swift::ArraySemanticsCall::isValidSignature() {
           AllocFuncName != "swift_bufferAllocateOnStack")
         return false;
 
-      if (!hasOneNonDebugUse(*AllocBufferAI))
+      if (!hasOneNonDebugUse(AllocBufferAI))
         return false;
     }
     return true;
@@ -474,7 +474,8 @@ void swift::ArraySemanticsCall::removeCall() {
 
     // array.isNativeTypeChecked might be shared among several get_element
     // calls. The last user should delete it.
-    if (IsNative && getSingleNonDebugUser(*IsNative) == SemanticsCall) {
+    if (IsNative && getSingleNonDebugUser((ApplyInst *)IsNative) ==
+                      SemanticsCall) {
       deleteAllDebugUses(IsNative);
       (*IsNative).replaceAllUsesWithUndef();
       IsNative.removeCall();

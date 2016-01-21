@@ -48,12 +48,12 @@ SILCombiner::visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
   ProjectExistentialBoxInst *SingleProjection = nullptr;
 
   // For each user U of the alloc_existential_box...
-  for (auto U : getNonDebugUses(*AEBI)) {
+  for (auto U : getNonDebugUses(AEBI)) {
 
     if (auto *PEBI = dyn_cast<ProjectExistentialBoxInst>(U->getUser())) {
       if (SingleProjection) return nullptr;
       SingleProjection = PEBI;
-      for (auto AddrUse : getNonDebugUses(*PEBI)) {
+      for (auto AddrUse : getNonDebugUses(PEBI)) {
         // Record stores into the box.
         if (auto *SI = dyn_cast<StoreInst>(AddrUse->getUser())) {
           // If this is not the only store into the box then bail out.
@@ -226,7 +226,7 @@ public:
     // anything other than the init_existential_addr/open_existential_addr
     // container.
 
-    for (auto *Op : getNonDebugUses(*ASI)) {
+    for (auto *Op : getNonDebugUses(ASI)) {
       visit(Op->getUser());
 
       // If we found a non-legal user, bail early.
@@ -266,7 +266,7 @@ public:
 
     // Make sure that the open_existential does not have any uses except
     // destroy_addr.
-    for (auto *Use : getNonDebugUses(*I)) {
+    for (auto *Use : getNonDebugUses(I)) {
       if (!isa<DestroyAddrInst>(Use->getUser())) {
         LegalUsers = false;
         return;
@@ -399,7 +399,7 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   // Go through the loads uses and add any users that are projections to the
   // projection list.
   llvm::SmallVector<ProjInstPairTy, 8> Projections;
-  for (auto *UI : getNonDebugUses(*LI)) {
+  for (auto *UI : getNonDebugUses(LI)) {
     auto *User = UI->getUser();
 
     // If we have any non SEI, TEI instruction, don't do anything here.
@@ -901,7 +901,7 @@ visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI) {
     return nullptr;
 
   // For each user U of the take_enum_data_addr...
-  for (auto U : getNonDebugUses(*TEDAI))
+  for (auto U : getNonDebugUses(TEDAI))
     // Check if it is load. If it is not a load, bail...
     if (!isa<LoadInst>(U->getUser()))
       return nullptr;
@@ -916,7 +916,7 @@ visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI) {
   // Go back through a second time now that we know all of our users are
   // loads. Perform the transformation on each load.
   SmallVector<LoadInst*, 4> ToRemove;
-  for (auto U : getNonDebugUses(*TEDAI)) {
+  for (auto U : getNonDebugUses(TEDAI)) {
     // Grab the load.
     LoadInst *L = cast<LoadInst>(U->getUser());
 

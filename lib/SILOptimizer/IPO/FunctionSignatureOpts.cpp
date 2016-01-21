@@ -101,7 +101,7 @@ getNonTrivialNonDebugReleaseUse(SILArgument *Arg) {
     }
 
     // Otherwise add all non-debug uses of I to the worklist.
-    for (Operand *I : getNonDebugUses(*U))
+    for (Operand *I : getNonDebugUses(U))
       Worklist.push_back(I->getUser());
   }
 

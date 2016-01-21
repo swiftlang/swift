@@ -302,7 +302,7 @@ SILInstruction *SILCombiner::eraseInstFromFunction(SILInstruction &I,
     }
   }
 
-  for (Operand *DU : getDebugUses(I))
+  for (Operand *DU : getDebugUses(&I))
     Worklist.remove(DU->getUser());
 
   Worklist.remove(&I);

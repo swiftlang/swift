@@ -369,7 +369,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
   Clones.push_back(FirstPredArg);
 
   // We only move instructions with a single use.
-  if (!FSI || !hasOneNonDebugUse(*FSI))
+  if (!FSI || !hasOneNonDebugUse(FSI))
     return false;
 
   // Don't move instructions that are sensitive to their location.
@@ -398,7 +398,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
     // Find the Nth argument passed to BB.
     SILValue Arg = TI->getOperand(ArgNum);
     SILInstruction *SI = dyn_cast<SILInstruction>(Arg);
-    if (!SI || !hasOneNonDebugUse(*SI))
+    if (!SI || !hasOneNonDebugUse(SI))
       return false;
     if (SI->isIdenticalTo(FSI)) {
       Clones.push_back(SI);

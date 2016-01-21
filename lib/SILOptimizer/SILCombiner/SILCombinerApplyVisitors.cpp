@@ -1060,7 +1060,7 @@ static ApplyInst *optimizeCastThroughThinFunctionPointer(
 static bool
 hasOnlyRetainReleaseUsers(ApplyInst *AI, SILInstruction *IgnoreUser,
                           SmallVectorImpl<SILInstruction *> &Users) {
-  for (auto *Use : getNonDebugUses(*AI)) {
+  for (auto *Use : getNonDebugUses(AI)) {
     if (Use->getUser() == IgnoreUser)
       continue;
 

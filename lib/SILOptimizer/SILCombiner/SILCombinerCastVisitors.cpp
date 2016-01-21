@@ -241,7 +241,7 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
     return nullptr;
 
   // For each user U of the unchecked_addr_cast...
-  for (auto U : getNonDebugUses(*UADCI))
+  for (auto U : getNonDebugUses(UADCI))
     // Check if it is load. If it is not a load, bail...
     if (!isa<LoadInst>(U->getUser()))
       return nullptr;
@@ -251,7 +251,7 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
 
   // Ok, we have all loads. Lets simplify this. Go back through the loads a
   // second time, rewriting them into a load + bitcast from our source.
-  auto UsesRange = getNonDebugUses(*UADCI);
+  auto UsesRange = getNonDebugUses(UADCI);
   for (auto UI = UsesRange.begin(), E = UsesRange.end(); UI != E;) {
     // Grab the original load.
     LoadInst *L = cast<LoadInst>(UI->getUser());

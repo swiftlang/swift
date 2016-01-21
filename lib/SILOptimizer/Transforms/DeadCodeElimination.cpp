@@ -334,7 +334,7 @@ void DCE::propagateLiveBlockArgument(SILArgument *Arg) {
   // Conceptually, the dependency from a debug instruction to its definition
   // is in reverse direction: Only if its definition (the Arg) is alive, also
   // the debug_value instruction is alive.
-  for (Operand *DU : getDebugUses(*Arg))
+  for (Operand *DU : getDebugUses(Arg))
     markValueLive(DU->getUser());
 
   if (Arg->isFunctionArg())
@@ -357,7 +357,7 @@ void DCE::propagateLiveness(SILInstruction *I) {
     // Conceptually, the dependency from a debug instruction to its definition
     // is in reverse direction: Only if its definition is alive, also the
     // debug_value instruction is alive.
-    for (Operand *DU : getDebugUses(*I))
+    for (Operand *DU : getDebugUses(I))
       markValueLive(DU->getUser());
 
     // Handle all other reverse-dependency instructions, like cond_fail and
