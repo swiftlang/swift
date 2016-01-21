@@ -379,38 +379,40 @@ ConcreteDeclRef constraints::resolveLocatorToDecl(
 
 /// Emit a note referring to the target of a diagnostic, e.g., the function
 /// or parameter being used.
-static void noteTargetOfDiagnostic(ConstraintSystem &cs,
-                                   ConstraintLocator *targetLocator) {
-  // If there's no anchor, there's nothing we can do.
-  if (!targetLocator->getAnchor())
-    return;
+static void noteTargetOfMissingArchetype(ConstraintSystem &cs,
+                                         ConstraintLocator *targetLocator) {
 
-  // Try to resolve the locator to a particular declaration.
-  auto resolved
-    = resolveLocatorToDecl(cs, targetLocator,
-        [&](ConstraintLocator *locator) -> Optional<SelectedOverload> {
-          return None;
-        },
-        [&](ValueDecl *decl, Type openedType) -> ConcreteDeclRef {
-          return decl;
-        });
+  auto anchor = targetLocator->getAnchor();
+  if (!anchor) return;
+  
+  ConcreteDeclRef resolved;
+  
+  // Simple case: direct reference to a declaration.
+  if (auto dre = dyn_cast<DeclRefExpr>(anchor))
+    resolved = dre->getDeclRef();
+  
+  // Simple case: direct reference to a declaration.
+  if (auto mre = dyn_cast<MemberRefExpr>(anchor))
+    resolved = mre->getMember();
+  
+  if (auto ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(anchor))
+    resolved = ctorRef->getDeclRef();
 
   // We couldn't resolve the locator to a declaration, so we're done.
   if (!resolved)
     return;
-
+  
   auto decl = resolved.getDecl();
   if (isa<FuncDecl>(decl)) {
     auto name = decl->getName();
-    cs.getTypeChecker().diagnose(decl,
-                                 name.isOperator()? diag::note_call_to_operator
-                                                  : diag::note_call_to_func,
-                                 name);
+    auto diagID = name.isOperator() ? diag::note_call_to_operator
+                                    : diag::note_call_to_func;
+    cs.getTypeChecker().diagnose(decl, diagID, name);
     return;
   }
 
+  // FIXME: Specialize for implicitly-generated constructors.
   if (isa<ConstructorDecl>(decl)) {
-    // FIXME: Specialize for implicitly-generated constructors.
     cs.getTypeChecker().diagnose(decl, diag::note_call_to_initializer);
     return;
   }
@@ -4854,7 +4856,7 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
       diagnose(expr->getLoc(), diag::unbound_generic_parameter, archetype);
       
       // Emit a "note, archetype declared here" sort of thing.
-      noteTargetOfDiagnostic(*CS, tv->getImpl().getLocator());
+      noteTargetOfMissingArchetype(*CS, tv->getImpl().getLocator());
       return;
     }
     continue;
