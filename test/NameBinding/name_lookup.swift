@@ -485,3 +485,9 @@ class Test19935319 {
   func getFoo() -> Int {}
 }
 
+// <rdar://problem/23904262> QoI: ivar default initializer cannot reference other default initialized ivars?
+class r23904262 {
+  let x = 1
+  let y = x // expected-error {{cannot use instance member 'x' within property initializer; property initializers run before 'self' is available}}
+}
+

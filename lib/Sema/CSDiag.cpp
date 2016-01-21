@@ -2061,8 +2061,6 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
   }
 
   
-  
-  
   // Otherwise, we have at least one (and potentially many) viable candidates
   // sort them out.  If all of the candidates have the same problem (commonly
   // because there is exactly one candidate!) diagnose this.
@@ -2085,6 +2083,21 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
         .highlight(baseRange).highlight(nameLoc);
       return;
     case MemberLookupResult::UR_InstanceMemberOnType:
+      // If the base is an implicit self type reference, and we're in a
+      // property initializer, then the user wrote something like:
+      //
+      //   class Foo { let x = 1, y = x }
+      //
+      // which runs in type context, not instance context.  Produce a tailored
+      // diagnostic since this comes up and is otherwise non-obvious what is
+      // going on.
+      if (baseExpr && baseExpr->isImplicit() && isa<Initializer>(CS->DC) &&
+          CS->DC->getParent()->getDeclaredTypeOfContext()->isEqual(instanceTy)){
+        CS->TC.diagnose(nameLoc, diag::instance_member_in_initializer,
+                        memberName);
+        return;
+      }
+        
       diagnose(loc, diag::could_not_use_instance_member_on_type,
                instanceTy, memberName)
         .highlight(baseRange).highlight(nameLoc);
