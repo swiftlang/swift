@@ -16,10 +16,6 @@ protocol _ArrayProtocol
     ArrayLiteralConvertible
 {
   //===--- public interface -----------------------------------------------===//
-  /// Construct an array of `length` elements, each initialized to
-  /// `repeatedValue`.
-  init(repeating repeatedValue: Iterator.Element, length: Int)
-
   /// The number of elements the Array stores.
   var length: Int {get}
 

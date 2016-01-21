@@ -22,6 +22,11 @@ public protocol RangeReplaceableCollection : Collection {
   /// Create an empty instance.
   init()
 
+  /// Construct a Collection of `length` elements, each initialized to
+  /// `repeatedValue`.
+  init(repeating repeatedValue: Iterator.Element, length: Int)
+
+
   /// Replace the elements within `bounds` with `newElements`.
   ///
   /// Invalidates all indices with respect to `self`.
@@ -181,6 +186,13 @@ public protocol RangeReplaceableCollection : Collection {
 //===----------------------------------------------------------------------===//
 
 extension RangeReplaceableCollection {
+
+  public init(repeating repeatedValue: Iterator.Element, length: Int) {
+    self.init()
+    let elements = Repeated(_repeating: repeatedValue, length: length)
+    appendContentsOf(elements)
+  }
+
   public init<
     S : Sequence where S.Iterator.Element == Iterator.Element
   >(_ elements: S) {

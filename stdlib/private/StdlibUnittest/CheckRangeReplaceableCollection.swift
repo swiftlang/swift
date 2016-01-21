@@ -411,6 +411,21 @@ self.test("\(testNamePrefix).init(Sequence)/semantics") {
 }
 
 //===----------------------------------------------------------------------===//
+// init(repeating:length:)
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).init(repeating:length:)/semantics") {
+  let c = C(repeating: wrapValue(OpaqueValue(42)), length: 3)
+  expectEqualSequence(
+    [42, 42, 42],
+    c.map { extractValue($0).value })
+  let empty = C(repeating: wrapValue(OpaqueValue(42)), length: 0)
+  expectEqualSequence(
+    [],
+    empty.map { extractValue($0).value })
+}
+
+//===----------------------------------------------------------------------===//
 // replaceSubrange()
 //===----------------------------------------------------------------------===//
 
