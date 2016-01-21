@@ -21,6 +21,7 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
+#include "llvm/ProfileData/InstrProf.h"
 #include "llvm/ProfileData/CoverageMappingWriter.h"
 #include "llvm/Support/FileSystem.h"
 
@@ -30,6 +31,9 @@ using namespace irgen;
 using llvm::coverage::CounterMappingRegion;
 
 void IRGenModule::emitCoverageMapping() {
+#if 1
+  return;
+#else
   const auto &Mappings = SILMod->getCoverageMapList();
   // If there aren't any coverage maps, there's nothing to emit.
   if (Mappings.empty())
@@ -134,4 +138,5 @@ void IRGenModule::emitCoverageMapping() {
       CovDataVal, "__llvm_coverage_mapping");
 
   addUsedGlobal(CovData);
+#endif
 }
