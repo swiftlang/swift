@@ -115,6 +115,19 @@ namespace swift {
   Demangle::NodePointer _swift_buildDemanglingForMetadata(const Metadata *type);
 #endif
 
+#if defined(__CYGWIN__)
+  struct dl_phdr_info {
+    void *dlpi_addr;
+    const char *dlpi_name;
+  };
+
+  int _swift_dl_iterate_phdr(int (*Callback)(struct dl_phdr_info *info,
+                                             size_t size, void *data),
+                             void *data);
+  uint8_t *_swift_getSectionDataPE(void *handle, const char *section_name,
+                                   unsigned long *section_size);
+#endif
+
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_PRIVATE_H */

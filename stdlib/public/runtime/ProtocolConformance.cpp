@@ -31,21 +31,7 @@
 #include <dlfcn.h>
 #include <mutex>
 
-#if defined(__CYGWIN__)
-struct dl_phdr_info
-{
-	void			 *dlpi_addr;
-	const char       *dlpi_name;
-};
-
-int dl_iterate_phdr(int(*callback)(struct dl_phdr_info *info, size_t size, void *data),
-					void *data);
-uint8_t *getSectionDataPE(void *handle, const char *section_name,
-                          unsigned long *section_size);
-#endif
-
 using namespace swift;
-
 
 #if !defined(NDEBUG) && SWIFT_OBJC_INTEROP
 #include <objc/runtime.h>
@@ -358,8 +344,8 @@ static int _addImageProtocolConformances(struct dl_phdr_info *info,
 
   unsigned long conformancesSize;
   const uint8_t *conformances =
-    getSectionDataPE(handle, SWIFT_PROTOCOL_CONFORMANCES_SECTION,
-                     &conformancesSize);
+    _swift_getSectionDataPE(handle, SWIFT_PROTOCOL_CONFORMANCES_SECTION,
+                           &conformancesSize);
 
   if (!conformances) {
     // if there are no conformances, don't hold this handle open.
@@ -380,12 +366,14 @@ static void _initializeCallbacksToInspectDylib() {
   // Dyld will invoke this on our behalf for all images that have already
   // been loaded.
   _dyld_register_func_for_add_image(_addImageProtocolConformances);
-#elif defined(__ELF__) || defined(__CYGWIN__)
+#elif defined(__ELF__)
   // Search the loaded dls. Unlike the above, this only searches the already
   // loaded ones.
   // FIXME: Find a way to have this continue to happen after.
   // rdar://problem/19045112
   dl_iterate_phdr(_addImageProtocolConformances, nullptr);
+#elif defined(__CYGWIN__)
+  _swift_dl_iterate_phdr(_addImageProtocolConformances, nullptr);
 #else
 # error No known mechanism to inspect dynamic libraries on this platform.
 #endif
