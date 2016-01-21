@@ -26,13 +26,13 @@ namespace swift {
 /// A relative reference to an object stored in memory. The reference may be
 /// direct or indirect, and uses the low bit of the (assumed at least
 /// 2-byte-aligned) pointer to differentiate.
-template<typename ValueTy, bool Nullable = false>
+template<typename ValueTy, bool Nullable = false, typename Offset = int32_t>
 class RelativeIndirectablePointer {
 private:
   /// The relative offset of the pointer's memory from the `this` pointer.
   /// If the low bit is clear, this is a direct reference; otherwise, it is
   /// an indirect reference.
-  int32_t RelativeOffset;
+  Offset RelativeOffset;
 
   /// RelativePointers should appear in statically-generated metadata. They
   /// shouldn't be constructed or copied.
@@ -43,6 +43,10 @@ private:
     = delete;
   RelativeIndirectablePointer &operator=(const RelativeIndirectablePointer &)
     = delete;
+
+  static_assert(std::is_integral<Offset>::value &&
+                std::is_signed<Offset>::value,
+                "offset type should be signed integer");
 
 public:
   const ValueTy *get() const & {
@@ -79,11 +83,11 @@ public:
 /// A relative reference to a function, intended to reference private metadata
 /// functions for the current executable or dynamic library image from
 /// position-independent constant data.
-template<typename T, bool Nullable>
+template<typename T, bool Nullable, typename Offset>
 class RelativeDirectPointerImpl {
 private:
   /// The relative offset of the function's entry point from *this.
-  int32_t RelativeOffset;
+  Offset RelativeOffset;
 
   /// RelativePointers should appear in statically-generated metadata. They
   /// shouldn't be constructed or copied.
@@ -117,11 +121,11 @@ public:
 };
 
 /// A direct relative reference to an object.
-template<typename T, bool Nullable = true>
+template<typename T, bool Nullable = true, typename Offset = int32_t>
 class RelativeDirectPointer :
-  private RelativeDirectPointerImpl<T, Nullable>
+  private RelativeDirectPointerImpl<T, Nullable, Offset>
 {
-  using super = RelativeDirectPointerImpl<T, Nullable>;
+  using super = RelativeDirectPointerImpl<T, Nullable, Offset>;
 public:
   using super::get;
 
@@ -142,11 +146,11 @@ public:
 
 /// A specialization of RelativeDirectPointer for function pointers,
 /// allowing for calls.
-template<typename RetTy, typename...ArgTy, bool Nullable>
-class RelativeDirectPointer<RetTy (ArgTy...), Nullable> :
-  private RelativeDirectPointerImpl<RetTy (ArgTy...), Nullable>
+template<typename RetTy, typename...ArgTy, bool Nullable, typename Offset>
+class RelativeDirectPointer<RetTy (ArgTy...), Nullable, Offset> :
+  private RelativeDirectPointerImpl<RetTy (ArgTy...), Nullable, Offset>
 {
-  using super = RelativeDirectPointerImpl<RetTy (ArgTy...), Nullable>;
+  using super = RelativeDirectPointerImpl<RetTy (ArgTy...), Nullable, Offset>;
 public:
   using super::get;
 
@@ -163,9 +167,9 @@ public:
 
 /// A direct relative reference to an aligned object, with an additional
 /// tiny integer value crammed into its low bits.
-template<typename PointeeTy, typename IntTy>
+template<typename PointeeTy, typename IntTy, typename Offset = int32_t>
 class RelativeDirectPointerIntPair {
-  int32_t RelativeOffsetPlusInt;
+  Offset RelativeOffsetPlusInt;
 
   /// RelativePointers should appear in statically-generated metadata. They
   /// shouldn't be constructed or copied.
@@ -177,11 +181,11 @@ class RelativeDirectPointerIntPair {
   RelativeDirectPointerIntPair &operator=(const RelativeDirectPointerIntPair&)
     = delete;
 
-  static int32_t getMask() {
-    static_assert(alignof(PointeeTy) >= alignof(int32_t),
-                  "pointee alignment must be at least 32 bit");
+  static Offset getMask() {
+    static_assert(alignof(PointeeTy) >= alignof(Offset),
+                 "pointee alignment must be at least as strict as offset type");
 
-    return alignof(int32_t) - 1;
+    return alignof(Offset) - 1;
   }
 
 public:
@@ -189,6 +193,8 @@ public:
   using PointerTy = PointeeTy*;
 
   PointerTy getPointer() const & {
+    
+    
     // The value is addressed relative to `this`.
     auto base = reinterpret_cast<intptr_t>(this);
     intptr_t absolute = base + (RelativeOffsetPlusInt & ~getMask());
