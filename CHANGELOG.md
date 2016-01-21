@@ -104,6 +104,16 @@ Latest
 
   **(rdar://problem/21930334)**
 
+* When referencing a function or initializer, one can provide the
+  complete name, including argument labels. For example:
+
+      let fn1 = someView.insertSubview(_:at:)
+      let fn2 = someView.insertSubview(_:aboveSubview:)
+
+      let buttonFactory = UIButton.init(type:)
+
+  For more information, see [SE-0021](https://github.com/apple/swift-evolution/blob/master/proposals/0021-generalized-naming.md).
+
 2015-09-17 [Xcode 7.1, Swift 2.1]
 ----------
 
