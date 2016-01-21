@@ -119,6 +119,7 @@ KNOWN_SETTINGS=(
     skip-build-swiftpm          ""               "set to skip building swiftpm"
     skip-build-xctest           ""               "set to skip building xctest"
     skip-build-foundation       ""               "set to skip building foundation"
+    skip-build-libdispatch      ""               "set to skip building libdispatch"
     skip-test-cmark             ""               "set to skip testing CommonMark"
     skip-test-lldb              ""               "set to skip testing lldb"
     skip-test-swift             ""               "set to skip testing Swift"
@@ -126,6 +127,7 @@ KNOWN_SETTINGS=(
     skip-test-swiftpm           ""               "set to skip testing swiftpm"
     skip-test-xctest            ""               "set to skip testing xctest"
     skip-test-foundation        ""               "set to skip testing foundation"
+    skip-test-libdispatch       ""               "set to skip testing libdispatch"
     skip-test-osx               ""               "set to skip testing Swift stdlibs for OSX"
     skip-test-ios               ""               "set to skip testing Swift stdlibs for iOS"
     skip-test-ios-simulator     ""               "set to skip testing Swift stdlibs for iOS simulators (i.e. test devices only)"
@@ -165,6 +167,7 @@ KNOWN_SETTINGS=(
     install-swiftpm             ""               "whether to install swiftpm"
     install-xctest              ""               "whether to install xctest"
     install-foundation          ""               "whether to install foundation"
+    install-libdispatch         ""               "whether to install libdispatch"
     darwin-install-extract-symbols ""            "whether to extract symbols with dsymutil during installations"
     cross-compile-tools-deployment-targets ""    "space-separated list of targets to cross-compile host Swift tools for"
     skip-merge-lipo-cross-compile-tools ""       "set to skip running merge-lipo after installing cross-compiled host Swift tools"
@@ -542,6 +545,7 @@ if [[ "${SKIP_BUILD}" ]]; then
     SKIP_BUILD_SWIFTPM=1
     SKIP_BUILD_XCTEST=1
     SKIP_BUILD_FOUNDATION=1
+    SKIP_BUILD_LIBDISPATCH=1
 fi
 
 if [[ "${SKIP_IOS}" ]] ; then
@@ -886,6 +890,7 @@ LLBUILD_SOURCE_DIR="${WORKSPACE}/llbuild"
 SWIFTPM_SOURCE_DIR="${WORKSPACE}/swiftpm"
 XCTEST_SOURCE_DIR="${WORKSPACE}/swift-corelibs-xctest"
 FOUNDATION_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
+LIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 
 if [[ ! -d ${CMARK_SOURCE_DIR} ]]; then
     echo "Couldn't find cmark source directory."
@@ -926,6 +931,11 @@ if [[ ! "${SKIP_BUILD_FOUNDATION}" && ! -d ${FOUNDATION_SOURCE_DIR} ]]; then
     exit 1
 fi
 
+if [[ ! "${SKIP_BUILD_LIBDISPATCH}" && ! -d ${LIBDISPATCH_SOURCE_DIR} ]]; then
+    echo "Couldn't find libdispatch source directory."
+    exit 1
+fi
+
 # Symlink clang into the llvm tree.
 CLANG_SOURCE_DIR="${LLVM_SOURCE_DIR}/tools/clang"
 if [ ! -e "${WORKSPACE}/clang" ] ; then
@@ -954,6 +964,9 @@ if [[ ! "${SKIP_BUILD_XCTEST}" ]] ; then
 fi
 if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" foundation)
+fi
+if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
+     PRODUCTS=("${PRODUCTS[@]}" libdispatch)
 fi
 
 SWIFT_STDLIB_TARGETS=()
@@ -1184,6 +1197,9 @@ function build_directory_bin() {
             foundation)
                 echo "${root}/${FOUNDATION_BUILD_TYPE}/bin"
                 ;;
+            libdispatch)
+                echo "${root}/bin"
+                ;;
             *)
                 echo "error: unknown product: ${product}"
                 exit 1
@@ -1284,6 +1300,8 @@ function cmake_config_opt() {
             foundation)
                 echo "--config ${FOUNDATION_BUILD_TYPE}"
                 ;;            
+            libdispatch)
+                ;;
             *)
                 echo "error: unknown product: ${product}"
                 exit 1
@@ -1826,6 +1844,28 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 # Foundation builds itself and doesn't use cmake
                 continue
                 ;;
+            libdispatch)
+                LIBDISPATCH_BUILD_DIR=$(build_directory ${deployment_target} ${product})
+
+                set -x
+                if [[ ! -f "${LIBDISPATCH_BUILD_DIR}"/config.status ]]; then
+                    # First time building; need to run autotools and configure
+                    mkdir -p "${LIBDISPATCH_BUILD_DIR}"
+                    pushd "${LIBDISPATCH_SOURCE_DIR}"
+                    autoreconf -fvi
+                    popd
+                    pushd "${LIBDISPATCH_BUILD_DIR}"
+                    "${LIBDISPATCH_SOURCE_DIR}"/configure --prefix="${INSTALL_DESTDIR}"/"${INSTALL_PREFIX}"
+                    popd
+                fi
+                pushd "${LIBDISPATCH_BUILD_DIR}"
+                make
+                popd
+                { set +x; } 2>/dev/null
+
+                # libdispatch builds itself and doesn't use cmake
+                continue
+                ;;
             *)
                 echo "error: unknown product: ${product}"
                 exit 1
@@ -2013,6 +2053,20 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
                 echo "--- Finished tests for ${product} ---"
                 continue
                 ;;
+            libdispatch)
+                if [[ "${SKIP_TEST_LIBDISPATCH}" ]]; then
+                    continue
+                fi
+                LIBDISPATCH_BUILD_DIR=$(build_directory ${deployment_target} ${product})
+                echo "--- Running tests for ${product} ---"
+                set -x
+                pushd "${LIBDISPATCH_BUILD_DIR}"
+                make check
+                popd
+                { set +x; } 2>/dev/null
+                echo "--- Finished tests for ${product} ---"
+                continue
+                ;;
             *)
                 echo "error: unknown product: ${product}"
                 exit 1
@@ -2156,6 +2210,21 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 { set +x; } 2>/dev/null
 
                 # As foundation installation is self-contained, we break early here.
+                continue
+                ;;
+            libdispatch)
+                if [[ -z "${INSTALL_LIBDISPATCH}" ]] ; then
+                    continue
+                fi
+                echo "--- Installing ${product} ---"
+                LIBDISPATCH_BUILD_DIR=$(build_directory ${deployment_target} ${product})
+                set -x
+                pushd "${LIBDISPATCH_BUILD_DIR}"
+                make install
+                popd
+                { set +x; } 2>/dev/null
+
+                # As libdispatch installation is self-contained, we break early here.
                 continue
                 ;;
             *)

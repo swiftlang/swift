@@ -154,11 +154,12 @@ SWIFT_SOURCE_ROOT: a directory containing the source for LLVM, Clang, Swift.
    $SWIFT_SOURCE_ROOT/llvm
                      /clang
                      /swift
-                     /lldb                      (optional)
-                     /llbuild                   (optional)
-                     /swiftpm                   (optional, requires llbuild)
-                     /swift-corelibs-xctest     (optional)
-                     /swift-corelibs-foundation (optional)
+                     /lldb                       (optional)
+                     /llbuild                    (optional)
+                     /swiftpm                    (optional, requires llbuild)
+                     /swift-corelibs-xctest      (optional)
+                     /swift-corelibs-foundation  (optional)
+                     /swift-corelibs-libdispatch (optional)
 
 SWIFT_BUILD_ROOT: a directory in which to create out-of-tree builds.
                   Defaults to "$SWIFT_SOURCE_ROOT/build/".
@@ -309,6 +310,10 @@ details of the setups of other systems or automated environments.""")
         help="build foundation",
         action="store_true",
         dest="build_foundation")
+    projects_group.add_argument("--libdispatch",
+        help="build libdispatch",
+        action="store_true",
+        dest="build_libdispatch")
 
     extra_actions_group = parser.add_argument_group(
         title="Extra actions to perform before or in addition to building")
@@ -373,6 +378,11 @@ build the Debug variant of the Swift standard library and SDK overlay""",
         action="store_const",
         const="Debug",
         dest="foundation_build_variant")
+    build_variant_override_group.add_argument("--debug-libdispatch",
+        help="build the Debug variant of libdispatch",
+        action="store_const",
+        const="Debug",
+        dest="libdispatch_build_variant")
 
     assertions_group = parser.add_mutually_exclusive_group(required=False)
     assertions_group.add_argument("--assertions",
@@ -564,6 +574,9 @@ the number of parallel build jobs to use""",
     if args.foundation_build_variant is None:
         args.foundation_build_variant = args.build_variant
 
+    if args.libdispatch_build_variant is None:
+        args.libdispatch_build_variant = args.build_variant
+
     # Assertions are enabled by default.
     if args.assertions is None:
         args.assertions = True
@@ -615,6 +628,7 @@ the number of parallel build jobs to use""",
             "--skip-test-swiftpm",
             "--skip-test-xctest",
             "--skip-test-foundation",
+            "--skip-test-libdispatch",
             "--skip-test-ios",
             "--skip-test-tvos",
             "--skip-test-watchos",
@@ -671,6 +685,11 @@ the number of parallel build jobs to use""",
     if not args.build_foundation:
         build_script_impl_inferred_args += [
             "--skip-build-foundation"
+        ]
+
+    if not args.build_libdispatch:
+        build_script_impl_inferred_args += [
+            "--skip-build-libdispatch"
         ]
 
     if args.skip_build:
