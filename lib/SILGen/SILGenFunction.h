@@ -15,9 +15,10 @@
 
 #include "SILGen.h"
 #include "JumpDest.h"
+#include "Initialization.h"
 #include "swift/AST/AnyFunctionRef.h"
-#include "llvm/ADT/PointerIntPair.h"
 #include "swift/SIL/SILBuilder.h"
+#include "llvm/ADT/PointerIntPair.h"
 
 namespace swift {
   class ParameterList;
