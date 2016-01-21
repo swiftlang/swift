@@ -102,7 +102,7 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
     .withExtraInhabitants(unusedExtraInhabitants > 0)
     .withEnumWitnesses(true)
     .withInlineStorage(ValueWitnessTable::isValueInline(size, align));
-  vwtable->stride = llvm::RoundUpToAlignment(size, align);
+  vwtable->stride = llvm::alignTo(size, align);
   
   // Substitute in better common value witnesses if we have them.
   // If the payload type is a single-refcounted pointer, and the enum has
