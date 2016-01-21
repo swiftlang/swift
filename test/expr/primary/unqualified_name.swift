@@ -3,12 +3,14 @@
 func f0(x: Int, y: Int, z: Int) { }
 func f1(x: Int, while: Int) { }
 func f2(x: Int, `let` _: Int) { }
+func f3(x: Int, _ y: Int, z: Int) { }
 
 func test01() {
   _ = f0(_:y:z:)
   _ = f0(:y:z:) // expected-error{{an empty argument label is spelled with '_'}}{{10-10=_}}
   _ = f1(_:`while`:) // expected-warning{{keyword 'while' does not need to be escaped in argument list}}{{12-13=}}{{18-19=}}
   _ = f2(_:`let`:)
+  _ = f3(_::z:) // expected-error{{an empty argument label is spelled with '_'}}{{12-12=_}}
 }
 
 struct S0 {
