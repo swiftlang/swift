@@ -174,7 +174,8 @@ func r22459135() {
 
 
 // <rdar://problem/19710848> QoI: Friendlier error message for "[] as Set"
-_ = [] as Set  // expected-error {{generic parameter 'Element' could not be inferred}}
+// <rdar://problem/22326930> QoI: "argument for generic parameter 'Element' could not be inferred" lacks context
+_ = [] as Set  // expected-error {{generic parameter 'Element' could not be inferred in cast to 'Set<_>}}
 
 
 //<rdar://problem/22509125> QoI: Error when unable to infer generic archetype lacks greatness

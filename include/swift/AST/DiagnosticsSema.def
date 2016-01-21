@@ -594,6 +594,7 @@ NOTE(note_call_to_initializer,none,
      "in call to initializer", ())
 NOTE(note_init_parameter,none,
      "in initialization of parameter %0", (Identifier))
+
 ERROR(missing_nullary_call,none,
      "function produces expected type %0; did you mean to call it with '()'?",
      (Type))
@@ -669,6 +670,10 @@ ERROR(no_accessible_initializers,none,
       (Type))
 ERROR(unbound_generic_parameter,none,
       "generic parameter %0 could not be inferred", (Type))
+ERROR(unbound_generic_parameter_cast,none,
+      "generic parameter %0 could not be inferred in cast to %1", (Type, Type))
+
+
 ERROR(string_index_not_integer,none,
       "String may not be indexed with %0, it has variable size elements",
       (Type))

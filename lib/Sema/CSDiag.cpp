@@ -290,54 +290,7 @@ static Expr *simplifyLocatorToAnchor(ConstraintSystem &cs,
 }
 
 
-/// Emit a note referring to the target of a diagnostic, e.g., the function
-/// or parameter being used.
-static void noteTargetOfMissingArchetype(ConstraintSystem &cs,
-                                         ConstraintLocator *targetLocator) {
 
-  auto anchor = targetLocator->getAnchor();
-  if (!anchor) return;
-  
-  ConcreteDeclRef resolved;
-  
-  // Simple case: direct reference to a declaration.
-  if (auto dre = dyn_cast<DeclRefExpr>(anchor))
-    resolved = dre->getDeclRef();
-  
-  // Simple case: direct reference to a declaration.
-  if (auto mre = dyn_cast<MemberRefExpr>(anchor))
-    resolved = mre->getMember();
-  
-  if (auto ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(anchor))
-    resolved = ctorRef->getDeclRef();
-
-  // We couldn't resolve the locator to a declaration, so we're done.
-  if (!resolved)
-    return;
-  
-  auto decl = resolved.getDecl();
-  if (isa<FuncDecl>(decl)) {
-    auto name = decl->getName();
-    auto diagID = name.isOperator() ? diag::note_call_to_operator
-                                    : diag::note_call_to_func;
-    cs.getTypeChecker().diagnose(decl, diagID, name);
-    return;
-  }
-
-  // FIXME: Specialize for implicitly-generated constructors.
-  if (isa<ConstructorDecl>(decl)) {
-    cs.getTypeChecker().diagnose(decl, diag::note_call_to_initializer);
-    return;
-  }
-
-  if (isa<ParamDecl>(decl)) {
-    cs.getTypeChecker().diagnose(decl, diag::note_init_parameter,
-                                 decl->getName());
-    return;
-  }
-
-  // FIXME: Other decl types too.
-}
 
 /// \brief Determine the number of distinct overload choices in the
 /// provided set.
@@ -4749,6 +4702,75 @@ void ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
   diagnosis.diagnoseAmbiguity(expr);
 }
 
+
+/// Emit an error message about an unbound generic parameter existing, and
+/// emit notes referring to the target of a diagnostic, e.g., the function
+/// or parameter being used.
+static void diagnoseUnboundArchetype(Expr *overallExpr,
+                                     ArchetypeType *archetype,
+                                     ConstraintLocator *targetLocator,
+                                     ConstraintSystem &cs) {
+  auto &tc = cs.getTypeChecker();
+  auto anchor = targetLocator->getAnchor();
+
+  // The archetype may come from the explicit type in a cast expression.
+  if (auto *ECE = dyn_cast_or_null<ExplicitCastExpr>(anchor)) {
+    tc.diagnose(ECE->getLoc(), diag::unbound_generic_parameter_cast,
+                archetype, ECE->getCastTypeLoc().getType())
+      .highlight(ECE->getCastTypeLoc().getSourceRange());
+    return;
+  }
+  
+  // Otherwise, emit an error message on the expr we have, and emit a note
+  // about where the archetype came from.
+  tc.diagnose(overallExpr->getLoc(), diag::unbound_generic_parameter,
+              archetype);
+  
+  // If we have an anchor, drill into it to emit a
+  // "note: archetype declared here".
+  if (!anchor) return;
+  
+  ConcreteDeclRef resolved;
+  
+  // Simple case: direct reference to a declaration.
+  if (auto dre = dyn_cast<DeclRefExpr>(anchor))
+    resolved = dre->getDeclRef();
+  
+  // Simple case: direct reference to a declaration.
+  if (auto mre = dyn_cast<MemberRefExpr>(anchor))
+    resolved = mre->getMember();
+  
+  if (auto ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(anchor))
+    resolved = ctorRef->getDeclRef();
+  
+  // We couldn't resolve the locator to a declaration, so we're done.
+  if (!resolved)
+    return;
+  
+  auto decl = resolved.getDecl();
+  if (isa<FuncDecl>(decl)) {
+    auto name = decl->getName();
+    auto diagID = name.isOperator() ? diag::note_call_to_operator
+    : diag::note_call_to_func;
+    tc.diagnose(decl, diagID, name);
+    return;
+  }
+  
+  // FIXME: Specialize for implicitly-generated constructors.
+  if (isa<ConstructorDecl>(decl)) {
+    tc.diagnose(decl, diag::note_call_to_initializer);
+    return;
+  }
+  
+  if (isa<ParamDecl>(decl)) {
+    tc.diagnose(decl, diag::note_init_parameter, decl->getName());
+    return;
+  }
+  
+  // FIXME: Other decl types too.
+}
+
+
 /// Emit an ambiguity diagnostic about the specified expression.
 void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
 
@@ -4766,10 +4788,7 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
     // Only diagnose archetypes that don't have a parent, i.e., ones
     // that correspond to generic parameters.
     if (archetype && !archetype->getParent()) {
-      diagnose(expr->getLoc(), diag::unbound_generic_parameter, archetype);
-      
-      // Emit a "note, archetype declared here" sort of thing.
-      noteTargetOfMissingArchetype(*CS, tv->getImpl().getLocator());
+      diagnoseUnboundArchetype(expr, archetype, tv->getImpl().getLocator(),*CS);
       return;
     }
     continue;
