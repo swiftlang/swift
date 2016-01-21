@@ -153,4 +153,18 @@ func gcd_23700031<T>(a: T, b: T) {
   // expected-note @-1 {{overloads for '%' exist with these partially matching parameter lists: (UInt8, UInt8), (Int8, Int8), (UInt16, UInt16), (Int16, Int16), (UInt32, UInt32), (Int32, Int32), (UInt64, UInt64), (Int64, Int64), (UInt, UInt), (Int, Int), (Float, Float)}}
 }
 
-
+// <rdar://problem/24210190>
+//   Don't ignore tuple labels in same-type constraints or stronger.
+protocol Kingdom {
+  associatedtype King
+}
+struct Victory<General> {
+  init<K: Kingdom where K.King == General>(_ king: K) {}
+}
+struct MagicKingdom<K> : Kingdom {
+  typealias King = K
+}
+func magify<T>(t: T) -> MagicKingdom<T> { return MagicKingdom() }
+func foo(pair: (Int,Int)) -> Victory<(x:Int, y:Int)> {
+  return Victory(magify(pair)) // expected-error {{cannot invoke initializer for type 'Victory<_>' with an argument list of type '(MagicKingdom<(Int, Int)>)'}} expected-note {{expected an argument list of type '(K)'}}
+}

@@ -691,7 +691,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
       // If the names don't match, we may have a conflict.
       if (elt1.getName() != elt2.getName()) {
         // Same-type requirements require exact name matches.
-        if (kind == TypeMatchKind::SameType)
+        if (kind <= TypeMatchKind::SameType)
           return SolutionKind::Error;
 
         // For subtyping constraints, just make sure that this name isn't
