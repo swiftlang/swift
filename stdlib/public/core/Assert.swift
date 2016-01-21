@@ -259,7 +259,7 @@ public func precondition(
   @autoclosure _ message: () -> String = String(),
   file: StaticString = __FILE__, line: UInt = __LINE__
 ) {
-  fatalError("This API has been deprecated")
+  fatalError("unavailable function can't be called")
 }
 
 @available(*, unavailable, renamed="requirementFailure")
@@ -267,5 +267,5 @@ public func preconditionFailure(
   @autoclosure message: () -> String = String(),
   file: StaticString = __FILE__, line: UInt = __LINE__
 ) {
-  fatalError("This API has been deprecated")
+  fatalError("unavailable function can't be called")
 }

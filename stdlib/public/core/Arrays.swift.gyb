@@ -1365,19 +1365,19 @@ extension ContiguousArray {
 extension ${Self} {
   @available(*, unavailable, message="Please use init(repeating:count:) instead")
   init(count: Int, repeatedValue: Element) {
-    fatalError("This API has been deprecated")
+    fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, renamed="removeAt")
   public mutating func removeAtIndex(index: Int) -> Element {
-    fatalError("This API has been deprecated")
+    fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, renamed="replaceSubrange")
   public mutating func replaceRange<
     C : Collection where C.Iterator.Element == _Buffer.Element
   >(subRange: Range<Int>, with newElements: C) {
-    fatalError("This API has been deprecated")
+    fatalError("unavailable function can't be called")
   }
 }
 %end
