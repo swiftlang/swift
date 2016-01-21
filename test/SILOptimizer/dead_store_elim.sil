@@ -103,6 +103,13 @@ class foo {
   init()
 }
 
+class AB {
+  var value: Int
+  init(value: Int)
+   deinit 
+}
+
+
 class B {
   var i : Builtin.Int32
   init()
@@ -124,6 +131,21 @@ sil @S6_init : $@convention(thin) (@thin S6.Type) -> S6
 sil @S7_init : $@convention(thin) (@thin S7.Type) -> S7
 sil @S8_init : $@convention(thin) (@thin S8.Type) -> @owned S8
 sil @escaped_a : $@convention(thin) () -> Builtin.RawPointer
+
+// CHECK-LABEL: sil hidden @dead_store_across_fixlifetime_inst
+// CHECK: bb0 
+// CHECK-NOT: store 
+// CHECK: store 
+sil hidden @dead_store_across_fixlifetime_inst : $@convention(thin) (@owned AB, Int) -> () {
+bb0(%0 : $AB, %1 : $Int):
+  %2 = ref_element_addr %0 : $AB, #AB.value       // user: %3
+  store %1 to %2 : $*Int                            // user: %6
+  %4 = ref_element_addr %0 : $AB, #AB.value       // user: %5
+  fix_lifetime %0 : $AB
+  store %1 to %2 : $*Int                            // user: %6
+  %18 = tuple ()                                  // user: %19
+  return %18 : $()                                // id: %19
+}
 
 // We should be able to remove the local store that is not read.
 //

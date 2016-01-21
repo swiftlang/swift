@@ -124,6 +124,7 @@ static bool isDeadStoreInertInstruction(SILInstruction *Inst) {
   case ValueKind::CondFailInst:
   case ValueKind::IsUniqueInst:
   case ValueKind::IsUniqueOrPinnedInst:
+  case ValueKind::FixLifetimeInst:
     return true;
   default:
     return false;
