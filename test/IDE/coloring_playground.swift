@@ -5,6 +5,14 @@
 func playgroundCommentLine(f : () throws -> ()) rethrows {}
 // CHECK: <doc-comment-line>//: playground doc comment line
 
+/*:
+  playground doc comment multi-line
+*/
+func playgroundCommentMultiLine(f : () throws -> ()) rethrows {}
+// CHECK: <doc-comment-block>/*:
+// CHECK: playground doc comment multi-line
+// CHECK: */</doc-comment-block>
+
 // Keep this as the last test
 /**
   Trailing off ...
