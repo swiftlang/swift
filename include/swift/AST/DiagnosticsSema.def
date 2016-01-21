@@ -41,7 +41,7 @@
 NOTE(type_declared_here,none,
      "type declared here", ())
 NOTE(decl_declared_here,none,
-     "%0 declared here", (Identifier))
+     "%0 declared here", (DeclName))
 NOTE(extended_type_declared_here,none,
      "extended type declared here", ())
 
