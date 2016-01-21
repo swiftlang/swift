@@ -1370,32 +1370,18 @@ getSILFunctionTypeForSelectorFamily(SILModule &M, SelectorFamily family,
 
 static CanSILFunctionType
 getUncachedSILFunctionTypeForConstant(SILModule &M, SILDeclRef constant,
-                                  CanAnyFunctionType origLoweredType,
-                                  CanAnyFunctionType origLoweredInterfaceType,
-                                  CanAnyFunctionType substFormalType,
-                                  CanAnyFunctionType substInterfaceType) {
-  assert(origLoweredType->getExtInfo().getSILRepresentation()
+                                  CanAnyFunctionType origLoweredInterfaceType) {
+  assert(origLoweredInterfaceType->getExtInfo().getSILRepresentation()
            != SILFunctionTypeRepresentation::Thick
-         && origLoweredType->getExtInfo().getSILRepresentation()
+         && origLoweredInterfaceType->getExtInfo().getSILRepresentation()
              != SILFunctionTypeRepresentation::Block);
 
-  auto extInfo = origLoweredType->getExtInfo();
-
-  CanAnyFunctionType substLoweredInterfaceType;
-  if (substInterfaceType) {
-    substLoweredInterfaceType
-                    = M.Types.getLoweredASTFunctionType(substInterfaceType,
-                                                        constant.uncurryLevel,
-                                                        extInfo,
-                                                        constant);
-  } else {
-    substLoweredInterfaceType = origLoweredInterfaceType;
-  }
+  auto extInfo = origLoweredInterfaceType->getExtInfo();
 
   if (!constant.isForeign) {
     return getNativeSILFunctionType(M,
                   AbstractionPattern(origLoweredInterfaceType),
-                  substLoweredInterfaceType,
+                  origLoweredInterfaceType,
                   extInfo,
                   constant,
                   constant.kind);
@@ -1413,16 +1399,16 @@ getUncachedSILFunctionTypeForConstant(SILModule &M, SILDeclRef constant,
 
     if (auto clangDecl = findClangMethod(decl))
       return getSILFunctionTypeForClangDecl(M, clangDecl,
-                                            origLoweredType,
-                                            substLoweredInterfaceType,
+                                            origLoweredInterfaceType,
+                                            origLoweredInterfaceType,
                                             extInfo, foreignError);
   }
 
   // If the decl belongs to an ObjC method family, use that family's
   // ownership conventions.
   return getSILFunctionTypeForSelectorFamily(M, getSelectorFamily(constant),
-                                             origLoweredType,
-                                             substLoweredInterfaceType,
+                                             origLoweredInterfaceType,
+                                             origLoweredInterfaceType,
                                              extInfo, foreignError);
 }
 
@@ -1511,10 +1497,8 @@ SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
 
   // The SIL type encodes conventions according to the original type.
   CanSILFunctionType silFnType =
-    getUncachedSILFunctionTypeForConstant(M, constant, loweredType,
-                                          loweredInterfaceType,
-                                          CanAnyFunctionType(),
-                                          CanAnyFunctionType());
+    getUncachedSILFunctionTypeForConstant(M, constant,
+                                          loweredInterfaceType);
 
   DEBUG(llvm::dbgs() << "lowering type for constant ";
         constant.print(llvm::dbgs());
