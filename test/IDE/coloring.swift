@@ -437,6 +437,13 @@ func malformedBlockComment(f : () throws -> ()) rethrows {}
 func playgroundCommentLine(f : () throws -> ()) rethrows {}
 // CHECK: <comment-line>//: playground doc comment line</comment-line>
 
+/*:
+  playground doc comment multi-line
+*/
+func playgroundCommentMultiLine(f : () throws -> ()) rethrows {}
+// CHECK: <comment-block>/*:
+// CHECK: playground doc comment multi-line
+// CHECK: */</comment-block>
 
 "--\"\(x) --"
 // CHECK: <str>"--\"</str>\<anchor>(</anchor>x<anchor>)</anchor><str> --"</str>

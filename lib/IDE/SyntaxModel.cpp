@@ -115,7 +115,8 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
         if (Tok.getText().startswith("///") ||
             (IsPlayground && Tok.getText().startswith("//:")))
           Kind = SyntaxNodeKind::DocCommentLine;
-        else if (Tok.getText().startswith("/**"))
+        else if (Tok.getText().startswith("/**") ||
+                 (IsPlayground && Tok.getText().startswith("/*:")))
           Kind = SyntaxNodeKind::DocCommentBlock;
         else if (Tok.getText().startswith("//"))
           Kind = SyntaxNodeKind::CommentLine;
