@@ -1929,6 +1929,13 @@ class FormatWalker: public ide::SourceEntityWalker {
                   FindAlignLoc(AE->getElement(I)->getStartLoc()), tok::comma);
         }
       }
+
+      // Case label items in a case statement are siblings.
+      if (auto CS = dyn_cast_or_null<CaseStmt>(Node.dyn_cast<Stmt *>())) {
+        for(const CaseLabelItem& Item : CS->getCaseLabelItems()) {
+          addPair(Item.getEndLoc(), FindAlignLoc(Item.getStartLoc()), tok::comma);
+        }
+      }
     };
 
     SourceLoc findSibling() {
