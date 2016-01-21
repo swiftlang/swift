@@ -1876,8 +1876,7 @@ ERROR(partial_application_of_function_invalid,none,
         "function with 'inout' parameters|"
         "'mutating' method|"
         "'super.init' initializer chain|"
-        "'self.init' initializer delegation|"
-        "'super' method"
+        "'self.init' initializer delegation"
       "}0 is not allowed",
       (unsigned))
 
