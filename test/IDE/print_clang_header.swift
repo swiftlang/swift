@@ -23,7 +23,3 @@
 // Test header interface printing from a clang module, with the preprocessing record enabled by the CC args.
 // RUN: %target-swift-ide-test -source-filename %s -print-header -header-to-print %S/Inputs/print_clang_header/header-to-print.h -print-regular-comments --cc-args %target-cc-options -isysroot %clang-importer-sdk-path -fsyntax-only %t.framework.m -F %t -ivfsoverlay %t.yaml -Xclang -detailed-preprocessing-record > %t.module2.txt
 // RUN: diff -u %S/Inputs/print_clang_header/header-to-print.h.module.printed.txt %t.module2.txt
-
-// RUN: echo '#include "header-to-print.h"' > %t.i386.m
-// RUN: %target-swift-ide-test -source-filename %s -print-header -header-to-print %S/Inputs/print_clang_header/header-to-print.h -print-regular-comments --cc-args -arch i386 -isysroot %clang-importer-sdk-path -fsyntax-only %t.i386.m -I %S/Inputs/print_clang_header > %t.i386.txt
-// RUN: diff -u %S/Inputs/print_clang_header/header-to-print.h.printed.txt %t.i386.txt
