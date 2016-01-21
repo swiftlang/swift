@@ -617,7 +617,8 @@ public:
   /// Lowers a Swift type to a SILType, and returns the SIL TypeLowering
   /// for that type.
   const TypeLowering &getTypeLowering(Type t, unsigned uncurryLevel = 0) {
-    return getTypeLowering(AbstractionPattern(t), t, uncurryLevel);
+    AbstractionPattern pattern(CurGenericContext, t->getCanonicalType());
+    return getTypeLowering(pattern, t, uncurryLevel);
   }
 
   /// Lowers a Swift type to a SILType according to the abstraction
