@@ -146,8 +146,8 @@ is not enforced by the language.
 .. _semantic versioning: http://semver.org
 
 Normally only public entities are treated as versioned. However, in some cases
-it may be useful to version an ``internal`` entity as well. See `Pinning`_ 
-below.
+it may be useful to version an ``internal`` entity as well. See `Versioning
+Internal Declarations`_ below.
 
 The syntax for marking an entity as versioned has not yet been decided, but the
 rest of this document will use syntax #1 described below.
@@ -334,12 +334,13 @@ the following restrictions on the bodies of inlineable functions:
   functions declared within the inlineable function itself.
 
 - **They must not reference any** ``internal`` **entities except for those that
-  have been** `availability-pinned`_. See below for a discussion of pinning.
+  have been** `versioned`_. See below for a discussion of versioning internal
+  API.
 
 - **They must not reference any entities less available than the function
   itself.**
 
-.. _availability-pinned: #pinning
+.. _versioned: #versioning-internal-api
 
 An inlineable function is still emitted into its own module's binary. This
 makes it possible to take an existing function and make it inlineable, as long
@@ -365,17 +366,22 @@ considered to have ``shared`` linkage.)
 Local functions are subject to the same restrictions as the inlineable
 functions containing them, as described above.
 
-Pinning
--------
 
-FIXME: We're just going to call this "internal but versioned".
+Versioning Internal Declarations
+--------------------------------
 
-An `availability-pinned` entity is simply an ``internal`` member, free
-function, or global binding that has been marked ``@available``. This promises
-that the entity will be available at link time in the containing module's
-binary. This makes it safe to refer to such an entity from an inlineable
-function. If a pinned entity is ever made ``public``, its availability should
-not be changed.
+The initial discussion on versioning focused on ``public`` APIs, making sure
+that a client knows what features they can use when a specific version of a
+library is present. Inlineable functions have much the same constraints, except
+the inlineable function is the client and the entities being used may not be
+``public``.
+
+Adding a versioning annotation to an ``internal`` member, top-level function,
+or global binding promises that the entity will be available at link time in
+the containing module's binary. This makes it safe to refer to such an entity
+from an inlineable function. If the entity is ever made ``public``, its
+availability should not be changed; not only is it safe for new clients to rely
+on it, but *existing* clients require its presence as well.
 
 .. note::
 
@@ -383,20 +389,33 @@ not be changed.
     imply everything that ``public`` does, such as requiring overrides to be
     ``public``.
 
-Because a pinned class member may eventually be made public, it must be assumed
-that new overrides may eventually appear from outside the module unless the
-member is marked ``final`` or the class is not publicly subclassable.
+Because a versioned class member may eventually be made public, it must be
+assumed that new overrides may eventually appear from outside the module unless
+the member is marked ``final`` or the class is not publicly subclassable.
 
-We could do away with the entire "pinning" feature if we restricted inlineable
-functions to only refer to public entities. However, this removes one of the
-primary reasons to make something inlineable: to allow efficient access to a
-type while still protecting its invariants.
+Entities declared ``private`` may not be versioned; the mangled name of such an
+entity includes an identifier based on the containing file, which means moving
+the declaration to another file changes the entity's mangled name. This implies
+that a client would not be able to find the entity at run time if the source
+code is reorganized, which is unacceptable.
 
 .. note::
 
-    Types are not allowed to be pinned because that would have many more ripple
-    effects. It's not technically impossible; it just requires a lot more
-    thought.
+    There are ways around this limitation, the most simple being that versioned
+    ``private`` entities are subject to the same cross-file redeclaration rules
+    as ``internal`` entities. However, this is a purely additive feature, so to
+    keep things simple we'll stick with the basics.
+
+We could do away with the entire feature if we restricted inlineable functions
+to only refer to public entities. However, this removes one of the primary
+reasons to make something inlineable: to allow efficient access to a type while
+still protecting its invariants.
+
+.. note::
+
+    Non-public *types* are not allowed to be versioned because that would have
+    many more ripple effects. It's not technically impossible; it just requires
+    a lot more thought. Similar logic applies to conformances.
 
 
 Top-Level Variables and Constants
@@ -1098,9 +1117,6 @@ Glossary
     are always properly nested, and the global availability context includes
     the module's minimum deployment target and minimum dependency versions.
 
-  availability-pinned
-    See `Pinning`_.
-
   backwards-compatible
     A modification to an API that does not break existing clients. May also
     describe the API in question.
@@ -1121,7 +1137,9 @@ Glossary
     (Note that this is a dynamic constraint.)
 
   entity
-    A type, function, member, or global in a Swift program.
+    A type, function, member, or global in a Swift program. Occasionally the
+    term "entities" also includes conformances, since these have a runtime
+    presence and are depended on by clients.
 
   forwards-compatible
     An API that is designed to handle future clients, perhaps allowing certain
@@ -1154,3 +1172,6 @@ Glossary
   trivial
     A value whose assignment just requires a fixed-size bit-for-bit copy
     without any indirection or reference-counting operations.
+
+  versioned entity
+    See `Publishing Versioned API`_.
