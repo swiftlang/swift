@@ -366,11 +366,9 @@ struct SILConstantInfo {
   /// The formal type of the constant, still curried.  For a normal
   /// function, this is just its declared type; for a getter or
   /// setter, computing this can be more involved.
-  CanAnyFunctionType FormalType SIL_FUNCTION_TYPE_DEPRECATED;
   CanAnyFunctionType FormalInterfaceType;
 
   /// The uncurried and bridged type of the constant.
-  CanAnyFunctionType LoweredType SIL_FUNCTION_TYPE_DEPRECATED;
   CanAnyFunctionType LoweredInterfaceType;
 
   /// The SIL function type of the constant.
@@ -397,9 +395,7 @@ struct SILConstantInfo {
   }
 
   friend bool operator==(SILConstantInfo lhs, SILConstantInfo rhs) {
-    return lhs.FormalType == rhs.FormalType &&
-           lhs.FormalInterfaceType == rhs.FormalInterfaceType &&
-           lhs.LoweredType == rhs.LoweredType &&
+    return lhs.FormalInterfaceType == rhs.FormalInterfaceType &&
            lhs.LoweredInterfaceType == rhs.LoweredInterfaceType &&
            lhs.SILFnType == rhs.SILFnType &&
            lhs.ContextGenericParams == rhs.ContextGenericParams &&
@@ -541,7 +537,6 @@ class TypeConverter {
   /// The current generic context signature.
   CanGenericSignature CurGenericContext;
   
-  CanAnyFunctionType makeConstantType(SILDeclRef constant);
   CanAnyFunctionType makeConstantInterfaceType(SILDeclRef constant);
   
   /// Get the context parameters for a constant. Returns a pair of the innermost
@@ -714,8 +709,6 @@ public:
   }
   
   /// Get a function type curried with its capture context.
-  CanAnyFunctionType getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
-                                                 AnyFunctionRef closure);
   CanAnyFunctionType getFunctionInterfaceTypeWithCaptures(
                                               CanAnyFunctionType funcType,
                                               AnyFunctionRef closure);

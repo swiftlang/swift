@@ -1752,28 +1752,6 @@ static CanAnyFunctionType getGlobalGetterType(CanType varType) {
 }
 
 /// Get the type of a default argument generator, () -> T.
-static CanAnyFunctionType getDefaultArgGeneratorType(TypeConverter &TC,
-                                                     AbstractFunctionDecl *AFD,
-                                                     unsigned DefaultArgIndex,
-                                                     ASTContext &context) {
-  auto resultTy = AFD->getDefaultArg(DefaultArgIndex).second->getCanonicalType();
-  assert(resultTy && "Didn't find default argument?");
-  
-  // Get the generic parameters from the surrounding context.
-  auto genericParams
-    = TC.getConstantInfo(SILDeclRef(AFD))
-        .ContextGenericParams;
-  
-  if (genericParams)
-    return CanPolymorphicFunctionType::get(TupleType::getEmpty(context),
-                                           resultTy,
-                                           genericParams,
-                                           AnyFunctionType::ExtInfo());
-
-  return CanFunctionType::get(TupleType::getEmpty(context), resultTy);
-}
-
-/// Get the type of a default argument generator, () -> T.
 static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
                                                      TypeConverter &TC,
                                                      AbstractFunctionDecl *AFD,
@@ -1798,37 +1776,6 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
                                        AnyFunctionType::ExtInfo());
   
   return CanFunctionType::get(TupleType::getEmpty(context), resultTy);
-}
-
-/// Get the type of a destructor function.
-static CanAnyFunctionType getDestructorType(DestructorDecl *dd,
-                                            bool isDeallocating,
-                                            ASTContext &C,
-                                            bool isForeign) {
-  auto classType = dd->getDeclContext()->getDeclaredTypeInContext()
-                     ->getCanonicalType();
-  
-
-  assert((!isForeign || isDeallocating)
-         && "There are no foreign destroying destructors");
-  AnyFunctionType::ExtInfo extInfo =
-            AnyFunctionType::ExtInfo(FunctionTypeRepresentation::Thin,
-                                     /*noreturn*/ false,
-                                     /*throws*/ false);
-  if (isForeign)
-    extInfo = extInfo
-      .withSILRepresentation(SILFunctionTypeRepresentation::ObjCMethod);
-  else
-    extInfo = extInfo
-      .withSILRepresentation(SILFunctionTypeRepresentation::Method);
-  
-  CanType resultTy = isDeallocating? TupleType::getEmpty(C)->getCanonicalType()
-                                   : C.TheNativeObjectType;
-
-  if (auto params = dd->getDeclContext()->getGenericParamsOfContext())
-    return CanPolymorphicFunctionType::get(classType, resultTy, params, extInfo);
-
-  return CanFunctionType::get(classType, resultTy, extInfo);
 }
 
 /// Get the type of a destructor function.
@@ -1861,30 +1808,6 @@ static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
       GenericFunctionType::get(sig, classType, resultTy, extInfo)
       ->getCanonicalType());
   return CanFunctionType::get(classType, resultTy, extInfo);
-}
-
-/// Retrieve the type of the ivar initializer or destroyer method for
-/// a class.
-static CanAnyFunctionType getIVarInitDestroyerType(ClassDecl *cd, 
-                                                   bool isObjC,
-                                                   ASTContext &ctx,
-                                                   bool isDestroyer) {
-  auto classType = cd->getDeclaredTypeInContext()->getCanonicalType();
-
-  auto emptyTupleTy = TupleType::getEmpty(ctx)->getCanonicalType();
-  CanType resultType = isDestroyer? emptyTupleTy : classType;
-  auto extInfo = AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
-                                          /*noreturn*/ false,
-                                          /*throws*/ false);
-  extInfo = extInfo
-    .withSILRepresentation(isObjC? SILFunctionTypeRepresentation::ObjCMethod
-                                 : SILFunctionTypeRepresentation::Method);
-  
-  resultType = CanFunctionType::get(emptyTupleTy, resultType, extInfo);
-  if (auto params = cd->getGenericParams())
-    return CanPolymorphicFunctionType::get(classType, resultType, params, 
-                                           extInfo);
-  return CanFunctionType::get(classType, resultType, extInfo);
 }
 
 /// Retrieve the type of the ivar initializer or destroyer method for
@@ -1944,51 +1867,6 @@ TypeConverter::getEffectiveGenericSignature(AnyFunctionRef fn,
     return sig->getCanonicalSignature();
 
   return nullptr;
-}
-
-CanAnyFunctionType
-TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
-                                           AnyFunctionRef theClosure) {
-  // Get transitive closure of value captured by this function, and any
-  // captured functions.
-  auto captureInfo = getLoweredLocalCaptures(theClosure);
-
-  // Capture generic parameters from the enclosing context if necessary.
-  GenericParamList *genericParams =
-      getEffectiveGenericParams(theClosure, captureInfo);
-
-  // If we don't have any local captures (including function captures),
-  // there's no context to apply.
-  if (!theClosure.getCaptureInfo().hasLocalCaptures()) {
-    if (!genericParams)
-      return adjustFunctionType(funcType,
-                                FunctionType::Representation::Thin);
-
-    auto extInfo = AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
-                                            /*noreturn*/ false,
-                                            funcType->throws());
-    if (funcType->isNoEscape())
-      extInfo = extInfo.withNoEscape();
-
-    return CanPolymorphicFunctionType::get(funcType.getInput(),
-                                           funcType.getResult(),
-                                           genericParams, extInfo);
-
-  }
-
-  // Build the type with an extra empty tuple clause. We'll lower the captures
-  // into this position later.
-  auto extInfo = AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
-                                          /*noreturn*/ false,
-                                          funcType->throws());
-  if (funcType->isNoEscape())
-    extInfo = extInfo.withNoEscape();
-
-  if (genericParams)
-    return CanPolymorphicFunctionType::get(Context.TheEmptyTupleType, funcType,
-                                           genericParams, extInfo);
-  
-  return CanFunctionType::get(Context.TheEmptyTupleType, funcType, extInfo);
 }
 
 CanAnyFunctionType
@@ -2174,60 +2052,6 @@ TypeConverter::getConstantContextGenericParams(SILDeclRef c) {
   case SILDeclRef::Kind::DefaultArgGenerator:
     // Use the context generic parameters of the original declaration.
     return getConstantContextGenericParams(SILDeclRef(c.getDecl()));
-  }
-}
-
-CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c) {
-  ValueDecl *vd = c.loc.dyn_cast<ValueDecl *>();
-
-  switch (c.kind) {
-  case SILDeclRef::Kind::Func: {
-    if (auto *ACE = c.loc.dyn_cast<AbstractClosureExpr *>()) {
-      auto funcTy = cast<AnyFunctionType>(ACE->getType()->getCanonicalType());
-      return getFunctionTypeWithCaptures(funcTy, ACE);
-    }
-
-    FuncDecl *func = cast<FuncDecl>(vd);
-    auto funcTy = cast<AnyFunctionType>(func->getType()->getCanonicalType());
-    funcTy = cast<AnyFunctionType>(replaceDynamicSelfWithSelf(funcTy));
-    return getFunctionTypeWithCaptures(funcTy, func);
-  }
-
-  case SILDeclRef::Kind::Allocator:
-  case SILDeclRef::Kind::EnumElement:
-    return cast<AnyFunctionType>(vd->getType()->getCanonicalType());
-  
-  case SILDeclRef::Kind::Initializer:
-    return cast<AnyFunctionType>(cast<ConstructorDecl>(vd)
-                                   ->getInitializerType()->getCanonicalType());
-  
-  case SILDeclRef::Kind::Destroyer:
-  case SILDeclRef::Kind::Deallocator:
-    return getDestructorType(cast<DestructorDecl>(vd), 
-                             c.kind == SILDeclRef::Kind::Deallocator,
-                             Context,
-                             c.isForeign);
-  
-  case SILDeclRef::Kind::GlobalAccessor: {
-    VarDecl *var = cast<VarDecl>(vd);
-    assert(var->hasStorage() && "constant ref to computed global var");
-    return getGlobalAccessorType(var->getType()->getCanonicalType());
-  }
-  case SILDeclRef::Kind::GlobalGetter: {
-    VarDecl *var = cast<VarDecl>(vd);
-    assert(var->hasStorage() && "constant ref to computed global var");
-    return getGlobalGetterType(var->getType()->getCanonicalType());
-  }
-  case SILDeclRef::Kind::DefaultArgGenerator:
-    return getDefaultArgGeneratorType(*this,
-                                      cast<AbstractFunctionDecl>(vd),
-                                      c.defaultArgIndex, Context);
-  case SILDeclRef::Kind::IVarInitializer:
-      return getIVarInitDestroyerType(cast<ClassDecl>(vd), c.isForeign,
-                                      Context, false);
-  case SILDeclRef::Kind::IVarDestroyer:
-    return getIVarInitDestroyerType(cast<ClassDecl>(vd), c.isForeign,
-                                    Context, true);
   }
 }
 

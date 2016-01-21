@@ -1477,7 +1477,6 @@ SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
 
   // First, get a function type for the constant.  This creates the
   // right type for a getter or setter.
-  auto formalType = makeConstantType(constant);
   auto formalInterfaceType = makeConstantInterfaceType(constant);
   GenericParamList *contextGenerics, *innerGenerics;
   std::tie(contextGenerics, innerGenerics)
@@ -1485,12 +1484,9 @@ SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
 
   // The formal type is just that with the right representation.
   auto rep = getDeclRefRepresentation(constant);
-  formalType = adjustFunctionType(formalType, rep);
   formalInterfaceType = adjustFunctionType(formalInterfaceType, rep);
   // The lowered type is the formal type, but uncurried and with
   // parameters automatically turned into their bridged equivalents.
-  auto loweredType =
-    getLoweredASTFunctionType(formalType, constant.uncurryLevel, constant);
   auto loweredInterfaceType =
     getLoweredASTFunctionType(formalInterfaceType, constant.uncurryLevel,
                               constant);
@@ -1503,16 +1499,16 @@ SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
   DEBUG(llvm::dbgs() << "lowering type for constant ";
         constant.print(llvm::dbgs());
         llvm::dbgs() << "\n  formal type: ";
-        formalType.print(llvm::dbgs());
+        formalInterfaceType.print(llvm::dbgs());
         llvm::dbgs() << "\n  lowered AST type: ";
-        loweredType.print(llvm::dbgs());
+        loweredInterfaceType.print(llvm::dbgs());
         llvm::dbgs() << "\n  SIL type: ";
         silFnType.print(llvm::dbgs());
         llvm::dbgs() << "\n");
 
   SILConstantInfo result = {
-    formalType, formalInterfaceType,
-    loweredType, loweredInterfaceType,
+    formalInterfaceType,
+    loweredInterfaceType,
     silFnType,
     contextGenerics,
     innerGenerics,
@@ -1749,28 +1745,6 @@ TypeConverter::substFunctionType(CanSILFunctionType origFnType,
                               Context);
 }
 
-// This is a hack until we eliminate contextual type usage from ConstantInfo,
-// or add support for GenericFunctionType to mapTypeIntoContext().
-static AnyFunctionType *mapFuncTypeIntoContext(Module *M,
-                                               GenericParamList *genericParams,
-                                               Type type) {
-  auto fnTy = type->castTo<AnyFunctionType>();
-  if (!genericParams)
-    return fnTy;
-
-  auto inputTy = ArchetypeBuilder::mapTypeIntoContext(M, genericParams,
-                                                      fnTy->getInput());
-  auto resultTy = ArchetypeBuilder::mapTypeIntoContext(M, genericParams,
-                                                       fnTy->getResult());
-
-  // Introduce a generic signature
-  if (fnTy->is<GenericFunctionType>())
-    return PolymorphicFunctionType::get(inputTy, resultTy, genericParams,
-                                        fnTy->getExtInfo());
-  else
-    return FunctionType::get(inputTy, resultTy, fnTy->getExtInfo());
-}
-
 /// Returns the ConstantInfo corresponding to the VTable thunk for overriding.
 /// Will be the same as getConstantInfo if the declaration does not override.
 SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
@@ -1829,14 +1803,7 @@ SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
                                                         base.uncurryLevel + 1);
   }
 
-  auto overrideFormalTy = mapFuncTypeIntoContext(M.getSwiftModule(),
-                                                 derivedInfo.ContextGenericParams,
-                                                 overrideInterfaceTy);
-
-  // Lower the formal AST types.
-  auto overrideLoweredTy = getLoweredASTFunctionType(
-      cast<AnyFunctionType>(overrideFormalTy->getCanonicalType()),
-      derived.uncurryLevel, derived);
+  // Lower the formal AST type.
   auto overrideLoweredInterfaceTy = getLoweredASTFunctionType(
       cast<AnyFunctionType>(overrideInterfaceTy->getCanonicalType()),
       derived.uncurryLevel, derived);
@@ -1860,7 +1827,6 @@ SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
 
   // Build the SILConstantInfo and cache it.
   SILConstantInfo overrideInfo;
-  overrideInfo.LoweredType = overrideLoweredTy;
   overrideInfo.LoweredInterfaceType = overrideLoweredInterfaceTy;
   overrideInfo.SILFnType = fnTy;
   overrideInfo.ContextGenericParams = derivedInfo.ContextGenericParams;
@@ -2037,29 +2003,17 @@ TypeConverter::getBridgedFunctionType(AbstractionPattern pattern,
     genericSig = gft.getGenericSignature();
   }
 
-  // Pull the innermost generic parameter list in the type out.
-  Optional<GenericParamList *> genericParams;
+  // Remove this when PolymorphicFunctionType goes away.
   {
     CanAnyFunctionType innerTy = t;
     while (innerTy) {
-      if (auto pft = dyn_cast<PolymorphicFunctionType>(innerTy)) {
-        assert(!genericParams
-           || pft->getGenericParams().getOuterParameters() == *genericParams);
-        genericParams = &pft->getGenericParams();
-      }
+      assert(!isa<PolymorphicFunctionType>(innerTy));
       innerTy = dyn_cast<AnyFunctionType>(innerTy.getResult());
     }
   }
-  GenericParamList *innerGenericParams
-    = genericParams ? *genericParams : nullptr;
 
   auto rebuild = [&](CanType input, CanType result) -> CanAnyFunctionType {
-    if (genericParams) {
-      assert(!genericSig && "got mix of poly/generic function type?!");
-      return CanPolymorphicFunctionType::get(input, result,
-                                             innerGenericParams,
-                                             extInfo);
-    } else if (genericSig) {
+    if (genericSig) {
       return CanGenericFunctionType::get(genericSig, input, result, extInfo);
     } else {
       return CanFunctionType::get(input, result, extInfo);
@@ -2072,7 +2026,7 @@ TypeConverter::getBridgedFunctionType(AbstractionPattern pattern,
   case SILFunctionTypeRepresentation::Method:
   case SILFunctionTypeRepresentation::WitnessMethod:
     // No bridging needed for native functions.
-    if (t->getExtInfo() == extInfo && !innerGenericParams)
+    if (t->getExtInfo() == extInfo)
       return t;
     return rebuild(t.getInput(), t.getResult());
 
@@ -2190,19 +2144,11 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
   // The uncurried input types.
   SmallVector<TupleTypeElt, 4> inputs;
 
-  // The innermost generic parameter list.
-  // FIXME: Interface types make this unnecessary.
-  Optional<GenericParamList *> genericParams;
-
   // Merge inputs and generic parameters from the uncurry levels.
   for (;;) {
     inputs.push_back(TupleTypeElt(fnType->getInput()));
 
-    if (auto pft = dyn_cast<PolymorphicFunctionType>(fnType)) {
-      assert(!genericParams
-             || pft->getGenericParams().getOuterParameters() == *genericParams);
-      genericParams = &pft->getGenericParams();
-    }
+    assert(!isa<PolymorphicFunctionType>(fnType));
 
     // The uncurried function calls all of the intermediate function
     // levels and so throws if any of them do.
@@ -2263,18 +2209,9 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
 
   // Create the new function type.
   CanType inputType = CanType(TupleType::get(inputs, Context));
-  GenericParamList *innerGenericParams
-    = genericParams ? *genericParams : nullptr;
   if (genericSig) {
-    assert(!innerGenericParams && "got mix of Polymorphic/Generic FunctionType?!");
     return CanGenericFunctionType::get(genericSig,
                                        inputType, resultType, extInfo);
-  }
-
-  if (innerGenericParams) {
-    return CanPolymorphicFunctionType::get(inputType, resultType,
-                                           innerGenericParams,
-                                           extInfo);
   } else {
     return CanFunctionType::get(inputType, resultType, extInfo);
   }
