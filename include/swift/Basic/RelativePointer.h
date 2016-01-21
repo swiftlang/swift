@@ -23,16 +23,41 @@
 
 namespace swift {
 
+namespace detail {
+
+/// Apply a relative offset to a base pointer. The offset is applied to the base
+/// pointer using sign-extended, wrapping arithmetic.
+template<typename BasePtrTy, typename Offset>
+static inline uintptr_t applyRelativeOffset(BasePtrTy *basePtr, Offset offset) {
+  static_assert(std::is_integral<Offset>::value &&
+                std::is_signed<Offset>::value,
+                "offset type should be signed integer");
+
+  auto base = reinterpret_cast<uintptr_t>(basePtr);
+  // We want to do wrapping arithmetic, but with a sign-extended
+  // offset. To do this in C, we need to do signed promotion to get
+  // the sign extension, but we need to perform arithmetic on unsigned values,
+  // since signed overflow is undefined behavior.
+  auto extendOffset = (uintptr_t)(intptr_t)offset;
+  return base + extendOffset;
+}
+
+} // namespace detail
+
 /// A relative reference to an object stored in memory. The reference may be
 /// direct or indirect, and uses the low bit of the (assumed at least
 /// 2-byte-aligned) pointer to differentiate.
 template<typename ValueTy, bool Nullable = false, typename Offset = int32_t>
 class RelativeIndirectablePointer {
 private:
+  static_assert(std::is_integral<Offset>::value &&
+                std::is_signed<Offset>::value,
+                "offset type should be signed integer");
+  
   /// The relative offset of the pointer's memory from the `this` pointer.
   /// If the low bit is clear, this is a direct reference; otherwise, it is
   /// an indirect reference.
-  Offset RelativeOffset;
+  Offset RelativeOffsetPlusIndirect;
 
   /// RelativePointers should appear in statically-generated metadata. They
   /// shouldn't be constructed or copied.
@@ -44,23 +69,19 @@ private:
   RelativeIndirectablePointer &operator=(const RelativeIndirectablePointer &)
     = delete;
 
-  static_assert(std::is_integral<Offset>::value &&
-                std::is_signed<Offset>::value,
-                "offset type should be signed integer");
-
 public:
   const ValueTy *get() const & {
     // Check for null.
-    if (Nullable && RelativeOffset == 0)
+    if (Nullable && RelativeOffsetPlusIndirect == 0)
       return nullptr;
     
-    // The pointer is offset relative to `this`.
-    auto base = reinterpret_cast<intptr_t>(this);
-    intptr_t address = base + (RelativeOffset & ~1);
+    Offset offsetPlusIndirect = RelativeOffsetPlusIndirect;
+    uintptr_t address = detail::applyRelativeOffset(this,
+                                                    offsetPlusIndirect & ~1);
 
     // If the low bit is set, then this is an indirect address. Otherwise,
     // it's direct.
-    if (RelativeOffset & 1) {
+    if (offsetPlusIndirect & 1) {
       return *reinterpret_cast<const ValueTy * const *>(address);
     } else {
       return reinterpret_cast<const ValueTy *>(address);
@@ -109,8 +130,7 @@ public:
       return nullptr;
     
     // The value is addressed relative to `this`.
-    auto base = reinterpret_cast<intptr_t>(this);
-    intptr_t absolute = base + RelativeOffset;
+    uintptr_t absolute = detail::applyRelativeOffset(this, RelativeOffset);
     return reinterpret_cast<PointerTy>(absolute);
   }
 
@@ -193,11 +213,9 @@ public:
   using PointerTy = PointeeTy*;
 
   PointerTy getPointer() const & {
-    
-    
     // The value is addressed relative to `this`.
-    auto base = reinterpret_cast<intptr_t>(this);
-    intptr_t absolute = base + (RelativeOffsetPlusInt & ~getMask());
+    uintptr_t absolute = detail::applyRelativeOffset(this,
+                                            RelativeOffsetPlusInt & ~getMask());
     return reinterpret_cast<PointerTy>(absolute);
   }
 
