@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -module-name Swift -redundant-load-elim -dce | FileCheck %s 
+// RUN: %target-sil-opt -enable-sil-verify-all %s -module-name Swift -redundant-load-elim | FileCheck %s 
 
 import Builtin
 
@@ -394,34 +394,6 @@ bb0(%0 : $*Agg2, %1 : $*Agg1):
   %5 = store %3 to %0 : $*Agg2
   %6 = tuple()
   %7 = return %6 : $()
-}
-
-// *NOTE* This does not handle raw pointer since raw pointer is only layout compatible with heap references.
-// CHECK-LABEL: sil @store_to_load_forward_unchecked_addr_cast_struct : $@convention(thin) (Optional<A>) -> () {
-// CHECK: bb0([[INPUT:%[0-9]+]]
-// CHECK-NOT: load
-// CHECK: return
-sil @store_to_load_forward_unchecked_addr_cast_struct : $@convention(thin) (Optional<A>) -> () {
-bb0(%0 : $Optional<A>):
-  %1 = alloc_stack $Optional<A>
-  store %0 to %1 : $*Optional<A>
-  %2 = unchecked_addr_cast %1 : $*Optional<A> to $*Builtin.Int32
-  %3 = load %2 : $*Builtin.Int32
-  %4 = unchecked_addr_cast %1 : $*Optional<A> to $*A
-  %5 = load %4 : $*A
-  %6 = unchecked_addr_cast %1 : $*Optional<A> to $*Builtin.RawPointer
-  %7 = load %6 : $*Builtin.RawPointer
-  %8 = unchecked_addr_cast %1 : $*Optional<A> to $*Builtin.NativeObject
-  %9 = load %8 : $*Builtin.NativeObject
-  %10 = unchecked_addr_cast %1 : $*Optional<A> to $*Optional<Builtin.Int32>
-  %11 = load %10 : $*Optional<Builtin.Int32>
-  %12 = unchecked_addr_cast %1 : $*Optional<A> to $*Optional<Builtin.RawPointer>
-  %13 = load %12 : $*Optional<Builtin.RawPointer>
-  %14 = unchecked_addr_cast %1 : $*Optional<A> to $*Optional<Builtin.NativeObject>
-  %15 = load %14 : $*Optional<Builtin.NativeObject>
-  dealloc_stack %1 : $*Optional<A>
-  %9999 = tuple()
-  return %9999 : $()
 }
 
 // Check load forwarding across strong_release in case the stored memory does
