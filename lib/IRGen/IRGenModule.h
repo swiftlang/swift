@@ -19,6 +19,8 @@
 #define SWIFT_IRGEN_IRGENMODULE_H
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/Module.h"
+#include "swift/SIL/SILFunction.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/ClusteredBitVector.h"
 #include "swift/Basic/SuccessorMap.h"
