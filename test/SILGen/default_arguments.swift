@@ -253,3 +253,14 @@ func test_r18400194() {
   (r18400194)(1)
 }
 
+// rdar://24242783
+//   Don't add capture arguments to local default argument generators.
+func localFunctionWithDefaultArg() {
+  var z = 5
+  func bar(x: Int? = nil) {
+    z += 1
+  }
+  bar()
+}
+// CHECK-LABEL: sil shared @_TIFF17default_arguments27localFunctionWithDefaultArgFT_T_L_3barFTGSqSi__T_A_
+// CHECK-SAME: $@convention(thin) () -> Optional<Int>

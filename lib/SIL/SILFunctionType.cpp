@@ -565,7 +565,10 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
   }
   
   // Lower the capture context parameters, if any.
-  if (constant)
+  // But note that default arg generators can't capture anything right now,
+  // and if we ever add that ability, it will be a different capture list
+  // from the function to which the argument is attached.
+  if (constant && !constant->isDefaultArgGenerator())
   if (auto function = constant->getAnyFunctionRef()) {
     auto &Types = M.Types;
     auto loweredCaptures = Types.getLoweredLocalCaptures(*function);
