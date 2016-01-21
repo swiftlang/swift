@@ -769,5 +769,5 @@ public typealias MutableCollectionType = MutableCollection
 @available(*, unavailable, message="PermutationGenerator has been removed in Swift 3")
 public struct PermutationGenerator<C: Collection> {}
 
-@available(*, unavailable, message="MutableSliceable has been removed in Swift 3")
+@available(*, unavailable, message="Please use 'Collection where SubSequence : MutableCollection'")
 public typealias MutableSliceable = Collection
