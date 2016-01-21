@@ -173,7 +173,7 @@ static void linkerDiagnosticHandler(const llvm::DiagnosticInfo &DI,
 }
 
 bool swift::immediate::linkLLVMModules(llvm::Module *Module,
-                                       llvm::Module *SubModule
+                                       std::unique_ptr<llvm::Module> SubModule
                             // TODO: reactivate the linker mode if it is
                             // supported in llvm again. Otherwise remove the
                             // commented code completely.
@@ -186,7 +186,7 @@ bool swift::immediate::linkLLVMModules(llvm::Module *Module,
                               // TODO: reactivate the linker mode if it is
                               // supported in llvm again. Otherwise remove the
                               // commented code completely.
-  bool Failed = llvm::Linker::linkModules(*Module, *SubModule,
+  bool Failed = llvm::Linker::linkModules(*Module, std::move(SubModule),
                                           linkerDiagnosticHandlerNoCtx
                                           /*, LinkerMode*/);
   Ctx.setDiagnosticHandler(OldHandler, OldDiagnosticContext);
@@ -261,7 +261,7 @@ bool swift::immediate::IRGenImportedModules(
       break;
     }
 
-    if (!linkLLVMModules(&Module, SubModule.get()
+    if (!linkLLVMModules(&Module, std::move(SubModule)
                          // TODO: reactivate the linker mode if it is
                          // supported in llvm again. Otherwise remove the
                          // commented code completely.
