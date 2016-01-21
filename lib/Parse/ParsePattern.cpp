@@ -520,7 +520,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
     paramContext = ParameterContextKind::Curried;
   }
 
-  // If the decl uses currying syntax, warn that that syntax is going away.
+  // If the decl uses currying syntax, complain that that syntax has gone away.
   if (BodyParams.size() - FirstBodyPatternIndex > 1) {
     SourceRange allPatternsRange(
       BodyParams[FirstBodyPatternIndex]->getStartLoc(),

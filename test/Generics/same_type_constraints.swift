@@ -85,8 +85,8 @@ public struct LazySequenceOf<S : SequenceType, A where S.Generator.Element == A>
   public subscript(i : A) -> A { return i }
 }
 
-public func iterate<A>(f : A -> A)(x : A) -> LazySequenceOf<Iterate<A>, A>? { // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-  return nil
+public func iterate<A>(f : A -> A) -> (x : A) -> LazySequenceOf<Iterate<A>, A>? {
+  return { x in nil }
 }
 
 public final class Iterate<A> : SequenceType {

@@ -150,14 +150,14 @@ func unnamed(Int) { } // expected-error{{unnamed parameters must be written with
 
 // Test fixits on curried functions.
 func testCurryFixits() {
-  func f1(x: Int)(y: Int) {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift; use a single parameter list}} {{17-19=, }}
+  func f1(x: Int)(y: Int) {} // expected-error{{curried function declaration syntax has been removed; use a single parameter list}} {{17-19=, }}
   func f1a(x: Int, y: Int) {}
-  func f2(x: Int)(y: Int)(z: Int) {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift; use a single parameter list}} {{17-19=, }} {{25-27=, }}
+  func f2(x: Int)(y: Int)(z: Int) {} // expected-error{{curried function declaration syntax has been removed; use a single parameter list}} {{17-19=, }} {{25-27=, }}
   func f2a(x: Int, y: Int, z: Int) {}
-  func f3(x: Int)() {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift; use a single parameter list}} {{17-19=}}
+  func f3(x: Int)() {} // expected-error{{curried function declaration syntax has been removed; use a single parameter list}} {{17-19=}}
   func f3a(x: Int) {}
-  func f4()(x: Int) {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift; use a single parameter list}} {{11-13=}}
+  func f4()(x: Int) {} // expected-error{{curried function declaration syntax has been removed; use a single parameter list}} {{11-13=}}
   func f4a(x: Int) {}
-  func f5(x: Int)()(y: Int) {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift; use a single parameter list}} {{17-19=}} {{19-21=, }}
+  func f5(x: Int)()(y: Int) {} // expected-error{{curried function declaration syntax has been removed; use a single parameter list}} {{17-19=}} {{19-21=, }}
   func f5a(x: Int, y: Int) {}
 }

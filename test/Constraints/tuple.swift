@@ -72,11 +72,13 @@ extension Int : PosixErrorReturn {
 }
 
 func posixCantFail<A, T : protocol<Comparable, PosixErrorReturn>>
-  (f:(A) -> T)(args:A) -> T // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
+  (f:(A) -> T) -> (args:A) -> T
 {
-  let result = f(args)
-  assert(result != T.errorReturnValue())
-  return result
+  return { args in
+    let result = f(args)
+    assert(result != T.errorReturnValue())
+    return result
+  }
 }
 
 func open(name: String, oflag: Int) -> Int { }

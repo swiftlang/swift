@@ -5,8 +5,8 @@ func double(x: Int) -> Int {
   return x+x
 }
 
-func curriedSubtract(x: Int)(_ y: Int) -> Int {
-  return x-y
+func curriedSubtract(x: Int) -> (Int) -> Int {
+  return { y in x - y }
 }
 
 func twice(f: (Int) -> Int, _ x: Int) -> Int {

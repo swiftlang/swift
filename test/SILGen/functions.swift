@@ -23,41 +23,6 @@ func higher_order_function2(f: (Int, Int) -> Int, _ x: Int, _ y: Int) -> Int {
   return f(x, y)
 }
 
-// -- Entry point BBs correspond to curried arguments in left-to-right order.
-// CHECK-LABEL: sil hidden @_TF9functions16curried_function{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
-func curried_function(x: Int)(y: Int) -> Int {
-  var x = x
-  var y = y
-  // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
-  // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Builtin.Int64
-  // CHECK: [[PBX:%.*]] = project_box [[XADDR]]
-  // CHECK: [[YADDR:%[0-9]+]] = alloc_box $Builtin.Int64
-  // CHECK: [[PBY:%.*]] = project_box [[YADDR]]
-
-  return standalone_function(x, y)
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF9functions19standalone_function{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
-  // CHECK: [[X:%[0-9]+]] = load [[PBX]]
-  // CHECK: [[Y:%[0-9]+]] = load [[PBY]]
-  // CHECK: apply [[FUNC]]([[X]], [[Y]])
-
-  // CHECK: return
-}
-
-// -- Curried generic function needs to forward archetypes through entry points
-func generic_curried_function<T, U>(x: T)(y: U) { }
-
-// -- Curried function that returns a function uncurries to the right "natural" level
-// CHECK-LABEL: sil hidden @_TF9functions33curried_function_returns_function{{.*}} :  $@convention(thin) (Builtin.Int64, Builtin.Int64) -> @owned @callee_owned (Builtin.Int64) -> Builtin.Int64
-func curried_function_returns_function(x: Int)(y: Int) -> (z:Int) -> Int {
-  var x = x
-  var y = y
-  // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
-  return { z in standalone_function(standalone_function(x, y), z) }
-}
-// -- Local function has extra uncurry level with context
-// CHECK-LABEL: sil shared @_TFF9functions33curried_function_returns_function{{.*}} : $@convention(thin) (Builtin.Int64, @owned @box Builtin.Int64, @owned @box Builtin.Int64) -> Builtin.Int64
-// bb0(%0 : $@box Builtin.Int64, %1 : $@box Builtin.Int64, %4 : $Builtin.Int64):
-
 struct SomeStruct {
   // -- Constructors and methods are uncurried in 'self'
   // -- Instance methods use 'method' cc
@@ -67,12 +32,7 @@ struct SomeStruct {
   mutating
   func method(x: Int) {}
 
-  mutating
-  func curried_method(x: Int)(y: Int) {}
-
   static func static_method(x: Int) {}
-
-  static func static_curried_method(x: Int)(y: Int) {}
 
   func generic_method<T>(x: T) {}
 }
@@ -92,17 +52,9 @@ class SomeClass {
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $SomeClass):
   func method(x: Int) {}
 
-  // CHECK-LABEL: sil hidden @_TFC9functions9SomeClass14curried_method{{.*}} : $@convention(method) (Builtin.Int64, Builtin.Int64, @guaranteed SomeClass) -> ()
-  // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $SomeClass):
-  func curried_method(x: Int)(y: Int) {}
-
   // CHECK-LABEL: sil hidden @_TZFC9functions9SomeClass13static_method{{.*}} : $@convention(thin) (Builtin.Int64, @thick SomeClass.Type) -> ()
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $@thick SomeClass.Type):
   class func static_method(x: Int) {}
-
-  // CHECK-LABEL: sil hidden @_TZFC9functions9SomeClass21static_curried_method{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> ()
-  // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $@thick SomeClass.Type):
-  class func static_curried_method(x: Int)(y: Int) {}
 
   var someProperty: Int {
     get {
@@ -163,66 +115,6 @@ func calls(i: Int, j: Int, k: Int) {
   // CHECK: apply [[FUNC]]([[I]], [[J]])
   standalone_function(i, j)
 
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF9functions16curried_function{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
-  // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
-  // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
-  // CHECK: apply [[FUNC]]([[J]], [[I]])
-  curried_function(i)(y: j)
-
-  // -- Paren exprs shouldn't affect the uncurrying optimization.
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF9functions16curried_function{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
-  // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
-  // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
-  // CHECK: apply [[FUNC]]([[J]], [[I]])
-  (curried_function)(i)(y: j)
-
-  // -- Coercions and function conversions shouldn't affect the uncurrying
-  //    optimization.
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF9functions16curried_function{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
-  // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
-  // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
-  // CHECK: apply [[FUNC]]([[J]], [[I]])
-  (curried_function)(i)(y: j)
-
-  // CHECK: [[FUNC1:%[0-9]+]] = function_ref @_TF9functions33curried_function_returns_function{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> @owned @callee_owned (Builtin.Int64) -> Builtin.Int64
-  // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
-  // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
-  // CHECK: [[FUNC2:%[0-9]+]] = apply [[FUNC1]]([[J]], [[I]])
-  // CHECK: [[K:%[0-9]+]] = load [[KADDR]]
-  // CHECK: apply [[FUNC2]]([[K]])
-  curried_function_returns_function(i)(y: j)(z: k)
-
-  generic_curried_function(i)(y: j)
-  // -- Use of curried entry points as values.
-
-  // CHECK: [[F1BOX:%[0-9]+]] = alloc_box $@callee_owned (Builtin.Int64) -> Builtin.Int64
-  // CHECK: [[F1ADDR:%.*]] = project_box [[F1BOX]]
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF9functions16curried_function{{.*}} : $@convention(thin) (Builtin.Int64) -> @owned @callee_owned (Builtin.Int64) -> Builtin.Int64
-  // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
-  // CHECK: [[FUNC_CURRY:%[0-9]+]] = apply [[FUNC]]([[I]])
-  // CHECK: store [[FUNC_CURRY]] to [[F1ADDR]]
-  var f1 = curried_function(i)
-  // CHECK: [[F1:%[0-9]+]] = load [[F1ADDR]]
-  // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
-  // CHECK: apply [[F1]]([[J]])
-  f1(y: j)
-
-  // CHECK: [[F2BOX:%[0-9]+]] = alloc_box $@callee_owned (Builtin.Int64) -> @owned @callee_owned (Builtin.Int64) -> Builtin.Int64
-  // CHECK: [[F2ADDR:%.*]] = project_box [[F2BOX]]
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF9functions16curried_function{{.*}} : $@convention(thin) (Builtin.Int64) -> @owned @callee_owned (Builtin.Int64) -> Builtin.Int64
-  // CHECK: [[FUNC_THICK:%[0-9]+]] = thin_to_thick_function [[FUNC]] : ${{.*}} to $@callee_owned (Builtin.Int64) -> @owned @callee_owned (Builtin.Int64) -> Builtin.Int64
-  // CHECK: store [[FUNC_THICK]] to [[F2ADDR]]
-  var f2 = curried_function
-  // CHECK: [[F2:%[0-9]+]] = load [[F2ADDR]]
-  // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
-  // CHECK: [[F2_I:%[0-9]+]] = apply [[F2]]([[I]])
-  // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
-  // CHECK: apply [[F2_I]]([[J]])
-  f2(i)(y: j)
-
-  var gcf1: Int -> () = generic_curried_function(i)
-  gcf1(j)
-
   // -- Curry 'self' onto struct method argument lists.
 
   // CHECK: [[ST_ADDR:%.*]] = alloc_box $SomeStruct
@@ -239,10 +131,6 @@ func calls(i: Int, j: Int, k: Int) {
   // CHECK: [[THUNK_THICK:%.*]] = thin_to_thick_function [[THUNK]]
   var stm1 = SomeStruct.method
   stm1(&st)(i)
-  // CHECK: [[THUNK:%.*]] = function_ref @_TFV9functions10SomeStruct14curried_method{{.*}}
-  // CHECK: [[THUNK_THICK:%.*]] = thin_to_thick_function [[THUNK]]
-  var stm2 = SomeStruct.curried_method
-  stm2(&st)(i)(y: j)
 
   // -- Curry 'self' onto method argument lists dispatched using class_method.
 
@@ -261,13 +149,6 @@ func calls(i: Int, j: Int, k: Int) {
   // CHECK: apply [[METHOD]]([[I]], [[C]])
   c.method(i)
 
-  // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [[C]] : {{.*}}, #SomeClass.curried_method!2
-  // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
-  // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
-  // CHECK: apply [[METHOD]]([[J]], [[I]], [[C]])
-  c.curried_method(i)(y: j)
-
   // -- Curry 'self' onto unapplied methods dispatched using class_method.
   // CHECK: [[METHOD_CURRY_THUNK:%.*]] = function_ref @_TFC9functions9SomeClass6method{{.*}}
   // CHECK: apply [[METHOD_CURRY_THUNK]]
@@ -280,24 +161,6 @@ func calls(i: Int, j: Int, k: Int) {
   // CHECK: apply [[METHOD]]([[I]], [[C]])
   SomeClass.method(c)(i)
 
-  // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [[C]] : {{.*}}, #SomeClass.curried_method!2
-  // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
-  // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
-  // CHECK: apply [[METHOD]]([[J]], [[I]], [[C]])
-  SomeClass.curried_method(c)(i)(y: j)
-
-  // -- Curry 'self' onto unapplied methods, after applying side effects from a Type expression.
-
-  // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
-  // CHECK: [[SIDEFUNC:%[0-9]+]] = function_ref @_TF9functions21SomeClassWithBenefitsFT_MCS_9SomeClass : $@convention(thin) () -> @thick SomeClass.Type
-  // CHECK: apply [[SIDEFUNC]]()
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [[C]] : {{.*}}, #SomeClass.curried_method!2
-  // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
-  // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
-  // CHECK: apply [[METHOD]]([[J]], [[I]], [[C]])
-  SomeClassWithBenefits().curried_method(c)(i)(y: j)
-
   // -- Curry the Type onto static method argument lists.
   
   // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
@@ -305,25 +168,6 @@ func calls(i: Int, j: Int, k: Int) {
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: apply [[METHOD]]([[I]], [[META]])
   c.dynamicType.static_method(i)
-
-  // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [[META:%[0-9]+]] : {{.*}}, #SomeClass.static_curried_method!2
-  // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
-  // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
-  // CHECK: apply [[METHOD]]([[J]], [[I]], [[META]])
-  c.dynamicType.static_curried_method(i)(y: j)
-
-  // FIXME: use of curried method entry points as values
-  //var m1 = c.curried_method(i)
-  //m1(j)
-  //var m2 = c.curried_method
-  //m2(i)(j)
-  //var m3 = SomeClass.curried_method
-  //m3(c)(i)(j)
-  //var s1 = c.Type.static_curried_method(i)
-  //s1(j)
-  //var s2 = c.Type.static_curried_method
-  //s2(i)(j)
 
   // -- Curry property accesses.
 
@@ -458,18 +302,6 @@ func calls(i: Int, j: Int, k: Int) {
 }
 
 // -- Curried entry points
-// CHECK-LABEL: sil shared @_TF9functions16curried_function{{.*}} : $@convention(thin) (Builtin.Int64) -> @owned @callee_owned (Builtin.Int64) -> Builtin.Int64
-// CHECK: bb0([[X:%[0-9]+]] : $Builtin.Int64):
-// CHECK:   [[FUNC:%[0-9]+]] = function_ref @_TF9functions16curried_function{{.*}}  : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
-// CHECK:   [[CLOSURE:%[0-9]+]] = partial_apply [[FUNC]]([[X]])
-// CHECK:   return [[CLOSURE]]
-
-// CHECK-LABEL: sil shared @_TF9functions24generic_curried_function{{.*}} : $@convention(thin) <T, U> (@in T) -> @owned @callee_owned (@in U) -> () {
-// CHECK: bb0([[X:%.*]] : $*T):
-// CHECK:   [[UNCURRIED:%.*]] = function_ref @_TF9functions24generic_curried_function{{.*}}
-// CHECK:   [[CURRIED:%.*]] = partial_apply [[UNCURRIED]]<T, U>([[X]])
-// CHECK:   return [[CURRIED]] : $@callee_owned (@in U) -> ()
-
 // CHECK-LABEL: sil shared @_TFV9functions10SomeStruct6method{{.*}} : $@convention(thin) (@inout SomeStruct) -> @owned @callee_owned (Builtin.Int64) -> () {
 // CHECK:   [[UNCURRIED:%.*]] = function_ref @_TFV9functions10SomeStruct6method{{.*}} : $@convention(method) (Builtin.Int64, @inout SomeStruct) -> () // user: %2
 // CHECK:   [[CURRIED:%.*]] = partial_apply [[UNCURRIED]]

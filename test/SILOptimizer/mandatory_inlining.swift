@@ -80,28 +80,6 @@ func test_auto_closure_without_capture() -> Bool {
   // CHECK: [[FALSE:%.*]] = struct $Bool ([[FV:%.*]] : $Builtin.Int1)
   // CHECK: return [[FALSE]]
 
-@_transparent func test_curried(x: Int)(y: Int) -> Int { // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-  return y
-}
-
-func call_uncurried(x: Int, y: Int) -> Int {
-  return test_curried(x)(y: y)
-}
-
-// CHECK-LABEL: sil hidden @_TF18mandatory_inlining14call_uncurried
-  // CHECK-NOT: = apply
-  // CHECK: return
-
-func call_curried(x: Int, y: Int) -> Int {
-  let z = test_curried(x)
-  return z(y: y)
-}
-
-// CHECK-LABEL: sil hidden @_TF18mandatory_inlining12call_curried
-  // CHECK: = apply
-  // CHECK: = apply
-  // CHECK: return
-
 infix operator &&& {
   associativity left
   precedence 120

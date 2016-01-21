@@ -260,9 +260,9 @@ func rdar21784170() {
 }
 
 // <rdar://problem/21829141> BOGUS: unexpected trailing closure
-func expect<T, U>(_: T)(_: U.Type) {}  //  expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-func expect<T, U>(_: T, _: Int = 1)(_: U.Type) {} //  expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-expect(Optional(3))(Optional<Int>.self)
+func expect<T, U>(_: T) -> (U.Type) -> () { return { ty in () } } // expected-note{{found this candidate}}
+func expect<T, U>(_: T, _: Int = 1) -> (U.Type) -> () { return { ty in () } } // expected-note{{found this candidate}}
+expect(Optional(3))(Optional<Int>.self) // expected-error{{ambiguous use of 'expect'}}
 
 // <rdar://problem/19804707> Swift Enum Scoping Oddity
 func rdar19804707() {
@@ -300,8 +300,8 @@ func r20789423() {
 
 
 
-func f7(a: Int)(b : Int) -> Int { // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-  return a+b
+func f7(a: Int) -> (b: Int) -> Int {
+  return { b in a+b }
 }
 
 f7(1)(b: 1)
@@ -319,7 +319,7 @@ f8(b: 1.0)         // expected-error {{cannot convert value of type 'Double' to 
 
 class CurriedClass {
   func method1() {}
-  func method2(a: Int)(b : Int) {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
+  func method2(a: Int) -> (b : Int) -> () { return { b in () } }
   func method3(a: Int, b : Int) {}
 }
 

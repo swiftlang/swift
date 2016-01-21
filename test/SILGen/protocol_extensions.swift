@@ -473,8 +473,6 @@ func testG<T>(m: GenericMetaHolder<T>, gg: G<T>.Type) {
 extension P1 {
   final func f1() { }
 
-  final func curried1(b: Bool)(_ i: Int64) { }
-
   final subscript (i: Int64) -> Bool {
     get { return true }
   }
@@ -503,11 +501,6 @@ func testExistentials1(p1: P1, b: Bool, i: Int64) {
   // CHECK: [[F1:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P12f1{{.*}}
   // CHECK: apply [[F1]]<@opened([[UUID]]) P1>([[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
   p1.f1()
-
-  // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[P]] : $*P1 to $*@opened([[UUID:".*"]]) P1
-  // CHECK: [[CURRIED1:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P18curried1{{.*}}
-  // CHECK: [[CURRIED1]]<@opened([[UUID]]) P1>([[I]], [[B]], [[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Int64, Bool, @in_guaranteed τ_0_0) -> ()
-  p1.curried1(b)(i)
 
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[P]] : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: copy_addr [[POPENED]] to [initialization] [[POPENED_COPY:%.*]] :

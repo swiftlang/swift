@@ -97,20 +97,6 @@ func simple_arguments(x: Int, y: Int) -> Int {
   return x+y
 }
 
-// CHECK-LABEL: sil hidden @_TF5decls17curried_arguments
-// CHECK: bb0(%0 : $Int, %1 : $Int):
-// CHECK: [[X:%[0-9]+]] = alloc_box $Int
-// CHECK: [[PBX:%.*]] = project_box [[X]]
-// CHECK-NEXT: store %1 to [[PBX]]
-// CHECK: [[Y:%[0-9]+]] = alloc_box $Int
-// CHECK: [[PBY:%.*]] = project_box [[Y]]
-// CHECK-NEXT: store %0 to [[PBY]]
-func curried_arguments(x: Int)(y: Int) -> Int {
-  var x = x
-  var y = y
-  return x+y
-}
-
 // CHECK-LABEL: sil hidden @_TF5decls14tuple_argument
 // CHECK: bb0(%0 : $Int, %1 : $Float):
 // CHECK: [[UNIT:%[0-9]+]] = tuple ()

@@ -141,7 +141,7 @@ var test1b = { 42 }
 var test1c = { { 42 } }
 var test1d = { { { 42 } } }
 
-func test2(a: Int)(b: Int) -> (c: Int) { // expected-error{{cannot create a single-element tuple with an element label}} {{32-35=}} expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
+func test2(a: Int, b: Int) -> (c: Int) { // expected-error{{cannot create a single-element tuple with an element label}} {{32-35=}}
  a+b
  a+b+c // expected-error{{use of unresolved identifier 'c'}}
  return a+b

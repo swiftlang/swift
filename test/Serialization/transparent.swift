@@ -21,10 +21,6 @@ var raw = testTransparent(x: false)
 // SIL: store [[RESULT2]] to [[TMP]] : $*Int32
 var tmp = testBuiltin()
 
-func test_partial(i: Int32, j: Int32) {
-  calls(i: i, j: j)
-}
-
 // SIL-LABEL: sil public_external [transparent] [fragile] @_TF15def_transparent15testTransparentFT1xSb_Sb : $@convention(thin) (Bool) -> Bool {
 // SIL: bb0(%0 : $Bool):
 // SIL: return %0 : $Bool

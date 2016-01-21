@@ -258,10 +258,6 @@ protocol subject_containerProtocol1 {
 
 @objc
 protocol subject_containerObjCProtocol1 {
-  func func_Curried1()() // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-  // expected-error@-1 {{method cannot be a member of an @objc protocol because curried functions cannot be represented in Objective-C}}
-  // expected-note@-2 {{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
-
   func func_FunctionReturn1() -> PlainStruct
   // expected-error@-1 {{method cannot be a member of an @objc protocol because its result type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
@@ -688,37 +684,6 @@ class infer_instanceFunc1 {
 // CHECK-LABEL: {{^}} @objc func func_TupleStyle2(a: Int, b: Int, c: Int) {
 
   @objc func func_TupleStyle2a(a: Int, b: Int, c: Int) {}
-
-  func func_Curried1()() {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-// CHECK-LABEL: {{^}} func func_Curried1()() {
-
-  @objc func func_Curried1_()() {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-  // expected-error@-1 {{method cannot be marked @objc because curried functions cannot be represented in Objective-C}}
-
-  func func_Curried2()(a: Int) {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-// CHECK-LABEL: {{^}} func func_Curried2()(a: Int) {
-
-  @objc func func_Curried2_()(a: Int) {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-  // expected-error@-1 {{method cannot be marked @objc because curried functions cannot be represented in Objective-C}}
-
-  func func_Curried3()() -> Int {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-// CHECK-LABEL: {{^}} func func_Curried3()() -> Int {
-
-  @objc func func_Curried3_()() -> Int {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-  // expected-error@-1 {{method cannot be marked @objc because curried functions cannot be represented in Objective-C}}
-
-  func func_Curried4()(a: String) {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-// CHECK-LABEL: {{^}} func func_Curried4()(a: String) {
-
-  @objc func func_Curried4_()(a: String) {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-  // expected-error@-1 {{method cannot be marked @objc because curried functions cannot be represented in Objective-C}}
-
-  func func_Curried5()() -> String {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-// CHECK-LABEL: {{^}} func func_Curried5()() -> String {
-
-  @objc func func_Curried5_()() -> String {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-  // expected-error@-1 {{method cannot be marked @objc because curried functions cannot be represented in Objective-C}}
-
 
   // Check that we produce diagnostics for every parameter and return type.
   @objc func func_MultipleDiags(a: PlainStruct, b: PlainEnum) -> protocol<> {}
@@ -1597,50 +1562,30 @@ class infer_class5 : Protocol_ObjC1 {}
 
 protocol infer_protocol1 {
 // CHECK-LABEL: {{^}}protocol infer_protocol1 {
-
-  func func_Curried1()() // no-error expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-  // CHECK: {{^}} func func_Curried1()()
-
   func nonObjC1()
   // CHECK: {{^}} func nonObjC1()
 }
 
 protocol infer_protocol2 : Protocol_Class1 {
 // CHECK-LABEL: {{^}}protocol infer_protocol2 : Protocol_Class1 {
-
-  func func_Curried1()() // no-error expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-  // CHECK: {{^}} func func_Curried1()()
-
   func nonObjC1()
   // CHECK: {{^}} func nonObjC1()
 }
 
 protocol infer_protocol3 : Protocol_ObjC1 {
 // CHECK-LABEL: {{^}}protocol infer_protocol3 : Protocol_ObjC1 {
-
-  func func_Curried1()() // no-error expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-  // CHECK: {{^}} func func_Curried1()()
-
   func nonObjC1()
   // CHECK: {{^}} func nonObjC1()
 }
 
 protocol infer_protocol4 : Protocol_Class1, Protocol_ObjC1 {
 // CHECK-LABEL: {{^}}protocol infer_protocol4 : Protocol_Class1, Protocol_ObjC1 {
-
-  func func_Curried1()() // no-error expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-  // CHECK: {{^}} func func_Curried1()()
-
   func nonObjC1()
   // CHECK: {{^}} func nonObjC1()
 }
 
 protocol infer_protocol5 : Protocol_ObjC1, Protocol_Class1 {
 // CHECK-LABEL: {{^}}protocol infer_protocol5 : Protocol_ObjC1, Protocol_Class1 {
-
-  func func_Curried1()() // no-error expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-  // CHECK: {{^}} func func_Curried1()()
-
   func nonObjC1()
   // CHECK: {{^}} func nonObjC1()
 }

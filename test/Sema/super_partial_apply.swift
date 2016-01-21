@@ -5,13 +5,13 @@ func doFoo(f: () -> ()) {
 }
 
 class Base {
-  // expected-warning@+1 {{curried function declaration syntax will be removed in a future version of Swift; use a single parameter list}}
+  // expected-error@+1 {{curried function declaration syntax has been removed; use a single parameter list}}
   func foo()() {}
   func bar() {}
 }
 
 class Derived : Base {
-  // expected-warning@+1 {{curried function declaration syntax will be removed in a future version of Swift; use a single parameter list}}
+  // expected-error@+1 {{curried function declaration syntax has been removed; use a single parameter list}}
   override func foo()() {
     doFoo(super.foo()) // expected-error {{partial application of 'super' method is not allowed}}
   }
@@ -21,7 +21,7 @@ class Derived : Base {
 }
 
 class BaseWithFinal {
-  // expected-warning@+1 {{curried function declaration syntax will be removed in a future version of Swift; use a single parameter list}}
+  // expected-error@+1 {{curried function declaration syntax has been removed; use a single parameter list}}
   final func foo()() {}
 }
 

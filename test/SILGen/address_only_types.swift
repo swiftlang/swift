@@ -27,46 +27,12 @@ func address_only_ignored_argument(_: Unloadable) {
   // CHECK: return
 }
 
-// CHECK-LABEL: sil hidden @_TF18address_only_types30address_only_curried_arguments
-func address_only_curried_arguments(x: Unloadable)(y: Unloadable) {
-  // CHECK: bb0([[YARG:%[0-9]+]] : $*Unloadable, [[XARG:%[0-9]+]] : $*Unloadable):
-  // CHECK-NEXT: debug_value_addr [[YARG]] : $*Unloadable, let, name "y"
-  // CHECK-NEXT: debug_value_addr [[XARG]] : $*Unloadable, let, name "x"
-  // CHECK-NEXT: destroy_addr [[XARG]]
-  // CHECK-NEXT: destroy_addr [[YARG]]
-  // CHECK-NEXT: tuple
-  // CHECK-NEXT: return
-}
-
-// CHECK-LABEL: sil hidden @_TF18address_only_types41address_only_curried_arguments_and_return
-func address_only_curried_arguments_and_return(x: Unloadable)(y: Unloadable) -> Unloadable {
-  // CHECK: bb0([[RET:%[0-9]+]] : $*Unloadable, [[YARG:%[0-9]+]] : $*Unloadable, [[XARG:%[0-9]+]] : $*Unloadable):
-  // CHECK-NEXT: debug_value_addr [[YARG]] : $*Unloadable, let, name "y"
-  // CHECK-NEXT: debug_value_addr [[XARG]] : $*Unloadable, let, name "x"
-  // CHECK-NEXT: copy_addr [take] [[XARG]] to [initialization] [[RET]]
-  // CHECK-NEXT: destroy_addr [[YARG]]
-  // CHECK-NEXT: tuple
-  // CHECK-NEXT: return
-  return x
-}
-
 // CHECK-LABEL: sil hidden @_TF18address_only_types19address_only_return
 func address_only_return(x: Unloadable, y: Int) -> Unloadable {
   // CHECK: bb0([[RET:%[0-9]+]] : $*Unloadable, [[XARG:%[0-9]+]] : $*Unloadable, [[YARG:%[0-9]+]] : $Builtin.Int64):
   // CHECK-NEXT: debug_value_addr [[XARG]] : $*Unloadable, let, name "x"
   // CHECK-NEXT: debug_value [[YARG]] : $Builtin.Int64, let, name "y"
   // CHECK-NEXT: copy_addr [take] [[XARG]] to [initialization] [[RET]]
-  // CHECK-NEXT: [[VOID:%[0-9]+]] = tuple ()
-  // CHECK-NEXT: return [[VOID]]
-  return x
-}
-
-// CHECK-LABEL: sil hidden @_TF18address_only_types27address_only_curried_return
-func address_only_curried_return(x: Unloadable)(y: Int) -> Unloadable {
-  // CHECK: bb0([[RET:%[0-9]+]] : $*Unloadable, [[YARG:%[0-9]+]] : $Builtin.Int64, [[XADDR:%[0-9]+]] : $*Unloadable):
-  // CHECK-NEXT: debug_value [[YARG]] : $Builtin.Int64, let, name "y"
-  // CHECK-NEXT: debug_value_addr [[XADDR]] : $*Unloadable, let, name "x"
-  // CHECK-NEXT: copy_addr [take] [[XADDR]] to [initialization] [[RET]]
   // CHECK-NEXT: [[VOID:%[0-9]+]] = tuple ()
   // CHECK-NEXT: return [[VOID]]
   return x
