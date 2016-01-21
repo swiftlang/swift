@@ -1061,8 +1061,8 @@ void IRGenDebugInfo::emitVariableDeclaration(
       auto Size = Dim.SizeInBits;
       Dim = EltSizes.getNext();
       OffsetInBits +=
-        llvm::RoundUpToAlignment(Size, Dim.AlignInBits ? Dim.AlignInBits
-                                                       : SizeOfByte);
+        llvm::alignTo(Size, Dim.AlignInBits ? Dim.AlignInBits
+                      : SizeOfByte);
     }
     emitDbgIntrinsic(BB, Piece, Var, DBuilder.createExpression(Operands), Line,
                      Loc.Col, Scope, DS);
@@ -1153,7 +1153,7 @@ IRGenDebugInfo::createMemberType(DebugTypeInfo DbgTy, StringRef Name,
       Scope, Name, File, 0, SizeOfByte * DbgTy.size.getValue(),
       SizeOfByte * DbgTy.align.getValue(), OffsetInBits, Flags, Ty);
   OffsetInBits += getSizeInBits(Ty, DIRefMap);
-  OffsetInBits = llvm::RoundUpToAlignment(OffsetInBits,
+  OffsetInBits = llvm::alignTo(OffsetInBits,
                                           SizeOfByte * DbgTy.align.getValue());
   return DITy;
 }
