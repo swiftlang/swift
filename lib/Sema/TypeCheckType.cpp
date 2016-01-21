@@ -440,6 +440,35 @@ Type TypeChecker::applyUnboundGenericArguments(
   BoundGenericType *BGT = BoundGenericType::get(unbound->getDecl(),
                                                 unbound->getParent(),
                                                 genericArgTypes);
+
+  // Check for self referencing generic argument types.
+  // To meet this condition, a member's overall type must be same as the
+  // struct or enum it belongs to. Then it must have the same type as one
+  // of its type's arugment. See 'X' in the following example:
+  //   struct X<T> { let s: X<X> }
+  //   enum X<T> { case s(X<X>) }
+  bool SelfReferencingGenArgType = false;
+  auto DCT = dc->getDeclaredTypeInContext();
+  auto BGTN = BGT->getNominalOrBoundGenericNominal();
+  auto DCTN = DCT ? DCT->getNominalOrBoundGenericNominal() : nullptr;
+  auto BGTNI = BGTN ? BGTN->getDeclaredInterfaceType() : nullptr;
+  auto DCTNI = DCTN ? DCTN->getDeclaredInterfaceType() : nullptr;
+  if (BGTNI && DCTNI && BGTNI->isEqual(DCTNI)) {
+    for (auto GAT: genericArgTypes) {
+      if (GAT->isEqual(DCT)) {
+        SelfReferencingGenArgType = true;
+      }
+    }
+  }
+
+  if (SelfReferencingGenArgType) {
+    if (isa<StructDecl>(BGTN)) {
+      diagnose(BGTN->getLoc(), diag::unsupported_recursive_type, DCT);
+    } else if (isa<EnumDecl>(BGTN)) {
+      diagnose(BGTN->getLoc(), diag::recursive_enum_not_indirect, DCT);
+    }
+  }
+
   // Check protocol conformance.
   if (!BGT->hasTypeParameter()) {
     SourceLoc noteLoc = unbound->getDecl()->getLoc();

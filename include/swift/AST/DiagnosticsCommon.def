@@ -45,6 +45,12 @@ ERROR(not_implemented,none,
 ERROR(error_opening_output,none,
       "error opening '%0' for output: %1", (StringRef, StringRef))
 
+ERROR(unsupported_recursive_type,none,
+      "recursive value type %0 is not allowed", (Type))
+
+ERROR(recursive_enum_not_indirect,none,
+      "recursive enum %0 is not marked 'indirect'", (Type))
+
 
 NOTE(previous_decldef,none,
      "previous %select{declaration|definition}0 of %1 is here", 
