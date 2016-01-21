@@ -189,8 +189,10 @@ extension RangeReplaceableCollection {
 
   public init(repeating repeatedValue: Iterator.Element, length: Int) {
     self.init()
-    let elements = Repeated(_repeating: repeatedValue, length: length)
-    appendContentsOf(elements)
+    if length != 0 {
+      let elements = Repeated(_repeating: repeatedValue, length: length)
+      appendContentsOf(elements)
+    }
   }
 
   public init<
