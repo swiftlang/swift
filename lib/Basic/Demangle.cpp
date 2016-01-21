@@ -197,12 +197,6 @@ public:
     return true;
   }
 
-  bool nextIfNot(char c) {
-    if (isEmpty() || peek() == c) return false;
-    advanceOffset(1);
-    return true;
-  }
-
   /// Claim the next few characters if they exactly match the given string.
   bool nextIf(StringRef str) {
     if (!Text.startswith(str)) return false;
@@ -376,10 +370,6 @@ public:
   }
   
 private:
-  enum class IsProtocol {
-    yes = true, no = false
-  };
-
   enum class IsVariadic {
     yes = true, no = false
   };

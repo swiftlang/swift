@@ -1068,9 +1068,6 @@ public:
   using iterator = decltype(ValueToCaseMap)::iterator;
   iterator begin() { return ValueToCaseMap.getItems().begin(); }
   iterator end() { return ValueToCaseMap.getItems().begin(); }
-  iterator_range<iterator> currentTrackedState() {
-    return ValueToCaseMap.getItems();
-  }
 
   void clear() { ValueToCaseMap.clear(); }
 

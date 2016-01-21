@@ -197,15 +197,6 @@ public:
             valueDescription + " cannot apply to a function type");
   }
   
-  // Require that the operand is a reference-counted type, or potentially an
-  // optional thereof.
-  void requireRetainablePointerValue(SILValue value,
-                                     const Twine &valueDescription) {
-    require(value.getType().isObject(), valueDescription +" must be an object");
-    require(value.getType().hasRetainablePointerRepresentation(),
-            valueDescription + " must have retainable pointer representation");
-  }
-
   /// Assert that two types are equal.
   void requireSameType(SILType type1, SILType type2, const Twine &complaint) {
     _require(type1 == type2, complaint, [&] {
@@ -1538,12 +1529,6 @@ public:
   SILType getMethodSelfType(CanSILFunctionType ft) {
     return ft->getParameters().back().getSILType();
   }
-  CanType getMethodSelfInstanceType(CanSILFunctionType ft) {
-    auto selfTy = getMethodSelfType(ft);
-    if (auto metaTy = selfTy.getAs<AnyMetatypeType>())
-      return metaTy.getInstanceType();
-    return selfTy.getSwiftRValueType();
-  }
 
   void checkWitnessMethodInst(WitnessMethodInst *AMI) {
     auto methodType = requireObjectType(SILFunctionType, AMI,
@@ -1594,23 +1579,6 @@ public:
       require(AMI->getModule().lookUpWitnessTable(conformance, false).first,
               "Could not find witness table for conformance.");
     }
-  }
-
-  bool isSelfArchetype(CanType t, ArrayRef<ProtocolDecl*> protocols) {
-    ArchetypeType *archetype = dyn_cast<ArchetypeType>(t);
-    if (!archetype)
-      return false;
-
-    auto selfProto = archetype->getSelfProtocol();
-    if (!selfProto)
-      return false;
-
-    for (auto checkProto : protocols) {
-      if (checkProto == selfProto || checkProto->inheritsFrom(selfProto))
-        return true;
-    }
-
-    return false;
   }
 
   bool isOpenedArchetype(CanType t) {

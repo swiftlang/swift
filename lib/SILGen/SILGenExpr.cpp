@@ -1592,30 +1592,6 @@ public:
   ~NominalTypeMemberRefRValueEmitter() = default;
 
 private:
-  bool hasStructWithAtMostOneNonTrivialField(SILGenFunction &SGF) const {
-    auto *S = dyn_cast<StructDecl>(Base);
-    if (!S)
-      return false;
-
-    bool FoundNonTrivialField = false;
-
-    for (auto Field : S->getStoredProperties()) {
-      SILType Ty = SGF.getLoweredType(Field->getType()->getCanonicalType());
-      if (Ty.isTrivial(SGF.F.getModule()))
-        continue;
-
-      // We already found a non-trivial field, so we have two. Return false.
-      if (FoundNonTrivialField)
-        return false;
-
-      // We found one non-trivial field.
-      FoundNonTrivialField = true;
-    }
-
-    // We found at most one non-trivial field.
-    return true;
-  }
-
   RValue emitStructDecl(SILGenFunction &SGF) {
     ManagedValue base =
       SGF.emitRValueAsSingleValue(Expr->getBase(),

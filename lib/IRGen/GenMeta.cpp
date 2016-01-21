@@ -1791,12 +1791,6 @@ namespace {
   protected:
     Size getNextOffset() const { return NextOffset; }
 
-    /// Add a uintptr_t value that represents the given offset, but
-    /// scaled to a number of words.
-    void addConstantWordInWords(Size value) {
-      addConstantWord(getOffsetInWords(IGM, value));
-    }
-
     /// Add a constant word-sized value.
     void addConstantWord(int64_t value) {
       addWord(llvm::ConstantInt::get(IGM.SizeTy, value));

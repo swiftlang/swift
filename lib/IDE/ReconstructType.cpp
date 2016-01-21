@@ -102,10 +102,6 @@ struct MemberInfo {
   }
 };
 
-struct CachedMemberInfo {
-  std::vector<MemberInfo> member_infos;
-};
-
 struct EnumElementInfo {
   swift::Type clang_type;
   ConstString name;
@@ -560,24 +556,11 @@ struct VisitNodeResult {
     return _types.size() == 1 && _types.front();
   }
 
-  bool
-  HasSingleDecl ()
-  {
-    return _decls.size() == 1 && _decls.front();
-  }
-
   swift::Type
   GetFirstType ()
   {
     // Must ensure there is a type prior to calling this
     return _types.front();
-  }
-
-  swift::Decl*
-  GetFirstDecl ()
-  {
-    // Must ensure there is a decl prior to calling this
-    return _decls.front();
   }
 
   void

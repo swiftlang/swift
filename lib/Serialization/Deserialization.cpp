@@ -24,9 +24,6 @@
 using namespace swift;
 using namespace swift::serialization;
 
-using ConformancePair = std::pair<ProtocolDecl *, ProtocolConformance *>;
-
-
 namespace {
   struct IDAndKind {
     const Decl *D;

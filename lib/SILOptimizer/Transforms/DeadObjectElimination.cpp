@@ -370,7 +370,7 @@ public:
 
 private:
   void addStore(StoreInst *Store, IndexTrieNode *AddressNode);
-  bool recursivelyCollectInteriorUses(ValueBase *defInst,
+  bool recursivelyCollectInteriorUses(ValueBase *DefInst,
                                       IndexTrieNode *AddressNode,
                                       bool IsInteriorAddress);
 

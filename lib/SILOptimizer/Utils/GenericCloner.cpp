@@ -86,15 +86,3 @@ void GenericCloner::populateCloned() {
     visit(BI->first->getTerminator());
   }
 }
-
-void dumpTypeSubstitutionMap(const TypeSubstitutionMap &map) {
-  llvm::errs() << "{\n";
-  for (auto &kv : map) {
-    llvm::errs() << "  ";
-    kv.first->print(llvm::errs());
-    llvm::errs() << " => ";
-    kv.second->print(llvm::errs());
-    llvm::errs() << "\n";
-  }
-  llvm::errs() << "}\n";
-}

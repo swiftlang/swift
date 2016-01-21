@@ -64,8 +64,6 @@ struct ASTNodeBase {};
     };
 #include "swift/AST/PatternNodes.def"
 
-  enum ShouldHalt { Continue, Halt };
-
   class Verifier : public ASTWalker {
     PointerUnion<Module *, SourceFile *> M;
     ASTContext &Ctx;
