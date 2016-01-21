@@ -423,6 +423,8 @@ self.test("\(testNamePrefix).init(repeating:length:)/semantics") {
   expectEqualSequence(
     [],
     empty.map { extractValue($0).value })
+  expectCrashLater()
+  C(repeating: wrapValue(OpaqueValue(42)), length: -1)
 }
 
 //===----------------------------------------------------------------------===//
