@@ -27,6 +27,7 @@
 #include "swift/AST/Module.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILDebugScope.h"
 
 #include "DebugTypeInfo.h"
 #include "IRBuilder.h"
