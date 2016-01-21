@@ -41,8 +41,8 @@ protocol HairClass: class {}
 func test_class_composition_erasure(x: protocol<HairClass, ErrorProtocol>) -> ErrorProtocol {
   return x
 }
-// CHECK-LABEL: sil hidden @_TF18boxed_existentials30test_class_composition_erasureFPs13ErrorProtocolS_13HairClassType_PS0__
-// CHECK:         [[VALUE:%.*]] = open_existential_ref [[OLD_EXISTENTIAL:%.*]] : $protocol<ErrorProtocol, HairClassType> to $[[VALUE_TYPE:@opened\(.*\) protocol<ErrorProtocol, HairClassType>]]
+// CHECK-LABEL: sil hidden @_TF18boxed_existentials30test_class_composition_erasureFPs13ErrorProtocolS_9HairClass_PS0__
+// CHECK:         [[VALUE:%.*]] = open_existential_ref [[OLD_EXISTENTIAL:%.*]] : $protocol<ErrorProtocol, HairClass> to $[[VALUE_TYPE:@opened\(.*\) protocol<ErrorProtocol, HairClass>]]
 // CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $ErrorProtocol, $[[VALUE_TYPE]]
 // CHECK:         [[ADDR:%.*]] = project_existential_box $[[VALUE_TYPE]] in [[NEW_EXISTENTIAL]] : $ErrorProtocol
 // CHECK:         store [[VALUE]] to [[ADDR]]
