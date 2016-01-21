@@ -161,6 +161,8 @@ public struct EnumerateGenerator<
   var count: Int = 0
 
   /// Construct from a `Base` generator.
+  @swift3_migration(message="use the 'enumerated()' method on the sequence")
+  @available(*, deprecated, message="it will be removed in Swift 3.  Use the 'enumerate()' method on the sequence.")
   public init(_ base: Base) {
     self.base = base
   }
@@ -186,10 +188,13 @@ public struct EnumerateGenerator<
 ///
 /// - Note: Idiomatic usage is to call `enumerate` instead of
 ///   constructing an `EnumerateSequence` directly.
+@swift3_migration(renamed="EnumeratedSequence")
 public struct EnumerateSequence<Base : SequenceType> : SequenceType {
   var base: Base
 
   /// Construct from a `Base` sequence.
+  @swift3_migration(message="use the 'enumerated()' method on the sequence")
+  @available(*, deprecated, message="it will be removed in Swift 3.  Use the 'enumerate()' method on the sequence.")
   public init(_ base: Base) {
     self.base = base
   }
@@ -197,6 +202,7 @@ public struct EnumerateSequence<Base : SequenceType> : SequenceType {
   /// Returns a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
+  @swift3_migration(renamed="iterator()")
   public func generate() -> EnumerateGenerator<Base.Generator> {
     return EnumerateGenerator(base.generate())
   }
