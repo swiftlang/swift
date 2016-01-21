@@ -514,6 +514,14 @@ name of the directory under $SWIFT_BUILD_ROOT where the build products will be
 placed""",
         metavar="PATH")
 
+    parser.add_argument("--cc",
+        help="specify the C compiler to be used",
+        action="store", dest="cc")
+
+    parser.add_argument("--cxx",
+        help="specify the C++ compiler to be used",
+        action="store", dest="cxx")
+
     parser.add_argument("-j", "--jobs",
         help="""
 the number of parallel build jobs to use""",
@@ -662,6 +670,20 @@ the number of parallel build jobs to use""",
             "--skip-test-watchos",
         ]
 
+    if not args.cc or not args.cxx:
+        host_clang = swift_build_support.clang.host_clang(
+            xcrun_toolchain=args.darwin_xcrun_toolchain)
+        if not host_clang:
+            print_with_argv0(
+                "Can't find clang.  Please install clang-3.5 or a later version.")
+            return 1
+
+        if not args.cc:
+            args.cc = host_clang.cc
+
+        if not args.cxx:
+            args.cxx = host_clang.cxx
+
     if not args.build_lldb:
         build_script_impl_inferred_args += [
             "--skip-build-lldb"
@@ -755,13 +777,6 @@ the number of parallel build jobs to use""",
     if args.clean and os.path.isdir(build_dir):
         shutil.rmtree(build_dir)
 
-    host_clang = swift_build_support.clang.host_clang(
-        xcrun_toolchain=args.darwin_xcrun_toolchain)
-    if not host_clang:
-        print_with_argv0(
-            "Can't find clang.  Please install clang-3.5 or a later version.")
-        return 1
-
     host_cmake = args.cmake
     if not host_cmake:
         host_cmake = swift_build_support.cmake.host_cmake(
@@ -772,8 +787,8 @@ the number of parallel build jobs to use""",
     build_script_impl_args = [
         os.path.join(SWIFT_SOURCE_ROOT, "swift", "utils", "build-script-impl"),
         "--build-dir", build_dir,
-        "--host-cc", host_clang.cc,
-        "--host-cxx", host_clang.cxx,
+        "--host-cc", args.cc,
+        "--host-cxx", args.cxx,
         "--darwin-xcrun-toolchain", args.darwin_xcrun_toolchain,
         "--cmake", host_cmake,
         "--cmark-build-type", args.cmark_build_variant,
