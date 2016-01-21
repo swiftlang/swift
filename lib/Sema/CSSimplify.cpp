@@ -3225,7 +3225,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     return SolutionKind::Solved;
   }
   
-  if (shouldAttemptFixes() && name.isSimpleName("allZeros") &&
+  if (shouldAttemptFixes() && name.isSimpleName(getASTContext().Id_allZeros) &&
       (rawValueType = getRawRepresentableValueType(TC, DC, instanceTy))) {
     // Replace a reference to "X.allZeros" with a reference to X().
     // FIXME: This is temporary.

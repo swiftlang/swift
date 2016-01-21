@@ -24,6 +24,7 @@
 
 IDENTIFIER(alloc)
 IDENTIFIER(allocWithZone)
+IDENTIFIER(allZeros)
 IDENTIFIER(atIndexedSubscript)
 IDENTIFIER_(bridgeToObjectiveC)
 IDENTIFIER_WITH_NAME(code_, "_code")

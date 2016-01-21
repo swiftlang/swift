@@ -6162,7 +6162,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
     do {
       // We haven't found the reference to allZeros yet, look for it now.
       if ((allZerosRef = dyn_cast<UnresolvedDotExpr>(current))) {
-        if (allZerosRef->getName().getBaseName().str() == "allZeros")
+        if (allZerosRef->getName().isSimpleName(TC.Context.Id_allZeros))
           break;
         allZerosRef = nullptr;
       }
