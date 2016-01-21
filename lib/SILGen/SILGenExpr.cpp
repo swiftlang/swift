@@ -442,13 +442,14 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
 
   // Get the lowered AST types:
   //  - the original type
-  auto origLoweredFormalType = AbstractionPattern(constantInfo.LoweredType);
+  auto origLoweredFormalType =
+      AbstractionPattern(constantInfo.LoweredInterfaceType);
   if (hasLocalCaptures) {
     auto formalTypeWithoutCaptures =
-      cast<AnyFunctionType>(constantInfo.FormalType.getResult());
+      cast<AnyFunctionType>(constantInfo.FormalInterfaceType.getResult());
     origLoweredFormalType =
       AbstractionPattern(
-              SGM.Types.getLoweredASTFunctionType(formalTypeWithoutCaptures,0,
+              SGM.Types.getLoweredASTFunctionType(formalTypeWithoutCaptures, 0,
                                                   silDeclRef));
   }
 
