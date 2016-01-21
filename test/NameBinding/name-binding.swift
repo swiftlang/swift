@@ -211,7 +211,7 @@ print(forwardReferenceVar, terminator: ""); var forwardReferenceVar: Int = 0
 
 // <rdar://problem/23248290> Name lookup: "Cannot convert type 'Int' to expected argument type 'Int'" while trying to initialize ivar of generic type in class scope
 // https://gist.github.com/erynofwales/61768899502b7ac83c6e
-struct Matrix4<T: FloatingPointType>  {
+struct Matrix4<T: FloatingPoint>  {
   static func size() -> Int {}
   
   private var data: Int = Matrix4.size()   // Ok: Matrix4<T>
