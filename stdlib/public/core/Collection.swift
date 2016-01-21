@@ -19,7 +19,7 @@
 // This protocol is almost an implementation detail of the standard
 // library; it is used to deduce things like the `SubSequence` and
 // `Iterator` type from a minimal collection, but it is also used in
-// exposed places like as a constraint on CollectionDefaultIterator.
+// exposed places like as a constraint on IndexingIterator.
 public protocol Indexable {
   /// A type that represents a valid position in the collection.
   ///
@@ -46,7 +46,7 @@ public protocol Indexable {
   // The declaration of _Element and subscript here is a trick used to
   // break a cyclic conformance/deduction that Swift can't handle.  We
   // need something other than a Collection.Iterator.Element that can
-  // be used as CollectionDefaultIterator<T>'s Element.  Here we arrange for
+  // be used as IndexingIterator<T>'s Element.  Here we arrange for
   // the Collection itself to have an Element type that's deducible from
   // its subscript.  Ideally we'd like to constrain this Element to be the same
   // as Collection.Iterator.Element (see below), but we have no way of
@@ -71,7 +71,7 @@ public protocol MutableIndexable {
 }
 
 /// The iterator used for collections that don't specify one.
-public struct CollectionDefaultIterator<Elements : Indexable>
+public struct IndexingIterator<Elements : Indexable>
  : IteratorProtocol, Sequence {
 
   /// Create a *iterator* over the given collection.
@@ -115,13 +115,13 @@ public protocol Collection : Indexable, Sequence {
   /// encapsulates its iteration state.
   ///
   /// By default, a `Collection` satisfies `Sequence` by
-  /// supplying a `CollectionDefaultIterator` as its associated `Iterator`
+  /// supplying a `IndexingIterator` as its associated `Iterator`
   /// type.
-  associatedtype Iterator : IteratorProtocol = CollectionDefaultIterator<Self>
+  associatedtype Iterator : IteratorProtocol = IndexingIterator<Self>
 
   // FIXME: Needed here so that the Iterator is properly deduced from
   // a custom iterator() function.  Otherwise we get an
-  // CollectionDefaultIterator. <rdar://problem/21539115>
+  // IndexingIterator. <rdar://problem/21539115>
   func iterator() -> Iterator
   
   // FIXME: should be constrained to Collection
@@ -189,10 +189,10 @@ public protocol Collection : Indexable, Sequence {
 
 /// Supply the default `iterator()` method for `Collection` models
 /// that accept the default associated `Iterator`,
-/// `CollectionDefaultIterator<Self>`.
-extension Collection where Iterator == CollectionDefaultIterator<Self> {
-  public func iterator() -> CollectionDefaultIterator<Self> {
-    return CollectionDefaultIterator(self)
+/// `IndexingIterator<Self>`.
+extension Collection where Iterator == IndexingIterator<Self> {
+  public func iterator() -> IndexingIterator<Self> {
+    return IndexingIterator(self)
   }
 }
 

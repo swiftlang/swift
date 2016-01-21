@@ -374,7 +374,7 @@ struct Sentinel2 {}
 // CHECK-DAG: - !private ["V4main28OtherFileProtoNonImplementor", "deinit"]
 // CHECK-DAG: - !private ["Vs13EmptyIterator", "Element"]
 // CHECK-DAG: - !private ["Vs13EmptyIterator", "init"]
-// CHECK-DAG: - !private ["Vs25CollectionDefaultIterator", "Element"]
+// CHECK-DAG: - !private ["Vs16IndexingIterator", "Element"]
 // CHECK-DAG: - ["O4main13OtherFileEnum", "Value"]
 // CHECK-DAG: - !private ["V4main20OtherFileEnumWrapper", "Enum"]
 
@@ -413,7 +413,7 @@ struct Sentinel2 {}
 // CHECK-DAG: !private "V4main26OtherFileProtoImplementor2"
 // CHECK-DAG: !private "V4main28OtherFileProtoNonImplementor"
 // CHECK-DAG: !private "Vs13EmptyIterator"
-// CHECK-DAG: !private "Vs25CollectionDefaultIterator"
+// CHECK-DAG: !private "Vs16IndexingIterator"
 // CHECK-DAG: - "O4main13OtherFileEnum"
 // CHECK-DAG: !private "V4main20OtherFileEnumWrapper"
 // CHECK-DAG: !private "V4main20OtherFileEnumWrapper"

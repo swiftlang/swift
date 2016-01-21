@@ -176,7 +176,7 @@ func for_loops1(x: Int, c: Bool) {
 // CHECK-LABEL: sil hidden  @{{.*}}for_loops2
 func for_loops2() {
   // rdar://problem/19316670
-  // CHECK: [[NEXT:%[0-9]+]] = function_ref @_TFVs25CollectionDefaultIterator4next
+  // CHECK: [[NEXT:%[0-9]+]] = function_ref @_TFVs16IndexingIterator4next
   // CHECK-NEXT: alloc_stack $Optional<MyClass>
   // CHECK-NEXT: apply [[NEXT]]<Array<MyClass>,
   // CHECK: class_method [[OBJ:%[0-9]+]] : $MyClass, #MyClass.foo!1

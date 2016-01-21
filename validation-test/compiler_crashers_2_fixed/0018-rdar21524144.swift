@@ -10,10 +10,10 @@ public protocol Indexable {
 
 protocol Collection : Indexable, Sequence {}
 
-public struct CollectionDefaultIterator<Elements : Indexable>
+public struct IndexingIterator<Elements : Indexable>
   : IteratorProtocol, Sequence {
   
-  public func iterator() -> CollectionDefaultIterator {
+  public func iterator() -> IndexingIterator {
     return self
   }
   
@@ -23,8 +23,8 @@ public struct CollectionDefaultIterator<Elements : Indexable>
 }
 
 extension Sequence where Self : Collection {
-  func iterator() -> CollectionDefaultIterator<Self> {
-    return CollectionDefaultIterator(self)
+  func iterator() -> IndexingIterator<Self> {
+    return IndexingIterator(self)
   }
 }
 

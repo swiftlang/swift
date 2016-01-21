@@ -155,7 +155,7 @@ public struct ReverseCollection<
 
   /// A type that provides the *sequence*'s iteration interface and
   /// encapsulates its iteration state.
-  public typealias Iterator = CollectionDefaultIterator<ReverseCollection>
+  public typealias Iterator = IndexingIterator<ReverseCollection>
   
   public let _base: Base
 }
@@ -185,7 +185,7 @@ public struct ReverseRandomAccessCollection<
   
   /// A type that provides the *sequence*'s iteration interface and
   /// encapsulates its iteration state.
-  public typealias Iterator = CollectionDefaultIterator<
+  public typealias Iterator = IndexingIterator<
     ReverseRandomAccessCollection
   >
 

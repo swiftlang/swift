@@ -29,7 +29,7 @@ SliceTests.test("Slice/AssociatedTypes") {
     expectSliceType(${traversal}Slice.self)
     expectCollectionAssociatedTypes(
       collectionType: ${traversal}Slice.self,
-      iteratorType: CollectionDefaultIterator<${traversal}Slice>.self,
+      iteratorType: IndexingIterator<${traversal}Slice>.self,
       subSequenceType: ${traversal}Slice.self,
       indexType: Minimal${traversal}Index.self)
   }
@@ -143,7 +143,7 @@ SliceTests.test("MutableSlice/AssociatedTypes") {
     expectMutableSliceType(${traversal}MutableSlice.self)
     expectCollectionAssociatedTypes(
       collectionType: ${traversal}MutableSlice.self,
-      iteratorType: CollectionDefaultIterator<${traversal}MutableSlice>.self,
+      iteratorType: IndexingIterator<${traversal}MutableSlice>.self,
       subSequenceType: ${traversal}MutableSlice.self,
       indexType: Minimal${traversal}Index.self)
   }

@@ -75,8 +75,8 @@ class OffsetCollection : MutableCollection {
     get { return data[i - startIndex] }
     set { data[i - startIndex] = newValue }
   }
-  func iterator() -> CollectionDefaultIterator<[Int]> {
-    return CollectionDefaultIterator<[Int]>(data)
+  func iterator() -> IndexingIterator<[Int]> {
+    return IndexingIterator<[Int]>(data)
   }
   func toArray() -> [Int] {
     return data

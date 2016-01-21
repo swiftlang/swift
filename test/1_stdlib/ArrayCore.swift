@@ -65,8 +65,8 @@ struct MrMcRange : Collection {
     self.base = base
   }
 
-  func iterator() -> CollectionDefaultIterator<MrMcRange> {
-    return CollectionDefaultIterator(self)
+  func iterator() -> IndexingIterator<MrMcRange> {
+    return IndexingIterator(self)
   }
   
   var startIndex: Int {

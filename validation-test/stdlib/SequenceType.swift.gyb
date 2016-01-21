@@ -171,7 +171,7 @@ SequenceTypeTests.test("IteratorSequence/IteratorProtocol/empty") {
     let base = data.iterator()
     var iter = IteratorSequence(base)
     expectType(
-      IteratorSequence<CollectionDefaultIterator<Array<OpaqueValue<Int>>>>.self,
+      IteratorSequence<IndexingIterator<Array<OpaqueValue<Int>>>>.self,
       &iter)
     checkIterator(data, iter) { $0.value == $1.value }
   }
@@ -192,7 +192,7 @@ SequenceTypeTests.test("IteratorSequence/IteratorProtocol") {
     let base = data.iterator()
     var iter = IteratorSequence(base)
     expectType(
-      IteratorSequence<CollectionDefaultIterator<Array<OpaqueValue<Int>>>>.self,
+      IteratorSequence<IndexingIterator<Array<OpaqueValue<Int>>>>.self,
       &iter)
     checkIterator(data, iter) { $0.value == $1.value }
   }
@@ -213,7 +213,7 @@ SequenceTypeTests.test("IteratorSequence/Sequence/empty") {
     let base = data.iterator()
     var iter = IteratorSequence(base)
     expectType(
-      IteratorSequence<CollectionDefaultIterator<Array<OpaqueValue<Int>>>>.self,
+      IteratorSequence<IndexingIterator<Array<OpaqueValue<Int>>>>.self,
       &iter)
     checkSequence(data, iter) { $0.value == $1.value }
   }
@@ -234,7 +234,7 @@ SequenceTypeTests.test("IteratorSequence/Sequence") {
     let base = data.iterator()
     var iter = IteratorSequence(base)
     expectType(
-      IteratorSequence<CollectionDefaultIterator<Array<OpaqueValue<Int>>>>.self,
+      IteratorSequence<IndexingIterator<Array<OpaqueValue<Int>>>>.self,
       &iter)
     checkSequence(data, iter) { $0.value == $1.value }
   }

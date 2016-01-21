@@ -1602,8 +1602,8 @@ final class EvilCollection : Collection {
     return TestValueTy(i)
   }
 
-  func iterator() -> CollectionDefaultIterator<EvilCollection> {
-    return CollectionDefaultIterator(self)
+  func iterator() -> IndexingIterator<EvilCollection> {
+    return IndexingIterator(self)
   }
 }
 

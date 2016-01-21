@@ -62,8 +62,8 @@ struct X : Collection {
   }
   subscript(i: Index) -> Element { return msg[i] }
 
-  func iterator() -> CollectionDefaultIterator<X> {
-    return CollectionDefaultIterator(self)
+  func iterator() -> IndexingIterator<X> {
+    return IndexingIterator(self)
   }
 }
 

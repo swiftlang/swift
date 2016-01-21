@@ -198,7 +198,7 @@ extension String {
       internal let _ascii: Bool
       internal var _asciiBase: UnsafeBufferPointerIterator<UInt8>!
       internal var _base: UnsafeBufferPointerIterator<UInt16>!
-      internal var _iterator: CollectionDefaultIterator<_StringCore>!
+      internal var _iterator: IndexingIterator<_StringCore>!
     }
 
     /// Return an *iterator* over the `UnicodeScalar`s that comprise
