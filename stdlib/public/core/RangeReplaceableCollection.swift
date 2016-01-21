@@ -207,6 +207,9 @@ extension RangeReplaceableCollection {
   public mutating func appendContentsOf<
     S : Sequence where S.Iterator.Element == Iterator.Element
   >(newElements: S) {
+    let approximateCapacity = self.length +
+      numericCast(newElements.underestimatedLength)
+    self.reserveCapacity(approximateCapacity)
     for element in newElements {
       append(element)
     }
