@@ -674,8 +674,8 @@ the number of parallel build jobs to use""",
         host_clang = swift_build_support.clang.host_clang(
             xcrun_toolchain=args.darwin_xcrun_toolchain)
         if not host_clang:
-            print_with_argv0(
-                "Can't find clang.  Please install clang-3.5 or a later version.")
+            print_with_argv0("Can't find clang. "
+                             "Please install clang-3.5 or a later version.")
             return 1
 
         if not args.cc:
