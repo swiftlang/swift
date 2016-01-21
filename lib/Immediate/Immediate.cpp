@@ -31,6 +31,7 @@
 #include "llvm/Config/config.h"
 #include "llvm/ExecutionEngine/MCJIT.h"
 #include "llvm/IR/DiagnosticPrinter.h"
+#include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Linker/Linker.h"
 #include "llvm/Transforms/IPO.h"
