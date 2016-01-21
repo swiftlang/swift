@@ -1404,7 +1404,7 @@ void IRGenSILFunction::emitSILFunction() {
       auto next = std::next(SILFunction::iterator(bb));
       if (next != CurSILFn->end()) {
         auto nextBB = LoweredBBs[&*next].bb;
-        assert(curBB->getNextNode() == nextBB &&
+        assert(&*std::next(curBB->getIterator()) == nextBB &&
                "lost source SIL order?");
       }
     }
