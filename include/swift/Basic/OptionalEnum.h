@@ -55,7 +55,7 @@ namespace swift {
         I rawValue,
         typename std::enable_if<std::is_integral<I>::value>::type * = {})
       : Storage(rawValue) {
-      assert(rawValue == (uintptr_t)(intptr_t)*this);
+      assert((uintptr_t)rawValue == (uintptr_t)(intptr_t)*this);
     }
 
     void reset() {
