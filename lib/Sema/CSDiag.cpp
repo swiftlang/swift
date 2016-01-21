@@ -289,20 +289,6 @@ static Expr *simplifyLocatorToAnchor(ConstraintSystem &cs,
   return locator->getAnchor();
 }
 
-/// Retrieve the argument pattern for the given declaration.
-///
-static ParameterList *getParameterList(ValueDecl *decl) {
-  if (auto func = dyn_cast<FuncDecl>(decl))
-    return func->getParameterList(0);
-  if (auto constructor = dyn_cast<ConstructorDecl>(decl))
-    return constructor->getParameterList(1);
-  if (auto subscript = dyn_cast<SubscriptDecl>(decl))
-    return subscript->getIndices();
-
-  // FIXME: Variables of function type?
-  return nullptr;
-}
-
 ConcreteDeclRef constraints::resolveLocatorToDecl(
    ConstraintSystem &cs,
    ConstraintLocator *locator,
@@ -314,7 +300,6 @@ ConcreteDeclRef constraints::resolveLocatorToDecl(
   if (!locator->getAnchor())
     return ConcreteDeclRef();
 
-  ConcreteDeclRef declRef;
   auto anchor = locator->getAnchor();
   // Unwrap any specializations, constructor calls, implicit conversions, and
   // '.'s.
@@ -355,79 +340,41 @@ ConcreteDeclRef constraints::resolveLocatorToDecl(
     break;
   } while (true);
   
-  auto getConcreteDeclRefFromOverload
-    = [&](const SelectedOverload &selected) -> ConcreteDeclRef {
-      return getConcreteDeclRef(selected.choice.getDecl(),
-                                selected.openedType);
-    };
+  // Simple case: direct reference to a declaration.
+  if (auto dre = dyn_cast<DeclRefExpr>(anchor))
+    return dre->getDeclRef();
+    
+  // Simple case: direct reference to a declaration.
+  if (auto mre = dyn_cast<MemberRefExpr>(anchor))
+    return mre->getMember();
   
-  if (auto dre = dyn_cast<DeclRefExpr>(anchor)) {
-    // Simple case: direct reference to a declaration.
-    declRef = dre->getDeclRef();
-  } else if (auto mre = dyn_cast<MemberRefExpr>(anchor)) {
-    // Simple case: direct reference to a declaration.
-    declRef = mre->getMember();
-  } else if (isa<OverloadedDeclRefExpr>(anchor) ||
-             isa<OverloadedMemberRefExpr>(anchor) ||
-             isa<UnresolvedDeclRefExpr>(anchor)) {
+  if (auto ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(anchor))
+    return ctorRef->getDeclRef();
+
+  if (isa<OverloadedDeclRefExpr>(anchor) ||
+      isa<OverloadedMemberRefExpr>(anchor) ||
+      isa<UnresolvedDeclRefExpr>(anchor)) {
     // Overloaded and unresolved cases: find the resolved overload.
     auto anchorLocator = cs.getConstraintLocator(anchor);
     if (auto selected = findOvlChoice(anchorLocator)) {
       if (selected->choice.isDecl())
-        declRef = getConcreteDeclRefFromOverload(*selected);
+        return getConcreteDeclRef(selected->choice.getDecl(),
+                                  selected->openedType);
     }
-  } else if (isa<UnresolvedMemberExpr>(anchor)) {
+  }
+  
+  if (isa<UnresolvedMemberExpr>(anchor)) {
     // Unresolved member: find the resolved overload.
-    auto anchorLocator = cs.getConstraintLocator(
-                           anchor,
+    auto anchorLocator = cs.getConstraintLocator(anchor,
                            ConstraintLocator::UnresolvedMember);
     if (auto selected = findOvlChoice(anchorLocator)) {
       if (selected->choice.isDecl())
-        declRef = getConcreteDeclRefFromOverload(*selected);
+        return getConcreteDeclRef(selected->choice.getDecl(),
+                                  selected->openedType);
     }
-  } else if (auto ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(anchor)) {
-    declRef = ctorRef->getDeclRef();
   }
 
-  // If we didn't find the declaration, we're out of luck.
-  if (!declRef)
-    return ConcreteDeclRef();
-
-  // Use the declaration and the path to produce a more specific result.
-  // FIXME: This is an egregious hack. We'd be far better off
-  // FIXME: Perform deeper path resolution?
-  auto path = locator->getPath();
-  ParameterList *parameterList = nullptr;
-  bool impliesFullPattern = false;
-  while (!path.empty()) {
-    switch (path[0].getKind()) {
-    case ConstraintLocator::ApplyArgument:
-      // If we're calling into something that has parameters, dig into the
-      // actual parameter pattern.
-      parameterList = getParameterList(declRef.getDecl());
-      if (!parameterList)
-        break;
-
-      impliesFullPattern = true;
-      path = path.slice(1);
-      continue;
-
-    case ConstraintLocator::ApplyArgToParam: {
-      if (!parameterList) break;
-        
-      unsigned index = path[0].getValue2();
-      if (index < parameterList->size())
-        return parameterList->get(index);
-      break;
-    }
-
-    default:
-      break;
-    }
-
-    break;
-  }
-  return declRef;
+  return ConcreteDeclRef();
 }
 
 /// Emit a note referring to the target of a diagnostic, e.g., the function
