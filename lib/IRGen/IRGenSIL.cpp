@@ -1443,7 +1443,7 @@ void IRGenSILFunction::emitSILFunction() {
       auto next = std::next(SILFunction::iterator(bb));
       if (next != CurSILFn->end()) {
         auto nextBB = LoweredBBs[&*next].bb;
-        assert(curBB->getNextNode() == nextBB &&
+        assert(&*std::next(curBB->getIterator()) == nextBB &&
                "lost source SIL order?");
       }
     }
@@ -4589,8 +4589,8 @@ findPairedDeallocStackForDestroyAddr(DestroyAddrInst *destroyAddr) {
   auto allocStack = dyn_cast<AllocStackInst>(destroyAddr->getOperand());
   if (!allocStack) return nullptr;
 
-  for (auto inst = destroyAddr->getNextNode(); !isa<TermInst>(inst);
-       inst = inst->getNextNode()) {
+  for (auto inst = &*std::next(destroyAddr->getIterator()); !isa<TermInst>(inst);
+       inst = &*std::next(inst->getIterator())) {
     // If we find a dealloc_stack of the right memory, great.
     if (auto deallocStack = dyn_cast<DeallocStackInst>(inst))
       if (deallocStack->getOperand() == allocStack)
