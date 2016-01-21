@@ -7,7 +7,7 @@ public func getVersion() -> Int {
 #endif
 }
 
-@_fixed_layout public struct AddRemoveConformance {
+public struct AddConformance {
   public init() {
     x = 0
     y = 0
@@ -35,6 +35,6 @@ public protocol Point3DLike {
 }
 
 #if AFTER
-extension AddRemoveConformance : PointLike {}
-extension AddRemoveConformance : Point3DLike {}
+extension AddConformance : PointLike {}
+extension AddConformance : Point3DLike {}
 #endif
