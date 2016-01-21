@@ -127,3 +127,11 @@ class TestUnownedMember {
 // CHECK:  assign [[INVAL]] to [[FIELDPTR]] : $*@sil_unowned C
 // CHECK:  strong_release %0 : $C
 // CHECK:  return [[SELF]] : $TestUnownedMember
+
+// Just verify that lowering an unowned reference to a type parameter
+// doesn't explode.
+struct Unowned<T: AnyObject> {
+  unowned var object: T
+}
+func takesUnownedStruct(z: Unowned<C>) {}
+// CHECK-LABEL: sil hidden @_TF7unowned18takesUnownedStructFGVS_7UnownedCS_1C_T_ : $@convention(thin) (@owned Unowned<C>) -> ()

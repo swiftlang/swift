@@ -252,9 +252,34 @@ namespace {
       return asImpl().handleTrivial(type);
     }
 
-    RetTy visitUnownedStorageType(CanUnownedStorageType type) {
+    bool hasNativeReferenceCounting(CanType type) {
+      if (type->isTypeParameter()) {
+        auto signature = getGenericSignature();
+        assert(signature && "dependent type without generic signature?!");
+        assert(signature->requiresClass(type, *M.getSwiftModule()));
+
+        // If we have a superclass bound, recurse on that.  This should
+        // always terminate: even if we allow
+        //   <T, U: T, V: U, ...>
+        // at some point the type-checker should prove acyclic-ness.
+        auto bound = signature->getSuperclassBound(type, *M.getSwiftModule());
+        if (bound) {
+          return hasNativeReferenceCounting(bound->getCanonicalType());
+        }
+
+        // Ask whether Builtin.UnknownObject uses native reference counting.
+        auto &ctx = M.getASTContext();
+        return ctx.TheUnknownObjectType->
+                 usesNativeReferenceCounting(ResilienceExpansion::Maximal);
+      }
+
       // FIXME: resilience
-      if (type->isLoadable(ResilienceExpansion::Maximal)) {
+      return type->usesNativeReferenceCounting(ResilienceExpansion::Maximal);
+    }
+
+    RetTy visitUnownedStorageType(CanUnownedStorageType type) {
+      // FIXME: avoid this duplication of the behavior of isLoadable.
+      if (hasNativeReferenceCounting(type.getReferentType())) {
         return asImpl().visitLoadableUnownedStorageType(type);
       } else {
         return asImpl().visitAddressOnlyUnownedStorageType(type);
