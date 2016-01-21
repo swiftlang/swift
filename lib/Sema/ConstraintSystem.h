@@ -2232,27 +2232,6 @@ void simplifyLocator(Expr *&anchor,
                      SmallVectorImpl<LocatorPathElt> &targetPath,
                      SourceRange &range);
 
-/// Resolve a locator to the specific declaration it references, if possible.
-///
-/// \param cs The constraint system in which the locator will be resolved.
-///
-/// \param locator The locator to resolve.
-///
-/// \param findOvlChoice A function that searches for the overload choice
-/// associated with the given locator, or an empty optional if there is no such
-/// overload.
-///
-/// \returns the entity to which the locator resolved.
-///
-/// FIXME: It would be more natural to express the result as a locator.
-ConcreteDeclRef resolveLocatorToDecl(
-                  ConstraintSystem &cs,
-                  ConstraintLocator *locator,
-                  std::function<Optional<SelectedOverload>(ConstraintLocator *)>
-                    findOvlChoice,
-                  std::function<ConcreteDeclRef(ValueDecl *decl,
-                                                Type openedType)> getConcreteDeclRef);
-
 } // end namespace constraints
 
 template<typename ...Args>

@@ -3322,6 +3322,107 @@ namespace {
   };
 }
 
+
+/// Resolve a locator to the specific declaration it references, if possible.
+///
+/// \param cs The constraint system in which the locator will be resolved.
+///
+/// \param locator The locator to resolve.
+///
+/// \param findOvlChoice A function that searches for the overload choice
+/// associated with the given locator, or an empty optional if there is no such
+/// overload.
+///
+/// \returns the decl to which the locator resolved.
+///
+static ConcreteDeclRef
+resolveLocatorToDecl(ConstraintSystem &cs, ConstraintLocator *locator,
+   std::function<Optional<SelectedOverload>(ConstraintLocator *)> findOvlChoice,
+   std::function<ConcreteDeclRef (ValueDecl *decl,
+                                  Type openedType)> getConcreteDeclRef)
+{
+  assert(locator && "Null locator");
+  if (!locator->getAnchor())
+    return ConcreteDeclRef();
+
+  auto anchor = locator->getAnchor();
+  // Unwrap any specializations, constructor calls, implicit conversions, and
+  // '.'s.
+  // FIXME: This is brittle.
+  do {
+    if (auto specialize = dyn_cast<UnresolvedSpecializeExpr>(anchor)) {
+      anchor = specialize->getSubExpr();
+      continue;
+    }
+
+    if (auto implicit = dyn_cast<ImplicitConversionExpr>(anchor)) {
+      anchor = implicit->getSubExpr();
+      continue;
+    }
+
+    if (auto identity = dyn_cast<IdentityExpr>(anchor)) {
+      anchor = identity->getSubExpr();
+      continue;
+    }
+
+    if (auto tryExpr = dyn_cast<AnyTryExpr>(anchor)) {
+      if (isa<OptionalTryExpr>(tryExpr))
+        break;
+
+      anchor = tryExpr->getSubExpr();
+      continue;
+    }
+
+    if (auto selfApply = dyn_cast<SelfApplyExpr>(anchor)) {
+      anchor = selfApply->getFn();
+      continue;
+    }
+
+    if (auto dotSyntax = dyn_cast<DotSyntaxBaseIgnoredExpr>(anchor)) {
+      anchor = dotSyntax->getRHS();
+      continue;
+    }
+    break;
+  } while (true);
+  
+  // Simple case: direct reference to a declaration.
+  if (auto dre = dyn_cast<DeclRefExpr>(anchor))
+    return dre->getDeclRef();
+    
+  // Simple case: direct reference to a declaration.
+  if (auto mre = dyn_cast<MemberRefExpr>(anchor))
+    return mre->getMember();
+  
+  if (auto ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(anchor))
+    return ctorRef->getDeclRef();
+
+  if (isa<OverloadedDeclRefExpr>(anchor) ||
+      isa<OverloadedMemberRefExpr>(anchor) ||
+      isa<UnresolvedDeclRefExpr>(anchor)) {
+    // Overloaded and unresolved cases: find the resolved overload.
+    auto anchorLocator = cs.getConstraintLocator(anchor);
+    if (auto selected = findOvlChoice(anchorLocator)) {
+      if (selected->choice.isDecl())
+        return getConcreteDeclRef(selected->choice.getDecl(),
+                                  selected->openedType);
+    }
+  }
+  
+  if (isa<UnresolvedMemberExpr>(anchor)) {
+    // Unresolved member: find the resolved overload.
+    auto anchorLocator = cs.getConstraintLocator(anchor,
+                           ConstraintLocator::UnresolvedMember);
+    if (auto selected = findOvlChoice(anchorLocator)) {
+      if (selected->choice.isDecl())
+        return getConcreteDeclRef(selected->choice.getDecl(),
+                                  selected->openedType);
+    }
+  }
+
+  return ConcreteDeclRef();
+}
+
+
 /// \brief Given a constraint locator, find the owner of default arguments for
 /// that tuple, i.e., a FuncDecl.
 static ConcreteDeclRef
