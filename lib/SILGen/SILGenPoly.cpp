@@ -1669,6 +1669,13 @@ SILGenFunction::emitVTableThunk(SILDeclRef derived,
     F.setContextGenericParams(context);
     subs = getForwardingSubstitutions();
     fTy = fTy->substGenericArgs(SGM.M, SGM.SwiftModule, subs);
+
+    inputSubstType = cast<FunctionType>(
+        cast<GenericFunctionType>(inputSubstType)
+            ->substGenericArgs(SGM.SwiftModule, subs)->getCanonicalType());
+    outputSubstType = cast<FunctionType>(
+        cast<GenericFunctionType>(outputSubstType)
+            ->substGenericArgs(SGM.SwiftModule, subs)->getCanonicalType());
   }
 
   // Emit the indirect return and arguments.
@@ -1839,10 +1846,10 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
 
   // Get the type of the witness.
   auto witnessInfo = getConstantInfo(witness);
-  CanAnyFunctionType witnessSubstTy = witnessInfo.LoweredType;
+  CanAnyFunctionType witnessSubstTy = witnessInfo.LoweredInterfaceType;
   if (!witnessSubs.empty()) {
     witnessSubstTy = cast<FunctionType>(
-      cast<PolymorphicFunctionType>(witnessSubstTy)
+      cast<GenericFunctionType>(witnessSubstTy)
         ->substGenericArgs(SGM.M.getSwiftModule(), witnessSubs)
         ->getCanonicalType());
   }
@@ -1852,17 +1859,19 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   // abstraction pattern.
   auto reqtInfo = getConstantInfo(requirement);
 
-  // Ugh...
-  CanAnyFunctionType reqtSubstTy = reqtInfo.FormalType;
+  // FIXME: reqtSubstTy is already computed in SGM::emitProtocolWitness(),
+  // but its called witnessSubstIfaceTy there; the mapTypeIntoContext()
+  // calls should be pushed down into thunk emission.
+  CanAnyFunctionType reqtSubstTy = reqtInfo.LoweredInterfaceType;
   reqtSubstTy = cast<AnyFunctionType>(
-    cast<PolymorphicFunctionType>(reqtSubstTy)
-      ->substGenericArgs(conformance->getDeclContext()->getParentModule(),
-                         conformance->getType())
+    cast<GenericFunctionType>(reqtSubstTy)
+      ->partialSubstGenericArgs(conformance->getDeclContext()->getParentModule(),
+                                conformance->getInterfaceType())
       ->getCanonicalType());
-  reqtSubstTy = SGM.Types.getLoweredASTFunctionType(reqtSubstTy,
-                                                    requirement.uncurryLevel,
-                                                    requirement);
-  CanType reqtSubstInputTy = reqtSubstTy.getInput();
+  CanType reqtSubstInputTy = F.mapTypeIntoContext(reqtSubstTy.getInput())
+      ->getCanonicalType();
+  CanType reqtSubstResultTy = F.mapTypeIntoContext(reqtSubstTy.getResult())
+      ->getCanonicalType();
 
   AbstractionPattern reqtOrigTy(reqtInfo.LoweredInterfaceType);
   AbstractionPattern reqtOrigInputTy = reqtOrigTy.getFunctionInputType();
@@ -1981,7 +1990,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
                                             AbstractionPattern(witnessSubstTy.getResult()), // XXX ugly
                                             witnessSubstTy.getResult(),
                                             reqtOrigTy.getFunctionResultType(),
-                                            reqtSubstTy.getResult(),
+                                            reqtSubstResultTy,
                                             witnessResultValue,
                                             witnessSubstResultAddr,
                                             reqtResultAddr);

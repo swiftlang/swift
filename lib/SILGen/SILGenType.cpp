@@ -94,7 +94,8 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
 
   SILGenFunction(*this, *thunk)
     .emitVTableThunk(derived, basePattern,
-                     overrideInfo.LoweredType, derivedInfo.LoweredType);
+                     overrideInfo.LoweredInterfaceType,
+                     derivedInfo.LoweredInterfaceType);
 
   return thunk;
 }
