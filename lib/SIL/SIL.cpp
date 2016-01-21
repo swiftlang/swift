@@ -31,13 +31,9 @@ using namespace swift;
 
 void ValueBase::replaceAllUsesWith(ValueBase *RHS) {
   assert(this != RHS && "Cannot RAUW a value with itself");
-  assert(getNumTypes() == RHS->getNumTypes() &&
-         "An instruction and the value base that it is being replaced by "
-         "must have the same number of types");
-
   while (!use_empty()) {
     Operand *Op = *use_begin();
-    Op->set(SILValue(RHS, Op->get().getResultNumber()));
+    Op->set(RHS);
   }
 }
 

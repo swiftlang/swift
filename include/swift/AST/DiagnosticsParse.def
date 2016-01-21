@@ -395,10 +395,6 @@ ERROR(expected_sil_colon_value_ref,none,
       "expected ':' before type in SIL value reference", ())
 ERROR(expected_sil_value_name,none,
       "expected SIL value name", ())
-ERROR(expected_sil_value_name_result_number,none,
-      "expected result number in SIL value name", ())
-ERROR(invalid_sil_value_name_result_number,none,
-      "invalid result number in SIL value", ())
 ERROR(expected_sil_type_kind,none,
       "expected SIL type to %0", (StringRef))
 ERROR(expected_sil_constant,none,

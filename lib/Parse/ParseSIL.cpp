@@ -91,7 +91,6 @@ namespace {
 
     /// Data structures used to perform name lookup for local values.
     llvm::StringMap<ValueBase*> LocalValues;
-    llvm::StringMap<std::vector<SILValue>> ForwardMRVLocalValues;
     llvm::StringMap<SourceLoc> ForwardRefLocalValues;
 
     bool performTypeLocChecking(TypeLoc &T, bool IsSIL = true);
@@ -133,10 +132,8 @@ namespace {
     struct UnresolvedValueName {
       StringRef Name;
       SourceLoc NameLoc;
-      unsigned ResultVal;
 
       bool isUndef() const { return Name == "undef"; }
-      bool isMRV() const { return ResultVal != ~0U; }
     };
 
     /// getLocalValue - Get a reference to a local value with the specified name
@@ -505,20 +502,7 @@ SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type,
 
   if (Entry) {
     // If this value is already defined, check it to make sure types match.
-    SILType EntryTy;
-
-    // If this is a reference to something with multiple results, get the right
-    // one.
-    if (Name.isMRV()) {
-      if (Name.ResultVal >= Entry->getTypes().size()) {
-        HadError = true;
-        P.diagnose(Name.NameLoc, diag::invalid_sil_value_name_result_number);
-        // Make sure to return something of the requested type.
-        return new (SILMod) GlobalAddrInst(getDebugLoc(B, Loc), Type);
-      }
-    }
-
-    EntryTy = Entry->getType(Name.isMRV() ? Name.ResultVal : 0);
+    SILType EntryTy = Entry->getType();
 
     if (EntryTy != Type) {
       HadError = true;
@@ -528,27 +512,15 @@ SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type,
       return new (SILMod) GlobalAddrInst(getDebugLoc(B, Loc), Type);
     }
 
-    return SILValue(Entry, Name.isMRV() ? Name.ResultVal : 0);
+    return SILValue(Entry);
   }
   
   // Otherwise, this is a forward reference.  Create a dummy node to represent
   // it until we see a real definition.
   ForwardRefLocalValues[Name.Name] = Name.NameLoc;
 
-  if (!Name.isMRV()) {
-    Entry = new (SILMod) GlobalAddrInst(getDebugLoc(B, Loc), Type);
-    return Entry;
-  }
-
-  // If we have multiple results, track them through ForwardMRVLocalValues.
-  std::vector<SILValue> &Placeholders = ForwardMRVLocalValues[Name.Name];
-  if (Placeholders.size() <= Name.ResultVal)
-    Placeholders.resize(Name.ResultVal+1);
-
-  if (!Placeholders[Name.ResultVal])
-    Placeholders[Name.ResultVal] =
-      new (SILMod) GlobalAddrInst(getDebugLoc(B, Loc), Type);
-  return Placeholders[Name.ResultVal];
+  Entry = new (SILMod) GlobalAddrInst(getDebugLoc(B, Loc), Type);
+  return Entry;
 }
 
 /// setLocalValue - When an instruction or block argument is defined, this
@@ -567,11 +539,10 @@ void SILParser::setLocalValue(ValueBase *Value, StringRef Name,
     }
 
     // If the forward reference was of the wrong type, diagnose this now.
-    if (Entry->getTypes() != Value->getTypes()) {
-      // FIXME: report correct entry
+    if (Entry->getType() != Value->getType()) {
       P.diagnose(NameLoc, diag::sil_value_def_type_mismatch, Name,
-                 Entry->getType(0).getSwiftRValueType(),
-                 Value->getType(0).getSwiftRValueType());
+                 Entry->getType().getSwiftRValueType(),
+                 Value->getType().getSwiftRValueType());
       HadError = true;
     } else {
       // Forward references only live here if they have a single result.
@@ -583,45 +554,6 @@ void SILParser::setLocalValue(ValueBase *Value, StringRef Name,
 
   // Otherwise, just store it in our map.
   Entry = Value;
-
-  // If Entry has multiple values, it may be forward referenced.
-  if (Entry->getTypes().size() > 1) {
-    auto It = ForwardMRVLocalValues.find(Name);
-    if (It != ForwardMRVLocalValues.end()) {
-      // Take the information about the forward ref out of the maps.
-      std::vector<SILValue> Entries(std::move(It->second));
-      SourceLoc Loc = ForwardRefLocalValues[Name];
-
-      // Remove the entries from the maps.
-      ForwardRefLocalValues.erase(Name);
-      ForwardMRVLocalValues.erase(It);
-
-      // Verify that any forward-referenced values line up.
-      if (Entries.size() > Value->getTypes().size()) {
-        P.diagnose(Loc, diag::sil_value_def_type_mismatch, Name,
-                   Entry->getType(0).getSwiftRValueType(),
-                   Value->getType(0).getSwiftRValueType());
-        HadError = true;
-        return;
-      }
-
-      // Validate that any forward-referenced elements have the right type, and
-      // RAUW them.
-      for (unsigned i = 0, e = Entries.size(); i != e; ++i) {
-        if (!Entries[i]) continue;
-
-        if (Entries[i]->getType(0) != Value->getType(i)) {
-          P.diagnose(Loc, diag::sil_value_def_type_mismatch, Name,
-                     Entry->getType(0).getSwiftRValueType(),
-                     Value->getType(i).getSwiftRValueType());
-          HadError = true;
-          return;
-        }
-
-        Entries[i].replaceAllUsesWith(SILValue(Value, i));
-      }
-    }
-  }
 }
 
 
@@ -1094,7 +1026,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
 /// parseValueName - Parse a value name without a type available yet.
 ///
 ///     sil-value-name:
-///       sil-local-name ('#' integer_literal)?
+///       sil-local-name
 ///       'undef'
 ///
 bool SILParser::parseValueName(UnresolvedValueName &Result) {
@@ -1102,7 +1034,6 @@ bool SILParser::parseValueName(UnresolvedValueName &Result) {
 
   if (P.Tok.is(tok::kw_undef)) {
     Result.NameLoc = P.consumeToken(tok::kw_undef);
-    Result.ResultVal = ~1U;
     return false;
   }
 
@@ -1110,21 +1041,6 @@ bool SILParser::parseValueName(UnresolvedValueName &Result) {
   if (P.parseToken(tok::sil_local_name, Result.NameLoc,
                    diag::expected_sil_value_name))
     return true;
-
-  // If the result value specifier is present, parse it.
-  if (P.consumeIf(tok::pound)) {
-    unsigned Value = 0;
-    if (P.Tok.isNot(tok::integer_literal) ||
-        P.Tok.getText().getAsInteger(10, Value)) {
-      P.diagnose(P.Tok, diag::expected_sil_value_name_result_number);
-      return true;
-    }
-
-    P.consumeToken(tok::integer_literal);
-    Result.ResultVal = Value;
-  } else {
-    Result.ResultVal = ~0U;
-  }
 
   return false;
 }

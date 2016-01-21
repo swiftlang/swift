@@ -82,11 +82,9 @@ class SILInstruction : public ValueBase,public llvm::ilist_node<SILInstruction>{
   void setDebugScope(SILBuilder &B, const SILDebugScope *DS);
 
 protected:
-  SILInstruction(ValueKind Kind, SILDebugLocation *DebugLoc, SILType Ty)
-      : ValueBase(Kind, Ty), ParentBB(0), Location(*DebugLoc) {}
   SILInstruction(ValueKind Kind, SILDebugLocation *DebugLoc,
-                 SILTypeList *TypeList = nullptr)
-      : ValueBase(Kind, TypeList), ParentBB(0), Location(*DebugLoc) {}
+                 SILType Ty = SILType())
+      : ValueBase(Kind, Ty), ParentBB(0), Location(*DebugLoc) {}
 
 public:
   /// Instructions should be allocated using a dedicated instruction allocation
@@ -200,19 +198,12 @@ public:
   template <typename OpCmp>
   bool isIdenticalTo(const SILInstruction *RHS, OpCmp opEqual) const {
     // Quick check if both instructions have the same kind, number of operands,
-    // and number of types. This should filter out most cases.
+    // and types. This should filter out most cases.
     if (getKind() != RHS->getKind() ||
         getNumOperands() != RHS->getNumOperands() ||
-        getNumTypes() != RHS->getNumTypes()) {
+        getType() != RHS->getType()) {
       return false;
     }
-    
-    // Check types.
-    //
-    // Many instructions have only 1 type so it makes sense to check it first.
-    for (unsigned i = 0, e = getNumTypes(); i != e; ++i)
-      if (getType(i) != RHS->getType(i))
-        return false;
     
     // Check operands.
     for (unsigned i = 0, e = getNumOperands(); i != e; ++i)
@@ -343,9 +334,9 @@ public:
   /// getType() is ok if this is known to only have one type.
   template<typename X = void>
   typename std::enable_if<has_result<X>::value, SILType>::type
-  getType(unsigned i = 0) const { return ValueBase::getType(i); }
+  getType() const { return ValueBase::getType(); }
 
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }\
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   static bool classof(const ValueBase *V) {
@@ -408,9 +399,6 @@ class AllocationInst : public SILInstruction {
 protected:
   AllocationInst(ValueKind Kind, SILDebugLocation *DebugLoc, SILType Ty)
       : SILInstruction(Kind, DebugLoc, Ty) {}
-  AllocationInst(ValueKind Kind, SILDebugLocation *DebugLoc,
-                 SILTypeList *TypeList = nullptr)
-      : SILInstruction(Kind, DebugLoc, TypeList) {}
 
 public:
 
@@ -461,9 +449,6 @@ public:
   };
   void setArgNo(unsigned N) { VarInfo.setArgNo(N); }
 
-  /// getType() is ok since this is known to only have one type.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
-  
   /// getElementType - Get the type of the allocated memory (as opposed to the
   /// type of the instruction itself, which will be an address type).
   SILType getElementType() const {
@@ -489,8 +474,6 @@ class AllocRefInst : public AllocationInst, public StackPromotable {
                bool canBeOnStack);
 
 public:
-
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }
@@ -556,9 +539,6 @@ class AllocBoxInst : public AllocationInst {
 
 public:
 
-  /// getType() is ok since this is known to only have one type.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
-
   SILType getElementType() const {
     return SILType::getPrimitiveObjectType(getType().castTo<SILBoxType>()->
                                            getBoxedType());
@@ -607,7 +587,7 @@ public:
   }
   
   SILType getExistentialType() const {
-    return getType(0);
+    return getType();
   }
 
   ArrayRef<ProtocolConformanceRef> getConformances() const {
@@ -915,9 +895,6 @@ class ApplyInst : public ApplyInstBase<ApplyInst, SILInstruction> {
                            SILFunction &F);
 
 public:
-  /// getType() is ok since this is known to only have one type.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
-
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::ApplyInst;
   }
@@ -947,10 +924,6 @@ class PartialApplyInst
                                   SILFunction &F);
 
 public:
-  /// getType() is ok since this is known to only have one type.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
-
-
   /// Return the ast level function type of this partial apply.
   CanSILFunctionType getFunctionType() const {
     return getType().castTo<SILFunctionType>();
@@ -997,10 +970,6 @@ public:
   SILFunction *getReferencedFunction() const { return Function; }
 
   void dropReferencedFunction();
-
-  /// getType() is ok since this is known to only have one type.
-  /// The type is always a lowered function type.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   CanSILFunctionType getFunctionType() const {
     return getType().castTo<SILFunctionType>();
@@ -1049,10 +1018,6 @@ public:
   Identifier getName() const { return Name; }
   void setName(Identifier I) { Name = I; }
   
-  /// Currently all builtins have one result, so getType() is OK.
-  /// We may want to change that eventually.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
-
   /// \brief Looks up the llvm intrinsic ID and type for the builtin function.
   ///
   /// \returns Returns llvm::Intrinsic::not_intrinsic if the function is not an
@@ -1164,9 +1129,6 @@ public:
   
   void setReferencedGlobal(SILGlobalVariable *v) { Global = v; }
 
-  /// getType() is ok since this is known to only have one type.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
-
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }
 
@@ -1194,9 +1156,6 @@ class IntegerLiteralInst : public LiteralInst {
 public:
   /// getValue - Return the APInt for the underlying integer literal.
   APInt getValue() const;
-
-  /// getType() is ok since this is known to only have one type.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }
@@ -1226,9 +1185,6 @@ public:
 
   /// \brief Return the bitcast representation of the FP literal as an APInt.
   APInt getBits() const;
-
-  /// getType() is ok since this is known to only have one type.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }
@@ -1675,9 +1631,6 @@ protected:
       : SILInstruction(Kind, DebugLoc, Ty) {}
 
 public:
-  /// All conversion instructions return a single result.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
-
   /// All conversion instructions take the converted value, whose reference
   /// identity is expected to be preserved through the conversion chain, as their
   /// first operand. Some instructions may take additional operands that do not
@@ -2055,9 +2008,6 @@ public:
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }
 
-  /// getType() is ok since this is known to only have one type.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
-
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::ObjCProtocolInst;
   }
@@ -2152,9 +2102,6 @@ public:
     return Operands.getDynamicValuesAsArray();
   }
 
-  /// getType() is ok since this is known to only have one type.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
-
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
@@ -2229,9 +2176,8 @@ public:
 /// manipulate the reference count of their object operand.
 class RefCountingInst : public SILInstruction {
 protected:
-  RefCountingInst(ValueKind Kind, SILDebugLocation *DebugLoc,
-                  SILTypeList *TypeList = 0)
-      : SILInstruction(Kind, DebugLoc, TypeList) {}
+  RefCountingInst(ValueKind Kind, SILDebugLocation *DebugLoc)
+      : SILInstruction(Kind, DebugLoc) {}
 
 public:
   static bool classof(const ValueBase *V) {
@@ -2330,9 +2276,6 @@ public:
     return getElements()[i];
   }
 
-  /// getType() is ok since this is known to only have one type.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
-
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
@@ -2406,8 +2349,6 @@ public:
     return OptionalOperand
       ? OptionalOperand->asArray() : MutableArrayRef<Operand>{};
   }
-
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::EnumInst;
@@ -2556,9 +2497,6 @@ public:
   SILValue getDefaultResult() const {
     return static_cast<const Derived *>(this)->getDefaultResult();
   }
-
-  // getType() is OK because there's only one result.
-  SILType getType() const { return SILInstruction::getType(0); }
 };
 
 /// Common base class for the select_enum and select_enum_addr instructions,
@@ -2721,9 +2659,6 @@ class MetatypeInst : public SILInstruction {
   MetatypeInst(SILDebugLocation *DebugLoc, SILType Metatype);
 
 public:
-
-  /// getType() is ok since this is known to only have one type.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }
@@ -2924,9 +2859,6 @@ public:
              SILDeclRef Member, bool Volatile = false)
       : SILInstruction(Kind, DebugLoc, Ty), Member(Member), Volatile(Volatile) {
   }
-
-  /// getType() is ok since this is known to only have one type.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   SILDeclRef getMember() const { return Member; }
 
@@ -3258,9 +3190,6 @@ public:
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
-  /// getType() is OK since there's only one result.
-  SILType getType() const { return SILInstruction::getType(0); }
-
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::InitBlockStorageHeaderInst;
   }
@@ -3361,8 +3290,6 @@ public:
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
-
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::MarkDependenceInst;
   }
@@ -3409,9 +3336,8 @@ class IsUniqueOrPinnedInst :
 /// DeallocationInst - An abstract parent class for Dealloc{Stack, Box, Ref}.
 class DeallocationInst : public SILInstruction {
 protected:
-  DeallocationInst(ValueKind Kind, SILDebugLocation *DebugLoc,
-                   SILTypeList *TypeList = nullptr)
-      : SILInstruction(Kind, DebugLoc, TypeList) {}
+  DeallocationInst(ValueKind Kind, SILDebugLocation *DebugLoc)
+      : SILInstruction(Kind, DebugLoc) {}
 
 public:
   static bool classof(const ValueBase *V) {
@@ -3638,8 +3564,6 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
-
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() >= ValueKind::First_IndexingInst

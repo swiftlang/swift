@@ -1192,7 +1192,7 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
     ClassMethodInst *CMI = nullptr;
     ApplyInst *AI = nullptr;
     SILInstruction *Release = nullptr;
-    for (auto UI : SILValue(UCI, 0).getUses()) {
+    for (auto UI : UCI->getUses()) {
       auto *User = UI->getUser();
       if (auto *TAI = dyn_cast<ApplyInst>(User)) {
         if (!AI) {
@@ -2513,7 +2513,7 @@ static bool lowerRawSILOperations(SILFunction &Fn) {
 
       // mark_uninitialized just becomes a noop, resolving to its operand.
       if (auto *MUI = dyn_cast<MarkUninitializedInst>(Inst)) {
-        SILValue(MUI, 0).replaceAllUsesWith(MUI->getOperand());
+        MUI->replaceAllUsesWith(MUI->getOperand().getDef());
         MUI->eraseFromParent();
         Changed = true;
         continue;

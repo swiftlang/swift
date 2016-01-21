@@ -26,27 +26,6 @@
 using namespace swift;
 using namespace Lowering;
 
-namespace swift {
-  /// SILTypeList - The uniqued backing store for the SILValue type list.  This
-  /// is only exposed out of SILValue as an ArrayRef of types, so it should
-  /// never be used outside of libSIL.
-  class SILTypeList : public llvm::FoldingSetNode {
-  public:
-    unsigned NumTypes;
-    SILType Types[1];  // Actually variable sized.
-
-    void Profile(llvm::FoldingSetNodeID &ID) const {
-      for (unsigned i = 0, e = NumTypes; i != e; ++i) {
-        ID.AddPointer(Types[i].getOpaqueValue());
-      }
-    }
-  };
-} // end namespace swift.
-
-/// SILTypeListUniquingType - This is the type of the folding set maintained by
-/// SILModule that these things are uniqued into.
-typedef llvm::FoldingSet<SILTypeList> SILTypeListUniquingType;
-
 class SILModule::SerializationCallback : public SerializedSILLoader::Callback {
   void didDeserialize(Module *M, SILFunction *fn) override {
     updateLinkage(fn);
@@ -99,7 +78,6 @@ SILModule::SILModule(Module *SwiftModule, SILOptions &Options,
   : TheSwiftModule(SwiftModule), AssociatedDeclContext(associatedDC),
     Stage(SILStage::Raw), Callback(new SILModule::SerializationCallback()),
     wholeModule(wholeModule), Options(Options), Types(*this) {
-  TypeListUniquing = new SILTypeListUniquingType();
 }
 
 SILModule::~SILModule() {
@@ -116,8 +94,6 @@ SILModule::~SILModule() {
   // at all.
   for (SILFunction &F : *this)
     F.dropAllReferences();
-
-  delete (SILTypeListUniquingType*)TypeListUniquing;
 }
 
 void *SILModule::allocate(unsigned Size, unsigned Align) const {
@@ -427,47 +403,6 @@ SILFunction *SILModule::getOrCreateFunction(
                              contextGenericParams, loc, isBareSILFunction,
                              isTrans, isFragile, isThunk, classVisibility,
                              inlineStrategy, EK, InsertBefore, DebugScope, DC);
-}
-
-ArrayRef<SILType> ValueBase::getTypes() const {
-  // No results.
-  if (TypeOrTypeList.isNull())
-    return ArrayRef<SILType>();
-  // Arbitrary list of results.
-  if (auto *TypeList = TypeOrTypeList.dyn_cast<SILTypeList*>())
-    return ArrayRef<SILType>(TypeList->Types, TypeList->NumTypes);
-  // Single result.
-  return TypeOrTypeList.get<SILType>();
-}
-
-
-
-/// getSILTypeList - Get a uniqued pointer to a SIL type list.  This can only
-/// be used by SILValue.
-SILTypeList *SILModule::getSILTypeList(ArrayRef<SILType> Types) const {
-  assert(Types.size() > 1 && "Shouldn't use type list for 0 or 1 types");
-  auto UniqueMap = (SILTypeListUniquingType*)TypeListUniquing;
-
-  llvm::FoldingSetNodeID ID;
-  for (auto T : Types) {
-    ID.AddPointer(T.getOpaqueValue());
-  }
-
-  // If we already have this type list, just return it.
-  void *InsertPoint = 0;
-  if (SILTypeList *TypeList = UniqueMap->FindNodeOrInsertPos(ID, InsertPoint))
-    return TypeList;
-
-  // Otherwise, allocate a new one.
-  void *NewListP = BPA.Allocate(sizeof(SILTypeList)+
-                                sizeof(SILType)*(Types.size()-1),
-                                alignof(SILTypeList));
-  SILTypeList *NewList = new (NewListP) SILTypeList();
-  NewList->NumTypes = Types.size();
-  std::copy(Types.begin(), Types.end(), NewList->Types);
-
-  UniqueMap->InsertNode(NewList, InsertPoint);
-  return NewList;
 }
 
 const IntrinsicInfo &SILModule::getIntrinsicInfo(Identifier ID) {

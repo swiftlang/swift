@@ -31,16 +31,9 @@ class DominanceInfo;
 using UserTransform = std::function<SILInstruction *(Operand *)>;
 using ValueBaseUserRange =
   TransformRange<IteratorRange<ValueBase::use_iterator>, UserTransform>;
-using ValueUserRange =
-  TransformRange<IteratorRange<SILValue::use_iterator>, UserTransform>;
 
 inline ValueBaseUserRange makeUserRange(
     iterator_range<ValueBase::use_iterator> R) {
-  auto toUser = [](Operand *O) { return O->getUser(); };
-  return makeTransformRange(makeIteratorRange(R.begin(), R.end()),
-                            UserTransform(toUser));
-}
-inline ValueUserRange makeUserRange(iterator_range<SILValue::use_iterator> R) {
   auto toUser = [](Operand *O) { return O->getUser(); };
   return makeTransformRange(makeIteratorRange(R.begin(), R.end()),
                             UserTransform(toUser));
@@ -325,7 +318,7 @@ class BaseThreadingCloner : public SILClonerWithScopes<BaseThreadingCloner> {
     // A terminator defines no values. Keeping terminators in the AvailVals list
     // is problematic because terminators get replaced during SSA update.
     if (!isa<TermInst>(Orig))
-      AvailVals.push_back(std::make_pair(Orig, SILValue(Cloned, 0)));
+      AvailVals.push_back(std::make_pair(Orig, SILValue(Cloned)));
   }
 };
 

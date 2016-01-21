@@ -137,7 +137,7 @@ class InstructionsCloner : public SILClonerWithScopes<InstructionsCloner> {
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
     DestBB->push_back(Cloned);
     SILClonerWithScopes<InstructionsCloner>::postProcess(Orig, Cloned);
-    AvailVals.push_back(std::make_pair(Orig, SILValue(Cloned, 0)));
+    AvailVals.push_back(std::make_pair(Orig, Cloned));
   }
 
   // Clone all instructions from Insns into DestBB

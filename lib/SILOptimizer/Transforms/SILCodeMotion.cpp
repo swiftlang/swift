@@ -277,7 +277,7 @@ cheaperToPassOperandsAsArguments(SILInstruction *First,
     return None;
 
   assert(First->getNumOperands() == Second->getNumOperands() &&
-         First->getNumTypes() == Second->getNumTypes() &&
+         First->getType() == Second->getType() &&
          "Types should be identical");
 
   llvm::Optional<unsigned> DifferentOperandIndex;

@@ -55,15 +55,12 @@ struct ID {
     SILBasicBlock, SILUndef, SSAValue
   } Kind;
   unsigned Number;
-  int ResultNumber;
 
   // A stable ordering of ID objects.
   bool operator<(ID Other) const {
     if (unsigned(Kind) < unsigned(Other.Kind))
       return true;
     if (Number < Other.Number)
-      return true;
-    if (ResultNumber < Other.ResultNumber)
       return true;
     return false;
   }
@@ -123,8 +120,6 @@ static raw_ostream &operator<<(raw_ostream &OS, ID i) {
   }
   OS << i.Number;
 
-  if (i.ResultNumber != -1)
-    OS << '#' << i.ResultNumber;
   return OS;
 }
 
@@ -641,7 +636,6 @@ public:
     // Print result.
     if (V->hasValue()) {
       ID Name = getID(V);
-      Name.ResultNumber = -1; // Don't print subresult number.
       *this << Name << " = ";
     }
 
@@ -1207,7 +1201,7 @@ public:
       *this << ", ";
       *this << getIDAndType(WMI->getOperand());
     }
-    *this << " : " << WMI->getType(0);
+    *this << " : " << WMI->getType();
   }
   void visitDynamicMethodInst(DynamicMethodInst *DMI) {
     printMethodInst(DMI, DMI->getOperand(), "dynamic_method");
@@ -1491,24 +1485,20 @@ ID SILPrinter::getID(const SILBasicBlock *Block) {
       BlocksToIDMap[&B] = idx++;
   }
 
-  ID R = { ID::SILBasicBlock, BlocksToIDMap[Block], -1 };
+  ID R = { ID::SILBasicBlock, BlocksToIDMap[Block] };
   return R;
 }
 
 ID SILPrinter::getID(SILValue V) {
   if (isa<SILUndef>(V))
-    return { ID::SILUndef, 0, 0 };
+    return { ID::SILUndef, 0 };
 
   // Lazily initialize the instruction -> ID mapping.
   if (ValueToIDMap.empty()) {
     V->getParentBB()->getParent()->numberValues(ValueToIDMap);
   }
 
-  int ResultNumber = -1;
-  if (V.getDef()->getTypes().size() > 1)
-    ResultNumber = V.getResultNumber();
-
-  ID R = { ID::SSAValue, ValueToIDMap[V.getDef()], ResultNumber };
+  ID R = { ID::SSAValue, ValueToIDMap[V.getDef()] };
   return R;
 }
 

@@ -1013,9 +1013,9 @@ bool swift::tryDeleteDeadClosure(SILInstruction *Closure,
 
   // Then delete all user instructions.
   for (auto *User : Tracker.getTrackedUsers()) {
-    assert(User->getNumTypes() == 0 && "We expect only ARC operations without "
-                                       "results. This is true b/c of "
-                                       "isARCOperationRemovableIfObjectIsDead");
+    assert(!User->hasValue() && "We expect only ARC operations without "
+                                "results. This is true b/c of "
+                                "isARCOperationRemovableIfObjectIsDead");
     Callbacks.DeleteInst(User);
   }
 
@@ -1233,24 +1233,24 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
       if (isConditional) {
         SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
         CastSuccessBB->createBBArg(SILBridgedTy);
-        Builder.createBranch(Loc, CastSuccessBB, SILValue(Load,0));
+        Builder.createBranch(Loc, CastSuccessBB, SILValue(Load));
         Builder.setInsertionPoint(CastSuccessBB);
-        SrcOp = SILValue(CastSuccessBB->getBBArg(0), 0);
+        SrcOp = CastSuccessBB->getBBArg(0);
       } else {
         SrcOp = Load;
       }
     } else if (isConditional) {
       SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
       CastSuccessBB->createBBArg(SILBridgedTy);
-      NewI = Builder.createCheckedCastBranch(Loc, false, SILValue(Load, 0),
+      NewI = Builder.createCheckedCastBranch(Loc, false, Load,
                                              SILBridgedTy, CastSuccessBB,
                                              FailureBB);
       Builder.setInsertionPoint(CastSuccessBB);
-      SrcOp = SILValue(CastSuccessBB->getBBArg(0), 0);
+      SrcOp = CastSuccessBB->getBBArg(0);
     } else {
-      NewI = Builder.createUnconditionalCheckedCast(Loc, SILValue(Load, 0),
+      NewI = Builder.createUnconditionalCheckedCast(Loc, Load,
                                                     SILBridgedTy);
-      SrcOp = SILValue(NewI, 0);
+      SrcOp = NewI;
     }
   } else {
     SrcOp = Src;
@@ -1321,7 +1321,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
 
   Args.push_back(InOutOptionalParam);
   Args.push_back(SrcOp);
-  Args.push_back(SILValue(MetaTyVal, 0));
+  Args.push_back(MetaTyVal);
 
   auto *AI = Builder.createApply(Loc, FuncRef, SubstFnTy, ResultTy, Subs, Args,
                                  false);
@@ -1358,17 +1358,17 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
     Builder.createSwitchEnumAddr(Loc, InOutOptionalParam, ConvSuccessBB, CaseBBs);
 
     Builder.setInsertionPoint(FailureBB->begin());
-    Builder.createDeallocStack(Loc, SILValue(Tmp, 0));
+    Builder.createDeallocStack(Loc, Tmp);
 
     Builder.setInsertionPoint(ConvSuccessBB);
     auto Addr = Builder.createUncheckedTakeEnumDataAddr(Loc, InOutOptionalParam,
                                                         SomeDecl);
-    auto LoadFromOptional = Builder.createLoad(Loc, SILValue(Addr, 0));
+    auto LoadFromOptional = Builder.createLoad(Loc, Addr);
 
     // Store into Dest
     Builder.createStore(Loc, LoadFromOptional, Dest);
 
-    Builder.createDeallocStack(Loc, SILValue(Tmp, 0));
+    Builder.createDeallocStack(Loc, Tmp);
     SmallVector<SILValue, 1> SuccessBBArgs;
     Builder.createBranch(Loc, SuccessBB, SuccessBBArgs);
   }
@@ -1488,7 +1488,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   auto FnRef = Builder.createFunctionRef(Loc, BridgedFunc);
   if (Src.getType().isAddress()) {
     // Create load
-    Src = SILValue(Builder.createLoad(Loc, Src), 0);
+    Src = Builder.createLoad(Loc, Src);
   }
 
   if(ParamTypes[0].getConvention() == ParameterConvention::Direct_Guaranteed)
@@ -1511,8 +1511,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
            "Destination should have the same type or be a superclass "
            "of the source operand");
     auto CastedValue = SILValue(
-        (ConvTy == DestTy) ? NewI : Builder.createUpcast(Loc, NewAI, DestTy),
-        0);
+        (ConvTy == DestTy) ? NewI : Builder.createUpcast(Loc, NewAI, DestTy));
     NewI = Builder.createStore(Loc, CastedValue, Dest);
   }
 
@@ -1780,7 +1779,7 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
           TargetType, nullptr, nullptr);
 
       if (BridgedI) {
-        CastedValue = SILValue(BridgedI, 0);
+        CastedValue = BridgedI;
       } else {
         if (!canUseScalarCheckedCastInstructions(Mod, SourceType, TargetType))
           return nullptr;
@@ -1866,7 +1865,7 @@ optimizeCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
                 Dest.getType().getObjectType().getSwiftRValueType())) {
           SILBuilderWithScope B(Inst);
           auto NewI = B.createCheckedCastBranch(
-              Loc, false /*isExact*/, SILValue(MI, 0),
+              Loc, false /*isExact*/, MI,
               Dest.getType().getObjectType(), SuccessBB, FailureBB);
           SuccessBB->createBBArg(Dest.getType().getObjectType(), nullptr);
           B.setInsertionPoint(SuccessBB->begin());
@@ -2216,7 +2215,7 @@ bool swift::simplifyUsers(SILInstruction *I) {
     SILInstruction *User = UI->getUser();
     ++UI;
 
-    if (User->getNumTypes() != 1)
+    if (!User->hasValue())
       continue;
     SILValue S = simplifyInstruction(User);
     if (!S)

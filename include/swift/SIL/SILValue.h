@@ -25,7 +25,6 @@
 #include "llvm/Support/raw_ostream.h"
 
 namespace swift {
-  class SILTypeList;
   class Operand;
   class SILValue;
   class ValueBaseUseIterator;
@@ -51,7 +50,7 @@ namespace swift {
 /// represents a runtime computed value.  Things like SILInstruction derive
 /// from this.
 class alignas(8) ValueBase : public SILAllocated<ValueBase> {
-  PointerUnion<SILType, SILTypeList*> TypeOrTypeList;
+  SILType Type;
   Operand *FirstUse = nullptr;
   friend class Operand;
   friend class SILValue;
@@ -62,10 +61,8 @@ class alignas(8) ValueBase : public SILAllocated<ValueBase> {
   ValueBase &operator=(const ValueBase &) = delete;
 
 protected:
-  ValueBase(ValueKind Kind, SILTypeList *TypeList = 0)
-    : TypeOrTypeList(TypeList), Kind(Kind) {}
   ValueBase(ValueKind Kind, SILType Ty)
-    : TypeOrTypeList(Ty), Kind(Kind) {}
+    : Type(Ty), Kind(Kind) {}
 
 public:
   ~ValueBase() {
@@ -75,26 +72,12 @@ public:
 
   ValueKind getKind() const { return Kind; }
 
-  ArrayRef<SILType> getTypes() const;
-
   /// True if the "value" is actually a value that can be used by other
   /// instructions.
-  bool hasValue() const { return !TypeOrTypeList.isNull(); }
+  bool hasValue() const { return !Type.isNull(); }
 
-  SILType getType(unsigned i) const {
-    if (TypeOrTypeList.is<SILType>()) {
-      assert(i == 0);
-      return TypeOrTypeList.get<SILType>();
-    }
-    return getTypes()[i];
-  }
-
-  unsigned getNumTypes() const {
-    if (TypeOrTypeList.isNull())
-      return 0;
-    if (TypeOrTypeList.is<SILType>())
-      return 1;
-    return getTypes().size();
+  SILType getType() const {
+    return Type;
   }
 
   /// Replace every use of a result of this instruction with the corresponding
@@ -165,57 +148,38 @@ public:
 
 namespace swift {
 
-enum {
-  /// The number of bits required to store a ResultNumber.
-  /// This is primarily here as a way to allow everything that
-  /// depends on it to be easily grepped.
-  ValueResultNumberBits = 2
-};
-
-/// SILValue - A SILValue is a use of a specific result of a ValueBase.  As
-/// such, it is a pair of the ValueBase and the result number being referenced.
+/// SILValue - A SILValue is a wrapper around a ValueBase pointer.
 class SILValue {
-  llvm::PointerIntPair<ValueBase *, ValueResultNumberBits> ValueAndResultNumber;
-
-  explicit SILValue(void *p) {
-    ValueAndResultNumber =
-      decltype(ValueAndResultNumber)::getFromOpaqueValue(p);
-  }
+  ValueBase *Value;
 
 public:
-  SILValue(const ValueBase *V = 0, unsigned ResultNumber = 0)
-    : ValueAndResultNumber((ValueBase *)V, ResultNumber) {
-    assert(ResultNumber == getResultNumber() && "Overflow");
-  }
+  SILValue(const ValueBase *V = nullptr)
+    : Value((ValueBase *)V) { }
 
-  ValueBase *getDef() const {
-    return ValueAndResultNumber.getPointer();
-  }
+  ValueBase *getDef() const { return Value; }
   ValueBase *operator->() const { return getDef(); }
   ValueBase &operator*() const { return *getDef(); }
-  unsigned getResultNumber() const { return ValueAndResultNumber.getInt(); }
 
   SILType getType() const {
-    return getDef()->getType(getResultNumber());
+    return getDef()->getType();
   }
 
   // Comparison.
   bool operator==(SILValue RHS) const {
-    return ValueAndResultNumber == RHS.ValueAndResultNumber;
+    return Value == RHS.Value;
   }
   bool operator!=(SILValue RHS) const { return !(*this == RHS); }
   // Ordering (for std::map).
   bool operator<(SILValue RHS) const {
-    return ValueAndResultNumber.getOpaqueValue() <
-    RHS.ValueAndResultNumber.getOpaqueValue();
+    return Value < RHS.Value;
   }
 
-  using use_iterator = ValueUseIterator;
+  using use_iterator = ValueBaseUseIterator;
 
   /// Returns true if this value has no uses.
   /// To ignore debug-info instructions use swift::hasNoUsesExceptDebug instead
   /// (see comment in DebugUtils.h).
-  inline bool use_empty() const;
+  inline bool use_empty() const { return Value->use_empty(); }
 
   inline use_iterator use_begin() const;
   inline use_iterator use_end() const;
@@ -228,7 +192,7 @@ public:
   /// Returns true if this value has exactly one use.
   /// To ignore debug-info instructions use swift::hasOneNonDebugUse instead
   /// (see comment in DebugUtils.h).
-  inline bool hasOneUse() const;
+  inline bool hasOneUse() const { return Value->hasOneUse(); }
 
   /// Return the underlying SILValue after stripping off all casts from the
   /// current SILValue.
@@ -281,13 +245,13 @@ public:
   /// Convert this SILValue into an opaque pointer like type. For use with
   /// PointerLikeTypeTraits.
   void *getOpaqueValue() const {
-    return ValueAndResultNumber.getOpaqueValue();
+    return (void *)Value;
   }
 
   /// Convert the given opaque pointer into a SILValue. For use with
   /// PointerLikeTypeTraits.
   static SILValue getFromOpaqueValue(void *p) {
-    return SILValue(p);
+    return SILValue((ValueBase *)p);
   }
 
   /// Get the SILLocation associated with the value, if it has any.
@@ -295,7 +259,7 @@ public:
 
   enum {
     NumLowBitsAvailable =
-      llvm::PointerLikeTypeTraits<decltype(ValueAndResultNumber)>::
+    llvm::PointerLikeTypeTraits<ValueBase *>::
           NumLowBitsAvailable
   };
 };
@@ -512,70 +476,14 @@ inline bool ValueBase::hasOneUse() const {
   return ++I == E;
 }
 
-/// An iterator over all uses of a specific result of a ValueBase.
-class ValueUseIterator  : public std::iterator<std::forward_iterator_tag,
-                                               Operand*, ptrdiff_t>
-{
-  llvm::PointerIntPair<Operand*, ValueResultNumberBits> CurAndResultNumber;
-public:
-  ValueUseIterator() = default;
-  explicit ValueUseIterator(Operand *cur, unsigned resultNumber) {
-    // Skip past uses with different result numbers.
-    while (cur && cur->get().getResultNumber() != resultNumber)
-      cur = cur->NextUse;
-
-    CurAndResultNumber.setPointerAndInt(cur, resultNumber);
-  }
-
-  Operand *operator*() const { return CurAndResultNumber.getPointer(); }
-  Operand *operator->() const { return operator*(); }
-
-  SILInstruction *getUser() const {
-    return CurAndResultNumber.getPointer()->getUser();
-  }
-
-  ValueUseIterator &operator++() {
-    Operand *next = CurAndResultNumber.getPointer();
-    assert(next && "incrementing past end()!");
-
-    // Skip past uses with different result numbers.
-    while ((next = next->NextUse)) {
-      if (next->get().getResultNumber() == CurAndResultNumber.getInt())
-        break;
-    }
-
-    CurAndResultNumber.setPointer(next);
-    return *this;
-  }
-
-  ValueUseIterator operator++(int unused) {
-    ValueUseIterator copy = *this;
-    ++*this;
-    return copy;
-  }
-
-  friend bool operator==(ValueUseIterator lhs, ValueUseIterator rhs) {
-    return lhs.CurAndResultNumber.getPointer()
-        == rhs.CurAndResultNumber.getPointer();
-  }
-  friend bool operator!=(ValueUseIterator lhs, ValueUseIterator rhs) {
-    return !(lhs == rhs);
-  }
-};
 inline SILValue::use_iterator SILValue::use_begin() const {
-  return SILValue::use_iterator((*this)->FirstUse, getResultNumber());
+  return Value->use_begin();
 }
 inline SILValue::use_iterator SILValue::use_end() const {
-  return SILValue::use_iterator(nullptr, 0);
+  return Value->use_end();
 }
 inline iterator_range<SILValue::use_iterator> SILValue::getUses() const {
-  return { use_begin(), use_end() };
-}
-inline bool SILValue::use_empty() const { return use_begin() == use_end(); }
-inline bool SILValue::hasOneUse() const {
-  auto I = use_begin(), E = use_end();
-  if (I == E) return false;
-  return ++I == E;
+  return Value->getUses();
 }
 
 /// A constant-size list of the operands of an instruction.
@@ -760,7 +668,6 @@ static inline llvm::hash_code hash_value(SILValue V) {
 }
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILValue V) {
-  OS << "(" << V.getResultNumber() << "): ";
   V.print(OS);
   return OS;
 }
@@ -790,11 +697,7 @@ namespace llvm {
                                   llvm::DenseMapInfo<void*>::getTombstoneKey());
     }
     static unsigned getHashValue(swift::SILValue V) {
-      auto ResultNumHash =
-        DenseMapInfo<unsigned>::getHashValue(V.getResultNumber());
-      auto ValueBaseHash =
-        DenseMapInfo<swift::ValueBase *>::getHashValue(V.getDef());
-      return hash_combine(ResultNumHash, ValueBaseHash);
+      return DenseMapInfo<swift::ValueBase *>::getHashValue(V.getDef());
     }
     static bool isEqual(swift::SILValue LHS, swift::SILValue RHS) {
       return LHS == RHS;

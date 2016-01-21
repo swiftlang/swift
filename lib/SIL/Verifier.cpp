@@ -439,7 +439,7 @@ public:
   }
 
   void visitSILArgument(SILArgument *arg) {
-    checkLegalTypes(arg->getFunction(), arg);
+    checkLegalType(arg->getFunction(), arg);
   }
 
   void visitSILInstruction(SILInstruction *I) {
@@ -449,7 +449,7 @@ public:
     // Check the SILLLocation attached to the instruction.
     checkInstructionsSILLocation(I);
 
-    checkLegalTypes(I->getFunction(), I);
+    checkLegalType(I->getFunction(), I);
   }
 
   void checkSILInstruction(SILInstruction *I) {
@@ -514,7 +514,7 @@ public:
 
       // Make sure that if operand is generic that its primary archetypes match
       // the function context.
-      checkLegalTypes(I->getFunction(), operand.get().getDef());
+      checkLegalType(I->getFunction(), operand.get().getDef());
     }
   }
 
@@ -573,8 +573,8 @@ public:
 
   /// Check that the types of this value producer are all legal in the function
   /// context in which it exists.
-  void checkLegalTypes(SILFunction *F, ValueBase *value) {
-    for (auto type : value->getTypes()) {
+  void checkLegalType(SILFunction *F, ValueBase *value) {
+    if (SILType type = value->getType()) {
       checkLegalType(F, type);
     }
   }
@@ -618,7 +618,7 @@ public:
   }
 
   void checkAllocStackInst(AllocStackInst *AI) {
-    require(AI->getType(0).isAddress(),
+    require(AI->getType().isAddress(),
             "result of alloc_stack must be an address type");
 
     // Scan the parent block of AI and check that the users of AI inside this
@@ -1046,7 +1046,7 @@ public:
     require(Src.getType().isAddress() ||
             Src.getType().getSwiftRValueType()->getClassOrBoundGenericClass(),
             "mark_uninitialized must be an address or class");
-    require(Src.getType() == MU->getType(0),"operand and result type mismatch");
+    require(Src.getType() == MU->getType(),"operand and result type mismatch");
   }
   void checkMarkFunctionEscapeInst(MarkFunctionEscapeInst *MFE) {
     require(MFE->getModule().getStage() == SILStage::Raw,
@@ -1313,9 +1313,9 @@ public:
   }
   
   void checkMetatypeInst(MetatypeInst *MI) {
-    require(MI->getType(0).is<MetatypeType>(),
+    require(MI->getType().is<MetatypeType>(),
             "metatype instruction must be of metatype type");
-    require(MI->getType(0).castTo<MetatypeType>()->hasRepresentation(),
+    require(MI->getType().castTo<MetatypeType>()->hasRepresentation(),
             "metatype instruction must have a metatype representation");
   }
   void checkValueMetatypeInst(ValueMetatypeInst *MI) {
@@ -1478,7 +1478,7 @@ public:
     SILType operandTy = EI->getOperand().getType();
     require(operandTy.isAddress(),
             "must derive element_addr from address");
-    require(EI->getType(0).isAddress(),
+    require(EI->getType().isAddress(),
             "result of tuple_element_addr must be address");
     require(operandTy.is<TupleType>(),
             "must derive tuple_element_addr from tuple");
@@ -1497,7 +1497,7 @@ public:
             "must derive struct_element_addr from address");
     StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
     require(sd, "struct_element_addr operand must be struct address");
-    require(EI->getType(0).isAddress(),
+    require(EI->getType().isAddress(),
             "result of struct_element_addr must be address");
     require(!EI->getField()->isStatic(),
             "cannot get address of static property with struct_element_addr");
@@ -1515,7 +1515,7 @@ public:
 
   void checkRefElementAddrInst(RefElementAddrInst *EI) {
     requireReferenceValue(EI->getOperand(), "Operand of ref_element_addr");
-    require(EI->getType(0).isAddress(),
+    require(EI->getType().isAddress(),
             "result of ref_element_addr must be lvalue");
     require(!EI->getField()->isStatic(),
             "cannot get address of static property with struct_element_addr");
@@ -2905,8 +2905,6 @@ public:
         }
         if (i.isDeallocatingStack()) {
           SILValue op = i.getOperand(0);
-          require(op.getResultNumber() == 0,
-                  "stack dealloc operand is not local storage of stack alloc");
           require(!stack.empty(),
                   "stack dealloc with empty stack");
           require(op.getDef() == stack.back(),

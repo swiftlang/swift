@@ -312,7 +312,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   if (IEI && !OEI) {
     auto *ConcAlloc = Builder.createAllocStack(
         AS->getLoc(), IEI->getLoweredConcreteType(), AS->getVarInfo());
-    SILValue(IEI, 0).replaceAllUsesWith(ConcAlloc);
+    IEI->replaceAllUsesWith(ConcAlloc);
     eraseInstFromFunction(*IEI);
 
     for (auto UI = AS->use_begin(), UE = AS->use_end(); UI != UE;) {
@@ -330,7 +330,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
 
       auto *DS = cast<DeallocStackInst>(Op->getUser());
       Builder.setInsertionPoint(DS);
-      Builder.createDeallocStack(DS->getLoc(), SILValue(ConcAlloc, 0));
+      Builder.createDeallocStack(DS->getLoc(), ConcAlloc);
       eraseInstFromFunction(*DS);
     }
 
@@ -426,7 +426,7 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
     // If this projection is the same as the last projection we processed, just
     // replace all uses of the projection with the load we created previously.
     if (LastProj && Proj == *LastProj) {
-      replaceInstUsesWith(*Inst, LastNewLoad, 0);
+      replaceInstUsesWith(*Inst, LastNewLoad);
       eraseInstFromFunction(*Inst);
       continue;
     }
@@ -436,7 +436,7 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
     auto I = Proj.createAddrProjection(Builder, LI->getLoc(), LI->getOperand());
     LastProj = &Proj;
     LastNewLoad = Builder.createLoad(LI->getLoc(), I.get());
-    replaceInstUsesWith(*Inst, LastNewLoad, 0);
+    replaceInstUsesWith(*Inst, LastNewLoad);
     eraseInstFromFunction(*Inst);
   }
 
@@ -847,8 +847,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
                                               EnumInitOperand->get().getType());
   EnumInitOperand->set(AllocStack);
   Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(AI)));
-  SILValue Load(Builder.createLoad(DataAddrInst->getLoc(), AllocStack),
-                0);
+  SILValue Load(Builder.createLoad(DataAddrInst->getLoc(), AllocStack));
   EnumInst *E = Builder.createEnum(
       DataAddrInst->getLoc(), Load, DataAddrInst->getElement(),
       DataAddrInst->getOperand().getType().getObjectType());
@@ -926,7 +925,7 @@ visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI) {
     auto *D = Builder.createUncheckedEnumData(Loc, Ld, EnumElt, PayloadType);
 
     // Replace all uses of the old load with the data and erase the old load.
-    replaceInstUsesWith(*L, D, 0);
+    replaceInstUsesWith(*L, D);
     ToRemove.push_back(L);
   }
 
@@ -1089,7 +1088,7 @@ SILInstruction *SILCombiner::visitFixLifetimeInst(FixLifetimeInst *FLI) {
   if (auto *AI = dyn_cast<AllocStackInst>(FLI->getOperand())) {
     if (FLI->getOperand().getType().isLoadable(FLI->getModule())) {
       auto Load = Builder.createLoad(FLI->getLoc(), AI);
-      return Builder.createFixLifetime(FLI->getLoc(), SILValue(Load, 0));
+      return Builder.createFixLifetime(FLI->getLoc(), Load);
     }
   }
   return nullptr;

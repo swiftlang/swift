@@ -1022,9 +1022,7 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
           // If the user is a tuple_extract, just substitute the right value in.
           if (auto *TEI = dyn_cast<TupleExtractInst>(O->getUser())) {
             SILValue NewVal = TI->getOperand(TEI->getFieldNo());
-            assert(TEI->getTypes().size() == 1 &&
-                   "Currently, we only support single result instructions.");
-            SILValue(TEI, 0).replaceAllUsesWith(NewVal);
+            TEI->replaceAllUsesWith(NewVal.getDef());
             TEI->dropAllReferences();
             FoldedUsers.insert(TEI);
             if (auto *Inst = dyn_cast<SILInstruction>(NewVal.getDef()))
@@ -1038,8 +1036,6 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
 
 
       // We were able to fold, so all users should use the new folded value.
-      assert(User->getTypes().size() == 1 &&
-             "Currently, we only support single result instructions");
       SILValue(User).replaceAllUsesWith(C);
 
       // The new constant could be further folded now, add it to the worklist.

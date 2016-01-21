@@ -240,18 +240,14 @@ bool swift::mayUseValue(SILInstruction *User, SILValue Ptr,
   // the object then return true.
   // Notice that we need to check all of the values of the object.
   if (isa<StoreInst>(User)) {
-    for (int i = 0, e = Ptr->getNumTypes(); i < e; i++) {
-      if (AA->mayWriteToMemory(User, SILValue(Ptr.getDef(), i)))
-        return true;
-    }
+    if (AA->mayWriteToMemory(User, Ptr))
+      return true;
     return false;
   }
 
   if (isa<LoadInst>(User) ) {
-    for (int i = 0, e = Ptr->getNumTypes(); i < e; i++) {
-      if (AA->mayReadFromMemory(User, SILValue(Ptr.getDef(), i)))
-        return true;
-    }
+    if (AA->mayReadFromMemory(User, Ptr))
+      return true;
     return false;
   }
 
@@ -435,9 +431,8 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
     if (!Params[i].isGuaranteed())
       continue;
     SILValue Op = FAS.getArgument(i);
-    for (int i = 0, e = Ptr->getNumTypes(); i < e; i++)
-      if (!AA->isNoAlias(Op, SILValue(Ptr.getDef(), i)))
-        return true;
+    if (!AA->isNoAlias(Op, Ptr.getDef()))
+      return true;
   }
 
   // Ok, we were able to prove that all arguments to the apply that were

@@ -541,7 +541,7 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     if (SILValue V = simplifyInstruction(Inst)) {
       DEBUG(llvm::dbgs() << "SILCSE SIMPLIFY: " << *Inst << "  to: " << *V
             << '\n');
-      SILValue(Inst, 0).replaceAllUsesWith(V);
+      Inst->replaceAllUsesWith(V.getDef());
       Inst->eraseFromParent();
       Changed = true;
       ++NumSimplify;

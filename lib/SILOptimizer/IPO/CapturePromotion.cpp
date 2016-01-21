@@ -492,7 +492,6 @@ ClosureCloner::populateCloned() {
 void ClosureCloner::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
   SILValue Operand = Inst->getOperand();
   if (auto *A = dyn_cast<ProjectBoxInst>(Operand)) {
-    assert(Operand.getResultNumber() == 0);
     auto I = ProjectBoxArgumentMap.find(A);
     if (I != ProjectBoxArgumentMap.end()) {
       getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
@@ -513,7 +512,6 @@ void
 ClosureCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
   SILValue Operand = Inst->getOperand();
   if (SILArgument *A = dyn_cast<SILArgument>(Operand)) {
-    assert(Operand.getResultNumber() == 0);
     auto I = BoxArgumentMap.find(A);
     if (I != BoxArgumentMap.end()) {
       // Releases of the box arguments get replaced with ReleaseValue of the new
@@ -536,7 +534,6 @@ void
 ClosureCloner::visitStructElementAddrInst(StructElementAddrInst *Inst) {
   SILValue Operand = Inst->getOperand();
   if (auto *A = dyn_cast<ProjectBoxInst>(Operand)) {
-    assert(Operand.getResultNumber() == 0);
     auto I = ProjectBoxArgumentMap.find(A);
     if (I != ProjectBoxArgumentMap.end())
       return;
@@ -562,7 +559,6 @@ void
 ClosureCloner::visitLoadInst(LoadInst *Inst) {
   SILValue Operand = Inst->getOperand();
   if (auto *A = dyn_cast<ProjectBoxInst>(Operand)) {
-    assert(Operand.getResultNumber() == 0);
     auto I = ProjectBoxArgumentMap.find(A);
     if (I != ProjectBoxArgumentMap.end()) {
       // Loads of the address argument get eliminated completely; the uses of
@@ -571,9 +567,7 @@ ClosureCloner::visitLoadInst(LoadInst *Inst) {
       return;
     }
   } else if (auto *SEAI = dyn_cast<StructElementAddrInst>(Operand)) {
-    assert(Operand.getResultNumber() == 0);
     if (auto *A = dyn_cast<ProjectBoxInst>(SEAI->getOperand())) {
-      assert(SEAI->getOperand().getResultNumber() == 0);
       auto I = ProjectBoxArgumentMap.find(A);
       if (I != ProjectBoxArgumentMap.end()) {
         // Loads of a struct_element_addr of an argument get replaced with
@@ -885,7 +879,6 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
   SILModule &M = PAI->getModule();
 
   auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
-  assert(FRI && PAI->getCallee().getResultNumber() == 0);
 
   // Clone the closure with the given promoted captures.
   SILFunction *ClonedFn = constructClonedFunction(PAI, FRI, PromotableIndices);
@@ -954,7 +947,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
   auto *NewPAI = B.createPartialApply(PAI->getLoc(), FnVal, SubstFnTy,
                                       PAI->getSubstitutions(), Args,
                                       PAI->getType());
-  SILValue(PAI, 0).replaceAllUsesWith(NewPAI);
+  PAI->replaceAllUsesWith(NewPAI);
   PAI->eraseFromParent();
   if (FRI->use_empty()) {
     FRI->eraseFromParent();

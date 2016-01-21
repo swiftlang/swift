@@ -142,7 +142,7 @@ protected:
     if (auto *Arg = dyn_cast<SILArgument>(V))
       return Arg->getType().isObject();
     if (auto *Inst = dyn_cast<SILInstruction>(V))
-      return Inst->getNumTypes() == 1 && Inst->getType(0).isObject();
+      return Inst->hasValue() && Inst->getType().isObject();
     return false;
   }
 
@@ -634,7 +634,7 @@ static bool isTransitiveSafeUser(SILInstruction *I) {
   case ValueKind::EnumInst:
   case ValueKind::UncheckedRefCastInst:
   case ValueKind::UncheckedBitwiseCastInst:
-    assert(I->getNumTypes() == 1 && "We assume these are unary");
+    assert(I->hasValue() && "We assume these are unary");
     return true;
   default:
     return false;
@@ -2069,10 +2069,7 @@ protected:
 
       // Update outside used instruction values.
       for (auto &Inst : *OrigBB) {
-        for (unsigned i = 0, e = Inst.getNumTypes(); i != e; ++i) {
-          SILValue V(&Inst, i);
-          updateSSAForValue(OrigBB, V, SSAUp);
-        }
+        updateSSAForValue(OrigBB, &Inst, SSAUp);
       }
     }
   }
@@ -2152,7 +2149,7 @@ createFastNativeArraysCheck(SmallVectorImpl<ArraySemanticsCall> &ArrayProps,
     auto Loc = (*Call).getLoc();
     auto CallKind = Call.getKind();
     if (CallKind == ArrayCallKind::kArrayPropsIsNativeTypeChecked) {
-      auto Val = createStructExtract(B, Loc, SILValue(Call, 0), 0);
+      auto Val = createStructExtract(B, Loc, SILValue(Call), 0);
       Result = createAnd(B, Loc, Result, Val);
     }
   }

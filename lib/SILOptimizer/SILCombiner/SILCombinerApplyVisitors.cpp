@@ -35,7 +35,7 @@ using namespace swift::PatternMatch;
 static SILValue
 isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI, bool requireSingleUse) {
   if (requireSingleUse) {
-    SILValue PAIVal(PAI, 0);
+    SILValue PAIVal(PAI);
     if (!hasOneNonDebugUse(PAIVal))
       return SILValue();
   }
@@ -220,11 +220,11 @@ void PartialApplyCombiner::allocateTemporaries() {
                               IsTake_t::IsNotTake,
                               IsInitialization_t::IsInitialization);
 
-      Tmps.push_back(SILValue(Tmp, 0));
+      Tmps.push_back(Tmp);
       // If the temporary is non-trivial, we need to release it later.
       if (!Arg.getType().isTrivial(PAI->getModule()))
         needsReleases = true;
-      ArgToTmp.insert(std::make_pair(Arg, SILValue(Tmp, 0)));
+      ArgToTmp.insert(std::make_pair(Arg, Tmp));
     }
   }
 
@@ -763,7 +763,7 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
                                  cast<ApplyInst>(AI)->isNonThrowing());
 
   if (isa<ApplyInst>(NewAI))
-    replaceInstUsesWith(*AI.getInstruction(), NewAI.getInstruction(), 0);
+    replaceInstUsesWith(*AI.getInstruction(), NewAI.getInstruction());
   eraseInstFromFunction(*AI.getInstruction());
 
   return NewAI.getInstruction();
@@ -906,7 +906,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
                                                 WMI->getType(),
                                                 OptionalExistential,
                                                 WMI->isVolatile());
-    replaceInstUsesWith(*WMI, NewWMI, 0);
+    replaceInstUsesWith(*WMI, NewWMI);
     eraseInstFromFunction(*WMI);
   };
 
@@ -1225,7 +1225,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
       if (auto *OrigThinFun = dyn_cast<FunctionRefInst>(Ptr->getOperand()))
         if (auto *NewAI = optimizeCastThroughThinFunctionPointer(
                 Builder, AI, OrigThinFun, CastedThinFun)) {
-          replaceInstUsesWith(*AI, NewAI, 0);
+          replaceInstUsesWith(*AI, NewAI);
           eraseInstFromFunction(*AI);
           return nullptr;
         }

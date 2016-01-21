@@ -1014,7 +1014,7 @@ static bool isOrContainsReference(SILType Ty, SILModule *Mod) {
 
 bool EscapeAnalysis::isPointer(ValueBase *V) {
   assert(V->hasValue());
-  SILType Ty = V->getType(0);
+  SILType Ty = V->getType();
   auto Iter = isPointerCache.find(Ty);
   if (Iter != isPointerCache.end())
     return Iter->second;

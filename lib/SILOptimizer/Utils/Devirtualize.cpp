@@ -589,7 +589,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
   if (!isa<TryApplyInst>(AI)) {
     NewAI = B.createApply(AI.getLoc(), FRI, SubstCalleeSILType, ResultTy,
                           Subs, NewArgs, cast<ApplyInst>(AI)->isNonThrowing());
-    ResultValue = SILValue(NewAI.getInstruction(), 0);
+    ResultValue = NewAI.getInstruction();
   } else {
     auto *TAI = cast<TryApplyInst>(AI);
     // Create new normal and error BBs only if:

@@ -322,7 +322,7 @@ void GlobalPropertyOpt::scanInstruction(swift::SILInstruction *Inst) {
       return;
     }
   } else if (isa<RefElementAddrInst>(Inst) || isa<StructElementAddrInst>(Inst)) {
-    if (isArrayAddressType(Inst->getType(0))) {
+    if (isArrayAddressType(Inst->getType())) {
       // If the address of an array-field escapes, we give up for that field.
       if (canAddressEscape(Inst, true)) {
         setAddressEscapes(getAddrEntry(Inst));
@@ -331,7 +331,7 @@ void GlobalPropertyOpt::scanInstruction(swift::SILInstruction *Inst) {
       return;
     }
   } else if (StructExtractInst *SEI = dyn_cast<StructExtractInst>(Inst)) {
-    if (isArrayType(SEI->getType(0))) {
+    if (isArrayType(SEI->getType())) {
       // Add a dependency from the field to the extracted value.
       VarDecl *Field = SEI->getField();
       addDependency(getFieldEntry(Field), getValueEntry(SEI));
@@ -376,12 +376,10 @@ void GlobalPropertyOpt::scanInstruction(swift::SILInstruction *Inst) {
 
   // For everything else which we didn't handle above: we set the property of
   // the instruction value to false.
-  for (int TI = 0, NumTypes = Inst->getNumTypes(); TI < NumTypes; ++TI) {
-    SILType Type = Inst->getType(TI);
+  if (SILType Type = Inst->getType()) {
     if (isArrayType(Type) || isTupleWithArray(Type.getSwiftRValueType())) {
-      SILValue RV(Inst, TI);
-      DEBUG(llvm::dbgs() << "      value could be non-native array: " << *RV);
-      setNotNative(getValueEntry(RV));
+      DEBUG(llvm::dbgs() << "      value could be non-native array: " << *Inst);
+      setNotNative(getValueEntry(Inst));
     }
   }
 }
@@ -398,7 +396,7 @@ void GlobalPropertyOpt::scanInstructions() {
       int argIdx = 0;
       for (auto *BBArg : BB.getBBArgs()) {
         bool hasPreds = false;
-        SILType Type = BBArg->getType(0);
+        SILType Type = BBArg->getType();
         if (isArrayType(Type) || isTupleWithArray(Type.getSwiftRValueType())) {
           for (auto *Pred : BB.getPreds()) {
             hasPreds = true;

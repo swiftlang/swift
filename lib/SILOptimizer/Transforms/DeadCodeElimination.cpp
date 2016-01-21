@@ -452,9 +452,9 @@ bool DCE::removeDead(SILFunction &F) {
       DEBUG(llvm::dbgs() << "Removing dead argument:\n");
       DEBUG(Inst->dump());
 
-      for (unsigned i = 0, e = Inst->getNumTypes(); i != e; ++i) {
-        auto *Undef = SILUndef::get(Inst->getType(i), Inst->getModule());
-        SILValue(Inst, i).replaceAllUsesWith(Undef);
+      if (Inst->hasValue()) {
+        auto *Undef = SILUndef::get(Inst->getType(), Inst->getModule());
+        Inst->replaceAllUsesWith(Undef);
       }
 
       Changed = true;
@@ -482,9 +482,9 @@ bool DCE::removeDead(SILFunction &F) {
       DEBUG(llvm::dbgs() << "Removing dead instruction:\n");
       DEBUG(Inst->dump());
 
-      for (unsigned i = 0, e = Inst->getNumTypes(); i != e; ++i) {
-        auto *Undef = SILUndef::get(Inst->getType(i), Inst->getModule());
-        SILValue(Inst, i).replaceAllUsesWith(Undef);
+      if (Inst->hasValue()) {
+        auto *Undef = SILUndef::get(Inst->getType(), Inst->getModule());
+        Inst->replaceAllUsesWith(Undef);
       }
 
 

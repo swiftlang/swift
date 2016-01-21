@@ -338,7 +338,10 @@ AliasAnalysis::computeMemoryBehaviorInner(SILInstruction *Inst, SILValue V,
 MemBehaviorKeyTy AliasAnalysis::toMemoryBehaviorKey(SILValue V1, SILValue V2,
                                                     RetainObserveKind M) {
   size_t idx1 = MemoryBehaviorValueBaseToIndex.getIndex(V1.getDef());
+  assert(idx1 != std::numeric_limits<size_t>::max() &&
+         "~0 index reserved for empty/tombstone keys");
   size_t idx2 = MemoryBehaviorValueBaseToIndex.getIndex(V2.getDef());
-  unsigned R2 = V2.getResultNumber();
-  return {idx1, idx2, R2, M};
+  assert(idx2 != std::numeric_limits<size_t>::max() &&
+         "~0 index reserved for empty/tombstone keys");
+  return {idx1, idx2, M};
 }

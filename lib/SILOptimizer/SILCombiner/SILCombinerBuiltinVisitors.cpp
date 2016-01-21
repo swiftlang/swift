@@ -106,7 +106,7 @@ static SILInstruction *optimizeBuiltinWithSameOperands(SILBuilder &Builder,
     // We cannot just _return_ the operand because it is not necessarily an
     // instruction. It can be an argument.
     SILValue Op = I->getOperand(0);
-    C->replaceInstUsesWith(*I, Op.getDef(), 0, Op.getResultNumber());
+    C->replaceInstUsesWith(*I, Op.getDef());
     break;
   }
 
@@ -384,14 +384,14 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
         match(I->getArguments()[1],
               m_ApplyInst(BuiltinValueKind::ZExtOrBitCast,
                           m_SILValue(RCast))) &&
-        LCast->getType(0) == RCast->getType(0)) {
+        LCast->getType() == RCast->getType()) {
 
       auto *NewCmp = Builder.createBuiltinBinaryFunction(
           I->getLoc(), getBuiltinName(I->getBuiltinInfo().ID),
-          LCast->getType(0), I->getType(), {LCast, RCast});
+          LCast->getType(), I->getType(), {LCast, RCast});
 
       I->replaceAllUsesWith(NewCmp);
-      replaceInstUsesWith(*I, NewCmp, 0);
+      replaceInstUsesWith(*I, NewCmp);
       return eraseInstFromFunction(*I);
     }
     break;

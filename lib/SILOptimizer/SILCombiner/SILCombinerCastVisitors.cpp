@@ -263,7 +263,7 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
                                                     OutputTy.getObjectType());
     // Replace all uses of the old load with the new bitcasted result and erase
     // the old load.
-    replaceInstUsesWith(*L, BitCast, 0);
+    replaceInstUsesWith(*L, BitCast);
     eraseInstFromFunction(*L);
   }
 

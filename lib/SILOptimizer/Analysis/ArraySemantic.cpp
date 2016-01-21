@@ -315,7 +315,7 @@ static SILValue copyArrayLoad(SILValue ArrayStructValue,
     InsertPt = Inst;
   }
 
-  return SILValue(LI->clone(InsertBefore), 0);
+  return LI->clone(InsertBefore);
 }
 
 static ApplyInst *hoistOrCopyCall(ApplyInst *AI, SILInstruction *InsertBefore,

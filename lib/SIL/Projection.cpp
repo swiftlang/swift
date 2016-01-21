@@ -154,31 +154,31 @@ NewProjection::NewProjection(SILInstruction *I) : Value() {
     break;
   }
   case ValueKind::UpcastInst: {
-    auto *Ty = I->getType(0).getSwiftRValueType().getPointer();
+    auto *Ty = I->getType().getSwiftRValueType().getPointer();
     assert(Ty->isCanonical());
     Value = ValueTy(NewProjectionKind::Upcast, Ty);
     assert(getKind() == NewProjectionKind::Upcast);
     assert(getType(I->getOperand(0).getType(), I->getModule()) ==
-           I->getType(0));
+           I->getType());
     break;
   }
   case ValueKind::UncheckedRefCastInst: {
-    auto *Ty = I->getType(0).getSwiftRValueType().getPointer();
+    auto *Ty = I->getType().getSwiftRValueType().getPointer();
     assert(Ty->isCanonical());
     Value = ValueTy(NewProjectionKind::RefCast, Ty);
     assert(getKind() == NewProjectionKind::RefCast);
     assert(getType(I->getOperand(0).getType(), I->getModule()) ==
-           I->getType(0));
+           I->getType());
     break;
   }
   case ValueKind::UncheckedBitwiseCastInst:
   case ValueKind::UncheckedAddrCastInst: {
-    auto *Ty = I->getType(0).getSwiftRValueType().getPointer();
+    auto *Ty = I->getType().getSwiftRValueType().getPointer();
     assert(Ty->isCanonical());
     Value = ValueTy(NewProjectionKind::BitwiseCast, Ty);
     assert(getKind() == NewProjectionKind::BitwiseCast);
     assert(getType(I->getOperand(0).getType(), I->getModule()) ==
-           I->getType(0));
+           I->getType());
     break;
   }
   }
@@ -489,7 +489,7 @@ NewProjectionPath::computeSubSeqRelation(const NewProjectionPath &RHS) const {
 bool NewProjectionPath::findMatchingObjectProjectionPaths(
     SILInstruction *I, SmallVectorImpl<SILInstruction *> &T) const {
   // We only support unary instructions.
-  if (I->getNumOperands() != 1 || I->getNumTypes() != 1)
+  if (I->getNumOperands() != 1)
     return false;
 
   // Check that the base result type of I is equivalent to this types base path.
@@ -1529,7 +1529,7 @@ processUsersOfValue(ProjectionTree &Tree,
 
     DEBUG(llvm::dbgs() << "            Created projection.\n");
 
-    assert(User->getNumTypes() == 1 && "Projections should only have one use");
+    assert(User->hasValue() && "Projections should have a value");
 
     // Look up the Node for this projection add {User, ChildNode} to the
     // worklist.
@@ -1799,7 +1799,7 @@ createTreeFromValue(SILBuilder &B, SILLocation Loc, SILValue NewBase,
       for (unsigned ChildIdx : reversed(Node->ChildProjections)) {
         const ProjectionTreeNode *ChildNode = getNode(ChildIdx);
         SILInstruction *I = ChildNode->createProjection(B, Loc, V).get();
-        DEBUG(llvm::dbgs() << "    Adding Child: " << I->getType(0) << ": " << *I);
+        DEBUG(llvm::dbgs() << "    Adding Child: " << I->getType() << ": " << *I);
         Worklist.push_back(std::make_tuple(ChildNode, SILValue(I)));
       }
     } else {

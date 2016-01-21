@@ -150,7 +150,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
                          << "    New = " << *Result.getDef() << '\n');
 
       // Everything uses the new instruction now.
-      replaceInstUsesWith(*I, Result.getDef(), 0, Result.getResultNumber());
+      replaceInstUsesWith(*I, Result.getDef());
 
       // Push the new instruction and any users onto the worklist.
       Worklist.addUsersToWorklist(Result.getDef());
@@ -274,28 +274,6 @@ SILInstruction *SILCombiner::replaceInstUsesWith(SILInstruction &I,
         "    with " << *V << '\n');
 
   I.replaceAllUsesWith(V);
-
-  return &I;
-}
-
-/// This is meant to be used when one is attempting to replace only one of the
-/// results of I with a result of V.
-SILInstruction *
-SILCombiner::
-replaceInstUsesWith(SILInstruction &I, ValueBase *V, unsigned IIndex,
-                    unsigned VIndex) {
-  assert(IIndex < I.getNumTypes() && "Cannot have more results than "
-         "types.");
-  assert(VIndex < V->getNumTypes() && "Cannot have more results than "
-         "types.");
-
-  // Add all modified instrs to worklist.
-  Worklist.addUsersToWorklist(&I, IIndex);
-
-  DEBUG(llvm::dbgs() << "SC: Replacing " << I << "\n"
-        "    with " << *V << '\n');
-
-  SILValue(&I, IIndex).replaceAllUsesWith(SILValue(V, VIndex));
 
   return &I;
 }

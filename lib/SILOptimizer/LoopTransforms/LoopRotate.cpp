@@ -96,13 +96,7 @@ static void mapOperands(SILInstruction *I,
     auto Found = ValueMap.find(OrigDef);
     if (Found != ValueMap.end()) {
       SILValue MappedVal = Found->second;
-      unsigned ResultIdx = OrigVal.getResultNumber();
-      // All mapped instructions have their result number set to zero. Except
-      // for arguments that we followed along one edge to their incoming value
-      // on that edge.
-      if (isa<SILArgument>(OrigDef))
-        ResultIdx = MappedVal.getResultNumber();
-      Opd.set(SILValue(MappedVal.getDef(), ResultIdx));
+      Opd.set(MappedVal);
     }
   }
 }
@@ -124,19 +118,14 @@ updateSSAForUseOfInst(SILSSAUpdater &Updater,
   assert(MappedInst);
 
   // For each use of a specific result value of the instruction.
-  for (unsigned i = 0, e = Inst->getNumTypes(); i != e; ++i) {
-    SILValue Res(Inst, i);
-    // For block arguments, MappedValue is already indexed to indicate the
-    // single result value that feeds the argument. In this case, i==0 because
-    // SILArgument only produces one value.
-    SILValue MappedRes =
-        isa<SILArgument>(Inst) ? MappedValue : SILValue(MappedInst, i);
-    assert(Res.getType() == MappedRes.getType() && "The types must match");
+  if (Inst->hasValue()) {
+    SILValue Res(Inst);
+    assert(Res.getType() == MappedValue.getType() && "The types must match");
 
     InsertedPHIs.clear();
     Updater.Initialize(Res.getType());
     Updater.AddAvailableValue(Header, Res);
-    Updater.AddAvailableValue(EntryCheckBlock, MappedRes);
+    Updater.AddAvailableValue(EntryCheckBlock, MappedValue);
 
 
     // Because of the way that phi nodes are represented we have to collect all
@@ -363,7 +352,7 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
       mapOperands(I, ValueMap);
 
       // The actual operand will sort out which result idx to use.
-      ValueMap[&Inst] = SILValue(I, 0);
+      ValueMap[&Inst] = I;
     }
   }
 

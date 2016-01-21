@@ -171,8 +171,6 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
     SILArgument *Arg = *AI;
 
     // We were able to fold, so all users should use the new folded value.
-    assert(Arg->getTypes().size() == 1 &&
-           "Currently, we only support single result instructions.");
     SILValue(Arg).replaceAllUsesWith(Args[Idx]);
     NumBasicBlockArgsPropagated++;
   }

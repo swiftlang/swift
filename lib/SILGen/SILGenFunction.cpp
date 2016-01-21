@@ -327,7 +327,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
           B.createAllocBox(loc, vl.value.getType().getObjectType());
         ProjectBoxInst *boxAddress = B.createProjectBox(loc, allocBox);
         B.createCopyAddr(loc, vl.value, boxAddress, IsNotTake,IsInitialization);
-        capturedArgs.push_back(emitManagedRValueWithCleanup(SILValue(allocBox, 0)));
+        capturedArgs.push_back(emitManagedRValueWithCleanup(allocBox));
       }
 
       break;

@@ -259,7 +259,7 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
 
   // Find all dealloc instructions for AI and then chop them up.
   llvm::SmallVector<DeallocStackInst *, 4> ToRemove;
-  for (auto *Operand : getNonDebugUses(SILValue(AI, 0))) {
+  for (auto *Operand : getNonDebugUses(SILValue(AI))) {
     SILInstruction *User = Operand->getUser();
     SILBuilderWithScope B(User);
 

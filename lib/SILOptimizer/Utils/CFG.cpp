@@ -490,8 +490,7 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
     assert(SuccBB->getNumBBArg() < 2 && "Can take at most one argument");
     if (!SuccBB->getNumBBArg())
       return;
-    Args.push_back(
-        SILValue(NewEdgeBB->createBBArg(SuccBB->getBBArg(0)->getType()), 0));
+    Args.push_back(NewEdgeBB->createBBArg(SuccBB->getBBArg(0)->getType()));
     return;
   }
 
@@ -501,8 +500,7 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
         (EdgeIdx == 0) ? DMBI->getHasMethodBB() : DMBI->getNoMethodBB();
     if (!SuccBB->getNumBBArg())
       return;
-    Args.push_back(
-        SILValue(NewEdgeBB->createBBArg(SuccBB->getBBArg(0)->getType()), 0));
+    Args.push_back(NewEdgeBB->createBBArg(SuccBB->getBBArg(0)->getType()));
     return;
   }
 
@@ -511,16 +509,14 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
     auto SuccBB = EdgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
     if (!SuccBB->getNumBBArg())
       return;
-    Args.push_back(
-        SILValue(NewEdgeBB->createBBArg(SuccBB->getBBArg(0)->getType()), 0));
+    Args.push_back(NewEdgeBB->createBBArg(SuccBB->getBBArg(0)->getType()));
     return;
   }
   if (auto CBI = dyn_cast<CheckedCastAddrBranchInst>(T)) {
     auto SuccBB = EdgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
     if (!SuccBB->getNumBBArg())
       return;
-    Args.push_back(
-        SILValue(NewEdgeBB->createBBArg(SuccBB->getBBArg(0)->getType()), 0));
+    Args.push_back(NewEdgeBB->createBBArg(SuccBB->getBBArg(0)->getType()));
     return;
   }
 
@@ -528,8 +524,7 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
     auto *SuccBB = EdgeIdx == 0 ? TAI->getNormalBB() : TAI->getErrorBB();
     if (!SuccBB->getNumBBArg())
       return;
-    Args.push_back(
-        SILValue(NewEdgeBB->createBBArg(SuccBB->getBBArg(0)->getType()), 0));
+    Args.push_back(NewEdgeBB->createBBArg(SuccBB->getBBArg(0)->getType()));
     return;
   }
 

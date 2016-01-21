@@ -678,7 +678,7 @@ bool AllocOptimize::promoteLoad(SILInstruction *Inst) {
   DEBUG(llvm::dbgs() << "  *** Promoting load: " << *Inst << "\n");
   DEBUG(llvm::dbgs() << "      To value: " << *NewVal.getDef() << "\n");
   
-  SILValue(Inst, 0).replaceAllUsesWith(NewVal);
+  Inst->replaceAllUsesWith(NewVal.getDef());
   SILValue Addr = Inst->getOperand(0);
   Inst->eraseFromParent();
   if (auto *AddrI = dyn_cast<SILInstruction>(Addr))

@@ -187,41 +187,33 @@ SILDeserializer::readFuncTable(ArrayRef<uint64_t> fields, StringRef blobData) {
 /// In serializer, we pre-assign a value ID in order, to each basic block
 /// argument and each SILInstruction that has a value.
 /// In deserializer, we use LocalValues to store the definitions and
-/// ForwardMRVLocalValues for forward-referenced values (values that are
+/// ForwardLocalValues for forward-referenced values (values that are
 /// used but not yet defined). LocalValues are updated in setLocalValue where
 /// the ID passed in assumes the same ordering as in serializer: in-order
 /// for each basic block argument and each SILInstruction that has a value.
-/// We update ForwardMRVLocalValues in getLocalValue and when a value is defined
-/// in setLocalValue, the corresponding entry in ForwardMRVLocalValues will be
+/// We update ForwardLocalValues in getLocalValue and when a value is defined
+/// in setLocalValue, the corresponding entry in ForwardLocalValues will be
 /// erased.
 void SILDeserializer::setLocalValue(ValueBase *Value, ValueID Id) {
   ValueBase *&Entry = LocalValues[Id];
   assert(!Entry && "We should not redefine the same value.");
 
-  auto It = ForwardMRVLocalValues.find(Id);
-  if (It != ForwardMRVLocalValues.end()) {
+  auto It = ForwardLocalValues.find(Id);
+  if (It != ForwardLocalValues.end()) {
     // Take the information about the forward ref out of the map.
-    std::vector<SILValue> Entries = std::move(It->second);
+    ValueBase *Placeholder = It->second;
 
     // Remove the entries from the map.
-    ForwardMRVLocalValues.erase(It);
+    ForwardLocalValues.erase(It);
 
-    assert(Entries.size() <= Value->getTypes().size() &&
-           "Value Type mismatch?");
-    // Validate that any forward-referenced elements have the right type, and
-    // RAUW them.
-    for (unsigned i = 0, e = Entries.size(); i != e; ++i) {
-      if (!Entries[i])
-        continue;
-      Entries[i].replaceAllUsesWith(SILValue(Value, i));
-    }
+    Placeholder->replaceAllUsesWith(Value);
   }
 
   // Store it in our map.
   Entry = Value;
 }
 
-SILValue SILDeserializer::getLocalValue(ValueID Id, unsigned ResultNum,
+SILValue SILDeserializer::getLocalValue(ValueID Id,
                                         SILType Type) {
   if (Id == 0)
     return SILUndef::get(Type, &SILMod);
@@ -230,22 +222,16 @@ SILValue SILDeserializer::getLocalValue(ValueID Id, unsigned ResultNum,
   ValueBase *Entry = LocalValues.lookup(Id);
   if (Entry) {
     // If this value was already defined, check it to make sure types match.
-    SILType EntryTy = Entry->getType(ResultNum);
-    assert(EntryTy == Type && "Value Type mismatch?");
-    (void)EntryTy;
-    return SILValue(Entry, ResultNum);
+    assert(Entry->getType() == Type && "Value Type mismatch?");
+    return Entry;
   }
 
   // Otherwise, this is a forward reference.  Create a dummy node to represent
   // it until we see a real definition.
-  std::vector<SILValue> &Placeholders = ForwardMRVLocalValues[Id];
-  if (Placeholders.size() <= ResultNum)
-    Placeholders.resize(ResultNum+1);
-
-  if (!Placeholders[ResultNum])
-    Placeholders[ResultNum] =
-      new (SILMod) GlobalAddrInst(nullptr, Type);
-  return Placeholders[ResultNum];
+  ValueBase *&Placeholder = ForwardLocalValues[Id];
+  if (!Placeholder)
+    Placeholder = new (SILMod) GlobalAddrInst(nullptr, Type);
+  return Placeholder;
 }
 
 /// Return the SILBasicBlock of a given ID.
@@ -521,7 +507,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   UndefinedBlocks.clear();
   LastValueID = 0;
   LocalValues.clear();
-  ForwardMRVLocalValues.clear();
+  ForwardLocalValues.clear();
 
   // Another SIL_FUNCTION record means the end of this SILFunction.
   // SIL_VTABLE or SIL_GLOBALVAR or SIL_WITNESSTABLE record also means the end
@@ -629,8 +615,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   SILBuilder Builder(BB);
   Builder.setCurrentDebugScope(Fn->getDebugScope());
   unsigned OpCode = 0, TyCategory = 0, TyCategory2 = 0, TyCategory3 = 0,
-           ValResNum = 0, ValResNum2 = 0, Attr = 0,
-           NumSubs = 0, NumConformances = 0, IsNonThrowingApply = 0;
+           Attr = 0, NumSubs = 0, NumConformances = 0, IsNonThrowingApply = 0;
   ValueID ValID, ValID2, ValID3;
   TypeID TyID, TyID2, TyID3;
   TypeID ConcreteTyID;
@@ -644,27 +629,27 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     llvm_unreachable("Record kind for a SIL instruction is not supported.");
   case SIL_ONE_VALUE_ONE_OPERAND:
     SILOneValueOneOperandLayout::readRecord(scratch, OpCode, Attr,
-                                            ValID, ValResNum, TyID, TyCategory,
-                                            ValID2, ValResNum2);
+                                            ValID, TyID, TyCategory,
+                                            ValID2);
     break;
   case SIL_ONE_TYPE:
     SILOneTypeLayout::readRecord(scratch, OpCode, TyID, TyCategory);
     break;
   case SIL_ONE_OPERAND:
     SILOneOperandLayout::readRecord(scratch, OpCode, Attr,
-                                    TyID, TyCategory, ValID, ValResNum);
+                                    TyID, TyCategory, ValID);
     break;
   case SIL_ONE_TYPE_ONE_OPERAND:
     SILOneTypeOneOperandLayout::readRecord(scratch, OpCode, Attr,
                                            TyID, TyCategory,
                                            TyID2, TyCategory2,
-                                           ValID, ValResNum);
+                                           ValID);
     break;
   case SIL_INIT_EXISTENTIAL:
     SILInitExistentialLayout::readRecord(scratch, OpCode,
                                          TyID, TyCategory,
                                          TyID2, TyCategory2,
-                                         ValID, ValResNum,
+                                         ValID,
                                          ConcreteTyID,
                                          NumConformances);
     break;
@@ -672,7 +657,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILInstCastLayout::readRecord(scratch, OpCode, Attr,
                                   TyID, TyCategory,
                                   TyID2, TyCategory2,
-                                  ValID, ValResNum);
+                                  ValID);
     break;
   case SIL_ONE_TYPE_VALUES:
     SILOneTypeValuesLayout::readRecord(scratch, OpCode, TyID, TyCategory,
@@ -680,13 +665,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   case SIL_TWO_OPERANDS:
     SILTwoOperandsLayout::readRecord(scratch, OpCode, Attr,
-                                     TyID, TyCategory, ValID, ValResNum,
-                                     TyID2, TyCategory2, ValID2, ValResNum2);
+                                     TyID, TyCategory, ValID,
+                                     TyID2, TyCategory2, ValID2);
     break;
   case SIL_INST_APPLY: {
     unsigned IsPartial;
     SILInstApplyLayout::readRecord(scratch, IsPartial, NumSubs,
-                                   TyID, TyID2, ValID, ValResNum, ListOfValues);
+                                   TyID, TyID2, ValID, ListOfValues);
     switch (IsPartial) {
     case SIL_APPLY:
       OpCode = (unsigned)ValueKind::ApplyInst;
@@ -743,7 +728,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
            "Layout should be OneTypeOneOperand.");         \
     ResultVal = Builder.create##ID(Loc,                    \
                   getSILType(MF->getType(TyID), (SILValueCategory)TyCategory), \
-                  getLocalValue(ValID, ValResNum,                              \
+                  getLocalValue(ValID,                              \
                     getSILType(MF->getType(TyID2),                             \
                                (SILValueCategory)TyCategory2)));               \
     break;
@@ -761,7 +746,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&       \
            "Layout should be OneTypeOneOperand.");         \
     ResultVal = Builder.create##ID(Loc,                    \
-                  getLocalValue(ValID, ValResNum,                              \
+                  getLocalValue(ValID,                              \
                     getSILType(MF->getType(TyID2),                             \
                                (SILValueCategory)TyCategory2)),                \
                   getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));\
@@ -802,7 +787,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
            "Layout should be OneTypeOneOperand.");
     ResultVal = Builder.createDeallocExistentialBox(Loc,
                   MF->getType(TyID)->getCanonicalType(),
-                  getLocalValue(ValID, ValResNum,
+                  getLocalValue(ValID,
                     getSILType(MF->getType(TyID2),
                                (SILValueCategory)TyCategory2)));
     break;
@@ -811,9 +796,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   
   case ValueKind::RefToBridgeObjectInst: {
     auto RefTy = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
-    auto Ref = getLocalValue(ValID, ValResNum, RefTy);
+    auto Ref = getLocalValue(ValID, RefTy);
     auto BitsTy = getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2);
-    auto Bits = getLocalValue(ValID2, ValResNum2, BitsTy);
+    auto Bits = getLocalValue(ValID2, BitsTy);
     
     ResultVal = Builder.createRefToBridgeObject(Loc, Ref, Bits);
     break;
@@ -838,7 +823,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       ConcreteTy = MF->getType(ConcreteTyID)->getCanonicalType();
     SILValue operand;
     if ((ValueKind) OpCode != ValueKind::AllocExistentialBoxInst)
-      operand = getLocalValue(ValID, ValResNum,
+      operand = getLocalValue(ValID,
                          getSILType(Ty2, (SILValueCategory)TyCategory2));
 
     SmallVector<ProtocolConformanceRef, 2> conformances;
@@ -891,7 +876,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     bool isObjC = Attr & 0x01;
     ResultVal = Builder.createAllocRefDynamic(
                   Loc,
-                  getLocalValue(ValID, ValResNum,
+                  getLocalValue(ValID,
                                 getSILType(MF->getType(TyID2),
                                            (SILValueCategory)TyCategory2)),
                   getSILType(MF->getType(TyID), (SILValueCategory)TyCategory),
@@ -909,12 +894,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILFunctionType *FTI = SubstFnTy.castTo<SILFunctionType>();
     auto ArgTys = FTI->getParameterSILTypes();
 
-    assert((ArgTys.size() << 1) == ListOfValues.size() &&
+    assert(ArgTys.size() == ListOfValues.size() &&
            "Argument number mismatch in ApplyInst.");
     SmallVector<SILValue, 4> Args;
-    for (unsigned I = 0, E = ListOfValues.size(); I < E; I += 2)
-      Args.push_back(getLocalValue(ListOfValues[I], ListOfValues[I+1],
-                                   ArgTys[I>>1]));
+    for (unsigned I = 0, E = ListOfValues.size(); I < E; I++)
+      Args.push_back(getLocalValue(ListOfValues[I], ArgTys[I]));
     unsigned NumSub = NumSubs;
 
     SmallVector<Substitution, 4> Substitutions;
@@ -924,7 +908,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       Substitutions.push_back(*sub);
     }
 
-    ResultVal = Builder.createApply(Loc, getLocalValue(ValID, ValResNum, FnTy),
+    ResultVal = Builder.createApply(Loc, getLocalValue(ValID, FnTy),
                                     SubstFnTy,
                                     FTI->getResult().getSILType(),
                                     Substitutions, Args, IsNonThrowingApply != 0);
@@ -947,12 +931,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 
     SILFunctionType *FTI = SubstFnTy.castTo<SILFunctionType>();
     auto ArgTys = FTI->getParameterSILTypes();
-    assert((ArgTys.size() << 1) == ListOfValues.size() &&
+    assert(ArgTys.size() == ListOfValues.size() &&
            "Argument number mismatch in ApplyInst.");
     SmallVector<SILValue, 4> Args;
-    for (unsigned I = 0, E = ListOfValues.size(); I < E; I += 2)
-      Args.push_back(getLocalValue(ListOfValues[I], ListOfValues[I+1],
-                                   ArgTys[I>>1]));
+    for (unsigned I = 0, E = ListOfValues.size(); I < E; I++)
+      Args.push_back(getLocalValue(ListOfValues[I], ArgTys[I]));
     unsigned NumSub = NumSubs;
 
     SmallVector<Substitution, 4> Substitutions;
@@ -963,7 +946,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     }
 
     ResultVal = Builder.createTryApply(Loc,
-                                       getLocalValue(ValID, ValResNum, FnTy),
+                                       getLocalValue(ValID, FnTy),
                                        SubstFnTy, Substitutions, Args,
                                        normalBB, errorBB);
     break;
@@ -976,15 +959,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILFunctionType *FTI = SubstFnTy.castTo<SILFunctionType>();
     auto ArgTys = FTI->getParameterSILTypes();
 
-    assert((ArgTys.size() << 1) >= ListOfValues.size() &&
+    assert(ArgTys.size() >= ListOfValues.size() &&
            "Argument number mismatch in PartialApplyInst.");
 
-    SILValue FnVal = getLocalValue(ValID, ValResNum, FnTy);
+    SILValue FnVal = getLocalValue(ValID, FnTy);
     SmallVector<SILValue, 4> Args;
-    unsigned unappliedArgs = ArgTys.size() - (ListOfValues.size() >> 1);
-    for (unsigned I = 0, E = ListOfValues.size(); I < E; I += 2)
-      Args.push_back(getLocalValue(ListOfValues[I], ListOfValues[I+1],
-                                   ArgTys[(I>>1) + unappliedArgs]));
+    unsigned unappliedArgs = ArgTys.size() - ListOfValues.size();
+    for (unsigned I = 0, E = ListOfValues.size(); I < E; I++)
+      Args.push_back(getLocalValue(ListOfValues[I], ArgTys[I + unappliedArgs]));
 
     // Compute the result type of the partial_apply, based on which arguments
     // are getting applied.
@@ -1012,11 +994,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto ASTTy = MF->getType(TyID);
     auto ResultTy = getSILType(ASTTy, (SILValueCategory)(unsigned)TyID2);
     SmallVector<SILValue, 4> Args;
-    for (unsigned i = 0, e = ListOfValues.size(); i < e; i += 4) {
-      auto ArgASTTy = MF->getType(ListOfValues[i+2]);
+    for (unsigned i = 0, e = ListOfValues.size(); i < e; i += 3) {
+      auto ArgASTTy = MF->getType(ListOfValues[i+1]);
       auto ArgTy = getSILType(ArgASTTy,
-                              (SILValueCategory)(unsigned)ListOfValues[i+3]);
-      Args.push_back(getLocalValue(ListOfValues[i], ListOfValues[i+1], ArgTy));
+                              (SILValueCategory)(unsigned)ListOfValues[i+2]);
+      Args.push_back(getLocalValue(ListOfValues[i], ArgTy));
     }
     unsigned NumSub = NumSubs;
     SmallVector<Substitution, 4> Substitutions;
@@ -1061,7 +1043,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case ValueKind::DeallocStackInst: {
     auto Ty = MF->getType(TyID);
     ResultVal = Builder.createDeallocStack(Loc,
-        getLocalValue(ValID, ValResNum,
+        getLocalValue(ValID,
                       getSILType(Ty, (SILValueCategory)TyCategory)));
     break;
   }
@@ -1069,7 +1051,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto Ty = MF->getType(TyID);
     bool OnStack = (bool)Attr;
     ResultVal = Builder.createDeallocRef(Loc,
-        getLocalValue(ValID, ValResNum,
+        getLocalValue(ValID,
                       getSILType(Ty, (SILValueCategory)TyCategory)), OnStack);
     break;
   }
@@ -1077,9 +1059,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto Ty = MF->getType(TyID);
     auto Ty2 = MF->getType(TyID2);
     ResultVal = Builder.createDeallocPartialRef(Loc,
-        getLocalValue(ValID, ValResNum,
+        getLocalValue(ValID,
                       getSILType(Ty,  (SILValueCategory)TyCategory)),
-        getLocalValue(ValID2, ValResNum2,
+        getLocalValue(ValID2,
                       getSILType(Ty2,  (SILValueCategory)TyCategory2)));
     break;
   }
@@ -1095,9 +1077,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto Ty = MF->getType(TyID);
     auto Ty2 = MF->getType(TyID2);
     ResultVal = Builder.createMarkDependence(Loc,
-        getLocalValue(ValID, ValResNum,
+        getLocalValue(ValID,
                       getSILType(Ty,  (SILValueCategory)TyCategory)),
-        getLocalValue(ValID2, ValResNum2,
+        getLocalValue(ValID2,
                       getSILType(Ty2,  (SILValueCategory)TyCategory2)));
     break;
   }
@@ -1105,9 +1087,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto Ty = MF->getType(TyID);
     auto Ty2 = MF->getType(TyID2);
     ResultVal = Builder.createIndexAddr(Loc,
-        getLocalValue(ValID, ValResNum,
+        getLocalValue(ValID,
                       getSILType(Ty,  (SILValueCategory)TyCategory)),
-        getLocalValue(ValID2, ValResNum2,
+        getLocalValue(ValID2,
                       getSILType(Ty2,  (SILValueCategory)TyCategory2)));
     break;
   }
@@ -1115,9 +1097,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto Ty = MF->getType(TyID);
     auto Ty2 = MF->getType(TyID2);
     ResultVal = Builder.createIndexRawPointer(Loc,
-        getLocalValue(ValID, ValResNum,
+        getLocalValue(ValID,
                       getSILType(Ty,  (SILValueCategory)TyCategory)),
-        getLocalValue(ValID2, ValResNum2,
+        getLocalValue(ValID2,
                       getSILType(Ty2,  (SILValueCategory)TyCategory2)));
     break;
   }
@@ -1160,10 +1142,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     // Format: a list of typed values. A typed value is expressed by 4 IDs:
     // TypeID, TypeCategory, ValueID, ValueResultNumber.
     SmallVector<SILValue, 4> OpList;
-    for (unsigned I = 0, E = ListOfValues.size(); I < E; I += 4) {
+    for (unsigned I = 0, E = ListOfValues.size(); I < E; I += 3) {
       auto EltTy = MF->getType(ListOfValues[I]);
       OpList.push_back(
-        getLocalValue(ListOfValues[I+2], ListOfValues[I+3],
+        getLocalValue(ListOfValues[I+2],
                       getSILType(EltTy, (SILValueCategory)ListOfValues[I+1])));
     }
     ResultVal = Builder.createMarkFunctionEscape(Loc, OpList);
@@ -1171,7 +1153,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
   // Checked Conversion instructions.
   case ValueKind::UnconditionalCheckedCastInst: {
-    SILValue Val = getLocalValue(ValID, ValResNum,
+    SILValue Val = getLocalValue(ValID,
                  getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2));
     SILType Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
     ResultVal = Builder.createUnconditionalCheckedCast(Loc, Val, Ty);
@@ -1182,7 +1164,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case ValueKind::ID##Inst:                   \
     assert(RecordKind == SIL_ONE_OPERAND &&            \
            "Layout should be OneOperand.");            \
-    ResultVal = Builder.create##ID(Loc, getLocalValue(ValID, ValResNum,  \
+    ResultVal = Builder.create##ID(Loc, getLocalValue(ValID,  \
                     getSILType(MF->getType(TyID),                        \
                                (SILValueCategory)TyCategory)));          \
     break;
@@ -1215,7 +1197,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto Ty = MF->getType(TyID);
     bool isTake = (Attr > 0);
     ResultVal = Builder.createLoadUnowned(Loc,
-        getLocalValue(ValID, ValResNum,
+        getLocalValue(ValID,
                       getSILType(Ty, (SILValueCategory)TyCategory)),
         IsTake_t(isTake));
     break;
@@ -1224,7 +1206,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto Ty = MF->getType(TyID);
     bool isTake = (Attr > 0);
     ResultVal = Builder.createLoadWeak(Loc,
-        getLocalValue(ValID, ValResNum,
+        getLocalValue(ValID,
                       getSILType(Ty, (SILValueCategory)TyCategory)),
         IsTake_t(isTake));
     break;
@@ -1232,7 +1214,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case ValueKind::MarkUninitializedInst: {
     auto Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
     auto Kind = (MarkUninitializedInst::Kind)Attr;
-    auto Val = getLocalValue(ValID, ValResNum, Ty);
+    auto Val = getLocalValue(ValID, Ty);
     ResultVal = Builder.createMarkUninitialized(Loc, Val, Kind);
     break;
   }
@@ -1241,8 +1223,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory);
     SILType ValType = addrType.getObjectType();
     ResultVal = Builder.createStore(Loc,
-                    getLocalValue(ValID, ValResNum, ValType),
-                    getLocalValue(ValID2, ValResNum2, addrType));
+                    getLocalValue(ValID, ValType),
+                    getLocalValue(ValID2, addrType));
     break;
   }
   case ValueKind::StoreUnownedInst: {
@@ -1252,8 +1234,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto ValType = SILType::getPrimitiveObjectType(refType.getReferentType());
     bool isInit = (Attr > 0);
     ResultVal = Builder.createStoreUnowned(Loc,
-                    getLocalValue(ValID, ValResNum, ValType),
-                    getLocalValue(ValID2, ValResNum2, addrType),
+                    getLocalValue(ValID, ValType),
+                    getLocalValue(ValID2, addrType),
                     IsInitialization_t(isInit));
     break;
   }
@@ -1264,8 +1246,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto ValType = SILType::getPrimitiveObjectType(refType.getReferentType());
     bool isInit = (Attr > 0);
     ResultVal = Builder.createStoreWeak(Loc,
-                    getLocalValue(ValID, ValResNum, ValType),
-                    getLocalValue(ValID2, ValResNum2, addrType),
+                    getLocalValue(ValID, ValType),
+                    getLocalValue(ValID2, addrType),
                     IsInitialization_t(isInit));
     break;
   }
@@ -1275,8 +1257,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     bool isInit = (Attr & 0x2) > 0;
     bool isTake = (Attr & 0x1) > 0;
     ResultVal = Builder.createCopyAddr(Loc,
-                    getLocalValue(ValID, ValResNum, addrType),
-                    getLocalValue(ValID2, ValResNum2, addrType),
+                    getLocalValue(ValID, addrType),
+                    getLocalValue(ValID2, addrType),
                     IsTake_t(isTake),
                     IsInitialization_t(isInit));
     break;
@@ -1286,8 +1268,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory);
     SILType ValType = addrType.getObjectType();
     ResultVal = Builder.createAssign(Loc,
-                    getLocalValue(ValID, ValResNum, ValType),
-                    getLocalValue(ValID2, ValResNum2, addrType));
+                    getLocalValue(ValID, ValType),
+                    getLocalValue(ValID2, addrType));
     break;
   }
   case ValueKind::StructElementAddrInst:
@@ -1295,7 +1277,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     // Use SILOneValueOneOperandLayout.
     VarDecl *Field = cast<VarDecl>(MF->getDecl(ValID));
     auto Ty = MF->getType(TyID);
-    auto Val = getLocalValue(ValID2, ValResNum2,
+    auto Val = getLocalValue(ValID2,
                              getSILType(Ty, (SILValueCategory)TyCategory));
     auto ResultTy = Val.getType().getFieldType(Field, SILMod);
     if ((ValueKind)OpCode == ValueKind::StructElementAddrInst)
@@ -1311,10 +1293,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     // expressed by 4 IDs: TypeID, TypeCategory, ValueID, ValueResultNumber.
     auto Ty = MF->getType(TyID);
     SmallVector<SILValue, 4> OpList;
-    for (unsigned I = 0, E = ListOfValues.size(); I < E; I += 4) {
+    for (unsigned I = 0, E = ListOfValues.size(); I < E; I += 3) {
       auto EltTy = MF->getType(ListOfValues[I]);
       OpList.push_back(
-        getLocalValue(ListOfValues[I+2], ListOfValues[I+3],
+        getLocalValue(ListOfValues[I+2],
                       getSILType(EltTy, (SILValueCategory)ListOfValues[I+1])));
     }
     ResultVal = Builder.createStruct(Loc,
@@ -1334,12 +1316,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     default: llvm_unreachable("Out of sync with parent switch");
     case ValueKind::TupleElementAddrInst:
       ResultVal = Builder.createTupleElementAddr(Loc,
-                      getLocalValue(ValID, ValResNum, ST),
+                      getLocalValue(ValID, ST),
                       TyID, getSILType(ResultTy, SILValueCategory::Address));
       break;
     case ValueKind::TupleExtractInst:
       ResultVal = Builder.createTupleExtract(Loc,
-                                             getLocalValue(ValID, ValResNum,ST),
+                                             getLocalValue(ValID,ST),
                                              TyID,
                                 getSILType(ResultTy, SILValueCategory::Object));
       break;
@@ -1353,10 +1335,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     TupleType *TT = Ty->getAs<TupleType>();
     assert(TT && "Type of a TupleInst should be TupleType");
     SmallVector<SILValue, 4> OpList;
-    for (unsigned I = 0, E = ListOfValues.size(); I < E; I += 2) {
-      Type EltTy = TT->getElement(I >> 1).getType();
+    for (unsigned I = 0, E = ListOfValues.size(); I < E; I++) {
+      Type EltTy = TT->getElement(I).getType();
       OpList.push_back(
-        getLocalValue(ListOfValues[I], ListOfValues[I+1],
+        getLocalValue(ListOfValues[I],
                       getSILType(EltTy, SILValueCategory::Object)));
     }
     ResultVal = Builder.createTuple(Loc,
@@ -1366,9 +1348,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
   case ValueKind::BranchInst: {
     SmallVector<SILValue, 4> Args;
-    for (unsigned I = 0, E = ListOfValues.size(); I < E; I += 4)
+    for (unsigned I = 0, E = ListOfValues.size(); I < E; I += 3)
       Args.push_back(
-        getLocalValue(ListOfValues[I+2], ListOfValues[I+3],
+        getLocalValue(ListOfValues[I+2],
                       getSILType(MF->getType(ListOfValues[I]),
                                  (SILValueCategory)ListOfValues[I+1])));
 
@@ -1382,30 +1364,30 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     // for condition, the list has value for condition, true basic block ID,
     // false basic block ID, number of true arguments, and a list of true|false
     // arguments.
-    SILValue Cond = getLocalValue(ListOfValues[0], ListOfValues[1],
+    SILValue Cond = getLocalValue(ListOfValues[0],
                                   getSILType(MF->getType(TyID),
                                              (SILValueCategory)TyCategory));
 
-    unsigned NumTrueArgs = ListOfValues[4];
-    unsigned StartOfTrueArg = 5;
-    unsigned StartOfFalseArg = StartOfTrueArg + 4*NumTrueArgs;
+    unsigned NumTrueArgs = ListOfValues[3];
+    unsigned StartOfTrueArg = 4;
+    unsigned StartOfFalseArg = StartOfTrueArg + 3*NumTrueArgs;
     SmallVector<SILValue, 4> TrueArgs;
-    for (unsigned I = StartOfTrueArg, E = StartOfFalseArg; I < E; I += 4)
+    for (unsigned I = StartOfTrueArg, E = StartOfFalseArg; I < E; I += 3)
       TrueArgs.push_back(
-        getLocalValue(ListOfValues[I+2], ListOfValues[I+3],
+        getLocalValue(ListOfValues[I+2],
                       getSILType(MF->getType(ListOfValues[I]),
                                  (SILValueCategory)ListOfValues[I+1])));
 
     SmallVector<SILValue, 4> FalseArgs;
-    for (unsigned I = StartOfFalseArg, E = ListOfValues.size(); I < E; I += 4)
+    for (unsigned I = StartOfFalseArg, E = ListOfValues.size(); I < E; I += 3)
       FalseArgs.push_back(
-        getLocalValue(ListOfValues[I+2], ListOfValues[I+3],
+        getLocalValue(ListOfValues[I+2],
                       getSILType(MF->getType(ListOfValues[I]),
                                  (SILValueCategory)ListOfValues[I+1])));
 
     ResultVal = Builder.createCondBranch(Loc, Cond,
-                    getBBForReference(Fn, ListOfValues[2]), TrueArgs,
-                    getBBForReference(Fn, ListOfValues[3]), FalseArgs);
+                    getBBForReference(Fn, ListOfValues[1]), TrueArgs,
+                    getBBForReference(Fn, ListOfValues[2]), FalseArgs);
     break;
   }
   case ValueKind::SwitchEnumInst:
@@ -1414,16 +1396,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     // default basic block ID. Use SILOneTypeValuesLayout: the type is
     // for condition, the list has value for condition, hasDefault, default
     // basic block ID, a list of (DeclID, BasicBlock ID).
-    SILValue Cond = getLocalValue(ListOfValues[0], ListOfValues[1],
+    SILValue Cond = getLocalValue(ListOfValues[0],
                                   getSILType(MF->getType(TyID),
                                              (SILValueCategory)TyCategory));
 
     SILBasicBlock *DefaultBB = nullptr;
-    if (ListOfValues[2])
-      DefaultBB = getBBForReference(Fn, ListOfValues[3]);
+    if (ListOfValues[1])
+      DefaultBB = getBBForReference(Fn, ListOfValues[2]);
 
     SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 4> CaseBBs;
-    for (unsigned I = 4, E = ListOfValues.size(); I < E; I += 2) {
+    for (unsigned I = 3, E = ListOfValues.size(); I < E; I += 2) {
       CaseBBs.push_back( {cast<EnumElementDecl>(MF->getDecl(ListOfValues[I])),
                             getBBForReference(Fn, ListOfValues[I+1])} );
     }
@@ -1441,23 +1423,21 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     // for condition, the list has value for condition, result type,
     //   hasDefault, default
     // basic block ID, a list of (DeclID, BasicBlock ID).
-    SILValue Cond = getLocalValue(ListOfValues[0], ListOfValues[1],
+    SILValue Cond = getLocalValue(ListOfValues[0],
                                   getSILType(MF->getType(TyID),
                                              (SILValueCategory)TyCategory));
 
-    Type ResultLoweredTy = MF->getType(ListOfValues[2]);
-    SILValueCategory ResultCategory = (SILValueCategory)ListOfValues[3];
+    Type ResultLoweredTy = MF->getType(ListOfValues[1]);
+    SILValueCategory ResultCategory = (SILValueCategory)ListOfValues[2];
     SILType ResultTy = getSILType(ResultLoweredTy, ResultCategory);
     
     SILValue DefaultVal = nullptr;
-    if (ListOfValues[4])
-      DefaultVal = getLocalValue(ListOfValues[5], ListOfValues[6],
-                                   ResultTy);
+    if (ListOfValues[3])
+      DefaultVal = getLocalValue(ListOfValues[4], ResultTy);
 
     SmallVector<std::pair<EnumElementDecl*, SILValue>, 4> CaseVals;
-    for (unsigned I = 7, E = ListOfValues.size(); I < E; I += 3) {
-      auto Value = getLocalValue(ListOfValues[I+1], ListOfValues[I+2],
-                                 ResultTy);
+    for (unsigned I = 5, E = ListOfValues.size(); I < E; I += 2) {
+      auto Value = getLocalValue(ListOfValues[I+1], ResultTy);
       CaseVals.push_back({cast<EnumElementDecl>(MF->getDecl(ListOfValues[I])),
                          Value});
     }
@@ -1476,19 +1456,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     // basic block ID, a list of (Value ID, BasicBlock ID).
     SILType ResultTy = getSILType(MF->getType(TyID),
                                              (SILValueCategory)TyCategory);
-    SILValue Cond = getLocalValue(ListOfValues[0], ListOfValues[1],
-                                  getSILType(MF->getType(TyID),
+    SILValue Cond = getLocalValue(ListOfValues[0], getSILType(MF->getType(TyID),
                                              (SILValueCategory)TyCategory));
 
     SILBasicBlock *DefaultBB = nullptr;
-    if (ListOfValues[2])
-      DefaultBB = getBBForReference(Fn, ListOfValues[3]);
+    if (ListOfValues[1])
+      DefaultBB = getBBForReference(Fn, ListOfValues[2]);
 
     SmallVector<std::pair<SILValue, SILBasicBlock*>, 4> CaseBBs;
-    for (unsigned I = 4, E = ListOfValues.size(); I < E; I += 3) {
-      auto value = getLocalValue(ListOfValues[I], ListOfValues[I+1],
-                                 ResultTy);
-      CaseBBs.push_back( {value, getBBForReference(Fn, ListOfValues[I+2])} );
+    for (unsigned I = 3, E = ListOfValues.size(); I < E; I += 2) {
+      auto value = getLocalValue(ListOfValues[I], ResultTy);
+      CaseBBs.push_back( {value, getBBForReference(Fn, ListOfValues[I+1])} );
     }
     ResultVal = Builder.createSwitchValue(Loc, Cond, DefaultBB, CaseBBs);
     break;
@@ -1499,25 +1477,21 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     // for condition, the list has value for condition, result type,
     // hasDefault, default,
     // basic block ID, a list of (Value ID, Value ID).
-    SILValue Cond = getLocalValue(ListOfValues[0], ListOfValues[1],
-                                  getSILType(MF->getType(TyID),
+    SILValue Cond = getLocalValue(ListOfValues[0], getSILType(MF->getType(TyID),
                                              (SILValueCategory)TyCategory));
 
-    Type ResultLoweredTy = MF->getType(ListOfValues[2]);
-    SILValueCategory ResultCategory = (SILValueCategory)ListOfValues[3];
+    Type ResultLoweredTy = MF->getType(ListOfValues[1]);
+    SILValueCategory ResultCategory = (SILValueCategory)ListOfValues[2];
     SILType ResultTy = getSILType(ResultLoweredTy, ResultCategory);
 
     SILValue DefaultVal = nullptr;
-    if (ListOfValues[4])
-      DefaultVal = getLocalValue(ListOfValues[5], ListOfValues[6],
-                                 ResultTy);
+    if (ListOfValues[3])
+      DefaultVal = getLocalValue(ListOfValues[4], ResultTy);
 
     SmallVector<std::pair<SILValue, SILValue>, 4> CaseValuesAndResults;
-    for (unsigned I = 7, E = ListOfValues.size(); I < E; I += 4) {
-      auto CaseValue = getLocalValue(ListOfValues[I], ListOfValues[I+1],
-                                     Cond.getType());
-      auto Result = getLocalValue(ListOfValues[I+2], ListOfValues[I+3],
-                                  ResultTy);
+    for (unsigned I = 5, E = ListOfValues.size(); I < E; I += 2) {
+      auto CaseValue = getLocalValue(ListOfValues[I], Cond.getType());
+      auto Result = getLocalValue(ListOfValues[I+1], ResultTy);
       CaseValuesAndResults.push_back({CaseValue, Result});
     }
 
@@ -1529,8 +1503,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     // Format: a type, an operand and a decl ID. Use SILTwoOperandsLayout: type,
     // (DeclID + hasOperand), and an operand.
     SILValue Operand;
-    if (ValResNum)
-      Operand = getLocalValue(ValID2, ValResNum2,
+    if (Attr)
+      Operand = getLocalValue(ValID2,
                     getSILType(MF->getType(TyID2),
                                (SILValueCategory)TyCategory2));
     ResultVal = Builder.createEnum(Loc, Operand,
@@ -1546,7 +1520,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                    (SILValueCategory) TyCategory);
     SILType ResultTy = OperandTy.getEnumElementType(Elt, SILMod);
     ResultVal = Builder.createInitEnumDataAddr(Loc,
-                    getLocalValue(ValID2, ValResNum2, OperandTy),
+                    getLocalValue(ValID2, OperandTy),
                     Elt, ResultTy);
     break;
   }
@@ -1557,7 +1531,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                    (SILValueCategory) TyCategory);
     SILType ResultTy = OperandTy.getEnumElementType(Elt, SILMod);
     ResultVal = Builder.createUncheckedEnumData(Loc,
-                    getLocalValue(ValID2, ValResNum2, OperandTy),
+                    getLocalValue(ValID2, OperandTy),
                     Elt, ResultTy);
     break;
   }
@@ -1568,7 +1542,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                    (SILValueCategory) TyCategory);
     SILType ResultTy = OperandTy.getEnumElementType(Elt, SILMod);
     ResultVal = Builder.createUncheckedTakeEnumDataAddr(Loc,
-                    getLocalValue(ValID2, ValResNum2, OperandTy),
+                    getLocalValue(ValID2, OperandTy),
                     Elt, ResultTy);
     break;
   }
@@ -1577,7 +1551,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     EnumElementDecl *Elt = cast<EnumElementDecl>(MF->getDecl(ValID));
     auto Ty = MF->getType(TyID);
     ResultVal = Builder.createInjectEnumAddr(Loc,
-                    getLocalValue(ValID2, ValResNum2,
+                    getLocalValue(ValID2,
                                   getSILType(Ty, (SILValueCategory)TyCategory)),
                     Elt);
     break;
@@ -1586,7 +1560,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     // Use SILOneValueOneOperandLayout.
     VarDecl *Field = cast<VarDecl>(MF->getDecl(ValID));
     auto Ty = MF->getType(TyID);
-    auto Val = getLocalValue(ValID2, ValResNum2,
+    auto Val = getLocalValue(ValID2,
                              getSILType(Ty, (SILValueCategory)TyCategory));
     auto ResultTy = Val.getType().getFieldType(Field, SILMod);
     ResultVal = Builder.createRefElementAddr(Loc, Val, Field,
@@ -1613,20 +1587,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     default: llvm_unreachable("Out of sync with parent switch");
     case ValueKind::ClassMethodInst:
       ResultVal = Builder.createClassMethod(Loc,
-                    getLocalValue(ListOfValues[NextValueIndex],
-                                  ListOfValues[NextValueIndex+1], operandTy),
+                    getLocalValue(ListOfValues[NextValueIndex], operandTy),
                     DRef, Ty, IsVolatile);
       break;
     case ValueKind::SuperMethodInst:
       ResultVal = Builder.createSuperMethod(Loc,
-                    getLocalValue(ListOfValues[NextValueIndex],
-                                  ListOfValues[NextValueIndex+1], operandTy),
+                    getLocalValue(ListOfValues[NextValueIndex], operandTy),
                     DRef, Ty, IsVolatile);
       break;
     case ValueKind::DynamicMethodInst:
       ResultVal = Builder.createDynamicMethod(Loc,
-                    getLocalValue(ListOfValues[NextValueIndex],
-                                  ListOfValues[NextValueIndex+1], operandTy),
+                    getLocalValue(ListOfValues[NextValueIndex], operandTy),
                     DRef, Ty, IsVolatile);
       break;
     }
@@ -1649,7 +1620,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       SILType ExistentialOperandTy =
           getSILType(MF->getType(TyID3), (SILValueCategory)TyCategory3);
       if (ValID3)
-        ExistentialOperand = getLocalValue(ValID3, 0, ExistentialOperandTy);
+        ExistentialOperand = getLocalValue(ValID3, ExistentialOperandTy);
     }
     ResultVal = Builder.createWitnessMethod(
         Loc, Ty, Conformance, DRef, OperandTy, ExistentialOperand, Attr);
@@ -1658,13 +1629,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case ValueKind::DynamicMethodBranchInst: {
     // Format: a typed value, a SILDeclRef, a BasicBlock ID for method,
     // a BasicBlock ID for no method. Use SILOneTypeValuesLayout.
-    unsigned NextValueIndex = 2;
+    unsigned NextValueIndex = 1;
     SILDeclRef DRef = getSILDeclRef(MF, ListOfValues, NextValueIndex);
     assert(ListOfValues.size() == NextValueIndex + 2 &&
            "Wrong number of entries for DynamicMethodBranchInst");
     ResultVal = Builder.createDynamicMethodBranch(Loc,
-                    getLocalValue(ListOfValues[0], ListOfValues[1],
-                                  getSILType(MF->getType(TyID),
+                    getLocalValue(ListOfValues[0], getSILType(MF->getType(TyID),
                                              (SILValueCategory)TyCategory)),
                     DRef, getBBForReference(Fn, ListOfValues[NextValueIndex]),
                     getBBForReference(Fn, ListOfValues[NextValueIndex+1]));
@@ -1673,16 +1643,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case ValueKind::CheckedCastBranchInst: {
     // Format: the cast kind, a typed value, a BasicBlock ID for success,
     // a BasicBlock ID for failure. Uses SILOneTypeValuesLayout.
-    assert(ListOfValues.size() == 7 &&
+    assert(ListOfValues.size() == 6 &&
            "expect 7 numbers for CheckedCastBranchInst");
     bool isExact = ListOfValues[0] != 0;
-    SILType opTy = getSILType(MF->getType(ListOfValues[3]),
-                              (SILValueCategory)ListOfValues[4]);
-    SILValue op = getLocalValue(ListOfValues[1], ListOfValues[2], opTy);
+    SILType opTy = getSILType(MF->getType(ListOfValues[2]),
+                              (SILValueCategory)ListOfValues[3]);
+    SILValue op = getLocalValue(ListOfValues[1], opTy);
     SILType castTy = getSILType(MF->getType(TyID),
                                 (SILValueCategory)TyCategory);
-    auto *successBB = getBBForReference(Fn, ListOfValues[5]);
-    auto *failureBB = getBBForReference(Fn, ListOfValues[6]);
+    auto *successBB = getBBForReference(Fn, ListOfValues[4]);
+    auto *failureBB = getBBForReference(Fn, ListOfValues[5]);
 
     ResultVal = Builder.createCheckedCastBranch(Loc, isExact, op, castTy,
                                                 successBB, failureBB);
@@ -1693,14 +1663,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     CastConsumptionKind consumption = getCastConsumptionKind(ListOfValues[0]);
 
     CanType sourceType = MF->getType(ListOfValues[1])->getCanonicalType();
-    SILType srcAddrTy = getSILType(MF->getType(ListOfValues[4]),
-                                   (SILValueCategory)ListOfValues[5]);
-    SILValue src = getLocalValue(ListOfValues[2], ListOfValues[3], srcAddrTy);
+    SILType srcAddrTy = getSILType(MF->getType(ListOfValues[3]),
+                                   (SILValueCategory)ListOfValues[4]);
+    SILValue src = getLocalValue(ListOfValues[2], srcAddrTy);
 
-    CanType targetType = MF->getType(ListOfValues[6])->getCanonicalType();
+    CanType targetType = MF->getType(ListOfValues[5])->getCanonicalType();
     SILType destAddrTy =
       getSILType(MF->getType(TyID), (SILValueCategory) TyCategory);
-    SILValue dest = getLocalValue(ListOfValues[7], ListOfValues[8], destAddrTy);
+    SILValue dest = getLocalValue(ListOfValues[6], destAddrTy);
 
     if (OpCode == (unsigned) ValueKind::UnconditionalCheckedCastAddrInst) {
       ResultVal = Builder.createUnconditionalCheckedCastAddr(Loc, consumption,
@@ -1709,8 +1679,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       break;
     }
 
-    auto *successBB = getBBForReference(Fn, ListOfValues[9]);
-    auto *failureBB = getBBForReference(Fn, ListOfValues[10]);
+    auto *successBB = getBBForReference(Fn, ListOfValues[7]);
+    auto *failureBB = getBBForReference(Fn, ListOfValues[8]);
     ResultVal = Builder.createCheckedCastAddrBranch(Loc, consumption,
                                                     src, sourceType,
                                                     dest, targetType,
@@ -1719,34 +1689,34 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
   case ValueKind::UncheckedRefCastAddrInst: {
     CanType sourceType = MF->getType(ListOfValues[0])->getCanonicalType();
-    SILType srcAddrTy = getSILType(MF->getType(ListOfValues[3]),
-                                   (SILValueCategory)ListOfValues[4]);
-    SILValue src = getLocalValue(ListOfValues[1], ListOfValues[2], srcAddrTy);
+    SILType srcAddrTy = getSILType(MF->getType(ListOfValues[2]),
+                                   (SILValueCategory)ListOfValues[3]);
+    SILValue src = getLocalValue(ListOfValues[1], srcAddrTy);
 
-    CanType targetType = MF->getType(ListOfValues[5])->getCanonicalType();
+    CanType targetType = MF->getType(ListOfValues[4])->getCanonicalType();
     SILType destAddrTy =
       getSILType(MF->getType(TyID), (SILValueCategory) TyCategory);
-    SILValue dest = getLocalValue(ListOfValues[6], ListOfValues[7], destAddrTy);
+    SILValue dest = getLocalValue(ListOfValues[5], destAddrTy);
 
     ResultVal = Builder.createUncheckedRefCastAddr(Loc, src, sourceType,
                                                    dest, targetType);
     break;
   }
   case ValueKind::InitBlockStorageHeaderInst: {
-    assert(ListOfValues.size() == 6 &&
+    assert(ListOfValues.size() == 4 &&
            "expected 6 values for InitBlockStorageHeader");
     SILType blockTy
       = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
 
-    SILType storageTy = getSILType(MF->getType(ListOfValues[2]),
+    SILType storageTy = getSILType(MF->getType(ListOfValues[1]),
                                    SILValueCategory::Address);
     SILValue storage
-      = getLocalValue(ListOfValues[0], ListOfValues[1], storageTy);
+      = getLocalValue(ListOfValues[0], storageTy);
 
-    SILType invokeTy = getSILType(MF->getType(ListOfValues[5]),
+    SILType invokeTy = getSILType(MF->getType(ListOfValues[3]),
                                   SILValueCategory::Object);
     SILValue invoke
-      = getLocalValue(ListOfValues[3], ListOfValues[4], invokeTy);
+      = getLocalValue(ListOfValues[2], invokeTy);
 
     ResultVal = Builder.createInitBlockStorageHeader(Loc, storage, invoke,
                                                      blockTy);

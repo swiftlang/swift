@@ -55,7 +55,7 @@ namespace swift {
 
     /// Data structures used to perform name lookup for local values.
     llvm::DenseMap<uint32_t, ValueBase*> LocalValues;
-    llvm::DenseMap<uint32_t, std::vector<SILValue>> ForwardMRVLocalValues;
+    llvm::DenseMap<uint32_t, ValueBase*> ForwardLocalValues;
     serialization::ValueID LastValueID = 0;
 
     /// Data structures used to perform lookup of basic blocks.
@@ -89,7 +89,7 @@ namespace swift {
     /// register it and update our symbol table.
     void setLocalValue(ValueBase *Value, serialization::ValueID Id);
     /// Get a reference to a local value with the specified ID and type.
-    SILValue getLocalValue(serialization::ValueID Id, unsigned ResultNum,
+    SILValue getLocalValue(serialization::ValueID Id,
                            SILType Type);
 
     SILFunction *getFuncForReference(StringRef Name, SILType Ty);

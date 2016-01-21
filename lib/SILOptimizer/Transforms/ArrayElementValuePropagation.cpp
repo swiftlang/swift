@@ -116,7 +116,7 @@ bool ArrayAllocation::mapInitializationStores() {
 
     // Store to the base.
     auto *SI = dyn_cast<StoreInst>(Inst);
-    if (SI && SI->getDest() == SILValue(PointerToAddress, 0)) {
+    if (SI && SI->getDest() == PointerToAddress) {
       // We have already seen an entry for this index bail.
       if (ElementValueMap.count(0))
         return false;

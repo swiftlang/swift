@@ -440,7 +440,7 @@ namespace {
 
       if (!isa<MarkUninitializedInst>(TheMemory.MemoryInst)) {
         // Collect information about the retain count result as well.
-        for (auto UI : SILValue(TheMemory.MemoryInst, 0).getUses()) {
+        for (auto UI : TheMemory.MemoryInst->getUses()) {
           auto *User = UI->getUser();
 
           // If this is a release or dealloc_stack, then remember it as such.
@@ -498,7 +498,7 @@ collectTupleElementUses(TupleElementAddrInst *TEAI, unsigned BaseEltNo) {
   // BaseElt.  The uses hanging off the tuple_element_addr are going to be
   // counted as uses of the struct or enum itself.
   if (InStructSubElement || InEnumSubElement)
-    return collectUses(SILValue(TEAI, 0), BaseEltNo);
+    return collectUses(TEAI, BaseEltNo);
 
   assert(!IsSelfOfNonDelegatingInitializer && "self doesn't have tuple type");
 
@@ -511,7 +511,7 @@ collectTupleElementUses(TupleElementAddrInst *TEAI, unsigned BaseEltNo) {
     BaseEltNo += getElementCountRec(EltTy, false);
   }
   
-  collectUses(SILValue(TEAI, 0), BaseEltNo);
+  collectUses(TEAI, BaseEltNo);
 }
 
 void ElementUseCollector::collectStructElementUses(StructElementAddrInst *SEAI,
@@ -521,7 +521,7 @@ void ElementUseCollector::collectStructElementUses(StructElementAddrInst *SEAI,
   // current element.
   if (!IsSelfOfNonDelegatingInitializer) {
     llvm::SaveAndRestore<bool> X(InStructSubElement, true);
-    collectUses(SILValue(SEAI, 0), BaseEltNo);
+    collectUses(SEAI, BaseEltNo);
     return;
   }
 
@@ -537,7 +537,7 @@ void ElementUseCollector::collectStructElementUses(StructElementAddrInst *SEAI,
     BaseEltNo += getElementCountRec(FieldType, false);
   }
 
-  collectUses(SILValue(SEAI, 0), BaseEltNo);
+  collectUses(SEAI, BaseEltNo);
 }
 
 void ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
@@ -755,7 +755,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       // recursion that tuple stores are not scalarized outside, and that stores
       // should not be treated as partial stores.
       llvm::SaveAndRestore<bool> X(InEnumSubElement, true);
-      collectUses(SILValue(User, 0), BaseEltNo);
+      collectUses(User, BaseEltNo);
       continue;
     }
 
@@ -818,7 +818,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       // Scalarize LoadInst
       if (auto *LI = dyn_cast<LoadInst>(User)) {
         SILValue Result = scalarizeLoad(LI, ElementAddrs);
-        SILValue(LI, 0).replaceAllUsesWith(Result);
+        LI->replaceAllUsesWith(Result.getDef());
         LI->eraseFromParent();
         continue;
       }

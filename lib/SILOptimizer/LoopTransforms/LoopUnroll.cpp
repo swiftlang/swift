@@ -294,8 +294,7 @@ static void collectLoopLiveOutValues(
           assert(ClonedInstructions.count(&Inst) && "Unmapped instruction!");
 
           if (!LoopLiveOutValues.count(UsedValue))
-            LoopLiveOutValues[UsedValue].push_back(SILValue(
-                ClonedInstructions[&Inst], UsedValue.getResultNumber()));
+            LoopLiveOutValues[UsedValue].push_back(ClonedInstructions[&Inst]);
         }
       }
     }
@@ -390,10 +389,8 @@ static bool tryToUnrollLoop(SILLoop *Loop) {
           MappedValue = Cloner.getValueMap()[MapEntry.first];
         // Otherwise, consult the instruction map.
         else
-          MappedValue = SILValue(
-              Cloner
-                  .getInstMap()[cast<SILInstruction>(MapEntry.first.getDef())],
-              MapEntry.first.getResultNumber());
+          MappedValue = Cloner
+                  .getInstMap()[cast<SILInstruction>(MapEntry.first.getDef())];
         MapEntry.second.push_back(MappedValue);
         assert(MapEntry.second.size() == Cnt);
       }

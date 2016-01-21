@@ -110,7 +110,7 @@ public:
               DEBUG(llvm::dbgs() << "        Pin users are safe! Removing!\n");
               Changed = true;
               auto *Enum = SILBuilder(PinDef).createOptionalSome(
-                  PinDef->getLoc(), PinDef->getOperand(), PinDef->getType(0));
+                  PinDef->getLoc(), PinDef->getOperand(), PinDef->getType());
               SILValue(PinDef).replaceAllUsesWith(Enum);
               Unpin->eraseFromParent();
               PinDef->eraseFromParent();

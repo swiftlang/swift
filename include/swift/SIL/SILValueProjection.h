@@ -182,7 +182,7 @@ public:
   /// Returns the hashcode for the location.
   llvm::hash_code getHashCode() const {
     llvm::hash_code HC = llvm::hash_combine(
-        Base.getDef(), Base.getResultNumber(), Base.getType());
+        Base.getDef(), Base.getType());
     if (!Path.hasValue())
       return HC;
     HC = llvm::hash_combine(HC, hash_value(Path.getValue()));
@@ -381,8 +381,7 @@ public:
 static inline llvm::hash_code hash_value(const LSValue &V) {
   if (V.isCoveringValue())
     return llvm::hash_combine(V.isCoveringValue());
-  return llvm::hash_combine(V.getBase().getDef(), V.getBase().getResultNumber(),
-                            V.getBase().getType());
+  return llvm::hash_combine(V.getBase().getDef(), V.getBase().getType());
 }
 
 //===----------------------------------------------------------------------===//
@@ -507,8 +506,7 @@ public:
 };
 
 static inline llvm::hash_code hash_value(const LSLocation &L) {
-  return llvm::hash_combine(L.getBase().getDef(), L.getBase().getResultNumber(),
-                            L.getBase().getType());
+  return llvm::hash_combine(L.getBase().getDef(), L.getBase().getType());
 }
 
 } // end swift namespace

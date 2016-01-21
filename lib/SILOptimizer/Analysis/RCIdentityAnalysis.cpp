@@ -525,9 +525,7 @@ void RCIdentityFunctionInfo::getRCUsers(
       }
 
       // Otherwise, add all of User's uses to our list to continue searching.
-      for (unsigned i = 0, e = User->getNumTypes(); i != e; ++i) {
-        Worklist.push_back(SILValue(User, i));
-      }
+      Worklist.push_back(User);
     }
   }
 }

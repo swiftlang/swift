@@ -648,7 +648,7 @@ static void replaceAllUsesExceptDealloc(AllocStackInst *ASI, ValueBase *RHS) {
       Uses.push_back(Use);
   }
   for (Operand *Use : Uses) {
-    Use->set(SILValue(RHS, Use->get().getResultNumber()));
+    Use->set(RHS);
   }
 }
 

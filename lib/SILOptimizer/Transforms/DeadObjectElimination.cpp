@@ -179,9 +179,7 @@ void static
 removeInstructions(ArrayRef<SILInstruction*> UsersToRemove) {
   for (auto *I : UsersToRemove) {
     if (!I->use_empty())
-      for (unsigned i = 0, e = I->getNumTypes(); i != e; ++i)
-        SILValue(I, i).replaceAllUsesWith(SILUndef::get(I->getType(i),
-                                                        I->getModule()));
+      I->replaceAllUsesWith(SILUndef::get(I->getType(), I->getModule()));
     // Now we know that I should not have any uses... erase it from its parent.
     I->eraseFromParent();
   }

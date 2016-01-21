@@ -711,10 +711,12 @@ SILAnalysis *swift::createAliasAnalysis(SILModule *M) {
 AliasKeyTy AliasAnalysis::toAliasKey(SILValue V1, SILValue V2,
                                      SILType Type1, SILType Type2) {
   size_t idx1 = AliasValueBaseToIndex.getIndex(V1.getDef());
+  assert(idx1 != std::numeric_limits<size_t>::max() &&
+         "~0 index reserved for empty/tombstone keys");
   size_t idx2 = AliasValueBaseToIndex.getIndex(V2.getDef());
-  unsigned R1 = V1.getResultNumber();
-  unsigned R2 = V2.getResultNumber();
+  assert(idx2 != std::numeric_limits<size_t>::max() &&
+         "~0 index reserved for empty/tombstone keys");
   void *t1 = Type1.getOpaqueValue();
   void *t2 = Type2.getOpaqueValue();
-  return {idx1, idx2, R1, R2, t1, t2};
+  return {idx1, idx2, t1, t2};
 }

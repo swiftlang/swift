@@ -334,7 +334,7 @@ static void replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
     val = projection.createValueProjection(builder, LI->getLoc(), val).get();
   }
   op = LI->getOperand();
-  SILValue(LI, 0).replaceAllUsesWith(val);
+  LI->replaceAllUsesWith(val.getDef());
   LI->eraseFromParent();
   while (op.getDef() != ASI && op.use_empty()) {
     assert(isa<StructElementAddrInst>(op) || isa<TupleElementAddrInst>(op));

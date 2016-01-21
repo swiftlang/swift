@@ -138,7 +138,7 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
 
     // Create an argument on the return-to BB representing the returned value.
     SILValue RetArg = new (F.getModule()) SILArgument(ReturnToBB,
-                                            AI.getInstruction()->getType(0));
+                                            AI.getInstruction()->getType());
     // Replace all uses of the ApplyInst with the new argument.
     SILValue(AI.getInstruction()).replaceAllUsesWith(RetArg);
   }
@@ -281,7 +281,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
 
     case ValueKind::MetatypeInst:
       // Thin metatypes are always free.
-      if (I.getType(0).castTo<MetatypeType>()->getRepresentation()
+      if (I.getType().castTo<MetatypeType>()->getRepresentation()
             == MetatypeRepresentation::Thin)
         return InlineCost::Free;
       // TODO: Thick metatypes are free if they don't require generic or lazy

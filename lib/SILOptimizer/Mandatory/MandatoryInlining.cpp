@@ -131,8 +131,6 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
   }
 
   if (auto *PAI = dyn_cast<PartialApplyInst>(CalleeValue)) {
-    assert(CalleeValue.getResultNumber() == 0);
-
     SILValue Callee = PAI->getCallee();
     if (!tryDeleteDeadClosure(PAI))
       return;
@@ -140,7 +138,6 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
   }
 
   if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(CalleeValue)) {
-    assert(CalleeValue.getResultNumber() == 0);
     SILValue Callee = TTTFI->getCallee();
     if (!tryDeleteDeadClosure(TTTFI))
       return;
@@ -148,7 +145,6 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
   }
 
   if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeValue)) {
-    assert(CalleeValue.getResultNumber() == 0);
     if (!FRI->use_empty())
       return;
     FRI->eraseFromParent();
@@ -179,7 +175,6 @@ getCalleeFunction(FullApplySite AI, bool &IsThick,
   SILValue CalleeValue = AI.getCallee();
 
   if (LoadInst *LI = dyn_cast<LoadInst>(CalleeValue)) {
-    assert(CalleeValue.getResultNumber() == 0);
     // Conservatively only see through alloc_box; we assume this pass is run
     // immediately after SILGen
     auto *PBI = dyn_cast<ProjectBoxInst>(LI->getOperand());
@@ -226,8 +221,6 @@ getCalleeFunction(FullApplySite AI, bool &IsThick,
   // generated when using auto closures.
   if (PartialApplyInst *PAI =
         dyn_cast<PartialApplyInst>(CalleeValue)) {
-    assert(CalleeValue.getResultNumber() == 0);
-
     for (const auto &Arg : PAI->getArguments()) {
       CaptureArgs.push_back(Arg);
       FullArgs.push_back(Arg);
@@ -238,7 +231,6 @@ getCalleeFunction(FullApplySite AI, bool &IsThick,
     PartialApply = PAI;
   } else if (ThinToThickFunctionInst *TTTFI =
                dyn_cast<ThinToThickFunctionInst>(CalleeValue)) {
-    assert(CalleeValue.getResultNumber() == 0);
     CalleeValue = TTTFI->getOperand();
     IsThick = true;
   }
