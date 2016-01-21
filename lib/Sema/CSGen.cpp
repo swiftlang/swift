@@ -66,7 +66,8 @@ static bool isArithmeticOperatorDecl(ValueDecl *vd) {
   ( vd->getName().str() == "+" ||
     vd->getName().str() == "-" ||
     vd->getName().str() == "*" ||
-    vd->getName().str() == "/");
+    vd->getName().str() == "/" ||
+    vd->getName().str() == "%" );
 }
 
 namespace {
@@ -371,7 +372,10 @@ namespace {
 
     if (lti.collectedTypes.size() == 1) {
       // TODO: Compute the BCT.
-      CS.setFavoredType(expr, *lti.collectedTypes.begin());
+
+      auto favoredTy = (*lti.collectedTypes.begin())->getLValueOrInOutObjectType();
+
+      CS.setFavoredType(expr, favoredTy.getPointer());
       
       // If we have a chain of identical binop expressions with homogenous
       // argument types, we can directly simplify the associated constraint
@@ -413,6 +417,14 @@ namespace {
               if (rep1 != rep2) {
                 CS.mergeEquivalenceClasses(rep1, rep2, 
                                            /*updateWorkList*/ false);
+
+                // Since we're merging argument constraints, make sure that
+                // the representative tyvar is properly bound to the argument
+                // type.
+                CS.addConstraint(ConstraintKind::Bind,
+                                 rep1,
+                                 favoredTy,
+                                 CS.getConstraintLocator(binExp1));
               }                    
 
               auto odTy1 = ODR1->getType()->getAs<TypeVariableType>();
