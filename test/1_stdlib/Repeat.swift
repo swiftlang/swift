@@ -20,4 +20,9 @@ RepeatTests.test("Attributes") {
   expectEqual(r.repeatedValue, "repeat")
 }
 
+RepeatTests.test("Non-negative count") {
+  expectCrashLater()
+  repeatElement("repeat", count: -42)
+}
+
 runAllTests()

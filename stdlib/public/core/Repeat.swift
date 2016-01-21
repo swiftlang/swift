@@ -21,6 +21,7 @@ public struct Repeated<Element> : Collection {
   /// Construct an instance that contains `length` elements having the
   /// value `repeatedValue`.
   internal init(_repeating repeatedValue: Element, length: Int) {
+    _require(length >= 0, "Repetition count should be non-negative")
     self.length = length
     self.repeatedValue = repeatedValue
   }
