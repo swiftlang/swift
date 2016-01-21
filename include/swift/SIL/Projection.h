@@ -347,6 +347,7 @@ public:
     default:
       return false;
     case ValueKind::StructElementAddrInst:
+    case ValueKind::RefElementAddrInst:
     case ValueKind::TupleElementAddrInst:
     case ValueKind::UncheckedTakeEnumDataAddrInst:
       return true;

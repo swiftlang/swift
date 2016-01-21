@@ -215,7 +215,7 @@ AliasResult AliasAnalysis::aliasAddressProjection(SILValue V1, SILValue V2,
   // If V2 is also a gep instruction with a must-alias or not-aliasing base
   // pointer, figure out if the indices of the GEPs tell us anything about the
   // derived pointers.
-  if (!Projection::isAddrProjection(V2)) {
+  if (!NewProjection::isAddressProjection(V2)) {
     // Ok, V2 is not an address projection. See if V2 after stripping casts
     // aliases O1. If so, then we know that V2 must partially alias V1 via a
     // must alias relation on O1. This ensures that given an alloc_stack and a
@@ -226,9 +226,9 @@ AliasResult AliasAnalysis::aliasAddressProjection(SILValue V1, SILValue V2,
     return AliasResult::MayAlias;
   }
   
-  assert(!Projection::isAddrProjection(O1) &&
+  assert(!NewProjection::isAddressProjection(O1) &&
          "underlying object may not be a projection");
-  assert(!Projection::isAddrProjection(O2) &&
+  assert(!NewProjection::isAddressProjection(O2) &&
          "underlying object may not be a projection");
 
   // Do the base pointers alias?
@@ -273,7 +273,7 @@ AliasResult AliasAnalysis::aliasAddressProjection(SILValue V1, SILValue V2,
     return AliasResult::NoAlias;
 
   // If one of the GEPs is a super path of the other then they partially
-  // alias. W
+  // alias.
   if (BaseAlias == AliasResult::MustAlias &&
       isStrictSubSeqRelation(R))
     return AliasResult::PartialAlias;
@@ -611,14 +611,15 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
 
   // First if one instruction is a gep and the other is not, canonicalize our
   // inputs so that V1 always is the instruction containing the GEP.
-  if (!Projection::isAddrProjection(V1) && Projection::isAddrProjection(V2)) {
+  if (!NewProjection::isAddressProjection(V1) &&
+       NewProjection::isAddressProjection(V2)) {
     std::swap(V1, V2);
     std::swap(O1, O2);
   }
 
   // If V1 is an address projection, attempt to use information from the
   // aggregate type tree to disambiguate it from V2.
-  if (Projection::isAddrProjection(V1)) {
+  if (NewProjection::isAddressProjection(V1)) {
     AliasResult Result = aliasAddressProjection(V1, V2, O1, O2);
     if (Result != AliasResult::MayAlias)
       return Result;
