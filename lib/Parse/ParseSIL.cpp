@@ -2625,7 +2625,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   }
   case ValueKind::TupleElementAddrInst:
   case ValueKind::TupleExtractInst: {
-    Identifier ElemId;
     SourceLoc NameLoc;
     if (parseTypedValueRef(Val, B) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
@@ -3387,7 +3386,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     Identifier invoke, type;
     SourceLoc invokeLoc, typeLoc;
     
-    SILValue invokeVal, invokeValLoc;
+    SILValue invokeVal;
     
     SILType blockType;
     

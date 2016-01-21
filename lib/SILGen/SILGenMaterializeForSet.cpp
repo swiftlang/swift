@@ -449,7 +449,6 @@ collectIndicesFromParameters(SILGenFunction &gen, SILLocation loc,
 
   // Translate and reabstract the index values by recursively walking
   // the abstracted index type.
-  SmallVector<ManagedValue, 4> translatedIndices;
   translateIndices(gen, loc, pattern, substIndicesType,
                    sourceIndices, result);
   assert(sourceIndices.empty() && "index value not claimed!");

@@ -87,7 +87,6 @@ namespace {
 
       // If we're using checked_cast_addr, take the operand (which
       // should be an address) and build into the destination buffer.
-      ManagedValue abstractResult;
       if (Strategy == CastStrategy::Address) {
         SILValue resultBuffer =
           createAbstractResultBuffer(hasAbstraction, origTargetTL, ctx);

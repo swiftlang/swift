@@ -634,7 +634,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ValueID ValID, ValID2, ValID3;
   TypeID TyID, TyID2, TyID3;
   TypeID ConcreteTyID;
-  DeclID ProtoID;
   ModuleID OwningModuleID;
   SourceLoc SLoc;
   ArrayRef<uint64_t> ListOfValues;

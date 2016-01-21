@@ -1192,9 +1192,6 @@ Serializer::writeSubstitutions(ArrayRef<Substitution> substitutions,
   using namespace decls_block;
   auto abbrCode = abbrCodes[BoundGenericSubstitutionLayout::Code];
   for (auto &sub : substitutions) {
-    SmallVector<DeclID, 16> conformanceData;
-    SmallVector<const ProtocolConformance *, 8> conformancesToWrite;
-
     BoundGenericSubstitutionLayout::emitRecord(
       Out, ScratchRecord, abbrCode,
       addTypeRef(sub.getReplacement()),

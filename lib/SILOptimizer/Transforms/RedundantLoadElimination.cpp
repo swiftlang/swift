@@ -472,10 +472,6 @@ class RLEContext {
   /// A map from each BasicBlock to its BlockState.
   llvm::SmallDenseMap<SILBasicBlock *, BlockState, 4> BBToLocState;
 
-  /// A map for each basic block and whether its predecessors have forwardable
-  /// edges.
-  llvm::DenseMap<SILBasicBlock *, bool> ForwardableEdge;
-
 public:
   RLEContext(SILFunction *F, AliasAnalysis *AA, TypeExpansionAnalysis *TE,
              PostOrderFunctionInfo *PO);
