@@ -1105,9 +1105,9 @@ public:
   /// label, but doesn't need to be, diagnose it.
   void diagnoseEscapedArgumentLabel(const Token &tok);
 
-  /// Parse an unqualified-identifier.
+  /// Parse an unqualified-decl-name.
   ///
-  ///   unqualified-identifier:
+  ///   unqualified-decl-name:
   ///     identifier
   ///     identifier '(' ((identifier | '_') ':') + ')'
   ///
@@ -1115,8 +1115,8 @@ public:
   /// \param allowInit Whether to allow 'init' for initializers.
   /// \param loc Will be populated with the location of the name.
   /// \param diag The diagnostic to emit if this is not a name.
-  DeclName parseUnqualifiedIdentifier(bool allowInit, SourceLoc &loc,
-                                      const Diagnostic &diag);
+  DeclName parseUnqualifiedDeclName(bool allowInit, SourceLoc &loc,
+                                    const Diagnostic &diag);
 
   Expr *parseExprIdentifier();
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,

@@ -589,7 +589,7 @@ ParserResult<Expr> Parser::parseExprSuper() {
     }
 
     SourceLoc nameLoc;
-    DeclName name = parseUnqualifiedIdentifier(
+    DeclName name = parseUnqualifiedDeclName(
                       /*allowInit=*/true,
                       nameLoc,
                       diag::expected_identifier_after_super_dot_expr);
@@ -928,8 +928,8 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       return Result;
     }
 
-    Name = parseUnqualifiedIdentifier(/*allowInit=*/true, NameLoc, 
-                                      diag::expected_identifier_after_dot_expr);
+    Name = parseUnqualifiedDeclName(/*allowInit=*/true, NameLoc, 
+                                    diag::expected_identifier_after_dot_expr);
     if (!Name) return nullptr;
 
     ParserResult<Expr> Arg;
@@ -1078,9 +1078,9 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 
       if (Tok.isAny(tok::identifier, tok::kw_init)) {
         SourceLoc NameLoc;
-        DeclName Name = parseUnqualifiedIdentifier(/*allowInit=*/true,
-                                                   NameLoc,
-                                                   diag::expected_member_name);
+        DeclName Name = parseUnqualifiedDeclName(/*allowInit=*/true,
+                                                 NameLoc,
+                                                 diag::expected_member_name);
         if (!Name) return nullptr;
       
         Result = makeParserResult(
@@ -1363,9 +1363,9 @@ void Parser::diagnoseEscapedArgumentLabel(const Token &tok) {
     .fixItRemoveChars(end.getAdvancedLoc(-1), end);
 }
 
-DeclName Parser::parseUnqualifiedIdentifier(bool allowInit,
-                                            SourceLoc &loc,
-                                            const Diagnostic &diag) {
+DeclName Parser::parseUnqualifiedDeclName(bool allowInit,
+                                          SourceLoc &loc,
+                                          const Diagnostic &diag) {
   // Consume the base name.
   Identifier baseName;
 
@@ -1444,17 +1444,17 @@ DeclName Parser::parseUnqualifiedIdentifier(bool allowInit,
 }
 
 ///   expr-identifier:
-///     unqualified-identifier generic-args?
+///     unqualified-decl-name generic-args?
 Expr *Parser::parseExprIdentifier() {
   assert(Tok.is(tok::identifier) || Tok.is(tok::kw_self) ||
          Tok.is(tok::kw_Self));
 
   Token IdentTok = Tok;
 
-  // Parse the unqualified-identifier.
+  // Parse the unqualified-decl-name.
   SourceLoc loc;
-  DeclName name = parseUnqualifiedIdentifier(/*allowInit=*/false, loc,
-                                             diag::expected_expr);
+  DeclName name = parseUnqualifiedDeclName(/*allowInit=*/false, loc,
+                                           diag::expected_expr);
 
   SmallVector<TypeRepr*, 8> args;
   SourceLoc LAngleLoc, RAngleLoc;
