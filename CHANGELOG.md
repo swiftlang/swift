@@ -1,5 +1,13 @@
-Latest
-------
+
+Swift 3
+-------
+
+* Curried function syntax has been removed, and now produces a compile-time
+  error.
+
+
+Swift 2.2
+---------
 
 * Associated types in protocols can now be specified with a new 'associatedtype'
   declaration, to replace the use of 'typealias':
@@ -10,6 +18,9 @@ Latest
 
   The typealias keyword is still allowed (but deprecated and produces a warning)
   in Swift 2.2. This warning will become an error in Swift 3.
+
+* Curried function syntax has been deprecated, and is slated to be removed in 
+  Swift 3.
 
 * The ++ and -- operators have been deprecated, and are slated to be removed in
   Swift 3.0.  As a replacement, please use "x += 1" on integer or floating point
