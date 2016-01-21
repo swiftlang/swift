@@ -14,6 +14,7 @@
 #define SWIFT_AST_CAPTURE_INFO_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/PointerLikeTypeTraitsFwdDecl.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include <vector>
