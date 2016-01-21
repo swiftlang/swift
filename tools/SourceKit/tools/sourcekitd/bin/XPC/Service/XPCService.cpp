@@ -60,7 +60,7 @@ done:
 namespace {
 /// \brief Associates sourcekitd_uid_t to a UIdent.
 class SKUIDToUIDMap {
-  typedef llvm::DenseMap<sourcekitd_uid_t, UIdent> MapTy;
+  typedef llvm::DenseMap<void *, UIdent> MapTy;
   MapTy Map;
   WorkQueue Queue{ WorkQueue::Dequeuing::Concurrent, "UIDMap" };
 
