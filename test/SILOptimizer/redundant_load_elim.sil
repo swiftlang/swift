@@ -105,9 +105,7 @@ sil @escaped_a_ptr : $@convention(thin) (@out A) -> ()
 sil @escaped_a : $@convention(thin) () -> Builtin.RawPointer
 sil @init_twofield : $@convention(thin) (@thin TwoField.Type) -> TwoField
 
-
-
-// CHECK-LABEL: redundant_load_across_fixlifetime_inst
+// CHECK-LABEL: sil hidden @redundant_load_across_fixlifetime_inst
 // CHECK: load
 // CHECK-NOT: load
 // CHECK: return
