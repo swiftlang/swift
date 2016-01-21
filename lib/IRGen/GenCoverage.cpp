@@ -22,6 +22,7 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
+#include "llvm/ProfileData/InstrProf.h"
 #include "llvm/ProfileData/CoverageMappingWriter.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/ProfileData/InstrProf.h"
@@ -40,6 +41,9 @@ static StringRef getCoverageSection(IRGenModule &IGM) {
 }
 
 void IRGenModule::emitCoverageMapping() {
+#if 1
+  return;
+#else
   const auto &Mappings = SILMod->getCoverageMapList();
   // If there aren't any coverage maps, there's nothing to emit.
   if (Mappings.empty())
@@ -152,4 +156,5 @@ void IRGenModule::emitCoverageMapping() {
   CovData->setAlignment(8);
 
   addUsedGlobal(CovData);
+#endif
 }
