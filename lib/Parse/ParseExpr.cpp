@@ -1451,7 +1451,7 @@ Expr *Parser::parseExprIdentifier() {
 
   Token IdentTok = Tok;
 
-  // Pase the unqualified-identifier.
+  // Parse the unqualified-identifier.
   SourceLoc loc;
   DeclName name = parseUnqualifiedIdentifier(/*allowInit=*/false, loc,
                                              diag::expected_expr);
