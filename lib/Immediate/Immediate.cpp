@@ -183,12 +183,7 @@ bool swift::immediate::linkLLVMModules(llvm::Module *Module,
   auto OldHandler = Ctx.getDiagnosticHandler();
   void *OldDiagnosticContext = Ctx.getDiagnosticContext();
   Ctx.setDiagnosticHandler(linkerDiagnosticHandler, nullptr);
-                              // TODO: reactivate the linker mode if it is
-                              // supported in llvm again. Otherwise remove the
-                              // commented code completely.
-  bool Failed = llvm::Linker::linkModules(*Module, std::move(SubModule),
-                                          linkerDiagnosticHandlerNoCtx
-                                          /*, LinkerMode*/);
+  bool Failed = llvm::Linker::linkModules(*Module, std::move(SubModule));
   Ctx.setDiagnosticHandler(OldHandler, OldDiagnosticContext);
 
   return !Failed;
