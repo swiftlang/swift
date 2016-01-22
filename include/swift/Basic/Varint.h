@@ -26,7 +26,7 @@
 namespace swift {
 namespace Varint {
 
-/// Encode a unsigned integral type to a variable length 7-bit-encoded sequence
+/// Encode an unsigned integral type to a variable length 7-bit-encoded sequence
 /// of bytes.
 template <typename T>
 llvm::SmallVector<uint8_t, 10> encode(
@@ -58,7 +58,7 @@ llvm::SmallVector<uint8_t, 10> encode(
 ) {
   // Zig-zag encode the signed integer into the unsigned integer type.
   // Negative numbers are encoded as unsigned odd numbers in the
-  // unsigned type, postive numbers are even. This prioritizes the
+  // unsigned type, positive numbers are even. This prioritizes the
   // smaller numbers around zero, while making it compatible with
   // 7-bit encoding:
   // -3 -> 5
