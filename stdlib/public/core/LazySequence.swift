@@ -72,7 +72,7 @@
 ///       private var base: Base                  // The underlying generator.
 ///       private let combine: (ResultElement, Base.Element) -> ResultElement
 ///     }
-///     
+///
 ///     struct LazyScanSequence<Base: SequenceType, ResultElement>
 ///       : LazySequenceType // Chained operations on self are lazy, too
 ///     {
@@ -87,7 +87,7 @@
 ///     }
 ///
 /// and finally, we can give all lazy sequences a lazy `scan` method:
-///     
+///
 ///     extension LazySequenceType {
 ///       /// Returns a sequence containing the results of
 ///       ///
@@ -146,9 +146,9 @@ public protocol LazySequenceType : SequenceType {
   /// Note: this property need not be implemented by conforming types,
   /// it has a default implementation in a protocol extension that
   /// just returns `self`.
-  var elements: Elements {get} 
-  
-  var array: [Generator.Element] {get}
+  var elements: Elements { get }
+
+  var array: [Generator.Element] { get }
 }
 
 extension LazySequenceType {
@@ -177,7 +177,7 @@ public struct LazySequence<Base : SequenceType>
   public init(_ base: Base) {
     self._base = base
   }
-  
+
   public var _base: Base
 
   /// The `Base` (presumably non-lazy) sequence from which `self` was created.

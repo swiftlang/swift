@@ -312,7 +312,7 @@ extension Any${Kind} {
 //===----------------------------------------------------------------------===//
 
 internal protocol _ForwardIndexBoxType : class {
-  var typeID: ObjectIdentifier {get}
+  var typeID: ObjectIdentifier { get }
 
   @warn_unused_result
   func successor() -> _ForwardIndexBoxType
@@ -564,7 +564,7 @@ internal class _AnyCollectionBox<Element> : _AnyCollectionBoxBase<Element> {
 public protocol AnyCollectionType : CollectionType {
   /// Identifies the underlying collection stored by `self`. Instances
   /// copied from one another have the same `_underlyingCollectionID`.
-  var _underlyingCollectionID: ObjectIdentifier {get}
+  var _underlyingCollectionID: ObjectIdentifier { get }
 }
 
 /// Return true iff `lhs` and `rhs` store the same underlying collection.

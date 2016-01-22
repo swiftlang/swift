@@ -12,7 +12,7 @@
 
 public protocol ReverseIndexType : BidirectionalIndexType {
   associatedtype Base : BidirectionalIndexType
-  
+
   /// A type that can represent the number of steps between pairs of
   /// `ReverseIndex` values where one value is reachable from the other.
   associatedtype Distance: _SignedIntegerType = Base.Distance
@@ -22,7 +22,7 @@ public protocol ReverseIndexType : BidirectionalIndexType {
   ///
   /// If `self` is `advance(c.reverse.startIndex, n)`, then:
   /// - `self.base` is `advance(c.endIndex, -n)`.
-  /// - if `n` != `c.count`, then `c.reverse[self]` is 
+  /// - if `n` != `c.count`, then `c.reverse[self]` is
   ///   equivalent to `[self.base.predecessor()]`.
   var base: Base { get }
 
@@ -50,15 +50,15 @@ extension BidirectionalIndexType where Self : ReverseIndexType {
 public struct ReverseIndex<Base: BidirectionalIndexType>
 : BidirectionalIndexType, ReverseIndexType {
   public typealias Distance = Base.Distance
-  
+
   public init(_ base: Base) { self.base = base }
-  
+
   /// The successor position in the underlying (un-reversed)
   /// collection.
   ///
   /// If `self` is `advance(c.reverse.startIndex, n)`, then:
   /// - `self.base` is `advance(c.endIndex, -n)`.
-  /// - if `n` != `c.count`, then `c.reverse[self]` is 
+  /// - if `n` != `c.count`, then `c.reverse[self]` is
   ///   equivalent to `[self.base.predecessor()]`.
   public let base: Base
 
@@ -79,15 +79,15 @@ public struct ReverseRandomAccessIndex<Base: RandomAccessIndexType>
   : RandomAccessIndexType, ReverseIndexType {
 
   public typealias Distance = Base.Distance
-  
+
   public init(_ base: Base) { self.base = base }
-  
+
   /// The successor position in the underlying (un-reversed)
   /// collection.
   ///
   /// If `self` is `advance(c.reverse.startIndex, n)`, then:
   /// - `self.base` is `advance(c.endIndex, -n)`.
-  /// - if `n` != `c.count`, then `c.reverse[self]` is 
+  /// - if `n` != `c.count`, then `c.reverse[self]` is
   ///   equivalent to `[self.base.predecessor()]`.
   public let base: Base
 
@@ -106,7 +106,7 @@ public struct ReverseRandomAccessIndex<Base: RandomAccessIndexType>
 public protocol _ReverseCollectionType : CollectionType {
   associatedtype Index : ReverseIndexType
   associatedtype Base : CollectionType
-  var _base: Base {get}
+  var _base: Base { get }
 }
 
 extension CollectionType
@@ -162,7 +162,7 @@ public struct ReverseCollection<
   /// A type that provides the *sequence*'s iteration interface and
   /// encapsulates its iteration state.
   public typealias Generator = IndexingGenerator<ReverseCollection>
-  
+
   public let _base: Base
 
   @available(*, unavailable, renamed="Base")
@@ -191,7 +191,7 @@ public struct ReverseRandomAccessCollection<
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = ReverseRandomAccessIndex<Base.Index>
-  
+
   /// A type that provides the *sequence*'s iteration interface and
   /// encapsulates its iteration state.
   public typealias Generator = IndexingGenerator<
