@@ -333,8 +333,7 @@ public struct Mirror {
   /// Suggests a display style for the reflected subject.
   public let displayStyle: DisplayStyle?
 
-  //@swift3_migration(toProperty="superclassMirror")
-  @swift3_migration(message="it became a property 'superclassMirror'")
+  @swift3_migration(renamedToProperty="superclassMirror")
   @warn_unused_result
   public func superclassMirror() -> Mirror? {
     return _makeSuperclassMirror()
@@ -356,7 +355,7 @@ public protocol CustomReflectable {
   /// - Note: If `Self` has value semantics, the `Mirror` should be
   ///   unaffected by subsequent mutations of `self`.
   //@swift3_migration(toProperty="customMirror")
-  @swift3_migration(message="it became a property 'customMirror'")
+  @swift3_migration(renamedToProperty="customMirror")
   @warn_unused_result
   func customMirror() -> Mirror
 }
@@ -706,8 +705,7 @@ public protocol CustomPlaygroundQuickLookable {
   ///
   /// - Note: If `Self` has value semantics, the `Mirror` should be
   ///   unaffected by subsequent mutations of `self`.
-  //@swift3_migration(toProperty="customPlaygroundQuickLook")
-  @swift3_migration(message="it became a property 'customPlaygroundQuickLook'")
+  @swift3_migration(renamedToProperty="customPlaygroundQuickLook")
   @warn_unused_result
   func customPlaygroundQuickLook() -> PlaygroundQuickLook
 }
@@ -823,8 +821,7 @@ extension Mirror : CustomStringConvertible {
 }
 
 extension Mirror : CustomReflectable {
-  //@swift3_migration(toProperty="customMirror")
-  @swift3_migration(message="it became a property 'customMirror'")
+  @swift3_migration(renamedToProperty="customMirror")
   @warn_unused_result
   public func customMirror() -> Mirror {
     return Mirror(self, children: [:])

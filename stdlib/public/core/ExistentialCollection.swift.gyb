@@ -295,8 +295,7 @@ extension AnySequence {
 % for Kind in ['Sequence'] + [t + 'Collection' for t in traversals]:
 extension Any${Kind} {
 
-  //@swift3_migration(toProperty="underestimatedCount")
-  @swift3_migration(message="it became a property 'underestimatedCount'")
+  @swift3_migration(renamedToProperty="underestimatedCount")
   public func underestimateCount() -> Int {
     return _box._underestimateCount()
   }

@@ -35,8 +35,7 @@ extension SequenceType
     return self._base.generate()
   }
 
-  //@swift3_migration(toProperty="underestimatedCount")
-  @swift3_migration(message="it became a property 'underestimatedCount'")
+  @swift3_migration(renamedToProperty="underestimatedCount")
   public func underestimateCount() -> Int {
     return _base.underestimateCount()
   }
