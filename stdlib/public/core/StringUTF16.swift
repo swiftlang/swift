@@ -13,7 +13,8 @@
 extension String {
   /// A collection of UTF-16 code units that encodes a `String` value.
   public struct UTF16View
-    : CollectionType, CustomStringConvertible, CustomDebugStringConvertible {
+    : CollectionType, _Reflectable, CustomStringConvertible,
+    CustomDebugStringConvertible {
 
     public struct Index {
       // Foundation needs access to these fields so it can expose
@@ -119,6 +120,12 @@ extension String {
       self._offset = offset
       self._length = length
       self._core = _core
+    }
+
+    /// Returns a mirror that reflects `self`.
+    @warn_unused_result
+    public func _getMirror() -> _MirrorType {
+      return _UTF16ViewMirror(self)
     }
 
     public var description: String {
@@ -296,20 +303,5 @@ extension String.UTF16View.Index {
     characters: String
   ) -> String.Index? {
     return String.Index(self, within: characters)
-  }
-}
-
-// Reflection
-extension String.UTF16View : CustomReflectable {
-  /// Returns a mirror that reflects `self`.
-  @warn_unused_result
-  public func customMirror() -> Mirror {
-    return Mirror(self, children: _MirrorChildrenCollection(underlying: self))
-  }
-}
-
-extension String.UTF16View : CustomPlaygroundQuickLookable {
-  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
-    return .Text(description)
   }
 }

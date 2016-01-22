@@ -59,14 +59,14 @@ let invalidStatePlist3: Dictionary<String, AnyObject> = [
 ]
 
 // CHECK-LABEL: Some:
-// CHECK:         name: "California"
+// CHECK:         name: California
 // CHECK:         population: 38040000
-// CHECK:         abbrev: "CA"
+// CHECK:         abbrev: CA
 dump(stateFromPlistLame(goodStatePlist))
 // CHECK-LABEL: Some:
-// CHECK:         name: "California"
+// CHECK:         name: California
 // CHECK:         population: 38040000
-// CHECK:         abbrev: "CA"
+// CHECK:         abbrev: CA
 dump(stateFromPlistCool(goodStatePlist))
 // CHECK-LABEL: nil
 dump(stateFromPlistLame(invalidStatePlist1))
@@ -86,16 +86,44 @@ struct Country {
   let population: Int
 }
 
-enum Statistic : CustomReflectable {
+enum Statistic: _Reflectable {
   case ForState(State)
   case ForCountry(Country)
 
-  func customMirror() -> Mirror {
-    switch self {
-      case .ForState(let state): return Mirror(self, children: ["State": state], displayStyle: .Enum)
-      case .ForCountry(let country): return Mirror(self, children: ["Country": country], displayStyle: .Enum)
+  func _getMirror() -> _MirrorType {
+    return StatMirror(_value: self)
+  }
+}
+
+struct StatMirror: _MirrorType {
+  let _value: Statistic
+
+  var value: Any { return _value }
+  var valueType: Any.Type { return value.dynamicType }
+  var objectIdentifier: ObjectIdentifier? { return nil }
+  var count: Int { return 1 }
+
+  subscript(i: Int) -> (String, _MirrorType) {
+    assert(i == 0)
+    switch _value {
+    case .ForState(let state):
+      return ("State", _reflect(state))
+    case .ForCountry(let country):
+      return ("Country", _reflect(country))
     }
   }
+
+  var summary: String {
+    switch _value {
+    case .ForState:
+      return "State"
+    case .ForCountry:
+      return "Country"
+    }
+  }
+
+  var quickLookObject: PlaygroundQuickLook? { return nil }
+  var disposition: _MirrorDisposition { return .Enum }
 }
 
 func statisticFromPlist(plist: Dictionary<String, AnyObject>) -> Statistic? {
@@ -141,9 +169,9 @@ let invalidKindPlist: Dictionary<String, AnyObject> = [
   "population": 0
 ]
 
-// CHECK-LABEL: ▿ Optional(main.Statistic.ForState(main.State(name: "California", population: 38040000, abbrev: "CA")))
+// CHECK-LABEL: Some: State
 dump(statisticFromPlist(goodStatePlist2))
-// CHECK-LABEL: ▿ Optional(main.Statistic.ForCountry(main.Country(name: "India", population: 1237000000)))
+// CHECK-LABEL: Some: Country
 dump(statisticFromPlist(goodCountryPlist))
 // CHECK-LABEL: nil
 dump(statisticFromPlist(invalidCountryPlist1))

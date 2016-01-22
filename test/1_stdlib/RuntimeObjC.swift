@@ -664,13 +664,13 @@ Reflection.test("Class/ObjectiveCBase/Default") {
     dump(value, &output)
 
     let expected =
-      "▿ This is FooObjCClass #0\n" +
-      "  - super: FooMoreDerivedObjCClass\n" +
-      "    - super: FooDerivedObjCClass\n" +
-      "      - super: FooObjCClass\n" +
-      "        - super: NSObject\n" +
+      "▿ a.SwiftFooMoreDerivedObjCClass #0\n" +
+      "  ▿ super: This is FooObjCClass\n" +
+      "    ▿ FooDerivedObjCClass: This is FooObjCClass\n" +
+      "      ▿ FooObjCClass: This is FooObjCClass\n" +
+      "        - NSObject: This is FooObjCClass\n" +
       "  - first: 123\n" +
-      "  - second: \"abc\"\n"
+      "  - second: abc\n"
 
     expectEqual(expected, output)
   }
@@ -687,6 +687,9 @@ Reflection.test("MetatypeMirror") {
     var output = ""
     dump(objcProtocolMetatype, &output)
     expectEqual(expectedSomeClass, output)
+
+    expectEqual(_reflect(concreteClassMetatype).objectIdentifier!,
+                _reflect(objcProtocolMetatype).objectIdentifier!)
                 
     let objcProtocolConcreteMetatype = SomeObjCProto.self
     let expectedObjCProtocolConcrete = "- a.SomeObjCProto #0\n"
@@ -704,6 +707,24 @@ Reflection.test("MetatypeMirror") {
     let objcDefinedProtoType = NSObjectProtocol.self
     expectEqual(String(objcDefinedProtoType), "NSObject")
   }
+}
+
+class DullClass {}
+Reflection.test("ObjectIdentity") {
+  // Check that the primitive _MirrorType implementation produces appropriately
+  // unique identifiers for class instances.
+
+  let x = DullClass()
+  let y = DullClass()
+  let o = NSObject()
+  let p = NSObject()
+
+  checkEquatable(
+    true, _reflect(o).objectIdentifier!, _reflect(o).objectIdentifier!)
+  checkEquatable(
+    false, _reflect(o).objectIdentifier!, _reflect(p).objectIdentifier!)
+  checkEquatable(
+    false, _reflect(o).objectIdentifier!, _reflect(y).objectIdentifier!)
 }
 
 Reflection.test("CGPoint") {
@@ -767,10 +788,10 @@ Reflection.test("Unmanaged/not-nil") {
   dump(optionalURL, &output)
 
   let expected =
-    "▿ Optional(Swift.Unmanaged<__ObjC.CFURL>(_value: http://llvm.org/))\n" +
+    "▿ Swift.Unmanaged<__ObjC.CFURL>\n" +
     "  ▿ Some: Swift.Unmanaged<__ObjC.CFURL>\n" +
-    "    - _value: http://llvm.org/ #0\n" +
-    "      - super: NSObject\n"
+    "    ▿ _value: http://llvm.org/ #0\n" +
+    "      - NSObject: http://llvm.org/\n"
 
   expectEqual(expected, output)
 

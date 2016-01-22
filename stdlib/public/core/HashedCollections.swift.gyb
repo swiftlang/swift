@@ -4002,46 +4002,69 @@ internal func < <${TypeParametersDecl}> (
   return lhs._intPos < rhs
 }
 
-internal final class ${Self}ReflectionCollection<${TypeParametersDecl}> : CollectionType {
+internal class ${Self}Mirror<${TypeParametersDecl}> : _MirrorType {
   typealias MirroredType = ${Self}<${TypeParameters}>
-  let underlying : MirroredType
+  internal let _mirror : MirroredType
+  internal var _pos : ${Self}MirrorPosition<${TypeParameters}>
 
-  var startIndex : Int { return 0 }
-  var endIndex : Int { return underlying.count }
+  internal init(_ m : MirroredType) {
+    _mirror = m
+    _pos = ${Self}MirrorPosition(m)
+  }
 
-  internal var position : ${Self}MirrorPosition<${TypeParameters}>
+  internal var value: Any { return (_mirror as Any) }
 
-  subscript(i: Int) -> (String?, Any) {
-    _precondition(i >= 0 && i < underlying.count, "${Self}ReflectionCollection access out of bounds")
-    if position > i {
-      position._intPos = 0
+  internal var valueType: Any.Type { return (_mirror as Any).dynamicType }
+
+  internal var objectIdentifier: ObjectIdentifier? { return nil }
+
+  internal var count: Int { return _mirror.count }
+
+  internal subscript(i: Int) -> (String, _MirrorType) {
+    _precondition(i >= 0 && i < count, "_MirrorType access out of bounds")
+
+    if _pos > i {
+      _pos._intPos = 0
     }
-    while position < i && !(position == i) {
-      position.successor()
+
+    while _pos < i && !(_pos == i) {
+      _pos.successor()
     }
-    return ("[\(position._intPos)]", underlying[position.${Self}Pos])
+%if Self == 'Set':
+    return ("[\(_pos._intPos)]", _reflect(_mirror[_pos.${Self}Pos]))
+%elif Self == 'Dictionary':
+    return ("[\(_pos._intPos)]", _reflect(_mirror[_pos.${Self}Pos]))
+%end
   }
 
-  func generate() -> IndexingGenerator<${Self}ReflectionCollection<${TypeParameters}>> {
-    return IndexingGenerator(self)
+  internal var summary: String {
+%if Self == 'Set':
+    if count == 1 {
+      return "1 member"
+    }
+    return "\(count) members"
+%elif Self == 'Dictionary':
+    if count == 1 {
+      return "1 key/value pair"
+    }
+    return "\(count) key/value pairs"
+%end
   }
 
-  init(_ underlying: MirroredType) {
-    self.underlying = underlying
-    position = ${Self}MirrorPosition(underlying)
-  }
+  internal var quickLookObject: PlaygroundQuickLook? { return nil }
+
+%if Self == 'Set':
+  internal var disposition: _MirrorDisposition { return .MembershipContainer }
+%elif Self == 'Dictionary':
+  internal var disposition: _MirrorDisposition { return .KeyContainer }
+%end
 }
 
-extension ${Self} : CustomReflectable {
+extension ${Self} : _Reflectable {
   /// Returns a mirror that reflects `self`.
   @warn_unused_result
-  public func customMirror() -> Mirror {
-%if Self == 'Set':
-    let style = Mirror.DisplayStyle.Set
-%elif Self == 'Dictionary':
-    let style = Mirror.DisplayStyle.Dictionary
-%end
-    return Mirror(self, children: ${Self}ReflectionCollection(self), displayStyle: style)
+  public func _getMirror() -> _MirrorType {
+    return ${Self}Mirror(self)
   }
 }
 

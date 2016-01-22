@@ -86,7 +86,8 @@ extension _StringCore {
 
 extension String {
   /// A collection of UTF-8 code units that encodes a `String` value.
-  public struct UTF8View : CollectionType, CustomStringConvertible, CustomDebugStringConvertible {
+  public struct UTF8View : CollectionType, _Reflectable, CustomStringConvertible,
+    CustomDebugStringConvertible {
     internal let _core: _StringCore
     internal let _startIndex: Index
     internal let _endIndex: Index
@@ -227,6 +228,12 @@ extension String {
     ///   O(N) conversion.
     public subscript(subRange: Range<Index>) -> UTF8View {
       return UTF8View(_core, subRange.startIndex, subRange.endIndex)
+    }
+
+    /// Returns a mirror that reflects `self`.
+    @warn_unused_result
+    public func _getMirror() -> _MirrorType {
+      return _UTF8ViewMirror(self)
     }
 
     public var description: String {
@@ -402,20 +409,5 @@ extension String.UTF8View.Index {
     characters: String
   ) -> String.Index? {
     return String.Index(self, within: characters)
-  }
-}
-
-// Reflection
-extension String.UTF8View : CustomReflectable {
-  /// Returns a mirror that reflects `self`.
-  @warn_unused_result
-  public func customMirror() -> Mirror {
-    return Mirror(self, children: _MirrorChildrenCollection(underlying: self))
-  }
-}
-
-extension String.UTF8View : CustomPlaygroundQuickLookable {
-  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
-    return .Text(description)
   }
 }
