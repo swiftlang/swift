@@ -2010,7 +2010,7 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
                                 FunctionType::Representation::Thin);
     
     auto extInfo = AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
-                                            /*noreturn*/ false,
+                                            funcType->isNoReturn(),
                                             funcType->throws());
 
     return CanGenericFunctionType::get(genericSig,
