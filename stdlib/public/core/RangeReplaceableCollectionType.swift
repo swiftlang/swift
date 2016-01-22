@@ -446,10 +446,10 @@ public func +<
     S : SequenceType
     where S.Generator.Element == C.Generator.Element
 >(lhs: C, rhs: S) -> C {
-  var lhs = lhs
-  // FIXME: what if lhs is a reference type?  This will mutate it.
-  lhs.appendContentsOf(rhs)
-  return lhs
+  var result = lhs is AnyObject ? C(lhs) : lhs
+  result.reserveCapacity(lhs.count + numericCast(rhs.underestimateCount()))
+  result.appendContentsOf(rhs)
+  return result
 }
 
 @warn_unused_result
@@ -471,11 +471,23 @@ public func +<
     S : CollectionType
     where S.Generator.Element == C.Generator.Element
 >(lhs: C, rhs: S) -> C {
-  var lhs = lhs
-  // FIXME: what if lhs is a reference type?  This will mutate it.
-  lhs.reserveCapacity(lhs.count + numericCast(rhs.count))
-  lhs.appendContentsOf(rhs)
-  return lhs
+  var result = lhs is AnyObject ? C(lhs) : lhs
+  result.reserveCapacity(lhs.count + numericCast(rhs.count))
+  result.appendContentsOf(rhs)
+  return result
+}
+
+@warn_unused_result
+public func +<
+    C : RangeReplaceableCollectionType,
+    S : CollectionType
+    where S.Generator.Element == C.Generator.Element
+>(lhs: S, rhs: C) -> C {
+  var result = C()
+  result.reserveCapacity(rhs.count + numericCast(lhs.count))
+  result.appendContentsOf(lhs)
+  result.appendContentsOf(rhs)
+  return result
 }
 
 @warn_unused_result
@@ -484,11 +496,10 @@ public func +<
     RRC2 : RangeReplaceableCollectionType 
     where RRC1.Generator.Element == RRC2.Generator.Element
 >(lhs: RRC1, rhs: RRC2) -> RRC1 {
-  var lhs = lhs
-  // FIXME: what if lhs is a reference type?  This will mutate it.
-  lhs.reserveCapacity(lhs.count + numericCast(rhs.count))
-  lhs.appendContentsOf(rhs)
-  return lhs
+  var result = lhs is AnyObject ? RRC1(lhs) : lhs
+  result.reserveCapacity(lhs.count + numericCast(rhs.count))
+  result.appendContentsOf(rhs)
+  return result
 }
 
 @available(*, unavailable, renamed="RangeReplaceableCollectionType")
