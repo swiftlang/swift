@@ -150,7 +150,7 @@ def main():
         # Find Xcode.
         swift_path = subprocess.check_output([ 'xcrun', '--find', 'swift' ])
         xcode_path = swift_path
-        for i in range(0, 7):
+        for _ in range(0, 7):
             xcode_path = os.path.dirname(xcode_path)
 
         toolchains_dir = os.path.join(
