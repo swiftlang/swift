@@ -496,7 +496,7 @@ Reflection.test("Struct/NonGeneric/DefaultMirror") {
   do {
     var output = ""
     dump(StructWithDefaultMirror("123"), &output)
-    expectEqual("▿ a.StructWithDefaultMirror\n  - s: 123\n", output)
+    expectEqual("▿ a.StructWithDefaultMirror\n  - s: \"123\"\n", output)
   }
 
   do {
@@ -504,16 +504,10 @@ Reflection.test("Struct/NonGeneric/DefaultMirror") {
     // the internal _MirrorType implementation gets memory management right.
     var output = ""
     dump(StructWithDefaultMirror("\(456)"), &output)
-    expectEqual("▿ a.StructWithDefaultMirror\n  - s: 456\n", output)
+    expectEqual("▿ a.StructWithDefaultMirror\n  - s: \"456\"\n", output)
   }
 
-  // Structs have no identity and thus no object identifier
-  expectEmpty(_reflect(StructWithDefaultMirror("")).objectIdentifier)
-
-  // The default mirror provides no quick look object
-  expectEmpty(_reflect(StructWithDefaultMirror("")).quickLookObject)
-
-  expectEqual(.Struct, _reflect(StructWithDefaultMirror("")).disposition)
+  expectEqual(.Struct, Mirror(reflecting: StructWithDefaultMirror("")).displayStyle)
 }
 
 struct GenericStructWithDefaultMirror<T, U> {
@@ -533,11 +527,11 @@ Reflection.test("Struct/Generic/DefaultMirror") {
       "▿ a.GenericStructWithDefaultMirror<Swift.Int, Swift.Array<Swift.Optional<protocol<>>>>\n" +
       "  - first: 123\n" +
       "  ▿ second: 3 elements\n" +
-      "    ▿ [0]: abc\n" +
-      "      - Some: abc\n" +
-      "    ▿ [1]: 456\n" +
+      "    ▿ [0]: Optional(\"abc\")\n" +
+      "      - Some: \"abc\"\n" +
+      "    ▿ [1]: Optional(456)\n" +
       "      - Some: 456\n" +
-      "    ▿ [2]: 789.25\n" +
+      "    ▿ [2]: Optional(789.25)\n" +
       "      - Some: 789.25\n"
 
     expectEqual(expected, output)
@@ -595,7 +589,7 @@ Reflection.test("Enum/SingletonGeneric/DefaultMirror") {
 
     let expected =
       "▿ a.SingletonGenericEnumWithDefaultMirror<Swift.String>.OnlyOne\n" +
-      "  - OnlyOne: IIfx\n"
+      "  - OnlyOne: \"IIfx\"\n"
 
     expectEqual(expected, output)
   }
@@ -631,7 +625,7 @@ Reflection.test("Enum/SinglePayloadNonGeneric/DefaultMirror") {
       "  - [1]: a.SinglePayloadNonGenericEnumWithDefaultMirror.Dog\n" +
       "  ▿ [2]: a.SinglePayloadNonGenericEnumWithDefaultMirror.Volleyball\n" +
       "    ▿ Volleyball: (2 elements)\n" +
-      "      - .0: Wilson\n" +
+      "      - .0: \"Wilson\"\n" +
       "      - .1: 2000\n"
 
     expectEqual(expected, output)
@@ -808,7 +802,7 @@ Reflection.test("Enum/MultiPayloadGeneric/DefaultMirror") {
       "  ▿ [2]: a.MultiPayloadGenericEnumWithDefaultMirror<Swift.Int, Swift.String>.Centris\n" +
       "    - Centris: 4096\n" +
       "  ▿ [3]: a.MultiPayloadGenericEnumWithDefaultMirror<Swift.Int, Swift.String>.Quadra\n" +
-      "    - Quadra: 160MB\n" +
+      "    - Quadra: \"160MB\"\n" +
       "  - [4]: a.MultiPayloadGenericEnumWithDefaultMirror<Swift.Int, Swift.String>.PowerBook170\n" +
       "  - [5]: a.MultiPayloadGenericEnumWithDefaultMirror<Swift.Int, Swift.String>.PowerBookDuo220\n"
 
@@ -848,57 +842,7 @@ Reflection.test("Enum/IndirectGeneric/DefaultMirror") {
               "Cons(0, a.List<Swift.Int>.Cons(1, a.List<Swift.Int>.Nil))")
 }
 
-/// A type that provides its own mirror.
-struct BrilliantMirror : _MirrorType {
-  let _value: Brilliant
-
-  init (_ _value: Brilliant) {
-    self._value = _value
-  }
-
-  var value: Any {
-    return _value
-  }
-
-  var valueType: Any.Type {
-    return value.dynamicType
-  }
-
-  var objectIdentifier: ObjectIdentifier? {
-    return ObjectIdentifier(_value)
-  }
-
-  var count: Int {
-    return 3
-  }
-
-  subscript(i: Int) -> (String, _MirrorType) {
-    switch i {
-    case 0:
-      return ("first", _reflect(_value.first))
-    case 1:
-      return ("second", _reflect(_value.second))
-    case 2:
-      return ("self", self)
-    case _:
-      _preconditionFailure("child index out of bounds")
-    }
-  }
-
-  var summary: String {
-    return "Brilliant(\(_value.first), \(_value.second))"
-  }
-
-  var quickLookObject: PlaygroundQuickLook? {
-    return nil
-  }
-
-  var disposition: _MirrorDisposition {
-    return .Container
-  }
-}
-
-class Brilliant : _Reflectable {
+class Brilliant : CustomReflectable {
   let first: Int
   let second: String
 
@@ -907,8 +851,8 @@ class Brilliant : _Reflectable {
     self.second = snd
   }
 
-  func _getMirror() -> _MirrorType {
-    return BrilliantMirror(self)
+  func customMirror() -> Mirror {
+    return Mirror(self, children: ["first": first, "second": second, "self": self])
   }
 }
 
@@ -925,10 +869,10 @@ Reflection.test("CustomMirror") {
     dump(Brilliant(123, "four five six"), &output)
 
     let expected =
-      "▿ Brilliant(123, four five six) #0\n" +
+      "▿ a.Brilliant #0\n" +
       "  - first: 123\n" +
-      "  - second: four five six\n" +
-      "  ▿ self: Brilliant(123, four five six) #0\n"
+      "  - second: \"four five six\"\n" +
+      "  ▿ self: a.Brilliant #0\n"
 
     expectEqual(expected, output)
   }
@@ -936,7 +880,7 @@ Reflection.test("CustomMirror") {
   do {
     var output = ""
     dump(Brilliant(123, "four five six"), &output, maxDepth: 0)
-    expectEqual("▹ Brilliant(123, four five six) #0\n", output)
+    expectEqual("▹ a.Brilliant #0\n", output)
   }
 
   do {
@@ -944,9 +888,9 @@ Reflection.test("CustomMirror") {
     dump(Brilliant(123, "four five six"), &output, maxItems: 3)
 
     let expected =
-      "▿ Brilliant(123, four five six) #0\n" +
+      "▿ a.Brilliant #0\n" +
       "  - first: 123\n" +
-      "  - second: four five six\n" +
+      "  - second: \"four five six\"\n" +
       "    (1 more child)\n"
 
     expectEqual(expected, output)
@@ -957,7 +901,7 @@ Reflection.test("CustomMirror") {
     dump(Brilliant(123, "four five six"), &output, maxItems: 2)
 
     let expected =
-      "▿ Brilliant(123, four five six) #0\n" +
+      "▿ a.Brilliant #0\n" +
       "  - first: 123\n" +
       "    (2 more children)\n"
 
@@ -969,13 +913,11 @@ Reflection.test("CustomMirror") {
     dump(Brilliant(123, "four five six"), &output, maxItems: 1)
 
     let expected =
-      "▿ Brilliant(123, four five six) #0\n" +
+      "▿ a.Brilliant #0\n" +
       "    (3 children)\n"
 
     expectEqual(expected, output)
   }
-
-  expectEqual(.Container, _reflect(Brilliant(123, "four five six")).disposition)
 
   do {
     // Check that object identifiers are unique to class instances.
@@ -1011,10 +953,10 @@ Reflection.test("CustomMirrorIsInherited") {
     dump(Irradiant(), &output)
 
     let expected =
-      "▿ Brilliant(400, ) #0\n" +
+      "▿ a.Brilliant #0\n" +
       "  - first: 400\n" +
-      "  - second: \n" +
-      "  ▿ self: Brilliant(400, ) #0\n"
+      "  - second: \"\"\n" +
+      "  ▿ self: a.Brilliant #0\n"
 
     expectEqual(expected, output)
   }
@@ -1042,12 +984,6 @@ Reflection.test("MetatypeMirror") {
     dump(nativeProtocolMetatype, &output)
     expectEqual(expectedInt, output)
 
-    expectEqual(_reflect(concreteMetatype).objectIdentifier!,
-                _reflect(anyMetatype).objectIdentifier!)
-    expectEqual(_reflect(concreteMetatype).objectIdentifier!,
-                _reflect(nativeProtocolMetatype).objectIdentifier!)
-
-
     let concreteClassMetatype = SomeClass.self
     let expectedSomeClass = "- a.SomeClass #0\n"
     output = ""
@@ -1071,17 +1007,16 @@ Reflection.test("TupleMirror") {
 
     let expected =
       "▿ (2 elements)\n" +
-      "  ▿ .0: Brilliant(384, seven six eight) #0\n" +
+      "  ▿ .0: a.Brilliant #0\n" +
       "    - first: 384\n" +
-      "    - second: seven six eight\n" +
-      "    ▿ self: Brilliant(384, seven six eight) #0\n" +
+      "    - second: \"seven six eight\"\n" +
+      "    ▿ self: a.Brilliant #0\n" +
       "  ▿ .1: a.StructWithDefaultMirror\n" +
-      "    - s: nine\n"
+      "    - s: \"nine\"\n"
 
     expectEqual(expected, output)
 
-    expectEmpty(_reflect(tuple).quickLookObject)
-    expectEqual(.Tuple, _reflect(tuple).disposition)
+    expectEqual(.Tuple, Mirror(reflecting: tuple).displayStyle)
   }
 
   do {
@@ -1095,7 +1030,7 @@ Reflection.test("TupleMirror") {
       "  - .0: 1\n" +
       "  - .1: 2.5\n" +
       "  - .2: false\n" +
-      "  - .3: three\n"
+      "  - .3: \"three\"\n"
 
     expectEqual(expected, output)
   }
@@ -1110,29 +1045,17 @@ Reflection.test("TupleMirror") {
       "▿ (2 elements)\n" +
       "  - .0: 1\n" +
       "  ▿ .1: (2 elements)\n" +
-      "    - .0: Hello\n" +
-      "    - .1: World\n"
+      "    - .0: \"Hello\"\n" +
+      "    - .1: \"World\"\n"
 
     expectEqual(expected, output)
   }
 }
 
 class DullClass {}
-Reflection.test("ObjectIdentity") {
-  // Check that the primitive _MirrorType implementation produces appropriately
-  // unique identifiers for class instances.
 
-  let x = DullClass()
-  let y = DullClass()
-
-  checkEquatable(
-    true, _reflect(x).objectIdentifier!, _reflect(x).objectIdentifier!)
-  checkEquatable(
-    false, _reflect(x).objectIdentifier!, _reflect(y).objectIdentifier!)
-
-  expectEmpty(_reflect(x).quickLookObject)
-
-  expectEqual(.Class, _reflect(x).disposition)
+Reflection.test("ClassReflection") {
+  expectEqual(.Class, Mirror(reflecting: DullClass()).displayStyle)
 }
 
 Reflection.test("String/Mirror") {
@@ -1141,7 +1064,7 @@ Reflection.test("String/Mirror") {
     dump("", &output)
 
     let expected =
-      "- \n"
+      "- \"\"\n"
 
     expectEqual(expected, output)
   }
@@ -1155,7 +1078,7 @@ Reflection.test("String/Mirror") {
     dump("\u{61}\u{304b}\u{3099}\u{1f425}", &output)
 
     let expected =
-      "- \u{61}\u{304b}\u{3099}\u{1f425}\n"
+      "- \"\u{61}\u{304b}\u{3099}\u{1f425}\"\n"
 
     expectEqual(expected, output)
   }
@@ -1169,7 +1092,7 @@ Reflection.test("String.UTF8View/Mirror") {
   dump("\u{61}\u{304b}\u{3099}".utf8, &output)
 
   let expected =
-    "▿ \u{61}\u{304b}\u{3099}\n" +
+    "▿ UTF8View(\"\u{61}\u{304b}\u{3099}\")\n" +
     "  - [0]: 97\n" +
     "  - [1]: 227\n" +
     "  - [2]: 129\n" +
@@ -1190,7 +1113,7 @@ Reflection.test("String.UTF16View/Mirror") {
   dump("\u{61}\u{304b}\u{3099}\u{1f425}".utf16, &output)
 
   let expected =
-    "▿ \u{61}\u{304b}\u{3099}\u{1f425}\n" +
+    "▿ StringUTF16(\"\u{61}\u{304b}\u{3099}\u{1f425}\")\n" +
     "  - [0]: 97\n" +
     "  - [1]: 12363\n" +
     "  - [2]: 12441\n" +
@@ -1209,11 +1132,11 @@ Reflection.test("String.UnicodeScalarView/Mirror") {
   dump("\u{61}\u{304b}\u{3099}\u{1f425}".unicodeScalars, &output)
 
   let expected =
-    "▿ \u{61}\u{304b}\u{3099}\u{1f425}\n" +
-    "  - [0]: \u{61}\n" +
-    "  - [1]: \u{304b}\n" +
-    "  - [2]: \u{3099}\n" +
-    "  - [3]: \u{1f425}\n"
+    "▿ StringUnicodeScalarView(\"\u{61}\u{304b}\u{3099}\u{1f425}\")\n" +
+    "  - [0]: \"\u{61}\"\n" +
+    "  - [1]: \"\\u{304B}\"\n" +
+    "  - [2]: \"\\u{3099}\"\n" +
+    "  - [3]: \"\\u{0001F425}\"\n"
 
   expectEqual(expected, output)
 }
@@ -1226,7 +1149,7 @@ Reflection.test("Character/Mirror") {
     dump(input, &output)
 
     let expected =
-      "- \u{61}\n"
+      "- \"\u{61}\"\n"
 
     expectEqual(expected, output)
   }
@@ -1239,7 +1162,7 @@ Reflection.test("Character/Mirror") {
     dump(input, &output)
 
     let expected =
-      "- \u{304b}\u{3099}\n"
+      "- \"\u{304b}\u{3099}\"\n"
 
     expectEqual(expected, output)
   }
@@ -1251,7 +1174,7 @@ Reflection.test("Character/Mirror") {
     dump(input, &output)
 
     let expected =
-      "- \u{1f425}\n"
+      "- \"\u{1f425}\"\n"
 
     expectEqual(expected, output)
   }
@@ -1265,7 +1188,7 @@ Reflection.test("UnicodeScalar") {
     dump(input, &output)
 
     let expected =
-      "- \u{61}\n"
+      "- \"\u{61}\"\n"
 
     expectEqual(expected, output)
   }
@@ -1277,7 +1200,7 @@ Reflection.test("UnicodeScalar") {
     dump(input, &output)
 
     let expected =
-      "- \u{304b}\n"
+      "- \"\\u{304B}\"\n"
 
     expectEqual(expected, output)
   }
@@ -1289,7 +1212,7 @@ Reflection.test("UnicodeScalar") {
     dump(input, &output)
 
     let expected =
-      "- \u{3099}\n"
+      "- \"\\u{3099}\"\n"
 
     expectEqual(expected, output)
   }
@@ -1301,7 +1224,7 @@ Reflection.test("UnicodeScalar") {
     dump(input, &output)
 
     let expected =
-      "- \u{1f425}\n"
+      "- \"\\u{0001F425}\"\n"
 
     expectEqual(expected, output)
   }
@@ -1439,9 +1362,9 @@ Reflection.test("MirrorMirror") {
 Reflection.test("COpaquePointer/null") {
   // Don't crash on null pointers. rdar://problem/19708338
   var sequence = COpaquePointer()
-  var mirror = _reflect(sequence)
-  var child = mirror[0]
-  expectEqual("(Opaque Value)", child.1.summary)
+  var mirror = Mirror(reflecting: sequence)
+  var child = mirror.children.first!
+  expectEqual("(Opaque Value)", "\(child.1)")
 }
 
 Reflection.test("StaticString/Mirror") {
@@ -1450,7 +1373,7 @@ Reflection.test("StaticString/Mirror") {
     dump("" as StaticString, &output)
 
     let expected =
-      "- \n"
+      "- \"\"\n"
 
     expectEqual(expected, output)
   }
@@ -1464,7 +1387,7 @@ Reflection.test("StaticString/Mirror") {
     dump("\u{61}\u{304b}\u{3099}\u{1f425}" as StaticString, &output)
 
     let expected =
-      "- \u{61}\u{304b}\u{3099}\u{1f425}\n"
+      "- \"\u{61}\u{304b}\u{3099}\u{1f425}\"\n"
 
     expectEqual(expected, output)
   }

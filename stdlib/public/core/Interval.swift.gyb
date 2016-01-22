@@ -58,7 +58,8 @@ selfDocComment += """
 
 ${selfDocComment}
 public struct ${Self}<Bound : Comparable>
-  : IntervalType, Equatable, CustomStringConvertible, CustomDebugStringConvertible, _Reflectable {
+  : IntervalType, Equatable, CustomStringConvertible, CustomDebugStringConvertible,
+  CustomReflectable, CustomPlaygroundQuickLookable {
 
   @available(*, unavailable, renamed="Bound")
   public typealias T = Bound
@@ -129,8 +130,12 @@ public struct ${Self}<Bound : Comparable>
 
 
   /// Returns a mirror that reflects `self`.
-  public func _getMirror() -> _MirrorType {
-    return _IntervalMirror(self)
+  public func customMirror() -> Mirror {
+    return Mirror(self, children: ["start": start, "end": end])
+  }
+
+  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
+    return .Text(description)
   }
 
   internal var _start: Bound
@@ -198,34 +203,4 @@ public func ... <Bound : Comparable>(
 @warn_unused_result
 public func ~= <I: IntervalType>(pattern: I, value: I.Bound) -> Bool {
   return pattern.contains(value)
-}
-
-// Reflection support
-%import gyb
-%TBoilerplate = gyb.parseTemplate("../common/MirrorBoilerplate.gyb")
-
-%Boilerplate = gyb.executeTemplate(TBoilerplate,
-%                                  introspecteeType='T',
-%                                  disposition='Struct')
-
-internal struct _IntervalMirror<
-  T : protocol<IntervalType, CustomStringConvertible>
-> : _MirrorType {
-  ${Boilerplate}
-
-  internal var count: Int { return 2 }
-
-  internal subscript(i: Int) -> (String, _MirrorType) {
-    switch i {
-    case 0: return ("start", _reflect(_value.start))
-    case 1: return ("end", _reflect(_value.end))
-    default: _preconditionFailure("_MirrorType access out of bounds")
-    }
-  }
-
-  internal var summary: String { return _value.description }
-
-  internal var quickLookObject: PlaygroundQuickLook? {
-    return .Text(summary)
-  }
 }

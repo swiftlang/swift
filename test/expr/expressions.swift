@@ -684,10 +684,10 @@ nil != Int.self // expected-error {{binary operator '!=' cannot be applied to op
 // <rdar://problem/19032294> Disallow postfix ? when not chaining
 func testOptionalChaining(a : Int?, b : Int!, c : Int??) {
   a?    // expected-error {{optional chain has no effect, expression already produces 'Int?'}} {{4-5=}}
-  a?._getMirror()
+  a?.customMirror()
 
   b?   // expected-error {{'?' must be followed by a call, member lookup, or subscript}}
-  b?._getMirror()
+  b?.customMirror()
 
   var _: Int? = c?   // expected-error {{'?' must be followed by a call, member lookup, or subscript}}
 }

@@ -80,32 +80,18 @@ protocol _ArrayType
   var _buffer: _Buffer {get}
 }
 
-internal struct _ArrayTypeMirror<
-  T : _ArrayType where T.Index == Int
-> : _MirrorType {
-  let _value : T
+internal struct _ArrayTypeMirrorCollection<T : _ArrayType where T.Index == Int> : CollectionType {
+  let underlying : T
 
-  init(_ v : T) { _value = v }
+  var startIndex: Int { return 0 }
+  var endIndex: Int { return underlying.count }
 
-  var value: Any { return (_value as Any) }
-
-  var valueType: Any.Type { return (_value as Any).dynamicType }
-
-  var objectIdentifier: ObjectIdentifier? { return nil }
-
-  var count: Int { return _value.count }
-
-  subscript(i: Int) -> (String, _MirrorType) {
-    _precondition(i >= 0 && i < count, "_MirrorType access out of bounds")
-    return ("[\(i)]", _reflect(_value[_value.startIndex + i]))
+  subscript(i: Int) -> (String?, Any) {
+    _precondition(i >= 0 && i < count, "_ArrayTypeMirrorCollection access out of bounds")
+    return ("[\(i)]", underlying[underlying.startIndex + i])
   }
 
-  var summary: String {
-    if count == 1 { return "1 element" }
-    return "\(count) elements"
+  func generate() -> IndexingGenerator<_ArrayTypeMirrorCollection> {
+    return IndexingGenerator(self)
   }
-
-  var quickLookObject: PlaygroundQuickLook? { return nil }
-
-  var disposition: _MirrorDisposition { return .IndexContainer }
 }

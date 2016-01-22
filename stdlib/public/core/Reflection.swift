@@ -133,7 +133,7 @@ public protocol _MirrorType {
 @_silgen_name("swift_getSummary")
 public // COMPILER_INTRINSIC
 func _getSummary<T>(out: UnsafeMutablePointer<String>, x: T) {
-  out.initialize(_reflect(x).summary)
+  out.initialize(String(reflecting: x))
 }
 
 /// Produce a mirror for any value. If the value's type conforms to
@@ -152,8 +152,8 @@ public func dump<T, TargetStream : OutputStreamType>(
 ) -> T {
   var maxItemCounter = maxItems
   var visitedItems = [ObjectIdentifier : Int]()
-  _dumpWithMirror(
-    _reflect(x), name, indent, maxDepth, &maxItemCounter, &visitedItems,
+  _dumpObject(
+    x, name, indent, maxDepth, &maxItemCounter, &visitedItems,
     &targetStream)
   return x
 }
@@ -167,19 +167,20 @@ public func dump<T>(x: T, name: String? = nil, indent: Int = 0,
     maxItems: maxItems)
 }
 
-/// Dump an object's contents using a mirror. User code should use dump().
-func _dumpWithMirror<TargetStream : OutputStreamType>(
-    mirror: _MirrorType, _ name: String?, _ indent: Int, _ maxDepth: Int,
+/// Dump an object's contents. User code should use dump().
+func _dumpObject<TargetStream : OutputStreamType>(
+    object: Any, _ name: String?, _ indent: Int, _ maxDepth: Int,
     inout _ maxItemCounter: Int,
     inout _ visitedItems: [ObjectIdentifier : Int],
     inout _ targetStream: TargetStream
 ) {
-  if maxItemCounter <= 0 { return }
+  guard maxItemCounter > 0 else { return }
   maxItemCounter -= 1
 
   for _ in 0..<indent { print(" ", terminator: "", toStream: &targetStream) }
 
-  let count = mirror.count
+  let mirror = Mirror(reflecting: object)
+  let count = mirror.children.count
   let bullet = count == 0    ? "-"
              : maxDepth <= 0 ? "▹" : "▿"
   print("\(bullet) ", terminator: "", toStream: &targetStream)
@@ -187,22 +188,38 @@ func _dumpWithMirror<TargetStream : OutputStreamType>(
   if let nam = name {
     print("\(nam): ", terminator: "", toStream: &targetStream)
   }
-  print(mirror.summary, terminator: "", toStream: &targetStream)
+  // This takes the place of the old mirror API's 'summary' property
+  _dumpPrint(object, mirror, &targetStream)
 
-  if let id = mirror.objectIdentifier {
-    if let previous = visitedItems[id] {
+  let id : ObjectIdentifier?
+  if let classInstance = object as? AnyObject where object.dynamicType is AnyObject.Type {
+    // Object is a class (but not an ObjC-bridged struct)
+    id = ObjectIdentifier(classInstance)
+  } else if let metatypeInstance = object as? Any.Type {
+    // Object is a metatype
+    id = ObjectIdentifier(metatypeInstance)
+  } else {
+    id = nil
+  }
+  if let theId = id {
+    if let previous = visitedItems[theId] {
       print(" #\(previous)", toStream: &targetStream)
       return
     }
     let identifier = visitedItems.count
-    visitedItems[id] = identifier
+    visitedItems[theId] = identifier
     print(" #\(identifier)", terminator: "", toStream: &targetStream)
   }
 
   print("", toStream: &targetStream)
 
-  if maxDepth <= 0 { return }
+  guard maxDepth > 0 else { return }
 
+  if let superclassMirror = mirror.superclassMirror() {
+    _dumpSuperclass(superclassMirror, indent + 2, maxDepth - 1, &maxItemCounter, &visitedItems, &targetStream)
+  }
+
+  var currentIndex = mirror.children.startIndex
   for i in 0..<count {
     if maxItemCounter <= 0 {
       for _ in 0..<(indent+4) {
@@ -219,38 +236,62 @@ func _dumpWithMirror<TargetStream : OutputStreamType>(
       return
     }
 
-    let (name, child) = mirror[i]
-    _dumpWithMirror(child, name, indent + 2, maxDepth - 1,
+    let (name, child) = mirror.children[currentIndex]
+    currentIndex = currentIndex.successor()
+    _dumpObject(child, name, indent + 2, maxDepth - 1,
                     &maxItemCounter, &visitedItems, &targetStream)
   }
 }
 
-// -- _MirrorType implementations for basic data types
+/// Dump information about an object's superclass, given a mirror reflecting
+/// that superclass.
+func _dumpSuperclass<TargetStream : OutputStreamType>(
+    mirror: Mirror, _ indent: Int, _ maxDepth: Int,
+    inout _ maxItemCounter: Int,
+    inout _ visitedItems: [ObjectIdentifier : Int],
+    inout _ targetStream: TargetStream
+) {
+  guard maxItemCounter > 0 else { return }
+  maxItemCounter -= 1
 
-/// A mirror for a value that is represented as a simple value with no
-/// children.
-internal struct _LeafMirror<T>: _MirrorType {
-  let _value: T
-  let summaryFunction: T -> String
-  let quickLookFunction: T -> PlaygroundQuickLook?
+  for _ in 0..<indent { print(" ", terminator: "", toStream: &targetStream) }
 
-  init(_ value: T, _ summaryFunction: T -> String,
-       _ quickLookFunction: T -> PlaygroundQuickLook?) {
-    self._value = value
-    self.summaryFunction = summaryFunction
-    self.quickLookFunction = quickLookFunction
+  let count = mirror.children.count
+  let bullet = count == 0    ? "-"
+             : maxDepth <= 0 ? "▹" : "▿"
+  print("\(bullet) ", terminator: "", toStream: &targetStream)
+  print("super: \(String(reflecting: mirror.subjectType))",
+            toStream: &targetStream)
+
+  guard maxDepth > 0 else { return }
+
+  if let superclassMirror = mirror.superclassMirror() {
+    _dumpSuperclass(superclassMirror, indent + 2, maxDepth - 1,
+                        &maxItemCounter, &visitedItems, &targetStream)
   }
 
-  var value: Any { return _value }
-  var valueType: Any.Type { return value.dynamicType }
-  var objectIdentifier: ObjectIdentifier? { return nil }
-  var count: Int { return 0 }
-  subscript(i: Int) -> (String, _MirrorType) {
-    _preconditionFailure("no children")
+  var currentIndex = mirror.children.startIndex
+  for i in 0..<count {
+    if maxItemCounter <= 0 {
+      for _ in 0..<(indent+4) {
+        print(" ", terminator: "", toStream: &targetStream)
+      }
+      let remainder = count - i
+      print("(\(remainder)", terminator: "", toStream: &targetStream)
+      if i > 0 { print(" more", terminator: "", toStream: &targetStream) }
+      if remainder == 1 {
+        print(" child)", toStream: &targetStream)
+      } else {
+        print(" children)", toStream: &targetStream)
+      }
+      return
+    }
+
+    let (name, child) = mirror.children[currentIndex]
+    currentIndex = currentIndex.successor()
+    _dumpObject(child, name, indent + 2, maxDepth - 1,
+                    &maxItemCounter, &visitedItems, &targetStream)
   }
-  var summary: String { return summaryFunction(_value) }
-  var quickLookObject: PlaygroundQuickLook? { return quickLookFunction(_value) }
-  var disposition: _MirrorDisposition { return .Aggregate }
 }
 
 // -- Implementation details for the runtime's _MirrorType implementation
