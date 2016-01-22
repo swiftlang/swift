@@ -57,9 +57,7 @@
     {
       key.kind: source.lang.swift.decl.function.method.instance,
       key.name: "f(getMe a: Int, b: Double)",
-      key.sourcetext: "override func f(getMe a: Int, b: Double) {
-<#code#>
-}",
+      key.sourcetext: "override func f(getMe a: Int, b: Double) {\n<#code#>\n}",
       key.description: "f(getMe a: Int, b: Double)",
       key.typename: "",
       key.context: source.codecompletion.context.superclass,
@@ -115,9 +113,7 @@
     {
       key.kind: source.lang.swift.decl.function.constructor,
       key.name: "init()",
-      key.sourcetext: "init() {
-<#code#>
-}",
+      key.sourcetext: "init() {\n<#code#>\n}",
       key.description: "init()",
       key.typename: "",
       key.context: source.codecompletion.context.superclass,
