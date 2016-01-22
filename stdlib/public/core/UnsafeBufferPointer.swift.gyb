@@ -77,7 +77,6 @@ public struct Unsafe${Mutable}BufferPointer<Element>
 
   /// Construct an Unsafe${Mutable}Pointer over the `count` contiguous
   /// `Element` instances beginning at `start`.
-  @swift3_migration(renamed="init(start:length:)")
   public init(start: Unsafe${Mutable}Pointer<Element>, count: Int) {
     _precondition(
       count >= 0, "Unsafe${Mutable}BufferPointer with negative count")
@@ -99,7 +98,6 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   }
 
   /// The number of elements in the buffer.
-  @swift3_migration(renamed="length")
   public var count: Int {
     return _end - _position
   }

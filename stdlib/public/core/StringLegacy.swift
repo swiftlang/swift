@@ -14,7 +14,7 @@
 extension String {
   /// Construct an instance that is the concatenation of `count` copies
   /// of `repeatedValue`.
-  @swift3_migration(message="Renamed to init(repeating:length:) and reordered parameters")
+  @swift3_migration(message="Renamed to init(repeating:count:) and reordered parameters")
   public init(count: Int, repeatedValue c: Character) {
     let s = String(c)
     self = String(_storage: _StringBuffer(
@@ -28,7 +28,7 @@ extension String {
 
   /// Construct an instance that is the concatenation of `count` copies
   /// of `Character(repeatedValue)`.
-  @swift3_migration(message="Renamed to init(repeating:length:) and reordered parameters")
+  @swift3_migration(message="Renamed to init(repeating:count:) and reordered parameters")
   public init(count: Int, repeatedValue c: UnicodeScalar) {
     self = String._fromWellFormedCodeUnitSequence(UTF32.self,
         input: Repeat(count: count, repeatedValue: c.value))
