@@ -159,6 +159,7 @@ private:
   };
   SILValue SelfValue;
   ArrayRef<Substitution> Substitutions;
+  CanType OrigFormalOldType;
   CanType OrigFormalInterfaceType;
   CanAnyFunctionType SubstFormalType;
   Optional<SILLocation> SpecializeLoc;
@@ -176,10 +177,17 @@ private:
          SILLocation L)
     : kind(Kind::IndirectValue),
       IndirectValue(indirectValue),
+      OrigFormalOldType(origFormalType),
       OrigFormalInterfaceType(origFormalType),
       SubstFormalType(substFormalType),
       Loc(L)
   {}
+
+  static CanAnyFunctionType getConstantFormalType(SILGenFunction &gen,
+                                                  SILDeclRef fn)
+  SIL_FUNCTION_TYPE_DEPRECATED {
+    return gen.SGM.Types.getConstantInfo(fn.atUncurryLevel(0)).FormalType;
+  }
 
   static CanAnyFunctionType getConstantFormalInterfaceType(SILGenFunction &gen,
                                                   SILDeclRef fn) {
@@ -191,6 +199,7 @@ private:
          CanAnyFunctionType substFormalType,
          SILLocation l)
     : kind(Kind::StandaloneFunction), Constant(standaloneFunction),
+      OrigFormalOldType(getConstantFormalType(gen, standaloneFunction)),
       OrigFormalInterfaceType(getConstantFormalInterfaceType(gen,
                                                            standaloneFunction)),
       SubstFormalType(substFormalType),
@@ -205,6 +214,7 @@ private:
          CanAnyFunctionType substFormalType,
          SILLocation l)
     : kind(methodKind), Constant(methodName), SelfValue(selfValue),
+      OrigFormalOldType(getConstantFormalType(gen, methodName)),
       OrigFormalInterfaceType(getConstantFormalInterfaceType(gen, methodName)),
       SubstFormalType(substFormalType),
       Loc(l)
@@ -237,18 +247,11 @@ private:
       return CanType(TupleType::get(field, ctx));
     }
 
+    // These first two asserts will crash before they return if
+    // they're actually wrong.
+    assert(getArchetypeForSelf(origParamType));
+    assert(getArchetypeForSelf(selfType));
     assert(isa<MetatypeType>(origParamType) == isa<MetatypeType>(selfType));
-
-    if (auto mt = dyn_cast<MetatypeType>(origParamType))
-      assert(mt.getInstanceType()->isTypeParameter());
-    else
-      assert(origParamType->isTypeParameter());
-
-    if (auto mt = dyn_cast<MetatypeType>(selfType))
-      assert(isa<ArchetypeType>(mt.getInstanceType()));
-    else
-      assert(isa<ArchetypeType>(selfType));
-
     return selfType;
   }
 
@@ -287,13 +290,13 @@ private:
 
     // Add the 'self' parameter back.  We want it to look like a
     // substitution of the appropriate clause from the original type.
-    auto origFormalType = cast<AnyFunctionType>(OrigFormalInterfaceType);
+    auto polyFormalType = cast<PolymorphicFunctionType>(OrigFormalOldType);
     auto substSelfType =
-      buildSubstSelfType(origFormalType.getInput(), protocolSelfType, ctx);
+      buildSubstSelfType(polyFormalType.getInput(), protocolSelfType, ctx);
 
     auto extInfo = FunctionType::ExtInfo(FunctionType::Representation::Thin,
                                          /*noreturn*/ false,
-                                         /*throws*/ origFormalType->throws());
+                                         /*throws*/ polyFormalType->throws());
 
     SubstFormalType = CanFunctionType::get(substSelfType, SubstFormalType,
                                            extInfo);
@@ -305,18 +308,17 @@ private:
     assert(kind == Kind::DynamicMethod);
 
     // Drop the original self clause.
-    CanType methodType = OrigFormalInterfaceType;
+    CanType methodType = OrigFormalOldType;
     methodType = cast<AnyFunctionType>(methodType).getResult();
 
     // Replace it with the dynamic self type.
-    OrigFormalInterfaceType
+    OrigFormalOldType = OrigFormalInterfaceType
       = getDynamicMethodFormalType(SGM, SelfValue,
                                    Constant.getDecl(),
                                    Constant, methodType);
-    assert(!OrigFormalInterfaceType->hasTypeParameter());
 
     // Add a self clause to the substituted type.
-    auto origFormalType = cast<AnyFunctionType>(OrigFormalInterfaceType);
+    auto origFormalType = cast<AnyFunctionType>(OrigFormalOldType);
     auto selfType = origFormalType.getInput();
     SubstFormalType
       = CanFunctionType::get(selfType, SubstFormalType,
@@ -415,7 +417,7 @@ public:
   }
 
   CanType getOrigFormalType() const {
-    return OrigFormalInterfaceType;
+    return OrigFormalOldType;
   }
 
   CanAnyFunctionType getSubstFormalType() const {
@@ -3646,11 +3648,11 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
                                             ArrayRef<ManagedValue> args,
                                             SGFContext ctx) {
   auto origFormalType =
-    cast<AnyFunctionType>(fn->getInterfaceType()->getCanonicalType());
+    cast<AnyFunctionType>(fn->getType()->getCanonicalType());
   auto substFormalType = origFormalType;
   if (!subs.empty()) {
-    auto genericFnType = cast<GenericFunctionType>(substFormalType);
-    auto applied = genericFnType->substGenericArgs(SGM.SwiftModule, subs);
+    auto polyFnType = cast<PolymorphicFunctionType>(substFormalType);
+    auto applied = polyFnType->substGenericArgs(SGM.SwiftModule, subs);
     substFormalType = cast<FunctionType>(applied->getCanonicalType());
   }
 
@@ -3669,7 +3671,7 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
            == SILFunctionLanguage::Swift);
 
   return emitApply(loc, mv, subs, args, substFnType,
-                   AbstractionPattern(origFormalType).getFunctionResultType(),
+                   AbstractionPattern(origFormalType.getResult()),
                    substFormalType.getResult(),
                    options, None, None, ctx);
 }
@@ -3805,10 +3807,10 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
   SILConstantInfo constantInfo = gen.getConstantInfo(constant);
 
   // Apply substitutions to the callee type.
-  CanAnyFunctionType substAccessorType = constantInfo.FormalInterfaceType;
+  CanAnyFunctionType substAccessorType = constantInfo.FormalType;
   if (!substitutions.empty()) {
-    auto genericFn = cast<GenericFunctionType>(substAccessorType);
-    auto substFn = genericFn->substGenericArgs(gen.SGM.SwiftModule, substitutions);
+    auto polyFn = cast<PolymorphicFunctionType>(substAccessorType);
+    auto substFn = polyFn->substGenericArgs(gen.SGM.SwiftModule, substitutions);
     substAccessorType = cast<FunctionType>(substFn->getCanonicalType());
   }
 

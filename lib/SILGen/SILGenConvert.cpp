@@ -149,18 +149,18 @@ getOptionalSomeValue(SILLocation loc, ManagedValue value,
   return emitManagedRValueWithCleanup(result, optTL);
 }
 
-static Substitution getSimpleSubstitution(GenericSignature *genericSig,
+static Substitution getSimpleSubstitution(GenericParamList &generics,
                                           CanType typeArg) {
-  assert(genericSig->getGenericParams().size() == 1);
+  assert(generics.getParams().size() == 1);
   return Substitution{typeArg, {}};
 }
 
 /// Create the correct substitution for calling the given function at
 /// the given type.
 static Substitution getSimpleSubstitution(FuncDecl *fn, CanType typeArg) {
-  auto genericFnType =
-    cast<GenericFunctionType>(fn->getInterfaceType()->getCanonicalType());
-  return getSimpleSubstitution(genericFnType->getGenericSignature(), typeArg);
+  auto polyFnType =
+    cast<PolymorphicFunctionType>(fn->getType()->getCanonicalType());
+  return getSimpleSubstitution(polyFnType->getGenericParams(), typeArg);
 }
 
 static CanType getOptionalValueType(SILType optType,
