@@ -166,5 +166,5 @@ struct MagicKingdom<K> : Kingdom {
 }
 func magify<T>(t: T) -> MagicKingdom<T> { return MagicKingdom() }
 func foo(pair: (Int,Int)) -> Victory<(x:Int, y:Int)> {
-  return Victory(magify(pair)) // expected-error {{cannot invoke initializer for type 'Victory<_>' with an argument list of type '(MagicKingdom<(Int, Int)>)'}} expected-note {{expected an argument list of type '(K)'}}
+  return Victory(magify(pair)) // expected-error {{cannot convert return expression of type 'Victory<(Int, Int)>' to return type 'Victory<(x: Int, y: Int)>'}}
 }
