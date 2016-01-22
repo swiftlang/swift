@@ -190,7 +190,6 @@ public protocol CollectionType : Indexable, SequenceType {
   ///
   /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
   ///   O(N) otherwise.
-  @swift3_migration(renamed="length")
   var count: Index.Distance { get }
   
   // The following requirement enables dispatching for indexOf when
@@ -279,8 +278,8 @@ extension CollectionType {
   /// `self`, *nondestructively*.
   ///
   /// - Complexity: O(N).
-  //@swift3_migration(toProperty="underestimatedLength")
-  @swift3_migration(message="it became a property 'underestimatedLength'")
+  //@swift3_migration(toProperty="underestimatedCount")
+  @swift3_migration(message="it became a property 'underestimatedCount'")
   public func underestimateCount() -> Int {
     return numericCast(count)
   }

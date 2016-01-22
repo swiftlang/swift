@@ -283,7 +283,8 @@ public struct ${Collection}<
     return position._innerCollection![position._inner!]
   }
 
-  @swift3_migration(renamed="underestimatedLength", message="Becomes a property")
+  //@swift3_migration(toProperty="underestimatedCount")
+  @swift3_migration(message="it became a property 'underestimatedCount'")
   public func underestimateCount() -> Int {
     // To return any estimate of the number of elements, we have to start
     // evaluating the collections.  That is a bad default for `flatMap()`, so

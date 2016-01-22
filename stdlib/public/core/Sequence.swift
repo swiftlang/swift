@@ -88,8 +88,8 @@ public protocol SequenceType {
   /// `self`, **nondestructively**.
   ///
   /// - Complexity: O(N).
-  //@swift3_migration(toProperty="underestimatedLength")
-  @swift3_migration(message="it became a property 'underestimatedLength'")
+  //@swift3_migration(toProperty="underestimatedCount")
+  @swift3_migration(message="it became a property 'underestimatedCount'")
   @warn_unused_result
   func underestimateCount() -> Int
 
@@ -461,8 +461,8 @@ extension SequenceType {
   /// `self`, **nondestructively**.
   ///
   /// - Complexity: O(N).
-  //@swift3_migration(toProperty="underestimatedLength")
-  @swift3_migration(message="it became a property 'underestimatedLength'")
+  //@swift3_migration(toProperty="underestimatedCount")
+  @swift3_migration(message="it became a property 'underestimatedCount'")
   @warn_unused_result
   public func underestimateCount() -> Int {
     return 0

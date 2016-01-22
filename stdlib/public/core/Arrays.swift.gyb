@@ -508,7 +508,7 @@ extension ${Self} : _ArrayType {
 
   /// Construct a ${Self} of `count` elements, each initialized to
   /// `repeatedValue`.
-  @swift3_migration(renamed="init(repeating:length:)")
+  @swift3_migration(renamed="init(repeating:count:)")
   @_semantics("array.init")
   public init(count: Int, repeatedValue: Element) {
     var p: UnsafeMutablePointer<Element>
