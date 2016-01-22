@@ -38,7 +38,7 @@ func useTwoIdentical(xi: Int, yi: Float) {
   y = twoIdentical(1.0, y)
   y = twoIdentical(y, 1.0)
   
-  twoIdentical(x, y) // expected-error{{cannot invoke 'twoIdentical' with an argument list of type '(Int, Float)'}} expected-note{{expected an argument list of type '(T, T)'}}
+  twoIdentical(x, y) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
 }
 
 func mySwap<T>(inout x: T,
@@ -293,7 +293,9 @@ struct A {}
 func foo() {
     for i in min(1,2) { // expected-error{{type 'Int' does not conform to protocol 'SequenceType'}}
     }
-    let j = min(Int(3), Float(2.5)) // expected-error{{cannot invoke 'min' with an argument list of type '(Int, Float)'}} expected-note{{expected an argument list of type '(T, T)'}}
+    let j = min(Int(3), Float(2.5)) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
     let k = min(A(), A()) // expected-error{{cannot invoke 'min' with an argument list of type '(A, A)'}} expected-note{{expected an argument list of type '(T, T)'}}
+    let oi : Int? = 5
+    let l = min(3, oi) // expected-error{{value of optional type 'Int?' not unwrapped; did you mean to use '!' or '?'?}}
 }
 

@@ -883,6 +883,8 @@ namespace {
     CC_SelfMismatch,            ///< Self argument mismatches.
     CC_OneArgumentNearMismatch, ///< All arguments except one match, near miss.
     CC_OneArgumentMismatch,     ///< All arguments except one match.
+    CC_OneGenericArgumentNearMismatch, ///< All arguments except one match, guessing generic binding, near miss.
+    CC_OneGenericArgumentMismatch,     ///< All arguments except one match, guessing generic binding.
     CC_ArgumentNearMismatch,    ///< Argument list mismatch, near miss.
     CC_ArgumentMismatch,        ///< Argument list mismatch.
     CC_ArgumentLabelMismatch,   ///< Argument label mismatch.
@@ -1279,8 +1281,14 @@ CalleeCandidateInfo::evaluateCloseness(Type candArgListType,
   // If we have exactly one argument mismatching, classify it specially, so that
   // close matches are prioritized against obviously wrong ones.
   if (mismatchingArgs == 1) {
-    auto closeness = mismatchesAreNearMisses ? CC_OneArgumentNearMismatch
-                                             : CC_OneArgumentMismatch;
+    CandidateCloseness closeness;
+    if (singleArchetype.isNull()) {
+      closeness = mismatchesAreNearMisses ? CC_OneArgumentNearMismatch
+                                          : CC_OneArgumentMismatch;
+    } else {
+      closeness = mismatchesAreNearMisses ? CC_OneGenericArgumentNearMismatch
+                                          : CC_OneGenericArgumentMismatch;
+    }
     // Return information about the single failing argument.
     return { closeness, failureInfo };
   }
@@ -3757,7 +3765,9 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // as a specific problem of passing something of the wrong type into a
   // parameter.
   if ((calleeInfo.closeness == CC_OneArgumentMismatch ||
-       calleeInfo.closeness == CC_OneArgumentNearMismatch) &&
+       calleeInfo.closeness == CC_OneArgumentNearMismatch ||
+       calleeInfo.closeness == CC_OneGenericArgumentMismatch ||
+       calleeInfo.closeness == CC_OneGenericArgumentNearMismatch) &&
       calleeInfo.failedArgument.isValid()) {
     // Map the argument number into an argument expression.
     TCCOptions options = TCC_ForceRecheck;
@@ -4674,6 +4684,8 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
   case CC_NonLValueInOut:      // First argument is inout but no lvalue present.
   case CC_OneArgumentMismatch: // All arguments except one match.
   case CC_OneArgumentNearMismatch:
+  case CC_OneGenericArgumentMismatch:
+  case CC_OneGenericArgumentNearMismatch:
   case CC_SelfMismatch:        // Self argument mismatches.
   case CC_ArgumentNearMismatch:// Argument list mismatch.
   case CC_ArgumentMismatch:    // Argument list mismatch.
