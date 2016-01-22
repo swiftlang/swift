@@ -1770,14 +1770,14 @@ namespace {
           builtinLiteralFuncName 
             = DeclName(tc.Context, tc.Context.Id_init,
                        { tc.Context.Id_builtinUTF16StringLiteral,
-                         tc.Context.getIdentifier("numberOfCodeUnits") });
+                         tc.Context.getIdentifier("utf16CodeUnitCount") });
 
           elements.push_back(
             TupleTypeElt(tc.Context.TheRawPointerType,
                          tc.Context.Id_builtinUTF16StringLiteral));
           elements.push_back(
             TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context),
-                         tc.Context.getIdentifier("numberOfCodeUnits")));
+                         tc.Context.getIdentifier("utf16CodeUnitCount")));
           if (stringLiteral)
             stringLiteral->setEncoding(StringLiteralExpr::UTF16);
           else
@@ -1790,13 +1790,13 @@ namespace {
           builtinLiteralFuncName 
             = DeclName(tc.Context, tc.Context.Id_init,
                        { tc.Context.Id_builtinStringLiteral,
-                         tc.Context.getIdentifier("lengthInBytes"),
+                         tc.Context.getIdentifier("utf8CodeUnitCount"),
                          tc.Context.getIdentifier("isASCII") });
           elements.push_back(TupleTypeElt(tc.Context.TheRawPointerType,
                                          tc.Context.Id_builtinStringLiteral));
           elements.push_back(
             TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context),
-                         tc.Context.getIdentifier("lengthInBytes")));
+                         tc.Context.getIdentifier("utf8CodeUnitCount")));
           elements.push_back(
             TupleTypeElt(BuiltinIntegerType::get(1, tc.Context),
                          tc.Context.getIdentifier("isASCII")));
@@ -1815,7 +1815,7 @@ namespace {
         builtinLiteralFuncName
           = DeclName(tc.Context, tc.Context.Id_init,
                      { tc.Context.Id_builtinExtendedGraphemeClusterLiteral,
-                       tc.Context.getIdentifier("lengthInBytes"),
+                       tc.Context.getIdentifier("utf8CodeUnitCount"),
                        tc.Context.getIdentifier("isASCII") });
 
         builtinProtocol = tc.getProtocol(
@@ -1826,7 +1826,7 @@ namespace {
                        tc.Context.Id_builtinExtendedGraphemeClusterLiteral));
         elements.push_back(
           TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context),
-                       tc.Context.getIdentifier("lengthInBytes")));
+                       tc.Context.getIdentifier("utf8CodeUnitCount")));
         elements.push_back(
           TupleTypeElt(BuiltinIntegerType::get(1, tc.Context),
                        tc.Context.getIdentifier("isASCII")));

@@ -44,7 +44,7 @@ public struct StaticString
 
   /// If `_startPtrOrData` is a pointer, contains the length of the UTF-8 data
   /// in bytes.
-  var _lengthInBytes: Builtin.Word
+  var _utf8CodeUnitCount: Builtin.Word
 
   /// Extra flags:
   ///
@@ -82,13 +82,13 @@ public struct StaticString
   /// length in bytes of that data.
   ///
   /// If `self` stores a single Unicode scalar value, the value of
-  /// `lengthInBytes` is unspecified.
+  /// `utf8CodeUnitCount` is unspecified.
   @_transparent
-  public var lengthInBytes: Int {
+  public var utf8CodeUnitCount: Int {
     _require(
       hasPointerRepresentation,
       "StaticString should have pointer representation")
-    return Int(_lengthInBytes)
+    return Int(_utf8CodeUnitCount)
   }
 
   /// `true` iff `self` stores a pointer to ASCII or UTF-8 code units.
@@ -113,7 +113,8 @@ public struct StaticString
   public func withUTF8Buffer<R>(
     @noescape body: (UnsafeBufferPointer<UInt8>) -> R) -> R {
     if hasPointerRepresentation {
-      return body(UnsafeBufferPointer(start: utf8Start, length: Int(lengthInBytes)))
+      return body(UnsafeBufferPointer(
+        start: utf8Start, length: Int(utf8CodeUnitCount)))
     } else {
       var buffer: UInt64 = 0
       var i = 0
@@ -136,10 +137,12 @@ public struct StaticString
 
   @_transparent
   internal init(
-    start: Builtin.RawPointer, lengthInBytes: Builtin.Word, isASCII: Builtin.Int1
+    start: Builtin.RawPointer,
+    utf8CodeUnitCount: Builtin.Word,
+    isASCII: Builtin.Int1
   ) {
     self._startPtrOrData = start
-    self._lengthInBytes = lengthInBytes
+    self._utf8CodeUnitCount = utf8CodeUnitCount
     self._flags = Bool(isASCII) ? (0x2 as UInt8)._value : (0x0 as UInt8)._value
   }
 
@@ -149,7 +152,7 @@ public struct StaticString
   ) {
     self._startPtrOrData =
       unsafeBitCast(UInt(UInt32(unicodeScalar)), OpaquePointer.self)._rawValue
-    self._lengthInBytes = 0._builtinWordValue
+    self._utf8CodeUnitCount = 0._builtinWordValue
     self._flags = UnicodeScalar(_builtinUnicodeScalarLiteral: unicodeScalar).isASCII
       ? (0x3 as UInt8)._value
       : (0x1 as UInt8)._value
@@ -172,12 +175,12 @@ public struct StaticString
   @_transparent
   public init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
-    lengthInBytes: Builtin.Word,
+    utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1
   ) {
     self = StaticString(
       _builtinStringLiteral: start,
-      lengthInBytes: lengthInBytes,
+      utf8CodeUnitCount: utf8CodeUnitCount,
       isASCII: isASCII
     )
   }
@@ -193,12 +196,12 @@ public struct StaticString
   @_transparent
   public init(
     _builtinStringLiteral start: Builtin.RawPointer,
-    lengthInBytes: Builtin.Word,
+    utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1
   ) {
     self = StaticString(
       start: start,
-      lengthInBytes: lengthInBytes,
+      utf8CodeUnitCount: utf8CodeUnitCount,
       isASCII: isASCII)
   }
 
@@ -228,7 +231,7 @@ public struct StaticString
 }
 
 extension StaticString {
-  @available(*, unavailable, renamed="lengthInBytes")
+  @available(*, unavailable, renamed="utf8CodeUnitCount")
   public var byteSize: Int {
     fatalError("unavailable function can't be called")
   }

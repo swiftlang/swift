@@ -129,7 +129,7 @@ public protocol _BuiltinExtendedGraphemeClusterLiteralConvertible
 
   init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
-    lengthInBytes: Builtin.Word,
+    utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1)
 }
 
@@ -149,7 +149,7 @@ public protocol _BuiltinStringLiteralConvertible
 
   init(
     _builtinStringLiteral start: Builtin.RawPointer,
-    lengthInBytes: Builtin.Word,
+    utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1)
 }
 
@@ -158,7 +158,7 @@ public protocol _BuiltinUTF16StringLiteralConvertible
 
   init(
     _builtinUTF16StringLiteral start: Builtin.RawPointer,
-    numberOfCodeUnits: Builtin.Word)
+    utf16CodeUnitCount: Builtin.Word)
 }
 
 /// Conforming types can be initialized with arbitrary string literals.

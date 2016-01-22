@@ -70,7 +70,7 @@ CompilerProtocols.swift contains a second protocol::
 
     init(
         _builtinStringLiteral start: Builtin.RawPointer,
-        lengthInBytes: Builtin.Word,
+        utf8CodeUnitCount: Builtin.Word,
         isASCII: Builtin.Int1)
   }
 

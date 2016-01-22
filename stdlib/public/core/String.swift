@@ -188,13 +188,13 @@ extension String : _BuiltinExtendedGraphemeClusterLiteralConvertible {
   @_semantics("string.makeUTF8")
   public init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
-    lengthInBytes: Builtin.Word,
+    utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1) {
     self = String._fromWellFormedCodeUnitSequence(
       UTF8.self,
       input: UnsafeBufferPointer(
         start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
-        length: Int(lengthInBytes)))
+        length: Int(utf8CodeUnitCount)))
   }
 }
 
@@ -210,12 +210,12 @@ extension String : _BuiltinUTF16StringLiteralConvertible {
   @_semantics("string.makeUTF16")
   public init(
     _builtinUTF16StringLiteral start: Builtin.RawPointer,
-    numberOfCodeUnits: Builtin.Word
+    utf16CodeUnitCount: Builtin.Word
   ) {
     self = String(
       _StringCore(
         baseAddress: OpaquePointer(start),
-        length: Int(numberOfCodeUnits),
+        length: Int(utf16CodeUnitCount),
         elementShift: 1,
         hasCocoaBuffer: false,
         owner: nil))
@@ -227,13 +227,13 @@ extension String : _BuiltinStringLiteralConvertible {
   @_semantics("string.makeUTF8")
   public init(
     _builtinStringLiteral start: Builtin.RawPointer,
-    lengthInBytes: Builtin.Word,
+    utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1) {
     if Bool(isASCII) {
       self = String(
         _StringCore(
           baseAddress: OpaquePointer(start),
-          length: Int(lengthInBytes),
+          length: Int(utf8CodeUnitCount),
           elementShift: 0,
           hasCocoaBuffer: false,
           owner: nil))
@@ -243,7 +243,7 @@ extension String : _BuiltinStringLiteralConvertible {
         UTF8.self,
         input: UnsafeBufferPointer(
           start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
-          length: Int(lengthInBytes)))
+          length: Int(utf8CodeUnitCount)))
     }
   }
 }

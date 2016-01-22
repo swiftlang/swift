@@ -103,7 +103,7 @@ extension NSString : StringLiteralConvertible {
     if value.hasPointerRepresentation {
       immutableResult = NSString(
         bytesNoCopy: UnsafeMutablePointer<Void>(value.utf8Start),
-        length: Int(value.lengthInBytes),
+        length: Int(value.utf8CodeUnitCount),
         encoding: value.isASCII ? NSASCIIStringEncoding : NSUTF8StringEncoding,
         freeWhenDone: false)!
     } else {

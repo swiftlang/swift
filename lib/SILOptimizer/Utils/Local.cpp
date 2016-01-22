@@ -728,9 +728,9 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
   auto AIRightOperandsNum = AIRight->getNumOperands();
 
   // makeUTF16 should have following parameters:
-  // (start: RawPointer, numberOfCodeUnits: Word)
+  // (start: RawPointer, utf16CodeUnitCount: Word)
   // makeUTF8 should have following parameters:
-  // (start: RawPointer, byteSize: Word, isASCII: Int1)
+  // (start: RawPointer, utf8CodeUnitCount: Word, isASCII: Int1)
   if (!((FRILeftFun->hasSemanticsAttr("string.makeUTF16") &&
          AILeftOperandsNum == 4) ||
         (FRILeftFun->hasSemanticsAttr("string.makeUTF8") &&

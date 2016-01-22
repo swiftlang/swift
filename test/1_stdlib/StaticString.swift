@@ -15,7 +15,7 @@ var StaticStringTestSuite = TestSuite("StaticString")
 
 StaticStringTestSuite.test("PointerRepresentation/ASCII/Empty") {
   let str = StaticString()
-  expectEqual(0, str.lengthInBytes)
+  expectEqual(0, str.utf8CodeUnitCount)
   expectTrue(str.hasPointerRepresentation)
   expectTrue(str.isASCII)
   str.withUTF8Buffer {
@@ -33,7 +33,7 @@ StaticStringTestSuite.test("PointerRepresentation/ASCII") {
   expectEqual(0x61, str.utf8Start[0])
   expectEqual(0x62, str.utf8Start[1])
   expectEqual(0x63, str.utf8Start[2])
-  expectEqual(3, str.lengthInBytes)
+  expectEqual(3, str.utf8CodeUnitCount)
   expectTrue(str.hasPointerRepresentation)
   expectTrue(str.isASCII)
   str.withUTF8Buffer {
@@ -57,7 +57,7 @@ StaticStringTestSuite.test("PointerRepresentation/NonASCII") {
   expectEqual(0xb1, str.utf8Start[3])
   expectEqual(0xd0, str.utf8Start[4])
   expectEqual(0xb2, str.utf8Start[5])
-  expectEqual(6, str.lengthInBytes)
+  expectEqual(6, str.utf8CodeUnitCount)
   expectTrue(str.hasPointerRepresentation)
   expectFalse(str.isASCII)
   str.withUTF8Buffer {
@@ -139,7 +139,7 @@ StaticStringTestSuite.test("UnicodeScalarRepresentation/utf8Start")
   strOpaque.utf8Start
 }
 
-StaticStringTestSuite.test("UnicodeScalarRepresentation/lengthInBytes")
+StaticStringTestSuite.test("UnicodeScalarRepresentation/utf8CodeUnitCount")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
@@ -149,7 +149,7 @@ StaticStringTestSuite.test("UnicodeScalarRepresentation/lengthInBytes")
   let str = StaticString(_builtinUnicodeScalarLiteral: UInt32(0x5a)._value)
   let strOpaque = _opaqueIdentity(str)
   expectCrashLater()
-  strOpaque.lengthInBytes
+  strOpaque.utf8CodeUnitCount
 }
 
 runAllTests()

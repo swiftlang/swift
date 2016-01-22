@@ -62,12 +62,12 @@ public struct Character :
   @effects(readonly)
   public init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
-    lengthInBytes: Builtin.Word,
+    utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1) {
     self = Character(
       String(
-        _builtinExtendedGraphemeClusterLiteral: start, 
-        lengthInBytes: lengthInBytes, 
+        _builtinExtendedGraphemeClusterLiteral: start,
+        utf8CodeUnitCount: utf8CodeUnitCount,
         isASCII: isASCII))
   }
 
