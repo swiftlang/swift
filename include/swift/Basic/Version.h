@@ -110,7 +110,7 @@ public:
   static Version getCurrentCompilerVersion();
 
   /// Returns a version from the currently defined SWIFT_VERSION_MAJOR and
-  /// SWIFT_VERSION_MAJOR.
+  /// SWIFT_VERSION_MINOR.
   static Version getCurrentLanguageVersion();
 };
 
