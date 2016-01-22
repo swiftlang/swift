@@ -78,11 +78,10 @@ func passFunction(f: (Int) -> Float, x: Int, y: Float) {
    acceptFunction(f, y, y) // expected-error{{cannot convert value of type '(Int) -> Float' to expected argument type '(_) -> _'}}
 }
 
-func returnTuple<T, U>(_: T) -> (T, U) { }
+func returnTuple<T, U>(_: T) -> (T, U) { } // expected-note {{in call to function 'returnTuple'}}
 
 func testReturnTuple(x: Int, y: Float) {
-  returnTuple(x) // expected-error{{cannot invoke 'returnTuple' with an argument list of type '(Int)'}}
-  // expected-note @-1 {{expected an argument list of type '(T)'}}
+  returnTuple(x) // expected-error{{generic parameter 'T' could not be inferred}}
   
   var _ : (Int, Float) = returnTuple(x)
   var _ : (Float, Float) = returnTuple(y)
@@ -216,7 +215,7 @@ func rangeOfIsBefore<
 
 func callRangeOfIsBefore(ia: [Int], da: [Double]) {
   rangeOfIsBefore(ia.generate())
-  rangeOfIsBefore(da.generate()) // expected-error{{cannot invoke 'rangeOfIsBefore' with an argument list of type '(IndexingGenerator<[Double]>)'}} expected-note{{expected an argument list of type '(R)'}}
+  rangeOfIsBefore(da.generate()) // expected-error{{value of type '(_) -> ()' has no member 'Element'}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -288,3 +287,13 @@ var iy2 : Inty = "hello" // expected-error{{cannot convert value of type 'String
 class DeducePropertyParams {
   let badSet: Set = ["Hello"]
 }
+
+// SR-69
+struct A {}
+func foo() {
+    for i in min(1,2) { // expected-error{{type 'Int' does not conform to protocol 'SequenceType'}}
+    }
+    let j = min(Int(3), Float(2.5)) // expected-error{{cannot invoke 'min' with an argument list of type '(Int, Float)'}} expected-note{{expected an argument list of type '(T, T)'}}
+    let k = min(A(), A()) // expected-error{{cannot invoke 'min' with an argument list of type '(A, A)'}} expected-note{{expected an argument list of type '(T, T)'}}
+}
+

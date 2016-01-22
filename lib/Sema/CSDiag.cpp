@@ -1158,8 +1158,8 @@ static bool argumentMismatchIsNearMiss(Type argType, Type paramType) {
 /// list.  If the closeness is a miss by a single argument, then this returns
 /// information about that failure.
 static std::pair<CandidateCloseness, CalleeCandidateInfo::FailedArgumentInfo>
-evaluateCloseness(Type candArgListType, ArrayRef<CallArgParam> actualArgs,
-                  bool argsHaveTrailingClosure) {
+evaluateCloseness(ConstraintSystem *CS, Type candArgListType,
+                  ArrayRef<CallArgParam> actualArgs, bool argsHaveTrailingClosure) {
   auto candArgs = decomposeArgParamType(candArgListType);
 
   struct OurListener : public MatchCallArgumentListener {
@@ -1196,6 +1196,14 @@ evaluateCloseness(Type candArgListType, ArrayRef<CallArgParam> actualArgs,
   // If we found a mapping, check to see if the matched up arguments agree in
   // their type and count the number of mismatched arguments.
   unsigned mismatchingArgs = 0;
+
+  // Checking of archetypes.
+  // FIXME: For now just trying to verify applicability of arguments with only
+  // a single generic variable. Ideally we'd create a ConstraintSystem with
+  // type variables for all generics and solve it with the given argument types.
+  Type singleArchetype = nullptr;
+  Type matchingArgType = nullptr;
+  bool substitutable;
   
   // We classify an argument mismatch as being a "near" miss if it is a very
   // likely match due to a common sort of problem (e.g. wrong flags on a
@@ -1213,19 +1221,38 @@ evaluateCloseness(Type candArgListType, ArrayRef<CallArgParam> actualArgs,
     
     for (auto argNo : bindings) {
       auto argType = actualArgs[argNo].Ty;
+      auto rArgType = argType->getRValueType();
       
       // If the argument has an unresolved type, then we're not actually
       // matching against it.
-      if (argType->getRValueType()->is<UnresolvedType>())
+      if (rArgType->is<UnresolvedType>())
         continue;
       
       // FIXME: Right now, a "matching" overload is one with a parameter whose
-      // type is identical to one of the argument types. We can obviously do
-      // something more sophisticated with this.
-      // FIXME: Definitely need to handle archetypes for same-type constraints.
+      // type is identical to the argument type, or substitutable via rudimentery
+      // handling of functions with a single archetype in one or more parameters.
+      // We can still do something more sophisticated with this.
       // FIXME: Use TC.isConvertibleTo?
-      if (argType->getRValueType()->isEqual(paramType))
+      if (rArgType->isEqual(paramType))
         continue;
+      if (paramType->is<ArchetypeType>() && !rArgType->hasTypeVariable()) {
+        if (singleArchetype) {
+          if (!paramType->isEqual(singleArchetype)
+              || !rArgType->isEqual(matchingArgType)) {
+            // Since we've 'bound' singleArchetype and it is now potentially wrong,
+            // this is then the second mismatch -- give up right away.
+            return { CC_ArgumentMismatch, {}};
+          }
+        } else {
+          matchingArgType = rArgType;
+          singleArchetype = paramType;
+            
+          auto archetype = paramType->getAs<ArchetypeType>();
+          substitutable = CS->TC.isSubstitutableFor(rArgType, archetype, CS->DC);
+        }
+        if (substitutable)
+          continue;
+      }
       
       ++mismatchingArgs;
       
@@ -1426,7 +1453,7 @@ void CalleeCandidateInfo::filterList(ArrayRef<CallArgParam> actualArgs) {
     // If this isn't a function or isn't valid at this uncurry level, treat it
     // as a general mismatch.
     if (!inputType) return { CC_GeneralMismatch, {}};
-    return evaluateCloseness(inputType, actualArgs, hasTrailingClosure);
+    return evaluateCloseness(CS, inputType, actualArgs, hasTrailingClosure);
   });
 }
 
@@ -3525,7 +3552,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     
     // Explode out multi-index subscripts to find the best match.
     auto indexResult =
-      evaluateCloseness(cand.getArgumentType(), decomposedIndexType,
+      evaluateCloseness(CS, cand.getArgumentType(), decomposedIndexType,
                         /*FIXME: Subscript trailing closures*/false);
     if (selfConstraint > indexResult.first)
       return {selfConstraint, {}};
