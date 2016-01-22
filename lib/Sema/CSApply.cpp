@@ -2048,26 +2048,6 @@ namespace {
       return expr;
     }
 
-    /// \brief Retrieve the type of a reference to the given declaration.
-    Type getTypeOfDeclReference(ValueDecl *decl, bool isSpecialized) {
-      if (auto typeDecl = dyn_cast<TypeDecl>(decl)) {
-        // Resolve the reference to this type declaration in our
-        // current context.
-        auto type = cs.getTypeChecker().resolveTypeInContext(typeDecl, dc,
-                                                             TR_InExpression,
-                                                             isSpecialized);
-        if (!type)
-          return nullptr;
-
-        // Refer to the metatype of this type.
-        return MetatypeType::get(type);
-      }
-
-      return cs.TC.getUnopenedTypeOfReference(decl, Type(), dc,
-                                              /*base=*/nullptr,
-                                              /*wantInterfaceType=*/true);
-    }
-
     Expr *visitDeclRefExpr(DeclRefExpr *expr) {
       auto locator = cs.getConstraintLocator(expr);
 

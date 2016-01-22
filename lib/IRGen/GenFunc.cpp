@@ -266,40 +266,9 @@ namespace {
     CallResult() : CurState(State::Invalid) {}
     ~CallResult() { reset(); }
 
-    /// Configure this result to carry a number of direct values at
-    /// the given explosion level.
-    Explosion &initForDirectValues() {
-      assert(CurState == State::Invalid);
-      CurState = State::Direct;
-      return *new (&CurValue.Direct) Explosion();
-    }
-
-    /// As a potential efficiency, set that this is a direct result
-    /// with no values.
-    void setAsEmptyDirect() {
-      initForDirectValues();
-    }
-
-    /// Set this result so that it carries a single directly-returned
-    /// maximally-fragile value without management.
-    void setAsSingleDirectUnmanagedFragileValue(llvm::Value *value) {
-      initForDirectValues().add(value);
-    }
-
-    void setAsIndirectAddress(Address address) {
-      assert(CurState == State::Invalid);
-      CurState = State::Indirect;
-      CurValue.Indirect = address;
-    }
-
     bool isInvalid() const { return CurState == State::Invalid; } 
     bool isDirect() const { return CurState == State::Direct; }
     bool isIndirect() const { return CurState == State::Indirect; }
-
-    Explosion &getDirectValues() {
-      assert(isDirect());
-      return CurValue.Direct;
-    }
 
     Address getIndirectAddress() const {
       assert(isIndirect());

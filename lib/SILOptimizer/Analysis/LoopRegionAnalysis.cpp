@@ -916,16 +916,6 @@ struct alledge_iterator
     return SuccIter->getValue().IsNonLocal;
   }
 
-  Optional<unsigned> getSuccIndex() const {
-    if (isSubregion())
-      return None;
-    // Since we have a bidirectional iterator, this will perform increments
-    // until we get to SuccIter. This is the behavior we want so that we ensure
-    // that we skip over any dead successor edges. We are just performing
-    // graphing, so performance is not a concern.
-    return std::distance(Wrapper->Region->succ_begin(), SuccIter);
-  }
-
   LoopRegionWrapper *operator*() const {
     if (SubregionIter != Wrapper->Region->subregion_end()) {
       return &Wrapper->FuncInfo.Data[*SubregionIter];

@@ -2181,22 +2181,6 @@ void TypeChecker::checkOmitNeedlessWords(VarDecl *var) {
     .fixItReplace(var->getLoc(), newName->str());
 }
 
-namespace {
-  struct CallEdit {
-    enum {
-      RemoveDefaultArg,
-      Rename,
-    } Kind;
-
-    // The source range affected by this change.
-    SourceRange Range;
-
-    // The replacement text, for a rename.
-    std::string Name;
-  };
-
-}
-
 /// Find the source ranges of extraneous default arguments within a
 /// call to the given function.
 static bool hasExtraneousDefaultArguments(AbstractFunctionDecl *afd,

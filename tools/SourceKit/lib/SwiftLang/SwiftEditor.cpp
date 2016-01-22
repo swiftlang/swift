@@ -2446,7 +2446,7 @@ ImmutableTextSnapshotRef SwiftEditorDocument::replaceText(
 }
 
 void SwiftEditorDocument::updateSemaInfo() {
-  if (auto SemaInfo = Impl.SemanticInfo) {
+  if (Impl.SemanticInfo) {
     Impl.SemanticInfo->processLatestSnapshotAsync(Impl.EditableBuffer);
   }
 }

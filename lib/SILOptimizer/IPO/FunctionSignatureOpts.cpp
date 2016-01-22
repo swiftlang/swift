@@ -414,11 +414,6 @@ unsigned ArgumentDescriptor::updateOptimizedBBArgs(SILBuilder &Builder,
 
 namespace {
 
-template <typename T1, typename T2>
-inline T1 getFirstPairElt(const std::pair<T1, T2> &P) {
-  return P.first;
-}
-
 /// A class that contains all analysis information we gather about our
 /// function. Also provides utility methods for creating the new empty function.
 class FunctionAnalyzer {

@@ -219,7 +219,7 @@ public:
     S->Operations.erase(OpId);
   }
 
-  static void persistAsync(bool WithActions) {
+  static void persistAsync() {
     llvm::sys::ScopedLock L(GlobalMutex);
     auto S = CurrentState;
     Queue.dispatch([S] {S->persist();});
@@ -380,7 +380,7 @@ void handleTraceMessageRequest(uint64_t Session, xpc_object_t Msg) {
 
 void persistTracingData() {
   if (isTracingEnabled()) {
-    State::persistAsync(true);
+    State::persistAsync();
   }
 }
 

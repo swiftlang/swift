@@ -82,9 +82,6 @@ public:
   /// Whether the function is marked 'rethrows'.
   bool isBodyRethrows() const { return IsRethrows; }
 
-  /// The uncurry level that 'rethrows' applies to.
-  unsigned getNumBodyParameters() const { return ParamCount; }
-
   unsigned getNumArgumentsForFullApply() const {
     return (ParamCount - unsigned(IsProtocolMethod));
   }

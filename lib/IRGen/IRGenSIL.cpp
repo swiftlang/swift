@@ -388,12 +388,6 @@ public:
     (void)inserted;
   }
   
-  void overwriteLoweredValue(SILValue v, LoweredValue &&lv) {
-    auto it = LoweredValues.find(v);
-    assert(it != LoweredValues.end() && "no existing entry for overwrite?");
-    it->second = std::move(lv);
-  }
-  
   /// Create a new Address corresponding to the given SIL address value.
   void setLoweredAddress(SILValue v, const Address &address) {
     assert(v.getType().isAddress() && "address for non-address value?!");
@@ -434,17 +428,6 @@ public:
     setLoweredValue(v, LoweredValue(box));
   }
 
-  void overwriteLoweredExplosion(SILValue v, Explosion &e) {
-    assert(v.getType().isObject() && "explosion for address value?!");
-    overwriteLoweredValue(v, LoweredValue(e));
-  }
-
-  void setLoweredSingleValue(SILValue v, llvm::Value *scalar) {
-    Explosion e;
-    e.add(scalar);
-    setLoweredExplosion(v, e);
-  }
-  
   /// Create a new StaticFunction corresponding to the given SIL value.
   void setLoweredStaticFunction(SILValue v,
                                 llvm::Function *f,

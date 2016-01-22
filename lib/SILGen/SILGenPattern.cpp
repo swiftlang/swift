@@ -450,7 +450,7 @@ private:
 
   void bindVariable(SILLocation loc, VarDecl *var,
                     ConsumableManagedValue value, CanType formalValueType,
-                    bool isForSuccess);
+                    bool isIrrefutable);
 
   void emitSpecializedDispatch(ClauseMatrix &matrix, ArgArray args,
                                unsigned &lastRow, unsigned column,
@@ -525,11 +525,6 @@ public:
   }
   MutableArrayRef<Pattern *> getColumns() {
     return Columns;
-  }
-
-  /// Remove a column.
-  void removeColumn(unsigned index) {
-    Columns.erase(Columns.begin() + index);
   }
 
   /// Add new columns to the end of the row.

@@ -150,10 +150,6 @@ class ExistentialTypeInfoBase : public Base {
   }
 
 protected:
-  const ExistentialTypeInfoBase<Derived, Base> &asExistentialTI() const {
-    return *this;
-  }
-
   const Derived &asDerived() const {
     return *static_cast<const Derived*>(this);
   }
