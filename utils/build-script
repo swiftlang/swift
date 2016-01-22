@@ -64,6 +64,7 @@ class CompilerExecutable(object):
         if not companion:
             raise Exception("Can't infer companion compiler for %s. "
                             "Please specify --cc and --cxx." % (cmd))
+        print("Note: Inferred companion compiler %s for %s." % (companion, cmd))
         return companion
 
 
