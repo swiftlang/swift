@@ -4187,12 +4187,12 @@ extension ${Self} {
 extension Set {
   @available(*, unavailable, renamed="removeAt")
   public mutating func removeAtIndex(index: Index) -> Element {
-    _abstract()
+    fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, renamed="iterator")
   public func generate() -> SetIterator<Element> {
-    _abstract()
+    fatalError("unavailable function can't be called")
   }
 }
 
@@ -4200,11 +4200,11 @@ extension Set {
 extension Dictionary {
   @available(*, unavailable, renamed="removeAt")
   public mutating func removeAtIndex(index: Index) -> Element {
-    _abstract()
+    fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, renamed="iterator")
   public func generate() -> DictionaryIterator<Key, Value> {
-    _abstract()
+    fatalError("unavailable function can't be called")
   }
 }

@@ -560,5 +560,5 @@ func _isOptional<T>(type: T.Type) -> Bool {
 
 @available(*, unavailable, message="Removed in Swift 3. Please use Optional.unsafelyUnwrapped instead.")
 public func unsafeUnwrap<T>(nonEmpty: T?) -> T {
-  _abstract()
+  fatalError("unavailable function can't be called")
 }

@@ -735,12 +735,12 @@ extension Collection {
 
   @available(*, unavailable, renamed="iterator")
   public func generate() -> Iterator {
-    _abstract()
+    fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, message="Removed in Swift 3. Please use underestimatedCount peoperty.")
   public func underestimateCount() -> Int {
-    _abstract()
+    fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, message="Please use split(_:omitEmptySubsequences:isSeparator:) instead")
@@ -749,7 +749,7 @@ extension Collection {
     allowEmptySlices: Bool = false,
     @noescape isSeparator: (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
-    _abstract()
+    fatalError("unavailable function can't be called")
   }
 }
 
@@ -760,7 +760,7 @@ extension Collection where Iterator.Element : Equatable {
     maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false
   ) -> [SubSequence] {
-    _abstract()
+    fatalError("unavailable function can't be called")
   }
 }
 @available(*, unavailable, renamed="MutableCollection")

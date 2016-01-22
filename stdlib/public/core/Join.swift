@@ -188,6 +188,6 @@ public struct JoinGenerator<
 extension JoinSequence {
   @available(*, unavailable, renamed="iterator")
   public func generate() -> JoinIterator<Base.Iterator> {
-    _abstract()
+    fatalError("unavailable function can't be called")
   }
 }

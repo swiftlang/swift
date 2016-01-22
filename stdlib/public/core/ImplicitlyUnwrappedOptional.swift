@@ -138,20 +138,20 @@ extension ImplicitlyUnwrappedOptional : _ObjectiveCBridgeable {
 extension ImplicitlyUnwrappedOptional {
   @available(*, unavailable, message="Please use nil literal instead.")
   public init() {
-    _abstract()
+    fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, message="Has been removed in Swift 3.")
   public func map<U>(
     @noescape f: (Wrapped) throws -> U
   ) rethrows -> ImplicitlyUnwrappedOptional<U> {
-    _abstract()
+    fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, message="Has been removed in Swift 3.")
   public func flatMap<U>(
       @noescape f: (Wrapped) throws -> ImplicitlyUnwrappedOptional<U>
   ) rethrows -> ImplicitlyUnwrappedOptional<U> {
-    _abstract()
+    fatalError("unavailable function can't be called")
   }
 }

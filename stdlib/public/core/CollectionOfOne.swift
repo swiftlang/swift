@@ -84,6 +84,6 @@ public struct GeneratorOfOne<Element> {}
 extension IteratorOverOne {
   @available(*, unavailable, renamed="iterator")
   public func generate() -> IteratorOverOne<Element> {
-    _abstract()
+    fatalError("unavailable function can't be called")
   }
 }

@@ -261,14 +261,14 @@ public struct LazyFilterGenerator<Base : IteratorProtocol> {}
 extension LazyFilterSequence {
   @available(*, unavailable, renamed="iterator")
   public func generate() -> LazyFilterIterator<Base.Iterator> {
-    _abstract()
+    fatalError("unavailable function can't be called")
   }
 }
 
 extension LazyFilterCollection {
   @available(*, unavailable, renamed="iterator")
   public func generate() -> LazyFilterIterator<Base.Iterator> {
-    _abstract()
+    fatalError("unavailable function can't be called")
   }
 }
 

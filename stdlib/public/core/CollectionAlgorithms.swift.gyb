@@ -295,14 +295,14 @@ ${orderingRequirementForPredicate}
 extension ${Self} where Self.Iterator.Element : Comparable {
   @available(*, unavailable, renamed="sorted")
   public func sort() -> [Iterator.Element] {
-    _abstract()
+    fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, renamed="sorted")
   public func sort(
     @noescape isOrderedBefore: (Iterator.Element, Iterator.Element) -> Bool
   ) -> [Iterator.Element] {
-    _abstract()
+    fatalError("unavailable function can't be called")
   }
 }
 %end
@@ -314,7 +314,7 @@ extension MutableCollection
 
   @available(*, unavailable, renamed="sort")
   public mutating func sortInPlace() {
-    _abstract()
+    fatalError("unavailable function can't be called")
   }
 }
 
@@ -323,6 +323,6 @@ extension MutableCollection where Self.Index : RandomAccessIndex {
   public mutating func sortInPlace(
     @noescape isOrderedBefore: (Iterator.Element, Iterator.Element) -> Bool
   ) {
-    _abstract()
+    fatalError("unavailable function can't be called")
   }
 }

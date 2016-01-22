@@ -77,6 +77,6 @@ public struct EmptyGenerator<Element> {}
 extension EmptyIterator {
   @available(*, unavailable, renamed="iterator")
   public func generate() -> EmptyIterator<Element> {
-    _abstract()
+    fatalError("unavailable function can't be called")
   }
 }

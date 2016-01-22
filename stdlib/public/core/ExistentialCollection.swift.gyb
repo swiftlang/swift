@@ -680,7 +680,7 @@ public struct AnyGenerator<Element> {}
 extension AnyIterator {
   @available(*, unavailable, renamed="iterator")
   public func generate() -> AnyIterator<Element> {
-    _abstract()
+    fatalError("unavailable function can't be called")
   }
 }
 
@@ -689,7 +689,7 @@ extension Any${Kind} {
 
   @available(*, unavailable, message="Please use underestimatedCount property instead.")
   public var underestimateCount: Int {
-    _abstract()
+    fatalError("unavailable function can't be called")
   }
 }
 %end
@@ -700,6 +700,6 @@ public typealias AnyCollectionType = AnyCollectionProtocol
 extension AnyCollectionProtocol {
   @available(*, unavailable, renamed="iterator")
   public func generate() -> AnyIterator<Iterator.Element> {
-    _abstract()
+    fatalError("unavailable function can't be called")
   }
 }
