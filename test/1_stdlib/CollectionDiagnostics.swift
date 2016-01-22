@@ -373,3 +373,7 @@ func renamedAnyGenerator<G : GeneratorType>(g: G) {
   _ = anyGenerator { 1 } // expected-warning {{'anyGenerator' is deprecated: renamed to 'AnyGenerator'}} expected-note {{use 'AnyGenerator' instead}}
 }
 
+func deprecatedForwardCollectionPopLast<C: CollectionType where C.SubSequence == C>(c: C) {
+  var c = c
+  let _ = c.popLast() // expected-warning {{removed in Swift 3}}
+}
