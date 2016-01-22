@@ -46,7 +46,6 @@ We also intend to provide tools to detect inadvertent changes in interfaces.
   restructuring are still planned, including:
 
   * A discussion of back-dating, and how it usually is not allowed.
-  * A brief discussion of the implementation issues for fixed-layout value types with resilient members, and with non-public members.
   * A revisal of the discussion on fixed-layout classes.
   * A brief discussion of "deployment files", which represent distribution groupings that are themselves versioned. (For example, OS X 10.10.3 contains Foundation version 1153.20.) Deployment files are likely to provide a concrete implementation of "resilience domains".
   * A way to specify "minimum deployment libraries", like today's minimum deployment targets.
@@ -376,12 +375,12 @@ library is present. Inlineable functions have much the same constraints, except
 the inlineable function is the client and the entities being used may not be
 ``public``.
 
-Adding a versioning annotation to an ``internal`` member, top-level function,
-or global binding promises that the entity will be available at link time in
-the containing module's binary. This makes it safe to refer to such an entity
-from an inlineable function. If the entity is ever made ``public``, its
-availability should not be changed; not only is it safe for new clients to rely
-on it, but *existing* clients require its presence as well.
+Adding a versioning annotation to an ``internal`` entity promises that the
+entity will be available at link time in the containing module's binary. This
+makes it safe to refer to such an entity from an inlineable function. If the
+entity is ever made ``public``, its availability should not be changed; not
+only is it safe for new clients to rely on it, but *existing* clients require
+its presence as well.
 
 .. note::
 
@@ -392,6 +391,9 @@ on it, but *existing* clients require its presence as well.
 Because a versioned class member may eventually be made public, it must be
 assumed that new overrides may eventually appear from outside the module unless
 the member is marked ``final`` or the class is not publicly subclassable.
+
+Non-public conformances are never considered versioned, even if both the
+conforming type and the protocol are versioned.
 
 Entities declared ``private`` may not be versioned; the mangled name of such an
 entity includes an identifier based on the containing file, which means moving
@@ -407,15 +409,9 @@ code is reorganized, which is unacceptable.
     keep things simple we'll stick with the basics.
 
 We could do away with the entire feature if we restricted inlineable functions
-to only refer to public entities. However, this removes one of the primary
-reasons to make something inlineable: to allow efficient access to a type while
-still protecting its invariants.
-
-.. note::
-
-    Non-public *types* are not allowed to be versioned because that would have
-    many more ripple effects. It's not technically impossible; it just requires
-    a lot more thought. Similar logic applies to conformances.
+and fixed-layout structs to only refer to public entities. However, this
+removes one of the primary reasons to make something inlineable: to allow
+efficient access to a type while still protecting its invariants.
 
 
 Top-Level Variables and Constants
@@ -586,14 +582,64 @@ even ``private`` or ``internal`` ones. In effect:
   Adding any other new members is still permitted.
 - Existing instance properties may not be changed from stored to computed or
   vice versa.
-- Changing the body of any *existing* methods, initializers, or accessors is
-  permitted.
-- Adding or removing observing accessors from public stored properties is still
-  permitted.
+- Changing the body of any *existing* methods, initializers, or computed 
+  property accessors is permitted. Changing the body of a stored property
+  observing accessor is *not* permitted; more discussion below.
+- Adding or removing observing accessors from any stored properties (public or
+  non-public) is not permitted; more discussion below.
 - Removing stored instance properties is not permitted. Removing any other
   non-public members is still permitted.
 - Adding a new protocol conformance is still permitted.
 - Removing conformances to non-public protocols is still permitted.
+
+In addition, all fields of a ``@fixed_layout`` struct must have types that are
+*fixed-layout-compatible*, as described below:
+
+- A reference to a class instance.
+- A protocol or protocol composition, including ``Any``.
+- A metatype.
+- A function.
+- A tuple of fixed-layout-compatible types, including the empty tuple.
+- Another fixed-layout struct, which must be `versioned <versioned entity>`.
+- A `closed enum <#closed-enums>`_, which must be
+  `versioned <versioned entity>`.
+- (advanced) A struct or enum that is `versioned <versioned entity>`,
+  guaranteed `trivial`, and has a maximum size. See `Other Promises About
+  Types`_ below.
+
+A ``@fixed_layout`` struct is *not* guaranteed to use the same layout as a C
+struct with a similar "shape". If such a struct is necessary, it should be
+defined in a C header and imported into Swift.
+
+.. note::
+
+    We can add a *different* feature to control layout some day, or something
+    equivalent, but this feature should not restrict Swift from doing useful
+    things like minimizing member padding.
+
+All public stored properties in a fixed-layout struct are implicitly declared
+``@inlineable`` (as described above for top-level variables). Non-public
+stored properties may be accessed from inlineable functions only if they do not
+have observing accessors, even though they may not be versioned. This results
+in the restrictions on changing accessors described above.
+
+.. note::
+
+    It would be possible to say that a ``@fixed_layout`` struct only guarantees
+    the struct's total allocation size and how to copy it, while leaving all
+    property accesses to go through function calls. This would allow stored
+    properties to change their accessors, or (with the Behaviors proposal) to
+    change a behavior's implementation, or change from one behavior to another.
+    However, the *most common case* here is probably just a simple C-like
+    struct that groups together simple values, with only public stored
+    properties and no observing accessors, and having to opt into direct access
+    to those properties seems unnecessarily burdensome. The struct is being
+    declared ``@fixed_layout`` for a reason, after all: it's been discovered
+    that its use is causing performance issues.
+
+    Consequently, as a first pass we may just require all stored properties in
+    a ``@fixed_layout`` struct, public or non-public, to have trivial
+    accessors, i.e. no observing accessors and no behaviors.
 
 The ``@fixed_layout`` attribute takes a version number, just like
 ``@available``. This is so that clients can deploy against older versions of
@@ -604,18 +650,6 @@ were absent.)
 .. admonition:: TODO
 
     We really shouldn't care about the *order* of the stored properties.
-
-.. admonition:: TODO
-
-    Because observing accessors can still be added to public stored properties,
-    we don't get efficient setters unless they are also marked ``@inlineable``.
-    This seems suboptimal.
-
-.. admonition:: TODO
-
-    There are implementation concerns when the non-public fields do not have
-    public types. We probably just want to ban that configuration; otherwise,
-    clients will silently get slow performance copying the struct around.
 
 
 Fixed Properties
@@ -634,6 +668,8 @@ property remaining stored, by applying the ``@fixed`` attribute to the property.
     were spelled ``@fragile``, I would assume that accessors are permitted but
     they become inlineable, and so not having any accessors is just a
     degenerate case of that.
+    
+    Is ``@fixed`` any different from just ``@inlineable`` on a property?
 
 Like all other attributes in this section, the ``@fixed`` attribute must
 specify in which version of the library clients may rely on the property being
