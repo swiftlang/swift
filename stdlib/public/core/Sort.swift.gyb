@@ -364,8 +364,271 @@ public func sorted<
 ) -> [C.Generator.Element] {
   fatalError("unavailable function can't be called")
 }
+
+
+/// Performs a binary search in `from`..<`to` for the value at `val`,
+/// preserving the lower ordering of `val` in case of equal matches.
+///
+/// - Requires: The values in `from`..<`to` must already be in order.
+/// - Returns: The stable insertion point for the value in `val`.
+private func _stableSearchWithLower<
+  T${"" if p else ": Comparable"}
+>(
+  from: UnsafeMutablePointer<T>,
+  _ to: UnsafeMutablePointer<T>,
+  _ val: UnsafeMutablePointer<T> ${"," if p else ""}
+  ${"inout _ isOrderedBefore: (T, T) -> Bool" if p else ""}
+) -> UnsafeMutablePointer<T> {
+  var from = from
+  var count = to - from
+  while count > 0 {
+    let half = count / 2
+    let mid = from + half
+    if ${cmp("mid.memory", "val.memory", p)} {
+      from = mid + 1
+      count = count - half - 1
+    } else {
+      count = half
+    }
+  }
+  return from
+}
+
+/// Performs a binary search in `from`..<`to` for the value at `val`,
+/// preserving the upper ordering of `val` in case of equal matches.
+///
+/// - Requires: The values in `from`..<`to` must already be in order.
+/// - Returns: The stable insertion point for the value in `val`.
+private func _stableSearchWithUpper<
+  T${"" if p else ": Comparable"}
+>(
+  from: UnsafeMutablePointer<T>,
+  _ to: UnsafeMutablePointer<T>,
+  _ val: UnsafeMutablePointer<T> ${"," if p else ""}
+  ${"inout _ isOrderedBefore: (T, T) -> Bool" if p else ""}
+) -> UnsafeMutablePointer<T> {
+  var from = from
+  var count = to - from
+  while count > 0 {
+    let half = count / 2
+    let mid = from + half
+    if ${cmp("val.memory", "mid.memory", p)} {
+      count = half
+    } else {
+      from = mid + 1
+      count = count - half - 1
+    }
+  }
+  return from
+}
+
+/// Merges two consecutive, previously sorted ranges of elements.
+///
+/// The algorithm merges elements in place by choosing new pivots in the
+/// two ranges, such that elements between the lower pivot and the midpoint
+/// are ordered after the elements between the midpoint and the upper range.
+///
+/// For example:
+///
+///     var a = [1, 3, 5, 7, 9, 11, 13, 2, 4, 6, 8, 10]
+///              ~~~~~~~~~~~~~~~~~~~~~  ~~~~~~~~~~~~~~
+///     // (from, pivot, to) == (0, 7, 12)
+///     lowerPivot = 3     // value 7
+///     upperPivot = 9     // value 6
+///
+/// The elements in `lowerPivot`...`upperPivot` are then *rotated* so the
+/// original pivot element ends up at the position of `lowerPivot`:
+///
+///     _rotate(&a, lowerPivot, pivot, upperPivot)
+///     // a == [1, 3, 5, 2, 4, 6, 7, 9, 11, 13, 8, 10]
+///              ~~~~~~~  ~~~~~~~  ~~~~~~~~~~~~  ~~~~~
+///              ================  ===================
+///
+/// Finally, the two new pairs of consecutive, sorted ranges are merged
+/// recursively.
+///
+/// - Requires: The values in `from`..<`pivot` and `pivot`..<`to` must
+///   already be in order.
+private func _stableMerge<
+  T${"" if p else ": Comparable"}
+>(
+  from: UnsafeMutablePointer<T>,
+  _ pivot: UnsafeMutablePointer<T>,
+  _ to: UnsafeMutablePointer<T>,
+  _ lowerCount: Int,
+  _ upperCount: Int ${"," if p else ""}
+  ${"inout _ isOrderedBefore: (T, T) -> Bool" if p else ""}
+) {
+  switch (lowerCount, upperCount) {
+  // If one group has zero length, no merge needed
+  case (_, 0), (0, _):
+    return
+    
+  // Two elements might be flipped
+  case (1, 1):
+    if ${cmp("pivot.memory", "from.memory", p)} {
+      swap(&pivot.memory, &from.memory)
+    }
+    return
+  
+  // Three elements are trivial to merge
+  case (1, 2):
+    let upper = to - 1
+    if ${cmp("pivot.memory", "from.memory", p)} {
+      if !${cmp("upper.memory", "from.memory", p)} {    // 2 / 1, 3
+        swap(&pivot.memory, &from.memory)
+      } else {                                          // 3 / 1, 2
+        (from.memory, pivot.memory, upper.memory)
+          = (pivot.memory, upper.memory, from.memory)
+      }
+    }
+    return
+  case (2, 1):
+    let second = from + 1
+    if ${cmp("pivot.memory", "second.memory", p)} {
+      if !${cmp("pivot.memory", "from.memory", p)} {    // 1, 3 / 2
+        swap(&second.memory, &pivot.memory)
+      } else {                                          // 2, 3 / 1
+        (from.memory, second.memory, pivot.memory)
+          = (pivot.memory, from.memory, second.memory)
+      }
+    }
+    return
+  
+  default: break
+  }
+  
+  let lowerPivot: UnsafeMutablePointer<T>
+  let upperPivot: UnsafeMutablePointer<T>
+  let (lowerFirstCount, lowerSecondCount): (Int, Int)
+  
+  // The first pivot chosen will be in the middle of the larger range
+  if lowerCount > upperCount {
+    // Choose a new lower pivot in the middle of the lower range
+    lowerFirstCount = lowerCount / 2
+    lowerPivot = from + lowerFirstCount
+    // Find an upper pivot such that elements in the upper range below
+    // `upperPivot` are all ordered before the elements in the lower range
+    // *above* `lowerPivot`.
+    upperPivot = _stableSearchWithLower(pivot, to,
+                      lowerPivot ${", &isOrderedBefore" if p else ""})
+    lowerSecondCount = upperPivot - pivot
+  } else {
+    // Same as above, just reversed
+    lowerSecondCount = upperCount / 2
+    upperPivot = pivot + lowerSecondCount
+    lowerPivot = _stableSearchWithUpper(from, pivot,
+                      upperPivot ${", &isOrderedBefore" if p else ""})
+    lowerFirstCount = lowerPivot - from
+  }
+  
+  // Perform the rotation and adjust the midpoint
+  _rotate(lowerPivot, pivot, upperPivot)
+  let midpoint = lowerPivot + lowerSecondCount
+  
+  _stableMerge(from, lowerPivot, midpoint,
+        lowerFirstCount, lowerSecondCount ${", &isOrderedBefore" if p else ""})
+  _stableMerge(midpoint, upperPivot, to,
+        lowerCount - lowerFirstCount, upperCount - lowerSecondCount
+        ${", &isOrderedBefore" if p else ""})
+}
+
+/// Performs a stable sort on the elements in the range `from`..<`to`.
+///
+/// Smaller ranges are sorted via insertion sort, larger ranges are divided
+/// for sorting recursively, then the sorted pieces are merged.
+func _stableSortImpl<
+  T${"" if p else ": Comparable"}
+>(
+  from: UnsafeMutablePointer<T>,
+  _ to: UnsafeMutablePointer<T> ${"," if p else ""}
+  ${"inout _ isOrderedBefore: (T, T) -> Bool" if p else ""}
+) {
+  let count = to - from
+  
+  // Use an insertion sort for small runs
+  if count < 12 {
+    var buffer = UnsafeMutableBufferPointer(start: from, count: count)
+    _insertionSort(&buffer, buffer.indices ${", &isOrderedBefore" if p else ""})
+    return
+  }
+  
+  // Recursively sort the top and bottom halves
+  let middle = from + count / 2
+  _stableSortImpl(from, middle ${", &isOrderedBefore" if p else ""})
+  _stableSortImpl(middle, to ${", &isOrderedBefore" if p else ""})
+  
+  // Merge the top and bottom
+  _stableMerge(from, middle, to, middle - from, to - middle ${", &isOrderedBefore" if p else ""})
+}
+
+// A Swift implementation of a Java port of the STL's stable sort
+// via http://thomas.baudel.name/Visualisation/VisuTri/inplacestablesort.html
+
+/// Performs a stable sort on the elements in the range `from`..<`to`.
+func _stableSort<
+  T${"" if p else ": Comparable"}
+>(
+  from: UnsafeMutablePointer<T>,
+  _ to: UnsafeMutablePointer<T> ${"," if p else ""}
+  ${"_ isOrderedBefore: (T, T) -> Bool" if p else ""}
+) {
+% if p:
+  var comp = isOrderedBefore
+% end
+  _stableSortImpl(from, to ${", &comp" if p else ""})
+}
+
 % end
 // for p in preds
+
+/// Returns the greatest common denominator for `m` and `n`.
+private func _gcd (m: Int, _ n: Int) -> Int {
+  var (m, n) = (m, n)
+  while n != 0 {
+    let t = m % n
+    m = n
+    n = t
+  }
+  return m
+}
+
+/// Rotates the contents of memory in `from`..<`to` left so that the
+/// value at `mid` is now at `from`. Lower elements wrap back to the upper
+/// end of the range.
+///
+/// For example:
+///
+///     var a = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+///     a.withUnsafeMutableBufferPointer { b in
+///       let from = b.baseAddress
+///       _rotate(from, from + 3, from + b.count)
+///     }
+///     // a == [4, 5, 6, 7, 8, 9, 10, 1, 2, 3]
+private func _rotate<T>(
+  from: UnsafeMutablePointer<T>,
+  _ mid: UnsafeMutablePointer<T>,
+  _ to: UnsafeMutablePointer<T>
+) {
+  if from == mid || mid == to { return }
+  var n = _gcd(to - from, mid - from)
+  while n != 0 {
+    n -= 1
+    let val = (from + n).memory
+    let shift = mid - from
+    var (p1, p2) = (from + n, from + n + shift)
+    while p2 != from + n {
+      p1.memory = p2.memory
+      p1 = p2
+      if to - p2 > shift {
+        p2 += shift
+      } else {
+        p2 = from + (shift - (to - p2))
+      }
+    }
+    p1.memory = val
+  }
+}
 
 /// Exchange the values of `a` and `b`.
 ///

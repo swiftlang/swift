@@ -262,9 +262,8 @@ ${orderingRequirementForComparable}
     let didSortUnsafeBuffer: Void? =
       _withUnsafeMutableBufferPointerIfSupported {
       (baseAddress, count) -> Void in
-      var bufferPointer =
-        UnsafeMutableBufferPointer(start: baseAddress, count: count)
-      bufferPointer.sortInPlace()
+      let endAddress = baseAddress + count
+      _stableSort(baseAddress, endAddress)
       return ()
     }
     if didSortUnsafeBuffer == nil {
@@ -290,9 +289,8 @@ ${orderingRequirementForPredicate}
     let didSortUnsafeBuffer: Void? =
       _withUnsafeMutableBufferPointerIfSupported {
       (baseAddress, count) -> Void in
-      var bufferPointer =
-        UnsafeMutableBufferPointer(start: baseAddress, count: count)
-      bufferPointer.sortInPlace(escapableIsOrderedBefore)
+      let endAddress = baseAddress + count
+      _stableSort(baseAddress, endAddress, escapableIsOrderedBefore)
       return ()
     }
     if didSortUnsafeBuffer == nil {
@@ -300,4 +298,3 @@ ${orderingRequirementForPredicate}
     }
   }
 }
-
