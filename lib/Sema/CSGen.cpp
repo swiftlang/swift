@@ -2092,7 +2092,7 @@ namespace {
           outputTy = fnType->getResult();
         }
       } else if (auto TE = dyn_cast<TypeExpr>(fnExpr)) {
-        outputTy = TE->getType()->getAs<MetatypeType>()->getInstanceType();
+        outputTy = TE->getInstanceType();
         NominalTypeDecl *NTD = nullptr;
         
         if (auto nominalType = outputTy->getAs<NominalType>()) {

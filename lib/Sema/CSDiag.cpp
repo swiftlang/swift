@@ -1089,7 +1089,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
 
   if (auto TE = dyn_cast<TypeExpr>(fn)) {
     // It's always a metatype type, so use the instance type name.
-    auto instanceType =TE->getInstanceType();
+    auto instanceType = TE->getInstanceType();
     
     // TODO: figure out right value for isKnownPrivate
     if (!instanceType->getAs<TupleType>()) {

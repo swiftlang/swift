@@ -105,8 +105,7 @@ Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
   // sugar on it.  If so, propagate the sugar to the curried result function
   // type.
   if (isa<ConstructorRefCallExpr>(E) && isa<TypeExpr>(E->getArg())) {
-    auto resultSugar =
-      E->getArg()->getType()->castTo<MetatypeType>()->getInstanceType();
+    auto resultSugar = cast<TypeExpr>(E->getArg())->getInstanceType();
 
     // The result of this apply is "(args) -> T" where T is the type being
     // constructed.  Apply the sugar onto it.
