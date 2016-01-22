@@ -134,7 +134,7 @@ version of the library where the entity may be used.
   a declaration in Swift, because a client may depend on them
   See `New Conformances`_, below.
 
-Code within a library may always use all other entities declared within the
+Code within a library may generally use all other entities declared within the
 library (barring their own availability checks), since the entire library is
 shipped as a unit. That is, even if a particular API was introduced in v1.0,
 its (non-public) implementation may refer to APIs introduced in later versions.
@@ -220,8 +220,8 @@ Anything *not* listed in this document should be assumed unsafe.
 Top-Level Functions
 ~~~~~~~~~~~~~~~~~~~
 
-A public top-level function is fairly restricted in how it can be changed. The
-following changes are permitted:
+A versioned top-level function is fairly restricted in how it can be changed.
+The following changes are permitted:
 
 - Changing the body of the function.
 - Changing *internal* parameter names (i.e. the names used within the function
@@ -246,11 +246,11 @@ following changes are permitted:
 
 No other changes are permitted; the following are particularly of note:
 
-- A public function may not change its parameters or return type.
-- A public function may not change its generic requirements.
-- A public function may not change its external parameter names (labels).
-- A public function may not add, remove, or reorder parameters, whether or not
-  they have default values.
+- A versioned function may not change its parameters or return type.
+- A versioned function may not change its generic requirements.
+- A versioned function may not change its external parameter names (labels).
+- A versioned function may not add, remove, or reorder parameters, whether or
+  not they have default values.
 
 .. admonition:: TODO
 
@@ -277,7 +277,7 @@ are a few common reasons for this:
   allows the library author to preserve invariants while still allowing
   efficient access to the struct.
 
-A public function marked with the ``@inlineable`` attribute makes its body
+A versioned function marked with the ``@inlineable`` attribute makes its body
 available to clients as part of the module's public interface. The
 ``@inlineable`` attribute takes a version number, just like ``@available``;
 clients may not assume that the body of the function is suitable when deploying
@@ -388,7 +388,7 @@ its presence as well.
     imply everything that ``public`` does, such as requiring overrides to be
     ``public``.
 
-Because a versioned class member may eventually be made public, it must be
+Because a versioned class member may eventually be made ``public``, it must be
 assumed that new overrides may eventually appear from outside the module unless
 the member is marked ``final`` or the class is not publicly subclassable.
 
@@ -417,13 +417,13 @@ efficient access to a type while still protecting its invariants.
 Top-Level Variables and Constants
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Given a public module-scope variable declared with ``var``, the following
+Given a versioned module-scope variable declared with ``var``, the following
 changes are permitted:
 
 - Adding (but not removing) a public setter to a computed variable.
-- Adding or removing a non-public setter.
+- Adding or removing a non-public, non-versioned setter.
 - Changing from a stored variable to a computed variable, or vice versa, as
-  long as a previously-public setter is not removed.
+  long as a previously-versioned setter is not removed.
 - Changing the body of an accessor.
 - Adding or removing an observing accessor (``willSet`` or ``didSet``) to/from
   an existing variable. This is effectively the same as modifying the body of a
@@ -463,8 +463,8 @@ Giving Up Flexibility
 Both top-level constants and variables can be marked ``@inlineable`` to allow
 clients to access them more efficiently. This restricts changes a fair amount:
 
-- Adding a public setter to a computed variable is still permitted.
-- Adding or removing a non-public setter is still permitted.
+- Adding a versioned setter to a computed variable is still permitted.
+- Adding or removing a non-public, non-versioned setter is still permitted.
 - Changing from stored to computed or vice versa is forbidden, because it would
   break existing clients.
 - Changing the body of an accessor is permitted but discouraged; existing
@@ -510,7 +510,7 @@ the following changes are permitted:
 - Adding or removing an observing accessor (``willSet`` or ``didSet``) to/from
   an existing property. This is effectively the same as modifying the body of a
   setter.
-- Removing any non-public members, including stored properties.
+- Removing any non-public, non-versioned members, including stored properties.
 - Adding a new protocol conformance (with proper availability annotations).
 - Removing conformances to non-public protocols.
 
@@ -588,7 +588,7 @@ even ``private`` or ``internal`` ones. In effect:
 - Adding or removing observing accessors from any stored properties (public or
   non-public) is not permitted; more discussion below.
 - Removing stored instance properties is not permitted. Removing any other
-  non-public members is still permitted.
+  non-public, non-versioned members is still permitted.
 - Adding a new protocol conformance is still permitted.
 - Removing conformances to non-public protocols is still permitted.
 
@@ -617,11 +617,11 @@ defined in a C header and imported into Swift.
     equivalent, but this feature should not restrict Swift from doing useful
     things like minimizing member padding.
 
-All public stored properties in a fixed-layout struct are implicitly declared
-``@inlineable`` (as described above for top-level variables). Non-public
-stored properties may be accessed from inlineable functions only if they do not
-have observing accessors, even though they may not be versioned. This results
-in the restrictions on changing accessors described above.
+All versioned stored properties in a fixed-layout struct are implicitly
+declared ``@inlineable`` (as described above for top-level variables).
+Non-versioned stored properties may be accessed from inlineable functions only
+if they do not have observing accessors. These rules are the source of the
+restrictions on modifying accessors described above.
 
 .. note::
 
@@ -702,9 +702,9 @@ accommodate new values. More specifically, the following changes are permitted:
   an enum is RawRepresentable, changing the raw representations of cases may
   break existing clients who use them for serialization.
 - Adding a raw type to an enum that does not have one.
-- Removing a non-public case.
+- Removing a non-public, non-versioned case.
 - Adding any other members.
-- Removing any non-public members.
+- Removing any non-public, non-versioned members.
 - Adding a new protocol conformance (with proper availability annotations).
 - Removing conformances to non-public protocols.
 
@@ -730,30 +730,31 @@ accommodate new values. More specifically, the following changes are permitted:
 Closed Enums
 ------------
 
-A library owner may opt out of this flexibility by marking the enum as
-``@closed``. A "closed" enum may not have any ``private`` or ``internal`` cases
-and may not add new cases in the future. This guarantees to clients that the
-enum cases are exhaustive. In particular:
+A library owner may opt out of this flexibility by marking a versioned enum as
+``@closed``. A "closed" enum may not have any cases with less access than the
+enum itself, and may not add new cases in the future. This guarantees to
+clients that the enum cases are exhaustive. In particular:
 
 - Adding new cases is not permitted
 - Reordering existing cases is not permitted.
 - Adding a raw type to an enum that does not have one is still permitted.
 - Removing a non-public case is not applicable.
 - Adding any other members is still permitted.
-- Removing any non-public members is still permitted.
+- Removing any non-public, non-versioned members is still permitted.
 - Adding a new protocol conformance is still permitted.
 - Removing conformances to non-public protocols is still permitted.
 
 .. note::
 
-    Were a "closed" enum allowed to have non-public cases, clients of the
-    library would still have to treat the enum as opaque and would still have
-    to be able to handle unknown cases in their ``switch`` statements.
+    Were a public "closed" enum allowed to have non-public cases, clients of
+    the library would still have to treat the enum as opaque and would still
+    have to be able to handle unknown cases in their ``switch`` statements.
 
 The ``@closed`` attribute takes a version number, just like ``@available``.
 This is so that clients can deploy against older versions of the library, which
 may have non-public cases in the enum. (In this case the client must manipulate
-the enum as if the ``@closed`` attribute were absent.)
+the enum as if the ``@closed`` attribute were absent.) All cases that are not
+versioned become implicitly versioned with this number.
 
 Even for default "open" enums, adding new cases should not be done lightly. Any
 clients attempting to do an exhaustive switch over all enum cases will likely
@@ -778,8 +779,8 @@ There are very few safe changes to make to protocols:
 - A new optional requirement may be added to an ``@objc`` protocol.
 - All members may be reordered, including associated types.
 
-However, any members may be added to protocol extensions, and non-public
-members may always be removed from protocol extensions.
+However, any members may be added to protocol extensions, and non-public,
+non-versioned members may always be removed from protocol extensions.
 
 .. admonition:: TODO
 
@@ -805,7 +806,7 @@ support all of the following changes:
 - Adding or removing an observing accessor (``willSet`` or ``didSet``) to/from
   an existing property. This is effectively the same as modifying the body of a
   setter.
-- Removing any non-public members, including stored properties.
+- Removing any non-public, non-versioned members, including stored properties.
 - Adding a new protocol conformance (with proper availability annotations).
 - Removing conformances to non-public protocols.
 
@@ -905,7 +906,7 @@ are permitted:
   as both extensions have the exact same constraints.
 - Adding any new member.
 - Reordering members.
-- Removing any non-public member.
+- Removing any non-public, non-versioned member.
 - Changing the body of any methods, initializers, or accessors.
 
 
@@ -991,11 +992,11 @@ containing library is the version attached to the ``@inlineable`` attribute.
 Code within this context must be treated as if the containing library were just
 a normal dependency.
 
-A publicly inlineable function still has a public symbol, which may be used
-when the function is referenced from a client rather than called. This version
-of the function is not subject to the same restrictions as the version that
-may be inlined, and so it may be desirable to compile a function twice: once
-for inlining, once for maximum performance.
+A versioned inlineable function still has an exported symbol in the library
+binary, which may be used when the function is referenced from a client rather
+than called. This version of the function is not subject to the same
+restrictions as the version that may be inlined, and so it may be desirable to
+compile a function twice: once for inlining, once for maximum performance.
 
 
 Local Availability Contexts
@@ -1074,9 +1075,9 @@ check their work. Therefore, we intend to ship a tool that can compare two
 versions of a library's public interface, and present any suspect differences
 for verification. Important cases include but are not limited to:
 
-- Removal of public entities.
+- Removal of versioned entities.
 
-- Incompatible modifications to public entities, such as added protocol
+- Incompatible modifications to versioned entities, such as added protocol
   conformances lacking versioning information.
 
 - Unsafely-backdated "fragile" attributes as discussed in the `Giving Up
