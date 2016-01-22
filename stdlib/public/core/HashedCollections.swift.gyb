@@ -281,7 +281,7 @@ internal struct _UnmanagedAnyObjectArray {
 /// The order of elements in a set is stable between mutations but
 /// otherwise unpredictable.
 public struct Set<Element : Hashable> :
-  Hashable, Collection, ArrayLiteralConvertible {
+  SetAlgebra, Hashable, Collection, ArrayLiteralConvertible {
 
   internal typealias _Self = Set<Element>
   internal typealias _VariantStorage = _VariantSetStorage<Element>
@@ -473,9 +473,8 @@ public struct Set<Element : Hashable> :
     S : Sequence where S.Iterator.Element == Element
   >(possibleSuperset: S) -> Bool {
     // FIXME(performance): isEmpty fast path, here and elsewhere.
-    let other = possibleSuperset as? Set<Element> ?? Set(possibleSuperset)
-    let (isSubset, isEqual) = _compareSets(self, other)
-    return isSubset || isEqual
+    let other = Set(possibleSuperset)
+    return isSubsetOf(other)
   }
 
   /// Returns `true` iff `possibleStrictSuperset` contains every member
@@ -485,10 +484,8 @@ public struct Set<Element : Hashable> :
     S : Sequence where S.Iterator.Element == Element
   >(possibleStrictSuperset: S) -> Bool {
     // FIXME: code duplication.
-    let other =
-      possibleStrictSuperset as? Set<Element> ?? Set(possibleStrictSuperset)
-    let (isSubset, isEqual) = _compareSets(self, other)
-    return isSubset && !isEqual
+    let other = Set(possibleStrictSuperset)
+    return isStrictSubsetOf(other)
   }
 
   /// Returns `true` iff `self` contains every element of `possibleSubset`.
@@ -498,7 +495,7 @@ public struct Set<Element : Hashable> :
   >(possibleSubset: S) -> Bool {
     // FIXME(performance): Don't build a set; just ask if every element is in
     // `self`.
-    let other = possibleSubset as? Set<Element> ?? Set(possibleSubset)
+    let other = Set(possibleSubset)
     return other.isSubsetOf(self)
   }
 
@@ -508,7 +505,7 @@ public struct Set<Element : Hashable> :
   public func isStrictSupersetOf<
     S : Sequence where S.Iterator.Element == Element
   >(possibleStrictSubset: S) -> Bool {
-    let other = possibleStrictSubset as? Set<Element> ?? Set(possibleStrictSubset)
+    let other = Set(possibleStrictSubset)
     return other.isStrictSubsetOf(self)
   }
 
@@ -518,13 +515,8 @@ public struct Set<Element : Hashable> :
     S : Sequence where S.Iterator.Element == Element
   >(other: S) -> Bool {
     // FIXME(performance): Don't need to build a set.
-    let other = other as? Set<Element> ?? Set(other)
-    for member in self {
-      if other.contains(member) {
-        return false
-      }
-    }
-    return true
+    let otherSet = Set(other)
+    return isDisjointWith(otherSet)
   }
 
   // APINAMING: should we say which one wins if an element appears twice?
@@ -553,6 +545,12 @@ public struct Set<Element : Hashable> :
   public func subtract<
     S : Sequence where S.Iterator.Element == Element
   >(other: S) -> Set<Element> {
+    return _subtract(other)
+  }
+
+  internal func _subtract<
+    S : Sequence where S.Iterator.Element == Element
+  >(other: S) -> Set<Element> {
     var newSet = self
     newSet.subtractInPlace(other)
     return newSet
@@ -560,6 +558,12 @@ public struct Set<Element : Hashable> :
 
   /// Remove the elements of `other` from `self`.
   public mutating func subtractInPlace<
+    S : Sequence where S.Iterator.Element == Element
+  >(other: S) {
+    _subtractInPlace(other)
+  }
+
+  internal mutating func _subtractInPlace<
     S : Sequence where S.Iterator.Element == Element
   >(other: S) {
     for item in other {
@@ -572,14 +576,8 @@ public struct Set<Element : Hashable> :
   public func intersect<
     S : Sequence where S.Iterator.Element == Element
   >(other: S) -> Set<Element> {
-    let other = other as? Set<Element> ?? Set(other)
-    var newSet = Set<Element>()
-    for member in self {
-      if other.contains(member) {
-        newSet.insert(member)
-      }
-    }
-    return newSet
+    let otherSet = Set(other)
+    return intersect(otherSet)
   }
 
   /// Remove any members not contained in `other`.
@@ -617,14 +615,8 @@ public struct Set<Element : Hashable> :
   public mutating func exclusiveOrInPlace<
     S : Sequence where S.Iterator.Element == Element
   >(other: S) {
-    let other = other as? Set<Element> ?? Set(other)
-    for member in other {
-      if contains(member) {
-        remove(member)
-      } else {
-        insert(member)
-      }
-    }
+    let otherSet = Set(other)
+    exclusiveOrInPlace(otherSet)
   }
 
   public var hashValue: Int {
@@ -4183,6 +4175,83 @@ extension ${Self} {
 #endif
 
 %end
+
+extension Set {
+  /// Removes all elements of `other` from `self`.
+  ///
+  /// - Equivalent to replacing `self` with `self.subtract(other)`.
+  public mutating func subtractInPlace(other: Set<Element>) {
+    _subtractInPlace(other)
+  }
+
+  /// Returns true iff every element of `self` is contained in `other`.
+  @warn_unused_result
+  public func isSubsetOf(other: Set<Element>) -> Bool {
+    let (isSubset, isEqual) = _compareSets(self, other)
+    return isSubset || isEqual
+  }
+
+  /// Returns true iff every element of `other` is contained in `self`.
+  @warn_unused_result
+  public func isSupersetOf(other: Set<Element>) -> Bool {
+    return other.isSubsetOf(self)
+  }
+
+  /// Returns true iff `self.intersect(other).isEmpty`.
+  @warn_unused_result
+  public func isDisjointWith(other: Set<Element>) -> Bool {
+    for member in self {
+      if other.contains(member) {
+        return false
+      }
+    }
+    return true
+  }
+
+  /// Returns the set of elements contained in `self` but not in `other`.
+  @warn_unused_result
+  public func subtract(other: Set<Element>) -> Set<Element> {
+    return _subtract(other)
+  }
+
+  /// Returns true iff every element of `other` is contained in `self`
+  /// and `self` contains an element that is not contained in `other`.
+  @warn_unused_result
+  public func isStrictSupersetOf(other: Set<Element>) -> Bool {
+    return self.isSupersetOf(other) && self != other
+  }
+
+  /// Return true iff every element of `self` is contained in `other`
+  /// and `other` contains an element that is not contained in `self`.
+  @warn_unused_result
+  public func isStrictSubsetOf(other: Set<Element>) -> Bool {
+    return other.isStrictSupersetOf(self)
+  }
+
+  /// Return the members of `self` contained in `other`.
+  @warn_unused_result
+  public func intersect(other: Set<Element>) -> Set<Element> {
+    var newSet = Set<Element>()
+    for member in self {
+      if other.contains(member) {
+        newSet.insert(member)
+      }
+    }
+    return newSet
+  }
+
+  /// Replace `self` with the elements contained in `self` or `other`,
+  /// but not both.
+  public mutating func exclusiveOrInPlace(other: Set<Element>) {
+    for member in other {
+      if contains(member) {
+        remove(member)
+      } else {
+        insert(member)
+      }
+    }
+  }
+}
 
 extension Set {
   @available(*, unavailable, renamed="removeAt")
