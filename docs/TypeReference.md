@@ -1,12 +1,12 @@
 # Symbolic Type References
 
-*Symbolic type references* are compact represenations containing the
+*Symbolic type references* are compact representations containing the
 minimum amount of information about type relationships primarily for the
 purposes of reflection.
 
 ## Encoding
 
-Thees are encoded with a mostly textual mangling. Single characters
+These are encoded with a mostly textual mangling. Single characters
 denote the start of a mangling node but 32-bit integers can also be
 directly embedded.
 
@@ -16,7 +16,7 @@ typeref-symbol ::= prefix typeref
 typeref ::= 'b' relative-offset-to-name                          // Builtin type
 typeref ::= 'n' relative-offset-to-metadata                      // Internal nominal type
 typeref ::= 'N' relative-offset-to-name                          // External nominal type
-typeref ::= 'g' relative-offset-to-metadata count typeref-list   // Internal nound generic type
+typeref ::= 'g' relative-offset-to-metadata count typeref-list   // Internal bound generic type
 typeref ::= 'G' relative-offset-to-name count typeref-list       // External bound generic type
 typeref ::= '?' index depth                                      // Generic parameter
 typeref ::= 't' num-elements typeref-list                        // Tuple type
@@ -25,7 +25,7 @@ typeref ::= 'p' has-class-constrained-flag? count protocol-list  // Protocol com
 typeref ::= 'm' typeref                                          // Metatype
 typeref ::= 'e' count protocol-list                              // Existential metatype
 
-has-class-constrainged-flag ::= 'c'
+has-class-constrained-flag ::= 'c'
 
 func-representation ::= 't' // Thin
 func-representation ::= 'T' // Thick
