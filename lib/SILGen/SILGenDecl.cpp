@@ -1135,14 +1135,6 @@ void SILGenModule::emitExternalWitnessTable(ProtocolConformance *c) {
 void SILGenModule::emitExternalDefinition(Decl *d) {
   switch (d->getKind()) {
   case DeclKind::Func: {
-    auto fd = cast<FuncDecl>(d);
-    // FIXME: rdar://problem/24287125 causes us to emit some property accessors
-    // more than once. As a minimal workaround, skip emitting the function if
-    // the SILFunction for it already exists.
-    if (auto existing = getEmittedFunction(SILDeclRef(fd), NotForDefinition))
-      if (!existing->empty())
-        break;
-    
     emitFunction(cast<FuncDecl>(d));
     break;
   }
