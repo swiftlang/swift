@@ -2894,7 +2894,8 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
       return true;
     }
 
-    if (isUnresolvedOrTypeVarType(exprType))
+    if (isUnresolvedOrTypeVarType(exprType) ||
+        exprType->isEqual(contextualType))
       return false;
       
     // The conversion destination of throw is always ErrorType (at the moment)
@@ -2960,9 +2961,10 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
   }
   
   // If we don't have a type for the expression, then we cannot use it in
-  // conversion constraint diagnostic generation.
-  if (isUnresolvedOrTypeVarType(exprType)) {
-    // We can't do anything smart.
+  // conversion constraint diagnostic generation.  If the types match, then it
+  // must not be the contextual type that is the problem.
+  if (isUnresolvedOrTypeVarType(exprType) ||
+      exprType->isEqual(contextualType)) {
     return false;
   }
   
