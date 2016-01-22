@@ -62,7 +62,7 @@ class SwiftBenchHarness:
 
   def log(self, str, level):
     if self.verboseLevel >= level:
-      for i in range(1,level):
+      for _ in range(1, level):
         sys.stdout.write('  ')
       print(str)
 
@@ -300,7 +300,7 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
       return
     samples = []
     self.log("Running bench: %s, numsamples: %d" % (name, numSamples), 2)
-    for i in range(0,numSamples):
+    for _ in range(0, numSamples):
       try:
         r = self.runCommand([self.tests[name].binary, str(iterScale),
                              self.tests[name].name])
