@@ -773,16 +773,23 @@ bool ConstraintGraph::contractEdges() {
         // wrapper for the argument type.
         if (kind == ConstraintKind::BindParam) {
           auto node = tyvar1->getImpl().getGraphNode();
-          auto hasStrictSubtypeConstraint = false;
+          auto hasDependentConstraint = false;
 
           for (auto t1Constraint : node->getConstraints()) {
             if (isStrictInoutSubtypeConstraint(t1Constraint)) {
-              hasStrictSubtypeConstraint = true;
+              hasDependentConstraint = true;
+              break;
+            }
+            // TODO: Temporarily inhibit contraction for chained param binding
+            // constraints. (E.g., "$0 == $0")
+            if (t1Constraint != constraint &&
+                t1Constraint->getKind() == ConstraintKind::BindParam) {
+              hasDependentConstraint = true;
               break;
             }
           }
 
-          if (hasStrictSubtypeConstraint)
+          if (hasDependentConstraint)
             continue;
         }
 
