@@ -369,8 +369,8 @@ static bool diagnoseOperatorJuxtaposition(UnresolvedDeclRefExpr *UDRE,
     // Perform name lookup for the first and second pieces.  If either fail to
     // be found, then it isn't a valid split.
     NameLookupOptions LookupOptions = defaultUnqualifiedLookupOptions;
-    if (isa<AbstractFunctionDecl>(DC))
-      LookupOptions |= NameLookupFlags::KnownPrivate;
+    // This is only used for diagnostics, so always use KnownPrivate.
+    LookupOptions |= NameLookupFlags::KnownPrivate;
     auto startLookup = TC.lookupUnqualified(DC, startName, UDRE->getLoc(),
                                        LookupOptions);
     if (!startLookup) continue;
