@@ -16,6 +16,14 @@ func return_local_generic_function_without_captures<A, R>() -> A -> R {
   return f
 }
 
+func return_local_generic_function_with_captures<A, R>(a: A) -> A -> R {
+  func f(_: A) -> R {
+    _ = a
+  }
+
+  return f
+}
+
 // CHECK-LABEL: sil hidden @_TF8closures17read_only_capture
 func read_only_capture(x: Int) -> Int {
   var x = x

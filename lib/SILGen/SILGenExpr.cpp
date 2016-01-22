@@ -442,14 +442,22 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
 
   // Get the lowered AST types:
   //  - the original type
-  auto origLoweredFormalType = AbstractionPattern(constantInfo.LoweredType);
+  auto origLoweredFormalType =
+      AbstractionPattern(constantInfo.LoweredInterfaceType);
   if (hasLocalCaptures) {
-    auto formalTypeWithoutCaptures =
-      cast<AnyFunctionType>(constantInfo.FormalType.getResult());
+    // Get the unlowered formal type of the constant, stripping off
+    // the first level of function application, which applies captures.
+    origLoweredFormalType =
+      AbstractionPattern(constantInfo.FormalInterfaceType)
+          .getFunctionResultType();
+
+    // Lower it, being careful to use the right generic signature.
     origLoweredFormalType =
       AbstractionPattern(
-              SGM.Types.getLoweredASTFunctionType(formalTypeWithoutCaptures,0,
-                                                  silDeclRef));
+          origLoweredFormalType.getGenericSignature(),
+          SGM.Types.getLoweredASTFunctionType(
+              cast<FunctionType>(origLoweredFormalType.getType()),
+              0, silDeclRef));
   }
 
   // - the substituted type
