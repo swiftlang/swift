@@ -456,9 +456,8 @@ collectIndicesFromParameters(SILGenFunction &gen, SILLocation loc,
   return result;
 }
 
-static AnyFunctionType *getMaterializeForSetCallbackType(ASTContext &ctx,
-                                                         Type selfType,
-                                            GenericParamList *genericParams) {
+static FunctionType *getMaterializeForSetCallbackType(ASTContext &ctx,
+                                                      Type selfType) {
   //       (inout storage: Builtin.ValueBuffer,
   //        inout self: Self,
   //        @thick selfType: Self.Type) -> ()
@@ -473,11 +472,7 @@ static AnyFunctionType *getMaterializeForSetCallbackType(ASTContext &ctx,
   FunctionType::ExtInfo extInfo = FunctionType::ExtInfo()
                      .withRepresentation(FunctionType::Representation::Thin);
 
-  if (genericParams) {
-    return PolymorphicFunctionType::get(input, result, genericParams, extInfo);
-  } else {
-    return FunctionType::get(input, result, extInfo);
-  }
+  return FunctionType::get(input, result, extInfo);
 }
 
 static Type getSelfTypeForCallbackDeclaration(FuncDecl *witness) {
@@ -508,8 +503,7 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F, GeneratorF
                         /*discriminator*/ 0,
                         /*context*/ Witness);
     closure.setType(getMaterializeForSetCallbackType(ctx,
-                                 getSelfTypeForCallbackDeclaration(Witness),
-                                                     nullptr));
+                                 getSelfTypeForCallbackDeclaration(Witness)));
     closure.getCaptureInfo().setGenericParamCaptures(true);
 
     Mangle::Mangler mangler;
