@@ -36,10 +36,10 @@ public struct LazyFilterIterator<
   /// Creates an instance that produces the elements `x` of `base`
   /// for which `predicate(x) == true`.
   internal init(
-    _ base: Base,
+    _base: Base,
     whereElementsSatisfy predicate: (Base.Element) -> Bool
   ) {
-    self._base = base
+    self._base = _base
     self._predicate = predicate
   }
 
@@ -66,7 +66,7 @@ public struct LazyFilterSequence<Base : Sequence>
   /// - Complexity: O(1).
   public func iterator() -> LazyFilterIterator<Base.Iterator> {
     return LazyFilterIterator(
-      base.iterator(), whereElementsSatisfy: _include)
+      _base: base.iterator(), whereElementsSatisfy: _include)
   }
 
   /// Creates an instance consisting of the elements `x` of `base` for
@@ -166,10 +166,10 @@ public struct LazyFilterCollection<
   /// satisfy `predicate`.
   public // @testable
   init(
-    _ base: Base,
+    _base: Base,
     whereElementsSatisfy predicate: (Base.Iterator.Element) -> Bool
   ) {
-    self._base = base
+    self._base = _base
     self._predicate = predicate
   }
 
@@ -216,7 +216,7 @@ public struct LazyFilterCollection<
   /// - Complexity: O(1).
   public func iterator() -> LazyFilterIterator<Base.Iterator> {
     return LazyFilterIterator(
-      _base.iterator(), whereElementsSatisfy: _predicate)
+      _base: _base.iterator(), whereElementsSatisfy: _predicate)
   }
 
   var _base: Base
@@ -251,14 +251,32 @@ extension LazyCollectionProtocol {
     predicate: (Elements.Iterator.Element) -> Bool
   ) -> LazyFilterCollection<Self.Elements> {
     return LazyFilterCollection(
-      self.elements, whereElementsSatisfy: predicate)
+      _base: self.elements, whereElementsSatisfy: predicate)
   }
 }
 
 @available(*, unavailable, renamed="LazyFilterIterator")
 public struct LazyFilterGenerator<Base : IteratorProtocol> {}
 
+extension LazyFilterIterator {
+  @available(*, unavailable, message="use '.lazy.filter' on the sequence")
+  public init(
+    _ base: Base,
+    whereElementsSatisfy predicate: (Base.Element) -> Bool
+  ) {
+    fatalError("unavailable function can't be called")
+  }
+}
+
 extension LazyFilterSequence {
+  @available(*, unavailable, message="use '.lazy.filter' on the sequence")
+  public init(
+    _ base: Base,
+    whereElementsSatisfy predicate: (Base.Iterator.Element) -> Bool
+  ) {
+    fatalError("unavailable function can't be called")
+  }
+
   @available(*, unavailable, renamed="iterator")
   public func generate() -> LazyFilterIterator<Base.Iterator> {
     fatalError("unavailable function can't be called")
@@ -266,6 +284,14 @@ extension LazyFilterSequence {
 }
 
 extension LazyFilterCollection {
+  @available(*, unavailable, message="use '.lazy.filter' on the collection")
+  public init(
+    _ base: Base,
+    whereElementsSatisfy predicate: (Base.Iterator.Element) -> Bool
+  ) {
+    fatalError("unavailable function can't be called")
+  }
+
   @available(*, unavailable, renamed="iterator")
   public func generate() -> LazyFilterIterator<Base.Iterator> {
     fatalError("unavailable function can't be called")

@@ -52,10 +52,10 @@ extension LazyFilterCollection where Base : TestProtocol1 {
 }
 
 FilterTests.test("filtering collections") {
-  let f0 = LazyFilterCollection(0..<30) { $0 % 7 == 0 }
+  let f0 = LazyFilterCollection(_base: 0..<30) { $0 % 7 == 0 }
   expectEqualSequence([0, 7, 14, 21, 28], f0)
 
-  let f1 = LazyFilterCollection(1..<30) { $0 % 7 == 0 }
+  let f1 = LazyFilterCollection(_base: 1..<30) { $0 % 7 == 0 }
   expectEqualSequence([7, 14, 21, 28], f1)
 }
 
