@@ -2662,6 +2662,9 @@ WARNING(extraneous_default_args_in_call, none,
 WARNING(swift3_migration_rename, none,
         "%0 has been renamed %1 in Swift 3", (DeclName, DeclName))
 
+WARNING(swift3_migration_to_property, none,
+        "%0 has become a property (named %1) in Swift 3", (DeclName, DeclName))
+
 //------------------------------------------------------------------------------
 // Circular reference diagnostics
 //------------------------------------------------------------------------------

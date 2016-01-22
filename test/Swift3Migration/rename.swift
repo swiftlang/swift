@@ -12,6 +12,11 @@ struct X<@swift3_migration(renamed="Element") T> {
   init(other y: Y) {
     self.init(withY: y)
   }
+
+  @swift3_migration(renamedToProperty="wobbleProp")
+  func wobble() -> Int {
+    return 5
+  }
 }
 
 @swift3_migration(renamed="B")
@@ -19,6 +24,10 @@ struct Y { };
 
 
 X<Y>(withY: Y()).foo(1, y: 2)
+
+func test(xi: X<Int>) {
+  _ = xi.wobble()
+}
 
 protocol P {
   @swift3_migration(renamed="Assoc")

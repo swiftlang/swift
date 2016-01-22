@@ -33,7 +33,8 @@ namespace {
       // Dig out the swift3_migration attribute.
       auto attr = value->getAttrs().getAttribute<Swift3MigrationAttr>();
       if (!attr || !attr->getRenamed() ||
-          value->getFullName() == attr->getRenamed())
+          value->getFullName() == attr->getRenamed() ||
+          attr->isRenamedToProperty())
         return;
 
       // Perform the renaming.
@@ -54,8 +55,44 @@ namespace {
 
       // Dig out the swift3_migration attribute.
       auto attr = valueDecl->getAttrs().getAttribute<Swift3MigrationAttr>();
-      if (!attr || !attr->getRenamed() ||
-          attr->getRenamed() == valueDecl->getFullName())
+      if (!attr || !attr->getRenamed())
+        return true;
+
+      // Handle renaming of a function to a property.
+      if (attr->isRenamedToProperty()) {
+        auto func = dyn_cast<FuncDecl>(valueDecl);
+        if (!func) return true;
+
+        auto oldName = func->getFullName();
+        auto newName = attr->getRenamed();
+
+        auto diag = TC.diagnose(func->getLoc(),
+                                diag::swift3_migration_to_property,
+                                oldName, newName);
+
+        // func becomes var
+        diag.fixItReplace(func->getFuncLoc(), "var");
+
+        // Rename, if needed.
+        if (oldName.getBaseName() != newName.getBaseName())
+          diag.fixItReplace(func->getLoc(), newName.getBaseName().str());
+
+        // "() -> " becomes ": " to make it a variable.
+        SourceLoc lParenLoc = func->getParameterLists().back()->getLParenLoc();
+        SourceLoc resultTypeStartLoc =
+          func->getBodyResultTypeLoc().getSourceRange().Start;
+        diag.fixItReplaceChars(lParenLoc, resultTypeStartLoc, ": ");
+
+      // Remove the swift3_migration attribute, if it was explictly written.
+      // It's not useful once we've performed migration.
+      if (!attr->isImplicit())
+        diag.fixItRemove(attr->getRangeWithAt());
+
+        return true;
+      }
+
+      // If the names match exactly, we're done.
+      if (attr->getRenamed() == valueDecl->getFullName())
         return true;
 
       auto oldName = valueDecl->getFullName();

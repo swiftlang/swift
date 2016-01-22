@@ -2402,6 +2402,24 @@ Expr *TypeChecker::checkRenaming(ApplyExpr *apply, ApplyRenamingKind kind) {
     if (auto attr = afd->getAttrs().getAttribute<Swift3MigrationAttr>()) {
       if (attr->getRenamed() && attr->getRenamed() != afd->getFullName())
         newName = attr->getRenamed();
+
+      // If this function was renamed to a property, handle that
+      // directly here.
+      if (attr->isRenamedToProperty()) {
+        auto name = afd->getFullName();
+        auto diag = diagnose(fnRef->getLoc(),
+                             diag::swift3_migration_to_property,
+                             name, newName->getBaseName());
+
+        // Fix the name, if needed.
+        if (newName->getBaseName() != name.getBaseName()) {
+          diag.fixItReplace(fnRef->getLoc(), newName->getBaseName().str());
+        }
+
+        // Zap the parentheses.
+        diag.fixItRemove(apply->getArg()->getSourceRange());
+        return fnRef;
+      }
     }
     break;
   }

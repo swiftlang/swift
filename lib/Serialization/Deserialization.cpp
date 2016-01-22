@@ -2023,15 +2023,17 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       case decls_block::Swift3Migration_DECL_ATTR: {
         bool isImplicit;
         uint64_t renameLength;
+        bool isRenamedToProperty;
         uint64_t messageLength;
         serialization::decls_block::Swift3MigrationDeclAttrLayout::readRecord(
-          scratch, isImplicit, renameLength, messageLength);
+          scratch, isImplicit, renameLength, isRenamedToProperty, messageLength);
         StringRef renameStr = blobData.substr(0, renameLength);
         StringRef message = blobData.substr(renameLength,
                                             renameLength + messageLength);
         DeclName renamed = parseDeclName(getContext(), renameStr);
         Attr = new (ctx) Swift3MigrationAttr(SourceLoc(), SourceLoc(),
                                              SourceLoc(), renamed,
+                                             isRenamedToProperty,
                                              message, SourceLoc(), isImplicit);
         break;
       }

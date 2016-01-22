@@ -1743,6 +1743,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
                                         Out, ScratchRecord, abbrCode,
                                         theAttr->isImplicit(),
                                         renameLength,
+                                        theAttr->isRenamedToProperty(),
                                         theAttr->getMessage().size(),
                                         blob);
     return;

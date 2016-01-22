@@ -1560,6 +1560,7 @@ static void addSwift3MigrationAttr(ASTContext &ctx, ValueDecl *requirement,
       auto newAttr = new (ctx) Swift3MigrationAttr(SourceLoc(), SourceLoc(),
                                                    SourceLoc(),
                                                    attr->getRenamed(),
+                                                   attr->isRenamedToProperty(),
                                                    attr->getMessage(),
                                                    SourceLoc(),
                                                    /*implicit=*/true);

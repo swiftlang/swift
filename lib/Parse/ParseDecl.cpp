@@ -1165,6 +1165,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     SourceLoc lParenLoc = consumeToken(tok::l_paren);
 
     DeclName renamed;
+    bool isRenamedToProperty = false;
     StringRef message;
     bool invalid = false;
     do {
@@ -1217,7 +1218,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         continue;
       }
 
-      if (name == "renamed") {
+      if (name == "renamed" || name == "renamedToProperty") {
         if (renamed)
           diagnose(nameLoc, diag::attr_duplicate_argument, name);
 
@@ -1229,6 +1230,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         }
 
         renamed = newName;
+        isRenamedToProperty = (name == "renamedToProperty");
         continue;
       }
 
@@ -1250,7 +1252,9 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     }
 
     Attributes.add(new (Context) Swift3MigrationAttr(AtLoc, Loc, lParenLoc,
-                                                     renamed, message,
+                                                     renamed,
+                                                     isRenamedToProperty,
+                                                     message,
                                                      rParenLoc, false));
     break;
     }

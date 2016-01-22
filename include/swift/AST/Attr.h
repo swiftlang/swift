@@ -1154,18 +1154,21 @@ public:
 /// required to migrate the given Swift 2.x API to Swift 3.
 class Swift3MigrationAttr : public DeclAttribute {
   DeclName Renamed;
+  bool RenamedToProperty;
   StringRef Message;
 
 public:
   Swift3MigrationAttr(SourceLoc atLoc, SourceLoc attrLoc, SourceLoc lParenLoc,
-                      DeclName renamed, StringRef message, SourceLoc rParenLoc,
-                      bool implicit)
+                      DeclName renamed, bool renamedToProperty,
+                      StringRef message, SourceLoc rParenLoc, bool implicit)
     : DeclAttribute(DAK_Swift3Migration, atLoc, SourceRange(attrLoc, rParenLoc),
                     implicit),
-      Renamed(renamed), Message(message) { }
+      Renamed(renamed), RenamedToProperty(renamedToProperty),
+      Message(message) { }
 
   DeclName getRenamed() const { return Renamed; }
   StringRef getMessage() const { return Message; }
+  bool isRenamedToProperty() const { return RenamedToProperty; }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Swift3Migration;

@@ -4783,6 +4783,7 @@ public:
                                                     SourceLoc(), SourceLoc(),
                                                     SourceLoc(),
                                                     attr->getRenamed(),
+                                                    attr->isRenamedToProperty(),
                                                     attr->getMessage(),
                                                     SourceLoc(),
                                                     /*implicit=*/true));

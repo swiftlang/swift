@@ -5289,14 +5289,16 @@ void ClangImporter::Implementation::importAttributes(
     // swift3_migration attribute with the rename.
     if (swift3Name.Imported &&
         swift3Name.Imported != valueDecl->getFullName()) {
-      MappedDecl->getAttrs().add(new (SwiftContext) Swift3MigrationAttr(
-                                                      SourceLoc(),
-                                                      SourceLoc(),
-                                                      SourceLoc(),
-                                                      swift3Name.Imported,
-                                                      "",
-                                                      SourceLoc(),
-                                                      /*implicit=*/true));
+      MappedDecl->getAttrs().add(
+        new (SwiftContext) Swift3MigrationAttr(
+                                               SourceLoc(),
+                                               SourceLoc(),
+                                               SourceLoc(),
+                                               swift3Name.Imported,
+                                               /*isRenamedToProperty=*/false,
+                                               "",
+                                               SourceLoc(),
+                                               /*implicit=*/true));
     }
   }
 }

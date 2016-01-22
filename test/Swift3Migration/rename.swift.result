@@ -12,6 +12,11 @@ struct A< Element> {
   init(other y: B) {
     self.init(b: y)
   }
+
+  
+  var wobbleProp: Int {
+    return 5
+  }
 }
 
 
@@ -19,6 +24,10 @@ struct B { };
 
 
 A<B>(b: B()).bar(wibble: 1, wonka: 2)
+
+func test(xi: A<Int>) {
+  _ = xi.wobbleProp
+}
 
 protocol P {
   
