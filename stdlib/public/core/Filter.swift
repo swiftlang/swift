@@ -36,6 +36,8 @@ public struct LazyFilterGenerator<
 
   /// Creates an instance that produces the elements `x` of `base`
   /// for which `predicate(x) == true`.
+  @swift3_migration(message="use '.lazy.filter' on the sequence")
+  @available(*, deprecated, message="it will be removed in Swift 3, use '.lazy.filter' on the sequence")
   public init(
     _ base: Base,
     whereElementsSatisfy predicate: (Base.Element) -> Bool
@@ -168,6 +170,8 @@ public struct LazyFilterCollection<
 
   /// Construct an instance containing the elements of `base` that
   /// satisfy `predicate`.
+  @swift3_migration(message="use '.lazy.filter' on the collection")
+  @available(*, deprecated, message="it will be removed in Swift 3, use '.lazy.filter' on the collection")
   public init(
     _ base: Base,
     whereElementsSatisfy predicate: (Base.Generator.Element) -> Bool

@@ -354,7 +354,6 @@ public protocol CustomReflectable {
   ///
   /// - Note: If `Self` has value semantics, the `Mirror` should be
   ///   unaffected by subsequent mutations of `self`.
-  //@swift3_migration(toProperty="customMirror")
   @swift3_migration(renamedToProperty="customMirror")
   @warn_unused_result
   func customMirror() -> Mirror

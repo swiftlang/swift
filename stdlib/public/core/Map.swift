@@ -64,7 +64,7 @@ public struct LazyMapSequence<Base : SequenceType, Element>
 
   /// Create an instance with elements `transform(x)` for each element
   /// `x` of base.
-  @swift3_migration(message="removed in Swift 3, use '.lazy.map' on the sequence")
+  @swift3_migration(message="use '.lazy.map' on the sequence")
   @available(*, deprecated, message="it will be removed in Swift 3, use '.lazy.map' on the sequence")
   public init(_ base: Base, transform: (Base.Generator.Element) -> Element) {
     self._base = base
@@ -129,7 +129,7 @@ public struct LazyMapCollection<Base : CollectionType, Element>
 
   /// Create an instance with elements `transform(x)` for each element
   /// `x` of base.
-  @swift3_migration(message="removed in Swift 3, use '.lazy.map' on the collection")
+  @swift3_migration(message="use '.lazy.map' on the collection")
   @available(*, deprecated, message="it will be removed in Swift 3, use '.lazy.map' on the collection")
   public init(_ base: Base, transform: (Base.Generator.Element) -> Element) {
     self._base = base
