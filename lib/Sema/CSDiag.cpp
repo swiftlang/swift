@@ -1021,6 +1021,10 @@ namespace {
     /// After the candidate list is formed, it can be filtered down to discard
     /// obviously mismatching candidates and compute a "closeness" for the
     /// resultant set.
+    std::pair<CandidateCloseness, CalleeCandidateInfo::FailedArgumentInfo>
+    evaluateCloseness(Type candArgListType, ArrayRef<CallArgParam> actualArgs,
+                      bool argsHaveTrailingClosure);
+      
     void filterList(ArrayRef<CallArgParam> actualArgs);
     void filterList(Type actualArgsType) {
       return filterList(decomposeArgParamType(actualArgsType));
@@ -1157,8 +1161,8 @@ static bool argumentMismatchIsNearMiss(Type argType, Type paramType) {
 /// Determine how close an argument list is to an already decomposed argument
 /// list.  If the closeness is a miss by a single argument, then this returns
 /// information about that failure.
-static std::pair<CandidateCloseness, CalleeCandidateInfo::FailedArgumentInfo>
-evaluateCloseness(ConstraintSystem *CS, Type candArgListType,
+std::pair<CandidateCloseness, CalleeCandidateInfo::FailedArgumentInfo>
+CalleeCandidateInfo::evaluateCloseness(Type candArgListType,
                   ArrayRef<CallArgParam> actualArgs, bool argsHaveTrailingClosure) {
   auto candArgs = decomposeArgParamType(candArgListType);
 
@@ -1203,7 +1207,6 @@ evaluateCloseness(ConstraintSystem *CS, Type candArgListType,
   // type variables for all generics and solve it with the given argument types.
   Type singleArchetype = nullptr;
   Type matchingArgType = nullptr;
-  bool substitutable;
   
   // We classify an argument mismatch as being a "near" miss if it is a very
   // likely match due to a common sort of problem (e.g. wrong flags on a
@@ -1237,21 +1240,22 @@ evaluateCloseness(ConstraintSystem *CS, Type candArgListType,
         continue;
       if (paramType->is<ArchetypeType>() && !rArgType->hasTypeVariable()) {
         if (singleArchetype) {
-          if (!paramType->isEqual(singleArchetype)
-              || !rArgType->isEqual(matchingArgType)) {
-            // Since we've 'bound' singleArchetype and it is now potentially wrong,
-            // this is then the second mismatch -- give up right away.
-            return { CC_ArgumentMismatch, {}};
+          if (!paramType->isEqual(singleArchetype))
+            return { CC_ArgumentMismatch, {}}; // multiple archetypes, too complicated
+          if (rArgType->isEqual(matchingArgType)) {
+            continue;
+          } else {
+            paramType = matchingArgType;
+            // fallthrough as mismatched arg, comparing nearness to archetype bound type
           }
         } else {
-          matchingArgType = rArgType;
-          singleArchetype = paramType;
-            
           auto archetype = paramType->getAs<ArchetypeType>();
-          substitutable = CS->TC.isSubstitutableFor(rArgType, archetype, CS->DC);
+          if (CS->TC.isSubstitutableFor(rArgType, archetype, CS->DC)) {
+            matchingArgType = rArgType;
+            singleArchetype = paramType;
+            continue;
+          }
         }
-        if (substitutable)
-          continue;
       }
       
       ++mismatchingArgs;
@@ -1453,7 +1457,7 @@ void CalleeCandidateInfo::filterList(ArrayRef<CallArgParam> actualArgs) {
     // If this isn't a function or isn't valid at this uncurry level, treat it
     // as a general mismatch.
     if (!inputType) return { CC_GeneralMismatch, {}};
-    return evaluateCloseness(CS, inputType, actualArgs, hasTrailingClosure);
+    return this->evaluateCloseness(inputType, actualArgs, hasTrailingClosure);
   });
 }
 
@@ -3552,7 +3556,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     
     // Explode out multi-index subscripts to find the best match.
     auto indexResult =
-      evaluateCloseness(CS, cand.getArgumentType(), decomposedIndexType,
+      calleeInfo.evaluateCloseness(cand.getArgumentType(), decomposedIndexType,
                         /*FIXME: Subscript trailing closures*/false);
     if (selfConstraint > indexResult.first)
       return {selfConstraint, {}};
