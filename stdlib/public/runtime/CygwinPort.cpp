@@ -127,31 +127,3 @@ uint8_t *swift::_swift_getSectionDataPE(void *handle, const char *sectionName,
 
   return nullptr;
 }
-
-#include <mutex>
-
-namespace std {
-
-static std::unique_lock<std::mutex> *lock_ = nullptr;
-static std::mutex mutex_;
-
-template class function<void()>;
-function<void()> __once_functor;
-
-mutex &__get_once_mutex() { return mutex_; }
-
-void __set_once_functor_lock_ptr(unique_lock<mutex> *__ptr) { lock_ = __ptr; }
-
-#if 1
-extern "C" void __once_proxy() {
-  function<void()> once_functor = std::move(__once_functor);
-  unique_lock<mutex> *lock = lock_;
-  if (lock != nullptr) {
-    lock_ = nullptr;
-    lock->unlock();
-  }
-
-  once_functor();
-}
-#endif
-}
