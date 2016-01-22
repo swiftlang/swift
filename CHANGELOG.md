@@ -114,6 +114,24 @@ Latest
 
   For more information, see [SE-0021](https://github.com/apple/swift-evolution/blob/master/proposals/0021-generalized-naming.md).
 
+* There is a new build configuration function, `#if swift(>=x.y)`, which
+  tests if the current Swift language version is at least `x.y`. This
+  allows you to conditionally compile code for multiple language
+  versions in the same file, even with different syntax, by deactivating
+  parsing in inactive code blocks. For example:
+
+  ```swift
+  #if swift(>=2.2)
+    // Only this code will be parsed in Swift 3
+    func foo(x: Int) -> (y: Int) -> () {}
+  #else
+    // This code is ignored entirely.
+    func foo(x: Int)(y: Int) {}
+  #endif
+  ```
+
+  For more information, see [SE-0020](https://github.com/apple/swift-evolution/blob/master/proposals/0020-if-swift-version.md).
+
 2015-09-17 [Xcode 7.1, Swift 2.1]
 ----------
 
