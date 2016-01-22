@@ -324,7 +324,9 @@ public:
   }
 
   void visitString(StringRef Str) {
-    OS << '\"' << Str << '\"';
+    OS << '\"';
+    OS.write_escaped(Str);
+    OS << '\"';
   }
 
   void visitUID(StringRef UID) {

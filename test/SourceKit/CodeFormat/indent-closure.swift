@@ -35,7 +35,7 @@ func foo3() {
 
 // CHECK: key.sourcetext: "        var abc = 1"
 // CHECK: key.sourcetext: "        let a: String = {"
-// CHECK: key.sourcetext: "            let b = "asdf""
+// CHECK: key.sourcetext: "            let b = \"asdf\""
 // CHECK: key.sourcetext: "            return b"
 // CHECK: key.sourcetext: "        }()"
 // CHECK: key.sourcetext: "    }"
