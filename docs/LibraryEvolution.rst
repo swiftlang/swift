@@ -144,9 +144,10 @@ is not enforced by the language.
 
 .. _semantic versioning: http://semver.org
 
-Normally only public entities are treated as versioned. However, in some cases
-it may be useful to version an ``internal`` entity as well. See `Versioning
-Internal Declarations`_ below.
+In a versioned library, an entity from the list above may not be made
+``public`` without an appropriate version. However, in some cases it may be
+useful to version an ``internal`` entity as well. See `Versioning Internal
+Declarations`_ below.
 
 The syntax for marking an entity as versioned has not yet been decided, but the
 rest of this document will use syntax #1 described below.
