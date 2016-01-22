@@ -546,7 +546,7 @@ void SILParser::setLocalValue(ValueBase *Value, StringRef Name,
       HadError = true;
     } else {
       // Forward references only live here if they have a single result.
-      SILValue(Entry).replaceAllUsesWith(SILValue(Value));
+      Entry->replaceAllUsesWith(Value);
     }
     Entry = Value;
     return;

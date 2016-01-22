@@ -1342,7 +1342,7 @@ bool RLEContext::run() {
       DEBUG(llvm::dbgs() << "Replacing  " << SILValue(F.first) << "With "
                          << F.second);
       SILChanged = true;
-      SILValue(F.first).replaceAllUsesWith(F.second);
+      F.first->replaceAllUsesWith(F.second.getDef());
       InstsToDelete.insert(F.first);
       ++NumForwardedLoads;
     }

@@ -766,7 +766,7 @@ constantFoldStringConcatenation(ApplyInst *AI,
     return false;
 
   // Replace all uses of the old instruction by a new instruction.
-  SILValue(AI).replaceAllUsesWith(Concatenated);
+  AI->replaceAllUsesWith(Concatenated);
 
   auto RemoveCallback = [&](SILInstruction *DeadI) { WorkList.remove(DeadI); };
   // Remove operands that are not used anymore.
@@ -861,7 +861,7 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
       [&](SILInstruction *I, ValueBase *V) { /* ReplaceInstUsesAction */
 
         InvalidateInstructions = true;
-        SILValue(I).replaceAllUsesWith(V);
+        I->replaceAllUsesWith(V);
       },
       [&](SILInstruction *I) { /* EraseAction */
         auto *TI = dyn_cast<TermInst>(I);
@@ -1036,7 +1036,7 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
 
 
       // We were able to fold, so all users should use the new folded value.
-      SILValue(User).replaceAllUsesWith(C);
+      User->replaceAllUsesWith(C.getDef());
 
       // The new constant could be further folded now, add it to the worklist.
       if (auto *Inst = dyn_cast<SILInstruction>(C.getDef()))

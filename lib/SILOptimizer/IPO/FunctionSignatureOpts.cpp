@@ -397,8 +397,8 @@ unsigned ArgumentDescriptor::updateOptimizedBBArgs(SILBuilder &Builder,
 
   // Replace all uses of the original arg with undef so it does not have any
   // uses.
-  SILValue OrigArg = SILValue(BB->getBBArg(OldArgOffset));
-  OrigArg.replaceAllUsesWith(SILUndef::get(OrigArg.getType(), BB->getModule()));
+  SILArgument *OrigArg = BB->getBBArg(OldArgOffset);
+  OrigArg->replaceAllUsesWith(SILUndef::get(OrigArg->getType(), BB->getModule()));
 
   // Now erase the old argument since it does not have any uses. We also
   // decrement ArgOffset since we have one less argument now.

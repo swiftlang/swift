@@ -423,7 +423,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
   if (!FSI)
     return false;
 
-  SILValue Undef = SILUndef::get(FirstPredArg.getType(), BB->getModule());
+  auto *Undef = SILUndef::get(FirstPredArg.getType(), BB->getModule());
 
   // Delete the debug info of the instruction that we are about to sink.
   deleteAllDebugUses(FSI);
@@ -435,7 +435,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
     // The instruction we are lowering has an argument which is different
     // for each predecessor.  We need to sink the instruction, then add
     // arguments for each predecessor.
-    SILValue(BB->getBBArg(ArgNum)).replaceAllUsesWith(FSI);
+    BB->getBBArg(ArgNum)->replaceAllUsesWith(FSI);
 
     const auto &ArgType = FSI->getOperand(*DifferentOperandIndex).getType();
     BB->replaceBBArg(ArgNum, ArgType);
@@ -465,16 +465,16 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
   }
 
   // Sink one of the copies of the instruction.
-  FirstPredArg.replaceAllUsesWith(Undef);
+  FirstPredArg->replaceAllUsesWith(Undef);
   FSI->moveBefore(&*BB->begin());
-  SILValue(BB->getBBArg(ArgNum)).replaceAllUsesWith(FirstPredArg);
+  BB->getBBArg(ArgNum)->replaceAllUsesWith(FirstPredArg.getDef());
 
   // The argument is no longer in use. Replace all incoming inputs with undef
   // and try to delete the instruction.
   for (auto S : Clones)
     if (S.getDef() != FSI) {
       deleteAllDebugUses(S.getDef());
-      S.replaceAllUsesWith(Undef);
+      S->replaceAllUsesWith(Undef);
       auto DeadArgInst = cast<SILInstruction>(S.getDef());
       recursivelyDeleteTriviallyDeadInstructions(DeadArgInst);
     }

@@ -111,7 +111,7 @@ public:
               Changed = true;
               auto *Enum = SILBuilder(PinDef).createOptionalSome(
                   PinDef->getLoc(), PinDef->getOperand(), PinDef->getType());
-              SILValue(PinDef).replaceAllUsesWith(Enum);
+              PinDef->replaceAllUsesWith(Enum);
               Unpin->eraseFromParent();
               PinDef->eraseFromParent();
               // Remove this pindef from AvailablePins.

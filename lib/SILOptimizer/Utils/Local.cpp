@@ -2221,7 +2221,7 @@ bool swift::simplifyUsers(SILInstruction *I) {
     if (!S)
       continue;
 
-    SILValue(User).replaceAllUsesWith(S);
+    User->replaceAllUsesWith(S.getDef());
     User->eraseFromParent();
     Changed = true;
   }

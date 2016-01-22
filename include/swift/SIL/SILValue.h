@@ -230,8 +230,6 @@ public:
   /// intrinsic call.
   SILValue stripExpectIntrinsic();
 
-  void replaceAllUsesWith(SILValue V);
-
   void dump() const;
   void print(raw_ostream &os) const;
 

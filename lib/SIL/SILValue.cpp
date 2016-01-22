@@ -34,13 +34,6 @@ static_assert(sizeof(SILValue) == sizeof(uintptr_t),
 //                              Utility Methods
 //===----------------------------------------------------------------------===//
 
-void SILValue::replaceAllUsesWith(SILValue V) {
-  assert(*this != V && "Cannot RAUW a value with itself");
-  assert(getType() == V.getType() && "Invalid type");
-  while (!use_empty())
-    (**use_begin()).set(V);
-}
-
 static bool isRCIdentityPreservingCast(ValueKind Kind) {
   switch (Kind) {
   case ValueKind::UpcastInst:

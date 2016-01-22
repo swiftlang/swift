@@ -112,7 +112,7 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
     if (ReturnInst *RI = dyn_cast<ReturnInst>(CalleeEntryBB->getTerminator())) {
       // Replace all uses of the apply instruction with the operands of the
       // return instruction, appropriately mapped.
-      SILValue(nonTryAI).replaceAllUsesWith(remapValue(RI->getOperand()));
+      nonTryAI->replaceAllUsesWith(remapValue(RI->getOperand()).getDef());
       return true;
     }
   }
@@ -137,10 +137,10 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
                            SILFunction::iterator(ReturnToBB));
 
     // Create an argument on the return-to BB representing the returned value.
-    SILValue RetArg = new (F.getModule()) SILArgument(ReturnToBB,
+    auto *RetArg = new (F.getModule()) SILArgument(ReturnToBB,
                                             AI.getInstruction()->getType());
     // Replace all uses of the ApplyInst with the new argument.
-    SILValue(AI.getInstruction()).replaceAllUsesWith(RetArg);
+    AI.getInstruction()->replaceAllUsesWith(RetArg);
   }
 
   // Now iterate over the callee BBs and fix up the terminators.

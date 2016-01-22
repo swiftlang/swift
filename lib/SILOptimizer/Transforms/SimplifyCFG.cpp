@@ -1077,7 +1077,7 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
     // branch operands, since they must dominate the dest block.
     for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i) {
       if (DestBB->getBBArg(i) != BI->getArg(i).getDef())
-        SILValue(DestBB->getBBArg(i)).replaceAllUsesWith(BI->getArg(i));
+        DestBB->getBBArg(i)->replaceAllUsesWith(BI->getArg(i).getDef());
       else {
         // We must be processing an unreachable part of the cfg with a cycle.
         // bb1(arg1): // preds: bb3
@@ -2490,7 +2490,7 @@ bool ArgumentSplitter::createNewArguments() {
     assert(Agg->hasValue() && "Expected a result");
   }
 
-  SILValue(Arg).replaceAllUsesWith(SILValue(Agg));
+  Arg->replaceAllUsesWith(Agg);
 
   // Look at all users of agg and see if we can simplify any of them. This will
   // eliminate struct_extracts/tuple_extracts from the newly created aggregate

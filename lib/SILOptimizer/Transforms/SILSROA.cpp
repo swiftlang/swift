@@ -236,7 +236,7 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
       Elements.push_back(B.createLoad(LI->getLoc(), NewAI));
     auto *Agg = createAgg(B, LI->getLoc(), LI->getType().getObjectType(),
                           Elements);
-    SILValue(LI).replaceAllUsesWith(Agg);
+    LI->replaceAllUsesWith(Agg);
     LI->eraseFromParent();
   }
 
@@ -252,8 +252,8 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
 
   // Forward any field extracts to the new allocation.
   for (auto *Ext : ExtractInsts) {
-    SILValue NewValue = NewAllocations[getEltNoForProjection(Ext)];
-    SILValue(Ext).replaceAllUsesWith(NewValue);
+    AllocStackInst *NewValue = NewAllocations[getEltNoForProjection(Ext)];
+    Ext->replaceAllUsesWith(NewValue);
     Ext->eraseFromParent();
   }
 
