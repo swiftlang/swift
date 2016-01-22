@@ -40,6 +40,46 @@ import swift_build_support.cmake
 from swift_build_support.migration import migrate_impl_args
 
 
+# Utility for selecting host compilers.
+class CompilerExecutable(object):
+
+    def __init__(self, args):
+        if args.cc and not args.cxx:
+            self.cc, self.cxx = args.cc, self._suggest_companion(args.cc)
+        elif not args.cc and args.cxx:
+            self.cc, self.cxx = self._suggest_companion(args.cxx), args.cxx
+        elif not args.cc and not args.cxx:
+            host_clang = swift_build_support.clang.host_clang(
+                xcrun_toolchain=args.darwin_xcrun_toolchain)
+            if not host_clang:
+                raise Exception("Can't find clang. "
+                                "Please install clang-3.5 or a later version.")
+            self.cc, self.cxx = host_clang.cc, host_clang.cxx
+        else:
+            self.cc, self.cxx = args.cc, args.cxx
+
+
+    def _suggest_companion(self, cmd):
+        companion = self._find_companion_compiler(cmd)
+        if not companion:
+            raise Exception("Can't infer companion compiler for %s. "
+                            "Please specify --cc and --cxx." % (cmd))
+        return companion
+
+
+    def _find_companion_compiler(self, cmd):
+        suggestions = [
+            ("cc", "c++"),
+            ("gcc", "g++"),
+            ("clang", "clang++"),
+        ]
+        suggestions.extend([(s2, s1) for (s1, s2) in suggestions])
+        suggestions.sort(key=lambda pair: len(pair[0]), reverse=True)
+        for s1, s2 in suggestions:
+            if cmd.endswith(s1):
+                return cmd[:-len(s1)] + s2
+
+
 # Main entry point for the preset mode.
 def main_preset():
     parser = argparse.ArgumentParser(
@@ -516,11 +556,11 @@ placed""",
 
     parser.add_argument("--cc",
         help="specify the C compiler to be used",
-        action="store", dest="cc")
+        action="store")
 
     parser.add_argument("--cxx",
         help="specify the C++ compiler to be used",
-        action="store", dest="cxx")
+        action="store")
 
     parser.add_argument("-j", "--jobs",
         help="""
@@ -670,19 +710,11 @@ the number of parallel build jobs to use""",
             "--skip-test-watchos",
         ]
 
-    if not args.cc or not args.cxx:
-        host_clang = swift_build_support.clang.host_clang(
-            xcrun_toolchain=args.darwin_xcrun_toolchain)
-        if not host_clang:
-            print_with_argv0("Can't find clang. "
-                             "Please install clang-3.5 or a later version.")
-            return 1
-
-        if not args.cc:
-            args.cc = host_clang.cc
-
-        if not args.cxx:
-            args.cxx = host_clang.cxx
+    try:
+        compiler = CompilerExecutable(args)
+    except Exception as e:
+        print_with_argv0(e.message)
+        return 1
 
     if not args.build_lldb:
         build_script_impl_inferred_args += [
@@ -787,8 +819,8 @@ the number of parallel build jobs to use""",
     build_script_impl_args = [
         os.path.join(SWIFT_SOURCE_ROOT, "swift", "utils", "build-script-impl"),
         "--build-dir", build_dir,
-        "--host-cc", args.cc,
-        "--host-cxx", args.cxx,
+        "--host-cc", compiler.cc,
+        "--host-cxx", compiler.cxx,
         "--darwin-xcrun-toolchain", args.darwin_xcrun_toolchain,
         "--cmake", host_cmake,
         "--cmark-build-type", args.cmark_build_variant,
