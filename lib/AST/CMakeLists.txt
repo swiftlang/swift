@@ -4,6 +4,7 @@ add_swift_library(swiftAST
   ASTDumper.cpp
   ASTNode.cpp
   ASTPrinter.cpp
+  ASTVerifier.cpp
   ASTWalker.cpp
   Attr.cpp
   Availability.cpp
@@ -39,7 +40,6 @@ add_swift_library(swiftAST
   TypeRepr.cpp
   TypeWalker.cpp
   USRGeneration.cpp
-  Verifier.cpp
   LINK_LIBRARIES
     swiftMarkup
     swiftBasic
