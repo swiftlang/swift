@@ -4733,6 +4733,12 @@ static void diagnoseUnboundArchetype(Expr *overallExpr,
     tc.diagnose(ECE->getLoc(), diag::unbound_generic_parameter_cast,
                 archetype, ECE->getCastTypeLoc().getType())
       .highlight(ECE->getCastTypeLoc().getSourceRange());
+
+    // Emit a note specifying where this came from, if we can find it.
+    if (auto *ND = ECE->getCastTypeLoc().getType()
+          ->getNominalOrBoundGenericNominal())
+      tc.diagnose(ND, diag::archetype_declared_in_type, archetype,
+                  ND->getDeclaredType());
     return;
   }
   
@@ -4744,7 +4750,15 @@ static void diagnoseUnboundArchetype(Expr *overallExpr,
   // If we have an anchor, drill into it to emit a
   // "note: archetype declared here".
   if (!anchor) return;
-  
+
+
+  if (auto TE = dyn_cast<TypeExpr>(anchor)) {
+    if (auto *ND = TE->getInstanceType()->getNominalOrBoundGenericNominal())
+      tc.diagnose(ND, diag::archetype_declared_in_type, archetype,
+                  ND->getDeclaredType());
+    return;
+  }
+
   ConcreteDeclRef resolved;
   
   // Simple case: direct reference to a declaration.
@@ -4752,11 +4766,12 @@ static void diagnoseUnboundArchetype(Expr *overallExpr,
     resolved = dre->getDeclRef();
   
   // Simple case: direct reference to a declaration.
-  if (auto mre = dyn_cast<MemberRefExpr>(anchor))
-    resolved = mre->getMember();
+  if (auto MRE = dyn_cast<MemberRefExpr>(anchor))
+    resolved = MRE->getMember();
   
-  if (auto ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(anchor))
-    resolved = ctorRef->getDeclRef();
+  if (auto OCDRE = dyn_cast<OtherConstructorDeclRefExpr>(anchor))
+    resolved = OCDRE->getDeclRef();
+
   
   // We couldn't resolve the locator to a declaration, so we're done.
   if (!resolved)

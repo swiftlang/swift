@@ -185,7 +185,7 @@ func r22509125<T>(a : T?) { // expected-note {{in call to function 'r22509125'}}
 
 
 // <rdar://problem/24267414> QoI: error: cannot convert value of type 'Int' to specified type 'Int'
-struct R24267414<T> {
+struct R24267414<T> {  // expected-note {{'T' declared as parameter to type 'R24267414'}}
   static func foo() -> Int {}
 }
 var _ : Int = R24267414.foo() // expected-error {{generic parameter 'T' could not be inferred}}

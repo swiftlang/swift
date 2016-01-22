@@ -595,6 +595,7 @@ NOTE(note_call_to_initializer,none,
 NOTE(note_init_parameter,none,
      "in initialization of parameter %0", (Identifier))
 
+
 ERROR(missing_nullary_call,none,
      "function produces expected type %0; did you mean to call it with '()'?",
      (Type))
@@ -672,6 +673,8 @@ ERROR(unbound_generic_parameter,none,
       "generic parameter %0 could not be inferred", (Type))
 ERROR(unbound_generic_parameter_cast,none,
       "generic parameter %0 could not be inferred in cast to %1", (Type, Type))
+NOTE(archetype_declared_in_type,none,
+     "%0 declared as parameter to type %1", (Type, Type))
 
 
 ERROR(string_index_not_integer,none,

@@ -20,7 +20,7 @@ enum Z {
   init(_ x: Int, _ y: Int) { self = .point(x, y) }
 }
 
-enum Optional<T> {
+enum Optional<T> {  // expected-note {{'T' declared as parameter to type 'Optional'}}
   case none
   case value(T)
 
