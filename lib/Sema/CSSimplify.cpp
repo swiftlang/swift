@@ -2801,6 +2801,12 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     NameLookupOptions lookupOptions = defaultConstructorLookupOptions;
     if (isa<AbstractFunctionDecl>(DC))
       lookupOptions |= NameLookupFlags::KnownPrivate;
+    
+    // If we're doing a lookup for diagnostics, include inaccessible members,
+    // the diagnostics machinery will sort it out.
+    if (includeInaccessibleMembers)
+      lookupOptions |= NameLookupFlags::IgnoreAccessibility;
+
     LookupResult ctors = TC.lookupConstructors(DC, baseObjTy, lookupOptions);
     if (!ctors)
       return result;    // No result.
@@ -2900,6 +2906,12 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     NameLookupOptions lookupOptions = defaultMemberTypeLookupOptions;
     if (isa<AbstractFunctionDecl>(DC))
       lookupOptions |= NameLookupFlags::KnownPrivate;
+    
+    // If we're doing a lookup for diagnostics, include inaccessible members,
+    // the diagnostics machinery will sort it out.
+    if (includeInaccessibleMembers)
+      lookupOptions |= NameLookupFlags::IgnoreAccessibility;
+    
     auto lookup = TC.lookupMemberType(DC, baseObjTy, memberName.getBaseName(),
                                       lookupOptions);
     // Form the overload set.
