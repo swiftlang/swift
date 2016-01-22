@@ -148,7 +148,7 @@ class GlobalPropertyOpt {
     return false;
   }
   
-  static bool canAddressEscape(SILValue V, bool acceptWrite);
+  static bool canAddressEscape(SILValue V, bool acceptStore);
 
   /// Gets the entry for a struct or class field.
   Entry *getFieldEntry(VarDecl *Field) {
