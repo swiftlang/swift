@@ -107,9 +107,9 @@ protected:
   int_type Data;
 
   enum : int_type {
-    InternalExternalMask = 0b1U,
+    InternalExternalMask = 0x00000001U,
     InternalExternalShift = 0,
-    OwnershipMask = 0b110U,
+    OwnershipMask = 0x00000006U,
     OwnershipShift = 1,
   };
 
