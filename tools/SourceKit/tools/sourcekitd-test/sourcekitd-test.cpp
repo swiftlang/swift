@@ -591,6 +591,13 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
   bool IsError = sourcekitd_response_is_error(Resp);
   if (IsError) {
     sourcekitd_response_description_dump(Resp);
+
+  } else if (Opts.PrintResponseAsJSON) {
+    sourcekitd_variant_t Info = sourcekitd_response_get_value(Resp);
+    char *json = sourcekitd_variant_json_description_copy(Info);
+    llvm::outs() << json << '\n';
+    free(json);
+
   } else {
     sourcekitd_variant_t Info = sourcekitd_response_get_value(Resp);
     switch (Opts.Request) {

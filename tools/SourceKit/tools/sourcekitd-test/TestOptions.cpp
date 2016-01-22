@@ -202,6 +202,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       CheckInterfaceIsASCII = true;
       break;
 
+    case OPT_print_response_as_json:
+      PrintResponseAsJSON = true;
+      break;
+
     case OPT_INPUT:
       SourceFile = InputArg->getValue();
       SourceText = llvm::None;

@@ -560,6 +560,13 @@ SOURCEKITD_PUBLIC
 char *
 sourcekitd_variant_description_copy(sourcekitd_variant_t obj);
 
+/// \brief Copies a string representation of the variant object in JSON format.
+/// \returns A string representation of the variant object. This string should
+/// be disposed of with \c free when done.
+SOURCEKITD_PUBLIC
+char *
+sourcekitd_variant_json_description_copy(sourcekitd_variant_t obj);
+
 /// @}
 
 /// \brief Invoke a request synchronously.

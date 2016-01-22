@@ -1,0 +1,27 @@
+{
+  "key.offset": 0,
+  "key.length": 20,
+  "key.diagnostic_stage": "source.diagnostic.stage.swift.parse",
+  "key.syntaxmap": [
+    {
+      "key.kind": "source.lang.swift.syntaxtype.keyword",
+      "key.offset": 0,
+      "key.length": 4
+    },
+    {
+      "key.kind": "source.lang.swift.syntaxtype.identifier",
+      "key.offset": 5,
+      "key.length": 3
+    },
+    {
+      "key.kind": "source.lang.swift.syntaxtype.identifier",
+      "key.offset": 9,
+      "key.length": 1
+    },
+    {
+      "key.kind": "source.lang.swift.syntaxtype.typeidentifier",
+      "key.offset": 12,
+      "key.length": 3
+    }
+  ]
+}
