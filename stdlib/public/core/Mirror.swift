@@ -371,6 +371,7 @@ public protocol CustomLeafReflectable : CustomReflectable {}
 ///
 /// Do not declare new conformances to this protocol; they will not
 /// work as expected.
+@swift3_migration(renamed="MirrorPath")
 public protocol MirrorPathType {}
 extension IntMax : MirrorPathType {}
 extension Int : MirrorPathType {}
