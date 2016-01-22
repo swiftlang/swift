@@ -1025,7 +1025,7 @@ CalleeCandidateInfo::evaluateCloseness(Type candArgListType,
         continue;
       
       // FIXME: Right now, a "matching" overload is one with a parameter whose
-      // type is identical to the argument type, or substitutable via rudimentery
+      // type is identical to the argument type, or substitutable via rudimentary
       // handling of functions with a single archetype in one or more parameters.
       // We can still do something more sophisticated with this.
       // FIXME: Use TC.isConvertibleTo?

@@ -250,7 +250,7 @@ namespace {
       }
 
       // TODO: The systems that we need to solve for interpolated string expressions
-      // require bestoke logic that don't currently work with this approach.
+      // require bespoke logic that don't currently work with this approach.
       if (isa<InterpolatedStringLiteralExpr>(expr)) {
         return { false, expr };
       }
@@ -377,7 +377,7 @@ namespace {
 
       CS.setFavoredType(expr, favoredTy.getPointer());
       
-      // If we have a chain of identical binop expressions with homogenous
+      // If we have a chain of identical binop expressions with homogeneous
       // argument types, we can directly simplify the associated constraint
       // graph.
       auto simplifyBinOpExprTyVars = [&]() {
