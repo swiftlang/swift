@@ -674,6 +674,8 @@ namespace {
     CC_SelfMismatch,            ///< Self argument mismatches.
     CC_OneArgumentNearMismatch, ///< All arguments except one match, near miss.
     CC_OneArgumentMismatch,     ///< All arguments except one match.
+    CC_OneGenericArgumentNearMismatch, ///< All arguments except one match, guessing generic binding, near miss.
+    CC_OneGenericArgumentMismatch,     ///< All arguments except one match, guessing generic binding.
     CC_ArgumentNearMismatch,    ///< Argument list mismatch, near miss.
     CC_ArgumentMismatch,        ///< Argument list mismatch.
     CC_ArgumentLabelMismatch,   ///< Argument label mismatch.
@@ -812,6 +814,10 @@ namespace {
     /// After the candidate list is formed, it can be filtered down to discard
     /// obviously mismatching candidates and compute a "closeness" for the
     /// resultant set.
+    std::pair<CandidateCloseness, CalleeCandidateInfo::FailedArgumentInfo>
+    evaluateCloseness(Type candArgListType, ArrayRef<CallArgParam> actualArgs,
+                      bool argsHaveTrailingClosure);
+      
     void filterList(ArrayRef<CallArgParam> actualArgs);
     void filterList(Type actualArgsType) {
       return filterList(decomposeArgParamType(actualArgsType));
@@ -948,9 +954,9 @@ static bool argumentMismatchIsNearMiss(Type argType, Type paramType) {
 /// Determine how close an argument list is to an already decomposed argument
 /// list.  If the closeness is a miss by a single argument, then this returns
 /// information about that failure.
-static std::pair<CandidateCloseness, CalleeCandidateInfo::FailedArgumentInfo>
-evaluateCloseness(Type candArgListType, ArrayRef<CallArgParam> actualArgs,
-                  bool argsHaveTrailingClosure) {
+std::pair<CandidateCloseness, CalleeCandidateInfo::FailedArgumentInfo>
+CalleeCandidateInfo::evaluateCloseness(Type candArgListType,
+                  ArrayRef<CallArgParam> actualArgs, bool argsHaveTrailingClosure) {
   auto candArgs = decomposeArgParamType(candArgListType);
 
   struct OurListener : public MatchCallArgumentListener {
@@ -987,6 +993,13 @@ evaluateCloseness(Type candArgListType, ArrayRef<CallArgParam> actualArgs,
   // If we found a mapping, check to see if the matched up arguments agree in
   // their type and count the number of mismatched arguments.
   unsigned mismatchingArgs = 0;
+
+  // Checking of archetypes.
+  // FIXME: For now just trying to verify applicability of arguments with only
+  // a single generic variable. Ideally we'd create a ConstraintSystem with
+  // type variables for all generics and solve it with the given argument types.
+  Type singleArchetype = nullptr;
+  Type matchingArgType = nullptr;
   
   // We classify an argument mismatch as being a "near" miss if it is a very
   // likely match due to a common sort of problem (e.g. wrong flags on a
@@ -1004,19 +1017,39 @@ evaluateCloseness(Type candArgListType, ArrayRef<CallArgParam> actualArgs,
     
     for (auto argNo : bindings) {
       auto argType = actualArgs[argNo].Ty;
+      auto rArgType = argType->getRValueType();
       
       // If the argument has an unresolved type, then we're not actually
       // matching against it.
-      if (argType->getRValueType()->is<UnresolvedType>())
+      if (rArgType->is<UnresolvedType>())
         continue;
       
       // FIXME: Right now, a "matching" overload is one with a parameter whose
-      // type is identical to one of the argument types. We can obviously do
-      // something more sophisticated with this.
-      // FIXME: Definitely need to handle archetypes for same-type constraints.
+      // type is identical to the argument type, or substitutable via rudimentery
+      // handling of functions with a single archetype in one or more parameters.
+      // We can still do something more sophisticated with this.
       // FIXME: Use TC.isConvertibleTo?
-      if (argType->getRValueType()->isEqual(paramType))
+      if (rArgType->isEqual(paramType))
         continue;
+      if (paramType->is<ArchetypeType>() && !rArgType->hasTypeVariable()) {
+        if (singleArchetype) {
+          if (!paramType->isEqual(singleArchetype))
+            return { CC_ArgumentMismatch, {}}; // multiple archetypes, too complicated
+          if (rArgType->isEqual(matchingArgType)) {
+            continue;
+          } else {
+            paramType = matchingArgType;
+            // fallthrough as mismatched arg, comparing nearness to archetype bound type
+          }
+        } else {
+          auto archetype = paramType->getAs<ArchetypeType>();
+          if (CS->TC.isSubstitutableFor(rArgType, archetype, CS->DC)) {
+            matchingArgType = rArgType;
+            singleArchetype = paramType;
+            continue;
+          }
+        }
+      }
       
       ++mismatchingArgs;
       
@@ -1039,8 +1072,14 @@ evaluateCloseness(Type candArgListType, ArrayRef<CallArgParam> actualArgs,
   // If we have exactly one argument mismatching, classify it specially, so that
   // close matches are prioritized against obviously wrong ones.
   if (mismatchingArgs == 1) {
-    auto closeness = mismatchesAreNearMisses ? CC_OneArgumentNearMismatch
-                                             : CC_OneArgumentMismatch;
+    CandidateCloseness closeness;
+    if (singleArchetype.isNull()) {
+      closeness = mismatchesAreNearMisses ? CC_OneArgumentNearMismatch
+                                          : CC_OneArgumentMismatch;
+    } else {
+      closeness = mismatchesAreNearMisses ? CC_OneGenericArgumentNearMismatch
+                                          : CC_OneGenericArgumentMismatch;
+    }
     // Return information about the single failing argument.
     return { closeness, failureInfo };
   }
@@ -1224,7 +1263,7 @@ void CalleeCandidateInfo::filterList(ArrayRef<CallArgParam> actualArgs) {
     // If this isn't a function or isn't valid at this uncurry level, treat it
     // as a general mismatch.
     if (!inputType) return { CC_GeneralMismatch, {}};
-    return evaluateCloseness(inputType, actualArgs, hasTrailingClosure);
+    return this->evaluateCloseness(inputType, actualArgs, hasTrailingClosure);
   });
 }
 
@@ -3335,7 +3374,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     
     // Explode out multi-index subscripts to find the best match.
     auto indexResult =
-      evaluateCloseness(cand.getArgumentType(), decomposedIndexType,
+      calleeInfo.evaluateCloseness(cand.getArgumentType(), decomposedIndexType,
                         /*FIXME: Subscript trailing closures*/false);
     if (selfConstraint > indexResult.first)
       return {selfConstraint, {}};
@@ -3536,7 +3575,9 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // as a specific problem of passing something of the wrong type into a
   // parameter.
   if ((calleeInfo.closeness == CC_OneArgumentMismatch ||
-       calleeInfo.closeness == CC_OneArgumentNearMismatch) &&
+       calleeInfo.closeness == CC_OneArgumentNearMismatch ||
+       calleeInfo.closeness == CC_OneGenericArgumentMismatch ||
+       calleeInfo.closeness == CC_OneGenericArgumentNearMismatch) &&
       calleeInfo.failedArgument.isValid()) {
     // Map the argument number into an argument expression.
     TCCOptions options = TCC_ForceRecheck;
@@ -4453,6 +4494,8 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
   case CC_NonLValueInOut:      // First argument is inout but no lvalue present.
   case CC_OneArgumentMismatch: // All arguments except one match.
   case CC_OneArgumentNearMismatch:
+  case CC_OneGenericArgumentMismatch:
+  case CC_OneGenericArgumentNearMismatch:
   case CC_SelfMismatch:        // Self argument mismatches.
   case CC_ArgumentNearMismatch:// Argument list mismatch.
   case CC_ArgumentMismatch:    // Argument list mismatch.
