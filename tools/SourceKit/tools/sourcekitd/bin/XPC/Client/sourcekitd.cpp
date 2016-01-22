@@ -251,7 +251,7 @@ void sourcekitd::initialize() {
   initializeTracing();
 
   assert(!GlobalConn);
-  GlobalConn = xpc_connection_create("com.apple.SourceKitService", NULL);
+  GlobalConn = xpc_connection_create(SOURCEKIT_XPCSERVICE_IDENTIFIER, NULL);
 
   xpc_connection_set_event_handler(GlobalConn, ^(xpc_object_t event) {
     xpc_type_t type = xpc_get_type(event);
