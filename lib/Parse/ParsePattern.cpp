@@ -107,10 +107,13 @@ static ParserStatus parseDefaultArgument(Parser &P,
     break;
   }
   
-  assert((diagID.ID != DiagID()) == !defaultArgs &&
+  assert(((diagID.ID != DiagID()) == !defaultArgs ||
+          // Sometimes curried method parameter lists get default arg info.
+          // Remove this when they go away.
+          paramContext == Parser::ParameterContextKind::Curried) &&
          "Default arguments specified for an unexpected parameter list kind");
   
-  if (!defaultArgs) {
+  if (diagID.ID != DiagID()) {
     auto inFlight = P.diagnose(equalLoc, diagID);
     if (initR.isNonNull())
       inFlight.fixItRemove(SourceRange(equalLoc, initR.get()->getEndLoc()));
