@@ -5339,7 +5339,7 @@ public:
         if (!CD->getOverriddenDecl()) {
           TC.diagnose(CD, diag::initializer_does_not_override)
             .highlight(attr->getLocation());
-          CD->setInvalid();
+          attr->setInvalid();
         } else if (!overrideRequiresKeyword(CD->getOverriddenDecl())) {
           // Special case: we are overriding a 'required' initializer, so we
           // need (only) the 'required' keyword.
