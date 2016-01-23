@@ -171,7 +171,7 @@ func foo(pair: (Int,Int)) -> Victory<(x:Int, y:Int)> {
 
 
 // https://bugs.swift.org/browse/SR-596
-// Compiler crashes when accesing a non-existent property of a closure parameter
+// Compiler crashes when accessing a non-existent property of a closure parameter
 func call(f: C -> Void) {}
 func makeRequest() {
   call { obj in
