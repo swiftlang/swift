@@ -1315,7 +1315,7 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
   if (CachedSafeLoop.first)
     return CachedSafeLoop.second;
 
-  assert(CachedSafeLoop.second == false &&
+  assert(!CachedSafeLoop.second &&
          "We only move to a true state below");
 
   // We will compute the state of this loop now.

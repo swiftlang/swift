@@ -2528,7 +2528,7 @@ private:
       return;
     }
 
-    if (Options.SynthesizeSugarOnTypes == false ||
+    if (!Options.SynthesizeSugarOnTypes ||
         pointer->getKind() == Node::Kind::BoundGenericClass)
     {
       // no sugar here

@@ -1743,7 +1743,7 @@ public:
     }
 
     auto ItAndInserted = DeducedAssociatedTypeCache.insert({ NTD, Types });
-    assert(ItAndInserted.second == true && "should not be in the map");
+    assert(ItAndInserted.second && "should not be in the map");
     return ItAndInserted.first->second;
   }
 
