@@ -409,7 +409,7 @@ extension NSArray : ArrayLiteralConvertible {
     // + (instancetype)arrayWithObjects:(const id [])objects count:(NSUInteger)cnt;
     let x = _extractOrCopyToNativeArrayBuffer(elements._buffer)
     self.init(
-      objects: UnsafeMutablePointer(x.firstElementAddress), count: x.length)
+      objects: UnsafeMutablePointer(x.firstElementAddress), count: x.count)
     _fixLifetime(x)
   }
 }
@@ -524,7 +524,7 @@ extension NSDictionary : DictionaryLiteralConvertible {
     self.init(
       objects: elements.map { (AnyObject?)($0.1) },
       forKeys: elements.map { (NSCopying?)($0.0) },
-      count: elements.length)
+      count: elements.count)
   }
 }
 
@@ -631,7 +631,7 @@ extension Dictionary : _ObjectiveCBridgeable {
 
     // `Dictionary<Key, Value>` where either `Key` or `Value` is a value type
     // may not be backed by an NSDictionary.
-    var builder = _DictionaryBuilder<Key, Value>(length: d.count)
+    var builder = _DictionaryBuilder<Key, Value>(count: d.count)
     d.enumerateKeysAndObjectsUsing {
       (anyObjectKey: AnyObject, anyObjectValue: AnyObject,
        stop: UnsafeMutablePointer<ObjCBool>) in
@@ -886,7 +886,7 @@ extension Set : _ObjectiveCBridgeable {
 
     // `Set<Element>` where `Element` is a value type may not be backed by
     // an NSSet.
-    var builder = _SetBuilder<Element>(length: s.count)
+    var builder = _SetBuilder<Element>(count: s.count)
     s.enumerateObjectsUsing {
       (anyObjectMember: AnyObject, stop: UnsafeMutablePointer<ObjCBool>) in
       builder.add(member: Swift._forceBridgeFromObjectiveC(
@@ -963,7 +963,7 @@ extension NSEnumerator : Sequence {
 extension NSRange {
   public init(_ x: Range<Int>) {
     location = x.startIndex
-    length = x.length
+    length = x.count
   }
 
   @warn_unused_result
@@ -1138,7 +1138,7 @@ extension NSArray {
     // @objc(initWithObjects:count:)
     //    init(withObjects objects: UnsafePointer<AnyObject?>,
     //    count cnt: Int)
-    self.init(objects: UnsafeMutablePointer(x.firstElementAddress), count: x.length)
+    self.init(objects: UnsafeMutablePointer(x.firstElementAddress), count: x.count)
     _fixLifetime(x)
   }
 }

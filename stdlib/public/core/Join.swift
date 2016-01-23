@@ -26,7 +26,7 @@ public struct JoinIterator<
   /// Creates an iterator that presents the elements of the sequences
   /// traversed by `base`, concatenated using `separator`.
   ///
-  /// - Complexity: O(`separator.length`).
+  /// - Complexity: O(`separator.count`).
   public init<
     Separator : Sequence
     where
@@ -103,7 +103,7 @@ public struct JoinSequence<
   /// Creates a sequence that presents the elements of `base` sequences
   /// concatenated using `separator`.
   ///
-  /// - Complexity: O(`separator.length`).
+  /// - Complexity: O(`separator.count`).
   public init<
     Separator : Sequence
     where
@@ -125,13 +125,13 @@ public struct JoinSequence<
   public func _copyToNativeArrayBuffer()
     -> _ContiguousArrayBuffer<Base.Iterator.Element.Iterator.Element> {
     var result = ContiguousArray<Iterator.Element>()
-    let separatorSize: Int = numericCast(_separator.length)
+    let separatorSize: Int = numericCast(_separator.count)
 
     let reservation = _base._preprocessingPass {
       (s: Base) -> Int in
       var r = 0
       for chunk in s {
-        r += separatorSize + chunk.underestimatedLength
+        r += separatorSize + chunk.underestimatedCount
       }
       return r - separatorSize
     }

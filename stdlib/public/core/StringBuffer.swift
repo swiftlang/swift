@@ -144,7 +144,7 @@ public struct _StringBuffer {
     }
   }
 
-  var usedLength: Int {
+  var usedCount: Int {
     return (usedEnd - start) >> elementShift
   }
 
@@ -192,21 +192,21 @@ public struct _StringBuffer {
   ///
   /// - parameter bounds: Range of the substring that the caller tries
   ///   to extend.
-  /// - parameter newUsedLength: The desired size of the substring.
+  /// - parameter newUsedCount: The desired size of the substring.
   mutating func grow(
-    bounds: Range<UnsafePointer<_RawByte>>, newUsedLength: Int
+    bounds: Range<UnsafePointer<_RawByte>>, newUsedCount: Int
   ) -> Bool {
-    var newUsedLength = newUsedLength
+    var newUsedCount = newUsedCount
     // The substring to be grown could be pointing in the middle of this
     // _StringBuffer.  Adjust the size so that it covers the imaginary
     // substring from the start of the buffer to `oldUsedEnd`.
-    newUsedLength += (bounds.startIndex - UnsafePointer(start)) >> elementShift
+    newUsedCount += (bounds.startIndex - UnsafePointer(start)) >> elementShift
 
-    if _slowPath(newUsedLength > capacity) {
+    if _slowPath(newUsedCount > capacity) {
       return false
     }
 
-    let newUsedEnd = start + (newUsedLength << elementShift)
+    let newUsedEnd = start + (newUsedCount << elementShift)
 
     if _fastPath(self._storage.isUniquelyReferenced()) {
       usedEnd = newUsedEnd

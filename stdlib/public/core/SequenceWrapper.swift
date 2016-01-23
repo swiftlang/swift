@@ -28,8 +28,8 @@ extension _SequenceWrapper where
   Self : Sequence,
   Self.Iterator == Self.Base.Iterator {
 
-  public var underestimatedLength: Int {
-    return _base.underestimatedLength
+  public var underestimatedCount: Int {
+    return _base.underestimatedCount
   }
 }
 

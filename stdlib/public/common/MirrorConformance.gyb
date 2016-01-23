@@ -21,7 +21,7 @@
 # - genericArgs: a list of names of generic argument types that you need for your Mirror
 # - genericConstraints: a dictionary that contains constraints on generic argument types
 # - disposition: a valid disposition for your Mirror
-# You still need to provide length, subscript, summary and quickLookObject manually when using
+# You still need to provide count, subscript, summary and quickLookObject manually when using
 # this template, which is probably reasonable since those are "the meat" of every Mirror
 }%
 

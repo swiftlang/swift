@@ -195,7 +195,7 @@ array.check_subscript(index: Int)
   read. No state is written. Despite being read only, this operation is control
   dependent.
 
-array.get_length() -> Int
+array.get_count() -> Int
 
   Read the array count (``array.endIndex - array.startIndex``) from the storage
   descriptor. No elements are read. No state is written. This is neither guarded
@@ -204,7 +204,7 @@ array.get_length() -> Int
 array.get_capacity() -> Int
 
   Read the array capacity from the storage descriptor. The semantics
-  are identical to ``get_length`` except for the meaning of the return value.
+  are identical to ``get_count`` except for the meaning of the return value.
 
 array.make_mutable()
 
@@ -263,7 +263,7 @@ check_subscript  guards          get_element, get_element_address
 make_mutable     interferes-with props.isCocoa/needsElementTypeCheck
 get_elt_addr     interferes-with get_element, get_element_address,
                                  props.isCocoa/needsElementTypeCheck
-mutate_unknown   interferes-with get_element, check_subscript, get_length,
+mutate_unknown   interferes-with get_element, check_subscript, get_count,
                                  get_capacity, get_element_address,
                                  props.isCocoa/needsElementTypeCheck
 ================ =============== ==========================================

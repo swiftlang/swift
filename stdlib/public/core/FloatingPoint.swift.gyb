@@ -16,15 +16,15 @@ import SwiftShims
 # Utility code for later in this template
 #
 
-# // Bit counts for all floating point types.
+# // Bit counts for all floating point types. 
 # // 80-bit floating point types are only permitted on x86 architectures. This
 # // restriction is handled via #if's in the generated code.
 allFloatBits = [32, 64, 80]
 
-# Bit counts for all int types.
+# Bit counts for all int types
 allIntBits = [8, 16, 32, 64, 'Int']
 
-# Number of bits in the Builtin.Word type.
+# Number of bits in the Builtin.Word type
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 
 # Number of bits in integer literals.
@@ -96,14 +96,14 @@ def getMinNormalBitPattern(bits):
         return '0x0010000000000000'
     return 'error'
 
-def getExponentBitLength(bits):
+def getExponentBitCount(bits):
     if bits == 32:
         return '8'
     if bits == 64:
         return '11'
     return 'error'
 
-def getSignificantBitLength(bits):
+def getSignificantBitCount(bits):
     if bits == 32:
         return '23'
     if bits == 64:
@@ -224,12 +224,12 @@ extension ${Self} : FloatingPoint {
 
   @warn_unused_result
   func __getBiasedExponent() -> _BitsType {
-    return (_toBitPattern() >> ${getSignificantBitLength(bits)}) & ${getInfinityExponent(bits)}
+    return (_toBitPattern() >> ${getSignificantBitCount(bits)}) & ${getInfinityExponent(bits)}
   }
 
   @warn_unused_result
   func __getSignificand() -> _BitsType {
-    let mask: _BitsType = (1 << ${getSignificantBitLength(bits)}) - 1
+    let mask: _BitsType = (1 << ${getSignificantBitCount(bits)}) - 1
     return _toBitPattern() & mask
   }
 
@@ -322,7 +322,7 @@ extension ${Self} : FloatingPoint {
       // from infinity.
       let significand = __getSignificand()
       if significand != 0 {
-        return (significand >> (${getSignificantBitLength(bits)} - 1)) == 0
+        return (significand >> (${getSignificantBitCount(bits)} - 1)) == 0
       }
     }
     return false
@@ -341,7 +341,7 @@ extension ${Self} /* : FloatingPoint */ {
         if significand == 0 {
           return isSignMinus ? .NegativeInfinity : .PositiveInfinity
         }
-        let isQNaN = (significand >> (${getSignificantBitLength(bits)} - 1)) == 1
+        let isQNaN = (significand >> (${getSignificantBitCount(bits)} - 1)) == 1
         return isQNaN ? .QuietNaN : .SignalingNaN
       }
 

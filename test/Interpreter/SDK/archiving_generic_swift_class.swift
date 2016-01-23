@@ -163,20 +163,20 @@ func unarchive() {
   // written it.
   var rawData: [UInt8] = []
 
-  var buffer = [UInt8](repeating: 0, length: 4096)
+  var buffer = [UInt8](repeating: 0, count: 4096)
 
   while true {
-    let length = read(STDIN_FILENO, &buffer, 4096)
-    if length == 0 { break }
-    if length == -1 {
+    let count = read(STDIN_FILENO, &buffer, 4096)
+    if count == 0 { break }
+    if count == -1 {
       if errno == EINTR { continue }
       fatalError("read failed")
     }
-    rawData += buffer[0..<length]
+    rawData += buffer[0..<count]
   }
 
   // Feed it into an unarchiver.
-  let data = NSData(bytes: rawData, length: rawData.length)
+  let data = NSData(bytes: rawData, length: rawData.count)
   let unarchiver = NSKeyedUnarchiver(forReadingWith: data)
 
   guard let strings
@@ -201,7 +201,7 @@ func unarchive() {
 // Pick a mode based on the command-line arguments.
 // The test launches as a "driver" which then respawns itself into reader
 // and writer subprocesses.
-if Process.arguments.length < 2 {
+if Process.arguments.count < 2 {
   driver()
 } else if Process.arguments[1] == "-archive" {
   archive()

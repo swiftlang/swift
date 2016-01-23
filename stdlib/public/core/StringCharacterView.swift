@@ -81,12 +81,12 @@ extension String.CharacterView : Collection {
     public // SPI(Foundation)    
     init(_base: String.UnicodeScalarView.Index) {
       self._base = _base
-      self._lengthUTF16 = Index._measureExtendedGraphemeClusterForward(_base)
+      self._countUTF16 = Index._measureExtendedGraphemeClusterForward(_base)
     }
 
-    internal init(_base: UnicodeScalarView.Index, _lengthUTF16: Int) {
+    internal init(_base: UnicodeScalarView.Index, _countUTF16: Int) {
       self._base = _base
-      self._lengthUTF16 = _lengthUTF16
+      self._countUTF16 = _countUTF16
     }
 
     /// Returns the next consecutive value after `self`.
@@ -112,8 +112,8 @@ extension String.CharacterView : Collection {
 
     internal let _base: UnicodeScalarView.Index
 
-    /// The length of this extended grapheme cluster in UTF-16 code units.
-    internal let _lengthUTF16: Int
+    /// The count of this extended grapheme cluster in UTF-16 code units.
+    internal let _countUTF16: Int
 
     /// The integer offset of this index in UTF-16 code units.
     public // SPI(Foundation)
@@ -125,7 +125,7 @@ extension String.CharacterView : Collection {
     /// scalars.
     internal var _endBase: UnicodeScalarView.Index {
       return UnicodeScalarView.Index(
-          _utf16Index + _lengthUTF16, _base._core)
+          _utf16Index + _countUTF16, _base._core)
     }
 
     /// Returns the length of the first extended grapheme cluster in UTF-16
@@ -252,7 +252,7 @@ extension String.CharacterView : Collection {
 
     var disposition: _MirrorDisposition { return .Aggregate }
 
-    var length: Int { return 0 }
+    var count: Int { return 0 }
 
     subscript(i: Int) -> (String, _Mirror) {
       _requirementFailure("_Mirror access out of bounds")
@@ -276,7 +276,7 @@ extension String.CharacterView : RangeReplaceableCollection {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`bounds.length`) if `bounds.endIndex
+  /// - Complexity: O(`bounds.count`) if `bounds.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceSubrange<
     C: Collection where C.Iterator.Element == Character
@@ -313,7 +313,7 @@ extension String.CharacterView : RangeReplaceableCollection {
   public mutating func appendContentsOf<
     S : Sequence where S.Iterator.Element == Character
   >(newElements: S) {
-    reserveCapacity(_core.length + newElements.underestimatedLength)
+    reserveCapacity(_core.count + newElements.underestimatedCount)
     for c in newElements {
       self.append(c)
     }

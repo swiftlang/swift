@@ -40,7 +40,7 @@ CoreAudioTestSuite.test("UnsafeBufferPointer.init(_: AudioBuffer)") {
       mNumberChannels: 0, mDataByteSize: 0, mData: nil)
     let result: UnsafeBufferPointer<Float> = UnsafeBufferPointer(audioBuffer)
     expectEqual(nil, result.baseAddress)
-    expectEqual(0, result.length)
+    expectEqual(0, result.count)
   }
 
   do {
@@ -51,7 +51,7 @@ CoreAudioTestSuite.test("UnsafeBufferPointer.init(_: AudioBuffer)") {
     expectEqual(
       UnsafePointer<Float>(audioBuffer.mData),
       result.baseAddress)
-    expectEqual(256, result.length)
+    expectEqual(256, result.count)
   }
 }
 
@@ -62,7 +62,7 @@ CoreAudioTestSuite.test("UnsafeMutableBufferPointer.init(_: AudioBuffer)") {
     let result: UnsafeMutableBufferPointer<Float> =
       UnsafeMutableBufferPointer(audioBuffer)
     expectEqual(nil, result.baseAddress)
-    expectEqual(0, result.length)
+    expectEqual(0, result.count)
   }
 
   do {
@@ -74,7 +74,7 @@ CoreAudioTestSuite.test("UnsafeMutableBufferPointer.init(_: AudioBuffer)") {
     expectEqual(
       UnsafeMutablePointer<Float>(audioBuffer.mData),
       result.baseAddress)
-    expectEqual(256, result.length)
+    expectEqual(256, result.count)
   }
 }
 
@@ -82,7 +82,7 @@ CoreAudioTestSuite.test(
   "AudioBuffer.init(_: UnsafeMutableBufferPointer, numberOfChannels: Int)") {
   do {
     // NULL pointer.
-    let buffer = UnsafeMutableBufferPointer<Float>(start: nil, length: 0)
+    let buffer = UnsafeMutableBufferPointer<Float>(start: nil, count: 0)
     let result = AudioBuffer(buffer, numberOfChannels: 2)
     expectEqual(2, result.mNumberChannels)
     expectEqual(0, result.mDataByteSize)
@@ -91,7 +91,7 @@ CoreAudioTestSuite.test(
   do {
     // Non-NULL pointer.
     let buffer = UnsafeMutableBufferPointer<Float>(
-      start: UnsafeMutablePointer<Float>(bitPattern: 0x1234_5678), length: 0)
+      start: UnsafeMutablePointer<Float>(bitPattern: 0x1234_5678), count: 0)
     let result = AudioBuffer(buffer, numberOfChannels: 2)
     expectEqual(2, result.mNumberChannels)
     expectEqual(0, result.mDataByteSize)
@@ -108,7 +108,7 @@ CoreAudioTestSuite.test(
 #endif
   let buffer = UnsafeMutableBufferPointer<Float>(
     start: UnsafeMutablePointer<Float>(bitPattern: 0x1234_5678),
-    length: overflowingCount)
+    count: overflowingCount)
 
   expectCrashLater()
   // An overflow happens when we try to compute the value for mDataByteSize.
@@ -122,12 +122,12 @@ CoreAudioTestSuite.test("AudioBufferList.sizeInBytes(maximumBuffers: Int)") {
     AudioBufferList.sizeInBytes(maximumBuffers: 16))
 }
 
-CoreAudioTestSuite.test("AudioBufferList.sizeInBytes(maximumBuffers: Int)/trap/length<0") {
+CoreAudioTestSuite.test("AudioBufferList.sizeInBytes(maximumBuffers: Int)/trap/count<0") {
   expectCrashLater()
   AudioBufferList.sizeInBytes(maximumBuffers: -1)
 }
 
-CoreAudioTestSuite.test("AudioBufferList.sizeInBytes(maximumBuffers: Int)/trap/length==0") {
+CoreAudioTestSuite.test("AudioBufferList.sizeInBytes(maximumBuffers: Int)/trap/count==0") {
   expectCrashLater()
   AudioBufferList.sizeInBytes(maximumBuffers: -1)
 }
@@ -140,22 +140,22 @@ CoreAudioTestSuite.test("AudioBufferList.sizeInBytes(maximumBuffers: Int)/trap/o
 CoreAudioTestSuite.test("AudioBufferList.allocate(maximumBuffers: Int)") {
   do {
     let ablPtrWrapper = AudioBufferList.allocate(maximumBuffers: 1)
-    expectEqual(1, ablPtrWrapper.length)
+    expectEqual(1, ablPtrWrapper.count)
     free(ablPtrWrapper.unsafeMutablePointer)
   }
   do {
     let ablPtrWrapper = AudioBufferList.allocate(maximumBuffers: 16)
-    expectEqual(16, ablPtrWrapper.length)
+    expectEqual(16, ablPtrWrapper.count)
     free(ablPtrWrapper.unsafeMutablePointer)
   }
 }
 
-CoreAudioTestSuite.test("AudioBufferList.allocate(maximumBuffers: Int)/trap/length==0") {
+CoreAudioTestSuite.test("AudioBufferList.allocate(maximumBuffers: Int)/trap/count==0") {
   expectCrashLater()
   AudioBufferList.allocate(maximumBuffers: 0)
 }
 
-CoreAudioTestSuite.test("AudioBufferList.allocate(maximumBuffers: Int)/trap/length<0") {
+CoreAudioTestSuite.test("AudioBufferList.allocate(maximumBuffers: Int)/trap/count<0") {
   expectCrashLater()
   AudioBufferList.allocate(maximumBuffers: -1)
 }
@@ -188,21 +188,21 @@ CoreAudioTestSuite.test(
   }
 }
 
-CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.length") {
+CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.count") {
   let sizeInBytes = AudioBufferList.sizeInBytes(maximumBuffers: 16)
   let ablPtr = UnsafeMutablePointer<AudioBufferList>(
     UnsafeMutablePointer<UInt8>(allocatingCapacity: sizeInBytes))
 
   // It is important that 'ablPtrWrapper' is a 'let'.  We are verifying that
-  // the 'length' property has a nonmutating setter.
+  // the 'count' property has a nonmutating setter.
   let ablPtrWrapper = UnsafeMutableAudioBufferListPointer(ablPtr)
 
   // Test getter.
   UnsafeMutablePointer<UInt32>(ablPtr).pointee = 0x1234_5678
-  expectEqual(0x1234_5678, ablPtrWrapper.length)
+  expectEqual(0x1234_5678, ablPtrWrapper.count)
 
   // Test setter.
-  ablPtrWrapper.length = 0x7765_4321
+  ablPtrWrapper.count = 0x7765_4321
   expectEqual(0x7765_4321, UnsafeMutablePointer<UInt32>(ablPtr).pointee)
 
   ablPtr.deallocateCapacity(sizeInBytes)
@@ -226,7 +226,7 @@ CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.subscript(_: Int)")
     UnsafeMutablePointer<AudioBuffer>(
         UnsafeMutablePointer<UInt8>(ablPtr) + ablHeaderSize
       ).pointee = audioBuffer
-    ablPtrWrapper.length = 1
+    ablPtrWrapper.count = 1
 
     expectEqual(2, ablPtrWrapper[0].mNumberChannels)
     expectEqual(1024, ablPtrWrapper[0].mDataByteSize)
@@ -239,7 +239,7 @@ CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.subscript(_: Int)")
       mNumberChannels: 5, mDataByteSize: 256,
       mData: UnsafeMutablePointer<Void>(bitPattern: 0x8765_4321 as UInt))
 
-    ablPtrWrapper.length = 2
+    ablPtrWrapper.count = 2
     ablPtrWrapper[1] = audioBuffer
 
     let audioBufferPtr = UnsafeMutablePointer<AudioBuffer>(

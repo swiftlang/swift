@@ -868,7 +868,7 @@ struct BrilliantMirror : _Mirror {
     return ObjectIdentifier(_value)
   }
 
-  var length: Int {
+  var count: Int {
     return 3
   }
 
@@ -1433,7 +1433,7 @@ Reflection.test("MirrorMirror") {
   var mirror = Mirror(reflecting: object)
   var mirrorMirror = Mirror(reflecting: mirror)
 
-  expectEqual(0, mirrorMirror.children.length)
+  expectEqual(0, mirrorMirror.children.count)
 }
 
 Reflection.test("OpaquePointer/null") {

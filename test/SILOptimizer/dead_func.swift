@@ -5,7 +5,7 @@
 var a : [String] = ["foo"]
 
 _requirementFailure("unreachable")
-for i in 0...a.length {
+for i in 0...a.count {
   let x = 0
 }
 

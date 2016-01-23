@@ -19,26 +19,26 @@ struct _Prespecialize {
     func _createArrayUser<Element : Comparable>(sampleValue: Element) {
       // Initializers.
       let _: [Element] = [ sampleValue ]
-      var a = [Element](repeating: sampleValue, length: 1)
+      var a = [Element](repeating: sampleValue, count: 1)
 
       // Read array element
       let _ =  a[0]
 
       // Set array elements
-      for j in 0..<a.length {
+      for j in 0..<a.count {
         a[0] = a[j]
       }
 
-      for i1 in 0..<a.length {
-        for i2 in 0..<a.length {
+      for i1 in 0..<a.count {
+        for i2 in 0..<a.count {
           a[i1] = a[i2]
         }
       }
 
       a[0] = sampleValue
 
-      // Get length and capacity
-      let _ = a.length + a.capacity
+      // Get count and capacity
+      let _ = a.count + a.capacity
 
       // Iterate over array
       for e in a {
@@ -79,12 +79,12 @@ struct _Prespecialize {
 
   // Force pre-specialization of Range<Int>
   static internal func _specializeRanges() -> Int {
-    let a = [Int](repeating: 1, length: 10)
-    var length = 0
+    let a = [Int](repeating: 1, count: 10)
+    var count = 0
     // Specialize Range for integers
-    for i in 0..<a.length {
-      length += a[i]
+    for i in 0..<a.count {
+      count += a[i]
     }
-    return length
+    return count
   }
 }

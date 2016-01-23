@@ -123,7 +123,7 @@ func test<
   
   checkEqual(x, 1...5, true)
 
-  x.reserveCapacity(x.length + 2)
+  x.reserveCapacity(x.count + 2)
   checkEqual(x, 1...5, true)
   
   let bufferId0 = bufferID(x)
@@ -132,7 +132,7 @@ func test<
   x += 0..<2
   let bufferId1 = checkReallocation(x, bufferId0, false)
   
-  for i in x.length..<(x.capacity + 1) {
+  for i in x.count..<(x.capacity + 1) {
     let bufferId1a = checkReallocation(x, bufferId1, false)
     x.append(13)
   }
@@ -153,7 +153,7 @@ func test<
     // It's possible that factor will change, but (cursory) testing
     // has shown that using 1.5, the other popular growth factor,
     // slows things down.
-    for _ in a.length..<(a.capacity * 4) {
+    for _ in a.count..<(a.capacity * 4) {
       let oldId = bufferID(a)
       growBy1(&a)
       if oldId != bufferID(a) {
@@ -225,7 +225,7 @@ func nsArrayOfStrings() -> Array<NSString> {
   let src: ContiguousArray<NSString> = ["foo", "bar", "baz"]
 
   return src.withUnsafeBufferPointer {
-    let ns =  NSArray(objects: UnsafePointer($0.baseAddress), count: $0.length)
+    let ns =  NSArray(objects: UnsafePointer($0.baseAddress), count: $0.count)
     return _convertNSArrayToArray(ns)
   }
 }
@@ -293,7 +293,7 @@ func testSlice() {
 
   // ArraySlice it
   var bSlice = b[3..<8]
-  print("<\(bSlice.length)>")
+  print("<\(bSlice.count)>")
   // CHECK-NEXT: <5>
   print("bSlice0: \(bSlice)")      // CHECK-NEXT: bSlice0: [3, 4, 5, 6, 7]
 
@@ -332,7 +332,7 @@ func testSlice() {
 
   // Appending to aSlice works...
   aSlice.append("fodder")
-  print("<\(aSlice.length)>")      // CHECK-NEXT: <3>
+  print("<\(aSlice.count)>")      // CHECK-NEXT: <3>
   printSequence(aSlice)           // CHECK-NEXT: [buzz, baz, fodder]
 
   // And doesn't change a
@@ -371,7 +371,7 @@ func testReplace${A}(
   testReplace({ r })
   
   // This test should ensure r's retain isn't dropped before we start testing.
-  if (r.length != testWidth) {
+  if (r.count != testWidth) {
     print("something bad happened!")
   }
 }
@@ -387,7 +387,7 @@ for (maxValue, label) in [(testWidth, "trailing"), (testWidth*2, "interior")] {
   print("testing subrange replacement in \(label) Sub-ArraySlice")
   testReplaceArraySlice {
     var a = ContiguousArray(X(-testWidth)..<X(maxValue))
-    a.reserveCapacity(a.length * 3 / 2)
+    a.reserveCapacity(a.count * 3 / 2)
     return a[testWidth..<(2 * testWidth)]
   }
 }

@@ -19,9 +19,9 @@ var CollectionTypeTests = TestSuite("Collection")
 
 % import gyb
 
-struct CollectionWithDefaultUnderestimatedLength : Collection {
-  init(length: Int) {
-    self._length = length
+struct CollectionWithDefaultUnderestimatedCount : Collection {
+  init(count: Int) {
+    self._count = count
   }
 
   func iterator() -> MinimalIterator<OpaqueValue<Int>> {
@@ -30,12 +30,12 @@ struct CollectionWithDefaultUnderestimatedLength : Collection {
   }
 
   var startIndex: MinimalForwardIndex {
-    return MinimalForwardIndex(position: 0, startIndex: 0, endIndex: _length)
+    return MinimalForwardIndex(position: 0, startIndex: 0, endIndex: _count)
   }
 
   var endIndex: MinimalForwardIndex {
     return MinimalForwardIndex(
-      position: _length, startIndex: 0, endIndex: _length)
+      position: _count, startIndex: 0, endIndex: _count)
   }
 
   subscript(i: MinimalForwardIndex) -> OpaqueValue<Int> {
@@ -43,7 +43,7 @@ struct CollectionWithDefaultUnderestimatedLength : Collection {
     return OpaqueValue(0xffff)
   }
 
-  var _length: Int
+  var _count: Int
 }
 
 
@@ -58,9 +58,9 @@ var MinimalForwardCollectionWithCustomFilter_timesFilterWasCalled: Int = 0
 struct MinimalForwardCollectionWith${Implementation}Filter<Element>
   : Collection {
 
-  init(_ data: [Element], underestimatedLength: UnderestimatedLengthBehavior) {
+  init(_ data: [Element], underestimatedCount: UnderestimatedCountBehavior) {
     self._data = MinimalForwardCollection(
-      elements: data, underestimatedLength: underestimatedLength)
+      elements: data, underestimatedCount: underestimatedCount)
   }
 
   func iterator() -> MinimalIterator<Element> {
@@ -139,14 +139,14 @@ func callGenericCollectionFilter<S : Collection>(
 
 CollectionTypeTests.test("filter/Collection/${Implementation}Implementation/${dispatch}") {
   for test in filterTests {
-    for underestimatedLengthBehavior in [
-      UnderestimatedLengthBehavior.Precise,
-      UnderestimatedLengthBehavior.Half,
-      UnderestimatedLengthBehavior.Value(0)
+    for underestimatedCountBehavior in [
+      UnderestimatedCountBehavior.Precise,
+      UnderestimatedCountBehavior.Half,
+      UnderestimatedCountBehavior.Value(0)
     ] {
       let s = MinimalForwardCollectionWith${Implementation}Filter<OpaqueValue<Int>>(
         test.sequence.map(OpaqueValue.init),
-        underestimatedLength: underestimatedLengthBehavior)
+        underestimatedCount: underestimatedCountBehavior)
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
@@ -166,10 +166,10 @@ CollectionTypeTests.test("filter/Collection/${Implementation}Implementation/${di
 %     end
       expectEqual(
         test.sequence, s.map { $0.value }, "collection should not be consumed")
-      expectEqual(test.sequence.length, timesClosureWasCalled,
+      expectEqual(test.sequence.count, timesClosureWasCalled,
         "filter() should be eager and should only call its predicate once per element")
       expectGE(
-        2 * result.length, result.capacity,
+        2 * result.count, result.capacity,
         "filter() should not reserve capacity"
         + "(it does not know how much the predicate will filter out)")
     }
@@ -190,9 +190,9 @@ var MinimalForwardCollectionWithCustomMap_timesMapWasCalled: Int = 0
 struct MinimalForwardCollectionWith${Implementation}Map<Element>
   : Collection {
 
-  init(_ data: [Element], underestimatedLength: UnderestimatedLengthBehavior) {
+  init(_ data: [Element], underestimatedCount: UnderestimatedCountBehavior) {
     self._data = MinimalForwardCollection(
-      elements: data, underestimatedLength: underestimatedLength)
+      elements: data, underestimatedCount: underestimatedCount)
   }
 
   func iterator() -> MinimalIterator<Element> {
@@ -273,16 +273,16 @@ CollectionTypeTests.test(
   "map/Collection/${Implementation}Implementation/${dispatch}"
 ) {
   for test in mapTests {
-    for underestimatedLengthBehavior in [
-      UnderestimatedLengthBehavior.Precise,
-      UnderestimatedLengthBehavior.Half,
-      UnderestimatedLengthBehavior.Value(0)
+    for underestimatedCountBehavior in [
+      UnderestimatedCountBehavior.Precise,
+      UnderestimatedCountBehavior.Half,
+      UnderestimatedCountBehavior.Value(0)
     ] {
       let s = MinimalForwardCollectionWith${Implementation}Map<
         OpaqueValue<Int>
       >(
         test.sequence.map(OpaqueValue.init),
-        underestimatedLength: underestimatedLengthBehavior)
+        underestimatedCount: underestimatedCountBehavior)
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
@@ -307,7 +307,7 @@ CollectionTypeTests.test(
 %     end
       expectEqual(test.sequence, s.map { $0.value },
         "collection should not be consumed")
-      expectEqual(test.sequence.length, timesClosureWasCalled,
+      expectEqual(test.sequence.count, timesClosureWasCalled,
         "map() should be eager and should only call its predicate"
         + "once per element")
     }
@@ -327,23 +327,23 @@ CollectionTypeTests.test(
 ${LazyFlatMapTest}
 
 //===----------------------------------------------------------------------===//
-// underestimatedLength
+// underestimatedCount
 //===----------------------------------------------------------------------===//
 
-CollectionTypeTests.test("underestimatedLength/Collection/DefaultImplementation") {
+CollectionTypeTests.test("underestimatedCount/Collection/DefaultImplementation") {
   do {
-    let s = CollectionWithDefaultUnderestimatedLength(length: 0)
-    expectEqual(0, callGenericUnderestimatedLength(s))
+    let s = CollectionWithDefaultUnderestimatedCount(count: 0)
+    expectEqual(0, callGenericUnderestimatedCount(s))
   }
   do {
-    let s = CollectionWithDefaultUnderestimatedLength(length: 5)
-    expectEqual(5, callGenericUnderestimatedLength(s))
+    let s = CollectionWithDefaultUnderestimatedCount(count: 5)
+    expectEqual(5, callGenericUnderestimatedCount(s))
   }
 }
 
-struct CollectionWithCustomUnderestimateLength : Collection {
-  init(underestimatedLength: Int) {
-    self._underestimatedLength = underestimatedLength
+struct CollectionWithCustomUnderestimatedCount : Collection {
+  init(underestimatedCount: Int) {
+    self._underestimatedCount = underestimatedCount
   }
 
   func iterator() -> MinimalIterator<OpaqueValue<Int>> {
@@ -367,21 +367,21 @@ struct CollectionWithCustomUnderestimateLength : Collection {
     return OpaqueValue(0xffff)
   }
 
-  var underestimatedLength: Int {
-    return _underestimatedLength
+  var underestimatedCount: Int {
+    return _underestimatedCount
   }
 
-  let _underestimatedLength: Int
+  let _underestimatedCount: Int
 }
 
-CollectionTypeTests.test("underestimatedLength/Collection/CustomImplementation") {
+CollectionTypeTests.test("underestimatedCount/Collection/CustomImplementation") {
   do {
-    let s = CollectionWithCustomUnderestimateLength(underestimatedLength: 0)
-    expectEqual(0, callGenericUnderestimatedLength(s))
+    let s = CollectionWithCustomUnderestimatedCount(underestimatedCount: 0)
+    expectEqual(0, callGenericUnderestimatedCount(s))
   }
   do {
-    let s = CollectionWithCustomUnderestimateLength(underestimatedLength: 5)
-    expectEqual(5, callGenericUnderestimatedLength(s))
+    let s = CollectionWithCustomUnderestimatedCount(underestimatedCount: 5)
+    expectEqual(5, callGenericUnderestimatedCount(s))
   }
 }
 
@@ -390,24 +390,24 @@ CollectionTypeTests.test("underestimatedLength/Collection/CustomImplementation")
 //===----------------------------------------------------------------------===//
 
 struct MinimalForwardCollectionWithDefaultIterator : Collection {
-  init(length: Int) {
-    self._length = length
+  init(count: Int) {
+    self._count = count
   }
 
   var startIndex: MinimalForwardIndex {
-    return MinimalForwardIndex(position: 0, startIndex: 0, endIndex: _length)
+    return MinimalForwardIndex(position: 0, startIndex: 0, endIndex: _count)
   }
 
   var endIndex: MinimalForwardIndex {
     return MinimalForwardIndex(
-      position: _length, startIndex: 0, endIndex: _length)
+      position: _count, startIndex: 0, endIndex: _count)
   }
 
   subscript(i: MinimalForwardIndex) -> OpaqueValue<Int> {
     return OpaqueValue(i.position + 1)
   }
 
-  var _length: Int
+  var _count: Int
 }
 
 func callGenericIterator<S : Sequence>(sequence: S) -> S.Iterator {
@@ -415,8 +415,8 @@ func callGenericIterator<S : Sequence>(sequence: S) -> S.Iterator {
 }
 
 CollectionTypeTests.test("Collection.iterator()/DefaultImplementation") {
-  for length in [ 0, 5 ] {
-    let collection = MinimalForwardCollectionWithDefaultIterator(length: length)
+  for count in [ 0, 5 ] {
+    let collection = MinimalForwardCollectionWithDefaultIterator(count: count)
 
     do {
       // Check the return type of the function when called statically.
@@ -435,15 +435,15 @@ CollectionTypeTests.test("Collection.iterator()/DefaultImplementation") {
     }
 
     checkForwardCollection(
-      Array(1..<length+1).map(OpaqueValue.init) as [OpaqueValue<Int>],
+      Array(1..<count+1).map(OpaqueValue.init) as [OpaqueValue<Int>],
       collection
     ) { $0.value == $1.value }
   }
 }
 
 struct MinimalForwardCollectionWithCustomIterator : Collection {
-  init(length: Int) {
-    self._length = length
+  init(count: Int) {
+    self._count = count
   }
 
   static var timesIteratorWasCalled: Int = 0
@@ -451,29 +451,29 @@ struct MinimalForwardCollectionWithCustomIterator : Collection {
   func iterator() -> MinimalIterator<OpaqueValue<Int>> {
     ++MinimalForwardCollectionWithCustomIterator.timesIteratorWasCalled
     return MinimalIterator<OpaqueValue<Int>>(
-      Array(1..<_length+1).map(OpaqueValue.init) as [OpaqueValue<Int>]
+      Array(1..<_count+1).map(OpaqueValue.init) as [OpaqueValue<Int>]
     )
   }
 
   var startIndex: MinimalForwardIndex {
-    return MinimalForwardIndex(position: 0, startIndex: 0, endIndex: _length)
+    return MinimalForwardIndex(position: 0, startIndex: 0, endIndex: _count)
   }
 
   var endIndex: MinimalForwardIndex {
     return MinimalForwardIndex(
-      position: _length, startIndex: 0, endIndex: _length)
+      position: _count, startIndex: 0, endIndex: _count)
   }
 
   subscript(i: MinimalForwardIndex) -> OpaqueValue<Int> {
     return OpaqueValue(i.position + 1)
   }
 
-  var _length: Int
+  var _count: Int
 }
 
 CollectionTypeTests.test("Collection.iterator()/CustomImplementation") {
-  for length in [ 0, 5 ] {
-    let collection = MinimalForwardCollectionWithCustomIterator(length: length)
+  for count in [ 0, 5 ] {
+    let collection = MinimalForwardCollectionWithCustomIterator(count: count)
 
     do {
       // Check the return type of the function when called statically.
@@ -496,7 +496,7 @@ CollectionTypeTests.test("Collection.iterator()/CustomImplementation") {
     }
 
     checkForwardCollection(
-      Array(1..<length+1).map(OpaqueValue.init) as [OpaqueValue<Int>],
+      Array(1..<count+1).map(OpaqueValue.init) as [OpaqueValue<Int>],
       collection, resiliencyChecks: .none) { $0.value == $1.value }
 
   }
@@ -547,13 +547,13 @@ CollectionTypeTests.test("first/dispatch") {
 }
 
 //===----------------------------------------------------------------------===//
-// length
+// count
 //===----------------------------------------------------------------------===//
 
-CollectionTypeTests.test("length/dispatch") {
+CollectionTypeTests.test("count/dispatch") {
   let tester = CollectionLog.dispatchTester([OpaqueValue(1)])
-  _ = tester.length
-  expectCustomizable(tester, tester.log.length)
+  _ = tester.count
+  expectCustomizable(tester, tester.log.count)
 }
 
 //===----------------------------------------------------------------------===//

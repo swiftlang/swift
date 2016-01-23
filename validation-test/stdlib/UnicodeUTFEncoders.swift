@@ -72,7 +72,7 @@ func nsEncode<CodeUnit>(
   inout _ used: Int
 ) {
   var c = c
-  _require(buffer.length >= 4, "buffer is not large enough")
+  _require(buffer.count >= 4, "buffer is not large enough")
 
   let s = NSString(
     bytes: &c,
@@ -81,7 +81,7 @@ func nsEncode<CodeUnit>(
 
   s.getBytes(
     &buffer,
-    maxLength: buffer.length,
+    maxLength: buffer.count,
     usedLength: &used,
     encoding: encoding,
     options: [],
@@ -92,8 +92,8 @@ func nsEncode<CodeUnit>(
 class CodecTest<Codec : TestableUnicodeCodec> {
   var used = 0
   typealias CodeUnit = Codec.CodeUnit
-  var nsEncodeBuffer: [CodeUnit] = Array(repeating: 0, length: 4)
-  var encodeBuffer: [CodeUnit] = Array(repeating: 0, length: 4)
+  var nsEncodeBuffer: [CodeUnit] = Array(repeating: 0, count: 4)
+  var encodeBuffer: [CodeUnit] = Array(repeating: 0, count: 4)
 
   func testOne(scalar: UnicodeScalar) {
     /* Progress reporter

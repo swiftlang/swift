@@ -64,7 +64,7 @@ extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
 
   /// Returns the minimum element in `self` or `nil` if the sequence is empty.
   ///
-  /// - Complexity: O(`self.length`).
+  /// - Complexity: O(`elements.count`).
   ///
   /// ${orderingRequirement}
   @warn_unused_result
@@ -90,7 +90,7 @@ extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
 
   /// Returns the maximum element in `self` or `nil` if the sequence is empty.
   ///
-  /// - Complexity: O(`self.length`).
+  /// - Complexity: O(`elements.count`).
   ///   ${orderingRequirement}
   @warn_unused_result
   public func max(
@@ -341,7 +341,7 @@ extension Sequence {
   /// accumulated value initialized to `initial` and each element of
   /// `self`, in turn, i.e. return
   /// `combine(combine(...combine(combine(initial, self[0]),
-  /// self[1]),...self[length-2]), self[length-1])`.
+  /// self[1]),...self[count-2]), self[count-1])`.
   @warn_unused_result
   public func reduce<T>(
     initial: T, @noescape combine: (T, ${GElement}) throws -> T
@@ -362,16 +362,16 @@ extension Sequence {
   /// Return an `Array` containing the elements of `self` in reverse
   /// order.
   ///
-  /// Complexity: O(`self.length`).
+  /// Complexity: O(N), where N is the length of `self`.
   @warn_unused_result
   public func reversed() -> [${GElement}] {
     // FIXME(performance): optimize to 1 pass?  But Array(self) can be
     // optimized to a memcpy() sometimes.  Those cases are usually collections,
     // though.
     var result = Array(self)
-    let length = result.length
-    for i in 0..<length/2 {
-      swap(&result[i], &result[length - i - 1])
+    let count = result.count
+    for i in 0..<count/2 {
+      swap(&result[i], &result[count - i - 1])
     }
     return result
   }

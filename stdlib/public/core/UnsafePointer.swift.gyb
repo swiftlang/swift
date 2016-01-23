@@ -103,9 +103,9 @@ public struct ${Self}<Pointee>
   /// - Postcondition: The pointee is allocated, but not initialized.
   @warn_unused_result
   public init(allocatingCapacity count: Int) {
-    let lengthInBytes = strideof(Pointee.self) * count
-    self._rawValue = Builtin.allocRaw(
-      lengthInBytes._builtinWordValue, Builtin.alignof(Pointee.self))
+    let size = strideof(Pointee.self) * count
+    self._rawValue =
+      Builtin.allocRaw(size._builtinWordValue, Builtin.alignof(Pointee.self))
   }
 
   /// Deallocate uninitialized memory allocated for `count` instances
@@ -114,12 +114,10 @@ public struct ${Self}<Pointee>
   /// - Requires: The memory is not initialized.
   ///
   /// - Postcondition: The memory has been deallocated.
-  public func deallocateCapacity(count: Int) {
-    let lengthInBytes = strideof(Pointee.self) * count
+  public func deallocateCapacity(num: Int) {
+    let size = strideof(Pointee.self) * num
     Builtin.deallocRaw(
-      _rawValue,
-      lengthInBytes._builtinWordValue,
-      Builtin.alignof(Pointee.self))
+      _rawValue, size._builtinWordValue, Builtin.alignof(Pointee.self))
   }
 %  end
 
@@ -479,7 +477,7 @@ extension ${Self} : CustomDebugStringConvertible {
 ${MirrorDecl} {
   ${MirrorBoilerplate}
 
-  var length: Int { return 1 }
+  var count: Int { return 1 }
 
   func _getPointerValue() -> UInt64 {
     return UInt64(Int(Builtin.ptrtoint_Word(_value._rawValue)))

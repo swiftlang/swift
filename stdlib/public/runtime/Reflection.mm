@@ -360,9 +360,9 @@ const Metadata *swift_MagicMirrorData_objcValueType(HeapObject *owner,
 // -- Tuple destructuring.
   
 extern "C"
-intptr_t swift_TupleMirror_length(HeapObject *owner,
-                                  const OpaqueValue *value,
-                                  const Metadata *type) {
+intptr_t swift_TupleMirror_count(HeapObject *owner,
+                                 const OpaqueValue *value,
+                                 const Metadata *type) {
   auto Tuple = static_cast<const TupleTypeMetadata *>(type);
   return Tuple->NumElements;
 }
@@ -512,9 +512,9 @@ static const char *getFieldName(const char *fieldNames, size_t i) {
 // -- Struct destructuring.
   
 extern "C"
-intptr_t swift_StructMirror_length(HeapObject *owner,
-                                   const OpaqueValue *value,
-                                   const Metadata *type) {
+intptr_t swift_StructMirror_count(HeapObject *owner,
+                                  const OpaqueValue *value,
+                                  const Metadata *type) {
   auto Struct = static_cast<const StructMetadata *>(type);
   return Struct->Description->Struct.NumFields;
 }
@@ -608,9 +608,9 @@ const char *swift_EnumMirror_caseName(HeapObject *owner,
 }
 
 extern "C"
-intptr_t swift_EnumMirror_length(HeapObject *owner,
-                                 const OpaqueValue *value,
-                                 const Metadata *type) {
+intptr_t swift_EnumMirror_count(HeapObject *owner,
+                                const OpaqueValue *value,
+                                const Metadata *type) {
   if (!isEnumReflectable(type))
     return 0;
 
@@ -665,9 +665,9 @@ static Mirror getMirrorForSuperclass(const ClassMetadata *sup,
                                      const Metadata *type);
 
 extern "C"
-intptr_t swift_ClassMirror_length(HeapObject *owner,
-                                  const OpaqueValue *value,
-                                  const Metadata *type) {
+intptr_t swift_ClassMirror_count(HeapObject *owner,
+                                 const OpaqueValue *value,
+                                 const Metadata *type) {
   auto Clas = static_cast<const ClassMetadata*>(type);
   swift_release(owner);
   auto count = Clas->getDescription()->Class.NumFields;
@@ -804,9 +804,9 @@ static const Metadata *getMetadataForEncoding(const char *encoding) {
 /// \param owner passed at +1, consumed.
 /// \param value passed unowned.
 extern "C"
-intptr_t swift_ObjCMirror_length(HeapObject *owner,
-                                 const OpaqueValue *value,
-                                 const Metadata *type) {
+intptr_t swift_ObjCMirror_count(HeapObject *owner,
+                                const OpaqueValue *value,
+                                const Metadata *type) {
   auto isa = (Class)type;
   
   unsigned count = 0;

@@ -108,7 +108,7 @@ public func getVaList(args: [CVarArg]) -> CVaListPointer {
 public func _encodeBitsAsWords<T : CVarArg>(x: T) -> [Int] {
   let result = [Int](
     repeating: 0,
-    length: (sizeof(T.self) + sizeof(Int.self) - 1) / sizeof(Int.self))
+    count: (sizeof(T.self) + sizeof(Int.self) - 1) / sizeof(Int.self))
   var tmp = x
   // FIXME: use UnsafeMutablePointer.assignFrom() instead of memcpy.
   _memcpy(dest: UnsafeMutablePointer(result._baseAddressIfContiguous),
@@ -296,10 +296,10 @@ final internal class _VaListBuilder {
 #if os(watchOS) && arch(arm)   // FIXME: rdar://21203036 should be arch(armv7k)
     if let arg = arg as? _CVarArgAligned {
       let alignmentInWords = arg._cVarArgAlignment / sizeof(Int)
-      let misalignmentInWords = length % alignmentInWords
+      let misalignmentInWords = count % alignmentInWords
       if misalignmentInWords != 0 {
         let paddingInWords = alignmentInWords - misalignmentInWords
-        appendWords([Int](repeating: -1, length: paddingInWords))
+        appendWords([Int](repeating: -1, count: paddingInWords))
       }
     }
 #endif
@@ -318,59 +318,59 @@ final internal class _VaListBuilder {
   // FIXME: this should be packaged into a better storage type
 
   func appendWords(words: [Int]) {
-    let newLength = length + words.length
-    if newLength > allocated {
+    let newCount = count + words.count
+    if newCount > allocated {
       let oldAllocated = allocated
       let oldStorage = storage
-      let oldLength = length
+      let oldCount = count
 
-      allocated = max(newLength, allocated * 2)
-      storage = allocStorage(wordLength: allocated)
-      // length is updated below
+      allocated = max(newCount, allocated * 2)
+      storage = allocStorage(wordCount: allocated)
+      // count is updated below
 
       if oldStorage != nil {
-        storage.moveInitializeFrom(oldStorage, count: oldLength)
-        deallocStorage(wordLength: oldAllocated,
+        storage.moveInitializeFrom(oldStorage, count: oldCount)
+        deallocStorage(wordCount: oldAllocated,
           storage: oldStorage)
       }
     }
 
     for word in words {
-      storage[length] = word
-      length += 1
+      storage[count] = word
+      count += 1
     }
   }
 
   @warn_unused_result
-  func rawSizeAndAlignment(wordLength: Int) -> (Builtin.Word, Builtin.Word) {
-    return ((wordLength * strideof(Int.self))._builtinWordValue, 
+  func rawSizeAndAlignment(wordCount: Int) -> (Builtin.Word, Builtin.Word) {
+    return ((wordCount * strideof(Int.self))._builtinWordValue, 
       requiredAlignmentInBytes._builtinWordValue)
   }
 
   @warn_unused_result
-  func allocStorage(wordLength wordLength: Int) -> UnsafeMutablePointer<Int> {
-    let (rawSize, rawAlignment) = rawSizeAndAlignment(wordLength)
+  func allocStorage(wordCount wordCount: Int) -> UnsafeMutablePointer<Int> {
+    let (rawSize, rawAlignment) = rawSizeAndAlignment(wordCount)
     let rawStorage = Builtin.allocRaw(rawSize, rawAlignment)
     return UnsafeMutablePointer<Int>(rawStorage)
   }
 
   func deallocStorage(
-    wordLength wordLength: Int,
+    wordCount wordCount: Int,
     storage: UnsafeMutablePointer<Int>
   ) {
-    let (rawSize, rawAlignment) = rawSizeAndAlignment(wordLength)
+    let (rawSize, rawAlignment) = rawSizeAndAlignment(wordCount)
     Builtin.deallocRaw(storage._rawValue, rawSize, rawAlignment)
   }
 
   deinit {
     if storage != nil {
-      deallocStorage(wordLength: allocated, storage: storage)
+      deallocStorage(wordCount: allocated, storage: storage)
     }
   }
 
   // FIXME: alignof differs from the ABI alignment on some architectures
   let requiredAlignmentInBytes = alignof(Double.self)
-  var length = 0
+  var count = 0
   var allocated = 0
   var storage: UnsafeMutablePointer<Int> = nil
 }
@@ -390,7 +390,7 @@ final internal class _VaListBuilder {
 
   init() {
     // prepare the register save area
-    storage = Array(repeating: 0, length: _x86_64RegisterSaveWords)
+    storage = Array(repeating: 0, count: _x86_64RegisterSaveWords)
   }
 
   func append(arg: CVarArg) {
@@ -406,7 +406,7 @@ final internal class _VaListBuilder {
       }
       sseRegistersUsed += 1
     }
-    else if encoded.length == 1 && gpRegistersUsed < _x86_64CountGPRegisters {
+    else if encoded.count == 1 && gpRegistersUsed < _x86_64CountGPRegisters {
       storage[gpRegistersUsed] = encoded[0]
       gpRegistersUsed += 1
     }

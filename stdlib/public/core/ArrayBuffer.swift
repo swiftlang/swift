@@ -252,16 +252,16 @@ extension _ArrayBuffer {
       }
 
       // No contiguous storage found; we must allocate
-      let sliceLength = bounds.length
+      let boundsCount = bounds.count
       let result = _ContiguousArrayBuffer<Element>(
-        length: sliceLength, minimumCapacity: 0)
+        count: boundsCount, minimumCapacity: 0)
 
       // Tell Cocoa to copy the objects into our storage
       cocoa.buffer.getObjects(
         UnsafeMutablePointer(result.firstElementAddress),
         range: _SwiftNSRange(
           location: bounds.startIndex,
-          length: sliceLength))
+          length: boundsCount))
 
       return _SliceBuffer(result, shiftedToStartIndex: bounds.startIndex)
     }
@@ -286,14 +286,14 @@ extension _ArrayBuffer {
   }
 
   /// The number of elements the buffer stores.
-  public var length: Int {
+  public var count: Int {
     @inline(__always)
     get {
-      return _fastPath(_isNative) ? _native.length : _nonNative.count
+      return _fastPath(_isNative) ? _native.count : _nonNative.count
     }
     set {
-      _sanityCheck(_isNative, "attempting to update length of Cocoa array")
-      _native.length = newValue
+      _sanityCheck(_isNative, "attempting to update count of Cocoa array")
+      _native.count = newValue
     }
   }
   
@@ -401,7 +401,7 @@ extension _ArrayBuffer {
     if _fastPath(_isNative) {
       defer { _fixLifetime(self) }
       return try body(
-        UnsafeBufferPointer(start: firstElementAddress, length: length))
+        UnsafeBufferPointer(start: firstElementAddress, count: count))
     }
     return try ContiguousArray(self).withUnsafeBufferPointer(body)
   }
@@ -414,12 +414,12 @@ extension _ArrayBuffer {
     @noescape body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     _sanityCheck(
-      firstElementAddress != nil || length == 0,
+      firstElementAddress != nil || count == 0,
       "Array is bridging an opaque NSArray; can't get a pointer to the elements"
     )
     defer { _fixLifetime(self) }
     return try body(
-      UnsafeMutableBufferPointer(start: firstElementAddress, length: length))
+      UnsafeMutableBufferPointer(start: firstElementAddress, count: count))
   }
   
   /// An object that keeps the elements stored in this buffer alive.
@@ -437,7 +437,7 @@ extension _ArrayBuffer {
 
   /// A value that identifies the storage used by the buffer.  Two
   /// buffers address the same elements when they have the same
-  /// identity and length.
+  /// identity and count.
   public var identity: UnsafePointer<Void> {
     if _isNative {
       return _native.identity
@@ -461,7 +461,7 @@ extension _ArrayBuffer {
   /// reachable from `startIndex` by zero or more applications of
   /// `successor()`.
   public var endIndex: Int {
-    return length
+    return count
   }
 
   //===--- private --------------------------------------------------------===//

@@ -47,7 +47,7 @@ print("a == other: \(a == other)")
 print("name=\(a.value.name)")
 // CHECK-NEXT: name=DaveA
 
-print("length=\(a.value.locations.length)")
+print("length=\(a.value.locations.count)")
 // CHECK-NEXT: length=2
 
 print("locations[0]=\(a.value.locations[0])")

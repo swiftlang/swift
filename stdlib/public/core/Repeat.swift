@@ -18,11 +18,11 @@ public struct Repeated<Element> : Collection {
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = Int
 
-  /// Construct an instance that contains `length` elements having the
+  /// Construct an instance that contains `count` elements having the
   /// value `repeatedValue`.
-  internal init(_repeating repeatedValue: Element, length: Int) {
-    _require(length >= 0, "Repetition count should be non-negative")
-    self.length = length
+  internal init(_repeating repeatedValue: Element, count: Int) {
+    _require(count >= 0, "Repetition count should be non-negative")
+    self.count = count
     self.repeatedValue = repeatedValue
   }
   
@@ -32,10 +32,10 @@ public struct Repeated<Element> : Collection {
     return 0
   }
 
-  /// Always equal to `length`, which is one greater than the index of
+  /// Always equal to `count`, which is one greater than the index of
   /// the last element in a non-empty instance.
   public var endIndex: Index {
-    return length
+    return count
   }
 
   /// Access the element at `position`.
@@ -43,12 +43,12 @@ public struct Repeated<Element> : Collection {
   /// - Requires: `position` is a valid position in `self` and
   ///   `position != endIndex`.
   public subscript(position: Int) -> Element {
-    _require(position >= 0 && position < length, "Index out of range")
+    _require(position >= 0 && position < count, "Index out of range")
     return repeatedValue
   }
 
   /// The number of elements in this collection.
-  public let length: Int
+  public let count: Int
 
   /// The value of every element in this collection.
   public let repeatedValue: Element
@@ -56,7 +56,7 @@ public struct Repeated<Element> : Collection {
 
 /// Return a collection containing `n` repetitions of `elementInstance`.
 public func repeatElement<T>(element: T, count n: Int) -> Repeated<T> {
-  return Repeated(_repeating: element, length: n)
+  return Repeated(_repeating: element, count: n)
 }
 
 @available(*, unavailable, renamed="Repeated")

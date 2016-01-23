@@ -55,7 +55,7 @@ func _cocoaStringToSwiftString_NonASCII(
 
   return String(_StringCore(
     baseAddress: OpaquePointer(start),
-    length: length,
+    count: length,
     elementShift: 1,
     hasCocoaBuffer: true,
     owner: unsafeBitCast(cfImmutableValue, Optional<AnyObject>.self)))
@@ -74,16 +74,13 @@ internal func _cocoaStringToContiguous(
     "Known contiguously-stored strings should already be converted to Swift")
 
   let startIndex = range.startIndex
-  let length = range.endIndex - startIndex
+  let count = range.endIndex - startIndex
 
-  let buffer = _StringBuffer(
-    capacity: max(length, minimumCapacity),
-    initialSize: length,
-    elementWidth: 2)
+  let buffer = _StringBuffer(capacity: max(count, minimumCapacity), 
+                             initialSize: count, elementWidth: 2)
 
   _swift_stdlib_CFStringGetCharacters(
-    source,
-    _swift_shims_CFRange(location: startIndex, length: length),
+    source, _swift_shims_CFRange(location: startIndex, length: count), 
     UnsafeMutablePointer<_swift_shims_UniChar>(buffer.start))
   
   return buffer
@@ -114,7 +111,7 @@ internal func _cocoaStringSlice(
 
   let cfResult: AnyObject = _swift_stdlib_CFStringCreateWithSubstring(
     nil, cfSelf, _swift_shims_CFRange(
-      location: bounds.startIndex, length: bounds.length))
+      location: bounds.startIndex, length: bounds.count))
 
   return String(_cocoaString: cfResult)._core
 }
@@ -173,7 +170,7 @@ extension String {
 
     self._core = _StringCore(
       baseAddress: OpaquePointer(start),
-      length: length,
+      count: length,
       elementShift: isUTF16 ? 1 : 0,
       hasCocoaBuffer: true,
       owner: unsafeBitCast(cfImmutableValue, Optional<AnyObject>.self))
@@ -218,7 +215,7 @@ public final class _NSContiguousString : _SwiftNativeNSString {
   }
 
   func length() -> Int {
-    return _core.length
+    return _core.count
   }
 
   func characterAtIndex(index: Int) -> UInt16 {
@@ -229,19 +226,19 @@ public final class _NSContiguousString : _SwiftNativeNSString {
     buffer: UnsafeMutablePointer<UInt16>,
     range aRange: _SwiftNSRange) {
 
-    _require(aRange.location + aRange.length <= Int(_core.length))
+    _require(aRange.location + aRange.length <= Int(_core.count))
 
     if _core.elementWidth == 2 {
       UTF16._copy(
         _core.startUTF16 + aRange.location,
         destination: UnsafeMutablePointer<UInt16>(buffer),
-        length: aRange.length)
+        count: aRange.length)
     }
     else {
       UTF16._copy(
         _core.startASCII + aRange.location,
         destination: UnsafeMutablePointer<UInt16>(buffer),
-        length: aRange.length)
+        count: aRange.length)
     }
   }
 
@@ -255,7 +252,7 @@ public final class _NSContiguousString : _SwiftNativeNSString {
   // Implement sub-slicing without adding layers of wrapping
   //
   func substringFromIndex(start: Int) -> _NSContiguousString {
-    return _NSContiguousString(_core[Int(start)..<Int(_core.length)])
+    return _NSContiguousString(_core[Int(start)..<Int(_core.count)])
   }
 
   func substringToIndex(end: Int) -> _NSContiguousString {
@@ -279,8 +276,7 @@ extension String {
   /// Same as `_bridgeToObjectiveC()`, but located inside the core standard
   /// library.
   public func _stdlib_binary_bridgeToObjectiveCImpl() -> AnyObject {
-    if let ns = _core.cocoaBuffer
-        where _swift_stdlib_CFStringGetLength(ns) == _core.length {
+    if let ns = _core.cocoaBuffer where _swift_stdlib_CFStringGetLength(ns) == _core.count {
       return ns
     }
     _sanityCheck(_core.hasContiguousStorage)

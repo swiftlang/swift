@@ -62,15 +62,16 @@ public protocol _ArrayBufferProtocol : MutableCollection {
   @warn_unused_result
   func requestNativeBuffer() -> _ContiguousArrayBuffer<Element>?
 
-  /// Replace the given `subRange` with the first `subRangeNewLength`
-  /// elements of the given collection.
+  /// Replace the given `subRange` with the first `newCount` elements of
+  /// the given collection.
   ///
   /// - Requires: This buffer is backed by a uniquely-referenced
   /// `_ContiguousArrayBuffer`.
   mutating func replace<C : Collection where C.Iterator.Element == Element>(
     subRange subRange: Range<Int>,
-    with subRangeNewLength: Int,
-    elementsOf newValues: C)
+    with newCount: Int,
+    elementsOf newValues: C
+  )
 
   /// Returns a `_SliceBuffer` containing the elements in `bounds`.
   subscript(bounds: Range<Int>) -> _SliceBuffer<Element> {get}
@@ -91,7 +92,7 @@ public protocol _ArrayBufferProtocol : MutableCollection {
   ) rethrows -> R
 
   /// The number of elements the buffer stores.
-  var length: Int {get set}
+  var count: Int {get set}
 
   /// The number of elements the buffer can store without reallocation.
   var capacity: Int {get}
@@ -115,7 +116,7 @@ public protocol _ArrayBufferProtocol : MutableCollection {
 
   /// A value that identifies the storage used by the buffer.  Two
   /// buffers address the same elements when they have the same
-  /// identity and length.
+  /// identity and count.
   var identity: UnsafePointer<Void> {get}
 
   var startIndex: Int {get}
@@ -135,15 +136,15 @@ extension _ArrayBufferProtocol {
     C : Collection where C.Iterator.Element == Element
   >(
     subRange subRange: Range<Int>,
-    with subRangeNewLength: Int,
+    with newCount: Int,
     elementsOf newValues: C
   ) {
     _sanityCheck(startIndex == 0, "_SliceBuffer should override this function.")
-    let oldLength = self.length
-    let eraseLength = subRange.length
+    let oldCount = self.count
+    let eraseCount = subRange.count
 
-    let growth = subRangeNewLength - eraseLength
-    self.length = oldLength + growth
+    let growth = newCount - eraseCount
+    self.count = oldCount + growth
 
     let elements = self.subscriptBaseAddress
     _sanityCheck(elements != nil)
@@ -152,12 +153,12 @@ extension _ArrayBufferProtocol {
     let oldTailStart = elements + oldTailIndex
     let newTailIndex = oldTailIndex + growth
     let newTailStart = oldTailStart + growth
-    let tailLength = oldLength - subRange.endIndex
+    let tailCount = oldCount - subRange.endIndex
 
     if growth > 0 {
       // Slide the tail part of the buffer forwards, in reverse order
       // so as not to self-clobber.
-      newTailStart.moveInitializeBackwardFrom(oldTailStart, count: tailLength)
+      newTailStart.moveInitializeBackwardFrom(oldTailStart, count: tailCount)
 
       // Assign over the original subRange
       var i = newValues.startIndex
@@ -176,7 +177,7 @@ extension _ArrayBufferProtocol {
       // Assign all the new elements into the start of the subRange
       var i = subRange.startIndex
       var j = newValues.startIndex
-      for _ in 0..<subRangeNewLength {
+      for _ in 0..<newCount {
         elements[i] = newValues[j]
         i._successorInPlace()
         j._successorInPlace()
@@ -190,7 +191,7 @@ extension _ArrayBufferProtocol {
 
       // Move the tail backward to cover the shrinkage.
       let shrinkage = -growth
-      if tailLength > shrinkage {   // If the tail length exceeds the shrinkage
+      if tailCount > shrinkage {   // If the tail length exceeds the shrinkage
 
         // Assign over the rest of the replaced range with the first
         // part of the tail.
@@ -198,15 +199,15 @@ extension _ArrayBufferProtocol {
 
         // Slide the rest of the tail back
         oldTailStart.moveInitializeFrom(
-          oldTailStart + shrinkage, count: tailLength - shrinkage)
+          oldTailStart + shrinkage, count: tailCount - shrinkage)
       }
       else {                      // Tail fits within erased elements
         // Assign over the start of the replaced range with the tail
-        newTailStart.moveAssignFrom(oldTailStart, count: tailLength)
+        newTailStart.moveAssignFrom(oldTailStart, count: tailCount)
 
         // Destroy elements remaining after the tail in subRange
-        (newTailStart + tailLength).deinitializePointee(
-          count: shrinkage - tailLength)
+        (newTailStart + tailCount).deinitializePointee(
+          count: shrinkage - tailCount)
       }
     }
   }

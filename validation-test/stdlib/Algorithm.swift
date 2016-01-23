@@ -87,7 +87,7 @@ Algorithm.test("sorted/strings")
     [ "apple", "Banana", "cherry" ].sorted())
 
   let s = ["apple", "Banana", "cherry"].sorted() {
-    $0.characters.length > $1.characters.length
+    $0.characters.count > $1.characters.count
   }
   expectEqual([ "Banana", "cherry", "apple" ], s)
 }
@@ -104,7 +104,7 @@ struct A<T> : MutableCollection {
   }
 
   var endIndex: Int {
-    return impl.length
+    return impl.count
   }
 
   func iterator() -> Array<T>.Iterator {
@@ -113,24 +113,24 @@ struct A<T> : MutableCollection {
 
   subscript(i: Int) -> T {
     get {
-      expectTrue(i >= 0 && i < impl.length)
+      expectTrue(i >= 0 && i < impl.count)
       return impl[i]
     }
     set (x) {
-      expectTrue(i >= 0 && i < impl.length)
+      expectTrue(i >= 0 && i < impl.count)
       impl[i] = x
     }
   }
 
   subscript(r: Range<Int>) -> Array<T>.SubSequence {
     get {
-      expectTrue(r.startIndex >= 0 && r.startIndex <= impl.length)
-      expectTrue(r.endIndex >= 0 && r.endIndex <= impl.length)
+      expectTrue(r.startIndex >= 0 && r.startIndex <= impl.count)
+      expectTrue(r.endIndex >= 0 && r.endIndex <= impl.count)
       return impl[r]
     }
     set (x) {
-      expectTrue(r.startIndex >= 0 && r.startIndex <= impl.length)
-      expectTrue(r.endIndex >= 0 && r.endIndex <= impl.length)
+      expectTrue(r.startIndex >= 0 && r.startIndex <= impl.count)
+      expectTrue(r.endIndex >= 0 && r.endIndex <= impl.count)
       impl[r] = x
     }
   }
@@ -139,8 +139,8 @@ struct A<T> : MutableCollection {
 }
 
 func randomArray() -> A<Int> {
-  let length = Int(rand32(exclusiveUpperBound: 50))
-  return A(randArray(length))
+  let count = Int(rand32(exclusiveUpperBound: 50))
+  return A(randArray(count))
 }
 
 Algorithm.test("invalidOrderings") {
@@ -171,9 +171,9 @@ func makeQSortKiller(len: Int) -> [Int] {
   func Compare(x: Int, y : Int) -> Bool {
     if keys[x] == nil && keys[y] == nil {
       if (x == candidate) {
-        keys[x] = keys.length
+        keys[x] = keys.count
       } else {
-        keys[y] = keys.length
+        keys[y] = keys.count
       }
     }
     if keys[x] == nil {
@@ -187,8 +187,8 @@ func makeQSortKiller(len: Int) -> [Int] {
     return keys[x]! > keys[y]!
   }
 
-  var ary = [Int](repeating: 0, length: len)
-  var ret = [Int](repeating: 0, length: len)
+  var ary = [Int](repeating: 0, count: len)
+  var ret = [Int](repeating: 0, count: len)
   for i in 0..<len { ary[i] = i }
   ary = ary.sorted(Compare)
   for i in 0..<len {
@@ -202,10 +202,10 @@ Algorithm.test("sorted/complexity") {
 
   // Check performance of sorting an array of repeating values.
   var comparisons_100 = 0
-  ary = [Int](repeating: 0, length: 100)
+  ary = [Int](repeating: 0, count: 100)
   ary.sort { comparisons_100++; return $0 < $1 }
   var comparisons_1000 = 0
-  ary = [Int](repeating: 0, length: 1000)
+  ary = [Int](repeating: 0, count: 1000)
   ary.sort { comparisons_1000++; return $0 < $1 }
   expectTrue(comparisons_1000/comparisons_100 < 20)
 

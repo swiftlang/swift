@@ -16,7 +16,7 @@ public struct _FDInputStream {
   public let fd: CInt
   public var isClosed: Bool = false
   public var isEOF: Bool = false
-  internal var _buffer = [UInt8](repeating: 0, length: 256)
+  internal var _buffer = [UInt8](repeating: 0, count: 256)
   internal var _bufferUsed: Int = 0
 
   public init(fd: CInt) {
@@ -44,7 +44,7 @@ public struct _FDInputStream {
 
   public mutating func read() {
     let minFree = 128
-    var bufferFree = _buffer.length - _bufferUsed
+    var bufferFree = _buffer.count - _bufferUsed
     if bufferFree < minFree {
       _buffer.reserveCapacity(minFree - bufferFree)
       while bufferFree < minFree {
@@ -104,7 +104,7 @@ public struct _FDOutputStream : OutputStream {
     utf8.withUnsafeBufferPointer {
       (utf8) -> Void in
       var writtenBytes = 0
-      let bufferSize = utf8.length - 1
+      let bufferSize = utf8.count - 1
       while writtenBytes != bufferSize {
         let result = _swift_stdlib_write(
           self.fd, UnsafePointer(utf8.baseAddress + Int(writtenBytes)),

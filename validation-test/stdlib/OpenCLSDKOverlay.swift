@@ -77,8 +77,8 @@ var tests = TestSuite("MiscSDKOverlay")
 tests.test("clSetKernelArgsListAPPLE") {
   var err: cl_int                            // error code returned from api calls
   
-  var data = [Float](repeating: 0, length: DATA_SIZE)    // original data set given to device
-  var results = [Float](repeating: 0, length: DATA_SIZE) // results returned from device
+  var data = [Float](repeating: 0, count: DATA_SIZE)    // original data set given to device
+  var results = [Float](repeating: 0, count: DATA_SIZE) // results returned from device
   var correct: Int               // number of correct results returned
 
   var global: size_t                      // global domain size for our calculation
@@ -151,7 +151,7 @@ tests.test("clSetKernelArgsListAPPLE") {
   {
     var len: Int = 0
     
-    var buffer = [CChar](repeating: 0, length: 2048)
+    var buffer = [CChar](repeating: 0, count: 2048)
 
     print("Error: Failed to build program executable!")
     clGetProgramBuildInfo(

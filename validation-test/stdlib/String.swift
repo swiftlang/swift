@@ -325,7 +325,7 @@ StringTests.test("appendToSubstring") {
           sliceEnd < sliceStart {
           continue
         }
-        var s0 = String(repeating: UnicodeScalar("x"), length: initialSize)
+        var s0 = String(repeating: UnicodeScalar("x"), count: initialSize)
         let originalIdentity = s0.bufferID
         s0 = s0[
           s0.startIndex.advancedBy(sliceStart)..<s0.startIndex.advancedBy(sliceEnd)]
@@ -340,7 +340,7 @@ StringTests.test("appendToSubstring") {
         expectEqual(
           String(
             repeating: UnicodeScalar("x"),
-            length: sliceEnd - sliceStart + 1),
+            count: sliceEnd - sliceStart + 1),
           s0)
       }
     }
@@ -368,8 +368,8 @@ StringTests.test("appendToSubstringBug") {
   let prefixSize = size - suffixSize
   for i in 1..<10 {
     // We will be overflowing s0 with s1.
-    var s0 = String(repeating: UnicodeScalar("x"), length: size)
-    let s1 = String(repeating: UnicodeScalar("x"), length: prefixSize)
+    var s0 = String(repeating: UnicodeScalar("x"), count: size)
+    let s1 = String(repeating: UnicodeScalar("x"), count: prefixSize)
     let originalIdentity = s0.bufferID
 
     // Turn s0 into a slice that points to the end.
@@ -388,7 +388,7 @@ StringTests.test("appendToSubstringBug") {
     expectEqual(
       String(
         repeating: UnicodeScalar("x"),
-        length: suffixSize + prefixSize),
+        count: suffixSize + prefixSize),
       s0)
   }
 }
@@ -615,8 +615,8 @@ StringTests.test("stringCoreExtensibility") {
   let nonAscii = UTF16.CodeUnit(UnicodeScalar("é").value)
 
   for k in 0..<3 {
-    for length in 1..<16 {
-      for boundary in 0..<length {
+    for count in 1..<16 {
+      for boundary in 0..<count {
         
         var x = (
             k == 0 ? asciiString("b".characters)
@@ -626,7 +626,7 @@ StringTests.test("stringCoreExtensibility") {
 
         if k == 0 { expectEqual(1, x.elementWidth) }
         
-        for i in 0..<length {
+        for i in 0..<count {
           x.appendContentsOf(
             repeatElement(i < boundary ? ascii : nonAscii, count: 3))
         }
@@ -636,7 +636,7 @@ StringTests.test("stringCoreExtensibility") {
         expectEqualSequence(
           [UTF16.CodeUnit(UnicodeScalar("b").value)]
           + Array(repeatElement(ascii, count: 3*boundary))
-          + repeatElement(nonAscii, count: 3*(length - boundary))
+          + repeatElement(nonAscii, count: 3*(count - boundary))
           + repeatElement(ascii, count: 2),
           x
         )
@@ -705,10 +705,10 @@ StringTests.test("stringCoreReserve") {
 func makeStringCore(base: String) -> _StringCore {
   var x = _StringCore()
   // make sure some - but not all - replacements will have to grow the buffer
-  x.reserveCapacity(base._core.length * 3 / 2)
+  x.reserveCapacity(base._core.count * 3 / 2)
   x.appendContentsOf(base._core)
   // In case the core was widened and lost its capacity
-  x.reserveCapacity(base._core.length * 3 / 2)
+  x.reserveCapacity(base._core.count * 3 / 2)
   return x
 }
 
@@ -1051,7 +1051,7 @@ StringTests.test("indexConversion") {
   var matches: [String] = []
   
   re.enumerateMatchesIn(
-    s, options: NSMatchingOptions(), range: NSRange(0..<s.utf16.length)
+    s, options: NSMatchingOptions(), range: NSRange(0..<s.utf16.count)
   ) {
     result, flags, stop
   in

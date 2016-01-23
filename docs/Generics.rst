@@ -261,9 +261,9 @@ requirements. Protocols can also contain operators, properties, and subscript
 operators::
   
   protocol RandomAccessContainer : Collection {
-    var length : Int
-    func ==(lhs : Self, rhs : Self)
-    subscript (i : Int) -> Element
+    var count: Int
+    func == (lhs: Self, rhs: Self)
+    subscript(i: Int) -> Element
   }
 
 Operator requirements can be satisfied by operator definitions, property

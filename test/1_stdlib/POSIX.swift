@@ -164,8 +164,8 @@ POSIXTests.test("fcntl(CInt, CInt, UnsafeMutablePointer<Void>): locking and unlo
   expectGT(Int(fd), 0)
 	
   let data = "Testing 1 2 3"
-  let bytesWritten = write(fd, data, data.utf8.length)
-  expectEqual(data.utf8.length, bytesWritten)
+  let bytesWritten = write(fd, data, data.utf8.count)
+  expectEqual(data.utf8.count, bytesWritten)
 	
   var rc = close(fd)
   expectEqual(0, rc)
@@ -177,7 +177,7 @@ POSIXTests.test("fcntl(CInt, CInt, UnsafeMutablePointer<Void>): locking and unlo
   // Lock for reading...
   var flck = flock()
   flck.l_type = Int16(F_RDLCK)
-  flck.l_len = off_t(data.utf8.length)
+  flck.l_len = off_t(data.utf8.count)
   rc = fcntl(fd, F_SETLK, &flck)
   expectEqual(0, rc)
 	

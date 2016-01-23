@@ -25,8 +25,8 @@ func _permuteInternal(
 
 // Convenience wrapper for the permute method.
 func permute(size: Int, _ verify: ([Int]) -> Void) {
-  var perm = [Int](repeating: 0, length: size)
-  var visited = [Bool](repeating: false, length: size)
+  var perm = [Int](repeating: 0, count: size)
+  var visited = [Bool](repeating: false, count: size)
   _permuteInternal(0, size, &perm, &visited, verify)
 }
 
@@ -61,7 +61,7 @@ permute(3, printer)
 
 let sort_verifier: ([Int]) -> Void = {
     var y = $0.sorted()
-    for i in 0..<y.length - 1 {
+    for i in 0..<y.count - 1 {
     if (y[i] > y[i+1]) {
         print("Error: \(y)")
         return
@@ -90,7 +90,7 @@ let partition_verifier: ([Int]) -> Void = {
     }
     // Check that all of the elements in the second partition are greater or
     // equal to the pivot value.
-    for i in idx..<y.length - 1 {
+    for i in idx..<y.count - 1 {
       if y[i] < y[idx]  {
         print("Error!\n", terminator: "")
         return

@@ -236,7 +236,7 @@ internal struct _OptionalMirror<Wrapped> : _Mirror {
 
   var objectIdentifier: ObjectIdentifier? { return .None }
 
-  var length: Int { return (_value != nil) ? 1 : 0 }
+  var count: Int { return (_value != nil) ? 1 : 0 }
 
   subscript(i: Int) -> (String, _Mirror) {
     switch (_value, i) {

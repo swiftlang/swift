@@ -203,7 +203,7 @@ internal struct _IntervalMirror<
 > : _Mirror {
   ${Boilerplate}
 
-  internal var length: Int { return 2 }
+  internal var count: Int { return 2 }
 
   internal subscript(i: Int) -> (String, _Mirror) {
     switch i {

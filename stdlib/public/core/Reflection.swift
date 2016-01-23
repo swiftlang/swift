@@ -115,8 +115,8 @@ public protocol _Mirror {
   /// otherwise.
   var objectIdentifier: ObjectIdentifier? { get }
 
-  /// The length of `value`'s logical children.
-  var length: Int { get }
+  /// The count of `value`'s logical children.
+  var count: Int { get }
 
   /// Get a name and mirror for the `i`th logical child.
   subscript(i: Int) -> (String, _Mirror) { get }
@@ -184,8 +184,8 @@ func _dumpWithMirror<TargetStream : OutputStream>(
 
   for _ in 0..<indent { print(" ", terminator: "", toStream: &targetStream) }
 
-  let length = mirror.length
-  let bullet = length == 0    ? "-"
+  let count = mirror.count
+  let bullet = count == 0    ? "-"
              : maxDepth <= 0 ? "▹" : "▿"
   print("\(bullet) ", terminator: "", toStream: &targetStream)
 
@@ -199,7 +199,7 @@ func _dumpWithMirror<TargetStream : OutputStream>(
       print(" #\(previous)", toStream: &targetStream)
       return
     }
-    let identifier = visitedItems.length
+    let identifier = visitedItems.count
     visitedItems[id] = identifier
     print(" #\(identifier)", terminator: "", toStream: &targetStream)
   }
@@ -208,12 +208,12 @@ func _dumpWithMirror<TargetStream : OutputStream>(
 
   if maxDepth <= 0 { return }
 
-  for i in 0..<length {
+  for i in 0..<count {
     if maxItemCounter <= 0 {
       for _ in 0..<(indent+4) {
         print(" ", terminator: "", toStream: &targetStream)
       }
-      let remainder = length - i
+      let remainder = count - i
       print("(\(remainder)", terminator: "", toStream: &targetStream)
       if i > 0 { print(" more", terminator: "", toStream: &targetStream) }
       if remainder == 1 {
@@ -249,7 +249,7 @@ internal struct _LeafMirror<T>: _Mirror {
   var value: Any { return _value }
   var valueType: Any.Type { return value.dynamicType }
   var objectIdentifier: ObjectIdentifier? { return nil }
-  var length: Int { return 0 }
+  var count: Int { return 0 }
   subscript(i: Int) -> (String, _Mirror) {
     _requirementFailure("no children")
   }
@@ -302,7 +302,7 @@ struct _OpaqueMirror : _Mirror {
   var value: Any { return data.value }
   var valueType: Any.Type { return data.valueType }
   var objectIdentifier: ObjectIdentifier? { return nil }
-  var length: Int { return 0 }
+  var count: Int { return 0 }
   subscript(i: Int) -> (String, _Mirror) {
     _requirementFailure("no children")
   }
@@ -317,13 +317,13 @@ internal struct _TupleMirror : _Mirror {
   var value: Any { return data.value }
   var valueType: Any.Type { return data.valueType }
   var objectIdentifier: ObjectIdentifier? { return nil }
-  var length: Int {
-    @_silgen_name("swift_TupleMirror_length")get
+  var count: Int {
+    @_silgen_name("swift_TupleMirror_count")get
   }
   subscript(i: Int) -> (String, _Mirror) {
     @_silgen_name("swift_TupleMirror_subscript")get
   }
-  var summary: String { return "(\(length) elements)" }
+  var summary: String { return "(\(count) elements)" }
   var quickLookObject: PlaygroundQuickLook? { return nil }
   var disposition: _MirrorDisposition { return .Tuple }
 }
@@ -334,8 +334,8 @@ struct _StructMirror : _Mirror {
   var value: Any { return data.value }
   var valueType: Any.Type { return data.valueType }
   var objectIdentifier: ObjectIdentifier? { return nil }
-  var length: Int {
-    @_silgen_name("swift_StructMirror_length")get
+  var count: Int {
+    @_silgen_name("swift_StructMirror_count")get
   }
   subscript(i: Int) -> (String, _Mirror) {
     @_silgen_name("swift_StructMirror_subscript")get
@@ -354,8 +354,8 @@ struct _EnumMirror : _Mirror {
   var value: Any { return data.value }
   var valueType: Any.Type { return data.valueType }
   var objectIdentifier: ObjectIdentifier? { return nil }
-  var length: Int {
-    @_silgen_name("swift_EnumMirror_length")get
+  var count: Int {
+    @_silgen_name("swift_EnumMirror_count")get
   }
   var caseName: UnsafePointer<CChar> {
     @_silgen_name("swift_EnumMirror_caseName")get
@@ -376,8 +376,8 @@ struct _EnumMirror : _Mirror {
 }
 
 @warn_unused_result
-@_silgen_name("swift_ClassMirror_length")
-func _getClassLength(_: _MagicMirrorData) -> Int
+@_silgen_name("swift_ClassMirror_count")
+func _getClassCount(_: _MagicMirrorData) -> Int
 
 @warn_unused_result
 @_silgen_name("swift_ClassMirror_subscript")
@@ -399,8 +399,8 @@ struct _ClassMirror : _Mirror {
   var objectIdentifier: ObjectIdentifier? {
     return data._loadValue() as ObjectIdentifier
   }
-  var length: Int {
-    return _getClassLength(data)
+  var count: Int {
+    return _getClassCount(data)
   }
   subscript(i: Int) -> (String, _Mirror) {
     return _getClassChild(i, data)
@@ -428,8 +428,8 @@ struct _ClassSuperMirror : _Mirror {
   var objectIdentifier: ObjectIdentifier? {
     return nil
   }
-  var length: Int {
-    return _getClassLength(data)
+  var count: Int {
+    return _getClassCount(data)
   }
   subscript(i: Int) -> (String, _Mirror) {
     return _getClassChild(i, data)
@@ -451,7 +451,7 @@ struct _MetatypeMirror : _Mirror {
     return data._loadValue() as ObjectIdentifier
   }
 
-  var length: Int {
+  var count: Int {
     return 0
   }
   subscript(i: Int) -> (String, _Mirror) {

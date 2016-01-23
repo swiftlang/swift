@@ -31,10 +31,10 @@ PrintTests.test("Printable") {
   
   expectPrinted(expectedNull, nullUP)
   
-  expectPrinted("UnsafeBufferPointer(start: \(expectedNull), length: 0)",
-    UnsafeBufferPointer(start: nullUP, length: 0))
-  expectPrinted("UnsafeMutableBufferPointer(start: \(expectedNull), length: 0)",
-    UnsafeMutableBufferPointer(start: nullUP, length: 0))
+  expectPrinted("UnsafeBufferPointer(start: \(expectedNull), count: 0)",
+    UnsafeBufferPointer(start: nullUP, count: 0))
+  expectPrinted("UnsafeMutableBufferPointer(start: \(expectedNull), count: 0)",
+    UnsafeMutableBufferPointer(start: nullUP, count: 0))
   
   let nullOpaque: OpaquePointer = nil
   expectPrinted(expectedNull, nullOpaque)

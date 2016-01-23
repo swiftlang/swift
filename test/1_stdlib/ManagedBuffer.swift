@@ -54,8 +54,8 @@ extension ManagedBufferPointer
   }
 }
 
-struct LengthAndCapacity {
-  var length: LifetimeTracked
+struct CountAndCapacity {
+  var count: LifetimeTracked
   let capacity: Int
 }
 
@@ -63,21 +63,21 @@ struct LengthAndCapacity {
 // However, only half of the element storage is actually used to store
 // elements, interleaved with garbage, as a simple way of catching
 // potential bugs.
-final class TestManagedBuffer<T> : ManagedBuffer<LengthAndCapacity,T> {
+final class TestManagedBuffer<T> : ManagedBuffer<CountAndCapacity, T> {
   class func create(capacity: Int) -> TestManagedBuffer {
     let r = super.create(capacity) {
-      LengthAndCapacity(
-        length: LifetimeTracked(0), capacity: $0.capacity)
+      CountAndCapacity(
+        count: LifetimeTracked(0), capacity: $0.capacity)
     }
     return r as! TestManagedBuffer
   }
 
-  var length: Int {
+  var count: Int {
     get {
-      return value.length.value
+      return value.count.value
     }
     set {
-      value.length = LifetimeTracked(newValue)
+      value.count = LifetimeTracked(newValue)
     }
   }
   
@@ -92,40 +92,40 @@ final class TestManagedBuffer<T> : ManagedBuffer<LengthAndCapacity,T> {
   // This doesn't seem to compile properly when embedded directly in
   // deinit.
   func teardown() {
-    let length = self.length
+    let count = self.count
     
     withUnsafeMutablePointerToElements {
       (x: UnsafeMutablePointer<T>) -> () in
-      for i in 0.strideTo(length, by: 2) {
+      for i in 0.strideTo(count, by: 2) {
         (x + i).deinitializePointee()
       }
     }
   }
   
   func append(x: T) {
-    let length = self.length
-    require(length + 2 <= myCapacity)
+    let count = self.count
+    require(count + 2 <= myCapacity)
     
     withUnsafeMutablePointerToElements {
       (p: UnsafeMutablePointer<T>) -> () in
-      (p + length).initializePointee(x)
+      (p + count).initializePointee(x)
     }
-    self.length = length + 2
+    self.count = count + 2
   }
 }
 
 class MyBuffer<T> {
-  typealias Manager = ManagedBufferPointer<LengthAndCapacity, T>
+  typealias Manager = ManagedBufferPointer<CountAndCapacity, T>
   deinit {
     Manager(unsafeBufferObject: self).withUnsafeMutablePointers {
       (pointerToValue, pointerToElements) -> Void in
-      pointerToElements.deinitializePointee(count: self.length)
+      pointerToElements.deinitializePointee(count: self.count)
       pointerToValue.deinitializePointee()
     }
   }
 
-  var length: Int {
-    return Manager(unsafeBufferObject: self).value.length.value
+  var count: Int {
+    return Manager(unsafeBufferObject: self).value.count.value
   }
   var capacity: Int {
     return Manager(unsafeBufferObject: self).value.capacity
@@ -143,7 +143,7 @@ tests.test("basic") {
   expectEqual(0, LifetimeTracked.instances)
   if true {
     let s = TestManagedBuffer<LifetimeTracked>.create(10)
-    expectEqual(0, s.length)
+    expectEqual(0, s.count)
     expectLE(10, s.myCapacity)
     expectGE(12, s.myCapacity)  // allow some over-allocation but not too much
     
@@ -151,13 +151,13 @@ tests.test("basic") {
     for i in 1..<6 {
       s.append(LifetimeTracked(i))
       expectEqual(i + 1, LifetimeTracked.instances)
-      expectEqual(i * 2, s.length)
+      expectEqual(i * 2, s.count)
       expectEqual(
-        s.length,
-        s.withUnsafeMutablePointerToValue { $0.pointee.length.value }
+        s.count,
+        s.withUnsafeMutablePointerToValue { $0.pointee.count.value }
       )
       expectEqual(
-        s.myCapacity,
+        s.capacity,
         s.withUnsafeMutablePointerToValue { $0.pointee.capacity }
       )
       expectEqual(
@@ -169,25 +169,25 @@ tests.test("basic") {
 }
 
 tests.test("ManagedBufferPointer/SizeValidation/TestmanagedBuffer") {
-  let x = ManagedBufferPointer<LengthAndCapacity, LifetimeTracked>(
+  let x = ManagedBufferPointer<CountAndCapacity, LifetimeTracked>(
     bufferClass: TestManagedBuffer<LifetimeTracked>.self,
     minimumCapacity: 10
   ) {
     buffer, getRealCapacity in 
-    LengthAndCapacity(
-      length: LifetimeTracked(0), capacity: getRealCapacity(buffer))
+    CountAndCapacity(
+      count: LifetimeTracked(0), capacity: getRealCapacity(buffer))
   }
 }
 
 tests.test("ManagedBufferPointer/SizeValidation/MyBuffer") {
-  let x = ManagedBufferPointer<LengthAndCapacity, LifetimeTracked>(
+  let x = ManagedBufferPointer<CountAndCapacity, LifetimeTracked>(
     bufferClass:  MyBuffer<LifetimeTracked>.self,
     minimumCapacity: 0
-  ) { _, _ in LengthAndCapacity(length: LifetimeTracked(0), capacity: 99) }
+  ) { _, _ in CountAndCapacity(count: LifetimeTracked(0), capacity: 99) }
 }
 
 tests.test("ManagedBufferPointer") {
-  typealias Manager = ManagedBufferPointer<LengthAndCapacity, LifetimeTracked>
+  typealias Manager = ManagedBufferPointer<CountAndCapacity, LifetimeTracked>
 
   if true {
     var mgr = Manager(
@@ -195,8 +195,8 @@ tests.test("ManagedBufferPointer") {
       minimumCapacity: 10
     ) {
       buffer, getRealCapacity in 
-      LengthAndCapacity(
-        length: LifetimeTracked(0), capacity: getRealCapacity(buffer))
+      CountAndCapacity(
+        count: LifetimeTracked(0), capacity: getRealCapacity(buffer))
     }
     expectTrue(mgr.holdsUniqueReference())
 
@@ -205,11 +205,11 @@ tests.test("ManagedBufferPointer") {
     expectFalse(mgr.holdsUniqueReference())
     
     let s = buf!
-    expectEqual(0, s.length)
+    expectEqual(0, s.count)
     expectLE(10, s.capacity)
     expectGE(12, s.capacity)  // allow some over-allocation but not too much
     
-    expectEqual(s.length, mgr.value.length.value)
+    expectEqual(s.count, mgr.value.count.value)
     expectEqual(s.capacity, mgr.value.capacity)
 
     expectEqual(
@@ -222,24 +222,24 @@ tests.test("ManagedBufferPointer") {
     
     for i in 1..<6 {
       s.append(LifetimeTracked(i))
-      expectEqual(i * 2, s.length)
-      expectEqual(s.length, mgr.value.length.value)
+      expectEqual(i * 2, s.count)
+      expectEqual(s.count, mgr.value.count.value)
     }
     
     mgr = Manager(
       bufferClass:  MyBuffer<LifetimeTracked>.self,
       minimumCapacity: 0
-    ) { _, _ in LengthAndCapacity(length: LifetimeTracked(0), capacity: 99) }
+    ) { _, _ in CountAndCapacity(count: LifetimeTracked(0), capacity: 99) }
 
     expectTrue(mgr.holdsUniqueReference())
-    expectEqual(mgr.value.length.value, 0)
+    expectEqual(mgr.value.count.value, 0)
     expectEqual(mgr.value.capacity, 99)
 
     let s2 = mgr.buffer as! MyBuffer<LifetimeTracked>
     expectFalse(mgr.holdsUniqueReference())
     
     let val = mgr.withUnsafeMutablePointerToValue { $0 }.pointee
-    expectEqual(val.length.value, 0)
+    expectEqual(val.count.value, 0)
     expectEqual(val.capacity, 99)
   }
 }

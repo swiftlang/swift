@@ -78,9 +78,9 @@ public func _getTypeName(type: Any.Type, qualified: Bool)
 @warn_unused_result
 public // @testable
 func _typeName(type: Any.Type, qualified: Bool = true) -> String {
-  let (stringPtr, length) = _getTypeName(type, qualified: qualified)
+  let (stringPtr, count) = _getTypeName(type, qualified: qualified)
   return ._fromWellFormedCodeUnitSequence(UTF8.self,
-    input: UnsafeBufferPointer(start: stringPtr, length: length))
+    input: UnsafeBufferPointer(start: stringPtr, count: count))
 }
 
 @_silgen_name("swift_getTypeByMangledName")
@@ -95,7 +95,7 @@ func _getTypeByMangledName(
 public // SPI(Foundation)
 func _typeByName(name: String) -> Any.Type? {
   let components = name.characters.split{$0 == "."}.map(String.init)
-  guard components.length == 2 else {
+  guard components.count == 2 else {
     return nil
   }
 
@@ -106,9 +106,9 @@ func _typeByName(name: String) -> Any.Type? {
   if components[0] == "Swift" {
     name += "Ss"
   } else {
-    name += String(components[0].characters.length) + components[0]
+    name += String(components[0].characters.count) + components[0]
   }
-  name += String(components[1].characters.length) + components[1]
+  name += String(components[1].characters.count) + components[1]
 
   let nameUTF8 = Array(name.utf8)
   return nameUTF8.withUnsafeBufferPointer { (nameUTF8) in

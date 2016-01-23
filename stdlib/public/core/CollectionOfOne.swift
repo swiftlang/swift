@@ -71,7 +71,7 @@ public struct CollectionOfOne<Element> : Collection {
   }
 
   /// Return the number of elements (always one).
-  public var length: Int {
+  public var count: Int {
     return 1
   }
 

@@ -65,7 +65,7 @@ extension String {
     }
     let len = Int(_swift_stdlib_strlen(UnsafePointer(cString)))
     let buffer = UnsafeBufferPointer<Encoding.CodeUnit>(
-      start: cString, length: len)
+      start: cString, count: len)
 
     let (stringBuffer, hadError) = _StringBuffer.fromCodeUnits(
       encoding, input: buffer, repairIllFormedSequences: isReparing)
@@ -84,9 +84,9 @@ public func _persistCString(s: UnsafePointer<CChar>) -> [CChar]? {
   if s == nil {
     return nil
   }
-  let length = Int(_swift_stdlib_strlen(s))
-  var result = [CChar](repeating: 0, length: length + 1)
-  for i in 0..<length {
+  let count = Int(_swift_stdlib_strlen(s))
+  var result = [CChar](repeating: 0, count: count + 1)
+  for i in 0..<count {
     // FIXME: this will not compile on platforms where 'CChar' is unsigned.
     result[i] = s[i]
   }

@@ -118,10 +118,10 @@ func testConvertToArrayOfImplicitUnwrappedClass() {
 
   var arr: [X!] = _convertNSArrayToArray(nsarr)
   
-  // CHECK: Class array length = 2
+  // CHECK: Class array count = 2
   // CHECK: Element 0 has value X(1)
   // CHECK: Element 1 has value X(2)
-  print("Class array length = \(arr.length)")
+  print("Class array count = \(arr.count)")
   for (index, opt) in arr.enumerated() {
     if let x = opt {
       print("Element \(index) has value X(\(x.value))")
@@ -142,10 +142,10 @@ func testConvertToArrayOfImplicitUnwrappedString() {
 
   var arr: [String!] = _convertNSArrayToArray(nsarr)
   
-  // CHECK: String array length = 2
+  // CHECK: String array count = 2
   // CHECK: Element 0 has value Hello
   // CHECK: Element 1 has value World
-  print("String array length = \(arr.length)")
+  print("String array count = \(arr.count)")
   for (index, opt) in arr.enumerated() {
     if let str = opt {
       print("Element \(index) has value \(str)")

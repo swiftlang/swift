@@ -29,16 +29,16 @@ UnicodeInternals.test("copy") {
       (u8) -> () in
       let p8 = u8.baseAddress
 
-      UTF16._copy(p8, destination: p16, length: 3)
+      UTF16._copy(p8, destination: p16, count: 3)
       expectEqual([ 0, 1, 2, 9, 10, 11 ], Array(u16))
 
-      UTF16._copy(p16 + 3, destination: p8, length: 3)
+      UTF16._copy(p16 + 3, destination: p8, count: 3)
       expectEqual([ 9, 10, 11, 3, 4, 5 ], Array(u8))
 
-      UTF16._copy(p16, destination: p16 + 3, length: 3)
+      UTF16._copy(p16, destination: p16 + 3, count: 3)
       expectEqual([ 0, 1, 2, 0, 1, 2 ], Array(u16))
 
-      UTF16._copy(p8, destination: p8 + 3, length: 3)
+      UTF16._copy(p8, destination: p8 + 3, count: 3)
       expectEqual([ 9, 10, 11, 9, 10, 11 ], Array(u8))
     }
   }

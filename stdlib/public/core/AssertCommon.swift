@@ -64,7 +64,7 @@ func _isStdlibInternalChecksEnabled() -> Bool {
 func _reportFatalErrorInFile(
   prefix: UnsafePointer<UInt8>, _ prefixLength: UInt,
   _ message: UnsafePointer<UInt8>, _ messageLength: UInt,
-  _ file: UnsafePointer<UInt8>, _ fileLength: UInt,
+  _ fileName: UnsafePointer<UInt8>, _ fileLength: UInt,
   _ line: UInt)
 
 @_silgen_name("_swift_stdlib_reportFatalError")
@@ -92,19 +92,21 @@ func _reportUnimplementedInitializer(
 @noreturn @inline(never)
 @_semantics("stdlib_binary_only")
 func _assertionFailed(
-  prefix: StaticString, _ message: StaticString,
-  _ file: StaticString, _ line: UInt
+  prefix: StaticString,
+  _ message: StaticString,
+  _ fileName: StaticString,
+  _ line: UInt
 ) {
   prefix.withUTF8Buffer {
     (prefix) -> Void in
     message.withUTF8Buffer {
       (message) -> Void in
-      file.withUTF8Buffer {
-        (file) -> Void in
+      fileName.withUTF8Buffer {
+        (fileName) -> Void in
         _reportFatalErrorInFile(
-          prefix.baseAddress, UInt(prefix.length),
-          message.baseAddress, UInt(message.length),
-          file.baseAddress, UInt(file.length), line)
+          prefix.baseAddress, UInt(prefix.count),
+          message.baseAddress, UInt(message.count),
+          fileName.baseAddress, UInt(fileName.count), line)
         Builtin.int_trap()
       }
     }
@@ -121,19 +123,19 @@ func _assertionFailed(
 @_semantics("stdlib_binary_only")
 func _assertionFailed(
   prefix: StaticString, _ message: String,
-  _ file: StaticString, _ line: UInt
+  _ fileName: StaticString, _ line: UInt
 ) {
   prefix.withUTF8Buffer {
     (prefix) -> Void in
     let messageUTF8 = message.nulTerminatedUTF8
     messageUTF8.withUnsafeBufferPointer {
       (messageUTF8) -> Void in
-      file.withUTF8Buffer {
-        (file) -> Void in
+      fileName.withUTF8Buffer {
+        (fileName) -> Void in
         _reportFatalErrorInFile(
-          prefix.baseAddress, UInt(prefix.length),
-          messageUTF8.baseAddress, UInt(messageUTF8.length),
-          file.baseAddress, UInt(file.length), line)
+          prefix.baseAddress, UInt(prefix.count),
+          messageUTF8.baseAddress, UInt(messageUTF8.count),
+          fileName.baseAddress, UInt(fileName.count), line)
       }
     }
   }
@@ -149,19 +151,23 @@ func _assertionFailed(
 @noreturn @inline(never)
 @_semantics("stdlib_binary_only")
 @_semantics("arc.programtermination_point")
-func _fatalErrorMessage(prefix: StaticString, _ message: StaticString,
-                        _ file: StaticString, _ line: UInt) {
+func _fatalErrorMessage(
+  prefix: StaticString,
+  _ message: StaticString,
+  _ fileName: StaticString,
+  _ line: UInt
+) {
 #if INTERNAL_CHECKS_ENABLED
   prefix.withUTF8Buffer {
     (prefix) in
     message.withUTF8Buffer {
       (message) in
-      file.withUTF8Buffer {
-        (file) in
+      fileName.withUTF8Buffer {
+        (fileName) in
         _reportFatalErrorInFile(
-          prefix.baseAddress, UInt(prefix.length),
-          message.baseAddress, UInt(message.length),
-          file.baseAddress, UInt(file.length), line)
+          prefix.baseAddress, UInt(prefix.count),
+          message.baseAddress, UInt(message.count),
+          fileName.baseAddress, UInt(fileName.count), line)
       }
     }
   }
@@ -171,8 +177,8 @@ func _fatalErrorMessage(prefix: StaticString, _ message: StaticString,
     message.withUTF8Buffer {
       (message) in
       _reportFatalError(
-        prefix.baseAddress, UInt(prefix.length),
-        message.baseAddress, UInt(message.length))
+        prefix.baseAddress, UInt(prefix.count),
+        message.baseAddress, UInt(message.count))
     }
   }
 #endif
@@ -184,11 +190,13 @@ func _fatalErrorMessage(prefix: StaticString, _ message: StaticString,
 /// called by the Objective-C runtime.
 @_transparent @noreturn
 public // COMPILER_INTRINSIC
-func _unimplemented_initializer(className: StaticString,
-                                initName: StaticString = __FUNCTION__,
-                                file: StaticString = __FILE__,
-                                line: UInt = __LINE__,
-                                column: UInt = __COLUMN__) {
+func _unimplemented_initializer(
+  className: StaticString,
+  initName: StaticString = __FUNCTION__,
+  fileName: StaticString = __FILE__,
+  line: UInt = __LINE__,
+  column: UInt = __COLUMN__
+) {
   // This function is marked @_transparent so that it is inlined into the caller
   // (the initializer stub), and, depending on the build configuration,
   // redundant parameter values (__FILE__ etc.) are eliminated, and don't leak
@@ -199,12 +207,12 @@ func _unimplemented_initializer(className: StaticString,
       (className) in
       initName.withUTF8Buffer {
         (initName) in
-        file.withUTF8Buffer {
-          (file) in
+        fileName.withUTF8Buffer {
+          (fileName) in
           _reportUnimplementedInitializerInFile(
-            className.baseAddress, UInt(className.length),
-            initName.baseAddress, UInt(initName.length),
-            file.baseAddress, UInt(file.length), line, column)
+            className.baseAddress, UInt(className.count),
+            initName.baseAddress, UInt(initName.count),
+            fileName.baseAddress, UInt(fileName.count), line, column)
         }
       }
     }
@@ -214,8 +222,8 @@ func _unimplemented_initializer(className: StaticString,
       initName.withUTF8Buffer {
         (initName) in
         _reportUnimplementedInitializer(
-          className.baseAddress, UInt(className.length),
-          initName.baseAddress, UInt(initName.length))
+          className.baseAddress, UInt(className.count),
+          initName.baseAddress, UInt(initName.count))
       }
     }
   }
@@ -227,7 +235,8 @@ func _unimplemented_initializer(className: StaticString,
 public // COMPILER_INTRINSIC
 func _undefined<T>(
   @autoclosure message: () -> String = String(),
-  file: StaticString = __FILE__, line: UInt = __LINE__
+  fileName: StaticString = __FILE__,
+  line: UInt = __LINE__
 ) -> T {
-  _assertionFailed("fatal error", message(), file, line)
+  _assertionFailed("fatal error", message(), fileName, line)
 }

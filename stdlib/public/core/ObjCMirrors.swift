@@ -13,8 +13,8 @@
 import SwiftShims
 
 #if _runtime(_ObjC)
-@_silgen_name("swift_ObjCMirror_length") 
-func _getObjCLength(_: _MagicMirrorData) -> Int
+@_silgen_name("swift_ObjCMirror_count") 
+func _getObjCCount(_: _MagicMirrorData) -> Int
 @_silgen_name("swift_ObjCMirror_subscript") 
 func _getObjCChild(_: Int, _: _MagicMirrorData) -> (String, _Mirror)
 
@@ -32,8 +32,8 @@ struct _ObjCMirror : _Mirror {
   public var objectIdentifier: ObjectIdentifier? {
     return data._loadValue() as ObjectIdentifier
   }
-  public var length: Int {
-    return _getObjCLength(data)
+  public var count: Int {
+    return _getObjCCount(data)
   }
   public subscript(i: Int) -> (String, _Mirror) {
     return _getObjCChild(i, data)
@@ -58,8 +58,8 @@ struct _ObjCSuperMirror : _Mirror {
   public var objectIdentifier: ObjectIdentifier? {
     return nil
   }
-  public var length: Int {
-    return _getObjCLength(data)
+  public var count: Int {
+    return _getObjCCount(data)
   }
   public subscript(i: Int) -> (String, _Mirror) {
     return _getObjCChild(i, data)

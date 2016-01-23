@@ -74,7 +74,7 @@ public func _arrayForceCast<SourceElement, TargetElement>(
     
   case (.Value, .Verbatim):
     var buf = _ContiguousArrayBuffer<TargetElement>(
-      length: source.length, minimumCapacity: 0)
+      count: source.count, minimumCapacity: 0)
     
     let _: Void = buf.withUnsafeMutableBufferPointer {
       var p = $0.baseAddress
@@ -151,7 +151,7 @@ internal func _arrayConditionalBridgeElements<SourceElement, TargetElement>(
   _sanityCheck(!_isBridgedVerbatimToObjectiveC(TargetElement.self))
   
   let buf = _ContiguousArrayBuffer<TargetElement>(
-    length: source.length, minimumCapacity: 0)
+    count: source.count, minimumCapacity: 0)
   
   var p = buf.firstElementAddress
   
@@ -171,7 +171,7 @@ ElementwiseBridging:
   while false
   
   // Don't destroy anything we never created.
-  buf.length = p - buf.firstElementAddress
+  buf.count = p - buf.firstElementAddress
   
   // Report failure
   return nil

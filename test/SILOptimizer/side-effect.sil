@@ -54,9 +54,9 @@ sil [_semantics "array.check_index"] @check_index_Int : $@convention(method) (In
 sil [_semantics "array.get_element"] @get_element_Int : $@convention(method) (@out Int32, Int32, Bool, @guaranteed Array<Int32>) -> ()
 sil [_semantics "array.make_mutable"] @make_mutable_Int : $@convention(method) (@inout Array<Int32>) -> ()
 sil [_semantics "array.get_element_address"] @get_element_address_Int : $@convention(method) (Int32, @guaranteed Array<Int32>) -> UnsafeMutablePointer<Int32>
-sil [_semantics "array.get_length"] @get_count_Int : $@convention(method) (@guaranteed Array<Int32>) -> Int32
+sil [_semantics "array.get_count"] @get_count_Int : $@convention(method) (@guaranteed Array<Int32>) -> Int32
 sil [_semantics "array.get_capacity"] @get_capacity_Int : $@convention(method) (@guaranteed Array<Int32>) -> Int32
-sil [_semantics "array.get_length"] @get_count_X : $@convention(method) (@guaranteed Array<X>) -> Int32
+sil [_semantics "array.get_count"] @get_count_X : $@convention(method) (@guaranteed Array<X>) -> Int32
 
 ///////////
 // Tests //

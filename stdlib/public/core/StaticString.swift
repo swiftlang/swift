@@ -23,8 +23,8 @@
 /// Logically speaking, each instance looks something like this:
 ///
 ///      enum StaticString {
-///        case ASCII(start: UnsafePointer<UInt8>, length: Int)
-///        case UTF8(start: UnsafePointer<UInt8>, length: Int)
+///        case ASCII(start: UnsafePointer<UInt8>, count: Int)
+///        case UTF8(start: UnsafePointer<UInt8>, count: Int)
 ///        case Scalar(UnicodeScalar)
 ///      }
 public struct StaticString
@@ -114,7 +114,7 @@ public struct StaticString
     @noescape body: (UnsafeBufferPointer<UInt8>) -> R) -> R {
     if hasPointerRepresentation {
       return body(UnsafeBufferPointer(
-        start: utf8Start, length: Int(utf8CodeUnitCount)))
+        start: utf8Start, count: Int(utf8CodeUnitCount)))
     } else {
       var buffer: UInt64 = 0
       var i = 0
@@ -125,7 +125,7 @@ public struct StaticString
       UTF8.encode(unicodeScalar, output: sink)
       return body(UnsafeBufferPointer(
         start: UnsafePointer(Builtin.addressof(&buffer)),
-        length: i))
+        count: i))
     }
   }
 

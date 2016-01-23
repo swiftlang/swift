@@ -28,17 +28,17 @@ public struct _StringCore {
   //===--------------------------------------------------------------------===//
   // Internals
   public var _baseAddress: OpaquePointer
-  var _lengthAndFlags: UInt
+  var _countAndFlags: UInt
   public var _owner: AnyObject?
 
   /// (private) create the implementation of a string from its component parts.
   init(
     baseAddress: OpaquePointer,
-    _lengthAndFlags: UInt,
+    _countAndFlags: UInt,
     owner: AnyObject?
   ) {
     self._baseAddress = baseAddress
-    self._lengthAndFlags = _lengthAndFlags
+    self._countAndFlags = _countAndFlags
     self._owner = owner
     _invariantCheck()
   }
@@ -48,7 +48,7 @@ public struct _StringCore {
     // accesses lazily initialized globals, and thus it is a performance burden
     // in non-checked builds.
 #if INTERNAL_CHECKS_ENABLED
-    _sanityCheck(length >= 0)
+    _sanityCheck(count >= 0)
 
     if _baseAddress == nil {
 #if _runtime(_ObjC)
@@ -60,7 +60,7 @@ public struct _StringCore {
     }
     else if _baseAddress == _emptyStringBase {
       _sanityCheck(!hasCocoaBuffer)
-      _sanityCheck(length == 0, "Empty string storage with non-zero length")
+      _sanityCheck(count == 0, "Empty string storage with non-zero count")
       _sanityCheck(_owner == nil, "String pointing at empty storage has owner")
     }
     else if let buffer = nativeBuffer {
@@ -69,19 +69,19 @@ public struct _StringCore {
         "_StringCore elementWidth doesn't match its buffer's")
       _sanityCheck(UnsafeMutablePointer(_baseAddress) >= buffer.start)
       _sanityCheck(UnsafeMutablePointer(_baseAddress) <= buffer.usedEnd)
-      _sanityCheck(UnsafeMutablePointer(_pointerToNth(length)) <= buffer.usedEnd)
+      _sanityCheck(UnsafeMutablePointer(_pointerToNth(count)) <= buffer.usedEnd)
     }
 #endif
   }
 
-  /// Bitmask for the length part of `_lengthAndFlags`.
-  var _lengthMask: UInt {
+  /// Bitmask for the count part of `_countAndFlags`.
+  var _countMask: UInt {
     return UInt.max >> 2
   }
 
-  /// Bitmask for the flags part of `_lengthAndFlags`.
+  /// Bitmask for the flags part of `_countAndFlags`.
   var _flagMask: UInt {
-    return ~_lengthMask
+    return ~_countMask
   }
 
   /// Value by which to multiply a 2nd byte fetched in order to
@@ -97,7 +97,7 @@ public struct _StringCore {
   /// result may be null if the string is empty.
   @warn_unused_result
   func _pointerToNth(n: Int) -> OpaquePointer {
-    _sanityCheck(hasContiguousStorage && n >= 0 && n <= length)
+    _sanityCheck(hasContiguousStorage && n >= 0 && n <= count)
     return OpaquePointer(
       UnsafeMutablePointer<_RawByte>(_baseAddress) + (n << elementShift))
   }
@@ -105,7 +105,7 @@ public struct _StringCore {
   static func _copyElements(
     srcStart: OpaquePointer, srcElementWidth: Int,
     dstStart: OpaquePointer, dstElementWidth: Int,
-    length: Int
+    count: Int
   ) {
     // Copy the old stuff into the new storage
     if _fastPath(srcElementWidth == dstElementWidth) {
@@ -113,13 +113,13 @@ public struct _StringCore {
       _memcpy(
         dest: UnsafeMutablePointer(dstStart),
         src: UnsafeMutablePointer(srcStart),
-        size: UInt(length << (srcElementWidth - 1)))
+        size: UInt(count << (srcElementWidth - 1)))
     }
     else if (srcElementWidth < dstElementWidth) {
       // Widening ASCII to UTF-16; we need to copy the bytes manually
       var dest = UnsafeMutablePointer<UTF16.CodeUnit>(dstStart)
       var src = UnsafeMutablePointer<UTF8.CodeUnit>(srcStart)
-      let srcEnd = src + length
+      let srcEnd = src + count
       while (src != srcEnd) {
         dest.pointee = UTF16.CodeUnit(src.pointee)
         dest += 1
@@ -130,7 +130,7 @@ public struct _StringCore {
       // Narrowing UTF-16 to ASCII; we need to copy the bytes manually
       var dest = UnsafeMutablePointer<UTF8.CodeUnit>(dstStart)
       var src = UnsafeMutablePointer<UTF16.CodeUnit>(srcStart)
-      let srcEnd = src + length
+      let srcEnd = src + count
       while (src != srcEnd) {
         dest.pointee = UTF8.CodeUnit(src.pointee)
         dest += 1
@@ -143,7 +143,7 @@ public struct _StringCore {
   // Initialization
   public init(
     baseAddress: OpaquePointer,
-    length: Int,
+    count: Int,
     elementShift: Int,
     hasCocoaBuffer: Bool,
     owner: AnyObject?
@@ -151,13 +151,13 @@ public struct _StringCore {
     _sanityCheck(elementShift == 0 || elementShift == 1)
     self._baseAddress = baseAddress
 
-    self._lengthAndFlags
+    self._countAndFlags
       = (UInt(elementShift) << (UInt._sizeInBits - 1))
       | ((hasCocoaBuffer ? 1 : 0) << (UInt._sizeInBits - 2))
-      | UInt(length)
+      | UInt(count)
 
     self._owner = owner
-    _sanityCheck(UInt(length) & _flagMask == 0, "String too long to represent")
+    _sanityCheck(UInt(count) & _flagMask == 0, "String too long to represent")
     _invariantCheck()
   }
 
@@ -165,7 +165,7 @@ public struct _StringCore {
   init(_ buffer: _StringBuffer) {
     self = _StringCore(
       baseAddress: OpaquePointer(buffer.start),
-      length: buffer.usedLength,
+      count: buffer.usedCount,
       elementShift: buffer.elementShift,
       hasCocoaBuffer: false,
       owner: buffer._anyObject
@@ -177,7 +177,7 @@ public struct _StringCore {
   /// - Note: There is no null terminator in an empty string.
   public init() {
     self._baseAddress = _emptyStringBase
-    self._lengthAndFlags = 0
+    self._countAndFlags = 0
     self._owner = nil
     _invariantCheck()
   }
@@ -187,20 +187,20 @@ public struct _StringCore {
 
   /// The number of elements stored
   /// - Complexity: O(1).
-  public var length: Int {
+  public var count: Int {
     get {
-      return Int(_lengthAndFlags & _lengthMask)
+      return Int(_countAndFlags & _countMask)
     }
     set(newValue) {
       _sanityCheck(UInt(newValue) & _flagMask == 0)
-      _lengthAndFlags = (_lengthAndFlags & _flagMask) | UInt(newValue)
+      _countAndFlags = (_countAndFlags & _flagMask) | UInt(newValue)
     }
   }
 
   /// Left shift amount to apply to an offset N so that when
   /// added to a UnsafeMutablePointer<_RawByte>, it traverses N elements.
   var elementShift: Int {
-    return Int(_lengthAndFlags >> (UInt._sizeInBits - 1))
+    return Int(_countAndFlags >> (UInt._sizeInBits - 1))
   }
 
   /// The number of bytes per element.
@@ -221,7 +221,7 @@ public struct _StringCore {
 
   /// Are we using an `NSString` for storage?
   public var hasCocoaBuffer: Bool {
-    return Int((_lengthAndFlags << 1)._value) < 0
+    return Int((_countAndFlags << 1)._value) < 0
   }
 
   public var startASCII: UnsafeMutablePointer<UTF8.CodeUnit> {
@@ -236,7 +236,7 @@ public struct _StringCore {
 
   public var startUTF16: UnsafeMutablePointer<UTF16.CodeUnit> {
     _sanityCheck(
-      length == 0 || elementWidth == 2,
+      count == 0 || elementWidth == 2,
       "String does not contain contiguous UTF-16")
     return UnsafeMutablePointer(_baseAddress)
   }
@@ -273,16 +273,16 @@ public struct _StringCore {
       "subscript: subrange start precedes String start")
 
     _require(
-      bounds.endIndex <= length,
+      bounds.endIndex <= count,
       "subscript: subrange extends past String end")
 
-    let newLength = bounds.endIndex - bounds.startIndex
-    _sanityCheck(UInt(newLength) & _flagMask == 0)
+    let newCount = bounds.endIndex - bounds.startIndex
+    _sanityCheck(UInt(newCount) & _flagMask == 0)
 
     if hasContiguousStorage {
       return _StringCore(
         baseAddress: _pointerToNth(bounds.startIndex),
-        _lengthAndFlags: (_lengthAndFlags & _flagMask) | UInt(newLength),
+        _countAndFlags: (_countAndFlags & _flagMask) | UInt(newCount),
         owner: _owner)
     }
 #if _runtime(_ObjC)
@@ -310,7 +310,7 @@ public struct _StringCore {
       "subscript: index precedes String start")
 
     _require(
-      position <= length,
+      position <= count,
       "subscript: index points past String end")
 
     if _fastPath(_baseAddress != nil) {
@@ -332,7 +332,7 @@ public struct _StringCore {
       if _fastPath(elementWidth == 1) {
         for x in UnsafeBufferPointer(
           start: UnsafeMutablePointer<UTF8.CodeUnit>(_baseAddress),
-          length: length
+          count: count
         ) {
           Encoding.encode(UnicodeScalar(UInt32(x)), output: output)
         }
@@ -341,7 +341,7 @@ public struct _StringCore {
         let hadError = transcode(UTF16.self, encoding,
           UnsafeBufferPointer(
             start: UnsafeMutablePointer<UTF16.CodeUnit>(_baseAddress),
-            length: length
+            count: count
           ).iterator(),
           output,
           stoppingOnError: true
@@ -352,7 +352,7 @@ public struct _StringCore {
     else if (hasCocoaBuffer) {
 #if _runtime(_ObjC)
       _StringCore(
-        _cocoaStringToContiguous(cocoaBuffer!, 0..<length, minimumCapacity: 0)
+        _cocoaStringToContiguous(cocoaBuffer!, 0..<count, minimumCapacity: 0)
       ).encode(encoding, output: output)
 #else
       _sanityCheckFailure("encode: non-native string without objc runtime")
@@ -382,15 +382,15 @@ public struct _StringCore {
       // at the substring at the end of a _StringBuffer.  Otherwise, some other
       // String is using parts of the buffer beyond our last byte.
       let usedStart = _pointerToNth(0)
-      let usedEnd = _pointerToNth(length)
+      let usedEnd = _pointerToNth(count)
 
       // Attempt to claim unused capacity in the buffer
       if _fastPath(
         buffer.grow(
           UnsafePointer(usedStart)..<UnsafePointer(usedEnd),
-          newUsedLength: newSize)
+          newUsedCount: newSize)
       ) {
-        length = newSize
+        count = newSize
         return (0, usedEnd)
       }
       else if newSize > buffer.capacity {
@@ -417,7 +417,7 @@ public struct _StringCore {
       return existingStorage
     }
 
-    let oldCount = length
+    let oldCount = count
 
     _copyInPlace(
       newSize: newSize,
@@ -435,7 +435,7 @@ public struct _StringCore {
     newSize newSize: Int, newCapacity: Int, minElementWidth: Int
   ) {
     _sanityCheck(newCapacity >= newSize)
-    let oldCount = length
+    let oldCount = count
 
     // Allocate storage.
     let newElementWidth =
@@ -450,7 +450,7 @@ public struct _StringCore {
       _StringCore._copyElements(
         _baseAddress, srcElementWidth: elementWidth,
         dstStart: OpaquePointer(newStorage.start),
-        dstElementWidth: newElementWidth, length: oldCount)
+        dstElementWidth: newElementWidth, count: oldCount)
     }
     else {
 #if _runtime(_ObjC)
@@ -493,11 +493,11 @@ public struct _StringCore {
     let utf16Width = u1 == nil ? 1 : 2
 
     let destination = _growBuffer(
-      length + utf16Width, minElementWidth: minBytesPerCodeUnit)
+      count + utf16Width, minElementWidth: minBytesPerCodeUnit)
 
     if _fastPath(elementWidth == 1) {
       _sanityCheck(
-        _pointerToNth(length)
+        _pointerToNth(count)
         == OpaquePointer(UnsafeMutablePointer<_RawByte>(destination) + 1))
 
       UnsafeMutablePointer<UTF8.CodeUnit>(destination)[0] = UTF8.CodeUnit(u0)
@@ -522,12 +522,12 @@ public struct _StringCore {
       : rhs.representableAsASCII() ? 1 : 2
 
     let destination = _growBuffer(
-      length + rhs.length, minElementWidth: minElementWidth)
+      count + rhs.count, minElementWidth: minElementWidth)
 
     if _fastPath(rhs.hasContiguousStorage) {
       _StringCore._copyElements(
         rhs._baseAddress, srcElementWidth: rhs.elementWidth,
-        dstStart: destination, dstElementWidth:elementWidth, length: rhs.length)
+        dstStart: destination, dstElementWidth:elementWidth, count: rhs.count)
     }
     else {
 #if _runtime(_ObjC)
@@ -555,7 +555,7 @@ public struct _StringCore {
     let unsafeBuffer =
       UnsafeBufferPointer(
         start: UnsafeMutablePointer<UTF16.CodeUnit>(_baseAddress),
-        length: length)
+        count: count)
     return !unsafeBuffer.contains { $0 > 0x7f }
   }
 }
@@ -568,7 +568,7 @@ extension _StringCore : Collection {
 
   public // @testable
   var endIndex: Int {
-    return length
+    return count
   }
 }
 
@@ -576,7 +576,7 @@ extension _StringCore : RangeReplaceableCollection {
 
   /// Replace the elements within `bounds` with `newElements`.
   ///
-  /// - Complexity: O(`bounds.length`) if `bounds.endIndex
+  /// - Complexity: O(`bounds.count`) if `bounds.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceSubrange<
     C: Collection where C.Iterator.Element == UTF16.CodeUnit
@@ -588,15 +588,15 @@ extension _StringCore : RangeReplaceableCollection {
       "replaceSubrange: subrange start precedes String start")
 
     _require(
-      bounds.endIndex <= length,
+      bounds.endIndex <= count,
       "replaceSubrange: subrange extends past String end")
 
     let width = elementWidth == 2 || newElements.contains { $0 > 0x7f } ? 2 : 1
-    let replacementCount = numericCast(newElements.length) as Int
-    let replacedCount = bounds.length
-    let tailCount = length - bounds.endIndex
+    let replacementCount = numericCast(newElements.count) as Int
+    let replacedCount = bounds.count
+    let tailCount = count - bounds.endIndex
     let growth = replacementCount - replacedCount
-    let newLength = length + growth
+    let newCount = count + growth
 
     // Successfully claiming capacity only ensures that we can modify
     // the newly-claimed storage without observably mutating other
@@ -607,7 +607,7 @@ extension _StringCore : RangeReplaceableCollection {
 
     let existingStorage = !hasCocoaBuffer && (
       appending || isUniquelyReferencedNonObjC(&_owner)
-    ) ? _claimCapacity(newLength, minElementWidth: width).1 : nil
+    ) ? _claimCapacity(newCount, minElementWidth: width).1 : nil
 
     if _fastPath(existingStorage != nil) {
       let rangeStart = UnsafeMutablePointer<UInt8>(
@@ -642,7 +642,7 @@ extension _StringCore : RangeReplaceableCollection {
     else {
       var r = _StringCore(
         _StringBuffer(
-          capacity: newLength,
+          capacity: newCount,
           initialSize: 0,
           elementWidth:
             width == 1 ? 1
@@ -651,7 +651,7 @@ extension _StringCore : RangeReplaceableCollection {
         ))
       r.appendContentsOf(self[0..<bounds.startIndex])
       r.appendContentsOf(newElements)
-      r.appendContentsOf(self[bounds.endIndex..<length])
+      r.appendContentsOf(self[bounds.endIndex..<count])
       self = r
     }
   }
@@ -661,7 +661,7 @@ extension _StringCore : RangeReplaceableCollection {
       if _fastPath(isUniquelyReferencedNonObjC(&_owner)) {
 
         let bounds: Range<UnsafePointer<_RawByte>>
-          = UnsafePointer(_pointerToNth(0))..<UnsafePointer(_pointerToNth(length))
+          = UnsafePointer(_pointerToNth(0))..<UnsafePointer(_pointerToNth(count))
 
         if _fastPath(nativeBuffer!.hasCapacity(n, forSubRange: bounds)) {
           return
@@ -669,8 +669,8 @@ extension _StringCore : RangeReplaceableCollection {
       }
     }
     _copyInPlace(
-      newSize: length,
-      newCapacity: Swift.max(length, n),
+      newSize: count,
+      newCapacity: Swift.max(count, n),
       minElementWidth: 1)
   }
 
@@ -686,11 +686,11 @@ extension _StringCore : RangeReplaceableCollection {
       }
     }
 
-    let growth = s.underestimatedLength
+    let growth = s.underestimatedCount
     var iter = s.iterator()
 
     if _fastPath(growth > 0) {
-      let newSize = length + growth
+      let newSize = count + growth
       let destination = _growBuffer(newSize, minElementWidth: width)
       if elementWidth == 1 {
         let destination8 = UnsafeMutablePointer<UTF8.CodeUnit>(destination)

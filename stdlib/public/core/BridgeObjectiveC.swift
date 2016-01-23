@@ -461,7 +461,7 @@ internal struct _CocoaFastEnumerationStackBuf {
   var item15: Builtin.RawPointer
 
   @_transparent
-  var length: Int {
+  var count: Int {
     return 16
   }
 
@@ -483,7 +483,7 @@ internal struct _CocoaFastEnumerationStackBuf {
     item14 = item0
     item15 = item0
 
-    _sanityCheck(sizeofValue(self) >= sizeof(Builtin.RawPointer.self) * length)
+    _sanityCheck(sizeofValue(self) >= sizeof(Builtin.RawPointer.self) * count)
   }
 }
 

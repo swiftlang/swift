@@ -193,7 +193,7 @@ func isSmallRepresentation(s: String) -> Bool {
 }
 
 func checkRepresentation(s: String) {
-  let expectSmall = s.utf8.length <= 8
+  let expectSmall = s.utf8.count <= 8
   let isSmall = isSmallRepresentation(s)
 
   let expectedSize = expectSmall ? "small" : "large"

@@ -222,9 +222,9 @@ self.test("\(testNamePrefix)._withUnsafeMutableBufferPointerIfSupported()/semant
   for test in subscriptRangeTests {
     var c = makeWrappedCollection(test.collection)
     var result = c._withUnsafeMutableBufferPointerIfSupported {
-      (baseAddress, length) -> OpaqueValue<Array<OpaqueValue<Int>>> in
+      (baseAddress, count) -> OpaqueValue<Array<OpaqueValue<Int>>> in
       let bufferPointer =
-        UnsafeMutableBufferPointer(start: baseAddress, length: length)
+        UnsafeMutableBufferPointer(start: baseAddress, count: count)
       return OpaqueValue(Array(bufferPointer.map(extractValue)))
     }
     expectType(Optional<OpaqueValue<Array<OpaqueValue<Int>>>>.self, &result)
@@ -246,13 +246,13 @@ self.test("\(testNamePrefix).sorted/DispatchesThrough_withUnsafeMutableBufferPoi
   let sequence = [ 5, 4, 3, 2, 1 ]
 %   if predicate:
   let elements: [OpaqueValue<Int>] =
-    zip(sequence, 0..<sequence.length).map {
+    zip(sequence, 0..<sequence.count).map {
       OpaqueValue($0, identity: $1)
     }
   let c = makeWrappedCollection(elements)
 %   else:
   let elements: [MinimalComparableValue] =
-    zip(sequence, 0..<sequence.length).map {
+    zip(sequence, 0..<sequence.count).map {
       MinimalComparableValue($0, identity: $1)
     }
   let c = makeWrappedCollectionWithComparableElement(elements)
@@ -288,7 +288,7 @@ func checkSort_${'Predicate' if predicate else 'WhereElementIsComparable'}(
 %   if predicate:
   let extract = extractValue
   let elements: [OpaqueValue<Int>] =
-    zip(sequence, 0..<sequence.length).map {
+    zip(sequence, 0..<sequence.count).map {
       OpaqueValue($0, identity: $1)
     }
   let c = makeWrappedCollection(elements)
@@ -304,7 +304,7 @@ func checkSort_${'Predicate' if predicate else 'WhereElementIsComparable'}(
 
   let extract = extractValueFromComparable
   let elements: [MinimalComparableValue] =
-    zip(sequence, 0..<sequence.length).map {
+    zip(sequence, 0..<sequence.count).map {
       MinimalComparableValue($0, identity: $1)
     }
   let c = makeWrappedCollectionWithComparableElement(elements)
@@ -320,7 +320,7 @@ func checkSort_${'Predicate' if predicate else 'WhereElementIsComparable'}(
 
   // Check that we didn't lose any elements.
   expectEqualsUnordered(
-    0..<sequence.length,
+    0..<sequence.count,
     extractedResult.map { $0.identity })
 
   // Check that the elements are sorted.
@@ -589,7 +589,7 @@ func checkSortInPlace_${'Predicate' if predicate else 'WhereElementIsComparable'
 %   if predicate:
   let extract = extractValue
   let elements: [OpaqueValue<Int>] =
-    zip(sequence, 0..<sequence.length).map {
+    zip(sequence, 0..<sequence.count).map {
       OpaqueValue($0, identity: $1)
     }
 
@@ -606,7 +606,7 @@ func checkSortInPlace_${'Predicate' if predicate else 'WhereElementIsComparable'
 
   let extract = extractValueFromComparable
   let elements: [MinimalComparableValue] =
-    zip(sequence, 0..<sequence.length).map {
+    zip(sequence, 0..<sequence.count).map {
       MinimalComparableValue($0, identity: $1)
     }
 
@@ -618,7 +618,7 @@ func checkSortInPlace_${'Predicate' if predicate else 'WhereElementIsComparable'
 
   // Check that we didn't lose any elements.
   expectEqualsUnordered(
-    0..<sequence.length,
+    0..<sequence.count,
     extractedResult.map { $0.identity })
 
   // Check that the elements are sorted.
@@ -679,7 +679,7 @@ func checkPartition_${'Predicate' if predicate else 'WhereElementIsComparable'}(
 %   if predicate:
   let extract = extractValue
   let elements: [OpaqueValue<Int>] =
-    zip(sequence, 0..<sequence.length).map {
+    zip(sequence, 0..<sequence.count).map {
       OpaqueValue($0, identity: $1)
     }
 
@@ -690,7 +690,7 @@ func checkPartition_${'Predicate' if predicate else 'WhereElementIsComparable'}(
 
   let extract = extractValueFromComparable
   let elements: [MinimalComparableValue] =
-    zip(sequence, 0..<sequence.length).map {
+    zip(sequence, 0..<sequence.count).map {
       MinimalComparableValue($0, identity: $1)
     }
 
@@ -710,7 +710,7 @@ func checkPartition_${'Predicate' if predicate else 'WhereElementIsComparable'}(
 
   // Check that we didn't lose any elements.
   let identities = c.map { extract($0).identity }
-  expectEqualsUnordered(0..<sequence.length, identities)
+  expectEqualsUnordered(0..<sequence.count, identities)
 
   if verifyOrder {
     // All the elements in the first partition are less than the pivot
@@ -760,14 +760,14 @@ self.test("\(testNamePrefix).partition/DispatchesThrough_withUnsafeMutableBuffer
 %   if predicate:
   let extract = extractValue
   let elements: [OpaqueValue<Int>] =
-    zip(sequence, 0..<sequence.length).map {
+    zip(sequence, 0..<sequence.count).map {
       OpaqueValue($0, identity: $1)
     }
   let c = makeWrappedCollection(elements)
 %   else:
   let extract = extractValueFromComparable
   let elements: [MinimalComparableValue] =
-    zip(sequence, 0..<sequence.length).map {
+    zip(sequence, 0..<sequence.count).map {
       MinimalComparableValue($0, identity: $1)
     }
   let c = makeWrappedCollectionWithComparableElement(elements)

@@ -32,7 +32,7 @@ bb0:
   %17 = metatype $@thin ArrayOf<Foo>.Type
   %18 = function_ref @array_init : $@convention(thin) (@thin ArrayOf<Foo>.Type) -> @owned ArrayOf<Foo>
   %19 = apply %18(%17) : $@convention(thin) (@thin ArrayOf<Foo>.Type) -> @owned ArrayOf<Foo>
-  %25 = function_ref @array_get_length : $@convention(method) (@owned ArrayOf<Foo>) -> MyInt
+  %25 = function_ref @array_get_count : $@convention(method) (@owned ArrayOf<Foo>) -> MyInt
   retain_value %19 : $ArrayOf<Foo>
   %27 = apply %25(%19) : $@convention(method) (@owned ArrayOf<Foo>) -> MyInt
   %28 = tuple ()
@@ -42,4 +42,4 @@ bb0:
 
 sil [fragile] [_semantics "array.init"] @array_init : $@convention(thin) (@thin ArrayOf<Foo>.Type) -> @owned ArrayOf<Foo>
 
-sil [fragile] [_semantics "array.get_length"] @array_get_length : $@convention(method) (@owned ArrayOf<Foo>) -> MyInt
+sil [fragile] [_semantics "array.get_count"] @array_get_count : $@convention(method) (@owned ArrayOf<Foo>) -> MyInt

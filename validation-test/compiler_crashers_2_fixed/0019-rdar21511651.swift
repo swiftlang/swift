@@ -13,8 +13,8 @@ extension Sequence
     return self._base.iterator()
   }
 
-  public func underestimatedLength() -> Int {
-    return _base.underestimatedLength()
+  public func underestimatedCount() -> Int {
+    return _base.underestimatedCount()
   }
 
   public func _customContainsEquatableElement(
@@ -263,8 +263,8 @@ public struct _prext_MapCollection<Base : Collection, T>
     return _prext_MapIterator(_base: _base.iterator(), _transform: _transform)
   }
 
-  public func underestimatedLength() -> Int {
-    return _base.underestimatedLength()
+  public func underestimatedCount() -> Int {
+    return _base.underestimatedCount()
   }
 
   var _base: Base

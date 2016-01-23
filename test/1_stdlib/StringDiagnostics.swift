@@ -13,9 +13,9 @@ func testIntSubscripting(s: String, i: Int) {
   _ = s[17...20] // expected-error{{subscript' is unavailable: cannot subscript String with a Range<Int>, see the documentation comment for discussion}}
 }
 
-// Common pitfall: trying to access `String.length`.
-func testStringLength(s: String) {
-  _ = s.length // expected-error{{'length' is unavailable: there is no universally good answer, see the documentation comment for discussion}}
+// Common pitfall: trying to access `String.count`.
+func testStringCount(s: String) {
+  _ = s.count // expected-error{{'count' is unavailable: there is no universally good answer, see the documentation comment for discussion}}
 }
 
 func testNonAmbiguousStringComparisons() {

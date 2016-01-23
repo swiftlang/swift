@@ -35,7 +35,7 @@ def getMirrorDecl(Self, Disp=None):
 ${getMirrorDecl("NSURL")} {
   ${getMirrorBoilerplate("NSURL")}
   
-  var length: Int { get { return 0 } }
+  var count: Int { get { return 0 } }
   
   subscript(_: Int) -> (String, _Mirror) {
     _requirementFailure("_Mirror access out of bounds")
@@ -49,7 +49,7 @@ ${getMirrorDecl("NSURL")} {
 ${getMirrorDecl("NSRange")} {
   ${getMirrorBoilerplate("NSRange")}
   
-  var length: Int { get { return 2 } }
+  var count: Int { get { return 2 } }
   
   subscript(i: Int) -> (String, _Mirror) {
     switch i {
@@ -69,7 +69,7 @@ ${getMirrorDecl("NSRange")} {
 ${getMirrorDecl("NSDate")} {
   ${getMirrorBoilerplate("NSDate")}
   
-  var length: Int { get { return 0 } }
+  var count: Int { get { return 0 } }
   
   subscript(i: Int) -> (String, _Mirror) {
     _requirementFailure("_Mirror access out of bounds")
@@ -103,7 +103,7 @@ ${getMirrorDecl("NSSet","MembershipContainer")} {
   var objectIdentifier: ObjectIdentifier? { return .None }
   
   // this is the only member that needs to validate _a - others either don't touch it or call into this
-  var length: Int {
+  var count: Int {
     if _a != nil {
       return _a.count
     }
@@ -111,11 +111,11 @@ ${getMirrorDecl("NSSet","MembershipContainer")} {
   }
   
   subscript(i: Int) -> (String, _Mirror) {
-    _require(i >= 0 && i < length, "_Mirror access out of bounds")
+    _require(i >= 0 && i < count, "_Mirror access out of bounds")
     return ("[\(i)]", _reflect(_a[i]))
   }
   
-  var summary: String { return "\(length) elements" }
+  var summary: String { return "\(count) elements" }
   
   var quickLookObject: PlaygroundQuickLook? { return nil }
 }
@@ -123,7 +123,7 @@ ${getMirrorDecl("NSSet","MembershipContainer")} {
 ${getMirrorDecl("NSString")} {
   ${getMirrorBoilerplate("NSString")}
   
-  var length: Int { get { return 0 } }
+  var count: Int { get { return 0 } }
   
   subscript(_: Int) -> (String, _Mirror) {
     _requirementFailure("_Mirror access out of bounds")

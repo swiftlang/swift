@@ -14,7 +14,7 @@ var SceneKitTests = TestSuite("SceneKit")
 func bytesFromNSData(data: NSData) -> [UInt8] {
   return Array(UnsafeBufferPointer(
     start: UnsafePointer<UInt8>(data.bytes),
-    length: data.length))
+    count: data.length))
 }
 
 if #available(iOS 8.0, *) {

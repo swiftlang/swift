@@ -17,7 +17,7 @@ protocol _ArrayProtocol
 {
   //===--- public interface -----------------------------------------------===//
   /// The number of elements the Array stores.
-  var length: Int {get}
+  var count: Int {get}
 
   /// The number of elements the Array can store without reallocation.
   var capacity: Int {get}
@@ -41,21 +41,21 @@ protocol _ArrayProtocol
   /// - Postcondition: `capacity >= minimumCapacity` and the array has
   ///   mutable contiguous storage.
   ///
-  /// - Complexity: O(`self.length`).
+  /// - Complexity: O(`self.count`).
   mutating func reserveCapacity(minimumCapacity: Int)
 
   /// Operator form of `appendContentsOf`.
   func += <
-    S: Sequence where S.Iterator.Element == Iterator.Element
+    S : Sequence where S.Iterator.Element == Iterator.Element
   >(inout lhs: Self, rhs: S)
 
   /// Insert `newElement` at index `i`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`self.length`).
+  /// - Complexity: O(`self.count`).
   ///
-  /// - Requires: `i <= length`.
+  /// - Requires: `i <= count`.
   mutating func insert(newElement: Iterator.Element, at i: Int)
 
   /// Remove and return the element at the given index.
@@ -64,7 +64,7 @@ protocol _ArrayProtocol
   ///
   /// - Complexity: Worst case O(N).
   ///
-  /// - Requires: `length > index`.
+  /// - Requires: `count > index`.
   mutating func removeAt(index: Int) -> Iterator.Element
 
   //===--- implementation detail  -----------------------------------------===//
@@ -89,16 +89,16 @@ internal struct _ArrayProtocolMirror<
 
   var objectIdentifier: ObjectIdentifier? { return nil }
 
-  var length: Int { return _value.length }
+  var count: Int { return _value.count }
 
   subscript(i: Int) -> (String, _Mirror) {
-    _require(i >= 0 && i < length, "_Mirror access out of bounds")
+    _require(i >= 0 && i < count, "_Mirror access out of bounds")
     return ("[\(i)]", _reflect(_value[_value.startIndex + i]))
   }
 
   var summary: String {
-    if length == 1 { return "1 element" }
-    return "\(length) elements"
+    if count == 1 { return "1 element" }
+    return "\(count) elements"
   }
 
   var quickLookObject: PlaygroundQuickLook? { return nil }

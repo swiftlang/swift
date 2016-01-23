@@ -16,7 +16,7 @@ func main () -> Void
     // CHECK: !DILocalVariable(name: "random_int", arg: 4
 
             if rhs == random_string
-            || rhs.unicodeScalars.length == random_int {
+            || rhs.unicodeScalars.count == random_int {
                 var local_var : Int64 = 10
                 print("I have an int here \(local_var).\n", terminator: "")
                 return false

@@ -52,8 +52,8 @@ public struct LazyMapSequence<Base : Sequence, Element>
   /// `self`, **nondestructively**.
   ///
   /// - Complexity: O(N).
-  public var underestimatedLength: Int {
-    return _base.underestimatedLength
+  public var underestimatedCount: Int {
+    return _base.underestimatedCount
   }
 
   /// Create an instance with elements `transform(x)` for each element
@@ -103,16 +103,16 @@ public struct LazyMapCollection<Base : Collection, Element>
     return LazyMapIterator(_base: _base.iterator(), _transform: _transform)
   }
 
-  public var underestimatedLength: Int {
-    return _base.underestimatedLength
+  public var underestimatedCount: Int {
+    return _base.underestimatedCount
   }
 
   /// Returns the number of elements.
   ///
   /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndex`;
   ///   O(N) otherwise.
-  public var length: Base.Index.Distance {
-    return _base.length
+  public var count: Base.Index.Distance {
+    return _base.count
   }
 
   /// Create an instance with elements `transform(x)` for each element

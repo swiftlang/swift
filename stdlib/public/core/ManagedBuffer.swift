@@ -87,7 +87,7 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
 /// Note that the `Element` array is suitably-aligned **raw memory**.
 /// You are expected to construct and---if necessary---destroy objects
 /// there yourself, using the APIs on `UnsafeMutablePointer<Element>`.
-/// Typical usage stores a length and capacity in `Value` and destroys
+/// Typical usage stores a count and capacity in `Value` and destroys
 /// any live elements in the `deinit` of a subclass.
 /// - Note: Subclasses must not have any stored properties; any storage
 ///   needed should be included in `Value`.
@@ -147,13 +147,13 @@ public class ManagedBuffer<Value, Element>
 ///        deinit {
 ///          Manager(unsafeBufferObject: self).withUnsafeMutablePointers {
 ///            (pointerToValue, pointerToElements) -> Void in
-///            pointerToElements.deinitializePointee(count: self.length)
+///            pointerToElements.deinitializePointee(count: self.count)
 ///            pointerToValue.deinitializePointee()
 ///          }
 ///        }
 ///
 ///        // All properties are *computed* based on members of the Value
-///        var length: Int {
+///        var count: Int {
 ///          return Manager(unsafeBufferObject: self).value.0
 ///        }
 ///        var name: String {

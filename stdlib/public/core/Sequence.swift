@@ -87,7 +87,7 @@ public protocol Sequence {
   /// `self`, **nondestructively**.
   ///
   /// - Complexity: O(N).
-  var underestimatedLength: Int { get }
+  var underestimatedCount: Int { get }
 
   /// Return an `Array` containing the results of mapping `transform`
   /// over `self`.
@@ -124,7 +124,7 @@ public protocol Sequence {
   ///   exit from the current call to `body`, not any outer scope, and won't
   ///   skip subsequent calls.
   ///
-  /// - Complexity: O(`self.length`)
+  /// - Complexity: O(`self.count`)
   func forEach(@noescape body: (Iterator.Element) throws -> Void) rethrows
 
   /// Returns a subsequence containing all but the first `n` elements.
@@ -138,14 +138,14 @@ public protocol Sequence {
   ///
   /// - Requires: `self` is a finite sequence.
   /// - Requires: `n >= 0`
-  /// - Complexity: O(`self.length`)
+  /// - Complexity: O(`self.count`)
   @warn_unused_result
   func dropLast(n: Int) -> SubSequence
 
   /// Returns a subsequence, up to `maxLength` in length, containing the
   /// initial elements.
   ///
-  /// If `maxLength` exceeds `self.length`, the result contains all
+  /// If `maxLength` exceeds `self.count`, the result contains all
   /// the elements of `self`.
   ///
   /// - Requires: `maxLength >= 0`
@@ -155,7 +155,7 @@ public protocol Sequence {
   /// Returns a slice, up to `maxLength` in length, containing the
   /// final elements of `s`.
   ///
-  /// If `maxLength` exceeds `s.length`, the result contains all
+  /// If `maxLength` exceeds `s.count`, the result contains all
   /// the elements of `s`.
   ///
   /// - Requires: `self` is a finite sequence.
@@ -314,7 +314,7 @@ extension Sequence {
   public func map<T>(
     @noescape transform: (Iterator.Element) throws -> T
   ) rethrows -> [T] {
-    let initialCapacity = underestimatedLength
+    let initialCapacity = underestimatedCount
     var result = ContiguousArray<T>()
     result.reserveCapacity(initialCapacity)
 
@@ -361,12 +361,12 @@ extension Sequence {
     // and return it. This saves memory for sequences particularly longer
     // than `maxLength`.
     var ringBuffer: [Iterator.Element] = []
-    ringBuffer.reserveCapacity(Swift.min(maxLength, underestimatedLength))
+    ringBuffer.reserveCapacity(Swift.min(maxLength, underestimatedCount))
 
     var i = ringBuffer.startIndex
 
     for element in self {
-      if ringBuffer.length < maxLength {
+      if ringBuffer.count < maxLength {
         ringBuffer.append(element)
       } else {
         ringBuffer[i] = element
@@ -435,7 +435,7 @@ extension Sequence {
         if !appendSubsequence() {
           continue
         }
-        if result.length == maxSplits {
+        if result.count == maxSplits {
           break
         }
       } else {
@@ -455,7 +455,7 @@ extension Sequence {
   /// `self`, **nondestructively**.
   ///
   /// - Complexity: O(N).
-  public var underestimatedLength: Int {
+  public var underestimatedCount: Int {
     return 0
   }
 
@@ -489,7 +489,7 @@ extension Sequence {
   ///   exit from the current call to `body`, not any outer scope, and won't
   ///   skip subsequent calls.
   ///
-  /// - Complexity: O(`self.length`)
+  /// - Complexity: O(`self.count`)
   public func forEach(
     @noescape body: (Iterator.Element) throws -> Void
   ) rethrows {
@@ -564,7 +564,7 @@ extension Sequence where
     var i = ringBuffer.startIndex
 
     for element in self {
-      if ringBuffer.length < n {
+      if ringBuffer.count < n {
         ringBuffer.append(element)
       } else {
         result.append(ringBuffer[i])
@@ -596,7 +596,7 @@ extension Sequence {
   ///
   /// - Requires: `self` is a finite sequence.
   /// - Requires: `n >= 0`
-  /// - Complexity: O(`self.length`)
+  /// - Complexity: O(`self.count`)
   @warn_unused_result
   public func dropLast() -> SubSequence  { return dropLast(1) }
 }
@@ -654,7 +654,7 @@ extension Sequence {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, message="it became a property 'underestimatedLength'")
+  @available(*, unavailable, message="it became a property 'underestimatedCount'")
   func underestimateCount() -> Int {
     fatalError("unavailable function can't be called")
   }

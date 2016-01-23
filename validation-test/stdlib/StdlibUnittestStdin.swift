@@ -23,7 +23,7 @@ func simple_getline() -> [UInt8]? {
     let c = getchar()
     result.append(UInt8(c))
     if c == EOF {
-      if result.length == 0 {
+      if result.count == 0 {
         return nil
       }
       return result

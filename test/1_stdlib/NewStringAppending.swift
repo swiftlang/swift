@@ -42,13 +42,13 @@ func repr(x: _StringCore) -> String {
       ? UnsafeMutablePointer(b.start) - x.startUTF16
       : UnsafeMutablePointer(b.start) - x.startASCII
       return "Contiguous(owner: "
-      + "\(hexAddr(x._owner))[\(offset)...\(x.length + offset)]"
+      + "\(hexAddr(x._owner))[\(offset)...\(x.count + offset)]"
       + ", capacity = \(b.capacity))"
     }
-    return "Contiguous(owner: \(hexAddr(x._owner)), length: \(x.length))"
+    return "Contiguous(owner: \(hexAddr(x._owner)), count: \(x.count))"
   }
   else if let b2 = x.cocoaBuffer {
-    return "Opaque(buffer: \(hexAddr(b2))[0...\(x.length)])"
+    return "Opaque(buffer: \(hexAddr(b2))[0...\(x.count)])"
   }
   return "?????"
 }

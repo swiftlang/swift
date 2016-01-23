@@ -5,12 +5,12 @@ sil_stage canonical
 import Builtin
 import Swift
 
-sil [_semantics "array.get_length"] @getCount : $@convention(method) (@guaranteed Array<Int>) -> Int
+sil [_semantics "array.get_count"] @getCount : $@convention(method) (@guaranteed Array<Int>) -> Int
 sil [_semantics "array.get_capacity"] @getCapacity : $@convention(method) (@guaranteed Array<Int>) -> Int
 
 sil @user : $@convention(thin) (Int) -> ()
 
-// CHECK-LABEL:   sil @licm_get_length
+// CHECK-LABEL:   sil @licm_get_count
 // CHECK:           [[F1:%[0-9]+]] = function_ref @getCount
 // CHECK:           [[F2:%[0-9]+]] = function_ref @user
 // CHECK:           [[C:%[0-9]+]] = apply [[F1]](%0)
@@ -19,7 +19,7 @@ sil @user : $@convention(thin) (Int) -> ()
 // CHECK-NEXT:      cond_br
 // CHECK:         {{^}}bb2:
 // CHECK:           return
-sil @licm_get_length : $@convention(thin) (@guaranteed Array<Int>) -> () {
+sil @licm_get_count : $@convention(thin) (@guaranteed Array<Int>) -> () {
 bb0(%0 : $Array<Int>):
   br bb1
 

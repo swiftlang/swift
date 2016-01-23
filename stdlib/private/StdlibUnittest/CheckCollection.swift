@@ -14,10 +14,10 @@ public struct SubscriptRangeTest {
   public let expected: [OpaqueValue<Int>]
   public let collection: [OpaqueValue<Int>]
   public let bounds: Range<Int>
-  public let length: Int
+  public let count: Int
   public let loc: SourceLoc
 
-  public var isEmpty: Bool { return length == 0 }
+  public var isEmpty: Bool { return count == 0 }
 
   public func boundsIn<C : Collection>(c: C) -> Range<C.Index> {
     let i = c.startIndex
@@ -28,14 +28,13 @@ public struct SubscriptRangeTest {
 
   public init(
     expected: [Int], collection: [Int], bounds: Range<Int>,
-    length: Int,
+    count: Int,
     file: String = __FILE__, line: UInt = __LINE__
   ) {
-    require(length == collection.length)
     self.expected = expected.map(OpaqueValue.init)
     self.collection = collection.map(OpaqueValue.init)
     self.bounds = bounds
-    self.length = length
+    self.count = count
     self.loc = SourceLoc(file, line, comment: "test data")
   }
 }
@@ -114,66 +113,66 @@ public let subscriptRangeTests = [
     expected: [],
     collection: [],
     bounds: 0..<0,
-    length: 0),
+    count: 0),
 
   // Slice to the full extent.
   SubscriptRangeTest(
     expected: [ 1010 ],
     collection: [ 1010 ],
     bounds: 0..<1,
-    length: 1),
+    count: 1),
   SubscriptRangeTest(
     expected: [ 1010, 2020, 3030 ],
     collection: [ 1010, 2020, 3030 ],
     bounds: 0..<3,
-    length: 3),
+    count: 3),
 
   // Slice an empty prefix.
   SubscriptRangeTest(
     expected: [],
     collection: [ 1010, 2020, 3030 ],
     bounds: 0..<0,
-    length: 3),
+    count: 3),
 
   // Slice a prefix.
   SubscriptRangeTest(
     expected: [ 1010, 2020 ],
     collection: [ 1010, 2020, 3030 ],
     bounds: 0..<2,
-    length: 3),
+    count: 3),
 
   // Slice an empty suffix.
   SubscriptRangeTest(
     expected: [],
     collection: [ 1010, 2020, 3030 ],
     bounds: 3..<3,
-    length: 3),
+    count: 3),
 
   // Slice a suffix.
   SubscriptRangeTest(
     expected: [ 2020, 3030 ],
     collection: [ 1010, 2020, 3030 ],
     bounds: 1..<3,
-    length: 3),
+    count: 3),
 
   // Slice an empty range in the middle.
   SubscriptRangeTest(
     expected: [],
     collection: [ 1010, 2020, 3030 ],
     bounds: 2..<2,
-    length: 3),
+    count: 3),
 
   // Slice the middle part.
   SubscriptRangeTest(
     expected: [ 2020 ],
     collection: [ 1010, 2020, 3030 ],
     bounds: 1..<2,
-    length: 3),
+    count: 3),
   SubscriptRangeTest(
     expected: [ 2020, 3030, 4040 ],
     collection: [ 1010, 2020, 3030, 4040, 5050, 6060 ],
     bounds: 1..<4,
-    length: 6),
+    count: 6),
 ]
 
 public let prefixUpToTests = [
@@ -482,13 +481,13 @@ self.test("\(testNamePrefix).isEmpty/semantics") {
 }
 
 //===----------------------------------------------------------------------===//
-// length
+// count
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix).length/semantics") {
+self.test("\(testNamePrefix).count/semantics") {
   for test in subscriptRangeTests {
     let c = makeWrappedCollection(test.collection)
-    expectEqual(test.length, numericCast(c.length) as Int)
+    expectEqual(test.count, numericCast(c.count) as Int)
   }
 }
 
@@ -842,7 +841,7 @@ self.test("\(testNamePrefix).last") {
       expectEmpty(result)
     } else {
       expectOptionalEqual(
-        test.collection[test.length - 1],
+        test.collection[test.count - 1],
         result.map(extractValue)
       ) { $0.value == $1.value }
     }

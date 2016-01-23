@@ -225,7 +225,7 @@ internal protocol _HashStorage {
   mutating func removeAt(index: Index) -> SequenceElement
   mutating func removeValueForKey(key: Key) -> Value?
   mutating func removeAll(keepingCapacity keepCapacity: Bool)
-  var length: Int { get }
+  var count: Int { get }
 
   @warn_unused_result
   static func fromArray(elements: [SequenceElementWithoutLabels]) -> Self
@@ -401,8 +401,8 @@ public struct Set<Element : Hashable> :
   /// The number of members in the set.
   ///
   /// - Complexity: O(1).
-  public var length: Int {
-    return _variantStorage.length
+  public var count: Int {
+    return _variantStorage.count
   }
 
   //
@@ -595,7 +595,7 @@ public struct Set<Element : Hashable> :
     // The result can only have fewer or the same number of elements.
     // If no elements were removed, don't perform a reassignment
     // as this may cause an unnecessary uniquing COW.
-    if result.length != length {
+    if result.count != count {
       self = result
     }
   }
@@ -648,12 +648,12 @@ public struct Set<Element : Hashable> :
 
   /// `true` iff `self` is empty.
   public var isEmpty: Bool {
-    return length == 0
+    return count == 0
   }
 
   /// The first element of `self`, or `nil` if `self` is empty.
   public var first: Element? {
-    return length > 0 ? self[startIndex] : nil
+    return count > 0 ? self[startIndex] : nil
   }
 }
 
@@ -665,13 +665,13 @@ public struct Set<Element : Hashable> :
 internal func _compareSets<Element>(lhs: Set<Element>, _ rhs: Set<Element>)
   -> (isSubset: Bool, isEqual: Bool) {
   // FIXME(performance): performance could be better if we start by comparing
-  // lengths.
+  // counts.
   for member in lhs {
     if !rhs.contains(member) {
       return (false, false)
     }
   }
-  return (true, lhs.length == rhs.length)
+  return (true, lhs.count == rhs.count)
 }
 
 @warn_unused_result
@@ -685,7 +685,7 @@ public func == <Element : Hashable>(lhs: Set<Element>, rhs: Set<Element>) -> Boo
       return true
     }
 
-    if lhsNative.length != rhsNative.length {
+    if lhsNative.count != rhsNative.count {
       return false
     }
 
@@ -710,7 +710,7 @@ public func == <Element : Hashable>(lhs: Set<Element>, rhs: Set<Element>) -> Boo
 #if _runtime(_ObjC)
     let lhsNative = lhsNativeOwner.nativeStorage
 
-    if lhsNative.length != rhsCocoa.length {
+    if lhsNative.count != rhsCocoa.count {
       return false
     }
 
@@ -779,9 +779,9 @@ func _stdlib_CFSetGetValues(nss: _NSSet, _: UnsafeMutablePointer<AnyObject>)
 /// autorelease pool.
 internal func _stdlib_NSSet_allObjects(nss: _NSSet) ->
   _HeapBuffer<Int, AnyObject> {
-  let length = nss.count
+  let count = nss.count
   let buffer = _HeapBuffer<Int, AnyObject>(
-    _HeapBufferStorage<Int, AnyObject>.self, length, length)
+    _HeapBufferStorage<Int, AnyObject>.self, count, count)
   _stdlib_CFSetGetValues(nss, buffer.baseAddress)
   return buffer
 }
@@ -800,7 +800,7 @@ public func _setUpCast<DerivedValue, BaseValue>(source: Set<DerivedValue>)
   _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
   _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
 
-  var builder = _SetBuilder<BaseValue>(length: source.length)
+  var builder = _SetBuilder<BaseValue>(count: source.count)
   for member in source {
     builder.add(member: unsafeBitCast(member, BaseValue.self))
   }
@@ -820,7 +820,7 @@ public func _setBridgeToObjectiveC<SwiftValue, ObjCValue>(
   _sanityCheck(_isClassOrObjCExistential(ObjCValue.self))
   _sanityCheck(!_isBridgedVerbatimToObjectiveC(SwiftValue.self))
 
-  var result = Set<ObjCValue>(minimumCapacity: source.length)
+  var result = Set<ObjCValue>(minimumCapacity: source.count)
   let valueBridgesDirectly =
     _isBridgedVerbatimToObjectiveC(SwiftValue.self) ==
     _isBridgedVerbatimToObjectiveC(ObjCValue.self)
@@ -880,7 +880,7 @@ public func _setDownCastConditional<BaseValue, DerivedValue>(
   _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
   _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
 
-  var result = Set<DerivedValue>(minimumCapacity: source.length)
+  var result = Set<DerivedValue>(minimumCapacity: source.count)
   for member in source {
     if let derivedMember = member as? DerivedValue {
       result.insert(derivedMember)
@@ -924,7 +924,7 @@ public func _setBridgeFromObjectiveCConditional<
     _isBridgedVerbatimToObjectiveC(SwiftValue.self) ==
       _isBridgedVerbatimToObjectiveC(ObjCValue.self)
 
-  var result = Set<SwiftValue>(minimumCapacity: source.length)
+  var result = Set<SwiftValue>(minimumCapacity: source.count)
   for value in source {
     // Downcast the value.
     var resultValue: SwiftValue
@@ -1086,7 +1086,7 @@ public struct Dictionary<Key : Hashable, Value> :
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`self.length`).
+  /// - Complexity: O(`self.count`).
   public mutating func removeAt(index: Index) -> Element {
     return _variantStorage.removeAt(index)
   }
@@ -1110,7 +1110,7 @@ public struct Dictionary<Key : Hashable, Value> :
   ///   storage capacity that the collection has, otherwise the underlying
   ///   storage is released.  The default is `false`.
   ///
-  /// Complexity: O(`self.length`).
+  /// Complexity: O(`self.count`).
   public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
     // The 'will not decrease' part in the documentation comment is worded very
     // carefully.  The capacity can increase if we replace Cocoa storage with
@@ -1121,8 +1121,8 @@ public struct Dictionary<Key : Hashable, Value> :
   /// The number of entries in the dictionary.
   ///
   /// - Complexity: O(1).
-  public var length: Int {
-    return _variantStorage.length
+  public var count: Int {
+    return _variantStorage.count
   }
 
   //
@@ -1177,9 +1177,9 @@ public struct Dictionary<Key : Hashable, Value> :
   // Collection conformance
   //
 
-  /// `true` iff `length == 0`.
+  /// `true` iff `count == 0`.
   public var isEmpty: Bool {
-    return length == 0
+    return count == 0
   }
 
 }
@@ -1198,7 +1198,7 @@ public func == <Key : Equatable, Value : Equatable>(
       return true
     }
 
-    if lhsNative.length != rhsNative.length {
+    if lhsNative.count != rhsNative.count {
       return false
     }
 
@@ -1232,7 +1232,7 @@ public func == <Key : Equatable, Value : Equatable>(
 #if _runtime(_ObjC)
     let lhsNative = lhsNativeOwner.nativeStorage
 
-    if lhsNative.length != rhsCocoa.length {
+    if lhsNative.count != rhsCocoa.count {
       return false
     }
 
@@ -1276,7 +1276,7 @@ public func != <Key : Equatable, Value : Equatable>(
 extension Dictionary : CustomStringConvertible, CustomDebugStringConvertible {
   @warn_unused_result
   internal func _makeDescription() -> String {
-    if length == 0 {
+    if count == 0 {
       return "[:]"
     }
 
@@ -1313,9 +1313,9 @@ extension Dictionary : CustomStringConvertible, CustomDebugStringConvertible {
 @warn_unused_result
 internal func _stdlib_NSDictionary_allKeys(nsd: _NSDictionary)
     -> _HeapBuffer<Int, AnyObject> {
-  let length = nsd.count
+  let count = nsd.count
   let buffer = _HeapBuffer<Int, AnyObject>(
-    _HeapBufferStorage<Int, AnyObject>.self, length, length)
+    _HeapBufferStorage<Int, AnyObject>.self, count, count)
 
   nsd.getObjects(nil, andKeys: buffer.baseAddress)
   return buffer
@@ -1342,7 +1342,7 @@ public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
   _sanityCheck(_isClassOrObjCExistential(DerivedKey.self))
   _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
 
-  var result = Dictionary<BaseKey, BaseValue>(minimumCapacity: source.length)
+  var result = Dictionary<BaseKey, BaseValue>(minimumCapacity: source.count)
   for (k, v) in source {
     result[unsafeBitCast(k, BaseKey.self)] = unsafeBitCast(v, BaseValue.self)
   }
@@ -1375,7 +1375,7 @@ public func _dictionaryBridgeToObjectiveC<
     _isClassOrObjCExistential(ObjCKey.self) ||
     _isClassOrObjCExistential(ObjCValue.self))
 
-  var result = Dictionary<ObjCKey, ObjCValue>(minimumCapacity: source.length)
+  var result = Dictionary<ObjCKey, ObjCValue>(minimumCapacity: source.count)
   let keyBridgesDirectly =
     _isBridgedVerbatimToObjectiveC(SwiftKey.self) ==
       _isBridgedVerbatimToObjectiveC(ObjCKey.self)
@@ -1527,7 +1527,7 @@ public func _dictionaryBridgeFromObjectiveCConditional<
     _isBridgedVerbatimToObjectiveC(SwiftValue.self) ==
       _isBridgedVerbatimToObjectiveC(ObjCValue.self)
 
-  var result = Dictionary<SwiftKey, SwiftValue>(minimumCapacity: source.length)
+  var result = Dictionary<SwiftKey, SwiftValue>(minimumCapacity: source.count)
   for (key, value) in source {
     // Downcast the key.
     var resultKey: SwiftKey
@@ -1605,10 +1605,10 @@ collections = [
 ]
 }%
 
-/// A wrapper around a bitmap storage with room for at least bitLength bits.
+/// A wrapper around a bitmap storage with room for at least `bitCount` bits.
 internal struct _BitMap {
   internal let values: UnsafeMutablePointer<UInt>
-  internal let bitLength: Int
+  internal let bitCount: Int
 
   // Note: We use UInt here to get unsigned math (shifts).
   @warn_unused_result
@@ -1622,19 +1622,19 @@ internal struct _BitMap {
   }
 
   @warn_unused_result
-  internal static func wordsFor(bitLength: Int) -> Int {
-    return bitLength + Int._sizeInBytes - 1 / Int._sizeInBytes
+  internal static func wordsFor(bitCount: Int) -> Int {
+    return bitCount + Int._sizeInBytes - 1 / Int._sizeInBytes
   }
 
-  internal init(storage: UnsafeMutablePointer<UInt>, bitLength: Int) {
-    self.bitLength = bitLength
+  internal init(storage: UnsafeMutablePointer<UInt>, bitCount: Int) {
+    self.bitCount = bitCount
     self.values = storage
   }
 
   internal var numberOfWords: Int {
     @warn_unused_result
     get {
-      return _BitMap.wordsFor(bitLength)
+      return _BitMap.wordsFor(bitCount)
     }
   }
 
@@ -1647,14 +1647,14 @@ internal struct _BitMap {
   internal subscript(i: Int) -> Bool {
     @warn_unused_result
     get {
-      _sanityCheck(i < Int(bitLength) && i >= 0, "index out of bounds")
+      _sanityCheck(i < Int(bitCount) && i >= 0, "index out of bounds")
       let idx = UInt(i)
       let word = values[Int(_BitMap.wordIndex(idx))]
       let bit = word & (1 << _BitMap.bitIndex(idx))
       return bit != 0
     }
     nonmutating set {
-      _sanityCheck(i < Int(bitLength) && i >= 0, "index out of bounds")
+      _sanityCheck(i < Int(bitCount) && i >= 0, "index out of bounds")
       let idx = UInt(i)
       let wordIdx = _BitMap.wordIndex(idx)
       if newValue {
@@ -1675,7 +1675,7 @@ internal struct _HashedContainerStorageHeader {
   }
 
   internal var capacity: Int
-  internal var length: Int = 0
+  internal var count: Int = 0
   internal var maxLoadFactorInverse: Double =
     _hashContainerDefaultMaxLoadFactorInverse
 }
@@ -1755,13 +1755,13 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
     }
   }
 
-  internal var _length: Int {
+  internal var _count: Int {
     set {
-      _body.length = newValue
+      _body.count = newValue
     }
     @warn_unused_result
     get {
-      return _body.length
+      return _body.count
     }
   }
 
@@ -1826,7 +1826,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
     let storage = r as! StorageImpl
     let initializedEntries = _BitMap(
         storage: storage._initializedHashtableEntriesBitMapStorage,
-        bitLength: capacity)
+        bitCount: capacity)
     initializedEntries.initializeToZero()
     return storage
   }
@@ -1834,7 +1834,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
   deinit {
     let capacity = _capacity
     let initializedEntries = _BitMap(
-        storage: _initializedHashtableEntriesBitMapStorage, bitLength: capacity)
+        storage: _initializedHashtableEntriesBitMapStorage, bitCount: capacity)
     let keys = _keys
 %if Self == 'Dictionary':
     let values = _values
@@ -1892,7 +1892,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     buffer = StorageImpl.create(capacity)
     initializedEntries = _BitMap(
         storage: buffer._initializedHashtableEntriesBitMapStorage,
-        bitLength: capacity)
+        bitCount: capacity)
     keys = buffer._keys
 %if Self == 'Dictionary':
     values = buffer._values
@@ -1924,15 +1924,15 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   @_transparent
-  internal var length: Int {
+  internal var count: Int {
     @warn_unused_result
     get {
-      let result = buffer._length
+      let result = buffer._count
       _fixLifetime(buffer)
       return result
     }
     nonmutating set(newValue) {
-      buffer._length = newValue
+      buffer._count = newValue
       _fixLifetime(buffer)
     }
   }
@@ -2100,7 +2100,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
   /// Storage should be uniquely referenced.
   /// The `key` should not be present in the ${Self}.
-  /// This function does *not* update `length`.
+  /// This function does *not* update `count`.
 
 %if Self == 'Set':
 
@@ -2155,7 +2155,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
   @warn_unused_result
   internal func indexForKey(key: Key) -> Index? {
-    if length == 0 {
+    if count == 0 {
       // Fast path that avoids computing the hash of the key.
       return nil
     }
@@ -2190,7 +2190,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
   @warn_unused_result
   internal func maybeGet(key: Key) -> Value? {
-    if length == 0 {
+    if count == 0 {
       // Fast path that avoids computing the hash of the key.
       return nil
     }
@@ -2232,22 +2232,22 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
     let requiredCapacity =
       _Native${Self}Storage<${TypeParameters}>.getMinCapacity(
-        elements.length, _hashContainerDefaultMaxLoadFactorInverse)
+        elements.count, _hashContainerDefaultMaxLoadFactorInverse)
     let nativeStorage = _Native${Self}Storage<${TypeParameters}>(
       minimumCapacity: requiredCapacity)
 
 %if Self == 'Set':
 
-    var length = 0
+    var count = 0
     for key in elements {
       let (i, found) = nativeStorage._find(key, nativeStorage._bucket(key))
       if found {
         continue
       }
       nativeStorage.initializeKey(key, at: i.offset)
-      length += 1
+      count += 1
     }
-    nativeStorage.length = length
+    nativeStorage.count = count
 
 %elif Self == 'Dictionary':
 
@@ -2256,7 +2256,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
       _require(!found, "${Self} literal contains duplicate keys")
       nativeStorage.initializeKey(key, value: value, at: i.offset)
     }
-    nativeStorage.length = elements.length
+    nativeStorage.count = elements.count
 
 %end
 
@@ -2284,8 +2284,8 @@ internal struct _BridgedNative${Self}Storage {
   internal init(buffer: StorageImpl) {
     self.buffer = buffer
     initializedEntries = _BitMap(
-        storage: buffer._initializedHashtableEntriesBitMapStorage,
-        bitLength: buffer._capacity)
+      storage: buffer._initializedHashtableEntriesBitMapStorage,
+      bitCount: buffer._capacity)
     keys = buffer._keys
 %if Self == 'Dictionary':
     values = buffer._values
@@ -2735,7 +2735,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
 
   @objc
   internal var count: Int {
-    return nativeStorage.length
+    return nativeStorage.count
   }
 
   @warn_unused_result
@@ -2890,7 +2890,7 @@ internal struct _Cocoa${Self}Storage : _HashStorage {
     _sanityCheckFailure("cannot mutate NS${Self}")
   }
 
-  internal var length: Int {
+  internal var count: Int {
     return cocoa${Self}.count
   }
 
@@ -3011,7 +3011,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
           }
         }
       }
-      newNativeStorage.length = oldNativeStorage.length
+      newNativeStorage.count = oldNativeStorage.count
 
       self = .Native(newNativeOwner)
       return (reallocated: true,
@@ -3038,7 +3038,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
       }
 
 %end
-      newNativeStorage.length = cocoa${Self}.count
+      newNativeStorage.count = cocoa${Self}.count
 
       self = .Native(newNativeOwner)
       return (reallocated: true, capacityChanged: true)
@@ -3054,7 +3054,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     cocoaStorage: _Cocoa${Self}Storage
   ) {
     let minCapacity = NativeStorage.getMinCapacity(
-      cocoaStorage.length, _hashContainerDefaultMaxLoadFactorInverse)
+      cocoaStorage.count, _hashContainerDefaultMaxLoadFactorInverse)
     let allocated = ensureUniqueNativeStorage(minCapacity).reallocated
     _sanityCheck(allocated, "failed to allocate native ${Self} storage")
   }
@@ -3189,7 +3189,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     let minCapacity = found
       ? native.capacity
       : NativeStorage.getMinCapacity(
-          native.length + 1,
+          native.count + 1,
           native.maxLoadFactorInverse)
 
     let (_, capacityChanged) = ensureUniqueNativeStorage(minCapacity)
@@ -3203,7 +3203,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
       native.setKey(key, at: i.offset)
     } else {
       native.initializeKey(key, at: i.offset)
-      native.length += 1
+      native.count += 1
     }
 %elif Self == 'Dictionary':
     let oldValue: Value? = found ? native.valueAt(i.offset) : nil
@@ -3211,7 +3211,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
       native.setKey(key, value: value, at: i.offset)
     } else {
       native.initializeKey(key, value: value, at: i.offset)
-      native.length += 1
+      native.count += 1
     }
 %end
 
@@ -3250,7 +3250,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
 
     // remove the element
     nativeStorage.destroyEntryAt(offset)
-    nativeStorage.length -= 1
+    nativeStorage.count -= 1
 
     // If we've put a hole in a chain of contiguous elements, some
     // element after the hole may belong where the new hole is.
@@ -3431,11 +3431,11 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
         nativeStorage.destroyEntryAt(b)
       }
     }
-    nativeStorage.length = 0
+    nativeStorage.count = 0
   }
 
   internal mutating func removeAll(keepingCapacity keepCapacity: Bool) {
-    if length == 0 {
+    if count == 0 {
       return
     }
 
@@ -3454,20 +3454,20 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
       nativeRemoveAll()
     case .Cocoa(let cocoaStorage):
 #if _runtime(_ObjC)
-      self = .Native(NativeStorage.Owner(minimumCapacity: cocoaStorage.length))
+      self = .Native(NativeStorage.Owner(minimumCapacity: cocoaStorage.count))
 #else
       _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
 
-  internal var length: Int {
+  internal var count: Int {
     switch self {
     case .Native:
-      return native.length
+      return native.count
     case .Cocoa(let cocoaStorage):
 #if _runtime(_ObjC)
-      return cocoaStorage.length
+      return cocoaStorage.count
 #else
       _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
@@ -3827,7 +3827,7 @@ final internal class _Cocoa${Self}Iterator : IteratorProtocol {
     }
     let cocoa${Self} = self.cocoa${Self}
     if itemIndex == itemCount {
-      let stackBufLength = _fastEnumerationStackBuf.length
+      let stackBufCount = _fastEnumerationStackBuf.count
       // We can't use `withUnsafeMutablePointers` here to get pointers to
       // properties, because doing so might introduce a writeback buffer, but
       // fast enumeration relies on the pointer identity of the enumeration
@@ -3835,7 +3835,7 @@ final internal class _Cocoa${Self}Iterator : IteratorProtocol {
       itemCount = cocoa${Self}.countByEnumeratingWith(
         _fastEnumerationStatePtr,
         objects: UnsafeMutablePointer(_fastEnumerationStackBufPtr),
-        count: stackBufLength)
+        count: stackBufCount)
       if itemCount == 0 {
         itemIndex = -1
         return nil
@@ -4021,10 +4021,10 @@ internal class ${Self}Mirror<${TypeParametersDecl}> : _Mirror {
 
   internal var objectIdentifier: ObjectIdentifier? { return nil }
 
-  internal var length: Int { return _mirror.length }
+  internal var count: Int { return _mirror.count }
 
   internal subscript(i: Int) -> (String, _Mirror) {
-    _require(i >= 0 && i < length, "_Mirror access out of bounds")
+    _require(i >= 0 && i < count, "_Mirror access out of bounds")
 
     if _pos > i {
       _pos._intPos = 0
@@ -4042,15 +4042,15 @@ internal class ${Self}Mirror<${TypeParametersDecl}> : _Mirror {
 
   internal var summary: String {
 %if Self == 'Set':
-    if length == 1 {
+    if count == 1 {
       return "1 member"
     }
-    return "\(length) members"
+    return "\(count) members"
 %elif Self == 'Dictionary':
-    if length == 1 {
+    if count == 1 {
       return "1 key/value pair"
     }
-    return "\(length) key/value pairs"
+    return "\(count) key/value pairs"
 %end
   }
 
@@ -4083,43 +4083,43 @@ public struct _${Self}Builder<${TypeParametersDecl}> {
 
   internal var _result: ${Self}<${TypeParameters}>
   internal var _nativeStorage: _Native${Self}Storage<${TypeParameters}>
-  internal let _requestedLength: Int
-  internal var _actualLength: Int
+  internal let _requestedCount: Int
+  internal var _actualCount: Int
 
-  public init(length: Int) {
+  public init(count: Int) {
     let requiredCapacity =
       _Native${Self}Storage<${TypeParameters}>.getMinCapacity(
-        length, _hashContainerDefaultMaxLoadFactorInverse)
+        count, _hashContainerDefaultMaxLoadFactorInverse)
     _result = ${Self}<${TypeParameters}>(minimumCapacity: requiredCapacity)
     _nativeStorage = _result._variantStorage.native
-    _requestedLength = length
-    _actualLength = 0
+    _requestedCount = count
+    _actualCount = 0
   }
 
 %if Self == 'Set':
   public mutating func add(member newKey: Key) {
     _nativeStorage.unsafeAddNew(key: newKey)
-    _actualLength += 1
+    _actualCount += 1
   }
 %elif Self == 'Dictionary':
   public mutating func add(key newKey: Key, value: Value) {
     _nativeStorage.unsafeAddNew(key: newKey, value: value)
-    _actualLength += 1
+    _actualCount += 1
   }
 %end
 
   @warn_unused_result
   public mutating func take() -> ${Self}<${TypeParameters}> {
-    _require(_actualLength >= 0,
+    _require(_actualCount >= 0,
       "cannot take the result twice")
-    _require(_actualLength == _requestedLength,
-      "the number of members added does not match the promised length")
+    _require(_actualCount == _requestedCount,
+      "the number of members added does not match the promised count")
 
     // Finish building the `${Self}`.
-    _nativeStorage.length = _requestedLength
+    _nativeStorage.count = _requestedCount
 
     // Prevent taking the result twice.
-    _actualLength = -1
+    _actualCount = -1
     return _result
   }
 }

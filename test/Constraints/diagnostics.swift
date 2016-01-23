@@ -135,7 +135,7 @@ func rdar20142523() {
 // <rdar://problem/21080030> Bad diagnostic for invalid method call in boolean expression: (_, IntegerLiteralConvertible)' is not convertible to 'IntegerLiteralConvertible
 func rdar21080030() {
   var s = "Hello"
-  if s.characters.length() == 0 {} // expected-error{{cannot call value of non-function type 'Distance'}}
+  if s.characters.count() == 0 {} // expected-error{{cannot call value of non-function type 'Distance'}}
 }
 
 // <rdar://problem/21248136> QoI: problem with return type inference mis-diagnosed as invalid arguments
@@ -171,7 +171,7 @@ func r17020197(x : Int?, y : Int) {
 
 // <rdar://problem/20714480> QoI: Boolean expr not treated as Bool type when function return type is different
 func validateSaveButton(text: String) {
-  return (text.characters.length > 0) ? true : false  // expected-error {{unexpected non-void return value in void function}}
+  return (text.characters.count > 0) ? true : false  // expected-error {{unexpected non-void return value in void function}}
 }
 
 // <rdar://problem/20201968> QoI: poor diagnostic when calling a class method via a metatype
@@ -632,11 +632,11 @@ let a = safeAssign // expected-error {{generic parameter 'T' could not be inferr
 
 // <rdar://problem/21692808> QoI: Incorrect 'add ()' fixit with trailing closure
 struct Radar21692808<Element> {
-  init(length: Int, value: Element) {}
+  init(count: Int, value: Element) {}
 }
 func radar21692808() -> Radar21692808<Int> {
-  return Radar21692808<Int>(length: 1) { // expected-error {{cannot invoke initializer for type 'Radar21692808<Int>' with an argument list of type '(length: Int, () -> Int)'}}
-    // expected-note @-1 {{expected an argument list of type '(length: Int, value: Element)'}}
+  return Radar21692808<Int>(count: 1) { // expected-error {{cannot invoke initializer for type 'Radar21692808<Int>' with an argument list of type '(count: Int, () -> Int)'}}
+    // expected-note @-1 {{expected an argument list of type '(count: Int, value: Element)'}}
     return 1
   }
 }

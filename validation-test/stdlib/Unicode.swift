@@ -100,7 +100,7 @@ class EOFCountingIterator<T> : IteratorProtocol {
   }
 
   func next() -> T? {
-    if index == array.length {
+    if index == array.count {
       numTimesReturnedEOF += 1
       return .None
     }
@@ -2141,7 +2141,7 @@ class NonContiguousNSString : NSString {
   }
 
   @objc override var length: Int {
-    return _value.length
+    return _value.count
   }
 
   @objc override func characterAt(index: Int) -> unichar {
@@ -2189,7 +2189,7 @@ StringCookedViews.test("UTF8ForContiguousUTF16") {
     backingStorage.withUnsafeBufferPointer {
       (ptr) -> Void in
       let cfstring = CFStringCreateWithCharactersNoCopy(kCFAllocatorDefault,
-          ptr.baseAddress, backingStorage.length, kCFAllocatorNull)
+          ptr.baseAddress, backingStorage.count, kCFAllocatorNull)
       expectFalse(CFStringGetCStringPtr(cfstring,
           CFStringBuiltInEncodings.ASCII.rawValue) != nil)
       expectTrue(CFStringGetCharactersPtr(cfstring) != nil)
@@ -2266,7 +2266,7 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16Extra") {
   do {
     var bytes: [UInt8] = [ 97, 98, 99 ]
     var cfstring: CFString = CFStringCreateWithBytesNoCopy(
-      kCFAllocatorDefault, bytes, bytes.length,
+      kCFAllocatorDefault, bytes, bytes.count,
       CFStringBuiltInEncodings.MacRoman.rawValue, false, kCFAllocatorNull)
 
     // Sanity checks to make sure we are testing the code path that does UTF-8
@@ -2290,7 +2290,7 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16Extra") {
   do {
     var bytes: [UInt8] = [ 97, 98, 99 ]
     var cfstring: CFString = CFStringCreateWithBytes(kCFAllocatorDefault,
-        bytes, bytes.length, CFStringBuiltInEncodings.MacRoman.rawValue, false)
+        bytes, bytes.count, CFStringBuiltInEncodings.MacRoman.rawValue, false)
 
     // Sanity checks to make sure we are testing the code path that does UTF-8
     // encoding itself, instead of dispatching to CF.

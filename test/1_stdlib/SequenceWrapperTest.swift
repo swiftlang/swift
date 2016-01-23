@@ -59,10 +59,10 @@ sequenceWrapperTests.test("Dispatch/iterator()") {
     direct.iterator(), indirect.iterator(), dispatchLog.iterator)
 }
 
-sequenceWrapperTests.test("Dispatch/underestimatedLength") {
+sequenceWrapperTests.test("Dispatch/underestimatedCount") {
   expectWrapperDispatch(
-    direct.underestimatedLength, indirect.underestimatedLength,
-    dispatchLog.underestimatedLength)
+    direct.underestimatedCount, indirect.underestimatedCount,
+    dispatchLog.underestimatedCount)
 }
 
 sequenceWrapperTests.test("Dispatch/map") {

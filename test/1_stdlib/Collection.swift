@@ -218,33 +218,33 @@ func isPalindrome4<
 let array = [1, 2, 3, 4]
 let dict = [0:0, 1:1, 2:2, 3:3, 4:4]
 
-func testLength() {
-  // CHECK: testing length
-  print("testing length")
+func testCount() {
+  // CHECK: testing count
+  print("testing count")
   // CHECK-NEXT: random access: 4
-  print("random access: \(array.length)")
+  print("random access: \(array.count)")
   // CHECK-NEXT: bidirectional: 5
-  print("bidirectional: \(dict.length)")
+  print("bidirectional: \(dict.count)")
 }
-testLength()
+testCount()
 
 struct SequenceOnly<T : Sequence> : Sequence {
   var base: T
   func iterator() -> T.Iterator { return base.iterator() }
 }
 
-func testUnderestimatedLength() {
-  // CHECK: testing underestimatedLength
-  print("testing underestimatedLength")
+func testUnderestimatedCount() {
+  // CHECK: testing underestimatedCount
+  print("testing underestimatedCount")
   // CHECK-NEXT: random access: 4
-  print("random access: \(array.underestimatedLength)")
+  print("random access: \(array.underestimatedCount)")
   // CHECK-NEXT: bidirectional: 5
-  print("bidirectional: \(dict.underestimatedLength)")
+  print("bidirectional: \(dict.underestimatedCount)")
   // CHECK-NEXT: Sequence only: 0
   let s = SequenceOnly(base: array)
-  print("Sequence only: \(s.underestimatedLength)")
+  print("Sequence only: \(s.underestimatedCount)")
 }
-testUnderestimatedLength()
+testUnderestimatedCount()
 
 func testIsEmptyFirstLast() {
   // CHECK: testing isEmpty
