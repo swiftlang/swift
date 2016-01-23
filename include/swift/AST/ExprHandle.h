@@ -17,6 +17,7 @@
 #ifndef SWIFT_EXPRHANDLE_H
 #define SWIFT_EXPRHANDLE_H
 
+#include "swift/AST/TypeAlignments.h"
 #include "llvm/Support/DataTypes.h"
 #include "llvm/ADT/PointerIntPair.h"
 

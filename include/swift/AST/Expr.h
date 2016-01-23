@@ -21,9 +21,9 @@
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/Availability.h"
-#include "swift/Basic/PointerLikeTypeTraitsFwdDecl.h"
 
 namespace llvm {
   struct fltSemantics;
