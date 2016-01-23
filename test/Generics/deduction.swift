@@ -208,14 +208,14 @@ func callMin(x: Int, y: Int, a: Float, b: Float) {
   min2(a, b) // expected-error{{cannot invoke 'min2' with an argument list of type '(Float, Float)'}} expected-note {{expected an argument list of type '(T, T)'}}
 }
 
-func rangeOfIsBefore<
+func rangeOfIsBefore<  // expected-note {{in call to function 'rangeOfIsBefore'}}
   R : GeneratorType where R.Element : IsBefore
 >(range : R) { }
 
 
 func callRangeOfIsBefore(ia: [Int], da: [Double]) {
   rangeOfIsBefore(ia.generate())
-  rangeOfIsBefore(da.generate()) // expected-error{{value of type '(_) -> ()' has no member 'Element'}}
+  rangeOfIsBefore(da.generate()) // expected-error{{generic parameter 'R' could not be inferred}}
 }
 
 //===----------------------------------------------------------------------===//

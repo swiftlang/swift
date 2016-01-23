@@ -1933,12 +1933,22 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
   // and the source range for y.
   auto anchor = expr;
   SourceRange memberRange = anchor->getSourceRange();
-  if (auto locator = constraint->getLocator()) {
+  auto locator = constraint->getLocator();
+  if (locator) {
     locator = simplifyLocator(*CS, locator, memberRange);
     if (locator->getAnchor())
       anchor = locator->getAnchor();
   }
-
+  
+  // Check to see if this is a locator referring to something we cannot or do
+  // here: in this case, we ignore paths that end on archetypes witnesses, or
+  // associated types of the expression.
+  if (locator && !locator->getPath().empty()) {
+    // TODO: This should only ignore *unresolved* archetypes.  For resolved
+    // archetypes
+    return false;
+  }
+  
   // Retypecheck the anchor type, which is the base of the member expression.
   anchor = typeCheckArbitrarySubExprIndependently(anchor, TCC_AllowLValue);
   if (!anchor) return true;
@@ -1964,7 +1974,9 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
   // call the function, e.g. in "a.b.c" where they had to write "a.b().c".
   // Produce a specific diagnostic + fixit for this situation.
   if (auto baseFTy = baseObjTy->getAs<AnyFunctionType>()) {
-    if (baseFTy->getInput()->isVoid()) {
+    if (baseFTy->getInput()->isVoid() &&
+        (constraint->getKind() == ConstraintKind::ValueMember ||
+         constraint->getKind() == ConstraintKind::UnresolvedValueMember)) {
       SourceLoc insertLoc = anchor->getEndLoc();
     
       if (auto *DRE = dyn_cast<DeclRefExpr>(anchor)) {
