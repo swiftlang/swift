@@ -626,8 +626,12 @@ ERROR(expected_rparen_tuple_pattern_list,none,
       "expected ')' at end of tuple pattern", ())
 ERROR(untyped_pattern_ellipsis,none,
       "'...' cannot be applied to a subpattern which is not explicitly typed", ())
-ERROR(non_func_decl_pattern_init,none,
-      "default argument is only permitted for a non-curried function parameter",())
+ERROR(no_default_arg_closure,none,
+      "default arguments are not allowed in closures", ())
+ERROR(no_default_arg_subscript,none,
+      "default arguments are not allowed in subscripts", ())
+ERROR(no_default_arg_curried,none,
+      "default arguments are not allowed in curried parameter lists", ())
 ERROR(var_not_allowed_in_pattern, none,
       "Use of 'var' binding here is not allowed", ())
 WARNING(let_on_param_is_redundant, none,

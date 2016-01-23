@@ -67,7 +67,8 @@ void Parser::DefaultArgumentInfo::setFunctionContext(DeclContext *DC) {
 static ParserStatus parseDefaultArgument(Parser &P,
                                    Parser::DefaultArgumentInfo *defaultArgs,
                                    unsigned argIndex,
-                                   ExprHandle *&init) {
+                                   ExprHandle *&init,
+                                 Parser::ParameterContextKind paramContext) {
   SourceLoc equalLoc = P.consumeToken(tok::equal);
 
   // Enter a fresh default-argument context with a meaningless parent.
@@ -89,8 +90,28 @@ static ParserStatus parseDefaultArgument(Parser &P,
     defaultArgs->ParsedContexts.push_back(initDC);
   }
 
+  Diag<> diagID = { DiagID() };
+  switch (paramContext) {
+  case Parser::ParameterContextKind::Function:
+  case Parser::ParameterContextKind::Operator:
+  case Parser::ParameterContextKind::Initializer:
+    break;
+  case Parser::ParameterContextKind::Closure:
+    diagID = diag::no_default_arg_closure;
+    break;
+  case Parser::ParameterContextKind::Subscript:
+    diagID = diag::no_default_arg_subscript;
+    break;
+  case Parser::ParameterContextKind::Curried:
+    diagID = diag::no_default_arg_curried;
+    break;
+  }
+  
+  assert((diagID.ID != DiagID()) == !defaultArgs &&
+         "Default arguments specified for an unexpected parameter list kind");
+  
   if (!defaultArgs) {
-    auto inFlight = P.diagnose(equalLoc, diag::non_func_decl_pattern_init);
+    auto inFlight = P.diagnose(equalLoc, diagID);
     if (initR.isNonNull())
       inFlight.fixItRemove(SourceRange(equalLoc, initR.get()->getEndLoc()));
     return ParserStatus();
@@ -270,7 +291,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     if (Tok.is(tok::equal)) {
       param.EqualLoc = Tok.getLoc();
       status |= parseDefaultArgument(*this, defaultArgs, defaultArgIndex,
-                                     param.DefaultArg);
+                                     param.DefaultArg, paramContext);
 
       if (param.EllipsisLoc.isValid()) {
         // The range of the complete default argument.
@@ -439,15 +460,10 @@ mapParsedParameters(Parser &parser,
     }
 
     if (param.DefaultArg) {
-      if (!isFirstParameterClause) {
-        // Default arguments are only permitted on the first parameter clause.
-        parser.diagnose(param.EqualLoc, diag::non_func_decl_pattern_init)
-          .fixItRemove(SourceRange(param.EqualLoc,
-                                   param.DefaultArg->getExpr()->getEndLoc()));
-      } else {
-        result->setDefaultArgumentKind(getDefaultArgKind(param.DefaultArg));
-        result->setDefaultValue(param.DefaultArg);
-      }
+      assert(isFirstParameterClause &&
+             "Default arguments are only permitted on the first param clause");
+      result->setDefaultArgumentKind(getDefaultArgKind(param.DefaultArg));
+      result->setDefaultValue(param.DefaultArg);
     }
 
     elements.push_back(result);
