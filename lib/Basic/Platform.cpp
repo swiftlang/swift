@@ -1,4 +1,4 @@
-//===--- Platform.cpp - Implement platform-related helpers ------*- C++ -*-===//
+//===--- Platform.cpp - Implement platform-related helpers ----------------===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -1,4 +1,4 @@
-//===- ArraySemantic.cpp - Wrapper around array semantic calls. -*- C++ -*-===//
+//===--- ArraySemantic.cpp - Wrapper around array semantic calls. ---------===//
 //
 // This source file is part of the Swift.org open source project
 //

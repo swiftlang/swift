@@ -1,4 +1,4 @@
-//===--- OutputFileMap.cpp - Driver output file map -------------*- C++ -*-===//
+//===--- OutputFileMap.cpp - Driver output file map -----------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

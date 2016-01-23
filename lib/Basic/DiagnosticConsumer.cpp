@@ -1,4 +1,4 @@
-//===--- DiagnosticConsumer.cpp - Diagnostic Consumer Impl ------*- C++ -*-===//
+//===--- DiagnosticConsumer.cpp - Diagnostic Consumer Impl ----------------===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -1,4 +1,4 @@
-//===--- Enum.cpp - Runtime declarations for enums --------------*- C++ -*-===//
+//===--- Enum.cpp - Runtime declarations for enums ------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

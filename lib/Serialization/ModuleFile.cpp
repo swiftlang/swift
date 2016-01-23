@@ -1,4 +1,4 @@
-//===--- ModuleFile.cpp - Loading a serialized module -----------*- C++ -*-===//
+//===--- ModuleFile.cpp - Loading a serialized module ---------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
