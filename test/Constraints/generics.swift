@@ -197,3 +197,17 @@ _ = SR599()         // expected-error {{generic parameter 'T' could not be infer
 
 
 
+
+// <rdar://problem/19215114> QoI: Poor diagnostic when we are unable to infer type
+protocol Q19215114 {}
+protocol P19215114 {}
+
+// expected-note @+1 {{in call to function 'body9215114'}}
+func body9215114<T: P19215114, U: Q19215114>(t: T) -> (u: U) -> () {}
+
+func test9215114<T: P19215114, U: Q19215114>(t: T) -> (U) -> () {
+  //Should complain about not being able to infer type of U.
+  let f = body9215114(t)  // expected-error {{generic parameter 'T' could not be inferred}}
+  return f
+}
+
