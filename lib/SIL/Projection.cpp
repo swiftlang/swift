@@ -98,6 +98,7 @@ NewProjection::NewProjection(SILInstruction *I) : Value() {
     assert(getIndex() == 0);
     assert(getType(PBI->getOperand().getType(), PBI->getModule()) ==
            PBI->getType());
+    (void) PBI;
     break;
   }
   case ValueKind::TupleExtractInst: {
@@ -311,6 +312,7 @@ void NewProjection::getFirstLevelProjections(
           assert(X.getMostDerivedType(Mod) == SILType::getPrimitiveAddressType(
                                                 Box->getBoxedType()));
           X.verify(Mod););
+    (void) Box;
     Out.push_back(P);
     return;
   }

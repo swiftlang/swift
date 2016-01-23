@@ -329,6 +329,7 @@ static RValue emitCollectionDowncastExpr(SILGenFunction &SGF,
   auto toSubsts = toCollection->getSubstitutions(SGF.SGM.SwiftModule,nullptr);
   assert(fnArcheTypes.size() == fromSubsts.size() + toSubsts.size() &&
          "wrong number of generic collection parameters");
+  (void) fnArcheTypes;
 
   // Form type parameter substitutions.
   SmallVector<Substitution, 4> subs;

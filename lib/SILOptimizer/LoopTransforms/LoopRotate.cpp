@@ -113,9 +113,7 @@ updateSSAForUseOfInst(SILSSAUpdater &Updater,
   // Find the mapped instruction.
   assert(ValueMap.count(Inst) && "Expected to find value in map!");
   SILValue MappedValue = ValueMap.find(Inst)->second;
-  auto *MappedInst = MappedValue.getDef();
   assert(MappedValue);
-  assert(MappedInst);
 
   // For each use of a specific result value of the instruction.
   if (Inst->hasValue()) {

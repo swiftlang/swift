@@ -1210,6 +1210,7 @@ ASTContext::createTrivialSubstitutions(BoundGenericType *BGT,
   assert(Params.size() == 1);
   auto Param = Params[0];
   assert(Param->getArchetype() && "Not type-checked yet");
+  (void) Param;
   Substitution Subst(BGT->getGenericArgs()[0], {});
   auto Substitutions = AllocateCopy(llvm::makeArrayRef(Subst));
   auto arena = getArena(BGT->getRecursiveProperties());
