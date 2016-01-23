@@ -261,6 +261,9 @@ _ = {0}
 
 // <rdar://problem/22086634> "multi-statement closures require an explicit return type" should be an error not a note
 let samples = {   // expected-error {{type of expression is ambiguous without more context}}
+  // FIXME: This diagnostic should be improved, we can infer a type for the closure expr from
+  // its body (by trying really hard in diagnostic generation) and say that we need an explicit
+  // contextual result specified because we don't do cross-statement type inference or something.
           if (i > 10) { return true }
           else { return false }
         }()
