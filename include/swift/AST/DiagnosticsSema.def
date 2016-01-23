@@ -413,6 +413,12 @@ ERROR(serialization_target_too_new_repl,none,
       "module file's minimum deployment target is %0 v%1.%2%select{|.%3}3: %4",
       (StringRef, unsigned, unsigned, unsigned, StringRef))
 
+ERROR(reserved_member_name,none,
+      "type member may not be named %0, since it would conflict with the"
+      " 'foo.%1' expression", (DeclName, StringRef))
+NOTE(backticks_to_escape,none,
+     "backticks can escape this name if it is important to use", ())
+
 ERROR(invalid_redecl,none,"invalid redeclaration of %0", (DeclName))
 NOTE(invalid_redecl_prev,none,
      "%0 previously declared here", (DeclName))

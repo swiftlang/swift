@@ -2662,8 +2662,24 @@ public:
     
     DeclVisitor<DeclChecker>::visit(decl);
 
-    if (auto valueDecl = dyn_cast<ValueDecl>(decl)) {
-      checkRedeclaration(TC, valueDecl);
+    if (auto VD = dyn_cast<ValueDecl>(decl)) {
+      checkRedeclaration(TC, VD);
+      
+      // If this is a member of a nominal type, don't allow it to have a name of
+      // "Type" or "Protocol" since we reserve the X.Type and X.Protocol
+      // expressions to mean something builtin to the langauge.  We *do* allow
+      // these if they are escaped with backticks though.
+      auto &Context = TC.Context;
+      if (VD->getDeclContext()->isTypeContext() &&
+          (VD->getFullName().isSimpleName(Context.Id_Type) ||
+           VD->getFullName().isSimpleName(Context.Id_Protocol)) &&
+          VD->getNameLoc().isValid() &&
+          Context.SourceMgr.extractText({VD->getNameLoc(), 1}) != "`") {
+        TC.diagnose(VD->getNameLoc(), diag::reserved_member_name,
+                    VD->getFullName(), VD->getNameStr());
+        TC.diagnose(VD->getNameLoc(), diag::backticks_to_escape)
+          .fixItReplace(VD->getNameLoc(), "`"+VD->getNameStr().str()+"`");
+      }
     }
 
     if ((IsSecondPass && !IsFirstPass) ||
@@ -5603,7 +5619,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       validateExtension(ext);
     }
   }
-
+  
   switch (D->getKind()) {
   case DeclKind::Import:
   case DeclKind::Extension:
