@@ -148,7 +148,7 @@ KNOWN_SETTINGS=(
     build-swift-static-stdlib   "0"              "set to 1 to build static versions of the Swift standard library and SDK overlay"
     build-swift-examples        "1"              "set to 1 to build examples"
     build-swift-perf-testsuite  "0"              "set to 1 to build perf test suite"
-	build-serialized-stdlib-unittest "0"         "set to 1 to build the StdlibUnittest module with -sil-serialize-all"
+    build-serialized-stdlib-unittest "0"         "set to 1 to build the StdlibUnittest module with -sil-serialize-all"
     source-tree-includes-tests  "1"              "set to 0 to allow the build to proceed when 'test' directory is missing (required for B&I builds)"
     native-llvm-tools-path      ""               "directory that contains LLVM tools that are executable on the build machine"
     native-clang-tools-path     ""               "directory that contains Clang tools that are executable on the build machine"
