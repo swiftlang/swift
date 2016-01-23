@@ -21,7 +21,7 @@ protocol _SequenceWrapperType {
   associatedtype Base : SequenceType
   associatedtype Generator : GeneratorType = Base.Generator
   
-  var _base: Base {get}
+  var _base: Base { get }
 }
 
 extension SequenceType

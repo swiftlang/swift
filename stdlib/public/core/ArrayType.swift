@@ -21,22 +21,22 @@ protocol _ArrayType
   init(count: Int, repeatedValue: Generator.Element)
 
   /// The number of elements the Array stores.
-  var count: Int {get}
+  var count: Int { get }
 
   /// The number of elements the Array can store without reallocation.
-  var capacity: Int {get}
+  var capacity: Int { get }
 
   /// `true` if and only if the Array is empty.
-  var isEmpty: Bool {get}
+  var isEmpty: Bool { get }
 
   /// An object that guarantees the lifetime of this array's elements.
-  var _owner: AnyObject? {get}
+  var _owner: AnyObject? { get }
 
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, `nil`.
-  var _baseAddressIfContiguous: UnsafeMutablePointer<Element> {get}
+  var _baseAddressIfContiguous: UnsafeMutablePointer<Element> { get }
 
-  subscript(index: Int) -> Generator.Element {get set}
+  subscript(index: Int) -> Generator.Element { get set }
 
   //===--- basic mutations ------------------------------------------------===//
 
@@ -77,7 +77,7 @@ protocol _ArrayType
   init(_ buffer: _Buffer)
 
   // For testing.
-  var _buffer: _Buffer {get}
+  var _buffer: _Buffer { get }
 }
 
 internal struct _ArrayTypeMirror<
