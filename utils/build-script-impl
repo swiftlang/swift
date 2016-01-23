@@ -148,6 +148,7 @@ KNOWN_SETTINGS=(
     build-swift-static-stdlib   "0"              "set to 1 to build static versions of the Swift standard library and SDK overlay"
     build-swift-examples        "1"              "set to 1 to build examples"
     build-swift-perf-testsuite  "0"              "set to 1 to build perf test suite"
+	build-serialized-stdlib-unittest "0"         "set to 1 to build the StdlibUnittest module with -sil-serialize-all"
     source-tree-includes-tests  "1"              "set to 0 to allow the build to proceed when 'test' directory is missing (required for B&I builds)"
     native-llvm-tools-path      ""               "directory that contains LLVM tools that are executable on the build machine"
     native-clang-tools-path     ""               "directory that contains Clang tools that are executable on the build machine"
@@ -1646,6 +1647,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                     -DSWIFT_NATIVE_SWIFT_TOOLS_PATH:STRING="${native_swift_tools_path}"
                     -DSWIFT_BUILD_TOOLS:BOOL=$(true_false "${BUILD_SWIFT_TOOLS}")
                     -DSWIFT_BUILD_STDLIB:BOOL=$(true_false "${BUILD_SWIFT_STDLIB}")
+                    -DSWIFT_SERIALIZE_STDLIB_UNITTEST:BOOL=$(true_false "${BUILD_SERIALIZED_STDLIB_UNITTEST}")
                     -DSWIFT_BUILD_SDK_OVERLAY:BOOL=$(true_false "${BUILD_SWIFT_SDK_OVERLAY}")
                     -DSWIFT_BUILD_STATIC_STDLIB:BOOL=$(true_false "${BUILD_SWIFT_STATIC_STDLIB}")
                     -DSWIFT_BUILD_PERF_TESTSUITE:BOOL=$(true_false "${build_perf_testsuite_this_time}")

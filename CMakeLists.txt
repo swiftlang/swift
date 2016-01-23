@@ -28,6 +28,10 @@ option(SWIFT_STDLIB_ASSERTIONS
     "Enable internal checks for the Swift standard library (useful for debugging the library itself, does not affect checks required for safety)"
     "${SWIFT_STDLIB_ASSERTIONS_default}")
 
+option(SWIFT_SERIALIZE_STDLIB_UNITTEST
+    "Compile the StdlibUnittest module with -sil-serialize-all to increase the test coverage for the optimizer"
+    FALSE)
+
 option(SWIFT_BUILD_TOOLS
     "Build the Swift compiler and other tools"
     TRUE)
