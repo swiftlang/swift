@@ -1694,7 +1694,10 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
     // switch is not exhaustive.
     bool exhaustive = false;
     auto enumDecl = sourceType.getEnumOrBoundGenericEnum();
-    if (enumDecl->hasFixedLayout(SGF.SGM.M.getSwiftModule())) {
+
+    // FIXME: Get expansion from SILFunction
+    if (enumDecl->hasFixedLayout(SGF.SGM.M.getSwiftModule(),
+                                 ResilienceExpansion::Maximal)) {
       exhaustive = true;
 
       for (auto elt : enumDecl->getAllElements()) {

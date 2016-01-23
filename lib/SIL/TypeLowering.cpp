@@ -151,19 +151,22 @@ enum class LoweredTypeKind {
 };
 
 static LoweredTypeKind classifyType(CanType type, SILModule &M,
-                                    CanGenericSignature sig);
+                                    CanGenericSignature sig,
+                                    ResilienceExpansion expansion);
 
 namespace {
   /// A CRTP helper class for doing things that depends on type
   /// classification.
   template <class Impl, class RetTy>
   class TypeClassifierBase : public CanTypeVisitor<Impl, RetTy> {
-    SILModule &M;
-    CanGenericSignature Sig;
     Impl &asImpl() { return *static_cast<Impl*>(this); }
   protected:
-    TypeClassifierBase(SILModule &M, CanGenericSignature Sig)
-      : M(M), Sig(Sig) {}
+    SILModule &M;
+    CanGenericSignature Sig;
+    ResilienceExpansion Expansion;
+    TypeClassifierBase(SILModule &M, CanGenericSignature Sig,
+                       ResilienceExpansion Expansion)
+      : M(M), Sig(Sig), Expansion(Expansion) {}
 
   public:
     // The subclass should implement:
@@ -397,7 +400,7 @@ namespace {
       // SIL lowering to catch unsupported recursive value types.
       bool isAddressOnly = false;
       for (auto eltType : type.getElementTypes()) {
-        switch (classifyType(eltType, M, Sig)) {
+        switch (classifyType(eltType, M, Sig, Expansion)) {
         case LoweredTypeKind::Trivial:
           continue;
         case LoweredTypeKind::AddressOnly:
@@ -436,8 +439,9 @@ namespace {
   class TypeClassifier :
       public TypeClassifierBase<TypeClassifier, LoweredTypeKind> {
   public:
-    TypeClassifier(SILModule &M, CanGenericSignature Sig)
-        : TypeClassifierBase(M, Sig) {}
+    TypeClassifier(SILModule &M, CanGenericSignature Sig,
+                   ResilienceExpansion Expansion)
+        : TypeClassifierBase(M, Sig, Expansion) {}
 
     LoweredTypeKind handleReference(CanType type) {
       return LoweredTypeKind::Reference;
@@ -455,16 +459,19 @@ namespace {
 }
 
 static LoweredTypeKind classifyType(CanType type, SILModule &M,
-                                    CanGenericSignature sig) {
-  return TypeClassifier(M, sig).visit(type);
+                                    CanGenericSignature sig,
+                                    ResilienceExpansion expansion) {
+  return TypeClassifier(M, sig, expansion).visit(type);
 }
 
 /// True if the type, or the referenced type of an address
 /// type, is address-only.  For example, it could be a resilient struct or
 /// something of unknown size.
 bool SILType::isAddressOnly(CanType type, SILModule &M,
-                            CanGenericSignature sig) {
-  return classifyType(type, M, sig) == LoweredTypeKind::AddressOnly;
+                            CanGenericSignature sig,
+                            ResilienceExpansion expansion) {
+  return classifyType(type, M, sig, expansion)
+      == LoweredTypeKind::AddressOnly;
 }
 
 namespace {
@@ -1047,8 +1054,10 @@ namespace {
     CanType OrigType;
     IsDependent_t Dependent;
   public:
-    LowerType(TypeConverter &TC, CanType OrigType, IsDependent_t Dependent)
-      : TypeClassifierBase(TC.M, CanGenericSignature()),
+    LowerType(TypeConverter &TC, CanType OrigType,
+              CanGenericSignature Sig, ResilienceExpansion Expansion,
+              IsDependent_t Dependent)
+      : TypeClassifierBase(TC.M, Sig, Expansion),
         TC(TC), OrigType(OrigType),
         Dependent(Dependent) {}
         
@@ -1076,7 +1085,7 @@ namespace {
         auto unownedBaseType = CanUnownedStorageType::get(
                                                 dynamicSelfType.getSelfType());
 
-        return LowerType(TC, unownedBaseType, Dependent)
+        return LowerType(TC, unownedBaseType, Sig, Expansion, Dependent)
           .visit(unownedBaseType);
       }
 
@@ -1096,7 +1105,7 @@ namespace {
         auto unmanagedBaseType = CanUnmanagedStorageType::get(
                                                 dynamicSelfType.getSelfType());
 
-        return LowerType(TC, unmanagedBaseType, Dependent)
+        return LowerType(TC, unmanagedBaseType, Sig, Expansion, Dependent)
           .visit(unmanagedBaseType);
       }
 
@@ -1111,7 +1120,7 @@ namespace {
           ->getCanonicalType();
         auto weakBaseType = CanWeakStorageType::get(optBaseType);
 
-        return LowerType(TC, weakBaseType, Dependent)
+        return LowerType(TC, weakBaseType, Sig, Expansion, Dependent)
           .visit(weakBaseType);
       }
 
@@ -1158,7 +1167,7 @@ namespace {
       
       // For now, if the type does not have a fixed layout in all resilience
       // domains, we will treat it as address-only in SIL.
-      if (!D->hasFixedLayout())
+      if (!D->hasFixedLayout(M.getSwiftModule(), Expansion))
         isAddressOnly = true;
 
       // Classify the type according to its stored properties.
@@ -1166,8 +1175,8 @@ namespace {
       for (auto field : D->getStoredProperties()) {
         auto substFieldType =
           structType->getTypeOfMember(D->getModuleContext(), field, nullptr);
-        switch (classifyType(substFieldType->getCanonicalType(), TC.M,
-                             CanGenericSignature())) {
+        switch (classifyType(substFieldType->getCanonicalType(),
+                             M, Sig, Expansion)) {
         case LoweredTypeKind::AddressOnly:
           isAddressOnly = true;
           break;
@@ -1195,7 +1204,7 @@ namespace {
 
       // For now, if the type does not have a fixed layout in all resilience
       // domains, we will treat it as address-only in SIL.
-      if (!D->hasFixedLayout())
+      if (!D->hasFixedLayout(M.getSwiftModule(), Expansion))
         isAddressOnly = true;
       
       // Lower Self? as if it were Whatever? and Self! as if it were Whatever!.
@@ -1255,8 +1264,8 @@ namespace {
                               elt->getArgumentInterfaceType())
           ->getCanonicalType();
         
-        switch (classifyType(substEltType->getCanonicalType(), TC.M,
-                             CanGenericSignature())) {
+        switch (classifyType(substEltType->getCanonicalType(),
+                             M, Sig, Expansion)) {
         case LoweredTypeKind::AddressOnly:
           isAddressOnly = true;
           break;
@@ -1278,7 +1287,7 @@ namespace {
 
     const TypeLowering *visitDynamicSelfType(CanDynamicSelfType type) {
       return LowerType(TC, cast<DynamicSelfType>(OrigType).getSelfType(), 
-                       Dependent)
+                       Sig, Expansion, Dependent)
                .visit(type.getSelfType());
     }
 
@@ -1667,7 +1676,10 @@ TypeConverter::getTypeLoweringForUncachedLoweredType(TypeKey key) {
   insert(key, nullptr);
 
   CanType contextType = key.SubstType;
+  // FIXME: Get expansion from SILFunction
   auto *theInfo = LowerType(*this, key.SubstType,
+                            CanGenericSignature(),
+                            ResilienceExpansion::Minimal,
                             key.isDependent()).visit(contextType);
   insert(key, theInfo);
   return *theInfo;

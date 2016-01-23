@@ -1031,11 +1031,13 @@ namespace {
     assert(inst->hasDefault() && "doesn't have a default");
     SILType enumType = enumValue.getType();
 
-    if (!enumType.hasFixedLayout(inst->getModule()))
-      return nullptr;
-
     EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
     assert(decl && "switch_enum operand is not an enum");
+
+    // FIXME: Get expansion from SILFunction
+    if (!decl->hasFixedLayout(inst->getModule().getSwiftModule(),
+                              ResilienceExpansion::Maximal))
+      return nullptr;
 
     llvm::SmallPtrSet<EnumElementDecl *, 4> unswitchedElts;
     for (auto elt : decl->getAllElements())

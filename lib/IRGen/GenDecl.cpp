@@ -2796,19 +2796,8 @@ StringRef IRGenModule::mangleType(CanType type, SmallVectorImpl<char> &buffer) {
 /// - For enums, new cases can be added
 /// - For classes, the superclass might change the size or number
 ///   of stored properties
-bool IRGenModule::isResilient(Decl *D, ResilienceExpansion expansion) {
-  auto NTD = dyn_cast<NominalTypeDecl>(D);
-  if (!NTD)
-    return false;
-
-  switch (expansion) {
-  case ResilienceExpansion::Maximal:
-    return !NTD->hasFixedLayout(SILMod->getSwiftModule());
-  case ResilienceExpansion::Minimal:
-    return !NTD->hasFixedLayout();
-  }
-
-  llvm_unreachable("Bad resilience scope");
+bool IRGenModule::isResilient(NominalTypeDecl *D, ResilienceExpansion expansion) {
+  return !D->hasFixedLayout(SILMod->getSwiftModule(), expansion);
 }
 
 // The most general resilience expansion where the given declaration is visible.

@@ -67,7 +67,7 @@ namespace swift {
   class ProtocolDecl;
   class ProtocolType;
   struct RawComment;
-  enum class Resilience : unsigned char;
+  enum class ResilienceExpansion : unsigned;
   class TypeAliasDecl;
   class Stmt;
   class SubscriptDecl;
@@ -2788,9 +2788,7 @@ public:
 
   /// \brief Does this declaration expose a fixed layout to the given
   /// module?
-  bool hasFixedLayout(ModuleDecl *M) const {
-    return (hasFixedLayout() || M == getModuleContext());
-  }
+  bool hasFixedLayout(ModuleDecl *M, ResilienceExpansion expansion) const;
 
   void setMemberLoader(LazyMemberLoader *resolver, uint64_t contextData);
   bool hasLazyMembers() const {
@@ -4029,9 +4027,7 @@ public:
 
   /// \brief Does this declaration expose a fixed layout to the given
   /// module?
-  bool hasFixedLayout(ModuleDecl *M) const {
-    return (hasFixedLayout() || M == getModuleContext());
-  }
+  bool hasFixedLayout(ModuleDecl *M, ResilienceExpansion expansion) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

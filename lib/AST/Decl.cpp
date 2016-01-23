@@ -26,6 +26,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/TypeLoc.h"
 #include "clang/Lex/MacroInfo.h"
 #include "llvm/ADT/SmallString.h"
@@ -1178,6 +1179,8 @@ static bool isPolymorphic(const AbstractStorageDecl *storage) {
 /// MemberRefExpr use of this value in the specified context.
 AccessSemantics
 ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC) const {
+  ResilienceExpansion expansion = ResilienceExpansion::Maximal;
+
   if (auto *var = dyn_cast<AbstractStorageDecl>(this)) {
     // Observing member are accessed directly from within their didSet/willSet
     // specifiers.  This prevents assignments from becoming infinite loops.
@@ -1208,7 +1211,7 @@ ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC) const {
 
       // If the property does not have a fixed layout from the given context,
       // we cannot do direct access.
-      if (!var->hasFixedLayout(UseDC->getParentModule()))
+      if (!var->hasFixedLayout(UseDC->getParentModule(), expansion))
         return AccessSemantics::Ordinary;
 
       // We know enough about the property to perform direct access.
@@ -1347,6 +1350,17 @@ bool AbstractStorageDecl::hasFixedLayout() const {
   // Must use resilient access patterns.
   assert(getDeclContext()->isModuleScopeContext());
   return !getDeclContext()->getParentModule()->isResilienceEnabled();
+}
+
+bool AbstractStorageDecl::hasFixedLayout(ModuleDecl *M,
+                                         ResilienceExpansion expansion) const {
+  switch (expansion) {
+  case ResilienceExpansion::Minimal:
+    return hasFixedLayout();
+  case ResilienceExpansion::Maximal:
+    return hasFixedLayout() || M == getModuleContext();
+  }
+  llvm_unreachable("bad resilience expansion");
 }
 
 
@@ -1872,6 +1886,18 @@ bool NominalTypeDecl::hasFixedLayout() const {
   // Otherwise, access via indirect "resilient" interfaces.
   return !getParentModule()->isResilienceEnabled();
 }
+
+bool NominalTypeDecl::hasFixedLayout(ModuleDecl *M,
+                                     ResilienceExpansion expansion) const {
+  switch (expansion) {
+  case ResilienceExpansion::Minimal:
+    return hasFixedLayout();
+  case ResilienceExpansion::Maximal:
+    return hasFixedLayout() || M == getModuleContext();
+  }
+  llvm_unreachable("bad resilience expansion");
+}
+
 
 /// Provide the set of parameters to a generic type, or null if
 /// this function is not generic.

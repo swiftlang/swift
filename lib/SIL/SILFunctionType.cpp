@@ -275,8 +275,10 @@ enum class ConventionsKind : uint8_t {
 
       // Otherwise, query specifically for the original type.
       } else {
+        // FIXME: Get expansion from SILDeclRef
         return SILType::isPassedIndirectly(origType.getType(), M,
-                                           origType.getGenericSignature());
+                                           origType.getGenericSignature(),
+                                           ResilienceExpansion::Minimal);
       }
     }
 
@@ -526,9 +528,11 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
 
   // Otherwise, ask whether the original result type was address-only.
   } else {
+    // FIXME: Get expansion from SILDeclRef
     hasIndirectResult = SILType::isReturnedIndirectly(
         origResultType.getType(), M,
-        origResultType.getGenericSignature());
+        origResultType.getGenericSignature(),
+        ResilienceExpansion::Minimal);
   }
 
   // Okay, with that we can actually construct the result type.
