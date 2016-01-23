@@ -242,7 +242,7 @@ us to cleanly describe a protocol for collections::
 
   protocol Collection {
     typealias Element
-    func forEach(callback : (value : Element) -> void)
+    func forEach(callback : (value : Element) -> Void)
     func add(value : Element)
   }
 
@@ -330,7 +330,7 @@ type::
 
   struct EmployeeList : Collection { // EmployeeList is a collection
     typealias Element = T
-    func forEach(callback : (value : Element) -> void) { /* Implement this */ }
+    func forEach(callback : (value : Element) -> Void) { /* Implement this */ }
     func add(value : Element) { /* Implement this */ }
   }
 
@@ -367,7 +367,7 @@ extensions, e.g.,::
 
   extension String : Collection {
     typealias Element = char
-    func forEach(callback : (value : Element) -> void) { /* use existing String routines to enumerate characters */ }
+    func forEach(callback : (value : Element) -> Void) { /* use existing String routines to enumerate characters */ }
     func add(value : Element) { self += value /* append character */ }
   }
 
