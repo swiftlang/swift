@@ -16,6 +16,7 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 
 #include <cstddef>
