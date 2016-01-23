@@ -41,12 +41,6 @@ template <typename T> struct FwdDeclPointerLikeTypeTraits {
 
 } // end swift namespace
 
-namespace clang {
-class Decl;
-class MacroInfo;
-class Module;
-} // end clang namespace
-
 namespace swift {
 class ASTContext;
 class AssociatedTypeDecl;
@@ -74,9 +68,6 @@ class JobAction;
       : swift::FwdDeclPointerLikeTypeTraits<Cls *> {};                         \
   }
 
-DEFINE_FWDDECLTRAITS(clang::Decl);
-DEFINE_FWDDECLTRAITS(clang::MacroInfo);
-DEFINE_FWDDECLTRAITS(clang::Module);
 DEFINE_FWDDECLTRAITS(swift::ASTContext);
 DEFINE_FWDDECLTRAITS(swift::AssociatedTypeDecl);
 DEFINE_FWDDECLTRAITS(swift::BraceStmt);
