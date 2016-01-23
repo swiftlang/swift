@@ -1,4 +1,4 @@
-//===--- NSValue.swift - Bridging things in NSValue -----------*- swift -*-===//
+//===--- NSValue.swift - Bridging things in NSValue -----------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
