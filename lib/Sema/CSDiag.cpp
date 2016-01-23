@@ -691,25 +691,37 @@ namespace {
   /// Uncurry level of 0 indicates that we're looking at the "a" argument, an
   /// uncurry level of 1 indicates that we're looking at the "b" argument.
   ///
-  /// The declType specifies a specific type to use for this decl that may be
-  /// more resolved than the decls type.  For example, it may have generic
+  /// entityType specifies a specific type to use for this decl/expr that may be
+  /// more resolved than the concrete type.  For example, it may have generic
   /// arguments substituted in.
+  ///
   struct UncurriedCandidate {
-    ValueDecl *decl;
+    PointerUnion<ValueDecl *, Expr*> declOrExpr;
     unsigned level;
-    Type declType;
+    Type entityType;
 
     UncurriedCandidate(ValueDecl *decl, unsigned level)
-      : decl(decl), level(level), declType(decl->getType()) {
+      : declOrExpr(decl), level(level), entityType(decl->getType()) {
+    }
+    UncurriedCandidate(Expr *expr)
+      : declOrExpr(expr), level(0), entityType(expr->getType()) {
+    }
+ 
+    ValueDecl *getDecl() const {
+      return declOrExpr.dyn_cast<ValueDecl*>();
+    }
+
+    Expr *getExpr() const {
+      return declOrExpr.dyn_cast<Expr*>();
     }
 
     AnyFunctionType *getUncurriedFunctionType() const {
       // Start with the known type of the decl.
-      auto type = declType;
+      auto type = entityType;
 
       // If this is an operator func decl in a type context, the 'self' isn't
       // actually going to be applied.
-      if (auto *fd = dyn_cast<FuncDecl>(decl))
+      if (auto *fd = dyn_cast_or_null<FuncDecl>(getDecl()))
         if (fd->isOperator() && fd->getDeclContext()->isTypeContext()) {
           if (type->is<ErrorType>())
             return nullptr;
@@ -744,13 +756,16 @@ namespace {
     }
 
     void dump() const {
-      decl->dumpRef(llvm::errs());
+      if (auto decl = getDecl())
+        decl->dumpRef(llvm::errs());
+      else
+        llvm::errs() << "<<EXPR>>";
       llvm::errs() << " - uncurry level " << level;
 
       if (auto FT = getUncurriedFunctionType())
         llvm::errs() << " - type: " << Type(FT) << "\n";
       else
-        llvm::errs() << " - type <<NONFUNCTION>>: " << decl->getType() << "\n";
+        llvm::errs() << " - type <<NONFUNCTION>>: " << entityType << "\n";
     }
   };
 
@@ -880,24 +895,27 @@ void CalleeCandidateInfo::filterList(ClosenessPredicate predicate) {
   for (auto decl : candidates) {
     auto declCloseness = predicate(decl);
     
-    // If this candidate otherwise matched but was marked unavailable, then
-    // treat it as unavailable, which is a very close failure.
-    if (declCloseness.first == CC_ExactMatch &&
-        decl.decl->getAttrs().isUnavailable(CS->getASTContext()) &&
-        !CS->TC.getLangOpts().DisableAvailabilityChecking)
-      declCloseness.first = CC_Unavailable;
-    
-    // Likewise, if the candidate is inaccessible from the scope it is being
-    // accessed from, mark it as inaccessible or a general mismatch.
-    if (!decl.decl->isAccessibleFrom(CS->DC)) {
-      // If this was an exact match, downgrade it to inaccessible, so that
-      // accessible decls that are also an exact match will take precedence.
-      // Otherwise consider it to be a general mismatch so we only list it in
-      // an overload set as a last resort.
-      if (declCloseness.first == CC_ExactMatch)
-        declCloseness.first = CC_Inaccessible;
-      else
-        declCloseness.first = CC_GeneralMismatch;
+    // If we have a decl identified, refine the match.
+    if (auto VD = decl.getDecl()) {
+      // If this candidate otherwise matched but was marked unavailable, then
+      // treat it as unavailable, which is a very close failure.
+      if (declCloseness.first == CC_ExactMatch &&
+          VD->getAttrs().isUnavailable(CS->getASTContext()) &&
+          !CS->TC.getLangOpts().DisableAvailabilityChecking)
+        declCloseness.first = CC_Unavailable;
+      
+      // Likewise, if the candidate is inaccessible from the scope it is being
+      // accessed from, mark it as inaccessible or a general mismatch.
+      if (!VD->isAccessibleFrom(CS->DC)) {
+        // If this was an exact match, downgrade it to inaccessible, so that
+        // accessible decls that are also an exact match will take precedence.
+        // Otherwise consider it to be a general mismatch so we only list it in
+        // an overload set as a last resort.
+        if (declCloseness.first == CC_ExactMatch)
+          declCloseness.first = CC_Inaccessible;
+        else
+          declCloseness.first = CC_GeneralMismatch;
+      }
     }
     
     closenessList.push_back(declCloseness);
@@ -1124,7 +1142,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
     }
 
     if (!candidates.empty())
-      declName = candidates[0].decl->getNameStr().str();
+      declName = candidates[0].getDecl()->getNameStr().str();
     return;
   }
 
@@ -1169,9 +1187,9 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
         C.level += 1;
 
         // Compute a new substituted type if we have a base type to apply.
-        if (baseType && C.level == 1)
-          C.declType = baseType->getTypeOfMember(CS->DC->getParentModule(),
-                                                 C.decl, nullptr);
+        if (baseType && C.level == 1 && C.getDecl())
+          C.entityType = baseType->getTypeOfMember(CS->DC->getParentModule(),
+                                                   C.getDecl(), nullptr);
       }
 
       return;
@@ -1249,9 +1267,12 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
     if (candidates.empty()) continue;
     
     if (declName.empty())
-      declName = candidates[0].decl->getNameStr().str();
+      declName = candidates[0].getDecl()->getNameStr().str();
     return;
   }
+  
+  // Otherwise, just add the expression as a candidate.
+  candidates.push_back(fn);
 }
 
 /// After the candidate list is formed, it can be filtered down to discard
@@ -1344,12 +1365,12 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
       auto substType = baseType->getTypeOfMember(CS->DC->getParentModule(),
                                                  decl, nullptr);
       if (substType)
-        candidates.back().declType = substType;
+        candidates.back().entityType = substType;
     }
   }
 
   if (!candidates.empty())
-    declName = candidates[0].decl->getNameStr().str();
+    declName = candidates[0].getDecl()->getNameStr().str();
 }
 
 
@@ -1365,7 +1386,7 @@ suggestPotentialOverloads(SourceLoc loc, bool isResult) {
   for (auto cand : candidates) {
     Type type;
 
-    if (auto *SD = dyn_cast<SubscriptDecl>(cand.decl)) {
+    if (auto *SD = dyn_cast_or_null<SubscriptDecl>(cand.getDecl())) {
       type = isResult ? SD->getElementType() : SD->getIndicesType();
     } else {
       type = isResult ? cand.getResultType() : cand.getArgumentType();
@@ -1408,7 +1429,8 @@ bool CalleeCandidateInfo::diagnoseAnyStructuralArgumentError(Expr *fnExpr,
   if (auto *MTT = fnExpr->getType()->getAs<MetatypeType>()) {
     if (!MTT->getInstanceType()->is<TupleType>() &&
         (size() == 0 ||
-         (size() == 1 && isa<ProtocolDecl>(candidates[0].decl)))) {
+         (size() == 1 && candidates[0].getDecl() &&
+          isa<ProtocolDecl>(candidates[0].getDecl())))) {
       CS->TC.diagnose(fnExpr->getLoc(), diag::no_accessible_initializers,
                       MTT->getInstanceType());
       return true;
@@ -1440,7 +1462,8 @@ bool CalleeCandidateInfo::diagnoseAnyStructuralArgumentError(Expr *fnExpr,
   //   myFoo.doThing(42, b: 19)
   //
   // Check for this situation and handle it gracefully.
-  if (params.size() == 1 && candidates[0].decl->isInstanceMember() &&
+  if (params.size() == 1 && candidates[0].getDecl() &&
+      candidates[0].getDecl()->isInstanceMember() &&
       candidates[0].level == 0) {
     if (auto UDE = dyn_cast<UnresolvedDotExpr>(fnExpr))
       if (isa<TypeExpr>(UDE->getBase())) {
@@ -1593,14 +1616,17 @@ bool CalleeCandidateInfo::diagnoseAnyStructuralArgumentError(Expr *fnExpr,
 /// list.
 bool CalleeCandidateInfo::diagnoseSimpleErrors(SourceLoc loc) {
   // Handle symbols marked as explicitly unavailable.
-  if (closeness == CC_Unavailable)
-    return CS->TC.diagnoseExplicitUnavailability(candidates[0].decl, loc,
-                                                 CS->DC);
+  if (closeness == CC_Unavailable) {
+    auto decl = candidates[0].getDecl();
+    assert(decl && "Only decl-based candidates may be marked unavailable");
+    return CS->TC.diagnoseExplicitUnavailability(decl, loc, CS->DC);
+  }
 
   // Handle symbols that are matches, but are not accessible from the current
   // scope.
   if (closeness == CC_Inaccessible) {
-    auto decl = candidates[0].decl;
+    auto decl = candidates[0].getDecl();
+    assert(decl && "Only decl-based candidates may be marked inaccessible");
     if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
       CS->TC.diagnose(loc, diag::init_candidate_inaccessible,
                       CD->getResultType(), decl->getFormalAccess());
@@ -1610,7 +1636,7 @@ bool CalleeCandidateInfo::diagnoseSimpleErrors(SourceLoc loc) {
                       decl->getFormalAccess());
     }
     for (auto cand : candidates)
-      CS->TC.diagnose(cand.decl, diag::decl_declared_here, decl->getName());
+      CS->TC.diagnose(cand.getDecl(),diag::decl_declared_here, decl->getName());
     
     return true;
   }
@@ -2851,6 +2877,10 @@ bool FailureDiagnosis::diagnoseCalleeResultContextualConversionError() {
     return false;
       
   case 1:
+    // If the callee isn't of function type, then something else has gone wrong.
+    if (!calleeInfo[0].getResultType())
+      return false;
+      
     diagnose(expr->getLoc(), diag::candidates_no_match_result_type,
              calleeInfo.declName, calleeInfo[0].getResultType(),
              contextualResultType);
@@ -3142,10 +3172,11 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
   // If our candidates are instance members at curry level #0, then the argument
   // being provided is the receiver type for the instance.  We produce better
   // diagnostics when we don't force the self type down.
-  if (argType && !candidates.empty() &&
-      candidates[0].decl->isInstanceMember() && candidates[0].level == 0 &&
-      !isa<SubscriptDecl>(candidates[0].decl))
-    argType = Type();
+  if (argType && !candidates.empty())
+    if (auto decl = candidates[0].getDecl())
+      if (decl->isInstanceMember() && candidates[0].level == 0 &&
+          !isa<SubscriptDecl>(decl))
+        argType = Type();
   
 
   // FIXME: This should all just be a matter of getting the type of the
@@ -3368,7 +3399,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
                                  CalleeCandidateInfo::ClosenessResultTy
   {
     // Classify how close this match is.  Non-subscript decls don't match.
-    auto *SD = dyn_cast<SubscriptDecl>(cand.decl);
+    auto *SD = dyn_cast_or_null<SubscriptDecl>(cand.getDecl());
     if (!SD) return { CC_GeneralMismatch, {}};
     
     // Check to make sure the base expr type is convertible to the expected base
@@ -3410,7 +3441,10 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     // FIXME: suggestPotentialOverloads should do this.
     //calleeInfo.suggestPotentialOverloads(SE->getLoc());
     for (auto candidate : calleeInfo.candidates)
-      diagnose(candidate.decl, diag::found_candidate);
+      if (auto decl = candidate.getDecl())
+        diagnose(decl, diag::found_candidate);
+      else
+        diagnose(candidate.getExpr()->getLoc(), diag::found_candidate);
 
     return true;
   }

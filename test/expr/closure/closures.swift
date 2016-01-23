@@ -260,10 +260,10 @@ Void(0) // expected-error{{argument passed to call that takes no arguments}}
 _ = {0}
 
 // <rdar://problem/22086634> "multi-statement closures require an explicit return type" should be an error not a note
-let samples = {
+let samples = {   // expected-error {{type of expression is ambiguous without more context}}
           if (i > 10) { return true }
           else { return false }
-        }()  // expected-error {{cannot invoke closure of type '() -> _' with an argument list of type '()'}}
+        }()
 
 // <rdar://problem/19756953> Swift error: cannot capture '$0' before it is declared
 func f(fp : (Bool, Bool) -> Bool) {}
