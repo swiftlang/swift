@@ -197,6 +197,7 @@ public:
 
   void addCompletionsWithFilter(ArrayRef<Completion *> completions,
                                 StringRef filterText, Options options,
+                                const FilterRules &rules,
                                 Completion *&exactMatch);
 
   void sort(Options options);
@@ -271,8 +272,9 @@ void CodeCompletionOrganizer::preSortCompletions(
 
 void CodeCompletionOrganizer::addCompletionsWithFilter(
     ArrayRef<Completion *> completions, StringRef filterText,
-    Completion *&exactMatch) {
-  impl.addCompletionsWithFilter(completions, filterText, options, exactMatch);
+    const FilterRules &rules, Completion *&exactMatch) {
+  impl.addCompletionsWithFilter(completions, filterText, options, rules,
+                                exactMatch);
 }
 
 void CodeCompletionOrganizer::groupAndSort(const Options &options) {
@@ -425,9 +427,56 @@ static bool isHighPriorityKeyword(CodeCompletionKeywordKind kind) {
   }
 }
 
+bool FilterRules::hideCompletion(Completion *completion) const {
+
+  if (!completion->getName().empty()) {
+    auto I = hideByName.find(completion->getName());
+    if (I != hideByName.end())
+      return I->getValue();
+  }
+
+  switch (completion->getKind()) {
+  case Completion::Declaration:
+    break;
+  case Completion::Keyword: {
+    auto I = hideKeyword.find(completion->getKeywordKind());
+    if (I != hideKeyword.end())
+      return I->second;
+    if (hideAllKeywords)
+      return true;
+    break;
+  }
+  case Completion::Pattern: {
+    if (completion->hasCustomKind()) {
+      // FIXME: individual custom completions
+      if (hideCustomCompletions)
+        return true;
+    }
+    break;
+  }
+  case Completion::Literal: {
+    auto I = hideValueLiteral.find(completion->getLiteralKind());
+    if (I != hideValueLiteral.end())
+      return I->second;
+    if (hideAllValueLiterals)
+      return true;
+    break;
+  }
+  }
+
+  if (!completion->getModuleName().empty()) {
+    // FIXME: try each submodule chain starting from the most specific.
+    auto M = hideModule.find(completion->getModuleName());
+    if (M != hideModule.end())
+      return M->getValue();
+  }
+
+  return hideAll;
+}
+
 void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
     ArrayRef<Completion *> completions, StringRef filterText, Options options,
-    Completion *&exactMatch) {
+    const FilterRules &rules, Completion *&exactMatch) {
   assert(rootGroup);
 
   auto &contents = rootGroup->contents;
@@ -439,6 +488,9 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
         completionKind != CompletionKind::TypeSimpleBeginning &&
         completionKind != CompletionKind::PostfixExpr;
     for (Completion *completion : completions) {
+      if (rules.hideCompletion(completion))
+        continue;
+
       NameStyle style(completion->getName());
       bool hideUnderscore = options.hideUnderscores && style.leadingUnderscores;
       if (hideUnderscore && options.reallyHideAllUnderscores)
@@ -488,6 +540,9 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
   FuzzyStringMatcher pattern(filterText);
   pattern.normalize = true;
   for (Completion *completion : completions) {
+    if (rules.hideCompletion(completion))
+      continue;
+
     bool match = false;
     if (options.fuzzyMatching && filterText.size() >= options.minFuzzyLength) {
       match = pattern.matchesCandidate(completion->getName());

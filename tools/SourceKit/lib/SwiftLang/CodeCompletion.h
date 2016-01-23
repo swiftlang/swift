@@ -15,12 +15,15 @@
 
 #include "SourceKit/Core/LLVM.h"
 #include "swift/IDE/CodeCompletion.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
 
 namespace SourceKit {
 namespace CodeCompletion {
 
 using CodeCompletionDeclKind = swift::ide::CodeCompletionDeclKind;
+using CodeCompletionKeywordKind = swift::ide::CodeCompletionKeywordKind;
+using CodeCompletionLiteralKind = swift::ide::CodeCompletionLiteralKind;
 using SemanticContextKind = swift::ide::SemanticContextKind;
 using CodeCompletionString = swift::ide::CodeCompletionString;
 using SwiftResult = swift::ide::CodeCompletionResult;
@@ -204,6 +207,24 @@ public:
 
   unsigned getNextOffset() const;
   bool walk(Walker &walker) const override;
+};
+
+struct FilterRules {
+  bool hideAll = false;
+
+  bool hideAllValueLiterals = false;
+  llvm::SmallDenseMap<CodeCompletionLiteralKind, bool, 8> hideValueLiteral;
+
+  bool hideAllKeywords = false;
+  llvm::DenseMap<CodeCompletionKeywordKind, bool> hideKeyword;
+
+  bool hideCustomCompletions = false;
+  // FIXME: hide individual custom completions
+
+  llvm::StringMap<bool> hideModule;
+  llvm::StringMap<bool> hideByName;
+
+  bool hideCompletion(Completion *completion) const;
 };
 
 } // end namespace CodeCompletion

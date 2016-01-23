@@ -42,6 +42,8 @@ UIdent sourcekitd::KeyModuleName("key.modulename");
 UIdent sourcekitd::KeyNotification("key.notification");
 UIdent sourcekitd::KeyKeyword("key.keyword");
 UIdent sourcekitd::KeyName("key.name");
+UIdent sourcekitd::KeyNames("key.names");
+UIdent sourcekitd::KeyUIDs("key.uids");
 UIdent sourcekitd::KeyEnableSyntaxMap("key.enablesyntaxmap");
 UIdent sourcekitd::KeyEnableDiagnostics("key.enablediagnostics");
 UIdent sourcekitd::KeySyntacticOnly("key.syntactic_only");
@@ -103,9 +105,11 @@ UIdent sourcekitd::KeyAttribute("key.attribute");
 UIdent sourcekitd::KeyInheritedTypes("key.inheritedtypes");
 UIdent sourcekitd::KeyFormatOptions("key.editor.format.options");
 UIdent sourcekitd::KeyCodeCompleteOptions("key.codecomplete.options");
+UIdent sourcekitd::KeyFilterRules("key.codecomplete.filterrules");
 UIdent sourcekitd::KeyNextRequestStart("key.nextrequeststart");
 UIdent sourcekitd::KeyPopular("key.popular");
 UIdent sourcekitd::KeyUnpopular("key.unpopular");
+UIdent sourcekitd::KeyHide("key.hide");
 
 UIdent sourcekitd::KeyIsDeprecated("key.is_deprecated");
 UIdent sourcekitd::KeyIsUnavailable("key.is_unavailable");
@@ -184,7 +188,11 @@ static UIdent *OrderedKeys[] = {
   &KeyDiagnostics,
   &KeyFormatOptions,
   &KeyCodeCompleteOptions,
+  &KeyFilterRules,
   &KeyNextRequestStart,
+  &KeyPopular,
+  &KeyUnpopular,
+  &KeyHide,
 
   &KeyPlatform,
   &KeyIsDeprecated,
@@ -797,20 +805,7 @@ sourcekitd_object_t YAMLRequestParser::parse(StringRef YAMLStr,
     return nullptr;
   }
 
-  auto Object = dyn_cast<llvm::yaml::MappingNode>(Root);
-  if (Object == nullptr) {
-    Error = "Expected dictionary";
-    return nullptr;
-  }
-
-  sourcekitd_object_t Req =
-      sourcekitd_request_dictionary_create(nullptr, nullptr, 0);
-  if (parseDict(Req, Object, Error)) {
-    sourcekitd_request_release(Req);
-    return nullptr;
-  }
-
-  return Req;
+  return createObjFromNode(Root, Error);
 }
 
 sourcekitd_object_t YAMLRequestParser::createObjFromNode(
