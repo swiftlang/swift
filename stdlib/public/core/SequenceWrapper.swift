@@ -20,8 +20,8 @@ public // @testable
 protocol _SequenceWrapperType {
   associatedtype Base : SequenceType
   associatedtype Generator : GeneratorType = Base.Generator
-
-  var _base: Base { get }
+  
+  var _base: Base {get}
 }
 
 extension SequenceType
@@ -50,13 +50,13 @@ extension SequenceType
   ) rethrows -> [Base.Generator.Element] {
     return try _base.filter(includeElement)
   }
-
+  
   public func _customContainsEquatableElement(
     element: Base.Generator.Element
-  ) -> Bool? {
+  ) -> Bool? { 
     return _base._customContainsEquatableElement(element)
   }
-
+  
   /// If `self` is multi-pass (i.e., a `CollectionType`), invoke
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.

@@ -25,17 +25,17 @@ public protocol IntervalType {
   func clamp(intervalToClamp: Self) -> Self
 
   /// `true` iff `self` is empty.
-  var isEmpty: Bool { get }
+  var isEmpty: Bool {get}
 
 
   /// The `Interval`'s lower bound.
   ///
   /// Invariant: `start` <= `end`.
-  var start: Bound { get }
+  var start: Bound {get}
   /// The `Interval`'s upper bound.
   ///
   /// Invariant: `start` <= `end`.
-  var end: Bound { get }
+  var end: Bound {get}
 }
 
 % for Kind, rangeOperator, upperBoundCompare in [

@@ -37,7 +37,7 @@ public protocol Indexable {
   /// In an empty collection, `startIndex == endIndex`.
   ///
   /// - Complexity: O(1)
-  var startIndex: Index { get }
+  var startIndex: Index {get}
 
   /// The collection's "past the end" position.
   ///
@@ -46,7 +46,7 @@ public protocol Indexable {
   /// `successor()`.
   ///
   /// - Complexity: O(1)
-  var endIndex: Index { get }
+  var endIndex: Index {get}
 
   // The declaration of _Element and subscript here is a trick used to
   // break a cyclic conformance/deduction that Swift can't handle.  We
@@ -61,18 +61,18 @@ public protocol Indexable {
   /// Returns the element at the given `position`.
   ///
   /// - Complexity: O(1)
-  subscript(position: Index) -> _Element { get }
+  subscript(position: Index) -> _Element {get}
 }
 
 public protocol MutableIndexable {
   associatedtype Index : ForwardIndexType
 
-  var startIndex: Index { get }
-  var endIndex: Index { get }
+  var startIndex: Index {get}
+  var endIndex: Index {get}
 
   associatedtype _Element
 
-  subscript(position: Index) -> _Element { get set }
+  subscript(position: Index) -> _Element {get set}
 }
 
 /// A *generator* for an arbitrary *collection*.  Provided `C`
@@ -89,7 +89,7 @@ public protocol MutableIndexable {
 ///      }
 public struct IndexingGenerator<Elements : Indexable>
  : GeneratorType, SequenceType {
-
+  
   /// Create a *generator* over the given collection.
   public init(_ elements: Elements) {
     self._elements = elements
@@ -138,11 +138,11 @@ public protocol CollectionType : Indexable, SequenceType {
   // a custom generate() function.  Otherwise we get an
   // IndexingGenerator. <rdar://problem/21539115>
   func generate() -> Generator
-
+  
   // FIXME: should be constrained to CollectionType
   // (<rdar://problem/20715009> Implement recursive protocol
   // constraints)
-
+  
   /// A `SequenceType` that can represent a contiguous subrange of `self`'s
   /// elements.
   ///
@@ -153,13 +153,13 @@ public protocol CollectionType : Indexable, SequenceType {
   associatedtype SubSequence: Indexable, SequenceType = Slice<Self>
 
   /// Returns the element at the given `position`.
-  subscript(position: Index) -> Generator.Element { get }
+  subscript(position: Index) -> Generator.Element {get}
 
   /// Returns a collection representing a contiguous sub-range of
   /// `self`'s elements.
   ///
   /// - Complexity: O(1)
-  subscript(bounds: Range<Index>) -> SubSequence { get }
+  subscript(bounds: Range<Index>) -> SubSequence {get}
 
   /// Returns `self[startIndex..<end]`
   ///
@@ -187,10 +187,10 @@ public protocol CollectionType : Indexable, SequenceType {
   /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
   ///   O(N) otherwise.
   var count: Index.Distance { get }
-
+  
   // The following requirement enables dispatching for indexOf when
   // the element type is Equatable.
-
+  
   /// Returns `Optional(Optional(index))` if an element was found;
   /// `nil` otherwise.
   ///
@@ -797,7 +797,7 @@ public protocol MutableSliceable : CollectionType, MutableCollectionType {
   subscript(_: Range<Index>) -> SubSequence { get set }
 }
 
-@available(*, unavailable, message="Use the dropFirst() method instead.")
+@available(*, unavailable, message="Use the dropFirst() method instead.") 
 public func dropFirst<Seq : CollectionType>(s: Seq) -> Seq.SubSequence {
   fatalError("unavailable function can't be called")
 }
