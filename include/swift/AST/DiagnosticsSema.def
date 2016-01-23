@@ -77,6 +77,11 @@ NOTE(did_you_mean_raw_type,none,
 
 ERROR(expected_argument_in_contextual_member,none,
       "contextual member %0 expects argument of type %1", (DeclName, Type))
+
+ERROR(expected_result_in_contextual_member,none,
+      "member %0 in %2 produces result of type %1, but context expects %2",
+      (DeclName, Type, Type))
+
 ERROR(unexpected_argument_in_contextual_member,none,
       "contextual member %0 has no associated value", (DeclName))
 
@@ -1787,6 +1792,11 @@ ERROR(inout_expr_outside_of_call,none,
 ERROR(unresolved_member_no_inference,none,
       "reference to member %0 cannot be resolved without a contextual type",
       (DeclName))
+ERROR(unresolved_collection_literal,none,
+      "cannot infer type for empty collection literal without a "
+      "contextual type", ())
+ERROR(unresolved_nil_literal,none,
+      "'nil' requires a contextual type", ())
 
 ERROR(type_of_expression_is_ambiguous,none,
       "type of expression is ambiguous without more context", ())

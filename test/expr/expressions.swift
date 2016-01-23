@@ -646,13 +646,13 @@ func unusedExpressionResults() {
 func arrayLiterals() { 
   var a = [1,2,3]
   var b : [Int] = []
-  var c = []  // expected-error {{expression type '[_]' is ambiguous without more context}}
+  var c = []  // expected-error {{cannot infer type for empty collection literal without a contextual type}}
 }
 
 func dictionaryLiterals() {
   var a = [1 : "foo",2 : "bar",3 : "baz"]
   var b : Dictionary<Int, String> = [:]
-  var c = [:]  // expected-error {{expression type '[_ : _]' is ambiguous without more context}}
+  var c = [:]  // expected-error {{cannot infer type for empty collection literal without a contextual type}}
 }
 
 func invalidDictionaryLiteral() {
@@ -667,6 +667,8 @@ func invalidDictionaryLiteral() {
   var g = [1: "one", 2: ;] // expected-error {{expected value in dictionary literal}} expected-error 2{{expected ',' separator}} {{24-24=,}} {{24-24=,}} expected-error {{expected key expression in dictionary literal}}
 }
 
+    
+// FIXME: The issue here is a type compatibility problem, there is no ambiguity.
 [4].joinWithSeparator([1]) // expected-error {{type of expression is ambiguous without more context}}
 [4].joinWithSeparator([[[1]]]) // expected-error {{type of expression is ambiguous without more context}}
 

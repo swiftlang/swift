@@ -715,7 +715,7 @@ namespace {
       return declOrExpr.dyn_cast<Expr*>();
     }
 
-    AnyFunctionType *getUncurriedFunctionType() const {
+    Type getUncurriedType() const {
       // Start with the known type of the decl.
       auto type = entityType;
 
@@ -724,17 +724,23 @@ namespace {
       if (auto *fd = dyn_cast_or_null<FuncDecl>(getDecl()))
         if (fd->isOperator() && fd->getDeclContext()->isTypeContext()) {
           if (type->is<ErrorType>())
-            return nullptr;
+            return Type();
           type = type->castTo<AnyFunctionType>()->getResult();
         }
 
       for (unsigned i = 0, e = level; i != e; ++i) {
         auto funcTy = type->getAs<AnyFunctionType>();
-        if (!funcTy) return nullptr;
+        if (!funcTy) return Type();
         type = funcTy->getResult();
       }
 
-      return type->getAs<AnyFunctionType>();
+      return type;
+    }
+    
+    AnyFunctionType *getUncurriedFunctionType() const {
+      if (auto type = getUncurriedType())
+        return type->getAs<AnyFunctionType>();
+      return nullptr;
     }
 
     /// Given a function candidate with an uncurry level, return the parameter
@@ -819,8 +825,7 @@ namespace {
     }
 
     CalleeCandidateInfo(Type baseType, ArrayRef<OverloadChoice> candidates,
-                        unsigned UncurryLevel, bool hasTrailingClosure,
-                        ConstraintSystem *CS);
+                        bool hasTrailingClosure, ConstraintSystem *CS);
 
     typedef std::pair<CandidateCloseness, FailedArgumentInfo> ClosenessResultTy;
     typedef const std::function<ClosenessResultTy(UncurriedCandidate)>
@@ -1345,7 +1350,6 @@ void CalleeCandidateInfo::filterContextualMemberList(Expr *argExpr) {
 
 CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
                                          ArrayRef<OverloadChoice> overloads,
-                                         unsigned uncurryLevel,
                                          bool hasTrailingClosure,
                                          ConstraintSystem *CS)
   : CS(CS), hasTrailingClosure(hasTrailingClosure) {
@@ -1359,6 +1363,14 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
     if (!cand.isDecl()) continue;
 
     auto decl = cand.getDecl();
+    
+    // If this is a method or enum case member (not a var or subscript), then
+    // the uncurry level is 1.
+    unsigned uncurryLevel = 0;
+    if (!isa<AbstractStorageDecl>(decl) &&
+        decl->getDeclContext()->isTypeContext())
+      uncurryLevel = 1;
+    
     candidates.push_back({ decl, uncurryLevel });
 
     if (baseType) {
@@ -3384,7 +3396,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
 
   
   
-  CalleeCandidateInfo calleeInfo(baseType, result.ViableCandidates, 0,
+  CalleeCandidateInfo calleeInfo(baseType, result.ViableCandidates,
                                  /*FIXME: Subscript trailing closures*/
                                  /*hasTrailingClosure*/false, CS);
 
@@ -4515,9 +4527,8 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
   
   bool hasTrailingClosure = callArgHasTrailingClosure(E->getArgument());
 
-  // Dump all of our viable candidates into a CalleeCandidateInfo (with an
-  // uncurry level of 1 to represent the contextual type) and sort it out.
-  CalleeCandidateInfo candidateInfo(baseObjTy, result.ViableCandidates, 1,
+  // Dump all of our viable candidates into a CalleeCandidateInfo & sort it out.
+  CalleeCandidateInfo candidateInfo(baseObjTy, result.ViableCandidates,
                                     hasTrailingClosure, CS);
 
   // Filter the candidate list based on the argument we may or may not have.
@@ -4550,19 +4561,33 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     return false;
 
   case CC_ExactMatch: {        // This is a perfect match for the arguments.
-    // If we have an exact match, then we must have an argument list.
-    // If we didn't have an argument or an arg type, the expr would be valid.
-    if (!argumentTy) {
-      assert(!E->getArgument() && "Not an exact match");
-      // If this is an exact match, return false to diagnose this as an
-      // ambiguity.  It must be some other problem, such as failing to infer a
-      // generic argument on the enum type.
-      return false;
+
+    // If we have an exact match, then we must have an argument list, check it.
+    if (argumentTy) {
+      assert(E->getArgument() && "Exact match without argument?");
+      if (!typeCheckArgumentChildIndependently(E->getArgument(), argumentTy,
+                                               candidateInfo))
+        return true;
     }
     
-    assert(E->getArgument() && argumentTy && "Exact match without argument?");
-    return !typeCheckArgumentChildIndependently(E->getArgument(), argumentTy,
-                                                candidateInfo);
+    // If the argument is a match, then check the result type.  We might have
+    // looked up a contextual member whose result type disagrees with the
+    // expected result type.
+    auto resultTy = candidateInfo[0].getResultType();
+    if (!resultTy)
+      resultTy = candidateInfo[0].getUncurriedType();
+    
+    if (resultTy && !CS->getContextualType()->is<UnboundGenericType>() &&
+        !CS->TC.isConvertibleTo(resultTy, CS->getContextualType(), CS->DC)) {
+      diagnose(E->getNameLoc(), diag::expected_result_in_contextual_member,
+               E->getName(), resultTy, CS->getContextualType());
+      return true;
+    }
+    
+    // Otherwise, this is an exact match, return false to diagnose this as an
+    // ambiguity.  It must be some other problem, such as failing to infer a
+    // generic argument on the enum type.
+    return false;
   }
 
   case CC_Unavailable:
@@ -4941,14 +4966,33 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
     return;
   }
   
-  if (auto UME = dyn_cast<UnresolvedMemberExpr>(E)) {
+  // Diagnose ".foo" expressions that lack context specifically.
+  if (auto UME =
+        dyn_cast<UnresolvedMemberExpr>(E->getSemanticsProvidingExpr())) {
     if (!CS->getContextualType()) {
       diagnose(E->getLoc(), diag::unresolved_member_no_inference,UME->getName())
         .highlight(SourceRange(UME->getDotLoc(), UME->getNameLoc()));
       return;
     }
   }
+  
+  // Diagnose empty collection literals that lack context specifically.
+  if (auto CE = dyn_cast<CollectionExpr>(E->getSemanticsProvidingExpr())) {
+    if (CE->getNumElements() == 0) {
+      diagnose(E->getLoc(), diag::unresolved_collection_literal)
+        .highlight(E->getSourceRange());
+      return;
+    }
+  }
 
+  // Diagnose 'nil' without a contextual type.
+  if (isa<NilLiteralExpr>(E->getSemanticsProvidingExpr())) {
+    diagnose(E->getLoc(), diag::unresolved_nil_literal)
+      .highlight(E->getSourceRange());
+    return;
+  }
+
+  
   // Attempt to re-type-check the entire expression, allowing ambiguity, but
   // ignoring a contextual type.
   if (expr == E) {
