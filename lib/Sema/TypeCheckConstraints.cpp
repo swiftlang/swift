@@ -180,7 +180,10 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
         skipToNextAvailableInput();
       }
       sources[i] = TupleShuffleExpr::Variadic;
-      break;
+      
+      // Keep looking at subsequent arguments.  Non-variadic arguments may
+      // follow the variadic one.
+      continue;
     }
 
     // If there aren't any more inputs, we can use a default argument.

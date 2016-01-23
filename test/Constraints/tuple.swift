@@ -168,3 +168,15 @@ func magify<T>(t: T) -> MagicKingdom<T> { return MagicKingdom() }
 func foo(pair: (Int,Int)) -> Victory<(x:Int, y:Int)> {
   return Victory(magify(pair)) // expected-error {{cannot convert return expression of type 'Victory<(Int, Int)>' to return type 'Victory<(x: Int, y: Int)>'}}
 }
+
+
+// https://bugs.swift.org/browse/SR-596
+// Compiler crashes when accesing a non-existent property of a closure parameter
+func call(f: C -> Void) {}
+func makeRequest() {
+  call { obj in
+    print(obj.invalidProperty)  // expected-error {{value of type 'C' has no member 'invalidProperty'}}
+  }
+}
+
+
