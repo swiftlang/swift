@@ -147,6 +147,12 @@ public struct Range<
   }
 }
 
+extension Range : CustomReflectable {
+  public func customMirror() -> Mirror {
+    return Mirror(self, children: ["startIndex": startIndex, "endIndex": endIndex])
+  }
+}
+
 @warn_unused_result
 public func == <Element>(lhs: Range<Element>, rhs: Range<Element>) -> Bool {
   return lhs.startIndex == rhs.startIndex &&

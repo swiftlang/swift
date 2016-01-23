@@ -156,13 +156,13 @@ mirrors.test("Legacy") {
   expectTrue(m.subjectType == [Int].self)
   
   let x0: [Mirror.Child] = [
-    (label: "[0]", value: 1),
-    (label: "[1]", value: 2),
-    (label: "[2]", value: 3)
+    (label: nil, value: 1),
+    (label: nil, value: 2),
+    (label: nil, value: 3)
   ]
   expectFalse(
     zip(x0, m.children).contains {
-      $0.0.label != $0.1.label || $0.0.value as! Int != $0.1.value as! Int
+      $0.0.value as! Int != $0.1.value as! Int
     })
 
   class B { let bx: Int = 0 }
@@ -650,11 +650,8 @@ mirrors.test("class/Cluster") {
 mirrors.test("Addressing") {
   let m0 = Mirror(reflecting: [1, 2, 3])
   expectEqual(1, m0.descendant(0) as? Int)
-  expectEqual(1, m0.descendant("[0]") as? Int)
   expectEqual(2, m0.descendant(1) as? Int)
-  expectEqual(2, m0.descendant("[1]") as? Int)
   expectEqual(3, m0.descendant(2) as? Int)
-  expectEqual(3, m0.descendant("[2]") as? Int)
   
   let m1 = Mirror(reflecting: (a: ["one", "two", "three"], b: 4))
   let ott0 = m1.descendant(0) as? [String]
@@ -670,8 +667,6 @@ mirrors.test("Addressing") {
   expectEqual("two", m1.descendant(0, 1) as? String)
   expectEqual("three", m1.descendant(0, 2) as? String)
   expectEqual("one", m1.descendant(".0", 0) as? String)
-  expectEqual("two", m1.descendant(0, "[1]") as? String)
-  expectEqual("three", m1.descendant(".0", "[2]") as? String)
 
   struct Zee : CustomReflectable {
     func customMirror() -> Mirror {

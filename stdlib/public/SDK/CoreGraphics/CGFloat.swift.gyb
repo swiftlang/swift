@@ -145,10 +145,10 @@ public var CGFLOAT_MAX: CGFloat {
   fatalError("can't retrieve unavailable property")
 }
 
-extension CGFloat : _Reflectable {
+extension CGFloat : CustomReflectable {
   /// Returns a mirror that reflects `self`.
-  public func _getMirror() -> _MirrorType {
-    return _reflect(native)
+  public func customMirror() -> Mirror {
+    return Mirror(reflecting: native)
   }
 }
 
