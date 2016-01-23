@@ -51,7 +51,7 @@ The alternatives to generics tend to lead to poor solutions:
 
 * Object-oriented languages tend to use "top" types (id in Objective-C,
   java.lang.Object in pre-generics Java, etc.) for their containers and
-  algorithms, which gives up static type safety. Pre- generics Java forced the
+  algorithms, which gives up static type safety. Pre-generics Java forced the
   user to introduce run-time-checked type casts when interacting with containers
   (which is overly verbose), while Objective-C relies on id's unsound implicit
   conversion behavior to eliminate the need for casts.
