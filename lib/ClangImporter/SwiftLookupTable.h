@@ -19,7 +19,6 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Identifier.h"
-#include "swift/Basic/PointerLikeTypeTraitsFwdDecl.h"
 #include "clang/Serialization/ASTBitCodes.h"
 #include "clang/Serialization/ModuleFileExtension.h"
 #include "llvm/ADT/DenseMap.h"
