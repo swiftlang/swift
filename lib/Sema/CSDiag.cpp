@@ -815,8 +815,7 @@ namespace {
     /// obviously mismatching candidates and compute a "closeness" for the
     /// resultant set.
     std::pair<CandidateCloseness, CalleeCandidateInfo::FailedArgumentInfo>
-    evaluateCloseness(Type candArgListType, ArrayRef<CallArgParam> actualArgs,
-                      bool argsHaveTrailingClosure);
+    evaluateCloseness(Type candArgListType, ArrayRef<CallArgParam> actualArgs);
       
     void filterList(ArrayRef<CallArgParam> actualArgs);
     void filterList(Type actualArgsType) {
@@ -956,7 +955,7 @@ static bool argumentMismatchIsNearMiss(Type argType, Type paramType) {
 /// information about that failure.
 std::pair<CandidateCloseness, CalleeCandidateInfo::FailedArgumentInfo>
 CalleeCandidateInfo::evaluateCloseness(Type candArgListType,
-                  ArrayRef<CallArgParam> actualArgs, bool argsHaveTrailingClosure) {
+                  ArrayRef<CallArgParam> actualArgs) {
   auto candArgs = decomposeArgParamType(candArgListType);
 
   struct OurListener : public MatchCallArgumentListener {
@@ -984,7 +983,7 @@ CalleeCandidateInfo::evaluateCloseness(Type candArgListType,
   // shape) to the specified candidates parameters.  This ignores the concrete
   // types of the arguments, looking only at the argument labels etc.
   SmallVector<ParamBinding, 4> paramBindings;
-  if (matchCallArguments(actualArgs, candArgs, argsHaveTrailingClosure,
+  if (matchCallArguments(actualArgs, candArgs, hasTrailingClosure,
                          /*allowFixes:*/ true,
                          listener, paramBindings))
     // On error, get our closeness from whatever problem the listener saw.
@@ -1025,8 +1024,9 @@ CalleeCandidateInfo::evaluateCloseness(Type candArgListType,
         continue;
       
       // FIXME: Right now, a "matching" overload is one with a parameter whose
-      // type is identical to the argument type, or substitutable via rudimentary
-      // handling of functions with a single archetype in one or more parameters.
+      // type is identical to the argument type, or substitutable via
+      // rudimentary handling of functions with a single archetype in one or
+      // more parameters.
       // We can still do something more sophisticated with this.
       // FIXME: Use TC.isConvertibleTo?
       if (rArgType->isEqual(paramType))
@@ -1034,12 +1034,14 @@ CalleeCandidateInfo::evaluateCloseness(Type candArgListType,
       if (paramType->is<ArchetypeType>() && !rArgType->hasTypeVariable()) {
         if (singleArchetype) {
           if (!paramType->isEqual(singleArchetype))
-            return { CC_ArgumentMismatch, {}}; // multiple archetypes, too complicated
+            // Multiple archetypes, too complicated.
+            return { CC_ArgumentMismatch, {}};
           if (rArgType->isEqual(matchingArgType)) {
             continue;
           } else {
             paramType = matchingArgType;
-            // fallthrough as mismatched arg, comparing nearness to archetype bound type
+            // Fallthrough as mismatched arg, comparing nearness to archetype
+            // bound type.
           }
         } else {
           auto archetype = paramType->getAs<ArchetypeType>();
@@ -1263,7 +1265,7 @@ void CalleeCandidateInfo::filterList(ArrayRef<CallArgParam> actualArgs) {
     // If this isn't a function or isn't valid at this uncurry level, treat it
     // as a general mismatch.
     if (!inputType) return { CC_GeneralMismatch, {}};
-    return this->evaluateCloseness(inputType, actualArgs, hasTrailingClosure);
+    return evaluateCloseness(inputType, actualArgs);
   });
 }
 
@@ -3386,8 +3388,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     
     // Explode out multi-index subscripts to find the best match.
     auto indexResult =
-      calleeInfo.evaluateCloseness(cand.getArgumentType(), decomposedIndexType,
-                        /*FIXME: Subscript trailing closures*/false);
+      calleeInfo.evaluateCloseness(cand.getArgumentType(), decomposedIndexType);
     if (selfConstraint > indexResult.first)
       return {selfConstraint, {}};
     return indexResult;
