@@ -766,24 +766,19 @@ bool ConstraintGraph::contractEdges() {
         if (!(tyvar1 && tyvar2))
           continue;
 
+        auto isParamBindingConstraint = kind == ConstraintKind::BindParam;
+
         // We need to take special care not to directly contract parameter
         // binding constraints if there is an inout subtype constraint on the
         // type variable. The constraint solver depends on multiple constraints
         // being present in this case, so it can generate the appropriate lvalue
         // wrapper for the argument type.
-        if (kind == ConstraintKind::BindParam) {
+        if (isParamBindingConstraint) {
           auto node = tyvar1->getImpl().getGraphNode();
           auto hasDependentConstraint = false;
 
           for (auto t1Constraint : node->getConstraints()) {
             if (isStrictInoutSubtypeConstraint(t1Constraint)) {
-              hasDependentConstraint = true;
-              break;
-            }
-            // TODO: Temporarily inhibit contraction for chained param binding
-            // constraints. (E.g., "$0 == $0")
-            if (t1Constraint != constraint &&
-                t1Constraint->getKind() == ConstraintKind::BindParam) {
               hasDependentConstraint = true;
               break;
             }
@@ -796,11 +791,10 @@ bool ConstraintGraph::contractEdges() {
         auto rep1 = CS.getRepresentative(tyvar1);
         auto rep2 = CS.getRepresentative(tyvar2);
 
-        if (rep1 != rep2 &&
-            ((rep1->getImpl().canBindToLValue() ==
+        if (((rep1->getImpl().canBindToLValue() ==
               rep2->getImpl().canBindToLValue()) ||
               // Allow l-value contractions when binding parameter types.
-              constraint->getKind() == ConstraintKind::BindParam)) {
+              isParamBindingConstraint)) {
           if (CS.TC.getLangOpts().DebugConstraintSolver) {
             auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
             if (CS.solverState)
@@ -813,7 +807,8 @@ bool ConstraintGraph::contractEdges() {
 
           // Merge the edges and remove the constraint.
           removeEdge(constraint);
-          CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
+          if (rep1 != rep2)
+            CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
           didContractEdges = true;
         }
       }
