@@ -37,7 +37,7 @@ public protocol Indexable {
   /// In an empty collection, `startIndex == endIndex`.
   ///
   /// - Complexity: O(1)
-  var startIndex: Index {get}
+  var startIndex: Index { get }
 
   /// The collection's "past the end" position.
   ///
@@ -46,7 +46,7 @@ public protocol Indexable {
   /// `successor()`.
   ///
   /// - Complexity: O(1)
-  var endIndex: Index {get}
+  var endIndex: Index { get }
 
   // The declaration of _Element and subscript here is a trick used to
   // break a cyclic conformance/deduction that Swift can't handle.  We
@@ -61,18 +61,18 @@ public protocol Indexable {
   /// Returns the element at the given `position`.
   ///
   /// - Complexity: O(1)
-  subscript(position: Index) -> _Element {get}
+  subscript(position: Index) -> _Element { get }
 }
 
 public protocol MutableIndexable {
   associatedtype Index : ForwardIndexType
 
-  var startIndex: Index {get}
-  var endIndex: Index {get}
+  var startIndex: Index { get }
+  var endIndex: Index { get }
 
   associatedtype _Element
 
-  subscript(position: Index) -> _Element {get set}
+  subscript(position: Index) -> _Element { get set }
 }
 
 /// A *generator* for an arbitrary *collection*.  Provided `C`
@@ -153,13 +153,13 @@ public protocol CollectionType : Indexable, SequenceType {
   associatedtype SubSequence: Indexable, SequenceType = Slice<Self>
 
   /// Returns the element at the given `position`.
-  subscript(position: Index) -> Generator.Element {get}
+  subscript(position: Index) -> Generator.Element { get }
 
   /// Returns a collection representing a contiguous sub-range of
   /// `self`'s elements.
   ///
   /// - Complexity: O(1)
-  subscript(bounds: Range<Index>) -> SubSequence {get}
+  subscript(bounds: Range<Index>) -> SubSequence { get }
 
   /// Returns `self[startIndex..<end]`
   ///

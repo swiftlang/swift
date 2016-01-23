@@ -106,7 +106,7 @@ public struct ReverseRandomAccessIndex<Base: RandomAccessIndexType>
 public protocol _ReverseCollectionType : CollectionType {
   associatedtype Index : ReverseIndexType
   associatedtype Base : CollectionType
-  var _base: Base {get}
+  var _base: Base { get }
 }
 
 extension CollectionType
