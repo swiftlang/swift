@@ -19,7 +19,6 @@
 
 #include "llvm/ADT/PointerUnion.h"
 #include "swift/AST/TypeAlignments.h"
-#include "swift/Basic/PointerLikeTypeTraitsFwdDecl.h"
 
 namespace swift {
   class Expr;
