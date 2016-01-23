@@ -1,4 +1,4 @@
-//===--- XMLUtils.h - Various XML utility routines ------------------------===//
+//===--- XMLUtils.h - Various XML utility routines --------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

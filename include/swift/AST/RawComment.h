@@ -1,4 +1,4 @@
-//===--- RawComment.h - Extraction of raw comments ------------------------===//
+//===--- RawComment.h - Extraction of raw comments --------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

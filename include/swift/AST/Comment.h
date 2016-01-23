@@ -1,4 +1,4 @@
-//===--- Comment.h - Swift-specific comment parsing -----------------------===//
+//===--- Comment.h - Swift-specific comment parsing -------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -1,4 +1,4 @@
-//===--- PrintAsObjC.h - Emit a header file for a Swift AST ---------------===//
+//===--- PrintAsObjC.h - Emit a header file for a Swift AST -----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

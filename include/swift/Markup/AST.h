@@ -1,4 +1,4 @@
-//===--- AST.h - Markup AST nodes -----------------------------------------===//
+//===--- AST.h - Markup AST nodes -------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

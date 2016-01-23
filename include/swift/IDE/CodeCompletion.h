@@ -1,4 +1,4 @@
-//===--- CodeCompletion.h - Routines for code completion ------------------===//
+//===--- CodeCompletion.h - Routines for code completion --------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
