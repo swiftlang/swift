@@ -1,4 +1,4 @@
-//===--- ArgumentSource.cpp - Latent value representation -------*- C++ -*-===//
+//===--- ArgumentSource.cpp - Latent value representation -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //

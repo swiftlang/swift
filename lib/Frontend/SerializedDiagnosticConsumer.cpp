@@ -1,4 +1,4 @@
-//===- SerializedDiagnosticConsumer.cpp - Serialize Diagnostics -*- C++ -*-===//
+//===- SerializedDiagnosticConsumer.cpp - Serialize Diagnostics -----------===//
 //
 // This source file is part of the Swift.org open source project
 //

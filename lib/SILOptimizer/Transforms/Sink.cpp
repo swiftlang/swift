@@ -1,4 +1,4 @@
-//===--- Sink.cpp ----- Code Sinking ----------------------------*- C++ -*-===//
+//===--- Sink.cpp ----- Code Sinking --------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

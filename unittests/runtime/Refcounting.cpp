@@ -1,4 +1,4 @@
-//===--- Refcounting.cpp - Reference-counting for Swift ---------*- C++ -*-===//
+//===--- Refcounting.cpp - Reference-counting for Swift -------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

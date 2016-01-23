@@ -1,4 +1,4 @@
-//===--- TypeRepr.cpp - Swift Language Type Representation ------*- C++ -*-===//
+//===--- TypeRepr.cpp - Swift Language Type Representation ----------------===//
 //
 // This source file is part of the Swift.org open source project
 //

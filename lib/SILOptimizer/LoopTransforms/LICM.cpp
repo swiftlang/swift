@@ -1,4 +1,4 @@
-//===--- LICM.cpp - Loop invariant code motion ------------------*- C++ -*-===//
+//===--- LICM.cpp - Loop invariant code motion ----------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

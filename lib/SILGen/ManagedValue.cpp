@@ -1,4 +1,4 @@
-//===--- ManagedValue.cpp - Value with cleanup ------------------*- C++ -*-===//
+//===--- ManagedValue.cpp - Value with cleanup ----------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

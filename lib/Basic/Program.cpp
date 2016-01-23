@@ -1,4 +1,4 @@
-//===--- Program.cpp - Implement OS Program Concept -------------*- C++ -*-===//
+//===--- Program.cpp - Implement OS Program Concept -----------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

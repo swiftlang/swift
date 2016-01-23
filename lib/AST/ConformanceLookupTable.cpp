@@ -1,4 +1,4 @@
-//===--- ConformanceLookupTable - Conformance Lookup Table ------*- C++ -*-===//
+//===--- ConformanceLookupTable - Conformance Lookup Table ----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
