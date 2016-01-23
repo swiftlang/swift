@@ -2736,7 +2736,7 @@ class NominalTypeDecl : public TypeDecl, public DeclContext,
   friend class DeclContext;
   friend class IterableDeclContext;
   friend ArrayRef<ValueDecl *>
-           ValueDecl::getSatisfiedProtocolRequirements(bool) const;
+           ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const;
 
 protected:
   Type DeclaredTy;

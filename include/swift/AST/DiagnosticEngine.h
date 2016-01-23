@@ -421,7 +421,7 @@ namespace swift {
 
     /// \brief Figure out the Behavior for the given diagnostic, taking current
     /// state such as fatality into account.
-    Behavior determineBehavior(DiagID);
+    Behavior determineBehavior(DiagID id);
 
     bool hadAnyError() const { return anyErrorOccurred; }
     bool hasFatalErrorOccurred() const { return fatalErrorOccurred; }
