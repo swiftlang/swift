@@ -18,7 +18,6 @@
 #define SWIFT_SIL_SILVALUE_H
 
 #include "swift/Basic/Range.h"
-#include "swift/Basic/PointerLikeTypeTraitsFwdDecl.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -626,5 +625,8 @@ namespace llvm {
   };
 
 }  // end namespace llvm
+
+// FIXME: SILTypeList is going away, but for now just note it's 4-byte-aligned.
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::SILTypeList, 2);
 
 #endif
