@@ -398,7 +398,7 @@ private:
   template <typename T>
   void processKeyWithDefault(const char *Key, Optional<T> &Val,
                              const Optional<T> &DefaultValue, bool Required) {
-    assert(DefaultValue.hasValue() == false &&
+    assert(!DefaultValue.hasValue() &&
            "Optional<T> shouldn't have a value!");
     void *SaveInfo;
     bool UseDefault;

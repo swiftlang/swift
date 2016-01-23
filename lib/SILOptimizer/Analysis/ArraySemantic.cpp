@@ -245,7 +245,7 @@ static bool canHoistArrayArgument(ApplyInst *SemanticsCall, SILValue Arr,
                                              InsertBefore->getParent())) &&
            (SEI = dyn_cast<StructElementAddrInst>(Val)))
       Val = SEI->getOperand().getDef();
-    return DoesNotDominate == false;
+    return !DoesNotDominate;
   }
 
   return false;

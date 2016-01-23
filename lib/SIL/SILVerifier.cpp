@@ -2807,12 +2807,12 @@ public:
     bool FoundThrowBlock = false;
     for (auto &BB : *F) {
       if (isa<ReturnInst>(BB.getTerminator())) {
-        require(FoundReturnBlock == false,
+        require(!FoundReturnBlock,
                 "more than one return block in function");
         FoundReturnBlock = true;
       }
       if (isa<ThrowInst>(BB.getTerminator())) {
-        require(FoundThrowBlock == false,
+        require(!FoundThrowBlock,
                 "more than one throw block in function");
         FoundThrowBlock = true;
       }
