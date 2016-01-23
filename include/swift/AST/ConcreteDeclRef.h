@@ -18,8 +18,8 @@
 #define SWIFT_AST_CONCRETEDECLREF_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/PointerLikeTypeTraitsFwdDecl.h"
 #include "swift/AST/Substitution.h"
+#include "swift/AST/TypeAlignments.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/Compiler.h"
