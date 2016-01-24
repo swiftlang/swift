@@ -59,18 +59,15 @@ class SwiftBenchHarness:
   minIterTime = 1
   optFlags = []
 
-
   def log(self, str, level):
     if self.verboseLevel >= level:
       for _ in range(1, level):
         sys.stdout.write('  ')
       print(str)
 
-
   def runCommand(self, cmd):
     self.log('    Executing: ' + ' '.join(cmd), 1)
     return subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-
 
   def parseArguments(self):
     self.log("Parsing arguments.", 2)
@@ -101,7 +98,6 @@ class SwiftBenchHarness:
     self.log("Verbosity: %s." % self.verboseLevel, 3)
     self.log("Time limit: %s." % self.timeLimit, 3)
     self.log("Min sample time: %s." % self.minSampleTime, 3)
-
 
   def processSource(self, name):
     self.log("Processing source file: %s." % name, 2)
@@ -199,12 +195,10 @@ main()
     for n in testNames:
       self.tests[name + ":" + n].processedSource = processedName
 
-
   def processSources(self):
     self.log("Processing sources: %s." % self.sources, 2)
     for s in self.sources:
       self.processSource(s)
-
 
   def compileOpaqueCFile(self):
     self.log("Generating and compiling C file with opaque functions.", 3)
@@ -234,19 +228,16 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
     self.tests[name].status = status
     self.tests[name].output = output
 
-
   def compileSources(self):
     self.log("Compiling processed sources.", 2)
     self.compileOpaqueCFile()
     for t in self.tests:
       self.compileSource(t)
 
-
   def runBenchmarks(self):
     self.log("Running benchmarks.", 2)
     for t in self.tests:
       self.runBench(t)
-
 
   def parseBenchmarkOutput(self, res):
     # Parse lines like
@@ -257,7 +248,6 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
     if not m:
       return ("", 0, 0)
     return (m.group(1), m.group(2), m.group(3))
-
 
   def computeItersNumber(self, name):
     scale = 1
@@ -290,7 +280,6 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
       samples = 1
     return (samples, scale)
 
-
   def runBench(self, name):
     if not self.tests[name].status == "":
       return
@@ -315,7 +304,6 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
         break
     res = TestResults(name, samples)
     self.tests[name].results = res
-
 
   def reportResults(self):
     self.log("\nReporting results.", 2)

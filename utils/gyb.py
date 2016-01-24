@@ -513,7 +513,6 @@ class ParseContext:
             else:
                 yield self.tokenKind
 
-
     def nextToken(self):
         """Move to the next token"""
         for kind in self.tokens:
