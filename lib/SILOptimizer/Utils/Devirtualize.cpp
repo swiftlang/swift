@@ -694,7 +694,7 @@ static ApplySite devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   // Collect all the required substitutions.
   //
   // The complete set of substitutions may be different, e.g. because the found
-  // witness thunk F may have been created by a  specialization pass and have
+  // witness thunk F may have been created by a specialization pass and have
   // additional generic parameters.
   SmallVector<Substitution, 16> NewSubstList(Subs.begin(), Subs.end());
   if (auto generics = AI.getOrigCalleeType()->getGenericSignature()) {

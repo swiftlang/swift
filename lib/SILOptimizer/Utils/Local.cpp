@@ -1120,7 +1120,7 @@ ValueLifetime ValueLifetimeAnalysis::computeLastUsers() {
 //                    Casts Optimization and Simplification
 //===----------------------------------------------------------------------===//
 
-/// \brief  Get a substitution corresponding to the type witness.
+/// \brief Get a substitution corresponding to the type witness.
 /// Inspired by ProtocolConformance::getTypeWitnessByName.
 static const Substitution *
 getTypeWitnessByName(ProtocolConformance *conformance, Identifier name) {
@@ -1187,7 +1187,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   auto Loc = Inst->getLoc();
 
   // The conformance to _BridgedToObjectiveC is statically known.
-  // Retrieve the  bridging operation to be used if a static conformance
+  // Retrieve the bridging operation to be used if a static conformance
   // to _BridgedToObjectiveC can be proven.
   FuncDecl *BridgeFuncDecl =
       isConditional

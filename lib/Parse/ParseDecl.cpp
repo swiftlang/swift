@@ -4052,7 +4052,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   Identifier SimpleName;
   SourceLoc NameLoc = Tok.getLoc();
   Token NonglobalTok = Tok;
-  bool  NonglobalError = false;
+  bool NonglobalError = false;
 
   if (!(Flags & PD_AllowTopLevel) && 
       !(Flags & PD_InProtocol) &&

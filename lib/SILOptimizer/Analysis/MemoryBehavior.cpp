@@ -108,9 +108,9 @@ public:
 #define OPERANDALIAS_MEMBEHAVIOR_INST(Name)                             \
   MemBehavior visit##Name(Name *I) {                                    \
     for (Operand &Op : I->getAllOperands()) {                           \
-      if (!AA->isNoAlias(Op.get(), V)) {                                 \
+      if (!AA->isNoAlias(Op.get(), V)) {                                \
         DEBUG(llvm::dbgs() << "  " #Name                                \
-              " does alias inst. Returning  Normal behavior.\n");       \
+              " does alias inst. Returning Normal behavior.\n");        \
         return I->getMemoryBehavior();                                  \
       }                                                                 \
     }                                                                   \

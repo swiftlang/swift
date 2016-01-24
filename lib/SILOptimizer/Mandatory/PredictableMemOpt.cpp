@@ -925,7 +925,7 @@ bool AllocOptimize::tryToRemoveDeadAllocation() {
 bool AllocOptimize::doIt() {
   bool Changed = false;
 
-  // Don't  try to optimize incomplete aggregates.
+  // Don't try to optimize incomplete aggregates.
   if (MemoryType.aggregateHasUnreferenceableStorage())
     return false;
 

@@ -1924,7 +1924,7 @@ public:
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
-    return  T->getKind() == TypeKind::Module;
+    return T->getKind() == TypeKind::Module;
   }
   
 private:

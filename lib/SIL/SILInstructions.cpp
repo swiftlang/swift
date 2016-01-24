@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the high-level SILInstruction classes used for  SIL code.
+// This file defines the high-level SILInstruction classes used for SIL code.
 //
 //===----------------------------------------------------------------------===//
 

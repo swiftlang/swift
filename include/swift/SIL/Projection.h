@@ -1,4 +1,4 @@
-//===--- Projection.h - Utilities for working with  Projections -*- C++ -*-===//
+//===--- Projection.h - Utilities for working with Projections --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

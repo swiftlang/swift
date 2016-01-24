@@ -178,7 +178,7 @@ class DSEContext;
 /// 2. When a load instruction is encountered, remove the loaded location and
 ///    any location it may alias with from the BBWriteSetMid.
 ///
-/// 3. When an instruction reads from  memory in an unknown way, the
+/// 3. When an instruction reads from memory in an unknown way, the
 ///    BBWriteSetMid bit is cleared if the instruction can read the
 ///    corresponding LSLocation.
 ///

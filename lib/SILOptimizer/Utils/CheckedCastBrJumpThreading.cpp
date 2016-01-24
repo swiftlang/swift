@@ -537,7 +537,7 @@ bool CheckedCastBrJumpThreading::areEquivalentConditionsAlongSomePaths() {
 }
 
 /// Check if conditions of CCBI and DomCCBI are equivalent along
-/// all or at least  some paths.
+/// all or at least some paths.
 bool CheckedCastBrJumpThreading::areEquivalentConditionsAlongPaths() {
   // Are conditions equivalent along all paths?
   if (DomCondition == Condition) {

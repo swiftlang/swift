@@ -30,7 +30,7 @@
 using namespace swift;
 using namespace constraints;
 
-/// \brief  Get a substitution corresponding to the type witness.
+/// \brief Get a substitution corresponding to the type witness.
 /// Inspired by ProtocolConformance::getTypeWitnessByName.
 const Substitution *
 getTypeWitnessByName(ProtocolConformance *conformance,
@@ -1348,13 +1348,13 @@ namespace {
 
       if (conformsToBridgedToObjectiveC) {
         // The conformance to _BridgedToObjectiveC is statically known.
-        // Retrieve the  bridging operation to be used if a static conformance
+        // Retrieve the bridging operation to be used if a static conformance
         // to _BridgedToObjectiveC can be proven.
         fn = conditional
                  ? tc.Context.getConditionallyBridgeFromObjectiveCBridgeable(&tc)
                  : tc.Context.getForceBridgeFromObjectiveCBridgeable(&tc);
       } else {
-        // Retrieve the  bridging operation to be used if a static conformance
+        // Retrieve the bridging operation to be used if a static conformance
         // to _BridgedToObjectiveC cannot be proven.
         fn = conditional ? tc.Context.getConditionallyBridgeFromObjectiveC(&tc)
                          : tc.Context.getForceBridgeFromObjectiveC(&tc);

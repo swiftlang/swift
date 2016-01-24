@@ -799,7 +799,7 @@ FindNamedDecls (SwiftASTContext *ast,
       }
     }
   }
-  else  if (result._module)
+  else if (result._module)
   {
     swift::Module::AccessPathTy access_path;
     llvm::SmallVector<swift::ValueDecl*, 4> decls;
