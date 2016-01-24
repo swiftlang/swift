@@ -530,9 +530,6 @@ class TypeConverter {
   
   llvm::DenseMap<AnyFunctionRef, CaptureInfo> LoweredCaptures;
   
-  /// The set of recursive types we've already diagnosed.
-  llvm::DenseSet<NominalTypeDecl *> RecursiveNominalTypes;
-
   /// The current generic context signature.
   CanGenericSignature CurGenericContext;
   
