@@ -145,6 +145,7 @@ KNOWN_SETTINGS=(
     build-swift-tools           "1"              "set to 1 to build Swift host tools"
     build-swift-stdlib          "1"              "set to 1 to build the Swift standard library"
     build-swift-sdk-overlay     "1"              "set to 1 to build the Swift SDK overlay"
+    build-swift-dispatch-overlay "0"             "set to 1 to build the Swift libdispatch overlay on Linux"
     build-swift-static-stdlib   "0"              "set to 1 to build static versions of the Swift standard library and SDK overlay"
     build-swift-examples        "1"              "set to 1 to build examples"
     build-swift-perf-testsuite  "0"              "set to 1 to build perf test suite"
@@ -1649,6 +1650,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                     -DSWIFT_BUILD_STDLIB:BOOL=$(true_false "${BUILD_SWIFT_STDLIB}")
                     -DSWIFT_SERIALIZE_STDLIB_UNITTEST:BOOL=$(true_false "${BUILD_SERIALIZED_STDLIB_UNITTEST}")
                     -DSWIFT_BUILD_SDK_OVERLAY:BOOL=$(true_false "${BUILD_SWIFT_SDK_OVERLAY}")
+                    -DSWIFT_BUILD_DISPATCH_OVERLAY:BOOL=$(true_false "${BUILD_SWIFT_DISPATCH_OVERLAY}")
                     -DSWIFT_BUILD_STATIC_STDLIB:BOOL=$(true_false "${BUILD_SWIFT_STATIC_STDLIB}")
                     -DSWIFT_BUILD_PERF_TESTSUITE:BOOL=$(true_false "${build_perf_testsuite_this_time}")
                     -DSWIFT_BUILD_EXAMPLES:BOOL=$(true_false "${BUILD_SWIFT_EXAMPLES}")
