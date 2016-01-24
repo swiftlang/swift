@@ -313,7 +313,7 @@ also know how to "draw!"::
 It is unlikely that Cowboy is meant to conform to Shape, but the method name and
 signatures match, so implicit conformance deduces that Cowboy conforms to
 Shape. Random collisions between types are fairly rare. However, when one is
-using protocol inheritance with fine- grained (semantic or mostly-semantic)
+using protocol inheritance with fine-grained (semantic or mostly-semantic)
 differences between protocols in the hierarchy, they become more common. See
 http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2005/n1798.html for examples
 of this problem as it surfaced with C++ concepts. It is not clear at this time
@@ -835,7 +835,7 @@ cannot disambiguate the tokens::
 
 i.e.,::
 
-  identifier operator identifier operator unspaced_lparen integer- literal comma integer-literal rparen
+  identifier operator identifier operator unspaced_lparen integer-literal comma integer-literal rparen
 
 which can be interpreted as either::
 

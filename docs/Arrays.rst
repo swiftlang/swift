@@ -63,7 +63,7 @@ to all three of the components.
   efficient conversions from Cocoa and back—when ``Element`` can be a class
   type, ``Array<Element>`` can be backed by the (potentially non-contiguous)
   storage of an arbitrary ``NSArray`` rather than by a Swift
-  ``ContiguousArray``.  ``Array<Element>`` also supports up- and down- casts
+  ``ContiguousArray``.  ``Array<Element>`` also supports up- and downcasts
   between arrays of related class types.  When ``Element`` is known to be a
   non-class type, the performance of ``Array<Element>`` is identical to that
   of ``ContiguousArray<Element>``.
