@@ -51,7 +51,7 @@ public:
     OptimizeUnchecked
   };
 
-  /// Controls how  perform SIL linking.
+  /// Controls how to perform SIL linking.
   LinkingMode LinkMode = LinkNormal;
 
   /// Remove all runtime assertions during optimizations.

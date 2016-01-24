@@ -4814,7 +4814,7 @@ public:
     return true;
   }
 
-  /// Returns true if a  diagnostic about an accessor being less available
+  /// Returns true if a diagnostic about an accessor being less available
   /// than the accessor it overrides would be redundant because we will
   /// already emit another diagnostic.
   static bool

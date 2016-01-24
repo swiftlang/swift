@@ -232,7 +232,7 @@ public:
   static bool isKnownPositive(SILValue N) {
     if (IntegerLiteralInst *NI = dyn_cast<IntegerLiteralInst>(N))
       return NI->getValue().isStrictlyPositive();
-    return  false;
+    return false;
   }
 
   /// Return true if the absolute value of \p A is smaller than the
@@ -278,7 +278,7 @@ public:
         if (F.Relationship == ValueRelation::SAdd) {
           // L + R already known to not trap at this point in the program.
           // And the following applies:
-          // L >= A and R >= B  or (commutatively) R >= A and L >= B.
+          // L >= A and R >= B or (commutatively) R >= A and L >= B.
           SILValue A = BI->getOperand(0);
           SILValue B = BI->getOperand(1);
           if (knownRelation(A, L,  ValueRelation::SLE) &&
@@ -307,7 +307,7 @@ public:
         if (F.Relationship == ValueRelation::UAdd) {
           // L + R already known to not trap at this point in the program.
           // And the following applies:
-          // L >= A and R >= B  or (commutatively) R >= A and L >= B.
+          // L >= A and R >= B or (commutatively) R >= A and L >= B.
           SILValue A = BI->getOperand(0);
           SILValue B = BI->getOperand(1);
           if (knownRelation(A, L,  ValueRelation::ULE) &&
@@ -368,7 +368,7 @@ public:
         if (F.Relationship == ValueRelation::UMul) {
           // L * R already known to not trap at this point in the program.
           // And the following applies:
-          // L >= A and R >= B  or (commutatively) R >= A and L >= B.
+          // L >= A and R >= B or (commutatively) R >= A and L >= B.
           SILValue A = BI->getOperand(0);
           SILValue B = BI->getOperand(1);
           if (knownRelation(A, L,  ValueRelation::ULE) &&
@@ -526,7 +526,7 @@ public:
     ValueRelation Rel;
     switch (BI->getBuiltinInfo().ID) {
       default: return;
-      case  BuiltinValueKind::SAddOver:
+      case BuiltinValueKind::SAddOver:
         Rel = ValueRelation::SAdd;
         break;
       case BuiltinValueKind::UAddOver:

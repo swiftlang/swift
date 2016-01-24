@@ -156,7 +156,7 @@ static bool expandDestroyAddr(DestroyAddrInst *DA) {
 
 static bool expandReleaseValue(ReleaseValueInst *DV) {
   SILModule &Module = DV->getModule();
-  SILBuilderWithScope  Builder(DV);
+  SILBuilderWithScope Builder(DV);
 
   // Strength reduce destroy_addr inst into release/store if
   // we have a non-address only type.

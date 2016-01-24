@@ -1701,7 +1701,7 @@ void LifetimeChecker::deleteDeadRelease(unsigned ReleaseID) {
 
 /// processNonTrivialRelease - We handle two kinds of release instructions here:
 /// destroy_addr for alloc_stack's and strong_release/dealloc_box for
-/// alloc_box's.  By the  time that DI gets here, we've validated that all uses
+/// alloc_box's.  By the time that DI gets here, we've validated that all uses
 /// of the memory location are valid.  Unfortunately, the uses being valid
 /// doesn't mean that the memory is actually initialized on all paths leading to
 /// a release.  As such, we have to push the releases up the CFG to where the

@@ -568,7 +568,7 @@ public:
                       SILDeclRef fromLevel, SILDeclRef toLevel);
   /// Generates a thunk from a foreign function to the native Swift convention.
   void emitForeignToNativeThunk(SILDeclRef thunk);
-  /// Generates a thunk from a native function to the  conventions.
+  /// Generates a thunk from a native function to the conventions.
   void emitNativeToForeignThunk(SILDeclRef thunk);
   
   // Generate a nullary function that returns the given value.

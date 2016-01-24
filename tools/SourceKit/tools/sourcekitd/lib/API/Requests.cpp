@@ -1754,7 +1754,7 @@ bool SKEditorConsumer::handleDocumentSubStructureElement(UIdent Kind,
   Node.set(KeyKind, Kind);
   Node.set(KeyOffset, Offset);
   Node.set(KeyLength, Length);
-  return  true;
+  return true;
 }
 
 bool SKEditorConsumer::recordAffectedRange(unsigned Offset, unsigned Length) {

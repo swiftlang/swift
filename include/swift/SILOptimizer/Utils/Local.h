@@ -434,7 +434,7 @@ class CastOptimizer {
       SILBasicBlock *SuccessBB,
       SILBasicBlock *FailureBB);
 
-  /// Optimize a cast from   a Swift type implementing _ObjectiveCBridgeable
+  /// Optimize a cast from a Swift type implementing _ObjectiveCBridgeable
   /// into a bridged ObjC type.
   SILInstruction *
   optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,

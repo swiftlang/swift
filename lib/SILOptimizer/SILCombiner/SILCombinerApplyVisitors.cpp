@@ -624,7 +624,7 @@ static SILValue getInitOrOpenExistential(AllocStackInst *ASI, SILValue &Src) {
   return SrcValue;
 }
 
-/// find the init_existential, which could be used to  determine a concrete
+/// find the init_existential, which could be used to determine a concrete
 /// type of the \p Self.
 static SILInstruction *findInitExistential(FullApplySite AI, SILValue Self,
                                            CanType &OpenedArchetype) {
@@ -1015,7 +1015,7 @@ static ApplyInst *optimizeCastThroughThinFunctionPointer(
     return nullptr;
 
   // The fourth parameter is a metatype of a bound generic type. Use it to
-  // obtain  the type substitutions to apply.
+  // obtain the type substitutions to apply.
   auto MetaTy = dyn_cast<MetatypeType>(CastedParams[3].getType());
   if (!MetaTy)
     return nullptr;

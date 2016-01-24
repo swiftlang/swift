@@ -136,7 +136,7 @@ inline match_combine_and<LTy, RTy> m_CombineAnd(const LTy &L, const RTy &R) {
 
 /// Helper class to track the return type of vararg m_CombineOr matcher.
 template <typename ...Arguments>
-struct  OneOf_match;
+struct OneOf_match;
 
 template <typename T0>
 struct OneOf_match<T0> {
@@ -711,8 +711,8 @@ m_Ext(const T0 &Op0) {
 
 /// Matcher for any of the builtin CheckedTrunc instructions.
 template <typename T0>
-inline  typename OneOf_match<BuiltinApplyTy<T0>, BuiltinApplyTy<T0>,
-                             BuiltinApplyTy<T0>, BuiltinApplyTy<T0>>::Ty
+inline typename OneOf_match<BuiltinApplyTy<T0>, BuiltinApplyTy<T0>,
+                            BuiltinApplyTy<T0>, BuiltinApplyTy<T0>>::Ty
 m_CheckedTrunc(const T0 &Op0) {
   return m_UToSCheckedTrunc(Op0) || m_SToUCheckedTrunc(Op0) ||
          m_UToUCheckedTrunc(Op0) || m_SToSCheckedTrunc(Op0);

@@ -106,7 +106,7 @@ the Swift type system:
   flavors of equality constraints: 
 
     - Exact equality constraints, or  "binding", written ``T0 := X``
-      for some type variable ``T0`` and  type ``X``, which requires
+      for some type variable ``T0`` and type ``X``, which requires
       that ``T0`` be exactly identical to ``X``;
     - Equality constraints, written ``X == Y`` for types ``X`` and
       ``Y``, which require ``X`` and ``Y`` to have the same type,

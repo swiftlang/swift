@@ -1804,7 +1804,7 @@ static const Decl *ancestorTypeLevelDeclForAvailabilityFixit(const Decl *D) {
 /// declaration context containing the reference, make a best effort find up to
 /// three locations for potential fixits.
 ///
-/// \param  FoundVersionCheckNode Returns a node that can be wrapped in a
+/// \param FoundVersionCheckNode Returns a node that can be wrapped in a
 /// if #available(...) { ... } version check to fix the unavailable reference,
 /// or None if such a node cannot be found.
 ///

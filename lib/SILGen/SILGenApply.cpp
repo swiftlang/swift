@@ -3503,7 +3503,7 @@ namespace {
             closureTy);
           result = ManagedValue::forUnmanaged(partialApply);
        // Handle a regular call.
-       } else  if (!specializedEmitter) {
+       } else if (!specializedEmitter) {
           result = gen.emitApply(uncurriedLoc.getValue(), mv,
                                  callee.getSubstitutions(),
                                  uncurriedArgs,

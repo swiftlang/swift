@@ -960,7 +960,7 @@ class FunctionRefInst : public LiteralInst {
   /// Construct a FunctionRefInst.
   ///
   /// \param DebugLoc  The location of the reference.
-  /// \param F    The function being referenced.
+  /// \param F         The function being referenced.
   FunctionRefInst(SILDebugLocation *DebugLoc, SILFunction *F);
 
 public:
