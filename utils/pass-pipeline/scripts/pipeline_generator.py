@@ -12,7 +12,7 @@ sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__f
 import pass_pipeline_library
 import passes
 
-normal_pipeline = [x for x in pass_pipeline_library.normal_passpipelines()]
+normal_pipeline = list(pass_pipeline_library.normal_passpipelines())
 pass_pipelines = [x.identifier for x in normal_pipeline]
 
 parser = argparse.ArgumentParser(description=textwrap.dedent("""

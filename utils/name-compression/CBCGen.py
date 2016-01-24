@@ -105,7 +105,7 @@ escape_char1 = 'J'
 # notice that Y and J are missing because they are escape chars:
 charset = r"0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIKLMNOPQRSTUVWXZ$"
 # alphabet without the escape chars.
-encoders = [c for c in charset]
+encoders = list(charset)
 enc_len = len(encoders)
 
 # Take the most frequent entries from the table that fit into the range of

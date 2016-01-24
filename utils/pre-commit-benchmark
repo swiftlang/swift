@@ -222,7 +222,7 @@ def compareTimingsFiles(file1, file2):
     scores1, runs1 = getScores(file1)
     scores2, runs2 = getScores(file2)
     runs = min(runs1, runs2)
-    keys = [f for f in set(scores1.keys() + scores2.keys())]
+    keys = list(set(scores1.keys() + scores2.keys()))
     if VERBOSE:
         print(scores1)
         print(scores2)
