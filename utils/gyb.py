@@ -128,7 +128,7 @@ def tokenizePythonToUnmatchedCloseCurly(sourceText, start, lineStarts):
 
     try:
         for kind, text, tokenStart, tokenEnd, lineText \
-            in tokenize.generate_tokens(stream.readline):
+                in tokenize.generate_tokens(stream.readline):
 
             if text == '{':
                 nesting += 1
@@ -225,7 +225,7 @@ def tokenizeTemplate(templateText):
 
         # pull out the one matched key (ignoring internal patterns starting with _)
         ((kind, text), ) = (
-            (kind,text) for (kind,text) in m.groupdict().items()
+            (kind, text) for (kind, text) in m.groupdict().items()
             if text is not None and kind[0] != '_')
 
         if kind in ('literal', 'symbol'):
@@ -301,13 +301,13 @@ def splitGybLines(sourceLines):
     >>> src[s[1]]
     '        print 1\n'
     """
-    lastTokenText,lastTokenKind = None,None
+    lastTokenText, lastTokenKind = None, None
     unmatchedIndents = []
 
     dedents = 0
     try:
         for tokenKind, tokenText, tokenStart, (tokenEndLine, tokenEndCol), lineText \
-            in tokenize.generate_tokens(lambda i=iter(sourceLines): next(i)):
+                in tokenize.generate_tokens(lambda i=iter(sourceLines): next(i)):
 
             if tokenKind in (tokenize.COMMENT, tokenize.ENDMARKER):
                 continue
@@ -350,7 +350,7 @@ def codeStartsWithDedentKeyword(sourceLines):
     """
     tokenText = None
     for tokenKind, tokenText, _, _, _ \
-        in tokenize.generate_tokens(lambda i=iter(sourceLines): next(i)):
+            in tokenize.generate_tokens(lambda i=iter(sourceLines): next(i)):
 
         if tokenKind != tokenize.COMMENT and tokenText.strip() != '':
             break
@@ -533,7 +533,7 @@ class ExecutionContext:
     def appendText(self, text, file, line):
         # see if we need to inject a line marker
         if self.lineDirective:
-            if (file,line) != self.lastFileLine:
+            if (file, line) != self.lastFileLine:
                 # We can only insert the line directive at a line break
                 if len(self.resultText) == 0 \
                    or self.resultText[-1].endswith('\n'):
