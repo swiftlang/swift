@@ -398,7 +398,7 @@ functionList = [
   	[Response],
   	c_bool),
 
-#  ("sourcekitd_send_request",
+  #  ("sourcekitd_send_request",
 
   ("sourcekitd_send_request_sync",
   	[Object],
@@ -469,19 +469,19 @@ functionList = [
   ("sourcekitd_variant_dictionary_get_int64",
   	[Variant, UIdent],
   	c_int64),
-  
+
   ("sourcekitd_variant_dictionary_get_string",
   	[Variant, UIdent],
   	c_char_p),
-  
+
   ("sourcekitd_variant_dictionary_get_value",
   	[Variant, UIdent],
   	Variant),
-  
+
   ("sourcekitd_variant_dictionary_get_uid",
   	[Variant, UIdent],
   	c_object_p),
-  
+
   ("sourcekitd_variant_get_type",
   	[Variant],
   	VariantType.from_id),

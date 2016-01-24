@@ -101,9 +101,9 @@ html_style = 'swift.css'
 # documentation.
 html_theme_options = {
   # Red links are a bit too garish
-  "linkcolor" : "#577492",
-  "visitedlinkcolor" : "#577492",
-  "hoverlinkcolor" : "#551A8B"
+  "linkcolor": "#577492",
+  "visitedlinkcolor": "#577492",
+  "hoverlinkcolor": "#551A8B"
 }
 
 # Add any paths that contain custom themes here, relative to this directory.
@@ -178,14 +178,14 @@ htmlhelp_basename = 'Swiftdoc'
 # -- Options for LaTeX output --------------------------------------------------
 
 latex_elements = {
-# The paper size ('letterpaper' or 'a4paper').
-#'papersize': 'letterpaper',
+    # The paper size ('letterpaper' or 'a4paper').
+    #'papersize': 'letterpaper',
 
-# The font size ('10pt', '11pt' or '12pt').
-#'pointsize': '10pt',
+    # The font size ('10pt', '11pt' or '12pt').
+    #'pointsize': '10pt',
 
-# Additional stuff for the LaTeX preamble.
-#'preamble': '',
+    # Additional stuff for the LaTeX preamble.
+    #'preamble': '',
 }
 
 # Grouping the document tree into LaTeX files. List of tuples

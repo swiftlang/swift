@@ -17,7 +17,8 @@ def addLine(line):
   """
   Analyze the frequency of letters in \p line.
   """
-  for c in line: hist[c] += 1
+  for c in line:
+    hist[c] += 1
 
 # Read all of the input files and analyze the content of the files.
 for f in filenames:
@@ -25,11 +26,11 @@ for f in filenames:
     addLine(line.rstrip('\n').strip())
 
 # Sort all of the characters by their appearance frequency.
-sorted_chars = sorted(hist.items(), key=lambda x: x[1] * len(x[0]) , reverse=True)
+sorted_chars = sorted(hist.items(), key=lambda x: x[1] * len(x[0]), reverse=True)
 
 class Node:
   """ This is a node in the Huffman tree """
-  def __init__(self, hits, value = None, l = None, r = None):
+  def __init__(self, hits, value=None, l=None, r=None):
     self.hit = hits  # Number of occurrences for this node.
     self.left = l    # Left subtree.
     self.right = r   # Right subtree.
@@ -76,12 +77,13 @@ class Node:
     Generate the CPP code for the encoder.
     """
     if self.val:
-      sb = "if (ch == '" + str(self.val) +"') {"
+      sb = "if (ch == '" + str(self.val) + "') {"
       sb += "/*" + "".join(map(str, reversed(stack))) + "*/ "
       # Encode the bit stream as a numeric value. Updating the APInt in one go
       # is much faster than inserting one bit at a time.
       numeric_val = 0
-      for bit in reversed(stack): numeric_val = numeric_val * 2 + bit
+      for bit in reversed(stack):
+        numeric_val = numeric_val * 2 + bit
       # num_bits - the number of bits that we use in the bitstream.
       # bits - the numeric value of the bits that we encode in the bitstream.
       sb += "bits = %d; num_bits = %d; " % (numeric_val, len(stack))
@@ -117,7 +119,7 @@ index_of_char = ["-1"] * 256
 idx = 0
 for c in charset:
   index_of_char[ord(c)] = str(idx)
-  idx+=1
+  idx += 1
 
 
 print "#ifndef SWIFT_MANGLER_HUFFMAN_H"

@@ -15,7 +15,7 @@ def collect_top_entries(val):
   Collect the most frequent substrings and organize them in a table.
   """
   # sort items by hit rate.
-  lst = sorted(hist.items(), key=lambda x: x[1] , reverse=True)[0:val]
+  lst = sorted(hist.items(), key=lambda x: x[1], reverse=True)[0:val]
   # Strip out entries with a small number of hits.
   # These entries are not likely to help the compressor and can extend the compile
   # time of the mangler unnecessarily.
@@ -81,7 +81,8 @@ def addLine(line):
   Extract all of the possible substrings from \p line and insert them into
   the substring dictionary. This method knows to ignore the _T swift prefix.
   """
-  if not line.startswith("__T"): return
+  if not line.startswith("__T"):
+    return
 
   # Strip the "__T" for the prefix calculations.
   line = line[3:]
@@ -113,7 +114,7 @@ index_of_char = ["-1"] * 256
 idx = 0
 for c in charset:
   index_of_char[ord(c)] = str(idx)
-  idx+=1
+  idx += 1
 
 class Trie:
   """
@@ -165,11 +166,12 @@ key_values = [p[0] for p in table]
 # Array of string lengths.
 string_length_table = map(lambda x: str(len(x)), key_values)
 # Stringify the list of words that we use as substrings.
-string_key_list = map(lambda x: "\""+ x + "\"", key_values)
+string_key_list = map(lambda x: "\"" + x + "\"", key_values)
 
 # Add all of the substrings that we'll use for compression into the Trie.
 TrieHead = Trie()
-for i in xrange(len(key_values)): TrieHead.add(key_values[i], i)
+for i in xrange(len(key_values)):
+  TrieHead.add(key_values[i], i)
 
 
 # Generate the header file.

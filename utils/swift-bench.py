@@ -180,7 +180,7 @@ main()
         benchName = m.group(1)
         # TODO: Keep track of the line number as well
         self.log("Benchmark found: %s" % benchName, 3)
-        self.tests[name+":"+benchName] = Test(benchName, name, "", "")
+        self.tests[name + ":" + benchName] = Test(benchName, name, "", "")
         testNames.append(benchName)
         if m.group(2):
           output += intoBench
@@ -197,7 +197,7 @@ main()
     with open(processedName, 'w') as f:
       f.write(output)
     for n in testNames:
-      self.tests[name+":"+n].processedSource = processedName
+      self.tests[name + ":" + n].processedSource = processedName
 
 
   def processSources(self):
@@ -219,8 +219,9 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
     self.runCommand(['clang++', 'opaque.cpp', '-o', 'opaque.o', '-c', '-O2'])
 
   compiledFiles = {}
+
   def compileSource(self, name):
-    self.tests[name].binary = "./"+self.tests[name].processedSource.split(os.extsep)[0]
+    self.tests[name].binary = "./" + self.tests[name].processedSource.split(os.extsep)[0]
     if not self.tests[name].processedSource in self.compiledFiles:
       try:
         self.runCommand([self.compiler, self.tests[name].processedSource, "-o", self.tests[name].binary + '.o', '-c'] + self.optFlags)
@@ -330,6 +331,7 @@ class Test:
     self.processedSource = processedSource
     self.binary = binary
     self.status = ""
+
   def Print(self):
     print("NAME: %s" % self.name)
     print("SOURCE: %s" % self.source)
@@ -349,21 +351,23 @@ class TestResults:
     self.samples = samples
     if len(samples) > 0:
       self.Process()
+
   def Process(self):
     self.minimum = min(self.samples)
     self.maximum = max(self.samples)
     self.avg = sum(self.samples)/len(self.samples)
     self.std = pstdev(self.samples)
     self.err = self.std / math.sqrt(len(self.samples))
-    self.int_min = self.avg - self.err*1.96
-    self.int_max = self.avg + self.err*1.96
+    self.int_min = self.avg - self.err * 1.96
+    self.int_max = self.avg + self.err * 1.96
+
   def Print(self):
     print("SAMPLES: %d" % len(self.samples))
     print("MIN: %3.2e" % self.minimum)
     print("MAX: %3.2e" % self.maximum)
     print("AVG: %3.2e" % self.avg)
     print("STD: %3.2e" % self.std)
-    print("ERR: %3.2e (%2.1f%%)" % (self.err, self.err*100/self.avg))
+    print("ERR: %3.2e (%2.1f%%)" % (self.err, self.err * 100 / self.avg))
     print("CONF INT 0.95: (%3.2e, %3.2e)" % (self.int_min, self.int_max))
     print("")
 

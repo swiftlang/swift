@@ -89,9 +89,10 @@ def parseGenericOperator(m):
     for m2 in re.finditer(genericParameterConstraint, genericParams, reFlags):
         typeParameter = m2.group(1)
         protocol = m2.group(2)
-        
+
         # we're only interested if we can find a function parameter of that type
-        if not re.search(r':\s*%s\s*[,)]' % typeParameter, functionParams): continue
+        if not re.search(r':\s*%s\s*[,)]' % typeParameter, functionParams):
+            continue
 
         # Make some replacements in the signature to limit the graph size
         letterTau = '&#x3c4;'
@@ -105,12 +106,14 @@ def parseGenericOperator(m):
 def parseProtocol(m):
     child = m.group(1)
     # skip irrelevant protocols
-    if re.match(r'_Builtin.*Convertible', child): return 
+    if re.match(r'_Builtin.*Convertible', child):
+        return
     graph.setdefault(child, set())
     body[child] = bodyLines(m.group(3))
     if m.group(2):
         for parent in m.group(2).strip().split(","):
-            if re.match(r'_Builtin.*Convertible', parent): return
+            if re.match(r'_Builtin.*Convertible', parent):
+                return
             graph.setdefault(parent.strip(), set()).add(child)
 
 protocolsAndOperators = interpolate(r'''
@@ -123,8 +126,10 @@ protocolsAndOperators = interpolate(r'''
 
 # Main parsing loop
 for m in re.finditer(protocolsAndOperators, sourceSansComments, reFlags):
-    if m.group(1): parseProtocol(m)
-    elif m.group(5): parseGenericOperator(m)
+    if m.group(1):
+        parseProtocol(m)
+    elif m.group(5):
+        parseGenericOperator(m)
     # otherwise we matched some non-generic operator
 
 # Find clusters of protocols that have the same name when underscores
@@ -139,7 +144,7 @@ clusters = dict((c, nodes) for (c, nodes) in clusterBuilder.items() if len(nodes
 # A set of all intra-cluster edges
 clusterEdges = set(
     (s, t) for (c, elements) in clusters.items()
-    for s in elements 
+    for s in elements
     for t in graph[s] if t in elements)
 
 print('digraph ProtocolHierarchies {')
@@ -159,15 +164,14 @@ for node in sorted(graph.keys()):
     generics = sorted(genericOperators.get(node, set()))
     style = 'solid' if node.startswith('_') else 'bold'
     divider = '<HR/>\n' if len(requirements) != 0 and len(generics) != 0 else ''
-    
+
     label = node if len(requirements + generics) == 0 else (
         '\n<TABLE BORDER="0">\n<TR><TD>\n%s\n</TD></TR><HR/>\n%s%s%s</TABLE>\n' % (
-        node,
-        '\n'.join('<TR><TD>%s</TD></TR>' % r for r in requirements),
-        divider,
-        '\n'.join('<TR><TD>%s</TD></TR>' % g for g in generics)))
-    
-    
+            node,
+            '\n'.join('<TR><TD>%s</TD></TR>' % r for r in requirements),
+            divider,
+            '\n'.join('<TR><TD>%s</TD></TR>' % g for g in generics)))
+
     print(interpolate('    %(node)s [style = %(style)s, label=<%(label)s>]'))
 for (parent, children) in sorted(graph.items()):
     print('    %s -> {' % parent, end=' ')
