@@ -2667,7 +2667,7 @@ public:
       
       // If this is a member of a nominal type, don't allow it to have a name of
       // "Type" or "Protocol" since we reserve the X.Type and X.Protocol
-      // expressions to mean something builtin to the langauge.  We *do* allow
+      // expressions to mean something builtin to the language.  We *do* allow
       // these if they are escaped with backticks though.
       auto &Context = TC.Context;
       if (VD->getDeclContext()->isTypeContext() &&
