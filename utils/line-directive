@@ -58,7 +58,7 @@ def fline_map(filename):
 def map_line(filename, line_num):
     assert(line_num > 0)
     map = fline_map(filename)
-    index = bisect.bisect_left(map, (line_num,'',0))
+    index = bisect.bisect_left(map, (line_num, '', 0))
     base = map[index - 1]
     return base[1], base[2] + (line_num - base[0] - 1)
 

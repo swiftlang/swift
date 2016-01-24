@@ -64,7 +64,7 @@ class Object(object):
     def __init__(self, obj):
         if isinstance(obj, Object):
             self._obj = conf.lib.sourcekitd_request_retain(obj)
-        elif isinstance(obj, (int,long,bool)):
+        elif isinstance(obj, (int, long, bool)):
             self._obj = conf.lib.sourcekitd_request_int64_create(obj)
         elif isinstance(obj, str):
             self._obj = conf.lib.sourcekitd_request_string_create(obj)
@@ -74,10 +74,10 @@ class Object(object):
             self._obj = conf.lib.sourcekitd_request_dictionary_create(
                 POINTER(c_void_p)(), POINTER(c_void_p)(), 0)
             self._as_parameter_ = self._obj
-            for k,v in obj.iteritems():
+            for k, v in obj.iteritems():
                 conf.lib.sourcekitd_request_dictionary_set_value(self,
                     UIdent(k), Object(v))
-        elif isinstance(obj, (list,tuple)):
+        elif isinstance(obj, (list, tuple)):
             self._obj = conf.lib.sourcekitd_request_array_create(
                 POINTER(c_void_p)(), 0)
             self._as_parameter_ = self._obj
@@ -182,8 +182,8 @@ class ErrorKind(object):
         """Get the enumeration name of this error kind."""
         if self._name_map is None:
             self._name_map = {}
-            for key,value in ErrorKind.__dict__.items():
-                if isinstance(value,ErrorKind):
+            for key, value in ErrorKind.__dict__.items():
+                if isinstance(value, ErrorKind):
                     self._name_map[value] = key
         return self._name_map[self]
 
@@ -265,8 +265,8 @@ class VariantType(object):
         """Get the enumeration name of this variant type."""
         if self._name_map is None:
             self._name_map = {}
-            for key,value in VariantType.__dict__.items():
-                if isinstance(value,VariantType):
+            for key, value in VariantType.__dict__.items():
+                if isinstance(value, VariantType):
                     self._name_map[value] = key
         return self._name_map[self]
 

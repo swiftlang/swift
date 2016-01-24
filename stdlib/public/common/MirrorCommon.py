@@ -25,7 +25,7 @@ def getDisposition(disp=None):
 
 def _getGenericArgStrings(genericArgs=None, genericConstraints=None):
   if genericArgs is None:
-    return ('','')
+    return ('', '')
   genericArgString = ''
   first = True
   for arg in genericArgs:

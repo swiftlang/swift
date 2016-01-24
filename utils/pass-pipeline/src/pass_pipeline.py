@@ -6,6 +6,8 @@ class Pass(object):
         return "<pass name=%s>" % self.name
 
 PassListId = 0
+
+
 class PassList(object):
     def __init__(self, transforms):
         global PassListId

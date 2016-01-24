@@ -65,7 +65,7 @@ class GraphemeClusterBreakPropertyTable(UnicodeProperty):
         # values to symbolic values.
         self.symbolic_values = \
             [None] * (max(self.numeric_value_table.values()) + 1)
-        for k,v in self.numeric_value_table.items():
+        for k, v in self.numeric_value_table.items():
             self.symbolic_values[v] = k
 
         # Load the data file.
@@ -96,7 +96,7 @@ class GraphemeClusterBreakPropertyTable(UnicodeProperty):
         for cp in range(0, 0x110000):
             self.property_values[cp] = self.get_default_value()
 
-        for start_code_point,end_code_point,value in self.property_value_ranges:
+        for start_code_point, end_code_point, value in self.property_value_ranges:
             for cp in range(start_code_point, end_code_point + 1):
                 self.property_values[cp] = value
 
@@ -483,7 +483,7 @@ def get_extended_grapheme_cluster_rules_matrix(grapheme_cluster_break_property_t
             dict.fromkeys(any_value, None)
 
     # Iterate over rules in the order of increasing priority.
-    for firstList,action,secondList in reversed(rules):
+    for firstList, action, secondList in reversed(rules):
         for first in firstList:
             for second in secondList:
                 rules_matrix[first][second] = action

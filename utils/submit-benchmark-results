@@ -37,8 +37,8 @@ def capture_with_result(args, include_stderr=False):
             sys.exit('no such file or directory: %r when running %s.' % (
                 args[0], ' '.join(args)))
         raise
-    out,_ = p.communicate()
-    return out,p.wait()
+    out, _ = p.communicate()
+    return out, p.wait()
 
 def capture(args, include_stderr=False):
     """capture(command) - Run the given command (or argv list) in a shell and
@@ -119,10 +119,10 @@ def main():
    lnt_results['Machine'] = {
       'Name': machine_name,
       'Info': {
-         'hardware': capture(["uname","-m"], include_stderr=True).strip(),
-         'name': capture(["uname","-n"], include_stderr=True).strip(),
-         'os': capture(["uname","-sr"], include_stderr=True).strip(),
-         'uname': capture(["uname","-a"], include_stderr=True).strip(),
+         'hardware': capture(["uname", "-m"], include_stderr=True).strip(),
+         'name': capture(["uname", "-n"], include_stderr=True).strip(),
+         'os': capture(["uname", "-sr"], include_stderr=True).strip(),
+         'uname': capture(["uname", "-a"], include_stderr=True).strip(),
       }
    }
 
@@ -149,7 +149,7 @@ def main():
          continue
 
       # Extract the test name, which is encoded as 'suite :: name'.
-      test_name = 'nts.%s' % (test['name'].split('::',1)[1][1:],)
+      test_name = 'nts.%s' % (test['name'].split('::', 1)[1][1:],)
 
       # Convert this test to the 'nts' schema.
       compile_success = test['metrics'].get('compile_success', 1)
