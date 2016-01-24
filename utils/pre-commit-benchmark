@@ -70,7 +70,12 @@ def getWorkTreeSha():
 def buildBenchmarks(cacheDir, build_script_args):
     print('Building executables...')
 
-    configVars = {'SWIFT_INCLUDE_BENCHMARKS':'TRUE', 'SWIFT_INCLUDE_PERF_TESTSUITE':'TRUE', 'SWIFT_STDLIB_BUILD_TYPE':'RelWithDebInfo', 'SWIFT_STDLIB_ASSERTIONS':'FALSE'}
+    configVars = {
+        'SWIFT_INCLUDE_BENCHMARKS': 'TRUE',
+        'SWIFT_INCLUDE_PERF_TESTSUITE': 'TRUE',
+        'SWIFT_STDLIB_BUILD_TYPE': 'RelWithDebInfo',
+        'SWIFT_STDLIB_ASSERTIONS': 'FALSE'
+    }
 
     cmakeCache = os.path.join(buildDir, 'CMakeCache.txt')
 
@@ -227,9 +232,9 @@ def compareTimingsFiles(file1, file2):
         print(file1, "/", file2)
 
     rows = [["benchmark"]]
-    for i in range(0,runs):
+    for i in range(0, runs):
         rows[0].append("baserun%d" % i)
-    for i in range(0,runs):
+    for i in range(0, runs):
         rows[0].append("optrun%d" % i)
     rows[0] += ["delta", "speedup"]
 
