@@ -259,7 +259,8 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
         r = self.runCommand([self.tests[name].binary, str(scale),
                              self.tests[name].name])
         (testName, itersComputed, execTime) = self.parseBenchmarkOutput(r)
-        spent = int(execTime) / 1000000 # Convert ns to ms
+        # Convert ns to ms
+        spent = int(execTime) / 1000000
         if spent <= self.minIterTime:
           scale *= 2
         if scale > sys.maxint:

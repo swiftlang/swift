@@ -231,7 +231,8 @@ def tokenizeTemplate(templateText):
         if kind in ('literal', 'symbol'):
             if len(savedLiteral) == 0:
                 literalFirstMatch = m
-            savedLiteral.append(text) # literals and symbols get batched together
+            # literals and symbols get batched together
+            savedLiteral.append(text)
             pos = None
         else:
             # found a non-literal.  First yield any literal we've accumulated
@@ -248,7 +249,8 @@ def tokenizeTemplate(templateText):
         if pos is None:
             pos = m.end(0)
         else:
-            yield # Client is not yet ready to process next token
+            # Client is not yet ready to process next token
+            yield
 
     if savedLiteral != []:
         yield 'literal', ''.join(savedLiteral), literalFirstMatch
@@ -328,7 +330,8 @@ def splitGybLines(sourceLines):
             lastTokenText, lastTokenKind = tokenText, tokenKind
 
     except tokenize.TokenError:
-        return [] # Let the later compile() call report the error
+        # Let the later compile() call report the error
+        return []
 
     if lastTokenText == ':':
         unmatchedIndents.append(len(sourceLines))
@@ -459,7 +462,8 @@ class ParseContext:
             # Do we need to close the current lines?
             self.closeLines = kind == 'gybLinesClose'
 
-            if kind.endswith('Open'): # %{...}% and ${...} constructs
+            # %{...}% and ${...} constructs
+            if kind.endswith('Open'):
 
                 # Tokenize text that follows as Python up to an unmatched '}'
                 codeStart = self.tokenMatch.end(kind)
@@ -478,7 +482,8 @@ class ParseContext:
                     nextPos = m2.end(0)
                 else:
                     assert kind == 'substitutionOpen'
-                    nextPos = closePos + 1 # skip past the closing '}'
+                    # skip past the closing '}'
+                    nextPos = closePos + 1
 
                 # Resume tokenizing after the end of the code.
                 baseTokens.send(nextPos)

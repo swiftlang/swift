@@ -226,7 +226,8 @@ class Variant(Structure):
     def to_python_array(self):
         def applier(index, value, arr):
             arr.append(value.to_python_object())
-            return 1 # continue
+            # continue
+            return 1
         arr = []
         conf.lib.sourcekitd_variant_array_apply_f(self, callbacks['array_applier'](applier), arr)
         return arr
@@ -234,7 +235,8 @@ class Variant(Structure):
     def to_python_dictionary(self):
         def applier(cobj, value, d):
             d[str(UIdent(cobj))] = value.to_python_object()
-            return 1 # continue
+            # continue
+            return 1
         d = {}
         conf.lib.sourcekitd_variant_dictionary_apply_f(self, callbacks['dictionary_applier'](applier), d)
         return d
@@ -297,7 +299,7 @@ callbacks['dictionary_applier'] = CFUNCTYPE(c_int, c_object_p, Variant, py_objec
 functionList = [
   # FIXME: Fix PEP8 violation "continuation line under-indented for hanging
   #        indent" (E121) and remove "noqa" marker.
-  ("sourcekitd_cancel_request", # noqa
+  ("sourcekitd_cancel_request",  # noqa
   	[c_void_p]),
 
   ("sourcekitd_initialize",

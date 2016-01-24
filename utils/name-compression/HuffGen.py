@@ -31,10 +31,14 @@ sorted_chars = sorted(hist.items(), key=lambda x: x[1] * len(x[0]), reverse=True
 class Node:
   """ This is a node in the Huffman tree """
   def __init__(self, hits, value=None, l=None, r=None):
-    self.hit = hits  # Number of occurrences for this node.
-    self.left = l    # Left subtree.
-    self.right = r   # Right subtree.
-    self.val = value # Character value for leaf nodes.
+    # Number of occurrences for this node.
+    self.hit = hits
+    # Left subtree.
+    self.left = l
+    # Right subtree.
+    self.right = r
+    # Character value for leaf nodes.
+    self.val = value
 
   def merge(Left, Right):
     """ This is the merge phase of the huffman encoding algorithm

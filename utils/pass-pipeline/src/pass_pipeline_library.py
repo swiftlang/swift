@@ -78,7 +78,8 @@ def ssapass_passlist(optlevel):
         p.SILCombine,
         simplifycfg_silcombine_passlist(),
         p.GlobalLoadStoreOpts,
-        p.CodeMotion, # Need to add proper argument here
+        # Need to add proper argument here
+        p.CodeMotion,
         p.GlobalARCOpts,
         p.SpeculativeDevirtualizer,
         p.SILLinker,

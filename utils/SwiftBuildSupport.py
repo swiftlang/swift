@@ -11,9 +11,11 @@
 from __future__ import print_function
 
 try:
-    import ConfigParser # Python 2
+    # Python 2
+    import ConfigParser
 except ImportError:
-    import configparser as ConfigParser # Python 3
+    # Python 3
+    import configparser as ConfigParser
 
 import os
 import pipes
