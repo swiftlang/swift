@@ -1028,7 +1028,7 @@ void Decl::dump(raw_ostream &OS, unsigned Indent) const {
   llvm::SaveAndRestore<bool> X(getASTContext().LangOpts.DebugConstraintSolver,
                                true);
   PrintDecl(OS, Indent).visit(const_cast<Decl *>(this));
-  llvm::errs() << '\n';
+  OS << '\n';
 }
 
 /// Print the given declaration context (with its parents).
