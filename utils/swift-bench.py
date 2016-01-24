@@ -355,7 +355,7 @@ class TestResults:
   def Process(self):
     self.minimum = min(self.samples)
     self.maximum = max(self.samples)
-    self.avg = sum(self.samples)/len(self.samples)
+    self.avg = sum(self.samples) / len(self.samples)
     self.std = pstdev(self.samples)
     self.err = self.std / math.sqrt(len(self.samples))
     self.int_min = self.avg - self.err * 1.96
