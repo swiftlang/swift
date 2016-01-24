@@ -148,8 +148,9 @@ struct MaterializeForSetEmitter {
       // When we're emitting a standard implementation, use direct semantics.
       // If we used TheAccessSemantics::Ordinary here, the only downside would
       // be unnecessary vtable dispatching for class materializeForSets.
-      if (WitnessStorage->hasStorage() ||
-          WitnessStorage->hasAddressors())
+      if (!WitnessStorage->hasObservers() &&
+          (WitnessStorage->hasStorage() ||
+           WitnessStorage->hasAddressors()))
         TheAccessSemantics = AccessSemantics::DirectToStorage;
       else if (WitnessStorage->hasClangNode() ||
                WitnessStorage->getAttrs().hasAttribute<NSManagedAttr>())
