@@ -29,7 +29,8 @@ const std::vector<std::string> LangOptions::SupportedOSBuildConfigArguments = {
   "watchOS",
   "iOS",
   "Linux",
-  "FreeBSD"
+  "FreeBSD",
+  "Windows"
 };
 
 const std::vector<std::string> LangOptions::SupportedArchBuildConfigArguments = {
