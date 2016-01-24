@@ -49,7 +49,7 @@ struct WillSetDidSetStruct {
   }
 }
 
-struct WillSetDidSetClass {
+class WillSetDidSetClass {
   var x : Int {
     didSet {
       print("got \(x)")
@@ -119,26 +119,40 @@ func test() {
   // CHECK: 654321
   print(Bar.staticStoredBar)
   
-  
+
+  func increment(inout x: Int) {
+    x += 1
+  }
+
   var ds = WillSetDidSetStruct()
   print("start is \(ds.x)")
   ds.x = 42
+  print("now is \(ds.x)")
+  increment(&ds.x)
   print("now is \(ds.x)")
   
   // CHECK: start is 0
   // CHECK: from 0 to 42
   // CHECK: got 42
   // CHECK: now is 42
+  // CHECK: from 42 to 43
+  // CHECK: got 43
+  // CHECK: now is 43
 
-  var dsc = WillSetDidSetClass()
+  let dsc = WillSetDidSetClass()
   print("start is \(dsc.x)")
   dsc.x = 42
+  print("now is \(dsc.x)")
+  increment(&dsc.x)
   print("now is \(dsc.x)")
   
   // CHECK: start is 0
   // CHECK: from 0 to 42
   // CHECK: got 42
   // CHECK: now is 42
+  // CHECK: from 42 to 43
+  // CHECK: got 43
+  // CHECK: now is 43
 
 
   // Properties should be dynamically dispatched.
