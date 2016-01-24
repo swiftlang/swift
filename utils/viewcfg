@@ -125,9 +125,7 @@ def main():
             curBlock.addLine(line)
             blocks[blockName] = curBlock
 
-
     # Add empty blocks which we didn't see, but which are referenced.
-
     newBlocks = {}
     for name, block in blocks.iteritems():
         for adjName in (block.preds + block.getSuccs()):

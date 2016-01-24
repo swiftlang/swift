@@ -31,10 +31,14 @@ sorted_chars = sorted(hist.items(), key=lambda x: x[1] * len(x[0]), reverse=True
 class Node:
   """ This is a node in the Huffman tree """
   def __init__(self, hits, value=None, l=None, r=None):
-    self.hit = hits  # Number of occurrences for this node.
-    self.left = l    # Left subtree.
-    self.right = r   # Right subtree.
-    self.val = value # Character value for leaf nodes.
+    # Number of occurrences for this node.
+    self.hit = hits
+    # Left subtree.
+    self.left = l
+    # Right subtree.
+    self.right = r
+    # Character value for leaf nodes.
+    self.val = value
 
   def merge(Left, Right):
     """ This is the merge phase of the huffman encoding algorithm
@@ -104,7 +108,7 @@ charset = r"0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ$"
 nodes = []
 for c in sorted_chars:
   if c[0] in charset:
-    n = Node(c[1],c[0])
+    n = Node(c[1], c[0])
     heappush(nodes, n)
 
 # This is the Merge phase of the Huffman algorithm:
@@ -135,8 +139,8 @@ print "// The charset that the fragment indices can use:"
 print "const unsigned CharsetLength = %d;" % len(charset)
 print "const unsigned LongestEncodingLength = %d;" % (nodes[0].getMaxEncodingLength())
 print "const char *Charset = \"%s\";" % charset
-print "const int IndexOfChar[] =  {", ",".join(index_of_char),"};"
+print "const int IndexOfChar[] =  {", ",".join(index_of_char), "};"
 print "std::pair<char, unsigned> variable_decode(uint64_t tailbits) {\n", nodes[0].generate_decoder(0), "\n assert(false); return {0, 0};\n}"
-print "void variable_encode(uint64_t &bits, uint64_t &num_bits, char ch) {\n", nodes[0].generate_encoder([]),"assert(false);\n}"
+print "void variable_encode(uint64_t &bits, uint64_t &num_bits, char ch) {\n", nodes[0].generate_encoder([]), "assert(false);\n}"
 print "} // namespace"
 print "#endif /* SWIFT_MANGLER_HUFFMAN_H */"

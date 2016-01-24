@@ -41,8 +41,8 @@ Prefixes = {
 }
 
 Infixes = {
-  #Swift
-  "q_": "Generic Function"
+    #Swift
+    "q_": "Generic Function"
 }
 
 GenericFunctionPrefix = "__TTSg"

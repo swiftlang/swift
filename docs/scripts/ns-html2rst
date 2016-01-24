@@ -41,7 +41,7 @@ usage: nshtml2rst < NSString.html > NSString.rst
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE
     )
-    rst,stderr = p.communicate(html)
+    rst, stderr = p.communicate(html)
 
     # HACKETY HACK HACK: Our html documents apparently contain some
     # bogus heading level nesting.  Just fix up the one we know about

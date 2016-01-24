@@ -78,7 +78,8 @@ def all_integer_type_names():
     return [self_ty.stdlib_name for self_ty in all_integer_types(0)]
 
 def all_real_number_type_names():
-    return ['Float', 'Double'] # FIXME , 'Float80' Revert until I figure out a test failure  # Float80 for i386 & x86_64
+    # FIXME , 'Float80' Revert until I figure out a test failure  # Float80 for i386 & x86_64
+    return ['Float', 'Double']
 
 def all_numeric_type_names():
     return all_integer_type_names() + all_real_number_type_names()

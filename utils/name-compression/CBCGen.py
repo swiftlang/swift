@@ -10,6 +10,8 @@ if len(filenames) == 0:
   sys.exit(1)
 
 hist = defaultdict(int)
+
+
 def collect_top_entries(val):
   """
   Collect the most frequent substrings and organize them in a table.
@@ -102,7 +104,8 @@ escape_char1 = 'J'
 
 # notice that Y and J are missing because they are escape chars:
 charset = r"0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIKLMNOPQRSTUVWXZ$"
-encoders = [c for c in charset] # alphabet without the escape chars.
+# alphabet without the escape chars.
+encoders = [c for c in charset]
 enc_len = len(encoders)
 
 # Take the most frequent entries from the table that fit into the range of
@@ -153,7 +156,7 @@ class Trie:
     """
     sb = ""
     space = " " * depth
-    for opt,node in self.children.iteritems():
+    for opt, node in self.children.iteritems():
       sb += space + "if ((%d < n) && (str[%d] == '%s')) {\n" % (depth, depth, opt)
       sb += space + node.generate(depth + 1)
       sb += space + "}\n"
@@ -186,13 +189,13 @@ print "namespace CBC {"
 print "// The charset that the fragment indices can use:"
 print "const unsigned CharsetLength = %d;" % len(charset)
 print "const char *Charset = \"%s\";" % charset
-print "const int IndexOfChar[] =  {", ",".join(index_of_char),"};"
+print "const int IndexOfChar[] =  {", ",".join(index_of_char), "};"
 print "const char EscapeChar0 = '%s';" % escape_char0
 print "const char EscapeChar1 = '%s';" % escape_char1
 print "// The Fragments:"
 print "const unsigned NumFragments = ", len(string_key_list), ";"
-print "const char* CodeBook[] = {", ",".join(string_key_list),"};"
-print "const unsigned CodeBookLen[] = {", ",".join(string_length_table),"};"
+print "const char* CodeBook[] = {", ",".join(string_key_list), "};"
+print "const unsigned CodeBookLen[] = {", ",".join(string_length_table), "};"
 print TrieHead.generateHeader()
 print TrieHead.generate(0)
 print TrieHead.generateFooter()

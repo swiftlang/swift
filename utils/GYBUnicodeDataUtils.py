@@ -45,19 +45,19 @@ class GraphemeClusterBreakPropertyTable(UnicodeProperty):
     # reason for either of those to differ, then this mapping can be overridden
     # after an instance of this class is created.
     numeric_value_table = {
-      'Other': 0,
-      'CR': 1,
-      'LF': 2,
-      'Control': 3,
-      'Extend': 4,
-      'Regional_Indicator': 5,
-      'Prepend': 6,
-      'SpacingMark': 7,
-      'L': 8,
-      'V': 9,
-      'T': 10,
-      'LV': 11,
-      'LVT': 12,
+        'Other': 0,
+        'CR': 1,
+        'LF': 2,
+        'Control': 3,
+        'Extend': 4,
+        'Regional_Indicator': 5,
+        'Prepend': 6,
+        'SpacingMark': 7,
+        'L': 8,
+        'V': 9,
+        'T': 10,
+        'LV': 11,
+        'LVT': 12,
     }
 
     def __init__(self, grapheme_break_property_file_name):
@@ -65,7 +65,7 @@ class GraphemeClusterBreakPropertyTable(UnicodeProperty):
         # values to symbolic values.
         self.symbolic_values = \
             [None] * (max(self.numeric_value_table.values()) + 1)
-        for k,v in self.numeric_value_table.items():
+        for k, v in self.numeric_value_table.items():
             self.symbolic_values[v] = k
 
         # Load the data file.
@@ -96,7 +96,7 @@ class GraphemeClusterBreakPropertyTable(UnicodeProperty):
         for cp in range(0, 0x110000):
             self.property_values[cp] = self.get_default_value()
 
-        for start_code_point,end_code_point,value in self.property_value_ranges:
+        for start_code_point, end_code_point, value in self.property_value_ranges:
             for cp in range(start_code_point, end_code_point + 1):
                 self.property_values[cp] = value
 
@@ -463,17 +463,17 @@ def get_extended_grapheme_cluster_rules_matrix(grapheme_cluster_break_property_t
     # As in the referenced document, the rules are specified in order of
     # decreasing priority.
     rules = [
-      (['CR'], 'no_boundary', ['LF']),
-      (['Control', 'CR', 'LF'], 'boundary', any_value),
-      (any_value, 'boundary', ['Control', 'CR', 'LF']),
-      (['L'], 'no_boundary', ['L', 'V', 'LV', 'LVT']),
-      (['LV', 'V'], 'no_boundary', ['V', 'T']),
-      (['LVT', 'T'], 'no_boundary', ['T']),
-      (['Regional_Indicator'], 'no_boundary', ['Regional_Indicator']),
-      (any_value, 'no_boundary', ['Extend']),
-      (any_value, 'no_boundary', ['SpacingMark']),
-      (['Prepend'], 'no_boundary', any_value),
-      (any_value, 'boundary', any_value),
+        (['CR'], 'no_boundary', ['LF']),
+        (['Control', 'CR', 'LF'], 'boundary', any_value),
+        (any_value, 'boundary', ['Control', 'CR', 'LF']),
+        (['L'], 'no_boundary', ['L', 'V', 'LV', 'LVT']),
+        (['LV', 'V'], 'no_boundary', ['V', 'T']),
+        (['LVT', 'T'], 'no_boundary', ['T']),
+        (['Regional_Indicator'], 'no_boundary', ['Regional_Indicator']),
+        (any_value, 'no_boundary', ['Extend']),
+        (any_value, 'no_boundary', ['SpacingMark']),
+        (['Prepend'], 'no_boundary', any_value),
+        (any_value, 'boundary', any_value),
     ]
 
     # Expand the rules into a matrix.
@@ -483,7 +483,7 @@ def get_extended_grapheme_cluster_rules_matrix(grapheme_cluster_break_property_t
             dict.fromkeys(any_value, None)
 
     # Iterate over rules in the order of increasing priority.
-    for firstList,action,secondList in reversed(rules):
+    for firstList, action, secondList in reversed(rules):
         for first in firstList:
             for second in secondList:
                 rules_matrix[first][second] = action

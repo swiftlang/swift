@@ -128,7 +128,7 @@ def tokenizePythonToUnmatchedCloseCurly(sourceText, start, lineStarts):
 
     try:
         for kind, text, tokenStart, tokenEnd, lineText \
-            in tokenize.generate_tokens(stream.readline):
+                in tokenize.generate_tokens(stream.readline):
 
             if text == '{':
                 nesting += 1
@@ -225,13 +225,14 @@ def tokenizeTemplate(templateText):
 
         # pull out the one matched key (ignoring internal patterns starting with _)
         ((kind, text), ) = (
-            (kind,text) for (kind,text) in m.groupdict().items()
+            (kind, text) for (kind, text) in m.groupdict().items()
             if text is not None and kind[0] != '_')
 
         if kind in ('literal', 'symbol'):
             if len(savedLiteral) == 0:
                 literalFirstMatch = m
-            savedLiteral.append(text) # literals and symbols get batched together
+            # literals and symbols get batched together
+            savedLiteral.append(text)
             pos = None
         else:
             # found a non-literal.  First yield any literal we've accumulated
@@ -248,7 +249,8 @@ def tokenizeTemplate(templateText):
         if pos is None:
             pos = m.end(0)
         else:
-            yield # Client is not yet ready to process next token
+            # Client is not yet ready to process next token
+            yield
 
     if savedLiteral != []:
         yield 'literal', ''.join(savedLiteral), literalFirstMatch
@@ -301,13 +303,13 @@ def splitGybLines(sourceLines):
     >>> src[s[1]]
     '        print 1\n'
     """
-    lastTokenText,lastTokenKind = None,None
+    lastTokenText, lastTokenKind = None, None
     unmatchedIndents = []
 
     dedents = 0
     try:
         for tokenKind, tokenText, tokenStart, (tokenEndLine, tokenEndCol), lineText \
-            in tokenize.generate_tokens(lambda i=iter(sourceLines): next(i)):
+                in tokenize.generate_tokens(lambda i=iter(sourceLines): next(i)):
 
             if tokenKind in (tokenize.COMMENT, tokenize.ENDMARKER):
                 continue
@@ -328,7 +330,8 @@ def splitGybLines(sourceLines):
             lastTokenText, lastTokenKind = tokenText, tokenKind
 
     except tokenize.TokenError:
-        return [] # Let the later compile() call report the error
+        # Let the later compile() call report the error
+        return []
 
     if lastTokenText == ':':
         unmatchedIndents.append(len(sourceLines))
@@ -350,7 +353,7 @@ def codeStartsWithDedentKeyword(sourceLines):
     """
     tokenText = None
     for tokenKind, tokenText, _, _, _ \
-        in tokenize.generate_tokens(lambda i=iter(sourceLines): next(i)):
+            in tokenize.generate_tokens(lambda i=iter(sourceLines): next(i)):
 
         if tokenKind != tokenize.COMMENT and tokenText.strip() != '':
             break
@@ -459,7 +462,8 @@ class ParseContext:
             # Do we need to close the current lines?
             self.closeLines = kind == 'gybLinesClose'
 
-            if kind.endswith('Open'): # %{...}% and ${...} constructs
+            # %{...}% and ${...} constructs
+            if kind.endswith('Open'):
 
                 # Tokenize text that follows as Python up to an unmatched '}'
                 codeStart = self.tokenMatch.end(kind)
@@ -478,7 +482,8 @@ class ParseContext:
                     nextPos = m2.end(0)
                 else:
                     assert kind == 'substitutionOpen'
-                    nextPos = closePos + 1 # skip past the closing '}'
+                    # skip past the closing '}'
+                    nextPos = closePos + 1
 
                 # Resume tokenizing after the end of the code.
                 baseTokens.send(nextPos)
@@ -513,7 +518,6 @@ class ParseContext:
             else:
                 yield self.tokenKind
 
-
     def nextToken(self):
         """Move to the next token"""
         for kind in self.tokens:
@@ -533,7 +537,7 @@ class ExecutionContext:
     def appendText(self, text, file, line):
         # see if we need to inject a line marker
         if self.lineDirective:
-            if (file,line) != self.lastFileLine:
+            if (file, line) != self.lastFileLine:
                 # We can only insert the line directive at a line break
                 if len(self.resultText) == 0 \
                    or self.resultText[-1].endswith('\n'):

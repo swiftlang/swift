@@ -134,7 +134,8 @@ for m in re.finditer(protocolsAndOperators, sourceSansComments, reFlags):
 
 # Find clusters of protocols that have the same name when underscores
 # are stripped
-clusterBuilder = {} # map from potential cluster name to nodes in the cluster
+# map from potential cluster name to nodes in the cluster
+clusterBuilder = {}
 for n in graph:
     clusterBuilder.setdefault(n.translate(None, '_'), set()).add(n)
 
@@ -148,7 +149,8 @@ clusterEdges = set(
     for t in graph[s] if t in elements)
 
 print('digraph ProtocolHierarchies {')
-print('  mclimit = 100; ranksep=1.5; ') # ; packmode="array1"
+# ; packmode="array1"
+print('  mclimit = 100; ranksep=1.5; ')
 print('  edge [dir="back"];')
 print('  node [shape = box, fontname = Helvetica, fontsize = 10];')
 

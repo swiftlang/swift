@@ -142,7 +142,6 @@ def main():
         print("--verify-build-dir and --verify-xcode can't be used together")
         return 1
 
-
     if args.verify_build_dir is not None:
         commands = get_verify_build_dir_commands(args.verify_build_dir)
 
