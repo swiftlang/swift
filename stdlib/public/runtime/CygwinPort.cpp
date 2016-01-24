@@ -85,6 +85,8 @@ int swift::_swift_dl_iterate_phdr(int (*Callback)(struct dl_phdr_info *info,
 
 uint8_t *swift::_swift_getSectionDataPE(void *handle, const char *sectionName,
                                         unsigned long *sectionSize) {
+  // In Cygwin, dlopen() returns PE/COFF image pointer.
+  // This is relying on undocumented feature of Windows API LoadLibrary().
   unsigned char *peStart = (unsigned char *)handle;
 
   int ntHeadersOffset = peStart[0x3C];
