@@ -189,6 +189,23 @@ void TypeChecker::forceExternalDeclMembers(NominalTypeDecl *nominalDecl) {
   }
 }
 
+static Optional<Type>
+resolveAssociatedTypeInContext(TypeChecker &TC, AssociatedTypeDecl *assocType,
+                               DeclContext *DC, GenericTypeResolver *resolver) {
+  auto protoSelf = DC->getProtocolSelf();
+  auto selfTy = protoSelf->getDeclaredType()->castTo<GenericTypeParamType>();
+  auto baseTy = resolver->resolveGenericTypeParamType(selfTy);
+
+  if (baseTy->isTypeParameter())
+    return resolver->resolveSelfAssociatedType(baseTy, DC, assocType);
+
+  if (assocType->getDeclContext() != DC)
+    return TC.substMemberTypeWithBase(DC->getParentModule(), assocType,
+                                      protoSelf->getArchetype(),
+                                      /*isTypeReference=*/true);
+  return None;
+}
+
 Type TypeChecker::resolveTypeInContext(
        TypeDecl *typeDecl,
        DeclContext *fromDC,
@@ -276,43 +293,59 @@ Type TypeChecker::resolveTypeInContext(
     assert(!fromDC->isModuleContext());
   }
 
-  // If we found an associated type in an inherited protocol, the base
-  // for our reference to this associated type is our own 'Self'.
-  auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl);
-  if (assocType) {
-    // If we found an associated type from within its protocol, resolve it
-    // as a dependent member relative to Self if Self is still dependent.
-    if (fromDC->isProtocolOrProtocolExtensionContext()) {
-      auto selfTy = fromDC->getProtocolSelf()->getDeclaredType()
-                      ->castTo<GenericTypeParamType>();
-      auto baseTy = resolver->resolveGenericTypeParamType(selfTy);
-
-      if (baseTy->isTypeParameter()) {
-        return resolver->resolveSelfAssociatedType(baseTy, fromDC, assocType);
-      }
-    }
-
-    if (typeDecl->getDeclContext() != fromDC) {
-      if (fromDC->isProtocolOrProtocolExtensionContext()) {
-        return substMemberTypeWithBase(fromDC->getParentModule(),
-                                       typeDecl,
-                                       fromDC->getProtocolSelf()
-                                         ->getArchetype(),
-                                       /*isTypeReference=*/true);
-      }
-    }
-  }
-
   // Walk up through the type scopes to find the context where the type
   // declaration was found. When we find it, substitute the appropriate base
   // type.
   auto ownerNominal = ownerDC->isNominalTypeOrNominalTypeExtensionContext();
   assert(ownerNominal && "Owner must be a nominal type");
+  auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl);
   for (auto parentDC = fromDC; !parentDC->isModuleContext();
        parentDC = parentDC->getParent()) {
     // Skip non-type contexts.
     if (!parentDC->isTypeContext())
       continue;
+
+    // If we found an associated type in an inherited protocol, the base for our
+    // reference to this associated type is our own `Self`. If we can't resolve
+    // the associated type during this iteration, try again on the next.
+    if (assocType) {
+      if (auto proto = parentDC->isProtocolOrProtocolExtensionContext()) {
+        auto assocProto = assocType->getProtocol();
+        if (proto == assocProto || proto->inheritsFrom(assocProto)) {
+          // If the associated type is from our own protocol or we inherit from
+          // the associated type's protocol, resolve it
+          if (auto resolved = resolveAssociatedTypeInContext(
+                  *this, assocType, parentDC, resolver))
+            return *resolved;
+
+        } else if (auto ED = dyn_cast<ExtensionDecl>(parentDC)) {
+          // Otherwise, if we are in an extension there might be other
+          // associated types brought into the context through
+          // `extension ... where Self : SomeProtocol`
+          for (auto req : ED->getGenericParams()->getTrailingRequirements()) {
+            // Reject requirements other than constraints with an subject other
+            // than `Self`
+            if (req.getKind() != RequirementReprKind::TypeConstraint ||
+                !req.getSubject()->castTo<ArchetypeType>()->isSelfDerived())
+              continue;
+
+            // If the associated type is defined in the same protocol which is
+            // required for this extension, or if the required protocol inherits
+            // from the protocol the associated type is declared in, we can
+            // resolve the associated type with our `Self` as the reference
+            // point.
+            auto reqProto =
+                req.getConstraint()->castTo<ProtocolType>()->getDecl();
+            if (reqProto == assocProto || reqProto->inheritsFrom(assocProto)) {
+              if (auto resolved = resolveAssociatedTypeInContext(
+                      *this, assocType, parentDC, resolver))
+                return *resolved;
+              break;
+            }
+          }
+        }
+      }
+    }
 
     // Search the type of this context and its supertypes.
     llvm::SmallPtrSet<const NominalTypeDecl *, 8> visited;
