@@ -678,6 +678,7 @@ namespace {
     CC_OneGenericArgumentMismatch,     ///< All arguments except one match, guessing generic binding.
     CC_ArgumentNearMismatch,    ///< Argument list mismatch, near miss.
     CC_ArgumentMismatch,        ///< Argument list mismatch.
+    CC_GenericNonsubstitutableMismatch, ///< Arguments match each other, but generic binding not substitutable.
     CC_ArgumentLabelMismatch,   ///< Argument label mismatch.
     CC_ArgumentCountMismatch,   ///< This candidate has wrong # arguments.
     CC_GeneralMismatch          ///< Something else is wrong.
@@ -860,6 +861,11 @@ namespace {
     /// argument labels don't match up, diagnose that error and return true.
     bool diagnoseAnyStructuralArgumentError(Expr *fnExpr, Expr *argExpr);
     
+    /// If the candidate set has been narrowed to a single parameter or single
+    /// archetype that has argument type errors, diagnose that error and
+    /// return true.
+    bool diagnoseGenericParameterErrors(Expr *badArgExpr);
+    
     /// Emit a diagnostic and return true if this is an error condition we can
     /// handle uniformly.  This should be called after filtering the candidate
     /// list.
@@ -1023,6 +1029,11 @@ CalleeCandidateInfo::evaluateCloseness(Type candArgListType,
   // type variables for all generics and solve it with the given argument types.
   Type singleArchetype = nullptr;
   Type matchingArgType = nullptr;
+
+  // Number of args of generic archetype which are mismatched because
+  // isSubstitutableFor() has failed. If all mismatches are of this type, we'll
+  // return a different closeness for better diagnoses.
+  unsigned nonSubstitutableArgs = 0;
   
   // We classify an argument mismatch as being a "near" miss if it is a very
   // likely match due to a common sort of problem (e.g. wrong flags on a
@@ -1061,19 +1072,36 @@ CalleeCandidateInfo::evaluateCloseness(Type candArgListType,
             // Multiple archetypes, too complicated.
             return { CC_ArgumentMismatch, {}};
           if (rArgType->isEqual(matchingArgType)) {
-            continue;
+            if (nonSubstitutableArgs == 0)
+              continue;
+            ++nonSubstitutableArgs;
+            // Fallthrough, this is nonsubstitutable, so mismatches as well.
           } else {
-            paramType = matchingArgType;
-            // Fallthrough as mismatched arg, comparing nearness to archetype
-            // bound type.
+            if (nonSubstitutableArgs == 0) {
+              paramType = matchingArgType;
+              // Fallthrough as mismatched arg, comparing nearness to archetype
+              // bound type.
+            } else if (nonSubstitutableArgs == 1) {
+              // If we have only one nonSubstitutableArg so far, then this different
+              // type might be the one that we should be substituting for instead.
+              // Note that failureInfo is already set correctly for that case.
+              auto archetype = paramType->castTo<ArchetypeType>();
+              if (CS->TC.isSubstitutableFor(rArgType, archetype, CS->DC)) {
+                mismatchesAreNearMisses = argumentMismatchIsNearMiss(matchingArgType, rArgType);
+                matchingArgType = rArgType;
+                continue;
+              }
+            }
           }
         } else {
+          matchingArgType = rArgType;
+          singleArchetype = paramType;
+
           auto archetype = paramType->getAs<ArchetypeType>();
           if (CS->TC.isSubstitutableFor(rArgType, archetype, CS->DC)) {
-            matchingArgType = rArgType;
-            singleArchetype = paramType;
             continue;
           }
+          ++nonSubstitutableArgs;
         }
       }
       
@@ -1109,6 +1137,9 @@ CalleeCandidateInfo::evaluateCloseness(Type candArgListType,
     // Return information about the single failing argument.
     return { closeness, failureInfo };
   }
+    
+  if (nonSubstitutableArgs == mismatchingArgs)
+    return { CC_GenericNonsubstitutableMismatch, failureInfo };
   
   auto closeness = mismatchesAreNearMisses ? CC_ArgumentNearMismatch
                                            : CC_ArgumentMismatch;
@@ -1622,6 +1653,32 @@ bool CalleeCandidateInfo::diagnoseAnyStructuralArgumentError(Expr *fnExpr,
     return true;
   }
   return false;
+}
+
+/// If the candidate set has been narrowed to a single parameter or single
+/// archetype that has argument type errors, diagnose that error and
+/// return true.
+bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
+  bool foundFailure = false;
+  Type paramType = failedArgument.parameterType;
+  Type argType = badArgExpr->getType();
+  if (paramType->is<ArchetypeType>() && !argType->hasTypeVariable() &&
+      // FIXME: For protocol argument types, could add specific error
+      // similar to could_not_use_member_on_existential.
+      !argType->is<ProtocolType>() && !argType->is<ProtocolCompositionType>()) {
+    auto archetype = paramType->castTo<ArchetypeType>();
+    
+    // FIXME: Add specific error for not subclass, if the archetype has a superclass?
+    
+    for (auto proto : archetype->getConformsTo()) {
+      if (!CS->TC.conformsToProtocol(argType, proto, CS->DC, ConformanceCheckOptions(TR_InExpression))) {
+        CS->TC.diagnose(badArgExpr->getLoc(), diag::cannot_convert_argument_value_protocol,
+                        argType, proto->getDeclaredType());
+        foundFailure = true;
+      }
+    }
+  }
+  return foundFailure;
 }
 
 /// Emit a diagnostic and return true if this is an error condition we can
@@ -3640,7 +3697,8 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   if ((calleeInfo.closeness == CC_OneArgumentMismatch ||
        calleeInfo.closeness == CC_OneArgumentNearMismatch ||
        calleeInfo.closeness == CC_OneGenericArgumentMismatch ||
-       calleeInfo.closeness == CC_OneGenericArgumentNearMismatch) &&
+       calleeInfo.closeness == CC_OneGenericArgumentNearMismatch ||
+       calleeInfo.closeness == CC_GenericNonsubstitutableMismatch) &&
       calleeInfo.failedArgument.isValid()) {
     // Map the argument number into an argument expression.
     TCCOptions options = TCC_ForceRecheck;
@@ -3663,9 +3721,13 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     // Re-type-check the argument with the expected type of the candidate set.
     // This should produce a specific and tailored diagnostic saying that the
     // type mismatches with expectations.
-    if (!typeCheckChildIndependently(badArgExpr,
-                                     calleeInfo.failedArgument.parameterType,
+    Type paramType = calleeInfo.failedArgument.parameterType;
+    if (!typeCheckChildIndependently(badArgExpr, paramType,
                                      CTP_CallArgument, options))
+      return true;
+
+    // If that fails, it could be that the argument doesn't conform to an archetype.
+    if (calleeInfo.diagnoseGenericParameterErrors(badArgExpr))
       return true;
   }
       
@@ -4558,6 +4620,7 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
   case CC_OneArgumentNearMismatch:
   case CC_OneGenericArgumentMismatch:
   case CC_OneGenericArgumentNearMismatch:
+  case CC_GenericNonsubstitutableMismatch:
   case CC_SelfMismatch:        // Self argument mismatches.
   case CC_ArgumentNearMismatch:// Argument list mismatch.
   case CC_ArgumentMismatch:    // Argument list mismatch.

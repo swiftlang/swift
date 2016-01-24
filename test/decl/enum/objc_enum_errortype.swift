@@ -24,5 +24,4 @@ acceptBridgeableNSError(E2.A)
 }
 
 acceptBridgeableNSError(E3.A)
-// expected-error@-1{{cannot invoke 'acceptBridgeableNSError' with an argument list of type '(E3)'}}
-// expected-note@-2{{expected an argument list of type '(E)'}}
+// expected-error@-1{{argument type 'E3' does not conform to expected type '_ObjectiveCBridgeableErrorType'}}
