@@ -226,7 +226,7 @@ extension CollectionType where SubSequence == Self {
   /// If `!self.isEmpty`, remove the first element and return it, otherwise
   /// return `nil`.
   ///
-  /// - Complexity: O(`self.count`)
+  /// - Complexity: O(1)
   @warn_unused_result
   public mutating func popFirst() -> Generator.Element? {
     guard !isEmpty else { return nil }
@@ -234,17 +234,19 @@ extension CollectionType where SubSequence == Self {
     self = self[startIndex.successor()..<endIndex]
     return element
   }
+}
 
+extension CollectionType where
+    SubSequence == Self, Index : BidirectionalIndexType {
   /// If `!self.isEmpty`, remove the last element and return it, otherwise
   /// return `nil`.
   ///
-  /// - Complexity: O(`self.count`)
+  /// - Complexity: O(1)
   @warn_unused_result
   public mutating func popLast() -> Generator.Element? {
     guard !isEmpty else { return nil }
-    let lastElementIndex = startIndex.advancedBy(numericCast(count) - 1)
-    let element = self[lastElementIndex]
-    self = self[startIndex..<lastElementIndex]
+    let element = last!
+    self = self[startIndex..<endIndex.predecessor()]
     return element
   }
 }

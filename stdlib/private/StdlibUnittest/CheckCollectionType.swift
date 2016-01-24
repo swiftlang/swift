@@ -773,6 +773,44 @@ self.test("\(testNamePrefix).removeFirst(n: Int)/slice/removeTooMany/semantics")
 }
 
 //===----------------------------------------------------------------------===//
+// popFirst()/slice
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).popFirst()/slice/semantics") {
+  // This can just reuse the test data for removeFirst()
+  for test in removeFirstTests.filter({ $0.numberToRemove == 1 }) {
+    let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
+    var slice = c[c.startIndex..<c.endIndex]
+    let survivingIndices = Array(slice.startIndex.successor()..<slice.endIndex)
+    let removedElement = slice.popFirst()!
+    expectEqual(test.collection.first, extractValue(removedElement).value)
+    expectEqualSequence(
+      test.expectedCollection,
+      slice.map { extractValue($0).value },
+      "popFirst() shouldn't mutate the tail of the slice",
+      stackTrace: SourceLocStack().with(test.loc)
+    )
+    expectEqualSequence(
+      test.expectedCollection,
+      survivingIndices.map { extractValue(slice[$0]).value },
+      "popFirst() shouldn't invalidate indices",
+      stackTrace: SourceLocStack().with(test.loc)
+    )
+    expectEqualSequence(
+      test.collection,
+      c.map { extractValue($0).value },
+      "popFirst() shouldn't mutate the collection that was sliced",
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+self.test("\(testNamePrefix).popFirst()/slice/empty/semantics") {
+  let c = makeWrappedCollection(Array<OpaqueValue<Int>>())
+  var slice = c[c.startIndex..<c.startIndex]
+  expectEmpty(slice.popFirst())
+}
+
+//===----------------------------------------------------------------------===//
 
   } // addForwardCollectionTests
 
@@ -946,6 +984,51 @@ self.test("\(testNamePrefix).removeLast(n: Int)/slice/removeTooMany/semantics") 
   expectCrashLater()
   slice.removeLast(3) // Should trap.
 }
+
+//===----------------------------------------------------------------------===//
+// popLast()/slice
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).popLast()/slice/semantics") {
+  // This can just reuse the test data for removeLast()
+  for test in removeLastTests.filter({ $0.numberToRemove == 1 }) {
+    let c = makeWrappedCollection(test.collection)
+    var slice = c[c.startIndex..<c.endIndex]
+    let survivingIndices =
+      Array(
+        slice.startIndex ..<
+        slice.endIndex.advancedBy(numericCast(-test.numberToRemove))
+      )
+    let removedElement = slice.popLast()!
+    expectEqual(
+      test.collection.last!.value,
+      extractValue(removedElement).value)
+    expectEqualSequence(
+      test.expectedCollection,
+      slice.map { extractValue($0).value },
+      "popLast() shouldn't mutate the head of the slice",
+      stackTrace: SourceLocStack().with(test.loc)
+    )
+    expectEqualSequence(
+      test.expectedCollection,
+      survivingIndices.map { extractValue(slice[$0]).value },
+      "popLast() shouldn't invalidate indices",
+      stackTrace: SourceLocStack().with(test.loc)
+    )
+    expectEqualSequence(
+      test.collection.map { $0.value },
+      c.map { extractValue($0).value },
+      "popLast() shouldn't mutate the collection that was sliced",
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+self.test("\(testNamePrefix).popLast()/slice/empty/semantics") {
+  let c = makeWrappedCollection(Array<OpaqueValue<Int>>())
+  var slice = c[c.startIndex..<c.startIndex]
+  expectEmpty(slice.popLast())
+}
+
 
 //===----------------------------------------------------------------------===//
 // Index
