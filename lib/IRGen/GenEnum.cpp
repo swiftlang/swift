@@ -2323,7 +2323,7 @@ namespace {
           }
 
           // If neither destination nor source have payloads, we can just
-          // primitive- store the new empty-case value.
+          // primitive-store the new empty-case value.
           IGF.Builder.emitBlock(noDestNoSrcPayloadBB);
           {
             ConditionalDominanceScope noDestNoSrcCondition(IGF);
