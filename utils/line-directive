@@ -21,8 +21,7 @@ import re
 import bisect
 import subprocess
 
-line_pattern = re.compile(
- r'^// ###line ([0-9]+) "([^"]+)"\s*')
+line_pattern = re.compile(r'^// ###line ([0-9]+) "([^"]+)"\s*')
 
 def _make_line_map(filename, stream=None):
     """

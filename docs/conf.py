@@ -100,10 +100,10 @@ html_style = 'swift.css'
 # further.  For a list of options available for each theme, see the
 # documentation.
 html_theme_options = {
-  # Red links are a bit too garish
-  "linkcolor": "#577492",
-  "visitedlinkcolor": "#577492",
-  "hoverlinkcolor": "#551A8B"
+    # Red links are a bit too garish
+    "linkcolor": "#577492",
+    "visitedlinkcolor": "#577492",
+    "hoverlinkcolor": "#551A8B"
 }
 
 # Add any paths that contain custom themes here, relative to this directory.
@@ -191,8 +191,8 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('contents', 'Swift.tex', u'Swift Documentation',
-   u'LLVM project', 'manual'),
+    ('contents', 'Swift.tex', u'Swift Documentation',
+     u'LLVM project', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -235,9 +235,9 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  ('contents', 'Swift', u'Swift Documentation',
-   u'LLVM project', 'Swift', 'One line description of project.',
-   'Miscellaneous'),
+    ('contents', 'Swift', u'Swift Documentation',
+     u'LLVM project', 'Swift', 'One line description of project.',
+     'Miscellaneous'),
 ]
 
 # Documents to append as an appendix to all manuals.

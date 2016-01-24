@@ -45,19 +45,19 @@ class GraphemeClusterBreakPropertyTable(UnicodeProperty):
     # reason for either of those to differ, then this mapping can be overridden
     # after an instance of this class is created.
     numeric_value_table = {
-      'Other': 0,
-      'CR': 1,
-      'LF': 2,
-      'Control': 3,
-      'Extend': 4,
-      'Regional_Indicator': 5,
-      'Prepend': 6,
-      'SpacingMark': 7,
-      'L': 8,
-      'V': 9,
-      'T': 10,
-      'LV': 11,
-      'LVT': 12,
+        'Other': 0,
+        'CR': 1,
+        'LF': 2,
+        'Control': 3,
+        'Extend': 4,
+        'Regional_Indicator': 5,
+        'Prepend': 6,
+        'SpacingMark': 7,
+        'L': 8,
+        'V': 9,
+        'T': 10,
+        'LV': 11,
+        'LVT': 12,
     }
 
     def __init__(self, grapheme_break_property_file_name):
@@ -463,17 +463,17 @@ def get_extended_grapheme_cluster_rules_matrix(grapheme_cluster_break_property_t
     # As in the referenced document, the rules are specified in order of
     # decreasing priority.
     rules = [
-      (['CR'], 'no_boundary', ['LF']),
-      (['Control', 'CR', 'LF'], 'boundary', any_value),
-      (any_value, 'boundary', ['Control', 'CR', 'LF']),
-      (['L'], 'no_boundary', ['L', 'V', 'LV', 'LVT']),
-      (['LV', 'V'], 'no_boundary', ['V', 'T']),
-      (['LVT', 'T'], 'no_boundary', ['T']),
-      (['Regional_Indicator'], 'no_boundary', ['Regional_Indicator']),
-      (any_value, 'no_boundary', ['Extend']),
-      (any_value, 'no_boundary', ['SpacingMark']),
-      (['Prepend'], 'no_boundary', any_value),
-      (any_value, 'boundary', any_value),
+        (['CR'], 'no_boundary', ['LF']),
+        (['Control', 'CR', 'LF'], 'boundary', any_value),
+        (any_value, 'boundary', ['Control', 'CR', 'LF']),
+        (['L'], 'no_boundary', ['L', 'V', 'LV', 'LVT']),
+        (['LV', 'V'], 'no_boundary', ['V', 'T']),
+        (['LVT', 'T'], 'no_boundary', ['T']),
+        (['Regional_Indicator'], 'no_boundary', ['Regional_Indicator']),
+        (any_value, 'no_boundary', ['Extend']),
+        (any_value, 'no_boundary', ['SpacingMark']),
+        (['Prepend'], 'no_boundary', any_value),
+        (any_value, 'boundary', any_value),
     ]
 
     # Expand the rules into a matrix.

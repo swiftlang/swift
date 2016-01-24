@@ -117,26 +117,26 @@ def main():
    # Create the LNT report format.
    lnt_results = {}
    lnt_results['Machine'] = {
-      'Name': machine_name,
-      'Info': {
-         'hardware': capture(["uname", "-m"], include_stderr=True).strip(),
-         'name': capture(["uname", "-n"], include_stderr=True).strip(),
-         'os': capture(["uname", "-sr"], include_stderr=True).strip(),
-         'uname': capture(["uname", "-a"], include_stderr=True).strip(),
-      }
+       'Name': machine_name,
+       'Info': {
+           'hardware': capture(["uname", "-m"], include_stderr=True).strip(),
+           'name': capture(["uname", "-n"], include_stderr=True).strip(),
+           'os': capture(["uname", "-sr"], include_stderr=True).strip(),
+           'uname': capture(["uname", "-a"], include_stderr=True).strip(),
+       }
    }
 
    # FIXME: Record source versions for LLVM, Swift, etc.?
    lnt_results['Run'] = {
-      'Start Time': start_time.strftime('%Y-%m-%d %H:%M:%S'),
-      'End Time': end_time.strftime('%Y-%m-%d %H:%M:%S'),
-      'Info': {
-         '__report_version__': '1',
-         'tag': 'nts',
-         'inferred_run_order': run_order,
-         'run_order': run_order,
-         'sw_vers': capture(['sw_vers'], include_stderr=True).strip(),
-      }
+       'Start Time': start_time.strftime('%Y-%m-%d %H:%M:%S'),
+       'End Time': end_time.strftime('%Y-%m-%d %H:%M:%S'),
+       'Info': {
+           '__report_version__': '1',
+           'tag': 'nts',
+           'inferred_run_order': run_order,
+           'run_order': run_order,
+           'sw_vers': capture(['sw_vers'], include_stderr=True).strip(),
+       }
    }
 
    lnt_results['Tests'] = lnt_tests = []
