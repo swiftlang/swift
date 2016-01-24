@@ -60,9 +60,9 @@ var UnsafeMutablePointerTestSuite = TestSuite("UnsafeMutablePointer")
 var COpaquePointerTestSuite = TestSuite("COpaquePointer")
 
 % for (SelfName, SelfType) in [
-%     ( 'UnsafePointer', 'UnsafePointer<Float>' ),
-%     ( 'UnsafeMutablePointer', 'UnsafeMutablePointer<Float>'),
-%     ( 'COpaquePointer', 'COpaquePointer' ) ]:
+%         ('UnsafePointer', 'UnsafePointer<Float>'),
+%         ('UnsafeMutablePointer', 'UnsafeMutablePointer<Float>'),
+%         ('COpaquePointer', 'COpaquePointer')]:
 
 ${SelfName}TestSuite.test("convertFromNil") {
   let ptr: ${SelfType} = nil
