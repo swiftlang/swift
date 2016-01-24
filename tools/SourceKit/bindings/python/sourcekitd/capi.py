@@ -295,7 +295,9 @@ callbacks['dictionary_applier'] = CFUNCTYPE(c_int, c_object_p, Variant, py_objec
 
 # Functions strictly alphabetical order.
 functionList = [
-  ("sourcekitd_cancel_request",
+  # FIXME: Fix PEP8 violation "continuation line under-indented for hanging
+  #        indent" (E121) and remove "noqa" marker.
+  ("sourcekitd_cancel_request", # noqa
   	[c_void_p]),
 
   ("sourcekitd_initialize",
