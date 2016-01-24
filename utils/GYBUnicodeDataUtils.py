@@ -407,13 +407,13 @@ class UnicodeTrieGenerator(object):
         self.supp_lookup2_bytes_per_entry = 1 if len(self.supp_data) < 256 else 2
         self.supp_data_bytes_per_entry = 1
 
-        BMP_lookup_words = [elt for elt in self.BMP_lookup]
+        BMP_lookup_words = list(self.BMP_lookup)
         BMP_data_words = [
             unicode_property.to_numeric_value(elt)
             for block in self.BMP_data
             for elt in block]
 
-        supp_lookup1_words = [elt for elt in self.supp_lookup1]
+        supp_lookup1_words = list(self.supp_lookup1)
         supp_lookup2_words = [elt for block in self.supp_lookup2 for elt in block]
         supp_data_words = [
             unicode_property.to_numeric_value(elt)
