@@ -367,54 +367,6 @@ Local functions are subject to the same restrictions as the inlineable
 functions containing them, as described above.
 
 
-Versioning Internal Declarations
---------------------------------
-
-The initial discussion on versioning focused on ``public`` APIs, making sure
-that a client knows what features they can use when a specific version of a
-library is present. Inlineable functions have much the same constraints, except
-the inlineable function is the client and the entities being used may not be
-``public``.
-
-Adding a versioning annotation to an ``internal`` entity promises that the
-entity will be available at link time in the containing module's binary. This
-makes it safe to refer to such an entity from an inlineable function. If the
-entity is ever made ``public``, its availability should not be changed; not
-only is it safe for new clients to rely on it, but *existing* clients require
-its presence as well.
-
-.. note::
-
-    Why isn't this a special form of ``public``? Because we don't want it to
-    imply everything that ``public`` does, such as requiring overrides to be
-    ``public``.
-
-Because a versioned class member may eventually be made ``public``, it must be
-assumed that new overrides may eventually appear from outside the module unless
-the member is marked ``final`` or the class is not publicly subclassable.
-
-Non-public conformances are never considered versioned, even if both the
-conforming type and the protocol are versioned.
-
-Entities declared ``private`` may not be versioned; the mangled name of such an
-entity includes an identifier based on the containing file, which means moving
-the declaration to another file changes the entity's mangled name. This implies
-that a client would not be able to find the entity at run time if the source
-code is reorganized, which is unacceptable.
-
-.. note::
-
-    There are ways around this limitation, the most simple being that versioned
-    ``private`` entities are subject to the same cross-file redeclaration rules
-    as ``internal`` entities. However, this is a purely additive feature, so to
-    keep things simple we'll stick with the basics.
-
-We could do away with the entire feature if we restricted inlineable functions
-and fixed-layout structs to only refer to public entities. However, this
-removes one of the primary reasons to make something inlineable: to allow
-efficient access to a type while still protecting its invariants.
-
-
 Top-Level Variables and Constants
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -938,6 +890,54 @@ Given that these attributes share several characteristics, we could consider
 converging on a single common attribute, say ``@fixed``, ``@inline``, or
 ``@fragile``. However, this may be problematic if the same declaration has
 multiple kinds of flexibility, as in the description of classes above.
+
+
+Versioning Internal Declarations
+================================
+
+The initial discussion on versioning focused on ``public`` APIs, making sure
+that a client knows what features they can use when a specific version of a
+library is present. Inlineable functions have much the same constraints, except
+the inlineable function is the client and the entities being used may not be
+``public``.
+
+Adding a versioning annotation to an ``internal`` entity promises that the
+entity will be available at link time in the containing module's binary. This
+makes it safe to refer to such an entity from an inlineable function. If the
+entity is ever made ``public``, its availability should not be changed; not
+only is it safe for new clients to rely on it, but *existing* clients require
+its presence as well.
+
+.. note::
+
+    Why isn't this a special form of ``public``? Because we don't want it to
+    imply everything that ``public`` does, such as requiring overrides to be
+    ``public``.
+
+Because a versioned class member may eventually be made ``public``, it must be
+assumed that new overrides may eventually appear from outside the module unless
+the member is marked ``final`` or the class is not publicly subclassable.
+
+Non-public conformances are never considered versioned, even if both the
+conforming type and the protocol are versioned.
+
+Entities declared ``private`` may not be versioned; the mangled name of such an
+entity includes an identifier based on the containing file, which means moving
+the declaration to another file changes the entity's mangled name. This implies
+that a client would not be able to find the entity at run time if the source
+code is reorganized, which is unacceptable.
+
+.. note::
+
+    There are ways around this limitation, the most simple being that versioned
+    ``private`` entities are subject to the same cross-file redeclaration rules
+    as ``internal`` entities. However, this is a purely additive feature, so to
+    keep things simple we'll stick with the basics.
+
+We could do away with the entire feature if we restricted inlineable functions
+and fixed-layout structs to only refer to public entities. However, this
+removes one of the primary reasons to make something inlineable: to allow
+efficient access to a type while still protecting its invariants.
 
 
 Optimization
