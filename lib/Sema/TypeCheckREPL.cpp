@@ -225,7 +225,7 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   TopLevelCodeDecl *newTopLevel = new (Context) TopLevelCodeDecl(&SF);
 
   // Build function of type T->() which prints the operand.
-  auto *Arg = new (Context) ParamDecl(/*isLet=*/true,
+  auto *Arg = new (Context) ParamDecl(/*isLet=*/true, SourceLoc(),
                                          SourceLoc(), Identifier(),
                                          Loc, Context.getIdentifier("arg"),
                                          E->getType(), /*DC*/ newTopLevel);
