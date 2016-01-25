@@ -391,6 +391,8 @@ public:
   llvm::PointerType *ProtocolConformanceRecordPtrTy;
   llvm::StructType *TypeMetadataRecordTy;
   llvm::PointerType *TypeMetadataRecordPtrTy;
+  llvm::StructType *FieldDescriptorTy;
+  llvm::PointerType *FieldDescriptorPtrTy;
   llvm::StructType *FieldRecordTy;
   llvm::PointerType *FieldRecordPtrTy;
   llvm::PointerType *ErrorPtrTy;       /// %swift.error*

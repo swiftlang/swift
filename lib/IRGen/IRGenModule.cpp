@@ -286,6 +286,12 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
   TypeMetadataRecordPtrTy
     = TypeMetadataRecordTy->getPointerTo(DefaultAS);
 
+  FieldDescriptorTy = createStructType(*this, "swift.field_descriptor", {
+    Int32Ty, // Number of fields that follow
+    Int32Ty, // Size of fields that follow
+    // Tail-allocated FieldRecordTy elements
+  });
+
   FieldRecordTy = createStructType(*this, "swift.field_record", {
     Int32Ty,           // Flags
     RelativeAddressTy, // Offset to metadata or mangled name for external type
