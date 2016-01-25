@@ -3439,7 +3439,7 @@ SourceRange ParamDecl::getSourceRange() const {
   // If the typeloc has a valid location, use it to end the range.
   if (auto typeRepr = getTypeLoc().getTypeRepr()) {
     auto endLoc = typeRepr->getEndLoc();
-    if (endLoc.isValid())
+    if (endLoc.isValid() && !isTypeLocImplicit())
       return SourceRange(range.Start, endLoc);
   }
   
