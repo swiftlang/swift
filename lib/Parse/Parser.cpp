@@ -228,7 +228,8 @@ std::vector<Token> swift::tokenize(const LangOptions &LangOpts,
                                    const SourceManager &SM, unsigned BufferID,
                                    unsigned Offset, unsigned EndOffset,
                                    bool KeepComments,
-                                   bool TokenizeInterpolatedString) {
+                                   bool TokenizeInterpolatedString,
+                                   ArrayRef<Token> SplitTokens) {
   if (Offset == 0 && EndOffset == 0)
     EndOffset = SM.getRangeForBuffer(BufferID).getByteLength();
 
@@ -236,10 +237,34 @@ std::vector<Token> swift::tokenize(const LangOptions &LangOpts,
           KeepComments ? CommentRetentionMode::ReturnAsTokens
                        : CommentRetentionMode::AttachToNextToken,
           Offset, EndOffset);
+
+  auto TokComp = [&] (const Token &A, const Token &B) {
+    return SM.isBeforeInBuffer(A.getLoc(), B.getLoc());
+  };
+
+  std::set<Token, decltype(TokComp)> ResetTokens(TokComp);
+  for (auto C = SplitTokens.begin(), E = SplitTokens.end(); C != E; ++C) {
+    ResetTokens.insert(*C);
+  }
+
   std::vector<Token> Tokens;
   do {
     Tokens.emplace_back();
     L.lex(Tokens.back());
+
+    // If the token has the same location as a reset location,
+    // reset the token stream
+    auto F = ResetTokens.find(Tokens.back());
+    if (F != ResetTokens.end()) {
+      Tokens.back() = *F;
+      assert(Tokens.back().isNot(tok::string_literal));
+
+      auto NewState = L.getStateForBeginningOfTokenLoc(
+                                    F->getLoc().getAdvancedLoc(F->getLength()));
+      L.restoreState(NewState);
+      continue;
+    }
+
     if (Tokens.back().is(tok::string_literal) && TokenizeInterpolatedString) {
       Token StrTok = Tokens.back();
       Tokens.pop_back();
@@ -335,10 +360,17 @@ SourceLoc Parser::consumeStartingCharacterOfCurrentToken() {
     return consumeToken();
   }
 
+  markSplitToken(tok::oper_binary_unspaced, Tok.getText().substr(0, 1));
+
   // ... or a multi-character token with the first character being the one that
   // we want to consume as a separate token.
   restoreParserPosition(getParserPositionAfterFirstCharacter(Tok));
   return PreviousLoc;
+}
+
+void Parser::markSplitToken(tok Kind, StringRef Txt) {
+  SplitTokens.emplace_back();
+  SplitTokens.back().setToken(Kind, Txt);
 }
 
 SourceLoc Parser::consumeStartingLess() {
