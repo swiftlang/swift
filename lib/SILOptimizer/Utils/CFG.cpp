@@ -728,7 +728,7 @@ bool swift::mergeBasicBlockWithSuccessor(SILBasicBlock *BB, DominanceInfo *DT,
   // If there are any BB arguments in the destination, replace them with the
   // branch operands, since they must dominate the dest block.
   for (unsigned i = 0, e = Branch->getArgs().size(); i != e; ++i)
-    SuccBB->getBBArg(i)->replaceAllUsesWith(Branch->getArg(i).getDef());
+    SuccBB->getBBArg(i)->replaceAllUsesWith(Branch->getArg(i));
 
   Branch->eraseFromParent();
 

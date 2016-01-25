@@ -149,7 +149,7 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
       // dealloc_ref on self can be ignored, but dealloc_ref on anything else
       // cannot be eliminated.
       if (auto *DeallocRef = dyn_cast<DeallocRefInst>(&I)) {
-        if (stripCasts(DeallocRef->getOperand()).getDef() == Self) {
+        if (stripCasts(DeallocRef->getOperand()) == Self) {
           DEBUG(llvm::dbgs() << "            SAFE! dealloc_ref on self.\n");
           continue;
         } else {
@@ -161,7 +161,7 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
 
       // Storing into the object can be ignored.
       if (auto *SI = dyn_cast<StoreInst>(&I))
-        if (stripAddressProjections(SI->getDest()).getDef() == Self) {
+        if (stripAddressProjections(SI->getDest()) == Self) {
           DEBUG(llvm::dbgs() << "            SAFE! Instruction is a store into "
                 "self.\n");
           continue;
@@ -437,7 +437,7 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
     // Initialization points.
     if (auto *Store = dyn_cast<StoreInst>(User)) {
       // Bail if this address is stored to another object.
-      if (Store->getDest().getDef() != DefInst) {
+      if (Store->getDest() != DefInst) {
         DEBUG(llvm::dbgs() << "        Found an escaping store: " << *User);
         return false;
       }
@@ -505,7 +505,7 @@ bool DeadObjectAnalysis::analyze() {
 
   // Populate AllValues, AddressProjectionTrie, and StoredLocations.
   AddressProjectionTrie = new IndexTrieNode();
-  if (!recursivelyCollectInteriorUses(NewAddrValue.getDef(),
+  if (!recursivelyCollectInteriorUses(NewAddrValue,
                                       AddressProjectionTrie, false)) {
     return false;
   }

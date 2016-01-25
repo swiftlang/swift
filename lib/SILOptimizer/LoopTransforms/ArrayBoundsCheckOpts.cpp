@@ -78,7 +78,7 @@ static SILValue getArrayStructPointer(ArrayCallKind K, SILValue Array) {
   assert(K != ArrayCallKind::kNone);
 
   if (K < ArrayCallKind::kMakeMutable) {
-    auto LI = dyn_cast<LoadInst>(Array.getDef());
+    auto LI = dyn_cast<LoadInst>(Array);
     if (!LI) {
       return Array;
     }
@@ -116,7 +116,7 @@ static bool isArrayEltStore(StoreInst *SI) {
   if (auto *PtrToAddr =
           dyn_cast<PointerToAddressInst>(stripAddressProjections(Dest)))
     if (auto *SEI = dyn_cast<StructExtractInst>(PtrToAddr->getOperand())) {
-      ArraySemanticsCall Call(SEI->getOperand().getDef());
+      ArraySemanticsCall Call(SEI->getOperand());
       if (Call && Call.getKind() == ArrayCallKind::kGetElementAddress)
         return true;
     }
@@ -185,7 +185,7 @@ mayChangeArraySize(SILInstruction *I, ArrayCallKind &Kind, SILValue &Array,
   // stored in a runtime allocated object sub field of an alloca.
   if (auto *SI = dyn_cast<StoreInst>(I)) {
     auto Ptr = SI->getDest();
-    return isa<AllocStackInst>(Ptr.getDef()) || isArrayEltStore(SI)
+    return isa<AllocStackInst>(Ptr) || isArrayEltStore(SI)
                ? ArrayBoundsEffect::kNone
                : ArrayBoundsEffect::kMayChangeAny;
   }
@@ -199,11 +199,11 @@ mayChangeArraySize(SILInstruction *I, ArrayCallKind &Kind, SILValue &Array,
 /// the allocations.
 static bool isIdentifiedUnderlyingArrayObject(SILValue V) {
   // Allocations are safe.
-  if (isa<AllocationInst>(V.getDef()))
+  if (isa<AllocationInst>(V))
     return true;
 
   // Function arguments are safe.
-  if (auto Arg = dyn_cast<SILArgument>(V.getDef()))
+  if (auto Arg = dyn_cast<SILArgument>(V))
     return Arg->isFunctionArg();
 
   return false;
@@ -312,7 +312,7 @@ private:
     if (Array && !isIdentifiedUnderlyingArrayObject(Array)) {
       DEBUG(llvm::dbgs()
             << " not safe because of not identified underlying object "
-            << *Array.getDef() << " in " << *Inst);
+            << *Array << " in " << *Inst);
       allArraysInMemoryAreUnsafe = true;
       // No need to store specific arrays in this case.
       UnsafeArrays.clear();
@@ -336,8 +336,8 @@ getArrayIndexPair(SILValue Array, SILValue ArrayIndex, ArrayCallKind K) {
           K == ArrayCallKind::kCheckSubscript) &&
          "Must be a bounds check call");
   return std::make_pair(
-      Array.getDef(),
-      ArrayAccessDesc(ArrayIndex.getDef(), K == ArrayCallKind::kCheckIndex));
+      Array,
+      ArrayAccessDesc(ArrayIndex, K == ArrayCallKind::kCheckIndex));
 }
 
 /// Remove redundant checks in a basic block. This pass will reset the state
@@ -381,7 +381,7 @@ static bool removeRedundantChecksInBlock(SILBasicBlock &BB, ArraySet &Arrays,
 
     // Is this an unsafe array whose size could have been changed?
     if (ABC.isUnsafe(Array)) {
-      DEBUG(llvm::dbgs() << " not a safe array argument " << *Array.getDef());
+      DEBUG(llvm::dbgs() << " not a safe array argument " << *Array);
       continue;
     }
 
@@ -391,14 +391,14 @@ static bool removeRedundantChecksInBlock(SILBasicBlock &BB, ArraySet &Arrays,
       continue;
 
     auto IndexedArray =
-        getArrayIndexPair(Array.getDef(), ArrayIndex.getDef(), Kind);
-    DEBUG(llvm::dbgs() << " IndexedArray: " << *Array.getDef() << " and "
-                       << *ArrayIndex.getDef());
+        getArrayIndexPair(Array, ArrayIndex, Kind);
+    DEBUG(llvm::dbgs() << " IndexedArray: " << *Array << " and "
+                       << *ArrayIndex);
 
     // Saw a check for the first time.
     if (!RedundantChecks.count(IndexedArray)) {
       DEBUG(llvm::dbgs() << " first time: " << *Inst
-                         << "  with array argument: " << *Array.getDef());
+                         << "  with array argument: " << *Array);
       RedundantChecks.insert(IndexedArray);
       continue;
     }
@@ -444,7 +444,7 @@ static bool removeRedundantChecks(DominanceInfoNode *CurBB,
 
     // Is this an unsafe array whose size could have been changed?
     if (ABC.isUnsafe(Array)) {
-      DEBUG(llvm::dbgs() << " not a safe array argument " << *Array.getDef());
+      DEBUG(llvm::dbgs() << " not a safe array argument " << *Array);
       continue;
     }
 
@@ -453,12 +453,12 @@ static bool removeRedundantChecks(DominanceInfoNode *CurBB,
     if (!ArrayIndex)
       continue;
     auto IndexedArray =
-        getArrayIndexPair(Array.getDef(), ArrayIndex.getDef(), Kind);
+        getArrayIndexPair(Array, ArrayIndex, Kind);
 
     // Saw a check for the first time.
     if (!DominatingSafeChecks.count(IndexedArray)) {
       DEBUG(llvm::dbgs() << " first time: " << *Inst
-                         << "  with array arg: " << *Array.getDef());
+                         << "  with array arg: " << *Array);
       DominatingSafeChecks.insert(IndexedArray);
       SafeChecksToPop.push_back(IndexedArray);
       continue;
@@ -512,7 +512,7 @@ static bool isSignedLessEqual(SILValue Start, SILValue End, SILBasicBlock &BB) {
   // "up + 1" but the overflow check is on "up".
   SILValue PreInclusiveEnd;
   if (!match(
-          End.getDef(),
+          End,
           m_TupleExtractInst(m_ApplyInst(BuiltinValueKind::SAddOver,
                                          m_SILValue(PreInclusiveEnd), m_One()),
                              0)))
@@ -523,28 +523,28 @@ static bool isSignedLessEqual(SILValue Start, SILValue End, SILBasicBlock &BB) {
   for (auto &Inst : BB)
     if (auto CF = dyn_cast<CondFailInst>(&Inst)) {
       // Try to match a cond_fail on "XOR , (SLE Start, End), 1".
-      if (match(CF->getOperand().getDef(),
+      if (match(CF->getOperand(),
                 m_ApplyInst(BuiltinValueKind::Xor,
                             m_ApplyInst(BuiltinValueKind::ICMP_SLE,
-                                        m_Specific(Start.getDef()),
-                                        m_Specific(End.getDef())),
+                                        m_Specific(Start),
+                                        m_Specific(End)),
                             m_One())))
         return true;
       // Inclusive ranges will have a check on the upper value (before adding
       // one).
       if (PreInclusiveEnd) {
-        if (match(CF->getOperand().getDef(),
+        if (match(CF->getOperand(),
                   m_ApplyInst(BuiltinValueKind::Xor,
                               m_ApplyInst(BuiltinValueKind::ICMP_SLE,
-                                          m_Specific(Start.getDef()),
-                                          m_Specific(PreInclusiveEnd.getDef())),
+                                          m_Specific(Start),
+                                          m_Specific(PreInclusiveEnd)),
                               m_One())))
           IsPreInclusiveEndLEQ = true;
-        if (match(CF->getOperand().getDef(),
+        if (match(CF->getOperand(),
                   m_ApplyInst(BuiltinValueKind::Xor,
                               m_ApplyInst(BuiltinValueKind::ICMP_SGT,
-                                          m_Specific(End.getDef()),
-                                          m_Specific(PreInclusiveEnd.getDef())),
+                                          m_Specific(End),
+                                          m_Specific(PreInclusiveEnd)),
                               m_One())))
           IsPreInclusiveEndGTEnd = true;
         if (IsPreInclusiveEndLEQ && IsPreInclusiveEndGTEnd)
@@ -556,10 +556,10 @@ static bool isSignedLessEqual(SILValue Start, SILValue End, SILBasicBlock &BB) {
 }
 
 static bool isLessThan(SILValue Start, SILValue End) {
-  auto S = dyn_cast<IntegerLiteralInst>(Start.getDef());
+  auto S = dyn_cast<IntegerLiteralInst>(Start);
   if (!S)
     return false;
-  auto E = dyn_cast<IntegerLiteralInst>(End.getDef());
+  auto E = dyn_cast<IntegerLiteralInst>(End);
   if (!E)
     return false;
   return S->getValue().slt(E->getValue());
@@ -610,7 +610,7 @@ static SILValue getZeroToCountArray(SILValue Start, SILValue End) {
   if (!SEI)
     return SILValue();
     
-  ArraySemanticsCall SemCall(SEI->getOperand().getDef());
+  ArraySemanticsCall SemCall(SEI->getOperand());
   if (SemCall.getKind() != ArrayCallKind::kGetCount)
     return SILValue();
   
@@ -690,7 +690,7 @@ static bool isRangeChecked(SILValue Start, SILValue End,
 }
 
 static bool dominates(DominanceInfo *DT, SILValue V, SILBasicBlock *B) {
-  if (auto ValueBB = V.getDef()->getParentBB())
+  if (auto ValueBB = V->getParentBB())
     return DT->dominates(ValueBB, B);
   return false;
 }
@@ -861,8 +861,8 @@ private:
       return nullptr;
 
     DEBUG(llvm::dbgs() << " found an induction variable (ICMP_EQ): "
-                       << *HeaderVal << "  start: " << *Start.getDef()
-                       << "  end: " << *End.getDef());
+                       << *HeaderVal << "  start: " << *Start
+                       << "  end: " << *End);
 
     // Check whether the addition is overflow checked by a cond_fail or whether
     // code in the preheader's predecessor ensures that we won't overflow.
@@ -904,7 +904,7 @@ public:
       return nullptr;
 
     auto AsArg =
-        dyn_cast<SILArgument>(ArrayIndexStruct->getElements()[0].getDef());
+        dyn_cast<SILArgument>(ArrayIndexStruct->getElements()[0]);
     if (!AsArg)
       return nullptr;
 
@@ -985,8 +985,8 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
     SILValue Array = getArrayStructPointer(Kind, ArrayVal);
 
     // The array must strictly dominate the header.
-    if (!dominates(DT, Array.getDef(), Preheader)) {
-      DEBUG(llvm::dbgs() << " does not dominated header" << *Array.getDef());
+    if (!dominates(DT, Array, Preheader)) {
+      DEBUG(llvm::dbgs() << " does not dominated header" << *Array);
       continue;
     }
 
@@ -994,7 +994,7 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
     // This is either a SILValue which is defined outside the loop or it is an
     // array, which loaded from memory and the memory is not changed in the loop.
     if (!dominates(DT, ArrayVal, Preheader) && ABC.isUnsafe(Array)) {
-      DEBUG(llvm::dbgs() << " not a safe array argument " << *Array.getDef());
+      DEBUG(llvm::dbgs() << " not a safe array argument " << *Array);
       continue;
     }
 
@@ -1154,7 +1154,7 @@ static void reportBoundsChecks(SILFunction *F) {
       auto Array = ArrayCall.getSelf();
       ++NumBCs;
       llvm::dbgs() << " # CheckBounds: " << Inst
-                   << "     with array arg: " << *Array.getDef()
+                   << "     with array arg: " << *Array
                    << "     and index: " << Inst.getOperand(1);
     }
   }

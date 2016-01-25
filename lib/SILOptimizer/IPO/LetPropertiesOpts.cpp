@@ -225,8 +225,8 @@ static bool CmpSILValues(SILValue LHS, SILValue RHS) {
   if (LHS->getType() != RHS->getType())
     return false;
 
-  auto L = dyn_cast<SILInstruction>(LHS.getDef());
-  return L->isIdenticalTo(dyn_cast<SILInstruction>(RHS.getDef()), CmpSILValues);
+  auto L = dyn_cast<SILInstruction>(LHS);
+  return L->isIdenticalTo(dyn_cast<SILInstruction>(RHS), CmpSILValues);
 };
 
 /// Compare two sequences of SIL instructions. They should be structurally equivalent.

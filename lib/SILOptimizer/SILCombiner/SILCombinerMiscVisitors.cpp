@@ -283,7 +283,7 @@ public:
     }
 
     // Copies into the alloc_stack live range are safe.
-    if (I->getDest().getDef() == ASI) {
+    if (I->getDest() == ASI) {
       HaveSeenCopyInto = true;
       return;
     }
@@ -352,7 +352,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
     // no the alloc_stack.
     // Otherwise, just delete the copy_addr.
     if (auto *CopyAddr = dyn_cast<CopyAddrInst>(Op->getUser())) {
-      if (CopyAddr->isTakeOfSrc() && CopyAddr->getSrc().getDef() != AS) {
+      if (CopyAddr->isTakeOfSrc() && CopyAddr->getSrc() != AS) {
         Builder.setInsertionPoint(CopyAddr);
         Builder.createDestroyAddr(CopyAddr->getLoc(), CopyAddr->getSrc());
       }
@@ -689,7 +689,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
       auto Result = SEAI->getCaseResult(InjectedEnumElement);
 
       // Replace select_enum_addr by the result
-      replaceInstUsesWith(*SEAI, Result.getDef());
+      replaceInstUsesWith(*SEAI, Result);
       return nullptr;
     }
 
@@ -783,7 +783,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
     if (SI) {
       // Find a Store whose destination is taken from an init_enum_data_addr
       // whose address is same allocation as our inject_enum_addr.
-      DataAddrInst = dyn_cast<InitEnumDataAddrInst>(SI->getDest().getDef());
+      DataAddrInst = dyn_cast<InitEnumDataAddrInst>(SI->getDest());
       if (DataAddrInst && DataAddrInst->getOperand() == IEAI->getOperand())
         break;
       SI = nullptr;
@@ -808,7 +808,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
       for (auto &Opd : AI->getArgumentOperands()) {
         // Found an apply that initializes the enum. We can optimize this by
         // localizing the initialization to an alloc_stack and loading from it.
-        DataAddrInst = dyn_cast<InitEnumDataAddrInst>(Opd.get().getDef());
+        DataAddrInst = dyn_cast<InitEnumDataAddrInst>(Opd.get());
         if (DataAddrInst && DataAddrInst->getOperand() == IEAI->getOperand() &&
             Params[ArgIdx].getConvention() ==
                 ParameterConvention::Indirect_Out) {

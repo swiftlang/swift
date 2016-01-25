@@ -310,7 +310,7 @@ SILValue ConstantTracker::scanProjections(SILValue addr,
                                           SmallVectorImpl<Projection> *Result) {
   for (;;) {
     if (Projection::isAddrProjection(addr)) {
-      SILInstruction *I = cast<SILInstruction>(addr.getDef());
+      SILInstruction *I = cast<SILInstruction>(addr);
       if (Result) {
         Optional<Projection> P = Projection::addressProjectionForInstruction(I);
         Result->push_back(P.getValue());

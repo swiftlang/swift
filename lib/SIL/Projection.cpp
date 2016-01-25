@@ -1846,7 +1846,7 @@ public:
   /// If all SILValues have been set, we are complete.
   bool isComplete() const {
     return std::all_of(Values.begin(), Values.end(), [](SILValue V) -> bool {
-      return V.getDef();
+      return V;
     });
   }
 

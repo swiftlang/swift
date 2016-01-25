@@ -331,7 +331,7 @@ static bool sinkLiteralArguments(SILBasicBlock *BB, unsigned ArgNum) {
   // Check if the argument passed to the first predecessor is a literal inst.
   SILBasicBlock *FirstPred = *BB->pred_begin();
   SILValue FirstArg = getArgForBlock(FirstPred, BB, ArgNum);
-  LiteralInst *FirstLiteral = dyn_cast_or_null<LiteralInst>(FirstArg.getDef());
+  LiteralInst *FirstLiteral = dyn_cast_or_null<LiteralInst>(FirstArg);
   if (!FirstLiteral)
     return false;
 
@@ -342,7 +342,7 @@ static bool sinkLiteralArguments(SILBasicBlock *BB, unsigned ArgNum) {
 
     // Check that the incoming value is identical to the first literal.
     SILValue PredArg = getArgForBlock(P, BB, ArgNum);
-    LiteralInst *PredLiteral = dyn_cast_or_null<LiteralInst>(PredArg.getDef());
+    LiteralInst *PredLiteral = dyn_cast_or_null<LiteralInst>(PredArg);
     if (!PredLiteral || !PredLiteral->isIdenticalTo(FirstLiteral))
       return false;
   }
@@ -467,15 +467,15 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
   // Sink one of the copies of the instruction.
   FirstPredArg->replaceAllUsesWith(Undef);
   FSI->moveBefore(&*BB->begin());
-  BB->getBBArg(ArgNum)->replaceAllUsesWith(FirstPredArg.getDef());
+  BB->getBBArg(ArgNum)->replaceAllUsesWith(FirstPredArg);
 
   // The argument is no longer in use. Replace all incoming inputs with undef
   // and try to delete the instruction.
   for (auto S : Clones)
-    if (S.getDef() != FSI) {
-      deleteAllDebugUses(S.getDef());
+    if (S != FSI) {
+      deleteAllDebugUses(S);
       S->replaceAllUsesWith(Undef);
-      auto DeadArgInst = cast<SILInstruction>(S.getDef());
+      auto DeadArgInst = cast<SILInstruction>(S);
       recursivelyDeleteTriviallyDeadInstructions(DeadArgInst);
     }
 
@@ -945,7 +945,7 @@ static bool hoistDecrementsToPredecessors(SILBasicBlock *BB, AliasAnalysis *AA,
     SILValue Ptr = Inst->getOperand(0);
 
     // The pointer must be defined outside of this basic block.
-    if (Ptr.getDef()->getParentBB() == BB)
+    if (Ptr->getParentBB() == BB)
       continue;
 
     // No arc use to the beginning of this block.

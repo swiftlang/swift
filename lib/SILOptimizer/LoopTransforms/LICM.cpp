@@ -112,7 +112,7 @@ static bool hasLoopInvariantOperands(SILInstruction *I, SILLoop *L) {
 
   return std::all_of(Opds.begin(), Opds.end(), [=](Operand &Op) {
 
-    auto *Def = Op.get().getDef();
+    ValueBase *Def = Op.get();
 
     // Operand is defined outside the loop.
     if (auto *Inst = dyn_cast<SILInstruction>(Def))
@@ -348,7 +348,7 @@ static bool sinkFixLifetime(SILLoop *Loop, DominanceInfo *DomTree,
   // Sink the fix_lifetime instruction.
   bool Changed = false;
   for (auto *FLI : FixLifetimeInsts)
-    if (DomTree->dominates(FLI->getOperand().getDef()->getParentBB(),
+    if (DomTree->dominates(FLI->getOperand()->getParentBB(),
                            Preheader)) {
       auto Succs = ExitingBB->getSuccessors();
       for (unsigned EdgeIdx = 0; EdgeIdx <  Succs.size(); ++EdgeIdx) {

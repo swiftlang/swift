@@ -147,13 +147,13 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
       ++NumSimplified;
 
       DEBUG(llvm::dbgs() << "SC: Simplify Old = " << *I << '\n'
-                         << "    New = " << *Result.getDef() << '\n');
+                         << "    New = " << *Result << '\n');
 
       // Everything uses the new instruction now.
-      replaceInstUsesWith(*I, Result.getDef());
+      replaceInstUsesWith(*I, Result);
 
       // Push the new instruction and any users onto the worklist.
-      Worklist.addUsersToWorklist(Result.getDef());
+      Worklist.addUsersToWorklist(Result);
 
       eraseInstFromFunction(*I);
       MadeChange = true;

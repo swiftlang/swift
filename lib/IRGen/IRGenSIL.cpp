@@ -2687,7 +2687,7 @@ mapTriviallyToInt(IRGenSILFunction &IGF, const EnumImplStrategy &EIS, SelectEnum
     if (index < 0)
       return nullptr;
     
-    IntegerLiteralInst *intLit = dyn_cast<IntegerLiteralInst>(casePair.second.getDef());
+    IntegerLiteralInst *intLit = dyn_cast<IntegerLiteralInst>(casePair.second);
     if (!intLit)
       return nullptr;
     
@@ -3386,7 +3386,7 @@ static bool tryDeferFixedSizeBufferInitialization(IRGenSILFunction &IGF,
       return false;
 
     // Destination must be the allocation.
-    if (copy->getDest().getDef() != allocInst)
+    if (copy->getDest() != SILValue(allocInst))
       return false;
 
     // Copy must be an initialization.

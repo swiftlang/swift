@@ -805,7 +805,7 @@ findAddressRootAndUsers(ValueBase *Def,
         continue;
       RootUserInsts.insert(UserInst);
     }
-    return InitRoot.getDef();
+    return InitRoot;
   }
   return Def;
 }
@@ -817,7 +817,7 @@ bool CopyForwarding::backwardPropagateCopy(
   SmallPtrSetImpl<SILInstruction*> &DestUserInsts) {
 
   SILValue CopySrc = CopyInst->getSrc();
-  ValueBase *CopyDestDef = CopyInst->getDest().getDef();
+  ValueBase *CopyDestDef = CopyInst->getDest();
   SmallPtrSet<SILInstruction*, 8> RootUserInsts;
   ValueBase *CopyDestRoot = findAddressRootAndUsers(CopyDestDef, RootUserInsts);
 
@@ -1130,7 +1130,7 @@ static void performNRVO(CopyAddrInst *CopyInst) {
   DEBUG(llvm::dbgs() << "NRVO eliminates copy" << *CopyInst);
   ++NumCopyNRVO;
   replaceAllUsesExceptDealloc(cast<AllocStackInst>(CopyInst->getSrc()),
-                              CopyInst->getDest().getDef());
+                              CopyInst->getDest());
   assert(CopyInst->getSrc() == CopyInst->getDest() && "bad NRVO");
   CopyInst->eraseFromParent();
 }

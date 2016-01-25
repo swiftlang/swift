@@ -40,7 +40,7 @@ static bool hasLoopInvariantOperands(SILInstruction *I, SILLoop *L,
 
   return std::all_of(Opds.begin(), Opds.end(), [=](Operand &Op) {
 
-    auto *Def = Op.get().getDef();
+    ValueBase *Def = Op.get();
     // Operand is outside the loop or marked invariant.
     if (auto *Inst = dyn_cast<SILInstruction>(Def))
       return !L->contains(Inst->getParent()) || Inv.count(Inst);
@@ -92,7 +92,7 @@ static void mapOperands(SILInstruction *I,
                         const llvm::DenseMap<ValueBase *, SILValue> &ValueMap) {
   for (auto &Opd : I->getAllOperands()) {
     SILValue OrigVal = Opd.get();
-    ValueBase *OrigDef = OrigVal.getDef();
+    ValueBase *OrigDef = OrigVal;
     auto Found = ValueMap.find(OrigDef);
     if (Found != ValueMap.end()) {
       SILValue MappedVal = Found->second;

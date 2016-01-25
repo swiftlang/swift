@@ -431,7 +431,7 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
     if (!Params[i].isGuaranteed())
       continue;
     SILValue Op = FAS.getArgument(i);
-    if (!AA->isNoAlias(Op, Ptr.getDef()))
+    if (!AA->isNoAlias(Op, Ptr))
       return true;
   }
 
@@ -561,7 +561,7 @@ static bool addLastUse(SILValue V, SILBasicBlock *BB,
                        ReleaseTracker &Tracker) {
   for (auto I = BB->rbegin(); I != BB->rend(); ++I) {
     for (auto &Op : I->getAllOperands())
-      if (Op.get().getDef() == V.getDef()) {
+      if (Op.get() == V) {
         Tracker.trackLastRelease(&*I);
         return true;
       }

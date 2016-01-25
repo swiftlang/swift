@@ -404,8 +404,8 @@ struct BinaryOp_match {
     if (!I || I->getNumOperands() != 2)
       return false;
 
-    return L.match(I->getOperand(0).getDef()) &&
-           R.match(I->getOperand(1).getDef());
+    return L.match((ValueBase *)I->getOperand(0)) &&
+           R.match((ValueBase *)I->getOperand(1));
   }
 };
 
@@ -431,7 +431,7 @@ struct tupleextract_ty {
     if (!TEI)
       return false;
 
-    return TEI->getFieldNo() == index && L.match(TEI->getOperand().getDef());
+    return TEI->getFieldNo() == index && L.match((ValueBase *)TEI->getOperand());
   }
 };
 
@@ -522,10 +522,10 @@ struct Argument_match {
   template <typename ITy>
   bool match(ITy *V) {
     if (auto *Apply = dyn_cast<ApplyInst>(V)) {
-      return Val.match(Apply->getArgument(OpI).getDef());
+      return Val.match((ValueBase *)Apply->getArgument(OpI));
     }
     if (auto *Builtin = dyn_cast<BuiltinInst>(V)) {
-      return Val.match(Builtin->getArguments()[OpI].getDef());
+      return Val.match((ValueBase *)Builtin->getArguments()[OpI]);
     }
     return false;
   }

@@ -118,9 +118,6 @@ namespace {
     ValueID InstID = 0;
 
     llvm::DenseMap<const ValueBase*, ValueID> ValueIDs;
-    ValueID addValueRef(SILValue SV) {
-      return addValueRef(SV.getDef());
-    }
     ValueID addValueRef(const ValueBase *Val);
 
   public:

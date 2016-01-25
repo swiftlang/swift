@@ -563,8 +563,8 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
   if (isSameValueOrGlobal(V1, V2))
     return AliasResult::MustAlias;
 
-  DEBUG(llvm::dbgs() << "ALIAS ANALYSIS:\n    V1: " << *V1.getDef()
-        << "    V2: " << *V2.getDef());
+  DEBUG(llvm::dbgs() << "ALIAS ANALYSIS:\n    V1: " << *V1
+        << "    V2: " << *V2);
 
   // Pass in both the TBAA types so we can perform typed access TBAA and the
   // actual types of V1, V2 so we can perform class based TBAA.
@@ -579,15 +579,15 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
   // Strip off any casts on V1, V2.
   V1 = stripCasts(V1);
   V2 = stripCasts(V2);
-  DEBUG(llvm::dbgs() << "        After Cast Stripping V1:" << *V1.getDef());
-  DEBUG(llvm::dbgs() << "        After Cast Stripping V2:" << *V2.getDef());
+  DEBUG(llvm::dbgs() << "        After Cast Stripping V1:" << *V1);
+  DEBUG(llvm::dbgs() << "        After Cast Stripping V2:" << *V2);
 
   // Ok, we need to actually compute an Alias Analysis result for V1, V2. Begin
   // by finding the "base" of V1, V2 by stripping off all casts and GEPs.
   SILValue O1 = getUnderlyingObject(V1);
   SILValue O2 = getUnderlyingObject(V2);
-  DEBUG(llvm::dbgs() << "        Underlying V1:" << *O1.getDef());
-  DEBUG(llvm::dbgs() << "        Underlying V2:" << *O2.getDef());
+  DEBUG(llvm::dbgs() << "        Underlying V1:" << *O1);
+  DEBUG(llvm::dbgs() << "        Underlying V2:" << *O2);
 
   // If O1 and O2 do not equal, see if we can prove that they cannot be the
   // same object. If we can, return No Alias.
@@ -711,10 +711,10 @@ SILAnalysis *swift::createAliasAnalysis(SILModule *M) {
 
 AliasKeyTy AliasAnalysis::toAliasKey(SILValue V1, SILValue V2,
                                      SILType Type1, SILType Type2) {
-  size_t idx1 = AliasValueBaseToIndex.getIndex(V1.getDef());
+  size_t idx1 = AliasValueBaseToIndex.getIndex(V1);
   assert(idx1 != std::numeric_limits<size_t>::max() &&
          "~0 index reserved for empty/tombstone keys");
-  size_t idx2 = AliasValueBaseToIndex.getIndex(V2.getDef());
+  size_t idx2 = AliasValueBaseToIndex.getIndex(V2);
   assert(idx2 != std::numeric_limits<size_t>::max() &&
          "~0 index reserved for empty/tombstone keys");
   void *t1 = Type1.getOpaqueValue();

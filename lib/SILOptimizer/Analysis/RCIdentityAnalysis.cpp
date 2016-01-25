@@ -57,7 +57,7 @@ static bool isRCIdentityPreservingCast(ValueKind Kind) {
 static SILValue stripRCIdentityPreservingInsts(SILValue V) {
   // First strip off RC identity preserving casts.
   if (isRCIdentityPreservingCast(V->getKind()))
-    return cast<SILInstruction>(V.getDef())->getOperand(0);
+    return cast<SILInstruction>(V)->getOperand(0);
 
   // Then if we have a struct_extract that is extracting a non-trivial member
   // from a struct with no other non-trivial members, a ref count operation on

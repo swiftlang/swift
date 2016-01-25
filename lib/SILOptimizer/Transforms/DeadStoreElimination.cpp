@@ -658,7 +658,7 @@ void DSEContext::mergeSuccessorLiveIns(SILBasicBlock *BB) {
 void DSEContext::invalidateLSLocationBaseForGenKillSet(SILInstruction *I) {
   BlockState *S = getBlockState(I);
   for (unsigned i = 0; i < S->LocationNum; ++i) {
-    if (LocationVault[i].getBase().getDef() != I)
+    if (LocationVault[i].getBase() != I)
       continue;
     S->startTrackingLocation(S->BBKillSet, i);
     S->stopTrackingLocation(S->BBGenSet, i);
@@ -670,7 +670,7 @@ void DSEContext::invalidateLSLocationBaseForDSE(SILInstruction *I) {
   for (unsigned i = 0; i < S->LocationNum; ++i) {
     if (!S->BBWriteSetMid.test(i))
       continue;
-    if (LocationVault[i].getBase().getDef() != I)
+    if (LocationVault[i].getBase() != I)
       continue;
     S->stopTrackingLocation(S->BBWriteSetMid, i);
   }

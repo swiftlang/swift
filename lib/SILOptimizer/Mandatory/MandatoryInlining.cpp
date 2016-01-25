@@ -72,7 +72,7 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
   SmallVector<SILInstruction*, 16> InstsToDelete;
   for (SILValue V : FullArgs) {
     if (SILInstruction *I = dyn_cast<SILInstruction>(V))
-      if (I != CalleeValue.getDef() &&
+      if (I != CalleeValue &&
           isInstructionTriviallyDead(I))
         InstsToDelete.push_back(I);
   }
@@ -201,7 +201,7 @@ getCalleeFunction(FullApplySite AI, bool &IsThick,
       // making any assumptions
       if (static_cast<SILInstruction*>(I) == LI)
         return nullptr;
-      if ((SI = dyn_cast<StoreInst>(I)) && SI->getDest().getDef() == PBI) {
+      if ((SI = dyn_cast<StoreInst>(I)) && SI->getDest() == PBI) {
         // We found a store that we know dominates the load; now ensure there
         // are no other uses of the project_box except loads.
         for (Operand *PBIUse : PBI->getUses())

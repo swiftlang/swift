@@ -70,11 +70,11 @@ class GlobalPropertyOpt {
     friend raw_ostream &operator<<(raw_ostream &os, const Entry &entry) {
       if (entry.Field) {
         os << "field " << entry.Field->getName() << '\n';
-      } else if (!entry.Value.getDef()) {
+      } else if (!entry.Value) {
         os << "unknown-address\n";
-      } else if (auto *Inst = dyn_cast<SILInstruction>(entry.Value.getDef())) {
+      } else if (auto *Inst = dyn_cast<SILInstruction>(entry.Value)) {
         os << Inst->getParent()->getParent()->getName() << ": " << entry.Value;
-      } else if (auto *Arg = dyn_cast<SILArgument>(entry.Value.getDef())) {
+      } else if (auto *Arg = dyn_cast<SILArgument>(entry.Value)) {
         os << Arg->getParent()->getParent()->getName() << ": " << entry.Value;
       } else {
         os << entry.Value;
@@ -164,7 +164,7 @@ class GlobalPropertyOpt {
   /// Gets the entry for a value at an address, e.g. a struct/class field or
   /// an alloc_stack.
   Entry *getAddrEntry(SILValue value) {
-    ValueBase *def = value.getDef();
+    ValueBase *def = value;
     if (auto *MDI = dyn_cast<MarkDependenceInst>(def)) {
       return getAddrEntry(MDI->getOperand(0));
     }

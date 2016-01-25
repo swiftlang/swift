@@ -41,10 +41,6 @@ public:
     llvm_unreachable("Not reachable, all cases handled");
   }
 
-  ValueRetTy visit(SILValue V) {
-    return asImpl().visit(V.getDef());
-  }
-
   // Define default dispatcher implementations chain to parent nodes.
 #define VALUE(CLASS, PARENT)                                    \
   ValueRetTy visit##CLASS(CLASS *I) {                           \

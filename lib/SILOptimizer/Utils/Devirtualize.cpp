@@ -668,7 +668,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
   //   casted into an appropriate type. This SILValue may be a BB arg, if it
   //   was a cast between optional types.
   // - the second one is the new apply site.
-  return std::make_pair(ResultValue.getDef(), NewAI);
+  return std::make_pair(ResultValue, NewAI);
 }
 
 DevirtualizationResult swift::tryDevirtualizeClassMethod(FullApplySite AI,

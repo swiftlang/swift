@@ -303,7 +303,7 @@ void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
     break;
 
   case TermKind::BranchInst:
-    markValueLive(cast<BranchInst>(Term)->getArg(ArgIndex).getDef());
+    markValueLive(cast<BranchInst>(Term)->getArg(ArgIndex));
     break;
 
   case TermKind::CondBranchInst: {
@@ -311,12 +311,12 @@ void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
 
     if (CondBr->getTrueBB() == Succ) {
       auto TrueArgs = CondBr->getTrueArgs();
-      markValueLive(TrueArgs[ArgIndex].getDef());
+      markValueLive(TrueArgs[ArgIndex]);
     }
 
     if (CondBr->getFalseBB() == Succ) {
       auto FalseArgs = CondBr->getFalseArgs();
-      markValueLive(FalseArgs[ArgIndex].getDef());
+      markValueLive(FalseArgs[ArgIndex]);
     }
 
     break;
@@ -352,7 +352,7 @@ void DCE::propagateLiveBlockArgument(SILArgument *Arg) {
 void DCE::propagateLiveness(SILInstruction *I) {
   if (!isa<TermInst>(I)) {
     for (auto &O : I->getAllOperands())
-      markValueLive(O.get().getDef());
+      markValueLive(O.get());
 
     // Conceptually, the dependency from a debug instruction to its definition
     // is in reverse direction: Only if its definition is alive, also the
@@ -380,18 +380,18 @@ void DCE::propagateLiveness(SILInstruction *I) {
   case TermKind::SwitchEnumAddrInst:
   case TermKind::DynamicMethodBranchInst:
   case TermKind::CheckedCastBranchInst:
-    markValueLive(I->getOperand(0).getDef());
+    markValueLive(I->getOperand(0));
     return;
 
   case TermKind::TryApplyInst:
   case TermKind::SwitchValueInst:
     for (auto &O : I->getAllOperands())
-      markValueLive(O.get().getDef());
+      markValueLive(O.get());
     return;
 
   case TermKind::CheckedCastAddrBranchInst:
-    markValueLive(I->getOperand(0).getDef());
-    markValueLive(I->getOperand(1).getDef());
+    markValueLive(I->getOperand(0));
+    markValueLive(I->getOperand(1));
     return;
   }
   llvm_unreachable("corrupt instruction!");

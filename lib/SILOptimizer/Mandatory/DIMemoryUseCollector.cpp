@@ -818,7 +818,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       // Scalarize LoadInst
       if (auto *LI = dyn_cast<LoadInst>(User)) {
         SILValue Result = scalarizeLoad(LI, ElementAddrs);
-        LI->replaceAllUsesWith(Result.getDef());
+        LI->replaceAllUsesWith(Result);
         LI->eraseFromParent();
         continue;
       }

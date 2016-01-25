@@ -330,17 +330,17 @@ MemBehavior
 AliasAnalysis::computeMemoryBehaviorInner(SILInstruction *Inst, SILValue V,
                                           RetainObserveKind InspectionMode) {
   DEBUG(llvm::dbgs() << "GET MEMORY BEHAVIOR FOR:\n    " << *Inst << "    "
-                     << *V.getDef());
+                     << *V);
   assert(SEA && "SideEffectsAnalysis must be initialized!");
   return MemoryBehaviorVisitor(this, SEA, EA, V, InspectionMode).visit(Inst);
 }
 
 MemBehaviorKeyTy AliasAnalysis::toMemoryBehaviorKey(SILValue V1, SILValue V2,
                                                     RetainObserveKind M) {
-  size_t idx1 = MemoryBehaviorValueBaseToIndex.getIndex(V1.getDef());
+  size_t idx1 = MemoryBehaviorValueBaseToIndex.getIndex(V1);
   assert(idx1 != std::numeric_limits<size_t>::max() &&
          "~0 index reserved for empty/tombstone keys");
-  size_t idx2 = MemoryBehaviorValueBaseToIndex.getIndex(V2.getDef());
+  size_t idx2 = MemoryBehaviorValueBaseToIndex.getIndex(V2);
   assert(idx2 != std::numeric_limits<size_t>::max() &&
          "~0 index reserved for empty/tombstone keys");
   return {idx1, idx2, M};

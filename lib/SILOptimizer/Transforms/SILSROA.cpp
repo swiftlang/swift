@@ -144,7 +144,7 @@ bool SROAMemoryUseAnalyzer::analyze() {
     // If we store the alloca pointer, we cannot analyze its uses so bail...
     // It is ok if we store into the alloca pointer though.
     if (auto *SI = dyn_cast<StoreInst>(User)) {
-      if (SI->getDest().getDef() == AI) {
+      if (SI->getDest() == AI) {
         DEBUG(llvm::dbgs() << "        Found a store into the "
               "projection.\n");
         Stores.push_back(SI);

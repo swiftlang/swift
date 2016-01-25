@@ -96,7 +96,7 @@ SILValue swift::stripCasts(SILValue V) {
     if (isRCIdentityPreservingCast(K)
         || K == ValueKind::UncheckedTrivialBitCastInst
         || K == ValueKind::MarkDependenceInst) {
-      V = cast<SILInstruction>(V.getDef())->getOperand(0);
+      V = cast<SILInstruction>(V)->getOperand(0);
       continue;
     }
     
@@ -137,7 +137,7 @@ SILValue swift::stripAddressProjections(SILValue V) {
     V = stripSinglePredecessorArgs(V);
     if (!NewProjection::isAddressProjection(V))
       return V;
-    V = cast<SILInstruction>(V.getDef())->getOperand(0);
+    V = cast<SILInstruction>(V)->getOperand(0);
   }
 }
 
@@ -146,13 +146,13 @@ SILValue swift::stripValueProjections(SILValue V) {
     V = stripSinglePredecessorArgs(V);
     if (!NewProjection::isObjectProjection(V))
       return V;
-    V = cast<SILInstruction>(V.getDef())->getOperand(0);
+    V = cast<SILInstruction>(V)->getOperand(0);
   }
 }
 
 SILValue swift::stripIndexingInsts(SILValue V) {
   while (true) {
-    if (!isa<IndexingInst>(V.getDef()))
+    if (!isa<IndexingInst>(V))
       return V;
     V = cast<IndexingInst>(V)->getBase();
   }

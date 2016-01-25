@@ -1022,10 +1022,10 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
           // If the user is a tuple_extract, just substitute the right value in.
           if (auto *TEI = dyn_cast<TupleExtractInst>(O->getUser())) {
             SILValue NewVal = TI->getOperand(TEI->getFieldNo());
-            TEI->replaceAllUsesWith(NewVal.getDef());
+            TEI->replaceAllUsesWith(NewVal);
             TEI->dropAllReferences();
             FoldedUsers.insert(TEI);
-            if (auto *Inst = dyn_cast<SILInstruction>(NewVal.getDef()))
+            if (auto *Inst = dyn_cast<SILInstruction>(NewVal))
               WorkList.insert(Inst);
           }
         }
@@ -1036,10 +1036,10 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
 
 
       // We were able to fold, so all users should use the new folded value.
-      User->replaceAllUsesWith(C.getDef());
+      User->replaceAllUsesWith(C);
 
       // The new constant could be further folded now, add it to the worklist.
-      if (auto *Inst = dyn_cast<SILInstruction>(C.getDef()))
+      if (auto *Inst = dyn_cast<SILInstruction>(C))
         WorkList.insert(Inst);
     }
 

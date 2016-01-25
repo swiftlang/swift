@@ -94,7 +94,7 @@ static unsigned computeSubelement(SILValue Pointer, SILInstruction *RootInst) {
   
   while (1) {
     // If we got to the root, we're done.
-    if (RootInst == Pointer.getDef())
+    if (RootInst == Pointer)
       return SubEltNumber;
     
     auto *Inst = cast<SILInstruction>(Pointer);
@@ -676,9 +676,9 @@ bool AllocOptimize::promoteLoad(SILInstruction *Inst) {
   // Simply replace the load.
   assert(isa<LoadInst>(Inst));
   DEBUG(llvm::dbgs() << "  *** Promoting load: " << *Inst << "\n");
-  DEBUG(llvm::dbgs() << "      To value: " << *NewVal.getDef() << "\n");
+  DEBUG(llvm::dbgs() << "      To value: " << *NewVal << "\n");
   
-  Inst->replaceAllUsesWith(NewVal.getDef());
+  Inst->replaceAllUsesWith(NewVal);
   SILValue Addr = Inst->getOperand(0);
   Inst->eraseFromParent();
   if (auto *AddrI = dyn_cast<SILInstruction>(Addr))
@@ -739,7 +739,7 @@ bool AllocOptimize::promoteDestroyAddr(DestroyAddrInst *DAI) {
   ++NumDestroyAddrPromoted;
   
   DEBUG(llvm::dbgs() << "  *** Promoting destroy_addr: " << *DAI << "\n");
-  DEBUG(llvm::dbgs() << "      To value: " << *NewVal.getDef() << "\n");
+  DEBUG(llvm::dbgs() << "      To value: " << *NewVal << "\n");
   
   SILBuilderWithScope(DAI).emitReleaseValueOperation(DAI->getLoc(), NewVal);
   DAI->eraseFromParent();
@@ -826,7 +826,7 @@ void AllocOptimize::explodeCopyAddr(CopyAddrInst *CAI) {
       // for the copy_addr source, or it could be a load corresponding to the
       // "assign" operation on the destination of the copyaddr.
       if (LoadUse.isValid() &&
-          getAccessPathRoot(NewInst->getOperand(0)).getDef() == TheMemory) {
+          getAccessPathRoot(NewInst->getOperand(0)) == TheMemory) {
         LoadUse.Inst = NewInst;
         Uses.push_back(LoadUse);
       }

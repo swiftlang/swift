@@ -91,10 +91,10 @@ static bool analyzeStaticInitializer(SILFunction *F, SILInstruction *&Val,
       SGA = sga;
       GVar = SGA->getReferencedGlobal();
     } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
-      if (HasStore || SI->getDest().getDef() != SGA)
+      if (HasStore || SI->getDest() != SGA)
         return false;
       HasStore = true;
-      Val = dyn_cast<SILInstruction>(SI->getSrc().getDef());
+      Val = dyn_cast<SILInstruction>(SI->getSrc());
 
       // We only handle StructInst and TupleInst being stored to a
       // global variable for now.

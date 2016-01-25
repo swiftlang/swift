@@ -130,7 +130,7 @@ bool ArrayAllocation::mapInitializationStores() {
     if (!IndexAddr)
       return false;
     SI = dyn_cast_or_null<StoreInst>(getSingleNonDebugUser(IndexAddr));
-    if (!SI || SI->getDest().getDef() != IndexAddr)
+    if (!SI || SI->getDest() != IndexAddr)
       return false;
     auto *Index = dyn_cast<IntegerLiteralInst>(IndexAddr->getIndex());
     if (!Index)
@@ -185,7 +185,7 @@ bool ArrayAllocation::findValueReplacements() {
 /// Collect all get_element users and check that there are no escapes or uses
 /// that could change the array value.
 bool ArrayAllocation::analyseArrayValueUses() {
-  return recursivelyCollectUses(ArrayValue.getDef());
+  return recursivelyCollectUses(ArrayValue);
 }
 
 static bool doesNotChangeArray(ArraySemanticsCall &C) {

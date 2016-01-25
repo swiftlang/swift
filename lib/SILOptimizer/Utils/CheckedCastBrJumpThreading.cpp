@@ -227,7 +227,7 @@ SILValue CheckedCastBrJumpThreading::isArgValueEquivalentToCondition(
       return SILValue();
 
     // Have we visited this BB already?
-    if (!SeenValues.insert(Value.getDef()).second)
+    if (!SeenValues.insert(Value).second)
       return SILValue();
 
     if (SeenValues.size() > 10)
@@ -248,12 +248,12 @@ SILValue CheckedCastBrJumpThreading::isArgValueEquivalentToCondition(
 
       // Values should be the same
       if (!Def)
-        Def = Value.getDef();
+        Def = Value;
 
-      if (Def != Value.getDef())
+      if (Def != Value)
         return SILValue();
 
-      if (!DT->dominates(DomBB, Value.getDef()->getParentBB()))
+      if (!DT->dominates(DomBB, Value->getParentBB()))
         return SILValue();
       // OK, this value is a potential candidate
     }

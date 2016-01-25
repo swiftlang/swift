@@ -154,15 +154,15 @@ public:
   SILValue(const ValueBase *V = nullptr)
     : Value((ValueBase *)V) { }
 
-  ValueBase *getDef() const { return Value; }
-  ValueBase *operator->() const { return getDef(); }
-  ValueBase &operator*() const { return *getDef(); }
+  ValueBase *operator->() const { return Value; }
+  ValueBase &operator*() const { return *Value; }
+  operator ValueBase *() const { return Value; }
 
   // Comparison.
-  bool operator==(SILValue RHS) const {
-    return Value == RHS.Value;
-  }
+  bool operator==(SILValue RHS) const { return Value == RHS.Value; }
+  bool operator==(ValueBase *RHS) const { return Value == RHS; }
   bool operator!=(SILValue RHS) const { return !(*this == RHS); }
+  bool operator!=(ValueBase *RHS) const { return Value != RHS; }
   // Ordering (for std::map).
   bool operator<(SILValue RHS) const {
     return Value < RHS.Value;
@@ -170,7 +170,7 @@ public:
 
   /// Return true if underlying ValueBase of this SILValue is non-null. Return
   /// false otherwise.
-  explicit operator bool() const { return getDef() != nullptr; }
+  explicit operator bool() const { return Value != nullptr; }
 
   /// Convert this SILValue into an opaque pointer like type. For use with
   /// PointerLikeTypeTraits.
@@ -234,7 +234,7 @@ public:
     // It's probably not worth optimizing for the case of switching
     // operands on a single value.
     removeFromCurrent();
-    assert(reinterpret_cast<ValueBase *>(Owner) != newValue.getDef() &&
+    assert(reinterpret_cast<ValueBase *>(Owner) != newValue &&
         "Cannot add a value as an operand of the instruction that defines it!");
     TheValue = newValue;
     insertIntoCurrent();
@@ -577,7 +577,7 @@ public:
 
 /// SILValue hashes just like a pointer.
 static inline llvm::hash_code hash_value(SILValue V) {
-  return llvm::hash_value(V.getDef());
+  return llvm::hash_value((ValueBase *)V);
 }
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILValue V) {
@@ -593,7 +593,7 @@ namespace llvm {
   template<> struct simplify_type<const ::swift::SILValue> {
     typedef ::swift::ValueBase *SimpleType;
     static SimpleType getSimplifiedValue(::swift::SILValue Val) {
-      return Val.getDef();
+      return Val;
     }
   };
   template<> struct simplify_type< ::swift::SILValue>
@@ -610,7 +610,7 @@ namespace llvm {
                                   llvm::DenseMapInfo<void*>::getTombstoneKey());
     }
     static unsigned getHashValue(swift::SILValue V) {
-      return DenseMapInfo<swift::ValueBase *>::getHashValue(V.getDef());
+      return DenseMapInfo<swift::ValueBase *>::getHashValue(V);
     }
     static bool isEqual(swift::SILValue LHS, swift::SILValue RHS) {
       return LHS == RHS;

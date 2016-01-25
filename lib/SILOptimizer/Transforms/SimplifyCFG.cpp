@@ -214,7 +214,7 @@ void swift::updateSSAAfterCloning(BaseThreadingCloner &Cloner,
       continue;
 
     if (Inst->hasValue()) {
-      SILValue NewRes(AvailValPair.second.getDef());
+      SILValue NewRes(AvailValPair.second);
 
       SmallVector<UseWrapper, 16> UseList;
       // Collect the uses of the value.
@@ -514,7 +514,7 @@ static bool tryDominatorBasedSimplifications(
     //        DestBB
     //          cond_br %dominating_cond
     SmallVector<SILInstruction *, 16> UsersToReplace;
-    for (auto *Op : ignore_expect_uses(DominatingCondition.getDef())) {
+    for (auto *Op : ignore_expect_uses(DominatingCondition)) {
       auto *CondUserInst = Op->getUser();
 
       // Ignore the DominatingTerminator itself.
@@ -961,7 +961,7 @@ bool SimplifyCFG::simplifyBranchOperands(OperandValueArrayRef Operands) {
   for (auto O = Operands.begin(), E = Operands.end(); O != E; ++O)
     if (auto *I = dyn_cast<SILInstruction>(*O))
       if (SILValue Result = simplifyInstruction(I)) {
-        I->replaceAllUsesWith(Result.getDef());
+        I->replaceAllUsesWith(Result);
         if (isInstructionTriviallyDead(I)) {
           eraseFromParentWithDebugInsts(I);
           Simplified = true;
@@ -1077,8 +1077,8 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
     // If there are any BB arguments in the destination, replace them with the
     // branch operands, since they must dominate the dest block.
     for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i) {
-      if (DestBB->getBBArg(i) != BI->getArg(i).getDef())
-        DestBB->getBBArg(i)->replaceAllUsesWith(BI->getArg(i).getDef());
+      if (DestBB->getBBArg(i) != BI->getArg(i))
+        DestBB->getBBArg(i)->replaceAllUsesWith(BI->getArg(i));
       else {
         // We must be processing an unreachable part of the cfg with a cycle.
         // bb1(arg1): // preds: bb3
@@ -3324,12 +3324,12 @@ static void tryToReplaceArgWithIncomingValue(SILBasicBlock *BB, unsigned i,
   // If the incoming values of all predecessors are equal usually this means
   // that the common incoming value dominates the BB. But: this might be not
   // the case if BB is unreachable. Therefore we still have to check it.
-  if (!DT->dominates(V.getDef()->getParentBB(), BB))
+  if (!DT->dominates(V->getParentBB(), BB))
     return;
 
   // An argument has one result value. We need to replace this with the *value*
   // of the incoming block(s).
-  A->replaceAllUsesWith(V.getDef());
+  A->replaceAllUsesWith(V);
 }
 
 bool SimplifyCFG::simplifyArgs(SILBasicBlock *BB) {

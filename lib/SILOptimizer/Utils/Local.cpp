@@ -212,7 +212,7 @@ FullApplySite swift::findApplyFromDevirtualizedResult(SILInstruction *I) {
 
   if (isa<UpcastInst>(I) || isa<EnumInst>(I) || isa<UncheckedRefCastInst>(I))
     return findApplyFromDevirtualizedResult(
-        dyn_cast<SILInstruction>(I->getOperand(0).getDef()));
+        dyn_cast<SILInstruction>(I->getOperand(0)));
 
   return FullApplySite();
 }
@@ -633,7 +633,7 @@ ProjectBoxInst *swift::getOrCreateProjectBox(AllocBoxInst *ABI) {
          "alloc_box cannot be the last instruction of a block");
   SILInstruction *NextInst = &*Iter;
   if (auto *PBI = dyn_cast<ProjectBoxInst>(NextInst)) {
-    if (PBI->getOperand().getDef() == ABI)
+    if (PBI->getOperand() == ABI)
       return PBI;
   }
 
@@ -1079,7 +1079,7 @@ bool ValueLifetimeAnalysis::successorHasLiveIn(SILBasicBlock *BB) {
 SILInstruction *ValueLifetimeAnalysis::
 findLastDirectUseInBlock(SILBasicBlock *BB) {
   for (auto II = BB->rbegin(); II != BB->rend(); ++II) {
-    assert(DefValue.getDef() != &*II && "Found def before finding use!");
+    assert(DefValue != &*II && "Found def before finding use!");
 
     for (auto &Oper : II->getAllOperands()) {
       if (Oper.get() != DefValue)
@@ -1096,7 +1096,7 @@ findLastDirectUseInBlock(SILBasicBlock *BB) {
 SILInstruction *ValueLifetimeAnalysis::
 findLastSpecifiedUseInBlock(SILBasicBlock *BB) {
   for (auto II = BB->rbegin(); II != BB->rend(); ++II) {
-    assert(DefValue.getDef() != &*II && "Found def before finding use!");
+    assert(DefValue != &*II && "Found def before finding use!");
 
     if (UserSet.count(&*II))
       return &*II;
@@ -1647,7 +1647,7 @@ simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
   // Replace by unconditional_addr_cast, followed by a branch.
   // The unconditional_addr_cast can be skipped, if the result of a cast
   // is not used afterwards.
-  bool ResultNotUsed = isa<AllocStackInst>(Dest.getDef());
+  bool ResultNotUsed = isa<AllocStackInst>(Dest);
   for (auto Use : Dest->getUses()) {
     auto *User = Use->getUser();
     if (isa<DeallocStackInst>(User) || User == Inst)
@@ -1829,7 +1829,7 @@ optimizeCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
   // %1 = metatype $A.Type
   // %c = checked_cast_br %1 to ...
   // store %c to %3 (if successful)
-  if (auto *ASI = dyn_cast<AllocStackInst>(Src.getDef())) {
+  if (auto *ASI = dyn_cast<AllocStackInst>(Src)) {
     // Check if the value of this alloc_stack is set only once by a store
     // instruction, used only by CCABI and then deallocated.
     bool isLegal = true;
@@ -2109,10 +2109,10 @@ optimizeUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *Inst) {
       return nullptr;
     }
 
-    ReplaceInstUsesAction(Inst, Result.getDef());
+    ReplaceInstUsesAction(Inst, Result);
     EraseInstAction(Inst);
     WillSucceedAction();
-    return Result.getDef();
+    return Result;
   }
 
   return nullptr;
@@ -2166,7 +2166,7 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
   if (Feasibility == DynamicCastFeasibility::WillSucceed ||
       Feasibility == DynamicCastFeasibility::MaySucceed) {
 
-    bool ResultNotUsed = isa<AllocStackInst>(Dest.getDef());
+    bool ResultNotUsed = isa<AllocStackInst>(Dest);
     for (auto Use : Dest->getUses()) {
       auto *User = Use->getUser();
       if (isa<DeallocStackInst>(User) || User == Inst)
@@ -2222,7 +2222,7 @@ bool swift::simplifyUsers(SILInstruction *I) {
     if (!S)
       continue;
 
-    User->replaceAllUsesWith(S.getDef());
+    User->replaceAllUsesWith(S);
     User->eraseFromParent();
     Changed = true;
   }

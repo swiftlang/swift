@@ -505,7 +505,7 @@ public:
 
       // Make sure that if operand is generic that its primary archetypes match
       // the function context.
-      checkLegalType(I->getFunction(), operand.get().getDef());
+      checkLegalType(I->getFunction(), operand.get());
     }
   }
 
@@ -618,11 +618,11 @@ public:
     bool Allocated = true;
     for (auto Inst = AI->getIterator(), E = SBB->end(); Inst != E; ++Inst) {
       if (LoadInst *LI = dyn_cast<LoadInst>(Inst))
-        if (LI->getOperand().getDef() == AI)
+        if (LI->getOperand() == AI)
           require(Allocated, "AllocStack used by Load outside its lifetime");
 
       if (StoreInst *SI = dyn_cast<StoreInst>(Inst))
-        if (SI->getDest().getDef() == AI)
+        if (SI->getDest() == AI)
           require(Allocated, "AllocStack used by Store outside its lifetime");
 
       if (DeallocStackInst *DSI = dyn_cast<DeallocStackInst>(Inst))
@@ -2875,7 +2875,7 @@ public:
           SILValue op = i.getOperand(0);
           require(!stack.empty(),
                   "stack dealloc with empty stack");
-          require(op.getDef() == stack.back(),
+          require(op == stack.back(),
                   "stack dealloc does not match most recent stack alloc");
           stack.pop_back();
         }

@@ -112,7 +112,7 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
     if (ReturnInst *RI = dyn_cast<ReturnInst>(CalleeEntryBB->getTerminator())) {
       // Replace all uses of the apply instruction with the operands of the
       // return instruction, appropriately mapped.
-      nonTryAI->replaceAllUsesWith(remapValue(RI->getOperand()).getDef());
+      nonTryAI->replaceAllUsesWith(remapValue(RI->getOperand()));
       return true;
     }
   }

@@ -43,25 +43,25 @@ bool swift::pointsToLocalObject(SILValue V,
 /// Check if the value \p Value is known to be zero, non-zero or unknown.
 IsZeroKind swift::isZeroValue(SILValue Value) {
   // Inspect integer literals.
-  if (auto *L = dyn_cast<IntegerLiteralInst>(Value.getDef())) {
+  if (auto *L = dyn_cast<IntegerLiteralInst>(Value)) {
     if (!L->getValue())
       return IsZeroKind::Zero;
     return IsZeroKind::NotZero;
   }
 
   // Inspect Structs.
-  switch (Value.getDef()->getKind()) {
+  switch (Value->getKind()) {
     // Bitcast of zero is zero.
     case ValueKind::UncheckedTrivialBitCastInst:
     // Extracting from a zero class returns a zero.
     case ValueKind::StructExtractInst:
-      return isZeroValue(cast<SILInstruction>(Value.getDef())->getOperand(0));
+      return isZeroValue(cast<SILInstruction>(Value)->getOperand(0));
     default:
       break;
   }
 
   // Inspect casts.
-  if (auto *BI = dyn_cast<BuiltinInst>(Value.getDef())) {
+  if (auto *BI = dyn_cast<BuiltinInst>(Value)) {
     switch (BI->getBuiltinInfo().ID) {
       case BuiltinValueKind::IntToPtr:
       case BuiltinValueKind::PtrToInt:
@@ -89,7 +89,7 @@ IsZeroKind swift::isZeroValue(SILValue Value) {
   }
 
   // Handle results of XXX_with_overflow arithmetic.
-  if (auto *T = dyn_cast<TupleExtractInst>(Value.getDef())) {
+  if (auto *T = dyn_cast<TupleExtractInst>(Value)) {
     // Make sure we are extracting the number value and not
     // the overflow flag.
     if (T->getFieldNo() != 0)
@@ -103,9 +103,9 @@ IsZeroKind swift::isZeroValue(SILValue Value) {
   }
 
   //Inspect allocations and pointer literals.
-  if (isa<StringLiteralInst>(Value.getDef()) ||
-      isa<AllocationInst>(Value.getDef()) ||
-      isa<GlobalAddrInst>(Value.getDef()))
+  if (isa<StringLiteralInst>(Value) ||
+      isa<AllocationInst>(Value) ||
+      isa<GlobalAddrInst>(Value))
     return IsZeroKind::NotZero;
 
   return IsZeroKind::Unknown;
@@ -116,7 +116,7 @@ IsZeroKind swift::isZeroValue(SILValue Value) {
 Optional<bool> swift::computeSignBit(SILValue V) {
   SILValue Value = V;
   while (true) {
-    auto *Def = Value.getDef();
+    ValueBase *Def = Value;
     // Inspect integer literals.
     if (auto *L = dyn_cast<IntegerLiteralInst>(Def)) {
       if (L->getValue().isNonNegative())

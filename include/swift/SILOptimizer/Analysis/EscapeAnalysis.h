@@ -444,7 +444,7 @@ public:
 
     /// Gets or creates a node for a SILValue (same as above).
    CGNode *getNode(SILValue V, EscapeAnalysis *EA) {
-      return getNode(V.getDef(), EA, true);
+      return getNode(V, EA, true);
     }
 
     /// Gets or creates a content node to which \a AddrNode points to.
@@ -541,7 +541,7 @@ public:
 
     /// Gets or creates a node for a SILValue (same as above).
     CGNode *getNodeOrNull(SILValue V, EscapeAnalysis *EA) {
-      return getNode(V.getDef(), EA, false);
+      return getNode(V, EA, false);
     }
 
     /// Returns the number of use-points of a node.

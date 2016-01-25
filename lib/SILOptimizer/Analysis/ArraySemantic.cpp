@@ -230,7 +230,7 @@ static bool canHoistArrayArgument(ApplyInst *SemanticsCall, SILValue Arr,
       Convention != ParameterConvention::Direct_Guaranteed)
     return false;
 
-  auto *SelfVal = Arr.getDef();
+  ValueBase *SelfVal = Arr;
   auto *SelfBB = SelfVal->getParentBB();
   if (DT->dominates(SelfBB, InsertBefore->getParent()))
     return true;
@@ -238,13 +238,13 @@ static bool canHoistArrayArgument(ApplyInst *SemanticsCall, SILValue Arr,
   if (auto LI = dyn_cast<LoadInst>(SelfVal)) {
     // Are we loading a value from an address in a struct defined at a point
     // dominating the hoist point.
-    auto Val = LI->getOperand().getDef();
+    auto Val = LI->getOperand();
     bool DoesNotDominate;
     StructElementAddrInst *SEI;
     while ((DoesNotDominate = !DT->dominates(Val->getParentBB(),
                                              InsertBefore->getParent())) &&
            (SEI = dyn_cast<StructElementAddrInst>(Val)))
-      Val = SEI->getOperand().getDef();
+      Val = SEI->getOperand();
     return !DoesNotDominate;
   }
 
@@ -271,7 +271,7 @@ bool swift::ArraySemanticsCall::canHoist(SILInstruction *InsertBefore,
 
   case ArrayCallKind::kCheckSubscript: {
     auto IsNativeArg = getArrayPropertyIsNativeTypeChecked();
-    ArraySemanticsCall IsNative(IsNativeArg.getDef(),
+    ArraySemanticsCall IsNative(IsNativeArg,
                                 "array.props.isNativeTypeChecked", true);
     if (!IsNative) {
       // Do we have a constant parameter?
@@ -299,19 +299,19 @@ bool swift::ArraySemanticsCall::canHoist(SILInstruction *InsertBefore,
 static SILValue copyArrayLoad(SILValue ArrayStructValue,
                                SILInstruction *InsertBefore,
                                DominanceInfo *DT) {
-  if (DT->dominates(ArrayStructValue.getDef()->getParentBB(),
+  if (DT->dominates(ArrayStructValue->getParentBB(),
                     InsertBefore->getParent()))
     return ArrayStructValue;
 
-  auto *LI = cast<LoadInst>(ArrayStructValue.getDef());
+  auto *LI = cast<LoadInst>(ArrayStructValue);
 
   // Recursively move struct_element_addr.
-  auto *Val = LI->getOperand().getDef();
+  ValueBase *Val = LI->getOperand();
   auto *InsertPt = InsertBefore;
   while (!DT->dominates(Val->getParentBB(), InsertBefore->getParent())) {
     auto *Inst = cast<StructElementAddrInst>(Val);
     Inst->moveBefore(InsertPt);
-    Val = Inst->getOperand().getDef();
+    Val = Inst->getOperand();
     InsertPt = Inst;
   }
 
@@ -393,7 +393,7 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
     if (Kind == ArrayCallKind::kCheckSubscript) {
       // Copy the array.props argument call.
       auto IsNativeArg = getArrayPropertyIsNativeTypeChecked();
-      ArraySemanticsCall IsNative(IsNativeArg.getDef(),
+      ArraySemanticsCall IsNative(IsNativeArg,
                                   "array.props.isNativeTypeChecked", true);
       if (!IsNative) {
         // Do we have a constant parameter?
@@ -465,9 +465,9 @@ void swift::ArraySemanticsCall::removeCall() {
   break;
   case ArrayCallKind::kGetElement: {
     // Remove the matching isNativeTypeChecked and check_subscript call.
-    ArraySemanticsCall IsNative(SemanticsCall->getArgument(2).getDef(),
+    ArraySemanticsCall IsNative(SemanticsCall->getArgument(2),
                                 "array.props.isNativeTypeChecked");
-    ArraySemanticsCall SubscriptCheck(SemanticsCall->getArgument(3).getDef(),
+    ArraySemanticsCall SubscriptCheck(SemanticsCall->getArgument(3),
                                       "array.check_subscript");
     if (SubscriptCheck)
       SubscriptCheck.removeCall();
@@ -634,7 +634,7 @@ bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
 
   // Expect a check_subscript call or the empty dependence.
   auto SubscriptCheck = SemanticsCall->getArgument(3);
-  ArraySemanticsCall Check(SubscriptCheck.getDef(), "array.check_subscript");
+  ArraySemanticsCall Check(SubscriptCheck, "array.check_subscript");
   auto *EmptyDep = dyn_cast<StructInst>(SubscriptCheck);
   if (!Check && (!EmptyDep || !EmptyDep->getElements().empty()))
     return false;

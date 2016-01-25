@@ -1498,7 +1498,7 @@ ID SILPrinter::getID(SILValue V) {
     V->getParentBB()->getParent()->numberValues(ValueToIDMap);
   }
 
-  ID R = { ID::SSAValue, ValueToIDMap[V.getDef()] };
+  ID R = { ID::SSAValue, ValueToIDMap[V] };
   return R;
 }
 

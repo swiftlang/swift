@@ -106,7 +106,7 @@ static SILInstruction *optimizeBuiltinWithSameOperands(SILBuilder &Builder,
     // We cannot just _return_ the operand because it is not necessarily an
     // instruction. It can be an argument.
     SILValue Op = I->getOperand(0);
-    C->replaceInstUsesWith(*I, Op.getDef());
+    C->replaceInstUsesWith(*I, Op);
     break;
   }
 
@@ -334,7 +334,7 @@ SILInstruction *optimizeBitOp(BuiltinInst *BI,
   }
   if (isNeutral(bits))
     // The bit operation has no effect, e.g. x | 0 -> x
-    return C->replaceInstUsesWith(*BI, op.getDef());
+    return C->replaceInstUsesWith(*BI, op);
 
   if (isZero(bits))
     // The bit operation yields to a constant, e.g. x & 0 -> 0
@@ -451,7 +451,7 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
               m_BuiltinInst(BuiltinValueKind::PtrToInt, m_ValueBase()))) {
       if (Indexraw->getOperand(0) == Bytes2->getOperand(0) &&
           Indexraw->getOperand(1)->getType() == I->getType()) {
-        replaceInstUsesWith(*I, Indexraw->getOperand(1).getDef());
+        replaceInstUsesWith(*I, Indexraw->getOperand(1));
         return eraseInstFromFunction(*I);
       }
     }

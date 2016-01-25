@@ -902,7 +902,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
     unsigned Index = OpNo - 1 + FirstIndex;
     if (PromotableIndices.count(Index)) {
       SILValue BoxValue = PAI->getOperand(OpNo);
-      AllocBoxInst *ABI = cast<AllocBoxInst>(BoxValue.getDef());
+      AllocBoxInst *ABI = cast<AllocBoxInst>(BoxValue);
 
       SILParameterInfo CPInfo = CalleePInfo[Index];
       assert(CPInfo.getSILType() == BoxValue->getType() &&

@@ -2513,7 +2513,7 @@ static bool lowerRawSILOperations(SILFunction &Fn) {
 
       // mark_uninitialized just becomes a noop, resolving to its operand.
       if (auto *MUI = dyn_cast<MarkUninitializedInst>(Inst)) {
-        MUI->replaceAllUsesWith(MUI->getOperand().getDef());
+        MUI->replaceAllUsesWith(MUI->getOperand());
         MUI->eraseFromParent();
         Changed = true;
         continue;

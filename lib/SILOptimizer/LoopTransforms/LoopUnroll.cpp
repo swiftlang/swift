@@ -56,7 +56,7 @@ public:
 
 protected:
   SILValue remapValue(SILValue V) {
-    if (auto *BB = V.getDef()->getParentBB()) {
+    if (auto *BB = V->getParentBB()) {
       if (!Loop->contains(BB))
         return V;
     }
@@ -140,7 +140,7 @@ static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
     return None;
 
   auto *Start = dyn_cast_or_null<IntegerLiteralInst>(
-      RecArg->getIncomingValue(Preheader).getDef());
+      RecArg->getIncomingValue(Preheader));
   if (!Start)
     return None;
 
@@ -290,7 +290,7 @@ static void collectLoopLiveOutValues(
         // Is this use outside the loop.
         if (!Loop->contains(Op->getUser())) {
           auto UsedValue = Op->get();
-          assert(UsedValue.getDef() == &Inst && "Instructions must match");
+          assert(UsedValue == &Inst && "Instructions must match");
           assert(ClonedInstructions.count(&Inst) && "Unmapped instruction!");
 
           if (!LoopLiveOutValues.count(UsedValue))
@@ -390,7 +390,7 @@ static bool tryToUnrollLoop(SILLoop *Loop) {
         // Otherwise, consult the instruction map.
         else
           MappedValue = Cloner
-                  .getInstMap()[cast<SILInstruction>(MapEntry.first.getDef())];
+                  .getInstMap()[cast<SILInstruction>(MapEntry.first)];
         MapEntry.second.push_back(MappedValue);
         assert(MapEntry.second.size() == Cnt);
       }

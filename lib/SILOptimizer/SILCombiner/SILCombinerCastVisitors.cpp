@@ -178,7 +178,7 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
       if (InstanceType.getAddressType() != PTAI->getType())
         return nullptr;
 
-      auto IRPI = cast<IndexRawPointerInst>(PTAI->getOperand().getDef());
+      auto IRPI = cast<IndexRawPointerInst>(PTAI->getOperand());
       SILValue Ptr = IRPI->getOperand(0);
       SILValue Distance = Bytes->getArguments()[0];
       auto *NewPTAI =

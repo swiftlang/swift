@@ -86,7 +86,7 @@ static bool foldInverseReabstractionThunks(PartialApplyInst *PAI,
   // Replace the partial_apply(partial_apply(X)) by X and remove the
   // partial_applies.
 
-  Combiner->replaceInstUsesWith(*PAI, PAI2->getArgument(0).getDef());
+  Combiner->replaceInstUsesWith(*PAI, PAI2->getArgument(0));
   Combiner->eraseInstFromFunction(*PAI);
   assert(hasNoUsesExceptDebug(PAI2) && "Should not have any uses");
   Combiner->eraseInstFromFunction(*PAI2);
@@ -578,7 +578,7 @@ static SILValue getInitOrOpenExistential(AllocStackInst *ASI, SILValue &Src) {
       continue;
     if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
       if (!FoundCAI && !FoundIEAI) {
-        if (CAI->getDest().getDef() == ASI)
+        if (CAI->getDest() == ASI)
           FoundCAI = CAI;
       }
       continue;
@@ -1199,7 +1199,7 @@ bool SILCombiner::optimizeIdentityCastComposition(ApplyInst *FInverse,
   emitMatchingRCAdjustmentsForCall(FInverse, X);
 
   // Replace users of f_inverse by x.
-  replaceInstUsesWith(*FInverse, X.getDef());
+  replaceInstUsesWith(*FInverse, X);
 
   // Remove the calls.
   eraseInstFromFunction(*FInverse);

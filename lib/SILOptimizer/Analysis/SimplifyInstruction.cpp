@@ -513,11 +513,11 @@ static SILValue simplifyBuiltin(BuiltinInst *BI) {
                                                m_SILValue(val2)))))) {
 
       if (val2 == val3)
-        return val1.getDef();
+        return val1;
       if (val1 == val3)
-        return val2.getDef();
+        return val2;
       if (val1 == val2)
-        return val3.getDef();
+        return val3;
     }
   }
   }

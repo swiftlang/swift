@@ -65,7 +65,7 @@ static ValueBase *skipProjections(ValueBase *V) {
   for (;;) {
     if (!isProjection(V))
       return V;
-    V = cast<SILInstruction>(V)->getOperand(0).getDef();
+    V = cast<SILInstruction>(V)->getOperand(0);
   }
   llvm_unreachable("there is no escape from an infinite loop");
 }
@@ -395,7 +395,7 @@ void EscapeAnalysis::ConnectionGraph::computeUsePoints() {
           /// liferange. And that must be a releasing instruction.
           int ValueIdx = -1;
           for (const Operand &Op : I.getAllOperands()) {
-            ValueBase *OpV = Op.get().getDef();
+            ValueBase *OpV = Op.get();
             if (CGNode *OpNd = lookupNode(skipProjections(OpV))) {
               if (ValueIdx < 0) {
                 ValueIdx = addUsePoint(OpNd, &I);
@@ -1379,13 +1379,13 @@ bool EscapeAnalysis::deinitIsKnownToNotCapture(SILValue V) {
     // Check all operands of a partial_apply
     if (auto *PAI = dyn_cast<PartialApplyInst>(V)) {
       for (Operand &Op : PAI->getAllOperands()) {
-        if (isPointer(Op.get().getDef()) && !deinitIsKnownToNotCapture(Op.get()))
+        if (isPointer(Op.get()) && !deinitIsKnownToNotCapture(Op.get()))
           return false;
       }
       return true;
     }
-    if (isProjection(V.getDef())) {
-      V = dyn_cast<SILInstruction>(V.getDef())->getOperand(0);
+    if (isProjection(V)) {
+      V = dyn_cast<SILInstruction>(V)->getOperand(0);
       continue;
     }
     return false;
@@ -1404,8 +1404,8 @@ void EscapeAnalysis::setAllEscaping(SILInstruction *I,
   // In this case we don't even create a node for the resulting int value.
   for (const Operand &Op : I->getAllOperands()) {
     SILValue OpVal = Op.get();
-    if (!isNonWritableMemoryAddress(OpVal.getDef()))
-      setEscapesGlobal(ConGraph, OpVal.getDef());
+    if (!isNonWritableMemoryAddress(OpVal))
+      setEscapesGlobal(ConGraph, OpVal);
   }
   // Even if the instruction does not write memory it could e.g. return the
   // address of global memory. Therefore we have to define it as escaping.
