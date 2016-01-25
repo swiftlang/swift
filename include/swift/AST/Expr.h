@@ -752,7 +752,7 @@ public:
     return Segments.front()->getStartLoc();
   }
   SourceLoc getEndLoc() const {
-    return Segments.front()->getEndLoc();
+    return Segments.back()->getEndLoc();
   }
   
   static bool classof(const Expr *E) {
