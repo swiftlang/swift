@@ -211,14 +211,6 @@ private:
   {
   }
 
-  static CanArchetypeType getArchetypeForSelf(CanType selfType) {
-    if (auto mt = dyn_cast<MetatypeType>(selfType)) {
-      return cast<ArchetypeType>(mt.getInstanceType());
-    } else {
-      return cast<ArchetypeType>(selfType);
-    }
-  }
-
   /// Build a clause that looks like 'origParamType' but uses 'selfType'
   /// in place of the underlying archetype.
   static CanType buildSubstSelfType(CanType origParamType, CanType selfType,
@@ -238,31 +230,16 @@ private:
     }
 
     assert(isa<MetatypeType>(origParamType) == isa<MetatypeType>(selfType));
-
-    if (auto mt = dyn_cast<MetatypeType>(origParamType))
-      assert(mt.getInstanceType()->isTypeParameter());
-    else
-      assert(origParamType->isTypeParameter());
-
-    if (auto mt = dyn_cast<MetatypeType>(selfType))
-      assert(isa<ArchetypeType>(mt.getInstanceType()));
-    else
-      assert(isa<ArchetypeType>(selfType));
+    assert(origParamType->getRValueInstanceType()->isTypeParameter());
+    assert(selfType->getRValueInstanceType()->is<ArchetypeType>());
 
     return selfType;
   }
 
-  CanType getWitnessMethodSelfType() const {
-    CanType type = SubstFormalType.getInput();
-    if (auto tuple = dyn_cast<TupleType>(type)) {
-      assert(tuple->getNumElements() == 1);
-      type = tuple.getElementType(0);
-    }
-    if (auto lv = dyn_cast<InOutType>(type)) {
-      type = lv.getObjectType();
-    }
-    assert(getArchetypeForSelf(type));
-    return type;
+  CanArchetypeType getWitnessMethodSelfType() const {
+    return cast<ArchetypeType>(SubstFormalType.getInput()
+        ->getRValueInstanceType()
+        ->getCanonicalType());
   }
 
   CanSILFunctionType getSubstFunctionType(SILGenModule &SGM,
@@ -548,8 +525,7 @@ public:
       // Look up the witness for the archetype.
       auto proto = Constant.getDecl()->getDeclContext()
                                      ->isProtocolOrProtocolExtensionContext();
-      auto selfType = getWitnessMethodSelfType();
-      auto archetype = getArchetypeForSelf(selfType);
+      auto archetype = getWitnessMethodSelfType();
       // Get the openend existential value if the archetype is an opened
       // existential type.
       SILValue OpenedExistential;
