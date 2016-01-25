@@ -1874,18 +1874,36 @@ public:
 /// the initializer can be null if there is none.
 class PatternBindingEntry {
   Pattern *ThePattern;
-  llvm::PointerIntPair<Expr *, 1, bool> InitAndChecked;
-  
+
+  enum class Flags {
+    Checked = 1 << 0,
+    Removed = 1 << 1
+  };
+
+  // When the initializer is removed we don't actually clear the pointer
+  // because we might need to get initializer's source range. Since the
+  // initializer is ASTContext-allocated it is safe.
+  llvm::PointerIntPair<Expr *, 2, OptionSet<Flags>> InitCheckedAndRemoved;
+
 public:
   PatternBindingEntry(Pattern *P, Expr *E)
-    : ThePattern(P), InitAndChecked(E, false) {}
+    : ThePattern(P), InitCheckedAndRemoved(E, {}) {}
 
   Pattern *getPattern() const { return ThePattern; }
   void setPattern(Pattern *P) { ThePattern = P; }
-  Expr *getInit() const { return InitAndChecked.getPointer(); }
-  void setInit(Expr *E) { InitAndChecked.setPointer(E); }
-  bool isInitializerChecked() const { return InitAndChecked.getInt(); }
-  void setInitializerChecked() { InitAndChecked.setInt(true); }
+  Expr *getInit() const {
+    return (InitCheckedAndRemoved.getInt().contains(Flags::Removed))
+      ? nullptr : InitCheckedAndRemoved.getPointer();
+  }
+  SourceRange getOrigInitRange() const;
+  void setInit(Expr *E);
+  bool isInitializerChecked() const {
+    return InitCheckedAndRemoved.getInt().contains(Flags::Checked);
+  }
+  void setInitializerChecked() {
+    InitCheckedAndRemoved.setInt(
+      InitCheckedAndRemoved.getInt() | Flags::Checked);
+  }
 };
 
 /// \brief This decl contains a pattern and optional initializer for a set
@@ -1923,11 +1941,7 @@ public:
                                     StaticSpellingKind StaticSpelling,
                                     SourceLoc VarLoc,
                                     Pattern *Pat, Expr *E,
-                                    DeclContext *Parent) {
-    return create(Ctx, StaticLoc, StaticSpelling, VarLoc,
-                  PatternBindingEntry(Pat, E), Parent);
-  }
-
+                                    DeclContext *Parent);
 
   SourceLoc getStartLoc() const {
     return StaticLoc.isValid() ? StaticLoc : VarLoc;
@@ -1945,6 +1959,10 @@ public:
     return getPatternList()[i].getInit();
   }
   
+  SourceRange getOrigInitRange(unsigned i) const {
+    return getPatternList()[i].getOrigInitRange();
+  }
+
   void setInit(unsigned i, Expr *E) {
     getMutablePatternList()[i].setInit(E);
   }
