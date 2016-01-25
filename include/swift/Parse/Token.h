@@ -262,6 +262,9 @@ public:
     return SourceLoc(llvm::SMLoc::getFromPointer(trimComment().begin()));
   }
 
+  StringRef getRawText() const {
+    return Text;
+  }
 
   StringRef getText() const {
     if (EscapedIdentifier) {
