@@ -23,6 +23,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -306,7 +307,7 @@ static bool tryToSpeculateTarget(FullApplySite AI,
   // Strip any upcasts off of our 'self' value, potentially leaving us
   // with a value whose type is closer (in the class hierarchy) to the
   // actual dynamic type.
-  auto SubTypeValue = CMI->getOperand().stripUpCasts();
+  auto SubTypeValue = stripUpCasts(CMI->getOperand());
   SILType SubType = SubTypeValue.getType();
 
   // Bail if any generic types parameters of the class instance type are

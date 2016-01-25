@@ -21,6 +21,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Statistic.h"
@@ -224,7 +225,7 @@ static SILValue getInstanceWithExactDynamicType(SILValue S, SILModule &M,
                                                 ClassHierarchyAnalysis *CHA) {
 
   while (S) {
-    S = S.stripCasts();
+    S = stripCasts(S);
     if (isa<AllocRefInst>(S) || isa<MetatypeInst>(S))
       return S;
 
@@ -829,7 +830,7 @@ swift::tryDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA) {
   /// %YY = function_ref @...
   if (auto *CMI = dyn_cast<ClassMethodInst>(AI.getCallee())) {
     auto &M = AI.getModule();
-    auto Instance = CMI->getOperand().stripUpCasts();
+    auto Instance = stripUpCasts(CMI->getOperand());
     auto ClassType = Instance.getType();
     if (ClassType.is<MetatypeType>())
       ClassType = ClassType.getMetatypeInstanceType(M);

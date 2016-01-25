@@ -34,6 +34,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
@@ -123,7 +124,7 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
       // destructor. RefCountingOperations on other instructions could have side
       // effects though.
       if (auto *RefInst = dyn_cast<RefCountingInst>(&I)) {
-        if (RefInst->getOperand(0).stripCasts().getDef() == Self) {
+        if (stripCasts(RefInst->getOperand(0)) == Self) {
           // For now all ref counting insts have 1 operand. Put in an assert
           // just in case.
           assert(RefInst->getNumOperands() == 1 &&
@@ -148,7 +149,7 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
       // dealloc_ref on self can be ignored, but dealloc_ref on anything else
       // cannot be eliminated.
       if (auto *DeallocRef = dyn_cast<DeallocRefInst>(&I)) {
-        if (DeallocRef->getOperand().stripCasts().getDef() == Self) {
+        if (stripCasts(DeallocRef->getOperand()).getDef() == Self) {
           DEBUG(llvm::dbgs() << "            SAFE! dealloc_ref on self.\n");
           continue;
         } else {
@@ -160,7 +161,7 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
 
       // Storing into the object can be ignored.
       if (auto *SI = dyn_cast<StoreInst>(&I))
-        if (SI->getDest().stripAddressProjections().getDef() == Self) {
+        if (stripAddressProjections(SI->getDest()).getDef() == Self) {
           DEBUG(llvm::dbgs() << "            SAFE! Instruction is a store into "
                 "self.\n");
           continue;

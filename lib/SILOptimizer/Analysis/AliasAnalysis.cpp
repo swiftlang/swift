@@ -23,6 +23,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -220,7 +221,7 @@ AliasResult AliasAnalysis::aliasAddressProjection(SILValue V1, SILValue V2,
     // aliases O1. If so, then we know that V2 must partially alias V1 via a
     // must alias relation on O1. This ensures that given an alloc_stack and a
     // gep from that alloc_stack, we say that they partially alias.
-    if (isSameValueOrGlobal(O1, V2.stripCasts()))
+    if (isSameValueOrGlobal(O1, stripCasts(V2)))
       return AliasResult::PartialAlias;
 
     return AliasResult::MayAlias;
@@ -576,8 +577,8 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
 #endif
 
   // Strip off any casts on V1, V2.
-  V1 = V1.stripCasts();
-  V2 = V2.stripCasts();
+  V1 = stripCasts(V1);
+  V2 = stripCasts(V2);
   DEBUG(llvm::dbgs() << "        After Cast Stripping V1:" << *V1.getDef());
   DEBUG(llvm::dbgs() << "        After Cast Stripping V2:" << *V2.getDef());
 

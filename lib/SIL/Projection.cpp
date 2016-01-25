@@ -14,6 +14,7 @@
 #include "swift/SIL/Projection.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/DebugUtils.h"
 #include "llvm/ADT/None.h"
 #include "llvm/Support/Debug.h"
@@ -1127,7 +1128,7 @@ ProjectionPath::getAddrProjectionPath(SILValue Start, SILValue End,
   // End is a projection at all.
   auto Iter = End;
   if (IgnoreCasts)
-    Iter = Iter.stripCasts();
+    Iter = stripCasts(Iter);
   bool NextAddrIsIndex = false;
   while (Projection::isAddrProjection(Iter) && Start != Iter) {
     Projection AP = *Projection::addressProjectionForValue(Iter);
@@ -1136,7 +1137,7 @@ ProjectionPath::getAddrProjectionPath(SILValue Start, SILValue End,
 
     Iter = cast<SILInstruction>(*Iter).getOperand(0);
     if (IgnoreCasts)
-      Iter = Iter.stripCasts();
+      Iter = stripCasts(Iter);
   }
 
   // Return None if we have an empty projection list or if Start == Iter.

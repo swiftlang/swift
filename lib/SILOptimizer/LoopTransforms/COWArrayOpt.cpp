@@ -19,6 +19,7 @@
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
@@ -50,7 +51,7 @@ COWViewCFGFunction("view-cfg-before-cow-for", llvm::cl::init(""),
 /// distinguish between indexing and subelement access. The same index could
 /// either refer to the next element (indexed) or a subelement.
 static SILValue getAccessPath(SILValue V, SmallVectorImpl<unsigned>& Path) {
-  V = V.stripCasts();
+  V = stripCasts(V);
   ProjectionIndex PI(V.getDef());
   if (!PI.isValid() || V->getKind() == ValueKind::IndexAddrInst)
     return V;
@@ -785,12 +786,12 @@ bool COWArrayOpt::checkSafeElementValueUses(UserOperList &ElementValueUsers) {
   return true;
 }
 static bool isArrayEltStore(StoreInst *SI) {
-  SILValue Dest = SI->getDest().stripAddressProjections();
+  SILValue Dest = stripAddressProjections(SI->getDest());
   if (auto *MD = dyn_cast<MarkDependenceInst>(Dest))
     Dest = MD->getOperand(0);
 
   if (auto *PtrToAddr =
-          dyn_cast<PointerToAddressInst>(Dest.stripAddressProjections()))
+          dyn_cast<PointerToAddressInst>(stripAddressProjections(Dest)))
     if (auto *SEI = dyn_cast<StructExtractInst>(PtrToAddr->getOperand())) {
       ArraySemanticsCall Call(SEI->getOperand().getDef());
       if (Call && Call.getKind() == ArrayCallKind::kGetElementAddress)
@@ -1414,7 +1415,7 @@ void COWArrayOpt::hoistMakeMutableAndSelfProjection(
     ArraySemanticsCall MakeMutable, bool HoistProjection) {
   // Hoist projections.
   if (HoistProjection)
-    MakeMutable.getSelfOperand().hoistAddressProjections(
+    hoistAddressProjections(MakeMutable.getSelfOperand(),
       Preheader->getTerminator(), DomTree);
 
   assert(MakeMutable.canHoist(Preheader->getTerminator(), DomTree) &&
@@ -1432,7 +1433,7 @@ bool COWArrayOpt::hoistMakeMutable(ArraySemanticsCall MakeMutable) {
 
   // We can hoist address projections (even if they are only conditionally
   // executed).
-  auto ArrayAddrBase = CurrentArrayAddr.stripAddressProjections();
+  auto ArrayAddrBase = stripAddressProjections(CurrentArrayAddr);
   SILBasicBlock *ArrayAddrBaseBB = ArrayAddrBase.getDef()->getParentBB();
 
   if (ArrayAddrBaseBB && !DomTree->dominates(ArrayAddrBaseBB, Preheader)) {

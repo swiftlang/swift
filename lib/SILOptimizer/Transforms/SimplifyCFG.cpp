@@ -18,6 +18,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/Analysis/ProgramTerminationAnalysis.h"
@@ -267,7 +268,7 @@ SimplifyCFG::trySimplifyCheckedCastBr(TermInst *Term, DominanceInfo *DT) {
 
 static SILValue getTerminatorCondition(TermInst *Term) {
   if (auto *CondBr = dyn_cast<CondBranchInst>(Term))
-    return CondBr->getCondition().stripExpectIntrinsic();
+    return stripExpectIntrinsic(CondBr->getCondition());
 
   if (auto *SEI = dyn_cast<SwitchEnumInst>(Term))
     return SEI->getOperand();
@@ -578,7 +579,7 @@ static bool tryDominatorBasedSimplifications(
     for (auto *UserInst : UsersToReplace) {
       SILInstruction *EdgeValue = nullptr;
       for (auto &Op : UserInst->getAllOperands()) {
-        if (Op.get().stripExpectIntrinsic() == DominatingCondition) {
+        if (stripExpectIntrinsic(Op.get()) == DominatingCondition) {
           if (!EdgeValue)
             EdgeValue = createValueForEdge(UserInst, DominatingTerminator, Idx);
           Op.set(EdgeValue);
@@ -1294,7 +1295,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   // This looks through expect intrinsic calls and applies the ultimate expect
   // call inverted to the condition.
   if (auto *Xor =
-          dyn_cast<BuiltinInst>(BI->getCondition().stripExpectIntrinsic())) {
+          dyn_cast<BuiltinInst>(stripExpectIntrinsic(BI->getCondition()))) {
     if (Xor->getBuiltinInfo().ID == BuiltinValueKind::Xor) {
       // Check if it's a boolean inversion of the condition.
       OperandValueArrayRef Args = Xor->getArguments();

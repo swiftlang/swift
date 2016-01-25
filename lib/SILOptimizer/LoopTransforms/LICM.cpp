@@ -27,6 +27,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/InstructionUtils.h"
 
 #include "llvm/ADT/DepthFirstIterator.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -125,7 +126,7 @@ static bool hasLoopInvariantOperands(SILInstruction *I, SILLoop *L) {
 
 /// Check if an address does not depend on other values in a basic block.
 static SILInstruction *addressIndependent(SILValue Addr) {
-  Addr = Addr.stripCasts();
+  Addr = stripCasts(Addr);
   if (GlobalAddrInst *SGAI = dyn_cast<GlobalAddrInst>(Addr))
     return SGAI;
   if (StructElementAddrInst *SEAI = dyn_cast<StructElementAddrInst>(Addr))

@@ -648,6 +648,13 @@ void replaceLoadSequence(SILInstruction *I,
 /// be reached by calling the function represented by Decl?
 bool calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl);
 
+/// Hoist the address projection rooted in \p Op to \p InsertBefore.
+/// Requires the projected value to dominate the insertion point.
+///
+/// Will look through single basic block predecessor arguments.
+void hoistAddressProjections(Operand &Op, SILInstruction *InsertBefore,
+                             DominanceInfo *DomTree);
+
 } // end namespace swift
 
 #endif

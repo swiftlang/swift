@@ -194,42 +194,6 @@ public:
   /// (see comment in DebugUtils.h).
   inline bool hasOneUse() const { return Value->hasOneUse(); }
 
-  /// Return the underlying SILValue after stripping off all casts from the
-  /// current SILValue.
-  SILValue stripCasts();
-
-  /// Return the underlying SILValue after stripping off all upcasts from the
-  /// current SILValue.
-  SILValue stripUpCasts();
-
-  /// Return the underlying SILValue after stripping off all
-  /// upcasts and downcasts.
-  SILValue stripClassCasts();
-
-  /// Return the underlying SILValue after stripping off all casts and
-  /// address projection instructions.
-  ///
-  /// An address projection instruction is one of one of ref_element_addr,
-  /// struct_element_addr, tuple_element_addr.
-  SILValue stripAddressProjections();
-
-  /// Return the underlying SILValue after stripping off all aggregate projection
-  /// instructions.
-  ///
-  /// An aggregate projection instruction is either a struct_extract or a
-  /// tuple_extract instruction.
-  SILValue stripValueProjections();
-
-  /// Return the underlying SILValue after stripping off all indexing
-  /// instructions.
-  ///
-  /// An indexing inst is either index_addr or index_raw_pointer.
-  SILValue stripIndexingInsts();
-
-  /// Returns the underlying value after stripping off a builtin expect
-  /// intrinsic call.
-  SILValue stripExpectIntrinsic();
-
   void dump() const;
   void print(raw_ostream &os) const;
 
@@ -335,13 +299,6 @@ public:
   /// getOperandNumber - Return which operand this is in the operand list of the
   /// using instruction.
   unsigned getOperandNumber() const;
-
-  /// Hoist the address projection rooted in this operand to \p InsertBefore.
-  /// Requires the projected value to dominate the insertion point.
-  ///
-  /// Will look through single basic block predecessor arguments.
-  void hoistAddressProjections(SILInstruction *InsertBefore,
-                               DominanceInfo *DomTree);
 
 private:
   void removeFromCurrent() {

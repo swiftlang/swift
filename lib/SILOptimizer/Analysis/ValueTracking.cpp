@@ -16,24 +16,12 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SIL/PatternMatch.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
 using namespace swift::PatternMatch;
-
-/// Strip off casts/indexing insts/address projections from V until there is
-/// nothing left to strip.
-/// FIXME: Maybe put this on SILValue?
-/// FIXME: Why don't we strip projections after stripping indexes?
-SILValue swift::getUnderlyingObject(SILValue V) {
-  while (true) {
-    SILValue V2 = V.stripCasts().stripAddressProjections().stripIndexingInsts();
-    if (V2 == V)
-      return V2;
-    V = V2;
-  }
-}
 
 bool swift::isNotAliasingArgument(SILValue V,
                                   InoutAliasingAssumption isInoutAliasing) {

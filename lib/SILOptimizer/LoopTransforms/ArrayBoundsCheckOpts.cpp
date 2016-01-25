@@ -33,6 +33,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/InstructionUtils.h"
 
 #include "llvm/ADT/DepthFirstIterator.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -113,7 +114,7 @@ static bool isArrayEltStore(StoreInst *SI) {
     Dest = MD->getOperand(0);
 
   if (auto *PtrToAddr =
-          dyn_cast<PointerToAddressInst>(Dest.stripAddressProjections()))
+          dyn_cast<PointerToAddressInst>(stripAddressProjections(Dest)))
     if (auto *SEI = dyn_cast<StructExtractInst>(PtrToAddr->getOperand())) {
       ArraySemanticsCall Call(SEI->getOperand().getDef());
       if (Call && Call.getKind() == ArrayCallKind::kGetElementAddress)

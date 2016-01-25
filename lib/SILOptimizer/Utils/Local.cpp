@@ -20,6 +20,7 @@
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -1699,7 +1700,7 @@ simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
 SILInstruction *
 CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   if (Inst->isExact()) {
-    auto *ARI = dyn_cast<AllocRefInst>(Inst->getOperand().stripUpCasts());
+    auto *ARI = dyn_cast<AllocRefInst>(stripUpCasts(Inst->getOperand()));
     if (!ARI)
       return nullptr;
 
@@ -2375,3 +2376,53 @@ bool swift::calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl) {
     return true;
   }
 }
+
+void swift::hoistAddressProjections(Operand &Op, SILInstruction *InsertBefore,
+                                    DominanceInfo *DomTree) {
+  SILValue V = Op.get();
+  SILInstruction *Prev = nullptr;
+  auto *InsertPt = InsertBefore;
+  while (true) {
+    SILValue Incoming = stripSinglePredecessorArgs(V);
+    
+    // Forward the incoming arg from a single predecessor.
+    if (V != Incoming) {
+      if (V == Op.get()) {
+        // If we are the operand itself set the operand to the incoming
+        // argument.
+        Op.set(Incoming);
+        V = Incoming;
+      } else {
+        // Otherwise, set the previous projections operand to the incoming
+        // argument.
+        assert(Prev && "Must have seen a projection");
+        Prev->setOperand(0, Incoming);
+        V = Incoming;
+      }
+    }
+    
+    switch (V->getKind()) {
+      case ValueKind::StructElementAddrInst:
+      case ValueKind::TupleElementAddrInst:
+      case ValueKind::RefElementAddrInst:
+      case ValueKind::UncheckedTakeEnumDataAddrInst: {
+        auto *Inst = cast<SILInstruction>(V);
+        // We are done once the current projection dominates the insert point.
+        if (DomTree->dominates(Inst->getParent(), InsertBefore->getParent()))
+          return;
+        
+        // Move the current projection and memorize it for the next iteration.
+        Prev = Inst;
+        Inst->moveBefore(InsertPt);
+        InsertPt = Inst;
+        V = Inst->getOperand(0);
+        continue;
+      }
+      default:
+        assert(DomTree->dominates(V->getParentBB(), InsertBefore->getParent()) &&
+               "The projected value must dominate the insertion point");
+        return;
+    }
+  }
+}
+

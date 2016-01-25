@@ -18,6 +18,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include <algorithm>
 
@@ -83,7 +84,7 @@ public:
     KnownSafe = false;
 
     // Initialize value.
-    RCRoot = I->getOperand(0).stripCasts();
+    RCRoot = stripCasts(I->getOperand(0));
 
     // Clear our insertion point list.
     InsertPts.clear();
