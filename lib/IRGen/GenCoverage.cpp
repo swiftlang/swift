@@ -100,7 +100,7 @@ void IRGenModule::emitCoverageMapping() {
     W.write(OS);
 
     auto *NameVal =
-        llvm::ConstantDataArray::getString(Ctx, M.getName(), true);
+        llvm::ConstantDataArray::getString(Ctx, M.getName(), false);
     auto *NameVar =
         new llvm::GlobalVariable(*getModule(), NameVal->getType(), true,
                                  llvm::GlobalValue::LinkOnceAnyLinkage, NameVal,
