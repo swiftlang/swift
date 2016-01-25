@@ -244,7 +244,7 @@ Type TypeChecker::resolveTypeInContext(
   auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl);
   DeclContext *typeParent = nullptr;
   assert((ownerNominal || nonTypeOwner) &&
-         "Owner must be a nominal type or an non type context");
+         "Owner must be a nominal type or a non type context");
 
   for (auto parentDC = fromDC; !parentDC->isModuleContext();
        parentDC = parentDC->getParent()) {
