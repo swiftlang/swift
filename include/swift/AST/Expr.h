@@ -19,6 +19,7 @@
 
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ConcreteDeclRef.h"
+#include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/Availability.h"
@@ -893,14 +894,14 @@ class DeclRefExpr : public Expr {
   /// \brief The declaration pointer or SpecializeInfo pointer if it was
   /// explicitly specialized with <...>.
   llvm::PointerUnion<ConcreteDeclRef, SpecializeInfo *> DOrSpecialized;
-  SourceLoc Loc;
+  DeclNameLoc Loc;
 
   SpecializeInfo *getSpecInfo() const {
     return DOrSpecialized.dyn_cast<SpecializeInfo*>();
   }
 
 public:
-  DeclRefExpr(ConcreteDeclRef D, SourceLoc Loc, bool Implicit,
+  DeclRefExpr(ConcreteDeclRef D, DeclNameLoc Loc, bool Implicit,
               AccessSemantics semantics = AccessSemantics::Ordinary,
               Type Ty = Type())
     : Expr(ExprKind::DeclRef, Implicit, Ty), DOrSpecialized(D), Loc(Loc) {
@@ -943,8 +944,10 @@ public:
       return Spec->GenericArgs;
     return ArrayRef<TypeRepr *>();
   }
-  SourceRange getSourceRange() const { return Loc; }
-  
+  SourceRange getSourceRange() const { return Loc.getSourceRange(); }
+  SourceLoc getLoc() const { return Loc.getBaseNameLoc(); }
+  DeclNameLoc getNameLoc() const { return Loc; }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::DeclRef;
   }
@@ -1025,10 +1028,10 @@ public:
 /// constructor' entry point referenced by a 'new' expression.
 class OtherConstructorDeclRefExpr : public Expr {
   ConcreteDeclRef Ctor;
-  SourceLoc Loc;
+  DeclNameLoc Loc;
   
 public:
-  OtherConstructorDeclRefExpr(ConcreteDeclRef Ctor, SourceLoc Loc,
+  OtherConstructorDeclRefExpr(ConcreteDeclRef Ctor, DeclNameLoc Loc,
                               bool Implicit, Type Ty = {})
     : Expr(ExprKind::OtherConstructorDeclRef, Implicit, Ty),
       Ctor(Ctor), Loc(Loc)
@@ -1037,8 +1040,9 @@ public:
   ConstructorDecl *getDecl() const;
   ConcreteDeclRef getDeclRef() const { return Ctor; }
 
-  SourceLoc getConstructorLoc() const { return Loc; }
-  SourceRange getSourceRange() const { return Loc; }
+  SourceLoc getLoc() const { return Loc.getBaseNameLoc(); }
+  DeclNameLoc getConstructorLoc() const { return Loc; }
+  SourceRange getSourceRange() const { return Loc.getSourceRange(); }
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::OtherConstructorDeclRef;
@@ -1079,18 +1083,19 @@ public:
 /// OverloadedDeclRefExpr - A reference to an overloaded name that should
 /// eventually be resolved (by overload resolution) to a value reference.
 class OverloadedDeclRefExpr : public OverloadSetRefExpr {
-  SourceLoc Loc;
+  DeclNameLoc Loc;
   bool IsSpecialized = false;
   bool IsPotentiallyDelayedGlobalOperator = false;
 
 public:
-  OverloadedDeclRefExpr(ArrayRef<ValueDecl*> Decls, SourceLoc Loc,
+  OverloadedDeclRefExpr(ArrayRef<ValueDecl*> Decls, DeclNameLoc Loc,
                         bool Implicit, Type Ty = Type())
     : OverloadSetRefExpr(ExprKind::OverloadedDeclRef, Decls, Implicit, Ty),
       Loc(Loc) { }
   
-  SourceLoc getLoc() const { return Loc; }
-  SourceRange getSourceRange() const { return Loc; }
+  DeclNameLoc getNameLoc() const { return Loc; }
+  SourceLoc getLoc() const { return Loc.getBaseNameLoc(); }
+  SourceRange getSourceRange() const { return Loc.getSourceRange(); }
 
   void setSpecialized(bool specialized) { IsSpecialized = specialized; }
 
@@ -1116,11 +1121,11 @@ public:
 class OverloadedMemberRefExpr : public OverloadSetRefExpr {
   Expr *SubExpr;
   SourceLoc DotLoc;
-  SourceLoc MemberLoc;
+  DeclNameLoc MemberLoc;
   
 public:
   OverloadedMemberRefExpr(Expr *SubExpr, SourceLoc DotLoc,
-                          ArrayRef<ValueDecl *> Decls, SourceLoc MemberLoc,
+                          ArrayRef<ValueDecl *> Decls, DeclNameLoc MemberLoc,
                           bool Implicit, Type Ty = Type(),
                           AccessSemantics semantics = AccessSemantics::Ordinary)
     : OverloadSetRefExpr(ExprKind::OverloadedMemberRef, Decls, Implicit, Ty),
@@ -1129,15 +1134,16 @@ public:
   }
 
   SourceLoc getDotLoc() const { return DotLoc; }
-  SourceLoc getMemberLoc() const { return MemberLoc; }
+  DeclNameLoc getMemberLoc() const { return MemberLoc; }
   Expr *getBase() const { return SubExpr; }
   void setBase(Expr *E) { SubExpr = E; }
   
-  SourceLoc getLoc() const { return MemberLoc; }
+  SourceLoc getLoc() const { return MemberLoc.getBaseNameLoc(); }
   SourceLoc getStartLoc() const {
-    return DotLoc.isValid()? SubExpr->getStartLoc() : MemberLoc;
+    return DotLoc.isValid()? SubExpr->getStartLoc()
+                           : MemberLoc.getBaseNameLoc();
   }
-  SourceLoc getEndLoc() const { return MemberLoc; }
+  SourceLoc getEndLoc() const { return MemberLoc.getSourceRange().End; }
 
   AccessSemantics getAccessSemantics() const {
     return AccessSemantics(OverloadedMemberRefExprBits.Semantics);
@@ -1155,12 +1161,12 @@ public:
 ///
 class UnresolvedDeclRefExpr : public Expr {
   DeclName Name;
-  SourceLoc Loc;
+  DeclNameLoc Loc;
   DeclRefKind RefKind;
   bool IsSpecialized = false;
 
 public:
-  UnresolvedDeclRefExpr(DeclName name, DeclRefKind refKind, SourceLoc loc)
+  UnresolvedDeclRefExpr(DeclName name, DeclRefKind refKind, DeclNameLoc loc)
     : Expr(ExprKind::UnresolvedDeclRef, /*Implicit=*/loc.isInvalid()),
       Name(name), Loc(loc), RefKind(refKind) {
   }
@@ -1175,7 +1181,9 @@ public:
   /// specialized by <...>.
   bool isSpecialized() const { return IsSpecialized; }
 
-  SourceRange getSourceRange() const { return Loc; }
+  DeclNameLoc getNameLoc() const { return Loc; }
+
+  SourceRange getSourceRange() const { return Loc.getSourceRange(); }
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::UnresolvedDeclRef;
@@ -1192,15 +1200,15 @@ class MemberRefExpr : public Expr {
   Expr *Base;
   ConcreteDeclRef Member;
   SourceLoc DotLoc;
-  SourceRange NameRange;
+  DeclNameLoc NameLoc;
   
 public:
   MemberRefExpr(Expr *base, SourceLoc dotLoc, ConcreteDeclRef member,
-                SourceRange nameRange, bool Implicit,
+                DeclNameLoc loc, bool Implicit,
                 AccessSemantics semantics = AccessSemantics::Ordinary);
   Expr *getBase() const { return Base; }
   ConcreteDeclRef getMember() const { return Member; }
-  SourceLoc getNameLoc() const { return NameRange.Start; }
+  DeclNameLoc getNameLoc() const { return NameLoc; }
   SourceLoc getDotLoc() const { return DotLoc; }
   
   void setBase(Expr *E) { Base = E; }
@@ -1219,17 +1227,17 @@ public:
   /// property.
   void setIsSuper(bool isSuper) { MemberRefExprBits.IsSuper = isSuper; }
 
-  SourceLoc getLoc() const { return NameRange.Start; }
+  SourceLoc getLoc() const { return NameLoc.getBaseNameLoc(); }
   SourceLoc getStartLoc() const {
     SourceLoc BaseStartLoc = Base->getStartLoc();
-    if (BaseStartLoc.isInvalid() || NameRange.End.isInvalid()) {
-      return NameRange.Start;
+    if (BaseStartLoc.isInvalid() || NameLoc.isInvalid()) {
+      return NameLoc.getBaseNameLoc();
     } else {
       return BaseStartLoc;
     }
   }
   SourceLoc getEndLoc() const {
-    return NameRange.End;
+    return NameLoc.getSourceRange().End;
   }
   
   static bool classof(const Expr *E) {
@@ -1270,12 +1278,12 @@ class DynamicMemberRefExpr : public DynamicLookupExpr {
   Expr *Base;
   ConcreteDeclRef Member;
   SourceLoc DotLoc;
-  SourceLoc NameLoc;
+  DeclNameLoc NameLoc;
 
 public:
   DynamicMemberRefExpr(Expr *base, SourceLoc dotLoc,
                        ConcreteDeclRef member,
-                       SourceLoc nameLoc)
+                       DeclNameLoc nameLoc)
     : DynamicLookupExpr(ExprKind::DynamicMemberRef),
       Base(base), Member(member), DotLoc(dotLoc), NameLoc(nameLoc) {
     }
@@ -1290,22 +1298,22 @@ public:
   ConcreteDeclRef getMember() const { return Member; }
 
   /// Retrieve the location of the member name.
-  SourceLoc getNameLoc() const { return NameLoc; }
+  DeclNameLoc getNameLoc() const { return NameLoc; }
 
   /// Retrieve the location of the '.'.
   SourceLoc getDotLoc() const { return DotLoc; }
 
-  SourceLoc getLoc() const { return NameLoc; }
+  SourceLoc getLoc() const { return NameLoc.getBaseNameLoc(); }
 
   SourceLoc getStartLoc() const {
     SourceLoc BaseStartLoc = Base->getStartLoc();
     if (BaseStartLoc.isInvalid() || NameLoc.isInvalid()) {
-      return NameLoc;
+      return NameLoc.getBaseNameLoc();
     } else {
       return BaseStartLoc;
     }
   }
-  SourceLoc getEndLoc() const { return NameLoc; }
+  SourceLoc getEndLoc() const { return NameLoc.getSourceRange().End; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::DynamicMemberRef;
@@ -1372,28 +1380,28 @@ public:
 /// bar.foo.  These always have unresolved type.
 class UnresolvedMemberExpr : public Expr {
   SourceLoc DotLoc;
-  SourceLoc NameLoc;
+  DeclNameLoc NameLoc;
   DeclName Name;
   Expr *Argument;
 
 public:  
-  UnresolvedMemberExpr(SourceLoc dotLoc, SourceLoc nameLoc,
+  UnresolvedMemberExpr(SourceLoc dotLoc, DeclNameLoc nameLoc,
                        DeclName name, Expr *argument)
     : Expr(ExprKind::UnresolvedMember, /*Implicit=*/false),
       DotLoc(dotLoc), NameLoc(nameLoc), Name(name), Argument(argument) {
   }
 
   DeclName getName() const { return Name; }
-  SourceLoc getNameLoc() const { return NameLoc; }
+  DeclNameLoc getNameLoc() const { return NameLoc; }
   SourceLoc getDotLoc() const { return DotLoc; }
   Expr *getArgument() const { return Argument; }
   void setArgument(Expr *argument) { Argument = argument; }
 
-  SourceLoc getLoc() const { return NameLoc; }
+  SourceLoc getLoc() const { return NameLoc.getBaseNameLoc(); }
 
   SourceLoc getStartLoc() const { return DotLoc; }
   SourceLoc getEndLoc() const {
-    return (Argument ? Argument->getEndLoc() : NameLoc);
+    return (Argument ? Argument->getEndLoc() : NameLoc.getSourceRange().End);
   }
   
   static bool classof(const Expr *E) {
@@ -1869,27 +1877,30 @@ public:
 class UnresolvedDotExpr : public Expr {
   Expr *SubExpr;
   SourceLoc DotLoc;
-  SourceLoc NameLoc;
+  DeclNameLoc NameLoc;
   DeclName Name;
 public:
   UnresolvedDotExpr(Expr *subexpr, SourceLoc dotloc, DeclName name,
-                    SourceLoc nameloc, bool Implicit)
+                    DeclNameLoc nameloc, bool Implicit)
   : Expr(ExprKind::UnresolvedDot, Implicit), SubExpr(subexpr), DotLoc(dotloc),
     NameLoc(nameloc), Name(name) {}
   
-  SourceLoc getLoc() const { return NameLoc; }
+  SourceLoc getLoc() const { return NameLoc.getBaseNameLoc(); }
 
   SourceLoc getStartLoc() const {
-    return (DotLoc.isInvalid() ? NameLoc : SubExpr->getStartLoc());
+    return (DotLoc.isInvalid() ? NameLoc.getSourceRange().End 
+                               : SubExpr->getStartLoc());
   }
-  SourceLoc getEndLoc() const { return NameLoc; }
+  SourceLoc getEndLoc() const {
+    return NameLoc.getSourceRange().End ;
+  }
 
   SourceLoc getDotLoc() const { return DotLoc; }
   Expr *getBase() const { return SubExpr; }
   void setBase(Expr *e) { SubExpr = e; }
 
   DeclName getName() const { return Name; }
-  SourceLoc getNameLoc() const { return NameLoc; }
+  DeclNameLoc getNameLoc() const { return NameLoc; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::UnresolvedDot;

@@ -901,9 +901,11 @@ public:
       return skipChildren();
     }
     if (auto OCDR = dyn_cast<OtherConstructorDeclRefExpr>(E))
-      diagAvailability(OCDR->getDecl(), OCDR->getConstructorLoc());
+      diagAvailability(OCDR->getDecl(),
+                       OCDR->getConstructorLoc().getSourceRange());
     if (auto DMR = dyn_cast<DynamicMemberRefExpr>(E))
-      diagAvailability(DMR->getMember().getDecl(), DMR->getNameLoc());
+      diagAvailability(DMR->getMember().getDecl(),
+                       DMR->getNameLoc().getSourceRange());
     if (auto DS = dyn_cast<DynamicSubscriptExpr>(E))
       diagAvailability(DS->getMember().getDecl(), DS->getSourceRange());
     if (auto S = dyn_cast<SubscriptExpr>(E)) {
@@ -966,7 +968,7 @@ private:
 
     ValueDecl *D = E->getMember().getDecl();
     // Diagnose for the member declaration itself.
-    if (diagAvailability(D, E->getNameLoc()))
+    if (diagAvailability(D, E->getNameLoc().getSourceRange()))
       return;
 
     if (TC.getLangOpts().DisableAvailabilityChecking)
@@ -2455,5 +2457,5 @@ void TypeChecker::checkOmitNeedlessWords(MemberRefExpr *memberRef) {
   // Fix the name.
   auto name = var->getName();
   diagnose(memberRef->getNameLoc(), diag::omit_needless_words, name, *newName)
-    .fixItReplace(memberRef->getNameLoc(), newName->str());
+    .fixItReplace(memberRef->getNameLoc().getSourceRange(), newName->str());
 }

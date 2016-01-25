@@ -819,7 +819,8 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
 
   // Form the call, which will be emitted on any path that needs to run the
   // code.
-  auto DRE = new (Context) DeclRefExpr(tempDecl, loc, /*Implicit*/true,
+  auto DRE = new (Context) DeclRefExpr(tempDecl, DeclNameLoc(loc),
+                                       /*Implicit*/true,
                                        AccessSemantics::DirectToStorage);
   auto args = TupleExpr::createEmpty(Context, loc, loc, true);
   auto call = new (Context) CallExpr(DRE, args, /*implicit*/true);

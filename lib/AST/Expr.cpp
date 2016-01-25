@@ -864,10 +864,10 @@ ConstructorDecl *OtherConstructorDeclRefExpr::getDecl() const {
 }
 
 MemberRefExpr::MemberRefExpr(Expr *base, SourceLoc dotLoc,
-                             ConcreteDeclRef member, SourceRange nameRange,
+                             ConcreteDeclRef member, DeclNameLoc nameLoc,
                              bool Implicit, AccessSemantics semantics)
   : Expr(ExprKind::MemberRef, Implicit), Base(base),
-    Member(member), DotLoc(dotLoc), NameRange(nameRange) {
+    Member(member), DotLoc(dotLoc), NameLoc(nameLoc) {
    
   MemberRefExprBits.Semantics = (unsigned) semantics;
   MemberRefExprBits.IsSuper = false;

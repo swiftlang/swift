@@ -1553,12 +1553,12 @@ public:
 
   /// \brief Build a type-checked reference to the given value.
   Expr *buildCheckedRefExpr(ValueDecl *D, DeclContext *UseDC,
-                            SourceLoc nameLoc, bool Implicit);
+                            DeclNameLoc nameLoc, bool Implicit);
 
   /// \brief Build a reference to a declaration, where name lookup returned
   /// the given set of declarations.
   Expr *buildRefExpr(ArrayRef<ValueDecl *> Decls, DeclContext *UseDC,
-                     SourceLoc NameLoc, bool Implicit,
+                     DeclNameLoc NameLoc, bool Implicit,
                      bool isSpecialized = false);
   /// @}
 
@@ -1770,7 +1770,7 @@ public:
   /// either a static metatype or that the initializer is 'required'.
   bool
   diagnoseInvalidDynamicConstructorReferences(Expr *base,
-                                              SourceLoc memberRefLoc,
+                                              DeclNameLoc memberRefLoc,
                                               AnyMetatypeType *metaTy,
                                               ConstructorDecl *ctorDecl,
                                               bool SuppressDiagnostics);

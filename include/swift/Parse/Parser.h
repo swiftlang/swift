@@ -1115,7 +1115,7 @@ public:
   /// \param allowInit Whether to allow 'init' for initializers.
   /// \param loc Will be populated with the location of the name.
   /// \param diag The diagnostic to emit if this is not a name.
-  DeclName parseUnqualifiedDeclName(bool allowInit, SourceLoc &loc,
+  DeclName parseUnqualifiedDeclName(bool allowInit, DeclNameLoc &loc,
                                     const Diagnostic &diag);
 
   Expr *parseExprIdentifier();

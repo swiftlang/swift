@@ -407,11 +407,12 @@ public:
     }
     
     // FIXME: Compound names.
-    return new (TC.Context) EnumElementPattern(TypeLoc(), ume->getDotLoc(),
-                                               ume->getNameLoc(),
-                                               ume->getName().getBaseName(),
-                                               nullptr,
-                                               subPattern);
+    return new (TC.Context) EnumElementPattern(
+                              TypeLoc(), ume->getDotLoc(),
+                              ume->getNameLoc().getBaseNameLoc(),
+                              ume->getName().getBaseName(),
+                              nullptr,
+                              subPattern);
   }
   
   // Member syntax 'T.Element' forms a pattern if 'T' is an enum and the
@@ -438,11 +439,13 @@ public:
       = lookupEnumMemberElement(TC, DC, ty, ude->getName().getBaseName());
     
     // Build a TypeRepr from the head of the full path.
+    // FIXME: Compound names.
     TypeLoc loc(repr);
     loc.setType(ty);
     return new (TC.Context) EnumElementPattern(loc,
                                                ude->getDotLoc(),
-                                               ude->getNameLoc(),
+                                               ude->getNameLoc()
+                                                 .getBaseNameLoc(),
                                                ude->getName().getBaseName(),
                                                referencedElement,
                                                nullptr);
@@ -936,7 +939,8 @@ static bool coercePatternViaConditionalDowncast(TypeChecker &tc,
   matchVar->setHasNonPatternBindingInit();
 
   // Form the cast $match as? T, which produces an optional.
-  Expr *matchRef = new (tc.Context) DeclRefExpr(matchVar, pattern->getLoc(),
+  Expr *matchRef = new (tc.Context) DeclRefExpr(matchVar,
+                                                DeclNameLoc(pattern->getLoc()),
                                                 /*Implicit=*/true);
   Expr *cast = new (tc.Context) ConditionalCheckedCastExpr(
                                   matchRef,

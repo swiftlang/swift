@@ -658,7 +658,8 @@ public:
     
     // Compute the expression that advances the generator.
     Expr *genNext
-      = TC.callWitness(TC.buildCheckedRefExpr(generator, DC, S->getInLoc(),
+      = TC.callWitness(TC.buildCheckedRefExpr(generator, DC,
+                                              DeclNameLoc(S->getInLoc()),
                                               /*implicit*/true),
                        DC, generatorProto, genConformance,
                        TC.Context.Id_next, {}, diag::generator_protocol_broken);
@@ -1186,7 +1187,7 @@ Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
   Expr *superRef = new (Context) SuperRefExpr(ctor->getImplicitSelfDecl(),
                                               SourceLoc(), /*Implicit=*/true);
   Expr *r = new (Context) UnresolvedDotExpr(superRef, SourceLoc(),
-                                            Context.Id_init, SourceLoc(),
+                                            Context.Id_init, DeclNameLoc(),
                                             /*Implicit=*/true);
   Expr *args = TupleExpr::createEmpty(Context, SourceLoc(), SourceLoc(),
                                       /*Implicit=*/true);

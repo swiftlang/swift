@@ -453,9 +453,9 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     if (!diagnoseOperatorJuxtaposition(UDRE, DC, *this)) {
       diagnose(Loc, diag::use_unresolved_identifier, Name,
                UDRE->getName().isOperator())
-        .highlight(Loc);
+        .highlight(UDRE->getSourceRange());
     }
-    return new (Context) ErrorExpr(Loc);
+    return new (Context) ErrorExpr(UDRE->getSourceRange());
   }
 
   // FIXME: Need to refactor the way we build an AST node from a lookup result!
@@ -477,7 +477,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
         diagnose(Loc, diag::use_local_before_declaration, Name);
         diagnose(D->getLoc(), diag::decl_declared_here, Name);
       }
-      return new (Context) ErrorExpr(Loc);
+      return new (Context) ErrorExpr(UDRE->getSourceRange());
     }
     if (matchesDeclRefKind(D, UDRE->getRefKind()))
       ResultValues.push_back(D);
@@ -491,7 +491,8 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
       isa<TypeDecl>(ResultValues[0])) {
     // FIXME: This is odd.
     if (isa<ModuleDecl>(ResultValues[0])) {
-      return new (Context) DeclRefExpr(ResultValues[0], Loc, /*implicit=*/false,
+      return new (Context) DeclRefExpr(ResultValues[0], UDRE->getNameLoc(),
+                                       /*implicit=*/false,
                                        AccessSemantics::Ordinary,
                                        ResultValues[0]->getType());
     }
@@ -507,7 +508,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
       diagnose(Loc, diag::use_nonmatching_operator, Name.getBaseName(),
                UDRE->getRefKind() == DeclRefKind::BinaryOperator ? 0 :
                UDRE->getRefKind() == DeclRefKind::PrefixOperator ? 1 : 2);
-      return new (Context) ErrorExpr(Loc);
+      return new (Context) ErrorExpr(UDRE->getSourceRange());
     }
 
     // For operators, sort the results so that non-generic operations come
@@ -532,8 +533,8 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
       });
     }
 
-    return buildRefExpr(ResultValues, DC, Loc, UDRE->isImplicit(),
-                        UDRE->isSpecialized());
+    return buildRefExpr(ResultValues, DC, UDRE->getNameLoc(),
+                        UDRE->isImplicit(), UDRE->isSpecialized());
   }
 
   ResultValues.clear();
@@ -561,13 +562,15 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     if (auto NTD = dyn_cast<NominalTypeDecl>(Base)) {
       BaseExpr = TypeExpr::createForDecl(Loc, NTD, /*implicit=*/true);
     } else {
-      BaseExpr = new (Context) DeclRefExpr(Base, Loc, /*implicit=*/true);
+      BaseExpr = new (Context) DeclRefExpr(Base, UDRE->getNameLoc(),
+                                           /*implicit=*/true);
     }
     
    
     // Otherwise, form an UnresolvedDotExpr and sema will resolve it based on
     // type information.
-    return new (Context) UnresolvedDotExpr(BaseExpr, SourceLoc(), Name, Loc,
+    return new (Context) UnresolvedDotExpr(BaseExpr, SourceLoc(), Name,
+                                           UDRE->getNameLoc(),
                                            UDRE->isImplicit());
   }
   
@@ -575,7 +578,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   // very broken, but it's still conceivable that this may happen due to
   // invalid shadowed declarations.
   // llvm_unreachable("Can't represent lookup result");
-  return new (Context) ErrorExpr(Loc);
+  return new (Context) ErrorExpr(UDRE->getSourceRange());
 }
 
 /// If an expression references 'self.init' or 'super.init' in an
@@ -866,7 +869,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
              "This doesn't work on implicit TypeExpr's, "
              "TypeExpr should have been built correctly in the first place");
       auto *NewTypeRepr =
-        new (TC.Context) ProtocolTypeRepr(InnerTypeRepr, MRE->getNameLoc());
+        new (TC.Context) ProtocolTypeRepr(InnerTypeRepr,
+                                          MRE->getNameLoc().getBaseNameLoc());
       return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
     }
     
@@ -875,7 +879,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
              "This doesn't work on implicit TypeExpr's, "
              "TypeExpr should have been built correctly in the first place");
       auto *NewTypeRepr =
-        new (TC.Context) MetatypeTypeRepr(InnerTypeRepr, MRE->getNameLoc());
+        new (TC.Context) MetatypeTypeRepr(InnerTypeRepr,
+                                          MRE->getNameLoc().getBaseNameLoc());
       return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
     }
   }
@@ -2054,9 +2059,11 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   }
   
   // Build the 'expr ~= var' expression.
-  auto *matchOp = buildRefExpr(choices, DC, EP->getLoc(), /*Implicit=*/true);
+  // FIXME: Compound name locations.
+  auto *matchOp = buildRefExpr(choices, DC, DeclNameLoc(EP->getLoc()),
+                               /*Implicit=*/true);
   auto *matchVarRef = new (Context) DeclRefExpr(matchVar,
-                                                EP->getLoc(),
+                                                DeclNameLoc(EP->getLoc()),
                                                 /*Implicit=*/true);
   
   Expr *matchArgElts[] = {EP->getSubExpr(), matchVarRef};

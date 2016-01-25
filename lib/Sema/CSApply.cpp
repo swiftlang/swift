@@ -365,7 +365,7 @@ namespace {
 
   public:
     /// \brief Build a reference to the given declaration.
-    Expr *buildDeclRef(ValueDecl *decl, SourceLoc loc, Type openedType,
+    Expr *buildDeclRef(ValueDecl *decl, DeclNameLoc loc, Type openedType,
                        ConstraintLocatorBuilder locator,
                        bool specialized, bool implicit,
                        AccessSemantics semantics) {
@@ -379,7 +379,8 @@ namespace {
         auto openedFnType = openedType->castTo<FunctionType>();
         auto baseTy = simplifyType(openedFnType->getInput())
                         ->getRValueInstanceType();
-        Expr *base = TypeExpr::createImplicitHack(loc, baseTy, ctx);
+        Expr *base = TypeExpr::createImplicitHack(loc.getBaseNameLoc(), baseTy,
+                                                  ctx);
         auto result = buildMemberRef(base, openedType, SourceLoc(), decl,
                                      loc, openedFnType->getResult(),
                                      locator, locator, implicit, semantics,
@@ -411,8 +412,9 @@ namespace {
       // missing an ampersand in front of the ref.
       if (auto inoutType = type->getAs<InOutType>()) {
         auto &tc = cs.getTypeChecker();
-        tc.diagnose(loc, diag::missing_address_of, inoutType->getInOutObjectType())
-          .fixItInsert(loc, "&");
+        tc.diagnose(loc.getBaseNameLoc(), diag::missing_address_of,
+                    inoutType->getInOutObjectType())
+          .fixItInsert(loc.getBaseNameLoc(), "&");
         return nullptr;
       }
         
@@ -693,7 +695,7 @@ namespace {
 
     /// \brief Build a new member reference with the given base and member.
     Expr *buildMemberRef(Expr *base, Type openedFullType, SourceLoc dotLoc,
-                         ValueDecl *member, SourceLoc memberLoc,
+                         ValueDecl *member, DeclNameLoc memberLoc,
                          Type openedType, ConstraintLocatorBuilder locator,
                          ConstraintLocatorBuilder memberLocator,
                          bool Implicit, AccessSemantics semantics,
@@ -1243,7 +1245,7 @@ namespace {
 
     /// \brief Build a new reference to another constructor.
     Expr *buildOtherConstructorRef(Type openedFullType,
-                                   ConstructorDecl *ctor, SourceLoc loc,
+                                   ConstructorDecl *ctor, DeclNameLoc loc,
                                    ConstraintLocatorBuilder locator,
                                    bool implicit) {
       auto &tc = cs.getTypeChecker();
@@ -1403,7 +1405,8 @@ namespace {
       }
 
       ConcreteDeclRef fnSpecRef(tc.Context, fn, Subs);
-      Expr *fnRef = new (tc.Context) DeclRefExpr(fnSpecRef, object->getLoc(),
+      Expr *fnRef = new (tc.Context) DeclRefExpr(fnSpecRef,
+                                                 DeclNameLoc(object->getLoc()),
                                                  /*Implicit=*/true);
       TypeSubstitutionMap subMap;
       auto genericParam = fnGenericParams[0];
@@ -1914,11 +1917,12 @@ namespace {
       // FIXME: This location info is bogus.
       auto typeRef = TypeExpr::createImplicitHack(expr->getStartLoc(),
                                                   type, tc.Context);
-      Expr *memberRef = new (tc.Context) MemberRefExpr(typeRef,
-                                                       expr->getStartLoc(),
-                                                       member,
-                                                       expr->getStartLoc(),
-                                                       /*Implicit=*/true);
+      Expr *memberRef =
+        new (tc.Context) MemberRefExpr(typeRef,
+                                       expr->getStartLoc(),
+                                       member,
+                                       DeclNameLoc(expr->getStartLoc()),
+                                       /*Implicit=*/true);
       bool failed = tc.typeCheckExpressionShallow(memberRef, cs.DC);
       assert(!failed && "Could not reference string interpolation witness");
       (void)failed;
@@ -1951,7 +1955,8 @@ namespace {
         auto memberRef = buildMemberRef(
                            typeRef, choice.openedFullType,
                            segment->getStartLoc(), choice.choice.getDecl(),
-                           segment->getStartLoc(), choice.openedType,
+                           DeclNameLoc(segment->getStartLoc()),
+                           choice.openedType,
                            locator, locator, /*Implicit=*/true,
                            AccessSemantics::Ordinary,
                            /*isDynamic=*/false);
@@ -2065,10 +2070,10 @@ namespace {
 
       // FIXME: Cannibalize the existing DeclRefExpr rather than allocating a
       // new one?
-      return buildDeclRef(decl, expr->getLoc(), selected->openedFullType,
-                                  locator, expr->isSpecialized(),
-                                  expr->isImplicit(),
-                                  expr->getAccessSemantics());
+      return buildDeclRef(decl, expr->getNameLoc(), selected->openedFullType,
+                          locator, expr->isSpecialized(),
+                          expr->isImplicit(),
+                          expr->getAccessSemantics());
     }
 
     Expr *visitSuperRefExpr(SuperRefExpr *expr) {
@@ -2100,7 +2105,7 @@ namespace {
       auto choice = selected.choice;
       auto decl = choice.getDecl();
 
-      return buildDeclRef(decl, expr->getLoc(), selected.openedFullType,
+      return buildDeclRef(decl, expr->getNameLoc(), selected.openedFullType,
                           locator, expr->isSpecialized(), expr->isImplicit(),
                           AccessSemantics::Ordinary);
     }
@@ -2236,7 +2241,7 @@ namespace {
   private:
     /// Create a member reference to the given constructor.
     Expr *applyCtorRefExpr(Expr *expr, Expr *base, SourceLoc dotLoc,
-                           SourceLoc nameLoc, bool implicit,
+                           DeclNameLoc nameLoc, bool implicit,
                            ConstraintLocator *ctorLocator,
                            ConstructorDecl *ctor,
                            Type openedType) {
@@ -2307,7 +2312,7 @@ namespace {
     }
 
     Expr *applyMemberRefExpr(Expr *expr, Expr *base, SourceLoc dotLoc,
-                             SourceLoc nameLoc, bool implicit) {
+                             DeclNameLoc nameLoc, bool implicit) {
       // If we have a constructor member, handle it as a constructor.
       auto ctorLocator = cs.getConstraintLocator(
                            expr,
@@ -2393,7 +2398,7 @@ namespace {
 
         return new (cs.getASTContext()) TupleElementExpr(base, dotLoc,
                                           selected.choice.getTupleIndex(),
-                                          nameLoc,
+                                          nameLoc.getBaseNameLoc(),
                                           simplifyType(expr->getType()));
       }
 
@@ -3221,7 +3226,7 @@ namespace {
         tc.diagnose(E->getLoc(), diag::missing_undefined_runtime);
         return nullptr;
       }
-      DeclRefExpr *fnRef = new (ctx) DeclRefExpr(undefinedDecl, SourceLoc(),
+      DeclRefExpr *fnRef = new (ctx) DeclRefExpr(undefinedDecl, DeclNameLoc(),
                                                  /*Implicit=*/true);
       StringRef msg = "attempt to evaluate editor placeholder";
       Expr *argExpr = new (ctx) StringLiteralExpr(msg, E->getLoc(),
@@ -4776,7 +4781,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
       tc.validateDecl(fn);
       ConcreteDeclRef fnDeclRef(fn);
-      Expr *fnRef = new (tc.Context) DeclRefExpr(fnDeclRef, expr->getLoc(),
+      Expr *fnRef = new (tc.Context) DeclRefExpr(fnDeclRef,
+                                                 DeclNameLoc(expr->getLoc()),
                                                  /*Implicit=*/true);
       fnRef->setType(fn->getInterfaceType());
       Expr *call = new (tc.Context) CallExpr(fnRef, expr,
@@ -5236,7 +5242,7 @@ static bool isNonFinalClass(Type type) {
 // constructor must be required.
 bool
 TypeChecker::diagnoseInvalidDynamicConstructorReferences(Expr *base,
-                                                     SourceLoc memberRefLoc,
+                                                     DeclNameLoc memberRefLoc,
                                                      AnyMetatypeType *metaTy,
                                                      ConstructorDecl *ctorDecl,
                                                      bool SuppressDiagnostics) {
@@ -5397,7 +5403,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   Expr *declRef = buildMemberRef(fn,
                                  selected->openedFullType,
                                  /*DotLoc=*/SourceLoc(),
-                                 decl, fn->getEndLoc(),
+                                 decl, DeclNameLoc(fn->getEndLoc()),
                                  selected->openedType,
                                  locator,
                                  ctorLocator,
@@ -6082,7 +6088,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
     } while (current);
 
     if (fromRawCall) {
-      TC.diagnose(fromRawRef->getNameLoc(), 
+      TC.diagnose(fromRawRef->getNameLoc().getBaseNameLoc(), 
                   diag::migrate_from_raw_to_init)
         .fixItReplace(SourceRange(fromRawRef->getDotLoc(),
                                   fromRawCall->getArg()->getStartLoc()),
@@ -6125,7 +6131,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
     if (toRawCall) {
       TC.diagnose(toRawRef->getNameLoc(),
                   diag::migrate_to_raw_to_raw_value)
-        .fixItReplace(SourceRange(toRawRef->getNameLoc(),
+        .fixItReplace(SourceRange(toRawRef->getNameLoc().getBaseNameLoc(),
                                   toRawCall->getArg()->getEndLoc()),
                       "rawValue");
     } else {
@@ -6153,8 +6159,9 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
     if (allZerosRef) {
       TC.diagnose(allZerosRef->getNameLoc(),
                   diag::migrate_from_allZeros)
-        .fixItReplace(SourceRange(allZerosRef->getDotLoc(),
-                                  allZerosRef->getNameLoc()),
+        .fixItReplace(SourceRange(
+                        allZerosRef->getDotLoc(),
+                        allZerosRef->getNameLoc().getSourceRange().End),
                       "()");
     } else {
       // Diagnostic without Fix-It; we couldn't find what we needed.
@@ -6411,7 +6418,8 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
 
   auto memberRef = rewriter.buildMemberRef(base, openedFullType,
                                            base->getStartLoc(),
-                                           witness, base->getEndLoc(),
+                                           witness,
+                                           DeclNameLoc(base->getEndLoc()),
                                            openedType, locator, locator,
                                            /*Implicit=*/true,
                                            AccessSemantics::Ordinary,
@@ -6493,7 +6501,8 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
     
     // Form a reference to this member.
     Expr *memberRef = new (ctx) MemberRefExpr(expr, expr->getStartLoc(),
-                                              witness, expr->getEndLoc(),
+                                              witness,
+                                              DeclNameLoc(expr->getEndLoc()),
                                               /*Implicit=*/true);
     bool failed = tc.typeCheckExpressionShallow(memberRef, cs.DC);
     if (failed) {
@@ -6531,7 +6540,8 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
 
   // Form a reference to the builtin method.
   Expr *memberRef = new (ctx) MemberRefExpr(expr, SourceLoc(),
-                                            builtinMethod, expr->getLoc(),
+                                            builtinMethod,
+                                            DeclNameLoc(expr->getLoc()),
                                             /*Implicit=*/true);
   bool failed = tc.typeCheckExpressionShallow(memberRef, cs.DC);
   assert(!failed && "Could not reference witness?");
@@ -6587,7 +6597,7 @@ Expr *Solution::convertOptionalToBool(Expr *expr,
   Substitution sub(unwrappedOptionalType, {});
   ConcreteDeclRef fnSpecRef(ctx, fn, sub);
   auto *fnRef =
-      new (ctx) DeclRefExpr(fnSpecRef, SourceLoc(), /*Implicit=*/true);
+      new (ctx) DeclRefExpr(fnSpecRef, DeclNameLoc(), /*Implicit=*/true);
 
   TypeSubstitutionMap subMap;
   auto genericParam = fn->getGenericSignatureOfContext()->getGenericParams()[0];

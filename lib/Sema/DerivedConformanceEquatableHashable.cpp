@@ -99,7 +99,7 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
     auto indexExpr = new (C) IntegerLiteralExpr(StringRef(indexStr.data(),
                                                 indexStr.size()), SourceLoc(),
                                                 /*implicit*/ true);
-    auto indexRef = new (C) DeclRefExpr(indexVar, SourceLoc(),
+    auto indexRef = new (C) DeclRefExpr(indexVar, DeclNameLoc(),
                                         /*implicit*/true);
     auto assignExpr = new (C) AssignExpr(indexRef, SourceLoc(),
                                          indexExpr, /*implicit*/ true);
@@ -111,7 +111,7 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
   }
   
   // generate: switch enumVar { }
-  auto enumRef = new (C) DeclRefExpr(enumVarDecl, SourceLoc(),
+  auto enumRef = new (C) DeclRefExpr(enumVarDecl, DeclNameLoc(),
                                       /*implicit*/true);
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), enumRef,
                                        SourceLoc(), cases, SourceLoc(), C);
@@ -119,8 +119,8 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
   stmts.push_back(indexBind);
   stmts.push_back(switchStmt);
 
-  return new (C) DeclRefExpr(indexVar, SourceLoc(), /*implicit*/ true,
-                                  AccessSemantics::Ordinary, intType);
+  return new (C) DeclRefExpr(indexVar, DeclNameLoc(), /*implicit*/ true,
+                             AccessSemantics::Ordinary, intType);
 }
 
 /// Derive the body for an '==' operator for an enum
@@ -154,7 +154,7 @@ static void deriveBodyEquatable_enum_eq(AbstractFunctionDecl *eqDecl) {
                                          { }, { }, SourceLoc(),
                                          /*HasTrailingClosure*/ false,
                                          /*Implicit*/ true, tType);
-  auto *cmpFuncExpr = new (C) DeclRefExpr(cmpFunc, SourceLoc(),
+  auto *cmpFuncExpr = new (C) DeclRefExpr(cmpFunc, DeclNameLoc(),
                                           /*implicit*/ true,
                                           AccessSemantics::Ordinary,
                                           cmpFunc->getType());
@@ -311,7 +311,7 @@ deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
   
   auto memberRef = new (C) UnresolvedDotExpr(indexRef, SourceLoc(),
                                              C.Id_hashValue,
-                                             SourceLoc(),
+                                             DeclNameLoc(),
                                              /*implicit*/true);
   auto returnStmt = new (C) ReturnStmt(SourceLoc(), memberRef);
   statements.push_back(returnStmt);

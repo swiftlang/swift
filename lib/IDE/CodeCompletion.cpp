@@ -2820,7 +2820,7 @@ public:
     // We allocate these expressions on the stack because we know they can't
     // escape and there isn't a better way to allocate scratch Expr nodes.
     UnresolvedDeclRefExpr UDRE(op->getName(), DeclRefKind::PostfixOperator,
-                               expr->getSourceRange().End);
+                               DeclNameLoc(expr->getSourceRange().End));
     PostfixUnaryExpr opExpr(&UDRE, expr);
     Expr *tempExpr = &opExpr;
 
@@ -2872,7 +2872,7 @@ public:
     // We allocate these expressions on the stack because we know they can't
     // escape and there isn't a better way to allocate scratch Expr nodes.
     UnresolvedDeclRefExpr UDRE(op->getName(), DeclRefKind::BinaryOperator,
-                               SourceLoc());
+                               DeclNameLoc(SourceLoc()));
     sequence.drop_back(1).back() = &UDRE;
     CodeCompletionExpr CCE((SourceRange()));
     sequence.back() = &CCE;

@@ -206,7 +206,7 @@ void constraints::simplifyLocator(Expr *&anchor,
         targetAnchor = nullptr;
         targetPath.clear();
         
-        range = UDE->getNameLoc();
+        range = UDE->getNameLoc().getSourceRange();
         anchor = UDE->getBase();
         path = path.slice(1);
         continue;
@@ -1763,7 +1763,7 @@ private:
   /// unviable ones.
   void diagnoseUnviableLookupResults(MemberLookupResult &lookupResults,
                                      Type baseObjTy, Expr *baseExpr,
-                                     DeclName memberName, SourceLoc nameLoc,
+                                     DeclName memberName, DeclNameLoc nameLoc,
                                      SourceLoc loc);
   
   /// Produce a diagnostic for a general overload resolution failure
@@ -2083,7 +2083,8 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
         
         // Suggest inserting '.dynamicType' to construct another object of the
         // same dynamic type.
-        SourceLoc fixItLoc = ctorRef->getNameLoc().getAdvancedLoc(-1);
+        SourceLoc fixItLoc
+          = ctorRef->getNameLoc().getBaseNameLoc().getAdvancedLoc(-1);
         
         // Place the '.dynamicType' right before the init.
         diagnose(anchor->getLoc(), diag::init_not_instance_member)
@@ -2092,8 +2093,10 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
       }
     }
 
+    // FIXME: Dig out the property DeclNameLoc.
     diagnoseUnviableLookupResults(result, baseObjTy, anchor, memberName,
-                                  memberRange.Start, anchor->getLoc());
+                                  DeclNameLoc(memberRange.Start),
+                                  anchor->getLoc());
     return true;
   }
   
@@ -2122,7 +2125,7 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
 void FailureDiagnosis::
 diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
                               Expr *baseExpr,
-                              DeclName memberName, SourceLoc nameLoc,
+                              DeclName memberName, DeclNameLoc nameLoc,
                               SourceLoc loc) {
   SourceRange baseRange = baseExpr ? baseExpr->getSourceRange() : SourceRange();
   
@@ -2135,11 +2138,11 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
     } else if (auto MTT = baseObjTy->getAs<MetatypeType>()) {
       diagnose(loc, diag::could_not_find_type_member,
                MTT->getInstanceType(), memberName)
-        .highlight(baseRange).highlight(nameLoc);
+        .highlight(baseRange).highlight(nameLoc.getSourceRange());
     } else {
       diagnose(loc, diag::could_not_find_value_member,
                baseObjTy, memberName)
-        .highlight(baseRange).highlight(nameLoc);
+        .highlight(baseRange).highlight(nameLoc.getSourceRange());
       
       // Check for a few common cases that can cause missing members.
       if (baseObjTy->is<EnumType>() && memberName.isSimpleName("rawValue")) {
@@ -2171,7 +2174,7 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
     case MemberLookupResult::UR_UnavailableInExistential:
       diagnose(loc, diag::could_not_use_member_on_existential,
                instanceTy, memberName)
-        .highlight(baseRange).highlight(nameLoc);
+        .highlight(baseRange).highlight(nameLoc.getSourceRange());
       return;
     case MemberLookupResult::UR_InstanceMemberOnType:
       // If the base is an implicit self type reference, and we're in a
@@ -2191,12 +2194,12 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
         
       diagnose(loc, diag::could_not_use_instance_member_on_type,
                instanceTy, memberName)
-        .highlight(baseRange).highlight(nameLoc);
+        .highlight(baseRange).highlight(nameLoc.getSourceRange());
       return;
     case MemberLookupResult::UR_TypeMemberOnInstance:
       diagnose(loc, diag::could_not_use_type_member_on_instance,
                baseObjTy, memberName)
-        .highlight(baseRange).highlight(nameLoc);
+        .highlight(baseRange).highlight(nameLoc.getSourceRange());
       return;
         
     case MemberLookupResult::UR_MutatingMemberOnRValue:
@@ -2233,11 +2236,11 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
   if (!baseObjTy->isEqual(instanceTy))
     diagnose(loc, diag::could_not_use_type_member,
              instanceTy, memberName)
-    .highlight(baseRange).highlight(nameLoc);
+    .highlight(baseRange).highlight(nameLoc.getSourceRange());
   else
     diagnose(loc, diag::could_not_use_value_member,
              baseObjTy, memberName)
-    .highlight(baseRange).highlight(nameLoc);
+    .highlight(baseRange).highlight(nameLoc.getSourceRange());
   return;
 }
 
@@ -3389,7 +3392,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   // other problem) we should diagnose the problem.
   if (result.ViableCandidates.empty()) {
     diagnoseUnviableLookupResults(result, baseType, /*no base expr*/nullptr,
-                                  subscriptName, SE->getLoc(),
+                                  subscriptName, DeclNameLoc(SE->getLoc()),
                                   SE->getLoc());
     return true;
   }
@@ -4541,7 +4544,7 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     diagnose(E->getNameLoc(), diag::ambiguous_member_overload_set,
              E->getName())
       .highlight(argRange);
-    candidateInfo.suggestPotentialOverloads(E->getNameLoc());
+    candidateInfo.suggestPotentialOverloads(E->getNameLoc().getBaseNameLoc());
     return true;
   }
   
@@ -4971,7 +4974,8 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
         dyn_cast<UnresolvedMemberExpr>(E->getSemanticsProvidingExpr())) {
     if (!CS->getContextualType()) {
       diagnose(E->getLoc(), diag::unresolved_member_no_inference,UME->getName())
-        .highlight(SourceRange(UME->getDotLoc(), UME->getNameLoc()));
+        .highlight(SourceRange(UME->getDotLoc(),
+                               UME->getNameLoc().getSourceRange().End));
       return;
     }
   }

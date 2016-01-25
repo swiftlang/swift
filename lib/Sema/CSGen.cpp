@@ -35,7 +35,7 @@ static Expr *skipImplicitConversions(Expr *expr) {
 }
 
 /// \brief Find the declaration directly referenced by this expression.
-static ValueDecl *findReferencedDecl(Expr *expr, SourceLoc &loc) {
+static ValueDecl *findReferencedDecl(Expr *expr, DeclNameLoc &loc) {
   do {
     expr = expr->getSemanticsProvidingExpr();
 
@@ -45,7 +45,7 @@ static ValueDecl *findReferencedDecl(Expr *expr, SourceLoc &loc) {
     }
 
     if (auto dre = dyn_cast<DeclRefExpr>(expr)) {
-      loc = dre->getLoc();
+      loc = dre->getNameLoc();
       return dre->getDecl();
     }
 
@@ -2765,7 +2765,7 @@ namespace {
         // A DotSyntaxCallExpr is a member reference that has already been
         // type-checked down to a call; turn it back into an overloaded
         // member reference expression.
-        SourceLoc memberLoc;
+        DeclNameLoc memberLoc;
         if (auto member = findReferencedDecl(dotCall->getFn(), memberLoc)) {
           auto base = skipImplicitConversions(dotCall->getArg());
           auto members
@@ -2781,7 +2781,7 @@ namespace {
         // already been type-checked down to a call where the argument doesn't
         // actually matter; turn it back into an overloaded member reference
         // expression.
-        SourceLoc memberLoc;
+        DeclNameLoc memberLoc;
         if (auto member = findReferencedDecl(dotIgnored->getRHS(), memberLoc)) {
           auto base = skipImplicitConversions(dotIgnored->getLHS());
           auto members

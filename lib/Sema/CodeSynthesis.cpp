@@ -405,7 +405,7 @@ static Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
     if (param->isVariadic())
       return nullptr;
     
-    Expr *ref = new (ctx) DeclRefExpr(param, SourceLoc(), /*implicit*/ true);
+    Expr *ref = new (ctx) DeclRefExpr(param, DeclNameLoc(), /*implicit*/ true);
     if (param->getType()->is<InOutType>())
       ref = new (ctx) InOutExpr(SourceLoc(), ref, Type(), /*implicit=*/true);
     args.push_back(ref);
@@ -465,7 +465,7 @@ static Expr *buildSelfReference(VarDecl *selfDecl,
                                 TypeChecker &TC) {
   switch (selfAccessKind) {
   case SelfAccessKind::Peer:
-    return new (TC.Context) DeclRefExpr(selfDecl, SourceLoc(), IsImplicit);
+    return new (TC.Context) DeclRefExpr(selfDecl, DeclNameLoc(), IsImplicit);
 
   case SelfAccessKind::Super:
     return new (TC.Context) SuperRefExpr(selfDecl, SourceLoc(), IsImplicit);
@@ -519,7 +519,7 @@ static Expr *buildStorageReference(
 
   VarDecl *selfDecl = referenceContext.getSelfDecl();
   if (!selfDecl) {
-    return new (ctx) DeclRefExpr(storage, SourceLoc(), IsImplicit, semantics);
+    return new (ctx) DeclRefExpr(storage, DeclNameLoc(), IsImplicit, semantics);
   }
 
   // If we should use a super access if applicable, and we have an
@@ -545,7 +545,7 @@ static Expr *buildStorageReference(
   // however, it shouldn't be problematic because any overrides
   // should also redefine materializeForSet.
   return new (ctx) MemberRefExpr(selfDRE, SourceLoc(), storage,
-                                 SourceLoc(), IsImplicit, semantics);
+                                 DeclNameLoc(), IsImplicit, semantics);
 }
 
 static Expr *buildStorageReference(FuncDecl *accessor,
@@ -632,7 +632,7 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   //       (nil_literal_expr type='<null>'))))
   auto UDE = new (Ctx) UnresolvedDotExpr(Val, SourceLoc(),
                                          Ctx.getIdentifier("copyWithZone"),
-                                         SourceLoc(), /*implicit*/true);
+                                         DeclNameLoc(), /*implicit*/true);
   Expr *Nil = new (Ctx) NilLiteralExpr(SourceLoc(), /*implicit*/true);
   Nil = new (Ctx) ParenExpr(SourceLoc(), Nil, SourceLoc(), false);
 
@@ -739,7 +739,7 @@ static void synthesizeTrivialSetter(FuncDecl *setter,
   auto &ctx = TC.Context;
   SourceLoc loc = storage->getLoc();
 
-  auto *valueDRE = new (ctx) DeclRefExpr(valueVar, SourceLoc(), IsImplicit);
+  auto *valueDRE = new (ctx) DeclRefExpr(valueVar, DeclNameLoc(), IsImplicit);
   SmallVector<ASTNode, 1> setterBody;
   createPropertyStoreOrCallSuperclassSetter(setter, valueDRE, storage,
                                             setterBody, TC);
@@ -968,10 +968,12 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
   // or:
   //   (call_expr (decl_ref_expr(willSet)), (declrefexpr(value)))
   if (auto willSet = VD->getWillSetFunc()) {
-    Expr *Callee = new (Ctx) DeclRefExpr(willSet, SourceLoc(), /*imp*/true);
-    auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, SourceLoc(), /*imp*/true);
+    Expr *Callee = new (Ctx) DeclRefExpr(willSet, DeclNameLoc(), /*imp*/true);
+    auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, DeclNameLoc(),
+                                           /*imp*/true);
     if (SelfDecl) {
-      auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(), /*imp*/true);
+      auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, DeclNameLoc(),
+                                            /*imp*/true);
       Callee = new (Ctx) DotSyntaxCallExpr(Callee, SourceLoc(), SelfDRE);
     }
     SetterBody.push_back(new (Ctx) CallExpr(Callee, ValueDRE, true));
@@ -983,7 +985,7 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
   }
   
   // Create an assignment into the storage or call to superclass setter.
-  auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, SourceLoc(), true);
+  auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, DeclNameLoc(), true);
   createPropertyStoreOrCallSuperclassSetter(Set, ValueDRE, VD, SetterBody, TC);
 
   // Create:
@@ -993,11 +995,12 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
   // or:
   //   (call_expr (decl_ref_expr(didSet)), (decl_ref_expr(tmp)))
   if (auto didSet = VD->getDidSetFunc()) {
-    auto *OldValueExpr = new (Ctx) DeclRefExpr(OldValue, SourceLoc(),
+    auto *OldValueExpr = new (Ctx) DeclRefExpr(OldValue, DeclNameLoc(),
                                                /*impl*/true);
-    Expr *Callee = new (Ctx) DeclRefExpr(didSet, SourceLoc(), /*imp*/true);
+    Expr *Callee = new (Ctx) DeclRefExpr(didSet, DeclNameLoc(), /*imp*/true);
     if (SelfDecl) {
-      auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(), /*imp*/true);
+      auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, DeclNameLoc(),
+                                            /*imp*/true);
       Callee = new (Ctx) DotSyntaxCallExpr(Callee, SourceLoc(), SelfDRE);
     }
     SetterBody.push_back(new (Ctx) CallExpr(Callee, OldValueExpr, true));
@@ -1108,14 +1111,14 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   Body.push_back(Tmp1VD);
 
   // Build the early return inside the if.
-  auto *Tmp1DRE = new (Ctx) DeclRefExpr(Tmp1VD, SourceLoc(), /*Implicit*/true,
+  auto *Tmp1DRE = new (Ctx) DeclRefExpr(Tmp1VD, DeclNameLoc(), /*Implicit*/true,
                                         AccessSemantics::DirectToStorage);
   auto *EarlyReturnVal = new (Ctx) ForceValueExpr(Tmp1DRE, SourceLoc());
   auto *Return = new (Ctx) ReturnStmt(SourceLoc(), EarlyReturnVal,
                                       /*implicit*/true);
 
   // Build the "if" around the early return.
-  Tmp1DRE = new (Ctx) DeclRefExpr(Tmp1VD, SourceLoc(), /*Implicit*/true,
+  Tmp1DRE = new (Ctx) DeclRefExpr(Tmp1VD, DeclNameLoc(), /*Implicit*/true,
                                   AccessSemantics::DirectToStorage);
   
   // Call through "hasValue" on the decl ref.
@@ -1164,12 +1167,12 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   Body.push_back(Tmp2VD);
 
   // Assign tmp2 into storage.
-  auto Tmp2DRE = new (Ctx) DeclRefExpr(Tmp2VD, SourceLoc(), /*Implicit*/true,
+  auto Tmp2DRE = new (Ctx) DeclRefExpr(Tmp2VD, DeclNameLoc(), /*Implicit*/true,
                                        AccessSemantics::DirectToStorage);
   createPropertyStoreOrCallSuperclassSetter(Get, Tmp2DRE, Storage, Body, TC);
 
   // Return tmp2.
-  Tmp2DRE = new (Ctx) DeclRefExpr(Tmp2VD, SourceLoc(), /*Implicit*/true,
+  Tmp2DRE = new (Ctx) DeclRefExpr(Tmp2VD, DeclNameLoc(), /*Implicit*/true,
                                   AccessSemantics::DirectToStorage);
 
   Body.push_back(new (Ctx) ReturnStmt(SourceLoc(), Tmp2DRE, /*implicit*/true));
@@ -1474,7 +1477,8 @@ static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
 
   // Create a call to Swift._unimplemented_initializer
   auto loc = classDecl->getLoc();
-  Expr *fn = new (tc.Context) DeclRefExpr(unimplementedInitDecl, loc,
+  Expr *fn = new (tc.Context) DeclRefExpr(unimplementedInitDecl,
+                                          DeclNameLoc(loc),
                                           /*Implicit=*/true);
 
   llvm::SmallString<64> buffer;
@@ -1575,7 +1579,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                                           /*Implicit=*/true);
   Expr *ctorRef  = new (ctx) UnresolvedDotExpr(superRef, SourceLoc(),
                                                superclassCtor->getFullName(),
-                                               SourceLoc(),
+                                               DeclNameLoc(),
                                                /*Implicit=*/true);
 
   auto ctorArgs = buildArgumentForwardingExpr(bodyParams->getArray(), ctx);

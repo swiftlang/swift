@@ -118,7 +118,7 @@ DerivedConformance::createSelfDeclRef(AbstractFunctionDecl *fn) {
   ASTContext &C = fn->getASTContext();
 
   auto selfDecl = fn->getImplicitSelfDecl();
-  return new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true);
+  return new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/true);
 }
 
 FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,

@@ -561,14 +561,14 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
 }
 
 Expr *TypeChecker::buildCheckedRefExpr(ValueDecl *value, DeclContext *UseDC,
-                                       SourceLoc loc, bool Implicit) {
+                                       DeclNameLoc loc, bool Implicit) {
   auto type = getUnopenedTypeOfReference(value, Type(), UseDC);
   AccessSemantics semantics = value->getAccessSemanticsFromContext(UseDC);
   return new (Context) DeclRefExpr(value, loc, Implicit, semantics, type);
 }
 
 Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
-                                DeclContext *UseDC, SourceLoc NameLoc,
+                                DeclContext *UseDC, DeclNameLoc NameLoc,
                                 bool Implicit, bool isSpecialized) {
   assert(!Decls.empty() && "Must have at least one declaration");
 

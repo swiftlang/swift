@@ -321,9 +321,9 @@ static FuncDecl *makeRawValueTrivialGetter(ClangImporter::Implementation &Impl,
   if (Impl.hasFinishedTypeChecking())
     return getterDecl;
 
-  auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/ true);
+  auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/ true);
   auto valueRef = new (C) MemberRefExpr(selfRef, SourceLoc(),
-                                        rawDecl, SourceLoc(),
+                                        rawDecl, DeclNameLoc(),
                                         /*implicit*/ true);
   auto valueRet = new (C) ReturnStmt(SourceLoc(), valueRef);
   
@@ -379,11 +379,11 @@ static FuncDecl *makeRawValueTrivialSetter(ClangImporter::Implementation &Impl,
   if (Impl.hasFinishedTypeChecking())
     return setterDecl;
 
-  auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/ true);
-  auto dest = new (C) MemberRefExpr(selfRef, SourceLoc(), rawDecl, SourceLoc(),
+  auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/ true);
+  auto dest = new (C) MemberRefExpr(selfRef, SourceLoc(), rawDecl, DeclNameLoc(),
                                     /*implicit*/ true);
 
-  auto paramRef = new (C) DeclRefExpr(newValueDecl, SourceLoc(),
+  auto paramRef = new (C) DeclRefExpr(newValueDecl, DeclNameLoc(),
                                       /*implicit*/true);
 
   auto assign = new (C) AssignExpr(dest, SourceLoc(), paramRef,
@@ -443,13 +443,13 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   if (Impl.hasFinishedTypeChecking())
     return ctorDecl;
   
-  auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true);
-  auto paramRef = new (C) DeclRefExpr(param, SourceLoc(),
+  auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/true);
+  auto paramRef = new (C) DeclRefExpr(param, DeclNameLoc(),
                                       /*implicit*/ true);
   auto reinterpretCast
     = cast<FuncDecl>(getBuiltinValueDecl(C,C.getIdentifier("reinterpretCast")));
   auto reinterpretCastRef
-    = new (C) DeclRefExpr(reinterpretCast, SourceLoc(), /*implicit*/ true);
+    = new (C) DeclRefExpr(reinterpretCast, DeclNameLoc(), /*implicit*/ true);
   auto reinterpreted = new (C) CallExpr(reinterpretCastRef, paramRef,
                                         /*implicit*/ true);
   auto assign = new (C) AssignExpr(selfRef, SourceLoc(), reinterpreted,
@@ -502,11 +502,11 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   if (Impl.hasFinishedTypeChecking())
     return getterDecl;
   
-  auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true);
+  auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/true);
   auto reinterpretCast
     = cast<FuncDecl>(getBuiltinValueDecl(C, C.getIdentifier("reinterpretCast")));
   auto reinterpretCastRef
-    = new (C) DeclRefExpr(reinterpretCast, SourceLoc(), /*implicit*/ true);
+    = new (C) DeclRefExpr(reinterpretCast, DeclNameLoc(), /*implicit*/ true);
   auto reinterpreted = new (C) CallExpr(reinterpretCastRef, selfRef,
                                         /*implicit*/ true);
   auto ret = new (C) ReturnStmt(SourceLoc(), reinterpreted);
@@ -618,11 +618,12 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
   {
     auto selfDecl = getterDecl->getImplicitSelfDecl();
 
-    auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/ true);
+    auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                       /*implicit*/ true);
     auto reinterpretCast = cast<FuncDecl>(getBuiltinValueDecl(
         C, C.getIdentifier("reinterpretCast")));
     auto reinterpretCastRef
-      = new (C) DeclRefExpr(reinterpretCast, SourceLoc(), /*implicit*/ true);
+      = new (C) DeclRefExpr(reinterpretCast, DeclNameLoc(), /*implicit*/ true);
     auto reinterpreted = new (C) CallExpr(reinterpretCastRef, selfRef,
                                           /*implicit*/ true);
     auto ret = new (C) ReturnStmt(SourceLoc(), reinterpreted);
@@ -636,25 +637,25 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
   {
     auto inoutSelfDecl = setterDecl->getImplicitSelfDecl();
 
-    auto inoutSelfRef = new (C) DeclRefExpr(inoutSelfDecl, SourceLoc(),
+    auto inoutSelfRef = new (C) DeclRefExpr(inoutSelfDecl, DeclNameLoc(),
                                             /*implicit*/ true);
     auto inoutSelf = new (C) InOutExpr(SourceLoc(), inoutSelfRef,
       InOutType::get(importedUnionDecl->getType()), /*implicit*/ true);
 
     auto newValueDecl = setterDecl->getParameterList(1)->get(0);
 
-    auto newValueRef = new (C) DeclRefExpr(newValueDecl, SourceLoc(),
+    auto newValueRef = new (C) DeclRefExpr(newValueDecl, DeclNameLoc(),
                                            /*implicit*/ true);
     auto addressofFn = cast<FuncDecl>(getBuiltinValueDecl(
       C, C.getIdentifier("addressof")));
     auto addressofFnRef
-      = new (C) DeclRefExpr(addressofFn, SourceLoc(), /*implicit*/ true);
+      = new (C) DeclRefExpr(addressofFn, DeclNameLoc(), /*implicit*/ true);
     auto selfPointer = new (C) CallExpr(addressofFnRef, inoutSelf,
                                           /*implicit*/ true);
     auto initializeFn = cast<FuncDecl>(getBuiltinValueDecl(
       C, C.getIdentifier("initialize")));
     auto initializeFnRef
-      = new (C) DeclRefExpr(initializeFn, SourceLoc(), /*implicit*/ true);
+      = new (C) DeclRefExpr(initializeFn, DeclNameLoc(), /*implicit*/ true);
     auto initializeArgs = TupleExpr::createImplicit(C,
                                                    { newValueRef, selfPointer },
                                                    {});
@@ -1544,14 +1545,14 @@ namespace {
         // Construct the left-hand reference to self.
         Expr *lhs =
             new (context) DeclRefExpr(constructor->getImplicitSelfDecl(),
-                                      SourceLoc(), /*implicit=*/true);
+                                      DeclNameLoc(), /*implicit=*/true);
 
         // Construct the right-hand call to Builtin.zeroInitializer.
         Identifier zeroInitID = context.getIdentifier("zeroInitializer");
         auto zeroInitializerFunc =
             cast<FuncDecl>(getBuiltinValueDecl(context, zeroInitID));
         auto zeroInitializerRef = new (context) DeclRefExpr(zeroInitializerFunc,
-                                                            SourceLoc(),
+                                                            DeclNameLoc(),
                                                             /*implicit*/ true);
         auto emptyTuple = TupleExpr::createEmpty(context, SourceLoc(),
                                                  SourceLoc(),
@@ -1640,14 +1641,14 @@ namespace {
               continue;
 
             // Construct left-hand side.
-            Expr *lhs = new (context) DeclRefExpr(selfDecl, SourceLoc(),
+            Expr *lhs = new (context) DeclRefExpr(selfDecl, DeclNameLoc(),
                                                   /*Implicit=*/true);
-            lhs = new (context) MemberRefExpr(lhs, SourceLoc(), var, SourceLoc(),
-                                              /*Implicit=*/true);
+            lhs = new (context) MemberRefExpr(lhs, SourceLoc(), var,
+                                              DeclNameLoc(), /*Implicit=*/true);
 
             // Construct right-hand side.
             auto rhs = new (context) DeclRefExpr(valueParameters[i],
-                                                 SourceLoc(),
+                                                 DeclNameLoc(),
                                                  /*Implicit=*/true);
 
             // Add assignment.
@@ -1758,7 +1759,7 @@ namespace {
       // Construct the original constant. Enum constants without payloads look
       // like simple values, but actually have type 'MyEnum.Type -> MyEnum'.
       auto constantRef = new (Impl.SwiftContext) DeclRefExpr(original,
-                                                             SourceLoc(),
+                                                             DeclNameLoc(),
                                                              /*implicit*/true);
       Type importedEnumTy = importedEnum->getDeclaredTypeInContext();
       auto typeRef = TypeExpr::createImplicit(importedEnumTy,
