@@ -127,6 +127,10 @@ Type getTypeFromMangledTypename(ASTContext &Ctx,
                                 const char *mangled_typename,
                                 std::string &error);
 
+Type getTypeFromMangledSymbolname(ASTContext &Ctx,
+                                  const char *mangled_typename,
+                                  std::string &error);
+
 class XMLEscapingPrinter : public StreamPrinter {
   public:
   XMLEscapingPrinter(raw_ostream &OS) : StreamPrinter(OS){};

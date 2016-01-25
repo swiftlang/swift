@@ -2794,3 +2794,28 @@ swift::Type swift::ide::getTypeFromMangledTypename(swift::ASTContext &Ctx,
   }
   return swift::Type();
 }
+
+swift::Type swift::ide::getTypeFromMangledSymbolname(swift::ASTContext &Ctx,
+                                                     const char *mangled_typename,
+                                                     std::string &error)
+{
+  ConstString mangled_name (mangled_typename);
+  std::vector<swift::Demangle::NodePointer> nodes;
+  nodes.push_back(swift::Demangle::demangleSymbolAsNode(mangled_typename,
+                                                        mangled_name.length()));
+  VisitNodeResult empty_generic_context;
+  VisitNodeResult result;
+
+  VisitNode(&Ctx, nodes, result, empty_generic_context, nullptr);
+  error = result._error;
+  if (error.empty() && result._types.size() == 1)
+  {
+    return result._types.front().getPointer();
+  }
+  else
+  {
+    error = stringWithFormat("type for symbolname '%s' was not found",mangled_typename);
+    return swift::Type();
+  }
+  return swift::Type();
+}
