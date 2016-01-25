@@ -228,82 +228,52 @@ Type TypeChecker::resolveTypeInContext(
              genericParam->getDeclaredType()->castTo<GenericTypeParamType>());
   }
 
-  // If we are referring to a type within its own context, and we have either
-  // a generic type with no generic arguments or a non-generic type, use the
-  // type within the context.
-  if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
-    
-    forceExternalDeclMembers(nominal);
-    
-    if (!nominal->getGenericParams() || !isSpecialized) {
-      for (DeclContext *dc = fromDC; dc; dc = dc->getParent()) {
-        switch (dc->getContextKind()) {
-        case DeclContextKind::Module:
-        case DeclContextKind::FileUnit:
-        case DeclContextKind::TopLevelCodeDecl:
-          break;
-
-        case DeclContextKind::Initializer:
-          // If this is a property initializer, we may be referring to the
-          // type initializing the property.
-          continue;
-
-            
-        case DeclContextKind::NominalTypeDecl:
-          // If this is our nominal type, return its type within its context.
-          // FIXME: Just produce the type structure when TR_ResolveStructure.
-          if (cast<NominalTypeDecl>(dc) == nominal)
-            return resolver->resolveTypeOfContext(nominal);
-          continue;
-            
-        case DeclContextKind::ExtensionDecl:
-          // If this is an extension of our nominal type, return the type
-          // within the context of its extension.
-          // FIXME: Just produce the type structure when TR_ResolveStructure.
-          if (cast<ExtensionDecl>(dc)->getExtendedType()->getAnyNominal()
-                == nominal)
-            return resolver->resolveTypeOfContext(dc);
-          continue;
-
-        case DeclContextKind::AbstractClosureExpr:
-        case DeclContextKind::AbstractFunctionDecl:
-        case DeclContextKind::SubscriptDecl:
-          continue;
-        case DeclContextKind::SerializedLocal:
-          llvm_unreachable("should not be typechecking deserialized things");
-        }
-
-        break;
-      }
-    }
-  }
-
-  // If the type declaration itself is in a non-type context, no type
-  // substitution is needed.
-  DeclContext *ownerDC = typeDecl->getDeclContext();
-  if (!ownerDC->isTypeContext()) {
-    // FIXME: Just produce the type structure when TR_ResolveStructure.
-    return typeDecl->getDeclaredType();
-  }
-
-  // Find the nearest enclosing type context around the context from which
-  // we started our search.
-  while (!fromDC->isTypeContext()) {
-    fromDC = fromDC->getParent();
-    assert(!fromDC->isModuleContext());
+  auto nominalType = dyn_cast<NominalTypeDecl>(typeDecl);
+  if (nominalType && (!nominalType->getGenericParams() || !isSpecialized)) {
+    forceExternalDeclMembers(nominalType);
+  } else {
+    nominalType = nullptr;
   }
 
   // Walk up through the type scopes to find the context where the type
   // declaration was found. When we find it, substitute the appropriate base
   // type.
+  auto ownerDC = typeDecl->getDeclContext();
+  bool nonTypeOwner = !ownerDC->isTypeContext();
   auto ownerNominal = ownerDC->isNominalTypeOrNominalTypeExtensionContext();
-  assert(ownerNominal && "Owner must be a nominal type");
   auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl);
+  DeclContext *typeParent = nullptr;
+  assert((ownerNominal || nonTypeOwner) &&
+         "Owner must be a nominal type or an non type context");
+
   for (auto parentDC = fromDC; !parentDC->isModuleContext();
        parentDC = parentDC->getParent()) {
-    // Skip non-type contexts.
-    if (!parentDC->isTypeContext())
+
+    // If we are referring to a type within its own context, and we have either
+    // a generic type with no generic arguments or a non-generic type, use the
+    // type within the context.
+    if (nominalType) {
+      if (parentDC->isNominalTypeOrNominalTypeExtensionContext() == nominalType)
+        return resolver->resolveTypeOfContext(parentDC);
+      if (!parentDC->isModuleScopeContext() && !isa<TopLevelCodeDecl>(parentDC))
+        continue;
+
+      // If we didn't find a matching declaration, the iteration is restarted
+      // but we won't look anymore for the specific nominal type declaration
+      parentDC = fromDC;
+      nominalType = nullptr;
+    }
+
+    if (nonTypeOwner)
+      return typeDecl->getDeclaredType();
+
+    // For the next steps we need our parentDC to be a type context
+    if (!parentDC->isTypeContext()) {
       continue;
+    } else if (!typeParent) {
+      // Remember the first type decl context in the hierarchy for later use
+      typeParent = parentDC;
+    }
 
     // If we found an associated type in an inherited protocol, the base for our
     // reference to this associated type is our own `Self`. If we can't resolve
@@ -389,16 +359,21 @@ Type TypeChecker::resolveTypeInContext(
     }
   }
 
+  // At this point by iterating through the decl context hierarchy we should
+  // have encountered the first type context in the stack.
+  assert(typeParent && "incomplete iteration");
+  assert(!typeParent->isModuleContext());
+
   // Substitute in the appropriate type for 'Self'.
   // FIXME: We shouldn't have to guess here; the caller should tell us.
   Type fromType;
-  if (fromDC->isProtocolOrProtocolExtensionContext())
-    fromType = fromDC->getProtocolSelf()->getArchetype();
+  if (typeParent->isProtocolOrProtocolExtensionContext())
+    fromType = typeParent->getProtocolSelf()->getArchetype();
   else
-    fromType = resolver->resolveTypeOfContext(fromDC);
+    fromType = resolver->resolveTypeOfContext(typeParent);
 
   // Perform the substitution.
-  return substMemberTypeWithBase(fromDC->getParentModule(), typeDecl,
+  return substMemberTypeWithBase(typeParent->getParentModule(), typeDecl,
                                  fromType, /*isTypeReference=*/true);
 }
 
