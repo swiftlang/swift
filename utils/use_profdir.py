@@ -13,11 +13,17 @@
 # This script is used to help prevent profile data clobbering during code
 # coverage profiling.
 
+from __future__ import print_function
+
+from contextlib import closing, contextmanager
+import socket
 import sys
 import subprocess
 import os
 import string
 import random
+import glob
+from profdata_merge_worker import SERVER_ADDRESS
 
 def random_string(N):
     """Return a random ascii_uppercase + digits string of length `N`"""
@@ -54,6 +60,11 @@ def main():
     os.chdir(profdir)
     try:
         return_code = subprocess.call(cmd)
+        files = [os.path.join(profdir, fn) for fn in glob.glob('*.profraw')]
+        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
+            sock.connect(SERVER_ADDRESS)
+            for f in files:
+                sock.send(f + "\n")
     finally:
         os.chdir(previous_cwd)
 
