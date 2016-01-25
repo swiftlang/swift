@@ -72,8 +72,12 @@ protected:
     relativeAddressBase = base;
   }
 
-  llvm::Constant *getRelativeAddressFromNextField(llvm::Constant *referent) {
+  llvm::Constant *getRelativeAddressFromNextField(llvm::Constant *referent,
+                                     llvm::IntegerType *addressTy = nullptr) {
     assert(relativeAddressBase && "no relative address base set");
+    if (!addressTy)
+      addressTy = IGM.RelativeAddressTy;
+    
     // Determine the address of the next field in the initializer.
     llvm::Constant *fieldAddr =
       llvm::ConstantExpr::getPtrToInt(relativeAddressBase, IGM.SizeTy);
@@ -85,9 +89,8 @@ protected:
     llvm::Constant *relative
       = llvm::ConstantExpr::getSub(referent, fieldAddr);
     
-    if (relative->getType() != IGM.RelativeAddressTy)
-      relative = llvm::ConstantExpr::getTrunc(relative,
-                                              IGM.RelativeAddressTy);
+    if (relative->getType() != addressTy)
+      relative = llvm::ConstantExpr::getTrunc(relative, addressTy);
     return relative;
   }
 
@@ -95,6 +98,13 @@ protected:
   /// being built to another global variable.
   void addRelativeAddress(llvm::Constant *referent) {
     addInt32(getRelativeAddressFromNextField(referent));
+  }
+
+  /// Add a pointer-sized relative address from the current location in the
+  /// local being built to another global variable.
+  void addFarRelativeAddress(llvm::Constant *referent) {
+    addWord(getRelativeAddressFromNextField(referent,
+                                            IGM.FarRelativeAddressTy));
   }
 
   /// Add a 32-bit relative address from the current location in the local
@@ -107,6 +117,16 @@ protected:
       addConstantInt32(0);
   }
 
+  /// Add a pointer-sized relative address from the current location in the
+  /// local being built to another global variable, or null if a null referent
+  /// is passed.
+  void addFarRelativeAddressOrNull(llvm::Constant *referent) {
+    if (referent)
+      addFarRelativeAddress(referent);
+    else
+      addConstantWord(0);
+  }
+
   /// Add a 32-bit relative address from the current location in the local
   /// being built to another global variable. Pack a constant integer into
   /// the alignment bits of the pointer.
@@ -117,6 +137,20 @@ protected:
     relativeAddr = llvm::ConstantExpr::getAdd(relativeAddr,
                           llvm::ConstantInt::get(IGM.RelativeAddressTy, tag));
     addInt32(relativeAddr);
+  }
+
+  /// Add a pointer-size relative address from the current location in the
+  /// local being built to another global variable. Pack a constant integer
+  /// into the alignment bits of the pointer.
+  void addFarRelativeAddressWithTag(llvm::Constant *referent,
+                                    unsigned tag) {
+    // FIXME: could be 8 when targeting 64-bit platforms
+    assert(tag < 4 && "tag too big to pack in relative address");
+    llvm::Constant *relativeAddr =
+      getRelativeAddressFromNextField(referent, IGM.FarRelativeAddressTy);
+    relativeAddr = llvm::ConstantExpr::getAdd(relativeAddr,
+                       llvm::ConstantInt::get(IGM.FarRelativeAddressTy, tag));
+    addWord(relativeAddr);
   }
 
   /// Add a uint32_t value that represents the given offset
