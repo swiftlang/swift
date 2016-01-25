@@ -2915,7 +2915,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
 
   @_transparent
   internal var guaranteedNative: Bool {
-    return _canBeClass(Key.self) == 0 && _canBeClass(Value.self) == 0
+    return _canBeClass(Key.self) == 0 || _canBeClass(Value.self) == 0
   }
 
   @warn_unused_result
@@ -3942,7 +3942,7 @@ public struct ${Self}Generator<${TypeParametersDecl}> : GeneratorType {
 %if Self == 'Set':
     return _canBeClass(Element.self) == 0
 %elif Self == 'Dictionary':
-    return _canBeClass(Key.self) == 0 && _canBeClass(Value.self) == 0
+    return _canBeClass(Key.self) == 0 || _canBeClass(Value.self) == 0
 %end
   }
 
