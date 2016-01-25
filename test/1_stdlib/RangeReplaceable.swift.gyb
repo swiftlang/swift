@@ -5,6 +5,10 @@
 // RUN: %S/../../utils/line-directive %t/RangeReplaceable.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
+// This is a workaround to avoid the compiler generating too large code: rdar://problem/24330686
+// FIXME: remove the following line when the compiler problem is fixed.
+// REQUIRES: swift_test_mode_optimize_none
+
 import StdlibUnittest
 
 // Also import modules which are used by StdlibUnittest internally. This
