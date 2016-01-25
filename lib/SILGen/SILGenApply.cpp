@@ -1981,7 +1981,7 @@ ManagedValue SILGenFunction::emitApply(
 
     case ResultConvention::UnownedInnerPointer:
       // Autorelease the 'self' value to lifetime-extend it.
-      assert(lifetimeExtendedSelf.isValid()
+      assert(lifetimeExtendedSelf
              && "did not save lifetime-extended self param");
       B.createAutoreleaseValue(loc, lifetimeExtendedSelf);
       SWIFT_FALLTHROUGH;

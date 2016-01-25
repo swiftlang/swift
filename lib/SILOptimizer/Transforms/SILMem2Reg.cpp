@@ -279,7 +279,7 @@ bool MemoryToRegisters::isWriteOnlyAllocation(AllocStackInst *ASI,
 /// Promote a DebugValueAddr to a DebugValue of the given value.
 static void
 promoteDebugValueAddr(DebugValueAddrInst *DVAI, SILValue Value, SILBuilder &B) {
-  assert(Value.isValid() && "Expected valid value");
+  assert(Value && "Expected valid value");
   B.setInsertionPoint(DVAI);
   B.setCurrentDebugScope(DVAI->getDebugScope());
   B.createDebugValue(DVAI->getLoc(), Value, DVAI->getVarInfo());
@@ -349,7 +349,7 @@ static void replaceDestroy(DestroyAddrInst *DAI, SILValue NewValue) {
   assert(DAI->getOperand()->getType().isLoadable(DAI->getModule()) &&
          "Unexpected promotion of address-only type!");
 
-  assert(NewValue.isValid() && "Expected a value to release!");
+  assert(NewValue && "Expected a value to release!");
 
   SILBuilderWithScope Builder(DAI);
 
@@ -375,7 +375,7 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
     ++BBI;
 
     if (isLoadFromStack(Inst, ASI)) {
-      if (RunningVal.isValid()) {
+      if (RunningVal) {
         // If we are loading from the AllocStackInst and we already know the
         // content of the Alloca then use it.
         DEBUG(llvm::dbgs() << "*** Promoting load: " << *Inst);
@@ -415,7 +415,7 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
     // promote this when we deal with hooking up phis.
     if (auto *DVAI = dyn_cast<DebugValueAddrInst>(Inst)) {
       if (DVAI->getOperand() == ASI &&
-          RunningVal.isValid())
+          RunningVal)
         promoteDebugValueAddr(DVAI, RunningVal, B);
       continue;
     }
@@ -423,7 +423,7 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
     // Replace destroys with a release of the value.
     if (auto *DAI = dyn_cast<DestroyAddrInst>(Inst)) {
       if (DAI->getOperand() == ASI &&
-          RunningVal.isValid()) {
+          RunningVal) {
         replaceDestroy(DAI, RunningVal);
       }
       continue;
@@ -460,7 +460,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
     // Remove instructions that we are loading from. Replace the loaded value
     // with our running value.
     if (isLoadFromStack(Inst, ASI)) {
-      if (!RunningVal.isValid()) {
+      if (!RunningVal) {
         assert(ASI->getElementType().isVoid() &&
                "Expected initialization of non-void type!");
         RunningVal = SILUndef::get(ASI->getElementType(), ASI->getModule());
@@ -484,7 +484,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
     // Replace debug_value_addr with debug_value of the promoted value.
     if (auto *DVAI = dyn_cast<DebugValueAddrInst>(Inst)) {
       if (DVAI->getOperand() == ASI) {
-        if (RunningVal.isValid()) {
+        if (RunningVal) {
           promoteDebugValueAddr(DVAI, RunningVal, B);
         } else {
           // Drop debug_value_addr of uninitialized void values.

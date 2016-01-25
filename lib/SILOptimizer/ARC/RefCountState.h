@@ -136,7 +136,7 @@ public:
 
   /// Returns true if we have a valid value that we are tracking.
   bool hasRCRoot() const {
-    return RCRoot.isValid();
+    return (bool)RCRoot;
   }
 
   /// The latest point we can move the increment without bypassing instructions

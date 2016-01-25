@@ -175,9 +175,6 @@ public:
 
   /// Return true if underlying ValueBase of this SILValue is non-null. Return
   /// false otherwise.
-  bool isValid() const { return getDef() != nullptr; }
-  /// Return true if underlying ValueBase of this SILValue is non-null. Return
-  /// false otherwise.
   explicit operator bool() const { return getDef() != nullptr; }
 
   /// Convert this SILValue into an opaque pointer like type. For use with

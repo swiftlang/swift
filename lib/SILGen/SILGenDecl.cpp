@@ -358,7 +358,7 @@ public:
     assert(DidFinish && "did not call LetValueInit::finishInitialization!");
   }
 
-  bool hasAddress() const { return address.isValid(); }
+  bool hasAddress() const { return (bool)address; }
   
   // SingleBufferInitializations always have an address.
   SILValue getAddressForInPlaceInitialization() const override {
@@ -416,7 +416,7 @@ public:
     // lifetime.
     SILLocation PrologueLoc(vd);
     PrologueLoc.markAsPrologue();
-    if (address.isValid())
+    if (address)
       gen.B.createDebugValueAddr(PrologueLoc, value);
     else
       gen.B.createDebugValue(PrologueLoc, value);

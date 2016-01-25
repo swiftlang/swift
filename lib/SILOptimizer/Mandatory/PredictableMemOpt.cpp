@@ -485,7 +485,7 @@ computeAvailableValuesFrom(SILBasicBlock::iterator StartingFrom,
 static bool anyMissing(unsigned StartSubElt, unsigned NumSubElts,
                        ArrayRef<std::pair<SILValue, unsigned>> &Values) {
   while (NumSubElts) {
-    if (!Values[StartSubElt].first.isValid()) return true;
+    if (!Values[StartSubElt].first) return true;
     ++StartSubElt;
     --NumSubElts;
   }
@@ -509,7 +509,7 @@ AggregateAvailableValues(SILInstruction *Inst, SILType LoadTy,
   // general answer for arbitrary structs and tuples as well.
   if (FirstElt < AvailableValues.size()) {  // #Elements may be zero.
     SILValue FirstVal = AvailableValues[FirstElt].first;
-    if (FirstVal.isValid() && AvailableValues[FirstElt].second == 0 &&
+    if (FirstVal && AvailableValues[FirstElt].second == 0 &&
         FirstVal->getType() == LoadTy) {
       // If the first element of this value is available, check any extra ones
       // before declaring success.
@@ -576,7 +576,7 @@ AggregateAvailableValues(SILInstruction *Inst, SILType LoadTy,
   // Otherwise, we have a simple primitive.  If the value is available, use it,
   // otherwise emit a load of the value.
   auto Val = AvailableValues[FirstElt];
-  if (!Val.first.isValid())
+  if (!Val.first)
     return B.createLoad(Inst->getLoc(), Address);
   
   SILValue EltVal = ExtractSubElement(Val.first, Val.second, B, Inst->getLoc());
@@ -645,7 +645,7 @@ bool AllocOptimize::promoteLoad(SILInstruction *Inst) {
     // promote this load and there is nothing to do.
     bool AnyAvailable = false;
     for (unsigned i = FirstElt, e = i+NumLoadSubElements; i != e; ++i)
-      if (AvailableValues[i].first.isValid()) {
+      if (AvailableValues[i].first) {
         AnyAvailable = true;
         break;
       }
@@ -726,7 +726,7 @@ bool AllocOptimize::promoteDestroyAddr(DestroyAddrInst *DAI) {
     
     // If some value is not available at this load point, then we fail.
     for (unsigned i = FirstElt, e = FirstElt+NumLoadSubElements; i != e; ++i)
-      if (!AvailableValues[i].first.isValid())
+      if (!AvailableValues[i].first)
         return false;
   }
   

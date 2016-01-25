@@ -479,7 +479,7 @@ public:
 
     // Verify some basis structural stuff about an instruction's operands.
     for (auto &operand : I->getAllOperands()) {
-      require(operand.get().isValid(), "instruction has null operand");
+      require(operand.get(), "instruction has null operand");
 
       if (auto *valueI = dyn_cast<SILInstruction>(operand.get())) {
         require(valueI->getParent(),

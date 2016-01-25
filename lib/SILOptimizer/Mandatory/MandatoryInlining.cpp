@@ -116,7 +116,7 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
     // If we found a strong release, replace it with a strong release of the
     // source of the store and erase it.
     if (SRI) {
-      if (CalleeValue.isValid())
+      if (CalleeValue)
         SILBuilderWithScope(SRI)
             .emitStrongReleaseAndFold(SRI->getLoc(), CalleeValue);
       SRI->eraseFromParent();
@@ -126,7 +126,7 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
     PBI->eraseFromParent();
     assert(ABI->use_empty());
     ABI->eraseFromParent();
-    if (!CalleeValue.isValid())
+    if (!CalleeValue)
       return;
   }
 

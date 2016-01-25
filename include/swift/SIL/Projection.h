@@ -121,7 +121,7 @@ struct ProjectionIndex {
     }
     }
   }
-  bool isValid() const { return Aggregate.isValid(); }
+  bool isValid() const { return (bool)Aggregate; }
 };
 
 /// The kind of projection that we are representing.
