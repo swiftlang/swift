@@ -82,7 +82,7 @@ void IRGenModule::emitCoverageMapping() {
     W.write(OS);
 
     auto *NameVal =
-        llvm::ConstantDataArray::getString(LLVMContext, M.getName(), true);
+        llvm::ConstantDataArray::getString(LLVMContext, M.getName(), false);
     auto *NameVar =
         new llvm::GlobalVariable(*getModule(), NameVal->getType(), true,
                                  llvm::GlobalValue::LinkOnceAnyLinkage, NameVal,
@@ -92,9 +92,7 @@ void IRGenModule::emitCoverageMapping() {
     // Create a record for this function.
     llvm::Constant *FunctionRecordVals[] = {
         llvm::ConstantExpr::getBitCast(NameVar, Int8PtrTy),
-        // TODO: We're including the null to match the profile, but we should
-        // really skip the null in the profile instead.
-        llvm::ConstantInt::get(Int32Ty, M.getName().size() + 1),
+        llvm::ConstantInt::get(Int32Ty, M.getName().size()),
         llvm::ConstantInt::get(Int32Ty, CurrentSize - PrevSize),
         llvm::ConstantInt::get(Int64Ty, M.getHash())};
     FunctionRecords.push_back(llvm::ConstantStruct::get(
