@@ -651,7 +651,7 @@ std::string CGForDotView::getNodeLabel(const Node *Node) const {
     default: {
       std::string Inst;
       llvm::raw_string_ostream OI(Inst);
-      SILValue(Node->OrigNode->V).print(OI);
+      SILValue(Node->OrigNode->V)->print(OI);
       size_t start = Inst.find(" = ");
       if (start != std::string::npos) {
         start += 3;

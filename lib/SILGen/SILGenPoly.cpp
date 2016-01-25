@@ -1108,7 +1108,7 @@ namespace {
         llvm::errs() << "inout writeback in abstraction difference thunk "
                         "not yet implemented\n";
         llvm::errs() << "input value ";
-        input.getValue().dump();
+        input.getValue()->dump();
         llvm::errs() << "output type " << result.getSILType() << "\n";
         abort();
       }

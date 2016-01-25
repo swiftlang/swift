@@ -1713,7 +1713,7 @@ static SILValue emitRawApply(SILGenFunction &gen,
       out << "TYPE MISMATCH IN ARGUMENT " << i << " OF APPLY AT ";
       printSILLocationDescription(out, loc, gen.getASTContext());
       out << "  argument value: ";
-      argValue.print(out);
+      argValue->print(out);
       out << "  parameter type: ";
       inputTypes[i].print(out);
       out << "\n";

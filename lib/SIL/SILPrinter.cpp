@@ -1510,14 +1510,6 @@ void SILBasicBlock::printAsOperand(raw_ostream &OS, bool PrintType) {
 // Printing for SILInstruction, SILBasicBlock, SILFunction, and SILModule
 //===----------------------------------------------------------------------===//
 
-void SILValue::dump() const {
-  print(llvm::errs());
-}
-
-void SILValue::print(raw_ostream &OS) const {
-  SILPrinter(OS).print(*this);
-}
-
 void ValueBase::dump() const {
   print(llvm::errs());
 }

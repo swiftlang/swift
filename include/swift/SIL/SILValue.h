@@ -170,9 +170,6 @@ public:
     return Value < RHS.Value;
   }
 
-  void dump() const;
-  void print(raw_ostream &os) const;
-
   /// Return true if underlying ValueBase of this SILValue is non-null. Return
   /// false otherwise.
   explicit operator bool() const { return getDef() != nullptr; }
@@ -586,7 +583,7 @@ static inline llvm::hash_code hash_value(SILValue V) {
 }
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILValue V) {
-  V.print(OS);
+  V->print(OS);
   return OS;
 }
 

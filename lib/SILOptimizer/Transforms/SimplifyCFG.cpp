@@ -2825,7 +2825,7 @@ getSILValueFromCaseResult(SILBuilder &B, SILLocation Loc,
       return B.createIntegerLiteral(Loc, Type, Value.getBoolValue());
   } else {
     llvm::errs() << "Non IntegerLiteralInst switch case result\n";
-    Val.dump();
+    Val->dump();
     return Val;
   }
 }
