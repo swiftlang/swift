@@ -40,8 +40,10 @@ static Expr *createArgWithTrailingClosure(ASTContext &context,
   // If there are no elements, just build a parenthesized expression around
   // the closure.
   if (elementsIn.empty()) {
-    return new (context) ParenExpr(leftParen, closure, rightParen,
-                                   /*hasTrailingClosure=*/true);
+    auto PE = new (context) ParenExpr(leftParen, closure, rightParen,
+                                      /*hasTrailingClosure=*/true);
+    PE->setImplicit();
+    return PE;
   }
 
   // Create the list of elements, and add the trailing closure to the end.
@@ -1172,9 +1174,10 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         Expr *arg = createArgWithTrailingClosure(Context, SourceLoc(), { },
                                                  { }, { }, SourceLoc(), 
                                                  closure.get());
+        // The call node should still be marked as explicit
         Result = makeParserResult(
             ParserStatus(closure),
-            new (Context) CallExpr(Result.get(), arg, /*Implicit=*/true));
+            new (Context) CallExpr(Result.get(), arg, /*Implicit=*/false));
       }
 
       if (Result.hasCodeCompletion())
@@ -2008,6 +2011,7 @@ Expr *Parser::parseExprAnonClosureArg() {
     auto *var = new (Context) ParamDecl(/*IsLet*/ true, SourceLoc(),
                                         Identifier(), varLoc, ident, Type(),
                                         closure);
+    var->setImplicit();
     decls.push_back(var);
   }
 
