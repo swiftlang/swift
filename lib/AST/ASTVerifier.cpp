@@ -2675,6 +2675,20 @@ struct ASTNodeBase {};
                         [&]{ P->print(Out); });
     }
 
+    void assertValidRegion(Decl *D) {
+      auto R = D->getSourceRange();
+      if (R.isValid() && Ctx.SourceMgr.isBeforeInBuffer(R.End, R.Start)) {
+        Out << "invalid type source range for decl: ";
+        D->print(Out);
+        Out << "\n";
+        abort();
+      }
+    }
+
+    void checkSourceRanges(ParamDecl *PD) {
+      assertValidRegion(PD);
+    }
+
     void checkSourceRanges(Decl *D) {
       PrettyStackTraceDecl debugStack("verifying ranges", D);
 
