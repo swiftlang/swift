@@ -457,7 +457,7 @@ public:
     if (!BB->bbarg_empty()) {
       for (auto I = BB->bbarg_begin(), E = BB->bbarg_end(); I != E; ++I) {
         SILValue V = *I;
-        if (V.use_empty())
+        if (V->use_empty())
           continue;
         *this << "// " << getID(V);
         PrintState.OS.PadToColumn(50);

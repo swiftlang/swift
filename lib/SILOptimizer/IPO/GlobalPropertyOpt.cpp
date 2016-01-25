@@ -233,7 +233,7 @@ public:
 /// Checks if an address value does escape. If \p acceptStore is false, then
 /// we handle a store to the address like if the address would escape.
 bool GlobalPropertyOpt::canAddressEscape(SILValue V, bool acceptStore) {
-  for (auto UI : V.getUses()) {
+  for (auto UI : V->getUses()) {
     auto *User = UI->getUser();
     
     // These instructions do not cause the address to escape.

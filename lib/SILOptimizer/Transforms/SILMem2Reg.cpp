@@ -336,7 +336,7 @@ static void replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
   op = LI->getOperand();
   LI->replaceAllUsesWith(val.getDef());
   LI->eraseFromParent();
-  while (op.getDef() != ASI && op.use_empty()) {
+  while (op.getDef() != ASI && op->use_empty()) {
     assert(isa<StructElementAddrInst>(op) || isa<TupleElementAddrInst>(op));
     SILInstruction *Inst = cast<SILInstruction>(op);
     SILValue next = Inst->getOperand(0);

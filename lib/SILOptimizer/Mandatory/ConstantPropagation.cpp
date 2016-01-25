@@ -777,7 +777,7 @@ constantFoldStringConcatenation(ApplyInst *AI,
   for (auto &Op : AI->getAllOperands()) {
     SILValue Val = Op.get();
     Op.drop();
-    if (Val.use_empty()) {
+    if (Val->use_empty()) {
       auto *DeadI = dyn_cast<SILInstruction>(Val);
       recursivelyDeleteTriviallyDeadInstructions(DeadI, /*force*/ true,
                                                  RemoveCallback);

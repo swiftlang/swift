@@ -172,7 +172,7 @@ void swift::eraseUsesOfInstruction(SILInstruction *Inst,
 }
 
 void swift::eraseUsesOfValue(SILValue V) {
-  for (auto UI = V.use_begin(), E = V.use_end(); UI != E;) {
+  for (auto UI = V->use_begin(), E = V->use_end(); UI != E;) {
     auto *User = UI->getUser();
     UI++;
 
@@ -1648,7 +1648,7 @@ simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
   // The unconditional_addr_cast can be skipped, if the result of a cast
   // is not used afterwards.
   bool ResultNotUsed = isa<AllocStackInst>(Dest.getDef());
-  for (auto Use : Dest.getUses()) {
+  for (auto Use : Dest->getUses()) {
     auto *User = Use->getUser();
     if (isa<DeallocStackInst>(User) || User == Inst)
       continue;
@@ -2167,7 +2167,7 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
       Feasibility == DynamicCastFeasibility::MaySucceed) {
 
     bool ResultNotUsed = isa<AllocStackInst>(Dest.getDef());
-    for (auto Use : Dest.getUses()) {
+    for (auto Use : Dest->getUses()) {
       auto *User = Use->getUser();
       if (isa<DeallocStackInst>(User) || User == Inst)
         continue;

@@ -348,7 +348,7 @@ static SILType findTypedAccessType(SILValue V) {
 
   // Then look at any uses of V that potentially could act as a typed access
   // oracle.
-  for (auto Use : V.getUses())
+  for (auto Use : V->getUses())
     if (isTypedAccessOracle(Use->getUser()))
       return V.getType();
 

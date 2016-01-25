@@ -179,7 +179,7 @@ static bool useCaptured(Operand *UI) {
 }
 
 static bool partialApplyEscapes(SILValue V, bool examineApply) {
-  for (auto UI : V.getUses()) {
+  for (auto UI : V->getUses()) {
     auto *User = UI->getUser();
 
     // These instructions do not cause the address to escape.
@@ -343,7 +343,7 @@ static SILInstruction* findUnexpectedBoxUse(SILValue Box,
   // Scan all of the uses of the retain count value, collecting all
   // the releases and validating that we don't have an unexpected
   // user.
-  for (auto UI : Box.getUses()) {
+  for (auto UI : Box->getUses()) {
     auto *User = UI->getUser();
 
     // Retains and releases are fine. Deallocs are fine if we're not

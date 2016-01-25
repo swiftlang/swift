@@ -133,7 +133,7 @@ updateSSAForUseOfInst(SILSSAUpdater &Updater,
     // Instead we collect uses wrapping uses in branches specially so that we
     // can reconstruct the use even after the branch has been modified.
     SmallVector<UseWrapper, 8> StoredUses;
-    for (auto *U : Res.getUses())
+    for (auto *U : Res->getUses())
       StoredUses.push_back(UseWrapper(U));
     for (auto U : StoredUses) {
       Operand *Use = U;

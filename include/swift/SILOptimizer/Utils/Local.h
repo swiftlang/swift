@@ -242,7 +242,7 @@ public:
   }
 
   ValueLifetime computeFromDirectUses() {
-    return computeFromUserList(makeUserRange(DefValue.getUses()),
+    return computeFromUserList(makeUserRange(DefValue->getUses()),
                                std::false_type());
   }
 

@@ -775,13 +775,13 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       SILValue Addr = PBI;
       // If the AllocBox is used by a mark_uninitialized, scan the MUI for
       // interesting uses.
-      if (Addr.hasOneUse()) {
-        SILInstruction *SingleAddrUser = Addr.use_begin()->getUser();
+      if (Addr->hasOneUse()) {
+        SILInstruction *SingleAddrUser = Addr->use_begin()->getUser();
         if (isa<MarkUninitializedInst>(SingleAddrUser))
           Addr = SILValue(SingleAddrUser);
       }
 
-      for (Operand *AddrOp : Addr.getUses()) {
+      for (Operand *AddrOp : Addr->getUses()) {
         if (!isNonescapingUse(AddrOp, Mutations))
           return false;
       }

@@ -191,7 +191,7 @@ namespace {
 
 /// Return true if there are any users of V outside the specified block.
 static bool isUsedOutsideOfBlock(SILValue V, SILBasicBlock *BB) {
-  for (auto UI : V.getUses())
+  for (auto UI : V->getUses())
     if (UI->getUser()->getParent() != BB)
       return true;
   return false;

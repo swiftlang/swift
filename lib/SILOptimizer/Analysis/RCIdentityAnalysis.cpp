@@ -499,7 +499,7 @@ void RCIdentityFunctionInfo::getRCUsers(
     SILValue V = Worklist.pop_back_val();
 
     // For each user of V...
-    for (auto *Op : V.getUses()) {
+    for (auto *Op : V->getUses()) {
       SILInstruction *User = Op->getUser();
 
       // If we have already visited this user, continue.

@@ -174,26 +174,6 @@ public:
     return Value < RHS.Value;
   }
 
-  using use_iterator = ValueBaseUseIterator;
-
-  /// Returns true if this value has no uses.
-  /// To ignore debug-info instructions use swift::hasNoUsesExceptDebug instead
-  /// (see comment in DebugUtils.h).
-  inline bool use_empty() const { return Value->use_empty(); }
-
-  inline use_iterator use_begin() const;
-  inline use_iterator use_end() const;
-
-  /// Returns a range of all uses, which is useful for iterating over all uses.
-  /// To ignore debug-info instructions use swift::getNonDebugUses instead
-  /// (see comment in DebugUtils.h).
-  inline iterator_range<use_iterator> getUses() const;
-
-  /// Returns true if this value has exactly one use.
-  /// To ignore debug-info instructions use swift::hasOneNonDebugUse instead
-  /// (see comment in DebugUtils.h).
-  inline bool hasOneUse() const { return Value->hasOneUse(); }
-
   void dump() const;
   void print(raw_ostream &os) const;
 
@@ -429,16 +409,6 @@ inline bool ValueBase::hasOneUse() const {
   auto I = use_begin(), E = use_end();
   if (I == E) return false;
   return ++I == E;
-}
-
-inline SILValue::use_iterator SILValue::use_begin() const {
-  return Value->use_begin();
-}
-inline SILValue::use_iterator SILValue::use_end() const {
-  return Value->use_end();
-}
-inline iterator_range<SILValue::use_iterator> SILValue::getUses() const {
-  return Value->getUses();
 }
 
 /// A constant-size list of the operands of an instruction.

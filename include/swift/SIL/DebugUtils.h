@@ -126,13 +126,13 @@ using NonDUIterator = DebugUseIterator<true>;
 /// Returns a range of all debug instructions in the uses of a value (e.g.
 /// SILValue or SILInstruction).
 inline iterator_range<DUIterator> getDebugUses(SILValue V) {
-  return make_range(DUIterator(V.use_begin()), DUIterator(V.use_end()));
+  return make_range(DUIterator(V->use_begin()), DUIterator(V->use_end()));
 }
 
 /// Returns a range of all non-debug instructions in the uses of a value (e.g.
 /// SILValue or SILInstruction).
 inline iterator_range<NonDUIterator> getNonDebugUses(SILValue V) {
-  return make_range(NonDUIterator(V.use_begin()), NonDUIterator(V.use_end()));
+  return make_range(NonDUIterator(V->use_begin()), NonDUIterator(V->use_end()));
 }
 
 /// Returns true if a value (e.g. SILInstruction) has no uses except debug

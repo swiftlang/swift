@@ -2037,7 +2037,7 @@ protected:
                          SILSSAUpdater &SSAUp) {
     // Collect outside uses.
     SmallVector<UseWrapper, 16> UseList;
-    for (auto Use : V.getUses())
+    for (auto Use : V->getUses())
       if (OutsideBBs.count(Use->getUser()->getParent()) ||
           !BBMap.count(Use->getUser()->getParent())) {
         UseList.push_back(UseWrapper(Use));

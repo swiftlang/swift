@@ -588,7 +588,7 @@ bool swift::getFinalReleasesForValue(SILValue V, ReleaseTracker &Tracker) {
   // We'll treat this like a liveness problem where the value is the def. Each
   // block that has a use of the value has the value live-in unless it is the
   // block with the value.
-  for (auto *UI : V.getUses()) {
+  for (auto *UI : V->getUses()) {
     auto *User = UI->getUser();
     auto *BB = User->getParent();
 

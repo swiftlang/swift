@@ -573,7 +573,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
   ///
   SmallVector<SILInstruction*, 4> UsesToScalarize;
   
-  for (auto UI : Pointer.getUses()) {
+  for (auto UI : Pointer->getUses()) {
     auto *User = UI->getUser();
 
     // struct_element_addr P, #field indexes into the current element.
@@ -1169,7 +1169,7 @@ static bool isSelfInitUse(ValueMetatypeInst *Inst) {
 void ElementUseCollector::
 collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
                      llvm::SmallDenseMap<VarDecl*, unsigned> &EltNumbering) {
-  for (auto UI : ClassPointer.getUses()) {
+  for (auto UI : ClassPointer->getUses()) {
     auto *User = UI->getUser();
 
     // super_method always looks at the metatype for the class, not at any of

@@ -309,7 +309,7 @@ updateSSA(SILLoop *Loop,
     // Collect out of loop uses of this value.
     auto OrigValue = MapEntry.first;
     SmallVector<UseWrapper, 16> UseList;
-    for (auto Use : OrigValue.getUses())
+    for (auto Use : OrigValue->getUses())
       if (!Loop->contains(Use->getUser()->getParent()))
         UseList.push_back(UseWrapper(Use));
     // Update SSA of use with the available values.

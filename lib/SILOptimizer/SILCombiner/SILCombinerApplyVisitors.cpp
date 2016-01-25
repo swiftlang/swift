@@ -647,7 +647,7 @@ static SILInstruction *findInitExistential(FullApplySite AI, SILValue Self,
       }
     }
 
-    for (auto Use : Op.getUses()) {
+    for (auto Use : Op->getUses()) {
       SILValue User = Use->getUser();
 
       if (auto *IE = dyn_cast<InitExistentialAddrInst>(User)) {

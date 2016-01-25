@@ -453,7 +453,7 @@ protected:
 /// The collected use points will be consulted during forward and backward
 /// copy propagation.
 bool CopyForwarding::collectUsers() {
-  for (auto UI : CurrentDef.getUses()) {
+  for (auto UI : CurrentDef->getUses()) {
     SILInstruction *UserInst = UI->getUser();
     if (auto *Apply = dyn_cast<ApplyInst>(UserInst)) {
       /// A call to materializeForSet exposes an address within the parent
@@ -531,7 +531,7 @@ bool CopyForwarding::propagateCopy(CopyAddrInst *CopyInst) {
 
   // Gather a list of CopyDest users in this block.
   SmallPtrSet<SILInstruction*, 16> DestUserInsts;
-  for (auto UI : CopyDest.getUses()) {
+  for (auto UI : CopyDest->getUses()) {
     SILInstruction *UserInst = UI->getUser();
     if (UserInst != CopyInst && UI->getUser()->getParent() == BB)
       DestUserInsts.insert(UI->getUser());
@@ -588,7 +588,7 @@ bool CopyForwarding::areCopyDestUsersDominatedBy(
   SILValue CopyDest = Copy->getDest();
   DominanceInfo *DT = nullptr;
 
-  for (auto *Use : CopyDest.getUses()) {
+  for (auto *Use : CopyDest->getUses()) {
     auto *UserInst = Use->getUser();
     if (UserInst == Copy)
       continue;
@@ -799,7 +799,7 @@ findAddressRootAndUsers(ValueBase *Def,
                         SmallPtrSetImpl<SILInstruction*> &RootUserInsts) {
   if (isa<InitEnumDataAddrInst>(Def) || isa<InitExistentialAddrInst>(Def)) {
     SILValue InitRoot = cast<SILInstruction>(Def)->getOperand(0);
-    for (auto *Use : InitRoot.getUses()) {
+    for (auto *Use : InitRoot->getUses()) {
       auto *UserInst = Use->getUser();
       if (UserInst == Def)
         continue;
