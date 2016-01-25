@@ -1029,6 +1029,7 @@ static bool tryTypeVariableBindings(
               FreeTypeVariableBinding allowFreeTypeVariables) {
   bool anySolved = false;
   llvm::SmallPtrSet<CanType, 4> exploredTypes;
+  llvm::SmallPtrSet<TypeBase *, 4> boundTypes;
 
   SmallVector<PotentialBinding, 4> storedBindings;
   auto &tc = cs.getTypeChecker();
@@ -1070,6 +1071,9 @@ static bool tryTypeVariableBindings(
 
       // Remove parentheses. They're insignificant here.
       type = type->getWithoutParens();
+
+      if (!boundTypes.insert(type.getPointer()).second)
+        continue;
 
       if (tc.getLangOpts().DebugConstraintSolver) {
         auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
