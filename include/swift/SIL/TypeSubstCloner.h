@@ -263,7 +263,7 @@ protected:
     // If the type substituted type of the operand type and result types match
     // there is no need for an upcast and we can just use the operand.
     if (getOpType(Upcast->getType()) ==
-        getOpValue(Upcast->getOperand()).getType()) {
+        getOpValue(Upcast->getOperand())->getType()) {
       ValueMap.insert({SILValue(Upcast), getOpValue(Upcast->getOperand())});
       return;
     }

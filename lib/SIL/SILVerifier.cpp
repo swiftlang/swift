@@ -139,7 +139,7 @@ public:
   template <class T> typename CanTypeWrapperTraits<T>::type
   _requireObjectType(SILValue value, const Twine &valueDescription,
                      const char *typeName) {
-    return _requireObjectType<T>(value.getType(), valueDescription, typeName);
+    return _requireObjectType<T>(value->getType(), valueDescription, typeName);
   }
 #define requireObjectType(type, value, valueDescription) \
   _requireObjectType<type>(value, valueDescription, #type)
@@ -158,7 +158,7 @@ public:
   typename CanTypeWrapperTraits<T>::type
   _forbidObjectType(SILValue value, const Twine &valueDescription,
                     const char *typeName) {
-    return _forbidObjectType<T>(value.getType(), valueDescription, typeName);
+    return _forbidObjectType<T>(value->getType(), valueDescription, typeName);
   }
 #define forbidObjectType(type, value, valueDescription)                        \
   _forbidObjectType<type>(value, valueDescription, #type)
@@ -166,8 +166,8 @@ public:
   // Require that the operand is a non-optional, non-unowned reference-counted
   // type.
   void requireReferenceValue(SILValue value, const Twine &valueDescription) {
-    require(value.getType().isObject(), valueDescription +" must be an object");
-    require(value.getType().isReferenceCounted(F.getModule()),
+    require(value->getType().isObject(), valueDescription +" must be an object");
+    require(value->getType().isReferenceCounted(F.getModule()),
             valueDescription + " must have reference semantics");
     forbidObjectType(UnownedStorageType, value, valueDescription);
   }
@@ -176,9 +176,9 @@ public:
   // thereof.
   void requireReferenceOrOptionalReferenceValue(SILValue value,
                                                 const Twine &valueDescription) {
-    require(value.getType().isObject(), valueDescription +" must be an object");
+    require(value->getType().isObject(), valueDescription +" must be an object");
     
-    auto objectTy = value.getType();
+    auto objectTy = value->getType();
     OptionalTypeKind otk;
     if (auto optObjTy = objectTy.getAnyOptionalObjectType(F.getModule(), otk)) {
       objectTy = optObjTy;
@@ -193,7 +193,7 @@ public:
   void requireReferenceStorageCapableValue(SILValue value,
                                            const Twine &valueDescription) {
     requireReferenceOrOptionalReferenceValue(value, valueDescription);
-    require(!value.getType().is<SILFunctionType>(),
+    require(!value->getType().is<SILFunctionType>(),
             valueDescription + " cannot apply to a function type");
   }
   
@@ -644,9 +644,9 @@ public:
 
   void checkAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
     requireReferenceValue(ARDI, "Result of alloc_ref_dynamic");
-    require(ARDI->getOperand().getType().is<AnyMetatypeType>(),
+    require(ARDI->getOperand()->getType().is<AnyMetatypeType>(),
             "operand of alloc_ref_dynamic must be of metatype type");
-    auto metaTy = ARDI->getOperand().getType().castTo<AnyMetatypeType>();
+    auto metaTy = ARDI->getOperand()->getType().castTo<AnyMetatypeType>();
     require(metaTy->hasRepresentation(),
             "operand of alloc_ref_dynamic must have a metatype representation");
     if (ARDI->isObjC()) {
@@ -694,7 +694,7 @@ public:
     // Then make sure that we have a type that can be substituted for the
     // callee.
     auto substTy = checkApplySubstitutions(site.getSubstitutions(),
-                                           site.getCallee().getType());
+                                           site.getCallee()->getType());
     require(site.getOrigCalleeType()->getRepresentation() ==
             site.getSubstCalleeType()->getRepresentation(),
             "calling convention difference between types");
@@ -711,7 +711,7 @@ public:
             substTy->getParameters().size(),
             "apply doesn't have right number of arguments for function");
     for (size_t i = 0, size = site.getArguments().size(); i < size; ++i) {
-      requireSameType(site.getArguments()[i].getType(),
+      requireSameType(site.getArguments()[i]->getType(),
                       substTy->getParameters()[i].getSILType(),
                       "operand of 'apply' doesn't match function input type");
     }
@@ -734,7 +734,7 @@ public:
     // Check that if the apply is of a noreturn callee, make sure that an
     // unreachable is the next instruction.
     if (AI->getModule().getStage() == SILStage::Raw ||
-        !AI->getCallee().getType().getAs<SILFunctionType>()->isNoReturn())
+        !AI->getCallee()->getType().getAs<SILFunctionType>()->isNoReturn())
       return;
     require(isa<UnreachableInst>(std::next(SILBasicBlock::iterator(AI))),
             "No return apply without an unreachable as a next instruction.");
@@ -820,7 +820,7 @@ public:
     }
 
     auto substTy = checkApplySubstitutions(PAI->getSubstitutions(),
-                                        PAI->getCallee().getType());
+                                        PAI->getCallee()->getType());
 
     require(!PAI->getSubstCalleeType()->isPolymorphic(),
             "substituted callee type should not be generic");
@@ -841,7 +841,7 @@ public:
       substTy->getParameters().size() - PAI->getArguments().size();
 
     for (unsigned i = 0, size = PAI->getArguments().size(); i < size; ++i) {
-      require(PAI->getArguments()[i].getType()
+      require(PAI->getArguments()[i]->getType()
                 == substTy->getParameters()[i + offset].getSILType(),
               "applied argument types do not match suffix of function type's "
               "inputs");
@@ -951,18 +951,18 @@ public:
   }
   void checkLoadInst(LoadInst *LI) {
     require(LI->getType().isObject(), "Result of load must be an object");
-    require(LI->getOperand().getType().isAddress(),
+    require(LI->getOperand()->getType().isAddress(),
             "Load operand must be an address");
-    require(LI->getOperand().getType().getObjectType() == LI->getType(),
+    require(LI->getOperand()->getType().getObjectType() == LI->getType(),
             "Load operand type and result type mismatch");
   }
 
   void checkStoreInst(StoreInst *SI) {
-    require(SI->getSrc().getType().isObject(),
+    require(SI->getSrc()->getType().isObject(),
             "Can't store from an address source");
-    require(SI->getDest().getType().isAddress(),
+    require(SI->getDest()->getType().isAddress(),
             "Must store to an address dest");
-    require(SI->getDest().getType().getObjectType() == SI->getSrc().getType(),
+    require(SI->getDest()->getType().getObjectType() == SI->getSrc()->getType(),
             "Store operand type and dest type mismatch");
   }
 
@@ -970,15 +970,15 @@ public:
     SILValue Src = AI->getSrc(), Dest = AI->getDest();
     require(AI->getModule().getStage() == SILStage::Raw,
             "assign instruction can only exist in raw SIL");
-    require(Src.getType().isObject(), "Can't assign from an address source");
-    require(Dest.getType().isAddress(), "Must store to an address dest");
-    require(Dest.getType().getObjectType() == Src.getType(),
+    require(Src->getType().isObject(), "Can't assign from an address source");
+    require(Dest->getType().isAddress(), "Must store to an address dest");
+    require(Dest->getType().getObjectType() == Src->getType(),
             "Store operand type and dest type mismatch");
   }
 
   void checkLoadUnownedInst(LoadUnownedInst *LUI) {
     require(LUI->getType().isObject(), "Result of load must be an object");
-    auto PointerType = LUI->getOperand().getType();
+    auto PointerType = LUI->getOperand()->getType();
     auto PointerRVType = PointerType.getSwiftRValueType();
     require(PointerType.isAddress() &&
             PointerRVType->is<UnownedStorageType>(),
@@ -989,15 +989,15 @@ public:
   }
 
   void checkStoreUnownedInst(StoreUnownedInst *SUI) {
-    require(SUI->getSrc().getType().isObject(),
+    require(SUI->getSrc()->getType().isObject(),
             "Can't store from an address source");
-    auto PointerType = SUI->getDest().getType();
+    auto PointerType = SUI->getDest()->getType();
     auto PointerRVType = PointerType.getSwiftRValueType();
     require(PointerType.isAddress() &&
             PointerRVType->is<UnownedStorageType>(),
             "store_unowned address operand must be an unowned address");
     require(PointerRVType->getReferenceStorageReferent()->getCanonicalType() ==
-            SUI->getSrc().getType().getSwiftType(),
+            SUI->getSrc()->getType().getSwiftType(),
             "Store operand type and dest type mismatch");
   }
 
@@ -1005,7 +1005,7 @@ public:
     require(LWI->getType().isObject(), "Result of load must be an object");
     require(LWI->getType().getSwiftType()->getAnyOptionalObjectType(),
             "Result of weak load must be an optional");
-    auto PointerType = LWI->getOperand().getType();
+    auto PointerType = LWI->getOperand()->getType();
     auto PointerRVType = PointerType.getSwiftRValueType();
     require(PointerType.isAddress() &&
             PointerRVType->is<WeakStorageType>(),
@@ -1016,17 +1016,17 @@ public:
   }
 
   void checkStoreWeakInst(StoreWeakInst *SWI) {
-    require(SWI->getSrc().getType().isObject(),
+    require(SWI->getSrc()->getType().isObject(),
             "Can't store from an address source");
-    require(SWI->getSrc().getType().getSwiftType()->getAnyOptionalObjectType(),
+    require(SWI->getSrc()->getType().getSwiftType()->getAnyOptionalObjectType(),
             "store_weak must be of an optional value");
-    auto PointerType = SWI->getDest().getType();
+    auto PointerType = SWI->getDest()->getType();
     auto PointerRVType = PointerType.getSwiftRValueType();
     require(PointerType.isAddress() &&
             PointerRVType->is<WeakStorageType>(),
             "store_weak address operand must be a weak address");
     require(PointerRVType->getReferenceStorageReferent()->getCanonicalType() ==
-            SWI->getSrc().getType().getSwiftType(),
+            SWI->getSrc()->getType().getSwiftType(),
             "Store operand type and dest type mismatch");
   }
 
@@ -1034,78 +1034,78 @@ public:
     SILValue Src = MU->getOperand();
     require(MU->getModule().getStage() == SILStage::Raw,
             "mark_uninitialized instruction can only exist in raw SIL");
-    require(Src.getType().isAddress() ||
-            Src.getType().getSwiftRValueType()->getClassOrBoundGenericClass(),
+    require(Src->getType().isAddress() ||
+            Src->getType().getSwiftRValueType()->getClassOrBoundGenericClass(),
             "mark_uninitialized must be an address or class");
-    require(Src.getType() == MU->getType(),"operand and result type mismatch");
+    require(Src->getType() == MU->getType(),"operand and result type mismatch");
   }
   void checkMarkFunctionEscapeInst(MarkFunctionEscapeInst *MFE) {
     require(MFE->getModule().getStage() == SILStage::Raw,
             "mark_function_escape instruction can only exist in raw SIL");
     for (auto Elt : MFE->getElements())
-      require(Elt.getType().isAddress(), "MFE must refer to variable addrs");
+      require(Elt->getType().isAddress(), "MFE must refer to variable addrs");
   }
 
   void checkCopyAddrInst(CopyAddrInst *SI) {
-    require(SI->getSrc().getType().isAddress(),
+    require(SI->getSrc()->getType().isAddress(),
             "Src value should be lvalue");
-    require(SI->getDest().getType().isAddress(),
+    require(SI->getDest()->getType().isAddress(),
             "Dest address should be lvalue");
-    require(SI->getDest().getType() == SI->getSrc().getType(),
+    require(SI->getDest()->getType() == SI->getSrc()->getType(),
             "Store operand type and dest type mismatch");
   }
 
   void checkRetainValueInst(RetainValueInst *I) {
-    require(I->getOperand().getType().isObject(),
+    require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
   }
 
   void checkReleaseValueInst(ReleaseValueInst *I) {
-    require(I->getOperand().getType().isObject(),
+    require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
   }
   
   void checkAutoreleaseValueInst(AutoreleaseValueInst *I) {
-    require(I->getOperand().getType().isObject(),
+    require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
     // TODO: This instruction could in principle be generalized.
-    require(I->getOperand().getType().hasRetainablePointerRepresentation(),
+    require(I->getOperand()->getType().hasRetainablePointerRepresentation(),
             "Source value must be a reference type or optional thereof");
   }
   
   void checkCopyBlockInst(CopyBlockInst *I) {
-    require(I->getOperand().getType().isBlockPointerCompatible(),
+    require(I->getOperand()->getType().isBlockPointerCompatible(),
             "operand of copy_block should be a block");
-    require(I->getOperand().getType() == I->getType(),
+    require(I->getOperand()->getType() == I->getType(),
             "result of copy_block should be same type as operand");
   }
 
   void checkAllocValueBufferInst(AllocValueBufferInst *I) {
-    require(I->getOperand().getType().isAddress(),
+    require(I->getOperand()->getType().isAddress(),
             "Operand value should be an address");
-    require(I->getOperand().getType().is<BuiltinUnsafeValueBufferType>(),
+    require(I->getOperand()->getType().is<BuiltinUnsafeValueBufferType>(),
             "Operand value should be a Builtin.UnsafeValueBuffer");
   }
 
   void checkProjectValueBufferInst(ProjectValueBufferInst *I) {
-    require(I->getOperand().getType().isAddress(),
+    require(I->getOperand()->getType().isAddress(),
             "Operand value should be an address");
-    require(I->getOperand().getType().is<BuiltinUnsafeValueBufferType>(),
+    require(I->getOperand()->getType().is<BuiltinUnsafeValueBufferType>(),
             "Operand value should be a Builtin.UnsafeValueBuffer");
   }
 
   void checkProjectBoxInst(ProjectBoxInst *I) {
-    require(I->getOperand().getType().isObject(),
+    require(I->getOperand()->getType().isObject(),
             "project_box operand should be a value");
-    require(I->getOperand().getType().is<SILBoxType>(),
+    require(I->getOperand()->getType().is<SILBoxType>(),
             "project_box operand should be a @box type");
-    require(I->getType() == I->getOperand().getType().castTo<SILBoxType>()
+    require(I->getType() == I->getOperand()->getType().castTo<SILBoxType>()
                              ->getBoxedAddressType(),
             "project_box result should be address of boxed type");
   }
 
   void checkProjectExistentialBoxInst(ProjectExistentialBoxInst *PEBI) {
-    SILType operandType = PEBI->getOperand().getType();
+    SILType operandType = PEBI->getOperand()->getType();
     require(operandType.isObject(),
             "project_existential_box operand must not be address");
 
@@ -1133,9 +1133,9 @@ public:
   }
   
   void checkDeallocValueBufferInst(DeallocValueBufferInst *I) {
-    require(I->getOperand().getType().isAddress(),
+    require(I->getOperand()->getType().isAddress(),
             "Operand value should be an address");
-    require(I->getOperand().getType().is<BuiltinUnsafeValueBufferType>(),
+    require(I->getOperand()->getType().is<BuiltinUnsafeValueBufferType>(),
             "Operand value should be a Builtin.UnsafeValueBuffer");
   }
   
@@ -1156,7 +1156,7 @@ public:
               "member variables of struct");
 
       SILType loweredType = structTy.getFieldType(field, F.getModule());
-      require((*opi).getType() == loweredType,
+      require((*opi)->getType() == loweredType,
               "struct operand type does not match field type");
       ++opi;
     }
@@ -1173,80 +1173,80 @@ public:
             "EnumInst must take an argument iff the element does");
 
     if (UI->getElement()->hasArgumentType()) {
-      require(UI->getOperand().getType().isObject(),
+      require(UI->getOperand()->getType().isObject(),
               "EnumInst operand must be an object");
       SILType caseTy = UI->getType().getEnumElementType(UI->getElement(),
                                                         F.getModule());
-      require(caseTy == UI->getOperand().getType(),
+      require(caseTy == UI->getOperand()->getType(),
               "EnumInst operand type does not match type of case");
     }
   }
 
   void checkInitEnumDataAddrInst(InitEnumDataAddrInst *UI) {
-    EnumDecl *ud = UI->getOperand().getType().getEnumOrBoundGenericEnum();
+    EnumDecl *ud = UI->getOperand()->getType().getEnumOrBoundGenericEnum();
     require(ud, "InitEnumDataAddrInst must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
             "InitEnumDataAddrInst case must be a case of the enum operand type");
     require(UI->getElement()->hasArgumentType(),
             "InitEnumDataAddrInst case must have a data type");
-    require(UI->getOperand().getType().isAddress(),
+    require(UI->getOperand()->getType().isAddress(),
             "InitEnumDataAddrInst must take an address operand");
     require(UI->getType().isAddress(),
             "InitEnumDataAddrInst must produce an address");
 
     SILType caseTy =
-      UI->getOperand().getType().getEnumElementType(UI->getElement(),
+      UI->getOperand()->getType().getEnumElementType(UI->getElement(),
                                                     F.getModule());
     requireSameType(caseTy, UI->getType(),
             "InitEnumDataAddrInst result does not match type of enum case");
   }
 
   void checkUncheckedEnumDataInst(UncheckedEnumDataInst *UI) {
-    EnumDecl *ud = UI->getOperand().getType().getEnumOrBoundGenericEnum();
+    EnumDecl *ud = UI->getOperand()->getType().getEnumOrBoundGenericEnum();
     require(ud, "UncheckedEnumData must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
             "UncheckedEnumData case must be a case of the enum operand type");
     require(UI->getElement()->hasArgumentType(),
             "UncheckedEnumData case must have a data type");
-    require(UI->getOperand().getType().isObject(),
+    require(UI->getOperand()->getType().isObject(),
             "UncheckedEnumData must take an address operand");
     require(UI->getType().isObject(),
             "UncheckedEnumData must produce an address");
 
     SILType caseTy =
-      UI->getOperand().getType().getEnumElementType(UI->getElement(),
+      UI->getOperand()->getType().getEnumElementType(UI->getElement(),
                                                     F.getModule());
     require(caseTy == UI->getType(),
             "UncheckedEnumData result does not match type of enum case");
   }
 
   void checkUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *UI) {
-    EnumDecl *ud = UI->getOperand().getType().getEnumOrBoundGenericEnum();
+    EnumDecl *ud = UI->getOperand()->getType().getEnumOrBoundGenericEnum();
     require(ud, "UncheckedTakeEnumDataAddrInst must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
             "UncheckedTakeEnumDataAddrInst case must be a case of the enum operand type");
     require(UI->getElement()->hasArgumentType(),
             "UncheckedTakeEnumDataAddrInst case must have a data type");
-    require(UI->getOperand().getType().isAddress(),
+    require(UI->getOperand()->getType().isAddress(),
             "UncheckedTakeEnumDataAddrInst must take an address operand");
     require(UI->getType().isAddress(),
             "UncheckedTakeEnumDataAddrInst must produce an address");
 
     SILType caseTy =
-      UI->getOperand().getType().getEnumElementType(UI->getElement(),
+      UI->getOperand()->getType().getEnumElementType(UI->getElement(),
                                                     F.getModule());
     require(caseTy == UI->getType(),
             "UncheckedTakeEnumDataAddrInst result does not match type of enum case");
   }
 
   void checkInjectEnumAddrInst(InjectEnumAddrInst *IUAI) {
-    require(IUAI->getOperand().getType().is<EnumType>()
-              || IUAI->getOperand().getType().is<BoundGenericEnumType>(),
+    require(IUAI->getOperand()->getType().is<EnumType>()
+              || IUAI->getOperand()->getType().is<BoundGenericEnumType>(),
             "InjectEnumAddrInst must take an enum operand");
     require(IUAI->getElement()->getParentEnum()
-              == IUAI->getOperand().getType().getEnumOrBoundGenericEnum(),
+              == IUAI->getOperand()->getType().getEnumOrBoundGenericEnum(),
             "InjectEnumAddrInst case must be a case of the enum operand type");
-    require(IUAI->getOperand().getType().isAddress(),
+    require(IUAI->getOperand()->getType().isAddress(),
             "InjectEnumAddrInst must take an address operand");
   }
 
@@ -1257,7 +1257,7 @@ public:
             "Tuple field count mismatch!");
 
     for (size_t i = 0, size = TI->getElements().size(); i < size; ++i) {
-      require(TI->getElement(i).getType().getSwiftType()
+      require(TI->getElement(i)->getType().getSwiftType()
                ->isEqual(ResTy.getElementType(i)),
               "Tuple element arguments do not match tuple type!");
     }
@@ -1316,7 +1316,7 @@ public:
             "value_metatype instruction must have a metatype representation");
     auto formalInstanceTy
       = MI->getType().castTo<MetatypeType>().getInstanceType();
-    require(isLoweringOf(MI->getOperand().getType(), formalInstanceTy),
+    require(isLoweringOf(MI->getOperand()->getType(), formalInstanceTy),
             "value_metatype result must be formal metatype of "
             "lowered operand type");
   }
@@ -1325,11 +1325,11 @@ public:
             "existential_metatype instruction must be of metatype type");
     require(MI->getType().castTo<ExistentialMetatypeType>()->hasRepresentation(),
             "value_metatype instruction must have a metatype representation");
-    require(MI->getOperand().getType().isAnyExistentialType(),
+    require(MI->getOperand()->getType().isAnyExistentialType(),
             "existential_metatype operand must be of protocol type");
     auto formalInstanceTy
       = MI->getType().castTo<ExistentialMetatypeType>().getInstanceType();
-    require(isLoweringOf(MI->getOperand().getType(), formalInstanceTy),
+    require(isLoweringOf(MI->getOperand()->getType(), formalInstanceTy),
             "existential_metatype result must be formal metatype of "
             "lowered operand type");
   }
@@ -1363,20 +1363,20 @@ public:
             "Operand of dealloc_stack must be an alloc_stack");
   }
   void checkDeallocRefInst(DeallocRefInst *DI) {
-    require(DI->getOperand().getType().isObject(),
+    require(DI->getOperand()->getType().isObject(),
             "Operand of dealloc_ref must be object");
-    require(DI->getOperand().getType().getClassOrBoundGenericClass(),
+    require(DI->getOperand()->getType().getClassOrBoundGenericClass(),
             "Operand of dealloc_ref must be of class type");
   }
   void checkDeallocPartialRefInst(DeallocPartialRefInst *DPRI) {
-    require(DPRI->getInstance().getType().isObject(),
+    require(DPRI->getInstance()->getType().isObject(),
             "First operand of dealloc_partial_ref must be object");
-    auto class1 = DPRI->getInstance().getType().getClassOrBoundGenericClass();
+    auto class1 = DPRI->getInstance()->getType().getClassOrBoundGenericClass();
     require(class1,
             "First operand of dealloc_partial_ref must be of class type");
-    require(DPRI->getMetatype().getType().is<MetatypeType>(),
+    require(DPRI->getMetatype()->getType().is<MetatypeType>(),
             "Second operand of dealloc_partial_ref must be a metatype");
-    auto class2 = DPRI->getMetatype().getType().castTo<MetatypeType>()
+    auto class2 = DPRI->getMetatype()->getType().castTo<MetatypeType>()
         ->getInstanceType()->getClassOrBoundGenericClass();
     require(class2,
             "Second operand of dealloc_partial_ref must be a class metatype");
@@ -1399,9 +1399,9 @@ public:
   void checkDeallocBoxInst(DeallocBoxInst *DI) {
     // TODO: Allow the box to be typed, but for staging purposes, only require
     // it when -sil-enable-typed-boxes is enabled.
-    auto boxTy = DI->getOperand().getType().getAs<SILBoxType>();
+    auto boxTy = DI->getOperand()->getType().getAs<SILBoxType>();
     require(boxTy, "operand must be a @box type");
-    require(DI->getOperand().getType().isObject(),
+    require(DI->getOperand()->getType().isObject(),
             "operand must be an object");
     requireSameType(boxTy->getBoxedAddressType().getObjectType(),
                     DI->getElementType().getObjectType(),
@@ -1409,24 +1409,24 @@ public:
   }
 
   void checkDestroyAddrInst(DestroyAddrInst *DI) {
-    require(DI->getOperand().getType().isAddress(),
+    require(DI->getOperand()->getType().isAddress(),
             "Operand of destroy_addr must be address");
   }
 
   void checkIndexAddrInst(IndexAddrInst *IAI) {
     require(IAI->getType().isAddress(), "index_addr must produce an address");
-    require(IAI->getType() == IAI->getBase().getType(),
+    require(IAI->getType() == IAI->getBase()->getType(),
             "index_addr must produce an address of the same type as its base");
-    require(IAI->getIndex().getType().is<BuiltinIntegerType>(),
+    require(IAI->getIndex()->getType().is<BuiltinIntegerType>(),
             "index_addr index must be of a builtin integer type");
   }
 
   void checkIndexRawPointerInst(IndexRawPointerInst *IAI) {
     require(IAI->getType().is<BuiltinRawPointerType>(),
             "index_raw_pointer must produce a RawPointer");
-    require(IAI->getBase().getType().is<BuiltinRawPointerType>(),
+    require(IAI->getBase()->getType().is<BuiltinRawPointerType>(),
             "index_raw_pointer base must be a RawPointer");
-    require(IAI->getIndex().getType().is<BuiltinIntegerType>(),
+    require(IAI->getIndex()->getType().is<BuiltinIntegerType>(),
             "index_raw_pointer index must be of a builtin integer type");
   }
 
@@ -1444,7 +1444,7 @@ public:
   }
 
   void checkStructExtractInst(StructExtractInst *EI) {
-    SILType operandTy = EI->getOperand().getType();
+    SILType operandTy = EI->getOperand()->getType();
     require(operandTy.isObject(),
             "cannot struct_extract from address");
     require(EI->getType().isObject(),
@@ -1466,7 +1466,7 @@ public:
   }
 
   void checkTupleElementAddrInst(TupleElementAddrInst *EI) {
-    SILType operandTy = EI->getOperand().getType();
+    SILType operandTy = EI->getOperand()->getType();
     require(operandTy.isAddress(),
             "must derive element_addr from address");
     require(EI->getType().isAddress(),
@@ -1483,7 +1483,7 @@ public:
   }
 
   void checkStructElementAddrInst(StructElementAddrInst *EI) {
-    SILType operandTy = EI->getOperand().getType();
+    SILType operandTy = EI->getOperand()->getType();
     require(operandTy.isAddress(),
             "must derive struct_element_addr from address");
     StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
@@ -1512,7 +1512,7 @@ public:
             "cannot get address of static property with struct_element_addr");
     require(EI->getField()->hasStorage(),
             "cannot get address of computed property with ref_element_addr");
-    SILType operandTy = EI->getOperand().getType();
+    SILType operandTy = EI->getOperand()->getType();
     ClassDecl *cd = operandTy.getClassOrBoundGenericClass();
     require(cd, "ref_element_addr operand must be a class instance");
 
@@ -1630,7 +1630,7 @@ public:
   
   void checkDynamicMethodInst(DynamicMethodInst *EMI) {
     requireObjectType(SILFunctionType, EMI, "result of dynamic_method");
-    SILType operandType = EMI->getOperand().getType();
+    SILType operandType = EMI->getOperand()->getType();
 
     require(EMI->getMember().getDecl()->isObjC(), "method must be @objc");
     if (!EMI->getMember().getDecl()->isInstanceMember()) {
@@ -1655,7 +1655,7 @@ public:
                                         "result of class_method");
     require(!methodType->getExtInfo().hasContext(),
             "result method must be of a context-free function type");
-    SILType operandType = CMI->getOperand().getType();
+    SILType operandType = CMI->getOperand()->getType();
     require(operandType.isClassOrClassMetatype(),
             "operand must be of a class type");
     require(getMethodSelfType(methodType).isClassOrClassMetatype(),
@@ -1690,7 +1690,7 @@ public:
                                         "result of super_method");
     require(!methodType->getExtInfo().hasContext(),
             "result method must be of a context-free function type");
-    SILType operandType = CMI->getOperand().getType();
+    SILType operandType = CMI->getOperand()->getType();
     require(operandType.isClassOrClassMetatype(),
             "operand must be of a class type");
     require(getMethodSelfType(methodType).isClassOrClassMetatype(),
@@ -1711,7 +1711,7 @@ public:
   }
 
   void checkOpenExistentialAddrInst(OpenExistentialAddrInst *OEI) {
-    SILType operandType = OEI->getOperand().getType();
+    SILType operandType = OEI->getOperand()->getType();
     require(operandType.isAddress(),
             "open_existential_addr must be applied to address");
     require(operandType.canUseExistentialRepresentation(F.getModule(),
@@ -1726,7 +1726,7 @@ public:
   }
 
   void checkOpenExistentialRefInst(OpenExistentialRefInst *OEI) {
-    SILType operandType = OEI->getOperand().getType();
+    SILType operandType = OEI->getOperand()->getType();
     require(operandType.isObject(),
             "open_existential_ref operand must not be address");
 
@@ -1744,7 +1744,7 @@ public:
   }
 
   void checkOpenExistentialBoxInst(OpenExistentialBoxInst *OEI) {
-    SILType operandType = OEI->getOperand().getType();
+    SILType operandType = OEI->getOperand()->getType();
     require(operandType.isObject(),
             "open_existential_box operand must not be address");
 
@@ -1762,7 +1762,7 @@ public:
   }
 
   void checkOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *I) {
-    SILType operandType = I->getOperand().getType();
+    SILType operandType = I->getOperand()->getType();
     require(operandType.isObject(),
             "open_existential_metatype operand must not be address");
     require(operandType.is<ExistentialMetatypeType>(),
@@ -1817,7 +1817,7 @@ public:
   }
 
   void checkInitExistentialAddrInst(InitExistentialAddrInst *AEI) {
-    SILType exType = AEI->getOperand().getType();
+    SILType exType = AEI->getOperand()->getType();
     require(exType.isAddress(),
             "init_existential_addr must be applied to an address");
     require(exType.canUseExistentialRepresentation(F.getModule(),
@@ -1847,7 +1847,7 @@ public:
   }
 
   void checkInitExistentialRefInst(InitExistentialRefInst *IEI) {
-    SILType concreteType = IEI->getOperand().getType();
+    SILType concreteType = IEI->getOperand()->getType();
     require(concreteType.getSwiftType()->isBridgeableObjectType(),
             "init_existential_ref operand must be a class instance");
     require(IEI->getType().canUseExistentialRepresentation(F.getModule(),
@@ -1867,7 +1867,7 @@ public:
                     "init_existential_ref operand must be lowered to the right "
                     "abstraction level for the existential");
     
-    require(isLoweringOf(IEI->getOperand().getType(),
+    require(isLoweringOf(IEI->getOperand()->getType(),
                          IEI->getFormalConcreteType()),
             "init_existential_ref operand must be a lowering of the formal "
             "concrete type");
@@ -1876,7 +1876,7 @@ public:
   }
 
   void checkDeinitExistentialAddrInst(DeinitExistentialAddrInst *DEI) {
-    SILType exType = DEI->getOperand().getType();
+    SILType exType = DEI->getOperand()->getType();
     require(exType.isAddress(),
             "deinit_existential_addr must be applied to an address");
     require(exType.canUseExistentialRepresentation(F.getModule(),
@@ -1886,7 +1886,7 @@ public:
   }
   
   void checkDeallocExistentialBoxInst(DeallocExistentialBoxInst *DEBI) {
-    SILType exType = DEBI->getOperand().getType();
+    SILType exType = DEBI->getOperand()->getType();
     require(exType.isObject(),
             "dealloc_existential_box must be applied to a value");
     require(exType.canUseExistentialRepresentation(F.getModule(),
@@ -1896,7 +1896,7 @@ public:
   }
 
   void checkInitExistentialMetatypeInst(InitExistentialMetatypeInst *I) {
-    SILType operandType = I->getOperand().getType();
+    SILType operandType = I->getOperand()->getType();
     require(operandType.isObject(),
             "init_existential_metatype operand must not be an address");
     require(operandType.is<MetatypeType>(),
@@ -1991,13 +1991,13 @@ public:
 
   void checkUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *CI) {
     verifyCheckedCast(/*exact*/ false,
-                      CI->getOperand().getType(),
+                      CI->getOperand()->getType(),
                       CI->getType());
   }
 
   void checkCheckedCastBranchInst(CheckedCastBranchInst *CBI) {
     verifyCheckedCast(CBI->isExact(),
-                      CBI->getOperand().getType(),
+                      CBI->getOperand()->getType(),
                       CBI->getCastType());
 
     require(CBI->getSuccessBB()->bbarg_size() == 1,
@@ -2010,9 +2010,9 @@ public:
   }
 
   void checkCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
-    require(CCABI->getSrc().getType().isAddress(),
+    require(CCABI->getSrc()->getType().isAddress(),
             "checked_cast_addr_br src must be an address");
-    require(CCABI->getDest().getType().isAddress(),
+    require(CCABI->getDest()->getType().isAddress(),
             "checked_cast_addr_br dest must be an address");
 
     require(CCABI->getSuccessBB()->bbarg_size() == 0,
@@ -2049,7 +2049,7 @@ public:
     auto resTy = requireObjectType(AnyMetatypeType, TTOCI,
                                    "thick_to_objc_metatype result");
 
-    require(TTOCI->getOperand().getType().is<MetatypeType>() ==
+    require(TTOCI->getOperand()->getType().is<MetatypeType>() ==
             TTOCI->getType().is<MetatypeType>(),
             "thick_to_objc_metatype cannot change metatype kinds");
     require(opTy->getRepresentation() == MetatypeRepresentation::Thick,
@@ -2067,7 +2067,7 @@ public:
     auto resTy = requireObjectType(AnyMetatypeType, OCTTI,
                                    "objc_to_thick_metatype result");
 
-    require(OCTTI->getOperand().getType().is<MetatypeType>() ==
+    require(OCTTI->getOperand()->getType().is<MetatypeType>() ==
             OCTTI->getType().is<MetatypeType>(),
             "objc_to_thick_metatype cannot change metatype kinds");
     require(opTy->getRepresentation() == MetatypeRepresentation::ObjC,
@@ -2082,7 +2082,7 @@ public:
   void checkRefToUnownedInst(RefToUnownedInst *I) {
     requireReferenceStorageCapableValue(I->getOperand(),
                                         "Operand of ref_to_unowned");
-    auto operandType = I->getOperand().getType().getSwiftRValueType();
+    auto operandType = I->getOperand()->getType().getSwiftRValueType();
     auto resultType = requireObjectType(UnownedStorageType, I,
                                         "Result of ref_to_unowned");
     require(resultType->isLoadable(ResilienceExpansion::Maximal),
@@ -2108,7 +2108,7 @@ public:
   void checkRefToUnmanagedInst(RefToUnmanagedInst *I) {
     requireReferenceStorageCapableValue(I->getOperand(),
                                         "Operand of ref_to_unmanaged");
-    auto operandType = I->getOperand().getType().getSwiftRValueType();
+    auto operandType = I->getOperand()->getType().getSwiftRValueType();
     auto resultType = requireObjectType(UnmanagedStorageType, I,
                                         "Result of ref_to_unmanaged");
     require(resultType.getReferentType() == operandType,
@@ -2128,13 +2128,13 @@ public:
   }
 
   void checkUpcastInst(UpcastInst *UI) {
-    require(UI->getType() != UI->getOperand().getType(),
+    require(UI->getType() != UI->getOperand()->getType(),
             "can't upcast to same type");
     if (UI->getType().is<MetatypeType>()) {
       CanType instTy(UI->getType().castTo<MetatypeType>()->getInstanceType());
-      require(UI->getOperand().getType().is<MetatypeType>(),
+      require(UI->getOperand()->getType().is<MetatypeType>(),
               "upcast operand must be a class or class metatype instance");
-      CanType opInstTy(UI->getOperand().getType().castTo<MetatypeType>()
+      CanType opInstTy(UI->getOperand()->getType().castTo<MetatypeType>()
                          ->getInstanceType());
       require(instTy->getClassOrBoundGenericClass(),
               "upcast must convert a class metatype to a class metatype");
@@ -2144,13 +2144,13 @@ public:
     }
 
     require(UI->getType().getCategory() ==
-            UI->getOperand().getType().getCategory(),
+            UI->getOperand()->getType().getCategory(),
             "Upcast can only upcast in between types of the same "
             "SILValueCategory. This prevents address types from being cast to "
             "object types or vis-a-versa");
 
     auto ToTy = UI->getType();
-    auto FromTy = UI->getOperand().getType();
+    auto FromTy = UI->getOperand()->getType();
 
     // Upcast from Optional<B> to Optional<A> is legal as long as B is a
     // subclass of A.
@@ -2170,13 +2170,13 @@ public:
 
   void checkIsNonnullInst(IsNonnullInst *II) {
     // The operand must be a function type or a class type.
-    auto OpTy = II->getOperand().getType().getSwiftType();
+    auto OpTy = II->getOperand()->getType().getSwiftType();
     require(OpTy->mayHaveSuperclass() || OpTy->is<SILFunctionType>(),
             "is_nonnull operand must be a class or function type");
   }
 
   void checkAddressToPointerInst(AddressToPointerInst *AI) {
-    require(AI->getOperand().getType().isAddress(),
+    require(AI->getOperand()->getType().isAddress(),
             "address-to-pointer operand must be an address");
     require(AI->getType().getSwiftType()->isEqual(
                               AI->getType().getASTContext().TheRawPointerType),
@@ -2184,18 +2184,18 @@ public:
   }
   
   void checkUncheckedRefCastInst(UncheckedRefCastInst *AI) {
-    require(AI->getOperand().getType().isObject(),
+    require(AI->getOperand()->getType().isObject(),
             "unchecked_ref_cast operand must be a value");
     require(AI->getType().isObject(),
             "unchecked_ref_cast result must be an object");
-    require(SILType::canRefCast(AI->getOperand().getType(), AI->getType(),
+    require(SILType::canRefCast(AI->getOperand()->getType(), AI->getType(),
                                 AI->getModule()),
             "unchecked_ref_cast requires a heap object reference type");
   }
 
   void checkUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *AI) {
-    auto srcTy = AI->getSrc().getType();
-    auto destTy = AI->getDest().getType();
+    auto srcTy = AI->getSrc()->getType();
+    auto destTy = AI->getDest()->getType();
     require(srcTy.isAddress(),
             "unchecked_ref_cast_addr operand must be an address");
     require(destTy.isAddress(),
@@ -2207,14 +2207,14 @@ public:
   }
   
   void checkUncheckedAddrCastInst(UncheckedAddrCastInst *AI) {
-    require(AI->getOperand().getType().isAddress(),
+    require(AI->getOperand()->getType().isAddress(),
             "unchecked_addr_cast operand must be an address");
     require(AI->getType().isAddress(),
             "unchecked_addr_cast result must be an address");
   }
   
   void checkUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *BI) {
-    require(BI->getOperand().getType().isObject(),
+    require(BI->getOperand()->getType().isObject(),
             "unchecked_trivial_bit_cast must operate on a value");
     require(BI->getType().isObject(),
             "unchecked_trivial_bit_cast must produce a value");
@@ -2223,14 +2223,14 @@ public:
   }
 
   void checkUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *BI) {
-    require(BI->getOperand().getType().isObject(),
+    require(BI->getOperand()->getType().isObject(),
             "unchecked_bitwise_cast must operate on a value");
     require(BI->getType().isObject(),
             "unchecked_bitwise_cast must produce a value");
   }
 
   void checkRefToRawPointerInst(RefToRawPointerInst *AI) {
-    require(AI->getOperand().getType().getSwiftType()
+    require(AI->getOperand()->getType().getSwiftType()
               ->isAnyClassReferenceType(),
             "ref-to-raw-pointer operand must be a class reference or"
             " NativeObject");
@@ -2247,18 +2247,18 @@ public:
             || AI->getType().getSwiftType()->isEqual(
                             AI->getType().getASTContext().TheUnknownObjectType),
         "raw-pointer-to-ref result must be a class reference or NativeObject");
-    require(AI->getOperand().getType().getSwiftType()->isEqual(
+    require(AI->getOperand()->getType().getSwiftType()->isEqual(
                             AI->getType().getASTContext().TheRawPointerType),
             "raw-pointer-to-ref operand must be NativeObject");
   }
   
   void checkRefToBridgeObjectInst(RefToBridgeObjectInst *RI) {
-    require(RI->getConverted().getType().isObject(),
+    require(RI->getConverted()->getType().isObject(),
             "ref_to_bridge_object must convert from a value");
-    require(RI->getConverted().getType().getSwiftRValueType()
+    require(RI->getConverted()->getType().getSwiftRValueType()
               ->isBridgeableObjectType(),
             "ref_to_bridge_object must convert from a heap object ref");
-    require(RI->getBitsOperand().getType()
+    require(RI->getBitsOperand()->getType()
               == SILType::getBuiltinWordType(F.getASTContext()),
             "ref_to_bridge_object must take a Builtin.Word bits operand");
     require(RI->getType() == SILType::getBridgeObjectType(F.getASTContext()),
@@ -2266,7 +2266,7 @@ public:
   }
   
   void checkBridgeObjectToRefInst(BridgeObjectToRefInst *RI) {
-    require(RI->getConverted().getType()
+    require(RI->getConverted()->getType()
                == SILType::getBridgeObjectType(F.getASTContext()),
             "bridge_object_to_ref must take a BridgeObject");
     require(RI->getType().isObject(),
@@ -2275,7 +2275,7 @@ public:
             "bridge_object_to_ref must produce a heap object reference");
   }
   void checkBridgeObjectToWordInst(BridgeObjectToWordInst *RI) {
-    require(RI->getConverted().getType()
+    require(RI->getConverted()->getType()
                == SILType::getBridgeObjectType(F.getASTContext()),
             "bridge_object_to_word must take a BridgeObject");
     require(RI->getType().isObject(),
@@ -2316,7 +2316,7 @@ public:
   }
 
   void checkCondFailInst(CondFailInst *CFI) {
-    require(CFI->getOperand().getType()
+    require(CFI->getOperand()->getType()
               == SILType::getBuiltinIntegerType(1, F.getASTContext()),
             "cond_fail operand must be a Builtin.Int1");
   }
@@ -2327,7 +2327,7 @@ public:
     CanSILFunctionType ti = F.getLoweredFunctionType();
     SILType functionResultType
       = F.mapTypeIntoContext(ti->getResult().getSILType());
-    SILType instResultType = RI->getOperand().getType();
+    SILType instResultType = RI->getOperand()->getType();
     DEBUG(llvm::dbgs() << "function return type: ";
           functionResultType.dump();
           llvm::dbgs() << "return inst type: ";
@@ -2345,7 +2345,7 @@ public:
 
     SILType functionResultType
       = F.mapTypeIntoContext(fnType->getErrorResult().getSILType());
-    SILType instResultType = TI->getOperand().getType();
+    SILType instResultType = TI->getOperand()->getType();
     DEBUG(llvm::dbgs() << "function error result type: ";
           functionResultType.dump();
           llvm::dbgs() << "throw operand type: ";
@@ -2355,7 +2355,7 @@ public:
   }
   
   void checkSelectEnumCases(SelectEnumInstBase *I) {
-    EnumDecl *eDecl = I->getEnumOperand().getType().getEnumOrBoundGenericEnum();
+    EnumDecl *eDecl = I->getEnumOperand()->getType().getEnumOrBoundGenericEnum();
     require(eDecl, "select_enum operand must be an enum");
 
     // Find the set of enum elements for the type so we can verify
@@ -2379,7 +2379,7 @@ public:
       unswitchedElts.erase(elt);
 
       // The result value must match the type of the instruction.
-      requireSameType(result.getType(), I->getType(),
+      requireSameType(result->getType(), I->getType(),
                     "select_enum case operand must match type of instruction");
     }
 
@@ -2387,20 +2387,20 @@ public:
     require(unswitchedElts.empty() || I->hasDefault(),
             "nonexhaustive select_enum must have a default destination");
     if (I->hasDefault()) {
-      requireSameType(I->getDefaultResult().getType(),
+      requireSameType(I->getDefaultResult()->getType(),
                   I->getType(),
                   "select_enum default operand must match type of instruction");
     }
   }
 
   void checkSelectEnumInst(SelectEnumInst *SEI) {
-    require(SEI->getEnumOperand().getType().isObject(),
+    require(SEI->getEnumOperand()->getType().isObject(),
             "select_enum operand must be an object");
     
     checkSelectEnumCases(SEI);
   }
   void checkSelectEnumAddrInst(SelectEnumAddrInst *SEI) {
-    require(SEI->getEnumOperand().getType().isAddress(),
+    require(SEI->getEnumOperand()->getType().isAddress(),
             "select_enum_addr operand must be an address");
     
     checkSelectEnumCases(SEI);
@@ -2408,7 +2408,7 @@ public:
 
   void checkSwitchValueInst(SwitchValueInst *SVI) {
     // TODO: Type should be either integer or function
-    auto Ty = SVI->getOperand().getType();
+    auto Ty = SVI->getOperand()->getType();
     require(Ty.getAs<BuiltinIntegerType>() || Ty.getAs<SILFunctionType>(),
             "switch_value operand should be either of an integer "
             "or function type");
@@ -2424,7 +2424,7 @@ public:
       SILBasicBlock *dest;
       std::tie(value, dest) = SVI->getCase(i);
 
-      require(value.getType() == Ty,
+      require(value->getType() == Ty,
              "switch_value case value should have the same type as its operand");
 
       require(!cases.count(value),
@@ -2465,29 +2465,29 @@ public:
       seenCaseValues.insert(elt);
 
       // The result value must match the type of the instruction.
-      requireSameType(result.getType(), I->getType(),
+      requireSameType(result->getType(), I->getType(),
                     "select_value case operand must match type of instruction");
     }
 
     require(I->hasDefault(),
             "select_value should always have a default");
-    requireSameType(I->getDefaultResult().getType(),
+    requireSameType(I->getDefaultResult()->getType(),
                   I->getType(),
                   "select_value default operand must match type of instruction");
   }
 
   void checkSelectValueInst(SelectValueInst *SVI) {
-    require(SVI->getOperand().getType().isObject(),
+    require(SVI->getOperand()->getType().isObject(),
             "select_value operand must be an object");
 
     checkSelectValueCases(SVI);
   }
 
   void checkSwitchEnumInst(SwitchEnumInst *SOI) {
-    require(SOI->getOperand().getType().isObject(),
+    require(SOI->getOperand()->getType().isObject(),
             "switch_enum operand must be an object");
 
-    SILType uTy = SOI->getOperand().getType();
+    SILType uTy = SOI->getOperand()->getType();
     EnumDecl *uDecl = uTy.getEnumOrBoundGenericEnum();
     require(uDecl, "switch_enum operand is not an enum");
 
@@ -2544,10 +2544,10 @@ public:
   }
 
   void checkSwitchEnumAddrInst(SwitchEnumAddrInst *SOI){
-    require(SOI->getOperand().getType().isAddress(),
+    require(SOI->getOperand()->getType().isAddress(),
             "switch_enum_addr operand must be an address");
 
-    SILType uTy = SOI->getOperand().getType();
+    SILType uTy = SOI->getOperand()->getType();
     EnumDecl *uDecl = uTy.getEnumOrBoundGenericEnum();
     require(uDecl, "switch_enum_addr operand must be an enum");
 
@@ -2593,7 +2593,7 @@ public:
     require(std::equal(BI->getArgs().begin(), BI->getArgs().end(),
                       BI->getDestBB()->bbarg_begin(),
                       [](SILValue branchArg, SILArgument *bbArg) {
-                        return branchArg.getType() == bbArg->getType();
+                        return branchArg->getType() == bbArg->getType();
                       }),
             "branch argument types do not match arguments for dest bb");
   }
@@ -2605,9 +2605,9 @@ public:
     // the i1 is the use/decrement that ARC cares about and that after that
     // instruction is evaluated, the scalar i1 has a different identity and the
     // object can be deallocated.
-    require(CBI->getCondition().getType() ==
+    require(CBI->getCondition()->getType() ==
              SILType::getBuiltinIntegerType(1,
-                                 CBI->getCondition().getType().getASTContext()),
+                                 CBI->getCondition()->getType().getASTContext()),
             "condition of conditional branch must have Int1 type");
 
     require(CBI->getTrueArgs().size() == CBI->getTrueBB()->bbarg_size(),
@@ -2617,7 +2617,7 @@ public:
     require(std::equal(CBI->getTrueArgs().begin(), CBI->getTrueArgs().end(),
                       CBI->getTrueBB()->bbarg_begin(),
                       [](SILValue branchArg, SILArgument *bbArg) {
-                        return branchArg.getType() == bbArg->getType();
+                        return branchArg->getType() == bbArg->getType();
                       }),
             "true branch argument types do not match arguments for dest bb");
 
@@ -2626,13 +2626,13 @@ public:
     require(std::equal(CBI->getFalseArgs().begin(), CBI->getFalseArgs().end(),
                       CBI->getFalseBB()->bbarg_begin(),
                       [](SILValue branchArg, SILArgument *bbArg) {
-                        return branchArg.getType() == bbArg->getType();
+                        return branchArg->getType() == bbArg->getType();
                       }),
             "false branch argument types do not match arguments for dest bb");
   }
 
   void checkDynamicMethodBranchInst(DynamicMethodBranchInst *DMBI) {
-    SILType operandType = DMBI->getOperand().getType();
+    SILType operandType = DMBI->getOperand()->getType();
 
     require(DMBI->getMember().getDecl()->isObjC(), "method must be @objc");
     if (!DMBI->getMember().getDecl()->isInstanceMember()) {
@@ -2653,9 +2653,9 @@ public:
   }
   
   void checkProjectBlockStorageInst(ProjectBlockStorageInst *PBSI) {
-    require(PBSI->getOperand().getType().isAddress(),
+    require(PBSI->getOperand()->getType().isAddress(),
             "operand must be an address");
-    auto storageTy = PBSI->getOperand().getType().getAs<SILBlockStorageType>();
+    auto storageTy = PBSI->getOperand()->getType().getAs<SILBlockStorageType>();
     require(storageTy, "operand must be a @block_storage type");
     
     require(PBSI->getType().isAddress(),
@@ -2666,16 +2666,16 @@ public:
   }
   
   void checkInitBlockStorageHeaderInst(InitBlockStorageHeaderInst *IBSHI) {
-    require(IBSHI->getBlockStorage().getType().isAddress(),
+    require(IBSHI->getBlockStorage()->getType().isAddress(),
             "block storage operand must be an address");
     auto storageTy
-      = IBSHI->getBlockStorage().getType().getAs<SILBlockStorageType>();
+      = IBSHI->getBlockStorage()->getType().getAs<SILBlockStorageType>();
     require(storageTy, "block storage operand must be a @block_storage type");
     
-    require(IBSHI->getInvokeFunction().getType().isObject(),
+    require(IBSHI->getInvokeFunction()->getType().isObject(),
             "invoke function operand must be a value");
     auto invokeTy
-      = IBSHI->getInvokeFunction().getType().getAs<SILFunctionType>();
+      = IBSHI->getInvokeFunction()->getType().getAs<SILFunctionType>();
     require(invokeTy, "invoke function operand must be a function");
     require(invokeTy->getRepresentation()
               == SILFunctionType::Representation::CFunctionPointer,
@@ -2723,9 +2723,9 @@ public:
   }
   
   void checkObjCMetatypeToObjectInst(ObjCMetatypeToObjectInst *OMOI) {
-    require(OMOI->getOperand().getType().isObject(),
+    require(OMOI->getOperand()->getType().isObject(),
             "objc_metatype_to_object must take a value");
-    auto fromMetaTy = OMOI->getOperand().getType().getAs<MetatypeType>();
+    auto fromMetaTy = OMOI->getOperand()->getType().getAs<MetatypeType>();
     require(fromMetaTy, "objc_metatype_to_object must take an @objc metatype value");
     require(fromMetaTy->getRepresentation() == MetatypeRepresentation::ObjC,
             "objc_metatype_to_object must take an @objc metatype value");
@@ -2737,9 +2737,9 @@ public:
 
   void checkObjCExistentialMetatypeToObjectInst(
                                     ObjCExistentialMetatypeToObjectInst *OMOI) {
-    require(OMOI->getOperand().getType().isObject(),
+    require(OMOI->getOperand()->getType().isObject(),
             "objc_metatype_to_object must take a value");
-    auto fromMetaTy = OMOI->getOperand().getType()
+    auto fromMetaTy = OMOI->getOperand()->getType()
       .getAs<ExistentialMetatypeType>();
     require(fromMetaTy, "objc_metatype_to_object must take an @objc existential metatype value");
     require(fromMetaTy->getRepresentation() == MetatypeRepresentation::ObjC,

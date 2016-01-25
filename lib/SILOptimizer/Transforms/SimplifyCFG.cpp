@@ -379,7 +379,7 @@ public:
         auto Ty = EnumTy.getEnumElementType(EnumCase, SEI->getModule());
         SILValue UED(
             Builder.createUncheckedEnumData(Loc, EnumVal, EnumCase, Ty));
-        assert(UED.getType() ==
+        assert(UED->getType() ==
                    (*ThreadedSuccessorBlock->bbarg_begin())->getType() &&
                "Argument types must match");
         Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock, {UED});
@@ -440,7 +440,7 @@ static SILInstruction *createValueForEdge(SILInstruction *UserInst,
 
   if (auto *CBI = dyn_cast<CondBranchInst>(DominatingTerminator))
     return Builder.createIntegerLiteral(
-        CBI->getLoc(), CBI->getCondition().getType(), EdgeIdx == 0 ? -1 : 0);
+        CBI->getLoc(), CBI->getCondition()->getType(), EdgeIdx == 0 ? -1 : 0);
 
   auto *SEI = cast<SwitchEnumInst>(DominatingTerminator);
   auto *DstBlock = SEI->getSuccessors()[EdgeIdx].getBB();
@@ -1234,9 +1234,9 @@ static CondFailInst *getUnConditionalFail(SILBasicBlock *BB, SILValue Cond,
 static void createCondFail(CondFailInst *Orig, SILValue Cond, bool inverted,
                            SILBuilder &Builder) {
   if (inverted) {
-    auto *True = Builder.createIntegerLiteral(Orig->getLoc(), Cond.getType(), 1);
+    auto *True = Builder.createIntegerLiteral(Orig->getLoc(), Cond->getType(), 1);
     Cond = Builder.createBuiltinBinaryFunction(Orig->getLoc(), "xor",
-                                               Cond.getType(), Cond.getType(),
+                                               Cond->getType(), Cond->getType(),
                                                {Cond, True});
   }
   Builder.createCondFail(Orig->getLoc(), Cond);
@@ -1256,7 +1256,7 @@ static SILValue invertExpectAndApplyTo(SILBuilder &Builder,
   if (!IL)
     return V;
   SILValue NegatedExpectedValue = Builder.createIntegerLiteral(
-      IL->getLoc(), Args[1].getType(), IL->getValue() == 0 ? -1 : 0);
+      IL->getLoc(), Args[1]->getType(), IL->getValue() == 0 ? -1 : 0);
   return Builder.createBuiltin(BI->getLoc(), BI->getName(), BI->getType(), {},
                                {V, NegatedExpectedValue});
 }
@@ -1394,7 +1394,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   // select_enum with the first case and swap our operands. This simplifies
   // later dominance based processing.
   if (auto *SEI = dyn_cast<SelectEnumInst>(BI->getCondition())) {
-    EnumDecl *E = SEI->getEnumOperand().getType().getEnumOrBoundGenericEnum();
+    EnumDecl *E = SEI->getEnumOperand()->getType().getEnumOrBoundGenericEnum();
 
     auto AllElts = E->getAllElements();
     auto Iter = AllElts.begin();
@@ -1793,7 +1793,7 @@ static bool isTryApplyOfConvertFunction(TryApplyInst *TAI,
   // Check if it is a conversion of a non-throwing function into
   // a throwing function. If this is the case, replace by a
   // simple apply.
-  auto OrigFnTy = dyn_cast<SILFunctionType>(CFI->getConverted().getType().
+  auto OrigFnTy = dyn_cast<SILFunctionType>(CFI->getConverted()->getType().
                                             getSwiftRValueType());
   if (!OrigFnTy || OrigFnTy->hasErrorResult())
     return false;
@@ -1821,7 +1821,7 @@ static bool isTryApplyOfConvertFunction(TryApplyInst *TAI,
 
   // Look through the conversions and find the real callee.
   Callee = getActualCallee(CFI->getConverted());
-  CalleeType = Callee.getType();
+  CalleeType = Callee->getType();
   
   // If it a call of a throwing callee, bail.
   auto CalleeFnTy = dyn_cast<SILFunctionType>(CalleeType.getSwiftRValueType());
@@ -1879,7 +1879,7 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
     }
 
     auto OrigFnTy = dyn_cast<SILFunctionType>(
-        TAI->getCallee().getType().getSwiftRValueType());
+        TAI->getCallee()->getType().getSwiftRValueType());
     if (OrigFnTy->isPolymorphic()) {
       OrigFnTy = OrigFnTy->substGenericArgs(TAI->getModule(),
           TAI->getModule().getSwiftModule(), TAI->getSubstitutions());
@@ -2272,7 +2272,7 @@ deleteTriviallyDeadOperandsOfDeadArgument(MutableArrayRef<Operand> TermOperands,
   auto *I = dyn_cast<SILInstruction>(Op.get());
   if (!I)
     return;
-  Op.set(SILUndef::get(Op.get().getType(), M));
+  Op.set(SILUndef::get(Op.get()->getType(), M));
   recursivelyDeleteTriviallyDeadInstructions(I);
 }
 
@@ -2957,7 +2957,7 @@ bool simplifySwitchEnumToSelectEnum(SILBasicBlock *BB, unsigned ArgNum,
     // If it does, then pick one of those cases as a default.
 
     // Count the number of possible case tags for a given enum type
-    auto *Enum = SEI->getOperand().getType().getEnumOrBoundGenericEnum();
+    auto *Enum = SEI->getOperand()->getType().getEnumOrBoundGenericEnum();
     unsigned ElemCount = 0;
     for (auto E : Enum->getAllElements()) {
       if (E)

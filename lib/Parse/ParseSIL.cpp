@@ -1922,14 +1922,14 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
      return true;
 
    if (Opcode == ValueKind::LoadUnownedInst) {
-     if (!Val.getType().is<UnownedStorageType>()) {
+     if (!Val->getType().is<UnownedStorageType>()) {
        P.diagnose(addrLoc, diag::sil_operand_not_unowned_address, "source",
                   OpcodeName);
      }
      ResultVal = B.createLoadUnowned(InstLoc, Val, IsTake_t(isTake));
 
    } else {
-     if (!Val.getType().is<WeakStorageType>()) {
+     if (!Val->getType().is<WeakStorageType>()) {
        P.diagnose(addrLoc, diag::sil_operand_not_weak_address, "source",
                   OpcodeName);
      }
@@ -2250,14 +2250,14 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
 
-    if (!addrVal.getType().isAddress()) {
+    if (!addrVal->getType().isAddress()) {
       P.diagnose(addrLoc, diag::sil_operand_not_address,
                  "destination", OpcodeName);
       return true;
     }
 
     if (Opcode == ValueKind::StoreUnownedInst) {
-      auto refType = addrVal.getType().getAs<UnownedStorageType>();
+      auto refType = addrVal->getType().getAs<UnownedStorageType>();
       if (!refType) {
         P.diagnose(addrLoc, diag::sil_operand_not_unowned_address,
                    "destination", OpcodeName);
@@ -2271,7 +2271,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     }
 
     if (Opcode == ValueKind::StoreWeakInst) {
-      auto refType = addrVal.getType().getAs<WeakStorageType>();
+      auto refType = addrVal->getType().getAs<WeakStorageType>();
       if (!refType) {
         P.diagnose(addrLoc, diag::sil_operand_not_weak_address,
                    "destination", OpcodeName);
@@ -2284,7 +2284,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       break;
     }
 
-    SILType ValType = addrVal.getType().getObjectType();
+    SILType ValType = addrVal->getType().getObjectType();
 
     if (Opcode == ValueKind::StoreInst) {
       ResultVal = B.createStore(InstLoc,
@@ -2426,7 +2426,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         do {
           if (parseTypedValueRef(Val, B)) return true;
           OpList.push_back(Val);
-          TypeElts.push_back(Val.getType().getSwiftRValueType());
+          TypeElts.push_back(Val->getType().getSwiftRValueType());
         } while (P.consumeIf(tok::comma));
       }
       HadError |= P.parseToken(tok::r_paren,
@@ -2464,7 +2464,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
                           SILFileLocation(P.Tok.getLoc()), B))
           return true;
         OpList.push_back(Val);
-        TypeElts.push_back(Val.getType().getSwiftRValueType());
+        TypeElts.push_back(Val->getType().getSwiftRValueType());
       } while (P.consumeIf(tok::comma));
     }
     HadError |= P.parseToken(tok::r_paren,
@@ -2509,7 +2509,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     
     EnumElementDecl *Elt = cast<EnumElementDecl>(EltRef.getDecl());
-    auto ResultTy = Operand.getType().getEnumElementType(Elt, SILMod);
+    auto ResultTy = Operand->getType().getEnumElementType(Elt, SILMod);
     
     switch (Opcode) {
     case swift::ValueKind::InitEnumDataAddrInst:
@@ -2547,7 +2547,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
 
     unsigned Field = 0;
-    TupleType *TT = Val.getType().getAs<TupleType>();
+    TupleType *TT = Val->getType().getAs<TupleType>();
     if (P.Tok.isNot(tok::integer_literal) ||
         P.Tok.getText().getAsInteger(10, Field) ||
         Field >= TT->getNumElements()) {
@@ -2770,12 +2770,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
 
-    if (!DestLVal.getType().isAddress()) {
+    if (!DestLVal->getType().isAddress()) {
       P.diagnose(DestLoc, diag::sil_invalid_instr_operands);
       return true;
     }
 
-    SILValue SrcLVal = getLocalValue(SrcLName, DestLVal.getType(), InstLoc, B);
+    SILValue SrcLVal = getLocalValue(SrcLName, DestLVal->getType(), InstLoc, B);
     ResultVal = B.createCopyAddr(InstLoc, SrcLVal, DestLVal,
                                  IsTake_t(IsTake),
                                  IsInitialization_t(IsInit));
@@ -2817,7 +2817,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
 
     // FIXME: substitution means this type should be explicit to improve
     // performance.
-    auto ResultTy = Val.getType().getFieldType(Field, SILMod);
+    auto ResultTy = Val->getType().getFieldType(Field, SILMod);
     if (Opcode == ValueKind::StructElementAddrInst)
       ResultVal = B.createStructElementAddr(InstLoc, Val, Field,
                                             ResultTy.getAddressType());
@@ -2838,7 +2838,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
     VarDecl *Field = cast<VarDecl>(FieldV);
-    auto ResultTy = Val.getType().getFieldType(Field, SILMod);
+    auto ResultTy = Val->getType().getFieldType(Field, SILMod);
     ResultVal = B.createRefElementAddr(InstLoc, Val, Field, ResultTy);
     break;
   }
@@ -3053,14 +3053,14 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
 
       // Parse 'case' value-ref ':' sil-identifier.
       if (P.consumeIf(tok::kw_case)) {
-        if (parseValueRef(CaseVal, Val.getType(),
+        if (parseValueRef(CaseVal, Val->getType(),
                           SILFileLocation(P.Tok.getLoc()), B)) {
           // TODO: Issue a proper error message here
           P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "reference to a value");
           return true;
         }
-        auto intTy = Val.getType().getAs<BuiltinIntegerType>();
-        auto functionTy = Val.getType().getAs<SILFunctionType>();
+        auto intTy = Val->getType().getAs<BuiltinIntegerType>();
+        auto functionTy = Val->getType().getAs<SILFunctionType>();
         if (!intTy && !functionTy) {
           P.diagnose(P.Tok, diag::sil_integer_literal_not_integer_type);
           return true;
@@ -3079,7 +3079,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
 
             if (CaseValue.getBitWidth() != intTy->getGreatestWidth())
               CaseVal = B.createIntegerLiteral(
-                  IL->getLoc(), Val.getType(),
+                  IL->getLoc(), Val->getType(),
                   CaseValue.zextOrTrunc(intTy->getGreatestWidth()));
           }
         }
@@ -3164,7 +3164,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SILValue DefaultValue;
     if (DefaultResultName)
       DefaultValue = getLocalValue(*DefaultResultName, ResultType, InstLoc, B);
-    SILType ValType = Val.getType();
+    SILType ValType = Val->getType();
     for (auto &caseName : CaseValueAndResultNames)
       CaseValues.push_back(std::make_pair(
           getLocalValue(caseName.first, ValType, InstLoc, B),
@@ -3190,7 +3190,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     
     // Lower the type at the abstraction level of the existential.
     auto archetype
-      = ArchetypeType::getOpened(Val.getType().getSwiftRValueType())
+      = ArchetypeType::getOpened(Val->getType().getSwiftRValueType())
         ->getCanonicalType();
     
     SILType LoweredTy = SILMod.Types.getLoweredType(
@@ -3200,7 +3200,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     // Collect conformances for the type.
     ArrayRef<ProtocolConformanceRef> conformances
       = collectExistentialConformances(P, Ty,
-                                       Val.getType().getSwiftRValueType());
+                                       Val->getType().getSwiftRValueType());
     
     ResultVal = B.createInitExistentialAddr(InstLoc, Val, Ty, LoweredTy,
                                         conformances);
@@ -3256,7 +3256,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
 
     auto baseExType = ExistentialTy.getSwiftRValueType();
-    auto formalConcreteType = Val.getType().getSwiftRValueType();
+    auto formalConcreteType = Val->getType().getSwiftRValueType();
     while (auto instExType = dyn_cast<ExistentialMetatypeType>(baseExType)) {
       baseExType = instExType.getInstanceType();
       formalConcreteType =
@@ -3391,7 +3391,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
 
   SILValue FnVal = getLocalValue(FnName, Ty, InstLoc, B);
 
-  SILType FnTy = FnVal.getType();
+  SILType FnTy = FnVal->getType();
   CanSILFunctionType substFTI = FTI;
   if (!subs.empty()) {
     auto silFnTy = FnTy.castTo<SILFunctionType>();

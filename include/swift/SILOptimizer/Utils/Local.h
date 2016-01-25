@@ -340,9 +340,9 @@ public:
     // Create block arguments.
     unsigned ArgIdx = 0;
     for (auto Arg : BI->getArgs()) {
-      assert(Arg.getType() == DestBB->getBBArg(ArgIdx)->getType() &&
+      assert(Arg->getType() == DestBB->getBBArg(ArgIdx)->getType() &&
              "Types must match");
-      auto *BlockArg = EdgeBB->createBBArg(Arg.getType());
+      auto *BlockArg = EdgeBB->createBBArg(Arg->getType());
       ValueMap[DestBB->getBBArg(ArgIdx)] = SILValue(BlockArg);
       AvailVals.push_back(std::make_pair(DestBB->getBBArg(ArgIdx), BlockArg));
       ++ArgIdx;

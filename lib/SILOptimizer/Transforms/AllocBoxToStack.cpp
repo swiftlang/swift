@@ -333,9 +333,9 @@ static SILInstruction* findUnexpectedBoxUse(SILValue Box,
                                             bool examinePartialApply,
                                             bool inAppliedFunction,
                             llvm::SmallVectorImpl<Operand *> &PromotedOperands) {
-  assert((Box.getType().is<SILBoxType>()
-          || Box.getType()
-                 == SILType::getNativeObjectType(Box.getType().getASTContext()))
+  assert((Box->getType().is<SILBoxType>()
+          || Box->getType()
+                 == SILType::getNativeObjectType(Box->getType().getASTContext()))
          && "Expected an object pointer!");
 
   llvm::SmallVector<Operand *, 4> LocalPromotedOperands;

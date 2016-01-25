@@ -517,7 +517,7 @@ ClosureCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
       // Releases of the box arguments get replaced with ReleaseValue of the new
       // object type argument.
       SILFunction &F = getBuilder().getFunction();
-      auto &typeLowering = F.getModule().getTypeLowering(I->second.getType());
+      auto &typeLowering = F.getModule().getTypeLowering(I->second->getType());
       SILBuilderWithPostProcess<ClosureCloner, 1> B(this, Inst);
       typeLowering.emitReleaseValue(B, Inst->getLoc(), I->second);
       return;
@@ -732,7 +732,7 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
         return false;
 
       auto Callee = PAI->getCallee();
-      auto CalleeTy = Callee.getType().castTo<SILFunctionType>();
+      auto CalleeTy = Callee->getType().castTo<SILFunctionType>();
 
       // Bail if the signature has any dependent types as we do not
       // currently support these.
@@ -888,12 +888,12 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
   // closure.
   SILBuilderWithScope B(PAI);
   SILValue FnVal = B.createFunctionRef(PAI->getLoc(), ClonedFn);
-  SILType FnTy = FnVal.getType();
+  SILType FnTy = FnVal->getType();
 
   // Populate the argument list for a new partial_apply instruction, taking into
   // consideration any captures.
   auto CalleePInfo =
-      PAI->getCallee().getType().castTo<SILFunctionType>()->getParameters();
+      PAI->getCallee()->getType().castTo<SILFunctionType>()->getParameters();
   auto PInfo = PAI->getType().castTo<SILFunctionType>()->getParameters();
   unsigned FirstIndex = PInfo.size();
   unsigned OpNo = 1, OpCount = PAI->getNumOperands();
@@ -905,7 +905,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
       AllocBoxInst *ABI = cast<AllocBoxInst>(BoxValue.getDef());
 
       SILParameterInfo CPInfo = CalleePInfo[Index];
-      assert(CPInfo.getSILType() == BoxValue.getType() &&
+      assert(CPInfo.getSILType() == BoxValue->getType() &&
              "SILType of parameter info does not match type of parameter");
       // Cleanup the captured argument.
       releasePartialApplyCapturedArg(B, PAI->getLoc(), BoxValue,
@@ -931,7 +931,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
       if (!Addr)
         Addr = getOrCreateProjectBox(ABI);
 
-      auto &typeLowering = M.getTypeLowering(Addr.getType());
+      auto &typeLowering = M.getTypeLowering(Addr->getType());
       Args.push_back(
         typeLowering.emitLoadOfCopy(B, PAI->getLoc(), Addr, IsNotTake));
       ++NumCapturesPromoted;

@@ -79,7 +79,7 @@ public:
   /// Create a managed value for an l-value.
   static ManagedValue forLValue(SILValue value) {
     assert(value && "No value specified");
-    assert(value.getType().isAddress() &&
+    assert(value->getType().isAddress() &&
            "lvalues always have isAddress() type");
     return ManagedValue(value, true, CleanupHandle::invalid());
   }
@@ -119,7 +119,7 @@ public:
   }
   SILValue getValue() const { return valueAndFlag.getPointer(); }
   
-  SILType getType() const { return getValue().getType(); }
+  SILType getType() const { return getValue()->getType(); }
   
 
   CanType getSwiftType() const {

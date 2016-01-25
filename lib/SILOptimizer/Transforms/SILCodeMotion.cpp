@@ -56,7 +56,7 @@ static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
   // argument to the refcount instruction.
   SILValue EnumVal = DefOfEnum ? DefOfEnum : I->getOperand(0);
 
-  SILType ArgType = EnumVal.getType().getEnumElementType(EnumDecl, Mod);
+  SILType ArgType = EnumVal->getType().getEnumElementType(EnumDecl, Mod);
 
   auto *UEDI =
     Builder.createUncheckedEnumData(I->getLoc(), EnumVal, EnumDecl, ArgType);
@@ -170,7 +170,7 @@ static SILValue findValueShallowRoot(const SILValue &In) {
       // object references. For example: func f(x : C.Type) -> Any {return x}
       // Here we check that the uncasted reference is reference counted.
       SILValue V = CCBI->getOperand();
-      if (V.getType().isReferenceCounted(Pred->getParent()->getModule())) {
+      if (V->getType().isReferenceCounted(Pred->getParent()->getModule())) {
         return V;
       }
     }
@@ -298,7 +298,7 @@ cheaperToPassOperandsAsArguments(SILInstruction *First,
   // Found a different operand, now check to see if its type is something
   // cheap enough to sink.
   // TODO: Sink more than just integers.
-  const auto &ArgTy = First->getOperand(*DifferentOperandIndex).getType();
+  const auto &ArgTy = First->getOperand(*DifferentOperandIndex)->getType();
   if (!ArgTy.is<BuiltinIntegerType>())
     return None;
 
@@ -423,7 +423,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
   if (!FSI)
     return false;
 
-  auto *Undef = SILUndef::get(FirstPredArg.getType(), BB->getModule());
+  auto *Undef = SILUndef::get(FirstPredArg->getType(), BB->getModule());
 
   // Delete the debug info of the instruction that we are about to sink.
   deleteAllDebugUses(FSI);
@@ -437,7 +437,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
     // arguments for each predecessor.
     BB->getBBArg(ArgNum)->replaceAllUsesWith(FSI);
 
-    const auto &ArgType = FSI->getOperand(*DifferentOperandIndex).getType();
+    const auto &ArgType = FSI->getOperand(*DifferentOperandIndex)->getType();
     BB->replaceBBArg(ArgNum, ArgType);
 
     // Update all branch instructions in the predecessors to pass the new
@@ -766,7 +766,7 @@ static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
   // If the enum only has 2 values and its tag isn't the true branch, then we
   // know the true branch must be the other tag.
   EnumElementDecl *Elts[2] = {TrueElement.get(), nullptr};
-  EnumDecl *E = SEI->getEnumOperand().getType().getEnumOrBoundGenericEnum();
+  EnumDecl *E = SEI->getEnumOperand()->getType().getEnumOrBoundGenericEnum();
   if (!E)
     return false;
 
@@ -1200,7 +1200,7 @@ void BBEnumTagDataflowState::handlePredCondSelectEnum(CondBranchInst *CondBr) {
 
   // If the enum only has 2 values and its tag isn't the true branch, then we
   // know the true branch must be the other tag.
-  if (EnumDecl *E = Operand.getType().getEnumOrBoundGenericEnum()) {
+  if (EnumDecl *E = Operand->getType().getEnumOrBoundGenericEnum()) {
     // Look for a single other element on this enum.
     EnumElementDecl *OtherElt = nullptr;
     for (EnumElementDecl *Elt : E->getAllElements()) {

@@ -70,7 +70,7 @@ NewProjection::NewProjection(SILInstruction *I) : Value() {
     Value = ValueTy(NewProjectionKind::Struct, SEAI->getFieldNo());
     assert(getKind() == NewProjectionKind::Struct);
     assert(getIndex() == SEAI->getFieldNo());
-    assert(getType(SEAI->getOperand().getType(), SEAI->getModule()) ==
+    assert(getType(SEAI->getOperand()->getType(), SEAI->getModule()) ==
            SEAI->getType());
     break;
   }
@@ -79,7 +79,7 @@ NewProjection::NewProjection(SILInstruction *I) : Value() {
     Value = ValueTy(NewProjectionKind::Struct, SEI->getFieldNo());
     assert(getKind() == NewProjectionKind::Struct);
     assert(getIndex() == SEI->getFieldNo());
-    assert(getType(SEI->getOperand().getType(), SEI->getModule()) ==
+    assert(getType(SEI->getOperand()->getType(), SEI->getModule()) ==
            SEI->getType());
     break;
   }
@@ -88,7 +88,7 @@ NewProjection::NewProjection(SILInstruction *I) : Value() {
     Value = ValueTy(NewProjectionKind::Class, REAI->getFieldNo());
     assert(getKind() == NewProjectionKind::Class);
     assert(getIndex() == REAI->getFieldNo());
-    assert(getType(REAI->getOperand().getType(), REAI->getModule()) ==
+    assert(getType(REAI->getOperand()->getType(), REAI->getModule()) ==
            REAI->getType());
     break;
   }
@@ -97,7 +97,7 @@ NewProjection::NewProjection(SILInstruction *I) : Value() {
     Value = ValueTy(NewProjectionKind::Box, (unsigned)0);
     assert(getKind() == NewProjectionKind::Box);
     assert(getIndex() == 0);
-    assert(getType(PBI->getOperand().getType(), PBI->getModule()) ==
+    assert(getType(PBI->getOperand()->getType(), PBI->getModule()) ==
            PBI->getType());
     (void) PBI;
     break;
@@ -107,7 +107,7 @@ NewProjection::NewProjection(SILInstruction *I) : Value() {
     Value = ValueTy(NewProjectionKind::Tuple, TEI->getFieldNo());
     assert(getKind() == NewProjectionKind::Tuple);
     assert(getIndex() == TEI->getFieldNo());
-    assert(getType(TEI->getOperand().getType(), TEI->getModule()) ==
+    assert(getType(TEI->getOperand()->getType(), TEI->getModule()) ==
            TEI->getType());
     break;
   }
@@ -116,7 +116,7 @@ NewProjection::NewProjection(SILInstruction *I) : Value() {
     Value = ValueTy(NewProjectionKind::Tuple, TEAI->getFieldNo());
     assert(getKind() == NewProjectionKind::Tuple);
     assert(getIndex() == TEAI->getFieldNo());
-    assert(getType(TEAI->getOperand().getType(), TEAI->getModule()) ==
+    assert(getType(TEAI->getOperand()->getType(), TEAI->getModule()) ==
            TEAI->getType());
     break;
   }
@@ -125,7 +125,7 @@ NewProjection::NewProjection(SILInstruction *I) : Value() {
     Value = ValueTy(NewProjectionKind::Enum, UEDI->getElementNo());
     assert(getKind() == NewProjectionKind::Enum);
     assert(getIndex() == UEDI->getElementNo());
-    assert(getType(UEDI->getOperand().getType(), UEDI->getModule()) ==
+    assert(getType(UEDI->getOperand()->getType(), UEDI->getModule()) ==
            UEDI->getType());
     break;
   }
@@ -134,7 +134,7 @@ NewProjection::NewProjection(SILInstruction *I) : Value() {
     Value = ValueTy(NewProjectionKind::Enum, UTEDAI->getElementNo());
     assert(getKind() == NewProjectionKind::Enum);
     assert(getIndex() == UTEDAI->getElementNo());
-    assert(getType(UTEDAI->getOperand().getType(), UTEDAI->getModule()) ==
+    assert(getType(UTEDAI->getOperand()->getType(), UTEDAI->getModule()) ==
            UTEDAI->getType());
     break;
   }
@@ -160,7 +160,7 @@ NewProjection::NewProjection(SILInstruction *I) : Value() {
     assert(Ty->isCanonical());
     Value = ValueTy(NewProjectionKind::Upcast, Ty);
     assert(getKind() == NewProjectionKind::Upcast);
-    assert(getType(I->getOperand(0).getType(), I->getModule()) ==
+    assert(getType(I->getOperand(0)->getType(), I->getModule()) ==
            I->getType());
     break;
   }
@@ -169,7 +169,7 @@ NewProjection::NewProjection(SILInstruction *I) : Value() {
     assert(Ty->isCanonical());
     Value = ValueTy(NewProjectionKind::RefCast, Ty);
     assert(getKind() == NewProjectionKind::RefCast);
-    assert(getType(I->getOperand(0).getType(), I->getModule()) ==
+    assert(getType(I->getOperand(0)->getType(), I->getModule()) ==
            I->getType());
     break;
   }
@@ -179,7 +179,7 @@ NewProjection::NewProjection(SILInstruction *I) : Value() {
     assert(Ty->isCanonical());
     Value = ValueTy(NewProjectionKind::BitwiseCast, Ty);
     assert(getKind() == NewProjectionKind::BitwiseCast);
-    assert(getType(I->getOperand(0).getType(), I->getModule()) ==
+    assert(getType(I->getOperand(0)->getType(), I->getModule()) ==
            I->getType());
     break;
   }
@@ -189,7 +189,7 @@ NewProjection::NewProjection(SILInstruction *I) : Value() {
 NullablePtr<SILInstruction>
 NewProjection::createObjectProjection(SILBuilder &B, SILLocation Loc,
                                       SILValue Base) const {
-  SILType BaseTy = Base.getType();
+  SILType BaseTy = Base->getType();
 
   // We can only create a value projection from an object.
   if (!BaseTy.isObject())
@@ -223,7 +223,7 @@ NewProjection::createObjectProjection(SILBuilder &B, SILLocation Loc,
 NullablePtr<SILInstruction>
 NewProjection::createAddressProjection(SILBuilder &B, SILLocation Loc,
                                        SILValue Base) const {
-  SILType BaseTy = Base.getType();
+  SILType BaseTy = Base->getType();
 
   // We can only create an address projection from an object, unless we have a
   // class.
@@ -325,7 +325,7 @@ void NewProjection::getFirstLevelProjections(
 
 Optional<NewProjectionPath> NewProjectionPath::getProjectionPath(SILValue Start,
                                                                  SILValue End) {
-  NewProjectionPath P(Start.getType());
+  NewProjectionPath P(Start->getType());
 
   // If Start == End, there is a "trivial" projection path in between the
   // two. This is represented by returning an empty ProjectionPath.
@@ -334,8 +334,8 @@ Optional<NewProjectionPath> NewProjectionPath::getProjectionPath(SILValue Start,
 
   // Do not inspect the body of types with unreferenced types such as bitfields
   // and unions. This is currently only associated with structs.
-  if (Start.getType().aggregateHasUnreferenceableStorage() ||
-      End.getType().aggregateHasUnreferenceableStorage())
+  if (Start->getType().aggregateHasUnreferenceableStorage() ||
+      End->getType().aggregateHasUnreferenceableStorage())
     return llvm::NoneType::None;
 
   auto Iter = End;
@@ -496,7 +496,7 @@ bool NewProjectionPath::findMatchingObjectProjectionPaths(
     return false;
 
   // Check that the base result type of I is equivalent to this types base path.
-  if (I->getOperand(0).getType().copyCategory(BaseType) != BaseType)
+  if (I->getOperand(0)->getType().copyCategory(BaseType) != BaseType)
     return false;
 
   // We maintain the head of our worklist so we can use our worklist as a queue
@@ -579,8 +579,8 @@ SILValue NewProjectionPath::createObjectProjections(SILBuilder &B,
                                                     SILLocation Loc,
                                                     SILValue Base) {
   assert(BaseType.isAddress());
-  assert(Base.getType().isObject());
-  assert(Base.getType().getAddressType() == BaseType);
+  assert(Base->getType().isObject());
+  assert(Base->getType().getAddressType() == BaseType);
   SILValue Val = Base;
   for (auto iter : Path) {
     Val = iter.createObjectProjection(B, Loc, Val).get();
@@ -912,7 +912,7 @@ NullablePtr<SILInstruction>
 Projection::
 createValueProjection(SILBuilder &B, SILLocation Loc, SILValue Base) const {
   // Grab Base's type.
-  SILType BaseTy = Base.getType();
+  SILType BaseTy = Base->getType();
 
   // If BaseTy is not an object type, bail.
   if (!BaseTy.isObject())
@@ -942,7 +942,7 @@ NullablePtr<SILInstruction>
 Projection::
 createAddrProjection(SILBuilder &B, SILLocation Loc, SILValue Base) const {
   // Grab Base's type.
-  SILType BaseTy = Base.getType();
+  SILType BaseTy = Base->getType();
 
   // If BaseTy is not an address type, bail.
   if (!BaseTy.isAddress())
@@ -1073,7 +1073,7 @@ void Projection::getFirstLevelProjections(
  
 void Projection::getFirstLevelProjections(
     SILValue V, SILModule &Mod, llvm::SmallVectorImpl<Projection> &Out) {
-  getFirstLevelProjections(V.getType(), Mod, Out);
+  getFirstLevelProjections(V->getType(), Mod, Out);
 }
 
 NullablePtr<SILInstruction>
@@ -1112,8 +1112,8 @@ ProjectionPath::getAddrProjectionPath(SILValue Start, SILValue End,
                                       bool IgnoreCasts) {
   // Do not inspect the body of structs with unreferenced types such as
   // bitfields and unions.
-  if (Start.getType().aggregateHasUnreferenceableStorage() ||
-      End.getType().aggregateHasUnreferenceableStorage()) {
+  if (Start->getType().aggregateHasUnreferenceableStorage() ||
+      End->getType().aggregateHasUnreferenceableStorage()) {
     return llvm::NoneType::None;
   }
 
@@ -1790,7 +1790,7 @@ createTreeFromValue(SILBuilder &B, SILLocation Loc, SILValue NewBase,
     SILValue V = std::get<1>(Worklist.back());
     Worklist.pop_back();
 
-    DEBUG(llvm::dbgs() << "Visiting: " << V.getType() << ": " << V);
+    DEBUG(llvm::dbgs() << "Visiting: " << V->getType() << ": " << V);
 
     // If we have any children...
     unsigned NumChildren = Node->ChildProjections.size();

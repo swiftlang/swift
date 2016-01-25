@@ -235,7 +235,7 @@ void DCE::markLive(SILFunction &F) {
         // definition is alive.
         SILValue Op = FLI->getOperand();
         auto *OpInst = dyn_cast<SILInstruction>(Op);
-        if (OpInst && !Op.getType().isAddress()) {
+        if (OpInst && !Op->getType().isAddress()) {
           addReverseDependency(OpInst, FLI);
         } else {
           markValueLive(FLI);

@@ -1378,7 +1378,7 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
   SmallVector<ConsumableManagedValue, 4> destructured;
 
   // Break down the values.
-  auto tupleSILTy = v.getType();
+  auto tupleSILTy = v->getType();
   for (unsigned i = 0, e = sourceType->getNumElements(); i < e; ++i) {
     SILType fieldTy = tupleSILTy.getTupleElementType(i);
     auto &fieldTL = SGF.getTypeLowering(fieldTy);
@@ -1826,7 +1826,7 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
           break;
 
         case CastConsumptionKind::CopyOnSuccess: {
-          auto copy = SGF.emitTemporaryAllocation(loc, srcValue.getType());
+          auto copy = SGF.emitTemporaryAllocation(loc, srcValue->getType());
           SGF.B.createCopyAddr(loc, srcValue, copy,
                                IsNotTake, IsInitialization);
           // We can always take from the copy.
@@ -1856,7 +1856,7 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
 
       if (elt->isIndirect() || elt->getParentEnum()->isIndirect()) {
         SILValue boxedValue = SGF.B.createProjectBox(loc, origCMV.getValue());
-        eltTL = &SGF.getTypeLowering(boxedValue.getType());
+        eltTL = &SGF.getTypeLowering(boxedValue->getType());
         if (eltTL->isLoadable())
           boxedValue = SGF.B.createLoad(loc, boxedValue);
 

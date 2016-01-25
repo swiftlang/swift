@@ -174,7 +174,7 @@ static CanType getOptionalValueType(SILType optType,
 void SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
                                                       SILValue addr) {
   OptionalTypeKind OTK;
-  getOptionalValueType(addr.getType().getObjectType(), OTK);
+  getOptionalValueType(addr->getType().getObjectType(), OTK);
 
   // Generate code to the optional is present, and if not abort with a message
   // (provided by the stdlib).
@@ -201,7 +201,7 @@ void SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
 
 SILValue SILGenFunction::emitDoesOptionalHaveValue(SILLocation loc,
                                                    SILValue addrOrValue) {
-  SILType optType = addrOrValue.getType().getObjectType();
+  SILType optType = addrOrValue->getType().getObjectType();
   OptionalTypeKind optionalKind;
   getOptionalValueType(optType, optionalKind);
 
@@ -210,7 +210,7 @@ SILValue SILGenFunction::emitDoesOptionalHaveValue(SILLocation loc,
   SILValue no = B.createIntegerLiteral(loc, boolTy, 0);
   auto someDecl = getASTContext().getOptionalSomeDecl(optionalKind);
   
-  if (addrOrValue.getType().isAddress())
+  if (addrOrValue->getType().isAddress())
     return B.createSelectEnumAddr(loc, addrOrValue, boolTy, no,
                                   std::make_pair(someDecl, yes));
   return B.createSelectEnum(loc, addrOrValue, boolTy, no,
@@ -366,7 +366,7 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
 void SILGenFunction::OpaqueValueState::destroy(SILGenFunction &gen,
                                                SILLocation loc) {
   if (isConsumable && !hasBeenConsumed) {
-    auto &lowering = gen.getTypeLowering(value.getType().getSwiftRValueType());
+    auto &lowering = gen.getTypeLowering(value->getType().getSwiftRValueType());
     lowering.emitDestroyRValue(gen.B, loc, value);
   }
 }
@@ -426,7 +426,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     assert(existentialTL.isLoadable());
 
     SILValue metatype = F(SGFContext()).getUnmanagedValue();
-    assert(metatype.getType().castTo<AnyMetatypeType>()->getRepresentation()
+    assert(metatype->getType().castTo<AnyMetatypeType>()->getRepresentation()
              == MetatypeRepresentation::Thick);
 
     auto upcast =
@@ -501,7 +501,7 @@ ManagedValue SILGenFunction::emitClassMetatypeToObject(SILLocation loc,
   SILValue value = v.getUnmanagedValue();
 
   // Convert the metatype to objc representation.
-  auto metatypeTy = value.getType().castTo<MetatypeType>();
+  auto metatypeTy = value->getType().castTo<MetatypeType>();
   auto objcMetatypeTy = CanMetatypeType::get(metatypeTy.getInstanceType(),
                                              MetatypeRepresentation::ObjC);
   value = B.createThickToObjCMetatype(loc, value,
@@ -519,7 +519,7 @@ ManagedValue SILGenFunction::emitExistentialMetatypeToObject(SILLocation loc,
   SILValue value = v.getUnmanagedValue();
   
   // Convert the metatype to objc representation.
-  auto metatypeTy = value.getType().castTo<ExistentialMetatypeType>();
+  auto metatypeTy = value->getType().castTo<ExistentialMetatypeType>();
   auto objcMetatypeTy = CanExistentialMetatypeType::get(
                                               metatypeTy.getInstanceType(),
                                               MetatypeRepresentation::ObjC);

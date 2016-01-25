@@ -200,7 +200,7 @@ mangleClosureProp(PartialApplyInst *PAI) {
   // Then we mangle the types of the arguments that the partial apply is
   // specializing.
   for (auto &Op : PAI->getArgumentOperands()) {
-    SILType Ty = Op.get().getType();
+    SILType Ty = Op.get()->getType();
     M.mangleType(Ty.getSwiftRValueType(), 0);
   }
 }

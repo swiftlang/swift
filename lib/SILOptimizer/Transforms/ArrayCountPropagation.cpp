@@ -169,7 +169,7 @@ bool ArrayAllocation::propagateCountToUsers() {
 
     SmallVector<Operand *, 16> Uses;
     for (auto *Op : Count->getUses()) {
-      if (Op->get().getType() == ArrayCount.getType()) {
+      if (Op->get()->getType() == ArrayCount->getType()) {
         Uses.push_back(Op);
       }
     }

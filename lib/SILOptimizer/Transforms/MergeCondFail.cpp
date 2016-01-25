@@ -106,8 +106,8 @@ public:
       auto CurCond = CondFailToMerge[I]->getOperand();
       if (MergedCond) {
         CurCond = Builder.createBuiltinBinaryFunction(Loc, "or",
-                                                      CurCond.getType(),
-                                                      CurCond.getType(),
+                                                      CurCond->getType(),
+                                                      CurCond->getType(),
                                                       {MergedCond, CurCond});
       }
 

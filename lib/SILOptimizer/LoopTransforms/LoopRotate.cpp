@@ -118,10 +118,10 @@ updateSSAForUseOfInst(SILSSAUpdater &Updater,
   // For each use of a specific result value of the instruction.
   if (Inst->hasValue()) {
     SILValue Res(Inst);
-    assert(Res.getType() == MappedValue.getType() && "The types must match");
+    assert(Res->getType() == MappedValue->getType() && "The types must match");
 
     InsertedPHIs.clear();
-    Updater.Initialize(Res.getType());
+    Updater.Initialize(Res->getType());
     Updater.AddAvailableValue(Header, Res);
     Updater.AddAvailableValue(EntryCheckBlock, MappedValue);
 

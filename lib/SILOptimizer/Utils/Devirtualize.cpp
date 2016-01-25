@@ -387,7 +387,7 @@ getSubstitutionsForCallee(SILModule &M, CanSILFunctionType GenCalleeType,
   auto AISubs = AI.getSubstitutions();
 
   CanSILFunctionType AIGenCalleeType =
-      AI.getCallee().getType().castTo<SILFunctionType>();
+      AI.getCallee()->getType().castTo<SILFunctionType>();
 
   CanType AISelfClass = AIGenCalleeType->getSelfParameter().getType();
 
@@ -535,7 +535,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
 
   SILModule &Mod = AI.getModule();
   auto *MI = cast<MethodInst>(AI.getCallee());
-  auto ClassOrMetatypeType = ClassOrMetatype.getType();
+  auto ClassOrMetatypeType = ClassOrMetatype->getType();
   auto *F = getTargetClassMethod(Mod, ClassOrMetatypeType, MI->getMember());
 
   CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
@@ -558,7 +558,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
 
   for (unsigned i = 0, e = Args.size() - 1; i != e; ++i)
     NewArgs.push_back(castValueToABICompatibleType(&B, AI.getLoc(), Args[i],
-                                                   Args[i].getType(),
+                                                   Args[i]->getType(),
                                                    ParamTypes[i]).getValue());
 
   // Add the self argument, upcasting if required because we're
@@ -673,7 +673,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
 
 DevirtualizationResult swift::tryDevirtualizeClassMethod(FullApplySite AI,
                                                    SILValue ClassInstance) {
-  if (!canDevirtualizeClassMethod(AI, ClassInstance.getType()))
+  if (!canDevirtualizeClassMethod(AI, ClassInstance->getType()))
     return std::make_pair(nullptr, FullApplySite());
   return devirtualizeClassMethod(AI, ClassInstance);
 }
@@ -741,7 +741,7 @@ static ApplySite devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   for (unsigned ArgN = 0, ArgE = AI.getNumArguments(); ArgN != ArgE; ++ArgN) {
     SILValue A = AI.getArgument(ArgN);
     auto ParamType = ParamTypes[ParamTypes.size() - AI.getNumArguments() + ArgN];
-    if (A.getType() != ParamType)
+    if (A->getType() != ParamType)
       A = B.createUpcast(AI.getLoc(), A, ParamType);
 
     Arguments.push_back(A);
@@ -831,7 +831,7 @@ swift::tryDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA) {
   if (auto *CMI = dyn_cast<ClassMethodInst>(AI.getCallee())) {
     auto &M = AI.getModule();
     auto Instance = stripUpCasts(CMI->getOperand());
-    auto ClassType = Instance.getType();
+    auto ClassType = Instance->getType();
     if (ClassType.is<MetatypeType>())
       ClassType = ClassType.getMetatypeInstanceType(M);
 

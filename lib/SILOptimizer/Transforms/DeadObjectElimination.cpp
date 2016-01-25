@@ -383,7 +383,7 @@ private:
 // Record a store into this object.
 void DeadObjectAnalysis::
 addStore(StoreInst *Store, IndexTrieNode *AddressNode) {
-  if (Store->getSrc().getType().isTrivial(Store->getModule()))
+  if (Store->getSrc()->getType().isTrivial(Store->getModule()))
     return;
 
   // SSAUpdater cannot handle multiple defs in the same blocks. Therefore, we
@@ -544,7 +544,7 @@ static void insertReleases(ArrayRef<StoreInst*> Stores,
   assert(!Stores.empty());
   SILValue StVal = Stores.front()->getSrc();
 
-  SSAUp.Initialize(StVal.getType());
+  SSAUp.Initialize(StVal->getType());
 
   for (auto *Store : Stores)
     SSAUp.AddAvailableValue(Store->getParent(), Store->getSrc());
@@ -556,7 +556,7 @@ static void insertReleases(ArrayRef<StoreInst*> Stores,
     // per block, and all release points occur after all stores. Therefore we
     // can simply ask SSAUpdater for the reaching store.
     SILValue RelVal = SSAUp.GetValueAtEndOfBlock(RelPoint->getParent());
-    if (StVal.getType().isReferenceCounted(RelPoint->getModule()))
+    if (StVal->getType().isReferenceCounted(RelPoint->getModule()))
       B.createStrongRelease(RelPoint->getLoc(), RelVal)->getOperandRef();
     else
       B.createReleaseValue(RelPoint->getLoc(), RelVal)->getOperandRef();
@@ -780,7 +780,7 @@ bool DeadObjectElimination::processAllocApply(ApplyInst *AI) {
 
   ApplyInst *AllocBufferAI = nullptr;
   SILValue Arg0 = AI->getArgument(0);
-  if (Arg0.getType().isExistentialType()) {
+  if (Arg0->getType().isExistentialType()) {
     // This is a version of the initializer which receives a pre-allocated
     // buffer as first argument. If we want to delete the initializer we also
     // have to delete the allocation.

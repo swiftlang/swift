@@ -33,7 +33,7 @@ using namespace swift::PatternMatch;
 SILInstruction *SILCombiner::optimizeBuiltinCompareEq(BuiltinInst *BI,
                                                       bool NegateResult) {
   // Canonicalize boolean comparisons.
-  if (auto OpTy = BI->getArguments()[0].getType().getAs<BuiltinIntegerType>())
+  if (auto OpTy = BI->getArguments()[0]->getType().getAs<BuiltinIntegerType>())
     if (OpTy->isFixedWidth(1))
       // cmp_eq %X, -1 -> xor (cmp_eq %X, 0), -1
       if (!NegateResult) {
@@ -268,14 +268,14 @@ SILInstruction *optimizeBuiltinArrayOperation(BuiltinInst *I,
                                                TruncOrBitCast, Ptr, Distance);
   if (IdxRawPtr1)
     NewOp1 = createIndexAddrFrom(IdxRawPtr1, Metatype, TruncOrBitCast, Ptr,
-                                 Distance, NewOp1.getType(), Builder);
+                                 Distance, NewOp1->getType(), Builder);
 
   // Try to replace the second pointer operand.
   auto *IdxRawPtr2 = matchSizeOfMultiplication(I->getOperand(2), Metatype,
                                                TruncOrBitCast, Ptr, Distance);
   if (IdxRawPtr2)
     NewOp2 = createIndexAddrFrom(IdxRawPtr2, Metatype, TruncOrBitCast, Ptr,
-                                 Distance, NewOp2.getType(), Builder);
+                                 Distance, NewOp2->getType(), Builder);
 
   if (NewOp1 != I->getOperand(1) || NewOp2 != I->getOperand(2)) {
     SmallVector<SILValue, 5> NewOpds;
@@ -450,7 +450,7 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
     if (match(Bytes2,
               m_BuiltinInst(BuiltinValueKind::PtrToInt, m_ValueBase()))) {
       if (Indexraw->getOperand(0) == Bytes2->getOperand(0) &&
-          Indexraw->getOperand(1).getType() == I->getType()) {
+          Indexraw->getOperand(1)->getType() == I->getType()) {
         replaceInstUsesWith(*I, Indexraw->getOperand(1).getDef());
         return eraseInstFromFunction(*I);
       }

@@ -160,10 +160,6 @@ public:
   ValueBase *operator->() const { return getDef(); }
   ValueBase &operator*() const { return *getDef(); }
 
-  SILType getType() const {
-    return getDef()->getType();
-  }
-
   // Comparison.
   bool operator==(SILValue RHS) const {
     return Value == RHS.Value;

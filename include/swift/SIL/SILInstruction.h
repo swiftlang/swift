@@ -684,7 +684,7 @@ public:
 
   /// Get the type of the callee without the applied substitutions.
   CanSILFunctionType getOrigCalleeType() const {
-    return getCallee().getType().template castTo<SILFunctionType>();
+    return getCallee()->getType().template castTo<SILFunctionType>();
   }
 
   /// Get the type of the callee with the applied substitutions.
@@ -1256,7 +1256,7 @@ class LoadInst
   ///        use for the load.
   LoadInst(SILDebugLocation *DebugLoc, SILValue LValue)
       : UnaryInstructionBase(DebugLoc, LValue,
-                             LValue.getType().getObjectType()) {}
+                             LValue->getType().getObjectType()) {}
 };
 
 /// StoreInst - Represents a store from a memory location.
@@ -1309,7 +1309,7 @@ public:
   SILValue getDest() const { return Operands[Dest].get(); }
 
   bool isUnownedAssign() const {
-    return getDest().getType().getObjectType().is<UnownedStorageType>();
+    return getDest()->getType().getObjectType().is<UnownedStorageType>();
   }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
@@ -1351,7 +1351,7 @@ private:
   Kind ThisKind;
 
   MarkUninitializedInst(SILDebugLocation *DebugLoc, SILValue Address, Kind K)
-      : UnaryInstructionBase(DebugLoc, Address, Address.getType()),
+      : UnaryInstructionBase(DebugLoc, Address, Address->getType()),
         ThisKind(K) {}
 
 public:
@@ -1468,7 +1468,7 @@ class LoadReferenceInstBase : public UnaryInstructionBase<K> {
 
 protected:
   LoadReferenceInstBase(SILDebugLocation *loc, SILValue lvalue, IsTake_t isTake)
-    : UnaryInstructionBase<K>(loc, lvalue, getResultType(lvalue.getType())),
+    : UnaryInstructionBase<K>(loc, lvalue, getResultType(lvalue->getType())),
       IsTake(unsigned(isTake)) {
   }
 
@@ -2141,7 +2141,7 @@ public:
     // For each operand...
     for (unsigned i = 0, e = Ops.size(); i != e; ++i) {
       // If the operand is not trivial...
-      if (!Ops[i].get().getType().isTrivial(Mod)) {
+      if (!Ops[i].get()->getType().isTrivial(Mod)) {
         // And we have not found an Index yet, set index to i and continue.
         if (!Index.hasValue()) {
           Index = i;
@@ -2297,7 +2297,7 @@ public:
     // For each operand...
     for (unsigned i = 0, e = Ops.size(); i != e; ++i) {
       // If the operand is not trivial...
-      if (!Ops[i].get().getType().isTrivial(Mod)) {
+      if (!Ops[i].get()->getType().isTrivial(Mod)) {
         // And we have not found an Index yet, set index to i and continue.
         if (!Index.hasValue()) {
           Index = i;
@@ -2372,7 +2372,7 @@ public:
   EnumElementDecl *getElement() const { return Element; }
 
   EnumDecl *getEnumDecl() const {
-    auto *E = getOperand().getType().getEnumOrBoundGenericEnum();
+    auto *E = getOperand()->getType().getEnumOrBoundGenericEnum();
     assert(E && "Operand of unchecked_enum_data must be of enum type");
     return E;
   }
@@ -2442,7 +2442,7 @@ public:
   EnumElementDecl *getElement() const { return Element; }
 
   EnumDecl *getEnumDecl() const {
-    auto *E = getOperand().getType().getEnumOrBoundGenericEnum();
+    auto *E = getOperand()->getType().getEnumOrBoundGenericEnum();
     assert(E && "Operand of unchecked_take_enum_data_addr must be of enum"
                 " type");
     return E;
@@ -2706,7 +2706,7 @@ public:
   unsigned getFieldNo() const { return FieldNo; }
 
   TupleType *getTupleType() const {
-    return getOperand().getType().getSwiftRValueType()->castTo<TupleType>();
+    return getOperand()->getType().getSwiftRValueType()->castTo<TupleType>();
   }
 
   unsigned getNumTupleElts() const {
@@ -2736,7 +2736,7 @@ public:
 
 
   TupleType *getTupleType() const {
-    return getOperand().getType().getSwiftRValueType()->castTo<TupleType>();
+    return getOperand()->getType().getSwiftRValueType()->castTo<TupleType>();
   }
 };
 
@@ -2767,7 +2767,7 @@ public:
   }
 
   StructDecl *getStructDecl() const {
-    auto s = getOperand().getType().getStructOrBoundGenericStruct();
+    auto s = getOperand()->getType().getStructOrBoundGenericStruct();
     assert(s);
     return s;
   }
@@ -2809,7 +2809,7 @@ public:
   }
 
   StructDecl *getStructDecl() const {
-    auto s = getOperand().getType().getStructOrBoundGenericStruct();
+    auto s = getOperand()->getType().getStructOrBoundGenericStruct();
     assert(s);
     return s;
   }
@@ -2843,7 +2843,7 @@ public:
   }
 
   ClassDecl *getClassDecl() const {
-    auto s = getOperand().getType().getClassOrBoundGenericClass();
+    auto s = getOperand()->getType().getClassOrBoundGenericClass();
     assert(s);
     return s;
   }
@@ -3124,7 +3124,7 @@ public:
   /// this method returns Decoder<T>.
   CanType getFormalErasedObjectType() const {
     CanType exType = getType().getSwiftRValueType();
-    CanType concreteType = getOperand().getType().getSwiftRValueType();
+    CanType concreteType = getOperand()->getType().getSwiftRValueType();
     while (auto exMetatype = dyn_cast<ExistentialMetatypeType>(exType)) {
       exType = exMetatype.getInstanceType();
       concreteType = cast<MetatypeType>(concreteType).getInstanceType();
@@ -3280,7 +3280,7 @@ class MarkDependenceInst : public SILInstruction {
 
   MarkDependenceInst(SILDebugLocation *DebugLoc, SILValue value, SILValue base)
       : SILInstruction(ValueKind::MarkDependenceInst, DebugLoc,
-                       value.getType()),
+                       value->getType()),
         Operands{this, value, base} {}
 
 public:
@@ -3304,7 +3304,7 @@ class CopyBlockInst :
   friend class SILBuilder;
 
   CopyBlockInst(SILDebugLocation *DebugLoc, SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand, operand.getType()) {}
+      : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
 };
 
 /// Given an object reference, return true iff it is non-nil and refers
@@ -3556,7 +3556,7 @@ class IndexingInst : public SILInstruction {
 public:
   IndexingInst(ValueKind Kind, SILDebugLocation *DebugLoc, SILValue Operand,
                SILValue Index)
-      : SILInstruction(Kind, DebugLoc, Operand.getType()),
+      : SILInstruction(Kind, DebugLoc, Operand->getType()),
         Operands{this, Operand, Index} {}
 
   SILValue getBase() const { return Operands[Base].get(); }
@@ -4347,7 +4347,7 @@ public:
 
   /// Get the type of the callee without the applied substitutions.
   CanSILFunctionType getOrigCalleeType() const {
-    return getCallee().getType().castTo<SILFunctionType>();
+    return getCallee()->getType().castTo<SILFunctionType>();
   }
 
   /// Get the type of the callee with the applied substitutions.

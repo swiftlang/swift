@@ -313,7 +313,7 @@ updateSSA(SILLoop *Loop,
       if (!Loop->contains(Use->getUser()->getParent()))
         UseList.push_back(UseWrapper(Use));
     // Update SSA of use with the available values.
-    SSAUp.Initialize(OrigValue.getType());
+    SSAUp.Initialize(OrigValue->getType());
     SSAUp.AddAvailableValue(OrigValue->getParentBB(), OrigValue);
     for (auto NewValue : MapEntry.second)
       SSAUp.AddAvailableValue(NewValue->getParentBB(), NewValue);

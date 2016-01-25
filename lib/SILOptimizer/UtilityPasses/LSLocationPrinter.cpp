@@ -77,12 +77,12 @@ public:
         if (auto *LI = dyn_cast<LoadInst>(&II)) {
           SILValue V = LI->getOperand();
           // This is an address type, take it object type.
-          SILType Ty = V.getType().getObjectType();
+          SILType Ty = V->getType().getObjectType();
           ProjectionPath::expandTypeIntoLeafProjectionPaths(Ty, M, PPList);
         } else if (auto *SI = dyn_cast<StoreInst>(&II)) {
           SILValue V = SI->getDest();
           // This is an address type, take it object type.
-          SILType Ty = V.getType().getObjectType();
+          SILType Ty = V->getType().getObjectType();
           ProjectionPath::expandTypeIntoLeafProjectionPaths(Ty, M, PPList);
         } else {
           // Not interested in these instructions yet.
@@ -110,13 +110,13 @@ public:
         if (auto *LI = dyn_cast<LoadInst>(&II)) {
           V = LI->getOperand();
           // This is an address type, take it object type.
-          Ty = V.getType().getObjectType();
+          Ty = V->getType().getObjectType();
           NewProjectionPath::expandTypeIntoLeafProjectionPaths(Ty, M, PPList,
                                                                true);
         } else if (auto *SI = dyn_cast<StoreInst>(&II)) {
           V = SI->getDest();
           // This is an address type, take it object type.
-          Ty = V.getType().getObjectType();
+          Ty = V->getType().getObjectType();
           NewProjectionPath::expandTypeIntoLeafProjectionPaths(Ty, M, PPList,
                                                                true);
         } else {

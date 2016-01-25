@@ -228,7 +228,7 @@ static bool isCaptured(AllocStackInst *ASI, bool &inSingleBlock) {
     // Destroys of loadable types can be rewritten as releases, so
     // they are fine.
     if (auto *DAI = dyn_cast<DestroyAddrInst>(II))
-      if (DAI->getOperand().getType().isLoadable(DAI->getModule()))
+      if (DAI->getOperand()->getType().isLoadable(DAI->getModule()))
         continue;
 
     // Other instructions are assumed to capture the AllocStack.
@@ -265,7 +265,7 @@ bool MemoryToRegisters::isWriteOnlyAllocation(AllocStackInst *ASI,
     // Destroys of loadable types can be rewritten as releases, so
     // they are fine.
     if (auto *DAI = dyn_cast<DestroyAddrInst>(II))
-      if (!Promoted && DAI->getOperand().getType().isLoadable(DAI->getModule()))
+      if (!Promoted && DAI->getOperand()->getType().isLoadable(DAI->getModule()))
         continue;
 
     // Can't do anything else with it.
@@ -346,14 +346,14 @@ static void replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
 }
 
 static void replaceDestroy(DestroyAddrInst *DAI, SILValue NewValue) {
-  assert(DAI->getOperand().getType().isLoadable(DAI->getModule()) &&
+  assert(DAI->getOperand()->getType().isLoadable(DAI->getModule()) &&
          "Unexpected promotion of address-only type!");
 
   assert(NewValue.isValid() && "Expected a value to release!");
 
   SILBuilderWithScope Builder(DAI);
 
-  auto Ty = DAI->getOperand().getType();
+  auto Ty = DAI->getOperand()->getType();
   auto &TL = DAI->getModule().getTypeLowering(Ty);
   TL.emitLoweredReleaseValue(Builder, DAI->getLoc(), NewValue,
                              Lowering::TypeLowering::LoweringStyle::DeepNoEnum);

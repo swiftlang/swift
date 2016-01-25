@@ -472,7 +472,7 @@ static void explodeTuple(SILGenFunction &gen,
   // elements.
   SILValue tuple = managedTuple.forward(gen);
 
-  auto tupleSILType = tuple.getType();
+  auto tupleSILType = tuple->getType();
   auto tupleType = tupleSILType.castTo<TupleType>();
 
   out.reserve(tupleType->getNumElements());
@@ -553,7 +553,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
     if (outputAddr) {
       SILValue outputEltAddr =
         SGF.B.createTupleElementAddr(Loc, outputAddr, index);
-      auto &outputEltTL = SGF.getTypeLowering(outputEltAddr.getType());
+      auto &outputEltTL = SGF.getTypeLowering(outputEltAddr->getType());
       assert(outputEltTL.isAddressOnly() == inputEltTL.isAddressOnly());
       auto cleanup =
         SGF.enterDormantTemporaryCleanup(outputEltAddr, outputEltTL);
@@ -623,7 +623,7 @@ static ManagedValue manageParam(SILGenFunction &gen,
   // Unowned parameters are only guaranteed at the instant of the call, so we
   // must retain them even if we're in a context that can accept a +0 value.
   case ParameterConvention::Direct_Unowned:
-    gen.getTypeLowering(paramValue.getType())
+    gen.getTypeLowering(paramValue->getType())
           .emitRetainValue(gen.B, loc, paramValue);
     SWIFT_FALLTHROUGH;
   case ParameterConvention::Direct_Owned:
@@ -635,7 +635,7 @@ static ManagedValue manageParam(SILGenFunction &gen,
     if (allowPlusZero) {
       return ManagedValue::forUnmanaged(paramValue);
     } else {
-      auto copy = gen.emitTemporaryAllocation(loc, paramValue.getType());
+      auto copy = gen.emitTemporaryAllocation(loc, paramValue->getType());
       gen.B.createCopyAddr(loc, paramValue, copy, IsNotTake, IsInitialization);
       return gen.emitManagedBufferWithCleanup(copy);
     }
@@ -1205,7 +1205,7 @@ static SILValue getThunkInnerResultAddr(SILGenFunction &gen,
     resultType = gen.F.mapTypeIntoContext(resultType);
     
     // Re-use the original result if possible.
-    if (outerResultAddr && outerResultAddr.getType() == resultType)
+    if (outerResultAddr && outerResultAddr->getType() == resultType)
       return outerResultAddr;
     else
       return gen.emitTemporaryAllocation(loc, resultType);
@@ -1929,7 +1929,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
                                                 witness, isFree,
                                                 witnessParams, loc);
 
-  auto witnessFTy = witnessFnRef.getType().getAs<SILFunctionType>();
+  auto witnessFTy = witnessFnRef->getType().getAs<SILFunctionType>();
   
   if (!witnessSubs.empty())
     witnessFTy = witnessFTy->substGenericArgs(SGM.M, SGM.M.getSwiftModule(),

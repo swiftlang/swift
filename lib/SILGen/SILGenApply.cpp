@@ -40,7 +40,7 @@ static CanAnyFunctionType getDynamicMethodFormalType(SILGenModule &SGM,
   if (member->isInstanceMember()) {
     selfTy = ctx.TheUnknownObjectType;
   } else {
-    selfTy = proto.getType().getSwiftType();
+    selfTy = proto->getType().getSwiftType();
   }
   auto extInfo = FunctionType::ExtInfo()
                    .withRepresentation(FunctionType::Representation::Thin);
@@ -83,7 +83,7 @@ replaceSelfTypeForDynamicLookup(ASTContext &ctx,
 }
 
 static Type getExistentialArchetype(SILValue existential) {
-  CanType ty = existential.getType().getSwiftRValueType();
+  CanType ty = existential->getType().getSwiftRValueType();
   if (ty->is<ArchetypeType>())
     return ty;
   return cast<ProtocolType>(ty)->getDecl()->getProtocolSelf()->getArchetype();
@@ -100,7 +100,7 @@ static CanSILFunctionType getDynamicMethodLoweredType(SILGenFunction &gen,
   if (methodName.getDecl()->isInstanceMember()) {
     selfTy = getExistentialArchetype(proto)->getCanonicalType();
   } else {
-    selfTy = proto.getType().getSwiftType();
+    selfTy = proto->getType().getSwiftType();
   }
 
   // Replace the 'self' parameter type in the method type with it.
@@ -554,7 +554,7 @@ public:
       auto closureType =
         replaceSelfTypeForDynamicLookup(gen.getASTContext(),
                                 constantInfo.SILFnType,
-                                SelfValue.getType().getSwiftRValueType(),
+                                SelfValue->getType().getSwiftRValueType(),
                                 Constant);
 
       SILValue fn = gen.B.createDynamicMethod(Loc,
@@ -696,7 +696,7 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
 
       // Store the reference into a temporary.
       auto temp =
-        gen.emitTemporaryAllocation(selfLoc, ref.getValue().getType());
+        gen.emitTemporaryAllocation(selfLoc, ref.getValue()->getType());
       gen.B.createStore(selfLoc, ref.getValue(), temp);
 
       // If we had a cleanup, create a cleanup at the new address.
@@ -1695,7 +1695,7 @@ static SILValue emitRawApply(SILGenFunction &gen,
   // Add the buffer for the indirect return if needed.
   assert(bool(resultAddr) == substFnType->hasIndirectResult());
   if (substFnType->hasIndirectResult()) {
-    assert(resultAddr.getType() ==
+    assert(resultAddr->getType() ==
              substFnType->getIndirectResult().getSILType().getAddressType());
     argValues.push_back(resultAddr);
   }
@@ -1708,7 +1708,7 @@ static SILValue emitRawApply(SILGenFunction &gen,
     auto argValue = (inputTypes[i].isConsumed() ? args[i].forward(gen)
                                                 : args[i].getValue());
 #ifndef NDEBUG
-    if (argValue.getType() != inputTypes[i].getSILType()) {
+    if (argValue->getType() != inputTypes[i].getSILType()) {
       auto &out = llvm::errs();
       out << "TYPE MISMATCH IN ARGUMENT " << i << " OF APPLY AT ";
       printSILLocationDescription(out, loc, gen.getASTContext());
@@ -1756,7 +1756,7 @@ static SILValue emitRawApply(SILGenFunction &gen,
       continue;
 
     SILValue argValue = args[i].forward(gen);
-    SILType argType = argValue.getType();
+    SILType argType = argValue->getType();
     CleanupLocation cleanupLoc = CleanupLocation::get(loc);
     if (!argType.isAddress())
       gen.getTypeLowering(argType).emitDestroyRValue(gen.B, cleanupLoc, argValue);
@@ -2199,7 +2199,7 @@ namespace {
         destAddr = gen.B.createIndexAddr(loc, destAddr, index);
       }
 
-      assert(destAddr.getType() == loweredSubstParamType.getAddressType());
+      assert(destAddr->getType() == loweredSubstParamType.getAddressType());
 
       auto &destTL = SharedInfo->getBaseTypeLowering();
       Cleanup = gen.enterDormantTemporaryCleanup(destAddr, destTL);
@@ -3144,7 +3144,7 @@ namespace {
       assert(isArgPlusZeroOrTrivialRValue() && "Must have a plus zero or "
              "trivial rvalue as an argument.");
       SILValue ArgSILValue = ArgValue.peekRValue().peekScalarValue();
-      SILType ArgTy = ArgSILValue.getType();
+      SILType ArgTy = ArgSILValue->getType();
 
       // If we are trivial, there is no difference in between +1 and +0 since
       // a trivial object is not reference counted.
@@ -3687,7 +3687,7 @@ void SILGenFunction::emitUninitializedArrayDeallocation(SILLocation loc,
   auto deallocate = Ctx.getDeallocateUninitializedArray(nullptr);
 
   CanType arrayElementTy =
-    array.getType().castTo<BoundGenericType>().getGenericArgs()[0];
+    array->getType().castTo<BoundGenericType>().getGenericArgs()[0];
 
   // Invoke the intrinsic.
   Substitution sub{arrayElementTy, {}};
@@ -4095,7 +4095,7 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
 
   // Project out the materialized address.
   SILValue address = B.createTupleExtract(loc, pointerAndOptionalCallback, 0);
-  address = B.createPointerToAddress(loc, address, buffer.getType());
+  address = B.createPointerToAddress(loc, address, buffer->getType());
 
   // Project out the optional callback.
   SILValue optionalCallback =
@@ -4177,7 +4177,7 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
 
   // Drill down to the raw pointer using intrinsic knowledge of those types.
   auto pointerType =
-    pointer.getType().castTo<BoundGenericStructType>()->getDecl();
+    pointer->getType().castTo<BoundGenericStructType>()->getDecl();
   auto props = pointerType->getStoredProperties();
   assert(props.begin() != props.end());
   assert(std::next(props.begin()) == props.end());
@@ -4233,7 +4233,7 @@ static SILValue emitDynamicPartialApply(SILGenFunction &gen,
   // Pop the self type off of the function type.
   // Just to be weird, partially applying an objc method produces a native
   // function (?!)
-  auto fnTy = method.getType().castTo<SILFunctionType>();
+  auto fnTy = method->getType().castTo<SILFunctionType>();
   // If the original method has an @unowned_inner_pointer return, the partial
   // application thunk will lifetime-extend 'self' for us.
   auto resultInfo = fnTy->getResult();
@@ -4256,11 +4256,11 @@ static SILValue emitDynamicPartialApply(SILGenFunction &gen,
                                     CastConsumptionKind::CopyOnSuccess);
   self = gen.getManagedValue(loc, CMV).forward(gen);
 #else
-  if (!self.getType().isAddress())
+  if (!self->getType().isAddress())
     gen.B.emitRetainValueOperation(loc, self);
 #endif
 
-  SILValue result = gen.B.createPartialApply(loc, method, method.getType(), {},
+  SILValue result = gen.B.createPartialApply(loc, method, method->getType(), {},
                         self, SILType::getPrimitiveObjectType(partialApplyTy));
   // If necessary, thunk to the native ownership conventions and bridged types.
   auto nativeTy = gen.getLoweredLoadableType(methodTy).castTo<SILFunctionType>();
@@ -4280,7 +4280,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
 
   SILValue operand = base.getValue();
   if (!e->getMember().getDecl()->isInstanceMember()) {
-    auto metatype = operand.getType().castTo<MetatypeType>();
+    auto metatype = operand->getType().castTo<MetatypeType>();
     assert(metatype->getRepresentation() == MetatypeRepresentation::Thick);
     metatype = CanMetatypeType::get(metatype.getInstanceType(),
                                     MetatypeRepresentation::ObjC);
@@ -4339,7 +4339,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     SILValue result = emitDynamicPartialApply(*this, e, memberArg, operand,
                                               cast<FunctionType>(methodTy));
     if (isa<VarDecl>(e->getMember().getDecl())) {
-      result = B.createApply(e, result, result.getType(),
+      result = B.createApply(e, result, result->getType(),
                              getLoweredType(valueTy), {}, {});
     }
 
@@ -4424,7 +4424,7 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     llvm::SmallVector<SILValue, 1> indexArgs;
     std::move(index).forwardAll(*this, indexArgs);
     auto &valueTL = getTypeLowering(valueTy);
-    result = B.createApply(e, result, result.getType(),
+    result = B.createApply(e, result, result->getType(),
                            valueTL.getLoweredType(), {}, indexArgs);
 
     // Package up the result in an optional.

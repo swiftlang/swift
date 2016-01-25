@@ -89,13 +89,13 @@ public:
       CanType eltFormalType = tupleFormalType.getElementType(i);
       assert(eltFormalType->isMaterializable());
 
-      auto eltTy = tuple.getType().getTupleElementType(i);
-      assert(eltTy.isAddress() == tuple.getType().isAddress());
+      auto eltTy = tuple->getType().getTupleElementType(i);
+      assert(eltTy.isAddress() == tuple->getType().isAddress());
       auto &eltTI = gen.getTypeLowering(eltTy);
 
       // Project the element.
       SILValue elt;
-      if (tuple.getType().isObject()) {
+      if (tuple->getType().isObject()) {
         assert(eltTI.isLoadable());
         elt = gen.B.createTupleExtract(loc, tuple, i, eltTy);
       } else {

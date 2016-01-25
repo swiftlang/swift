@@ -75,13 +75,13 @@ void TupleInitialization::copyOrInitValueInto(ManagedValue valueMV,
   // and assign/init each element in turn.
   SILValue value = valueMV.forward(SGF);
   auto sourceType = cast<TupleType>(valueMV.getSwiftType());
-  auto sourceSILType = value.getType();
+  auto sourceSILType = value->getType();
   for (unsigned i = 0, e = sourceType->getNumElements(); i != e; ++i) {
     SILType fieldTy = sourceSILType.getTupleElementType(i);
     auto &fieldTL = SGF.getTypeLowering(fieldTy);
         
     SILValue member;
-    if (value.getType().isAddress()) {
+    if (value->getType().isAddress()) {
       member = SGF.B.createTupleElementAddr(loc, value, i, fieldTy);
       if (!fieldTL.isAddressOnly())
         member = SGF.B.createLoad(loc, member);
@@ -172,7 +172,7 @@ public:
   ReleaseValueCleanup(SILValue v) : v(v) {}
 
   void emit(SILGenFunction &gen, CleanupLocation l) override {
-    if (v.getType().isAddress())
+    if (v->getType().isAddress())
       gen.B.emitDestroyAddrAndFold(l, v);
     else
       gen.B.emitReleaseValueOperation(l, v);
@@ -408,7 +408,7 @@ public:
     // If we're binding an address to this let value, then we can use it as an
     // address later.  This happens when binding an address only parameter to
     // an argument, for example.
-    if (value.getType().isAddress())
+    if (value->getType().isAddress())
       address = value;
     gen.VarLocs[vd] = SILGenFunction::VarLoc::get(value);
 
@@ -681,7 +681,7 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
   // If the payload is indirect, project it out of the box.
   if (ElementDecl->isIndirect() || ElementDecl->getParentEnum()->isIndirect()) {
     SILValue boxedValue = SGF.B.createProjectBox(loc, eltMV.getValue());
-    auto &boxedTL = SGF.getTypeLowering(boxedValue.getType());
+    auto &boxedTL = SGF.getTypeLowering(boxedValue->getType());
     if (boxedTL.isLoadable())
       boxedValue = SGF.B.createLoad(loc, boxedValue);
 
@@ -1040,7 +1040,7 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond,
     }
 
     // Now that we have a boolean test as a Builtin.i1, emit the branch.
-    assert(booleanTestValue.getType().
+    assert(booleanTestValue->getType().
            castTo<BuiltinIntegerType>()->isFixedWidth(1) &&
            "Sema forces conditions to have Builtin.i1 type");
     
@@ -1064,7 +1064,7 @@ SILGenFunction::emitPatternBindingInitialization(Pattern *P,
 
 /// Enter a cleanup to deallocate the given location.
 CleanupHandle SILGenFunction::enterDeallocStackCleanup(SILValue temp) {
-  assert(temp.getType().isAddress() &&  "dealloc must have an address type");
+  assert(temp->getType().isAddress() &&  "dealloc must have an address type");
   Cleanups.pushCleanup<DeallocStackCleanup>(temp);
   return Cleanups.getTopCleanup();
 }
@@ -1244,7 +1244,7 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   // For 'let' bindings, we emit a release_value or destroy_addr, depending on
   // whether we have an address or not.
   SILValue Val = loc.value;
-  if (!Val.getType().isAddress())
+  if (!Val->getType().isAddress())
     B.emitReleaseValueOperation(silLoc, Val);
   else
     B.emitDestroyAddrAndFold(silLoc, Val);
@@ -1261,10 +1261,10 @@ void SILGenFunction::deallocateUninitializedLocalVariable(SILLocation silLoc,
   auto loc = VarLocs[vd];
 
   // Ignore let values captured without a memory location.
-  if (!loc.value.getType().isAddress()) return;
+  if (!loc.value->getType().isAddress()) return;
 
   assert(loc.box && "captured var should have been given a box");
-  B.createDeallocBox(silLoc, loc.value.getType().getObjectType(),
+  B.createDeallocBox(silLoc, loc.value->getType().getObjectType(),
                      loc.box);
 }
 

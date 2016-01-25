@@ -201,7 +201,7 @@ static ManagedValue emitGetIntoTemporary(SILGenFunction &gen,
 
   if (!value.isInContext()) {
     if (value.getType().getSwiftRValueType()
-          != temporaryInit->getAddress().getType().getSwiftRValueType()) {
+          != temporaryInit->getAddress()->getType().getSwiftRValueType()) {
       value = gen.emitSubstToOrigValue(loc, value,
                                        component.getOrigFormalType(),
                                        component.getSubstFormalType());
@@ -364,7 +364,7 @@ static LValueTypeData getValueTypeData(CanType formalType,
   return {
     AbstractionPattern(formalType),
     formalType,
-    value.getType().getObjectType()
+    value->getType().getObjectType()
   };
 }
 static LValueTypeData getValueTypeData(SILGenFunction &gen, Expr *e) {
@@ -922,7 +922,7 @@ namespace {
           SILType::getPrimitiveObjectType(TupleType::getEmpty(ctx));
 
         SILType callbackSILType = gen.getLoweredType(
-                  optionalCallback.getType().getSwiftRValueType()
+                  optionalCallback->getType().getSwiftRValueType()
                                             .getAnyOptionalObjectType());
 
         // The callback is a BB argument from the switch_enum.
@@ -2031,8 +2031,8 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
   // in the very common case of this being equivalent to the r-value
   // type.
   auto &addrTL =
-    (addr.getType() == rvalueTL.getLoweredType().getAddressType()
-       ? rvalueTL : getTypeLowering(addr.getType()));
+    (addr->getType() == rvalueTL.getLoweredType().getAddressType()
+       ? rvalueTL : getTypeLowering(addr->getType()));
 
   // Never do a +0 load together with a take.
   bool isPlusZeroOk = (isTake == IsNotTake &&
@@ -2078,12 +2078,12 @@ SILValue SILGenFunction::emitConversionToSemanticRValue(SILLocation loc,
                                                         SILValue src,
                                                   const TypeLowering &valueTL) {
   // Weak storage types are handled with their underlying type.
-  assert(!src.getType().is<WeakStorageType>() &&
+  assert(!src->getType().is<WeakStorageType>() &&
          "weak pointers are always the right optional types");
 
   // For @unowned(safe) types, we need to generate a strong retain and
   // strip the unowned box.
-  if (auto unownedType = src.getType().getAs<UnownedStorageType>()) {
+  if (auto unownedType = src->getType().getAs<UnownedStorageType>()) {
     assert(unownedType->isLoadable(ResilienceExpansion::Maximal));
     (void) unownedType;
 
@@ -2094,7 +2094,7 @@ SILValue SILGenFunction::emitConversionToSemanticRValue(SILLocation loc,
 
   // For @unowned(unsafe) types, we need to strip the unmanaged box
   // and then do an (unsafe) retain.
-  if (auto unmanagedType = src.getType().getAs<UnmanagedStorageType>()) {
+  if (auto unmanagedType = src->getType().getAs<UnmanagedStorageType>()) {
     auto result = B.createUnmanagedToRef(loc, src,
               SILType::getPrimitiveObjectType(unmanagedType.getReferentType()));
     B.createStrongRetain(loc, result);
@@ -2112,7 +2112,7 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &gen,
                                          SILValue src,
                                          const TypeLowering &valueTL,
                                          IsTake_t isTake) {
-  SILType storageType = src.getType();
+  SILType storageType = src->getType();
 
   // For @weak types, we need to create an Optional<T>.
   // Optional<T> is currently loadable, but it probably won't be forever.
@@ -2133,7 +2133,7 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &gen,
   }
 
   // For @unowned(unsafe) types, we need to strip the unmanaged box.
-  if (auto unmanagedType = src.getType().getAs<UnmanagedStorageType>()) {
+  if (auto unmanagedType = src->getType().getAs<UnmanagedStorageType>()) {
     auto value = gen.B.createLoad(loc, src);
     auto result = gen.B.createUnmanagedToRef(loc, value,
             SILType::getPrimitiveObjectType(unmanagedType.getReferentType()));
@@ -2163,7 +2163,7 @@ static void emitStoreOfSemanticRValue(SILGenFunction &gen,
                                       SILValue dest,
                                       const TypeLowering &valueTL,
                                       IsInitialization_t isInit) {
-  auto storageType = dest.getType();
+  auto storageType = dest->getType();
 
   // For @weak types, we need to break down an Optional<T> and then
   // emit the storeWeak ourselves.
@@ -2215,7 +2215,7 @@ SILValue SILGenFunction::emitSemanticLoad(SILLocation loc,
                                           const TypeLowering &srcTL,
                                           const TypeLowering &rvalueTL,
                                           IsTake_t isTake) {
-  assert(srcTL.getLoweredType().getAddressType() == src.getType());
+  assert(srcTL.getLoweredType().getAddressType() == src->getType());
   assert(rvalueTL.isLoadable());
 
   // Easy case: the types match.
@@ -2235,8 +2235,8 @@ void SILGenFunction::emitSemanticLoadInto(SILLocation loc,
                                           const TypeLowering &destTL,
                                           IsTake_t isTake,
                                           IsInitialization_t isInit) {
-  assert(srcTL.getLoweredType().getAddressType() == src.getType());
-  assert(destTL.getLoweredType().getAddressType() == dest.getType());
+  assert(srcTL.getLoweredType().getAddressType() == src->getType());
+  assert(destTL.getLoweredType().getAddressType() == dest->getType());
 
   // Easy case: the types match.
   if (srcTL.getLoweredType() == destTL.getLoweredType()) {
@@ -2254,12 +2254,12 @@ void SILGenFunction::emitSemanticStore(SILLocation loc,
                                        SILValue dest,
                                        const TypeLowering &destTL,
                                        IsInitialization_t isInit) {
-  assert(destTL.getLoweredType().getAddressType() == dest.getType());
+  assert(destTL.getLoweredType().getAddressType() == dest->getType());
 
   // Easy case: the types match.
-  if (rvalue.getType() == destTL.getLoweredType()) {
-    assert(destTL.isAddressOnly() == rvalue.getType().isAddress());
-    if (rvalue.getType().isAddress()) {
+  if (rvalue->getType() == destTL.getLoweredType()) {
+    assert(destTL.isAddressOnly() == rvalue->getType().isAddress());
+    if (rvalue->getType().isAddress()) {
       B.createCopyAddr(loc, rvalue, dest, IsTake, isInit);
     } else {
       emitUnloweredStoreOfCopy(B, loc, rvalue, dest, isInit);
@@ -2267,7 +2267,7 @@ void SILGenFunction::emitSemanticStore(SILLocation loc,
     return;
   }
 
-  auto &rvalueTL = getTypeLowering(rvalue.getType());
+  auto &rvalueTL = getTypeLowering(rvalue->getType());
   emitStoreOfSemanticRValue(*this, loc, rvalue, dest, rvalueTL, isInit);
 }
 
@@ -2278,7 +2278,7 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
   auto &destTL = getTypeLowering(storageType);
   (void)destTL;
   // Easy case: the types match.
-  if (semanticValue.getType() == storageType) {
+  if (semanticValue->getType() == storageType) {
     return semanticValue;
   }
   
@@ -2447,7 +2447,7 @@ void SILGenFunction::emitCopyLValueInto(SILLocation loc, LValue &&src,
   if (!destAddr)
     return skipPeephole();
   if (src.getTypeOfRValue().getSwiftRValueType()
-        != destAddr.getType().getSwiftRValueType())
+        != destAddr->getType().getSwiftRValueType())
     return skipPeephole();
   
   auto srcAddr = emitAddressOfLValue(loc, std::move(src), AccessKind::Read)
@@ -2477,7 +2477,7 @@ void SILGenFunction::emitAssignLValueToLValue(SILLocation loc,
   auto destAddr = emitAddressOfLValue(loc, std::move(dest), AccessKind::Write)
                     .getUnmanagedValue();
 
-  if (srcAddr.getType() == destAddr.getType()) {
+  if (srcAddr->getType() == destAddr->getType()) {
     B.createCopyAddr(loc, srcAddr, destAddr, IsNotTake, IsNotInitialization);
   } else {
     // If there's a semantic conversion necessary, do a load then assign.

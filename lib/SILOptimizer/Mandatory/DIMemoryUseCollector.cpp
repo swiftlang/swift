@@ -177,7 +177,7 @@ emitElementAddress(unsigned EltNo, SILLocation Loc, SILBuilder &B) const {
     if (IsSelf) {
       if (auto *NTD =
              cast_or_null<NominalTypeDecl>(PointeeType->getAnyNominal())) {
-        if (isa<ClassDecl>(NTD) && Ptr.getType().isAddress())
+        if (isa<ClassDecl>(NTD) && Ptr->getType().isAddress())
           Ptr = B.createLoad(Loc, Ptr);
         for (auto *VD : NTD->getStoredProperties()) {
           auto FieldType = VD->getType()->getCanonicalType();
@@ -333,7 +333,7 @@ onlyTouchesTrivialElements(const DIMemoryObjectInfo &MI) const {
 static void getScalarizedElementAddresses(SILValue Pointer, SILBuilder &B,
                                           SILLocation Loc,
                                       SmallVectorImpl<SILValue> &ElementAddrs) {
-  CanType AggType = Pointer.getType().getSwiftRValueType();
+  CanType AggType = Pointer->getType().getSwiftRValueType();
   TupleType *TT = AggType->castTo<TupleType>();
   for (auto &Field : TT->getElements()) {
     (void)Field;
@@ -347,7 +347,7 @@ static void getScalarizedElementAddresses(SILValue Pointer, SILBuilder &B,
 static void getScalarizedElements(SILValue V,
                                   SmallVectorImpl<SILValue> &ElementVals,
                                   SILLocation Loc, SILBuilder &B) {
-  TupleType *TT = V.getType().getSwiftRValueType()->castTo<TupleType>();
+  TupleType *TT = V->getType().getSwiftRValueType()->castTo<TupleType>();
   for (auto &Field : TT->getElements()) {
     (void)Field;
     ElementVals.push_back(B.emitTupleExtract(Loc, V, ElementVals.size()));
@@ -563,9 +563,9 @@ void ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
 }
 
 void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
-  assert(Pointer.getType().isAddress() &&
+  assert(Pointer->getType().isAddress() &&
          "Walked through the pointer to the value?");
-  SILType PointeeType = Pointer.getType().getObjectType();
+  SILType PointeeType = Pointer->getType().getObjectType();
 
   /// This keeps track of instructions in the use list that touch multiple tuple
   /// elements and should be scalarized.  This is done as a second phase to

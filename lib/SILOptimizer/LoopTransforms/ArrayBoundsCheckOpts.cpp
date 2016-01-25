@@ -699,7 +699,7 @@ static bool dominates(DominanceInfo *DT, SILValue V, SILBasicBlock *B) {
 static SILValue getSub(SILLocation Loc, SILValue Val, unsigned SubVal,
                        SILBuilder &B) {
   SmallVector<SILValue, 4> Args(1, Val);
-  Args.push_back(B.createIntegerLiteral(Loc, Val.getType(), SubVal));
+  Args.push_back(B.createIntegerLiteral(Loc, Val->getType(), SubVal));
   Args.push_back(B.createIntegerLiteral(
       Loc, SILType::getBuiltinIntegerType(1, B.getASTContext()), -1));
 
@@ -749,7 +749,7 @@ struct InductionInfo {
     auto Loc = Inc->getLoc();
     auto ResultTy = SILType::getBuiltinIntegerType(1, Builder.getASTContext());
     auto *CmpSGE = Builder.createBuiltinBinaryFunction(
-        Loc, "cmp_sge", Start.getType(), ResultTy, {Start, End});
+        Loc, "cmp_sge", Start->getType(), ResultTy, {Start, End});
     Builder.createCondFail(Loc, CmpSGE);
     IsOverflowCheckInserted = true;
 
@@ -954,7 +954,7 @@ public:
 };
 
 static bool hasArrayType(SILValue Value, SILModule &M) {
-  return Value.getType().getNominalOrBoundGenericNominal() ==
+  return Value->getType().getNominalOrBoundGenericNominal() ==
            M.getASTContext().getArrayDecl();
 }
 
@@ -1211,7 +1211,7 @@ public:
           auto rcRoot = RCIA->getRCIdentityRoot(Call.getSelf());
           // Check the type of the array. We need to have an array element type
           // that is not calling a deinit function.
-          if (DestAnalysis->mayStoreToMemoryOnDestruction(rcRoot.getType()))
+          if (DestAnalysis->mayStoreToMemoryOnDestruction(rcRoot->getType()))
             continue;
 
           ReleaseSafeArrays.insert(rcRoot);

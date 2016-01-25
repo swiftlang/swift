@@ -276,7 +276,7 @@ public:
 
   ApplyInst *createApply(SILLocation Loc, SILValue Fn, ArrayRef<SILValue> Args,
                          bool isNonThrowing) {
-    auto FnTy = Fn.getType();
+    auto FnTy = Fn->getType();
     return createApply(Loc, Fn, FnTy,
                        FnTy.castTo<SILFunctionType>()->getResult().getSILType(),
                        ArrayRef<Substitution>(), Args, isNonThrowing);
@@ -337,14 +337,14 @@ public:
   createBuiltinBinaryFunctionWithOverflow(SILLocation Loc, StringRef Name,
                                           ArrayRef<SILValue> Args) {
     assert(Args.size() == 3 && "Need three arguments");
-    assert(Args[0].getType() == Args[1].getType() &&
+    assert(Args[0]->getType() == Args[1]->getType() &&
            "Binary operands must match");
-    assert(Args[2].getType().is<BuiltinIntegerType>() &&
-           Args[2].getType().getSwiftRValueType()->isBuiltinIntegerType(1) &&
+    assert(Args[2]->getType().is<BuiltinIntegerType>() &&
+           Args[2]->getType().getSwiftRValueType()->isBuiltinIntegerType(1) &&
            "Must have a third Int1 operand");
 
-    SILType OpdTy = Args[0].getType();
-    SILType Int1Ty = Args[2].getType();
+    SILType OpdTy = Args[0]->getType();
+    SILType Int1Ty = Args[2]->getType();
 
     TupleTypeElt ResultElts[] = {OpdTy.getSwiftRValueType(),
                                  Int1Ty.getSwiftRValueType()};
@@ -479,7 +479,7 @@ public:
   CopyAddrInst *createCopyAddr(SILLocation Loc, SILValue srcAddr,
                                SILValue destAddr, IsTake_t isTake,
                                IsInitialization_t isInitialize) {
-    assert(srcAddr.getType() == destAddr.getType());
+    assert(srcAddr->getType() == destAddr->getType());
     return insert(new (F.getModule()) CopyAddrInst(
         createSILDebugLocation(Loc), srcAddr, destAddr, isTake, isInitialize));
   }
@@ -735,7 +735,7 @@ public:
                                                  SILValue Operand,
                                                  EnumElementDecl *Element) {
     SILType EltType =
-        Operand.getType().getEnumElementType(Element, getModule());
+        Operand->getType().getEnumElementType(Element, getModule());
     return createUncheckedEnumData(Loc, Operand, Element, EltType);
   }
 
@@ -750,7 +750,7 @@ public:
   createUncheckedTakeEnumDataAddr(SILLocation Loc, SILValue Operand,
                                   EnumElementDecl *Element) {
     SILType EltType =
-        Operand.getType().getEnumElementType(Element, getModule());
+        Operand->getType().getEnumElementType(Element, getModule());
     return createUncheckedTakeEnumDataAddr(Loc, Operand, Element, EltType);
   }
 
@@ -790,7 +790,7 @@ public:
 
   TupleExtractInst *createTupleExtract(SILLocation Loc, SILValue Operand,
                                        unsigned FieldNo) {
-    auto type = Operand.getType().getTupleElementType(FieldNo);
+    auto type = Operand->getType().getTupleElementType(FieldNo);
     return createTupleExtract(Loc, Operand, FieldNo, type);
   }
 
@@ -806,7 +806,7 @@ public:
   createTupleElementAddr(SILLocation Loc, SILValue Operand, unsigned FieldNo) {
     return insert(new (F.getModule()) TupleElementAddrInst(
         createSILDebugLocation(Loc), Operand, FieldNo,
-        Operand.getType().getTupleElementType(FieldNo)));
+        Operand->getType().getTupleElementType(FieldNo)));
   }
 
   StructExtractInst *createStructExtract(SILLocation Loc, SILValue Operand,
@@ -817,7 +817,7 @@ public:
 
   StructExtractInst *createStructExtract(SILLocation Loc, SILValue Operand,
                                          VarDecl *Field) {
-    auto type = Operand.getType().getFieldType(Field, F.getModule());
+    auto type = Operand->getType().getFieldType(Field, F.getModule());
     return createStructExtract(Loc, Operand, Field, type);
   }
 
@@ -831,7 +831,7 @@ public:
 
   StructElementAddrInst *
   createStructElementAddr(SILLocation Loc, SILValue Operand, VarDecl *Field) {
-    auto ResultTy = Operand.getType().getFieldType(Field, F.getModule());
+    auto ResultTy = Operand->getType().getFieldType(Field, F.getModule());
     return createStructElementAddr(Loc, Operand, Field, ResultTy);
   }
 
@@ -842,7 +842,7 @@ public:
   }
   RefElementAddrInst *createRefElementAddr(SILLocation Loc, SILValue Operand,
                                            VarDecl *Field) {
-    auto ResultTy = Operand.getType().getFieldType(Field, F.getModule());
+    auto ResultTy = Operand->getType().getFieldType(Field, F.getModule());
     return createRefElementAddr(Loc, Operand, Field, ResultTy);
   }
 
@@ -954,7 +954,7 @@ public:
 
   ProjectBlockStorageInst *createProjectBlockStorage(SILLocation Loc,
                                                      SILValue Storage) {
-    auto CaptureTy = Storage.getType()
+    auto CaptureTy = Storage->getType()
                          .castTo<SILBlockStorageType>()
                          ->getCaptureAddressType();
     return createProjectBlockStorage(Loc, Storage, CaptureTy);
@@ -1041,7 +1041,7 @@ public:
                       FixLifetimeInst(createSILDebugLocation(Loc), Operand));
   }
   void emitFixLifetime(SILLocation Loc, SILValue Operand) {
-    if (getTypeLowering(Operand.getType()).isTrivial())
+    if (getTypeLowering(Operand->getType()).isTrivial())
       return;
     createFixLifetime(Loc, Operand);
   }
@@ -1084,7 +1084,7 @@ public:
   }
   DeallocBoxInst *createDeallocBox(SILLocation Loc, SILValue operand) {
     auto eltType =
-        operand.getType().castTo<SILBoxType>()->getBoxedAddressType();
+        operand->getType().castTo<SILBoxType>()->getBoxedAddressType();
     return insert(new (F.getModule()) DeallocBoxInst(
         createSILDebugLocation(Loc), eltType, operand));
   }
@@ -1113,7 +1113,7 @@ public:
   }
   ProjectBoxInst *createProjectBox(SILLocation Loc, SILValue boxOperand) {
     auto valueTy =
-        boxOperand.getType().castTo<SILBoxType>()->getBoxedAddressType();
+        boxOperand->getType().castTo<SILBoxType>()->getBoxedAddressType();
 
     return insert(new (F.getModule()) ProjectBoxInst(
         createSILDebugLocation(Loc), valueTy, boxOperand));
@@ -1370,16 +1370,16 @@ public:
   /// Convenience function for calling emitRetain on the type lowering
   /// for the non-address value.
   void emitRetainValueOperation(SILLocation Loc, SILValue v) {
-    assert(!v.getType().isAddress());
-    auto &lowering = getTypeLowering(v.getType());
+    assert(!v->getType().isAddress());
+    auto &lowering = getTypeLowering(v->getType());
     return lowering.emitRetainValue(*this, Loc, v);
   }
 
   /// Convenience function for calling TypeLowering.emitRelease on the type
   /// lowering for the non-address value.
   void emitReleaseValueOperation(SILLocation Loc, SILValue v) {
-    assert(!v.getType().isAddress());
-    auto &lowering = getTypeLowering(v.getType());
+    assert(!v->getType().isAddress());
+    auto &lowering = getTypeLowering(v->getType());
     lowering.emitReleaseValue(*this, Loc, v);
   }
 
@@ -1395,7 +1395,7 @@ public:
   SILValue emitTupleExtract(SILLocation Loc, SILValue Operand,
                             unsigned FieldNo) {
     return emitTupleExtract(Loc, Operand, FieldNo,
-                            Operand.getType().getTupleElementType(FieldNo));
+                            Operand->getType().getTupleElementType(FieldNo));
   }
 
   SILValue emitStructExtract(SILLocation Loc, SILValue Operand, VarDecl *Field,
@@ -1408,7 +1408,7 @@ public:
 
   SILValue emitStructExtract(SILLocation Loc, SILValue Operand,
                              VarDecl *Field) {
-    auto type = Operand.getType().getFieldType(Field, F.getModule());
+    auto type = Operand->getType().getFieldType(Field, F.getModule());
     return emitStructExtract(Loc, Operand, Field, type);
   }
 

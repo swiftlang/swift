@@ -344,13 +344,13 @@ static SILType findTypedAccessType(SILValue V) {
   // typed oracle.
   if (auto *I = dyn_cast<SILInstruction>(V))
     if (isTypedAccessOracle(I))
-      return V.getType();
+      return V->getType();
 
   // Then look at any uses of V that potentially could act as a typed access
   // oracle.
   for (auto Use : V->getUses())
     if (isTypedAccessOracle(Use->getUser()))
-      return V.getType();
+      return V->getType();
 
   // Otherwise return an empty SILType
   return SILType();
@@ -634,7 +634,7 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
 bool AliasAnalysis::canApplyDecrementRefCount(FullApplySite FAS, SILValue Ptr) {
   // Treat applications of @noreturn functions as decrementing ref counts. This
   // causes the apply to become a sink barrier for ref count increments.
-  if (FAS.getCallee().getType().getAs<SILFunctionType>()->isNoReturn())
+  if (FAS.getCallee()->getType().getAs<SILFunctionType>()->isNoReturn())
     return true;
 
   /// If the pointer cannot escape to the function we are done.

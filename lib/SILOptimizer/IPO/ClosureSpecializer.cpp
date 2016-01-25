@@ -190,7 +190,7 @@ public:
   createNewClosure(SILBuilder &B, SILValue V,
                    llvm::SmallVectorImpl<SILValue> &Args) const {
     if (isa<PartialApplyInst>(getClosure()))
-      return B.createPartialApply(getClosure()->getLoc(), V, V.getType(), {},
+      return B.createPartialApply(getClosure()->getLoc(), V, V->getType(), {},
                                   Args, getClosure()->getType());
 
     assert(isa<ThinToThickFunctionInst>(getClosure()) &&
@@ -288,7 +288,7 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
   for (auto Arg : CSDesc.getArguments()) {
     NewArgs.push_back(Arg);
 
-    SILType ArgTy = Arg.getType();
+    SILType ArgTy = Arg->getType();
 
     // If our argument is of trivial type, continue...
     if (ArgTy.isTrivial(M))
@@ -454,7 +454,7 @@ static bool isSupportedClosure(const SILInstruction *Closure) {
     // If any arguments are not objects, return false. This is a temporary
     // limitation.
     for (SILValue Arg : PAI->getArguments())
-      if (!Arg.getType().isObject())
+      if (!Arg->getType().isObject())
         return false;
 
     // Ok, it is a closure we support, set Callee.

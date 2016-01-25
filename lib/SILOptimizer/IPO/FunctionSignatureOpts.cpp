@@ -345,7 +345,7 @@ unsigned ArgumentDescriptor::updateOptimizedBBArgs(SILBuilder &Builder,
     //
     // TODO: This should not be necessary.
     if (CalleeRelease) {
-      SILType CalleeReleaseTy = CalleeRelease->getOperand(0).getType();
+      SILType CalleeReleaseTy = CalleeRelease->getOperand(0)->getType();
       CalleeRelease->setOperand(
           0, SILUndef::get(CalleeReleaseTy, Builder.getModule()));
 

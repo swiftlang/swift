@@ -257,7 +257,7 @@ MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
       if (NewBehavior != Behavior) {
         SILValue Arg = AI->getArgument(Idx);
         // We only consider the argument effects if the argument aliases V.
-        if (!Arg.getType().isAddress() ||
+        if (!Arg->getType().isAddress() ||
             !AA->isNoAlias(Arg, V, computeTBAAType(Arg), getValueTBAAType())) {
           Behavior = NewBehavior;
         }

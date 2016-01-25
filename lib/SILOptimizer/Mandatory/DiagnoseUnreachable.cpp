@@ -402,7 +402,7 @@ static void setOutsideBlockUsesToUndef(SILInstruction *I) {
   for (auto *Use : Uses)
     if (auto *User = dyn_cast<SILInstruction>(Use->getUser()))
       if (User->getParent() != BB)
-        Use->set(SILUndef::get(Use->get().getType(), Mod));
+        Use->set(SILUndef::get(Use->get()->getType(), Mod));
 }
 
 static SILInstruction *getAsCallToNoReturn(SILInstruction *I) {

@@ -71,7 +71,7 @@ static bool canApplyOfBuiltinUseNonTrivialValues(BuiltinInst *BInst) {
   if (II.ID != llvm::Intrinsic::not_intrinsic) {
     if (II.hasAttribute(llvm::Attribute::ReadNone)) {
       for (auto &Op : BInst->getAllOperands()) {
-        if (!Op.get().getType().isTrivial(Mod)) {
+        if (!Op.get()->getType().isTrivial(Mod)) {
           return false;
         }
       }
@@ -83,7 +83,7 @@ static bool canApplyOfBuiltinUseNonTrivialValues(BuiltinInst *BInst) {
   auto &BI = BInst->getBuiltinInfo();
   if (BI.isReadNone()) {
     for (auto &Op : BInst->getAllOperands()) {
-      if (!Op.get().getType().isTrivial(Mod)) {
+      if (!Op.get()->getType().isTrivial(Mod)) {
         return false;
       }
     }
@@ -147,7 +147,7 @@ bool swift::canNeverUseValues(SILInstruction *Inst) {
   // safe.
   case ValueKind::UncheckedTrivialBitCastInst: {
     SILValue Op = cast<UncheckedTrivialBitCastInst>(Inst)->getOperand();
-    return Op.getType().isTrivial(Inst->getModule());
+    return Op->getType().isTrivial(Inst->getModule());
   }
 
   // Typed GEPs do not use pointers. The user of the typed GEP may but we will

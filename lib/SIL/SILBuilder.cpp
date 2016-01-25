@@ -48,7 +48,7 @@ SILInstruction *SILBuilder::tryCreateUncheckedRefCast(SILLocation Loc,
                                                       SILValue Op,
                                                       SILType ResultTy) {
   auto &M = F.getModule();
-  if (!SILType::canRefCast(Op.getType(), ResultTy, M))
+  if (!SILType::canRefCast(Op->getType(), ResultTy, M))
     return nullptr;
 
   return insert(
@@ -165,7 +165,7 @@ static bool couldReduceStrongRefcount(SILInstruction *Inst) {
   // value drops a retain.  We would have to do more alias analysis to be able
   // to safely ignore one of those.
   if (auto AI = dyn_cast<AssignInst>(Inst)) {
-    auto StoredType = AI->getOperand(0).getType();
+    auto StoredType = AI->getOperand(0)->getType();
     if (StoredType.isTrivial(Inst->getModule()) ||
         StoredType.is<ReferenceStorageType>())
       return false;
@@ -176,7 +176,7 @@ static bool couldReduceStrongRefcount(SILInstruction *Inst) {
     if (CAI->isInitializationOfDest())
       return false;
 
-    SILType StoredType = CAI->getOperand(0).getType().getObjectType();
+    SILType StoredType = CAI->getOperand(0)->getType().getObjectType();
     if (StoredType.isTrivial(Inst->getModule()) ||
         StoredType.is<ReferenceStorageType>())
       return false;

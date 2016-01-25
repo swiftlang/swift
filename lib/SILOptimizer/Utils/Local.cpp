@@ -511,7 +511,7 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
                                                   LoweredOptionalSrcType);
     // Cast the wrapped value.
     return castValueToABICompatibleType(B, Loc, WrappedValue,
-                                        WrappedValue.getType(),
+                                        WrappedValue->getType(),
                                         DestTy);
   }
 
@@ -863,13 +863,13 @@ SILInstruction *StringConcatenationOptimizer::optimize() {
 
   // Length of the concatenated literal according to its encoding.
   auto *Len = Builder.createIntegerLiteral(
-      AI->getLoc(), AILeft->getOperand(2).getType(), getConcatenatedLength());
+      AI->getLoc(), AILeft->getOperand(2)->getType(), getConcatenatedLength());
   Arguments.push_back(Len);
 
   // isAscii flag for UTF8-encoded string literals.
   if (Encoding == StringLiteralInst::Encoding::UTF8) {
     bool IsAscii = isAscii();
-    auto ILType = AILeft->getOperand(3).getType();
+    auto ILType = AILeft->getOperand(3)->getType();
     auto *Ascii =
         Builder.createIntegerLiteral(AI->getLoc(), ILType, intmax_t(IsAscii));
     Arguments.push_back(Ascii);
@@ -922,12 +922,12 @@ void swift::releasePartialApplyCapturedArg(SILBuilder &Builder, SILLocation Loc,
   }
 
   // If we have a trivial type, we do not need to put in any extra releases.
-  if (Arg.getType().isTrivial(Builder.getModule()))
+  if (Arg->getType().isTrivial(Builder.getModule()))
     return;
 
   // Otherwise, we need to destroy the argument.
-  if (Arg.getType().isObject()) {
-    if (Arg.getType().hasReferenceSemantics()) {
+  if (Arg->getType().isObject()) {
+    if (Arg->getType().hasReferenceSemantics()) {
       auto U = Builder.emitStrongRelease(Loc, Arg);
       if (U.isNull())
         return;
@@ -967,7 +967,7 @@ static void releaseCapturedArgsOfDeadPartialApply(PartialApplyInst *PAI,
   SILBuilderWithScope Builder(PAI);
   SILLocation Loc = PAI->getLoc();
   CanSILFunctionType PAITy =
-      dyn_cast<SILFunctionType>(PAI->getCallee().getType().getSwiftType());
+      dyn_cast<SILFunctionType>(PAI->getCallee()->getType().getSwiftType());
 
   // Emit a destroy value for each captured closure argument.
   ArrayRef<SILParameterInfo> Params = PAITy->getParameters();
@@ -1213,10 +1213,10 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   SILValue SrcOp;
   SILInstruction *NewI = nullptr;
 
-  assert(Src.getType().isAddress() && "Source should have an address type");
-  assert(Dest.getType().isAddress() && "Source should have an address type");
+  assert(Src->getType().isAddress() && "Source should have an address type");
+  assert(Dest->getType().isAddress() && "Source should have an address type");
 
-  if (SILBridgedTy != Src.getType()) {
+  if (SILBridgedTy != Src->getType()) {
     // Check if we can simplify a cast into:
     // - ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
     // - then convert _ObjectiveCBridgeable._ObjectiveCType to
@@ -1302,7 +1302,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   SILValue InOutOptionalParam;
   if (isConditional) {
     // Create a temporary
-    OptionalTy = OptionalType::get(Dest.getType().getSwiftRValueType())
+    OptionalTy = OptionalType::get(Dest->getType().getSwiftRValueType())
                      ->getImplementationType()
                      .getCanonicalTypeOrNull();
     OptionalTy.getAnyOptionalObjectType(OTK);
@@ -1487,7 +1487,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   SILType ResultTy = SubstFnTy.castTo<SILFunctionType>()->getSILResult();
 
   auto FnRef = Builder.createFunctionRef(Loc, BridgedFunc);
-  if (Src.getType().isAddress()) {
+  if (Src->getType().isAddress()) {
     // Create load
     Src = Builder.createLoad(Loc, Src);
   }
@@ -1507,7 +1507,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   if (Dest) {
     // If it is addr cast then store the result.
     auto ConvTy = NewAI->getType();
-    auto DestTy = Dest.getType().getObjectType();
+    auto DestTy = Dest->getType().getObjectType();
     assert((ConvTy == DestTy || DestTy.isSuperclassOf(ConvTy)) &&
            "Destination should have the same type or be a superclass "
            "of the source operand");
@@ -1622,8 +1622,8 @@ simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
 
   // Check if we can statically predict the outcome of the cast.
   auto Feasibility = classifyDynamicCast(Mod.getSwiftModule(),
-                          Src.getType().getSwiftRValueType(),
-                          Dest.getType().getSwiftRValueType(),
+                          Src->getType().getSwiftRValueType(),
+                          Dest->getType().getSwiftRValueType(),
                           isSourceTypeExact,
                           Mod.isWholeModule());
 
@@ -1633,7 +1633,7 @@ simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
 
   if (Feasibility == DynamicCastFeasibility::WillFail) {
     if (shouldDestroyOnFailure(Inst->getConsumptionKind())) {
-      auto &srcTL = Builder.getModule().getTypeLowering(Src.getType());
+      auto &srcTL = Builder.getModule().getTypeLowering(Src->getType());
       srcTL.emitDestroyAddress(Builder, Loc, Src);
     }
     auto NewI = Builder.createBranch(Loc, FailureBB);
@@ -1669,7 +1669,7 @@ simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
 
     if (!BridgedI) {
       // Since it is an addr cast, only address types are handled here.
-      if (!Src.getType().isAddress() || !Dest.getType().isAddress()) {
+      if (!Src->getType().isAddress() || !Dest->getType().isAddress()) {
         return nullptr;
       } else if (!emitSuccessfulIndirectUnconditionalCast(
                      Builder, Mod.getSwiftModule(), Loc,
@@ -1733,7 +1733,7 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   if (!Inst)
     return nullptr;
 
-  auto LoweredSourceType = Inst->getOperand().getType();
+  auto LoweredSourceType = Inst->getOperand()->getType();
   auto LoweredTargetType = Inst->getCastType();
   auto SourceType = LoweredSourceType.getSwiftRValueType();
   auto TargetType = LoweredTargetType.getSwiftRValueType();
@@ -1771,7 +1771,7 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   // is not used afterwards.
   bool ResultNotUsed = SuccessBB->getBBArg(0)->use_empty();
   SILValue CastedValue;
-  if (Op.getType() != LoweredTargetType) {
+  if (Op->getType() != LoweredTargetType) {
     if (!ResultNotUsed) {
       auto Src = Inst->getOperand();
       auto Dest = SILValue();
@@ -1817,7 +1817,7 @@ optimizeCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
   auto *FailureBB = Inst->getFailureBB();
 
   // If there is an unbound generic type involved in the cast, bail.
-  if (Src.getType().hasArchetype() || Dest.getType().hasArchetype())
+  if (Src->getType().hasArchetype() || Dest->getType().hasArchetype())
     return nullptr;
 
   // %1 = metatype $A.Type
@@ -1863,12 +1863,12 @@ optimizeCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
         if (SuccessBB->getSinglePredecessor()
             && canUseScalarCheckedCastInstructions(Inst->getModule(),
                 MI->getType().getSwiftRValueType(),
-                Dest.getType().getObjectType().getSwiftRValueType())) {
+                Dest->getType().getObjectType().getSwiftRValueType())) {
           SILBuilderWithScope B(Inst);
           auto NewI = B.createCheckedCastBranch(
               Loc, false /*isExact*/, MI,
-              Dest.getType().getObjectType(), SuccessBB, FailureBB);
-          SuccessBB->createBBArg(Dest.getType().getObjectType(), nullptr);
+              Dest->getType().getObjectType(), SuccessBB, FailureBB);
+          SuccessBB->createBBArg(Dest->getType().getObjectType(), nullptr);
           B.setInsertionPoint(SuccessBB->begin());
           // Store the result
           B.createStore(Loc, SuccessBB->getBBArg(0), Dest);
@@ -2040,7 +2040,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
 ValueBase *
 CastOptimizer::
 optimizeUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *Inst) {
-  auto LoweredSourceType = Inst->getOperand().getType();
+  auto LoweredSourceType = Inst->getOperand()->getType();
   auto LoweredTargetType = Inst->getType();
   auto Loc = Inst->getLoc();
   auto Op = Inst->getOperand();
@@ -2149,7 +2149,7 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
     SILInstruction *NewI = Builder.createBuiltinTrap(Loc);
     // mem2reg's invariants get unhappy if we don't try to
     // initialize a loadable result.
-    auto DestType = Dest.getType();
+    auto DestType = Dest->getType();
     auto &resultTL = Mod.Types.getTypeLowering(DestType);
     if (!resultTL.isAddressOnly()) {
       auto undef = SILValue(SILUndef::get(DestType.getObjectType(),

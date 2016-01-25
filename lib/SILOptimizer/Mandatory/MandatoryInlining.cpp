@@ -60,7 +60,7 @@ static void fixupReferenceCounts(SILBasicBlock::iterator I, SILLocation Loc,
   // Add a retain of each non-address type capture argument, because it will be
   // consumed by the closure body.
   for (auto &CaptureArg : CaptureArgs)
-    if (!CaptureArg.getType().isAddress())
+    if (!CaptureArg->getType().isAddress())
       B.emitRetainValueOperation(Loc, CaptureArg);
 }
 

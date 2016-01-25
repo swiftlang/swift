@@ -101,7 +101,7 @@ static unsigned computeSubelement(SILValue Pointer, SILInstruction *RootInst) {
     if (auto *PBI = dyn_cast<ProjectBoxInst>(Inst)) {
       Pointer = PBI->getOperand();
     } else if (auto *TEAI = dyn_cast<TupleElementAddrInst>(Inst)) {
-      SILType TT = TEAI->getOperand().getType();
+      SILType TT = TEAI->getOperand()->getType();
       
       // Keep track of what subelement is being referenced.
       for (unsigned i = 0, e = TEAI->getFieldNo(); i != e; ++i) {
@@ -109,7 +109,7 @@ static unsigned computeSubelement(SILValue Pointer, SILInstruction *RootInst) {
       }
       Pointer = TEAI->getOperand();
     } else if (auto *SEAI = dyn_cast<StructElementAddrInst>(Inst)) {
-      SILType ST = SEAI->getOperand().getType();
+      SILType ST = SEAI->getOperand()->getType();
       
       // Keep track of what subelement is being referenced.
       StructDecl *SD = SEAI->getStructDecl();
@@ -134,7 +134,7 @@ static unsigned computeSubelement(SILValue Pointer, SILInstruction *RootInst) {
 /// the path.
 static SILValue ExtractSubElement(SILValue Val, unsigned SubElementNumber,
                                   SILBuilder &B, SILLocation Loc) {
-  SILType ValTy = Val.getType();
+  SILType ValTy = Val->getType();
   
   // Extract tuple elements.
   if (auto TT = ValTy.getAs<TupleType>()) {
@@ -310,7 +310,7 @@ updateAvailableValues(SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
   if (isa<StoreInst>(Inst) || isa<AssignInst>(Inst)) {
     unsigned StartSubElt = computeSubelement(Inst->getOperand(1), TheMemory);
     assert(StartSubElt != ~0U && "Store within enum projection not handled");
-    SILType ValTy = Inst->getOperand(0).getType();
+    SILType ValTy = Inst->getOperand(0)->getType();
     
     for (unsigned i = 0, e = getNumSubElements(ValTy, Module); i != e; ++i) {
       // If this element is not required, don't fill it in.
@@ -338,7 +338,7 @@ updateAvailableValues(SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
   if (auto *CAI = dyn_cast<CopyAddrInst>(Inst)) {
     unsigned StartSubElt = computeSubelement(Inst->getOperand(1), TheMemory);
     assert(StartSubElt != ~0U && "Store within enum projection not handled");
-    SILType ValTy = Inst->getOperand(1).getType();
+    SILType ValTy = Inst->getOperand(1)->getType();
     
     bool AnyRequired = false;
     for (unsigned i = 0, e = getNumSubElements(ValTy, Module); i != e; ++i) {
@@ -354,7 +354,7 @@ updateAvailableValues(SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
     
     // If the copyaddr is of a non-loadable type, we can't promote it.  Just
     // consider it to be a clobber.
-    if (CAI->getOperand(0).getType().isLoadable(Module)) {
+    if (CAI->getOperand(0)->getType().isLoadable(Module)) {
       // Otherwise, some part of the copy_addr's value is demanded by a load, so
       // we need to explode it to its component pieces.  This only expands one
       // level of the copyaddr.
@@ -510,7 +510,7 @@ AggregateAvailableValues(SILInstruction *Inst, SILType LoadTy,
   if (FirstElt < AvailableValues.size()) {  // #Elements may be zero.
     SILValue FirstVal = AvailableValues[FirstElt].first;
     if (FirstVal.isValid() && AvailableValues[FirstElt].second == 0 &&
-        FirstVal.getType() == LoadTy) {
+        FirstVal->getType() == LoadTy) {
       // If the first element of this value is available, check any extra ones
       // before declaring success.
       bool AllMatch = true;
@@ -581,7 +581,7 @@ AggregateAvailableValues(SILInstruction *Inst, SILType LoadTy,
   
   SILValue EltVal = ExtractSubElement(Val.first, Val.second, B, Inst->getLoc());
   // It must be the same type as LoadTy if available.
-  assert(EltVal.getType() == LoadTy &&
+  assert(EltVal->getType() == LoadTy &&
          "Subelement types mismatch");
   return EltVal;
 }
@@ -605,7 +605,7 @@ bool AllocOptimize::promoteLoad(SILInstruction *Inst) {
   if (auto CAI = dyn_cast<CopyAddrInst>(Inst)) {
     // If this is a CopyAddr, verify that the element type is loadable.  If not,
     // we can't explode to a load.
-    if (!CAI->getSrc().getType().isLoadable(Module))
+    if (!CAI->getSrc()->getType().isLoadable(Module))
       return false;
   } else if (!isa<LoadInst>(Inst))
     return false;
@@ -615,7 +615,7 @@ bool AllocOptimize::promoteLoad(SILInstruction *Inst) {
   if (hasEscapedAt(Inst))
     return false;
   
-  SILType LoadTy = Inst->getOperand(0).getType().getObjectType();
+  SILType LoadTy = Inst->getOperand(0)->getType().getObjectType();
   
   // If this is a load/copy_addr from a struct field that we want to promote,
   // compute the access path down to the field so we can determine precise
@@ -697,7 +697,7 @@ bool AllocOptimize::promoteDestroyAddr(DestroyAddrInst *DAI) {
   
   // We cannot promote destroys of address-only types, because we can't expose
   // the load.
-  SILType LoadTy = Address.getType().getObjectType();
+  SILType LoadTy = Address->getType().getObjectType();
   if (LoadTy.isAddressOnly(Module))
     return false;
   
@@ -753,7 +753,7 @@ bool AllocOptimize::promoteDestroyAddr(DestroyAddrInst *DAI) {
 void AllocOptimize::explodeCopyAddr(CopyAddrInst *CAI) {
   DEBUG(llvm::dbgs() << "  -- Exploding copy_addr: " << *CAI << "\n");
   
-  SILType ValTy = CAI->getDest().getType().getObjectType();
+  SILType ValTy = CAI->getDest()->getType().getObjectType();
   auto &TL = Module.getTypeLowering(ValTy);
   
   // Keep track of the new instructions emitted.

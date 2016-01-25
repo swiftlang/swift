@@ -243,7 +243,7 @@ struct MaterializeForSetEmitter {
     // Eagerly loading here could cause an unnecessary
     // load+materialize in some cases, but it's not really important.
     SILValue selfValue = self.getValue();
-    if (selfValue.getType().isAddress()) {
+    if (selfValue->getType().isAddress()) {
       selfValue = gen.B.createLoad(loc, selfValue);
     }
 

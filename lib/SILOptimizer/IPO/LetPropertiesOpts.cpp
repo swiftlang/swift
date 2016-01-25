@@ -222,7 +222,7 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
 
 /// Compare to SILValues structurally.
 static bool CmpSILValues(SILValue LHS, SILValue RHS) {
-  if (LHS.getType() != RHS.getType())
+  if (LHS->getType() != RHS->getType())
     return false;
 
   auto L = dyn_cast<SILInstruction>(LHS.getDef());

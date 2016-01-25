@@ -1199,7 +1199,7 @@ bool COWArrayOpt::hoistInLoopWithOnlyNonArrayValueMutatingOperations() {
         // are release before we hit a make_unique instruction.
         ApplyInst *SemCall = Sem;
         if (Sem.getKind() == ArrayCallKind::kGetElement &&
-            !SemCall->getArgument(0).getType().isTrivial(Module)) {
+            !SemCall->getArgument(0)->getType().isTrivial(Module)) {
           CreatedNonTrivialValues.insert(SemCall->getArgument(0));
         } else if (Sem.getKind() == ArrayCallKind::kMakeMutable) {
           MakeMutableCalls.push_back(Sem);
@@ -1229,7 +1229,7 @@ bool COWArrayOpt::hoistInLoopWithOnlyNonArrayValueMutatingOperations() {
       // is trivial.
       if (StoreInst *SI = dyn_cast<StoreInst>(Inst)) {
         if (!isArrayEltStore(SI) ||
-            !SI->getSrc().getType().isTrivial(Module)) {
+            !SI->getSrc()->getType().isTrivial(Module)) {
           DEBUG(llvm::dbgs()
                 << "     (NO) non trivial store could store an array value "
                 << *Inst);
@@ -1351,12 +1351,12 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
         // that all types are the same make guarantees that this cannot happen.
         if (SameTy.isNull()) {
           SameTy =
-              Sem.getSelf().getType().getSwiftRValueType()->getCanonicalType();
+              Sem.getSelf()->getType().getSwiftRValueType()->getCanonicalType();
           continue;
         }
         
         if (Sem.getSelf()
-                       .getType()
+                       ->getType()
                        .getSwiftRValueType()
                        ->getCanonicalType() != SameTy) {
           DEBUG(llvm::dbgs() << "    (NO) mismatching array types\n");
@@ -1833,7 +1833,7 @@ private:
   }
 
   bool isClassElementTypeArray(SILValue Arr) {
-    auto Ty = Arr.getType().getSwiftRValueType();
+    auto Ty = Arr->getType().getSwiftRValueType();
     auto Canonical = Ty.getCanonicalTypeOrNull();
     if (Canonical.isNull())
       return false;
@@ -2046,7 +2046,7 @@ protected:
       return;
 
     // Update SSA form.
-    SSAUp.Initialize(V.getType());
+    SSAUp.Initialize(V->getType());
     SSAUp.AddAvailableValue(OrigBB, V);
     SILValue NewVal = remapValue(V);
     SSAUp.AddAvailableValue(BBMap[OrigBB], NewVal);
@@ -2106,7 +2106,7 @@ protected:
 
 static SILValue createStructExtract(SILBuilder &B, SILLocation Loc,
                                     SILValue Opd, unsigned FieldNo) {
-  SILType Ty = Opd.getType();
+  SILType Ty = Opd->getType();
   auto SD = Ty.getStructOrBoundGenericStruct();
   auto Properties = SD->getStoredProperties();
   unsigned Counter = 0;
@@ -2130,9 +2130,9 @@ static Identifier getBinaryFunction(StringRef Name, SILType IntSILTy,
 /// Create a binary and function.
 static SILValue createAnd(SILBuilder &B, SILLocation Loc, SILValue Opd1,
                           SILValue Opd2) {
-  auto AndFn = getBinaryFunction("and", Opd1.getType(), B.getASTContext());
+  auto AndFn = getBinaryFunction("and", Opd1->getType(), B.getASTContext());
   SILValue Args[] = {Opd1, Opd2};
-  return B.createBuiltin(Loc, AndFn, Opd1.getType(), {}, Args);
+  return B.createBuiltin(Loc, AndFn, Opd1->getType(), {}, Args);
 }
 
 /// Create a check over all array.props calls that they have the 'fast native

@@ -139,7 +139,7 @@ namespace {
         // Tolerate being passed an address here.  It comes up during switch
         //emission.
         scalarOperandValue = operand.forward(SGF);
-        if (scalarOperandValue.getType().isAddress()) {
+        if (scalarOperandValue->getType().isAddress()) {
           scalarOperandValue = SGF.B.createLoad(Loc, scalarOperandValue);
         }
         SGF.B.createCheckedCastBranch(Loc, /*exact*/ false, scalarOperandValue,

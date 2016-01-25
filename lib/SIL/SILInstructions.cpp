@@ -457,7 +457,7 @@ static SILType getPinResultType(SILType operandType) {
 }
 
 StrongPinInst::StrongPinInst(SILDebugLocation *Loc, SILValue operand)
-    : UnaryInstructionBase(Loc, operand, getPinResultType(operand.getType())) {}
+    : UnaryInstructionBase(Loc, operand, getPinResultType(operand->getType())) {}
 
 CopyAddrInst::CopyAddrInst(SILDebugLocation *Loc, SILValue SrcLValue,
                            SILValue DestLValue, IsTake_t isTakeOfSrc,
@@ -519,13 +519,13 @@ bool TupleExtractInst::isTrivialEltOfOneRCIDTuple() const {
 
   // If the elt we are extracting is trivial, we cannot have any non trivial
   // fields.
-  if (getOperand().getType().isTrivial(Mod))
+  if (getOperand()->getType().isTrivial(Mod))
     return false;
 
   // Ok, now we know that our tuple has non-trivial fields. Make sure that our
   // parent tuple has only one non-trivial field.
   bool FoundNonTrivialField = false;
-  SILType OpTy = getOperand().getType();
+  SILType OpTy = getOperand()->getType();
   unsigned FieldNo = getFieldNo();
 
   // For each element index of the tuple...
@@ -567,7 +567,7 @@ bool TupleExtractInst::isEltOnlyNonTrivialElt() const {
 
   // Ok, we know that the elt we are extracting is non-trivial. Make sure that
   // we have no other non-trivial elts.
-  SILType OpTy = getOperand().getType();
+  SILType OpTy = getOperand()->getType();
   unsigned FieldNo = getFieldNo();
 
   // For each element index of the tuple...
@@ -598,7 +598,7 @@ bool StructExtractInst::isTrivialFieldOfOneRCIDStruct() const {
   if (!getType().isTrivial(Mod))
     return false;
 
-  SILType StructTy = getOperand().getType();
+  SILType StructTy = getOperand()->getType();
 
   // If the elt we are extracting is trivial, we cannot have any non trivial
   // fields.
@@ -649,7 +649,7 @@ bool StructExtractInst::isFieldOnlyNonTrivialField() const {
   if (getType().isTrivial(Mod))
     return false;
 
-  SILType StructTy = getOperand().getType();
+  SILType StructTy = getOperand()->getType();
 
   // Ok, we are visiting a non-trivial field. Then for every stored field...
   for (VarDecl *D : getStructDecl()->getStoredProperties()) {
@@ -835,7 +835,7 @@ SwitchValueInst::SwitchValueInst(SILDebugLocation *Loc, SILValue Operand,
   auto *succs = getSuccessorBuf();
   unsigned OperandBitWidth = 0;
 
-  if (auto OperandTy = Operand.getType().getAs<BuiltinIntegerType>()) {
+  if (auto OperandTy = Operand->getType().getAs<BuiltinIntegerType>()) {
     OperandBitWidth = OperandTy->getGreatestWidth();
   }
 
@@ -906,7 +906,7 @@ SelectValueInst::SelectValueInst(SILDebugLocation *Loc, SILValue Operand,
 
   unsigned OperandBitWidth = 0;
 
-  if (auto OperandTy = Operand.getType().getAs<BuiltinIntegerType>()) {
+  if (auto OperandTy = Operand->getType().getAs<BuiltinIntegerType>()) {
     OperandBitWidth = OperandTy->getGreatestWidth();
   }
 
@@ -1029,7 +1029,7 @@ namespace {
   template <class Inst> EnumElementDecl *
   getUniqueCaseForDefaultValue(Inst *inst, SILValue enumValue) {
     assert(inst->hasDefault() && "doesn't have a default");
-    SILType enumType = enumValue.getType();
+    SILType enumType = enumValue->getType();
 
     EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
     assert(decl && "switch_enum operand is not an enum");
@@ -1119,7 +1119,7 @@ NullablePtr<EnumElementDecl> SwitchEnumInstBase::getUniqueCaseForDefault() {
 NullablePtr<EnumElementDecl>
 SwitchEnumInstBase::getUniqueCaseForDestination(SILBasicBlock *BB) {
   SILValue value = getOperand();
-  SILType enumType = value.getType();
+  SILType enumType = value->getType();
   EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
   assert(decl && "switch_enum operand is not an enum");
   (void)decl;

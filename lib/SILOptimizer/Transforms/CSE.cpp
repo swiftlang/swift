@@ -623,7 +623,7 @@ bool CSE::canHandle(SILInstruction *Inst) {
     return !WMI->isVolatile();
   }
   if (auto *EMI = dyn_cast<ExistentialMetatypeInst>(Inst)) {
-    return !EMI->getOperand().getType().isAddress();
+    return !EMI->getOperand()->getType().isAddress();
   }
   switch (Inst->getKind()) {
     case ValueKind::FunctionRefInst:

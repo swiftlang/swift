@@ -1279,7 +1279,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto Ty = MF->getType(TyID);
     auto Val = getLocalValue(ValID2,
                              getSILType(Ty, (SILValueCategory)TyCategory));
-    auto ResultTy = Val.getType().getFieldType(Field, SILMod);
+    auto ResultTy = Val->getType().getFieldType(Field, SILMod);
     if ((ValueKind)OpCode == ValueKind::StructElementAddrInst)
       ResultVal = Builder.createStructElementAddr(Loc, Val, Field,
                                                   ResultTy.getAddressType());
@@ -1490,7 +1490,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 
     SmallVector<std::pair<SILValue, SILValue>, 4> CaseValuesAndResults;
     for (unsigned I = 5, E = ListOfValues.size(); I < E; I += 2) {
-      auto CaseValue = getLocalValue(ListOfValues[I], Cond.getType());
+      auto CaseValue = getLocalValue(ListOfValues[I], Cond->getType());
       auto Result = getLocalValue(ListOfValues[I+1], ResultTy);
       CaseValuesAndResults.push_back({CaseValue, Result});
     }
@@ -1562,7 +1562,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto Ty = MF->getType(TyID);
     auto Val = getLocalValue(ValID2,
                              getSILType(Ty, (SILValueCategory)TyCategory));
-    auto ResultTy = Val.getType().getFieldType(Field, SILMod);
+    auto ResultTy = Val->getType().getFieldType(Field, SILMod);
     ResultVal = Builder.createRefElementAddr(Loc, Val, Field,
                                              ResultTy);
     break;

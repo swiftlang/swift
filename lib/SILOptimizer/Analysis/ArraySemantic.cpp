@@ -55,7 +55,7 @@ bool swift::ArraySemanticsCall::isValidSignature() {
   case ArrayCallKind::kCheckIndex: {
     // Int, @guaranteed/@owned Self
     if (SemanticsCall->getNumArguments() != 2 ||
-        !SemanticsCall->getArgument(0).getType().isTrivial(Mod))
+        !SemanticsCall->getArgument(0)->getType().isTrivial(Mod))
       return false;
     auto SelfConvention = FnTy->getSelfParameter().getConvention();
     return SelfConvention == ParameterConvention::Direct_Guaranteed ||
@@ -64,9 +64,9 @@ bool swift::ArraySemanticsCall::isValidSignature() {
   case ArrayCallKind::kCheckSubscript: {
     // Int, Bool, Self
     if (SemanticsCall->getNumArguments() != 3 ||
-        !SemanticsCall->getArgument(0).getType().isTrivial(Mod))
+        !SemanticsCall->getArgument(0)->getType().isTrivial(Mod))
       return false;
-    if (!SemanticsCall->getArgument(1).getType().isTrivial(Mod))
+    if (!SemanticsCall->getArgument(1)->getType().isTrivial(Mod))
       return false;
     auto SelfConvention = FnTy->getSelfParameter().getConvention();
     return SelfConvention == ParameterConvention::Direct_Guaranteed ||
@@ -80,7 +80,7 @@ bool swift::ArraySemanticsCall::isValidSignature() {
     // Make sure that if we are a _adoptStorage call that our storage is
     // uniquely referenced by us.
     SILValue Arg0 = SemanticsCall->getArgument(0);
-    if (Arg0.getType().isExistentialType()) {
+    if (Arg0->getType().isExistentialType()) {
       auto *AllocBufferAI = dyn_cast<ApplyInst>(Arg0);
       if (!AllocBufferAI)
         return false;
@@ -515,7 +515,7 @@ swift::ArraySemanticsCall::getArrayPropertyIsNativeTypeChecked() const {
 bool swift::ArraySemanticsCall::mayHaveBridgedObjectElementType() const {
   assert(hasSelf() && "Need self parameter");
 
-  auto Ty = getSelf().getType().getSwiftRValueType();
+  auto Ty = getSelf()->getType().getSwiftRValueType();
   auto Canonical = Ty.getCanonicalTypeOrNull();
   if (Canonical.isNull())
     return true;
@@ -549,7 +549,7 @@ SILValue swift::ArraySemanticsCall::getInitializationCount() const {
     // argument. The count is the second argument.
     // A call to _allocateUninitialized has the count as first argument.
     SILValue Arg0 = SemanticsCall->getArgument(0);
-    if (Arg0.getType().isExistentialType())
+    if (Arg0->getType().isExistentialType())
       return SemanticsCall->getArgument(1);
     else return SemanticsCall->getArgument(0);
   }
@@ -622,7 +622,7 @@ bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
   assert(getKind() == ArrayCallKind::kGetElement &&
          "Must be a get_element call");
   // We only handle loadable types.
-  if (!V.getType().isLoadable(SemanticsCall->getModule()))
+  if (!V->getType().isLoadable(SemanticsCall->getModule()))
    return false;
 
   auto Dest = SemanticsCall->getArgument(0);
@@ -640,7 +640,7 @@ bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
     return false;
 
   SILBuilderWithScope Builder(SemanticsCall);
-  auto &ValLowering = Builder.getModule().getTypeLowering(V.getType());
+  auto &ValLowering = Builder.getModule().getTypeLowering(V->getType());
   ValLowering.emitRetainValue(Builder, SemanticsCall->getLoc(), V);
   ValLowering.emitStoreOfCopy(Builder, SemanticsCall->getLoc(), V, Dest,
                               IsInitialization_t::IsInitialization);

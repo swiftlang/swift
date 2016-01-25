@@ -189,7 +189,7 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
   else
     methodValue = emitGlobalFunctionRef(loc, methodConstant);
 
-  SILType methodTy = methodValue.getType();
+  SILType methodTy = methodValue->getType();
 
   if (!subs.empty()) {
     // Specialize the generic method.
@@ -256,7 +256,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       auto &tl = getTypeLowering(vd->getType()->getReferenceStorageReferent());
       SILValue Val = Entry.value;
 
-      if (!Val.getType().isAddress()) {
+      if (!Val->getType().isAddress()) {
         // Our 'let' binding can guarantee the lifetime for the callee,
         // if we don't need to do anything more to it.
         if (canGuarantee && !vd->getType()->is<ReferenceStorageType>()) {
@@ -290,7 +290,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       // address of the value.
       assert(VarLocs.count(vd) && "no location for captured var!");
       VarLoc vl = VarLocs[vd];
-      assert(vl.value.getType().isAddress() && "no address for captured var!");
+      assert(vl.value->getType().isAddress() && "no address for captured var!");
       capturedArgs.push_back(ManagedValue::forLValue(vl.value));
       break;
     }
@@ -300,7 +300,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       // address of the value.
       assert(VarLocs.count(vd) && "no location for captured var!");
       VarLoc vl = VarLocs[vd];
-      assert(vl.value.getType().isAddress() && "no address for captured var!");
+      assert(vl.value->getType().isAddress() && "no address for captured var!");
 
       // If this is a boxed variable, we can use it directly.
       if (vl.box) {
@@ -324,7 +324,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         // closure context and pass it down to the partially applied function
         // in-place.
         AllocBoxInst *allocBox =
-          B.createAllocBox(loc, vl.value.getType().getObjectType());
+          B.createAllocBox(loc, vl.value->getType().getObjectType());
         ProjectBoxInst *boxAddress = B.createProjectBox(loc, allocBox);
         B.createCopyAddr(loc, vl.value, boxAddress, IsNotTake,IsInitialization);
         capturedArgs.push_back(emitManagedRValueWithCleanup(allocBox));
@@ -353,7 +353,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
 
   auto constantInfo = getConstantInfo(constant);
   SILValue functionRef = emitGlobalFunctionRef(loc, constant, constantInfo);
-  SILType functionTy = functionRef.getType();
+  SILType functionTy = functionRef->getType();
 
   auto expectedType =
     cast<FunctionType>(TheClosure.getType()->getCanonicalType());
@@ -390,7 +390,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     forwardedArgs.push_back(capture.forward(*this));
 
   SILType closureTy =
-    SILGenBuilder::getPartialApplyResultType(functionRef.getType(),
+    SILGenBuilder::getPartialApplyResultType(functionRef->getType(),
                                              capturedArgs.size(), SGM.M,
                                              forwardSubs);
   auto toClosure =
@@ -501,9 +501,9 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
 
     // Call UIApplicationMain.
     SILParameterInfo argTypes[] = {
-      SILParameterInfo(argc.getType().getSwiftRValueType(),
+      SILParameterInfo(argc->getType().getSwiftRValueType(),
                        ParameterConvention::Direct_Unowned),
-      SILParameterInfo(argv.getType().getSwiftRValueType(),
+      SILParameterInfo(argv->getType().getSwiftRValueType(),
                        ParameterConvention::Direct_Unowned),
       SILParameterInfo(IUOptNSStringTy, ParameterConvention::Direct_Unowned),
       SILParameterInfo(IUOptNSStringTy, ParameterConvention::Direct_Unowned),
@@ -514,7 +514,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                                         CFunctionPointer),
                   ParameterConvention::Direct_Unowned,
                   argTypes,
-                  SILResultInfo(argc.getType().getSwiftRValueType(),
+                  SILResultInfo(argc->getType().getSwiftRValueType(),
                                 ResultConvention::Unowned),
                   /*error result*/ None,
                   getASTContext());
@@ -534,10 +534,10 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
 
     B.createApply(mainClass, UIApplicationMain,
                   UIApplicationMain->getType(),
-                  argc.getType(), {}, args);
+                  argc->getType(), {}, args);
     SILValue r = B.createIntegerLiteral(mainClass,
                         SILType::getBuiltinIntegerType(32, getASTContext()), 0);
-    if (r.getType() != F.getLoweredFunctionType()->getResult().getSILType())
+    if (r->getType() != F.getLoweredFunctionType()->getResult().getSILType())
       r = B.createStruct(mainClass,
                        F.getLoweredFunctionType()->getResult().getSILType(), r);
 
@@ -550,9 +550,9 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     // return NSApplicationMain(C_ARGC, C_ARGV);
 
     SILParameterInfo argTypes[] = {
-      SILParameterInfo(argc.getType().getSwiftRValueType(),
+      SILParameterInfo(argc->getType().getSwiftRValueType(),
                        ParameterConvention::Direct_Unowned),
-      SILParameterInfo(argv.getType().getSwiftRValueType(),
+      SILParameterInfo(argv->getType().getSwiftRValueType(),
                        ParameterConvention::Direct_Unowned),
     };
     auto NSApplicationMainType = SILFunctionType::get(nullptr,
@@ -562,7 +562,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                     .withRepresentation(SILFunctionType::Representation::Thin),
                   ParameterConvention::Direct_Unowned,
                   argTypes,
-                  SILResultInfo(argc.getType().getSwiftRValueType(),
+                  SILResultInfo(argc->getType().getSwiftRValueType(),
                                 ResultConvention::Unowned),
                   /*error result*/ None,
                   getASTContext());
@@ -578,10 +578,10 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
 
     B.createApply(mainClass, NSApplicationMain,
                   NSApplicationMain->getType(),
-                  argc.getType(), {}, args);
+                  argc->getType(), {}, args);
     SILValue r = B.createIntegerLiteral(mainClass,
                         SILType::getBuiltinIntegerType(32, getASTContext()), 0);
-    if (r.getType() != F.getLoweredFunctionType()->getResult().getSILType())
+    if (r->getType() != F.getLoweredFunctionType()->getResult().getSILType())
       r = B.createStruct(mainClass,
                        F.getLoweredFunctionType()->getResult().getSILType(), r);
     B.createReturn(mainClass, r);
@@ -727,18 +727,18 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
     = SGM.getConstantType(from).castTo<SILFunctionType>()
          ->getResult().getSILType();
   resultTy = F.mapTypeIntoContext(resultTy);
-  auto toTy = toFn.getType();
+  auto toTy = toFn->getType();
 
   // Forward archetypes and specialize if the function is generic.
   if (!subs.empty()) {
-    auto toFnTy = toFn.getType().castTo<SILFunctionType>();
+    auto toFnTy = toFn->getType().castTo<SILFunctionType>();
     toTy = getLoweredLoadableType(
               toFnTy->substGenericArgs(SGM.M, SGM.SwiftModule, subs));
   }
 
   // Partially apply the next uncurry level and return the result closure.
   auto closureTy =
-    SILGenBuilder::getPartialApplyResultType(toFn.getType(), curriedArgs.size(),
+    SILGenBuilder::getPartialApplyResultType(toFn->getType(), curriedArgs.size(),
                                              SGM.M, subs);
   SILInstruction *toClosure =
     B.createPartialApply(vd, toFn, toTy, subs, curriedArgs, closureTy);

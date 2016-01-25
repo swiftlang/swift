@@ -48,14 +48,14 @@ using namespace Lowering;
 
 ManagedValue SILGenFunction::emitManagedRetain(SILLocation loc,
                                                SILValue v) {
-  auto &lowering = getTypeLowering(v.getType().getSwiftRValueType());
+  auto &lowering = getTypeLowering(v->getType().getSwiftRValueType());
   return emitManagedRetain(loc, v, lowering);
 }
 
 ManagedValue SILGenFunction::emitManagedRetain(SILLocation loc,
                                                SILValue v,
                                                const TypeLowering &lowering) {
-  assert(lowering.getLoweredType() == v.getType());
+  assert(lowering.getLoweredType() == v->getType());
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(v);
   assert(!lowering.isAddressOnly() && "cannot retain an unloadable type");
@@ -65,13 +65,13 @@ ManagedValue SILGenFunction::emitManagedRetain(SILLocation loc,
 }
 
 ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v) {
-  auto &lowering = getTypeLowering(v.getType());
+  auto &lowering = getTypeLowering(v->getType());
   return emitManagedRValueWithCleanup(v, lowering);
 }
 
 ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v,
                                                const TypeLowering &lowering) {
-  assert(lowering.getLoweredType() == v.getType());
+  assert(lowering.getLoweredType() == v->getType());
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(v);
   
@@ -79,13 +79,13 @@ ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v,
 }
 
 ManagedValue SILGenFunction::emitManagedBufferWithCleanup(SILValue v) {
-  auto &lowering = getTypeLowering(v.getType());
+  auto &lowering = getTypeLowering(v->getType());
   return emitManagedBufferWithCleanup(v, lowering);
 }
 
 ManagedValue SILGenFunction::emitManagedBufferWithCleanup(SILValue v,
                                                const TypeLowering &lowering) {
-  assert(lowering.getLoweredType().getAddressType() == v.getType());
+  assert(lowering.getLoweredType().getAddressType() == v->getType());
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(v);
 
@@ -255,7 +255,7 @@ ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc, VarDecl *var,
   if (It != VarLocs.end()) {
     // If this has an address, return it.  By-value let's have no address.
     SILValue ptr = It->second.value;
-    if (ptr.getType().isAddress())
+    if (ptr->getType().isAddress())
       return ManagedValue::forLValue(ptr);
     
     // Otherwise, it is an RValue let.
@@ -367,14 +367,14 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
     auto It = VarLocs.find(decl);
     if (It != VarLocs.end()) {
       // Mutable lvalue and address-only 'let's are LValues.
-      assert(!It->second.value.getType().isAddress() &&
+      assert(!It->second.value->getType().isAddress() &&
              "LValue cases should be handled above");
 
       SILValue Scalar = It->second.value;
 
       // For weak and unowned types, convert the reference to the right
       // pointer.
-      if (Scalar.getType().is<ReferenceStorageType>()) {
+      if (Scalar->getType().is<ReferenceStorageType>()) {
         Scalar = emitConversionToSemanticRValue(loc, Scalar,
                                                 getTypeLowering(refType));
         // emitConversionToSemanticRValue always produces a +1 strong result.
@@ -1047,7 +1047,7 @@ RValue RValueEmitter::visitMetatypeConversionExpr(MetatypeConversionExpr *E,
   // such in the SIL type system, for example, a cast from DynamicSelf.Type
   // directly to its own Self.Type.
   auto loweredResultTy = SGF.getLoweredLoadableType(E->getType());
-  if (metaBase.getType() == loweredResultTy)
+  if (metaBase->getType() == loweredResultTy)
     return RValue(SGF, E, ManagedValue::forUnmanaged(metaBase));
 
   auto upcast = SGF.B.createUpcast(E, metaBase, loweredResultTy);
@@ -2351,7 +2351,7 @@ RValue RValueEmitter::visitLValueToPointerExpr(LValueToPointerExpr *E,
   SILType abstractedTy
     = SGF.getLoweredType(AbstractionPattern(E->getAbstractionPatternType()),
                          E->getSubExpr()->getType()->getLValueOrInOutObjectType());
-  if (address.getType().getObjectType() != abstractedTy)
+  if (address->getType().getObjectType() != abstractedTy)
     SGF.SGM.diagnose(E, diag::not_implemented,
                      "abstraction difference in inout conversion");
   
@@ -3095,7 +3095,7 @@ public:
     // Convert the value back to a +1 strong reference.
     auto unowned = std::move(value).getAsSingleValue(gen, loc).getUnmanagedValue();
     auto strongType = SILType::getPrimitiveObjectType(
-              unowned.getType().castTo<UnmanagedStorageType>().getReferentType());
+              unowned->getType().castTo<UnmanagedStorageType>().getReferentType());
     auto owned = gen.B.createUnmanagedToRef(loc, unowned, strongType);
     gen.B.createRetainValue(loc, owned);
     auto ownedMV = gen.emitManagedRValueWithCleanup(owned);
@@ -3110,7 +3110,7 @@ public:
     SILValue owned = gen.B.createLoad(loc, base.getUnmanagedValue());
     // Convert it to unowned.
     auto unownedType = SILType::getPrimitiveObjectType(
-            CanUnmanagedStorageType::get(owned.getType().getSwiftRValueType()));
+            CanUnmanagedStorageType::get(owned->getType().getSwiftRValueType()));
     SILValue unowned = gen.B.createRefToUnmanaged(loc, owned, unownedType);
     
     return ManagedValue::forUnmanaged(unowned);

@@ -862,9 +862,9 @@ public:
 
   NullablePtr<SILInstruction>
   createProjection(SILBuilder &B, SILLocation Loc, SILValue Base) const {
-    if (Base.getType().isAddress()) {
+    if (Base->getType().isAddress()) {
       return createAddrProjection(B, Loc, Base);
-    } else if (Base.getType().isObject()) {
+    } else if (Base->getType().isObject()) {
       return createValueProjection(B, Loc, Base);
     } else {
       llvm_unreachable("Unsupported SILValueCategory");

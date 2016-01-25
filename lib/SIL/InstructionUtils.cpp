@@ -105,7 +105,7 @@ SILValue swift::stripCasts(SILValue V) {
 }
 
 SILValue swift::stripUpCasts(SILValue V) {
-  assert(V.getType().isClassOrClassMetatype() &&
+  assert(V->getType().isClassOrClassMetatype() &&
          "Expected class or class metatype!");
   
   V = stripSinglePredecessorArgs(V);

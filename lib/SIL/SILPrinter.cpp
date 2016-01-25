@@ -425,7 +425,7 @@ public:
   ID getID(const SILBasicBlock *B);
   ID getID(SILValue V);
   IDAndType getIDAndType(SILValue V) {
-    return { getID(V), V.getType() };
+    return { getID(V), V->getType() };
   }
 
   //===--------------------------------------------------------------------===//
@@ -766,7 +766,7 @@ public:
     interleave(AI->getArguments(),
                [&](const SILValue &arg) { *this << getID(arg); },
                [&] { *this << ", "; });
-    *this << ") : " << AI->getCallee().getType();
+    *this << ") : " << AI->getCallee()->getType();
   }
 
   void visitTryApplyInst(TryApplyInst *AI) {
@@ -777,7 +777,7 @@ public:
     interleave(AI->getArguments(),
                [&](const SILValue &arg) { *this << getID(arg); },
                [&] { *this << ", "; });
-    *this << ") : " << AI->getCallee().getType();
+    *this << ") : " << AI->getCallee()->getType();
     *this << ", normal " << getID(AI->getNormalBB());
     *this << ", error " << getID(AI->getErrorBB());
   }
@@ -791,7 +791,7 @@ public:
     interleave(CI->getArguments(),
                [&](const SILValue &arg) { *this << getID(arg); },
                [&] { *this << ", "; });
-    *this << ") : " << CI->getCallee().getType();
+    *this << ") : " << CI->getCallee()->getType();
   }
 
   void visitFunctionRefInst(FunctionRefInst *FRI) {

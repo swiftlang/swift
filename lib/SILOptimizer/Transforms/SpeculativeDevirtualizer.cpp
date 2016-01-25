@@ -308,7 +308,7 @@ static bool tryToSpeculateTarget(FullApplySite AI,
   // with a value whose type is closer (in the class hierarchy) to the
   // actual dynamic type.
   auto SubTypeValue = stripUpCasts(CMI->getOperand());
-  SILType SubType = SubTypeValue.getType();
+  SILType SubType = SubTypeValue->getType();
 
   // Bail if any generic types parameters of the class instance type are
   // unbound.

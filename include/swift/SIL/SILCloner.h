@@ -1270,7 +1270,7 @@ SILCloner<ImplClass>::
 visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *Inst) {
   // Create a new archetype for this opened existential type.
   CanType openedType = Inst->getType().getSwiftRValueType();
-  CanType exType = Inst->getOperand().getType().getSwiftRValueType();
+  CanType exType = Inst->getOperand()->getType().getSwiftRValueType();
   while (auto exMetatype = dyn_cast<ExistentialMetatypeType>(exType)) {
     exType = exMetatype.getInstanceType();
     openedType = cast<MetatypeType>(openedType).getInstanceType();
@@ -1279,7 +1279,7 @@ visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *Inst) {
   OpenedExistentialSubs[archetypeTy] 
     = ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType());
 
-  if (!Inst->getOperand().getType().canUseExistentialRepresentation(
+  if (!Inst->getOperand()->getType().canUseExistentialRepresentation(
           Inst->getModule(), ExistentialRepresentation::Class)) {
     getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst, getBuilder().createOpenExistentialMetatype(

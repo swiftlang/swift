@@ -79,7 +79,7 @@ void LSValue::expand(SILValue Base, SILModule *M, LSValueList &Vals,
   // address projection paths from the accessed type to each indivisible field,
   // i.e. leaf nodes, then we append these projection paths to the Base.
   for (const auto &P :
-       TE->getTypeExpansionProjectionPaths(Base.getType(), M, TEKind::TELeaf)) {
+       TE->getTypeExpansionProjectionPaths(Base->getType(), M, TEKind::TELeaf)) {
     Vals.push_back(LSValue(Base, P.getValue()));
   }
 }
