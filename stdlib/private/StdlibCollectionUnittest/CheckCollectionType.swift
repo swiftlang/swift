@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import StdlibUnittest
+
 public struct SubscriptRangeTest {
   public let expected: [OpaqueValue<Int>]
   public let collection: [OpaqueValue<Int>]

@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import StdlibUnittest
+
 extension TestSuite {
   /// Adds a set of tests for `RangeReplaceableCollectionType` that is also a
   /// slice type.

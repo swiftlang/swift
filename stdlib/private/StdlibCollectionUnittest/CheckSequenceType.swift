@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import StdlibUnittest
+
 public struct DropFirstTest {
   public var sequence: [Int]
   public let dropElements: Int

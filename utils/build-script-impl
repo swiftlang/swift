@@ -144,6 +144,7 @@ KNOWN_SETTINGS=(
     build-llvm                  "1"              "set to 1 to build LLVM and Clang"
     build-swift-tools           "1"              "set to 1 to build Swift host tools"
     build-swift-stdlib          "1"              "set to 1 to build the Swift standard library"
+    build-swift-stdlib-unittest-extra "0"        "set to 1 to build optional StdlibUnittest components"
     build-swift-sdk-overlay     "1"              "set to 1 to build the Swift SDK overlay"
     build-swift-static-stdlib   "0"              "set to 1 to build static versions of the Swift standard library and SDK overlay"
     build-swift-examples        "1"              "set to 1 to build examples"
@@ -976,8 +977,18 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
             ;;
     esac
     if [[ "${build_for_this_target}" ]] ; then
-        SWIFT_STDLIB_TARGETS=(
-            "${SWIFT_STDLIB_TARGETS[@]}" "swift-stdlib-${deployment_target}")
+        if [[ "${BUILD_SWIFT_STDLIB_UNITTEST_EXTRA}" == "1" ]] ; then
+            SWIFT_STDLIB_TARGETS=(
+                "${SWIFT_STDLIB_TARGETS[@]}" "swift-stdlib-${deployment_target}")
+        else
+            if [[ "${SKIP_TEST_VALIDATION}" ]] ; then
+                SWIFT_STDLIB_TARGETS=(
+                    "${SWIFT_STDLIB_TARGETS[@]}" "swift-test-stdlib-${deployment_target}")
+            else
+                SWIFT_STDLIB_TARGETS=(
+                    "${SWIFT_STDLIB_TARGETS[@]}" "swift-stdlib-${deployment_target}")
+            fi
+        fi
     fi
     if [[ "${perftest_this_target}" ]] ; then
         SWIFT_PERFTEST_TARGETS=(

@@ -3,6 +3,7 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
+import StdlibCollectionUnittest
 import SwiftPrivate
 
 // Also import modules which are used by StdlibUnittest internally. This
