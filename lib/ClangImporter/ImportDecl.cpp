@@ -353,7 +353,7 @@ static FuncDecl *makeRawValueTrivialSetter(ClangImporter::Implementation &Impl,
 
   auto *selfDecl = ParamDecl::createSelf(SourceLoc(), importedDecl,
                                          /*static*/false, /*inout*/true);
-  auto *newValueDecl = new (C) ParamDecl(/*IsLet*/true, SourceLoc(),
+  auto *newValueDecl = new (C) ParamDecl(/*IsLet*/true, SourceLoc(),SourceLoc(),
                                          Identifier(), SourceLoc(),
                                          C.Id_value, rawType, importedDecl);
   newValueDecl->setImplicit();
@@ -416,7 +416,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   auto selfDecl = ParamDecl::createSelf(SourceLoc(), enumDecl,
                                         /*static*/false, /*inout*/true);
 
-  auto param = new (C) ParamDecl(/*let*/ true,
+  auto param = new (C) ParamDecl(/*let*/ true, SourceLoc(),
                                  SourceLoc(), C.Id_rawValue,
                                  SourceLoc(), C.Id_rawValue,
                                  enumDecl->getRawType(),
@@ -551,7 +551,7 @@ static FuncDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
   auto &C = Impl.SwiftContext;
   auto selfDecl = ParamDecl::createSelf(SourceLoc(), importedDecl,
                                         /*isStatic*/false, /*isInOut*/true);
-  auto newValueDecl = new (C) ParamDecl(/*isLet */ true, SourceLoc(),
+  auto newValueDecl = new (C) ParamDecl(/*isLet */ true,SourceLoc(),SourceLoc(),
                                         Identifier(), SourceLoc(), C.Id_value,
                                         importedFieldDecl->getType(),
                                         importedDecl);
@@ -1592,7 +1592,7 @@ namespace {
       for (auto var : members) {
         Identifier argName = wantCtorParamNames ? var->getName()
                                                 : Identifier();
-        auto param = new (context) ParamDecl(/*IsLet*/ true,
+        auto param = new (context) ParamDecl(/*IsLet*/ true, SourceLoc(),
                                              SourceLoc(), argName,
                                              SourceLoc(), var->getName(),
                                              var->getType(), structDecl);
@@ -3562,7 +3562,7 @@ namespace {
       auto selfDecl = ParamDecl::createSelf(SourceLoc(), dc);
 
       auto paramVarDecl = new (context) ParamDecl(/*isLet=*/false, SourceLoc(),
-                                                  Identifier(), loc,
+                                                  SourceLoc(), Identifier(),loc,
                                                   valueIndex->get(0)->getName(),
                                                   elementTy, dc);
       
