@@ -71,6 +71,7 @@ class Parser {
 
   bool IsInputIncomplete = false;
   SourceLoc DelayedDeclEnd;
+  std::vector<Token> SplitTokens;
 
 public:
   SourceManager &SourceMgr;
@@ -154,6 +155,8 @@ public:
   bool allowTopLevelCode() const {
     return SF.isScriptMode();
   }
+
+  std::vector<Token> &getSplitTokens() { return SplitTokens; }
 
   /// Returns true if the parser reached EOF with incomplete source input, due
   /// for example, a missing right brace.
