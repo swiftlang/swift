@@ -1875,15 +1875,21 @@ public:
 class PatternBindingEntry {
   Pattern *ThePattern;
   llvm::PointerIntPair<Expr *, 1, bool> InitAndChecked;
-  
+  // Initializer may be reset several times after original value is set by
+  // parser, but we need to at least store the original source range to be
+  // able get the original source location of the initializer
+  SourceRange OrigInitRange;
+
 public:
-  PatternBindingEntry(Pattern *P, Expr *E)
-    : ThePattern(P), InitAndChecked(E, false) {}
+  PatternBindingEntry(Pattern *P, Expr *E, SourceRange OIR)
+    : ThePattern(P), InitAndChecked(E, false), OrigInitRange(OIR) {}
 
   Pattern *getPattern() const { return ThePattern; }
   void setPattern(Pattern *P) { ThePattern = P; }
   Expr *getInit() const { return InitAndChecked.getPointer(); }
   void setInit(Expr *E) { InitAndChecked.setPointer(E); }
+  SourceRange getOrigInitRange() const { return OrigInitRange; }
+  void setOrigInitRange(SourceRange SR) { OrigInitRange = SR; }
   bool isInitializerChecked() const { return InitAndChecked.getInt(); }
   void setInitializerChecked() { InitAndChecked.setInt(true); }
 };
@@ -1923,11 +1929,7 @@ public:
                                     StaticSpellingKind StaticSpelling,
                                     SourceLoc VarLoc,
                                     Pattern *Pat, Expr *E,
-                                    DeclContext *Parent) {
-    return create(Ctx, StaticLoc, StaticSpelling, VarLoc,
-                  PatternBindingEntry(Pat, E), Parent);
-  }
-
+                                    DeclContext *Parent);
 
   SourceLoc getStartLoc() const {
     return StaticLoc.isValid() ? StaticLoc : VarLoc;
@@ -1945,6 +1947,10 @@ public:
     return getPatternList()[i].getInit();
   }
   
+  SourceRange getOrigInitRange(unsigned i) const {
+    return getPatternList()[i].getOrigInitRange();
+  }
+
   void setInit(unsigned i, Expr *E) {
     getMutablePatternList()[i].setInit(E);
   }
