@@ -1187,10 +1187,11 @@ TypeExpr *TypeExpr::createForSpecializedDecl(SourceLoc Loc, TypeDecl *D,
 // Create an implicit TypeExpr, with location information even though it
 // shouldn't have one.  This is presently used to work around other location
 // processing bugs.  If you have an implicit location, use createImplicit.
-TypeExpr *TypeExpr::createImplicitHack(SourceLoc Loc, Type Ty, ASTContext &C) {
+TypeExpr *TypeExpr::createImplicitHack(SourceLoc StartLoc, Type Ty,
+                                       ASTContext &C, SourceLoc EndLoc) {
   // FIXME: This is horrible.
-  if (Loc.isInvalid()) return createImplicit(Ty, C);
-  auto *Repr = new (C) FixedTypeRepr(Ty, Loc);
+  if (StartLoc.isInvalid()) return createImplicit(Ty, C);
+  auto *Repr = new (C) FixedTypeRepr(Ty, StartLoc, EndLoc);
   auto *Res = new (C) TypeExpr(TypeLoc(Repr, Ty));
   Res->setImplicit();
   Res->setType(MetatypeType::get(Ty, C));

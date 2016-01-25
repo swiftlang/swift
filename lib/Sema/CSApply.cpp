@@ -379,7 +379,7 @@ namespace {
         auto openedFnType = openedType->castTo<FunctionType>();
         auto baseTy = simplifyType(openedFnType->getInput())
                         ->getRValueInstanceType();
-        Expr *base = TypeExpr::createImplicitHack(loc, baseTy, ctx);
+        Expr *base = TypeExpr::createImplicitHack(loc, baseTy, ctx, loc);
         auto result = buildMemberRef(base, openedType, SourceLoc(), decl,
                                      loc, openedFnType->getResult(),
                                      locator, locator, implicit, semantics,
@@ -1419,9 +1419,10 @@ namespace {
       Expr *args[2] = {
         object,
         new (tc.Context) DotSelfExpr(
-                           TypeExpr::createImplicitHack(object->getLoc(),
+                           TypeExpr::createImplicitHack(object->getStartLoc(),
                                                         valueType,
-                                                        tc.Context),
+                                                        tc.Context,
+                                                        object->getEndLoc()),
                            object->getLoc(), object->getLoc(),
                            MetatypeType::get(valueType))
       };
@@ -1917,7 +1918,8 @@ namespace {
       // Build a reference to the init(stringInterpolation:) initializer.
       // FIXME: This location info is bogus.
       auto typeRef = TypeExpr::createImplicitHack(expr->getStartLoc(),
-                                                  type, tc.Context);
+                                                  type, tc.Context,
+                                                  expr->getEndLoc());
       Expr *memberRef = new (tc.Context) MemberRefExpr(typeRef,
                                                        expr->getStartLoc(),
                                                        member,
@@ -2043,8 +2045,9 @@ namespace {
         
       DeclName constrName(tc.getObjectLiteralConstructorName(expr));
       Expr *arg = expr->getArg();
-      Expr *base = TypeExpr::createImplicitHack(expr->getLoc(), conformingType,
-                                                ctx);
+      Expr *base = TypeExpr::createImplicitHack(expr->getStartLoc(),
+                                                conformingType, ctx,
+                                                expr->getEndLoc());
       Expr *semanticExpr = tc.callWitness(base, dc, proto, conformance,
                                           constrName, arg,
                                           diag::object_literal_broken_proto);
@@ -2200,7 +2203,8 @@ namespace {
       // The base expression is simply the metatype of the base type.
       // FIXME: This location info is bogus.
       auto base = TypeExpr::createImplicitHack(expr->getDotLoc(),
-                                               baseTy, tc.Context);
+                                               baseTy, tc.Context,
+                                               expr->getDotLoc());
 
       // Build the member reference.
       bool isDynamic
@@ -2357,8 +2361,8 @@ namespace {
                                              baseMetaTy->getInstanceType());
           
           // FIXME: We're dropping side effects in the base here!
-          base = TypeExpr::createImplicitHack(base->getLoc(), classTy, 
-                                              tc.Context);
+          base = TypeExpr::createImplicitHack(base->getStartLoc(), classTy,
+                                              tc.Context, base->getEndLoc());
         } else {
           // Bridge the base to its corresponding Objective-C object.
           base = bridgeToObjectiveC(base);
@@ -2476,8 +2480,9 @@ namespace {
       // be nicer to re-use them.
 
       // FIXME: This location info is bogus.
-      Expr *typeRef = TypeExpr::createImplicitHack(expr->getLoc(),
-                                                   arrayTy, tc.Context);
+      Expr *typeRef = TypeExpr::createImplicitHack(expr->getStartLoc(),
+                                                   arrayTy, tc.Context,
+                                                   expr->getEndLoc());
       DeclName name(tc.Context, tc.Context.Id_init,
                     { tc.Context.Id_arrayLiteral });
 
@@ -2541,8 +2546,9 @@ namespace {
       // It would be nicer to re-use them.
       // FIXME: Cache the name.
       // FIXME: This location info is bogus.
-      Expr *typeRef = TypeExpr::createImplicitHack(expr->getLoc(),
-                                                   dictionaryTy, tc.Context);
+      Expr *typeRef = TypeExpr::createImplicitHack(expr->getStartLoc(),
+                                                   dictionaryTy, tc.Context,
+                                                   expr->getEndLoc());
 
       DeclName name(tc.Context, tc.Context.Id_init,
                     { tc.Context.Id_dictionaryLiteral });
@@ -5153,8 +5159,8 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
 
     // Call the builtin conversion operation.
     // FIXME: Bogus location info.
-    Expr *base = TypeExpr::createImplicitHack(literal->getLoc(), type,
-                                              tc.Context);
+    Expr *base = TypeExpr::createImplicitHack(literal->getStartLoc(), type,
+                                              tc.Context, literal->getEndLoc());
     Expr *result = tc.callWitness(base, dc,
                                   builtinProtocol, builtinConformance,
                                   builtinLiteralFuncName,
@@ -5213,8 +5219,8 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
 
   // Convert the resulting expression to the final literal type.
   // FIXME: Bogus location info.
-  Expr *base = TypeExpr::createImplicitHack(literal->getLoc(), type,
-                                            tc.Context);
+  Expr *base = TypeExpr::createImplicitHack(literal->getStartLoc(), type,
+                                            tc.Context, literal->getEndLoc());
   literal = tc.callWitness(base, dc,
                            protocol, conformance, literalFuncName,
                            literal, brokenProtocolDiag);
