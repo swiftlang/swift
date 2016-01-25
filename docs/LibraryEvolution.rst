@@ -274,7 +274,7 @@ are a few common reasons for this:
   save the overhead of a cross-library function call and allow further
   optimization of callers.
 
-- The function accesses a fixed-layout struct with non-public members; this
+- The function accesses a fixed-contents struct with non-public members; this
   allows the library author to preserve invariants while still allowing
   efficient access to the struct.
 
@@ -472,7 +472,7 @@ layout.
 
 .. admonition:: TODO
 
-    We need to pin down how this, and the ``@fixed_layout`` attribute below,
+    We need to pin down how this, and the ``@fixed_contents`` attribute below,
     interacts with the "Behaviors" proposal. Behaviors that just change the
     accessors of a property are fine, but those that provide new entry points
     are trickier.
@@ -522,12 +522,14 @@ declare themselves to be either more or less available than what the extension
 provides.
 
 
-Fixed-layout Structs
---------------------
+Fixed-Contents Structs
+----------------------
 
-To opt out of this flexibility, a struct may be marked ``@fixed_layout``. This
-promises that no stored properties will be added to or removed from the struct,
-even ``private`` or ``internal`` ones. In effect:
+To opt out of this flexibility, a struct may be marked ``@fixed_contents``.
+This promises that no stored properties will be added to or removed from the
+struct, even ``private`` or ``internal`` ones. Additionally, all versioned
+stored properties in a ``@fixed_contents`` struct are implicitly declared
+``@inlineable`` (as described above for top-level variables). In effect:
 
 - Reordering stored instance properties relative to one another is not
   permitted. Reordering all other members is still permitted.
@@ -535,32 +537,28 @@ even ``private`` or ``internal`` ones. In effect:
   Adding any other new members is still permitted.
 - Existing instance properties may not be changed from stored to computed or
   vice versa.
-- Changing the body of any *existing* methods, initializers, or computed 
-  property accessors is permitted. Changing the body of a stored property
-  observing accessor is *not* permitted; more discussion below.
-- Adding or removing observing accessors from any stored properties (public or
-  non-public) is not permitted; more discussion below.
+- Changing the body of any *existing* methods, initializers, computed property
+  accessors, or non-instance stored property accessors is permitted. Changing
+  the body of a stored instance property observing accessor is only permitted
+  if the property is not `versioned <versioned entity>`.
+- Adding or removing observing accessors from any
+  `versioned <versioned entity>` stored instance properties (public or
+  non-public) is not permitted.
 - Removing stored instance properties is not permitted. Removing any other
   non-public, non-versioned members is still permitted.
 - Adding a new protocol conformance is still permitted.
 - Removing conformances to non-public protocols is still permitted.
 
-In addition, all fields of a ``@fixed_layout`` struct must have types that are
-*fixed-layout-compatible*, as described below:
+Additionally, if the type of any stored instance property includes a struct or
+enum, that struct or enum must be `versioned <versioned entity>`. This includes
+generic parameters and members of tuples.
 
-- A reference to a class instance.
-- A protocol or protocol composition, including ``Any``.
-- A metatype.
-- A function.
-- A tuple of fixed-layout-compatible types, including the empty tuple.
-- Another fixed-layout struct, which must be `versioned <versioned entity>`.
-- A `closed enum <#closed-enums>`_, which must be
-  `versioned <versioned entity>`.
-- (advanced) A struct or enum that is `versioned <versioned entity>`,
-  guaranteed `trivial`, and has a maximum size. See `Other Promises About
-  Types`_ below.
+.. note::
 
-A ``@fixed_layout`` struct is *not* guaranteed to use the same layout as a C
+    This name is intentionally awful to encourage us to come up with a better
+    one.
+
+A ``@fixed_contents`` struct is *not* guaranteed to use the same layout as a C
 struct with a similar "shape". If such a struct is necessary, it should be
 defined in a C header and imported into Swift.
 
@@ -570,34 +568,28 @@ defined in a C header and imported into Swift.
     equivalent, but this feature should not restrict Swift from doing useful
     things like minimizing member padding.
 
-All versioned stored properties in a fixed-layout struct are implicitly
-declared ``@inlineable`` (as described above for top-level variables).
-Non-versioned stored properties may be accessed from inlineable functions only
-if they do not have observing accessors. These rules are the source of the
-restrictions on modifying accessors described above.
-
 .. note::
 
-    It would be possible to say that a ``@fixed_layout`` struct only guarantees
-    the struct's total allocation size and how to copy it, while leaving all
-    property accesses to go through function calls. This would allow stored
-    properties to change their accessors, or (with the Behaviors proposal) to
-    change a behavior's implementation, or change from one behavior to another.
-    However, the *most common case* here is probably just a simple C-like
-    struct that groups together simple values, with only public stored
-    properties and no observing accessors, and having to opt into direct access
-    to those properties seems unnecessarily burdensome. The struct is being
-    declared ``@fixed_layout`` for a reason, after all: it's been discovered
-    that its use is causing performance issues.
+    It would be possible to say that a ``@fixed_contents`` struct only
+    guarantees the "shape" of the struct, so to speak, while
+    leaving all property accesses to go through function calls. This would
+    allow stored properties to change their accessors, or (with the Behaviors
+    proposal) to change a behavior's implementation, or change from one
+    behavior to another. However, the *most common case* here is probably just
+    a simple C-like struct that groups together simple values, with only public
+    stored properties and no observing accessors, and having to opt into direct
+    access to those properties seems unnecessarily burdensome. The struct is
+    being declared ``@fixed_contents`` for a reason, after all: it's been
+    discovered that its use is causing performance issues.
 
     Consequently, as a first pass we may just require all stored properties in
-    a ``@fixed_layout`` struct, public or non-public, to have trivial
+    a ``@fixed_contents`` struct, public or non-public, to have trivial
     accessors, i.e. no observing accessors and no behaviors.
 
-The ``@fixed_layout`` attribute takes a version number, just like
+The ``@fixed_contents`` attribute takes a version number, just like
 ``@available``. This is so that clients can deploy against older versions of
 the library, which may have a different layout for the struct. (In this case
-the client must manipulate the struct as if the ``@fixed_layout`` attribute
+the client must manipulate the struct as if the ``@fixed_contents`` attribute
 were absent.)
 
 .. admonition:: TODO
@@ -788,7 +780,7 @@ Possible Restrictions on Classes
 --------------------------------
 
 In addition to ``final``, it may be useful to restrict the size of a class
-instance (like a struct's ``@fixed_layout``) or the number of overridable
+instance (like a struct's ``@fixed_contents``) or the number of overridable
 members in its virtual dispatch table. These annotations have not been designed.
 
 
@@ -842,7 +834,7 @@ A Unifying Theme
 
 So far this proposal has talked about ways to give up flexibility for several
 different kinds of declarations: ``@inlineable`` for functions,
-``@fixed_layout`` for structs, etc. Each of these has a different set of
+``@fixed_contents`` for structs, etc. Each of these has a different set of
 constraints it enforces on the library author and promises it makes to clients.
 However, they all follow a common theme of giving up the flexibility of future
 changes in exchange for improved performance and perhaps some semantic
@@ -898,7 +890,7 @@ code is reorganized, which is unacceptable.
     keep things simple we'll stick with the basics.
 
 We could do away with the entire feature if we restricted inlineable functions
-and fixed-layout structs to only refer to public entities. However, this
+and fixed-contents structs to only refer to public entities. However, this
 removes one of the primary reasons to make something inlineable: to allow
 efficient access to a type while still protecting its invariants.
 
@@ -1048,7 +1040,7 @@ for verification. Important cases include but are not limited to:
   Flexibility`_ section.
 
 - Unsafe modifications to entities marked with the "fragile" attributes, such as
-  adding a stored property to a ``@fixed_layout`` struct.
+  adding a stored property to a ``@fixed_contents`` struct.
 
 
 Automatic Versioning
