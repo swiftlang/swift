@@ -32,7 +32,7 @@ func passClosure() {
   }
   
   takeClosure {
-    $0 = 42     // expected-error{{cannot assign to value: '$0' is a 'let' constant}}
+    $0 = 42     // expected-error{{cannot assign to value: '$0' is immutable}}
     return 42
   }
   
