@@ -605,43 +605,6 @@ were absent.)
     We really shouldn't care about the *order* of the stored properties.
 
 
-Fixed Properties
-----------------
-
-As shown above, the ``@fixed_layout`` attribute promises that all stored
-properties currently in a type will remain stored in all future library
-versions, but sometimes that isn't a reasonable promise. In this case, a
-library owner may still want to allow clients to rely on a *specific* stored
-property remaining stored, by applying the ``@fixed`` attribute to the property.
-
-.. admonition:: TODO
-
-    Is it valid for a fixed property to have observing accessors, or is it more
-    useful to promise that the setter is just a direct field access too? If it
-    were spelled ``@fragile``, I would assume that accessors are permitted but
-    they become inlineable, and so not having any accessors is just a
-    degenerate case of that.
-    
-    Is ``@fixed`` any different from just ``@inlineable`` on a property?
-
-Like all other attributes in this section, the ``@fixed`` attribute must
-specify in which version of the library clients may rely on the property being
-stored. The attribute may not be applied to non-final properties in classes.
-
-.. note::
-
-    It would be possible to allow ``@fixed`` on non-final properties, and have
-    it only apply when the client code is definitively working with an instance
-    of the base class, not any of its subclasses. But this is probably too
-    subtle, and makes it look like the attribute is doing something useful when
-    it actually isn't.
-
-.. note::
-
-    This is getting into "diminishing returns" territory. Should we just take
-    it out of the document for now? We can probably add it later, although like
-    the other attributes it couldn't be backdated.
-
 Enums
 ~~~~~
 
