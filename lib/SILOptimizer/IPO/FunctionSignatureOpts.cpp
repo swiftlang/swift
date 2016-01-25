@@ -507,7 +507,7 @@ bool FunctionAnalyzer::analyze() {
     bool isABIRequired = isArgumentABIRequired(Args[i]);
     auto OnlyRelease = getNonTrivialNonDebugReleaseUse(Args[i]);
 
-    // If this argument is not ABI required and has not uses except for debug
+    // If this argument is not ABI required and has no uses except for debug
     // instructions, remove it.
     if (!isABIRequired && OnlyRelease && OnlyRelease.getValue().isNull()) {
       A.IsDead = true;
