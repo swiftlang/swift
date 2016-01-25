@@ -1,16 +1,22 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-protocol d {
-protocol P {
-class A : b(a""foobar"""):
-typealias b : A<T> <C> : (n: A {
+func d: a {
+public var f(self.h : AnyObject) -> {
 }
-typealias B<T>] as String)
+super.b {
+}
+struct c {
+A> T -> : T> == j> {
+}
+}
+get {
 }
 }
 protocol a {
-func b: d =
+typealias d : a {
+return "
+enum a: d {
