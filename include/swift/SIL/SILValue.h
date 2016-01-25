@@ -26,7 +26,6 @@
 
 namespace swift {
   class Operand;
-  class SILValue;
   class ValueBaseUseIterator;
   class ValueUseIterator;
   class SILBasicBlock;
@@ -53,7 +52,6 @@ class alignas(8) ValueBase : public SILAllocated<ValueBase> {
   SILType Type;
   Operand *FirstUse = nullptr;
   friend class Operand;
-  friend class SILValue;
 
   const ValueKind Kind;
 

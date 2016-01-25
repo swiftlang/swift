@@ -49,7 +49,6 @@ namespace {
 
 namespace swift {
 
-class SILValue;
 class SILInstruction;
 class ValueBase;
 class SideEffectAnalysis;

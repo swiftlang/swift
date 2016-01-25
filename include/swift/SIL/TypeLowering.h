@@ -37,7 +37,6 @@ namespace swift {
   class SILBuilder;
   class SILLocation;
   class SILModule;
-  class SILValue;
   class ValueDecl;
 
 namespace Lowering {
