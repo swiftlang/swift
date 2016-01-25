@@ -156,22 +156,22 @@ T RaceTest_ExpectEqual(std::function<T()> code)
 }
 
 /// Some unique global pointers.
-char Global1 = 0;
-char Global2 = 0;
-char Global3 = 0;
+uint32_t Global1 = 0;
+uint32_t Global2 = 0;
+uint32_t Global3 = 0;
 
 /// The general structure of a generic metadata.
-template <unsigned NumFields>
+template <typename Instance>
 struct GenericMetadataTest {
   GenericMetadata Header;
-  void *Fields[NumFields];
+  Instance Template;
 };
 
-GenericMetadataTest<3> MetadataTest1 = {
+GenericMetadataTest<StructMetadata> MetadataTest1 = {
   // Header
   {
     // allocation function
-    [](GenericMetadata *pattern, const void *args) {
+    [](GenericMetadata *pattern, const void *args) -> Metadata * {
       auto metadata = swift_allocateGenericValueMetadata(pattern, args);
       auto metadataWords = reinterpret_cast<const void**>(metadata);
       auto argsWords = reinterpret_cast<const void* const*>(args);
@@ -186,8 +186,8 @@ GenericMetadataTest<3> MetadataTest1 = {
 
   // Fields
   {
-    (void*) MetadataKind::Struct,
-    &Global1,
+    MetadataKind::Struct,
+    reinterpret_cast<const NominalTypeDescriptor*>(&Global1),
     nullptr
   }
 };
@@ -266,11 +266,15 @@ TEST(MetadataTest, getGenericMetadata) {
 
   auto result1 = RaceTest_ExpectEqual<const Metadata *>(
     [&]() -> const Metadata * {
-      auto inst = swift_getGenericMetadata(metadataTemplate, args);
+      auto inst = static_cast<const StructMetadata*>
+        (swift_getGenericMetadata(metadataTemplate, args));
 
       auto fields = reinterpret_cast<void * const *>(inst);
-      EXPECT_EQ((void*) MetadataKind::Struct, fields[0]);
-      EXPECT_EQ(&Global1, fields[1]);
+
+      EXPECT_EQ(MetadataKind::Struct, inst->getKind());
+      EXPECT_EQ((const NominalTypeDescriptor*)&Global1,
+                inst->Description.get());
+
       EXPECT_EQ(&Global2, fields[2]);
 
       return inst;
@@ -280,12 +284,15 @@ TEST(MetadataTest, getGenericMetadata) {
 
   RaceTest_ExpectEqual<const Metadata *>(
     [&]() -> const Metadata * {
-      auto inst = swift_getGenericMetadata(metadataTemplate, args);
+      auto inst = static_cast<const StructMetadata*>
+        (swift_getGenericMetadata(metadataTemplate, args));
       EXPECT_NE(inst, result1);
 
       auto fields = reinterpret_cast<void * const *>(inst);
-      EXPECT_EQ((void*) MetadataKind::Struct, fields[0]);
-      EXPECT_EQ(&Global1, fields[1]);
+      EXPECT_EQ(MetadataKind::Struct, inst->getKind());
+      EXPECT_EQ((const NominalTypeDescriptor*)&Global1,
+                inst->Description.get());
+
       EXPECT_EQ(&Global3, fields[2]);
 
       return inst;
@@ -294,7 +301,7 @@ TEST(MetadataTest, getGenericMetadata) {
 
 FullMetadata<ClassMetadata> MetadataTest2 = {
   { { nullptr }, { &_TWVBo } },
-  { { { MetadataKind::Class } }, nullptr, 0, ClassFlags(), nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { { { MetadataKind::Class } }, nullptr, 0, ClassFlags(), nullptr, 0, 0, 0, 0, 0 }
 };
 
 TEST(MetadataTest, getMetatypeMetadata) {
@@ -548,7 +555,7 @@ struct {
   { &Global1, &Global3, &Global2, &Global3 },
   { { { &destroySuperclass }, { &_TWVBo } },
     { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1, ClassFlags(), nullptr,
-      nullptr, 0, 0, 0, sizeof(SuperclassWithPrefix),
+      0, 0, 0, sizeof(SuperclassWithPrefix),
       sizeof(SuperclassWithPrefix.Prefix) + sizeof(HeapMetadataHeader) } }
 };
 ClassMetadata * const SuperclassWithPrefix_AddressPoint =
@@ -580,7 +587,7 @@ struct {
   },
   { { { &destroySubclass }, { &_TWVBo } },
     { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1, ClassFlags(), nullptr,
-      nullptr, 0, 0, 0,
+      0, 0, 0,
       sizeof(GenericSubclass.Pattern) + sizeof(GenericSubclass.Suffix),
       sizeof(HeapMetadataHeader) } },
   { &Global2, &Global1, &Global2 }

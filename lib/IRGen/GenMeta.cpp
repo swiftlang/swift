@@ -1841,7 +1841,24 @@ void irgen::emitMetatypeRef(IRGenFunction &IGF, CanMetatypeType type,
 /** Nominal Type Descriptor Emission *****************************************/
 /*****************************************************************************/
 
-namespace {
+namespace {  
+  /// Helper to produce a dummy value that can stand in for a global constant
+  /// for us to build relative references against before the constant is
+  /// instantiated.
+  static std::unique_ptr<llvm::GlobalVariable>
+  createTemporaryRelativeAddressBase(IRGenModule &IGM) {
+    return std::unique_ptr<llvm::GlobalVariable>(
+      new llvm::GlobalVariable(IGM.Int8Ty, true,
+                               llvm::GlobalValue::PrivateLinkage));
+  }
+  
+  static void
+  replaceTemporaryRelativeAddressBase(IRGenModule &IGM,
+            std::unique_ptr<llvm::GlobalVariable> temp, llvm::Constant *real) {
+    real = llvm::ConstantExpr::getBitCast(real, IGM.Int8PtrTy);
+    temp->replaceAllUsesWith(real);
+  }
+
   template<class Impl>
   class NominalTypeDescriptorBuilderBase : public ConstantBuilder<> {
     Impl &asImpl() { return *static_cast<Impl*>(this); }
@@ -1925,9 +1942,7 @@ namespace {
     
     llvm::Constant *emit() {
       // Set up a dummy global to stand in for the constant.
-      std::unique_ptr<llvm::GlobalVariable> tempBase(
-                   new llvm::GlobalVariable(IGM.Int8Ty, true,
-                                            llvm::GlobalValue::PrivateLinkage));
+      auto tempBase = createTemporaryRelativeAddressBase(IGM);
       setRelativeAddressBase(tempBase.get());
       asImpl().layout();
       auto init = getInit();
@@ -1939,9 +1954,7 @@ namespace {
       var->setInitializer(init);
       IGM.setTrueConstGlobal(var);
 
-      auto replacer = llvm::ConstantExpr::getBitCast(var, IGM.Int8PtrTy);
-      tempBase->replaceAllUsesWith(replacer);
-
+      replaceTemporaryRelativeAddressBase(IGM, std::move(tempBase), var);
       return var;
     }
     
@@ -2855,6 +2868,7 @@ namespace {
   protected:
     IRGenModule &IGM = super::IGM;
     ClassDecl * const& Target = super::Target;
+    using super::setRelativeAddressBase;
     using super::addWord;
     using super::addConstantWord;
     using super::addInt16;
@@ -2863,14 +2877,18 @@ namespace {
     using super::addConstantInt32;
     using super::addStruct;
     using super::getNextOffset;
+    using super::addFarRelativeAddress;
+    using super::addFarRelativeAddressOrNull;
     const StructLayout &Layout;
     const ClassLayout &FieldLayout;
     SILVTable *VTable;
 
     ClassMetadataBuilderBase(IRGenModule &IGM, ClassDecl *theClass,
                              const StructLayout &layout,
-                             const ClassLayout &fieldLayout)
+                             const ClassLayout &fieldLayout,
+                             llvm::GlobalVariable *relativeAddressBase)
       : super(IGM, theClass), Layout(layout), FieldLayout(fieldLayout) {
+      setRelativeAddressBase(relativeAddressBase);
       VTable = IGM.SILMod->lookUpVTable(Target);
     }
 
@@ -2934,7 +2952,9 @@ namespace {
     }
     
     void addNominalTypeDescriptor() {
-      addWord(ClassNominalTypeDescriptorBuilder(IGM, Target).emit());
+      auto descriptor =
+        ClassNominalTypeDescriptorBuilder(IGM, Target).emit();
+      addFarRelativeAddress(descriptor);
     }
     
     void addIVarDestroyer() {
@@ -3156,8 +3176,10 @@ namespace {
   public:
     ClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                          const StructLayout &layout,
-                         const ClassLayout &fieldLayout)
-      : ClassMetadataBuilderBase(IGM, theClass, layout, fieldLayout) {
+                         const ClassLayout &fieldLayout,
+                         llvm::GlobalVariable *relativeAddressBase)
+      : ClassMetadataBuilderBase(IGM, theClass, layout, fieldLayout,
+                                 relativeAddressBase) {
 
       assert(layout.isFixedLayout() &&
              "non-fixed layout classes require a template");
@@ -3236,8 +3258,9 @@ namespace {
   public:
     GenericClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                                 const StructLayout &layout,
-                                const ClassLayout &fieldLayout)
-      : super(IGM, theClass, layout, fieldLayout)
+                                const ClassLayout &fieldLayout,
+                                llvm::GlobalVariable *relativeAddressBase)
+      : super(IGM, theClass, layout, fieldLayout, relativeAddressBase)
     {
       // We need special initialization of metadata objects to trick the ObjC
       // runtime into initializing them.
@@ -3583,16 +3606,22 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
                               const ClassLayout &fieldLayout) {
   assert(!classDecl->isForeign());
 
+  // Set up a dummy global to stand in for the metadata object while we produce
+  // relative references.
+  auto tempBase = createTemporaryRelativeAddressBase(IGM);
+
   // TODO: classes nested within generic types
   llvm::Constant *init;
   bool isPattern;
   if (IGM.hasMetadataPattern(classDecl)) {
-    GenericClassMetadataBuilder builder(IGM, classDecl, layout, fieldLayout);
+    GenericClassMetadataBuilder builder(IGM, classDecl, layout, fieldLayout,
+                                        tempBase.get());
     builder.layout();
     init = builder.getInit();
     isPattern = true;
   } else {
-    ClassMetadataBuilder builder(IGM, classDecl, layout, fieldLayout);
+    ClassMetadataBuilder builder(IGM, classDecl, layout, fieldLayout,
+                                 tempBase.get());
     builder.layout();
     init = builder.getInit();
     isPattern = false;
@@ -3614,7 +3643,7 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
                // special case: it's not a pattern, ObjC interoperation isn't
                // required, there are no class fields, and there is nothing that
                // needs to be runtime-adjusted.
-               /*isConstant*/ false, init, section);
+               /*isConstant*/ false, init, std::move(tempBase), section);
 
   // Add non-generic classes to the ObjC class list.
   if (IGM.ObjCInterop && !isPattern && !isIndirect) {
@@ -4332,9 +4361,15 @@ namespace {
     using super::Target;
     using super::addConstantWord;
     using super::addWord;
+    using super::addFarRelativeAddress;
+    using super::addFarRelativeAddressOrNull;
+    using super::setRelativeAddressBase;
 
-    StructMetadataBuilderBase(IRGenModule &IGM, StructDecl *theStruct)
-      : super(IGM, theStruct) {}
+    StructMetadataBuilderBase(IRGenModule &IGM, StructDecl *theStruct,
+                              llvm::GlobalVariable *relativeAddressBase)
+    : super(IGM, theStruct) {
+      setRelativeAddressBase(relativeAddressBase);
+    }
 
   public:
     void addMetadataFlags() {
@@ -4342,12 +4377,14 @@ namespace {
     }
 
     void addNominalTypeDescriptor() {
-      addWord(StructNominalTypeDescriptorBuilder(IGM, Target).emit());
+      llvm::Constant *descriptor =
+        StructNominalTypeDescriptorBuilder(IGM, Target).emit();
+      addFarRelativeAddress(descriptor);
     }
 
     void addParentMetadataRef() {
-      // FIXME!
-      addWord(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
+      // FIXME: populate
+      addFarRelativeAddressOrNull(nullptr);
     }
     
     void addFieldOffset(VarDecl *var) {
@@ -4384,8 +4421,9 @@ namespace {
   class StructMetadataBuilder :
     public StructMetadataBuilderBase<StructMetadataBuilder> {
   public:
-    StructMetadataBuilder(IRGenModule &IGM, StructDecl *theStruct)
-      : StructMetadataBuilderBase(IGM, theStruct) {}
+    StructMetadataBuilder(IRGenModule &IGM, StructDecl *theStruct,
+                          llvm::GlobalVariable *relativeAddressBase)
+      : StructMetadataBuilderBase(IGM, theStruct, relativeAddressBase) {}
 
     void addValueWitnessTable() {
       auto type = this->Target->getDeclaredType()->getCanonicalType();
@@ -4418,8 +4456,9 @@ namespace {
     typedef GenericMetadataBuilderBase super;
                         
   public:
-    GenericStructMetadataBuilder(IRGenModule &IGM, StructDecl *theStruct)
-      : super(IGM, theStruct) {}
+    GenericStructMetadataBuilder(IRGenModule &IGM, StructDecl *theStruct,
+                                 llvm::GlobalVariable *relativeAddressBase)
+      : super(IGM, theStruct, relativeAddressBase) {}
 
     llvm::Value *emitAllocateMetadata(IRGenFunction &IGF,
                                       llvm::Value *metadataPattern,
@@ -4456,16 +4495,20 @@ namespace {
 
 /// Emit the type metadata or metadata template for a struct.
 void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
+  // Set up a dummy global to stand in for the metadata object while we produce
+  // relative references.
+  auto tempBase = createTemporaryRelativeAddressBase(IGM);
+
   // TODO: structs nested within generic types
   llvm::Constant *init;
   bool isPattern;
   if (IGM.hasMetadataPattern(structDecl)) {
-    GenericStructMetadataBuilder builder(IGM, structDecl);
+    GenericStructMetadataBuilder builder(IGM, structDecl, tempBase.get());
     builder.layout();
     init = builder.getInit();
     isPattern = true;
   } else {
-    StructMetadataBuilder builder(IGM, structDecl);
+    StructMetadataBuilder builder(IGM, structDecl, tempBase.get());
     builder.layout();
     init = builder.getInit();
     isPattern = false;
@@ -4479,7 +4522,8 @@ void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
   bool isIndirect = false;
 
   IGM.defineTypeMetadata(declaredType, isIndirect, isPattern,
-                         /*isConstant*/!isPattern, init);
+                         /*isConstant*/!isPattern, init,
+                         std::move(tempBase));
 }
 
 // Enums
@@ -4488,17 +4532,24 @@ namespace {
 
 template<class Impl>
 class EnumMetadataBuilderBase
-       : public ConstantBuilder<EnumMetadataLayout<Impl>> {
+       : public ConstantBuilder<EnumMetadataLayout<Impl>>
+{
   using super = ConstantBuilder<EnumMetadataLayout<Impl>>;
 
 protected:
   using super::IGM;
   using super::Target;
   using super::addWord;
+  using super::addFarRelativeAddress;
+  using super::addFarRelativeAddressOrNull;
+  using super::setRelativeAddressBase;
 
 public:
-  EnumMetadataBuilderBase(IRGenModule &IGM, EnumDecl *theEnum)
-    : super(IGM, theEnum) {}
+  EnumMetadataBuilderBase(IRGenModule &IGM, EnumDecl *theEnum,
+                          llvm::GlobalVariable *relativeAddressBase)
+  : super(IGM, theEnum) {
+    setRelativeAddressBase(relativeAddressBase);
+  }
   
   void addMetadataFlags() {
     addWord(getMetadataKind(IGM, Target->classifyAsOptionalType()
@@ -4506,13 +4557,15 @@ public:
   }
   
   void addNominalTypeDescriptor() {
-    // FIXME!
-    addWord(EnumNominalTypeDescriptorBuilder(IGM, Target).emit());
+    auto descriptor =
+      EnumNominalTypeDescriptorBuilder(IGM, Target).emit();
+    
+    addFarRelativeAddress(descriptor);
   }
   
   void addParentMetadataRef() {
-    // FIXME!
-    addWord(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
+    // FIXME: populate
+    addFarRelativeAddressOrNull(nullptr);
   }
   
   void addGenericArgument(ArchetypeType *type) {
@@ -4528,8 +4581,9 @@ class EnumMetadataBuilder
   : public EnumMetadataBuilderBase<EnumMetadataBuilder>
 {
 public:
-  EnumMetadataBuilder(IRGenModule &IGM, EnumDecl *theEnum)
-    : EnumMetadataBuilderBase(IGM, theEnum) {}
+  EnumMetadataBuilder(IRGenModule &IGM, EnumDecl *theEnum,
+                      llvm::GlobalVariable *relativeAddressBase)
+    : EnumMetadataBuilderBase(IGM, theEnum, relativeAddressBase) {}
   
   void addValueWitnessTable() {
     auto type = Target->getDeclaredType()->getCanonicalType();
@@ -4555,8 +4609,9 @@ class GenericEnumMetadataBuilder
                         EnumMetadataBuilderBase<GenericEnumMetadataBuilder>>
 {
 public:
-  GenericEnumMetadataBuilder(IRGenModule &IGM, EnumDecl *theEnum)
-    : GenericMetadataBuilderBase(IGM, theEnum) {}
+  GenericEnumMetadataBuilder(IRGenModule &IGM, EnumDecl *theEnum,
+                             llvm::GlobalVariable *relativeAddressBase)
+    : GenericMetadataBuilderBase(IGM, theEnum, relativeAddressBase) {}
 
   llvm::Value *emitAllocateMetadata(IRGenFunction &IGF,
                                     llvm::Value *metadataPattern,
@@ -4604,17 +4659,21 @@ public:
 }
 
 void irgen::emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum) {
+  // Set up a dummy global to stand in for the metadata object while we produce
+  // relative references.
+  auto tempBase = createTemporaryRelativeAddressBase(IGM);
+
   // TODO: enums nested inside generic types
   llvm::Constant *init;
   
   bool isPattern;
   if (IGM.hasMetadataPattern(theEnum)) {
-    GenericEnumMetadataBuilder builder(IGM, theEnum);
+    GenericEnumMetadataBuilder builder(IGM, theEnum, tempBase.get());
     builder.layout();
     init = builder.getInit();
     isPattern = true;
   } else {
-    EnumMetadataBuilder builder(IGM, theEnum);
+    EnumMetadataBuilder builder(IGM, theEnum, tempBase.get());
     builder.layout();
     init = builder.getInit();
     isPattern = false;
@@ -4628,7 +4687,8 @@ void irgen::emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum) {
   bool isIndirect = false;
   
   IGM.defineTypeMetadata(declaredType, isIndirect, isPattern,
-                         /*isConstant*/!isPattern, init);
+                         /*isConstant*/!isPattern, init,
+                         std::move(tempBase));
 }
 
 llvm::Value *IRGenFunction::emitObjCSelectorRefLoad(StringRef selector) {
@@ -4774,8 +4834,9 @@ namespace {
                       StructMetadataBuilderBase<ForeignStructMetadataBuilder>>
   {
   public:
-    ForeignStructMetadataBuilder(IRGenModule &IGM, StructDecl *target)
-      : ForeignMetadataBuilderBase(IGM, target)
+    ForeignStructMetadataBuilder(IRGenModule &IGM, StructDecl *target,
+                                 llvm::GlobalVariable *relativeAddressBase)
+      : ForeignMetadataBuilderBase(IGM, target, relativeAddressBase)
     {}
     
     CanType getTargetType() const {
@@ -4796,8 +4857,9 @@ namespace {
                       EnumMetadataBuilderBase<ForeignEnumMetadataBuilder>>
   {
   public:
-    ForeignEnumMetadataBuilder(IRGenModule &IGM, EnumDecl *target)
-      : ForeignMetadataBuilderBase(IGM, target)
+    ForeignEnumMetadataBuilder(IRGenModule &IGM, EnumDecl *target,
+                               llvm::GlobalVariable *relativeAddressBase)
+      : ForeignMetadataBuilderBase(IGM, target, relativeAddressBase)
     {}
     
     CanType getTargetType() const {
@@ -4818,36 +4880,68 @@ namespace {
 }
 
 llvm::Constant *
-irgen::emitForeignTypeMetadataInitializer(IRGenModule &IGM, CanType type,
-                                          Size &offsetOfAddressPoint) {
+IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
+  // Create a temporary base for relative references.
+  auto tempBase = createTemporaryRelativeAddressBase(*this);
+
+  // What we save in GlobalVars is actually the offsetted value.
+  auto entity = LinkEntity::forForeignTypeMetadataCandidate(type);
+  if (auto entry = GlobalVars[entity])
+    return entry;
+  
+  // Compute the constant initializer and the offset of the type
+  // metadata candidate within it.
+  Size addressPoint;
+  llvm::Constant *init;
   if (auto classType = dyn_cast<ClassType>(type)) {
     assert(!classType.getParent());
     auto classDecl = classType->getDecl();
     assert(classDecl->isForeign());
 
-    ForeignClassMetadataBuilder builder(IGM, classDecl);
+    ForeignClassMetadataBuilder builder(*this, classDecl);
     builder.layout();
-    offsetOfAddressPoint = builder.getOffsetOfAddressPoint();
-    return builder.getInit();
+    addressPoint = builder.getOffsetOfAddressPoint();
+    init = builder.getInit();
   } else if (auto structType = dyn_cast<StructType>(type)) {
     auto structDecl = structType->getDecl();
     assert(structDecl->hasClangNode());
     
-    ForeignStructMetadataBuilder builder(IGM, structDecl);
+    ForeignStructMetadataBuilder builder(*this, structDecl, tempBase.get());
     builder.layout();
-    offsetOfAddressPoint = builder.getOffsetOfAddressPoint();
-    return builder.getInit();
+    addressPoint = builder.getOffsetOfAddressPoint();
+    init = builder.getInit();
   } else if (auto enumType = dyn_cast<EnumType>(type)) {
     auto enumDecl = enumType->getDecl();
     assert(enumDecl->hasClangNode());
     
-    ForeignEnumMetadataBuilder builder(IGM, enumDecl);
+    ForeignEnumMetadataBuilder builder(*this, enumDecl, tempBase.get());
     builder.layout();
-    offsetOfAddressPoint = builder.getOffsetOfAddressPoint();
-    return builder.getInit();
+    addressPoint = builder.getOffsetOfAddressPoint();
+    init = builder.getInit();
   } else {
     llvm_unreachable("foreign metadata for unexpected type?!");
   }
+  
+  // Create the global variable.
+  LinkInfo link = LinkInfo::get(*this, entity, ForDefinition);
+  auto var = link.createVariable(*this, init->getType(),
+                                 getPointerAlignment());
+  var->setInitializer(init);
+  
+  // Close the loop on relative references.
+  replaceTemporaryRelativeAddressBase(*this, std::move(tempBase), var);
+
+  // Apply the offset.
+  llvm::Constant *result = var;
+  result = llvm::ConstantExpr::getBitCast(result, Int8PtrTy);
+  result = llvm::ConstantExpr::getInBoundsGetElementPtr(
+      Int8Ty, result, getSize(addressPoint));
+  result = llvm::ConstantExpr::getBitCast(result, TypeMetadataPtrTy);
+
+  // Only remember the offset.
+  GlobalVars[entity] = result;
+
+  return result;
 }
 
 // Protocols
