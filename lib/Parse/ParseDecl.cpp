@@ -4050,6 +4050,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     Tok.setKind(tok::oper_prefix);
   }
   Identifier SimpleName;
+  Token NameTok = Tok;
   SourceLoc NameLoc = Tok.getLoc();
   Token NonglobalTok = Tok;
   bool NonglobalError = false;
@@ -4097,6 +4098,13 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     auto Result = parseGenericParameters(LAngleLoc);
     GenericParams = Result.getPtrOrNull();
     GPHasCodeCompletion |= Result.hasCodeCompletion();
+
+    auto NameTokText = NameTok.getRawText();
+    markSplitToken(tok::identifier,
+                   NameTokText.substr(0, NameTokText.size() - 1));
+    markSplitToken(tok::oper_binary_unspaced,
+                   NameTokText.substr(NameTokText.size() - 1));
+
   } else {
     auto Result = maybeParseGenericParams();
     GenericParams = Result.getPtrOrNull();
