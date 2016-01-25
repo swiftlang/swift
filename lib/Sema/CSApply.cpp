@@ -941,6 +941,9 @@ namespace {
         assert((!baseIsInstance || member->isInstanceMember()) &&
                "can't call a static method on an instance");
         apply = new (context) DotSyntaxCallExpr(ref, dotLoc, base);
+        if (Implicit) {
+          apply->setImplicit();
+        }
       }
       return finishApply(apply, openedType, nullptr);
     }
@@ -1422,6 +1425,7 @@ namespace {
                            object->getLoc(), object->getLoc(),
                            MetatypeType::get(valueType))
       };
+      args[1]->setImplicit();
 
       // Form the argument tuple.
       Expr *argTuple = TupleExpr::createImplicit(tc.Context, args, {});
@@ -4353,6 +4357,9 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
                                             argParen->getRParenLoc(),
                                             argParen->hasTrailingClosure(),
                                             fromTupleExpr[0]->getType());
+      if (argParen->isImplicit()) {
+        argParen->setImplicit();
+      }
       arg = argParen;
     } else {
       // coerceToType may have updated the element type of the ParenExpr in
@@ -5173,7 +5180,8 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
     // If there is no argument to the constructor function, then just pass in
     // the empty tuple.
     literal = TupleExpr::createEmpty(tc.Context, literal->getLoc(),
-                                     literal->getLoc(), /*implicit*/true);
+                                     literal->getLoc(),
+                                     /*implicit*/!literal->getLoc().isValid());
   } else {
     // Otherwise, figure out the type of the constructor function and coerce to
     // it.

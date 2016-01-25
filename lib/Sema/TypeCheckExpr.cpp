@@ -313,7 +313,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
                                      SourceLoc(), 
                                      ArgElts2, { }, { }, SourceLoc(),
                                      /*hasTrailingClosure=*/false,
-                                     LHS->isImplicit() && RHS->isImplicit());
+                                     /*Implicit=*/true);
 
   
   
