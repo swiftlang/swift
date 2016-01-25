@@ -291,6 +291,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitEnumElementDecl(EnumElementDecl *ED) {
+    if (ED->hasArgumentType()) {
+      if (auto TR = ED->getArgumentTypeLoc().getTypeRepr()) {
+        if (doIt(TR)) {
+          return true;
+        }
+      }
+    }
+
     // The getRawValueExpr should remain the untouched original LiteralExpr for
     // serialization and validation purposes. We only traverse the type-checked
     // form, unless we haven't populated it yet.
