@@ -3369,12 +3369,14 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
   }
 }
 
-ParamDecl::ParamDecl(bool isLet, SourceLoc argumentNameLoc,
+ParamDecl::ParamDecl(bool isLet,
+                     SourceLoc letVarInOutLoc, SourceLoc argumentNameLoc,
                      Identifier argumentName, SourceLoc parameterNameLoc,
                      Identifier parameterName, Type ty, DeclContext *dc)
   : VarDecl(DeclKind::Param, /*IsStatic=*/false, isLet, parameterNameLoc,
             parameterName, ty, dc),
-  ArgumentName(argumentName), ArgumentNameLoc(argumentNameLoc) {
+  ArgumentName(argumentName), ArgumentNameLoc(argumentNameLoc),
+  LetVarInOutLoc(letVarInOutLoc) {
 }
 
 /// Clone constructor, allocates a new ParamDecl identical to the first.
@@ -3385,6 +3387,7 @@ ParamDecl::ParamDecl(ParamDecl *PD)
             PD->getDeclContext()),
     ArgumentName(PD->getArgumentName()),
     ArgumentNameLoc(PD->getArgumentNameLoc()),
+    LetVarInOutLoc(PD->getLetVarInOutLoc()),
     typeLoc(PD->getTypeLoc()),
     DefaultValueAndIsVariadic(PD->DefaultValueAndIsVariadic),
     IsTypeLocImplicit(PD->IsTypeLocImplicit),
@@ -3430,7 +3433,7 @@ ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
       selfType = InOutType::get(selfType);
   }
     
-  auto *selfDecl = new (C) ParamDecl(/*IsLet*/!isInOut, SourceLoc(),
+  auto *selfDecl = new (C) ParamDecl(/*IsLet*/!isInOut, SourceLoc(),SourceLoc(),
                                      Identifier(), loc, C.Id_self, selfType,DC);
   selfDecl->setImplicit();
   return selfDecl;

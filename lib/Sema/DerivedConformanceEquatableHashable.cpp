@@ -195,9 +195,9 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
   auto enumTy = parentDC->getDeclaredTypeInContext();
   
   auto getParamDecl = [&](StringRef s) -> ParamDecl* {
-    return new (C) ParamDecl(/*isLet*/true, SourceLoc(), Identifier(),
-                             SourceLoc(), C.getIdentifier(s), enumTy,
-                             parentDC);
+    return new (C) ParamDecl(/*isLet*/true, SourceLoc(), SourceLoc(),
+                             Identifier(), SourceLoc(), C.getIdentifier(s),
+                             enumTy, parentDC);
   };
   
   auto params = ParameterList::create(C, {

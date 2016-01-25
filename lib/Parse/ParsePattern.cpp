@@ -314,7 +314,8 @@ mapParsedParameters(Parser &parser,
   -> ParamDecl * {
     auto specifierKind = paramInfo.SpecifierKind;
     bool isLet = specifierKind == Parser::ParsedParameter::Let;
-    auto param = new (ctx) ParamDecl(isLet, argNameLoc, argName,
+    auto param = new (ctx) ParamDecl(isLet, paramInfo.LetVarInOutLoc,
+                                     argNameLoc, argName,
                                      paramNameLoc, paramName, Type(),
                                      parser.CurDeclContext);
     param->getAttrs() = paramInfo.Attrs;
@@ -815,8 +816,8 @@ Pattern *Parser::createBindingFromPattern(SourceLoc loc, Identifier name,
                                           bool isLet) {
   VarDecl *var;
   if (ArgumentIsParameter) {
-    var = new (Context) ParamDecl(isLet, loc, name, loc, name, Type(),
-                                  CurDeclContext);
+    var = new (Context) ParamDecl(isLet, SourceLoc(), loc, name, loc, name,
+                                  Type(), CurDeclContext);
   } else {
     var = new (Context) VarDecl(/*static*/ false, /*IsLet*/ isLet,
                                 loc, name, Type(), CurDeclContext);
