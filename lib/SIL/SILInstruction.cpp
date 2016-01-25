@@ -35,13 +35,6 @@ using namespace Lowering;
 // Instruction-specific properties on SILValue
 //===----------------------------------------------------------------------===//
 
-Optional<SILLocation> SILValue::getLoc() const {
-  if (auto I = dyn_cast<SILInstruction>(*this)) {
-    return I->getLoc();
-  }
-  return None;
-}
-
 SILLocation SILInstruction::getLoc() const { return Location.getLocation(); }
 
 const SILDebugScope *SILInstruction::getDebugScope() const {
