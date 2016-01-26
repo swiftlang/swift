@@ -192,7 +192,7 @@ static inline llvm::hash_code hash_value(const SILValueProjection &S) {
 
 using LSLocationValueMap = llvm::DenseMap<LSLocation, LSValue>;
 using LSValueList = llvm::SmallVector<LSValue, 8>;
-using LSValueIndexMap = llvm::DenseMap<LSValue, unsigned>;
+using LSValueIndexMap = llvm::SmallDenseMap<LSValue, unsigned, 32>;
 using ValueTableMap = llvm::SmallMapVector<unsigned, unsigned, 8>;
 
 /// A LSValue is an abstraction of an object field value in program. It
@@ -365,7 +365,7 @@ static inline llvm::hash_code hash_value(const LSValue &V) {
 /// Type declarations.
 using LSLocationSet = llvm::DenseSet<LSLocation>;
 using LSLocationList = llvm::SmallVector<LSLocation, 8>;
-using LSLocationIndexMap = llvm::DenseMap<LSLocation, unsigned>;
+using LSLocationIndexMap = llvm::SmallDenseMap<LSLocation, unsigned, 32>;
 using LSLocationBaseMap = llvm::DenseMap<SILValue, LSLocation>;
 
 /// This class represents a field in an allocated object. It consists of a

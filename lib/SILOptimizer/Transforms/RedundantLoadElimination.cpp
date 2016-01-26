@@ -456,7 +456,7 @@ private:
 
   /// Contains a map between LSLocation to their index in the LocationVault.
   /// Use for fast lookup.
-  llvm::DenseMap<LSLocation, unsigned> LocToBitIndex;
+  LSLocationIndexMap LocToBitIndex;
 
   /// Keeps a map between the accessed SILValue and the location.
   LSLocationBaseMap BaseToLocIndex;
