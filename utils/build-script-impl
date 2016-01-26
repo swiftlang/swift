@@ -71,7 +71,7 @@ KNOWN_SETTINGS=(
     llvm-enable-assertions      "1"              "enable assertions in LLVM and Clang"
     swift-build-type            "Debug"          "the CMake build variant for Swift"
     swift-enable-assertions     "1"              "enable assertions in Swift"
-    swift-analyze-code-coverage "Default"        "enable code coverage analysis in Swift (set to Merged to merge profdata files and remove intermediaries)"
+    swift-analyze-code-coverage "default"        "enable code coverage analysis in Swift (set to \`merged\` to merge profdata files and remove intermediaries)"
     swift-stdlib-build-type     "Debug"          "the CMake build variant for Swift"
     swift-stdlib-enable-assertions "1"           "enable assertions in Swift"
     lldb-build-type             "Debug"          "the CMake build variant for LLDB"
@@ -1589,7 +1589,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     -DCMAKE_CXX_FLAGS="$(swift_c_flags ${deployment_target})"
                     -DCMAKE_BUILD_TYPE:STRING="${SWIFT_BUILD_TYPE}"
                     -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${SWIFT_ENABLE_ASSERTIONS}")
-                    -DSWIFT_ANALYZE_CODE_COVERAGE:BOOL=$(true_false "${SWIFT_ANALYZE_CODE_COVERAGE}")
+                    -DSWIFT_ANALYZE_CODE_COVERAGE:STRING=$(toupper "${SWIFT_ANALYZE_CODE_COVERAGE}")
                     -DSWIFT_STDLIB_BUILD_TYPE:STRING="${SWIFT_STDLIB_BUILD_TYPE}"
                     -DSWIFT_STDLIB_ASSERTIONS:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_ASSERTIONS}")
                     -DSWIFT_NATIVE_LLVM_TOOLS_PATH:STRING="${native_llvm_tools_path}"

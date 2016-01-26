@@ -512,12 +512,11 @@ also build for Apple watchos, but disallow tests that require an watchOS device"
         action="store_true")
 
     parser.add_argument("--swift-analyze-code-coverage",
-        help="""enable code coverage analysis in Swift (set to Merged to merge
+        help="""enable code coverage analysis in Swift (set to `merged` to merge
 and remove intermediary profdata files)""",
-        action="store_const",
-        const="Default",
-        dest="swift_analyze_code_coverage",
-        default="Default")
+        const="default",
+        nargs='?',
+        dest="swift_analyze_code_coverage")
 
     parser.add_argument("--build-subdir",
         help="""
@@ -729,8 +728,6 @@ the number of parallel build jobs to use""",
             swift_build_dir_label += "Assert"
         if args.swift_analyze_code_coverage:
             swift_build_dir_label += "Coverage"
-        if args.swift_analyze_code_coverage == "Merged":
-            swift_build_dir_label += "Merged"
 
         swift_stdlib_build_dir_label = args.swift_stdlib_build_variant
         if args.swift_stdlib_assertions:
