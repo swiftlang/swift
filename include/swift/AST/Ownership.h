@@ -19,12 +19,14 @@
 #ifndef SWIFT_OWNERSHIP_H
 #define SWIFT_OWNERSHIP_H
 
+#include <stdint.h>
+
 namespace swift {
 
 /// Different kinds of reference ownership supported by Swift.
 // This enum is used in diagnostics. If you add a case here, the diagnostics
 // must be updated as well.
-enum class Ownership {
+enum class Ownership : uint8_t {
   /// \brief a strong reference (the default semantics)
   Strong,
 

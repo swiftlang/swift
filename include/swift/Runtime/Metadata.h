@@ -2262,7 +2262,7 @@ public:
     return Flags.isExternal();
   }
 
-  FieldRecordOwnership getOwnership() const {
+  Ownership getOwnership() const {
     return Flags.getOwnership();
   }
 };
