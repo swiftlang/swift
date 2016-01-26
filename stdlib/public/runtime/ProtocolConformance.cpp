@@ -33,7 +33,6 @@
 
 using namespace swift;
 
-
 #if !defined(NDEBUG) && SWIFT_OBJC_INTEROP
 #include <objc/runtime.h>
 
@@ -143,6 +142,8 @@ const {
 #define SWIFT_PROTOCOL_CONFORMANCES_SECTION "__swift2_proto"
 #elif defined(__ELF__)
 #define SWIFT_PROTOCOL_CONFORMANCES_SECTION ".swift2_protocol_conformances_start"
+#elif defined(__CYGWIN__)
+#define SWIFT_PROTOCOL_CONFORMANCES_SECTION ".sw2prtc"
 #endif
 
 namespace {
@@ -181,7 +182,7 @@ namespace {
 #  if __APPLE__
       assert((!Success && Data <= 0xFFFFFFFFU) ||
              (Success && Data > 0xFFFFFFFFU));
-#  elif __linux__ || __FreeBSD__
+#  elif __linux__ || __FreeBSD__ || __CYGWIN__
       assert((!Success && Data <= 0x0FFFU) ||
              (Success && Data > 0x0FFFU));
 #  else
@@ -216,7 +217,7 @@ namespace {
 #if __LP64__
 #  if __APPLE__
       return Data > 0xFFFFFFFFU;
-#  elif __linux__ || __FreeBSD__
+#  elif __linux__ || __FreeBSD__ || __CYGWIN__
       return Data > 0x0FFFU;
 #  else
 #    error "port me"
@@ -332,6 +333,31 @@ static int _addImageProtocolConformances(struct dl_phdr_info *info,
   dlclose(handle);
   return 0;
 }
+#elif defined(__CYGWIN__)
+static int _addImageProtocolConformances(struct dl_phdr_info *info,
+                                          size_t size, void * /*data*/) {
+  void *handle;
+  if (!info->dlpi_name || info->dlpi_name[0] == '\0') {
+    handle = dlopen(nullptr, RTLD_LAZY);
+  } else
+    handle = dlopen(info->dlpi_name, RTLD_LAZY | RTLD_NOLOAD);
+
+  unsigned long conformancesSize;
+  const uint8_t *conformances =
+    _swift_getSectionDataPE(handle, SWIFT_PROTOCOL_CONFORMANCES_SECTION,
+                           &conformancesSize);
+
+  if (!conformances) {
+    // if there are no conformances, don't hold this handle open.
+    dlclose(handle);
+    return 0;
+  }
+
+  _addImageProtocolConformancesBlock(conformances, conformancesSize);
+
+  dlclose(handle);
+  return 0;
+}
 #endif
 
 static void _initializeCallbacksToInspectDylib() {
@@ -346,6 +372,8 @@ static void _initializeCallbacksToInspectDylib() {
   // FIXME: Find a way to have this continue to happen after.
   // rdar://problem/19045112
   dl_iterate_phdr(_addImageProtocolConformances, nullptr);
+#elif defined(__CYGWIN__)
+  _swift_dl_iterate_phdr(_addImageProtocolConformances, nullptr);
 #else
 # error No known mechanism to inspect dynamic libraries on this platform.
 #endif
