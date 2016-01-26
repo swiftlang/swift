@@ -96,6 +96,19 @@ enum class DSEKind : unsigned {
   PerformDSE = 2,
 };
 
+/// Return the deallocate stack instructions corresponding to the given
+/// AllocStackInst.
+static llvm::SmallVector<SILInstruction *, 1> findDeallocStackInst(
+                                                   AllocStackInst *ASI) {
+  llvm::SmallVector<SILInstruction *, 1> DSIs;
+  for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E; ++UI) {
+    if (DeallocStackInst *D = dyn_cast<DeallocStackInst>(UI->getUser())) {
+      DSIs.push_back(D);
+    }   
+  }
+  return DSIs;
+}
+
 //===----------------------------------------------------------------------===//
 //                             Utility Functions
 //===----------------------------------------------------------------------===//
@@ -221,6 +234,10 @@ public:
   /// point of the basic block.
   llvm::SmallBitVector BBMaxStoreSet;
 
+  /// If a bit in the vector is set, then the location is dead at the end of
+  /// this basic block. 
+  llvm::SmallBitVector BBDeallocateLocation;
+
   /// The dead stores in the current basic block.
   llvm::DenseSet<SILInstruction *> DeadStores;
 
@@ -237,9 +254,6 @@ public:
   /// Return the current basic block.
   SILBasicBlock *getBB() const { return BB; }
 
-  /// Initialize the bitvectors for the return basic block.
-  void initReturnBlock(DSEContext &Ctx);
-
   /// Initialize the bitvectors for the current basic block.
   void init(DSEContext &Ctx, bool PessimisticDF);
 
@@ -251,6 +265,9 @@ public:
   void startTrackingLocation(llvm::SmallBitVector &BV, unsigned bit);
   void stopTrackingLocation(llvm::SmallBitVector &BV, unsigned bit);
   bool isTrackingLocation(llvm::SmallBitVector &BV, unsigned bit);
+
+  /// Set the store bit for stack slot deallocated in this basic block. 
+  void initStoreSetAtEndOfBlock(DSEContext &Ctx);
 };
 
 } // end anonymous namespace
@@ -453,20 +470,6 @@ public:
 
 } // end anonymous namespace
 
-void BlockState::initReturnBlock(DSEContext &Ctx) {
-  auto *EA = Ctx.getEA();
-  auto *Fn = Ctx.getFn();
-  std::vector<LSLocation> &LocationVault = Ctx.getLocationVault();
-
-  // We set the store bit at the end of the function if the location does
-  // not escape the function.
-  for (unsigned i = 0; i < LocationVault.size(); ++i) {
-    if (!LocationVault[i].isNonEscapingLocalLSLocation(Fn, EA))
-      continue;
-    startTrackingLocation(BBWriteSetOut, i);
-  }
-}
-
 void BlockState::init(DSEContext &Ctx, bool PessimisticDF)  {
   std::vector<LSLocation> &LV = Ctx.getLocationVault();
   LocationNum = LV.size();
@@ -497,10 +500,9 @@ void BlockState::init(DSEContext &Ctx, bool PessimisticDF)  {
   // MaxStoreSet is optimistically set to true initially.
   BBMaxStoreSet.resize(LocationNum, true);
 
-  // If basic block has no successor, then all local writes can be considered
-  // dead for block with no successor.
-  if (BB->succ_empty()) 
-    initReturnBlock(Ctx);
+
+  // DeallocateLocation initially empty.
+  BBDeallocateLocation.resize(LocationNum, false);
 }
 
 unsigned DSEContext::getLocationBit(const LSLocation &Loc) {
@@ -556,7 +558,7 @@ void DSEContext::processBasicBlockForGenKillSet(SILBasicBlock *BB) {
   // Compute the MaxStoreSet at the end of the basic block.
   auto *BBState = getBlockState(BB);
   if (BB->succ_empty()) {
-    BBState->BBMaxStoreSet = BBState->BBWriteSetOut;
+    BBState->BBMaxStoreSet |= BBState->BBDeallocateLocation;
   } else {
     auto Iter = BB->succ_begin();
     BBState->BBMaxStoreSet = getBlockState(*Iter)->BBMaxStoreSet;
@@ -630,14 +632,33 @@ void DSEContext::processBasicBlockForDSE(SILBasicBlock *BB,
   S->BBWriteSetIn = S->BBWriteSetMid;
 }
 
+void BlockState::initStoreSetAtEndOfBlock(DSEContext &Ctx) {
+  std::vector<LSLocation> &LocationVault = Ctx.getLocationVault();
+  // We set the store bit at the end of the basic block in which a stack
+  // allocated location is deallocated.
+  for (unsigned i = 0; i < LocationVault.size(); ++i) {
+    // Turn on the store bit at the block which the stack slot is deallocated.
+    if (auto *ASI = dyn_cast<AllocStackInst>(LocationVault[i].getBase())) {
+      for (auto X : findDeallocStackInst(ASI)) {
+        SILBasicBlock *DSIBB = X->getParent();
+        if (DSIBB != BB)
+          continue;
+        startTrackingLocation(BBDeallocateLocation, i);
+      }
+    }
+  }
+}
+
 void DSEContext::mergeSuccessorLiveIns(SILBasicBlock *BB) {
   // If basic block has no successor, then all local writes can be considered
   // dead for block with no successor.
-  if (BB->succ_empty())
+  BlockState *C = getBlockState(BB);
+  if (BB->succ_empty()) {
+    C->BBWriteSetOut |= C->BBDeallocateLocation;
     return;
+  }
 
   // Use the first successor as the base condition.
-  BlockState *C = getBlockState(BB);
   auto Iter = BB->succ_begin();
   C->BBWriteSetOut = getBlockState(*Iter)->BBWriteSetIn;
 
@@ -656,6 +677,10 @@ void DSEContext::mergeSuccessorLiveIns(SILBasicBlock *BB) {
   for (auto EndIter = BB->succ_end(); Iter != EndIter; ++Iter) {
     C->BBWriteSetOut &= getBlockState(*Iter)->BBWriteSetIn;
   }
+
+  // We set the store bit at the end of the basic block in which a stack
+  // allocated location is deallocated.
+  C->BBWriteSetOut |= C->BBDeallocateLocation;
 }
 
 void DSEContext::invalidateLSLocationBaseForGenKillSet(SILInstruction *I) {
@@ -1123,6 +1148,11 @@ bool DSEContext::run() {
   // Initialize the BBToLocState mapping.
   for (auto &S : BlockStates) {
     BBToLocState[S.getBB()] = &S;
+  }
+
+  // Initialize the store bit state at the end of each basic block.
+  for (auto &X : BlockStates) {
+    X.initStoreSetAtEndOfBlock(*this);
   }
 
   // We perform dead store elimination in the following phases.

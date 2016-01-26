@@ -184,6 +184,7 @@ bb0:
 
 // CHECK-LABEL: sil @store_after_store
 // CHECK: bb0 
+// CHECK: store
 // CHECK-NOT: store
 // CHECK: return
 sil @store_after_store : $@convention(thin) (@owned B) -> () {
