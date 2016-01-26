@@ -565,6 +565,7 @@ public:
                                 llvm::Function *fn);
   llvm::Constant *emitProtocolConformances();
   llvm::Constant *emitTypeMetadataRecords();
+  llvm::Constant *getAddrOfFieldName(StringRef Name);
   StringRef getFieldMetadataSectionName();
   StringRef getFieldNamesSectionName();
 
@@ -581,6 +582,7 @@ private:
   llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
     GlobalStrings;
   llvm::StringMap<llvm::Constant*> GlobalUTF16Strings;
+  llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>> FieldNames;
   llvm::StringMap<llvm::Constant*> ObjCSelectorRefs;
   llvm::StringMap<llvm::Constant*> ObjCMethodNames;
 

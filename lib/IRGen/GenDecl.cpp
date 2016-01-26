@@ -2739,6 +2739,26 @@ llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
   return address;
 }
 
+llvm::Constant *IRGenModule::getAddrOfFieldName(StringRef Name) {
+  auto &entry = FieldNames[Name];
+  if (entry.second)
+    return entry.second;
+
+  auto init = llvm::ConstantDataArray::getString(LLVMContext, Name);
+  auto global = new llvm::GlobalVariable(Module, init->getType(), true,
+                                         llvm::GlobalValue::LinkOnceODRLinkage,
+                                         init);
+  global->setSection(getFieldNamesSectionName());
+
+  auto zero = llvm::ConstantInt::get(SizeTy, 0);
+  llvm::Constant *indices[] = { zero, zero };
+  auto address = llvm::ConstantExpr::getInBoundsGetElementPtr(
+      global->getValueType(), global, indices);
+
+  entry = { global, address };
+  return address;
+}
+
 /// Get or create a global UTF-16 string constant.
 ///
 /// \returns an i16* with a null terminator; note that embedded nulls
