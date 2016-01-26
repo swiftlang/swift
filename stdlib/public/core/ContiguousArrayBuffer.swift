@@ -603,7 +603,16 @@ internal func _copyCollectionToNativeArrayBuffer<
     count: numericCast(count),
     minimumCapacity: 0
   )
-  source._initializeTo(result.firstElementAddress)
+
+  var p = result.firstElementAddress
+  var i = source.startIndex
+  for _ in 0..<count {
+    // FIXME(performance): use _initializeTo().
+    p.initialize(source[i])
+    i._successorInPlace()
+    p._successorInPlace()
+  }
+  _expectEnd(i, source)
   return result
 }
 
