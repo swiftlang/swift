@@ -982,6 +982,11 @@ except that they can be enforced by the compiler.
 - ``size_in_bits(N)``: Promises that the type is not larger than a certain
   size. (It may be smaller.)
 
+- ``fixed_size``: Promises that the type has *some* size known at compile-time,
+  allowing optimizations like promoting allocations to the stack. Only applies
+  to fixed-contents structs and closed enums, which can already infer this
+  information; the explicit annotation allows it to be enforced.
+
 Collectively these features are known as "performance assertions", to
 underscore the fact that they do not affect how a type is used at the source
 level, but do allow for additional optimizations. We may also expose some of
