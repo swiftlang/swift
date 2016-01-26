@@ -4413,7 +4413,6 @@ ParserStatus Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     
     // See if there's a raw value expression.
     SourceLoc EqualsLoc;
-    auto NextLoc = peekToken().getLoc();
     ParserResult<Expr> RawValueExpr;
     LiteralExpr *LiteralRawValueExpr = nullptr;
     if (Tok.is(tok::equal)) {
@@ -4421,14 +4420,22 @@ ParserStatus Parser::parseDeclEnumCase(ParseDeclOptions Flags,
       {
         CodeCompletionCallbacks::InEnumElementRawValueRAII
             InEnumElementRawValue(CodeCompletion);
-        RawValueExpr = parseExpr(diag::expected_expr_enum_case_raw_value);
+        if (!CurLocalContext) {
+          // A local context is needed for parsing closures. We want to parse
+          // them anyways for proper diagnosis.
+          LocalContext tempContext{};
+          CurLocalContext = &tempContext;
+          RawValueExpr = parseExpr(diag::expected_expr_enum_case_raw_value);
+          CurLocalContext = nullptr;
+        } else {
+          RawValueExpr = parseExpr(diag::expected_expr_enum_case_raw_value);
+        }
       }
       if (RawValueExpr.hasCodeCompletion()) {
         Status.setHasCodeCompletion();
         return Status;
       }
       if (RawValueExpr.isNull()) {
-        diagnose(NextLoc, diag::nonliteral_enum_case_raw_value);
         Status.setIsParseError();
         return Status;
       }
