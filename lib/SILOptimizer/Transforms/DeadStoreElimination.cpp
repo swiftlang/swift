@@ -333,6 +333,9 @@ private:
   /// used to facilitate fast location to index lookup.
   LSLocationIndexMap LocToBitIndex;
 
+  /// Keeps a map between the accessed SILValue and the location.
+  LSLocationBaseMap BaseToLocIndex;
+
   /// Return the BlockState for the basic block this basic block belongs to.
   BlockState *getBlockState(SILBasicBlock *B) { return BBToLocState[B]; }
 
@@ -744,8 +747,13 @@ void DSEContext::processRead(SILInstruction *I, BlockState *S, SILValue Mem,
   //
   // This will make comparison between locations easier. This eases the
   // implementation of intersection operator in the data flow.
-  SILValue UO = getUnderlyingObject(Mem);
-  LSLocation L(UO, NewProjectionPath::getProjectionPath(UO, Mem));
+  LSLocation L;
+  if (BaseToLocIndex.find(Mem) != BaseToLocIndex.end()) {
+    L = BaseToLocIndex[Mem];
+  } else {
+    SILValue UO = getUnderlyingObject(Mem);
+    L = LSLocation(UO, NewProjectionPath::getProjectionPath(UO, Mem));
+  }
 
   // If we cant figure out the Base or Projection Path for the read instruction,
   // process it as an unknown memory instruction for now.
@@ -824,8 +832,13 @@ void DSEContext::processWrite(SILInstruction *I, BlockState *S, SILValue Val,
   //
   // This will make comparison between locations easier. This eases the
   // implementation of intersection operator in the data flow.
-  SILValue UO = getUnderlyingObject(Mem);
-  LSLocation L(UO, NewProjectionPath::getProjectionPath(UO, Mem));
+  LSLocation L;
+  if (BaseToLocIndex.find(Mem) != BaseToLocIndex.end()) {
+    L = BaseToLocIndex[Mem];
+  } else {
+    SILValue UO = getUnderlyingObject(Mem);
+    L = LSLocation(UO, NewProjectionPath::getProjectionPath(UO, Mem));
+  }
 
   // If we cant figure out the Base or Projection Path for the store
   // instruction, simply ignore it.
@@ -1082,7 +1095,8 @@ bool DSEContext::run() {
 
   // Walk over the function and find all the locations accessed by
   // this function.
-  LSLocation::enumerateLSLocations(*F, LocationVault, LocToBitIndex, TE);
+  LSLocation::enumerateLSLocations(*F, LocationVault, LocToBitIndex,
+                                   BaseToLocIndex, TE);
 
   // Check how to optimize this function.
   ProcessKind Kind = getProcessFunctionKind();

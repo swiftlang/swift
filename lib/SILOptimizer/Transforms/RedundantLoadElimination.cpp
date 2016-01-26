@@ -451,6 +451,9 @@ class RLEContext {
   /// Use for fast lookup.
   llvm::DenseMap<LSLocation, unsigned> LocToBitIndex;
 
+  /// Keeps a map between the accessed SILValue and the location.
+  LSLocationBaseMap BaseToLocIndex;
+
   /// Keeps all the loadstorevalues for the current function. The BitVector in
   /// each g is then laid on top of it to keep track of which LSLocation
   /// has a downward available value.
@@ -495,6 +498,9 @@ public:
 
   /// Returns the current type expansion analysis we are .
   TypeExpansionAnalysis *getTE() const { return TE; }
+
+  /// Returns the SILValue base to bit index.
+  LSLocationBaseMap &getBM() { return BaseToLocIndex; }
 
   /// Return the BlockState for the basic block this basic block belongs to.
   BlockState &getBlockState(SILBasicBlock *B) { return BBToLocState[B]; }
@@ -646,8 +652,14 @@ bool BlockState::setupRLE(RLEContext &Ctx, SILInstruction *I, SILValue Mem) {
   // Try to construct a SILValue for the current LSLocation.
   //
   // Collect the locations and their corresponding values into a map.
-  SILValue UO = getUnderlyingObject(Mem);
-  LSLocation L(UO, NewProjectionPath::getProjectionPath(UO, Mem));
+  LSLocation L;
+  LSLocationBaseMap &BaseToLocIndex = Ctx.getBM();
+  if (BaseToLocIndex.find(Mem) != BaseToLocIndex.end()) {
+    L = BaseToLocIndex[Mem];
+  } else {
+    SILValue UO = getUnderlyingObject(Mem);
+    L = LSLocation(UO, NewProjectionPath::getProjectionPath(UO, Mem));
+  }
 
   LSLocationValueMap Values;
   // Use the ForwardValIn as we are currently processing the basic block.
@@ -772,8 +784,14 @@ void BlockState::updateForwardSetAndValForWrite(RLEContext &Ctx, unsigned L,
 void BlockState::processWrite(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
                               SILValue Val, RLEKind Kind) {
   // Initialize the LSLocation.
-  SILValue UO = getUnderlyingObject(Mem);
-  LSLocation L(UO, NewProjectionPath::getProjectionPath(UO, Mem));
+  LSLocation L;
+  LSLocationBaseMap &BaseToLocIndex = Ctx.getBM();
+  if (BaseToLocIndex.find(Mem) != BaseToLocIndex.end()) {
+    L = BaseToLocIndex[Mem];
+  } else {
+    SILValue UO = getUnderlyingObject(Mem);
+    L = LSLocation(UO, NewProjectionPath::getProjectionPath(UO, Mem));
+  }
 
   // If we cant figure out the Base or Projection Path for the write,
   // process it as an unknown memory instruction.
@@ -823,8 +841,14 @@ void BlockState::processWrite(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
 void BlockState::processRead(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
                              SILValue Val, RLEKind Kind) {
   // Initialize the LSLocation.
-  SILValue UO = getUnderlyingObject(Mem);
-  LSLocation L(UO, NewProjectionPath::getProjectionPath(UO, Mem));
+  LSLocation L;
+  LSLocationBaseMap &BaseToLocIndex = Ctx.getBM();
+  if (BaseToLocIndex.find(Mem) != BaseToLocIndex.end()) {
+    L = BaseToLocIndex[Mem];
+  } else {
+    SILValue UO = getUnderlyingObject(Mem);
+    L = LSLocation(UO, NewProjectionPath::getProjectionPath(UO, Mem));
+  }
 
   // If we cant figure out the Base or Projection Path for the read, simply
   // ignore it for now.
@@ -984,7 +1008,8 @@ RLEContext::RLEContext(SILFunction *F, AliasAnalysis *AA,
     : Fn(F), AA(AA), TE(TE), PO(PO) {
   // Walk over the function and find all the locations accessed by
   // this function.
-  LSLocation::enumerateLSLocations(*Fn, LocationVault, LocToBitIndex, TE);
+  LSLocation::enumerateLSLocations(*Fn, LocationVault, LocToBitIndex,
+                                   BaseToLocIndex, TE);
 
   // For all basic blocks in the function, initialize a BB state. Since we
   // know all the locations accessed in this function, we can resize the bit

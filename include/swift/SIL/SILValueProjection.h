@@ -366,6 +366,7 @@ static inline llvm::hash_code hash_value(const LSValue &V) {
 using LSLocationSet = llvm::DenseSet<LSLocation>;
 using LSLocationList = llvm::SmallVector<LSLocation, 8>;
 using LSLocationIndexMap = llvm::DenseMap<LSLocation, unsigned>;
+using LSLocationBaseMap = llvm::DenseMap<SILValue, LSLocation>;
 
 /// This class represents a field in an allocated object. It consists of a
 /// base that is the tracked SILValue, and a projection path to the
@@ -469,12 +470,14 @@ public:
   static void enumerateLSLocation(SILModule *M, SILValue Mem,
                                   std::vector<LSLocation> &LSLocationVault,
                                   LSLocationIndexMap &LocToBit,
+                                  LSLocationBaseMap &BaseToLoc,
                                   TypeExpansionAnalysis *TE);
 
   /// Enumerate all the locations in the function.
   static void enumerateLSLocations(SILFunction &F,
                                    std::vector<LSLocation> &LSLocationVault,
                                    LSLocationIndexMap &LocToBit,
+                                   LSLocationBaseMap &BaseToLoc,
                                    TypeExpansionAnalysis *TE);
 };
 

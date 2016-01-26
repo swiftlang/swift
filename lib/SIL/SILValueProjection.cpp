@@ -302,6 +302,7 @@ void LSLocation::reduce(LSLocation Base, SILModule *M, LSLocationSet &Locs,
 void LSLocation::enumerateLSLocation(SILModule *M, SILValue Mem,
                                      std::vector<LSLocation> &Locations,
                                      LSLocationIndexMap &IndexMap,
+                                     LSLocationBaseMap &BaseMap,
                                      TypeExpansionAnalysis *TypeCache) {
   // Construct a Location to represent the memory written by this instruction.
   SILValue UO = getUnderlyingObject(Mem);
@@ -312,31 +313,42 @@ void LSLocation::enumerateLSLocation(SILModule *M, SILValue Mem,
   if (!L.isValid())
     return;
 
+  // We have processed this SILValue before.
+  if (BaseMap.find(Mem) != BaseMap.end())
+    return;
+
+  // Record the SILValue to location mapping.
+  BaseMap[Mem] = L; 
+
   // Expand the given Mem into individual fields and add them to the
   // locationvault.
   LSLocationList Locs;
   LSLocation::expand(L, M, Locs, TypeCache);
   for (auto &Loc : Locs) {
+   if (IndexMap.find(Loc) != IndexMap.end())
+     continue;
    IndexMap[Loc] = Locations.size();
    Locations.push_back(Loc);
- }
+  }
+
 }
 
 void LSLocation::enumerateLSLocations(SILFunction &F,
                                       std::vector<LSLocation> &Locations,
                                       LSLocationIndexMap &IndexMap,
+                                     LSLocationBaseMap &BaseMap,
                                       TypeExpansionAnalysis *TypeCache) {
   // Enumerate all locations accessed by the loads or stores.
   for (auto &B : F) {
     for (auto &I : B) {
       if (auto *LI = dyn_cast<LoadInst>(&I)) {
         enumerateLSLocation(&I.getModule(), LI->getOperand(), Locations,
-                            IndexMap, TypeCache);
+                            IndexMap, BaseMap, TypeCache);
         continue;
       }
       if (auto *SI = dyn_cast<StoreInst>(&I)) {
         enumerateLSLocation(&I.getModule(), SI->getDest(), Locations,
-                            IndexMap, TypeCache);
+                            IndexMap, BaseMap, TypeCache);
         continue;
       }
     }
