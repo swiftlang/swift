@@ -136,20 +136,6 @@ static bool inline isPerformingRLE(RLEKind Kind) {
   return Kind == RLEKind::PerformRLE;
 }
 
-/// Return true if all basic blocks have their predecessors processed if
-/// they are iterated in reverse post order.
-static bool isOneIterationFunction(PostOrderFunctionInfo *PO) {
-  llvm::DenseSet<SILBasicBlock *> HandledBBs;
-  for (SILBasicBlock *B : PO->getReversePostOrder()) {
-    for (auto X : B->getPreds()) {
-      if (HandledBBs.find(X) == HandledBBs.end())
-        return false;
-    }
-    HandledBBs.insert(B);
-  }
-  return true;
-}
-
 /// Returns true if this is an instruction that may have side effects in a
 /// general sense but are inert from a load store perspective.
 static bool isRLEInertInstruction(SILInstruction *Inst) {
@@ -198,8 +184,18 @@ static bool isReachable(SILBasicBlock *Block) {
 //===----------------------------------------------------------------------===//
 namespace {
 
-// If there are too many locations in the function, we bail out.
-constexpr unsigned MaxLSLocationLimit = 2048;
+/// If this function has too many basic blocks or too many locations, it may
+/// take a long time to compute the genset and killset. The number of memory
+/// behavior or alias query we need to do in worst case is roughly linear to
+/// # of BBs x(times) # of locations.
+///
+/// we could run RLE on functions with 128 basic blocks and 128 locations,
+/// which is a large function.  
+constexpr unsigned MaxLSLocationBBMultiplicationNone = 128*128;
+
+/// we could run optimistic RLE on functions with less than 64 basic blocks
+/// and 64 locations which is a sizeable function.
+constexpr unsigned MaxLSLocationBBMultiplicationPessimistic = 64*64;
 
 /// forward declaration.
 class RLEContext;
@@ -301,7 +297,7 @@ private:
 public:
   BlockState() = default;
 
-  void init(SILBasicBlock *NewBB, unsigned bitcnt, bool reachable) {
+  void init(SILBasicBlock *NewBB, unsigned bitcnt, bool optimistic) {
     BB = NewBB;
     LocationNum = bitcnt;
     // For reachable basic blocks, the initial state of ForwardSetOut should be
@@ -326,7 +322,7 @@ public:
     //
     // we rely on other passes to clean up unreachable block.
     ForwardSetIn.resize(LocationNum, false);
-    ForwardSetOut.resize(LocationNum, reachable);
+    ForwardSetOut.resize(LocationNum, optimistic);
 
     ForwardSetMax.resize(LocationNum, true);
 
@@ -426,8 +422,17 @@ using BBValueMap = llvm::DenseMap<SILBasicBlock *, SILValue>;
 /// This class stores global state that we use when computing redundant load and
 /// their replacement in each basic block.
 class RLEContext {
+  enum class ProcessKind {
+    ProcessMultipleIterations = 0,
+    ProcessOneIteration = 1,
+    ProcessNone = 2,
+  }; 
+private:
   /// Function currently processing.
   SILFunction *Fn;
+
+  /// The passmanager we are using.
+  SILPassManager *PM;
 
   /// The alias analysis that we will use during all computations.
   AliasAnalysis *AA;
@@ -467,8 +472,8 @@ class RLEContext {
   llvm::SmallDenseMap<SILBasicBlock *, BlockState, 4> BBToLocState;
 
 public:
-  RLEContext(SILFunction *F, AliasAnalysis *AA, TypeExpansionAnalysis *TE,
-             PostOrderFunctionInfo *PO);
+  RLEContext(SILFunction *F, SILPassManager *PM, AliasAnalysis *AA,
+             TypeExpansionAnalysis *TE, PostOrderFunctionInfo *PO);
 
   RLEContext(const RLEContext &) = delete;
   RLEContext(RLEContext &&) = default;
@@ -476,6 +481,10 @@ public:
 
   /// Entry point to redundant load elimination.
   bool run();
+
+  /// Use a set of ad hoc rules to tell whether we should run a pessimistic
+  /// one iteration data flow on the function.
+  ProcessKind getProcessFunctionKind();
 
   /// Run the iterative data flow until convergence.
   void runIterativeRLE();
@@ -998,26 +1007,51 @@ void BlockState::processInstructionWithKind(RLEContext &Ctx,
   }
 }
 
+RLEContext::ProcessKind RLEContext::getProcessFunctionKind() {
+  bool RunOneIteration = true;
+  unsigned BBCount = 0;
+  unsigned LocationCount = LocationVault.size();
+
+  // If all basic blocks will have their predecessors processed if
+  // the basic blocks in the functions are iterated in post order.
+  // Then this function can be processed in one iteration, i.e. no
+  // need to generate the genset and killset.
+  auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(Fn);
+  llvm::DenseSet<SILBasicBlock *> HandledBBs;
+  for (SILBasicBlock *B : PO->getReversePostOrder()) {
+    ++BBCount;
+    for (auto X : B->getPreds()) {
+      if (HandledBBs.find(X) == HandledBBs.end()) {
+        RunOneIteration = false;
+        break;
+      }
+    }
+    HandledBBs.insert(B);
+  }
+
+  // Data flow may take too long to run.
+  if (BBCount * LocationCount > MaxLSLocationBBMultiplicationNone)
+    return ProcessKind::ProcessNone;
+
+  // This function's data flow would converge in 1 iteration.
+  if (RunOneIteration)
+    return ProcessKind::ProcessOneIteration;
+  
+  // We run one pessimistic data flow to do dead store elimination on
+  // the function.
+  if (BBCount * LocationCount > MaxLSLocationBBMultiplicationPessimistic)
+    return ProcessKind::ProcessOneIteration;
+
+  return ProcessKind::ProcessMultipleIterations;
+}
 
 //===----------------------------------------------------------------------===//
 //                          RLEContext Implementation
 //===----------------------------------------------------------------------===//
 
-RLEContext::RLEContext(SILFunction *F, AliasAnalysis *AA,
+RLEContext::RLEContext(SILFunction *F, SILPassManager *PM, AliasAnalysis *AA,
                        TypeExpansionAnalysis *TE, PostOrderFunctionInfo *PO)
-    : Fn(F), AA(AA), TE(TE), PO(PO) {
-  // Walk over the function and find all the locations accessed by
-  // this function.
-  LSLocation::enumerateLSLocations(*Fn, LocationVault, LocToBitIndex,
-                                   BaseToLocIndex, TE);
-
-  // For all basic blocks in the function, initialize a BB state. Since we
-  // know all the locations accessed in this function, we can resize the bit
-  // vector to the appropriate size.
-  for (auto &B : *F) {
-    BBToLocState[&B] = BlockState();
-    BBToLocState[&B].init(&B, LocationVault.size(), isReachable(&B));
-  }
+    : Fn(F), PM(PM), AA(AA), TE(TE), PO(PO) {
 }
 
 LSLocation &RLEContext::getLocation(const unsigned index) {
@@ -1307,10 +1341,6 @@ void RLEContext::runIterativeRLE() {
 }
 
 bool RLEContext::run() {
-  // Data flow may take too long to converge.
-  if (LocationVault.size() > MaxLSLocationLimit)
-    return false;
-
   // We perform redundant load elimination in the following phases.
   //
   // Phase 1. Compute the genset and killset for every basic block.
@@ -1322,7 +1352,32 @@ bool RLEContext::run() {
   // Phase 3. we compute the real forwardable value at a given point.
   //
   // Phase 4. we perform the redundant load elimination.
-  if (!isOneIterationFunction(PO))
+
+  // Walk over the function and find all the locations accessed by
+  // this function.
+  LSLocation::enumerateLSLocations(*Fn, LocationVault, LocToBitIndex,
+                                   BaseToLocIndex, TE);
+
+  // Check how to optimize this function.
+  ProcessKind Kind = getProcessFunctionKind();
+  
+  // We do not optimize this function at all.
+  if (Kind == ProcessKind::ProcessNone)
+    return false;
+
+  // Do we run a multi-iteration data flow ?
+  bool MultiIteration = Kind == ProcessKind::ProcessMultipleIterations ?
+                        true : false;
+
+  // For all basic blocks in the function, initialize a BB state. Since we
+  // know all the locations accessed in this function, we can resize the bit
+  // vector to the appropriate size.
+  for (auto &B : *Fn) {
+    BBToLocState[&B] = BlockState();
+    BBToLocState[&B].init(&B, LocationVault.size(), MultiIteration && isReachable(&B));
+  }
+
+  if (MultiIteration)
     runIterativeRLE();
 
   // We have the available value bit computed and the local forwarding value.
@@ -1376,7 +1431,7 @@ class RedundantLoadElimination : public SILFunctionTransform {
     auto *TE = PM->getAnalysis<TypeExpansionAnalysis>();
     auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
 
-    RLEContext RLE(F, AA, TE, PO);
+    RLEContext RLE(F, PM, AA, TE, PO);
     if (RLE.run()) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
