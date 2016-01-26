@@ -326,10 +326,33 @@ internal func _usesNativeSwiftReferenceCounting(theClass: AnyClass) -> Bool {
 #endif
 }
 
+#if os(Windows)
+// If the return type of a C/C++ function is a structure,
+// the calling convension is different from caller's.  
+// A wrapper function is introduced.
+struct PrivPair {
+  var negative : UInt
+  var positive : UInt
+}
+
+@_silgen_name("swift_class_getInstanceExtents")
+private func swift_class_getInstanceExtents_raw(inout pair: PrivPair,
+                                                theClass: AnyClass)
+
+@warn_unused_result
+func swift_class_getInstanceExtents(theClass: AnyClass)
+  -> (negative: UInt, positive: UInt) {
+  var pair = PrivPair(negative : 0, positive : 0)
+  swift_class_getInstanceExtents_raw(&pair, theClass: theClass)
+
+  return (pair.negative, pair.positive)
+}
+#else
 @warn_unused_result
 @_silgen_name("swift_class_getInstanceExtents")
 func swift_class_getInstanceExtents(theClass: AnyClass)
   -> (negative: UInt, positive: UInt)
+#endif
 
 @warn_unused_result
 @_silgen_name("swift_objc_class_unknownGetInstanceExtents")

@@ -40,4 +40,8 @@ def host_target():
         if machine == 'amd64':
             return 'freebsd-x86_64'
 
+    elif system == 'CYGWIN_NT-10.0':
+        if machine == 'x86_64':
+            return 'cygwin-x86_64'
+
     return None
