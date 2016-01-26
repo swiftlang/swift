@@ -469,7 +469,7 @@ private:
   llvm::DenseMap<LSValue, unsigned> ValToBitIndex;
 
   /// A map from each BasicBlock to its BlockState.
-  llvm::SmallDenseMap<SILBasicBlock *, BlockState, 4> BBToLocState;
+  llvm::SmallDenseMap<SILBasicBlock *, BlockState, 16> BBToLocState;
 
 public:
   RLEContext(SILFunction *F, SILPassManager *PM, AliasAnalysis *AA,
