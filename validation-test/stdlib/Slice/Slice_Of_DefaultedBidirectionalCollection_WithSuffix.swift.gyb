@@ -33,7 +33,7 @@ var SliceTests = TestSuite("CollectionType")
 %   WrapperType='Slice',
 %   name='WithSuffix',
 %   prefix=[],
-%   suffix=[ -9999, -9998, -9997 ])
+%   suffix=[ -9999, -9998, -9997])
 ${SliceTest}
 
 runAllTests()
