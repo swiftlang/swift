@@ -334,17 +334,10 @@ public:
   /// Convenience method for getting the raw underlying kind.
   NewProjectionKind getKind() const { return *Value.getKind(); }
 
-  static bool isAddressProjection(SILValue V) {
-    auto *I = dyn_cast<SILInstruction>(V);
-    if (!I)
-      return false;
-    return isAddressProjection(I);
-  }
-
   /// Returns true if this instruction projects from an address type to an
   /// address subtype.
-  static bool isAddressProjection(SILInstruction *I) {
-    switch (I->getKind()) {
+  static bool isAddressProjection(SILValue V) {
+    switch (V->getKind()) {
     default:
       return false;
     case ValueKind::StructElementAddrInst:
@@ -356,17 +349,10 @@ public:
     }
   }
 
-  static bool isObjectProjection(SILValue V) {
-    auto *I = dyn_cast<SILInstruction>(V);
-    if (!I)
-      return false;
-    return isObjectProjection(I);
-  }
-
   /// Returns true if this instruction projects from an object type to an object
   /// subtype.
-  static bool isObjectProjection(SILInstruction *I) {
-    switch (I->getKind()) {
+  static bool isObjectProjection(SILValue V) {
+    switch (V->getKind()) {
     default:
       return false;
     case ValueKind::StructExtractInst:
@@ -375,17 +361,10 @@ public:
     }
   }
 
-  static bool isObjectToAddressProjection(SILValue V) {
-    auto *I = dyn_cast<SILInstruction>(V);
-    if (!I)
-      return false;
-    return isObjectToAddressProjection(I);
-  }
-
   /// Returns true if this instruction projects from an object type into an
   /// address subtype.
-  static bool isObjectToAddressProjection(SILInstruction *I) {
-    return isa<RefElementAddrInst>(I) || isa<ProjectBoxInst>(I);
+  static bool isObjectToAddressProjection(SILValue V) {
+    return isa<RefElementAddrInst>(V) || isa<ProjectBoxInst>(V);
   }
 
   /// Given a specific SILType, return all first level projections if it is an
