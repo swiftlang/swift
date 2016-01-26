@@ -355,6 +355,9 @@ Optional<NewProjectionPath> NewProjectionPath::getProjectionPath(SILValue Start,
   if (P.empty() || Start != Iter || NextAddrIsIndex)
     return llvm::NoneType::None;
 
+  // Reverse to get a path from base to most-derived.
+  std::reverse(P.Path.begin(), P.Path.end());
+
   // Otherwise, return P.
   return std::move(P);
 }
@@ -379,8 +382,8 @@ bool NewProjectionPath::hasNonEmptySymmetricDifference(
     return false;
 
   // Otherwise, we have a common base and perhaps some common subpath.
-  auto LHSReverseIter = Path.rbegin();
-  auto RHSReverseIter = RHS.Path.rbegin();
+  auto LHSIter = Path.begin();
+  auto RHSIter = RHS.Path.begin();
 
   bool FoundDifferingProjections = false;
 
@@ -388,8 +391,8 @@ bool NewProjectionPath::hasNonEmptySymmetricDifference(
   unsigned i = 0;
   for (unsigned e = std::min(size(), RHS.size()); i != e; ++i) {
     // Grab the current projections.
-    const NewProjection &LHSProj = *LHSReverseIter;
-    const NewProjection &RHSProj = *RHSReverseIter;
+    const NewProjection &LHSProj = *LHSIter;
+    const NewProjection &RHSProj = *RHSIter;
 
     // If we are accessing different fields of a common object, the two
     // projection paths may have a non-empty symmetric difference. We check if
@@ -400,8 +403,8 @@ bool NewProjectionPath::hasNonEmptySymmetricDifference(
     }
 
     // Continue if we are accessing the same field.
-    LHSReverseIter++;
-    RHSReverseIter++;
+    LHSIter++;
+    RHSIter++;
   }
 
   // All path elements are the same. The symmetric difference is empty.
@@ -412,14 +415,14 @@ bool NewProjectionPath::hasNonEmptySymmetricDifference(
   // casts in the symmetric difference. To be conservative, we only wish to
   // allow for casts to appear in the common parts of projections.
   for (unsigned li = i, e = size(); li != e; ++li) {
-    if (LHSReverseIter->isAliasingCast())
+    if (LHSIter->isAliasingCast())
       return false;
-    LHSReverseIter++;
+    LHSIter++;
   }
   for (unsigned ri = i, e = RHS.size(); ri != e; ++ri) {
-    if (RHSReverseIter->isAliasingCast())
+    if (RHSIter->isAliasingCast())
       return false;
-    RHSReverseIter++;
+    RHSIter++;
   }
 
   // If we don't have any casts in our symmetric difference (i.e. only typed
@@ -442,17 +445,16 @@ NewProjectionPath::computeSubSeqRelation(const NewProjectionPath &RHS) const {
   if (empty() || RHS.empty())
     return SubSeqRelation_t::Unknown;
 
-  // We reverse the projection path to scan from the common object.
-  auto LHSReverseIter = rbegin();
-  auto RHSReverseIter = RHS.rbegin();
+  auto LHSIter = begin();
+  auto RHSIter = RHS.begin();
 
   unsigned MinPathSize = std::min(size(), RHS.size());
 
   // For each index i until min path size...
   for (unsigned i = 0; i != MinPathSize; ++i) {
     // Grab the current projections.
-    const NewProjection &LHSProj = *LHSReverseIter;
-    const NewProjection &RHSProj = *RHSReverseIter;
+    const NewProjection &LHSProj = *LHSIter;
+    const NewProjection &RHSProj = *RHSIter;
 
     // If the two projections do not equal exactly, return Unrelated.
     //
@@ -466,8 +468,8 @@ NewProjectionPath::computeSubSeqRelation(const NewProjectionPath &RHS) const {
       return SubSeqRelation_t::Unknown;
 
     // Otherwise increment reverse iterators.
-    LHSReverseIter++;
-    RHSReverseIter++;
+    LHSIter++;
+    RHSIter++;
   }
 
   // Ok, we now know that one of the paths is a subsequence of the other. If
@@ -616,6 +618,11 @@ raw_ostream &NewProjectionPath::print(raw_ostream &os, SILModule &M) {
       continue;
     }
 
+    if (IterProj.getKind() == NewProjectionKind::Box) {
+      os << "Box: ";
+      continue;
+    }
+
     llvm_unreachable("Can not print this projection kind");
   }
 
@@ -634,7 +641,7 @@ raw_ostream &NewProjectionPath::print(raw_ostream &os, SILModule &M) {
   return os;
 }
 
-raw_ostream &NewProjectionPath::printProjections(raw_ostream &os, SILModule &M) {
+raw_ostream &NewProjectionPath::printProjections(raw_ostream &os, SILModule &M) const {
   // Match how the memlocation print tests expect us to print projection paths.
   //
   // TODO: It sort of sucks having to print these bottom up computationally. We
@@ -663,7 +670,7 @@ void NewProjectionPath::dump(SILModule &M) {
   llvm::outs() << "\n";
 }
 
-void NewProjectionPath::dumpProjections(SILModule &M) {
+void NewProjectionPath::dumpProjections(SILModule &M) const {
   printProjections(llvm::outs(), M);
 }
 
@@ -676,79 +683,6 @@ void NewProjectionPath::verify(SILModule &M) {
     assert(IterTy);
   }
 #endif
-}
-
-void NewProjectionPath::expandTypeIntoLeafProjectionPaths(
-    SILType B, SILModule *Mod, llvm::SmallVectorImpl<NewProjectionPath> &Paths,
-    bool OnlyLeafNode) {
-  // Perform a BFS to expand the given type into projectionpath each of
-  // which contains 1 field from the type.
-  llvm::SmallVector<NewProjectionPath, 8> Worklist;
-  llvm::SmallVector<NewProjection, 8> Projections;
-
-  // Push an empty projection path to get started.
-  NewProjectionPath P(B);
-  Worklist.push_back(P);
-  do {
-    // Get the next level projections based on current projection's type.
-    NewProjectionPath PP = Worklist.pop_back_val();
-    // Get the current type to process.
-    SILType Ty = PP.getMostDerivedType(*Mod);
-
-    DEBUG(llvm::dbgs() << "Visiting type: " << Ty << "\n");
-
-    // Get the first level projection of the current type.
-    Projections.clear();
-    NewProjection::getFirstLevelProjections(Ty, *Mod, Projections);
-
-    // Reached the end of the projection tree, this field can not be expanded
-    // anymore.
-    if (Projections.empty()) {
-      DEBUG(llvm::dbgs() << "    No projections. Finished projection list\n");
-      Paths.push_back(PP);
-      continue;
-    }
-
-    // If this is a class type, we also have reached the end of the type
-    // tree for this type.
-    //
-    // We do not push its next level projection into the worklist,
-    // if we do that, we could run into an infinite loop, e.g.
-    //
-    //   class SelfLoop {
-    //     var p : SelfLoop
-    //   }
-    //
-    //   struct XYZ {
-    //     var x : Int
-    //     var y : SelfLoop
-    //   }
-    //
-    // The worklist would never be empty in this case !.
-    //
-    if (Ty.getClassOrBoundGenericClass()) {
-      DEBUG(llvm::dbgs() << "    Found class. Finished projection list\n");
-      Paths.push_back(PP);
-      continue;
-    }
-
-    // This is NOT a leaf node, keep the intermediate nodes as well.
-    if (!OnlyLeafNode) {
-      DEBUG(llvm::dbgs() << "    Found class. Finished projection list\n");
-      Paths.push_back(PP);
-    }
-
-    // Keep expanding the location.
-    for (auto &P : Projections) {
-      NewProjectionPath X(B);
-      X.append(PP);
-      assert(PP.getMostDerivedType(*Mod) == X.getMostDerivedType(*Mod));
-      X.append(P);
-      Worklist.push_back(X);
-    }
-
-    // Keep iterating if the worklist is not empty.
-  } while (!Worklist.empty());
 }
 
 //===----------------------------------------------------------------------===//
@@ -1203,16 +1137,16 @@ computeSubSeqRelation(const ProjectionPath &RHS) const {
     return SubSeqRelation_t::Unknown;
 
   // We reverse the projection path to scan from the common object.
-  auto LHSReverseIter = rbegin();
-  auto RHSReverseIter = RHS.rbegin();
+  auto LHSIter = begin();
+  auto RHSIter = RHS.begin();
 
   unsigned MinPathSize = std::min(size(), RHS.size());
 
   // For each index i until min path size...
   for (unsigned i = 0; i != MinPathSize; ++i) {
     // Grab the current projections.
-    const Projection &LHSProj = *LHSReverseIter;
-    const Projection &RHSProj = *RHSReverseIter;
+    const Projection &LHSProj = *LHSIter;
+    const Projection &RHSProj = *RHSIter;
 
     // If the two projections do not equal exactly, return Unrelated.
     //
@@ -1226,8 +1160,8 @@ computeSubSeqRelation(const ProjectionPath &RHS) const {
       return SubSeqRelation_t::Unknown;
 
     // Otherwise increment reverse iterators.
-    LHSReverseIter++;
-    RHSReverseIter++;
+    LHSIter++;
+    RHSIter++;
   }
 
   // Ok, we now know that one of the paths is a subsequence of the other. If
@@ -1320,6 +1254,143 @@ ProjectionPath::subtractPaths(const ProjectionPath &LHS, const ProjectionPath &R
   }
 
   return P;
+}
+
+void
+NewProjectionPath::expandTypeIntoLeafProjectionPaths(SILType B, SILModule *Mod,
+                                                     NewProjectionPathList &Paths) {
+  // Perform a BFS to expand the given type into projectionpath each of
+  // which contains 1 field from the type.
+  llvm::SmallVector<NewProjectionPath, 8> Worklist;
+  llvm::SmallVector<NewProjection, 8> Projections;
+
+  // Push an empty projection path to get started.
+  NewProjectionPath P(B);
+  Worklist.push_back(P);
+  do {
+    // Get the next level projections based on current projection's type.
+    NewProjectionPath PP = Worklist.pop_back_val();
+    // Get the current type to process.
+    SILType Ty = PP.getMostDerivedType(*Mod);
+
+    DEBUG(llvm::dbgs() << "Visiting type: " << Ty << "\n");
+
+    // Get the first level projection of the current type.
+    Projections.clear();
+    NewProjection::getFirstLevelProjections(Ty, *Mod, Projections);
+
+    // Reached the end of the projection tree, this field can not be expanded
+    // anymore.
+    if (Projections.empty()) {
+      DEBUG(llvm::dbgs() << "    No projections. Finished projection list\n");
+      Paths.push_back(PP);
+      continue;
+    }
+
+    // If this is a class type, we also have reached the end of the type
+    // tree for this type.
+    //
+    // We do not push its next level projection into the worklist,
+    // if we do that, we could run into an infinite loop, e.g.
+    //
+    //   class SelfLoop {
+    //     var p : SelfLoop
+    //   }
+    //
+    //   struct XYZ {
+    //     var x : Int
+    //     var y : SelfLoop
+    //   }
+    //
+    // The worklist would never be empty in this case !.
+    //
+    if (Ty.getClassOrBoundGenericClass()) {
+      DEBUG(llvm::dbgs() << "    Found class. Finished projection list\n");
+      Paths.push_back(PP);
+      continue;
+    }
+
+    // Keep expanding the location.
+    for (auto &P : Projections) {
+      NewProjectionPath X(B);
+      X.append(PP);
+      ///assert(PP.getMostDerivedType(*Mod) == X.getMostDerivedType(*Mod));
+      X.append(P);
+      Worklist.push_back(X);
+    }
+    // Keep iterating if the worklist is not empty.
+  } while (!Worklist.empty());
+}
+
+void
+NewProjectionPath::expandTypeIntoNodeProjectionPaths(SILType B, SILModule *Mod,
+                                                     NewProjectionPathList &Paths) {
+  // Perform a BFS to expand the given type into projectionpath each of
+  // which contains 1 field from the type.
+  llvm::SmallVector<NewProjectionPath, 8> Worklist;
+  llvm::SmallVector<NewProjection, 8> Projections;
+
+  // Push an empty projection path to get started.
+  NewProjectionPath P(B);
+  Worklist.push_back(P);
+  do {
+    // Get the next level projections based on current projection's type.
+    NewProjectionPath PP = Worklist.pop_back_val();
+    // Get the current type to process.
+    SILType Ty = PP.getMostDerivedType(*Mod);
+
+    DEBUG(llvm::dbgs() << "Visiting type: " << Ty << "\n");
+
+    // Get the first level projection of the current type.
+    Projections.clear();
+    NewProjection::getFirstLevelProjections(Ty, *Mod, Projections);
+
+    // Reached the end of the projection tree, this field can not be expanded
+    // anymore.
+    if (Projections.empty()) {
+      DEBUG(llvm::dbgs() << "    No projections. Finished projection list\n");
+      Paths.push_back(PP);
+      continue;
+    }
+
+    // If this is a class type, we also have reached the end of the type
+    // tree for this type.
+    //
+    // We do not push its next level projection into the worklist,
+    // if we do that, we could run into an infinite loop, e.g.
+    //
+    //   class SelfLoop {
+    //     var p : SelfLoop
+    //   }
+    //
+    //   struct XYZ {
+    //     var x : Int
+    //     var y : SelfLoop
+    //   }
+    //
+    // The worklist would never be empty in this case !.
+    //
+    if (Ty.getClassOrBoundGenericClass()) {
+      DEBUG(llvm::dbgs() << "    Found class. Finished projection list\n");
+      Paths.push_back(PP);
+      continue;
+    }
+
+    // This is NOT a leaf node, keep the intermediate nodes as well.
+    DEBUG(llvm::dbgs() << "    Found class. Finished projection list\n");
+    Paths.push_back(PP);
+
+    // Keep expanding the location.
+    for (auto &P : Projections) {
+      NewProjectionPath X(B);
+      X.append(PP);
+      assert(PP.getMostDerivedType(*Mod) == X.getMostDerivedType(*Mod));
+      X.append(P);
+      Worklist.push_back(X);
+    }
+
+    // Keep iterating if the worklist is not empty.
+  } while (!Worklist.empty());
 }
 
 void

@@ -655,7 +655,9 @@ bool BlockState::setupRLE(RLEContext &Ctx, SILInstruction *I, SILValue Mem) {
   // Try to construct a SILValue for the current LSLocation.
   //
   // Collect the locations and their corresponding values into a map.
-  LSLocation L(Mem);
+  SILValue UO = getUnderlyingObject(Mem);
+  LSLocation L(UO, NewProjectionPath::getProjectionPath(UO, Mem));
+
   LSLocationValueMap Values;
   // Use the ForwardValIn as we are currently processing the basic block.
   if (!Ctx.collectLocationValues(I->getParent(), L, Values, getForwardValIn()))
@@ -785,7 +787,8 @@ void BlockState::updateForwardSetAndValForWrite(RLEContext &Ctx, unsigned lbit,
 void BlockState::processWrite(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
                               SILValue Val, RLEKind Kind) {
   // Initialize the LSLocation.
-  LSLocation L(Mem);
+  SILValue UO = getUnderlyingObject(Mem);
+  LSLocation L(UO, NewProjectionPath::getProjectionPath(UO, Mem));
 
   // If we cant figure out the Base or Projection Path for the write,
   // process it as an unknown memory instruction.
@@ -843,7 +846,8 @@ void BlockState::processWrite(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
 void BlockState::processRead(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
                              SILValue Val, RLEKind Kind) {
   // Initialize the LSLocation.
-  LSLocation L(Mem);
+  SILValue UO = getUnderlyingObject(Mem);
+  LSLocation L(UO, NewProjectionPath::getProjectionPath(UO, Mem));
 
   // If we cant figure out the Base or Projection Path for the read, simply
   // ignore it for now.
@@ -1145,7 +1149,7 @@ SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
 
   // Finally, collect all the values for the SILArgument, materialize it using
   // the SSAUpdater.
-  Updater.Initialize(L.getType());
+  Updater.Initialize(L.getType(&BB->getModule()).getObjectType());
   for (auto V : Values) {
     Updater.AddAvailableValue(V.first, V.second);
   }

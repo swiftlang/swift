@@ -744,7 +744,8 @@ void DSEContext::processRead(SILInstruction *I, BlockState *S, SILValue Mem,
   //
   // This will make comparison between locations easier. This eases the
   // implementation of intersection operator in the data flow.
-  LSLocation L(Mem);
+  SILValue UO = getUnderlyingObject(Mem);
+  LSLocation L(UO, NewProjectionPath::getProjectionPath(UO, Mem));
 
   // If we cant figure out the Base or Projection Path for the read instruction,
   // process it as an unknown memory instruction for now.
@@ -823,7 +824,8 @@ void DSEContext::processWrite(SILInstruction *I, BlockState *S, SILValue Val,
   //
   // This will make comparison between locations easier. This eases the
   // implementation of intersection operator in the data flow.
-  LSLocation L(Mem);
+  SILValue UO = getUnderlyingObject(Mem);
+  LSLocation L(UO, NewProjectionPath::getProjectionPath(UO, Mem));
 
   // If we cant figure out the Base or Projection Path for the store
   // instruction, simply ignore it.
@@ -903,10 +905,10 @@ void DSEContext::processWrite(SILInstruction *I, BlockState *S, SILValue Val,
     // particular instruction may not be accessing the base, so we need to
     // *rebase* the locations w.r.t. to the current instruction.
     SILValue B = Locs[0].getBase();
-    Optional<ProjectionPath> BP = ProjectionPath::getAddrProjectionPath(B, Mem);
+    Optional<NewProjectionPath> BP = NewProjectionPath::getProjectionPath(B, Mem);
     // Strip off the projection path from base to the accessed field.
     for (auto &X : Alives) {
-      X.subtractPaths(BP);
+      X.removePathPrefix(BP);
     }
 
     // We merely setup the remaining live stores, but do not materialize in IR

@@ -26,7 +26,7 @@ enum class TEKind {
   TENode  // Intermediate and leaf nodes expansion.
 }; 
 
-using TypeExpansionMap = llvm::DenseMap<SILType, ProjectionPathList>;
+using TypeExpansionMap = llvm::DenseMap<SILType, NewProjectionPathList>;
 
 /// This analysis determines memory effects during destruction.
 class TypeExpansionAnalysis : public SILAnalysis {
@@ -45,9 +45,8 @@ public:
   }
 
   /// Return ProjectionPath to every leaf or intermediate node of the given type.
-  const ProjectionPathList &getTypeExpansionProjectionPaths(SILType B,
-                                                            SILModule *Mod,
-                                                            TEKind K);
+  const NewProjectionPathList &getTypeExpansion(SILType B, SILModule *Mod,
+                                                TEKind K);
 };
 }
 #endif

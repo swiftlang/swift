@@ -36,6 +36,7 @@ class SILBuilder;
 class ProjectionPath;
 class NewProjectionPath;
 using ProjectionPathList = llvm::SmallVector<Optional<ProjectionPath>, 8>;
+using NewProjectionPathList = llvm::SmallVector<Optional<NewProjectionPath>, 8>;
 
 enum class SubSeqRelation_t : uint8_t {
   Unknown,
@@ -387,6 +388,11 @@ public:
     return isa<RefElementAddrInst>(I) || isa<ProjectBoxInst>(I);
   }
 
+  /// Given a specific SILType, return all first level projections if it is an
+  /// aggregate.
+  static void getFirstLevelProjections(SILType V, SILModule &Mod,
+                                       llvm::SmallVectorImpl<NewProjection> &Out);
+
   /// Is this cast which only allows for equality?
   ///
   /// If we enforce strict type based aliasing when computing access paths this
@@ -409,12 +415,6 @@ public:
       return false;
     }
   }
-
-  /// Given a specific SILType, return all first level projections if
-  /// it is an aggregate.
-  static void
-  getFirstLevelProjections(SILType V, SILModule &Mod,
-                           llvm::SmallVectorImpl<NewProjection> &Out);
 
   bool isNominalKind() const {
     switch (getKind()) {
@@ -481,7 +481,16 @@ public:
 
   /// Do not allow copy construction. The only way to get one of these is from
   /// getProjectionPath.
-  NewProjectionPath(const NewProjectionPath &Other) = default;
+  NewProjectionPath(const NewProjectionPath &Other) {
+    BaseType = Other.BaseType;
+    Path = Other.Path;
+  } 
+
+  NewProjectionPath &operator=(const NewProjectionPath &O) {
+    BaseType = O.BaseType;
+    Path = O.Path;
+    return *this;
+  }
 
   /// We only allow for moves of NewProjectionPath since we only want them to be
   /// able to be constructed by calling our factory method.
@@ -497,6 +506,20 @@ public:
     Path = O.Path;
     O.BaseType = SILType();
     O.Path.clear();
+    return *this;
+  }
+
+  /// Append the projection \p P onto this.
+  NewProjectionPath &append(const NewProjection &P) {
+    push_back(P);
+    return *this;
+  }
+
+  /// Append the projections in \p Other onto this.
+  NewProjectionPath &append(const NewProjectionPath &Other) {
+    for (auto &X : Other.Path) {
+      push_back(X);
+    }
     return *this;
   }
 
@@ -519,11 +542,21 @@ public:
   removePrefix(const NewProjectionPath &Path, const NewProjectionPath &Prefix);
 
   /// Given the SILType Base, expand every leaf nodes in the type tree.
-  /// Include the intermediate nodes if OnlyLeafNode is false.
-  static void
-  expandTypeIntoLeafProjectionPaths(SILType BaseType, SILModule *Mod,
-                                    llvm::SmallVectorImpl<NewProjectionPath> &P,
-                                    bool OnlyLeafNode);
+  ///
+  /// NOTE: this function returns a single empty projection path if the BaseType
+  /// is a leaf node in the type tree.
+  static void expandTypeIntoLeafProjectionPaths(SILType BaseType,
+                                                SILModule *Mod,
+                                                NewProjectionPathList &P);
+
+  /// Given the SILType Base, expand every intermediate and leaf nodes in the
+  /// type tree.
+  ///
+  /// NOTE: this function returns a single empty projection path if the BaseType
+  /// is a leaf node in the type tree.
+  static void expandTypeIntoNodeProjectionPaths(SILType BaseType,
+                                                SILModule *Mod,
+                                                NewProjectionPathList &P);
 
   /// Returns true if the two paths have a non-empty symmetric
   /// difference.
@@ -602,20 +635,6 @@ public:
     return IterTy;
   }
 
-  /// Append the projection \p P onto this.
-  NewProjectionPath &append(const NewProjection &P) {
-    push_back(P);
-    return *this;
-  }
-
-  /// Append the projections in \p Other onto this.
-  NewProjectionPath &append(const NewProjectionPath &Other) {
-    for (auto &X : Other.Path) {
-      push_back(X);
-    }
-    return *this;
-  }
-
   /// Returns true if the contained projection path is empty.
   bool empty() const { return Path.empty(); }
 
@@ -640,9 +659,9 @@ public:
   void verify(SILModule &M);
 
   raw_ostream &print(raw_ostream &OS, SILModule &M);
-  raw_ostream &printProjections(raw_ostream &OS, SILModule &M);
+  raw_ostream &printProjections(raw_ostream &OS, SILModule &M) const;
   void dump(SILModule &M);
-  void dumpProjections(SILModule &M);
+  void dumpProjections(SILModule &M) const;
 };
 
 //===----------------------------------------------------------------------===//
@@ -890,7 +909,7 @@ public:
   /// Given a specific SILType, return all first level address projections if
   /// it is an aggregate.
   static void getFirstLevelAddrProjections(SILType V, SILModule &Mod,
-                                        llvm::SmallVectorImpl<Projection> &Out);
+                                           llvm::SmallVectorImpl<Projection> &Out);
 
   /// Form an aggregate of type BaseType using the SILValue Values. Returns the
   /// aggregate on success if this is a case we handle or an empty SILValue
@@ -1065,12 +1084,23 @@ static inline llvm::hash_code hash_value(const ProjectionPath &P) {
   return llvm::hash_combine_range(P.begin(), P.end());
 }
 
+/// Returns the hashcode for the new projection path.
+static inline llvm::hash_code hash_value(const NewProjectionPath &P) {
+  return llvm::hash_combine_range(P.begin(), P.end());
+}
+
+/// Returns the hashcode for the projection path.
 static inline llvm::hash_code hash_value(const Projection &P) {
   if (P.isNominalKind()) {
     return llvm::hash_value(P.getDecl());
   } else {
     return llvm::hash_value(P.getIndex());
   }
+}
+
+/// Returns the hashcode for the projection path.
+static inline llvm::hash_code hash_value(const NewProjection &P) {
+  return llvm::hash_combine(static_cast<unsigned>(P.getKind()));
 }
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,

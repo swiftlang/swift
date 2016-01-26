@@ -77,6 +77,7 @@ struct Wrapper {
 
 class AB {
   var value: Int
+  var value2: Int
   init(value: Int)
    deinit 
 }
@@ -94,6 +95,17 @@ struct TwoField {
   init()
 }
 
+class C1 {}
+
+class C2  {
+ var current: Int
+ init()
+}
+class C3 : C2 {
+ override init()
+}
+
+sil_global @total : $Int32
 
 sil @use : $@convention(thin) (Builtin.Int32) -> ()
 sil @use_Int : $@convention(thin) (Int) -> ()
@@ -104,6 +116,30 @@ sil @use_twofield : $@convention(thin) (TwoField) -> ()
 sil @escaped_a_ptr : $@convention(thin) (@out A) -> ()
 sil @escaped_a : $@convention(thin) () -> Builtin.RawPointer
 sil @init_twofield : $@convention(thin) (@thin TwoField.Type) -> TwoField
+
+
+// We have a bug in the old projection code which this test case exposes.
+// Make sure its handled properly in the new projection.
+//
+// Make sure the store to the different fields does not affect the load
+//
+// CHECK-LABEL: sil hidden @load_forward_across_store_to_different_field
+// CHECK: load
+// CHECK-NOT: load
+// CHECK: return
+sil hidden @load_forward_across_store_to_different_field : $@convention(thin) (@owned AB) -> Int {
+bb0(%0 : $AB):
+  %2 = ref_element_addr %0 : $AB, #AB.value       // user: %3
+  %3 = load %2 : $*Int                            // user: %6
+  %222 = ref_element_addr %0 : $AB, #AB.value2       // user: %3
+  store %3 to %222 : $*Int
+  %4 = ref_element_addr %0 : $AB, #AB.value       // user: %5
+  %5 = load %4 : $*Int                            // user: %7
+  %22 = function_ref @use_Int : $@convention(thin) (Int) -> ()
+  apply %22(%3) : $@convention(thin) (Int) -> ()
+  apply %22(%5) : $@convention(thin) (Int) -> ()
+  return %5 : $Int                               // id: %15
+}
 
 // CHECK-LABEL: sil hidden @redundant_load_across_fixlifetime_inst
 // CHECK: load
@@ -249,8 +285,6 @@ bb0(%0 : $Agg1):
   dealloc_stack %1 : $*Agg1
   return %5 : $Builtin.Int32
 }
-
-sil_global @total : $Int32
 
 // CHECK-LABEL: sil @store_promotion
 // CHECK: store
@@ -904,4 +938,43 @@ bb0(%0 : $@box Builtin.Int32):
   return %r : $(Builtin.Int32, Builtin.Int32)
 }
 
+// Make sure we can forward loads to class members from the same class through
+// upcast.
+//
+// CHECK-LABEL: sil @load_forward_same_upcasted_base
+// CHECK: bb0
+// CHECK: load 
+// CHECK-NOT: load 
+// CHECK: return
+sil @load_forward_same_upcasted_base : $@convention(thin)(C3) -> () {
+bb0(%0 : $C3):
+  %1 = upcast %0 : $C3 to $C2
+  %2 = ref_element_addr %1 : $C2, #C2.current
+  %3 = load %2 : $*Int
+  %4 = upcast %0 : $C3 to $C2
+  %5 = ref_element_addr %4 : $C2, #C2.current
+  %6 = load %5 : $*Int
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// Make sure we can forward loads to class members from the same class through
+// downcast.
+//
+// CHECK-LABEL: sil @load_forward_same_downcasted_base
+// CHECK: bb0
+// CHECK: load 
+// CHECK-NOT: load 
+// CHECK: return
+sil @load_forward_same_downcasted_base : $@convention(thin)(C1) -> () {
+bb0(%0 : $C1):
+  %1 = unchecked_ref_cast %0 : $C1 to $C2
+  %2 = ref_element_addr %1 : $C2, #C2.current
+  %3 = load %2 : $*Int
+  %4 = unchecked_ref_cast %0 : $C1 to $C2
+  %5 = ref_element_addr %4 : $C2, #C2.current
+  %6 = load %5 : $*Int
+  %7 = tuple ()
+  return %7 : $()
+}
 
