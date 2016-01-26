@@ -4359,12 +4359,13 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
     // If the element changed, rebuild a new ParenExpr.
     assert(fromTupleExpr.size() == 1 && fromTupleExpr[0]);
     if (fromTupleExpr[0] != argParen->getSubExpr()) {
+      bool argParenImplicit = argParen->isImplicit();
       argParen = new (tc.Context) ParenExpr(argParen->getLParenLoc(),
                                             fromTupleExpr[0],
                                             argParen->getRParenLoc(),
                                             argParen->hasTrailingClosure(),
                                             fromTupleExpr[0]->getType());
-      if (argParen->isImplicit()) {
+      if (argParenImplicit) {
         argParen->setImplicit();
       }
       arg = argParen;
