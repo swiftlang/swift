@@ -416,7 +416,17 @@ bool irgen::hasKnownVTableEntry(IRGenModule &IGM,
   return hasKnownSwiftImplementation(IGM, theClass);
 }
 
-static bool hasBuiltinTypeMetadata(CanType type) {
+/// Is it basically trivial to access the given metadata?  If so, we don't
+/// need a cache variable in its accessor.
+bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
+  // Value type metadata only requires dynamic initialization on first
+  // access if it contains a resilient type.
+  if (isa<StructType>(type) || isa<EnumType>(type)) {
+    assert(!cast<NominalType>(type)->getDecl()->isGenericContext() &&
+           "shouldn't be called for a generic type");
+    return (IGM.getTypeInfoForLowered(type).isFixedSize());
+  }
+
   // The empty tuple type has a singleton metadata.
   if (auto tuple = dyn_cast<TupleType>(type))
     return tuple->getNumElements() == 0;
@@ -431,23 +441,9 @@ static bool hasBuiltinTypeMetadata(CanType type) {
   if (isa<SILBoxType>(type))
     return true;
 
-  return false;
-}
-
-/// Is it basically trivial to access the given metadata?  If so, we don't
-/// need a cache variable in its accessor.
-static bool isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
-  // Value type metadata only requires dynamic initialization on first
-  // access if it contains a resilient type.
-  if (isa<StructType>(type) || isa<EnumType>(type)) {
-    assert(!cast<NominalType>(type)->getDecl()->isGenericContext() &&
-           "shouldn't be called for a generic type");
-    return (IGM.getTypeInfoForLowered(type).isFixedSize());
-  }
-
-  if (hasBuiltinTypeMetadata(type)) {
+  // DynamicSelfType is actually local.
+  if (type->hasDynamicSelfType())
     return true;
-  }
 
   return false;
 }
@@ -455,8 +451,7 @@ static bool isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
 /// Return the standard access strategy for getting a non-dependent
 /// type metadata object.
 MetadataAccessStrategy
-irgen::getTypeMetadataAccessStrategy(IRGenModule &IGM, CanType type,
-                                     bool preferDirectAccess) {
+irgen::getTypeMetadataAccessStrategy(IRGenModule &IGM, CanType type) {
   assert(!type->hasArchetype());
 
   // Non-generic structs, enums, and classes are special cases.
@@ -468,10 +463,6 @@ irgen::getTypeMetadataAccessStrategy(IRGenModule &IGM, CanType type,
   if (nominal && !isa<ProtocolType>(nominal)) {
     if (nominal->getDecl()->isGenericContext())
       return MetadataAccessStrategy::NonUniqueAccessor;
-
-    if (preferDirectAccess &&
-        isTypeMetadataAccessTrivial(IGM, type))
-      return MetadataAccessStrategy::Direct;
 
     // If the type doesn't guarantee that it has an access function,
     // we might have to use a non-unique accessor.
@@ -491,14 +482,6 @@ irgen::getTypeMetadataAccessStrategy(IRGenModule &IGM, CanType type,
     }
     llvm_unreachable("bad formal linkage");
   }
-
-  // DynamicSelfType is actually local.
-  if (type->hasDynamicSelfType())
-    return MetadataAccessStrategy::Direct;
-
-  // Some types have special metadata in the runtime.
-  if (hasBuiltinTypeMetadata(type))
-    return MetadataAccessStrategy::Direct;
 
   // Everything else requires a shared accessor function.
   return MetadataAccessStrategy::NonUniqueAccessor;
@@ -1158,22 +1141,20 @@ static llvm::Value *emitCallToTypeMetadataAccessFunction(IRGenFunction &IGF,
 
 /// Produce the type metadata pointer for the given type.
 llvm::Value *IRGenFunction::emitTypeMetadataRef(CanType type) {
-  if (!type->hasArchetype()) {
-    switch (getTypeMetadataAccessStrategy(IGM, type,
-                                          /*preferDirectAccess=*/true)) {
-    case MetadataAccessStrategy::Direct:
-      return emitDirectTypeMetadataRef(*this, type);
-    case MetadataAccessStrategy::PublicUniqueAccessor:
-    case MetadataAccessStrategy::HiddenUniqueAccessor:
-    case MetadataAccessStrategy::PrivateAccessor:
-      return emitCallToTypeMetadataAccessFunction(*this, type, NotForDefinition);
-    case MetadataAccessStrategy::NonUniqueAccessor:
-      return emitCallToTypeMetadataAccessFunction(*this, type, ForDefinition);
-    }
-    llvm_unreachable("bad type metadata access strategy");
+  if (type->hasArchetype() ||
+      isTypeMetadataAccessTrivial(IGM, type)) {
+    return emitDirectTypeMetadataRef(*this, type);
   }
 
-  return emitDirectTypeMetadataRef(*this, type);
+  switch (getTypeMetadataAccessStrategy(IGM, type)) {
+  case MetadataAccessStrategy::PublicUniqueAccessor:
+  case MetadataAccessStrategy::HiddenUniqueAccessor:
+  case MetadataAccessStrategy::PrivateAccessor:
+    return emitCallToTypeMetadataAccessFunction(*this, type, NotForDefinition);
+  case MetadataAccessStrategy::NonUniqueAccessor:
+    return emitCallToTypeMetadataAccessFunction(*this, type, ForDefinition);
+  }
+  llvm_unreachable("bad type metadata access strategy");
 }
 
 /// Return the address of a function that will return type metadata 
@@ -1183,13 +1164,11 @@ llvm::Function *irgen::getOrCreateTypeMetadataAccessFunction(IRGenModule &IGM,
   assert(!type->hasArchetype() &&
          "cannot create global function to return dependent type metadata");
 
-  switch (getTypeMetadataAccessStrategy(IGM, type,
-                                        /*preferDirectAccess=*/false)) {
+  switch (getTypeMetadataAccessStrategy(IGM, type)) {
   case MetadataAccessStrategy::PublicUniqueAccessor:
   case MetadataAccessStrategy::HiddenUniqueAccessor:
   case MetadataAccessStrategy::PrivateAccessor:
     return getTypeMetadataAccessFunction(IGM, type, NotForDefinition);
-  case MetadataAccessStrategy::Direct:
   case MetadataAccessStrategy::NonUniqueAccessor:
     return getTypeMetadataAccessFunction(IGM, type, ForDefinition);
   }
