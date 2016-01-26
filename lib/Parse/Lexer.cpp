@@ -177,7 +177,15 @@ Lexer::Lexer(const LangOptions &Options,
   StringRef contents = SM.extractText(SM.getRangeForBuffer(BufferID));
   BufferStart = contents.data();
   BufferEnd = contents.data() + contents.size();
-  CurPtr = BufferStart;
+
+  // Check for Unicode BOM at start of file (Only UTF-8 BOM supported now).
+  size_t BOMLength = llvm::StringSwitch<size_t>(contents)
+    .StartsWith("\xEF\xBB\xBF", 3)
+    .Default(0);
+
+  // Since the UTF-8 BOM doesn't carry information (UTF-8 has no dependency
+  // on byte order), throw it away.
+  CurPtr = BufferStart + BOMLength;
 
   // Initialize code completion.
   if (BufferID == SM.getCodeCompletionBufferID()) {
