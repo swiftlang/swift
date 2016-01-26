@@ -1175,3 +1175,9 @@ _ = r19874152S5()  // ok
 
 
 
+// <rdar://problem/24314506> QoI: Fix-it for dictionary initializer on required class var suggests [] instead of [:]
+class r24314506 {  // expected-error {{class 'r24314506' has no initializers}}
+  var myDict: [String: AnyObject]  // expected-note {{stored property 'myDict' without initial value prevents synthesized initializers}} {{34-34= = [:]}}
+}
+
+
