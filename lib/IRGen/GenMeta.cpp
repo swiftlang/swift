@@ -123,24 +123,45 @@ namespace {
   /// nominal metadata reference.  The structure produced here is
   /// consumed by swift_getGenericMetadata() and must correspond to
   /// the fill operations that the compiler emits for the bound decl.
+  ///
+  /// FIXME: Rework to use GenericSignature instead of AllArchetypes
+  /// FIXME: Rework for nested generics
   struct GenericArguments {
     /// The values to use to initialize the arguments structure.
     SmallVector<llvm::Value *, 8> Values;
     SmallVector<llvm::Type *, 8> Types;
 
+    void collectTypes(IRGenModule &IGM, const NominalTypeDecl *nominal) {
+      auto generics = nominal->getGenericParamsOfContext();
+      collectTypes(IGM, generics->getForwardingSubstitutions(IGM.Context));
+    }
+
+    void collectTypes(IRGenModule &IGM, ArrayRef<Substitution> subs) {
+      // Add all the argument archetypes.
+      Types.append(subs.size(), IGM.TypeMetadataPtrTy);
+
+      // Add protocol witness tables for all those archetypes.
+      for (auto sub : subs) {
+        auto conformances = sub.getConformances();
+
+        for (auto &conformance : conformances) {
+          auto *proto = conformance.getRequirement();
+          if (!Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
+            continue;
+
+          Types.push_back(IGM.WitnessTablePtrTy);
+        }
+      }
+    }
+
     void collect(IRGenFunction &IGF, BoundGenericType *type) {
       auto subs = type->getSubstitutions(/*FIXME:*/nullptr, nullptr);
+
       // Add all the argument archetypes.
-      // TODO: only the *primary* archetypes
-      // TODO: not archetypes from outer contexts
-      // TODO: but we are partially determined by the outer context!
       for (auto &sub : subs) {
         CanType subbed = sub.getReplacement()->getCanonicalType();
         Values.push_back(IGF.emitTypeMetadataRef(subbed));
       }
-
-      // All of those values are metadata pointers.
-      Types.append(Values.size(), IGF.IGM.TypeMetadataPtrTy);
 
       // Add protocol witness tables for all those archetypes.
       for (auto i : indices(subs)) {
@@ -148,8 +169,8 @@ namespace {
         emitWitnessTableRefs(IGF, subs[i], &metadata, Values);
       }
 
-      // All of those values are witness table pointers.
-      Types.append(Values.size() - Types.size(), IGF.IGM.WitnessTablePtrTy);
+      collectTypes(IGF.IGM, subs);
+      assert(Types.size() == Values.size());
     }
   };
 }
@@ -240,138 +261,55 @@ static llvm::Value *emitForeignTypeMetadataRef(IRGenFunction &IGF,
 }
 
 /// Returns a metadata reference for a nominal type.
+///
+/// This is only valid in a couple of special cases:
+/// 1) The nominal type is generic, in which case we emit a call to the
+///    generic metadata accessor function, which must be defined separately.
+/// 2) The nominal type is a value type with a fixed size from this
+///    resilience domain, in which case we can reference the constant
+///    metadata directly.
+///
+/// In any other case, a metadata accessor should be called instead.
 static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
                                            NominalTypeDecl *theDecl,
                                            CanType theType) {
   assert(!isa<ProtocolDecl>(theDecl));
 
-  // Non-native Swift classes need to be handled differently.
-  if (auto theClass = dyn_cast<ClassDecl>(theDecl)) {
-    // We emit a completely different pattern for foreign classes.
-    if (theClass->isForeign()) {
-      return emitForeignTypeMetadataRef(IGF, theType);
-    }
-
-    // Classes that might not have Swift metadata use a different
-    // symbol name.
-    if (!hasKnownSwiftMetadata(IGF.IGM, theClass)) {
-      assert(!theDecl->getGenericParamsOfContext() &&
-             "ObjC class cannot be generic");
-      return emitObjCMetadataRef(IGF, theClass);
-    }
-  } else if (theDecl->hasClangNode()) {
-    // Imported Clang types require foreign metadata uniquing too.
-    return emitForeignTypeMetadataRef(IGF, theType);
+  if (!theDecl->isGenericContext()) {
+    assert(!IGF.IGM.isResilient(theDecl, ResilienceExpansion::Maximal));
+    // TODO: If Obj-C interop is off, we can relax this to allow referencing
+    // class metadata too.
+    assert(isa<StructDecl>(theDecl) || isa<EnumDecl>(theDecl));
+    return IGF.IGM.getAddrOfTypeMetadata(theType, false);
   }
 
-  bool isPattern = IGF.IGM.hasMetadataPattern(theDecl);
-
-  // If this is generic, check to see if we've maybe got a local
-  // reference already.
-  if (isPattern) {
-    if (auto cache = IGF.tryGetLocalTypeData(theType,
-                                             LocalTypeDataKind::forTypeMetadata()))
-      return cache;
-  }
-
-  // Grab a reference to the metadata or metadata template.
-  CanType declaredType = theDecl->getDeclaredType()->getCanonicalType();
-  llvm::Value *metadata = IGF.IGM.getAddrOfTypeMetadata(declaredType,isPattern);
-
-  // If we don't have a metadata pattern, that's all we need.
-  if (!isPattern) {
-    assert(metadata->getType() == IGF.IGM.TypeMetadataPtrTy);
-
-    // If this is a class, we need to force ObjC initialization,
-    // but only if we're doing Objective-C interop.
-    if (IGF.IGM.ObjCInterop && isa<ClassDecl>(theDecl)) {
-      metadata = IGF.Builder.CreateBitCast(metadata, IGF.IGM.ObjCClassPtrTy);
-      metadata = IGF.Builder.CreateCall(IGF.IGM.getGetInitializedObjCClassFn(),
-                                        metadata);
-      metadata = IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy);
-    }
-
-    return metadata;
-  }
-
-  // Okay, we need to call swift_getGenericMetadata.
-  assert(metadata->getType() == IGF.IGM.TypeMetadataPatternPtrTy);
-
-  // If we have a pattern but no generic substitutions, we're just
-  // doing resilient type layout.
-  if (isPattern && !theDecl->isGenericContext()) {
-    llvm::Constant *getter = IGF.IGM.getGetResilientMetadataFn();
-
-    auto result = IGF.Builder.CreateCall(getter, {metadata});
-    result->setDoesNotThrow();
-    result->addAttribute(llvm::AttributeSet::FunctionIndex,
-                         llvm::Attribute::ReadNone);
-    IGF.setScopedLocalTypeData(theType, LocalTypeDataKind::forTypeMetadata(),
-                               result);
-    return result;
-  }
-
-  // Grab the substitutions.
+  // We are applying generic parameters to a generic type.
   auto boundGeneric = cast<BoundGenericType>(theType);
   assert(boundGeneric->getDecl() == theDecl);
 
+  // Check to see if we've maybe got a local reference already.
+  if (auto cache = IGF.tryGetLocalTypeData(theType,
+                                           LocalTypeDataKind::forTypeMetadata()))
+    return cache;
+
+  // Grab the substitutions.
   GenericArguments genericArgs;
   genericArgs.collect(IGF, boundGeneric);
-  
-  // If we have less than four arguments, use a fast entry point.
   assert(genericArgs.Values.size() > 0 && "no generic args?!");
-  if (genericArgs.Values.size() <= 4) {
-    llvm::Constant *fastGetter;
-    switch (genericArgs.Values.size()) {
-    case 1: fastGetter = IGF.IGM.getGetGenericMetadata1Fn(); break;
-    case 2: fastGetter = IGF.IGM.getGetGenericMetadata2Fn(); break;
-    case 3: fastGetter = IGF.IGM.getGetGenericMetadata3Fn(); break;
-    case 4: fastGetter = IGF.IGM.getGetGenericMetadata4Fn(); break;
-    default: llvm_unreachable("bad number of generic arguments");
-    }
-    
-    SmallVector<llvm::Value *, 5> args;
-    args.push_back(metadata);
-    for (auto value : genericArgs.Values)
-      args.push_back(IGF.Builder.CreateBitCast(value, IGF.IGM.Int8PtrTy));
-    auto result = IGF.Builder.CreateCall(fastGetter, args);
-    result->setDoesNotThrow();
-    result->addAttribute(llvm::AttributeSet::FunctionIndex,
-                         llvm::Attribute::ReadNone);
-    IGF.setScopedLocalTypeData(theType, LocalTypeDataKind::forTypeMetadata(),
-                               result);
-    return result;
-  }
 
-  // Slam that information directly into the generic arguments buffer.
-  auto argsBufferTy =
-    llvm::StructType::get(IGF.IGM.LLVMContext, genericArgs.Types);
-  Address argsBuffer = IGF.createAlloca(argsBufferTy,
-                                        IGF.IGM.getPointerAlignment(),
-                                        "generic.arguments");
-  IGF.Builder.CreateLifetimeStart(argsBuffer,
-                          IGF.IGM.getPointerSize() * genericArgs.Values.size());
-  for (unsigned i = 0, e = genericArgs.Values.size(); i != e; ++i) {
-    Address elt = IGF.Builder.CreateStructGEP(argsBuffer, i,
-                                              IGF.IGM.getPointerSize() * i);
-    IGF.Builder.CreateStore(genericArgs.Values[i], elt);
-  }
+  // Call the generic metadata accessor function.
+  llvm::Function *accessor =
+      IGF.IGM.getAddrOfGenericTypeMetadataAccessFunction(theDecl,
+                                                         genericArgs.Types,
+                                                         NotForDefinition);
 
-  // Cast to void*.
-  llvm::Value *arguments =
-    IGF.Builder.CreateBitCast(argsBuffer.getAddress(), IGF.IGM.Int8PtrTy);
-
-  // Make the call.
-  auto result = IGF.Builder.CreateCall(IGF.IGM.getGetGenericMetadataFn(),
-                                       {metadata, arguments});
+  auto result = IGF.Builder.CreateCall(accessor, genericArgs.Values);
   result->setDoesNotThrow();
   result->addAttribute(llvm::AttributeSet::FunctionIndex,
-                       llvm::Attribute::ReadOnly);
+                       llvm::Attribute::ReadNone);
 
-  IGF.Builder.CreateLifetimeEnd(argsBuffer,
-                          IGF.IGM.getPointerSize() * genericArgs.Values.size());
-
-  IGF.setScopedLocalTypeData(theType, LocalTypeDataKind::forTypeMetadata(), result);
+  IGF.setScopedLocalTypeData(theType, LocalTypeDataKind::forTypeMetadata(),
+                             result);
   return result;
 }
 
@@ -419,11 +357,20 @@ bool irgen::hasKnownVTableEntry(IRGenModule &IGM,
 /// Is it basically trivial to access the given metadata?  If so, we don't
 /// need a cache variable in its accessor.
 bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
+  assert(!type->hasArchetype());
+  assert(!type->hasUnboundGenericType());
+
   // Value type metadata only requires dynamic initialization on first
   // access if it contains a resilient type.
   if (isa<StructType>(type) || isa<EnumType>(type)) {
-    assert(!cast<NominalType>(type)->getDecl()->isGenericContext() &&
+    assert(!type->getAnyNominal()->isGenericContext() &&
            "shouldn't be called for a generic type");
+
+    // Imported type metadata always requires an accessor.
+    if (type->getAnyNominal()->hasClangNode())
+      return false;
+
+    // Resiliently-sized metadata access always requires an accessor.
     return (IGM.getTypeInfoForLowered(type).isFixedSize());
   }
 
@@ -452,6 +399,8 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
 /// type metadata object.
 MetadataAccessStrategy
 irgen::getTypeMetadataAccessStrategy(IRGenModule &IGM, CanType type) {
+  // We should not be emitting accessors for partially-substituted
+  // generic types.
   assert(!type->hasArchetype());
 
   // Non-generic structs, enums, and classes are special cases.
@@ -459,16 +408,21 @@ irgen::getTypeMetadataAccessStrategy(IRGenModule &IGM, CanType type) {
   // Note that while protocol types don't have a metadata pattern,
   // we still require an accessor since we actually want to get
   // the metadata for the existential type.
-  auto nominal = dyn_cast<NominalType>(type);
-  if (nominal && !isa<ProtocolType>(nominal)) {
-    if (nominal->getDecl()->isGenericContext())
-      return MetadataAccessStrategy::NonUniqueAccessor;
+  auto nominal = type->getAnyNominal();
+  if (nominal && !isa<ProtocolDecl>(nominal)) {
+    // Metadata accessors for fully-substituted generic types are
+    // emitted with shared linkage.
+    if (nominal->isGenericContext()) {
+      if (isa<BoundGenericType>(type))
+        return MetadataAccessStrategy::NonUniqueAccessor;
+      assert(isa<UnboundGenericType>(type));
+    }
 
     // If the type doesn't guarantee that it has an access function,
     // we might have to use a non-unique accessor.
 
     // Everything else requires accessors.
-    switch (getDeclLinkage(nominal->getDecl())) {
+    switch (getDeclLinkage(nominal)) {
     case FormalLinkage::PublicUnique:
       return MetadataAccessStrategy::PublicUniqueAccessor;
     case FormalLinkage::HiddenUnique:
@@ -1074,11 +1028,129 @@ void irgen::emitLazyCacheAccessFunction(IRGenModule &IGM,
   IGF.Builder.CreateRet(phi);
 }
 
+static llvm::Value *emitGenericMetadataAccessFunction(IRGenFunction &IGF,
+                                                      NominalTypeDecl *nominal,
+                                                      GenericArguments genericArgs) {
+  CanType declaredType = nominal->getDeclaredType()->getCanonicalType();
+  llvm::Value *metadata = IGF.IGM.getAddrOfTypeMetadata(declaredType, true);
+
+  // Collect input arguments to the generic metadata accessor, as laid out
+  // by the GenericArguments class.
+  for (auto &arg : IGF.CurFn->args())
+    genericArgs.Values.push_back(&arg);
+  assert(genericArgs.Values.size() == genericArgs.Types.size());
+
+  // If we have less than four arguments, use a fast entry point.
+  assert(genericArgs.Values.size() > 0 && "no generic args?!");
+
+  // Slam that information directly into the generic arguments buffer.
+  auto argsBufferTy =
+    llvm::StructType::get(IGF.IGM.LLVMContext, genericArgs.Types);
+  Address argsBuffer = IGF.createAlloca(argsBufferTy,
+                                        IGF.IGM.getPointerAlignment(),
+                                        "generic.arguments");
+  IGF.Builder.CreateLifetimeStart(argsBuffer,
+                          IGF.IGM.getPointerSize() * genericArgs.Values.size());
+  for (unsigned i = 0, e = genericArgs.Values.size(); i != e; ++i) {
+    Address elt = IGF.Builder.CreateStructGEP(argsBuffer, i,
+                                              IGF.IGM.getPointerSize() * i);
+    IGF.Builder.CreateStore(genericArgs.Values[i], elt);
+  }
+
+  // Cast to void*.
+  llvm::Value *arguments =
+    IGF.Builder.CreateBitCast(argsBuffer.getAddress(), IGF.IGM.Int8PtrTy);
+
+  // Make the call.
+  auto result = IGF.Builder.CreateCall(IGF.IGM.getGetGenericMetadataFn(),
+                                       {metadata, arguments});
+  result->setDoesNotThrow();
+  result->addAttribute(llvm::AttributeSet::FunctionIndex,
+                       llvm::Attribute::ReadOnly);
+
+  IGF.Builder.CreateLifetimeEnd(argsBuffer,
+                          IGF.IGM.getPointerSize() * genericArgs.Values.size());
+
+  return result;
+
+}
+
+/// Emit the body of a metadata accessor function for the given type.
+static llvm::Value *emitMetadataAccessFunction(IRGenFunction &IGF,
+                                               CanType type) {
+  if (auto nominal = type->getAnyNominal()) {
+    if (nominal->isGenericContext()) {
+      // This is a metadata accessor for a fully substituted generic type.
+      assert(!type->hasArchetype() &&
+             "partially substituted types do not have accessors");
+      return emitDirectTypeMetadataRef(IGF, type);
+    }
+
+    // We should not be emitting metadata accessors for types unless
+    // we have full knowledge of their layout.
+    assert(!IGF.IGM.isResilient(nominal, ResilienceExpansion::Maximal));
+
+    // We will still have a metadata pattern if the type is not generic,
+    // but contains resiliently-sized fields.
+    bool isPattern = IGF.IGM.hasMetadataPattern(nominal);
+
+    // Non-native Swift classes need to be handled differently.
+    if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
+      // We emit a completely different pattern for foreign classes.
+      if (classDecl->isForeign()) {
+        return emitForeignTypeMetadataRef(IGF, type);
+      }
+
+      // Classes that might not have Swift metadata use a different
+      // symbol name.
+      if (!hasKnownSwiftMetadata(IGF.IGM, classDecl)) {
+        assert(!classDecl->isGenericContext() &&
+               "ObjC class cannot be generic");
+        return emitObjCMetadataRef(IGF, classDecl);
+      }
+
+      // If this is a class with constant metadata, we still need to
+      // force ObjC initialization if we're doing Objective-C interop.
+      if (IGF.IGM.ObjCInterop && !isPattern) {
+        llvm::Value *metadata = IGF.IGM.getAddrOfTypeMetadata(type, false);
+        metadata = IGF.Builder.CreateBitCast(metadata, IGF.IGM.ObjCClassPtrTy);
+        metadata = IGF.Builder.CreateCall(IGF.IGM.getGetInitializedObjCClassFn(),
+                                          metadata);
+        return IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy);
+      }
+
+    // Imported value types require foreign metadata uniquing too.
+    } else if (nominal->hasClangNode()) {
+      return emitForeignTypeMetadataRef(IGF, type);
+    }
+
+    // If we have a pattern but no generic substitutions, we're just
+    // doing resilient type layout.
+    if (isPattern) {
+      llvm::Constant *getter = IGF.IGM.getGetResilientMetadataFn();
+
+      llvm::Value *metadata = IGF.IGM.getAddrOfTypeMetadata(type, true);
+      auto result = IGF.Builder.CreateCall(getter, {metadata});
+      result->setDoesNotThrow();
+      result->addAttribute(llvm::AttributeSet::FunctionIndex,
+                           llvm::Attribute::ReadNone);
+      return result;
+    }
+
+    // Accessor is trivial, just return pointer to constant metadata.
+    return IGF.IGM.getAddrOfTypeMetadata(type, false);
+  }
+
+  return emitDirectTypeMetadataRef(IGF, type);
+}
+
 /// Get or create an accessor function to the given non-dependent type.
 static llvm::Function *getTypeMetadataAccessFunction(IRGenModule &IGM,
-                                                     CanType type,
-                                               ForDefinition_t shouldDefine) {
+                                                 CanType type,
+                                                 ForDefinition_t shouldDefine) {
   assert(!type->hasArchetype());
+  assert(!isa<UnboundGenericType>(type));
+
   llvm::Function *accessor =
     IGM.getAddrOfTypeMetadataAccessFunction(type, shouldDefine);
 
@@ -1099,7 +1171,33 @@ static llvm::Function *getTypeMetadataAccessFunction(IRGenModule &IGM,
 
   emitLazyCacheAccessFunction(IGM, accessor, cacheVariable,
                               [&](IRGenFunction &IGF) -> llvm::Value* {
-    return emitDirectTypeMetadataRef(IGF, type);
+    return emitMetadataAccessFunction(IGF, type);
+  });
+
+  return accessor;
+}
+
+/// Get or create an accessor function to the given generic type.
+static llvm::Function *getGenericTypeMetadataAccessFunction(IRGenModule &IGM,
+                                                 NominalTypeDecl *nominal,
+                                                 ForDefinition_t shouldDefine) {
+  assert(nominal->isGenericContext());
+
+  GenericArguments genericArgs;
+  genericArgs.collectTypes(IGM, nominal);
+
+  llvm::Function *accessor =
+    IGM.getAddrOfGenericTypeMetadataAccessFunction(
+        nominal, genericArgs.Types, shouldDefine);
+
+  // If we're not supposed to define the accessor, or if we already
+  // have defined it, just return the pointer.
+  if (!shouldDefine || !accessor->empty())
+    return accessor;
+
+  emitLazyCacheAccessFunction(IGM, accessor, /*cacheVariable=*/nullptr,
+                              [&](IRGenFunction &IGF) -> llvm::Value* {
+    return emitGenericMetadataAccessFunction(IGF, nominal, genericArgs);
   });
 
   return accessor;
@@ -1109,9 +1207,10 @@ static llvm::Function *getTypeMetadataAccessFunction(IRGenModule &IGM,
 /// for the given type.
 static void maybeEmitTypeMetadataAccessFunction(IRGenModule &IGM,
                                                 NominalTypeDecl *theDecl) {
-  // Currently, we always emit type metadata access functions for
-  // the non-generic types we define.
-  if (theDecl->isGenericContext()) return;
+  if (theDecl->isGenericContext()) {
+    (void) getGenericTypeMetadataAccessFunction(IGM, theDecl, ForDefinition);
+    return;
+  }
 
   CanType declaredType = theDecl->getDeclaredType()->getCanonicalType();
   (void) getTypeMetadataAccessFunction(IGM, declaredType, ForDefinition);

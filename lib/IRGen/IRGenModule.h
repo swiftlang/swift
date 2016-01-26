@@ -755,6 +755,10 @@ public:
   llvm::Constant *getAddrOfTypeMetadata(CanType concreteType, bool isPattern);
   llvm::Function *getAddrOfTypeMetadataAccessFunction(CanType type,
                                                ForDefinition_t forDefinition);
+  llvm::Function *getAddrOfGenericTypeMetadataAccessFunction(
+                                             NominalTypeDecl *nominal,
+                                             ArrayRef<llvm::Type *> genericArgs,
+                                             ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type,
                                                ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfForeignTypeMetadataCandidate(CanType concreteType);

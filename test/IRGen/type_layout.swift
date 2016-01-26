@@ -52,7 +52,7 @@ struct TypeLayoutTest<T> {
   // CHECK:       store i8** [[T_LAYOUT]]
   var i: GSing<T>
   // -- Multi-element generic struct, need to derive from metadata
-  // CHECK:       [[METADATA:%.*]] = call %swift.type* @swift_getGenericMetadata1
+  // CHECK:       [[METADATA:%.*]] = call %swift.type* @_TMaV11type_layout5GMult
   // CHECK:       [[T0:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
   // CHECK:       [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], {{i32|i64}} -1
   // CHECK:       [[VALUE_WITNESSES:%.*]] = load i8**, i8*** [[T1]]

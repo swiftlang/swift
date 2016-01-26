@@ -2165,12 +2165,37 @@ IRGenModule::getAddrOfTypeMetadataAccessFunction(CanType type,
   return entry;
 }
 
+/// Fetch the type metadata access function for the given generic type.
+llvm::Function *
+IRGenModule::getAddrOfGenericTypeMetadataAccessFunction(
+                                           NominalTypeDecl *nominal,
+                                           ArrayRef<llvm::Type *> genericArgs,
+                                           ForDefinition_t forDefinition) {
+  assert(!genericArgs.empty());
+  assert(nominal->isGenericContext());
+
+  auto type = nominal->getDeclaredType()->getCanonicalType();
+  assert(isa<UnboundGenericType>(type));
+  LinkEntity entity = LinkEntity::forTypeMetadataAccessFunction(type);
+  llvm::Function *&entry = GlobalFuncs[entity];
+  if (entry) {
+    if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
+    return entry;
+  }
+
+  auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy, genericArgs, false);
+  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+  entry = link.createFunction(*this, fnType, RuntimeCC, llvm::AttributeSet());
+  return entry;
+}
+
 /// Get or create a type metadata cache variable.  These are an
 /// implementation detail of type metadata access functions.
 llvm::Constant *
 IRGenModule::getAddrOfTypeMetadataLazyCacheVariable(CanType type,
                                               ForDefinition_t forDefinition) {
   assert(!type->hasArchetype() && !type->hasTypeParameter());
+  assert(!type->hasUnboundGenericType());
   LinkEntity entity = LinkEntity::forTypeMetadataLazyCacheVariable(type);
   return getAddrOfLLVMVariable(entity, getPointerAlignment(), forDefinition,
                                TypeMetadataPtrTy, DebugTypeInfo());

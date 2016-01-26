@@ -98,8 +98,7 @@ sil_vtable StorageQualified {}
 // CHECK:   load %swift.type**, %swift.type*** [[SLOT]], align 8
 // CHECK:   br
 // CHECK:   store {{.*}} @_TMfV18field_type_vectors3Foo
-// CHECK:   [[T:%.*]] = bitcast %swift.type* %T to i8*
-// CHECK:   call %swift.type* @swift_getGenericMetadata1({{.*}} @_TMPV18field_type_vectors3Bar {{.*}}, i8* [[T]])
+// CHECK:   call %swift.type* @_TMaV18field_type_vectors3Bar(%swift.type* %T)
 
 // CHECK: define private %swift.type** [[ZIM_TYPES_ACCESSOR]](%swift.type* %"Zim<T, U>")
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %"Zim<T, U>" to %swift.type***

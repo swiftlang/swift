@@ -3579,14 +3579,14 @@ void irgen::emitWitnessTableRefs(IRGenFunction &IGF,
   // Look at the replacement type.
   CanType replType = sub.getReplacement()->getCanonicalType();
 
-  for (unsigned j : indices(conformances)) {
-    auto proto = conformances[j].getRequirement();
+  for (auto &conformance : conformances) {
+    auto *proto = conformance.getRequirement();
     if (!Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
       continue;
 
     auto wtable = emitWitnessTableRef(IGF, replType, metadataCache,
                                       proto, IGF.IGM.getProtocolInfo(proto),
-                                      conformances[j]);
+                                      conformance);
 
     out.push_back(wtable);
   }

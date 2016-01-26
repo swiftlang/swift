@@ -504,36 +504,6 @@ FUNCTION(AllocateGenericValueMetadata, swift_allocateGenericValueMetadata,
          ARGS(TypeMetadataPatternPtrTy, Int8PtrPtrTy),
          ATTRS(NoUnwind))
 
-// Metadata *swift_getGenericMetadata1(GenericMetadata *pattern,
-//                                     const void *arg0);
-FUNCTION(GetGenericMetadata1, swift_getGenericMetadata1, RuntimeCC,
-         RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPatternPtrTy, Int8PtrTy),
-         ATTRS(NoUnwind, ReadNone))
-
-// Metadata *swift_getGenericMetadata2(GenericMetadata *pattern,
-//                                     const void *arg0, const void *arg1);
-FUNCTION(GetGenericMetadata2, swift_getGenericMetadata2, RuntimeCC,
-         RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPatternPtrTy, Int8PtrTy, Int8PtrTy),
-         ATTRS(NoUnwind, ReadNone))
-
-// Metadata *swift_getGenericMetadata3(GenericMetadata *pattern,
-//                                     const void *arg0, const void *arg1,
-//                                     const void *arg2);
-FUNCTION(GetGenericMetadata3, swift_getGenericMetadata3, RuntimeCC,
-         RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPatternPtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy),
-         ATTRS(NoUnwind, ReadNone))
-
-// Metadata *swift_getGenericMetadata4(GenericMetadata *pattern,
-//                                     const void *arg0, const void *arg1,
-//                                     const void *arg2, const void *arg3);
-FUNCTION(GetGenericMetadata4, swift_getGenericMetadata4, RuntimeCC,
-         RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPatternPtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy),
-         ATTRS(NoUnwind, ReadNone))
-
 // const ProtocolWitnessTable *
 // swift_getGenericWitnessTable(GenericProtocolWitnessTable *genericTable,
 //                              const Metadata *type,

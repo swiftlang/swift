@@ -204,7 +204,7 @@ sil @_TFC15generic_classes31RecursiveGenericInheritsGenericD : $@convention(meth
 
 
 // CHECK: define [[ROOTGENERIC]]* @RootGeneric_fragile_dependent_alloc
-// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_getGenericMetadata
+// CHECK:   [[METADATA:%.*]] = call %swift.type* @_TMaC15generic_classes11RootGeneric
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8*
 // CHECK:   [[T0:%.*]] = getelementptr inbounds i8, i8* [[METADATA_ARRAY]], i32 48
 // CHECK:   [[T1:%.*]] = bitcast i8* [[T0]] to i32*
@@ -323,8 +323,7 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   [[T1:%.*]] = load i8*, i8** [[T0]]
 // CHECK:   %B = bitcast i8* [[T1]] to %swift.type*
 //   Construct the superclass.
-// CHECK:   [[T0:%.*]] = bitcast %swift.type* %A to i8*
-// CHECK:   [[SUPER:%.*]] = call %swift.type* @swift_getGenericMetadata1(%swift.type_pattern* {{.*}} @_TMPC15generic_classes11RootGeneric {{.*}}, i8* [[T0]])
+// CHECK:   [[SUPER:%.*]] = call %swift.type* @_TMaC15generic_classes11RootGeneric(%swift.type* %A)
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* [[SUPER]] to %objc_class*
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* [[T0]])
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**

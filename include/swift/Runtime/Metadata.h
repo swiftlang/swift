@@ -2463,27 +2463,6 @@ extern "C" const Metadata *
 swift_getGenericMetadata(GenericMetadata *pattern,
                          const void *arguments);
 
-// Fast entry points for swift_getGenericMetadata with a small number of
-// template arguments.
-extern "C" const Metadata *
-swift_getGenericMetadata1(GenericMetadata *pattern,
-                          const void *arg0);
-extern "C" const Metadata *
-swift_getGenericMetadata2(GenericMetadata *pattern,
-                          const void *arg0,
-                          const void *arg1);
-extern "C" const Metadata *
-swift_getGenericMetadata3(GenericMetadata *pattern,
-                          const void *arg0,
-                          const void *arg1,
-                          const void *arg2);
-extern "C" const Metadata *
-swift_getGenericMetadata4(GenericMetadata *pattern,
-                          const void *arg0,
-                          const void *arg1,
-                          const void *arg2,
-                          const void *arg3);
-
 // Callback to allocate a generic class metadata object.
 extern "C" ClassMetadata *
 swift_allocateGenericClassMetadata(GenericMetadata *pattern,

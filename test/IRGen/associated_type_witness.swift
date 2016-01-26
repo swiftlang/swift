@@ -107,9 +107,7 @@ struct Computed<T, U> : Assocked {
 // CHECK:         [[T0:%.*]] = bitcast %swift.type* %"Computed<T, U>" to %swift.type**
 // CHECK-NEXT:    [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 4
 // CHECK-NEXT:    [[U:%.*]] = load %swift.type*, %swift.type** [[T1]], align 8, !invariant.load
-// CHECK:         [[T0:%.*]] = bitcast %swift.type* [[T]] to i8*
-// CHECK-NEXT:    [[T1:%.*]] = bitcast %swift.type* [[U]] to i8*
-// CHECK-NEXT:    [[FETCH_RESULT]] = call %swift.type* @swift_getGenericMetadata2({{.*}}, i8* [[T0]], i8* [[T1]])
+// CHECK-NEXT:    [[FETCH_RESULT]] = call %swift.type* @_TMaV23associated_type_witness4Pair(%swift.type* [[T]], %swift.type* [[U]])
 // CHECK-NEXT:    store atomic %swift.type* [[FETCH_RESULT]], %swift.type** [[CACHE]] release, align 8
 // CHECK-NEXT:    br label %cont
 
