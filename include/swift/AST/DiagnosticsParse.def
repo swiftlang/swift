@@ -1016,6 +1016,14 @@ ERROR(expected_type_after_as,none,
 ERROR(string_interpolation_extra,none,
       "extra tokens after interpolated string expression", ())
 
+// Selector expressions.
+ERROR(expr_selector_expected_lparen,PointsToFirstBadToken,
+      "expected '(' following '#selector'", ())
+ERROR(expr_selector_expected_expr,PointsToFirstBadToken,
+      "expected expression naming a method within '#selector(...)'", ())
+ERROR(expr_selector_expected_rparen,PointsToFirstBadToken,
+      "expected ')' to complete '#selector' expression", ())
+
 //------------------------------------------------------------------------------
 // Attribute-parsing diagnostics
 //------------------------------------------------------------------------------

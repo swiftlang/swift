@@ -434,6 +434,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
 ///     expr-postfix(Mode)
 ///     operator-prefix expr-unary(Mode)
 ///     '&' expr-unary(Mode)
+///     expr-selector
 ///
 ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   UnresolvedDeclRefExpr *Operator;
@@ -453,6 +454,9 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
     return makeParserResult(
         new (Context) InOutExpr(Loc, SubExpr.get(), Type()));
   }
+
+  case tok::pound_selector:
+    return parseExprSelector();
 
   case tok::oper_postfix:
     // Postfix operators cannot start a subexpression, but can happen
@@ -497,6 +501,50 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
 
   return makeParserResult(
       new (Context) PrefixUnaryExpr(Operator, SubExpr.get()));
+}
+
+/// parseExprSelector
+///
+///   expr-selector:
+///     '#selector' '(' expr ')'
+///
+ParserResult<Expr> Parser::parseExprSelector() {
+  // Consume '#selector'.
+  SourceLoc keywordLoc = consumeToken(tok::pound_selector);
+
+  // Parse the leading '('.
+  if (!Tok.is(tok::l_paren)) {
+    diagnose(Tok, diag::expr_selector_expected_lparen);
+    return makeParserError();
+  }
+  SourceLoc lParenLoc = consumeToken(tok::l_paren);
+
+  // Parse the subexpression.
+  ParserResult<Expr> subExpr = parseExpr(diag::expr_selector_expected_expr);
+  if (subExpr.hasCodeCompletion())
+    return subExpr;
+
+  // Parse the closing ')'
+  SourceLoc rParenLoc;
+  if (subExpr.isParseError()) {
+    skipUntilDeclStmtRBrace(tok::r_paren);
+    if (Tok.is(tok::r_paren))
+      rParenLoc = consumeToken();
+    else
+      rParenLoc = Tok.getLoc();
+  } else {
+    parseMatchingToken(tok::r_paren, rParenLoc,
+                       diag::expr_selector_expected_rparen, lParenLoc);
+  }
+
+  // If the subexpression was in error, just propagate the error.
+  if (subExpr.isParseError())
+    return makeParserResult<Expr>(
+             new (Context) ErrorExpr(SourceRange(keywordLoc, rParenLoc)));
+
+  return makeParserResult<Expr>(
+    new (Context) ObjCSelectorExpr(keywordLoc, lParenLoc, subExpr.get(),
+                                   rParenLoc));
 }
 
 static DeclRefKind getDeclRefKindForOperator(tok kind) {

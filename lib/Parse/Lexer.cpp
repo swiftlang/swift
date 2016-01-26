@@ -1619,6 +1619,11 @@ Restart:
       return formToken(tok::pound_available, TokStart);
     }
 
+    if (getSubstring(TokStart + 1, 8).equals("selector")) {
+      CurPtr += 8;
+      return formToken(tok::pound_selector, TokStart);
+    }
+
     // Allow a hashbang #! line at the beginning of the file.
     if (CurPtr - 1 == BufferStart && *CurPtr == '!') {
       CurPtr--;
