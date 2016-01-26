@@ -471,23 +471,29 @@ public:
 
 private:
   SILType BaseType;
+  SILType MostDerivedType;
   PathTy Path;
 
 public:
   /// Create an empty path which serves as a stack. Use push_back() to populate
   /// the stack with members.
-  NewProjectionPath(SILType Base) : BaseType(Base), Path() {}
+  NewProjectionPath(SILType Base) 
+     : BaseType(Base), MostDerivedType(SILType()), Path() {}
+  NewProjectionPath(SILType Base, SILType End) 
+     : BaseType(Base), MostDerivedType(End), Path() {}
   ~NewProjectionPath() = default;
 
   /// Do not allow copy construction. The only way to get one of these is from
   /// getProjectionPath.
   NewProjectionPath(const NewProjectionPath &Other) {
     BaseType = Other.BaseType;
+    MostDerivedType = Other.MostDerivedType;
     Path = Other.Path;
   } 
 
   NewProjectionPath &operator=(const NewProjectionPath &O) {
     BaseType = O.BaseType;
+    MostDerivedType = O.MostDerivedType;
     Path = O.Path;
     return *this;
   }
@@ -496,15 +502,19 @@ public:
   /// able to be constructed by calling our factory method.
   NewProjectionPath(NewProjectionPath &&O) {
     BaseType = O.BaseType;
+    MostDerivedType = O.MostDerivedType;
     Path = O.Path;
     O.BaseType = SILType();
+    O.MostDerivedType = SILType();
     O.Path.clear();
   }
 
   NewProjectionPath &operator=(NewProjectionPath &&O) {
     BaseType = O.BaseType;
+    MostDerivedType = O.MostDerivedType;
     Path = O.Path;
     O.BaseType = SILType();
+    O.MostDerivedType = SILType();
     O.Path.clear();
     return *this;
   }
@@ -512,6 +522,8 @@ public:
   /// Append the projection \p P onto this.
   NewProjectionPath &append(const NewProjection &P) {
     push_back(P);
+    // Invalidate most derived type.
+    MostDerivedType = SILType();
     return *this;
   }
 
@@ -520,6 +532,8 @@ public:
     for (auto &X : Other.Path) {
       push_back(X);
     }
+    // Invalidate most derived type.
+    MostDerivedType = SILType();
     return *this;
   }
 
@@ -614,10 +628,13 @@ public:
   SILType getBaseType() const { return BaseType; }
 
   /// Returns the most derived type of the projection path.
-  SILType getMostDerivedType(SILModule &M) const {
+  SILType getMostDerivedType(SILModule &M) {
     if (Path.empty())
       return getBaseType();
-    return getDerivedType(Path.size(), M);
+    if (MostDerivedType)
+      return MostDerivedType;
+    MostDerivedType = getDerivedType(Path.size(), M);
+    return MostDerivedType;
   }
 
   /// Returns the ith derived type of the path. This is zero indexed with 0

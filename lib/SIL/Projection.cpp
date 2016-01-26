@@ -325,7 +325,7 @@ void NewProjection::getFirstLevelProjections(
 
 Optional<NewProjectionPath> NewProjectionPath::getProjectionPath(SILValue Start,
                                                                  SILValue End) {
-  NewProjectionPath P(Start->getType());
+  NewProjectionPath P(Start->getType(), End->getType());
 
   // If Start == End, there is a "trivial" projection path in between the
   // two. This is represented by returning an empty ProjectionPath.
