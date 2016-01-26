@@ -1867,6 +1867,19 @@ namespace {
       NextOffset += Size(2);
     }
 
+    /// Add a constant 8-bit value.
+    void addConstantInt8(int8_t value) {
+      addInt8(llvm::ConstantInt::get(IGM.Int8Ty, value));
+    }
+
+    /// Add an 8-bit value.
+    void addInt8(llvm::Constant *value) {
+      assert(value->getType() == IGM.Int8Ty);
+      assert(NextOffset.isMultipleOf(Size(1)));
+      Fields.push_back(value);
+      NextOffset += Size(1);
+    }
+
     /// Add a constant of the given size.
     void addStruct(llvm::Constant *value, Size size) {
       assert(size.getValue()
