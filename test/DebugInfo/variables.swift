@@ -3,7 +3,7 @@
 // Ensure that the debug info we're emitting passes the back end verifier.
 // RUN: %target-swift-frontend %s -g -S -o - | FileCheck %s --check-prefix ASM-%target-object-format
 // ASM-macho: .section __DWARF,__debug_info
-// ASM-elf: .section .debug_info,"",@progbits
+// ASM-elf: .section .debug_info,"",{{[@%]}}progbits
 
 // Test variables-interpreter.swift runs this code with `swift -g -i`.
 // Test variables-repl.swift runs this code with `swift -g < variables.swift`.
