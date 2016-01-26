@@ -494,7 +494,6 @@ static CondFailInst *hasCondFailUse(SILInstruction *I) {
 /// a cond_fail on the second result.
 static CondFailInst *isOverflowChecked(BuiltinInst *AI) {
   for (auto *Op : AI->getUses()) {
-    SILValue Extract;
     if (!match(Op->getUser(), m_TupleExtractInst(m_ValueBase(), 1)))
       continue;
 
