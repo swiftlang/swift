@@ -911,7 +911,8 @@ void CalleeCandidateInfo::filterList(ClosenessPredicate predicate) {
       
       // Likewise, if the candidate is inaccessible from the scope it is being
       // accessed from, mark it as inaccessible or a general mismatch.
-      if (!VD->isAccessibleFrom(CS->DC)) {
+      if (VD->hasAccessibility() &&
+          !VD->isAccessibleFrom(CS->DC)) {
         // If this was an exact match, downgrade it to inaccessible, so that
         // accessible decls that are also an exact match will take precedence.
         // Otherwise consider it to be a general mismatch so we only list it in
