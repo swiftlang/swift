@@ -304,6 +304,10 @@ void LSLocation::enumerateLSLocation(SILModule *M, SILValue Mem,
                                      LSLocationIndexMap &IndexMap,
                                      LSLocationBaseMap &BaseMap,
                                      TypeExpansionAnalysis *TypeCache) {
+  // We have processed this SILValue before.
+  if (BaseMap.find(Mem) != BaseMap.end())
+    return;
+
   // Construct a Location to represent the memory written by this instruction.
   SILValue UO = getUnderlyingObject(Mem);
   LSLocation L(UO, NewProjectionPath::getProjectionPath(UO, Mem));
@@ -311,10 +315,6 @@ void LSLocation::enumerateLSLocation(SILModule *M, SILValue Mem,
   // If we cant figure out the Base or Projection Path for the memory location,
   // simply ignore it for now.
   if (!L.isValid())
-    return;
-
-  // We have processed this SILValue before.
-  if (BaseMap.find(Mem) != BaseMap.end())
     return;
 
   // Record the SILValue to location mapping.
