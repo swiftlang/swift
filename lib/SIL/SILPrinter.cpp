@@ -850,6 +850,7 @@ public:
     switch (kind) {
     case StringLiteralInst::Encoding::UTF8: return "utf8 ";
     case StringLiteralInst::Encoding::UTF16: return "utf16 ";
+    case StringLiteralInst::Encoding::ObjCSelector: return "objc_selector ";
     }
     llvm_unreachable("bad string literal encoding");
   }

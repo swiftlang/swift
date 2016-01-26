@@ -831,6 +831,9 @@ RValue RValueEmitter::emitStringLiteral(Expr *E, StringRef Str,
   case StringLiteralInst::Encoding::UTF8:
     Elts = EltsArray;
     break;
+
+  case StringLiteralInst::Encoding::ObjCSelector:
+    llvm_unreachable("Objective-C selectors cannot be formed here");
   }
 
   return RValue(Elts, ty);
