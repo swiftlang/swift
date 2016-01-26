@@ -2479,6 +2479,26 @@ namespace {
       // case we return the null type.
       return E->getType();
     }
+
+    Type visitObjCSelectorExpr(ObjCSelectorExpr *E) {
+      // #selector only makes sense when we have the Objective-C
+      // #runtime.
+      auto &tc = CS.getTypeChecker();
+      if (!tc.Context.LangOpts.EnableObjCInterop) {
+        tc.diagnose(E->getLoc(), diag::expr_selector_no_objc_runtime);
+        return nullptr;
+      }
+
+      // Make sure we can reference ObjectiveC.Selector.
+      // FIXME: Fix-It to add the import?
+      auto type = CS.getTypeChecker().getObjCSelectorType(CS.DC);
+      if (!type) {
+        tc.diagnose(E->getLoc(), diag::expr_selector_module_missing);
+        return nullptr;
+      }
+
+      return type;
+    }
   };
 
   /// \brief AST walker that "sanitizes" an expression for the

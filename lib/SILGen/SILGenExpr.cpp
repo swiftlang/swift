@@ -197,6 +197,7 @@ namespace {
                                               SGFContext C);
     RValue visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C);
     RValue visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, SGFContext C);
+    RValue visitObjCSelectorExpr(ObjCSelectorExpr *E, SGFContext C);
     RValue visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E,
                                            SGFContext C);
     RValue visitCollectionExpr(CollectionExpr *E, SGFContext C);
@@ -1955,6 +1956,13 @@ visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
 RValue RValueEmitter::
 visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, SGFContext C) {
   return visit(E->getSemanticExpr(), C);
+}
+
+RValue RValueEmitter::visitObjCSelectorExpr(ObjCSelectorExpr *e, SGFContext C) {
+  SILType loweredSelectorTy = SGF.getLoweredType(e->getType());
+
+  SGF.SGM.diagnose(e, diag::unsupported_objc_selector);
+  return RValue(SGF, e, SGF.emitUndef(e, loweredSelectorTy));
 }
 
 static StringRef

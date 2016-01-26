@@ -2161,6 +2161,16 @@ public:
     }
     OS << ')';
   }
+  void visitObjCSelectorExpr(ObjCSelectorExpr *E) {
+    printCommon(E, "objc_selector_expr") << " decl=";
+    if (auto method = E->getMethod())
+      method->dumpRef(OS);
+    else
+      OS << "<unresolved>";
+    OS << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
 };
 
 } // end anonymous namespace.
