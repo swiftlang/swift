@@ -324,7 +324,9 @@ public:
     ForwardSetIn.resize(LocationNum, false);
     ForwardSetOut.resize(LocationNum, optimistic);
 
-    ForwardSetMax.resize(LocationNum, true);
+    // If we are running an optimsitic data flow, set forward max to true
+    // initially.
+    ForwardSetMax.resize(LocationNum, optimistic);
 
     BBGenSet.resize(LocationNum, false);
     BBKillSet.resize(LocationNum, false);
