@@ -901,8 +901,12 @@ function(_add_swift_library_single target name)
 
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     set(install_name_dir "@rpath")
+
     if(SWIFTLIB_SINGLE_IS_STDLIB)
-      set(install_name_dir "${SWIFT_DARWIN_STDLIB_INSTALL_NAME_DIR}")
+      # Always use @rpath for XCTest.
+      if(NOT "${module_name}" STREQUAL "XCTest")
+        set(install_name_dir "${SWIFT_DARWIN_STDLIB_INSTALL_NAME_DIR}")
+      endif()
     endif()
 
     set_target_properties("${target}"
