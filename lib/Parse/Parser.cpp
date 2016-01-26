@@ -360,13 +360,17 @@ SourceLoc Parser::consumeStartingCharacterOfCurrentToken() {
     return consumeToken();
   }
 
-  SplitTokens.emplace_back();
-  SplitTokens.back().setToken(tok::oper_postfix, Tok.getText().substr(0, 1));
+  markSplitToken(tok::oper_binary_unspaced, Tok.getText().substr(0, 1));
 
   // ... or a multi-character token with the first character being the one that
   // we want to consume as a separate token.
   restoreParserPosition(getParserPositionAfterFirstCharacter(Tok));
   return PreviousLoc;
+}
+
+void Parser::markSplitToken(tok Kind, StringRef Txt) {
+  SplitTokens.emplace_back();
+  SplitTokens.back().setToken(Kind, Txt);
 }
 
 SourceLoc Parser::consumeStartingLess() {

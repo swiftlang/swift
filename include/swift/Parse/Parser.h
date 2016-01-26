@@ -156,7 +156,9 @@ public:
     return SF.isScriptMode();
   }
 
-  std::vector<Token> &getSplitTokens() { return SplitTokens; }
+  const std::vector<Token> &getSplitTokens() { return SplitTokens; }
+
+  void markSplitToken(tok Kind, StringRef Txt);
 
   /// Returns true if the parser reached EOF with incomplete source input, due
   /// for example, a missing right brace.
