@@ -993,8 +993,7 @@ public:
   // Create an implicit TypeExpr, with location information even though it
   // shouldn't have one.  This is presently used to work around other location
   // processing bugs.  If you have an implicit location, use createImplicit.
-  static TypeExpr *createImplicitHack(SourceLoc StartLoc, Type Ty,
-                                      ASTContext &C, SourceLoc EndLoc);
+  static TypeExpr *createImplicitHack(SourceLoc Loc, Type Ty, ASTContext &C);
 
   
   /// Return a TypeExpr for a TypeDecl and the specified location.

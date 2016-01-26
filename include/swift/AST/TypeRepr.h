@@ -717,18 +717,14 @@ private:
 /// that cannot be spelled in the language proper.
 class FixedTypeRepr : public TypeRepr {
   Type Ty;
-  SourceLoc StartLoc;
-  SourceLoc EndLoc;
+  SourceLoc Loc;
 
 public:
   FixedTypeRepr(Type Ty, SourceLoc Loc)
-    : TypeRepr(TypeReprKind::Fixed), Ty(Ty), StartLoc(Loc), EndLoc(Loc) {}
-
-  FixedTypeRepr(Type Ty, SourceLoc StartLoc, SourceLoc EndLoc)
-    : TypeRepr(TypeReprKind::Fixed), Ty(Ty),StartLoc(StartLoc),EndLoc(EndLoc) {}
+    : TypeRepr(TypeReprKind::Fixed), Ty(Ty), Loc(Loc) {}
 
   /// Retrieve the location.
-  SourceLoc getLoc() const { return StartLoc; }
+  SourceLoc getLoc() const { return Loc; }
 
   /// Retrieve the fixed type.
   Type getType() const { return Ty; }
@@ -739,8 +735,8 @@ public:
   static bool classof(const FixedTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const { return StartLoc; }
-  SourceLoc getEndLocImpl() const { return EndLoc; }
+  SourceLoc getStartLocImpl() const { return Loc; }
+  SourceLoc getEndLocImpl() const { return Loc; }
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
