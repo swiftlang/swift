@@ -64,7 +64,7 @@ function(_add_variant_c_compile_link_flags
         "-m${SWIFT_SDK_${sdk}_VERSION_MIN_NAME}-version-min=${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION}")
 
     if(analyze_code_coverage)
-      list(APPEND result "-fprofile-instr-generate=swift-%p.profraw"
+      list(APPEND result "-fprofile-instr-generate"
                          "-fcoverage-mapping")
     endif()
   endif()
@@ -111,7 +111,7 @@ function(_add_variant_c_compile_flags
   endif()
 
   if(analyze_code_coverage)
-    list(APPEND result "-fprofile-instr-generate=swift-%p.profraw"
+    list(APPEND result "-fprofile-instr-generate"
                        "-fcoverage-mapping")
   endif()
 

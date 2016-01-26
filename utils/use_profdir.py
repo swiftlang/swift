@@ -15,15 +15,15 @@
 
 from __future__ import print_function
 
-from contextlib import closing, contextmanager
 import socket
 import sys
 import subprocess
 import os
 import string
 import random
-import glob
+from glob import glob
 from profdata_merge_worker import SERVER_ADDRESS
+import argparse
 
 def random_string(N):
     """Return a random ascii_uppercase + digits string of length `N`"""
@@ -33,6 +33,12 @@ def random_string(N):
 def main():
     # Grab passed in bash command
     cmd = sys.argv[1:]
+
+    # Check if we're going to merge the profdata files together
+    merged = True # False
+    if cmd[0] == "--merged":
+        merged = True
+        cmd = cmd[1:]
 
     # Search arguments for test identifiers
     script_files = [f for f in cmd if f.endswith('.script')]
@@ -55,18 +61,18 @@ def main():
         if e.errno != ERROR_FILE_EXISTS:
             raise
 
-    # cd into the new directory and execute the passed in command
-    previous_cwd = os.getcwd()
-    os.chdir(profdir)
-    try:
-        return_code = subprocess.call(cmd)
-        files = [os.path.join(profdir, fn) for fn in glob.glob('*.profraw')]
-        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
-            sock.connect(SERVER_ADDRESS)
-            for f in files:
-                sock.send(f + "\n")
-    finally:
-        os.chdir(previous_cwd)
+    os.environ["LLVM_PROFILE_FILE"] = os.path.join(profdir, "swift-%p.profraw")
+    return_code = subprocess.call(cmd)
+
+    # Send the filenames in this directory to the merge worker, if we're
+    # merging the files
+    if merged:
+        profile_glob = os.path.join(profdir, '*.profraw')
+        files = [os.path.join(profdir, fn) for fn in glob(profile_glob)]
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect(SERVER_ADDRESS)
+        sock.send("\n".join(files))
+        sock.close()
 
     return return_code
 
