@@ -1772,6 +1772,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       encoding = StringLiteralInst::Encoding::UTF8;
     } else if (P.Tok.getText() == "utf16") {
       encoding = StringLiteralInst::Encoding::UTF16;
+    } else if (P.Tok.getText() == "objc_selector") {
+      encoding = StringLiteralInst::Encoding::ObjCSelector;
     } else {
       P.diagnose(P.Tok, diag::sil_string_invalid_encoding, P.Tok.getText());
       return true;

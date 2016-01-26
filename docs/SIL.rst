@@ -2452,6 +2452,7 @@ string_literal
   sil-instruction ::= 'string_literal' encoding string-literal
   encoding ::= 'utf8'
   encoding ::= 'utf16'
+  encoding ::= 'objc_selector'
 
   %1 = string_literal "asdf"
   // %1 has type $Builtin.RawPointer
@@ -2459,7 +2460,10 @@ string_literal
 Creates a reference to a string in the global string table. The result
 is a pointer to the data.  The referenced string is always null-terminated. The
 string literal value is specified using Swift's string
-literal syntax (though ``\()`` interpolations are not allowed).
+literal syntax (though ``\()`` interpolations are not allowed). When
+the encoding is ``objc_selector``, the string literal produces a
+reference to a UTF-8-encoded Objective-C selector in the Objective-C
+method name segment.
 
 Dynamic Dispatch
 ~~~~~~~~~~~~~~~~
