@@ -261,7 +261,7 @@ public:
     return SourceLoc(llvm::SMLoc::getFromPointer(trimComment().begin()));
   }
 
-  StringRef getFullText() const {
+  StringRef getRawText() const {
     return Text;
   }
 
