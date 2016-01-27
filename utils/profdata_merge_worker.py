@@ -1,5 +1,19 @@
 #!/usr/bin/env python
 
+# utils/profdata_merge_worker.py
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See http://swift.org/LICENSE.txt for license information
+# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
+# This script is used to prevent profile data filling up available disk space
+# by listening for profile data and merging them into a universal profdata
+# file while tests are executing.
+
 import os
 import shutil
 import pipes
@@ -19,6 +33,8 @@ FILES_MERGED = set()
 CONFIG = None
 
 class Config():
+    """A class to store configuration information specified by command-line arguments.
+    Used to encapsulate what would normally be global variables."""
     def __init__(self, debug, out_dir):
         self.debug = debug
         self.out_dir = out_dir
@@ -120,7 +136,10 @@ def run_server():
     if os.path.exists(CONFIG.pid_file_path):
         with open(CONFIG.pid_file_path) as pidfile:
             pid = pidfile.read()
-            printsync('existing process found with pid %s' % pid)
+            printsync(("existing process found with pid %s." +
+                       "Ensure there are no other test runners running," +
+                       "and delete the file at %s")
+                       % (pid, CONFIG.pid_file_path))
         return
 
     with open(CONFIG.pid_file_path, "w") as pidfile:
@@ -175,6 +194,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     subparsers = parser.add_subparsers()
+
     start = subparsers.add_parser("start")
     start.add_argument("-d", "--debug",
         help="Run in foreground and report status.",

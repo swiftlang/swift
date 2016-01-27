@@ -515,6 +515,7 @@ also build for Apple watchos, but disallow tests that require an watchOS device"
         help="""enable code coverage analysis in Swift (set to `merged` to merge
 and remove intermediary profdata files)""",
         const="default",
+        choices=["default", "merged"],
         nargs='?',
         dest="swift_analyze_code_coverage")
 
