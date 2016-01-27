@@ -17,6 +17,7 @@ endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
   add_subdirectory(StdlibUnittest)
+  add_subdirectory(StdlibCollectionUnittest)
   add_subdirectory(SwiftPrivateDarwinExtras)
   add_subdirectory(SwiftPrivatePthreadExtras)
 endif()
