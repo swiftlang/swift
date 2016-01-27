@@ -208,6 +208,9 @@ public:
   /// Emit type metadata records for types without explicit protocol conformance.
   void emitTypeMetadataRecords();
 
+  /// Emit field type records for nominal types for reflection purposes.
+  void emitReflectionMetadataRecords();
+
   /// Emit everything which is reachable from already emitted IR.
   void emitLazyDefinitions();
   
@@ -399,8 +402,6 @@ public:
   llvm::PointerType *TypeMetadataRecordPtrTy;
   llvm::StructType *FieldDescriptorTy;
   llvm::PointerType *FieldDescriptorPtrTy;
-  llvm::StructType *FieldRecordTy;
-  llvm::PointerType *FieldRecordPtrTy;
   llvm::PointerType *ErrorPtrTy;       /// %swift.error*
   llvm::StructType *OpenedErrorTripleTy; /// { %swift.opaque*, %swift.type*, i8** }
   llvm::PointerType *OpenedErrorTriplePtrTy; /// { %swift.opaque*, %swift.type*, i8** }*
@@ -429,6 +430,11 @@ public:
   }
   Alignment getTypeMetadataAlignment() const {
     return getPointerAlignment();
+  }
+
+  Size::int_type getOffsetInWords(Size offset) {
+    assert(offset.isMultipleOf(getPointerSize()));
+    return offset / getPointerSize();
   }
 
   llvm::Type *getReferenceType(ReferenceCounting style);
@@ -553,6 +559,9 @@ private:
   
 //--- Globals ---------------------------------------------------------------
 public:
+  std::pair<llvm::GlobalVariable *, llvm::Constant *>
+  createStringConstant(StringRef Str, bool willBeRelativelyAddressed = false,
+                       StringRef sectionName = "");
   llvm::Constant *getAddrOfGlobalString(StringRef utf8,
                                         bool willBeRelativelyAddressed = false);
   llvm::Constant *getAddrOfGlobalUTF16String(StringRef utf8);
@@ -572,9 +581,12 @@ public:
                                 llvm::Function *fn);
   llvm::Constant *emitProtocolConformances();
   llvm::Constant *emitTypeMetadataRecords();
+  llvm::Constant *emitReflectionMetadataRecords();
+  llvm::Constant *getAddrOfStringForTypeRef(StringRef Str);
   llvm::Constant *getAddrOfFieldName(StringRef Name);
-  StringRef getFieldMetadataSectionName();
-  StringRef getFieldNamesSectionName();
+  StringRef getReflectionMetadataSectionName();
+  StringRef getReflectionStringsSectionName();
+  StringRef getReflectionTypeRefSectionName();
 
   llvm::Constant *getOrCreateHelperFunction(StringRef name,
                                             llvm::Type *resultType,
@@ -589,6 +601,9 @@ private:
   llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
     GlobalStrings;
   llvm::StringMap<llvm::Constant*> GlobalUTF16Strings;
+  llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
+    StringsForTypeRef;
+  llvm::DenseMap<CanType, llvm::GlobalVariable*> TypeRefs;
   llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>> FieldNames;
   llvm::StringMap<llvm::Constant*> ObjCSelectorRefs;
   llvm::StringMap<llvm::Constant*> ObjCMethodNames;
@@ -624,6 +639,8 @@ private:
   SmallVector<NormalProtocolConformance *, 4> ProtocolConformances;
   /// List of nominal types to generate type metadata records for.
   SmallVector<CanType, 4> RuntimeResolvableTypes;
+  /// Collection of nominal types to generate field metadata records.
+  SmallVector<const NominalTypeDecl *, 4> NominalTypeDecls;
   /// List of ExtensionDecls corresponding to the generated
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
@@ -739,6 +756,7 @@ public:
   void emitClangDecl(clang::Decl *decl);
   void finalizeClangCodeGen();
   void finishEmitAfterTopLevel();
+  void addNominalTypeDecl(const NominalTypeDecl *Decl);
 
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
                                       llvm::AttributeSet &attrs);

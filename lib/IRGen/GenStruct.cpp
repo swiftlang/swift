@@ -753,6 +753,7 @@ llvm::Constant *irgen::emitPhysicalStructMemberFixedOffset(IRGenModule &IGM,
 void IRGenModule::emitStructDecl(StructDecl *st) {
   emitStructMetadata(*this, st);
   emitNestedTypeDecls(st->getMembers());
+  addNominalTypeDecl(st);
 }
 
 namespace {

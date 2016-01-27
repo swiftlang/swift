@@ -848,6 +848,10 @@ void IRGenModule::finishEmitAfterTopLevel() {
   finalizeClangCodeGen();
 }
 
+void IRGenModule::addNominalTypeDecl(const NominalTypeDecl *Decl) {
+  NominalTypeDecls.push_back(Decl);
+}
+
 static void emitLazyTypeMetadata(IRGenModule &IGM, CanType type) {
   auto decl = type.getAnyNominal();
   assert(decl);
@@ -872,6 +876,12 @@ void IRGenModuleDispatcher::emitProtocolConformances() {
 void IRGenModuleDispatcher::emitTypeMetadataRecords() {
   for (auto &m : *this) {
     m.second->emitTypeMetadataRecords();
+  }
+}
+
+void IRGenModuleDispatcher::emitReflectionMetadataRecords() {
+  for (auto &m : *this) {
+    m.second->emitReflectionMetadataRecords();
   }
 }
 
@@ -2755,48 +2765,8 @@ llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
     return entry.second;
   }
 
-  // If not, create it.  This implicitly adds a trailing null.
-  auto init = llvm::ConstantDataArray::getString(LLVMContext, data);
-  auto global = new llvm::GlobalVariable(Module, init->getType(), true,
-                                         llvm::GlobalValue::PrivateLinkage,
-                                         init);
-  // FIXME: ld64 crashes resolving relative references to coalesceable symbols.
-  // rdar://problem/22674524
-  // If we intend to relatively address this string, don't mark it with
-  // unnamed_addr to prevent it from going into the cstrings section and getting
-  // coalesced.
-  if (!willBeRelativelyAddressed)
-    global->setUnnamedAddr(true);
-
-  // Drill down to make an i8*.
-  auto zero = llvm::ConstantInt::get(SizeTy, 0);
-  llvm::Constant *indices[] = { zero, zero };
-  auto address = llvm::ConstantExpr::getInBoundsGetElementPtr(
-      global->getValueType(), global, indices);
-
-  // Cache and return.
-  entry = {global, address};
-  return address;
-}
-
-llvm::Constant *IRGenModule::getAddrOfFieldName(StringRef Name) {
-  auto &entry = FieldNames[Name];
-  if (entry.second)
-    return entry.second;
-
-  auto init = llvm::ConstantDataArray::getString(LLVMContext, Name);
-  auto global = new llvm::GlobalVariable(Module, init->getType(), true,
-                                         llvm::GlobalValue::LinkOnceODRLinkage,
-                                         init);
-  global->setSection(getFieldNamesSectionName());
-
-  auto zero = llvm::ConstantInt::get(SizeTy, 0);
-  llvm::Constant *indices[] = { zero, zero };
-  auto address = llvm::ConstantExpr::getInBoundsGetElementPtr(
-      global->getValueType(), global, indices);
-
-  entry = { global, address };
-  return address;
+  entry = createStringConstant(data, willBeRelativelyAddressed);
+  return entry.second;
 }
 
 /// Get or create a global UTF-16 string constant.

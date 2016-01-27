@@ -293,18 +293,9 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
   TypeMetadataRecordPtrTy
     = TypeMetadataRecordTy->getPointerTo(DefaultAS);
 
-  FieldDescriptorTy = createStructType(*this, "swift.field_descriptor", {
-    Int32Ty, // Number of fields that follow
-    Int32Ty, // Size of fields that follow
-    // Tail-allocated FieldRecordTy elements
-  });
-
-  FieldRecordTy = createStructType(*this, "swift.field_record", {
-    Int32Ty,           // Flags
-    RelativeAddressTy, // Offset to metadata or mangled name for external type
-    RelativeAddressTy, // Offset to field name
-  });
-  FieldRecordPtrTy = FieldRecordTy->getPointerTo(DefaultAS);
+  FieldDescriptorTy
+    = llvm::StructType::create(LLVMContext, "swift.field_descriptor");
+  FieldDescriptorPtrTy = FieldDescriptorTy->getPointerTo(DefaultAS);
 
   FixedBufferTy = nullptr;
   for (unsigned i = 0; i != MaxNumValueWitnesses; ++i)
@@ -475,6 +466,34 @@ llvm::Constant *IRGenModule::get##ID##Fn() {               \
                       RETURNS, ARGS, ATTRS);               \
 }
 #include "RuntimeFunctions.def"
+
+std::pair<llvm::GlobalVariable *, llvm::Constant *>
+IRGenModule::createStringConstant(StringRef Str,
+  bool willBeRelativelyAddressed, StringRef sectionName) {
+  // If not, create it.  This implicitly adds a trailing null.
+  auto init = llvm::ConstantDataArray::getString(LLVMContext, Str);
+  auto global = new llvm::GlobalVariable(Module, init->getType(), true,
+                                         llvm::GlobalValue::PrivateLinkage,
+                                         init);
+  // FIXME: ld64 crashes resolving relative references to coalesceable symbols.
+  // rdar://problem/22674524
+  // If we intend to relatively address this string, don't mark it with
+  // unnamed_addr to prevent it from going into the cstrings section and getting
+  // coalesced.
+  if (!willBeRelativelyAddressed)
+    global->setUnnamedAddr(true);
+
+  if (!sectionName.empty())
+    global->setSection(sectionName);
+
+  // Drill down to make an i8*.
+  auto zero = llvm::ConstantInt::get(SizeTy, 0);
+  llvm::Constant *indices[] = { zero, zero };
+  auto address = llvm::ConstantExpr::getInBoundsGetElementPtr(
+    global->getValueType(), global, indices);
+
+  return { global, address };
+}
 
 llvm::Constant *IRGenModule::getEmptyTupleMetadata() {
   if (EmptyTupleMetadata)
@@ -899,30 +918,3 @@ IRGenModule *IRGenModuleDispatcher::getGenModule(SILFunction *f) {
   return getPrimaryIGM();
 }
 
-StringRef IRGenModule::getFieldMetadataSectionName() {
-  switch (TargetInfo.OutputObjectFormat) {
-    case llvm::Triple::MachO:
-      return "__DATA, __swift2_field_names, regular, no_dead_strip";
-      break;
-    case llvm::Triple::ELF:
-      return ".swift2_field_names";
-      break;
-    default:
-      llvm_unreachable("Don't know how to emit field name table for "
-                       "the selected object format.");
-  }
-}
-
-StringRef IRGenModule::getFieldNamesSectionName() {
-  switch (TargetInfo.OutputObjectFormat) {
-    case llvm::Triple::MachO:
-      return "__DATA, __swift2_field_metadata, regular, no_dead_strip";
-      break;
-    case llvm::Triple::ELF:
-      return ".swift2_field_metadata";
-      break;
-    default:
-      llvm_unreachable("Don't know how to emit field metadata table for "
-                       "the selected object format.");
-  }
-}

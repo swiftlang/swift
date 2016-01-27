@@ -187,11 +187,15 @@ def disable_llvm_value_names : Flag<["-"], "disable-llvm-value-names">,
 def enable_llvm_value_names : Flag<["-"], "enable-llvm-value-names">,
   HelpText<"Add names to local values in LLVM IR">;
 
-def strip_field_names : Flag<["-"], "strip-field-names">,
-  HelpText<"Strip field names from nominal type metadata">;
+def enable_reflection_metadata : Flag<["-"], "enable-reflection-metadata">,
+  HelpText<"Enable emission of reflection metadata for nominal types">;
 
-def strip_field_metadata : Flag<["-"], "strip-field-metadata">,
-  HelpText<"Strip all field metadata for nominal types">;
+def strip_reflection_metadata : Flag<["-"], "strip-reflection-metadata">,
+  HelpText<"Strip all reflection metadata for nominal types">;
+
+def strip_reflection_names : Flag<["-"], "strip-reflection-names">,
+  HelpText<"Strip names of stored properties and enum cases from"
+           "reflection metadata">;
 
 def stack_promotion_checks : Flag<["-"], "emit-stack-promotion-checks">,
   HelpText<"Emit runtime checks for correct stack promotion of objects.">;

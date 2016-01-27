@@ -564,6 +564,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
       // In JIT mode these are manually registered above.
       IGM.emitProtocolConformances();
       IGM.emitTypeMetadataRecords();
+      IGM.emitReflectionMetadataRecords();
     }
 
     // Okay, emit any definitions that we suddenly need.
@@ -703,6 +704,8 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
 
   // Emit protocol conformances.
   dispatcher.emitProtocolConformances();
+
+  dispatcher.emitReflectionMetadataRecords();
 
   // Okay, emit any definitions that we suddenly need.
   dispatcher.emitLazyDefinitions();

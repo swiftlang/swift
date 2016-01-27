@@ -2226,44 +2226,17 @@ public:
 
 struct FieldRecord {
 private:
-  FieldRecordFlags Flags;
+  RelativeIndirectablePointer<const char> MangledTypeName;
 
-  union {
-    /// A direct reference to the metadata.
-    RelativeDirectPointer<Metadata> DirectType;
-
-    /// A direct reference to a mangled name which must be
-    /// looked up in another binary image.
-    RelativeDirectPointer<const char> MangledTypeName;
-  };
-
-  RelativeDirectPointer<const char> FieldName;
+  RelativeIndirectablePointer<const char> FieldName;
 
 public:
-  const Metadata *getDirectType() const {
-    assert(isInternal() && "Field does not have an internal type metadata");
-    return DirectType;
-  }
-
-  const char *getTypeMangledName() const {
-    assert(isExternal() && "Field does not have an external type metadata");
+  const char *getMangledTypeName() const {
     return MangledTypeName;
   }
 
   const char *getFieldName()  const {
     return FieldName;
-  }
-
-  bool isInternal() const {
-    return Flags.isInternal();
-  }
-
-  bool isExternal() const {
-    return Flags.isExternal();
-  }
-
-  Ownership getOwnership() const {
-    return Flags.getOwnership();
   }
 };
 

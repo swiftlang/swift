@@ -49,7 +49,7 @@
 // CHECK:   i8* null,
 // CHECK:   _PROPERTIES__TtC17objc_class_export3Foo
 // CHECK: }, section "__DATA, __objc_const", align 8
-// CHECK: @_TMfC17objc_class_export3Foo = internal global {{.*i64}} } {
+// CHECK: @_TMfC17objc_class_export3Foo = internal global <{{.*i64}} }> <{
 // CHECK:   void ([[FOO]]*)* @_TFC17objc_class_export3FooD,
 // CHECK:   i8** @_TWVBO,
 // CHECK:   i64 ptrtoint (%objc_class* @"OBJC_METACLASS_$__TtC17objc_class_export3Foo" to i64),
@@ -59,7 +59,7 @@
 // CHECK:   i64 add (i64 ptrtoint ({{.*}}* @_DATA__TtC17objc_class_export3Foo to i64), i64 1),
 // CHECK:   [[FOO]]* (%swift.type*)* @_TZFC17objc_class_export3Foo6createfT_S0_,
 // CHECK:   void (%VSC6NSRect*, [[FOO]]*)* @_TFC17objc_class_export3Foo10drawInRectfT5dirtyVSC6NSRect_T_
-// CHECK: }, section "__DATA,__objc_data, regular"
+// CHECK: }>, section "__DATA,__objc_data, regular"
 // -- TODO: The OBJC_CLASS symbol should reflect the qualified runtime name of
 //    Foo.
 // CHECK: @_TMC17objc_class_export3Foo = alias %swift.type, bitcast (i64* getelementptr inbounds ({{.*}} @_TMfC17objc_class_export3Foo, i32 0, i32 2) to %swift.type*)

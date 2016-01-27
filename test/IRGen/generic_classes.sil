@@ -11,7 +11,7 @@ import Swift
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
 // CHECK: [[ROOTGENERIC_NAME:@.*]] = private constant [32 x i8] c"C15generic_classes11RootGeneric\00"
 // CHECK: [[ROOTGENERIC_FIELDS:@.*]] = private constant [7 x i8] c"x\00y\00z\00\00"
-// CHECK: @_TMnC15generic_classes11RootGeneric = constant { {{.*}} i32 } {
+// CHECK: @_TMnC15generic_classes11RootGeneric = constant <{ {{.*}} i32 }> <{
 // --       name
 // CHECK:   [32 x i8]* [[ROOTGENERIC_NAME]]
 // --       num fields
@@ -38,7 +38,7 @@ import Swift
 // CHECK:   @_TFC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_,
 // --       field offset placeholders
 // CHECK:   i64 16, i64 0, i64 0
-// CHECK: }
+// CHECK: }>
 
 // -- Check that offset vars are emitted for fixed-layout generics
 //    <rdar://problem/15081049>
@@ -49,7 +49,7 @@ import Swift
 // -- fixed-layout nongeneric descriptor
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
 // CHECK: [[ROOTNONGENERIC_NAME:@.*]] = private constant [35 x i8] c"C15generic_classes14RootNonGeneric\00"
-// CHECK: @_TMnC15generic_classes14RootNonGeneric = constant { {{.*}} i32 } {
+// CHECK: @_TMnC15generic_classes14RootNonGeneric = constant <{ {{.*}} i32 }> <{
 // --       name
 // CHECK:   [35 x i8]* [[ROOTNONGENERIC_NAME]]
 // --       num fields
@@ -64,9 +64,9 @@ import Swift
 // CHECK:   i32 0,
 // --       number of generic params, primary params
 // CHECK:   i32 0, i32 0
-// CHECK: }
+// CHECK: }>
 
-// CHECK: @_TMfC15generic_classes14RootNonGeneric = internal global { {{.*}} } {
+// CHECK: @_TMfC15generic_classes14RootNonGeneric = internal global <{ {{.*}} }> <{
 // CHECK:   void (%C15generic_classes14RootNonGeneric*)* @_TFC15generic_classes14RootNonGenericD,
 // CHECK:   i8** @_TWVBo,
 // CHECK-native: i64 0,
@@ -82,7 +82,7 @@ import Swift
 // CHECK:   i16 7,
 // CHECK:   i16 0,
 // CHECK:   {{.*}}* @_TMnC15generic_classes14RootNonGeneric,
-// CHECK: }
+// CHECK: }>
 
 // CHECK: @_TMPC15generic_classes22GenericInheritsGeneric = global
 // --       template fill function

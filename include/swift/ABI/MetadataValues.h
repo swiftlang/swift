@@ -94,54 +94,6 @@ enum : unsigned {
   /// Number of words reserved in generic metadata patterns.
   NumGenericMetadataPrivateDataWords = 16,
 };
-
-/// Records information about a type's fields.
-struct FieldRecordFlags {
-protected:
-  using int_type = unsigned;
-  int_type Data;
-
-  enum : int_type {
-    InternalExternalMask = 0x00000001U,
-    InternalExternalShift = 0,
-    OwnershipMask = 0x00000006U,
-    OwnershipShift = 1,
-  };
-
-public:
-  FieldRecordFlags() : Data(0) {}
-
-  /// True if this field has a type defined in the same image
-  /// as the type that contains it.
-  constexpr bool isInternal() const {
-    return ((Data >> InternalExternalShift) & InternalExternalMask) == 0;
-  }
-
-  /// True if this field has a type that is defined in another
-  /// image as the type that contains it.
-  constexpr bool isExternal() const {
-    return !isInternal();
-  }
-
-  /// Get the ownership semantics if the field has a reference type.
-  constexpr Ownership getOwnership() const {
-    return Ownership((Data >> OwnershipShift) & OwnershipMask);
-  }
-
-  void setInternal(bool internal) {
-    if (internal)
-      Data &= ~InternalExternalMask;
-    else
-      Data |= InternalExternalMask;
-  }
-
-  void setOwnership(Ownership ownership) {
-    Data &= ~OwnershipMask;
-    Data |= int_type(ownership) << OwnershipShift;
-  }
-
-  int_type getValue() const { return Data; }
-};
   
 /// Kinds of type metadata/protocol conformance records.
 enum class TypeMetadataRecordKind : unsigned {

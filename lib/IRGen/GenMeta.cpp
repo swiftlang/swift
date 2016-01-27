@@ -22,6 +22,7 @@
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/Mangle.h"
 #include "swift/AST/Substitution.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -38,6 +39,7 @@
 #include "Address.h"
 #include "Callee.h"
 #include "ClassMetadataLayout.h"
+#include "ConstantBuilder.h"
 #include "FixedTypeInfo.h"
 #include "GenClass.h"
 #include "GenPoly.h"
@@ -59,6 +61,7 @@ using namespace irgen;
 
 static llvm::Value *emitLoadOfObjCHeapMetadataRef(IRGenFunction &IGF,
                                                   llvm::Value *object);
+
 static llvm::LoadInst *
 emitLoadFromMetadataAtIndex(IRGenFunction &IGF,
                             llvm::Value *metadata,
@@ -73,15 +76,11 @@ static llvm::ConstantInt *getMetadataKind(IRGenModule &IGM,
   return llvm::ConstantInt::get(IGM.MetadataKindTy, uint8_t(kind));
 }
 
-static Size::int_type getOffsetInWords(IRGenModule &IGM, Size offset) {
-  assert(offset.isMultipleOf(IGM.getPointerSize()));
-  return offset / IGM.getPointerSize();
-}
 static Address createPointerSizedGEP(IRGenFunction &IGF,
                                      Address base,
                                      Size offset) {
   return IGF.Builder.CreateConstArrayGEP(base,
-                                         getOffsetInWords(IGF.IGM, offset),
+                                         IGF.IGM.getOffsetInWords(offset),
                                          offset);
 }
 
@@ -1845,182 +1844,6 @@ void irgen::emitMetatypeRef(IRGenFunction &IGF, CanMetatypeType type,
 /*****************************************************************************/
 
 namespace {
-  class ConstantBuilderBase {
-  protected:
-    IRGenModule &IGM;
-    ConstantBuilderBase(IRGenModule &IGM) : IGM(IGM) {}
-  };
-
-  template <class Base = ConstantBuilderBase>
-  class ConstantBuilder : public Base {
-  protected:
-    template <class... T>
-    ConstantBuilder(T &&...args) : Base(std::forward<T>(args)...) {}
-
-    IRGenModule &IGM = Base::IGM;
-
-  private:
-    llvm::GlobalVariable *relativeAddressBase = nullptr;
-    llvm::SmallVector<llvm::Constant*, 16> Fields;
-    Size NextOffset = Size(0);
-
-  protected:
-    Size getNextOffset() const { return NextOffset; }
-
-    /// Add a constant word-sized value.
-    void addConstantWord(int64_t value) {
-      addWord(llvm::ConstantInt::get(IGM.SizeTy, value));
-    }
-
-    /// Add a word-sized value.
-    void addWord(llvm::Constant *value) {
-      assert(value->getType() == IGM.IntPtrTy ||
-             value->getType()->isPointerTy());
-      assert(NextOffset.isMultipleOf(IGM.getPointerSize()));
-      Fields.push_back(value);
-      NextOffset += IGM.getPointerSize();
-    }
-
-    void setRelativeAddressBase(llvm::GlobalVariable *base) {
-      relativeAddressBase = base;
-    }
-
-    llvm::Constant *getRelativeAddressFromNextField(llvm::Constant *referent) {
-      assert(relativeAddressBase && "no relative address base set");
-      // Determine the address of the next field in the initializer.
-      llvm::Constant *fieldAddr =
-        llvm::ConstantExpr::getPtrToInt(relativeAddressBase, IGM.SizeTy);
-      fieldAddr = llvm::ConstantExpr::getAdd(fieldAddr,
-                            llvm::ConstantInt::get(IGM.SizeTy,
-                                                   getNextOffset().getValue()));
-      referent = llvm::ConstantExpr::getPtrToInt(referent, IGM.SizeTy);
-
-      llvm::Constant *relative
-        = llvm::ConstantExpr::getSub(referent, fieldAddr);
-      
-      if (relative->getType() != IGM.RelativeAddressTy)
-        relative = llvm::ConstantExpr::getTrunc(relative,
-                                                IGM.RelativeAddressTy);
-      return relative;
-    }
-
-    /// Add a 32-bit relative address from the current location in the local
-    /// being built to another global variable.
-    void addRelativeAddress(llvm::Constant *referent) {
-      addInt32(getRelativeAddressFromNextField(referent));
-    }
-
-    /// Add a 32-bit relative address from the current location in the local
-    /// being built to another global variable, or null if a null referent
-    /// is passed.
-    void addRelativeAddressOrNull(llvm::Constant *referent) {
-      if (referent)
-        addRelativeAddress(referent);
-      else
-        addConstantInt32(0);
-    }
-
-    /// Add a 32-bit relative address from the current location in the local
-    /// being built to another global variable. Pack a constant integer into
-    /// the alignment bits of the pointer.
-    void addRelativeAddressWithTag(llvm::Constant *referent,
-                                   unsigned tag) {
-      assert(tag < 4 && "tag too big to pack in relative address");
-      llvm::Constant *relativeAddr = getRelativeAddressFromNextField(referent);
-      relativeAddr = llvm::ConstantExpr::getAdd(relativeAddr,
-                            llvm::ConstantInt::get(IGM.RelativeAddressTy, tag));
-      addInt32(relativeAddr);
-    }
-
-    /// Add a uint32_t value that represents the given offset
-    /// scaled to a number of words.
-    void addConstantInt32InWords(Size value) {
-      addConstantInt32(getOffsetInWords(IGM, value));
-    }
-
-    /// Add a constant 32-bit value.
-    void addConstantInt32(int32_t value) {
-      addInt32(llvm::ConstantInt::get(IGM.Int32Ty, value));
-    }
-
-    /// Add a 32-bit value.
-    void addInt32(llvm::Constant *value) {
-      assert(value->getType() == IGM.Int32Ty);
-      assert(NextOffset.isMultipleOf(Size(4)));
-      Fields.push_back(value);
-      NextOffset += Size(4);
-    }
-
-    /// Add a constant 16-bit value.
-    void addConstantInt16(int16_t value) {
-      addInt16(llvm::ConstantInt::get(IGM.Int16Ty, value));
-    }
-
-    /// Add a 16-bit value.
-    void addInt16(llvm::Constant *value) {
-      assert(value->getType() == IGM.Int16Ty);
-      assert(NextOffset.isMultipleOf(Size(2)));
-      Fields.push_back(value);
-      NextOffset += Size(2);
-    }
-
-    /// Add a constant 8-bit value.
-    void addConstantInt8(int8_t value) {
-      addInt8(llvm::ConstantInt::get(IGM.Int8Ty, value));
-    }
-
-    /// Add an 8-bit value.
-    void addInt8(llvm::Constant *value) {
-      assert(value->getType() == IGM.Int8Ty);
-      assert(NextOffset.isMultipleOf(Size(1)));
-      Fields.push_back(value);
-      NextOffset += Size(1);
-    }
-
-    /// Add a constant of the given size.
-    void addStruct(llvm::Constant *value, Size size) {
-      assert(size.getValue()
-               == IGM.DataLayout.getTypeStoreSize(value->getType()));
-      assert(NextOffset.isMultipleOf(
-                  Size(IGM.DataLayout.getABITypeAlignment(value->getType()))));
-      Fields.push_back(value);
-      NextOffset += size;
-    }
-    
-    class ReservationToken {
-      size_t Index;
-      ReservationToken(size_t index) : Index(index) {}
-      friend ConstantBuilder<Base>;
-    };
-    ReservationToken reserveFields(unsigned numFields, Size size) {
-      unsigned index = Fields.size();
-      Fields.append(numFields, nullptr);
-      NextOffset += size;
-      return ReservationToken(index);
-    }
-    MutableArrayRef<llvm::Constant*> claimReservation(ReservationToken token,
-                                                      unsigned numFields) {
-      return MutableArrayRef<llvm::Constant*>(&Fields[0] + token.Index,
-                                              numFields);
-    }
-
-  public:
-    llvm::Constant *getInit() const {
-      return llvm::ConstantStruct::getAnon(Fields);
-    }
-
-    /// An optimization of getInit for when we have a known type we
-    /// can use when there aren't any extra fields.
-    llvm::Constant *getInitWithSuggestedType(unsigned numFields,
-                                             llvm::StructType *type) {
-      if (Fields.size() == numFields) {
-        return llvm::ConstantStruct::get(type, Fields);
-      } else {
-        return getInit();
-      }
-    }
-  };
-
   template<class Impl>
   class NominalTypeDescriptorBuilderBase : public ConstantBuilder<> {
     Impl &asImpl() { return *static_cast<Impl*>(this); }
@@ -2167,7 +1990,7 @@ namespace {
     }
 
     Size::int_type getTargetIndex() {
-      return getOffsetInWords(this->IGM, getTargetOffset());
+      return this->IGM.getOffsetInWords(getTargetOffset());
     }
   };
 
@@ -2628,6 +2451,7 @@ namespace {
       addRelativeAddress(caseTypeVectorAccessor);
     }
   };
+
 }
 
 void
@@ -2673,7 +2497,7 @@ irgen::emitFieldTypeAccessor(IRGenModule &IGM,
     vectorPtr = IGF.Builder.CreateBitCast(metadata,
                                           metadataArrayPtrTy->getPointerTo());
     vectorPtr = IGF.Builder.CreateConstInBoundsGEP1_32(
-        /*Ty=*/nullptr, vectorPtr, getOffsetInWords(IGM, offset));
+        /*Ty=*/nullptr, vectorPtr, IGM.getOffsetInWords(offset));
   }
   
   // First, see if the field type vector has already been populated. This
@@ -3553,7 +3377,7 @@ namespace {
           // an invariant load, which could be hoisted above the point
           // where the metadata becomes fully initialized
           Size offset = getClassFieldOffset(IGF.IGM, Target, prop);
-          int index = getOffsetInWords(IGF.IGM, offset);
+          int index = IGF.IGM.getOffsetInWords(offset);
           auto offsetVal = emitLoadFromMetadataAtIndex(IGF, metadata, index,
                                                        IGF.IGM.SizeTy);
           IGF.Builder.CreateStore(offsetVal, offsetA);
@@ -3983,6 +3807,26 @@ namespace {
   END_GENERIC_METADATA_SEARCHER(ArgumentIndex)
 }
 
+int32_t irgen::getIndexOfGenericArgument(IRGenModule &IGM,
+                                         NominalTypeDecl *decl,
+                                         ArchetypeType *archetype) {
+  switch (decl->getKind()) {
+    case DeclKind::Class:
+      return FindClassArgumentIndex(IGM, cast<ClassDecl>(decl), archetype)
+        .getTargetIndex();
+    case DeclKind::Struct:
+      return FindStructArgumentIndex(IGM, cast<StructDecl>(decl), archetype)
+        .getTargetIndex();
+    case DeclKind::Enum:
+      return FindEnumArgumentIndex(IGM, cast<EnumDecl>(decl), archetype)
+        .getTargetIndex();
+    case DeclKind::Protocol:
+      llvm_unreachable("protocols are never generic!");
+    default:
+      llvm_unreachable("not a nominal type");
+  }
+}
+
 /// Given a reference to nominal type metadata of the given type,
 /// derive a reference to the nth argument metadata.  The type must
 /// have generic arguments.
@@ -4004,24 +3848,10 @@ llvm::Value *irgen::emitArgumentMetadataRef(IRGenFunction &IGF,
   case DeclKind::Protocol:
     llvm_unreachable("protocols are never generic!");
 
+  case DeclKind::Struct:
+  case DeclKind::Enum:
   case DeclKind::Class: {
-    int index =
-      FindClassArgumentIndex(IGF.IGM, cast<ClassDecl>(decl), targetArchetype)
-        .getTargetIndex();
-    return emitLoadOfMetadataRefAtIndex(IGF, metadata, index);
-  }
-
-  case DeclKind::Struct: {
-    int index =
-      FindStructArgumentIndex(IGF.IGM, cast<StructDecl>(decl), targetArchetype)
-        .getTargetIndex();
-    return emitLoadOfMetadataRefAtIndex(IGF, metadata, index);
-  }
-
-  case DeclKind::Enum: {
-    int index =
-      FindEnumArgumentIndex(IGF.IGM, cast<EnumDecl>(decl), targetArchetype)
-        .getTargetIndex();
+    int index = getIndexOfGenericArgument(IGF.IGM, decl, targetArchetype);
     return emitLoadOfMetadataRefAtIndex(IGF, metadata, index);
   }
   }
@@ -4119,7 +3949,7 @@ llvm::Value *irgen::emitClassFieldOffset(IRGenFunction &IGF,
                                          VarDecl *field,
                                          llvm::Value *metadata) {
   irgen::Size offset = getClassFieldOffset(IGF.IGM, theClass, field);
-  int index = getOffsetInWords(IGF.IGM, offset);
+  int index = IGF.IGM.getOffsetInWords(offset);
   return emitInvariantLoadFromMetadataAtIndex(IGF, metadata, index,
                                               IGF.IGM.SizeTy);
 }

@@ -22,8 +22,7 @@ protocol Runcible {
 // -- witness table
 // CHECK:           @_TWPVSC6NSRect33protocol_conformance_records_objc8Runcible
 // -- flags 0x02: nonunique direct metadata
-// CHECK:           i32 2
-// CHECK:         },
+// CHECK:           i32 2 },
 extension NSRect: Runcible {
   func runce() {}
 }
@@ -38,7 +37,7 @@ extension NSRect: Runcible {
 // CHECK:           @_TWPCSo5Gizmo33protocol_conformance_records_objc8Runcible
 // -- flags 0x01: unique direct metadata (TODO should be 0x03 indirect class)
 // CHECK:           i32 1
-// CHECK:         },
+// CHECK:         }
 extension Gizmo: Runcible {
   func runce() {}
 }

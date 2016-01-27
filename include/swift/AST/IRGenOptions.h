@@ -131,10 +131,10 @@ public:
   unsigned ValueNames : 1;
 
   /// Only strip the field names section from nominal type field metadata.
-  unsigned StripFieldNames : 1;
+  unsigned StripReflectionNames : 1;
 
   /// Strip all nominal type field metadata.
-  unsigned StripFieldMetadata : 1;
+  unsigned StripReflectionMetadata : 1;
 
   /// List of backend command-line options for -embed-bitcode.
   std::vector<uint8_t> CmdArgs;
@@ -147,7 +147,7 @@ public:
                    EmitStackPromotionChecks(false), GenerateProfile(false),
                    EmbedMode(IRGenEmbedMode::None),
                    HasValueNamesSetting(false), ValueNames(false),
-                   StripFieldNames(false), StripFieldMetadata(false)
+                   StripReflectionNames(true), StripReflectionMetadata(true)
                    {}
 
   /// Gets the name of the specified output filename.

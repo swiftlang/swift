@@ -1204,13 +1204,18 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     }
   }
 
-  if (Args.hasArg(OPT_strip_field_names)) {
-    Opts.StripFieldNames = true;
+  if (Args.hasArg(OPT_enable_reflection_metadata)) {
+    Opts.StripReflectionMetadata = false;
+    Opts.StripReflectionNames = false;
   }
 
-  if (Args.hasArg(OPT_strip_field_metadata)) {
-    Opts.StripFieldMetadata = true;
-    Opts.StripFieldNames = true;
+  if (Args.hasArg(OPT_strip_reflection_names)) {
+    Opts.StripReflectionNames = true;
+  }
+
+  if (Args.hasArg(OPT_strip_reflection_metadata)) {
+    Opts.StripReflectionMetadata = true;
+    Opts.StripReflectionNames = true;
   }
 
   return false;

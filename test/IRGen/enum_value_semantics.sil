@@ -122,12 +122,12 @@ enum GenericFixedLayout<T> {
 // CHECK: ]
 
 
-// CHECK-LABEL: @_TMfO20enum_value_semantics20SinglePayloadTrivial = internal constant { {{.*}}* } {
+// CHECK-LABEL: @_TMfO20enum_value_semantics20SinglePayloadTrivial = internal constant <{ {{.*}}* }> <{
 // CHECK:   i8** getelementptr inbounds ([26 x i8*], [26 x i8*]* @_TWVO20enum_value_semantics20SinglePayloadTrivial, i32 0, i32 0),
 // CHECK:   i64 2,
 // CHECK:   {{.*}}* @_TMnO20enum_value_semantics20SinglePayloadTrivial,
 // CHECK:   %swift.type* null
-// CHECK: }
+// CHECK: }>
 
 
 // CHECK-LABEL: @_TWVO20enum_value_semantics23SinglePayloadNontrivial = constant [26 x i8*] [
@@ -163,15 +163,15 @@ enum GenericFixedLayout<T> {
 // CHECK: ]
 
 
-// CHECK-LABEL: @_TMfO20enum_value_semantics23SinglePayloadNontrivial = internal constant { {{.*}}* } {
+// CHECK-LABEL: @_TMfO20enum_value_semantics23SinglePayloadNontrivial = internal constant <{ {{.*}}* }> <{
 // CHECK:   i8** getelementptr inbounds ([26 x i8*], [26 x i8*]* @_TWVO20enum_value_semantics23SinglePayloadNontrivial, i32 0, i32 0),
 // CHECK:   i64 2,
 // CHECK:   {{.*}}* @_TMnO20enum_value_semantics23SinglePayloadNontrivial,
 // CHECK:   %swift.type* null
-// CHECK: }
+// CHECK: }>
 
 
-// CHECK-LABEL: @_TMPO20enum_value_semantics18GenericFixedLayout = global {{[{].*\* [}]}} {
+// CHECK-LABEL: @_TMPO20enum_value_semantics18GenericFixedLayout = global <{{[{].*\* [}]}}> <{
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_GenericFixedLayout
 // CHECK:   i32 48, i16 1, i16 8,
 // CHECK:   [16 x i8*] zeroinitializer,
@@ -181,7 +181,7 @@ enum GenericFixedLayout<T> {
 // CHECK:   %swift.type* null,
 // CHECK:   %swift.type* null,
 // CHECK:   %swift.type** null
-// CHECK: }
+// CHECK: }>
 
 sil @single_payload_nontrivial_copy_destroy : $(SinglePayloadNontrivial) -> () {
 bb0(%0 : $SinglePayloadNontrivial):
