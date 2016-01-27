@@ -1063,6 +1063,11 @@ public:
     AsWrittenString = Str;
   }
 
+  /// Further analyze the written string, if it's not empty, to collect the first
+  /// type, the second type and the requirement kind.
+  Optional<std::tuple<StringRef, StringRef, RequirementReprKind>>
+  getAsAnalyzedWrittenString() const;
+
   SourceRange getSourceRange() const {
     return SourceRange(Types[0].getSourceRange().Start,
                        Types[1].getSourceRange().End);
