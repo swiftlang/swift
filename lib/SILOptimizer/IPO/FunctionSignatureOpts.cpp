@@ -409,14 +409,14 @@ unsigned ArgumentDescriptor::updateOptimizedBBArgs(SILBuilder &Builder,
 }
 
 //===----------------------------------------------------------------------===//
-//                             Function Analyzer
+//                             Signature Optimizer
 //===----------------------------------------------------------------------===//
 
 namespace {
 
 /// A class that contains all analysis information we gather about our
 /// function. Also provides utility methods for creating the new empty function.
-class FunctionAnalyzer {
+class SignatureOptimizer {
   llvm::BumpPtrAllocator &Allocator;
 
   RCIdentityFunctionInfo *RCIA;
@@ -441,12 +441,12 @@ class FunctionAnalyzer {
 
 public:
   ArrayRef<ArgumentDescriptor> getArgList() const { return ArgDescList; }
-  FunctionAnalyzer() = delete;
-  FunctionAnalyzer(const FunctionAnalyzer &) = delete;
-  FunctionAnalyzer(FunctionAnalyzer &&) = delete;
+  SignatureOptimizer() = delete;
+  SignatureOptimizer(const SignatureOptimizer &) = delete;
+  SignatureOptimizer(SignatureOptimizer &&) = delete;
 
-  FunctionAnalyzer(llvm::BumpPtrAllocator &Allocator,
-                   RCIdentityFunctionInfo *RCIA, SILFunction *F)
+  SignatureOptimizer(llvm::BumpPtrAllocator &Allocator,
+                     RCIdentityFunctionInfo *RCIA, SILFunction *F)
       : Allocator(Allocator), RCIA(RCIA), F(F),
         MayBindDynamicSelf(computeMayBindDynamicSelf(F)), ShouldOptimize(false),
         HaveModifiedSelfArgument(false), ArgDescList() {}
@@ -487,7 +487,7 @@ private:
 /// This function goes through the arguments of F and sees if we have anything
 /// to optimize in which case it returns true. If we have nothing to optimize,
 /// it returns false.
-bool FunctionAnalyzer::analyze() {
+bool SignatureOptimizer::analyze() {
   // For now ignore functions with indirect results.
   if (F->getLoweredFunctionType()->hasIndirectResult())
     return false;
@@ -563,7 +563,7 @@ bool FunctionAnalyzer::analyze() {
 //                         Creating the New Function
 //===----------------------------------------------------------------------===//
 
-CanSILFunctionType FunctionAnalyzer::createOptimizedSILFunctionType() {
+CanSILFunctionType SignatureOptimizer::createOptimizedSILFunctionType() {
   const ASTContext &Ctx = F->getModule().getASTContext();
   CanSILFunctionType FTy = F->getLoweredFunctionType();
 
@@ -589,8 +589,8 @@ CanSILFunctionType FunctionAnalyzer::createOptimizedSILFunctionType() {
                               InterfaceResult, InterfaceErrorResult, Ctx);
 }
 
-SILFunction *FunctionAnalyzer::createEmptyFunctionWithOptimizedSig(
-                                     const std::string &NewFName) {
+SILFunction *SignatureOptimizer::createEmptyFunctionWithOptimizedSig(
+    const std::string &NewFName) {
   SILModule &M = F->getModule();
 
   // Create the new optimized function type.
@@ -618,7 +618,7 @@ SILFunction *FunctionAnalyzer::createEmptyFunctionWithOptimizedSig(
 //                                  Mangling
 //===----------------------------------------------------------------------===//
 
-std::string FunctionAnalyzer::getOptimizedName() {
+std::string SignatureOptimizer::getOptimizedName() {
   Mangle::Mangler M;
   auto P = SpecializationPass::FunctionSignatureOpts;
   FunctionSignatureSpecializationMangler FSSM(P, M, F);
@@ -653,7 +653,7 @@ std::string FunctionAnalyzer::getOptimizedName() {
 
 /// This function takes in OldF and all callsites of OldF and rewrites the
 /// callsites to call the new function.
-static void rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer,
+static void rewriteApplyInstToCallNewFunction(SignatureOptimizer &Optimizer,
                                               SILFunction *NewF,
                                               const ApplyList &CallSites) {
   for (auto FAS : CallSites) {
@@ -665,7 +665,7 @@ static void rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer,
 
     // Create the args for the new apply, ignoring any dead arguments.
     llvm::SmallVector<SILValue, 8> NewArgs;
-    ArrayRef<ArgumentDescriptor> ArgDescs = Analyzer.getArgDescList();
+    ArrayRef<ArgumentDescriptor> ArgDescs = Optimizer.getArgDescList();
     for (auto &ArgDesc : ArgDescs) {
       ArgDesc.addCallerArgs(Builder, FAS, NewArgs);
     }
@@ -719,7 +719,7 @@ static void rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer,
 }
 
 static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
-                            FunctionAnalyzer &Analyzer) {
+                            SignatureOptimizer &Optimizer) {
   // TODO: What is the proper location to use here?
   SILLocation Loc = BB->getParent()->getLocation();
   SILBuilder Builder(BB);
@@ -729,7 +729,7 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
 
   // Create the args for the thunk's apply, ignoring any dead arguments.
   llvm::SmallVector<SILValue, 8> ThunkArgs;
-  ArrayRef<ArgumentDescriptor> ArgDescs = Analyzer.getArgDescList();
+  ArrayRef<ArgumentDescriptor> ArgDescs = Optimizer.getArgDescList();
   for (auto &ArgDesc : ArgDescs) {
     ArgDesc.addThunkArgs(Builder, BB, ThunkArgs);
   }
@@ -791,14 +791,14 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
 static SILFunction *
 moveFunctionBodyToNewFunctionWithName(SILFunction *F,
                                       const std::string &NewFName,
-                                      FunctionAnalyzer &Analyzer) {
+                                      SignatureOptimizer &Optimizer) {
   // First we create an empty function (i.e. no BB) whose function signature has
   // had its arity modified.
   //
   // We only do this to remove dead arguments. All other function signature
   // optimization is done later by modifying the function signature elements
   // themselves.
-  SILFunction *NewF = Analyzer.createEmptyFunctionWithOptimizedSig(NewFName);
+  SILFunction *NewF = Optimizer.createEmptyFunctionWithOptimizedSig(NewFName);
   // Then we transfer the body of F to NewF. At this point, the arguments of the
   // first BB will not match.
   NewF->spliceBody(F);
@@ -806,7 +806,7 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
 
   // Then perform any updates to the arguments of NewF.
   SILBasicBlock *NewFEntryBB = &*NewF->begin();
-  MutableArrayRef<ArgumentDescriptor> ArgDescs = Analyzer.getArgDescList();
+  MutableArrayRef<ArgumentDescriptor> ArgDescs = Optimizer.getArgDescList();
   unsigned ArgOffset = 0;
   SILBuilder Builder(NewFEntryBB->begin());
   Builder.setCurrentDebugScope(NewFEntryBB->getParent()->getDebugScope());
@@ -824,7 +824,7 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
   for (auto &ArgDesc : ArgDescs) {
     ThunkBody->createBBArg(ArgDesc.ParameterInfo.getSILType(), ArgDesc.Decl);
   }
-  createThunkBody(ThunkBody, NewF, Analyzer);
+  createThunkBody(ThunkBody, NewF, Optimizer);
 
   F->setThunk(IsThunk);
   assert(F->getDebugScope()->SILFn != NewF->getDebugScope()->SILFn);
@@ -852,8 +852,8 @@ static bool optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
   llvm::SmallVector<ArgumentDescriptor, 8> Arguments;
 
   // Analyze function arguments. If there is no work to be done, exit early.
-  FunctionAnalyzer Analyzer(BPA, RCIA, F);
-  if (!Analyzer.analyze()) {
+  SignatureOptimizer Optimizer(BPA, RCIA, F);
+  if (!Optimizer.analyze()) {
     DEBUG(llvm::dbgs() << "    Has no optimizable arguments... "
                           "bailing...\n");
     return false;
@@ -864,7 +864,7 @@ static bool optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
 
   ++NumFunctionSignaturesOptimized;
 
-  auto NewFName = Analyzer.getOptimizedName();
+  auto NewFName = Optimizer.getOptimizedName();
 
   // If we already have a specialized version of this function, do not
   // respecialize. For now just bail.
@@ -878,13 +878,13 @@ static bool optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
 
   // Otherwise, move F over to NewF.
   SILFunction *NewF =
-      moveFunctionBodyToNewFunctionWithName(F, NewFName, Analyzer);
+      moveFunctionBodyToNewFunctionWithName(F, NewFName, Optimizer);
 
   // And remove all Callee releases that we found and made redundant via owned
   // to guaranteed conversion.
   //
   // TODO: If more stuff needs to be placed here, refactor into its own method.
-  for (auto &A : Analyzer.getArgDescList()) {
+  for (auto &A : Optimizer.getArgDescList()) {
     if (A.CalleeRelease) {
       A.CalleeRelease->eraseFromParent();
       if (A.CalleeReleaseInThrowBlock) {
@@ -895,7 +895,7 @@ static bool optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
 
   // Rewrite all apply insts calling F to call NewF. Update each call site as
   // appropriate given the form of function signature optimization performed.
-  rewriteApplyInstToCallNewFunction(Analyzer, NewF, CallSites);
+  rewriteApplyInstToCallNewFunction(Optimizer, NewF, CallSites);
 
   return true;
 }
