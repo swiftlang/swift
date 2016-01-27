@@ -847,10 +847,6 @@ static bool optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
 
   assert(!CallSites.empty() && "Unexpected empty set of call sites!");
 
-  // An array containing our ArgumentDescriptor objects that contain information
-  // from our analysis.
-  llvm::SmallVector<ArgumentDescriptor, 8> Arguments;
-
   // Analyze function arguments. If there is no work to be done, exit early.
   SignatureOptimizer Optimizer(BPA, RCIA, F);
   if (!Optimizer.analyze()) {
