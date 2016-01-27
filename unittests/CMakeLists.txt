@@ -27,7 +27,7 @@ function(add_swift_unittest test_dirname)
     set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
       LINK_FLAGS " -Xlinker -rpath -Xlinker ${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/macosx")
 
-    if(SWIFT_ANALYZE_CODE_COVERAGE)
+    if(NOT SWIFT_ANALYZE_CODE_COVERAGE STREQUAL "NONE")
       set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
           LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
     endif()
