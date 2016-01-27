@@ -542,6 +542,7 @@ public:
   llvm::Constant *getAddrOfObjCProtocolRef(ProtocolDecl *proto,
                                            ForDefinition_t forDefinition);
   void addUsedGlobal(llvm::GlobalValue *global);
+  void addCompilerUsedGlobal(llvm::GlobalValue *global);
   void addObjCClass(llvm::Constant *addr, bool nonlazy);
   void addProtocolConformanceRecord(NormalProtocolConformance *conformance);
 
@@ -570,6 +571,14 @@ private:
   /// forcing visibility of symbols which may otherwise be optimized
   /// out.
   SmallVector<llvm::WeakVH, 4> LLVMUsed;
+
+  /// LLVMCompilerUsed - List of global values which are required to be
+  /// present in the object file; bitcast to i8*. This is used for
+  /// forcing visibility of symbols which may otherwise be optimized
+  /// out.
+  ///
+  /// Similar to LLVMUsed, but emitted as llvm.compiler.used.
+  SmallVector<llvm::WeakVH, 4> LLVMCompilerUsed;
 
   /// Metadata nodes for autolinking info.
   ///
