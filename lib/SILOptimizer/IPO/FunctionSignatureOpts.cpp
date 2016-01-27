@@ -428,9 +428,6 @@ class SignatureOptimizer {
   /// generic argument of the callee.
   bool MayBindDynamicSelf;
 
-  /// Did we ascertain that we can optimize this function?
-  bool ShouldOptimize;
-
   /// Did we change the self argument. If so we need to change the calling
   /// convention 'method' to 'freestanding'.
   bool HaveModifiedSelfArgument;
@@ -448,7 +445,7 @@ public:
   SignatureOptimizer(llvm::BumpPtrAllocator &Allocator,
                      RCIdentityFunctionInfo *RCIA, SILFunction *F)
       : Allocator(Allocator), RCIA(RCIA), F(F),
-        MayBindDynamicSelf(computeMayBindDynamicSelf(F)), ShouldOptimize(false),
+        MayBindDynamicSelf(computeMayBindDynamicSelf(F)),
         HaveModifiedSelfArgument(false), ArgDescList() {}
 
   /// Analyze the given function.
@@ -499,6 +496,9 @@ bool SignatureOptimizer::analyze() {
   ConsumedArgToEpilogueReleaseMatcher ArgToReturnReleaseMap(RCIA, F);
   ConsumedArgToEpilogueReleaseMatcher ArgToThrowReleaseMap(
       RCIA, F, ConsumedArgToEpilogueReleaseMatcher::ExitKind::Throw);
+
+  // Did we decide we should optimize any parameter?
+  bool ShouldOptimize = false;
 
   for (unsigned i = 0, e = Args.size(); i != e; ++i) {
     ArgumentDescriptor A(Allocator, Args[i]);
