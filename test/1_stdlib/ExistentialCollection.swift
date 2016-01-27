@@ -166,6 +166,72 @@ tests.test("AnySequence.init(() -> Generator)") {
   }
 }
 
+tests.test("AnySequence.forEach(Generator.Element -> Void)") {
+  var tester = SequenceLog.dispatchTester([ 1, 2, 3 ].map(OpaqueValue.init))
+  _ = AnySequence(tester).forEach { _ in () }
+  expectCustomizable(tester, tester.log.forEach)
+}
+
+tests.test("AnySequence.generate()") {
+  var tester = SequenceLog.dispatchTester([ 1, 2, 3 ].map(OpaqueValue.init))
+  _ = AnySequence(tester).generate()
+  expectCustomizable(tester, tester.log.generate)
+}
+
+tests.test("AnySequence.underestimateCount()") {
+  var tester = SequenceLog.dispatchTester([ 1, 2, 3 ].map(OpaqueValue.init))
+  _ = AnySequence(tester).underestimateCount()
+  expectCustomizable(tester, tester.log.underestimateCount)
+}
+
+tests.test("AnySequence.map(Generator.Element -> T)") {
+  var tester = SequenceLog.dispatchTester([ 1, 2, 3 ].map(OpaqueValue.init))
+  _ = AnySequence(tester).map { "\($0)" }
+  expectCustomizable(tester, tester.log.map)
+}
+
+tests.test("AnySequence.filter(Generator.Element -> Bool)") {
+  var tester = SequenceLog.dispatchTester([ 1, 2, 3 ].map(OpaqueValue.init))
+  _ = AnySequence(tester).filter { true }
+  expectCustomizable(tester, tester.log.filter)
+}
+
+tests.test("AnySequence.dropFirst(Int)") {
+  var tester = SequenceLog.dispatchTester([ 1, 2, 3 ].map(OpaqueValue.init))
+  _ = AnySequence(tester).dropFirst(2)
+  expectCustomizable(tester, tester.log.dropFirst)
+}
+
+tests.test("AnySequence.dropLast(Int)") {
+  var tester = SequenceLog.dispatchTester([ 1, 2, 3 ].map(OpaqueValue.init))
+  _ = AnySequence(tester).dropLast(2)
+  expectCustomizable(tester, tester.log.dropLast)
+}
+
+tests.test("AnySequence.prefix(Int)") {
+  var tester = SequenceLog.dispatchTester([ 1, 2, 3 ].map(OpaqueValue.init))
+  _ = AnySequence(tester).prefix(2)
+  expectCustomizable(tester, tester.log.prefix)
+}
+
+tests.test("AnySequence.suffix(Int)") {
+  var tester = SequenceLog.dispatchTester([ 1, 2, 3 ].map(OpaqueValue.init))
+  _ = AnySequence(tester).suffix(2)
+  expectCustomizable(tester, tester.log.suffix)
+}
+
+tests.test("AnySequence.split(Int, Bool, Generator.Element -> Bool)") {
+  var tester = SequenceLog.dispatchTester([ 1, 2, 3 ].map(OpaqueValue.init))
+  _ = AnySequence(tester).split(2, allowEmptySlices: true) { _ in false }
+  expectCustomizable(tester, tester.log.split)
+}
+
+// FIXME: expectCustomizable with internal AnySequence methods:
+// _customContainsEquatableElement
+// _preprocessingPass
+// _copyToNativeArrayBuffer
+// _initializeTo
+
 tests.test("ForwardIndex") {
   var i = AnyForwardIndex(InstrumentedIndex(0))
   i = i.successor()
