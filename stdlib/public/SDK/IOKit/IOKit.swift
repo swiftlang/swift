@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(OSX)
+@_exported import IOKit
 
 /// General error
 public let kIOReturnError           = iokit_common_err(0x2bc)
@@ -117,11 +117,9 @@ public let kIOReturnNotFound        = iokit_common_err(0x2f0)
 /// Should never be seen
 public let kIOReturnInvalid         = iokit_common_err(0x1)
 
-private let SYS_IOKIT        = UInt32((0x38 & 0x3f) << 26)
-private let SUB_IOKIT_COMMON = UInt32((0 & 0xfff) << 14)
+let SYS_IOKIT        = UInt32((0x38 & 0x3f) << 26)
+let SUB_IOKIT_COMMON = UInt32((0 & 0xfff) << 14)
 
-private func iokit_common_err(value: UInt32) -> Int32 {
-    return Int32(bitPattern: SYS_IOKIT | SUB_IOKIT_COMMON | value)
+func iokit_common_err(value: UInt32) -> IOReturn {
+    return IOReturn(bitPattern: SYS_IOKIT | SUB_IOKIT_COMMON | value)
 }
-
-#endif
