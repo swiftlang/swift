@@ -10,3 +10,11 @@ func foo(x : Int32) -> Int32 {
 foo(1)
 foo(2)
 foo(3)
+
+// rdar://problem/23256795 - Avoid crash if an if_expr has no parent
+// CHECK-LABEL: sil_coverage_map {{.*}}// coverage_ternary.bar.__allocating_init
+class bar {
+  var m1 = 0 == 1
+             ? "false" // CHECK: [[@LINE]]:16 -> [[@LINE]]:23 : 1
+             : "true"; // CHECK: [[@LINE]]:16 -> [[@LINE]]:22 : 0
+}

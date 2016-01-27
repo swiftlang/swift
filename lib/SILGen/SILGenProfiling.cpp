@@ -564,8 +564,11 @@ public:
       assignCounter(E);
     } else if (auto *IE = dyn_cast<IfExpr>(E)) {
       CounterExpr &ThenCounter = assignCounter(IE->getThenExpr());
-      assignCounter(IE->getElseExpr(),
-                    CounterExpr::Sub(getCurrentCounter(), ThenCounter));
+      if (Parent.isNull())
+        assignCounter(IE->getElseExpr());
+      else
+        assignCounter(IE->getElseExpr(),
+                      CounterExpr::Sub(getCurrentCounter(), ThenCounter));
     }
 
     if (hasCounter(E))
