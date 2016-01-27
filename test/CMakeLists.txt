@@ -198,17 +198,23 @@ if(PYTHONINTERP_FOUND)
             "${CMAKE_CURRENT_SOURCE_DIR}/../utils/profdata_merge_worker.py")
 
         if(SWIFT_ANALYZE_CODE_COVERAGE STREQUAL "MERGED")
-            add_custom_target("profdata-merge${test_mode_target_suffix}${VARIANT_SUFFIX}"
-                COMMAND "${PYTHON_EXECUTABLE} ${profdata_merge_worker} start -o ${swift_test_results_dir}"
-                DEPENDS ${test_dependencies}
-                COMMENT "Running profdata merge worker for ${VARIANT_TRIPLE}"
-                ${cmake_3_2_USES_TERMINAL})
+            set(command_profdata_merge_start
+                COMMAND ${PYTHON_EXECUTABLE} ${profdata_merge_worker} start -o ${swift_test_results_dir})
+            set(command_profdata_merge_stop
+                COMMAND ${PYTHON_EXECUTABLE} ${profdata_merge_worker} stop)
+        else()
+            set(command_profdata_merge_start)
+            set(command_profdata_merge_stop)
         endif()
 
+        message(STATUS ${command_profdata_merge_start})
+        message(STATUS ${command_profdata_merge_stop})
         add_custom_target("check-swift${test_mode_target_suffix}${VARIANT_SUFFIX}"
             ${command_upload_stdlib}
             ${command_clean_test_results_dir}
+            ${command_profdata_merge_start}
             COMMAND ${lit_command} "${test_bin_dir}"
+            ${command_profdata_merge_stop}
             DEPENDS ${test_dependencies}
             COMMENT "Running Swift tests for ${VARIANT_TRIPLE}"
             ${cmake_3_2_USES_TERMINAL})
@@ -216,7 +222,9 @@ if(PYTHONINTERP_FOUND)
         add_custom_target("check-swift-validation${test_mode_target_suffix}${VARIANT_SUFFIX}"
             ${command_upload_stdlib}
             ${command_clean_test_results_dir}
+            ${command_profdata_merge_start}
             COMMAND ${lit_command} "${validation_test_bin_dir}"
+            ${command_profdata_merge_stop}
             DEPENDS ${test_dependencies}
             COMMENT "Running Swift validation tests for ${VARIANT_TRIPLE}"
             ${cmake_3_2_USES_TERMINAL})
@@ -224,18 +232,12 @@ if(PYTHONINTERP_FOUND)
         add_custom_target("check-swift-all${test_mode_target_suffix}${VARIANT_SUFFIX}"
             ${command_upload_stdlib}
             ${command_clean_test_results_dir}
+            ${command_profdata_merge_start}
             COMMAND ${lit_command} "${validation_test_bin_dir}" "${test_bin_dir}"
+            ${command_profdata_merge_stop}
             DEPENDS ${test_dependencies}
             COMMENT "Running all Swift tests for ${VARIANT_TRIPLE}"
             ${cmake_3_2_USES_TERMINAL})
-
-        if(SWIFT_ANALYZE_CODE_COVERAGE STREQUAL "MERGED")
-            add_custom_target("profdata-teardown${test_mode_target_suffix}${VARIANT_SUFFIX}"
-                COMMAND "${PYTHON_EXECUTABLE} ${profdata_merge_worker} stop"
-                DEPENDS ${test_dependencies}
-                COMMENT "Stopping profdata merge worker for ${VARIANT_TUPLE}"
-                ${cmake_3_2_USES_TERMINAL})
-        endif()
 
 
       endforeach()
@@ -263,12 +265,6 @@ if(PYTHONINTERP_FOUND)
 
     add_custom_target(check-swift-all${test_mode_target_suffix}
         DEPENDS "check-swift-all${test_mode_target_suffix}${SWIFT_PRIMARY_VARIANT_SUFFIX}")
-
-    add_custom_target(profdata-merge${test_mode_target_suffix}
-        DEPENDS "profdata-merge${test_mode_target_suffix}${SWIFT_PRIMARY_VARIANT_SUFFIX}")
-
-    add_custom_target(profdata-teardown${test_mode_target_suffix}
-        DEPENDS "profdata-teardown${test_mode_target_suffix}${SWIFT_PRIMARY_VARIANT_SUFFIX}")
 
   endforeach()
 

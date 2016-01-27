@@ -159,11 +159,11 @@ def stop_server(args):
 def start_server(args):
     global CONFIG
     CONFIG = Config(args.debug, args.output_dir)
+    if not CONFIG.debug:
+        pid = os.fork()
+        if pid != 0:
+            sys.exit(0) # kill the parent process we forked from.
     try:
-        if not CONFIG.debug:
-            pid = os.fork()
-            if pid != 0:
-                sys.exit(0) # kill the parent process we forked from.
         run_server()
     finally:
         if os.path.exists(CONFIG.pid_file_path):
@@ -173,8 +173,8 @@ def start_server(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers()
 
+    subparsers = parser.add_subparsers()
     start = subparsers.add_parser("start")
     start.add_argument("-d", "--debug",
         help="Run in foreground and report status.",
