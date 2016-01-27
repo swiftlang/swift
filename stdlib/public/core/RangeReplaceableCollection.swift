@@ -363,6 +363,7 @@ public func +<
 >(lhs: C, rhs: S) -> C {
   var lhs = lhs
   // FIXME: what if lhs is a reference type?  This will mutate it.
+  lhs.reserveCapacity(lhs.count + numericCast(rhs.underestimatedCount))
   lhs.appendContentsOf(rhs)
   return lhs
 }
@@ -374,23 +375,10 @@ public func +<
   where S.Iterator.Element == C.Iterator.Element
 >(lhs: S, rhs: C) -> C {
   var result = C()
-  result.reserveCapacity(rhs.count + numericCast(rhs.underestimatedCount))
+  result.reserveCapacity(rhs.count + numericCast(lhs.underestimatedCount))
   result.appendContentsOf(lhs)
   result.appendContentsOf(rhs)
   return result
-}
-
-@warn_unused_result
-public func +<
-  C : RangeReplaceableCollection,
-  S : Collection
-  where S.Iterator.Element == C.Iterator.Element
->(lhs: C, rhs: S) -> C {
-  var lhs = lhs
-  // FIXME: what if lhs is a reference type?  This will mutate it.
-  lhs.reserveCapacity(lhs.count + numericCast(rhs.count))
-  lhs.appendContentsOf(rhs)
-  return lhs
 }
 
 @warn_unused_result
