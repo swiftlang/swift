@@ -340,6 +340,10 @@ public:
     switch (V->getKind()) {
     default:
       return false;
+    case ValueKind::IndexAddrInst: {
+      unsigned Scalar;
+      return getIntegerIndex(cast<IndexAddrInst>(V)->getIndex(), Scalar);
+    }
     case ValueKind::StructElementAddrInst:
     case ValueKind::RefElementAddrInst:
     case ValueKind::ProjectBoxInst:

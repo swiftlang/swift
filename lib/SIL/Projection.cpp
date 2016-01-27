@@ -339,20 +339,19 @@ Optional<NewProjectionPath> NewProjectionPath::getProjectionPath(SILValue Start,
     return llvm::NoneType::None;
 
   auto Iter = End;
-  bool NextAddrIsIndex = false;
   while (Start != Iter) {
     NewProjection AP(Iter);
     if (!AP.isValid())
       break;
     P.Path.push_back(AP);
-    NextAddrIsIndex = AP.getKind() == NewProjectionKind::Index;
     Iter = cast<SILInstruction>(*Iter).getOperand(0);
   }
 
   // Return None if we have an empty projection list or if Start == Iter.
-  // If the next project is index_addr, then Start and End actually point to
-  // disjoint locations (the value at Start has an implicit index_addr #0).
-  if (P.empty() || Start != Iter || NextAddrIsIndex)
+  // We do not worry about th implicit #0 in case of index_addr, as the
+  // NewProjectionPath never allow paths to be compared as a list of indices.
+  // Only the encoded type+index pair will be compared.
+  if (P.empty() || Start != Iter)
     return llvm::NoneType::None;
 
   // Reverse to get a path from base to most-derived.
