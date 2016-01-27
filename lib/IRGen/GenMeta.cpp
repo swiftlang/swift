@@ -1039,8 +1039,6 @@ static llvm::Value *emitGenericMetadataAccessFunction(IRGenFunction &IGF,
   for (auto &arg : IGF.CurFn->args())
     genericArgs.Values.push_back(&arg);
   assert(genericArgs.Values.size() == genericArgs.Types.size());
-
-  // If we have less than four arguments, use a fast entry point.
   assert(genericArgs.Values.size() > 0 && "no generic args?!");
 
   // Slam that information directly into the generic arguments buffer.
