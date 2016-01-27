@@ -13,7 +13,10 @@ import ObjectiveC
 
 var StringOrderRelationTestSuite = TestSuite("StringOrderRelation")
 
-StringOrderRelationTestSuite.test("StringOrderRelation/ASCII/NullByte") {
+StringOrderRelationTestSuite.test("StringOrderRelation/ASCII/NullByte")
+  .xfail(.LinuxAny(reason: "String comparison: ICU vs. Foundation"))
+  .xfail(.FreeBSDAny(reason: "String comparison: ICU vs. Foundation"))
+  .code {
   let baseString = "a"
   let nullbyteString = "a\0"
   expectTrue(baseString < nullbyteString)
