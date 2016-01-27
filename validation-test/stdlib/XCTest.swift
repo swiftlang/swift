@@ -5,7 +5,7 @@
 
 // Currently it fails because a dylib cannot be found.
 // TODO: Re-enable this test when rdar://problem/24222804 is fixed
-// REQUIRES: FIXME
+// REQUIRES: OS=macosx
 
 // watchOS 2.0 does not have a public XCTest module.
 // XFAIL: OS=watchos
