@@ -324,7 +324,7 @@ public:
     ForwardSetIn.resize(LocationNum, false);
     ForwardSetOut.resize(LocationNum, optimistic);
 
-    // If we are running an optimsitic data flow, set forward max to true
+    // If we are running an optimistic data flow, set forward max to true
     // initially.
     ForwardSetMax.resize(LocationNum, optimistic);
 
