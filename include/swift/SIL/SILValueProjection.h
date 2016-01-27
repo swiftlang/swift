@@ -119,7 +119,8 @@ public:
   void removePathPrefix(Optional<NewProjectionPath> &P) {
     if (!P.hasValue())
       return;
-    NewProjectionPath::removePrefix(Path.getValue(), P.getValue());
+    // Remove prefix does not modify the Path in-place.
+    Path = NewProjectionPath::removePrefix(Path.getValue(), P.getValue());
   }
 
   /// Return true if the RHS have identical projection paths.
