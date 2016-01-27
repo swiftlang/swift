@@ -1040,7 +1040,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
   ArrayRef<ValueDecl *> otherDefinitions;
   if (currentDC->isTypeContext()) {
     // Look within a type context.
-    if (auto nominal = currentDC->getDeclaredTypeOfContext()->getAnyNominal()) {
+    if (auto nominal = currentDC->isNominalTypeOrNominalTypeExtensionContext()) {
       otherDefinitions = nominal->lookupDirect(current->getBaseName());
       if (tracker)
         tracker->addUsedMember({nominal, current->getName()}, isCascading);
@@ -2826,8 +2826,7 @@ public:
 
     // Synthesize materializeForSet in non-protocol contexts.
     if (auto materializeForSet = VD->getMaterializeForSetFunc()) {
-      Type containerTy = VD->getDeclContext()->getDeclaredTypeOfContext();
-      if (!containerTy || !containerTy->is<ProtocolType>()) {
+      if (!VD->getDeclContext()->isProtocolOrProtocolExtensionContext()) {
         synthesizeMaterializeForSet(materializeForSet, VD, TC);
         TC.typeCheckDecl(materializeForSet, true);
         TC.typeCheckDecl(materializeForSet, false);
@@ -3061,8 +3060,7 @@ public:
 
     // Synthesize materializeForSet in non-protocol contexts.
     if (auto materializeForSet = SD->getMaterializeForSetFunc()) {
-      Type containerTy = SD->getDeclContext()->getDeclaredTypeOfContext();
-      if (!containerTy || !containerTy->is<ProtocolType>()) {
+      if (!SD->getDeclContext()->isProtocolOrProtocolExtensionContext()) {
         synthesizeMaterializeForSet(materializeForSet, SD, TC);
         TC.typeCheckDecl(materializeForSet, true);
         TC.typeCheckDecl(materializeForSet, false);
@@ -3817,12 +3815,8 @@ public:
       return false;
     }
 
-    auto containerTy = dc->getDeclaredTypeOfContext();
-    if (containerTy->is<ErrorType>())
-      return true;
-
     // 'Self' is only a dynamic self on class methods.
-    auto nominal = containerTy->getAnyNominal();
+    auto nominal = dc->isNominalTypeOrNominalTypeExtensionContext();
     assert(nominal && "Non-nominal container for method type?");
     if (!isa<ClassDecl>(nominal) && !isa<ProtocolDecl>(nominal)) {
       int which;
