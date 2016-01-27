@@ -543,7 +543,7 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
       return ConstraintSystem::SolutionKind::Error;
     }
     // If the param type is an empty existential composition, the function can
-    // only have one argument. Check if exactly one arguement was passed to this
+    // only have one argument. Check if exactly one argument was passed to this
     // function, otherwise we obviously have a mismatch
     if (auto tupleArgType = argType->getAs<TupleType>()) {
       if (tupleArgType->getNumElements() != 1) {
