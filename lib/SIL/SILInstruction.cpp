@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the high-level SILInstruction classes used for  SIL code.
+// This file defines the high-level SILInstruction classes used for SIL code.
 //
 //===----------------------------------------------------------------------===//
 
@@ -34,13 +34,6 @@ using namespace Lowering;
 //===----------------------------------------------------------------------===//
 // Instruction-specific properties on SILValue
 //===----------------------------------------------------------------------===//
-
-Optional<SILLocation> SILValue::getLoc() const {
-  if (auto I = dyn_cast<SILInstruction>(*this)) {
-    return I->getLoc();
-  }
-  return None;
-}
 
 SILLocation SILInstruction::getLoc() const { return Location.getLocation(); }
 
@@ -172,7 +165,7 @@ void SILInstruction::replaceAllUsesWithUndef() {
   SILModule &Mod = getModule();
   while (!use_empty()) {
     Operand *Op = *use_begin();
-    Op->set(SILUndef::get(Op->get().getType(), Mod));
+    Op->set(SILUndef::get(Op->get()->getType(), Mod));
   }
 }
 
@@ -261,6 +254,10 @@ namespace {
       return true;
     }
 
+    bool visitProjectExistentialBoxInst(const ProjectExistentialBoxInst *RHS) {
+      return true;
+    }
+
     bool visitStrongReleaseInst(const StrongReleaseInst *RHS) {
       return true;
     }
@@ -285,6 +282,11 @@ namespace {
     bool visitFunctionRefInst(const FunctionRefInst *RHS) {
       auto *X = cast<FunctionRefInst>(LHS);
       return X->getReferencedFunction() == RHS->getReferencedFunction();
+    }
+
+    bool visitAllocGlobalInst(const AllocGlobalInst *RHS) {
+      auto *X = cast<AllocGlobalInst>(LHS);
+      return X->getReferencedGlobal() == RHS->getReferencedGlobal();
     }
 
     bool visitGlobalAddrInst(const GlobalAddrInst *RHS) {

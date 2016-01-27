@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 // This file lists words that map to various parts of speech. 
-// ===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 #if !defined(PREPOSITION) && !defined(VERB)
 #  error define one or more of PREPOSITION, VERB
@@ -26,10 +26,6 @@
 
 #ifndef VERB
 #  define VERB(Word)
-#endif
-
-#ifndef AUXILIARY_VERB
-#  define AUXILIARY_VERB(Word)
 #endif
 
 DIRECTIONAL_PREPOSITION(above)
@@ -842,33 +838,6 @@ VERB(yell)
 VERB(zip)
 VERB(zoom)
 
-AUXILIARY_VERB(am)
-AUXILIARY_VERB(are)
-AUXILIARY_VERB(been)
-AUXILIARY_VERB(being)
-AUXILIARY_VERB(can)
-AUXILIARY_VERB(could)
-AUXILIARY_VERB(did)
-AUXILIARY_VERB(does)
-AUXILIARY_VERB(had)
-AUXILIARY_VERB(has)
-AUXILIARY_VERB(have)
-AUXILIARY_VERB(having)
-AUXILIARY_VERB(is)
-AUXILIARY_VERB(may)
-AUXILIARY_VERB(might)
-AUXILIARY_VERB(must)
-AUXILIARY_VERB(need)
-AUXILIARY_VERB(needs)
-AUXILIARY_VERB(ought)
-AUXILIARY_VERB(shall)
-AUXILIARY_VERB(should)
-AUXILIARY_VERB(was)
-AUXILIARY_VERB(were)
-AUXILIARY_VERB(will)
-AUXILIARY_VERB(would)
-
-#undef AUXILIARY_VERB
 #undef VERB
 #undef DIRECTIONAL_PREPOSITION
 #undef PREPOSITION

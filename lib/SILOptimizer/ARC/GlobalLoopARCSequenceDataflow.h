@@ -1,4 +1,4 @@
-//===--- GlobalLoopARCSequenceDataflow.h ----------------------------------===//
+//===--- GlobalLoopARCSequenceDataflow.h ------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -14,8 +14,8 @@
 #define SWIFT_SILOPTIMIZER_PASSMANAGER_ARC_GLOBALLOOPARCSEQUENCEDATAFLOW_H
 
 #include "RefCountState.h"
-#include "ProgramTerminationAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopRegionAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ProgramTerminationAnalysis.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/NullablePtr.h"
 #include "llvm/ADT/MapVector.h"

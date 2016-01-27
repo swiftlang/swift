@@ -1,4 +1,4 @@
-//===--- NumericParsing.swift.gyb ----------------------------------------===//
+//===--- NumericParsing.swift.gyb -----------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -16,20 +16,22 @@
 // RUN: %S/../../utils/line-directive %t/NumericParsing.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 %{
-from SwiftIntTypes import *
+from SwiftIntTypes import all_integer_types
 
 word_bits = int(CMAKE_SIZEOF_VOID_P)
   
 def maskOfWidth(n):
   return (1 << n) - 1
 
-def inRadix(radix, n, zero = '0'):
+def inRadix(radix, n, zero='0'):
   """
 Represent the int n in the given radix.  
 Note: the third parameter, zero, is not for user consumption.
   """
-  if n < 0: return '-' + inRadix(radix, -n, '')
-  elif n == 0: return zero
+  if n < 0:
+    return '-' + inRadix(radix, -n, '')
+  elif n == 0:
+    return zero
   else:
     r = n % radix
     digit = chr((ord('0') + r) if r < 10 else (ord('a') + r - 10))
@@ -43,7 +45,7 @@ radices_to_test = [2, 8, 10, 16, max_radix]
 
 # How many values to test in each radix?  A nice prime number of course.
 number_of_values = 23
-}% 
+}%
 
 import StdlibUnittest
 

@@ -1,4 +1,4 @@
-//===--- SourceLoader.cpp - Import .swift files as modules ------*- c++ -*-===//
+//===--- SourceLoader.cpp - Import .swift files as modules ----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -106,6 +106,8 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
     bufferID = Ctx.SourceMgr.addNewSourceBuffer(std::move(inputFile));
 
   auto *importMod = Module::create(moduleID.first, Ctx);
+  if (EnableResilience)
+    importMod->setResilienceEnabled(true);
   Ctx.LoadedModules[moduleID.first] = importMod;
 
   auto implicitImportKind = SourceFile::ImplicitModuleImportKind::Stdlib;

@@ -32,9 +32,9 @@ namespace irgen {
   class IRGenFunction;
 
   /// Emit a witness table reference.
-  llvm::Value *emitWitnessTableRef(IRGenFunction &IGF,
-                                   CanArchetypeType archetype,
-                                   ProtocolDecl *protocol);
+  llvm::Value *emitArchetypeWitnessTableRef(IRGenFunction &IGF,
+                                            CanArchetypeType archetype,
+                                            ProtocolDecl *protocol);
 
   /// Emit a metadata reference for an associated type of an archetype.
   llvm::Value *emitAssociatedTypeMetadataRef(IRGenFunction &IGF,

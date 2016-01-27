@@ -35,6 +35,12 @@ public:
   /// When emitting fixits as code edits, apply all fixits from diagnostics
   /// without any filtering.
   bool FixitCodeForAllDiagnostics = false;
+
+  /// Suppress all warnings
+  bool SuppressWarnings = false;
+
+  /// Treat all warnings as errors
+  bool WarningsAsErrors = false;
 };
 
 }

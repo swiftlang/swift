@@ -1,4 +1,4 @@
-//===--- TypeSubstCloner.h - Clones code and substitutes types ---*- C++ -*-==//
+//===--- TypeSubstCloner.h - Clones code and substitutes types --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -78,17 +78,15 @@ protected:
                             Original.getContextGenericParams(),
                             ApplySubs);
     // Remap opened archetypes into the cloned context.
-    newSub = Substitution(newSub.getArchetype(),
-                          getASTTypeInClonedContext(newSub.getReplacement()
+    newSub = Substitution(getASTTypeInClonedContext(newSub.getReplacement()
                                                       ->getCanonicalType()),
                           newSub.getConformances());
     return newSub;
   }
 
-  ProtocolConformance *remapConformance(ArchetypeType *archetype,
-                                        CanType type,
-                                        ProtocolConformance *conf) {
-    Substitution sub(archetype, type, conf);
+  ProtocolConformanceRef remapConformance(CanType type,
+                                          ProtocolConformanceRef conf) {
+    Substitution sub(type, conf);
     return remapSubstitution(sub).getConformances()[0];
   }
 
@@ -206,8 +204,8 @@ protected:
     auto Conformance = sub.getConformances()[0];
 
     auto newLookupType = getOpASTType(Inst->getLookupType());
-    if (Conformance) {
-      CanType Ty = Conformance->getType()->getCanonicalType();
+    if (Conformance.isConcrete()) {
+      CanType Ty = Conformance.getConcrete()->getType()->getCanonicalType();
 
       if (Ty != newLookupType) {
         assert(Ty->isSuperclassOf(newLookupType, nullptr) &&
@@ -265,7 +263,7 @@ protected:
     // If the type substituted type of the operand type and result types match
     // there is no need for an upcast and we can just use the operand.
     if (getOpType(Upcast->getType()) ==
-        getOpValue(Upcast->getOperand()).getType()) {
+        getOpValue(Upcast->getOperand())->getType()) {
       ValueMap.insert({SILValue(Upcast), getOpValue(Upcast->getOperand())});
       return;
     }

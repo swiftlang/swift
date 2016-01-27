@@ -1,4 +1,4 @@
-//===--- LoopRegionAnalysis.h ---------------------------------------------===//
+//===--- LoopRegionAnalysis.h -----------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -129,8 +129,6 @@
 #include "llvm/Support/raw_ostream.h"
 
 namespace swift {
-
-class LoopRegionFunctionInfo;
 
 /// A loop region is a data structure which represents one of a basic block,
 /// loop, or function. In the case of a loop, function, it contains an internal

@@ -50,8 +50,9 @@ const uint16_t VERSION_MAJOR = 0;
 /// When the format changes IN ANY WAY, this number should be incremented.
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
-/// describe what change you made.
-const uint16_t VERSION_MINOR = 225; // Last change: simplify tuple patterns.
+/// describe what change you made. The content of this comment isn't important;
+/// it just ensures a conflict if two people change the module format.
+const uint16_t VERSION_MINOR = 238; // SILValue changes
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -232,7 +233,8 @@ static inline OperatorKind getStableFixity(DeclKind kind) {
 enum GenericRequirementKind : uint8_t {
   Conformance = 0,
   SameType,
-  WitnessMarker
+  WitnessMarker,
+  Superclass
 };
 using GenericRequirementKindField = BCFixed<2>;
 
@@ -266,8 +268,11 @@ enum class DefaultArgumentKind : uint8_t {
   Function,
   Inherited,
   DSOHandle,
+  Nil,
+  EmptyArray,
+  EmptyDictionary,
 };
-using DefaultArgumentField = BCFixed<3>;
+using DefaultArgumentField = BCFixed<4>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -434,7 +439,8 @@ namespace options_block {
     SDK_PATH = 1,
     XCC,
     IS_SIB,
-    IS_TESTABLE
+    IS_TESTABLE,
+    IS_RESILIENT
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -454,6 +460,10 @@ namespace options_block {
 
   using IsTestableLayout = BCRecordLayout<
     IS_TESTABLE
+  >;
+
+  using IsResilientLayout = BCRecordLayout<
+    IS_RESILIENT
   >;
 }
 
@@ -657,7 +667,6 @@ namespace decls_block {
 
   using BoundGenericSubstitutionLayout = BCRecordLayout<
     BOUND_GENERIC_SUBSTITUTION,
-    TypeIDField, // archetype
     TypeIDField,  // replacement
     BCVBR<5>
     // Trailed by protocol conformance info (if any)
@@ -1000,7 +1009,6 @@ namespace decls_block {
     DeclIDField,           // ParamDecl
     BCFixed<1>,            // isVariadic?
     DefaultArgumentField   // default argument
-    // The element pattern trails the record.
     >;
 
   using ParenPatternLayout = BCRecordLayout<
@@ -1112,10 +1120,10 @@ namespace decls_block {
     BCVBR<2> // context-scoped discriminator counter
   >;
 
-  /// A placeholder for lack of conformance information. Conformances are
-  /// indexed, so simply omitting one would be incorrect.
-  using NoConformanceLayout = BCRecordLayout<
-    NO_CONFORMANCE
+  /// A placeholder for lack of concrete conformance information.
+  using AbstractProtocolConformanceLayout = BCRecordLayout<
+    ABSTRACT_PROTOCOL_CONFORMANCE,
+    DeclIDField // the protocol
   >;
 
   using NormalProtocolConformanceLayout = BCRecordLayout<
@@ -1127,15 +1135,15 @@ namespace decls_block {
     BCVBR<5>, // inherited conformances count
     BCVBR<5>, // defaulted definitions count
     BCArray<DeclIDField>
-    // The array contains value-value-substitutionCount triplets,
+    // The array contains archetype-value pairs,
     // then type declarations, then defaulted definitions.
     // Inherited conformances follow, then the substitution records for the
-    // values and then types.
+    // associated types.
   >;
 
   using SpecializedProtocolConformanceLayout = BCRecordLayout<
     SPECIALIZED_PROTOCOL_CONFORMANCE,
-  TypeIDField,         // conforming type
+    TypeIDField,         // conforming type
     BCVBR<5>             // # of substitutions for the conformance
     // followed by substitution records for the conformance
   >;
@@ -1341,18 +1349,19 @@ namespace decls_block {
     BCArray<IdentifierIDField>
   >;
 
+  using Swift3MigrationDeclAttrLayout = BCRecordLayout<
+    Swift3Migration_DECL_ATTR,
+    BCFixed<1>, // implicit flag
+    BCVBR<5>,   // number of bytes in rename string
+    BCVBR<5>,   // number of bytes in message string
+    BCBlob      // rename, followed by message
+  >;
+
   using WarnUnusedResultDeclAttrLayout = BCRecordLayout<
     WarnUnusedResult_DECL_ATTR,
     BCFixed<1>, // implicit flag
     BCVBR<6>,  // index at the end of the message,
     BCBlob     // blob contains the message and mutating-version
-               // strings, separated by the prior index
-  >;
-
-  using MigrationIdDeclAttrLayout = BCRecordLayout<
-    MigrationId_DECL_ATTR,
-    BCVBR<6>,  // index at the end of the ident,
-    BCBlob     // blob contains the ident and pattern
                // strings, separated by the prior index
   >;
 

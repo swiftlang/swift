@@ -49,22 +49,22 @@ struct Fulfilled<T : protocol<P, Q> > : Assocked {
 }
 
 //   Associated type metadata access function for Fulfilled.Assoc.
-// CHECK-LABEL:  define internal %swift.type* @_TWtuRx23associated_type_witness1PxS_1QrGVS_9Fulfilledx_S_8AssockedS_5Assoc(%swift.type* %Self, i8** %wtable)
-// CHECK:         [[T0:%.*]] = bitcast %swift.type* %Self to %swift.type**
+// CHECK-LABEL:  define internal %swift.type* @_TWtuRx23associated_type_witness1PxS_1QrGVS_9Fulfilledx_S_8AssockedS_5Assoc(%swift.type* %"Fulfilled<T>", i8** %"Fulfilled<T>.Assocked")
+// CHECK:         [[T0:%.*]] = bitcast %swift.type* %"Fulfilled<T>" to %swift.type**
 // CHECK-NEXT:    [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 3
 // CHECK-NEXT:    [[T2:%.*]] = load %swift.type*, %swift.type** [[T1]], align 8, !invariant.load
 // CHECK-NEXT:    ret %swift.type* [[T2]]
 
 //   Associated type witness table access function for Fulfilled.Assoc : P.
-// CHECK-LABEL:  define internal i8** @_TWTuRx23associated_type_witness1PxS_1QrGVS_9Fulfilledx_S_8AssockedS_5AssocPS_1P_(%swift.type* %Self.Assoc, %swift.type* %Self, i8** %wtable)
-// CHECK:         [[T0:%.*]] = bitcast %swift.type* %Self to i8***
+// CHECK-LABEL:  define internal i8** @_TWTuRx23associated_type_witness1PxS_1QrGVS_9Fulfilledx_S_8AssockedS_5AssocPS_1P_(%swift.type* %"Fulfilled<T>.Assoc", %swift.type* %"Fulfilled<T>", i8** %"Fulfilled<T>.Assocked")
+// CHECK:         [[T0:%.*]] = bitcast %swift.type* %"Fulfilled<T>" to i8***
 // CHECK-NEXT:    [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 4
 // CHECK-NEXT:    [[T2:%.*]] = load i8**, i8*** [[T1]], align 8, !invariant.load
 // CHECK-NEXT:    ret i8** [[T2]]
 
 //   Associated type witness table access function for Fulfilled.Assoc : Q.
-// CHECK-LABEL:  define internal i8** @_TWTuRx23associated_type_witness1PxS_1QrGVS_9Fulfilledx_S_8AssockedS_5AssocPS_1Q_(%swift.type* %Self.Assoc, %swift.type* %Self, i8** %wtable)
-// CHECK:         [[T0:%.*]] = bitcast %swift.type* %Self to i8***
+// CHECK-LABEL:  define internal i8** @_TWTuRx23associated_type_witness1PxS_1QrGVS_9Fulfilledx_S_8AssockedS_5AssocPS_1Q_(%swift.type* %"Fulfilled<T>.Assoc", %swift.type* %"Fulfilled<T>", i8** %"Fulfilled<T>.Assocked")
+// CHECK:         [[T0:%.*]] = bitcast %swift.type* %"Fulfilled<T>" to i8***
 // CHECK-NEXT:    [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 5
 // CHECK-NEXT:    [[T2:%.*]] = load i8**, i8*** [[T1]], align 8, !invariant.load
 // CHECK-NEXT:    ret i8** [[T2]]
@@ -90,9 +90,9 @@ struct Computed<T, U> : Assocked {
 }
 
 //   Associated type metadata access function for Computed.Assoc.
-// CHECK-LABEL:  define internal %swift.type* @_TWtu0_rGV23associated_type_witness8Computedxq__S_8AssockedS_5Assoc(%swift.type* %Self, i8** %wtable)
+// CHECK-LABEL:  define internal %swift.type* @_TWtu0_rGV23associated_type_witness8Computedxq__S_8AssockedS_5Assoc(%swift.type* %"Computed<T, U>", i8** %"Computed<T, U>.Assocked")
 // CHECK:         entry:
-// CHECK:          [[T0:%.*]] = getelementptr inbounds i8*, i8** %wtable, i32 3
+// CHECK:          [[T0:%.*]] = getelementptr inbounds i8*, i8** %"Computed<T, U>.Assocked", i32 3
 // CHECK-NEXT:     [[CACHE:%.*]] = bitcast i8** [[T0]] to %swift.type**
 // CHECK-NEXT:     [[CACHE_RESULT:%.*]] = load %swift.type*, %swift.type** [[CACHE]], align 8
 // CHECK-NEXT:     [[T1:%.*]] = icmp eq %swift.type* [[CACHE_RESULT]], null
@@ -101,15 +101,13 @@ struct Computed<T, U> : Assocked {
 // CHECK-NEXT:     [[T0:%.*]] = phi %swift.type* [ [[CACHE_RESULT]], %entry ], [ [[FETCH_RESULT:%.*]], %fetch ]
 // CHECK-NEXT:     ret %swift.type* [[T0]]
 // CHECK:        fetch:
-// CHECK-NEXT:    [[T0:%.*]] = bitcast %swift.type* %Self to %swift.type**
+// CHECK-NEXT:    [[T0:%.*]] = bitcast %swift.type* %"Computed<T, U>" to %swift.type**
 // CHECK-NEXT:    [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 3
 // CHECK-NEXT:    [[T:%.*]] = load %swift.type*, %swift.type** [[T1]], align 8, !invariant.load
-// CHECK:         [[T0:%.*]] = bitcast %swift.type* %Self to %swift.type**
+// CHECK:         [[T0:%.*]] = bitcast %swift.type* %"Computed<T, U>" to %swift.type**
 // CHECK-NEXT:    [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 4
 // CHECK-NEXT:    [[U:%.*]] = load %swift.type*, %swift.type** [[T1]], align 8, !invariant.load
-// CHECK:         [[T0:%.*]] = bitcast %swift.type* [[T]] to i8*
-// CHECK-NEXT:    [[T1:%.*]] = bitcast %swift.type* [[U]] to i8*
-// CHECK-NEXT:    [[FETCH_RESULT]] = call %swift.type* @swift_getGenericMetadata2({{.*}}, i8* [[T0]], i8* [[T1]])
+// CHECK-NEXT:    [[FETCH_RESULT]] = call %swift.type* @_TMaV23associated_type_witness4Pair(%swift.type* [[T]], %swift.type* [[U]])
 // CHECK-NEXT:    store atomic %swift.type* [[FETCH_RESULT]], %swift.type** [[CACHE]] release, align 8
 // CHECK-NEXT:    br label %cont
 

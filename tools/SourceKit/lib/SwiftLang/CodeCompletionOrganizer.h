@@ -1,4 +1,4 @@
-//===--- CodeCompletionOrganizer.h - -----------------------------*- C++ -*-==//
+//===--- CodeCompletionOrganizer.h - ----------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -86,7 +86,8 @@ public:
   ///
   /// Precondition: \p completions should be sorted with preSortCompletions().
   void addCompletionsWithFilter(ArrayRef<Completion *> completions,
-                                StringRef filterText, Completion *&exactMatch);
+                                StringRef filterText, const FilterRules &rules,
+                                Completion *&exactMatch);
 
   void groupAndSort(const Options &options);
 

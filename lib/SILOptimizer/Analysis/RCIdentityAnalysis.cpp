@@ -51,23 +51,13 @@ static bool isRCIdentityPreservingCast(ValueKind Kind) {
 }
 
 //===----------------------------------------------------------------------===//
-//                          RCIdentityRoot Analysis
+//                    RC Identity Root Instruction Casting
 //===----------------------------------------------------------------------===//
-
-/// Returns true if FirstIV is a SILArgument or SILInstruction in a BB that
-/// dominates the BB of A.
-static bool dominatesArgument(DominanceInfo *DI, SILArgument *A,
-                              SILValue FirstIV) {
-  SILBasicBlock *OtherBB = FirstIV->getParentBB();
-  if (!OtherBB || OtherBB == A->getParent())
-    return false;
-  return DI->dominates(OtherBB, A->getParent());
-}
 
 static SILValue stripRCIdentityPreservingInsts(SILValue V) {
   // First strip off RC identity preserving casts.
   if (isRCIdentityPreservingCast(V->getKind()))
-    return cast<SILInstruction>(V.getDef())->getOperand(0);
+    return cast<SILInstruction>(V)->getOperand(0);
 
   // Then if we have a struct_extract that is extracting a non-trivial member
   // from a struct with no other non-trivial members, a ref count operation on
@@ -108,7 +98,35 @@ static SILValue stripRCIdentityPreservingInsts(SILValue V) {
     if (SILValue NewValue = TI->getUniqueNonTrivialElt())
       return NewValue;
 
+  // Any SILArgument with a single predecessor from a "phi" perspective is
+  // dead. In such a case, the SILArgument must be rc-identical.
+  //
+  // This is the easy case. The difficult case is when you have an argument with
+  // /multiple/ predecessors.
+  //
+  // We do not need to insert this SILArgument into the visited SILArgument set
+  // since we will only visit it twice if we go around a back edge due to a
+  // different SILArgument that is actually being used for its phi node like
+  // purposes.
+  if (auto *A = dyn_cast<SILArgument>(V))
+    if (SILValue Result = A->getSingleIncomingValue())
+      return Result;
+
   return SILValue();
+}
+
+//===----------------------------------------------------------------------===//
+//                  RC Identity Dominance Argument Analysis
+//===----------------------------------------------------------------------===//
+
+/// Returns true if FirstIV is a SILArgument or SILInstruction in a BB that
+/// dominates the BB of A.
+static bool dominatesArgument(DominanceInfo *DI, SILArgument *A,
+                              SILValue FirstIV) {
+  SILBasicBlock *OtherBB = FirstIV->getParentBB();
+  if (!OtherBB || OtherBB == A->getParent())
+    return false;
+  return DI->dominates(OtherBB, A->getParent());
 }
 
 /// V is the incoming value for the SILArgument A on at least one path.  Find a
@@ -226,6 +244,18 @@ findDominatingNonPayloadedEdge(SILBasicBlock *IncomingEdgeBB,
   return false;
 }
 
+static SILValue allIncomingValuesEqual(
+    llvm::SmallVectorImpl<std::pair<SILBasicBlock *,
+                                    SILValue >> &IncomingValues) {
+  SILValue First = stripRCIdentityPreservingInsts(IncomingValues[0].second);
+  if (std::all_of(std::next(IncomingValues.begin()), IncomingValues.end(),
+                     [&First](std::pair<SILBasicBlock *, SILValue> P) -> bool {
+                       return stripRCIdentityPreservingInsts(P.second) == First;
+                     }))
+    return First;
+  return SILValue();
+}
+
 /// Return the underlying SILValue after stripping off SILArguments that cannot
 /// affect RC identity.
 ///
@@ -283,11 +313,16 @@ SILValue RCIdentityFunctionInfo::stripRCIdentityPreservingArgs(SILValue V,
 
   unsigned IVListSize = IncomingValues.size();
 
-  // If we only have one incoming value, just return the identity root of that
-  // incoming value. There can be no loop problems.
-  if (IVListSize == 1) {
-    return IncomingValues[0].second;
-  }
+  assert(IVListSize != 1 && "Should have been handled in "
+         "stripRCIdentityPreservingInsts");
+
+  // Ok, we have multiple predecessors. See if all of them are the same
+  // value. If so, just return that value.
+  //
+  // This returns a SILValue to save a little bit of compile time since we
+  // already compute that value here.
+  if (SILValue V = allIncomingValuesEqual(IncomingValues))
+    return V;
 
   // Ok, we have multiple predecessors. First find the first non-payloaded enum.
   llvm::SmallVector<SILBasicBlock *, 8> NoPayloadEnumBBs;
@@ -334,7 +369,7 @@ SILValue RCIdentityFunctionInfo::stripRCIdentityPreservingArgs(SILValue V,
 
   // At this point, we know that we have *some* NoPayloadEnums. If FirstIV is
   // not an enum, then we must bail. We do not try to analyze this case.
-  if (!FirstIV.getType().getEnumOrBoundGenericEnum())
+  if (!FirstIV->getType().getEnumOrBoundGenericEnum())
     return SILValue();
 
   // Now we know that FirstIV is an enum and that all payloaded enum cases after
@@ -357,6 +392,10 @@ SILValue RCIdentityFunctionInfo::stripRCIdentityPreservingArgs(SILValue V,
 llvm::cl::opt<bool> StripOffArgs(
     "enable-rc-identity-arg-strip", llvm::cl::init(true),
     llvm::cl::desc("Should RC identity try to strip off arguments"));
+
+//===----------------------------------------------------------------------===//
+//                   Top Level RC Identity Root Entrypoints
+//===----------------------------------------------------------------------===//
 
 SILValue RCIdentityFunctionInfo::stripRCIdentityPreservingOps(SILValue V,
                                                       unsigned RecursionDepth) {
@@ -383,6 +422,37 @@ SILValue RCIdentityFunctionInfo::stripRCIdentityPreservingOps(SILValue V,
   }
 
   return V;
+}
+
+
+SILValue RCIdentityFunctionInfo::getRCIdentityRootInner(SILValue V,
+                                                    unsigned RecursionDepth) {
+  // Only allow this method to be recursed on for a limited number of times to
+  // make sure we don't explode compile time.
+  if (RecursionDepth >= MaxRecursionDepth)
+    return SILValue();
+
+  SILValue NewValue = stripRCIdentityPreservingOps(V, RecursionDepth);
+  if (!NewValue)
+    return SILValue();
+
+  // We can get back V if our analysis completely fails. There is no point in
+  // storing this value into the cache so just return it.
+  if (NewValue == V)
+    return V;
+
+  return NewValue;
+}
+
+SILValue RCIdentityFunctionInfo::getRCIdentityRoot(SILValue V) {
+  SILValue Root = getRCIdentityRootInner(V, 0);
+  VisitedArgs.clear();
+
+  // If we fail to find a root, return V.
+  if (!Root)
+    return V;
+
+  return Root;
 }
 
 //===----------------------------------------------------------------------===//
@@ -429,7 +499,7 @@ void RCIdentityFunctionInfo::getRCUsers(
     SILValue V = Worklist.pop_back_val();
 
     // For each user of V...
-    for (auto *Op : V.getUses()) {
+    for (auto *Op : V->getUses()) {
       SILInstruction *User = Op->getUser();
 
       // If we have already visited this user, continue.
@@ -455,9 +525,7 @@ void RCIdentityFunctionInfo::getRCUsers(
       }
 
       // Otherwise, add all of User's uses to our list to continue searching.
-      for (unsigned i = 0, e = User->getNumTypes(); i != e; ++i) {
-        Worklist.push_back(SILValue(User, i));
-      }
+      Worklist.push_back(User);
     }
   }
 }
@@ -465,36 +533,6 @@ void RCIdentityFunctionInfo::getRCUsers(
 //===----------------------------------------------------------------------===//
 //                              Main Entry Point
 //===----------------------------------------------------------------------===//
-
-SILValue RCIdentityFunctionInfo::getRCIdentityRootInner(SILValue V,
-                                                    unsigned RecursionDepth) {
-  // Only allow this method to be recursed on for a limited number of times to
-  // make sure we don't explode compile time.
-  if (RecursionDepth >= MaxRecursionDepth)
-    return SILValue();
-
-  SILValue NewValue = stripRCIdentityPreservingOps(V, RecursionDepth);
-  if (!NewValue)
-    return SILValue();
-
-  // We can get back V if our analysis completely fails. There is no point in
-  // storing this value into the cache so just return it.
-  if (NewValue == V)
-    return V;
-
-  return NewValue;
-}
-
-SILValue RCIdentityFunctionInfo::getRCIdentityRoot(SILValue V) {
-  SILValue Root = getRCIdentityRootInner(V, 0);
-  VisitedArgs.clear();
-
-  // If we fail to find a root, return V.
-  if (!Root)
-    return V;
-
-  return Root;
-}
 
 void RCIdentityAnalysis::initialize(SILPassManager *PM) {
   DA = PM->getAnalysis<DominanceAnalysis>();

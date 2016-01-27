@@ -219,3 +219,15 @@ public func sem_open(
 ) -> UnsafeMutablePointer<sem_t> {
   return _swift_Glibc_sem_open4(name, oflag, mode, value)
 }
+
+// FreeBSD defines extern char **environ differently than Linux.
+#if os(FreeBSD)
+@warn_unused_result
+@_silgen_name("_swift_FreeBSD_getEnv")
+func _swift_FreeBSD_getEnv(
+) -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<CChar>>>
+
+public var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>> {
+  return _swift_FreeBSD_getEnv().memory
+}
+#endif

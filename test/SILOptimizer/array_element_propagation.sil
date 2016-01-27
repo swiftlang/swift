@@ -95,7 +95,7 @@ sil @propagate01 : $@convention(thin) () -> () {
   %30 = apply %29(%12, %28, %7) : $@convention(method) (MyInt, MyBool, @guaranteed MyArray<MyInt>) -> _MyDependenceToken
   debug_value %30 : $_MyDependenceToken
   %31 = function_ref @getElement : $@convention(method) (@out MyInt, MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> ()
-  %32 = apply %31(%26#1, %12, %28, %30, %7) : $@convention(method) (@out MyInt, MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> ()
+  %32 = apply %31(%26, %12, %28, %30, %7) : $@convention(method) (@out MyInt, MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> ()
   %35 = alloc_stack $MyInt
   debug_value %16 : $MyInt
   debug_value %7 : $MyArray<MyInt>
@@ -103,7 +103,7 @@ sil @propagate01 : $@convention(thin) () -> () {
   strong_retain %25 : $Builtin.BridgeObject
   %36 = apply %29(%16, %28, %7) : $@convention(method) (MyInt, MyBool, @guaranteed MyArray<MyInt>) -> _MyDependenceToken
   debug_value %36 : $_MyDependenceToken
-  %37 = apply %31(%35#1, %16, %28, %36, %7) : $@convention(method) (@out MyInt, MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> ()
+  %37 = apply %31(%35, %16, %28, %36, %7) : $@convention(method) (@out MyInt, MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> ()
   strong_release %25 : $Builtin.BridgeObject
   %44 = alloc_stack $MyInt
   debug_value %7 : $MyArray<MyInt>
@@ -111,12 +111,12 @@ sil @propagate01 : $@convention(thin) () -> () {
   strong_retain %25 : $Builtin.BridgeObject
   %45 = apply %29(%20, %28, %7) : $@convention(method) (MyInt, MyBool, @guaranteed MyArray<MyInt>) -> _MyDependenceToken
   debug_value %45 : $_MyDependenceToken
-  %46 = apply %31(%44#1, %20, %28, %45, %7) : $@convention(method) (@out MyInt, MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> ()
+  %46 = apply %31(%44, %20, %28, %45, %7) : $@convention(method) (@out MyInt, MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> ()
   strong_release %25 : $Builtin.BridgeObject
   %52 = tuple ()
-  dealloc_stack %44#0 : $*@local_storage MyInt
-  dealloc_stack %35#0 : $*@local_storage MyInt
-  dealloc_stack %26#0 : $*@local_storage MyInt
+  dealloc_stack %44 : $*MyInt
+  dealloc_stack %35 : $*MyInt
+  dealloc_stack %26 : $*MyInt
   strong_release %25 : $Builtin.BridgeObject
   return %52 : $()
 }
@@ -156,15 +156,15 @@ sil @repeated_initialization : $@convention(thin) () -> () {
   %29 = function_ref @checkSubscript : $@convention(method) (MyInt, MyBool, @guaranteed MyArray<MyInt>) -> _MyDependenceToken
   %30 = apply %29(%12, %28, %7) : $@convention(method) (MyInt, MyBool, @guaranteed MyArray<MyInt>) -> _MyDependenceToken
   %31 = function_ref @getElement : $@convention(method) (@out MyInt, MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> ()
-  %32 = apply %31(%26#1, %12, %28, %30, %7) : $@convention(method) (@out MyInt, MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> ()
+  %32 = apply %31(%26, %12, %28, %30, %7) : $@convention(method) (@out MyInt, MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> ()
   %35 = alloc_stack $MyInt
   strong_retain %25 : $Builtin.BridgeObject
   %36 = apply %29(%16, %28, %7) : $@convention(method) (MyInt, MyBool, @guaranteed MyArray<MyInt>) -> _MyDependenceToken
-  %37 = apply %31(%35#1, %16, %28, %36, %7) : $@convention(method) (@out MyInt, MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> ()
+  %37 = apply %31(%35, %16, %28, %36, %7) : $@convention(method) (@out MyInt, MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> ()
   strong_release %25 : $Builtin.BridgeObject
   %52 = tuple ()
-  dealloc_stack %35#0 : $*@local_storage MyInt
-  dealloc_stack %26#0 : $*@local_storage MyInt
+  dealloc_stack %35 : $*MyInt
+  dealloc_stack %26 : $*MyInt
   strong_release %25 : $Builtin.BridgeObject
   return %52 : $()
 }
@@ -198,11 +198,11 @@ sil @unknown_use : $@convention(thin) () -> () {
   %29 = function_ref @checkSubscript : $@convention(method) (MyInt, MyBool, @guaranteed MyArray<MyInt>) -> _MyDependenceToken
   %30 = apply %29(%12, %28, %7) : $@convention(method) (MyInt, MyBool, @guaranteed MyArray<MyInt>) -> _MyDependenceToken
   %31 = function_ref @getElement : $@convention(method) (@out MyInt, MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> ()
-  %32 = apply %31(%26#1, %12, %28, %30, %7) : $@convention(method) (@out MyInt, MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> ()
+  %32 = apply %31(%26, %12, %28, %30, %7) : $@convention(method) (@out MyInt, MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> ()
   %33 = function_ref @unknown_array_use : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyBool
   %34 = apply %33(%7) : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyBool
   %52 = tuple ()
-  dealloc_stack %26#0 : $*@local_storage MyInt
+  dealloc_stack %26 : $*MyInt
   strong_release %25 : $Builtin.BridgeObject
   return %52 : $()
 }

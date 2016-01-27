@@ -322,7 +322,7 @@ covered by this model at all. For example, having multiple threads execute on
 different slices of the same array would require copying the array to temporary
 disjoint memory spaces to do operations, then recopy it back into place. This
 data copying can be awkward and reduce the benefits of parallelism to make it
-non- profitable.
+non-profitable.
 
 There are multiple different ways to tackle this. We can just throw it back into
 the programmer's lap and tell them that the behavior is undefined if they get a

@@ -1,4 +1,4 @@
-//===--- Projection.h - Utilities for working with  Projections -*- C++ -*-===//
+//===--- Projection.h - Utilities for working with Projections --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -36,6 +36,7 @@ class SILBuilder;
 class ProjectionPath;
 class NewProjectionPath;
 using ProjectionPathList = llvm::SmallVector<Optional<ProjectionPath>, 8>;
+using NewProjectionPathList = llvm::SmallVector<Optional<NewProjectionPath>, 8>;
 
 enum class SubSeqRelation_t : uint8_t {
   Unknown,
@@ -94,6 +95,13 @@ struct ProjectionIndex {
       Aggregate = REA->getOperand();
       break;
     }
+    case ValueKind::ProjectBoxInst: {
+      ProjectBoxInst *PBI = cast<ProjectBoxInst>(V);
+      // A box has only a single payload.
+      Index = 0;
+      Aggregate = PBI->getOperand();
+      break;
+    }
     case ValueKind::TupleElementAddrInst: {
       TupleElementAddrInst *TEA = cast<TupleElementAddrInst>(V);
       Index = TEA->getFieldNo();
@@ -114,7 +122,7 @@ struct ProjectionIndex {
     }
     }
   }
-  bool isValid() const { return Aggregate.isValid(); }
+  bool isValid() const { return (bool)Aggregate; }
 };
 
 /// The kind of projection that we are representing.
@@ -135,23 +143,21 @@ struct ProjectionIndex {
 /// The NewProjection class contains the logic to use NewProjectionKind in this
 /// manner.
 enum class NewProjectionKind : unsigned {
-  Invalid = 0,
-
   // PointerProjectionKinds
-  Upcast = 1,
-  RefCast = 2,
-  BitwiseCast = 3,
+  Upcast = 0,
+  RefCast = 1,
+  BitwiseCast = 2,
+  FirstPointerKind = Upcast,
   LastPointerKind = BitwiseCast,
 
-  /// Index Projection Kinds
-  // This is an index projection for which we have an index >= 4096, requiring
-  // us to malloc memory. It needs to be able to be stored in at most 3 bits.
-  LargeIndex = 7,
-  Struct = 8,
-  Tuple = 9,
-  Index = 10,
-  Class = 11,
-  Enum = 12,
+  // Index Projection Kinds
+  FirstIndexKind = 7,
+  Struct = PointerIntEnumIndexKindValue<0, NewProjectionKind>::value,
+  Tuple = PointerIntEnumIndexKindValue<1, NewProjectionKind>::value,
+  Index = PointerIntEnumIndexKindValue<2, NewProjectionKind>::value,
+  Class = PointerIntEnumIndexKindValue<3, NewProjectionKind>::value,
+  Enum = PointerIntEnumIndexKindValue<4, NewProjectionKind>::value,
+  Box = PointerIntEnumIndexKindValue<5, NewProjectionKind>::value,
   LastIndexKind = Enum,
 };
 
@@ -168,13 +174,12 @@ static inline bool isCastNewProjectionKind(NewProjectionKind Kind) {
   case NewProjectionKind::RefCast:
   case NewProjectionKind::BitwiseCast:
     return true;
-  case NewProjectionKind::Invalid:
-  case NewProjectionKind::LargeIndex:
   case NewProjectionKind::Struct:
   case NewProjectionKind::Tuple:
   case NewProjectionKind::Index:
   case NewProjectionKind::Class:
   case NewProjectionKind::Enum:
+  case NewProjectionKind::Box:
     return false;
   }
 }
@@ -246,12 +251,16 @@ public:
   /// Apply this projection to \p BaseType and return the relevant subfield's
   /// SILType if BaseField has less subtypes than projection's offset.
   SILType getType(SILType BaseType, SILModule &M) const {
+    assert(isValid());
     switch (getKind()) {
     case NewProjectionKind::Struct:
     case NewProjectionKind::Class:
       return BaseType.getFieldType(getVarDecl(BaseType), M);
     case NewProjectionKind::Enum:
       return BaseType.getEnumElementType(getEnumElementDecl(BaseType), M);
+    case NewProjectionKind::Box:
+      return SILType::getPrimitiveAddressType(BaseType.castTo<SILBoxType>()->
+                                                getBoxedType());
     case NewProjectionKind::Tuple:
       return BaseType.getTupleElementType(getIndex());
     case NewProjectionKind::Upcast:
@@ -261,13 +270,11 @@ public:
     case NewProjectionKind::Index:
       // Index types do not change the underlying type.
       return BaseType;
-    case NewProjectionKind::LargeIndex:
-    case NewProjectionKind::Invalid:
-      llvm_unreachable("No type for this projection kind");
     }
   }
 
   VarDecl *getVarDecl(SILType BaseType) const {
+    assert(isValid());
     assert((getKind() == NewProjectionKind::Struct ||
             getKind() == NewProjectionKind::Class));
     assert(BaseType.getNominalOrBoundGenericNominal() &&
@@ -279,6 +286,7 @@ public:
   }
 
   EnumElementDecl *getEnumElementDecl(SILType BaseType) const {
+    assert(isValid());
     assert(getKind() == NewProjectionKind::Enum);
     assert(BaseType.getEnumOrBoundGenericEnum() && "Expected enum type");
     auto Iter = BaseType.getEnumOrBoundGenericEnum()->getAllElements().begin();
@@ -287,24 +295,25 @@ public:
   }
 
   ValueDecl *getValueDecl(SILType BaseType) const {
+    assert(isValid());
     switch (getKind()) {
     case NewProjectionKind::Enum:
       return getEnumElementDecl(BaseType);
     case NewProjectionKind::Struct:
     case NewProjectionKind::Class:
       return getVarDecl(BaseType);
-    case NewProjectionKind::Invalid:
     case NewProjectionKind::Upcast:
     case NewProjectionKind::RefCast:
     case NewProjectionKind::BitwiseCast:
-    case NewProjectionKind::LargeIndex:
     case NewProjectionKind::Index:
     case NewProjectionKind::Tuple:
+    case NewProjectionKind::Box:
       llvm_unreachable("NewProjectionKind that does not have a value decl?");
     }
   }
 
   SILType getCastType(SILType BaseType) const {
+    assert(isValid());
     assert(getKind() == NewProjectionKind::Upcast ||
            getKind() == NewProjectionKind::RefCast ||
            getKind() == NewProjectionKind::BitwiseCast);
@@ -323,41 +332,31 @@ public:
   }
 
   /// Convenience method for getting the raw underlying kind.
-  NewProjectionKind getKind() const {
-    return Value.getKind();
-  }
-
-  static bool isAddressProjection(SILValue V) {
-    auto *I = dyn_cast<SILInstruction>(V);
-    if (!I)
-      return false;
-    return isAddressProjection(I);
-  }
+  NewProjectionKind getKind() const { return *Value.getKind(); }
 
   /// Returns true if this instruction projects from an address type to an
   /// address subtype.
-  static bool isAddressProjection(SILInstruction *I) {
-    switch (I->getKind()) {
+  static bool isAddressProjection(SILValue V) {
+    switch (V->getKind()) {
     default:
       return false;
+    case ValueKind::IndexAddrInst: {
+      unsigned Scalar;
+      return getIntegerIndex(cast<IndexAddrInst>(V)->getIndex(), Scalar);
+    }
     case ValueKind::StructElementAddrInst:
+    case ValueKind::RefElementAddrInst:
+    case ValueKind::ProjectBoxInst:
     case ValueKind::TupleElementAddrInst:
     case ValueKind::UncheckedTakeEnumDataAddrInst:
       return true;
     }
   }
 
-  static bool isObjectProjection(SILValue V) {
-    auto *I = dyn_cast<SILInstruction>(V);
-    if (!I)
-      return false;
-    return isObjectProjection(I);
-  }
-
   /// Returns true if this instruction projects from an object type to an object
   /// subtype.
-  static bool isObjectProjection(SILInstruction *I) {
-    switch (I->getKind()) {
+  static bool isObjectProjection(SILValue V) {
+    switch (V->getKind()) {
     default:
       return false;
     case ValueKind::StructExtractInst:
@@ -366,18 +365,16 @@ public:
     }
   }
 
-  static bool isObjectToAddressProjection(SILValue V) {
-    auto *I = dyn_cast<SILInstruction>(V);
-    if (!I)
-      return false;
-    return isObjectToAddressProjection(I);
-  }
-
   /// Returns true if this instruction projects from an object type into an
   /// address subtype.
-  static bool isObjectToAddressProjection(SILInstruction *I) {
-    return isa<RefElementAddrInst>(I);
+  static bool isObjectToAddressProjection(SILValue V) {
+    return isa<RefElementAddrInst>(V) || isa<ProjectBoxInst>(V);
   }
+
+  /// Given a specific SILType, return all first level projections if it is an
+  /// aggregate.
+  static void getFirstLevelProjections(SILType V, SILModule &Mod,
+                                       llvm::SmallVectorImpl<NewProjection> &Out);
 
   /// Is this cast which only allows for equality?
   ///
@@ -392,22 +389,15 @@ public:
     case NewProjectionKind::BitwiseCast:
       return true;
     case NewProjectionKind::Upcast:
-    case NewProjectionKind::Invalid:
-    case NewProjectionKind::LargeIndex:
     case NewProjectionKind::Struct:
     case NewProjectionKind::Tuple:
     case NewProjectionKind::Index:
     case NewProjectionKind::Class:
     case NewProjectionKind::Enum:
+    case NewProjectionKind::Box:
       return false;
     }
   }
-
-  /// Given a specific SILType, return all first level projections if
-  /// it is an aggregate.
-  static void
-  getFirstLevelProjections(SILType V, SILModule &Mod,
-                           llvm::SmallVectorImpl<NewProjection> &Out);
 
   bool isNominalKind() const {
     switch (getKind()) {
@@ -417,11 +407,10 @@ public:
       return true;
     case NewProjectionKind::BitwiseCast:
     case NewProjectionKind::Index:
-    case NewProjectionKind::Invalid:
-    case NewProjectionKind::LargeIndex:
     case NewProjectionKind::RefCast:
     case NewProjectionKind::Tuple:
     case NewProjectionKind::Upcast:
+    case NewProjectionKind::Box:
       return false;
     }
   }
@@ -465,32 +454,69 @@ public:
 
 private:
   SILType BaseType;
+  SILType MostDerivedType;
   PathTy Path;
 
 public:
   /// Create an empty path which serves as a stack. Use push_back() to populate
   /// the stack with members.
-  NewProjectionPath(SILType Base) : BaseType(Base), Path() {}
+  NewProjectionPath(SILType Base) 
+     : BaseType(Base), MostDerivedType(SILType()), Path() {}
+  NewProjectionPath(SILType Base, SILType End) 
+     : BaseType(Base), MostDerivedType(End), Path() {}
   ~NewProjectionPath() = default;
 
   /// Do not allow copy construction. The only way to get one of these is from
   /// getProjectionPath.
-  NewProjectionPath(const NewProjectionPath &Other) = default;
+  NewProjectionPath(const NewProjectionPath &Other) {
+    BaseType = Other.BaseType;
+    MostDerivedType = Other.MostDerivedType;
+    Path = Other.Path;
+  } 
+
+  NewProjectionPath &operator=(const NewProjectionPath &O) {
+    BaseType = O.BaseType;
+    MostDerivedType = O.MostDerivedType;
+    Path = O.Path;
+    return *this;
+  }
 
   /// We only allow for moves of NewProjectionPath since we only want them to be
   /// able to be constructed by calling our factory method.
   NewProjectionPath(NewProjectionPath &&O) {
     BaseType = O.BaseType;
+    MostDerivedType = O.MostDerivedType;
     Path = O.Path;
     O.BaseType = SILType();
+    O.MostDerivedType = SILType();
     O.Path.clear();
   }
 
   NewProjectionPath &operator=(NewProjectionPath &&O) {
     BaseType = O.BaseType;
+    MostDerivedType = O.MostDerivedType;
     Path = O.Path;
     O.BaseType = SILType();
+    O.MostDerivedType = SILType();
     O.Path.clear();
+    return *this;
+  }
+
+  /// Append the projection \p P onto this.
+  NewProjectionPath &append(const NewProjection &P) {
+    push_back(P);
+    // Invalidate most derived type.
+    MostDerivedType = SILType();
+    return *this;
+  }
+
+  /// Append the projections in \p Other onto this.
+  NewProjectionPath &append(const NewProjectionPath &Other) {
+    for (auto &X : Other.Path) {
+      push_back(X);
+    }
+    // Invalidate most derived type.
+    MostDerivedType = SILType();
     return *this;
   }
 
@@ -513,11 +539,21 @@ public:
   removePrefix(const NewProjectionPath &Path, const NewProjectionPath &Prefix);
 
   /// Given the SILType Base, expand every leaf nodes in the type tree.
-  /// Include the intermediate nodes if OnlyLeafNode is false.
-  static void
-  expandTypeIntoLeafProjectionPaths(SILType BaseType, SILModule *Mod,
-                                    llvm::SmallVectorImpl<NewProjectionPath> &P,
-                                    bool OnlyLeafNode);
+  ///
+  /// NOTE: this function returns a single empty projection path if the BaseType
+  /// is a leaf node in the type tree.
+  static void expandTypeIntoLeafProjectionPaths(SILType BaseType,
+                                                SILModule *Mod,
+                                                NewProjectionPathList &P);
+
+  /// Given the SILType Base, expand every intermediate and leaf nodes in the
+  /// type tree.
+  ///
+  /// NOTE: this function returns a single empty projection path if the BaseType
+  /// is a leaf node in the type tree.
+  static void expandTypeIntoNodeProjectionPaths(SILType BaseType,
+                                                SILModule *Mod,
+                                                NewProjectionPathList &P);
 
   /// Returns true if the two paths have a non-empty symmetric
   /// difference.
@@ -575,10 +611,13 @@ public:
   SILType getBaseType() const { return BaseType; }
 
   /// Returns the most derived type of the projection path.
-  SILType getMostDerivedType(SILModule &M) const {
+  SILType getMostDerivedType(SILModule &M) {
     if (Path.empty())
       return getBaseType();
-    return getDerivedType(Path.size(), M);
+    if (MostDerivedType)
+      return MostDerivedType;
+    MostDerivedType = getDerivedType(Path.size(), M);
+    return MostDerivedType;
   }
 
   /// Returns the ith derived type of the path. This is zero indexed with 0
@@ -594,20 +633,6 @@ public:
       IterTy = Proj.getType(IterTy, M);
     }
     return IterTy;
-  }
-
-  /// Append the projection \p P onto this.
-  NewProjectionPath &append(const NewProjection &P) {
-    push_back(P);
-    return *this;
-  }
-
-  /// Append the projections in \p Other onto this.
-  NewProjectionPath &append(const NewProjectionPath &Other) {
-    for (auto &X : Other.Path) {
-      push_back(X);
-    }
-    return *this;
   }
 
   /// Returns true if the contained projection path is empty.
@@ -634,9 +659,9 @@ public:
   void verify(SILModule &M);
 
   raw_ostream &print(raw_ostream &OS, SILModule &M);
-  raw_ostream &printProjections(raw_ostream &OS, SILModule &M);
+  raw_ostream &printProjections(raw_ostream &OS, SILModule &M) const;
   void dump(SILModule &M);
-  void dumpProjections(SILModule &M);
+  void dumpProjections(SILModule &M) const;
 };
 
 //===----------------------------------------------------------------------===//
@@ -649,6 +674,7 @@ enum class ProjectionKind : unsigned {
   Index,
   Class,
   Enum,
+  Box,
   LastProjectionKind = Enum,
 };
 
@@ -736,6 +762,7 @@ public:
     case ValueKind::StructElementAddrInst:
     case ValueKind::TupleElementAddrInst:
     case ValueKind::RefElementAddrInst:
+    case ValueKind::ProjectBoxInst:
     case ValueKind::UncheckedTakeEnumDataAddrInst:
       return true;
     default:
@@ -753,6 +780,7 @@ public:
     case ValueKind::StructElementAddrInst:
     case ValueKind::TupleElementAddrInst:
     case ValueKind::RefElementAddrInst:
+    case ValueKind::ProjectBoxInst:
     case ValueKind::UncheckedTakeEnumDataAddrInst:
     default:
       return false;
@@ -816,6 +844,7 @@ public:
       return true;
     case ProjectionKind::Tuple:
     case ProjectionKind::Index:
+    case ProjectionKind::Box:
       return false;
     }
   }
@@ -828,6 +857,7 @@ public:
     switch (getKind()) {
     case ProjectionKind::Tuple:
     case ProjectionKind::Index:
+    case ProjectionKind::Box:
       return true;
     case ProjectionKind::Struct:
     case ProjectionKind::Class:
@@ -851,9 +881,9 @@ public:
 
   NullablePtr<SILInstruction>
   createProjection(SILBuilder &B, SILLocation Loc, SILValue Base) const {
-    if (Base.getType().isAddress()) {
+    if (Base->getType().isAddress()) {
       return createAddrProjection(B, Loc, Base);
-    } else if (Base.getType().isObject()) {
+    } else if (Base->getType().isObject()) {
       return createValueProjection(B, Loc, Base);
     } else {
       llvm_unreachable("Unsupported SILValueCategory");
@@ -879,7 +909,7 @@ public:
   /// Given a specific SILType, return all first level address projections if
   /// it is an aggregate.
   static void getFirstLevelAddrProjections(SILType V, SILModule &Mod,
-                                        llvm::SmallVectorImpl<Projection> &Out);
+                                           llvm::SmallVectorImpl<Projection> &Out);
 
   /// Form an aggregate of type BaseType using the SILValue Values. Returns the
   /// aggregate on success if this is a case we handle or an empty SILValue
@@ -901,6 +931,7 @@ private:
   explicit Projection(TupleElementAddrInst *TEA);
   explicit Projection(IndexAddrInst *SEA);
   explicit Projection(RefElementAddrInst *REA);
+  explicit Projection(ProjectBoxInst *PBI);
   explicit Projection(UncheckedTakeEnumDataAddrInst *UTEDAI);
   explicit Projection(StructExtractInst *SEI);
   explicit Projection(TupleExtractInst *TEI);
@@ -1053,12 +1084,23 @@ static inline llvm::hash_code hash_value(const ProjectionPath &P) {
   return llvm::hash_combine_range(P.begin(), P.end());
 }
 
+/// Returns the hashcode for the new projection path.
+static inline llvm::hash_code hash_value(const NewProjectionPath &P) {
+  return llvm::hash_combine_range(P.begin(), P.end());
+}
+
+/// Returns the hashcode for the projection path.
 static inline llvm::hash_code hash_value(const Projection &P) {
   if (P.isNominalKind()) {
     return llvm::hash_value(P.getDecl());
   } else {
     return llvm::hash_value(P.getIndex());
   }
+}
+
+/// Returns the hashcode for the projection path.
+static inline llvm::hash_code hash_value(const NewProjection &P) {
+  return llvm::hash_combine(static_cast<unsigned>(P.getKind()));
 }
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,

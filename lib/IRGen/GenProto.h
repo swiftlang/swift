@@ -24,7 +24,7 @@ namespace llvm {
 namespace swift {
   class CanType;
   class FuncDecl;
-  class ProtocolConformance;
+  class ProtocolConformanceRef;
   struct SILDeclRef;
   class SILType;
   class SILFunction;
@@ -38,6 +38,13 @@ namespace irgen {
   class IRGenModule;
   class ProtocolInfo;
   class TypeInfo;
+
+  /// Set an LLVM value name for the given type metadata.
+  void setTypeMetadataName(IRGenModule &IGM, llvm::Value *value, CanType type);
+
+  /// Set an LLVM value name for the given protocol witness table.
+  void setProtocolWitnessTableName(IRGenModule &IGM, llvm::Value *value,
+                                   CanType type, ProtocolDecl *protocol);
   
   /// Extract the method pointer from an archetype's witness table
   /// as a function value.
@@ -45,7 +52,7 @@ namespace irgen {
                               CanType baseTy,
                               llvm::Value **baseMetadataCache,
                               SILDeclRef member,
-                              ProtocolConformance *conformance,
+                              ProtocolConformanceRef conformance,
                               Explosion &out);
 
   /// Given a type T and an associated type X of some protocol P to
@@ -118,11 +125,6 @@ namespace irgen {
                                  WitnessMetadata *witnessMetadata,
                                  const GetParameterFn &getParameter);
   
-  /// Perform the metadata bindings necessary to emit a generic value witness.
-  void emitPolymorphicParametersForGenericValueWitness(IRGenFunction &IGF,
-                                                       NominalTypeDecl *ntd,
-                                                       llvm::Value *selfMeta);
-
   /// Add the trailing arguments necessary for calling a witness method.
   void emitTrailingWitnessArguments(IRGenFunction &IGF,
                                     WitnessMetadata &witnessMetadata,
@@ -154,7 +156,8 @@ namespace irgen {
 
   /// Emit references to the witness tables for the substituted type
   /// in the given substitution.
-  void emitWitnessTableRefs(IRGenFunction &IGF, const Substitution &sub,
+  void emitWitnessTableRefs(IRGenFunction &IGF,
+                            const Substitution &sub,
                             llvm::Value **metadataCache,
                             SmallVectorImpl<llvm::Value *> &out);
 
@@ -164,7 +167,7 @@ namespace irgen {
                                    llvm::Value **srcMetadataCache,
                                    ProtocolDecl *proto,
                                    const ProtocolInfo &protoI,
-                                   ProtocolConformance *conformance);
+                                   ProtocolConformanceRef conformance);
 
   /// An entry in a list of known protocols.
   class ProtocolEntry {
@@ -186,18 +189,6 @@ namespace irgen {
                                           ProtocolDecl *target,
                                     const GetWitnessTableFn &getWitnessTable);
 
-  /// Allocate space for a value in a value buffer.
-  Address emitAllocateBuffer(IRGenFunction &IGF, SILType valueType,
-                             Address buffer);
-
-  /// Project to the address of a value in a value buffer.
-  Address emitProjectBuffer(IRGenFunction &IGF, SILType valueType,
-                            Address buffer);
-
-  /// Deallocate space for a value in a value buffer.
-  void emitDeallocateBuffer(IRGenFunction &IGF, SILType valueType,
-                            Address buffer);
-  
 } // end namespace irgen
 } // end namespace swift
 

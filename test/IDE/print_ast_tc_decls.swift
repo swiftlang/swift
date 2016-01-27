@@ -91,7 +91,7 @@ protocol FooProtocol {}
 protocol BarProtocol {}
 protocol BazProtocol { func baz() }
 protocol QuxProtocol {
-  typealias Qux
+  associatedtype Qux
 }
 
 protocol SubFooProtocol : FooProtocol { }
@@ -176,30 +176,6 @@ struct d0100_FooStruct {
     }
   }
 // PASS_COMMON-NEXT: {{^}}  subscript (i: Int, j: Int) -> Double { get }{{$}}
-
-  func curriedVoidFunc1()() {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-// PASS_COMMON-NEXT: {{^}}  func curriedVoidFunc1()(){{$}}
-
-  func curriedVoidFunc2()(a: Int) {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-// PASS_COMMON-NEXT: {{^}}  func curriedVoidFunc2()(a: Int){{$}}
-
-  func curriedVoidFunc3(a: Int)() {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-// PASS_COMMON-NEXT: {{^}}  func curriedVoidFunc3(a: Int)(){{$}}
-
-  func curriedVoidFunc4(a: Int)(b: Int) {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-// PASS_COMMON-NEXT: {{^}}  func curriedVoidFunc4(a: Int)(b: Int){{$}}
-
-  func curriedStringFunc1()() -> String { return "" } // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-// PASS_COMMON-NEXT: {{^}}  func curriedStringFunc1()() -> String{{$}}
-
-  func curriedStringFunc2()(a: Int) -> String { return "" } // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-// PASS_COMMON-NEXT: {{^}}  func curriedStringFunc2()(a: Int) -> String{{$}}
-
-  func curriedStringFunc3(a: Int)() -> String { return "" } // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-// PASS_COMMON-NEXT: {{^}}  func curriedStringFunc3(a: Int)() -> String{{$}}
-
-  func curriedStringFunc4(a: Int)(b: Int) -> String { return "" } // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-// PASS_COMMON-NEXT: {{^}}  func curriedStringFunc4(a: Int)(b: Int) -> String{{$}}
 
   func bodyNameVoidFunc1(a: Int, b x: Float) {}
 // PASS_COMMON-NEXT: {{^}}  func bodyNameVoidFunc1(a: Int, b x: Float){{$}}
@@ -470,8 +446,8 @@ class d0121_TestClassDerived : d0120_TestClassBase {
 protocol d0130_TestProtocol {
 // PASS_COMMON-LABEL: {{^}}protocol d0130_TestProtocol {{{$}}
 
-  typealias NestedTypealias
-// PASS_COMMON-NEXT: {{^}}  typealias NestedTypealias{{$}}
+  associatedtype NestedTypealias
+// PASS_COMMON-NEXT: {{^}}  associatedtype NestedTypealias{{$}}
 
   var property1: Int { get }
 // PASS_COMMON-NEXT: {{^}}  var property1: Int { get }{{$}}
@@ -879,14 +855,14 @@ typealias SimpleTypealias1 = FooProtocol
 // Associated types.
 
 protocol AssociatedType1 {
-  typealias AssociatedTypeDecl1 = Int
-// PASS_ONE_LINE-DAG: {{^}}  typealias AssociatedTypeDecl1 = Int{{$}}
+  associatedtype AssociatedTypeDecl1 = Int
+// PASS_ONE_LINE-DAG: {{^}}  associatedtype AssociatedTypeDecl1 = Int{{$}}
 
-  typealias AssociatedTypeDecl2 : FooProtocol
-// PASS_ONE_LINE-DAG: {{^}}  typealias AssociatedTypeDecl2 : FooProtocol{{$}}
+  associatedtype AssociatedTypeDecl2 : FooProtocol
+// PASS_ONE_LINE-DAG: {{^}}  associatedtype AssociatedTypeDecl2 : FooProtocol{{$}}
 
-  typealias AssociatedTypeDecl3 : FooProtocol, BarProtocol
-// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  typealias AssociatedTypeDecl3 : FooProtocol, BarProtocol{{$}}
+  associatedtype AssociatedTypeDecl3 : FooProtocol, BarProtocol
+// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  associatedtype AssociatedTypeDecl3 : FooProtocol, BarProtocol{{$}}
 }
 
 //===---
@@ -1157,12 +1133,12 @@ infix operator %%<> {
 //===---
 
 protocol d2700_ProtocolWithAssociatedType1 {
-  typealias TA1
+  associatedtype TA1
   func returnsTA1() -> TA1
 }
 
 // PASS_COMMON: {{^}}protocol d2700_ProtocolWithAssociatedType1 {{{$}}
-// PASS_COMMON-NEXT: {{^}}  typealias TA1{{$}}
+// PASS_COMMON-NEXT: {{^}}  associatedtype TA1{{$}}
 // PASS_COMMON-NEXT: {{^}}  func returnsTA1() -> Self.TA1{{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}
 
@@ -1336,7 +1312,7 @@ public func ParamAttrs3(@noescape a : () -> ()) {
 // Protocol extensions
 
 protocol ProtocolToExtend {
-  typealias Assoc
+  associatedtype Assoc
 }
 
 extension ProtocolToExtend where Self.Assoc == Int {}

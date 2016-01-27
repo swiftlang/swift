@@ -61,14 +61,13 @@ namespace swift {
   class NameAliasType;
   class EnumCaseDecl;
   class EnumElementDecl;
-  struct Parameter;
   class ParameterList;
   class Pattern;
   struct PrintOptions;
   class ProtocolDecl;
   class ProtocolType;
   struct RawComment;
-  enum class Resilience : unsigned char;
+  enum class ResilienceExpansion : unsigned;
   class TypeAliasDecl;
   class Stmt;
   class SubscriptDecl;
@@ -886,6 +885,20 @@ void *allocateMemoryForDecl(AllocatorTy &allocator, size_t baseSize,
   return mem;
 }
 
+enum class RequirementReprKind : unsigned int {
+  /// A type bound T : P, where T is a type that depends on a generic
+  /// parameter and P is some type that should bound T, either as a concrete
+  /// supertype or a protocol to which T must conform.
+  TypeConstraint,
+
+  /// A same-type requirement T == U, where T and U are types that shall be
+  /// equivalent.
+  SameType,
+
+  // Note: there is code that packs this enum in a 2-bit bitfield.  Audit users
+  // when adding enumerators.
+};
+
 /// \brief A single requirement in a 'where' clause, which places additional
 /// restrictions on the generic parameters or associated types of a generic
 /// function, type, or protocol.
@@ -896,14 +909,14 @@ void *allocateMemoryForDecl(AllocatorTy &allocator, size_t baseSize,
 /// \c GenericParamList assumes these are POD-like.
 class RequirementRepr {
   SourceLoc SeparatorLoc;
-  RequirementKind Kind : 2;
+  RequirementReprKind Kind : 2;
   bool Invalid : 1;
   TypeLoc Types[2];
   /// Set during deserialization; used to print out the requirements accurately
   /// for the generated interface.
   StringRef AsWrittenString;
 
-  RequirementRepr(SourceLoc SeparatorLoc, RequirementKind Kind,
+  RequirementRepr(SourceLoc SeparatorLoc, RequirementReprKind Kind,
                   TypeLoc FirstType, TypeLoc SecondType)
     : SeparatorLoc(SeparatorLoc), Kind(Kind), Invalid(false),
       Types{FirstType, SecondType} { }
@@ -911,7 +924,7 @@ class RequirementRepr {
   void printImpl(raw_ostream &OS, bool AsWritten) const;
 
 public:
-  /// \brief Construct a new conformance requirement.
+  /// \brief Construct a new type-constraint requirement.
   ///
   /// \param Subject The type that must conform to the given protocol or
   /// composition, or be a subclass of the given class type.
@@ -919,10 +932,10 @@ public:
   /// this requirement was implied.
   /// \param Constraint The protocol or protocol composition to which the
   /// subject must conform, or superclass from which the subject must inherit.
-  static RequirementRepr getConformance(TypeLoc Subject,
-                                    SourceLoc ColonLoc,
-                                    TypeLoc Constraint) {
-    return { ColonLoc, RequirementKind::Conformance, Subject, Constraint };
+  static RequirementRepr getTypeConstraint(TypeLoc Subject,
+                                           SourceLoc ColonLoc,
+                                           TypeLoc Constraint) {
+    return { ColonLoc, RequirementReprKind::TypeConstraint, Subject, Constraint };
   }
 
   /// \brief Construct a new same-type requirement.
@@ -932,13 +945,13 @@ public:
   /// an invalid location if this requirement was implied.
   /// \param SecondType The second type.
   static RequirementRepr getSameType(TypeLoc FirstType,
-                                 SourceLoc EqualLoc,
-                                 TypeLoc SecondType) {
-    return { EqualLoc, RequirementKind::SameType, FirstType, SecondType };
+                                     SourceLoc EqualLoc,
+                                     TypeLoc SecondType) {
+    return { EqualLoc, RequirementReprKind::SameType, FirstType, SecondType };
   }
 
   /// \brief Determine the kind of requirement
-  RequirementKind getKind() const { return Kind; }
+  RequirementReprKind getKind() const { return Kind; }
 
   /// \brief Determine whether this requirement is invalid.
   bool isInvalid() const { return Invalid; }
@@ -946,98 +959,98 @@ public:
   /// \brief Mark this requirement invalid.
   void setInvalid() { Invalid = true; }
 
-  /// \brief For a conformance requirement, return the subject of the
+  /// \brief For a type-bound requirement, return the subject of the
   /// conformance relationship.
   Type getSubject() const {
-    assert(getKind() == RequirementKind::Conformance);
+    assert(getKind() == RequirementReprKind::TypeConstraint);
     return Types[0].getType();
   }
 
   TypeRepr *getSubjectRepr() const {
-    assert(getKind() == RequirementKind::Conformance);
+    assert(getKind() == RequirementReprKind::TypeConstraint);
     return Types[0].getTypeRepr();
   }
 
   TypeLoc &getSubjectLoc() {
-    assert(getKind() == RequirementKind::Conformance);
+    assert(getKind() == RequirementReprKind::TypeConstraint);
     return Types[0];
   }
 
   const TypeLoc &getSubjectLoc() const {
-    assert(getKind() == RequirementKind::Conformance);
+    assert(getKind() == RequirementReprKind::TypeConstraint);
     return Types[0];
   }
 
-  /// \brief For a conformance requirement, return the protocol or to which
+  /// \brief For a type-bound requirement, return the protocol or to which
   /// the subject conforms or superclass it inherits.
   Type getConstraint() const {
-    assert(getKind() == RequirementKind::Conformance);
+    assert(getKind() == RequirementReprKind::TypeConstraint);
     return Types[1].getType();
   }
 
   TypeLoc &getConstraintLoc() {
-    assert(getKind() == RequirementKind::Conformance);
+    assert(getKind() == RequirementReprKind::TypeConstraint);
     return Types[1];
   }
 
   const TypeLoc &getConstraintLoc() const {
-    assert(getKind() == RequirementKind::Conformance);
+    assert(getKind() == RequirementReprKind::TypeConstraint);
     return Types[1];
   }
 
   /// \brief Retrieve the location of the ':' in an explicitly-written
   /// conformance requirement.
   SourceLoc getColonLoc() const {
-    assert(getKind() == RequirementKind::Conformance);
+    assert(getKind() == RequirementReprKind::TypeConstraint);
     return SeparatorLoc;
   }
 
   /// \brief Retrieve the first type of a same-type requirement.
   Type getFirstType() const {
-    assert(getKind() == RequirementKind::SameType);
+    assert(getKind() == RequirementReprKind::SameType);
     return Types[0].getType();
   }
 
   TypeRepr *getFirstTypeRepr() const {
-    assert(getKind() == RequirementKind::SameType);
+    assert(getKind() == RequirementReprKind::SameType);
     return Types[0].getTypeRepr();
   }
 
   TypeLoc &getFirstTypeLoc() {
-    assert(getKind() == RequirementKind::SameType);
+    assert(getKind() == RequirementReprKind::SameType);
     return Types[0];
   }
 
   const TypeLoc &getFirstTypeLoc() const {
-    assert(getKind() == RequirementKind::SameType);
+    assert(getKind() == RequirementReprKind::SameType);
     return Types[0];
   }
 
   /// \brief Retrieve the second type of a same-type requirement.
   Type getSecondType() const {
-    assert(getKind() == RequirementKind::SameType);
+    assert(getKind() == RequirementReprKind::SameType);
     return Types[1].getType();
   }
 
   TypeRepr *getSecondTypeRepr() const {
-    assert(getKind() == RequirementKind::SameType);
+    assert(getKind() == RequirementReprKind::SameType);
     return Types[1].getTypeRepr();
   }
 
   TypeLoc &getSecondTypeLoc() {
-    assert(getKind() == RequirementKind::SameType);
+    assert(getKind() == RequirementReprKind::SameType);
     return Types[1];
   }
 
   const TypeLoc &getSecondTypeLoc() const {
-    assert(getKind() == RequirementKind::SameType);
+    assert(getKind() == RequirementReprKind::SameType);
     return Types[1];
   }
 
   /// \brief Retrieve the location of the '==' in an explicitly-written
   /// same-type requirement.
   SourceLoc getEqualLoc() const {
-    assert(getKind() == RequirementKind::SameType);
+    assert(getKind() == RequirementReprKind::SameType);
     return SeparatorLoc;
   }
 
@@ -1049,6 +1062,11 @@ public:
   void setAsWrittenString(StringRef Str) {
     AsWrittenString = Str;
   }
+
+  /// Further analyze the written string, if it's not empty, to collect the first
+  /// type, the second type and the requirement kind.
+  Optional<std::tuple<StringRef, StringRef, RequirementReprKind>>
+  getAsAnalyzedWrittenString() const;
 
   SourceRange getSourceRange() const {
     return SourceRange(Types[0].getSourceRange().Start,
@@ -2383,7 +2401,7 @@ class TypeAliasDecl : public TypeDecl {
   /// The type that represents this (sugared) name alias.
   mutable NameAliasType *AliasTy;
 
-  SourceLoc TypeAliasLoc; // The location of the 'typalias' keyword
+  SourceLoc TypeAliasLoc; // The location of the 'typealias' keyword
   TypeLoc UnderlyingTy;
 
 public:
@@ -2723,7 +2741,7 @@ class NominalTypeDecl : public TypeDecl, public DeclContext,
   friend class DeclContext;
   friend class IterableDeclContext;
   friend ArrayRef<ValueDecl *>
-           ValueDecl::getSatisfiedProtocolRequirements(bool) const;
+           ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const;
 
 protected:
   Type DeclaredTy;
@@ -2765,13 +2783,17 @@ public:
 
   /// \brief Does this declaration expose a fixed layout to all resilience
   /// domains?
+  ///
+  /// For structs, this means clients can assume the number and order of
+  /// stored properties will not change.
+  ///
+  /// For enums, this means clients can assume the number and order of
+  /// cases will not change.
   bool hasFixedLayout() const;
 
   /// \brief Does this declaration expose a fixed layout to the given
   /// module?
-  bool hasFixedLayout(ModuleDecl *M) const {
-    return (hasFixedLayout() || M == getModuleContext());
-  }
+  bool hasFixedLayout(ModuleDecl *M, ResilienceExpansion expansion) const;
 
   void setMemberLoader(LazyMemberLoader *resolver, uint64_t contextData);
   bool hasLazyMembers() const {
@@ -2828,12 +2850,12 @@ public:
   /// Set the generic signature of this type.
   void setGenericSignature(GenericSignature *sig);
 
-  /// Retrieve the generic parameter types.
-  ArrayRef<GenericTypeParamType *> getGenericParamTypes() const {
+  /// Retrieve the innermost generic parameter types.
+  ArrayRef<GenericTypeParamType *> getInnermostGenericParamTypes() const {
     if (!GenericSig)
       return { };
 
-    return GenericSig->getGenericParams();
+    return GenericSig->getInnermostGenericParams();
   }
 
   /// Retrieve the generic requirements.
@@ -3598,9 +3620,9 @@ public:
     ///      to and may be overridden.
     ///   2) When a stored property satisfies a protocol requirement, these
     ///      accessors end up as entries in the witness table.
-    ///   3) Perhaps someday these will be used by accesses outside of this
-    ///      resilience domain, when the owning type is resilient.
-    ///
+    ///   3) When a stored property is accessed outside of the storage
+    ///      declaration's resilience domain, when the owning type or
+    ///      global variable is resilient.
     StoredWithTrivialAccessors,
 
     /// This is a stored property with either a didSet specifier or a
@@ -4000,6 +4022,18 @@ public:
   AccessStrategy getAccessStrategy(AccessSemantics semantics,
                                    AccessKind accessKind) const;
 
+  /// \brief Does this declaration expose a fixed layout to all resilience
+  /// domains?
+  ///
+  /// Roughly speaking, this means we can make assumptions about whether
+  /// the storage is stored or computed, and if stored, the precise access
+  /// pattern to be used.
+  bool hasFixedLayout() const;
+
+  /// \brief Does this declaration expose a fixed layout to the given
+  /// module?
+  bool hasFixedLayout(ModuleDecl *M, ResilienceExpansion expansion) const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractStorageDecl &&
@@ -4198,12 +4232,6 @@ public:
   /// The resulting source location will be valid if the argument name
   /// was specified separately from the parameter name.
   SourceLoc getArgumentNameLoc() const { return ArgumentNameLoc; }
-
-  /// Return the Parameter value corresponding to this ParamDecl.
-  Parameter &getParameter();
-  const Parameter &getParameter() const {
-    return const_cast<ParamDecl*>(this)->getParameter();
-  }
   
   TypeLoc &getTypeLoc() { return typeLoc; }
   TypeLoc getTypeLoc() const { return typeLoc; }
@@ -4631,7 +4659,10 @@ public:
   ///
   /// Note that some functions don't have an implicit 'self' decl, for example,
   /// free functions.  In this case nullptr is returned.
-  ParamDecl *getImplicitSelfDecl() const;
+  const ParamDecl *getImplicitSelfDecl() const {
+    return const_cast<AbstractFunctionDecl*>(this)->getImplicitSelfDecl();
+  }
+  ParamDecl *getImplicitSelfDecl();
 
   /// \brief Retrieve the set of parameters to a generic function, or null if
   /// this function is not generic.
@@ -4836,7 +4867,7 @@ public:
   SourceLoc getAccessorKeywordLoc() const {return AccessorKeywordLoc; }
 
   SourceLoc getStartLoc() const {
-    return StaticLoc.isValid() ? StaticLoc : FuncLoc;
+    return StaticLoc.isValid() && !isAccessor() ? StaticLoc : FuncLoc;
   }
   SourceRange getSourceRange() const;
 

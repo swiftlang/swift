@@ -373,13 +373,17 @@ public:
   class BacktrackingScope {
     Parser &P;
     ParserPosition PP;
+    bool Backtrack = true;
 
   public:
     BacktrackingScope(Parser &P) : P(P), PP(P.getParserPosition()) {}
 
     ~BacktrackingScope() {
-      P.backtrackToPosition(PP);
+      if (Backtrack)
+        P.backtrackToPosition(PP);
     }
+
+    void cancelBacktrack() { Backtrack = false; }
   };
 
   /// RAII object that, when it is destructed, restores the parser and lexer to
@@ -448,10 +452,11 @@ public:
   void skipUntil(tok T1, tok T2 = tok::unknown);
   void skipUntilAnyOperator();
 
-  /// \brief Skip until a token that starts with '>'.  Applies heuristics that
-  /// are suitable when trying to find the end of a list of generic parameters,
-  /// generic arguments, or list of types in a protocol composition.
-  void skipUntilGreaterInTypeList(bool protocolComposition=false);
+  /// \brief Skip until a token that starts with '>', and consume it if found.
+  /// Applies heuristics that are suitable when trying to find the end of a list
+  /// of generic parameters, generic arguments, or list of types in a protocol
+  /// composition.
+  SourceLoc skipUntilGreaterInTypeList(bool protocolComposition = false);
 
   /// skipUntilDeclStmtRBrace - Skip to the next decl or '}'.
   void skipUntilDeclRBrace();
@@ -706,7 +711,7 @@ public:
 
   bool parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                              DeclAttrKind DK);
-  
+
   /// Parse a version tuple of the form x[.y[.z]]. Returns true if there was
   /// an error parsing.
   bool parseVersionTuple(clang::VersionTuple &Version, SourceRange &Range,
@@ -1092,10 +1097,28 @@ public:
                                               bool isExprBasic);
   ParserResult<Expr> parseExprPostfix(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprUnary(Diag<> ID, bool isExprBasic);
+  ParserResult<Expr> parseExprSelector();
   ParserResult<Expr> parseExprSuper();
   ParserResult<Expr> parseExprConfiguration();
   Expr *parseExprStringLiteral();
-  
+
+  /// If the token is an escaped identifier being used as an argument
+  /// label, but doesn't need to be, diagnose it.
+  void diagnoseEscapedArgumentLabel(const Token &tok);
+
+  /// Parse an unqualified-decl-name.
+  ///
+  ///   unqualified-decl-name:
+  ///     identifier
+  ///     identifier '(' ((identifier | '_') ':') + ')'
+  ///
+  ///
+  /// \param allowInit Whether to allow 'init' for initializers.
+  /// \param loc Will be populated with the location of the name.
+  /// \param diag The diagnostic to emit if this is not a name.
+  DeclName parseUnqualifiedDeclName(bool allowInit, DeclNameLoc &loc,
+                                    const Diagnostic &diag);
+
   Expr *parseExprIdentifier();
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
                                    Identifier PlaceholderId);
@@ -1190,11 +1213,12 @@ public:
   //===--------------------------------------------------------------------===//
   // Generics Parsing
 
-  GenericParamList *parseGenericParameters();
-  GenericParamList *parseGenericParameters(SourceLoc LAngleLoc);
-  GenericParamList *maybeParseGenericParams();
-  bool parseGenericWhereClause(SourceLoc &WhereLoc,
-                               SmallVectorImpl<RequirementRepr> &Requirements);
+  ParserResult<GenericParamList> parseGenericParameters();
+  ParserResult<GenericParamList> parseGenericParameters(SourceLoc LAngleLoc);
+  ParserResult<GenericParamList> maybeParseGenericParams();
+  ParserStatus parseGenericWhereClause(SourceLoc &WhereLoc,
+                               SmallVectorImpl<RequirementRepr> &Requirements,
+                                       bool &FirstTypeInComplete);
 
   //===--------------------------------------------------------------------===//
   // Availability Specification Parsing
@@ -1206,6 +1230,20 @@ public:
   ParserResult<AvailabilitySpec> parseAvailabilitySpec();
   ParserResult<VersionConstraintAvailabilitySpec> parseVersionConstraintSpec();
 };
+
+/// Parse a stringified Swift declaration name, e.g. "init(frame:)".
+StringRef parseDeclName(StringRef name,
+                        SmallVectorImpl<StringRef> &argumentLabels,
+                        bool &isFunctionName);
+
+/// Form a Swift declaration name from its constituent parts.
+DeclName formDeclName(ASTContext &ctx,
+                      StringRef baseName,
+                      ArrayRef<StringRef> argumentLabels,
+                      bool isFunctionName);
+
+/// Parse a stringified Swift declaration name, e.g. "init(frame:)".
+DeclName parseDeclName(ASTContext &ctx, StringRef name);
 
 } // end namespace swift
 

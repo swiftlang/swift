@@ -1,6 +1,8 @@
-public func doFoo(f: () -> ()) {
-  f()
-}
+
+import resilient_struct
+
+
+// Fixed-layout, fixed-size base class
 
 @_fixed_layout
 public class OutsideParent {
@@ -23,6 +25,25 @@ public class OutsideParent {
   }
 }
 
+
+// Fixed-layout, resiliently-sized base class
+
+@_fixed_layout
+public class OutsideParentWithResilientProperty {
+  public let p: Point
+  public let s: Size
+  public let color: Int32
+
+  public init(p: Point, s: Size, color: Int32) {
+    self.p = p
+    self.s = s
+    self.color = color
+  }
+}
+
+
+// Resilient base class
+
 public class ResilientOutsideParent {
   public var property: String = "ResilientOutsideParent.property"
   public final var finalProperty: String = "ResilientOutsideParent.finalProperty"
@@ -44,6 +65,9 @@ public class ResilientOutsideParent {
   }
 }
 
+
+// Fixed-layout, fixed-size subclass
+
 @_fixed_layout
 public class OutsideChild : OutsideParent {
   public override func method() {
@@ -57,6 +81,9 @@ public class OutsideChild : OutsideParent {
   }
 }
 
+
+// Resilient subclass
+
 public class ResilientOutsideChild : ResilientOutsideParent {
   public override func method() {
     print("ResilientOutsideChild.method()")
@@ -68,6 +95,9 @@ public class ResilientOutsideChild : ResilientOutsideParent {
     super.classMethod()
   }
 }
+
+
+// Fixed-layout, dependently-sized, generic base class
 
 @_fixed_layout
 public class GenericOutsideParent<A> {
@@ -86,6 +116,9 @@ public class GenericOutsideParent<A> {
   }
 }
 
+
+// Resilient generic base class
+
 public class ResilientGenericOutsideParent<A> {
   public var property: A
   public init(property: A) {
@@ -101,6 +134,9 @@ public class ResilientGenericOutsideParent<A> {
     print("ResilientGenericOutsideParent.classMethod()")
   }
 }
+
+
+// Fixed-layout, dependently-sized, generic subclass
 
 @_fixed_layout
 public class GenericOutsideChild<A> : GenericOutsideParent<A> {
@@ -120,6 +156,9 @@ public class GenericOutsideChild<A> : GenericOutsideParent<A> {
   }
 }
 
+
+// Resilient generic subclass
+
 public class ResilientGenericOutsideChild<A> : ResilientGenericOutsideParent<A> {
   public override init(property: A) {
     print("ResilientGenericOutsideGenericChild.init(a: A)")
@@ -136,6 +175,9 @@ public class ResilientGenericOutsideChild<A> : ResilientGenericOutsideParent<A> 
     super.classMethod()
   }
 }
+
+
+// Fixed-layout, fixed-size subclass of generic class
 
 @_fixed_layout
 public class ConcreteOutsideChild : GenericOutsideParent<String> {
@@ -154,6 +196,9 @@ public class ConcreteOutsideChild : GenericOutsideParent<String> {
     super.classMethod()
   }
 }
+
+
+// Resilient subclass of generic class
 
 public class ResilientConcreteOutsideChild : ResilientGenericOutsideParent<String> {
   public override init(property: String) {

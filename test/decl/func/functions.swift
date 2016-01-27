@@ -121,8 +121,10 @@ func testObjCMethodCurry(a : ClassWithObjCMethod) -> (Int) -> () {
 }
 
 // We used to crash on this.
-func rdar16786220(var let c: Int) -> () { // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{19-22=}} expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}}
+func rdar16786220(var let c: Int) -> () { // expected-error {{Use of 'var' binding here is not allowed}} {{19-22=}} expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}}
+  var c = c
   c = 42
+  _ = c
 }
 
 
@@ -136,9 +138,11 @@ func !!!<T>(lhs: UnsafePointer<T>, rhs: UnsafePointer<T>) -> Bool { return false
 
 // <rdar://problem/16786168> Functions currently permit 'var inout' parameters
 func inout_inout_error(inout inout x : Int) {} // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{30-36=}}
-// expected-warning@+1 {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{22-25=}}
+// expected-error@+1 {{Use of 'var' binding here is not allowed}} {{22-25=}}
 func var_inout_error(var inout x : Int) { // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{26-32=}}
+  var x = x
   x = 2
+  _ = x
 }
 
 // Unnamed parameters require the name "_":
@@ -146,14 +150,14 @@ func unnamed(Int) { } // expected-error{{unnamed parameters must be written with
 
 // Test fixits on curried functions.
 func testCurryFixits() {
-  func f1(x: Int)(y: Int) {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift; use a single parameter list}} {{17-19=, }}
+  func f1(x: Int)(y: Int) {} // expected-error{{curried function declaration syntax has been removed; use a single parameter list}} {{17-19=, }}
   func f1a(x: Int, y: Int) {}
-  func f2(x: Int)(y: Int)(z: Int) {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift; use a single parameter list}} {{17-19=, }} {{25-27=, }}
+  func f2(x: Int)(y: Int)(z: Int) {} // expected-error{{curried function declaration syntax has been removed; use a single parameter list}} {{17-19=, }} {{25-27=, }}
   func f2a(x: Int, y: Int, z: Int) {}
-  func f3(x: Int)() {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift; use a single parameter list}} {{17-19=}}
+  func f3(x: Int)() {} // expected-error{{curried function declaration syntax has been removed; use a single parameter list}} {{17-19=}}
   func f3a(x: Int) {}
-  func f4()(x: Int) {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift; use a single parameter list}} {{11-13=}}
+  func f4()(x: Int) {} // expected-error{{curried function declaration syntax has been removed; use a single parameter list}} {{11-13=}}
   func f4a(x: Int) {}
-  func f5(x: Int)()(y: Int) {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift; use a single parameter list}} {{17-19=}} {{19-21=, }}
+  func f5(x: Int)()(y: Int) {} // expected-error{{curried function declaration syntax has been removed; use a single parameter list}} {{17-19=}} {{19-21=, }}
   func f5a(x: Int, y: Int) {}
 }

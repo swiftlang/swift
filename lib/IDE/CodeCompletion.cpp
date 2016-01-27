@@ -1,4 +1,4 @@
-//===- CodeCompletion.cpp - Code completion implementation ----------------===//
+//===--- CodeCompletion.cpp - Code completion implementation --------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -284,7 +284,9 @@ std::string swift::ide::removeCodeCompletionTokens(
     if (C == '#' && Ptr <= End - 2 && Ptr[1] == '^') {
       do {
         Ptr++;
-      } while(*Ptr != '#');
+      } while (Ptr < End && *Ptr != '#');
+      if (Ptr == End)
+        break;
       continue;
     }
     CleanFile += C;
@@ -443,8 +445,9 @@ CodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   case DeclKind::Module:
     return CodeCompletionDeclKind::Module;
   case DeclKind::TypeAlias:
-  case DeclKind::AssociatedType:
     return CodeCompletionDeclKind::TypeAlias;
+  case DeclKind::AssociatedType:
+    return CodeCompletionDeclKind::AssociatedType;
   case DeclKind::GenericTypeParam:
     return CodeCompletionDeclKind::GenericTypeParam;
   case DeclKind::Enum:
@@ -535,6 +538,9 @@ void CodeCompletionResult::print(raw_ostream &OS) const {
       break;
     case CodeCompletionDeclKind::TypeAlias:
       Prefix.append("[TypeAlias]");
+      break;
+    case CodeCompletionDeclKind::AssociatedType:
+      Prefix.append("[AssociatedType]");
       break;
     case CodeCompletionDeclKind::GenericTypeParam:
       Prefix.append("[GenericTypeParam]");
@@ -1232,6 +1238,7 @@ public:
   void completeCallArg(CallExpr *E) override;
   void completeReturnStmt(CodeCompletionExpr *E) override;
   void completeAfterPound(CodeCompletionExpr *E, StmtKind ParentKind) override;
+  void completeGenericParams(TypeLoc TL) override;
   void addKeywords(CodeCompletionResultSink &Sink);
 
   void doneParsing() override;
@@ -1258,7 +1265,7 @@ ArchetypeTransformer::ArchetypeTransformer(DeclContext *DC, Type Ty) :
   if (!D)
     return;
   SmallVector<Type, 3> Scrach;
-  auto Params = D->getGenericParamTypes();
+  auto Params = D->getInnermostGenericParamTypes();
   auto Args = BaseTy->getAllGenericArgs(Scrach);
   assert(Params.size() == Args.size());
   for (unsigned I = 0, N = Params.size(); I < N; I ++) {
@@ -1736,7 +1743,7 @@ public:
     }
 
     auto ItAndInserted = DeducedAssociatedTypeCache.insert({ NTD, Types });
-    assert(ItAndInserted.second == true && "should not be in the map");
+    assert(ItAndInserted.second && "should not be in the map");
     return ItAndInserted.first->second;
   }
 
@@ -1805,12 +1812,12 @@ public:
         Builder.addComma();
       NeedComma = true;
 
-      Type type = param.decl->getType();
-      if (param.isVariadic())
-        type = Parameter::getVarargBaseTy(type);
+      Type type = param->getType();
+      if (param->isVariadic())
+        type = ParamDecl::getVarargBaseTy(type);
 
-      Builder.addCallParameter(param.decl->getArgumentName(), type,
-                               param.isVariadic());
+      Builder.addCallParameter(param->getArgumentName(), type,
+                               param->isVariadic());
     }
   }
 
@@ -1904,6 +1911,9 @@ public:
 
         case DefaultArgumentKind::Normal:
         case DefaultArgumentKind::Inherited:
+        case DefaultArgumentKind::Nil:
+        case DefaultArgumentKind::EmptyArray:
+        case DefaultArgumentKind::EmptyDictionary:
           if (includeDefaultArgs)
             break;
           continue;
@@ -1926,7 +1936,7 @@ public:
           Builder.addComma();
         if (BodyParams) {
           // If we have a local name for the parameter, pass in that as well.
-          auto name = BodyParams->get(i).decl->getName();
+          auto name = BodyParams->get(i)->getName();
           Builder.addCallParameter(Name, name, ParamType, TupleElt.isVararg());
         } else {
           Builder.addCallParameter(Name, ParamType, TupleElt.isVararg());
@@ -1944,7 +1954,7 @@ public:
 
       modifiedBuilder = true;
       if (BodyParams) {
-        auto name = BodyParams->get(0).decl->getName();
+        auto name = BodyParams->get(0)->getName();
         Builder.addCallParameter(Identifier(), name, T,
                                  /*IsVarArg*/false);
       } else
@@ -2810,7 +2820,7 @@ public:
     // We allocate these expressions on the stack because we know they can't
     // escape and there isn't a better way to allocate scratch Expr nodes.
     UnresolvedDeclRefExpr UDRE(op->getName(), DeclRefKind::PostfixOperator,
-                               expr->getSourceRange().End);
+                               DeclNameLoc(expr->getSourceRange().End));
     PostfixUnaryExpr opExpr(&UDRE, expr);
     Expr *tempExpr = &opExpr;
 
@@ -2862,7 +2872,7 @@ public:
     // We allocate these expressions on the stack because we know they can't
     // escape and there isn't a better way to allocate scratch Expr nodes.
     UnresolvedDeclRefExpr UDRE(op->getName(), DeclRefKind::BinaryOperator,
-                               SourceLoc());
+                               DeclNameLoc(SourceLoc()));
     sequence.drop_back(1).back() = &UDRE;
     CodeCompletionExpr CCE((SourceRange()));
     sequence.back() = &CCE;
@@ -3440,8 +3450,7 @@ public:
     }
     std::string Description = TargetName.str() + " Attribute";
 #define DECL_ATTR(KEYWORD, NAME, ...)                                         \
-    if (!StringRef(#KEYWORD).startswith("_") &&                               \
-        !DeclAttribute::isUserInaccessible(DAK_##NAME) &&                     \
+    if (!DeclAttribute::isUserInaccessible(DAK_##NAME) &&                     \
         !DeclAttribute::isDeclModifier(DAK_##NAME) &&                         \
         !DeclAttribute::shouldBeRejectedByParser(DAK_##NAME) &&               \
         (!DeclAttribute::isSilOnly(DAK_##NAME) || IsInSil)) {                 \
@@ -3926,6 +3935,12 @@ void CodeCompletionCallbacksImpl::completeAfterPound(CodeCompletionExpr *E,
   ParentStmtKind = ParentKind;
 }
 
+void CodeCompletionCallbacksImpl::completeGenericParams(TypeLoc TL) {
+  CurDeclContext = P.CurDeclContext;
+  Kind = CompletionKind::GenericParams;
+  ParsedTypeLoc = TL;
+}
+
 void CodeCompletionCallbacksImpl::completeNominalMemberBeginning(
     SmallVectorImpl<StringRef> &Keywords) {
   assert(!InEnumElementRawValue);
@@ -4048,6 +4063,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink) {
   case CompletionKind::UnresolvedMember:
   case CompletionKind::CallArg:
   case CompletionKind::AfterPound:
+  case CompletionKind::GenericParams:
     break;
 
   case CompletionKind::StmtOrExpr:
@@ -4563,6 +4579,17 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     Lookup.addPoundAvailable(ParentStmtKind);
     break;
   }
+
+  case CompletionKind::GenericParams: {
+    if (auto NM = ParsedTypeLoc.getType()->getAnyNominal()) {
+      if (auto Params = NM->getGenericParams()) {
+        for (auto GP : Params->getParams()) {
+          Lookup.addGenericTypeParamRef(GP, DeclVisibilityKind::GenericParameter);
+        }
+      }
+    }
+    break;
+  }
   }
 
   if (Lookup.RequestedCachedResults) {
@@ -4730,6 +4757,7 @@ void swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
       case CodeCompletionDeclKind::Enum:
       case CodeCompletionDeclKind::Protocol:
       case CodeCompletionDeclKind::TypeAlias:
+      case CodeCompletionDeclKind::AssociatedType:
       case CodeCompletionDeclKind::GenericTypeParam:
         return true;
       case CodeCompletionDeclKind::EnumElement:

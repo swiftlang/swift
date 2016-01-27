@@ -429,3 +429,7 @@ public protocol RawValueB
 enum RawValueBTest: Double, RawValueB {
   case A, B
 }
+
+enum foo : String {
+  case bar = nil // expected-error {{cannot convert nil to raw type 'String'}}
+}

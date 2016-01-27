@@ -944,7 +944,7 @@ var didSetPropertyTakingOldValue : Int = 0 {
 
 // rdar://16280138 - synthesized getter is defined in terms of archetypes, not interface types
 protocol AbstractPropertyProtocol {
-  typealias Index
+  associatedtype Index
   var a : Index { get }
 }
 struct AbstractPropertyStruct<T> : AbstractPropertyProtocol {
@@ -1173,5 +1173,11 @@ struct r19874152S6 {
 }
 _ = r19874152S5()  // ok
 
+
+
+// <rdar://problem/24314506> QoI: Fix-it for dictionary initializer on required class var suggests [] instead of [:]
+class r24314506 {  // expected-error {{class 'r24314506' has no initializers}}
+  var myDict: [String: AnyObject]  // expected-note {{stored property 'myDict' without initial value prevents synthesized initializers}} {{34-34= = [:]}}
+}
 
 

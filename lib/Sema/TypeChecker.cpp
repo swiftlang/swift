@@ -388,6 +388,11 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
       auto decl = TC.Context.ExternalDefinitions[currentExternalDef];
       
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(decl)) {
+        // HACK: don't type-check the same function body twice.  This is
+        // supposed to be handled by just not enqueuing things twice,
+        // but that gets tricky with synthesized function bodies.
+        if (AFD->isBodyTypeChecked()) continue;
+
         PrettyStackTraceDecl StackEntry("type-checking", AFD);
         TC.typeCheckAbstractFunctionBody(AFD);
         continue;
@@ -464,11 +469,6 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
     }
     TC.UsedConformances.clear();
 
-    TC.definedFunctions.insert(TC.definedFunctions.end(),
-                               TC.implicitlyDefinedFunctions.begin(),
-                               TC.implicitlyDefinedFunctions.end());
-    TC.implicitlyDefinedFunctions.clear();
-
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
            currentExternalDef < TC.Context.ExternalDefinitions.size() ||
            !TC.UsedConformances.empty());
@@ -524,7 +524,6 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     TypeChecker TC(Ctx);
     SharedTimer timer("Type checking / Semantic analysis");
 
-    auto &DefinedFunctions = TC.definedFunctions;
     if (Options.contains(TypeCheckingFlags::DebugTimeFunctionBodies))
       TC.enableDebugTimeFunctionBodies();
 
@@ -593,11 +592,6 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
       TC.contextualizeTopLevelCode(TLC,
                              llvm::makeArrayRef(SF.Decls).slice(StartElem));
     }
-    
-    DefinedFunctions.insert(DefinedFunctions.end(),
-                            TC.implicitlyDefinedFunctions.begin(),
-                            TC.implicitlyDefinedFunctions.end());
-    TC.implicitlyDefinedFunctions.clear();
 
     // If we're in REPL mode, inject temporary result variables and other stuff
     // that the REPL needs to synthesize.
@@ -642,6 +636,9 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
                                    bool isSILType, DeclContext *DC,
                                    bool ProduceDiagnostics) {
   TypeResolutionOptions options;
+
+  // Fine to have unbound generic types.
+  options |= TR_AllowUnboundGenerics;
   if (isSILType)
     options |= TR_SILType;
 
@@ -997,9 +994,17 @@ private:
     if (auto *storageDecl = dyn_cast<AbstractStorageDecl>(D)) {
       // Use the declaration's availability for the context when checking
       // the bodies of its accessors.
-      if (storageDecl->hasAccessorFunctions()) {
+
+      // HACK: For synthesized trivial accessors we may have not a valid
+      // location for the end of the braces, so in that case we will fall back
+      // to using the range for the storage declaration. The right fix here is
+      // to update AbstractStorageDecl::addTrivialAccessors() to take brace
+      // locations and have callers of that method provide appropriate source
+      // locations.
+      SourceLoc BracesEnd = storageDecl->getBracesRange().End;
+      if (storageDecl->hasAccessorFunctions() && BracesEnd.isValid()) {
         return SourceRange(storageDecl->getStartLoc(),
-                           storageDecl->getBracesRange().End);
+                           BracesEnd);
       }
       
       // For a variable declaration (without accessors) we use the range of the
@@ -1799,7 +1804,7 @@ static const Decl *ancestorTypeLevelDeclForAvailabilityFixit(const Decl *D) {
 /// declaration context containing the reference, make a best effort find up to
 /// three locations for potential fixits.
 ///
-/// \param  FoundVersionCheckNode Returns a node that can be wrapped in a
+/// \param FoundVersionCheckNode Returns a node that can be wrapped in a
 /// if #available(...) { ... } version check to fix the unavailable reference,
 /// or None if such a node cannot be found.
 ///
@@ -2285,7 +2290,7 @@ void TypeChecker::checkForForbiddenPrefix(const Decl *D) {
 void TypeChecker::checkForForbiddenPrefix(const UnresolvedDeclRefExpr *E) {
   if (!hasEnabledForbiddenTypecheckPrefix())
     return;
-  checkForForbiddenPrefix(E->getName());
+  checkForForbiddenPrefix(E->getName().getBaseName());
 }
 
 void TypeChecker::checkForForbiddenPrefix(Identifier Ident) {

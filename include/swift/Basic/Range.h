@@ -1,4 +1,4 @@
-//===- Range.h - Classes for conveniently working with ranges ---*- C++ -*-===//
+//===--- Range.h - Classes for conveniently working with ranges -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -290,6 +290,11 @@ inline
 bool
 none_of(Range R, Predicate P) {
   return std::none_of(R.begin(), R.end(), P);
+}
+
+template <class Range, class Predicate>
+inline unsigned count_if(Range R, Predicate P) {
+  return std::count_if(R.begin(), R.end(), P);
 }
 
 } // namespace swift

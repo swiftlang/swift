@@ -22,7 +22,7 @@
 ///
 /// > `a` **subsumes** `b` iff `([a] as Self).isSupersetOf([b])`
 ///
-/// In many models of `SetAlgebraType` such as `Set<T>`, `a`
+/// In many models of `SetAlgebraType` such as `Set<Element>`, `a`
 /// *subsumes* `b` if and only if `a == b`, but that is not always the
 /// case.  For example, option sets typically do not satisfy that
 /// property.
@@ -47,7 +47,7 @@
 ///   - `x.isStrictSubsetOf(y)` iff `x.isSubsetOf(y) && x != y`
 public protocol SetAlgebraType : Equatable, ArrayLiteralConvertible {
   /// A type for which `Self` provides a containment test.
-  typealias Element
+  associatedtype Element
   
   /// Creates an empty set.
   ///

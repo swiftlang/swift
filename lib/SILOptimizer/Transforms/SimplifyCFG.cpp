@@ -18,8 +18,10 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
+#include "swift/SILOptimizer/Analysis/ProgramTerminationAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Local.h"
@@ -35,6 +37,7 @@ using namespace swift;
 STATISTIC(NumBlocksDeleted,  "Number of unreachable blocks removed");
 STATISTIC(NumBlocksMerged,   "Number of blocks merged together");
 STATISTIC(NumJumpThreads,    "Number of jumps threaded");
+STATISTIC(NumTermBlockSimplified,  "Number of programterm block simplified");
 STATISTIC(NumConstantFolded, "Number of terminators constant folded");
 STATISTIC(NumDeadArguments,  "Number of unused arguments removed");
 STATISTIC(NumSROAArguments, "Number of aggregate argument levels split by "
@@ -169,6 +172,7 @@ namespace {
     bool simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI);
     bool simplifySwitchEnumBlock(SwitchEnumInst *SEI);
     bool simplifyUnreachableBlock(UnreachableInst *UI);
+    bool simplifyProgramTerminationBlock(SILBasicBlock *BB);
     bool simplifyArgument(SILBasicBlock *BB, unsigned i);
     bool simplifyArgs(SILBasicBlock *BB);
     bool trySimplifyCheckedCastBr(TermInst *Term, DominanceInfo *DT);
@@ -187,7 +191,7 @@ namespace {
 
 /// Return true if there are any users of V outside the specified block.
 static bool isUsedOutsideOfBlock(SILValue V, SILBasicBlock *BB) {
-  for (auto UI : V.getUses())
+  for (auto UI : V->getUses())
     if (UI->getUser()->getParent() != BB)
       return true;
   return false;
@@ -209,25 +213,16 @@ void swift::updateSSAAfterCloning(BaseThreadingCloner &Cloner,
     if (Inst->use_empty())
       continue;
 
-    for (unsigned i = 0, e = Inst->getNumTypes(); i != e; ++i) {
-      // Get the result index for the cloned instruction. This is going to be
-      // the result index stored in the available value for arguments (we look
-      // through the phi node) and the same index as the original value
-      // otherwise.
-      unsigned ResIdx = i;
-      if (isa<SILArgument>(Inst))
-        ResIdx = AvailValPair.second.getResultNumber();
-
-      SILValue Res(Inst, i);
-      SILValue NewRes(AvailValPair.second.getDef(), ResIdx);
+    if (Inst->hasValue()) {
+      SILValue NewRes(AvailValPair.second);
 
       SmallVector<UseWrapper, 16> UseList;
       // Collect the uses of the value.
-      for (auto Use : Res.getUses())
+      for (auto Use : Inst->getUses())
         UseList.push_back(UseWrapper(Use));
 
-      SSAUp.Initialize(Res.getType());
-      SSAUp.AddAvailableValue(DestBB, Res);
+      SSAUp.Initialize(Inst->getType());
+      SSAUp.AddAvailableValue(DestBB, Inst);
       SSAUp.AddAvailableValue(SrcBB, NewRes);
 
       if (UseList.empty())
@@ -273,7 +268,7 @@ SimplifyCFG::trySimplifyCheckedCastBr(TermInst *Term, DominanceInfo *DT) {
 
 static SILValue getTerminatorCondition(TermInst *Term) {
   if (auto *CondBr = dyn_cast<CondBranchInst>(Term))
-    return CondBr->getCondition().stripExpectIntrinsic();
+    return stripExpectIntrinsic(CondBr->getCondition());
 
   if (auto *SEI = dyn_cast<SwitchEnumInst>(Term))
     return SEI->getOperand();
@@ -379,12 +374,12 @@ public:
       SILBuilderWithScope Builder(SEI);
       if (!ThreadedSuccessorBlock->bbarg_empty()) {
         auto EnumVal = SEI->getOperand();
-        auto EnumTy = EnumVal->getType(0);
+        auto EnumTy = EnumVal->getType();
         auto Loc = SEI->getLoc();
         auto Ty = EnumTy.getEnumElementType(EnumCase, SEI->getModule());
         SILValue UED(
             Builder.createUncheckedEnumData(Loc, EnumVal, EnumCase, Ty));
-        assert(UED.getType() ==
+        assert(UED->getType() ==
                    (*ThreadedSuccessorBlock->bbarg_begin())->getType() &&
                "Argument types must match");
         Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock, {UED});
@@ -426,7 +421,7 @@ static SILInstruction *createEnumElement(SILBuilder &Builder,
                                          EnumElementDecl *EnumElement) {
   auto EnumVal = SEI->getOperand();
   // Do we have a payload.
-  auto EnumTy = EnumVal->getType(0);
+  auto EnumTy = EnumVal->getType();
   if (EnumElement->hasArgumentType()) {
     auto Ty = EnumTy.getEnumElementType(EnumElement, SEI->getModule());
     SILValue UED(Builder.createUncheckedEnumData(SEI->getLoc(), EnumVal,
@@ -445,7 +440,7 @@ static SILInstruction *createValueForEdge(SILInstruction *UserInst,
 
   if (auto *CBI = dyn_cast<CondBranchInst>(DominatingTerminator))
     return Builder.createIntegerLiteral(
-        CBI->getLoc(), CBI->getCondition().getType(), EdgeIdx == 0 ? -1 : 0);
+        CBI->getLoc(), CBI->getCondition()->getType(), EdgeIdx == 0 ? -1 : 0);
 
   auto *SEI = cast<SwitchEnumInst>(DominatingTerminator);
   auto *DstBlock = SEI->getSuccessors()[EdgeIdx].getBB();
@@ -519,7 +514,7 @@ static bool tryDominatorBasedSimplifications(
     //        DestBB
     //          cond_br %dominating_cond
     SmallVector<SILInstruction *, 16> UsersToReplace;
-    for (auto *Op : ignore_expect_uses(DominatingCondition.getDef())) {
+    for (auto *Op : ignore_expect_uses(DominatingCondition)) {
       auto *CondUserInst = Op->getUser();
 
       // Ignore the DominatingTerminator itself.
@@ -584,7 +579,7 @@ static bool tryDominatorBasedSimplifications(
     for (auto *UserInst : UsersToReplace) {
       SILInstruction *EdgeValue = nullptr;
       for (auto &Op : UserInst->getAllOperands()) {
-        if (Op.get().stripExpectIntrinsic() == DominatingCondition) {
+        if (stripExpectIntrinsic(Op.get()) == DominatingCondition) {
           if (!EdgeValue)
             EdgeValue = createValueForEdge(UserInst, DominatingTerminator, Idx);
           Op.set(EdgeValue);
@@ -966,7 +961,7 @@ bool SimplifyCFG::simplifyBranchOperands(OperandValueArrayRef Operands) {
   for (auto O = Operands.begin(), E = Operands.end(); O != E; ++O)
     if (auto *I = dyn_cast<SILInstruction>(*O))
       if (SILValue Result = simplifyInstruction(I)) {
-        SILValue(I, 0).replaceAllUsesWith(Result);
+        I->replaceAllUsesWith(Result);
         if (isInstructionTriviallyDead(I)) {
           eraseFromParentWithDebugInsts(I);
           Simplified = true;
@@ -1082,8 +1077,8 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
     // If there are any BB arguments in the destination, replace them with the
     // branch operands, since they must dominate the dest block.
     for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i) {
-      if (DestBB->getBBArg(i) != BI->getArg(i).getDef())
-        SILValue(DestBB->getBBArg(i)).replaceAllUsesWith(BI->getArg(i));
+      if (DestBB->getBBArg(i) != BI->getArg(i))
+        DestBB->getBBArg(i)->replaceAllUsesWith(BI->getArg(i));
       else {
         // We must be processing an unreachable part of the cfg with a cycle.
         // bb1(arg1): // preds: bb3
@@ -1239,9 +1234,9 @@ static CondFailInst *getUnConditionalFail(SILBasicBlock *BB, SILValue Cond,
 static void createCondFail(CondFailInst *Orig, SILValue Cond, bool inverted,
                            SILBuilder &Builder) {
   if (inverted) {
-    auto *True = Builder.createIntegerLiteral(Orig->getLoc(), Cond.getType(), 1);
+    auto *True = Builder.createIntegerLiteral(Orig->getLoc(), Cond->getType(), 1);
     Cond = Builder.createBuiltinBinaryFunction(Orig->getLoc(), "xor",
-                                               Cond.getType(), Cond.getType(),
+                                               Cond->getType(), Cond->getType(),
                                                {Cond, True});
   }
   Builder.createCondFail(Orig->getLoc(), Cond);
@@ -1261,7 +1256,7 @@ static SILValue invertExpectAndApplyTo(SILBuilder &Builder,
   if (!IL)
     return V;
   SILValue NegatedExpectedValue = Builder.createIntegerLiteral(
-      IL->getLoc(), Args[1].getType(), IL->getValue() == 0 ? -1 : 0);
+      IL->getLoc(), Args[1]->getType(), IL->getValue() == 0 ? -1 : 0);
   return Builder.createBuiltin(BI->getLoc(), BI->getName(), BI->getType(), {},
                                {V, NegatedExpectedValue});
 }
@@ -1300,7 +1295,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   // This looks through expect intrinsic calls and applies the ultimate expect
   // call inverted to the condition.
   if (auto *Xor =
-          dyn_cast<BuiltinInst>(BI->getCondition().stripExpectIntrinsic())) {
+          dyn_cast<BuiltinInst>(stripExpectIntrinsic(BI->getCondition()))) {
     if (Xor->getBuiltinInfo().ID == BuiltinValueKind::Xor) {
       // Check if it's a boolean inversion of the condition.
       OperandValueArrayRef Args = Xor->getArguments();
@@ -1399,7 +1394,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   // select_enum with the first case and swap our operands. This simplifies
   // later dominance based processing.
   if (auto *SEI = dyn_cast<SelectEnumInst>(BI->getCondition())) {
-    EnumDecl *E = SEI->getEnumOperand().getType().getEnumOrBoundGenericEnum();
+    EnumDecl *E = SEI->getEnumOperand()->getType().getEnumOrBoundGenericEnum();
 
     auto AllElts = E->getAllElements();
     auto Iter = AllElts.begin();
@@ -1540,7 +1535,7 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
   }
 
   auto &Mod = SEI->getModule();
-  auto OpndTy = SEI->getOperand()->getType(0);
+  auto OpndTy = SEI->getOperand()->getType();
   auto Ty = OpndTy.getEnumElementType(Element, Mod);
   auto *UED = SILBuilderWithScope(SEI)
     .createUncheckedEnumData(SEI->getLoc(), SEI->getOperand(), Element, Ty);
@@ -1692,11 +1687,10 @@ bool SimplifyCFG::simplifyUnreachableBlock(UnreachableInst *UI) {
       }
     }
 
-    for (unsigned i = 0, e = MaybeDead->getNumTypes(); i != e; ++i)
-      if (!SILValue(&*MaybeDead, i).use_empty()) {
-        auto Undef = SILUndef::get(MaybeDead->getType(i), BB->getModule());
-        SILValue(&*MaybeDead, i).replaceAllUsesWith(Undef);
-      }
+    if (!MaybeDead->use_empty()) {
+      auto Undef = SILUndef::get(MaybeDead->getType(), BB->getModule());
+      MaybeDead->replaceAllUsesWith(Undef);
+    }
 
     DeadInstrs.push_back(&*MaybeDead);
     Changed = true;
@@ -1799,7 +1793,7 @@ static bool isTryApplyOfConvertFunction(TryApplyInst *TAI,
   // Check if it is a conversion of a non-throwing function into
   // a throwing function. If this is the case, replace by a
   // simple apply.
-  auto OrigFnTy = dyn_cast<SILFunctionType>(CFI->getConverted().getType().
+  auto OrigFnTy = dyn_cast<SILFunctionType>(CFI->getConverted()->getType().
                                             getSwiftRValueType());
   if (!OrigFnTy || OrigFnTy->hasErrorResult())
     return false;
@@ -1827,7 +1821,7 @@ static bool isTryApplyOfConvertFunction(TryApplyInst *TAI,
 
   // Look through the conversions and find the real callee.
   Callee = getActualCallee(CFI->getConverted());
-  CalleeType = Callee.getType();
+  CalleeType = Callee->getType();
   
   // If it a call of a throwing callee, bail.
   auto CalleeFnTy = dyn_cast<SILFunctionType>(CalleeType.getSwiftRValueType());
@@ -1885,7 +1879,7 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
     }
 
     auto OrigFnTy = dyn_cast<SILFunctionType>(
-        TAI->getCallee().getType().getSwiftRValueType());
+        TAI->getCallee()->getType().getSwiftRValueType());
     if (OrigFnTy->isPolymorphic()) {
       OrigFnTy = OrigFnTy->substGenericArgs(TAI->getModule(),
           TAI->getModule().getSwiftModule(), TAI->getSubstitutions());
@@ -2129,14 +2123,15 @@ bool SimplifyCFG::simplifyBlocks() {
     case TermKind::DynamicMethodBranchInst:
     case TermKind::ReturnInst:
       break;
-    case TermKind::Invalid:
-      llvm_unreachable("Invalid Term Inst?!");
     }
     // If the block has a cond_fail, try to move it to the predecessors.
     Changed |= tryMoveCondFailToPreds(BB);
 
     // Simplify the block argument list.
     Changed |= simplifyArgs(BB);
+
+    // Simplify the program termination block.
+    Changed |= simplifyProgramTerminationBlock(BB);
   }
 
   return Changed;
@@ -2277,7 +2272,7 @@ deleteTriviallyDeadOperandsOfDeadArgument(MutableArrayRef<Operand> TermOperands,
   auto *I = dyn_cast<SILInstruction>(Op.get());
   if (!I)
     return;
-  Op.set(SILUndef::get(Op.get().getType(), M));
+  Op.set(SILUndef::get(Op.get()->getType(), M));
   recursivelyDeleteTriviallyDeadInstructions(I);
 }
 
@@ -2493,10 +2488,10 @@ bool ArgumentSplitter::createNewArguments() {
     auto Loc = RegularLocation::getAutoGeneratedLocation();
     Agg = Projection::createAggFromFirstLevelProjections(
               B, Loc, Arg->getType(), NewArgumentValues).get();
-    assert(Agg->getNumTypes() == 1 && "Expected only one result");
+    assert(Agg->hasValue() && "Expected a result");
   }
 
-  SILValue(Arg).replaceAllUsesWith(SILValue(Agg));
+  Arg->replaceAllUsesWith(Agg);
 
   // Look at all users of agg and see if we can simplify any of them. This will
   // eliminate struct_extracts/tuple_extracts from the newly created aggregate
@@ -2758,7 +2753,6 @@ getSwitchEnumPred(SILBasicBlock *BB, SwitchEnumInst *SEI, SILBasicBlock *PostBB,
 
   // Check that this block only produces the value, but does not
   // have any side effects.
-  bool BBHasIntegerLiteral = false;
   auto First = BB->begin();
   auto *BI = dyn_cast<BranchInst>(BB->getTerminator());
   if (!BI)
@@ -2783,7 +2777,6 @@ getSwitchEnumPred(SILBasicBlock *BB, SwitchEnumInst *SEI, SILBasicBlock *PostBB,
     // The branch can pass arguments only to the PostBB.
     if (BI->getDestBB() != PostBB)
       return nullptr;
-    BBHasIntegerLiteral = true;
   }
 
   // Each BB on the path should have only a single branch instruction.
@@ -2832,7 +2825,7 @@ getSILValueFromCaseResult(SILBuilder &B, SILLocation Loc,
       return B.createIntegerLiteral(Loc, Type, Value.getBoolValue());
   } else {
     llvm::errs() << "Non IntegerLiteralInst switch case result\n";
-    Val.dump();
+    Val->dump();
     return Val;
   }
 }
@@ -2964,7 +2957,7 @@ bool simplifySwitchEnumToSelectEnum(SILBasicBlock *BB, unsigned ArgNum,
     // If it does, then pick one of those cases as a default.
 
     // Count the number of possible case tags for a given enum type
-    auto *Enum = SEI->getOperand().getType().getEnumOrBoundGenericEnum();
+    auto *Enum = SEI->getOperand()->getType().getEnumOrBoundGenericEnum();
     unsigned ElemCount = 0;
     for (auto E : Enum->getAllElements()) {
       if (E)
@@ -3030,7 +3023,7 @@ bool simplifySwitchEnumToSelectEnum(SILBasicBlock *BB, unsigned ArgNum,
   // Do not replace the bbarg
   SmallVector<SILValue, 4> Args;
   Args.push_back(SelectInst);
-  B.setInsertionPoint(SelectInst->getNextNode());
+  B.setInsertionPoint(&*std::next(SelectInst->getIterator()));
   B.createBranch(SEI->getLoc(), BB, Args);
   // Remove switch_enum instruction
   SEI->getParent()->getTerminator()->eraseFromParent();
@@ -3297,7 +3290,7 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   // Okay, we'll replace the BB arg with one with the right type, replace
   // the uses in this block, and then rewrite the branch operands.
   A->replaceAllUsesWith(SILUndef::get(A->getType(), BB->getModule()));
-  auto *NewArg = BB->replaceBBArg(i, User->getType(0));
+  auto *NewArg = BB->replaceBBArg(i, User->getType());
   User->replaceAllUsesWith(NewArg);
 
   // Rewrite the branch operand for each incoming branch.
@@ -3331,12 +3324,12 @@ static void tryToReplaceArgWithIncomingValue(SILBasicBlock *BB, unsigned i,
   // If the incoming values of all predecessors are equal usually this means
   // that the common incoming value dominates the BB. But: this might be not
   // the case if BB is unreachable. Therefore we still have to check it.
-  if (!DT->dominates(V.getDef()->getParentBB(), BB))
+  if (!DT->dominates(V->getParentBB(), BB))
     return;
 
   // An argument has one result value. We need to replace this with the *value*
   // of the incoming block(s).
-  SILValue(A, 0).replaceAllUsesWith(V);
+  A->replaceAllUsesWith(V);
 }
 
 bool SimplifyCFG::simplifyArgs(SILBasicBlock *BB) {
@@ -3373,6 +3366,40 @@ bool SimplifyCFG::simplifyArgs(SILBasicBlock *BB) {
     removeArgument(BB, i);
     Changed = true;
   }
+
+  return Changed;
+}
+
+bool SimplifyCFG::simplifyProgramTerminationBlock(SILBasicBlock *BB) {
+  // If this is not ARC-inert, do not do anything to it.
+  //
+  // TODO: should we use ProgramTerminationAnalysis ?. The reason we do not
+  // use the analysis is because the CFG is likely to be invalidated right
+  // after this pass, o we do not really get the benefit of reusing the
+  // computation for the next iteration of the pass.
+  if (!isARCInertTrapBB(BB))
+    return false;
+
+  // This is going to be the last basic block this program is going to execute
+  // and this block is inert from the ARC's prospective, no point to do any
+  // releases at this point.
+  bool Changed = false;
+  llvm::SmallPtrSet<SILInstruction *, 4> InstsToRemove;
+  for (auto &I : *BB) {
+    if (!isa<StrongReleaseInst>(I) && !isa<UnownedReleaseInst>(I) && 
+        !isa<ReleaseValueInst>(I) && !isa<DestroyAddrInst>(I))
+      continue;
+    InstsToRemove.insert(&I);
+  }
+
+  // Remove the instructions.
+  for (auto I : InstsToRemove) {
+    I->eraseFromParent();
+    Changed = true;
+  }
+
+  if (Changed)
+   ++NumTermBlockSimplified;
 
   return Changed;
 }

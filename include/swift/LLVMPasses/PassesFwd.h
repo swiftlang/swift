@@ -1,4 +1,4 @@
-//===--- PassesFwd.h - Creation functions for LLVM  passes ------*- C++ -*-===//
+//===--- PassesFwd.h - Creation functions for LLVM passes -------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -10,7 +10,7 @@ struct Steroids {}
 protocol Gymnast {
   func backflip(angle: Double) -> Self
   func compete() -> Medal -> Self
-  func scandal()(s: Steroids) -> ()
+  func scandal() -> (Steroids) -> ()
   static func currentYear() -> Int
 }
 
@@ -27,8 +27,8 @@ final class Archimedes : Gymnast {
     }
   }
 
-  func scandal()(s: Steroids) -> () {
-    print("Archimedes don't do that")
+  func scandal() -> (Steroids) -> () {
+    return { s in print("Archimedes don't do that") }
   }
 
   static func currentYear() -> Int {

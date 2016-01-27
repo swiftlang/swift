@@ -1894,8 +1894,11 @@ class FormatWalker: public ide::SourceEntityWalker {
         // Trailing closures are not considered siblings to other args.
         unsigned EndAdjust = TE->hasTrailingClosure() ? 1 : 0;
         for (unsigned I = 0, N = TE->getNumElements() - EndAdjust; I < N; I ++) {
-          addPair(TE->getElement(I)->getEndLoc(),
-                  FindAlignLoc(TE->getElement(I)->getStartLoc()), tok::comma);
+          auto EleStart = TE->getElementNameLoc(I);
+          if (EleStart.isInvalid()) {
+            EleStart = TE->getElement(I)->getStartLoc();
+          }
+          addPair(TE->getElement(I)->getEndLoc(), EleStart, tok::comma);
         }
       }
 
@@ -1912,9 +1915,9 @@ class FormatWalker: public ide::SourceEntityWalker {
 
         // Function parameters are siblings.
         for (auto P : AFD->getParameterLists()) {
-          for (auto &param : *P) {
-            addPair(param.getEndLoc(),
-                    FindAlignLoc(param.getStartLoc()), tok::comma);
+          for (auto param : *P) {
+            addPair(param->getEndLoc(),
+                    FindAlignLoc(param->getStartLoc()), tok::comma);
           }
         }
       }
@@ -1924,6 +1927,13 @@ class FormatWalker: public ide::SourceEntityWalker {
         for (unsigned I = 0, N = AE->getNumElements(); I < N;  I ++) {
           addPair(AE->getElement(I)->getEndLoc(),
                   FindAlignLoc(AE->getElement(I)->getStartLoc()), tok::comma);
+        }
+      }
+
+      // Case label items in a case statement are siblings.
+      if (auto CS = dyn_cast_or_null<CaseStmt>(Node.dyn_cast<Stmt *>())) {
+        for(const CaseLabelItem& Item : CS->getCaseLabelItems()) {
+          addPair(Item.getEndLoc(), FindAlignLoc(Item.getStartLoc()), tok::comma);
         }
       }
     };
@@ -2436,7 +2446,7 @@ ImmutableTextSnapshotRef SwiftEditorDocument::replaceText(
 }
 
 void SwiftEditorDocument::updateSemaInfo() {
-  if (auto SemaInfo = Impl.SemanticInfo) {
+  if (Impl.SemanticInfo) {
     Impl.SemanticInfo->processLatestSnapshotAsync(Impl.EditableBuffer);
   }
 }
@@ -2806,9 +2816,9 @@ void SwiftEditorDocument::reportDocumentStructure(swift::SourceFile &SrcFile,
   ModelContext.walk(Walker);
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // EditorOpen
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
                                   bool EnableSyntaxMap,
@@ -2844,9 +2854,9 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
 }
 
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // EditorClose
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 void SwiftLangSupport::editorClose(StringRef Name, bool RemoveCache) {
   auto Removed = EditorDocuments.remove(Name);
@@ -2858,9 +2868,9 @@ void SwiftLangSupport::editorClose(StringRef Name, bool RemoveCache) {
 }
 
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // EditorReplaceText
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 void SwiftLangSupport::editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf,
                                          unsigned Offset, unsigned Length,
@@ -2886,9 +2896,9 @@ void SwiftLangSupport::editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf
 }
 
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // EditorFormatText
-//============================================================================//
+//===----------------------------------------------------------------------===//
 void SwiftLangSupport::editorApplyFormatOptions(StringRef Name,
                                                 OptionsDictionary &FmtOptions) {
   auto EditorDoc = EditorDocuments.getByUnresolvedName(Name);
@@ -2913,9 +2923,9 @@ void SwiftLangSupport::editorExtractTextFromComment(StringRef Source,
   Consumer.handleSourceText(extractPlainTextFromComment(Source));
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // EditorExpandPlaceholder
-//============================================================================//
+//===----------------------------------------------------------------------===//
 void SwiftLangSupport::editorExpandPlaceholder(StringRef Name, unsigned Offset,
                                                unsigned Length,
                                                EditorConsumer &Consumer) {

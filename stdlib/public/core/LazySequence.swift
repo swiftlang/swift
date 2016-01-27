@@ -132,7 +132,7 @@ public protocol LazySequenceType : SequenceType {
   /// possibly with a simpler type.
   ///
   /// - See also: `elements`
-  typealias Elements: SequenceType = Self
+  associatedtype Elements: SequenceType = Self
 
   /// A sequence containing the same elements as this one, possibly with
   /// a simpler type.
@@ -146,9 +146,9 @@ public protocol LazySequenceType : SequenceType {
   /// Note: this property need not be implemented by conforming types,
   /// it has a default implementation in a protocol extension that
   /// just returns `self`.
-  var elements: Elements {get} 
+  var elements: Elements { get }
   
-  var array: [Generator.Element] {get}
+  var array: [Generator.Element] { get }
 }
 
 extension LazySequenceType {

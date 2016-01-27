@@ -1,4 +1,4 @@
-//===---- ClosureSpecializer.cpp ------ Performs Closure Specialization----===//
+//===--- ClosureSpecializer.cpp - Performs Closure Specialization ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -190,13 +190,13 @@ public:
   createNewClosure(SILBuilder &B, SILValue V,
                    llvm::SmallVectorImpl<SILValue> &Args) const {
     if (isa<PartialApplyInst>(getClosure()))
-      return B.createPartialApply(getClosure()->getLoc(), V, V.getType(), {},
-                                  Args, getClosure()->getType(0));
+      return B.createPartialApply(getClosure()->getLoc(), V, V->getType(), {},
+                                  Args, getClosure()->getType());
 
     assert(isa<ThinToThickFunctionInst>(getClosure()) &&
            "We only support partial_apply and thin_to_thick_function");
     return B.createThinToThickFunction(getClosure()->getLoc(), V,
-                                       getClosure()->getType(0));
+                                       getClosure()->getType());
   }
 
   FullApplySite getApplyInst() const { return AI; }
@@ -288,7 +288,7 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
   for (auto Arg : CSDesc.getArguments()) {
     NewArgs.push_back(Arg);
 
-    SILType ArgTy = Arg.getType();
+    SILType ArgTy = Arg->getType();
 
     // If our argument is of trivial type, continue...
     if (ArgTy.isTrivial(M))
@@ -454,7 +454,7 @@ static bool isSupportedClosure(const SILInstruction *Closure) {
     // If any arguments are not objects, return false. This is a temporary
     // limitation.
     for (SILValue Arg : PAI->getArguments())
-      if (!Arg.getType().isObject())
+      if (!Arg->getType().isObject())
         return false;
 
     // Ok, it is a closure we support, set Callee.
@@ -559,7 +559,8 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
       ClosureUser->getInlineStrategy(), ClosureUser->getEffectsKind(),
       ClosureUser, ClosureUser->getDebugScope());
   Fn->setDeclCtx(ClosureUser->getDeclContext());
-  Fn->setSemanticsAttr(ClosureUser->getSemanticsAttr());
+  for (auto &Attr : ClosureUser->getSemanticsAttrs())
+    Fn->addSemanticsAttr(Attr);
   return Fn;
 }
 

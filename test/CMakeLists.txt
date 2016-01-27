@@ -40,7 +40,7 @@ function(get_test_dependencies SDK result_var_name)
   endif()
 
   set(deps_binaries
-      swift swift-ide-test sil-opt swift-llvm-opt swift-demangle sil-extract swift-compress
+      swift swift-ide-test sil-opt swift-llvm-opt swift-demangle sil-extract
       lldb-moduleimport-test)
   if(NOT SWIFT_BUILT_STANDALONE)
     list(APPEND deps_binaries llc)
@@ -173,7 +173,10 @@ if(PYTHONINTERP_FOUND)
         set(test_dependencies)
         get_test_dependencies("${SDK}" test_dependencies)
         list(APPEND test_dependencies
-            "swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+            "swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+
+        set(validation_test_dependencies
+            "swiftStdlibCollectionUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
 
         set(test_bin_dir "${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}")
         set(validation_test_bin_dir
@@ -206,7 +209,7 @@ if(PYTHONINTERP_FOUND)
             ${command_upload_stdlib}
             ${command_clean_test_results_dir}
             COMMAND ${lit_command} "${validation_test_bin_dir}"
-            DEPENDS ${test_dependencies}
+            DEPENDS ${test_dependencies} ${validation_test_dependencies}
             COMMENT "Running Swift validation tests for ${VARIANT_TRIPLE}"
             ${cmake_3_2_USES_TERMINAL})
 
@@ -214,7 +217,7 @@ if(PYTHONINTERP_FOUND)
             ${command_upload_stdlib}
             ${command_clean_test_results_dir}
             COMMAND ${lit_command} "${validation_test_bin_dir}" "${test_bin_dir}"
-            DEPENDS ${test_dependencies}
+            DEPENDS ${test_dependencies} ${validation_test_dependencies}
             COMMENT "Running all Swift tests for ${VARIANT_TRIPLE}"
             ${cmake_3_2_USES_TERMINAL})
       endforeach()

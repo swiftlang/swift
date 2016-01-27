@@ -182,8 +182,13 @@ public:
 
   /// Indicates whether we are compiling for testing.
   ///
-  /// \see Module::isTestingEnabled
+  /// \see ModuleDecl::isTestingEnabled
   bool EnableTesting = false;
+
+  /// Indicates whether we are compiling for resilience.
+  ///
+  /// \see ModuleDecl::isResilienceEnabled
+  bool EnableResilience = false;
 
   /// Indicates that the frontend should emit "verbose" SIL
   /// (if asked to emit SIL).

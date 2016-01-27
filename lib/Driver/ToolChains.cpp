@@ -39,6 +39,8 @@ using namespace llvm::opt;
 
 /// The name of the Swift migrator binary.
 static const char * const SWIFT_UPDATE_NAME = "swift-update";
+/// The limit for passing a list of files on the command line.
+static const size_t TOO_MANY_FILES = 128;
 
 static void addInputsOfType(ArgStringList &Arguments,
                             ArrayRef<const Action *> Inputs,
@@ -124,8 +126,10 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddLastArg(arguments, options::OPT_parse_stdlib);
   inputArgs.AddLastArg(arguments, options::OPT_resource_dir);
   inputArgs.AddLastArg(arguments, options::OPT_solver_memory_threshold);
+  inputArgs.AddLastArg(arguments, options::OPT_suppress_warnings);
   inputArgs.AddLastArg(arguments, options::OPT_profile_generate);
   inputArgs.AddLastArg(arguments, options::OPT_profile_coverage_mapping);
+  inputArgs.AddLastArg(arguments, options::OPT_warnings_as_errors);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
@@ -152,9 +156,12 @@ static void addCommonFrontendArgs(const ToolChain &TC,
 ToolChain::InvocationInfo
 ToolChain::constructInvocation(const CompileJobAction &job,
                                const JobContext &context) const {
-  ArgStringList Arguments;
+  InvocationInfo II{SWIFT_EXECUTABLE_NAME};
+  ArgStringList &Arguments = II.Arguments;
 
-  if (context.OI.CompilerMode != OutputInfo::Mode::UpdateCode)
+  if (context.OI.CompilerMode == OutputInfo::Mode::UpdateCode)
+    II.ExecutableName = SWIFT_UPDATE_NAME;
+  else
     Arguments.push_back("-frontend");
 
   // Determine the frontend mode option.
@@ -242,23 +249,39 @@ ToolChain::constructInvocation(const CompileJobAction &job,
 
     auto *IA = cast<InputAction>(context.InputActions[0]);
     const Arg &PrimaryInputArg = IA->getInputArg();
-    bool FoundPrimaryInput = false;
 
-    for (auto *A : make_range(context.Args.filtered_begin(options::OPT_INPUT),
-                              context.Args.filtered_end())) {
-      // See if this input should be passed with -primary-file.
-      // FIXME: This will pick up non-source inputs too, like .o files.
-      if (!FoundPrimaryInput && PrimaryInputArg.getIndex() == A->getIndex()) {
-        Arguments.push_back("-primary-file");
-        FoundPrimaryInput = true;
+    if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
+        context.getTopLevelInputFiles().size() > TOO_MANY_FILES) {
+      Arguments.push_back("-filelist");
+      Arguments.push_back(context.getAllSourcesPath());
+      Arguments.push_back("-primary-file");
+      PrimaryInputArg.render(context.Args, Arguments);
+    } else {
+      bool FoundPrimaryInput = false;
+      for (auto inputPair : context.getTopLevelInputFiles()) {
+        if (!types::isPartOfSwiftCompilation(inputPair.first))
+          continue;
+
+        // See if this input should be passed with -primary-file.
+        if (!FoundPrimaryInput &&
+            PrimaryInputArg.getIndex() == inputPair.second->getIndex()) {
+          Arguments.push_back("-primary-file");
+          FoundPrimaryInput = true;
+        }
+        Arguments.push_back(inputPair.second->getValue());
       }
-      Arguments.push_back(A->getValue());
     }
     break;
   }
   case OutputInfo::Mode::SingleCompile: {
-    for (const Action *A : context.InputActions) {
-      cast<InputAction>(A)->getInputArg().render(context.Args, Arguments);
+    if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
+        context.InputActions.size() > TOO_MANY_FILES) {
+      Arguments.push_back("-filelist");
+      Arguments.push_back(context.getAllSourcesPath());
+    } else {
+      for (const Action *A : context.InputActions) {
+        cast<InputAction>(A)->getInputArg().render(context.Args, Arguments);
+      }
     }
     break;
   }
@@ -340,20 +363,25 @@ ToolChain::constructInvocation(const CompileJobAction &job,
 
   // Add the output file argument if necessary.
   if (context.Output.getPrimaryOutputType() != types::TY_Nothing) {
-    for (auto &FileName : context.Output.getPrimaryOutputFilenames()) {
-      Arguments.push_back("-o");
-      Arguments.push_back(FileName.c_str());
+    if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
+        context.Output.getPrimaryOutputFilenames().size() > TOO_MANY_FILES) {
+      Arguments.push_back("-output-filelist");
+      Arguments.push_back(context.getTemporaryFilePath("outputs", ""));
+      II.FilelistInfo = {Arguments.back(),
+                         context.Output.getPrimaryOutputType(),
+                         FilelistInfo::Output};
+    } else {
+      for (auto &FileName : context.Output.getPrimaryOutputFilenames()) {
+        Arguments.push_back("-o");
+        Arguments.push_back(FileName.c_str());
+      }
     }
   }
 
   if (context.Args.hasArg(options::OPT_embed_bitcode_marker))
     Arguments.push_back("-embed-bitcode-marker");
 
-  auto program = SWIFT_EXECUTABLE_NAME;
-  if (context.OI.CompilerMode == OutputInfo::Mode::UpdateCode)
-    program = SWIFT_UPDATE_NAME;
-
-  return {program, Arguments};
+  return II;
 }
 
 ToolChain::InvocationInfo
@@ -530,24 +558,37 @@ ToolChain::constructInvocation(const BackendJobAction &job,
 ToolChain::InvocationInfo
 ToolChain::constructInvocation(const MergeModuleJobAction &job,
                                const JobContext &context) const {
-  ArgStringList Arguments;
+  InvocationInfo II{SWIFT_EXECUTABLE_NAME};
+  ArgStringList &Arguments = II.Arguments;
 
-  if (context.OI.CompilerMode != OutputInfo::Mode::UpdateCode)
+  if (context.OI.CompilerMode == OutputInfo::Mode::UpdateCode)
+    II.ExecutableName = SWIFT_UPDATE_NAME;
+  else
     Arguments.push_back("-frontend");
 
   // We just want to emit a module, so pass -emit-module without any other
   // mode options.
   Arguments.push_back("-emit-module");
 
-  size_t origLen = Arguments.size();
-  (void)origLen;
-  addInputsOfType(Arguments, context.Inputs, types::TY_SwiftModuleFile);
-  addInputsOfType(Arguments, context.InputActions, types::TY_SwiftModuleFile);
-  assert(Arguments.size() - origLen >=
-         context.Inputs.size() + context.InputActions.size());
-  assert((Arguments.size() - origLen == context.Inputs.size() ||
-          !context.InputActions.empty()) &&
-         "every input to MergeModule must generate a swiftmodule");
+  if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
+      context.Inputs.size() > TOO_MANY_FILES) {
+    Arguments.push_back("-filelist");
+    Arguments.push_back(context.getTemporaryFilePath("inputs", ""));
+    II.FilelistInfo = {Arguments.back(), types::TY_SwiftModuleFile,
+                       FilelistInfo::Input};
+
+    addInputsOfType(Arguments, context.InputActions, types::TY_SwiftModuleFile);
+  } else {
+    size_t origLen = Arguments.size();
+    (void)origLen;
+    addInputsOfType(Arguments, context.Inputs, types::TY_SwiftModuleFile);
+    addInputsOfType(Arguments, context.InputActions, types::TY_SwiftModuleFile);
+    assert(Arguments.size() - origLen >=
+           context.Inputs.size() + context.InputActions.size());
+    assert((Arguments.size() - origLen == context.Inputs.size() ||
+            !context.InputActions.empty()) &&
+           "every input to MergeModule must generate a swiftmodule");
+  }
 
   // Tell all files to parse as library, which is necessary to load them as
   // serialized ASTs.
@@ -573,11 +614,7 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   Arguments.push_back(
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 
-  auto program = SWIFT_EXECUTABLE_NAME;
-  if (context.OI.CompilerMode == OutputInfo::Mode::UpdateCode)
-    program = SWIFT_UPDATE_NAME;
-
-  return {program, Arguments};
+  return II;
 }
 
 ToolChain::InvocationInfo
@@ -819,8 +856,18 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   const Driver &D = getDriver();
   const llvm::Triple &Triple = getTriple();
 
-  ArgStringList Arguments;
-  addPrimaryInputsOfType(Arguments, context.Inputs, types::TY_Object);
+  InvocationInfo II{"ld"};
+  ArgStringList &Arguments = II.Arguments;
+
+  if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
+      context.Inputs.size() > TOO_MANY_FILES) {
+    Arguments.push_back("-filelist");
+    Arguments.push_back(context.getTemporaryFilePath("inputs", "LinkFileList"));
+    II.FilelistInfo = {Arguments.back(), types::TY_Object, FilelistInfo::Input};
+  } else {
+    addPrimaryInputsOfType(Arguments, context.Inputs, types::TY_Object);
+  }
+
   addInputsOfType(Arguments, context.InputActions, types::TY_Object);
 
   if (context.OI.DebugInfoKind == IRGenDebugInfoKind::Normal) {
@@ -995,7 +1042,7 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   Arguments.push_back("-o");
   Arguments.push_back(context.Output.getPrimaryOutputFilename().c_str());
 
-  return {"ld", Arguments};
+  return II;
 }
 
 ToolChain::InvocationInfo

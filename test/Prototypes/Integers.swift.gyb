@@ -1,4 +1,4 @@
-//===--- Integers.swift.gyb -----------------------------------------------===//
+//===--- Integers.swift.gyb -----------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,9 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 // RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb -DWORD_BITS=%target-ptrsize %s -o %t/out.swift
-// RUN: %S/../../utils/line-directive %t/out.swift -- %target-build-swift -parse-stdlib %t/out.swift -o %t/a.out
+// RUN: %S/../../utils/line-directive %t/out.swift -- %target-build-swift -parse-stdlib %t/out.swift -o %t/a.out -Onone
 // RUN: %S/../../utils/line-directive %t/out.swift -- %target-run %t/a.out
+
 // REQUIRES: executable_test
+
+// FIXME: this test runs forever on iOS arm64
+// REQUIRES: OS=macosx
+
 import Swift
 
 %{
@@ -32,7 +37,7 @@ IntLiteral = 'Int%s' % builtinIntLiteralBits
 # 32-bit iOS simulator doesn't have Int128 support, so we stop at
 # double-word.  When we've implemented the arithmetic algorithms
 # for bignum, we can go further.
-fixedBitWidths = [2**x for x in range(3, 8) if 2**x <= 2*word_bits]
+fixedBitWidths = [2 ** x for x in range(3, 8) if 2 ** x <= 2 * word_bits]
 minFixedBits = fixedBitWidths[0]
 maxFixedBits = fixedBitWidths[-1]
   
@@ -177,6 +182,16 @@ public protocol IntegerType
   : Comparable, ArithmeticType, 
     IntegerLiteralConvertible, CustomStringConvertible {
 
+  // FIXME: Ideally, this constraint would just be : IntegerType.
+  // Until we get recursive protocol requirements, that isn't
+  // possible, and we really need to factor IntegerType differently
+  // than it currently is so we can remove the constraints on
+  // AbsoluteValue in the multiprecision multiplication routines.
+  typealias AbsoluteValue : Comparable, ArithmeticType, 
+    IntegerLiteralConvertible, CustomStringConvertible 
+
+  var absoluteValue: AbsoluteValue { get }
+  
   // Dispatching through these puts less stress on the user reading
   // the interface and error messages (and on the type checker) than
   // does having many operator overloads.
@@ -634,8 +649,13 @@ public func &${x.operator} <T: FixedWidthIntegerType>(lhs: T, rhs: T) -> T {
 //===--- UnsignedIntegerType ----------------------------------------------===//
 //===----------------------------------------------------------------------===//
 public protocol UnsignedIntegerType : IntegerType {
+  typealias AbsoluteValue : IntegerType  
 }
+
 extension UnsignedIntegerType {
+  @_transparent
+  public var absoluteValue: Self { return self }
+
   @_transparent
   public static var isSigned: Bool { return false }
   
@@ -712,7 +732,6 @@ extension UnsignedIntegerType where Self : FixedWidthIntegerType {
 
 public protocol SignedIntegerType : IntegerType {
   typealias AbsoluteValue : IntegerType
-  var absoluteValue: AbsoluteValue { get }
 }
 
 extension SignedIntegerType {
@@ -1036,7 +1055,11 @@ extension IntegerType {
 
 % for x in binaryArithmetic:
 @_transparent
-public func ${x.operator}= <T: IntegerType>(inout lhs: T, rhs: T) {
+public func ${x.operator}= <
+  T: IntegerType
+    // FIXME: remove this constraint by refactoring IntegerType
+    where T.AbsoluteValue : IntegerType  
+>(inout lhs: T, rhs: T) {
   lhs.${x.name}InPlace(rhs)
 }
 % end
@@ -1051,6 +1074,96 @@ public func +=<T: IntegerType, U: IntegerType>(inout lhs: T, rhs: U) {
 public func -=<T: IntegerType, U: IntegerType>(inout lhs: T, rhs: U) {
   let overflow = lhs.subtractInPlace(rhs)
   _assertCond(overflow == .None, "overflow in multiprecision subtract.")
+}
+
+//===--- Multiplication ---------------------------------------------------===//
+//
+// * Use the log-space algorithm given at
+//   https://en.wikipedia.org/wiki/Multiplication_algorithm#Space_complexity:
+//
+//       multiply(a[1..p], b[1..q], base)
+//         tot = 0
+//         for ri = 1 to p + q - 1
+//           for bi = MAX(1, ri - p + 1) to MIN(ri, q)
+//             ai = ri − bi + 1
+//             tot = tot + (a[ai] * b[bi])
+//           product[ri] = tot mod base
+//           tot = floor(tot / base)
+//         product[p+q] = tot mod base
+//         return product
+//       
+//
+// * Treat each word as a "digit."  
+extension IntegerType {
+  static func multiplyNonNegative<
+    LHS: IntegerType, RHS: IntegerType
+  >(a: LHS, _ b: RHS, negativeResult: Bool) -> (Self, ArithmeticOverflow) {
+    _log("* \(self).multiplyNonNegative(\(a.hex), \(b.hex), negativeResult: \(negativeResult))")
+
+    var product: Self = 0
+    var total: UDWord = negativeResult ? ~0 : 0
+    let p = a.countRepresentedWords, q = b.countRepresentedWords
+    var ri: Word = 1
+    var overflow = false
+    _log("p = \(p), q = \(q)")
+    
+    while ri <= p + q - 1 {
+      _log("** ri = \(ri)")
+      var bi: Word = Swift.max(1, ri - p + 1)
+      while bi <= Swift.min(ri, q) {
+        let ai = ri - bi + 1
+        _log("*** ai = \(ai), bi = \(bi)")
+        let p2 = UDWord(a.uword(ai - 1)) * UDWord(b.uword(bi - 1))
+        total = total &+ p2
+        _log("*** total += p2: \(p2.hex) => \(total.hex)")
+        bi += 1
+      }
+
+      _log("** total = \(total.hex)")
+      let u = negativeResult ? ~total._lowUWord : total._lowUWord
+      _log("** product word \(ri - 1) = \(u.hex)")
+      if !product.replaceUWord(ri - 1, with: u) {
+        overflow = true
+      }
+      if !negativeResult {
+        total &>>= UWord.bitWidth
+      }
+      else {
+        let signedTotal = DWord(bitPattern: total) 
+        total = UDWord(bitPattern: signedTotal &>> UWord.bitWidth)
+      }
+      _log("** total shifted to \(total.hex)")
+      ri += 1
+    }
+    let u = negativeResult ? ~total._lowUWord : total._lowUWord
+    _log("** product word \(p + q - 1) = \(u.hex)")
+    
+    if !product.replaceUWord(p + q - 1, with: u) { overflow = true  }
+    if (product < 0) != negativeResult { overflow = true  }
+    
+    return (product, overflow ? .Overflow : .None)
+  }
+  
+  static func multiply<
+    LHS: IntegerType, RHS: IntegerType
+      // FIXME: remove this constraint by refactoring IntegerType
+      where LHS.AbsoluteValue : IntegerType, RHS.AbsoluteValue : IntegerType
+  >(lhs: LHS, _ rhs: RHS) -> (Self, ArithmeticOverflow) {
+    return multiplyNonNegative(
+      lhs.absoluteValue, rhs.absoluteValue,
+      negativeResult: (lhs < 0) != (rhs < 0))
+  }
+}
+
+func *= <
+  LHS : IntegerType, RHS : IntegerType 
+    // FIXME: remove this constraint by refactoring IntegerType
+    where LHS.AbsoluteValue : IntegerType, RHS.AbsoluteValue : IntegerType
+>(inout lhs: LHS, rhs: RHS) {
+  
+  let (newLHS, overflow) = LHS.multiply(lhs, rhs)
+  _assertCond(overflow == .None, "Overflow in multiprecision in-place multiply")
+  lhs = newLHS
 }
 
 //===--- Tests ------------------------------------------------------------===//
@@ -1097,6 +1210,41 @@ import SwiftPrivate
 #if _runtime(_ObjC)
 import ObjectiveC
 #endif
+
+func expectEqual<T: IntegerType>(
+  expected: T, _ actual: T,
+  @autoclosure _ message: () -> String = "",
+  showFrame: Bool = true,
+  stackTrace: SourceLocStack = SourceLocStack(),  
+  file: String = __FILE__, line: UInt = __LINE__
+) {
+  if expected != actual {
+    expectationFailure(
+      "expected: \(String(reflecting: expected))"
+      + " (of type \(String(reflecting: expected.dynamicType)))\n"
+      + "  = \(expected.hex)\n"
+      + "actual: \(String(reflecting: actual))"
+      + " (of type \(String(reflecting: actual.dynamicType)))\n"
+      + "  = \(actual.hex)\n",
+      trace: message(),
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  }
+}
+
+func expectEqual<T: IntegerType>(
+  expected: (T, ArithmeticOverflow), _ actual: (T, ArithmeticOverflow),
+  @autoclosure _ message: () -> String = "",
+  showFrame: Bool = true,
+  stackTrace: SourceLocStack = SourceLocStack(),  
+  file: String = __FILE__, line: UInt = __LINE__
+) {
+% for i in 0, 1:
+  expectEqual(
+    expected.${i}, actual.${i}, message(),
+    showFrame: false,
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+% end
+}
 
 var tests = TestSuite("Integers")
 
@@ -1667,6 +1815,136 @@ tests.test("Multiprecision/+/Int16") {
   
   x += (-1 as DWord)
   expectEqual(Int16.min, x)
+}
+
+tests.test("Multiprecision/*/Int8") {
+  let uShift = Int8.bitWidth - 1
+  expectEqual((42, .None), Int8.multiply(7 as Int8, 6 as Int8))
+  expectEqual((42, .None), Int8.multiply(-7 as Int8, -6 as Int8))
+  expectEqual((-42, .None), Int8.multiply(-7 as DWord, 6 as Int8))
+  expectEqual((-42, .None), Int8.multiply(7 as Int8, -6 as DWord))
+  
+  expectEqual((UInt8.max - 1, .None), UInt8.multiply(Int8.max, 2 as Int8))
+  expectEqual((UInt8.max - 1, .None), UInt8.multiply(-Int8.max, -2 as Int8))
+  expectEqual(
+    (0, .Overflow),
+    UInt8.multiply((1 as UInt8) << (UInt8.bitWidth - 1), 2 as Int8))
+
+  expectEqual(
+    (Int8.max - 1, .None),
+    Int8.multiply(Int8.max >> 1, 2 as Int8))
+  
+  expectEqual(
+    (Int8.max - 1, .None),
+    Int8.multiply(-(Int8.max >> 1), -2 as Int8))
+  
+  expectEqual(
+    (-Int8.max + 1, .None),
+    Int8.multiply(-(Int8.max >> 1), 2 as Int8))
+
+  let shift = Int8.bitWidth - 2
+  expectEqual(
+    (Int8.min, .Overflow),
+    Int8.multiply((1 << shift) as Int8, 2 as Int8))
+  
+  expectEqual(
+    (Int8.min, .Overflow),
+    Int8.multiply(-(1 << shift) as Int8, -2 as Int8))
+  
+  expectEqual(
+    (Int8.min, .None), Int8.multiply((1 << shift) as Int8, -2 as Int8))
+  
+  expectEqual(
+    (Int8.min, .None), Int8.multiply(-(1 << shift) as Int8, 2 as Int8))
+}
+
+tests.test("Multiprecision/*/Word") {
+  expectEqual((42, .None), Word.multiply(7 as Word, 6 as Word))
+  expectEqual((42, .None), Word.multiply(-7 as Word, -6 as Word))
+  expectEqual((-42, .None), Word.multiply(-7 as DWord, 6 as Word))
+  expectEqual((-42, .None), Word.multiply(7 as Word, -6 as DWord))
+  
+  expectEqual((UWord.max - 1, .None), UWord.multiply(Word.max, 2 as Word))
+  expectEqual((UWord.max - 1, .None), UWord.multiply(-Word.max, -2 as Word))
+  expectEqual(
+    (0, .Overflow),
+    UWord.multiply((1 as UWord) << (UWord.bitWidth - 1), 2 as Word))
+
+  expectEqual(
+    (Word.max - 1, .None),
+    Word.multiply(Word.max >> 1, 2 as Word))
+  
+  expectEqual(
+    (Word.max - 1, .None),
+    Word.multiply(-(Word.max >> 1), -2 as Word))
+  
+  expectEqual(
+    (-Word.max + 1, .None),
+    Word.multiply(-(Word.max >> 1), 2 as Word))
+
+  let shift = Word.bitWidth - 2
+  expectEqual(
+    (Word.min, .Overflow),
+    Word.multiply((1 << shift) as Word, 2 as Word))
+  
+  expectEqual(
+    (Word.min, .Overflow),
+    Word.multiply(-(1 << shift) as Word, -2 as Word))
+  
+  expectEqual(
+    (Word.min, .None),
+    Word.multiply((1 << shift) as Word, -2 as Word))
+  
+  expectEqual(
+    (Word.min, .None),
+    Word.multiply(-(1 << shift) as Word, 2 as Word))
+}
+
+tests.test("Multiprecision/*/DWord") {
+  let uShift = DWord.bitWidth - 1
+  expectEqual((42, .None), DWord.multiply(7 as DWord, 6 as DWord))
+  expectEqual((42, .None), DWord.multiply(-7 as DWord, -6 as DWord))
+  expectEqual((-42, .None), DWord.multiply(-7 as DWord, 6 as DWord))
+  expectEqual((-42, .None), DWord.multiply(7 as DWord, -6 as DWord))
+  
+  expectEqual((UDWord.max - 1, .None), UDWord.multiply(DWord.max, 2 as DWord))
+  expectEqual((UDWord.max - 1, .None), UDWord.multiply(-DWord.max, -2 as DWord))
+  expectEqual(
+    (0, .Overflow),
+    UDWord.multiply((1 as UDWord) << (UDWord.bitWidth - 1), 2 as DWord))
+
+  expectEqual(
+    (DWord.max - 1, .None),
+    DWord.multiply(DWord.max >> 1, 2 as DWord))
+  
+  expectEqual(
+    (DWord.max - 1, .None),
+    DWord.multiply(-(DWord.max >> 1), -2 as DWord))
+  
+  expectEqual(
+    (-DWord.max + 1, .None),
+    DWord.multiply(-(DWord.max >> 1), 2 as DWord))
+
+  let shift = DWord.bitWidth - 2
+  expectEqual(
+    (DWord.min, .Overflow),
+    DWord.multiply((1 << shift) as DWord, 2 as DWord))
+  
+  expectEqual(
+    (DWord.min, .Overflow),
+    DWord.multiply(-(1 << shift) as DWord, -2 as DWord))
+  
+  expectEqual(
+    (DWord.min, .None),
+    DWord.multiply((1 << shift) as DWord, -2 as DWord))
+  
+  expectEqual(
+    (DWord.min, .None),
+    DWord.multiply(-(1 << shift) as DWord, 2 as DWord))
+
+  expectEqual(
+    ((-2 << Word.bitWidth) + 1, .Overflow),
+    DWord.multiply(UWord.max, UWord.max))
 }
 
 tests.test("Multiprecision/Overflow/+/Int16") {

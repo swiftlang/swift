@@ -1,4 +1,4 @@
-//===-- Frontend.h - frontend utility methods ------------------*- C++ -*--===//
+//===--- Frontend.h - frontend utility methods ------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -267,8 +267,6 @@ public:
 
   void setCodeCompletionFactory(CodeCompletionCallbacksFactory *Factory) {
     CodeCompletionFactory = Factory;
-    if (Factory)
-      LangOpts.EnableCodeCompletionDelayedEnumConformanceHack = true;
   }
 
   CodeCompletionCallbacksFactory *getCodeCompletionFactory() const {

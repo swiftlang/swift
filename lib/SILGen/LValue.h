@@ -334,6 +334,9 @@ public:
   LValue &operator=(const LValue &) = delete;
   LValue &operator=(LValue &&) = default;
 
+  static LValue forValue(ManagedValue value,
+                         CanType substFormalType);
+
   static LValue forAddress(ManagedValue address,
                            AbstractionPattern origFormalType,
                            CanType substFormalType);

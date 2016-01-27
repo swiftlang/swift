@@ -171,9 +171,7 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
     SILArgument *Arg = *AI;
 
     // We were able to fold, so all users should use the new folded value.
-    assert(Arg->getTypes().size() == 1 &&
-           "Currently, we only support single result instructions.");
-    SILValue(Arg).replaceAllUsesWith(Args[Idx]);
+    Arg->replaceAllUsesWith(Args[Idx]);
     NumBasicBlockArgsPropagated++;
   }
 
@@ -268,7 +266,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
         }
 
       // Not fully covered switches will be diagnosed later. SILGen represents
-      // them with a Default basic block with an unrechable instruction.
+      // them with a Default basic block with an unreachable instruction.
       // We are going to produce an error on all unreachable instructions not
       // eliminated by DCE.
       if (!TheSuccessorBlock)
@@ -404,7 +402,7 @@ static void setOutsideBlockUsesToUndef(SILInstruction *I) {
   for (auto *Use : Uses)
     if (auto *User = dyn_cast<SILInstruction>(Use->getUser()))
       if (User->getParent() != BB)
-        Use->set(SILUndef::get(Use->get().getType(), Mod));
+        Use->set(SILUndef::get(Use->get()->getType(), Mod));
 }
 
 static SILInstruction *getAsCallToNoReturn(SILInstruction *I) {

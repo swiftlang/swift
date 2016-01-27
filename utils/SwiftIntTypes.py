@@ -23,9 +23,9 @@ class SwiftIntegerType(object):
         self.is_signed = is_signed
 
         if is_word:
-            self.possible_bitwidths = [ 32, 64 ]
+            self.possible_bitwidths = [32, 64]
         else:
-            self.possible_bitwidths = [ bits ]
+            self.possible_bitwidths = [bits]
 
         # Derived properties
         self.stdlib_name = \
@@ -48,11 +48,11 @@ class SwiftIntegerType(object):
 
 def all_integer_types(word_bits):
     for bitwidth in _all_integer_type_bitwidths:
-        for is_signed in [ False, True ]:
+        for is_signed in [False, True]:
             yield SwiftIntegerType(is_word=False, bits=bitwidth,
                 is_signed=is_signed)
 
-    for is_signed in [ False, True ]:
+    for is_signed in [False, True]:
         yield SwiftIntegerType(is_word=True, bits=word_bits,
             is_signed=is_signed)
 
@@ -78,28 +78,28 @@ def all_integer_type_names():
     return [self_ty.stdlib_name for self_ty in all_integer_types(0)]
 
 def all_real_number_type_names():
-    return ['Float', 'Double'] #FIXME , 'Float80' Revert until I figure out a test failure  # Float80 for i386 & x86_64
+    # FIXME , 'Float80' Revert until I figure out a test failure  # Float80 for i386 & x86_64
+    return ['Float', 'Double']
 
 def all_numeric_type_names():
     return all_integer_type_names() + all_real_number_type_names()
 
 def numeric_type_names_Macintosh_only():
-    return ['Float80']  
+    return ['Float80']
 
 # Swift_Programming_Language/Expressions.html
 
 def all_integer_binary_operator_names():
     return ['<<', '>>', '&*', '&', '&+', '&-', '|', '^']
-    
+
 def all_integer_or_real_binary_operator_names():
     return ['*', '/', '%', '+', '-', '..<', '...']
-    
+
 def all_arithmetic_comparison_operator_names():
     return ['<', '<=', '>', '>=', '==', '!=']
-    
+
 def all_integer_assignment_operator_names():
     return ['<<=', '>>=', '&=', '^=', '|=']
-    
+
 def all_integer_or_real_assignment_operator_names():
     return ['=', '*=', '/=', '%=', '+=', '-=']
-    

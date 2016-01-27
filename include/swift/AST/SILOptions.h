@@ -51,7 +51,7 @@ public:
     OptimizeUnchecked
   };
 
-  /// Controls how  perform SIL linking.
+  /// Controls how to perform SIL linking.
   LinkingMode LinkMode = LinkNormal;
 
   /// Remove all runtime assertions during optimizations.
@@ -97,9 +97,6 @@ public:
 
   /// Should we use a pass pipeline passed in via a json file? Null by default.
   StringRef ExternalPassPipelineFilename;
-
-  /// Use super_method for native super method calls instead of function_ref.
-  bool UseNativeSuperMethod = false;
   
   /// Emit captures and function contexts using +0 caller-guaranteed ARC
   /// conventions.

@@ -317,13 +317,6 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
   return SILType(loweredTy.getSwiftRValueType(), getCategory());
 }
 
-bool SILType::hasFixedLayout(SILModule &M) const {
-  if (auto *NTD = getNominalOrBoundGenericNominal())
-    return NTD->hasFixedLayout(M.getSwiftModule());
-
-  llvm_unreachable("hasFixedLayout on non-nominal types not implemented");
-}
-
 /// True if the type, or the referenced type of an address type, is
 /// address-only. For example, it could be a resilient struct or something of
 /// unknown size.
@@ -443,13 +436,8 @@ OptionalTypeKind SILType::getOptionalTypeKind() const {
 SILType SILType::getAnyOptionalObjectType(SILModule &M,
                                           OptionalTypeKind &OTK) const {
   if (auto objectTy = getSwiftRValueType()->getAnyOptionalObjectType(OTK)) {
-    // Lower the payload type at the abstraction level of Optional's generic
-    // parameter.
-    auto archetype = getNominalOrBoundGenericNominal()->getGenericParams()
-      ->getPrimaryArchetypes()[0];
-    
     auto loweredTy
-      = M.Types.getLoweredType(AbstractionPattern(archetype), objectTy);
+      = M.Types.getLoweredType(AbstractionPattern::getOpaque(), objectTy);
     
     return SILType(loweredTy.getSwiftRValueType(), getCategory());
   }

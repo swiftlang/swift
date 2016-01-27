@@ -1,4 +1,4 @@
-//===-- frontend_main.cpp - Swift Compiler Frontend -----------------------===//
+//===--- frontend_main.cpp - Swift Compiler Frontend ----------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

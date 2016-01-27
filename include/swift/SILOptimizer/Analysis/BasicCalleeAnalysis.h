@@ -1,4 +1,4 @@
-//===- BasicCalleeAnalysis.h - Determine callees per call site -*- C++ -*--===//
+//===- BasicCalleeAnalysis.h - Determine callees per call site --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -364,7 +364,7 @@ bb0(%0 : $FakeOptional<Builtin.NativeObject>):
   apply %1() : $@convention(thin) () -> ()
   %3 = alloc_stack $Builtin.Int32
   retain_value %0 : $FakeOptional<Builtin.NativeObject>
-  dealloc_stack %3#0 : $*@local_storage Builtin.Int32
+  dealloc_stack %3 : $*Builtin.Int32
   switch_enum %0 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.Some!enumelt.1: bb1, case #FakeOptional.None!enumelt: bb2
 
 bb1(%2 : $Builtin.NativeObject):
@@ -491,7 +491,7 @@ bb2:
   br bb3
 
 bb3:
-  dealloc_stack %3#0 : $*@local_storage FakeOptional<Builtin.Int32>
+  dealloc_stack %3 : $*FakeOptional<Builtin.Int32>
   return %1 : $FakeOptional<Builtin.NativeObject>
 }
 
@@ -521,7 +521,7 @@ bb10:
   %1 = function_ref @blocker : $@convention(thin) () -> ()
   retain_value %0 : $FakeOptional<Builtin.Int32>
   %3 = alloc_stack $Builtin.Int32
-  dealloc_stack %3#0 : $*@local_storage Builtin.Int32
+  dealloc_stack %3 : $*Builtin.Int32
   release_value %0 : $FakeOptional<Builtin.Int32>
   switch_enum %0 : $FakeOptional<Builtin.Int32>, case #FakeOptional.Some!enumelt.1: bb1, case #FakeOptional.None!enumelt: bb2
 
@@ -568,7 +568,7 @@ bb0(%0 : $FakeOptional<Builtin.NativeObject>):
   apply %1() : $@convention(thin) () -> ()
   %3 = alloc_stack $Builtin.Int32
   retain_value %0 : $FakeOptional<Builtin.NativeObject>
-  dealloc_stack %3#0 : $*@local_storage Builtin.Int32
+  dealloc_stack %3 : $*Builtin.Int32
   %100 = select_enum %0 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.Some!enumelt.1: %t, case #FakeOptional.None!enumelt: %f : $Builtin.Int1
   cond_br %100, bb1, bb2
 
@@ -734,7 +734,7 @@ bb10:
   %1 = function_ref @blocker : $@convention(thin) () -> ()
   retain_value %0 : $FakeOptional<Builtin.Int32>
   %3 = alloc_stack $Builtin.Int32
-  dealloc_stack %3#0 : $*@local_storage Builtin.Int32
+  dealloc_stack %3 : $*Builtin.Int32
   %100 = select_enum %0 : $FakeOptional<Builtin.Int32>, case #FakeOptional.Some!enumelt.1: %t, case #FakeOptional.None!enumelt: %f : $Builtin.Int1
   release_value %0 : $FakeOptional<Builtin.Int32>
   cond_br %100, bb1, bb2
@@ -1625,11 +1625,11 @@ class G {}
 sil @cast_consumption : $@convention(thin) (@owned F) -> () {
 bb0(%0 : $F):
   %1 = alloc_stack $F
-  store %0 to %1#1 : $*F
+  store %0 to %1 : $*F
   strong_retain %0 : $F
-  unconditional_checked_cast_addr take_always F in %1#1 : $*F to G in %1#1 : $*F
+  unconditional_checked_cast_addr take_always F in %1 : $*F to G in %1 : $*F
   strong_release %0 : $F
-  dealloc_stack %1#0 : $*@local_storage F
+  dealloc_stack %1 : $*F
   %2 = tuple ()
   return %2 : $()
 }

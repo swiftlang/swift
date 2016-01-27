@@ -1,4 +1,4 @@
-//===--- Linker.h --------------------------------------------*- C++ -*----===//
+//===--- Linker.h -----------------------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -71,7 +71,7 @@ public:
   bool visitApplyInst(ApplyInst *AI);
   bool visitPartialApplyInst(PartialApplyInst *PAI);
   bool visitFunctionRefInst(FunctionRefInst *FRI);
-  bool visitProtocolConformance(ProtocolConformance *C,
+  bool visitProtocolConformance(ProtocolConformanceRef C,
                                 const Optional<SILDeclRef> &Member);
   bool visitWitnessMethodInst(WitnessMethodInst *WMI) {
     return visitProtocolConformance(WMI->getConformance(), WMI->getMember());

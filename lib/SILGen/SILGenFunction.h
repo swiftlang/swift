@@ -238,24 +238,23 @@ public:
                             SILValue Existential,
                             CanType FormalConcreteType,
                             SILType LoweredConcreteType,
-                            ArrayRef<ProtocolConformance*> Conformances);
+                            ArrayRef<ProtocolConformanceRef> Conformances);
 
   InitExistentialMetatypeInst *
   createInitExistentialMetatype(SILLocation loc, SILValue metatype,
                                 SILType existentialType,
-                                ArrayRef<ProtocolConformance*> conformances);
+                                ArrayRef<ProtocolConformanceRef> conformances);
   
   InitExistentialRefInst *
   createInitExistentialRef(SILLocation Loc, SILType ExistentialType,
                            CanType FormalConcreteType,
                            SILValue Concrete,
-                           ArrayRef<ProtocolConformance*> Conformances);
+                           ArrayRef<ProtocolConformanceRef> Conformances);
 
   AllocExistentialBoxInst *createAllocExistentialBox(SILLocation Loc,
                                  SILType ExistentialType,
                                  CanType ConcreteType,
-                                 SILType ConcreteLoweredType,
-                                 ArrayRef<ProtocolConformance *> Conformances);
+                                 ArrayRef<ProtocolConformanceRef> Conformances);
 };
 
 /// Parameter to \c SILGenFunction::emitCaptures that indicates what the
@@ -569,7 +568,7 @@ public:
                       SILDeclRef fromLevel, SILDeclRef toLevel);
   /// Generates a thunk from a foreign function to the native Swift convention.
   void emitForeignToNativeThunk(SILDeclRef thunk);
-  /// Generates a thunk from a native function to the  conventions.
+  /// Generates a thunk from a native function to the conventions.
   void emitNativeToForeignThunk(SILDeclRef thunk);
   
   // Generate a nullary function that returns the given value.
@@ -906,7 +905,7 @@ public:
                             CanType concreteFormalType,
                             const TypeLowering &concreteTL,
                             const TypeLowering &existentialTL,
-                            const ArrayRef<ProtocolConformance *> &conformances,
+                            ArrayRef<ProtocolConformanceRef> conformances,
                             SGFContext C,
                             llvm::function_ref<ManagedValue (SGFContext)> F);
 
@@ -1083,6 +1082,7 @@ public:
                                        FuncDecl *witness,
                                        ArrayRef<Substitution> witnessSubs,
                                        ArrayRef<ManagedValue> params);
+  void emitMaterializeForSet(FuncDecl *decl);
 
   SILDeclRef getAddressorDeclRef(AbstractStorageDecl *decl,
                                  AccessKind accessKind,
@@ -1347,8 +1347,6 @@ public:
   /// convention.
   ManagedValue emitNativeToBridgedValue(SILLocation loc, ManagedValue v,
                                         SILFunctionTypeRepresentation destRep,
-                                        AbstractionPattern origNativeTy,
-                                        CanType substNativeTy,
                                         CanType bridgedTy);
   
   /// Convert a value received as the result or argument of a function with
@@ -1376,8 +1374,6 @@ public:
   emitBridgeReturnValueForForeignError(SILLocation loc,
                                        SILValue result,
                                        SILFunctionTypeRepresentation repr,
-                                       AbstractionPattern origNativeType,
-                                       CanType substNativeType,
                                        SILType bridgedResultType,
                                        SILValue foreignErrorSlot,
                                  const ForeignErrorConvention &foreignError);
@@ -1424,6 +1420,12 @@ public:
                                     AbstractionPattern outputOrigType,
                                     CanType outputSubstType,
                                     SGFContext ctx = SGFContext());
+
+  /// Used for emitting SILArguments of bare functions, such as thunks and
+  /// open-coded materializeForSet.
+  void collectThunkParams(SILLocation loc,
+                          SmallVectorImpl<ManagedValue> &params,
+                          bool allowPlusZero);
 
   /// Build the type of a function transformation thunk.
   CanSILFunctionType buildThunkType(ManagedValue fn,
@@ -1542,8 +1544,7 @@ public:
   
   /// Produce a substitution for invoking a pointer argument conversion
   /// intrinsic.
-  Substitution getPointerSubstitution(Type pointerType,
-                                      ArchetypeType *archetype);
+  Substitution getPointerSubstitution(Type pointerType);
 };
 
 

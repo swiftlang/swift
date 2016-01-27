@@ -44,10 +44,10 @@ class DerivedClass {
 }
 
 protocol P1 {
-  typealias Element
+  associatedtype Element
 }
 protocol P2 : P1 {
-  typealias Element
+  associatedtype Element
 }
 
 func overloadedEach<O: P1>(source: O, _ closure: () -> ()) {
@@ -59,8 +59,7 @@ func overloadedEach<P: P2>(source: P, _ closure: () -> ()) {
 struct S : P2 {
   typealias Element = Int
   func each(@autoclosure closure: () -> ()) {
-    overloadedEach(self, closure) // expected-error {{cannot invoke 'overloadedEach' with an argument list of type '(S, @autoclosure () -> ())'}}
- // expected-note @-1 {{overloads for 'overloadedEach' exist with these partially matching parameter lists: (O, () -> ()), (P, () -> ())}}
+    overloadedEach(self, closure) // expected-error {{invalid conversion from non-escaping function of type '@autoclosure () -> ()' to potentially escaping function type '() -> ()'}}
   }
 }
 

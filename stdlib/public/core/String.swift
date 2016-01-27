@@ -306,7 +306,7 @@ extension String {
 /// - returns:
 ///   * an unspecified value less than zero if `lhs < rhs`,
 ///   * zero if `lhs == rhs`,
-///   * an unspecified value greater than zero  if `lhs > rhs`.
+///   * an unspecified value greater than zero if `lhs > rhs`.
 @_silgen_name("swift_stdlib_compareNSStringDeterministicUnicodeCollation")
 public func _stdlib_compareNSStringDeterministicUnicodeCollation(
   lhs: AnyObject, _ rhs: AnyObject

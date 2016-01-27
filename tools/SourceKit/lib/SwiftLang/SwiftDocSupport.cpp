@@ -523,8 +523,8 @@ static void addParameters(ArrayRef<Identifier> &ArgNames,
       ArgNames = ArgNames.slice(1);
     }
 
-    if (auto typeRepr = param.decl->getTypeLoc().getTypeRepr()) {
-      SourceRange TypeRange = param.decl->getTypeLoc().getSourceRange();
+    if (auto typeRepr = param->getTypeLoc().getTypeRepr()) {
+      SourceRange TypeRange = param->getTypeLoc().getSourceRange();
       if (auto InOutTyR = dyn_cast_or_null<InOutTypeRepr>(typeRepr))
         TypeRange = InOutTyR->getBase()->getSourceRange();
       if (TypeRange.isInvalid())
@@ -535,7 +535,7 @@ static void addParameters(ArrayRef<Identifier> &ArgNames,
         SM.getLocOffsetInBuffer(Lexer::getLocForEndOfToken(SM, TypeRange.End),
                                 BufferID);
       TextRange TR{ StartOffs, EndOffs-StartOffs };
-      TextEntity Param(param.decl, Arg, TR, StartOffs);
+      TextEntity Param(param, Arg, TR, StartOffs);
       Ent.SubEntities.push_back(std::move(Param));
     }
   }

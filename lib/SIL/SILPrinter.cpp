@@ -55,15 +55,12 @@ struct ID {
     SILBasicBlock, SILUndef, SSAValue
   } Kind;
   unsigned Number;
-  int ResultNumber;
 
   // A stable ordering of ID objects.
   bool operator<(ID Other) const {
     if (unsigned(Kind) < unsigned(Other.Kind))
       return true;
     if (Number < Other.Number)
-      return true;
-    if (ResultNumber < Other.ResultNumber)
       return true;
     return false;
   }
@@ -123,8 +120,6 @@ static raw_ostream &operator<<(raw_ostream &OS, ID i) {
   }
   OS << i.Number;
 
-  if (i.ResultNumber != -1)
-    OS << '#' << i.ResultNumber;
   return OS;
 }
 
@@ -334,7 +329,6 @@ static void print(raw_ostream &OS, SILValueCategory category) {
   switch (category) {
   case SILValueCategory::Object: return;
   case SILValueCategory::Address: OS << '*'; return;
-  case SILValueCategory::LocalStorage: OS << "*@local_storage "; return;
   }
   llvm_unreachable("bad value category!");
 }
@@ -431,7 +425,7 @@ public:
   ID getID(const SILBasicBlock *B);
   ID getID(SILValue V);
   IDAndType getIDAndType(SILValue V) {
-    return { getID(V), V.getType() };
+    return { getID(V), V->getType() };
   }
 
   //===--------------------------------------------------------------------===//
@@ -463,7 +457,7 @@ public:
     if (!BB->bbarg_empty()) {
       for (auto I = BB->bbarg_begin(), E = BB->bbarg_end(); I != E; ++I) {
         SILValue V = *I;
-        if (V.use_empty())
+        if (V->use_empty())
           continue;
         *this << "// " << getID(V);
         PrintState.OS.PadToColumn(50);
@@ -642,7 +636,6 @@ public:
     // Print result.
     if (V->hasValue()) {
       ID Name = getID(V);
-      Name.ResultNumber = -1; // Don't print subresult number.
       *this << Name << " = ";
     }
 
@@ -773,7 +766,7 @@ public:
     interleave(AI->getArguments(),
                [&](const SILValue &arg) { *this << getID(arg); },
                [&] { *this << ", "; });
-    *this << ") : " << AI->getCallee().getType();
+    *this << ") : " << AI->getCallee()->getType();
   }
 
   void visitTryApplyInst(TryApplyInst *AI) {
@@ -784,7 +777,7 @@ public:
     interleave(AI->getArguments(),
                [&](const SILValue &arg) { *this << getID(arg); },
                [&] { *this << ", "; });
-    *this << ") : " << AI->getCallee().getType();
+    *this << ") : " << AI->getCallee()->getType();
     *this << ", normal " << getID(AI->getNormalBB());
     *this << ", error " << getID(AI->getErrorBB());
   }
@@ -798,7 +791,7 @@ public:
     interleave(CI->getArguments(),
                [&](const SILValue &arg) { *this << getID(arg); },
                [&] { *this << ", "; });
-    *this << ") : " << CI->getCallee().getType();
+    *this << ") : " << CI->getCallee()->getType();
   }
 
   void visitFunctionRefInst(FunctionRefInst *FRI) {
@@ -820,6 +813,15 @@ public:
     
     *this << ") : ";
     *this << BI->getType();
+  }
+  
+  void visitAllocGlobalInst(AllocGlobalInst *AGI) {
+    *this << "alloc_global ";
+    if (AGI->getReferencedGlobal()) {
+      AGI->getReferencedGlobal()->printName(PrintState.OS);
+    } else {
+      *this << "<<placeholder>>";
+    }
   }
   
   void visitGlobalAddrInst(GlobalAddrInst *GAI) {
@@ -1199,7 +1201,7 @@ public:
       *this << ", ";
       *this << getIDAndType(WMI->getOperand());
     }
-    *this << " : " << WMI->getType(0);
+    *this << " : " << WMI->getType();
   }
   void visitDynamicMethodInst(DynamicMethodInst *DMI) {
     printMethodInst(DMI, DMI->getOperand(), "dynamic_method");
@@ -1335,6 +1337,10 @@ public:
   }
   void visitProjectBoxInst(ProjectBoxInst *PBI) {
     *this << "project_box " << getIDAndType(PBI->getOperand());
+  }
+  void visitProjectExistentialBoxInst(ProjectExistentialBoxInst *PEBI) {
+    *this << "project_existential_box " << PEBI->getValueType()
+    << " in " << getIDAndType(PEBI->getOperand());
   }
 
   void visitCondFailInst(CondFailInst *FI) {
@@ -1479,24 +1485,20 @@ ID SILPrinter::getID(const SILBasicBlock *Block) {
       BlocksToIDMap[&B] = idx++;
   }
 
-  ID R = { ID::SILBasicBlock, BlocksToIDMap[Block], -1 };
+  ID R = { ID::SILBasicBlock, BlocksToIDMap[Block] };
   return R;
 }
 
 ID SILPrinter::getID(SILValue V) {
   if (isa<SILUndef>(V))
-    return { ID::SILUndef, 0, 0 };
+    return { ID::SILUndef, 0 };
 
   // Lazily initialize the instruction -> ID mapping.
   if (ValueToIDMap.empty()) {
     V->getParentBB()->getParent()->numberValues(ValueToIDMap);
   }
 
-  int ResultNumber = -1;
-  if (V.getDef()->getTypes().size() > 1)
-    ResultNumber = V.getResultNumber();
-
-  ID R = { ID::SSAValue, ValueToIDMap[V.getDef()], ResultNumber };
+  ID R = { ID::SSAValue, ValueToIDMap[V] };
   return R;
 }
 
@@ -1507,14 +1509,6 @@ void SILBasicBlock::printAsOperand(raw_ostream &OS, bool PrintType) {
 //===----------------------------------------------------------------------===//
 // Printing for SILInstruction, SILBasicBlock, SILFunction, and SILModule
 //===----------------------------------------------------------------------===//
-
-void SILValue::dump() const {
-  print(llvm::errs());
-}
-
-void SILValue::print(raw_ostream &OS) const {
-  SILPrinter(OS).print(*this);
-}
 
 void ValueBase::dump() const {
   print(llvm::errs());
@@ -1608,8 +1602,8 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose,
   if (getEffectsKind() == EffectsKind::ReadWrite)
     OS << "[readwrite] ";
 
-  if (!getSemanticsAttr().empty())
-    OS << "[_semantics \"" << getSemanticsAttr() << "\"] ";
+  for (auto &Attr : getSemanticsAttrs())
+    OS << "[_semantics \"" << Attr << "\"] ";
 
   printName(OS);
   OS << " : $";
@@ -1951,8 +1945,8 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
       OS << "associated_type_protocol ("
          << assocProtoWitness.Requirement->getName() << ": "
          << assocProtoWitness.Protocol->getName() << "): ";
-      if (assocProtoWitness.Witness)
-        assocProtoWitness.Witness->printName(OS, Options);
+      if (assocProtoWitness.Witness.isConcrete())
+        assocProtoWitness.Witness.getConcrete()->printName(OS, Options);
       else
         OS << "dependent";
       break;

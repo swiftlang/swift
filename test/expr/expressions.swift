@@ -128,7 +128,7 @@ func errorRecovery() {
   var f: (Int,Int) = (1, 2, f : 3) // expected-error {{cannot convert value of type '(Int, Int, f: Int)' to specified type '(Int, Int)'}}
   
   // <rdar://problem/22426860> CrashTracer: [USER] swift at …mous_namespace::ConstraintGenerator::getTypeForPattern + 698
-  var (g1, g2, g3) = (1, 2) // expected-error {{different number of elements}}
+  var (g1, g2, g3) = (1, 2) // expected-error {{'(Int, Int)' is not convertible to '(_, _, _)', tuples have a different number of elements}}
 }
 
 func acceptsInt(x: Int) {}
@@ -141,7 +141,7 @@ var test1b = { 42 }
 var test1c = { { 42 } }
 var test1d = { { { 42 } } }
 
-func test2(a: Int)(b: Int) -> (c: Int) { // expected-error{{cannot create a single-element tuple with an element label}} {{32-35=}} expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
+func test2(a: Int, b: Int) -> (c: Int) { // expected-error{{cannot create a single-element tuple with an element label}} {{32-35=}}
  a+b
  a+b+c // expected-error{{use of unresolved identifier 'c'}}
  return a+b
@@ -405,13 +405,13 @@ var st_u11 = " \u{00110000} "  // expected-error {{invalid unicode scalar}}
 func stringliterals(d: [String: Int]) {
 
   // rdar://11385385
-  var x = 4
+  let x = 4
   "Hello \(x+1) world"
   
   "Error: \(x+1"; // expected-error {{unterminated string literal}}
   
   "Error: \(x+1   // expected-error {{unterminated string literal}}
-  ;
+  ;    // expected-error {{';' statements are not allowed}}
 
   // rdar://14050788 [DF] String Interpolations can't contain quotes
   "test \("nested")"
@@ -432,6 +432,7 @@ func stringliterals(d: [String: Int]) {
   // expected-error @-2 {{unterminated string literal}} expected-error @-1 {{unterminated string literal}}
 
   // FIXME: bad diagnostics.
+  // expected-warning @+1 {{initialization of variable 'x2' was never used; consider replacing with assignment to '_' or removing it}}
   /* expected-error {{unterminated string literal}} expected-error {{expected ',' separator}} expected-error {{expected ',' separator}} expected-note {{to match this opening '('}}  */ var x2 : () = ("hello" + "
   ; // expected-error {{expected expression in list of expressions}}
 } // expected-error {{expected ')' in expression list}}
@@ -645,13 +646,13 @@ func unusedExpressionResults() {
 func arrayLiterals() { 
   var a = [1,2,3]
   var b : [Int] = []
-  var c = []  // expected-error {{expression type '[_]' is ambiguous without more context}}
+  var c = []  // expected-error {{cannot infer type for empty collection literal without a contextual type}}
 }
 
 func dictionaryLiterals() {
   var a = [1 : "foo",2 : "bar",3 : "baz"]
   var b : Dictionary<Int, String> = [:]
-  var c = [:]  // expected-error {{expression type '[_ : _]' is ambiguous without more context}}
+  var c = [:]  // expected-error {{cannot infer type for empty collection literal without a contextual type}}
 }
 
 func invalidDictionaryLiteral() {
@@ -666,6 +667,8 @@ func invalidDictionaryLiteral() {
   var g = [1: "one", 2: ;] // expected-error {{expected value in dictionary literal}} expected-error 2{{expected ',' separator}} {{24-24=,}} {{24-24=,}} expected-error {{expected key expression in dictionary literal}}
 }
 
+    
+// FIXME: The issue here is a type compatibility problem, there is no ambiguity.
 [4].joinWithSeparator([1]) // expected-error {{type of expression is ambiguous without more context}}
 [4].joinWithSeparator([[[1]]]) // expected-error {{type of expression is ambiguous without more context}}
 

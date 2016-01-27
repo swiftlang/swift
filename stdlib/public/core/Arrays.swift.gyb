@@ -328,9 +328,6 @@ public struct ${Self}<Element>
     return Builtin.castToNativeObject(_buffer.owner)
   }
   
-  // Don't inline copyBuffer - this would inline the copy loop into the current
-  // path preventing retains/releases to be matched across that region.
-  @inline(never)
   static internal func _copyBuffer(inout buffer: _Buffer) {
     let newBuffer = _ContiguousArrayBuffer<Element>(
       count: buffer.count, minimumCapacity: buffer.count)
@@ -1086,7 +1083,7 @@ internal func _forceCreateUniqueMutableBufferImpl<_Buffer : _ArrayBufferType>(
 }
 
 internal protocol _PointerFunctionType {
-  typealias Element
+  associatedtype Element
   func call(_: UnsafeMutablePointer<Element>, count: Int)
 }
 

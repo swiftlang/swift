@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Fulfillment.h"
+#include "IRGen.h"
 
 #include "swift/AST/Decl.h"
 #include "swift/SIL/TypeLowering.h"
@@ -326,4 +327,19 @@ bool FulfillmentMap::addFulfillment(FulfillmentKey key,
     Fulfillments.insert({ key, Fulfillment(source, std::move(path)) });
     return true;
   }
+}
+
+bool FulfillmentMap::Everything::isInterestingType(CanType type) const {
+  return true;
+}
+bool FulfillmentMap::Everything::hasInterestingType(CanType type) const {
+  return true;
+}
+bool FulfillmentMap::Everything
+                   ::hasLimitedInterestingConformances(CanType type) const {
+  return false;
+}
+GenericSignature::ConformsToArray
+FulfillmentMap::Everything::getInterestingConformances(CanType type) const{
+  return {};
 }

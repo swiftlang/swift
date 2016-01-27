@@ -1,4 +1,4 @@
-//===--- RValue.cpp - Exploded RValue Representation ------------*- C++ -*-===//
+//===--- RValue.cpp - Exploded RValue Representation ----------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -19,6 +19,7 @@
 
 #include "Initialization.h"
 #include "RValue.h"
+#include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/Basic/Fallthrough.h"
@@ -30,6 +31,20 @@ using namespace Lowering;
 static unsigned getTupleSize(CanType t) {
   if (TupleType *tt = dyn_cast<TupleType>(t))
     return tt->getNumElements();
+  return 1;
+}
+
+static unsigned getRValueSize(AbstractionPattern pattern, CanType formalType) {
+  if (pattern.isTuple()) {
+    unsigned count = 0;
+    auto formalTupleType = cast<TupleType>(formalType);
+    for (auto i : indices(formalTupleType.getElementTypes())) {
+      count += getRValueSize(pattern.getTupleElementType(i),
+                             formalTupleType.getElementType(i));
+    }
+    return count;
+  }
+
   return 1;
 }
 
@@ -74,13 +89,13 @@ public:
       CanType eltFormalType = tupleFormalType.getElementType(i);
       assert(eltFormalType->isMaterializable());
 
-      auto eltTy = tuple.getType().getTupleElementType(i);
-      assert(eltTy.isAddress() == tuple.getType().isAddress());
+      auto eltTy = tuple->getType().getTupleElementType(i);
+      assert(eltTy.isAddress() == tuple->getType().isAddress());
       auto &eltTI = gen.getTypeLowering(eltTy);
 
       // Project the element.
       SILValue elt;
-      if (tuple.getType().isObject()) {
+      if (tuple->getType().isObject()) {
         assert(eltTI.isLoadable());
         elt = gen.B.createTupleExtract(loc, tuple, i, eltTy);
       } else {
@@ -311,7 +326,7 @@ static void copyOrInitValuesInto(Initialization *init,
 
   if (auto Address = init->getAddressOrNull()) {
     if (isa<GlobalAddrInst>(Address) &&
-      gen.getTypeLowering(type).getLoweredType().isTrivial(gen.SGM.M)) {
+        gen.getTypeLowering(type).getLoweredType().isTrivial(gen.SGM.M)) {
       // Implode tuples in initialization of globals if they are
       // of trivial types.
       implodeTuple = true;
@@ -391,6 +406,10 @@ RValue::RValue(SILGenFunction &gen, Expr *expr, ManagedValue v)
 
 RValue::RValue(CanType type)
   : type(type), elementsToBeAdded(getTupleSize(type)) {
+}
+
+RValue::RValue(AbstractionPattern pattern, CanType type)
+  : type(type), elementsToBeAdded(getRValueSize(pattern, type)) {
 }
 
 void RValue::addElement(RValue &&element) & {

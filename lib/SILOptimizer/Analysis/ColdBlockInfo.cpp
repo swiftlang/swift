@@ -1,4 +1,4 @@
-//===----- ColdBlockInfo.cpp - Fast/slow path analysis for the SIL CFG ----===//
+//===--- ColdBlockInfo.cpp - Fast/slow path analysis for the SIL CFG ------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -57,8 +57,8 @@ static BranchHint getBranchHint(SILValue Cond) {
     return BranchHint::None;
   
   if (auto *F = AI->getCalleeFunction()) {
-    if (F->hasDefinedSemantics()) {
-      if (F->getSemanticsString() == "branchhint") {
+    if (F->hasSemanticsAttrs()) {
+      if (F->hasSemanticsAttr("branchhint")) {
         // A "branchint" model takes a Bool expected value as the second
         // argument.
         if (auto *SI = dyn_cast<StructInst>(AI->getArgument(1))) {
@@ -72,9 +72,9 @@ static BranchHint getBranchHint(SILValue Cond) {
       }
       // fastpath/slowpath attrs are untested because the inliner luckily
       // inlines them before the downstream calls.
-      else if (F->getSemanticsString() == "slowpath")
+      else if (F->hasSemanticsAttr("slowpath"))
         return BranchHint::LikelyFalse;
-      else if (F->getSemanticsString() == "fastpath")
+      else if (F->hasSemanticsAttr("fastpath"))
         return BranchHint::LikelyTrue;
     }
   }

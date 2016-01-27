@@ -1,4 +1,4 @@
-//===--- HeapObject.h - Swift Language Allocation ABI ----------*- C++ -*--===//
+//===--- HeapObject.h - Swift Language Allocation ABI -----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -205,10 +205,6 @@ extern "C" void swift_release(HeapObject *object);
 /// Atomically decrements the retain count of an object n times. If the retain
 /// count reaches zero, the object is destroyed
 extern "C" void swift_release_n(HeapObject *object, uint32_t n);
-
-/// ObjC compatibility. Never call this.
-extern "C" size_t swift_retainCount(HeapObject *object);
-extern "C" size_t swift_unownedRetainCount(HeapObject *object);
 
 /// Is this pointer a non-null unique reference to an object
 /// that uses Swift reference counting?

@@ -48,7 +48,7 @@ func test0(ref: A) {
 // CHECK-NEXT: [[BUFFER:%.*]] = alloc_stack $OrdinarySub
 // CHECK-NEXT: [[T0:%.*]] = address_to_pointer [[BUFFER]]
 // CHECK-NEXT: [[T1:%.*]] = class_method %0 : $A, #A.array!materializeForSet.1
-// CHECK-NEXT: [[T2:%.*]] = apply [[T1]]([[T0]], [[STORAGE]]#1, %0)
+// CHECK-NEXT: [[T2:%.*]] = apply [[T1]]([[T0]], [[STORAGE]], %0)
 // CHECK-NEXT: [[T3:%.*]] = tuple_extract [[T2]] {{.*}}, 0
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[OPT_CALLBACK:%.*]] = tuple_extract [[T2]] {{.*}}, 1
@@ -59,11 +59,11 @@ func test0(ref: A) {
 // CHECK-NEXT: switch_enum [[OPT_CALLBACK]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout A, @thick A.Type) -> ()>, case #Optional.Some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.None!enumelt: [[CONT:bb[0-9]+]]
 // CHECK:    [[WRITEBACK]]([[CALLBACK:%.*]] : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout A, @thick A.Type) -> ()):
 // CHECK-NEXT: [[TEMP2:%.*]] = alloc_stack $A
-// CHECK-NEXT: store %0 to [[TEMP2]]#1 : $*A
+// CHECK-NEXT: store %0 to [[TEMP2]] : $*A
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thick A.Type
 // CHECK-NEXT: [[T1:%.*]] = address_to_pointer [[ADDR]] : $*OrdinarySub to $Builtin.RawPointer
-// CHECK-NEXT: apply [[CALLBACK]]([[T1]], [[STORAGE]]#1, [[TEMP2]]#1, [[T0]])
-// CHECK-NEXT: dealloc_stack [[TEMP2]]#0
+// CHECK-NEXT: apply [[CALLBACK]]([[T1]], [[STORAGE]], [[TEMP2]], [[T0]])
+// CHECK-NEXT: dealloc_stack [[TEMP2]]
 // CHECK-NEXT: br [[CONT]]
 // CHECK:    [[CONT]]:
 // CHECK-NEXT: dealloc_stack [[BUFFER]]
@@ -103,7 +103,7 @@ func test1(ref: B) {
 // CHECK-NEXT: [[BUFFER:%.*]] = alloc_stack $MutatingSub
 // CHECK-NEXT: [[T0:%.*]] = address_to_pointer [[BUFFER]]
 // CHECK-NEXT: [[T1:%.*]] = class_method %0 : $B, #B.array!materializeForSet.1
-// CHECK-NEXT: [[T2:%.*]] = apply [[T1]]([[T0]], [[STORAGE]]#1, %0)
+// CHECK-NEXT: [[T2:%.*]] = apply [[T1]]([[T0]], [[STORAGE]], %0)
 // CHECK-NEXT: [[T3:%.*]] = tuple_extract [[T2]] {{.*}}, 0
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[OPT_CALLBACK:%.*]] = tuple_extract [[T2]] {{.*}}, 1
@@ -114,11 +114,11 @@ func test1(ref: B) {
 // CHECK-NEXT: switch_enum [[OPT_CALLBACK]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout B, @thick B.Type) -> ()>, case #Optional.Some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.None!enumelt: [[CONT:bb[0-9]+]]
 // CHECK:    [[WRITEBACK]]([[CALLBACK:%.*]] : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout B, @thick B.Type) -> ()):
 // CHECK-NEXT: [[TEMP2:%.*]] = alloc_stack $B
-// CHECK-NEXT: store %0 to [[TEMP2]]#1 : $*B
+// CHECK-NEXT: store %0 to [[TEMP2]] : $*B
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thick B.Type
 // CHECK-NEXT: [[T1:%.*]] = address_to_pointer [[ADDR]] : $*MutatingSub to $Builtin.RawPointer
-// CHECK-NEXT: apply [[CALLBACK]]([[T1]], [[STORAGE]]#1, [[TEMP2]]#1, [[T0]])
-// CHECK-NEXT: dealloc_stack [[TEMP2]]#0
+// CHECK-NEXT: apply [[CALLBACK]]([[T1]], [[STORAGE]], [[TEMP2]], [[T0]])
+// CHECK-NEXT: dealloc_stack [[TEMP2]]
 // CHECK-NEXT: br [[CONT]]
 // CHECK:    [[CONT]]:
 //   Formal access to LHS.
@@ -126,7 +126,7 @@ func test1(ref: B) {
 // CHECK-NEXT: [[BUFFER2:%.*]] = alloc_stack $MutatingSub
 // CHECK-NEXT: [[T0:%.*]] = address_to_pointer [[BUFFER2]]
 // CHECK-NEXT: [[T1:%.*]] = class_method %0 : $B, #B.array!materializeForSet.1
-// CHECK-NEXT: [[T2:%.*]] = apply [[T1]]([[T0]], [[STORAGE2]]#1, %0)
+// CHECK-NEXT: [[T2:%.*]] = apply [[T1]]([[T0]], [[STORAGE2]], %0)
 // CHECK-NEXT: [[T3:%.*]] = tuple_extract [[T2]] {{.*}}, 0
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[OPT_CALLBACK:%.*]] = tuple_extract [[T2]] {{.*}}, 1
@@ -137,11 +137,11 @@ func test1(ref: B) {
 // CHECK-NEXT: switch_enum [[OPT_CALLBACK]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout B, @thick B.Type) -> ()>, case #Optional.Some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.None!enumelt: [[CONT:bb[0-9]+]]
 // CHECK:    [[WRITEBACK]]([[CALLBACK:%.*]] : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout B, @thick B.Type) -> ()):
 // CHECK-NEXT: [[TEMP2:%.*]] = alloc_stack $B
-// CHECK-NEXT: store %0 to [[TEMP2]]#1 : $*B
+// CHECK-NEXT: store %0 to [[TEMP2]] : $*B
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thick B.Type
 // CHECK-NEXT: [[T1:%.*]] = address_to_pointer [[ADDR]] : $*MutatingSub to $Builtin.RawPointer
-// CHECK-NEXT: apply [[CALLBACK]]([[T1]], [[STORAGE2]]#1, [[TEMP2]]#1, [[T0]])
-// CHECK-NEXT: dealloc_stack [[TEMP2]]#0
+// CHECK-NEXT: apply [[CALLBACK]]([[T1]], [[STORAGE2]], [[TEMP2]], [[T0]])
+// CHECK-NEXT: dealloc_stack [[TEMP2]]
 // CHECK-NEXT: br [[CONT]]
 // CHECK:    [[CONT]]:
 // CHECK-NEXT: dealloc_stack [[BUFFER2]]

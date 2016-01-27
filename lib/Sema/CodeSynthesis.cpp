@@ -22,7 +22,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/Parameter.h"
+#include "swift/AST/ParameterList.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 using namespace swift;
@@ -33,17 +33,21 @@ const bool IsImplicit = true;
 /// decl is specified, the new decl is inserted next to the hint.
 static void addMemberToContextIfNeeded(Decl *D, DeclContext *DC,
                                        Decl *Hint = nullptr) {
-  if (auto *ntd = dyn_cast<NominalTypeDecl>(DC))
+  if (auto *ntd = dyn_cast<NominalTypeDecl>(DC)) {
     ntd->addMember(D, Hint);
-  else if (auto *ed = dyn_cast<ExtensionDecl>(DC))
+  } else if (auto *ed = dyn_cast<ExtensionDecl>(DC)) {
     ed->addMember(D, Hint);
-  else
+  } else if (isa<SourceFile>(DC)) {
+    auto *mod = DC->getParentModule();
+    mod->getDerivedFileUnit().addDerivedDecl(cast<FuncDecl>(D));
+  } else {
     assert((isa<AbstractFunctionDecl>(DC) || isa<FileUnit>(DC)) &&
            "Unknown declcontext");
+  }
 }
 
 static ParamDecl *getParamDeclAtIndex(FuncDecl *fn, unsigned index) {
-  return fn->getParameterLists().back()->get(index).decl;
+  return fn->getParameterLists().back()->get(index);
 }
 
 static VarDecl *getFirstParamDecl(FuncDecl *fn) {
@@ -51,7 +55,7 @@ static VarDecl *getFirstParamDecl(FuncDecl *fn) {
 };
 
 
-static Parameter buildArgument(SourceLoc loc, DeclContext *DC,
+static ParamDecl *buildArgument(SourceLoc loc, DeclContext *DC,
                                StringRef name, Type type, bool isLet) {
   auto &context = DC->getASTContext();
   auto *param = new (context) ParamDecl(isLet, SourceLoc(), Identifier(),
@@ -59,15 +63,15 @@ static Parameter buildArgument(SourceLoc loc, DeclContext *DC,
                                         Type(), DC);
   param->setImplicit();
   param->getTypeLoc().setType(type);
-  return Parameter::withoutLoc(param);
+  return param;
 }
 
-static Parameter buildLetArgument(SourceLoc loc, DeclContext *DC,
+static ParamDecl *buildLetArgument(SourceLoc loc, DeclContext *DC,
                                   StringRef name, Type type) {
   return buildArgument(loc, DC, name, type, /*isLet*/ true);
 }
 
-static Parameter buildInOutArgument(SourceLoc loc, DeclContext *DC,
+static ParamDecl *buildInOutArgument(SourceLoc loc, DeclContext *DC,
                                      StringRef name, Type type) {
   return buildArgument(loc, DC, name, InOutType::get(type), /*isLet*/ false);
 }
@@ -91,7 +95,7 @@ static Type getTypeOfStorage(AbstractStorageDecl *storage,
 ///   forwarding pattern.
 static ParameterList *
 buildIndexForwardingParamList(AbstractStorageDecl *storage,
-                              ArrayRef<Parameter> prefix) {
+                              ArrayRef<ParamDecl*> prefix) {
   auto &context = storage->getASTContext();
   auto subscript = dyn_cast<SubscriptDecl>(storage);
 
@@ -100,13 +104,14 @@ buildIndexForwardingParamList(AbstractStorageDecl *storage,
     return ParameterList::create(context, prefix);
 
   // Clone the parameter list over for a new decl, so we get new ParamDecls.
-  auto indices = subscript->getIndices()->clone(context);
+  auto indices = subscript->getIndices()->clone(context,
+                                                ParameterList::Implicit);
   if (prefix.empty())
     return indices;
   
   
   // Otherwise, we need to build up a new parameter list.
-  SmallVector<Parameter, 4> elements;
+  SmallVector<ParamDecl*, 4> elements;
 
   // Start with the fields we were given, if there are any.
   elements.append(prefix.begin(), prefix.end());
@@ -174,11 +179,10 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
   
   // Add a "(value : T, indices...)" argument list.
   auto storageType = getTypeOfStorage(storage, TC);
-  auto valueParam = buildLetArgument(storage->getLoc(),
+  valueDecl = buildLetArgument(storage->getLoc(),
                                      storage->getDeclContext(), "value",
                                      storageType);
-  valueDecl = valueParam.decl;
-  params.push_back(buildIndexForwardingParamList(storage, valueParam));
+  params.push_back(buildIndexForwardingParamList(storage, valueDecl));
 
   Type setterRetTy = TupleType::getEmpty(TC.Context);
   FuncDecl *setter = FuncDecl::create(
@@ -304,8 +308,7 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   //  - The buffer parameter, (buffer: Builtin.RawPointer,
   //                           inout storage: Builtin.UnsafeValueBuffer,
   //                           indices...).
-  
-  Parameter bufferElements[] = {
+  ParamDecl *bufferElements[] = {
     buildLetArgument(loc, DC, "buffer", ctx.TheRawPointerType),
     buildInOutArgument(loc, DC, "callbackStorage", ctx.TheUnsafeValueBufferType)
   };
@@ -324,7 +327,16 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   
   // materializeForSet is mutating and static if the setter is.
   auto setter = storage->getSetter();
-  materializeForSet->setMutating(setter->isMutating());
+
+  // Open-code the setMutating() calculation since we might run before
+  // the setter has been type checked. Also as a hack, always mark the
+  // setter mutating if we're inside a protocol, because it seems some
+  // things break otherwise -- the root cause should be fixed eventually.
+  materializeForSet->setMutating(
+      setter->getDeclContext()->isProtocolOrProtocolExtensionContext() ||
+      (!setter->getAttrs().hasAttribute<NonMutatingAttr>() &&
+       !storage->isSetterNonMutating()));
+
   materializeForSet->setStatic(setter->isStatic());
 
   // materializeForSet is final if the storage is.
@@ -355,7 +367,7 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   // If the property came from ObjC, we need to register this as an external
   // definition to be compiled.
   if (needsToBeRegisteredAsExternalDecl(storage))
-    TC.Context.addedExternalDecl(materializeForSet);
+    TC.Context.addExternalDecl(materializeForSet);
   
   return materializeForSet;
 }
@@ -375,17 +387,6 @@ void swift::convertStoredVarInProtocolToComputed(VarDecl *VD, TypeChecker &TC) {
   TC.typeCheckDecl(VD->getGetter(), false);
 }
 
-/// Build a tuple around the given arguments.
-static Expr *buildTupleExpr(ASTContext &ctx, ArrayRef<Expr*> args) {
-  if (args.size() == 1) {
-    return args[0];
-  }
-  SmallVector<Identifier, 4> labels(args.size());
-  SmallVector<SourceLoc, 4> labelLocs(args.size());
-  return TupleExpr::create(ctx, SourceLoc(), args, labels, labelLocs,
-                           SourceLoc(), false, IsImplicit);
-}
-
 
 /// Build an expression that evaluates the specified parameter list as a tuple
 /// or paren expr, suitable for use in an applyexpr.
@@ -393,7 +394,7 @@ static Expr *buildTupleExpr(ASTContext &ctx, ArrayRef<Expr*> args) {
 /// NOTE: This returns null if a varargs parameter exists in the list, as it
 /// cannot be forwarded correctly yet.
 ///
-static Expr *buildArgumentForwardingExpr(ArrayRef<Parameter> params,
+static Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
                                          ASTContext &ctx) {
   SmallVector<Identifier, 4> labels;
   SmallVector<SourceLoc, 4> labelLocs;
@@ -401,16 +402,15 @@ static Expr *buildArgumentForwardingExpr(ArrayRef<Parameter> params,
   
   for (auto param : params) {
     // We cannot express how to forward variadic parameters yet.
-    if (param.isVariadic())
+    if (param->isVariadic())
       return nullptr;
     
-    Expr *ref = new (ctx) DeclRefExpr(param.decl, SourceLoc(),
-                                      /*implicit*/ true);
-    if (param.decl->getType()->is<InOutType>())
+    Expr *ref = new (ctx) DeclRefExpr(param, DeclNameLoc(), /*implicit*/ true);
+    if (param->getType()->is<InOutType>())
       ref = new (ctx) InOutExpr(SourceLoc(), ref, Type(), /*implicit=*/true);
     args.push_back(ref);
     
-    labels.push_back(param.decl->getArgumentName());
+    labels.push_back(param->getArgumentName());
     labelLocs.push_back(SourceLoc());
   }
   
@@ -465,7 +465,7 @@ static Expr *buildSelfReference(VarDecl *selfDecl,
                                 TypeChecker &TC) {
   switch (selfAccessKind) {
   case SelfAccessKind::Peer:
-    return new (TC.Context) DeclRefExpr(selfDecl, SourceLoc(), IsImplicit);
+    return new (TC.Context) DeclRefExpr(selfDecl, DeclNameLoc(), IsImplicit);
 
   case SelfAccessKind::Super:
     return new (TC.Context) SuperRefExpr(selfDecl, SourceLoc(), IsImplicit);
@@ -519,7 +519,7 @@ static Expr *buildStorageReference(
 
   VarDecl *selfDecl = referenceContext.getSelfDecl();
   if (!selfDecl) {
-    return new (ctx) DeclRefExpr(storage, SourceLoc(), IsImplicit, semantics);
+    return new (ctx) DeclRefExpr(storage, DeclNameLoc(), IsImplicit, semantics);
   }
 
   // If we should use a super access if applicable, and we have an
@@ -545,7 +545,7 @@ static Expr *buildStorageReference(
   // however, it shouldn't be problematic because any overrides
   // should also redefine materializeForSet.
   return new (ctx) MemberRefExpr(selfDRE, SourceLoc(), storage,
-                                 SourceLoc(), IsImplicit, semantics);
+                                 DeclNameLoc(), IsImplicit, semantics);
 }
 
 static Expr *buildStorageReference(FuncDecl *accessor,
@@ -578,7 +578,7 @@ static ProtocolDecl *getNSCopyingProtocol(TypeChecker &TC,
 
   SmallVector<ValueDecl *, 2> results;
   DC->lookupQualified(ModuleType::get(foundation),
-                      ctx.getIdentifier("NSCopying"),
+                      ctx.getSwiftId(KnownFoundationEntity::NSCopying),
                       NL_QualifiedDefault | NL_KnownNonCascadingDependency,
                       /*resolver=*/nullptr,
                       results);
@@ -632,7 +632,7 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   //       (nil_literal_expr type='<null>'))))
   auto UDE = new (Ctx) UnresolvedDotExpr(Val, SourceLoc(),
                                          Ctx.getIdentifier("copyWithZone"),
-                                         SourceLoc(), /*implicit*/true);
+                                         DeclNameLoc(), /*implicit*/true);
   Expr *Nil = new (Ctx) NilLiteralExpr(SourceLoc(), /*implicit*/true);
   Nil = new (Ctx) ParenExpr(SourceLoc(), Nil, SourceLoc(), false);
 
@@ -694,14 +694,16 @@ static void createPropertyStoreOrCallSuperclassSetter(FuncDecl *accessor,
 /// accessor as transparent, since in this case we just want it for abstraction
 /// purposes (i.e., to make access to the variable uniform and to be able to
 /// put the getter in a vtable).
+///
+/// If the storage is for a global stored property or a stored property of a
+/// resilient type, we are synthesizing accessors to present a resilient
+/// interface to the storage and they should not be transparent.
 static void maybeMarkTransparent(FuncDecl *accessor,
                                  AbstractStorageDecl *storage,
                                  TypeChecker &TC) {
-  auto *NTD = storage->getDeclContext()
+  auto *nominal = storage->getDeclContext()
       ->isNominalTypeOrNominalTypeExtensionContext();
-
-  // FIXME: resilient global variables
-  if (!NTD || NTD->hasFixedLayout())
+  if (nominal && nominal->hasFixedLayout())
     accessor->getAttrs().add(new (TC.Context) TransparentAttr(IsImplicit));
 }
 
@@ -724,7 +726,7 @@ static void synthesizeTrivialGetter(FuncDecl *getter,
  
   // Register the accessor as an external decl if the storage was imported.
   if (needsToBeRegisteredAsExternalDecl(storage))
-    TC.Context.addedExternalDecl(getter);
+    TC.Context.addExternalDecl(getter);
 }
 
 /// Synthesize the body of a trivial setter.
@@ -737,7 +739,7 @@ static void synthesizeTrivialSetter(FuncDecl *setter,
   auto &ctx = TC.Context;
   SourceLoc loc = storage->getLoc();
 
-  auto *valueDRE = new (ctx) DeclRefExpr(valueVar, SourceLoc(), IsImplicit);
+  auto *valueDRE = new (ctx) DeclRefExpr(valueVar, DeclNameLoc(), IsImplicit);
   SmallVector<ASTNode, 1> setterBody;
   createPropertyStoreOrCallSuperclassSetter(setter, valueDRE, storage,
                                             setterBody, TC);
@@ -747,62 +749,7 @@ static void synthesizeTrivialSetter(FuncDecl *setter,
 
   // Register the accessor as an external decl if the storage was imported.
   if (needsToBeRegisteredAsExternalDecl(storage))
-    TC.Context.addedExternalDecl(setter);
-}
-
-/// Build the result expression of a materializeForSet accessor.
-///
-/// \param address an expression yielding the address to return
-/// \param callbackFn an optional closure expression for the callback
-static Expr *buildMaterializeForSetResult(ASTContext &ctx, Expr *address,
-                                          Expr *callbackFn) {
-  if (!callbackFn) {
-    callbackFn = new (ctx) NilLiteralExpr(SourceLoc(), IsImplicit);
-  }
-
-  return TupleExpr::create(ctx, SourceLoc(), { address, callbackFn },
-                           { Identifier(), Identifier() },
-                           { SourceLoc(), SourceLoc() },
-                           SourceLoc(), false, IsImplicit);
-}
-
-/// Create a call to the builtin function with the given name.
-static Expr *buildCallToBuiltin(ASTContext &ctx, StringRef builtinName,
-                                ArrayRef<Expr*> args) {
-  auto builtin = getBuiltinValueDecl(ctx, ctx.getIdentifier(builtinName));
-  Expr *builtinDRE = new (ctx) DeclRefExpr(builtin, SourceLoc(), IsImplicit);
-  Expr *arg = buildTupleExpr(ctx, args);
-  return new (ctx) CallExpr(builtinDRE, arg, IsImplicit);
-}
-
-/// Synthesize the body of a materializeForSet accessor for a stored
-/// property.
-static void synthesizeStoredMaterializeForSet(FuncDecl *materializeForSet,
-                                              AbstractStorageDecl *storage,
-                                              VarDecl *bufferDecl,
-                                              TypeChecker &TC) {
-  ASTContext &ctx = TC.Context;
-
-  // return (Builtin.addressof(&self.property), nil)
-  Expr *result = buildStorageReference(materializeForSet, storage,
-                                       AccessSemantics::DirectToStorage,
-                                       SelfAccessKind::Peer, TC);
-  result = new (ctx) InOutExpr(SourceLoc(), result, Type(), IsImplicit);
-  result = buildCallToBuiltin(ctx, "addressof", result);
-  result = buildMaterializeForSetResult(ctx, result, /*callback*/ nullptr);
-
-  ASTNode returnStmt = new (ctx) ReturnStmt(SourceLoc(), result, IsImplicit);
-
-  SourceLoc loc = storage->getLoc();
-  materializeForSet->setBody(BraceStmt::create(ctx, loc, returnStmt, loc,true));
-
-  maybeMarkTransparent(materializeForSet, storage, TC);
-
-  TC.typeCheckDecl(materializeForSet, true);
-  
-  // Register the accessor as an external decl if the storage was imported.
-  if (needsToBeRegisteredAsExternalDecl(storage))
-    TC.Context.addedExternalDecl(materializeForSet);
+    TC.Context.addExternalDecl(setter);
 }
 
 /// Does a storage decl currently lacking accessor functions require a
@@ -885,20 +832,23 @@ void swift::addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
     TC.typeCheckDecl(setter, false);
   }
 
-  // We've added some members to our containing type, add them to the
-  // members list.
-  addMemberToContextIfNeeded(getter, storage->getDeclContext());
-  if (setter)
-    addMemberToContextIfNeeded(setter, storage->getDeclContext());
+  auto *DC = storage->getDeclContext();
 
-  // Always add a materializeForSet when we're creating trivial
-  // accessors for a mutable stored property.  We only do this when we
-  // need to be able to access something polymorphically, and we always
-  // want a materializeForSet in such situations.
-  if (setter) {
+  // We've added some members to our containing context, add them to
+  // the right list.
+  addMemberToContextIfNeeded(getter, DC);
+  if (setter)
+    addMemberToContextIfNeeded(setter, DC);
+
+  // If we're creating trivial accessors for a stored property of a
+  // nominal type, the stored property is either witnessing a
+  // protocol requirement or the nominal type is resilient. In both
+  // cases, we need to expose a materializeForSet.
+  //
+  // Global stored properties don't get a materializeForSet.
+  if (setter && DC->isNominalTypeOrNominalTypeExtensionContext()) {
     FuncDecl *materializeForSet = addMaterializeForSet(storage, TC);
     synthesizeMaterializeForSet(materializeForSet, storage, TC);
-    TC.typeCheckDecl(materializeForSet, true);
     TC.typeCheckDecl(materializeForSet, false);
   }
 }
@@ -943,456 +893,23 @@ void TypeChecker::synthesizeWitnessAccessorsForStorage(
       requirement->getSetter() && !storage->getMaterializeForSetFunc()) {
     FuncDecl *materializeForSet = addMaterializeForSet(storage, *this);
     synthesizeMaterializeForSet(materializeForSet, storage, *this);
-    typeCheckDecl(materializeForSet, true);
     typeCheckDecl(materializeForSet, false);
   }
   return;
 }
 
-using CallbackGenerator =
-  llvm::function_ref<void(SmallVectorImpl<ASTNode> &callbackBody,
-                          VarDecl *selfDecl, VarDecl *bufferDecl,
-                          VarDecl *callbackStorageDecl)>;
-
-/// Build a materializeForSet callback function.
-/// It should have type
-///   (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer,
-///    inout T, T.Type) -> ()
-static Expr *buildMaterializeForSetCallback(ASTContext &ctx,
-                                            FuncDecl *materializeForSet,
-                                            AbstractStorageDecl *storage,
-                                      const CallbackGenerator &generator) {
-
-  auto DC = storage->getDeclContext();
-  SourceLoc loc = storage->getLoc();
-
-  Type selfType =
-    getSelfTypeForMaterializeForSetCallback(ctx, DC,
-                                            materializeForSet->isStatic());
-
-  // Build the parameters pattern.
-  //
-  // Unexpected subtlety: it actually important to call the inout self
-  // parameter something other than 'self' so that we don't trigger
-  // the "implicit use of self" diagnostic.
-  auto bufferParam =
-    buildLetArgument(loc, DC, "buffer", ctx.TheRawPointerType);
-  auto callbackStorageParam =
-    buildInOutArgument(loc, DC, "callbackStorage",ctx.TheUnsafeValueBufferType);
-  auto selfValueParam = buildInOutArgument(loc, DC, "selfValue", selfType);
-  auto selfTypeParam = buildLetArgument(loc, DC, "selfType",
-                                        MetatypeType::get(selfType));
-
-  auto paramList = ParameterList::create(ctx, {
-    bufferParam,
-    callbackStorageParam,
-    selfValueParam,
-    selfTypeParam
-  });
-
-  // Create the closure expression itself.
-  auto closure = new (ctx) ClosureExpr(paramList, SourceLoc(), SourceLoc(),
-                                       SourceLoc(), TypeLoc(),
-                                       /*discriminator*/ 0, materializeForSet);
-
-  // Generate the body of the closure.
-  SmallVector<ASTNode, 4> body;
-  generator(body, selfValueParam.decl, bufferParam.decl,
-            callbackStorageParam.decl);
-  closure->setBody(BraceStmt::create(ctx, SourceLoc(), body, SourceLoc(),
-                                     IsImplicit),
-                   /*isSingleExpression*/ false);
-  closure->setImplicit(IsImplicit);
-
-  // Call our special builtin to turn that into an opaque thin function.
-  auto result = buildCallToBuiltin(ctx, "makeMaterializeForSetCallback",
-                                   { closure });
-  return result;
-}
-
-/// Build a builtin operation on a Builtin.UnsafeValueBuffer.
-static Expr *buildValueBufferOperation(ASTContext &ctx, StringRef builtinName,
-                                       VarDecl *bufferDecl, Type valueType) {
-  // &buffer
-  Expr *bufferRef = new (ctx) DeclRefExpr(bufferDecl, SourceLoc(), IsImplicit);
-  bufferRef = new (ctx) InOutExpr(SourceLoc(), bufferRef, Type(), IsImplicit);
-
-  // T.self
-  Expr *metatypeRef = TypeExpr::createImplicit(valueType, ctx);
-  metatypeRef = new (ctx) DotSelfExpr(metatypeRef, SourceLoc(), SourceLoc());
-  metatypeRef->setImplicit(IsImplicit);
-
-  // Builtin.whatever(&buffer, T.self)
-  return buildCallToBuiltin(ctx, builtinName, { bufferRef, metatypeRef });
-}
-
-/// Build a call to Builtin.take.
-static Expr *buildBuiltinTake(ASTContext &ctx, Expr *address,
-                              Type valueType) {
-  // Builtin.take(address) as ValueType
-  Expr *result = buildCallToBuiltin(ctx, "take", { address });
-  result = new (ctx) CoerceExpr(result, SourceLoc(),
-                                TypeLoc::withoutLoc(valueType));
-  result->setImplicit(IsImplicit);
-  return result;
-}
-
-/// Build an expression to initialize callback storage.
-static ASTNode buildInitializeCallbackStorage(FuncDecl *materializeForSet,
-                                              Expr *initializer,
-                                              Type initializerType,
-                                              ASTContext &ctx) {
-  // let allocatedCallbackStorage =
-  //   Builtin.allocateValueBuffer(&callbackStorage, IndexType.self))
-  VarDecl *callbackStorageDecl = getParamDeclAtIndex(materializeForSet, 1);
-  Expr *allocatedCallbackStorage =
-    buildValueBufferOperation(ctx, "allocValueBuffer", callbackStorageDecl,
-                              initializerType);
-
-  // Builtin.initialize(indexArgs, allocatedCallbackStorage)
-  return buildCallToBuiltin(ctx, "initialize",
-                            { initializer, allocatedCallbackStorage });
-}
-
-/// Build an expression to take from callback storage.
-static Expr *buildTakeFromCallbackStorage(VarDecl *storage, Type valueType,
-                                          ASTContext &ctx) {
-  Expr *address =
-    buildValueBufferOperation(ctx, "projectValueBuffer", storage, valueType);
-  return buildBuiltinTake(ctx, address, valueType);
-}
-
-namespace {
-  /// A reference to storage from the context of a materializeForSet
-  /// callback.
-  class CallbackStorageReferenceContext : public StorageReferenceContext {
-    VarDecl *Self;
-    VarDecl *CallbackStorage;
-  public:
-    CallbackStorageReferenceContext(VarDecl *self, VarDecl *callbackStorage)
-      : Self(self), CallbackStorage(callbackStorage) {}
-    virtual ~CallbackStorageReferenceContext() = default;
-
-    VarDecl *getSelfDecl() const override {
-      return Self;
-    }
-    Expr *getIndexRefExpr(ASTContext &ctx,
-                          SubscriptDecl *subscript) const override {
-      return buildTakeFromCallbackStorage(CallbackStorage,
-                                          subscript->getIndicesType(), ctx);
-    }
-  };
-}
-
-/// Synthesize the body of a materializeForSet accessor for a
-/// computed property.
-static void synthesizeComputedMaterializeForSet(FuncDecl *materializeForSet,
-                                                AbstractStorageDecl *storage,
-                                                VarDecl *bufferDecl,
-                                                TypeChecker &TC) {
-  ASTContext &ctx = TC.Context;
-
-  SmallVector<ASTNode, 4> body;
-  
-  AccessSemantics semantics;
-  // If the storage is dynamic, we must dynamically redispatch through the
-  // accessor. Otherwise, we can do a direct peer access.
-  if (needsDynamicMaterializeForSet(storage))
-    semantics = AccessSemantics::Ordinary;
-  else
-    semantics = AccessSemantics::DirectToAccessor;
-
-  // Builtin.initialize(self.property, buffer)
-  Expr *curValue = buildStorageReference(materializeForSet, storage,
-                                         semantics,
-                                         SelfAccessKind::Peer, TC);
-  Expr *bufferRef = new (ctx) DeclRefExpr(bufferDecl, SourceLoc(), IsImplicit);
-  body.push_back(buildCallToBuiltin(ctx, "initialize",
-                                    { curValue, bufferRef }));
-
-  // If this is a subscript, preserve the index value:
-  if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
-    Expr *indices = buildSubscriptIndexReference(ctx, materializeForSet);
-    ASTNode initialize =
-      buildInitializeCallbackStorage(materializeForSet, indices,
-                                     subscript->getIndicesType(), ctx);
-    body.push_back(initialize);
-  }
-
-  // Build the callback.
-  Expr *callback =
-    buildMaterializeForSetCallback(ctx, materializeForSet, storage,
-      [&](SmallVectorImpl<ASTNode> &body,
-          VarDecl *selfDecl, VarDecl *bufferDecl,
-          VarDecl *callbackStorageDecl) {
-      // self.property = Builtin.take(buffer)
-      Expr *bufferRef =
-        new (ctx) DeclRefExpr(bufferDecl, SourceLoc(), IsImplicit);
-      Expr *value = buildBuiltinTake(ctx, bufferRef,
-                                     getTypeOfStorage(storage, TC));
-
-      Expr *storageRef =
-        buildStorageReference(
-               CallbackStorageReferenceContext{selfDecl, callbackStorageDecl},
-                              storage, semantics,
-                              SelfAccessKind::Peer, TC);
-      body.push_back(new (ctx) AssignExpr(storageRef, SourceLoc(),
-                                          value, IsImplicit));
-
-      // If this is a subscript, deallocate the subscript buffer:
-      if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
-        // Builtin.deallocValueBuffer(&callbackStorage, IndexType.self)
-        body.push_back(buildValueBufferOperation(ctx, "deallocValueBuffer",
-                                                 callbackStorageDecl,
-                                                 subscript->getIndicesType()));
-      }
-    });
-
-  // return (buffer, callback)
-  Expr *result = new (ctx) DeclRefExpr(bufferDecl, SourceLoc(), IsImplicit);
-
-  result = buildMaterializeForSetResult(ctx, result, callback);
-  body.push_back(new (ctx) ReturnStmt(SourceLoc(), result, IsImplicit));
-
-  SourceLoc loc = storage->getLoc();
-  materializeForSet->setBody(BraceStmt::create(ctx, loc, body, loc, true));
-
-  // Mark it transparent, there is no user benefit to this actually existing.
-  materializeForSet->getAttrs().add(new (ctx) TransparentAttr(IsImplicit));
-
-  TC.typeCheckDecl(materializeForSet, true);
-  
-  // Register the accessor as an external decl if the storage was imported.
-  if (needsToBeRegisteredAsExternalDecl(storage))
-    TC.Context.addedExternalDecl(materializeForSet);
-}
-
-/// Build a direct call to an addressor from within a
-/// materializeForSet method.
-static Expr *buildCallToAddressor(FuncDecl *materializeForSet,
-                                  AbstractStorageDecl *storage,
-                                  VarDecl *bufferDecl,
-                                  FuncDecl *addressor,
-                                  ASTContext &ctx) {
-  // Build a direct reference to the addressor.
-  Expr *fn;
-
-  // Apply the self argument if applicable.
-  if (auto self = materializeForSet->getImplicitSelfDecl()) {
-    Expr *selfRef = new (ctx) DeclRefExpr(self, SourceLoc(), IsImplicit);
-    // if (addressor->computeSelfType(nullptr)->is<LValueType>()) {
-    //   selfRef = new (ctx) InOutExpr(SourceLoc(), selfRef, Type(), IsImplicit);
-    // }
-
-    ValueDecl *localMembers[] = { addressor };
-    fn = new (ctx) OverloadedMemberRefExpr(selfRef, SourceLoc(),
-                                           ctx.AllocateCopy(localMembers),
-                                           SourceLoc(), IsImplicit, Type(),
-                                           AccessSemantics::DirectToStorage);
-  } else {
-    fn = new (ctx) DeclRefExpr(addressor, SourceLoc(), IsImplicit,
-                               AccessSemantics::DirectToStorage);
-  }
-
-  // Apply the rest of the addressor arguments.
-  Expr *args;
-  if (isa<SubscriptDecl>(storage)) {
-    args = buildSubscriptIndexReference(ctx, materializeForSet);
-  } else {
-    args = TupleExpr::createImplicit(ctx, {}, {});
-  }
-
-  return new (ctx) CallExpr(fn, args, IsImplicit);
-}
-
-/// Given an expression of type UnsafeMutablePointer<T>, create an
-/// expression of type Builtin.RawPointer.
-static Expr *buildUnsafeMutablePointerToRawPointer(Expr *operand,
-                                                   ASTContext &ctx) {
-  // Just directly drill in.
-  NominalTypeDecl *ptrType = ctx.getUnsafeMutablePointerDecl();
-  
-  // If that doesn't work, just bail out; the result probably won't
-  // type-check, but there are worse failure modes for a broken stdlib.
-  if (!ptrType) return operand;
-  auto props = ptrType->getStoredProperties();
-  if (props.begin() == props.end()) return operand;
-
-  auto storageProp = props.front();
-  return new (ctx) MemberRefExpr(operand, SourceLoc(), storageProp,
-                                 SourceRange(), IsImplicit);
-}
-
-/// Synthesize the body of a materializeForSet accessor for an
-/// addressed property.
-static void synthesizeAddressedMaterializeForSet(FuncDecl *materializeForSet,
-                                                 AbstractStorageDecl *storage,
-                                                 VarDecl *bufferDecl,
-                                                 TypeChecker &TC) {
-  ASTContext &ctx = TC.Context;
-
-  SmallVector<ASTNode, 4> body;
-
-  // Call the mutable addressor.
-  auto addressor = storage->getMutableAddressor();
-  Expr *addressorResult = buildCallToAddressor(materializeForSet, storage,
-                                               bufferDecl, addressor, ctx);
-
-  Expr *result;
-  Expr *callback;
-  switch (addressor->getAddressorKind()) {
-  case AddressorKind::NotAddressor:
-    llvm_unreachable("addressor is not an addressor?");
-
-  // If we have an unsafe addressor, this is easy: we just pull out
-  // the raw pointer and use that as the result.
-  case AddressorKind::Unsafe:
-    result = buildUnsafeMutablePointerToRawPointer(addressorResult, ctx);
-    callback = nullptr;
-    break;
-
-  case AddressorKind::Owning:
-  case AddressorKind::NativeOwning:
-  case AddressorKind::NativePinning: {
-    // We need to bind the result to a temporary variable.
-    //   let temporary = addressor(self)(indices)
-    auto tempDecl = new (ctx) VarDecl(/*static*/ false, /*let*/ true,
-                                      SourceLoc(), ctx.getIdentifier("tmp"),
-                                      Type(), materializeForSet);
-    tempDecl->setImplicit(IsImplicit);
-    auto bindingPattern = new (ctx) NamedPattern(tempDecl, IsImplicit);
-    auto bindingDecl = PatternBindingDecl::create(ctx, /*static*/ SourceLoc(),
-                                                  StaticSpellingKind::None,
-                                                  SourceLoc(), bindingPattern,
-                                                  addressorResult,
-                                                  materializeForSet);
-    bindingDecl->setImplicit(IsImplicit);
-    body.push_back(bindingDecl);
-    body.push_back(tempDecl);
-
-    // This should be Builtin.NativePointer or something like it.
-    Type ownerType = [&]() -> Type {
-      switch (addressor->getAddressorKind()){
-      case AddressorKind::NotAddressor:
-      case AddressorKind::Unsafe:
-        llvm_unreachable("filtered out");
-      case AddressorKind::Owning:
-        return ctx.TheUnknownObjectType;
-      case AddressorKind::NativeOwning:
-        return ctx.TheNativeObjectType;
-      case AddressorKind::NativePinning:
-        return OptionalType::get(ctx.TheNativeObjectType);
-      }
-      llvm_unreachable("bad addressor kind");
-    }();
-
-    // Initialize the callback storage with the owner value, which is
-    // the second element of the addressor result.
-    Expr *owner = new (ctx) DeclRefExpr(tempDecl, SourceLoc(), IsImplicit);
-    owner = new (ctx) TupleElementExpr(owner, SourceLoc(), /*field index*/ 1,
-                                       SourceLoc(), Type());
-    owner->setImplicit(IsImplicit);
-    body.push_back(buildInitializeCallbackStorage(materializeForSet, owner,
-                                                  ownerType, ctx));
-
-    // The result is the first element of the addressor result.
-    result = new (ctx) DeclRefExpr(tempDecl, SourceLoc(), IsImplicit);
-    result = new (ctx) TupleElementExpr(result, SourceLoc(), /*field index*/ 0,
-                                        SourceLoc(), Type());
-    result->setImplicit(IsImplicit);
-    result = buildUnsafeMutablePointerToRawPointer(result, ctx);
-
-    // Build the callback.
-    callback = buildMaterializeForSetCallback(ctx, materializeForSet, storage,
-      [&](SmallVectorImpl<ASTNode> &body, VarDecl *selfDecl,
-          VarDecl *bufferDecl, VarDecl *callbackStorageDecl) {
-      // Pull the owner out of callback storage.
-      Expr *owner =
-        buildTakeFromCallbackStorage(callbackStorageDecl, ownerType, ctx);
-
-      // For an owning addressor, we can just drop the value we pulled out.
-      if (addressor->getAddressorKind() != AddressorKind::NativePinning) {
-        body.push_back(owner);
-
-      // For a pinning addressor, we have to unpin it.
-      } else {
-        Expr *unpin = buildCallToBuiltin(ctx, "unpin", { owner });
-        body.push_back(unpin);
-      }
-
-      // This should always be a no-op, but do it for the sake of formalism.
-      // Builtin.deallocValueBuffer(&callbackStorage, OwnerType.self)
-      body.push_back(buildValueBufferOperation(ctx, "deallocValueBuffer",
-                                               callbackStorageDecl,
-                                               ownerType));
-    });
-    break;
-  }
-  }
-
-  // return (buffer, callback)
-  result = buildMaterializeForSetResult(ctx, result, callback);
-  body.push_back(new (ctx) ReturnStmt(SourceLoc(), result, IsImplicit));
-
-  SourceLoc loc = storage->getLoc();
-  materializeForSet->setBody(BraceStmt::create(ctx, loc, body, loc));
-
-  // Mark it transparent, there is no user benefit to this actually existing.
-  materializeForSet->getAttrs().add(new (ctx) TransparentAttr(IsImplicit));
-
-  TC.typeCheckDecl(materializeForSet, true);
-  
-  // Register the accessor as an external decl if the storage was imported.
-  if (needsToBeRegisteredAsExternalDecl(storage))
-    TC.Context.addedExternalDecl(materializeForSet);
-}
-
 void swift::synthesizeMaterializeForSet(FuncDecl *materializeForSet,
                                         AbstractStorageDecl *storage,
                                         TypeChecker &TC) {
-  VarDecl *bufferDecl = getFirstParamDecl(materializeForSet);
+  // The body is actually emitted by SILGen
 
-  switch (storage->getStorageKind()) {
-  case AbstractStorageDecl::Stored:
-  case AbstractStorageDecl::Addressed:
-    llvm_unreachable("no accessors");
+  maybeMarkTransparent(materializeForSet, storage, TC);
 
-  // We can use direct access to stored variables, but not if they're
-  // weak, unowned, or dynamic.
-  case AbstractStorageDecl::StoredWithTrivialAccessors: {
-    // Only variables can be Stored, and only variables can be weak/unowned.
-    auto var = cast<VarDecl>(storage);
-    if (var->getType()->is<ReferenceStorageType>()
-        || needsDynamicMaterializeForSet(var)) {
-      synthesizeComputedMaterializeForSet(materializeForSet, storage,
-                                          bufferDecl, TC);
-      return;
-    }
-
-    synthesizeStoredMaterializeForSet(materializeForSet, storage,
-                                      bufferDecl, TC);
-    return;
-  }
-
-  // We should access these by calling mutableAddress.
-  case AbstractStorageDecl::AddressedWithTrivialAccessors:
-  case AbstractStorageDecl::ComputedWithMutableAddress:
-    synthesizeAddressedMaterializeForSet(materializeForSet, storage,
-                                         bufferDecl, TC);
-    return;
-
-  // These must be accessed with a getter/setter pair.
-  // TODO: StoredWithObservers and AddressedWithObservers could be
-  // made to work with the callback as long as there isn't a willSet.
-  case AbstractStorageDecl::StoredWithObservers:
-  case AbstractStorageDecl::InheritedWithObservers:
-  case AbstractStorageDecl::AddressedWithObservers:
-  case AbstractStorageDecl::Computed:
-    synthesizeComputedMaterializeForSet(materializeForSet, storage,
-                                        bufferDecl, TC);
-    return;
-  }
-  llvm_unreachable("bad abstract storage kind");
+  TC.typeCheckDecl(materializeForSet, true);
+  
+  // Register the accessor as an external decl if the storage was imported.
+  if (needsToBeRegisteredAsExternalDecl(storage))
+    TC.Context.addExternalDecl(materializeForSet);
 }
 
 /// Given a VarDecl with a willSet: and/or didSet: specifier, synthesize the
@@ -1415,7 +932,7 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
   // decls for 'self' and 'value'.
   auto *Set = VD->getSetter();
   auto *SelfDecl = Set->getImplicitSelfDecl();
-  VarDecl *ValueDecl = Set->getParameterLists().back()->get(0).decl;
+  VarDecl *ValueDecl = Set->getParameterLists().back()->get(0);
 
   // The setter loads the oldValue, invokes willSet with the incoming value,
   // does a direct store, then invokes didSet with the oldValue.
@@ -1451,10 +968,12 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
   // or:
   //   (call_expr (decl_ref_expr(willSet)), (declrefexpr(value)))
   if (auto willSet = VD->getWillSetFunc()) {
-    Expr *Callee = new (Ctx) DeclRefExpr(willSet, SourceLoc(), /*imp*/true);
-    auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, SourceLoc(), /*imp*/true);
+    Expr *Callee = new (Ctx) DeclRefExpr(willSet, DeclNameLoc(), /*imp*/true);
+    auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, DeclNameLoc(),
+                                           /*imp*/true);
     if (SelfDecl) {
-      auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(), /*imp*/true);
+      auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, DeclNameLoc(),
+                                            /*imp*/true);
       Callee = new (Ctx) DotSyntaxCallExpr(Callee, SourceLoc(), SelfDRE);
     }
     SetterBody.push_back(new (Ctx) CallExpr(Callee, ValueDRE, true));
@@ -1466,7 +985,7 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
   }
   
   // Create an assignment into the storage or call to superclass setter.
-  auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, SourceLoc(), true);
+  auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, DeclNameLoc(), true);
   createPropertyStoreOrCallSuperclassSetter(Set, ValueDRE, VD, SetterBody, TC);
 
   // Create:
@@ -1476,11 +995,12 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
   // or:
   //   (call_expr (decl_ref_expr(didSet)), (decl_ref_expr(tmp)))
   if (auto didSet = VD->getDidSetFunc()) {
-    auto *OldValueExpr = new (Ctx) DeclRefExpr(OldValue, SourceLoc(),
+    auto *OldValueExpr = new (Ctx) DeclRefExpr(OldValue, DeclNameLoc(),
                                                /*impl*/true);
-    Expr *Callee = new (Ctx) DeclRefExpr(didSet, SourceLoc(), /*imp*/true);
+    Expr *Callee = new (Ctx) DeclRefExpr(didSet, DeclNameLoc(), /*imp*/true);
     if (SelfDecl) {
-      auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(), /*imp*/true);
+      auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, DeclNameLoc(),
+                                            /*imp*/true);
       Callee = new (Ctx) DotSyntaxCallExpr(Callee, SourceLoc(), SelfDRE);
     }
     SetterBody.push_back(new (Ctx) CallExpr(Callee, OldValueExpr, true));
@@ -1591,14 +1111,14 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   Body.push_back(Tmp1VD);
 
   // Build the early return inside the if.
-  auto *Tmp1DRE = new (Ctx) DeclRefExpr(Tmp1VD, SourceLoc(), /*Implicit*/true,
+  auto *Tmp1DRE = new (Ctx) DeclRefExpr(Tmp1VD, DeclNameLoc(), /*Implicit*/true,
                                         AccessSemantics::DirectToStorage);
   auto *EarlyReturnVal = new (Ctx) ForceValueExpr(Tmp1DRE, SourceLoc());
   auto *Return = new (Ctx) ReturnStmt(SourceLoc(), EarlyReturnVal,
                                       /*implicit*/true);
 
   // Build the "if" around the early return.
-  Tmp1DRE = new (Ctx) DeclRefExpr(Tmp1VD, SourceLoc(), /*Implicit*/true,
+  Tmp1DRE = new (Ctx) DeclRefExpr(Tmp1VD, DeclNameLoc(), /*Implicit*/true,
                                   AccessSemantics::DirectToStorage);
   
   // Call through "hasValue" on the decl ref.
@@ -1647,12 +1167,12 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   Body.push_back(Tmp2VD);
 
   // Assign tmp2 into storage.
-  auto Tmp2DRE = new (Ctx) DeclRefExpr(Tmp2VD, SourceLoc(), /*Implicit*/true,
+  auto Tmp2DRE = new (Ctx) DeclRefExpr(Tmp2VD, DeclNameLoc(), /*Implicit*/true,
                                        AccessSemantics::DirectToStorage);
   createPropertyStoreOrCallSuperclassSetter(Get, Tmp2DRE, Storage, Body, TC);
 
   // Return tmp2.
-  Tmp2DRE = new (Ctx) DeclRefExpr(Tmp2VD, SourceLoc(), /*Implicit*/true,
+  Tmp2DRE = new (Ctx) DeclRefExpr(Tmp2VD, DeclNameLoc(), /*Implicit*/true,
                                   AccessSemantics::DirectToStorage);
 
   Body.push_back(new (Ctx) ReturnStmt(SourceLoc(), Tmp2DRE, /*implicit*/true));
@@ -1764,20 +1284,34 @@ void swift::maybeAddMaterializeForSet(AbstractStorageDecl *storage,
         return;
     }
 
-  // Structs and enums don't need this.
-  } else {
-    assert(isa<StructDecl>(container) || isa<EnumDecl>(container));
+  // Enums don't need this.
+  } else if (isa<EnumDecl>(container)) {
     return;
+
+  // Structs imported by Clang don't need this, because we can
+  // synthesize it later.
+  } else {
+    assert(isa<StructDecl>(container));
+    if (container->hasClangNode())
+      return;
   }
 
   addMaterializeForSet(storage, TC);
 }
 
 void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
-  if (var->getGetter() || var->isBeingTypeChecked() || isa<ParamDecl>(var))
+  // If we've already synthesized accessors or are currently in the process
+  // of doing so, don't proceed.
+  if (var->getGetter() || var->isBeingTypeChecked())
     return;
 
-  // Lazy properties get accessors.
+  // Local variables don't get accessors.
+  if (var->getDeclContext()->isLocalContext())
+    return;
+
+  assert(!var->hasAccessorFunctions());
+
+  // Lazy properties require special handling.
   if (var->getAttrs().hasAttribute<LazyAttr>()) {
     var->setIsBeingTypeChecked();
 
@@ -1799,41 +1333,47 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
     addMemberToContextIfNeeded(getter, var->getDeclContext());
     addMemberToContextIfNeeded(setter, var->getDeclContext());
     return;
-
   }
-  // Stored properties in SIL mode don't get auto-synthesized accessors.
-  bool isInSILMode = false;
-  if (auto sourceFile = var->getDeclContext()->getParentSourceFile())
-    isInSILMode = sourceFile->Kind == SourceFileKind::SIL;
 
-  auto nominal = var->getDeclContext()->isNominalTypeOrNominalTypeExtensionContext();
-  if (var->hasAccessorFunctions() ||
-      var->isImplicit() ||
-      nominal == nullptr)
+  // Implicit properties don't get accessors.
+  if (var->isImplicit())
     return;
 
-  // Non-NSManaged class instance variables get accessors, because it affects
-  // vtable layout.
-  if (isa<ClassDecl>(nominal)) {
+  auto nominal = var->getDeclContext()->isNominalTypeOrNominalTypeExtensionContext();
+  if (!nominal) {
+    // Fixed-layout global variables don't get accessors.
+    if (var->hasFixedLayout())
+      return;
+
+  // Stored properties in protocols are converted to computed
+  // elsewhere.
+  } else if (isa<ProtocolDecl>(nominal)) {
+    return;
+
+  // NSManaged properties on classes require special handling.
+  } else if (isa<ClassDecl>(nominal)) {
     if (var->getAttrs().hasAttribute<NSManagedAttr>()) {
       var->setIsBeingTypeChecked();
       convertNSManagedStoredVarToComputed(var, TC);
       var->setIsBeingTypeChecked(false);
-    } else if (!isInSILMode) {
-      var->setIsBeingTypeChecked();
-      addTrivialAccessorsToStorage(var, TC);
-      var->setIsBeingTypeChecked(false);
+      return;
     }
+
+  // Stored properties imported from Clang don't get accessors.
+  } else if (isa<StructDecl>(nominal)) {
+    if (nominal->hasClangNode())
+      return;
   }
 
-  // Public instance variables of resilient structs get accessors.
-  if (auto structDecl = dyn_cast<StructDecl>(nominal)) {
-    if (!structDecl->hasFixedLayout() && !isInSILMode) {
-      var->setIsBeingTypeChecked();
-      addTrivialAccessorsToStorage(var, TC);
-      var->setIsBeingTypeChecked(false);
-    }
-  }
+  // Stored properties in SIL mode don't get accessors.
+  if (auto sourceFile = var->getDeclContext()->getParentSourceFile())
+    if (sourceFile->Kind == SourceFileKind::SIL)
+      return;
+
+  // Everything else gets accessors.
+  var->setIsBeingTypeChecked();
+  addTrivialAccessorsToStorage(var, TC);
+  var->setIsBeingTypeChecked(false);
 }
 
 /// \brief Create an implicit struct or class constructor.
@@ -1853,7 +1393,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
     accessLevel = std::min(accessLevel, Accessibility::Internal);
 
   // Determine the parameter type of the implicit constructor.
-  SmallVector<Parameter, 8> params;
+  SmallVector<ParamDecl*, 8> params;
   if (ICK == ImplicitConstructorKind::Memberwise) {
     assert(isa<StructDecl>(decl) && "Only struct have memberwise constructor");
 
@@ -1885,7 +1425,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       auto *arg = new (context) ParamDecl(/*IsLet*/true, Loc, var->getName(),
                                           Loc, var->getName(), varType, decl);
       arg->setImplicit();
-      params.push_back(Parameter::withoutLoc(arg));
+      params.push_back(arg);
     }
   }
 
@@ -1920,7 +1460,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
   // If the struct in which this constructor is being added was imported,
   // add it as an external definition.
   if (decl->hasClangNode()) {
-    tc.Context.addedExternalDecl(ctor);
+    tc.Context.addExternalDecl(ctor);
   }
 
   return ctor;
@@ -1937,7 +1477,8 @@ static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
 
   // Create a call to Swift._unimplemented_initializer
   auto loc = classDecl->getLoc();
-  Expr *fn = new (tc.Context) DeclRefExpr(unimplementedInitDecl, loc,
+  Expr *fn = new (tc.Context) DeclRefExpr(unimplementedInitDecl,
+                                          DeclNameLoc(loc),
                                           /*Implicit=*/true);
 
   llvm::SmallString<64> buffer;
@@ -2036,10 +1577,10 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   // Reference to super.init.
   Expr *superRef = new (ctx) SuperRefExpr(selfDecl, SourceLoc(),
                                           /*Implicit=*/true);
-  Expr *ctorRef  = new (ctx) UnresolvedConstructorExpr(superRef,
-                                                       SourceLoc(),
-                                                       SourceLoc(),
-                                                       /*Implicit=*/true);
+  Expr *ctorRef  = new (ctx) UnresolvedDotExpr(superRef, SourceLoc(),
+                                               superclassCtor->getFullName(),
+                                               DeclNameLoc(),
+                                               /*Implicit=*/true);
 
   auto ctorArgs = buildArgumentForwardingExpr(bodyParams->getArray(), ctx);
 

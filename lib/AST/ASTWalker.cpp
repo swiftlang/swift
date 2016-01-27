@@ -56,7 +56,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ExprHandle.h"
-#include "swift/AST/Parameter.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 using namespace swift;
 
@@ -123,10 +123,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return inherited::visit(PL);
   }
   
-  bool visit(Parameter &P) {
-    return inherited::visit(P);
-  }
-
   //===--------------------------------------------------------------------===//
   //                                 Decls
   //===--------------------------------------------------------------------===//
@@ -237,8 +233,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 #ifndef NDEBUG
     PrettyStackTraceDecl debugStack("walking into body of", AFD);
 #endif
-    if (Walker.shouldWalkIntoFunctionGenericParams() &&
-        AFD->getGenericParams()) {
+    if (AFD->getGenericParams() &&
+        Walker.shouldWalkIntoFunctionGenericParams()) {
 
       // Visit generic params
       for (auto &P : AFD->getGenericParams()->getParams()) {
@@ -253,15 +249,13 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       // Visit param conformance
       for (auto &Req : AFD->getGenericParams()->getRequirements()) {
         switch (Req.getKind()) {
-        case RequirementKind::SameType:
+        case RequirementReprKind::SameType:
           if (doIt(Req.getFirstTypeLoc()) || doIt(Req.getSecondTypeLoc()))
             return true;
           break;
-        case RequirementKind::Conformance:
-          if (doIt(Req.getSubjectLoc()))
+        case RequirementReprKind::TypeConstraint:
+          if (doIt(Req.getSubjectLoc()) || doIt(Req.getConstraintLoc()))
             return true;
-          break;
-        case RequirementKind::WitnessMarker:
           break;
         }
       }
@@ -350,15 +344,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   Expr *visitSuperRefExpr(SuperRefExpr *E) { return E; }
   Expr *visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E) {
     return E;
-  }
-  
-  Expr *visitUnresolvedConstructorExpr(UnresolvedConstructorExpr *E) {
-    if (auto sub = doIt(E->getSubExpr())) {
-      E->setSubExpr(sub);
-      return E;
-    }
-    
-    return nullptr;
   }
   
   Expr *visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *E) { return E; }
@@ -499,16 +484,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
   Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
-    if (!E->getBase())
-      return E;
-    
-    if (Expr *E2 = doIt(E->getBase())) {
-      E->setBase(E2);
-      return E;
-    }
-    return nullptr;
-  }
-  Expr *visitUnresolvedSelectorExpr(UnresolvedSelectorExpr *E) {
     if (!E->getBase())
       return E;
     
@@ -828,6 +803,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
+  Expr *visitObjCSelectorExpr(ObjCSelectorExpr *E) {
+    Expr *sub = doIt(E->getSubExpr());
+    if (!sub) return nullptr;
+
+    E->setSubExpr(sub);
+    return E;
+  }
+
   //===--------------------------------------------------------------------===//
   //                           Everything Else
   //===--------------------------------------------------------------------===//
@@ -845,18 +828,18 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     if (!Walker.walkToParameterListPre(PL))
       return false;
     
-    for (auto &P : *PL) {
+    for (auto P : *PL) {
       // Walk each parameter's decl and typeloc and default value.
-      if (doIt(P.decl))
+      if (doIt(P))
         return true;
       
       // Don't walk into the type if the decl is implicit, or if the type is
       // implicit.
-      if (!P.decl->isImplicit() && !P.decl->isTypeLocImplicit() &&
-          doIt(P.decl->getTypeLoc()))
+      if (!P->isImplicit() && !P->isTypeLocImplicit() &&
+          doIt(P->getTypeLoc()))
         return true;
       
-      if (auto *E = P.getDefaultValue()) {
+      if (auto *E = P->getDefaultValue()) {
         auto res = doIt(E->getExpr());
         if (!res) return true;
         E->setExpr(res, E->alreadyChecked());

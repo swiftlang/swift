@@ -46,7 +46,7 @@ func testAmbiguousStringComparisons(s: String) {
 func acceptsSequence<S : SequenceType>(sequence: S) {}
 
 func testStringIsNotASequence(s: String) {
-  acceptsSequence(s) // expected-error {{cannot invoke 'acceptsSequence' with an argument list of type '(String)'}} expected-note {{expected an argument list of type '(S)'}}
+  acceptsSequence(s) // expected-error {{argument type 'String' does not conform to expected type 'SequenceType'}}
 }
 
 func testStringDeprecation(hello: String) {

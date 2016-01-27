@@ -91,7 +91,7 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
 
     elements.push_back(
       emitImplicitValueConstructorArg(gen, Loc,
-                                      param.decl->getType()->getCanonicalType(),
+                                      param->getType()->getCanonicalType(),
                                       ctor));
   }
 
@@ -300,7 +300,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
       case OTK_ImplicitlyUnwrappedOptional:
         returnAddress = B.createInitEnumDataAddr(ctor, IndirectReturnAddress,
                  getASTContext().getOptionalSomeDecl(ctor->getFailability()),
-                                                 selfLV.getType());
+                                                 selfLV->getType());
         break;
       }
       
@@ -453,7 +453,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     // When using Objective-C allocation, convert the metatype
     // argument to an Objective-C metatype.
     if (useObjCAllocation) {
-      auto metaTy = allocArg.getType().castTo<MetatypeType>();
+      auto metaTy = allocArg->getType().castTo<MetatypeType>();
       metaTy = CanMetatypeType::get(metaTy.getInstanceType(),
                                     MetatypeRepresentation::ObjC);
       allocArg = B.createThickToObjCMetatype(Loc, allocArg,

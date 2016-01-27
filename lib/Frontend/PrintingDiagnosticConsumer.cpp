@@ -1,4 +1,4 @@
-//===- PrintingDiagnosticConsumer.cpp - Print Text Diagnostics ------------===//
+//===--- PrintingDiagnosticConsumer.cpp - Print Text Diagnostics ----------===//
 //
 // This source file is part of the Swift.org open source project
 //

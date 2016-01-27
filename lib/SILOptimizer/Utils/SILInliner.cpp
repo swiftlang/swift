@@ -1,4 +1,4 @@
-//===--- SILInliner.cpp - Inlines SIL functions ----------------------------==//
+//===--- SILInliner.cpp - Inlines SIL functions ---------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -112,7 +112,7 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
     if (ReturnInst *RI = dyn_cast<ReturnInst>(CalleeEntryBB->getTerminator())) {
       // Replace all uses of the apply instruction with the operands of the
       // return instruction, appropriately mapped.
-      SILValue(nonTryAI).replaceAllUsesWith(remapValue(RI->getOperand()));
+      nonTryAI->replaceAllUsesWith(remapValue(RI->getOperand()));
       return true;
     }
   }
@@ -137,10 +137,10 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
                            SILFunction::iterator(ReturnToBB));
 
     // Create an argument on the return-to BB representing the returned value.
-    SILValue RetArg = new (F.getModule()) SILArgument(ReturnToBB,
-                                            AI.getInstruction()->getType(0));
+    auto *RetArg = new (F.getModule()) SILArgument(ReturnToBB,
+                                            AI.getInstruction()->getType());
     // Replace all uses of the ApplyInst with the new argument.
-    SILValue(AI.getInstruction()).replaceAllUsesWith(RetArg);
+    AI.getInstruction()->replaceAllUsesWith(RetArg);
   }
 
   // Now iterate over the callee BBs and fix up the terminators.
@@ -228,6 +228,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::FixLifetimeInst:
     case ValueKind::MarkDependenceInst:
     case ValueKind::FunctionRefInst:
+    case ValueKind::AllocGlobalInst:
     case ValueKind::GlobalAddrInst:
       return InlineCost::Free;
 
@@ -280,7 +281,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
 
     case ValueKind::MetatypeInst:
       // Thin metatypes are always free.
-      if (I.getType(0).castTo<MetatypeType>()->getRepresentation()
+      if (I.getType().castTo<MetatypeType>()->getRepresentation()
             == MetatypeRepresentation::Thin)
         return InlineCost::Free;
       // TODO: Thick metatypes are free if they don't require generic or lazy
@@ -332,6 +333,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::DestroyAddrInst:
     case ValueKind::ProjectValueBufferInst:
     case ValueKind::ProjectBoxInst:
+    case ValueKind::ProjectExistentialBoxInst:
     case ValueKind::ReleaseValueInst:
     case ValueKind::AutoreleaseValueInst:
     case ValueKind::DynamicMethodBranchInst:

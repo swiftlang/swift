@@ -1,4 +1,4 @@
-//===- DiagnosticConsumer.h - Diagnostic Consumer Interface -----*- C++ -*-===//
+//===--- DiagnosticConsumer.h - Diagnostic Consumer Interface ---*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -28,7 +28,7 @@ namespace swift {
 
 /// \brief Describes the kind of diagnostic.
 ///
-enum class DiagnosticKind {
+enum class DiagnosticKind : uint8_t {
   Error,
   Warning,
   Note

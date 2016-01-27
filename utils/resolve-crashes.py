@@ -2,7 +2,7 @@
 
 # A small utility to take the output of a Swift validation test run
 # where some compiler crashers have been fixed, and move them into the
-# "fixed" testsuite, removing the "--crash" in the process. 
+# "fixed" testsuite, removing the "--crash" in the process.
 
 import re
 import sys
@@ -19,8 +19,8 @@ regex = re.compile('.*Swift :: compiler_crashers(|_2)/(.*\.swift).*')
 for line in sys.stdin:
     match = regex.match(line)
     if match:
-        suffix=match.group(1)
-        filename=match.group(2)
+        suffix = match.group(1)
+        filename = match.group(2)
 
         # Move the test over to the fixed suite.
         from_filename = 'validation-test/compiler_crashers%s/%s' % (suffix, filename)

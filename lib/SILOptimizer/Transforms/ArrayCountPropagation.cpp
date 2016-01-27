@@ -1,4 +1,4 @@
-//===------ ArrayCountPropagation.cpp - Propagate the count of arrays -----===//
+//===--- ArrayCountPropagation.cpp - Propagate the count of arrays --------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -114,7 +114,7 @@ bool ArrayAllocation::isInitializationWithKnownCount() {
 /// Collect all getCount users and check that there are no escapes or uses that
 /// could change the array value.
 bool ArrayAllocation::analyseArrayValueUses() {
-  return recursivelyCollectUses(ArrayValue.getDef());
+  return recursivelyCollectUses(ArrayValue);
 }
 
 static bool doesNotChangeArrayCount(ArraySemanticsCall &C) {
@@ -169,7 +169,7 @@ bool ArrayAllocation::propagateCountToUsers() {
 
     SmallVector<Operand *, 16> Uses;
     for (auto *Op : Count->getUses()) {
-      if (Op->get().getType() == ArrayCount.getType()) {
+      if (Op->get()->getType() == ArrayCount->getType()) {
         Uses.push_back(Op);
       }
     }

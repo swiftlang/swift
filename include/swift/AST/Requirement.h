@@ -28,6 +28,10 @@ enum class RequirementKind : unsigned int {
   /// A conformance requirement T : P, where T is a type that depends
   /// on a generic parameter and P is a protocol to which T must conform.
   Conformance,
+  /// A superclass requirement T : C, where T is a type that depends
+  /// on a generic parameter and C is a concrete class type which T must
+  /// equal or be a subclass of.
+  Superclass,
   /// A same-type requirement T == U, where T and U are types that shall be
   /// equivalent.
   SameType,

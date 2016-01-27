@@ -25,9 +25,9 @@
 #include "llvm/ADT/MapVector.h"
 using namespace swift;
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Diagnose assigning variable to itself.
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 static Decl *findSimpleReferencedDecl(const Expr *E) {
   if (auto *LE = dyn_cast<LoadExpr>(E))
@@ -437,8 +437,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
             isa<SelfApplyExpr>(ParentExpr) ||             // T.foo()  T()
             isa<UnresolvedDotExpr>(ParentExpr) ||
             isa<DotSyntaxBaseIgnoredExpr>(ParentExpr) ||
-            isa<UnresolvedConstructorExpr>(ParentExpr) ||
-            isa<UnresolvedSelectorExpr>(ParentExpr) ||
             isa<UnresolvedSpecializeExpr>(ParentExpr) ||
             isa<OpenExistentialExpr>(ParentExpr)) {
           return;
@@ -490,7 +488,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       TC.diagnose(DRE->getLoc(), diag::warn_unqualified_access,
                   VD->getName(), VD->getDescriptiveKind(),
                   declParent->getDescriptiveKind(), declParent->getFullName());
-      TC.diagnose(VD, diag::decl_declared_here, VD->getName());
+      TC.diagnose(VD, diag::decl_declared_here, VD->getFullName());
 
       if (VD->getDeclContext()->isTypeContext()) {
         TC.diagnose(DRE->getLoc(), diag::fix_unqualified_access_member)
@@ -771,9 +769,9 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
   const_cast<Expr *>(E)->walk(DiagnoseWalker(TC, isAlreadyInClosure));
 }
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Diagnose availability.
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted=".
@@ -903,9 +901,11 @@ public:
       return skipChildren();
     }
     if (auto OCDR = dyn_cast<OtherConstructorDeclRefExpr>(E))
-      diagAvailability(OCDR->getDecl(), OCDR->getConstructorLoc());
+      diagAvailability(OCDR->getDecl(),
+                       OCDR->getConstructorLoc().getSourceRange());
     if (auto DMR = dyn_cast<DynamicMemberRefExpr>(E))
-      diagAvailability(DMR->getMember().getDecl(), DMR->getNameLoc());
+      diagAvailability(DMR->getMember().getDecl(),
+                       DMR->getNameLoc().getSourceRange());
     if (auto DS = dyn_cast<DynamicSubscriptExpr>(E))
       diagAvailability(DS->getMember().getDecl(), DS->getSourceRange());
     if (auto S = dyn_cast<SubscriptExpr>(E)) {
@@ -968,7 +968,7 @@ private:
 
     ValueDecl *D = E->getMember().getDecl();
     // Diagnose for the member declaration itself.
-    if (diagAvailability(D, E->getNameLoc()))
+    if (diagAvailability(D, E->getNameLoc().getSourceRange()))
       return;
 
     if (TC.getLangOpts().DisableAvailabilityChecking)
@@ -1156,9 +1156,9 @@ static void diagAvailability(TypeChecker &TC, const Expr *E,
   const_cast<Expr*>(E)->walk(walker);
 }
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Per func/init diagnostics
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 namespace {
 class VarDeclUsageChecker : public ASTWalker {
@@ -1194,9 +1194,9 @@ public:
   VarDeclUsageChecker(TypeChecker &TC, AbstractFunctionDecl *AFD) : TC(TC) {
     // Track the parameters of the function.
     for (auto PL : AFD->getParameterLists())
-      for (auto &param : *PL)
-        if (shouldTrackVarDecl(param.decl))
-          VarDecls[param.decl] = 0;
+      for (auto param : *PL)
+        if (shouldTrackVarDecl(param))
+          VarDecls[param] = 0;
     
   }
     
@@ -1820,14 +1820,15 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
   SourceLoc endOfIncrementLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr, FS->getIncrement().getPtrOrNull()->getEndLoc());
     
   diagnostic
+   .fixItRemoveChars(loopVarDecl->getLoc(), loopVar->getLoc())
    .fixItReplaceChars(loopPatternEnd, startValue->getStartLoc(), " in ")
    .fixItReplaceChars(FS->getFirstSemicolonLoc(), endValue->getStartLoc(), " ..< ")
    .fixItRemoveChars(FS->getSecondSemicolonLoc(), endOfIncrementLoc);
 }
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // High-level entry points.
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 /// \brief Emit diagnostics for syntactic restrictions on a given expression.
 void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
@@ -1847,9 +1848,9 @@ void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
     checkCStyleForLoop(TC, forStmt);
 }
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Utility functions
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 void swift::fixItAccessibility(InFlightDiagnostic &diag, ValueDecl *VD,
                                Accessibility desiredAccess, bool isForSetter) {
@@ -2045,22 +2046,13 @@ static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
 
   // String'ify the parameter types.
   SmallVector<OmissionTypeName, 4> paramTypes;
-  Type functionType = afd->getInterfaceType();
-  Type argumentType;
-  for (unsigned i = 0, n = afd->getNaturalArgumentCount()-1; i != n; ++i)
-    functionType = functionType->getAs<AnyFunctionType>()->getResult();
-  argumentType = functionType->getAs<AnyFunctionType>()->getInput();
-  if (auto tupleTy = argumentType->getAs<TupleType>()) {
-    if (tupleTy->getNumElements() == argNameStrs.size()) {
-      for (const auto &elt : tupleTy->getElements())
-        paramTypes.push_back(getTypeNameForOmission(elt.getType())
-                               .withDefaultArgument(elt.hasDefaultArg()));
-    }
+
+  // Always look at the parameters in the last parameter list.
+  for (auto param : *afd->getParameterLists().back()) {
+    paramTypes.push_back(getTypeNameForOmission(param->getType())
+                         .withDefaultArgument(param->isDefaultArgument()));
   }
-
-  if (argNameStrs.size() == 1 && paramTypes.empty())
-    paramTypes.push_back(getTypeNameForOmission(argumentType));
-
+  
   // Handle contextual type, result type, and returnsSelf.
   Type contextType = afd->getDeclContext()->getDeclaredInterfaceType();
   Type resultType;
@@ -2077,8 +2069,8 @@ static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
   // Figure out the first parameter name.
   StringRef firstParamName;
   auto params = afd->getParameterList(afd->getImplicitSelfDecl() ? 1 : 0);
-  if (params->size() != 0)
-    firstParamName = params->get(0).decl->getName().str();
+  if (params->size() != 0 && !params->get(0)->getName().empty())
+    firstParamName = params->get(0)->getName().str();
 
   // Find the set of property names.
   const InheritedNameSet *allPropertyNames = nullptr;
@@ -2191,49 +2183,6 @@ void TypeChecker::checkOmitNeedlessWords(VarDecl *var) {
     .fixItReplace(var->getLoc(), newName->str());
 }
 
-/// Determine the "fake" default argument provided by the given expression.
-static Optional<StringRef> getDefaultArgForExpr(Expr *expr) {
-  // Empty array literals, [].
-  if (auto arrayExpr = dyn_cast<ArrayExpr>(expr)) {
-    if (arrayExpr->getElements().empty())
-      return StringRef("[]");
-
-    return None;
-  }
-
-  // nil.
-  if (auto call = dyn_cast<CallExpr>(expr)) {
-    if (auto ctorRefCall = dyn_cast<ConstructorRefCallExpr>(call->getFn())) {
-      if (auto ctorRef = dyn_cast<DeclRefExpr>(ctorRefCall->getFn())) {
-        if (auto ctor = dyn_cast<ConstructorDecl>(ctorRef->getDecl())) {
-          if (ctor->getFullName().getArgumentNames().size() == 1 &&
-              ctor->getFullName().getArgumentNames()[0]
-                == ctor->getASTContext().Id_nilLiteral)
-            return StringRef("nil");
-        }
-      }
-    }
-  }
-
-  return None;
-}
-
-namespace {
-  struct CallEdit {
-    enum {
-      RemoveDefaultArg,
-      Rename,
-    } Kind;
-
-    // The source range affected by this change.
-    SourceRange Range;
-
-    // The replacement text, for a rename.
-    std::string Name;
-  };
-
-}
-
 /// Find the source ranges of extraneous default arguments within a
 /// call to the given function.
 static bool hasExtraneousDefaultArguments(AbstractFunctionDecl *afd,
@@ -2269,11 +2218,11 @@ static bool hasExtraneousDefaultArguments(AbstractFunctionDecl *afd,
   }
 
   for (unsigned i = 0; i != numElementsInParens; ++i) {
-    auto &param = bodyParams->get(i);
-    if (!param.decl->isDefaultArgument())
+    auto param = bodyParams->get(i);
+    if (!param->isDefaultArgument())
       continue;
 
-    auto defaultArg = param.decl->getType()->getInferredDefaultArgString();
+    auto defaultArg = param->getDefaultArgumentKind();
 
     // Never consider removing the first argument for a "set" method
     // with an unnamed first argument.
@@ -2286,9 +2235,9 @@ static bool hasExtraneousDefaultArguments(AbstractFunctionDecl *afd,
 
     SourceRange removalRange;
     if (argTuple && i < argTuple->getNumElements()) {
-      // Check whether we have a default argument.
-      auto exprArg = getDefaultArgForExpr(argTuple->getElement(i));
-      if (!exprArg || defaultArg != *exprArg)
+      // Check whether the supplied argument is the same as the
+      // default argument.
+      if (defaultArg != inferDefaultArgumentKind(argTuple->getElement(i)))
         continue;
 
       // Figure out where to start removing this argument.
@@ -2324,8 +2273,7 @@ static bool hasExtraneousDefaultArguments(AbstractFunctionDecl *afd,
       }
     } else if (argParen) {
       // Check whether we have a default argument.
-      auto exprArg = getDefaultArgForExpr(argParen->getSubExpr());
-      if (!exprArg || defaultArg != *exprArg)
+      if (defaultArg != inferDefaultArgumentKind(argParen->getSubExpr()))
         continue;
 
       removalRange = SourceRange(argParen->getSubExpr()->getStartLoc(),
@@ -2509,5 +2457,5 @@ void TypeChecker::checkOmitNeedlessWords(MemberRefExpr *memberRef) {
   // Fix the name.
   auto name = var->getName();
   diagnose(memberRef->getNameLoc(), diag::omit_needless_words, name, *newName)
-    .fixItReplace(memberRef->getNameLoc(), newName->str());
+    .fixItReplace(memberRef->getNameLoc().getSourceRange(), newName->str());
 }

@@ -132,7 +132,8 @@ Array
 The following semantic tags describe Array operations. The operations
 are first described in terms of the Array "state". Relations between the
 operations are formally defined below. 'Array' refers to the standard library
-Array<T>, ContiguousArray<T>, and ArraySlice<T> data-structures.
+Array<Element>, ContiguousArray<Element>, and ArraySlice<Element>
+data-structures.
 
 We consider the array state to consist of a set of disjoint elements
 and a storage descriptor that encapsulates nonelement data such as the
@@ -156,7 +157,7 @@ array.init
   may act as a guard to other potentially mutating operations, such as
   ``get_element_address``.
 
-array.uninitialized(count: Builtin.Word) -> (Array<T>, Builtin.RawPointer)
+array.uninitialized(count: Builtin.Word) -> (Array<Element>, Builtin.RawPointer)
 
   Creates an array with the specified number of elements. It initializes
   the storage descriptor but not the array elements. The returned tuple

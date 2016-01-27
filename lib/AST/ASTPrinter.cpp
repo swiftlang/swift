@@ -1,4 +1,4 @@
-//===--- ASTPrinter.cpp - Swift Language AST Printer---------------------===//
+//===--- ASTPrinter.cpp - Swift Language AST Printer ----------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -23,7 +23,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/Parameter.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeVisitor.h"
@@ -137,8 +137,12 @@ bool ASTPrinter::printTypeInterface(Type Ty, DeclContext *DC,
   Ty = Ty->getRValueType();
   PrintOptions Options = PrintOptions::printTypeInterface(Ty.getPointer(), DC);
    if (auto ND = Ty->getNominalOrBoundGenericNominal()) {
+     llvm::SmallPtrSet<const ExtensionDecl*, 4> AllExts;
+     for (auto Ext : ND->getExtensions()) {
+       AllExts.insert(Ext);
+     }
      Options.printExtensionContentAsMembers = [&](const ExtensionDecl *ED) {
-       return isExtensionApplied(*ND->getDeclContext(), Ty, ED);
+       return AllExts.count(ED) == 1 && isExtensionApplied(*ND->getDeclContext(), Ty, ED);
      };
      ND->print(OS, Options);
      return true;
@@ -215,6 +219,14 @@ ASTPrinter &ASTPrinter::operator<<(UUID UU) {
   llvm::SmallString<UUID::StringBufferSize> Str;
   UU.toString(Str);
   printTextImpl(Str);
+  return *this;
+}
+
+ASTPrinter &ASTPrinter::operator<<(DeclName name) {
+  llvm::SmallString<32> str;
+  llvm::raw_svector_ostream os(str);
+  name.print(os);
+  printTextImpl(os.str());
   return *this;
 }
 
@@ -471,7 +483,7 @@ private:
   /// \returns true if anything was printed.
   bool printASTNodes(const ArrayRef<ASTNode> &Elements, bool NeedIndent = true);
 
-  void printOneParameter(const Parameter &param, bool Curried,
+  void printOneParameter(const ParamDecl *param, bool Curried,
                          bool ArgNameIsAPIByDefault);
 
   void printParameterList(ParameterList *PL, bool isCurried,
@@ -676,8 +688,7 @@ void PrintAST::printWhereClause(ArrayRef<RequirementRepr> requirements) {
 
   bool isFirst = true;
   for (auto &req : requirements) {
-    if (req.isInvalid() ||
-        req.getKind() == RequirementKind::WitnessMarker)
+    if (req.isInvalid())
       continue;
 
     if (isFirst) {
@@ -687,25 +698,33 @@ void PrintAST::printWhereClause(ArrayRef<RequirementRepr> requirements) {
       Printer << ", ";
     }
 
-    auto asWrittenStr = req.getAsWrittenString();
-    if (!asWrittenStr.empty()) {
-      Printer << asWrittenStr;
+    auto TupleOp = req.getAsAnalyzedWrittenString();
+    if (TupleOp.hasValue()) {
+      auto Tuple = TupleOp.getValue();
+      Printer << std::get<0>(Tuple);
+      switch(std::get<2>(Tuple)) {
+      case RequirementReprKind::TypeConstraint:
+        Printer << " : ";
+        break;
+      case RequirementReprKind::SameType:
+        Printer << " == ";
+        break;
+      }
+      Printer << std::get<1>(Tuple);
       continue;
     }
 
     switch (req.getKind()) {
-    case RequirementKind::Conformance:
+    case RequirementReprKind::TypeConstraint:
       printTypeLoc(req.getSubjectLoc());
       Printer << " : ";
       printTypeLoc(req.getConstraintLoc());
       break;
-    case RequirementKind::SameType:
+    case RequirementReprKind::SameType:
       printTypeLoc(req.getFirstTypeLoc());
       Printer << " == ";
       printTypeLoc(req.getSecondTypeLoc());
       break;
-    case RequirementKind::WitnessMarker:
-      llvm_unreachable("Handled above");
     }
   }
 }
@@ -1268,6 +1287,13 @@ void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
           Printer << ".";
         }
       }
+
+      // Respect alias type.
+      if (extendedType->getKind() == TypeKind::NameAlias) {
+        extendedType.print(Printer, Options);
+        return;
+      }
+
       Printer.printTypeRef(nominal, nominal->getName());
     });
   printInherited(decl);
@@ -1377,7 +1403,7 @@ void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
   if (!Options.SkipIntroducerKeywords)
-    Printer << "typealias ";
+    Printer << "associatedtype ";
   recordDeclLoc(decl,
     [&]{
       Printer.printName(decl->getName());
@@ -1540,12 +1566,12 @@ void PrintAST::visitParamDecl(ParamDecl *decl) {
   return visitVarDecl(decl);
 }
 
-void PrintAST::printOneParameter(const Parameter &param, bool Curried,
+void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
                                  bool ArgNameIsAPIByDefault) {
   auto printArgName = [&]() {
     // Print argument name.
-    auto ArgName = param.decl->getArgumentName();
-    auto BodyName = param.decl->getName();
+    auto ArgName = param->getArgumentName();
+    auto BodyName = param->getName();
     switch (Options.ArgAndParamPrinting) {
     case PrintOptions::ArgAndParamPrintingMode::ArgumentOnly:
       Printer.printName(ArgName, PrintNameContext::FunctionParameter);
@@ -1572,7 +1598,7 @@ void PrintAST::printOneParameter(const Parameter &param, bool Curried,
     Printer << ": ";
   };
 
-  auto TheTypeLoc = param.decl->getTypeLoc();
+  auto TheTypeLoc = param->getTypeLoc();
   if (TheTypeLoc.getTypeRepr()) {
     // If the outer typeloc is an InOutTypeRepr, print the 'inout' before the
     // subpattern.
@@ -1587,8 +1613,8 @@ void PrintAST::printOneParameter(const Parameter &param, bool Curried,
       Printer << "inout ";
     }
   } else {
-    if (param.decl->hasType())
-      TheTypeLoc = TypeLoc::withoutLoc(param.decl->getType());
+    if (param->hasType())
+      TheTypeLoc = TypeLoc::withoutLoc(param->getType());
     
     if (Type T = TheTypeLoc.getType()) {
       if (auto *IOT = T->getAs<InOutType>()) {
@@ -1600,8 +1626,8 @@ void PrintAST::printOneParameter(const Parameter &param, bool Curried,
 
   // If the parameter is autoclosure, or noescape, print it.  This is stored
   // on the type of the decl, not on the typerepr.
-  if (param.decl->hasType()) {
-    auto bodyCanType = param.decl->getType()->getCanonicalType();
+  if (param->hasType()) {
+    auto bodyCanType = param->getType()->getCanonicalType();
     if (auto patternType = dyn_cast<AnyFunctionType>(bodyCanType)) {
       switch (patternType->isAutoClosure()*2 + patternType->isNoEscape()) {
       case 0: break; // neither.
@@ -1636,14 +1662,14 @@ void PrintAST::printOneParameter(const Parameter &param, bool Curried,
   
   // If the parameter is variadic, we will print the "..." after it, but we have
   // to strip off the added array type.
-  if (param.isVariadic() && TheTypeLoc.getType()) {
+  if (param->isVariadic() && TheTypeLoc.getType()) {
     if (auto *BGT = TheTypeLoc.getType()->getAs<BoundGenericType>())
       TheTypeLoc.setType(BGT->getGenericArgs()[0]);
   }
   
   printTypeLoc(TheTypeLoc);
   
-  if (param.isVariadic())
+  if (param->isVariadic())
     Printer << "...";
 
   // After printing the type, we need to restore what the option used to be.
@@ -1654,19 +1680,15 @@ void PrintAST::printOneParameter(const Parameter &param, bool Curried,
   
   
   if (Options.PrintDefaultParameterPlaceholder &&
-      param.decl->isDefaultArgument()) {
-    // For Clang declarations, figure out the default we're using.
-    auto AFD = dyn_cast<AbstractFunctionDecl>(param.decl->getDeclContext());
-    if (AFD && AFD->getClangDecl() && param.decl->hasType()) {
-      auto CurrType = param.decl->getType();
-      Printer << " = " << CurrType->getInferredDefaultArgString();
-    } else {
-      // Use placeholder anywhere else.
-      Printer << " = default";
-    }
+      param->isDefaultArgument()) {
+    Printer << " = ";
+    auto defaultArgStr
+      = getDefaultArgumentSpelling(param->getDefaultArgumentKind());
+    if (defaultArgStr.empty())
+      Printer << "default";
+    else
+      Printer << defaultArgStr;
   }
-
-  
 }
 
 void PrintAST::printParameterList(ParameterList *PL, bool isCurried,
@@ -1765,8 +1787,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
           Printer << (decl->isSetter() ? "set" : "willSet");
 
           auto params = decl->getParameterLists().back();
-          if (params->size() != 0 && !params->get(0).decl->isImplicit()) {
-            auto Name = params->get(0).decl->getName();
+          if (params->size() != 0 && !params->get(0)->isImplicit()) {
+            auto Name = params->get(0)->getName();
             if (!Name.empty()) {
               Printer << "(";
               Printer.printName(Name);
@@ -2826,6 +2848,7 @@ public:
   unsigned getDepthOfRequirement(const Requirement &req) {
     switch (req.getKind()) {
     case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
     case RequirementKind::WitnessMarker:
       return getDepthOfType(req.getFirstType());
 
@@ -2921,6 +2944,7 @@ public:
       visit(req.getFirstType());
       switch (req.getKind()) {
       case RequirementKind::Conformance:
+      case RequirementKind::Superclass:
         Printer << " : ";
         break;
 
@@ -3163,21 +3187,12 @@ public:
   }
 
   void visitTypeVariableType(TypeVariableType *T) {
-    auto Base = T->getBaseBeingSubstituted();
-    
     if (T->getASTContext().LangOpts.DebugConstraintSolver) {
       Printer << "$T" << T->getID();
       return;
     }
     
-    if (T->isEqual(Base) || T->isPrinting) {
-      Printer << "_";
-      return;
-    }
-    
-    llvm::SaveAndRestore<bool> isPrinting(T->isPrinting, true);
-    
-    visit(Base);
+    Printer << "_";
   }
 };
 } // unnamed namespace
@@ -3364,7 +3379,5 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
 
 void Substitution::print(llvm::raw_ostream &os,
                          const PrintOptions &PO) const {
-  Archetype->print(os, PO);
-  os << " = ";
   Replacement->print(os, PO);
 }

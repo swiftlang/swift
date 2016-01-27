@@ -1,4 +1,4 @@
-//===-------------- EscapeAnalysis.cpp - SIL Escape Analysis --------------===//
+//===--- EscapeAnalysis.cpp - SIL Escape Analysis -------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -65,7 +65,7 @@ static ValueBase *skipProjections(ValueBase *V) {
   for (;;) {
     if (!isProjection(V))
       return V;
-    V = cast<SILInstruction>(V)->getOperand(0).getDef();
+    V = cast<SILInstruction>(V)->getOperand(0);
   }
   llvm_unreachable("there is no escape from an infinite loop");
 }
@@ -100,7 +100,8 @@ getNode(ValueBase *V, EscapeAnalysis *EA, bool createIfNeeded) {
     if (SILArgument *Arg = dyn_cast<SILArgument>(V)) {
       if (Arg->isFunctionArg()) {
         Node = allocNode(V, NodeType::Argument);
-        Node->mergeEscapeState(EscapeState::Arguments);
+        if (!isSummaryGraph)
+          Node->mergeEscapeState(EscapeState::Arguments);
       } else {
         Node = allocNode(V, NodeType::Value);
       }
@@ -394,7 +395,7 @@ void EscapeAnalysis::ConnectionGraph::computeUsePoints() {
           /// liferange. And that must be a releasing instruction.
           int ValueIdx = -1;
           for (const Operand &Op : I.getAllOperands()) {
-            ValueBase *OpV = Op.get().getDef();
+            ValueBase *OpV = Op.get();
             if (CGNode *OpNd = lookupNode(skipProjections(OpV))) {
               if (ValueIdx < 0) {
                 ValueIdx = addUsePoint(OpNd, &I);
@@ -650,7 +651,7 @@ std::string CGForDotView::getNodeLabel(const Node *Node) const {
     default: {
       std::string Inst;
       llvm::raw_string_ostream OI(Inst);
-      SILValue(Node->OrigNode->V).print(OI);
+      SILValue(Node->OrigNode->V)->print(OI);
       size_t start = Inst.find(" = ");
       if (start != std::string::npos) {
         start += 3;
@@ -1013,13 +1014,12 @@ static bool isOrContainsReference(SILType Ty, SILModule *Mod) {
 
 bool EscapeAnalysis::isPointer(ValueBase *V) {
   assert(V->hasValue());
-  SILType Ty = V->getType(0);
+  SILType Ty = V->getType();
   auto Iter = isPointerCache.find(Ty);
   if (Iter != isPointerCache.end())
     return Iter->second;
 
-  bool IP = (Ty.isAddress() || Ty.isLocalStorage() ||
-             isOrContainsReference(Ty, M));
+  bool IP = (Ty.isAddress() || isOrContainsReference(Ty, M));
   isPointerCache[Ty] = IP;
   return IP;
 }
@@ -1124,7 +1124,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         return;
       case ArrayCallKind::kGetElement:
         // This is like a load from a ref_element_addr.
-        if (FAS.getArgument(0).getType().isAddress()) {
+        if (FAS.getArgument(0)->getType().isAddress()) {
           if (CGNode *AddrNode = ConGraph->getNode(ASC.getSelf(), this)) {
             if (CGNode *DestNode = ConGraph->getNode(FAS.getArgument(0), this)) {
               // One content node for going from the array buffer pointer to
@@ -1207,6 +1207,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       return;
     case ValueKind::StrongReleaseInst:
     case ValueKind::ReleaseValueInst:
+    case ValueKind::StrongUnpinInst:
     case ValueKind::UnownedReleaseInst: {
       SILValue OpV = I->getOperand(0);
       if (CGNode *AddrNode = ConGraph->getNode(OpV, this)) {
@@ -1216,7 +1217,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         // deallocation).
         CGNode *CapturedByDeinit = ConGraph->getContentNode(AddrNode);
         CapturedByDeinit = ConGraph->getContentNode(CapturedByDeinit);
-        if (isArrayOrArrayStorage(OpV)) {
+        if (deinitIsKnownToNotCapture(OpV)) {
           CapturedByDeinit = ConGraph->getContentNode(CapturedByDeinit);
         }
         ConGraph->setEscapesGlobal(CapturedByDeinit);
@@ -1314,6 +1315,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case ValueKind::BridgeObjectToRefInst:
     case ValueKind::UncheckedAddrCastInst:
     case ValueKind::UnconditionalCheckedCastInst:
+    case ValueKind::StrongPinInst:
       // A cast is almost like a projection.
       if (CGNode *OpNode = ConGraph->getNode(I->getOperand(0), this)) {
         ConGraph->setNode(I, OpNode);
@@ -1361,15 +1363,32 @@ analyzeSelectInst(SelectInst *SI, ConnectionGraph *ConGraph) {
   }
 }
 
-bool EscapeAnalysis::isArrayOrArrayStorage(SILValue V) {
+bool EscapeAnalysis::deinitIsKnownToNotCapture(SILValue V) {
   for (;;) {
-    if (V.getType().getNominalOrBoundGenericNominal() == ArrayType)
+    // The deinit of an array buffer does not capture the array elements.
+    if (V->getType().getNominalOrBoundGenericNominal() == ArrayType)
       return true;
 
-    if (!isProjection(V.getDef()))
-      return false;
+    // The deinit of a box does not capture its content.
+    if (V->getType().is<SILBoxType>())
+      return true;
 
-    V = dyn_cast<SILInstruction>(V.getDef())->getOperand(0);
+    if (isa<FunctionRefInst>(V))
+      return true;
+
+    // Check all operands of a partial_apply
+    if (auto *PAI = dyn_cast<PartialApplyInst>(V)) {
+      for (Operand &Op : PAI->getAllOperands()) {
+        if (isPointer(Op.get()) && !deinitIsKnownToNotCapture(Op.get()))
+          return false;
+      }
+      return true;
+    }
+    if (isProjection(V)) {
+      V = dyn_cast<SILInstruction>(V)->getOperand(0);
+      continue;
+    }
+    return false;
   }
 }
 
@@ -1385,8 +1404,8 @@ void EscapeAnalysis::setAllEscaping(SILInstruction *I,
   // In this case we don't even create a node for the resulting int value.
   for (const Operand &Op : I->getAllOperands()) {
     SILValue OpVal = Op.get();
-    if (!isNonWritableMemoryAddress(OpVal.getDef()))
-      setEscapesGlobal(ConGraph, OpVal.getDef());
+    if (!isNonWritableMemoryAddress(OpVal))
+      setEscapesGlobal(ConGraph, OpVal);
   }
   // Even if the instruction does not write memory it could e.g. return the
   // address of global memory. Therefore we have to define it as escaping.
@@ -1501,9 +1520,18 @@ bool EscapeAnalysis::mergeCalleeGraph(FullApplySite FAS,
     // of the apply site.
     SILValue CallerArg = (Idx < numCallerArgs ? FAS.getArgument(Idx) :
                           FAS.getCallee());
-    if (CGNode *CalleeNd = CalleeGraph->getNode(Callee->getArgument(Idx), this)) {
-      Callee2CallerMapping.add(CalleeNd, CallerGraph->getNode(CallerArg, this));
-    }
+    CGNode *CalleeNd = CalleeGraph->getNode(Callee->getArgument(Idx), this);
+    if (!CalleeNd)
+      continue;
+
+    CGNode *CallerNd = CallerGraph->getNode(CallerArg, this);
+    // There can be the case that we see a callee argument as pointer but not
+    // the caller argument. E.g. if the callee argument has a @convention(c)
+    // function type and the caller passes a function_ref.
+    if (!CallerNd)
+      continue;
+
+    Callee2CallerMapping.add(CalleeNd, CallerNd);
   }
 
   // Map the return value.
@@ -1564,14 +1592,8 @@ bool EscapeAnalysis::canEscapeTo(SILValue V, FullApplySite FAS) {
   return canEscapeToUsePoint(V, FAS.getInstruction(), ConGraph);
 }
 
-static bool isAddress(SILType T) {
-  // We include local storage, too. This makes it more tolerant for checking
-  // the #0 result of alloc_stack.
-  return T.isAddress() || T.isLocalStorage();
-}
-
 static bool hasReferenceSemantics(SILType T) {
-  // Exclude address and local storage types.
+  // Exclude address types.
   return T.isObject() && T.hasReferenceSemantics();
 }
 
@@ -1595,7 +1617,7 @@ bool EscapeAnalysis::canObjectOrContentEscapeTo(SILValue V, FullApplySite FAS) {
   if (ConGraph->isUsePoint(UsePoint, Node))
     return true;
 
-  if (hasReferenceSemantics(V.getType())) {
+  if (hasReferenceSemantics(V->getType())) {
     // Check if the object "content", i.e. a pointer to one of its stored
     // properties, can escape to the called function.
     CGNode *ContentNode = ConGraph->getContentNode(Node);
@@ -1679,9 +1701,9 @@ bool EscapeAnalysis::canPointToSameMemory(SILValue V1, SILValue V2) {
   CGNode *Content1 = ConGraph->getContentNode(Node1);
   CGNode *Content2 = ConGraph->getContentNode(Node2);
 
-  SILType T1 = V1.getType();
-  SILType T2 = V2.getType();
-  if (isAddress(T1) && isAddress(T2)) {
+  SILType T1 = V1->getType();
+  SILType T2 = V2->getType();
+  if (T1.isAddress() && T2.isAddress()) {
     return Content1 == Content2;
   }
   if (hasReferenceSemantics(T1) && hasReferenceSemantics(T2)) {
@@ -1690,15 +1712,44 @@ bool EscapeAnalysis::canPointToSameMemory(SILValue V1, SILValue V2) {
   // As we model the ref_element_addr instruction as a content-relationship, we
   // have to go down one content level if just one of the values is a
   // ref-counted object.
-  if (isAddress(T1) && hasReferenceSemantics(T2)) {
+  if (T1.isAddress() && hasReferenceSemantics(T2)) {
     Content2 = ConGraph->getContentNode(Content2);
     return Content1 == Content2;
   }
-  if (isAddress(T2) && hasReferenceSemantics(T1)) {
+  if (T2.isAddress() && hasReferenceSemantics(T1)) {
     Content1 = ConGraph->getContentNode(Content1);
     return Content1 == Content2;
   }
   return true;
+}
+
+bool EscapeAnalysis::canParameterEscape(FullApplySite FAS, int ParamIdx,
+                                        bool checkContentOfIndirectParam) {
+  CalleeList Callees = BCA->getCalleeList(FAS);
+  if (!Callees.allCalleesVisible())
+    return true;
+
+  // Derive the connection graph of the apply from the known callees.
+  for (SILFunction *Callee : Callees) {
+    FunctionInfo *FInfo = getFunctionInfo(Callee);
+    if (!FInfo->isValid())
+      recompute(FInfo);
+
+    CGNode *Node = FInfo->SummaryGraph.getNodeOrNull(
+                                         Callee->getArgument(ParamIdx), this);
+    if (!Node)
+      return true;
+
+    if (checkContentOfIndirectParam) {
+      Node = Node->getContentNodeOrNull();
+      if (!Node)
+        continue;
+    }
+
+    if (Node->escapes())
+      return true;
+  }
+  return false;
 }
 
 void EscapeAnalysis::invalidate(InvalidationKind K) {

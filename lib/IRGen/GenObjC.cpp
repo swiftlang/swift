@@ -341,7 +341,7 @@ llvm::Constant *IRGenModule::getAddrOfObjCSelectorRef(StringRef selector) {
 
 /// Get or create an ObjC protocol record. Always returns an i8*. We lazily
 /// create ObjC protocol_t records for protocols, storing references to the
-/// record into the __objc_protolist and  and __objc_protorefs sections to be
+/// record into the __objc_protolist and __objc_protorefs sections to be
 /// fixed up by the runtime.
 ///
 /// It is not correct to use this value as a Protocol* reference directly. The
@@ -356,7 +356,7 @@ llvm::Constant *IRGenModule::getAddrOfObjCProtocolRecord(ProtocolDecl *proto,
 
 /// Get or create an ObjC protocol reference. Always returns an i8**. We lazily
 /// create ObjC protocol_t records for protocols, storing references to the
-/// record into the __objc_protolist and  and __objc_protorefs sections to be
+/// record into the __objc_protolist and __objc_protorefs sections to be
 /// fixed up by the runtime.
 llvm::Constant *IRGenModule::getAddrOfObjCProtocolRef(ProtocolDecl *proto,
                                                ForDefinition_t forDefinition) {

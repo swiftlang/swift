@@ -274,12 +274,18 @@ class Foo {
 
 // <rdar://problem/23952125> QoI: Subscript in protocol with missing {}, better diagnostic please
 protocol r23952125 {
-  typealias ItemType
+  associatedtype ItemType
   var count: Int { get }
   subscript(index: Int) -> ItemType  // expected-error {{subscript in protocol must have explicit { get } or { get set } specifier}} {{36-36= { get set \}}}
   
   var c : Int // expected-error {{property in protocol must have explicit { get } or { get set } specifier}}
 }
 
-
-
+// <rdar://problem/16812341> QoI: Poor error message when providing a default value for a subscript parameter
+struct S4 {
+  subscript(subs: Int = 0) -> Int {  // expected-error {{default arguments are not allowed in subscripts}}
+    get {
+      return 1
+    }
+  }
+}

@@ -429,6 +429,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, XCC);
   BLOCK_RECORD(options_block, IS_SIB);
   BLOCK_RECORD(options_block, IS_TESTABLE);
+  BLOCK_RECORD(options_block, IS_RESILIENT);
 
   BLOCK(INPUT_BLOCK);
   BLOCK_RECORD(input_block, IMPORTED_MODULE);
@@ -490,7 +491,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::BOUND_GENERIC_SUBSTITUTION);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
-                              decls_block::NO_CONFORMANCE);
+                              decls_block::ABSTRACT_PROTOCOL_CONFORMANCE);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::NORMAL_PROTOCOL_CONFORMANCE);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
@@ -575,6 +576,11 @@ void Serializer::writeHeader(const SerializationOptions &options) {
       if (M->isTestingEnabled()) {
         options_block::IsTestableLayout IsTestable(Out);
         IsTestable.emit(ScratchRecord);
+      }
+
+      if (M->isResilienceEnabled()) {
+        options_block::IsResilientLayout IsResilient(Out);
+        IsResilient.emit(ScratchRecord);
       }
 
       if (options.SerializeOptionsForDebugging) {
@@ -752,6 +758,9 @@ static uint8_t getRawStableDefaultArgumentKind(swift::DefaultArgumentKind kind) 
   CASE(Line)
   CASE(Function)
   CASE(DSOHandle)
+  CASE(Nil)
+  CASE(EmptyArray)
+  CASE(EmptyDictionary)
 #undef CASE
   }
 }
@@ -800,10 +809,10 @@ void Serializer::writeParameterList(const ParameterList *PL) {
     // FIXME: Default argument expressions?
     
     auto defaultArg =
-      getRawStableDefaultArgumentKind(param.decl->getDefaultArgumentKind());
+      getRawStableDefaultArgumentKind(param->getDefaultArgumentKind());
     ParameterListEltLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                       addDeclRef(param.decl),
-                                       param.isVariadic(),
+                                       addDeclRef(param),
+                                       param->isVariadic(),
                                        defaultArg);
   }
 }
@@ -918,6 +927,7 @@ static uint8_t getRawStableRequirementKind(RequirementKind kind) {
 
   switch (kind) {
   CASE(Conformance)
+  CASE(Superclass)
   CASE(SameType)
   CASE(WitnessMarker)
   }
@@ -970,7 +980,7 @@ bool Serializer::writeGenericParams(const GenericParamList *genericParams,
     llvm::raw_svector_ostream ReqOS(ReqStr);
     next.printAsWritten(ReqOS);
     switch (next.getKind()) {
-    case RequirementKind::Conformance:
+    case RequirementReprKind::TypeConstraint:
       GenericRequirementLayout::emitRecord(
                                       Out, ScratchRecord, abbrCode,
                                       GenericRequirementKind::Conformance,
@@ -978,16 +988,13 @@ bool Serializer::writeGenericParams(const GenericParamList *genericParams,
                                       addTypeRef(next.getConstraint()),
                                       ReqOS.str());
       break;
-    case RequirementKind::SameType:
+    case RequirementReprKind::SameType:
       GenericRequirementLayout::emitRecord(
                                       Out, ScratchRecord, abbrCode,
                                       GenericRequirementKind::SameType,
                                       addTypeRef(next.getFirstType()),
                                       addTypeRef(next.getSecondType()),
                                       ReqOS.str());
-      break;
-    case RequirementKind::WitnessMarker:
-      llvm_unreachable("Can't show up in requirement representations");
       break;
     }
   }
@@ -1036,8 +1043,6 @@ void Serializer::writeNormalConformance(
     data.push_back(addDeclRef(witness.getDecl()));
     assert(witness.getDecl() || req->getAttrs().hasAttribute<OptionalAttr>()
            || req->getAttrs().isUnavailable(req->getASTContext()));
-    // The substitution records are serialized later.
-    data.push_back(witness.getSubstitutions().size());
     ++numValueWitnesses;
   });
 
@@ -1084,11 +1089,6 @@ void Serializer::writeNormalConformance(
                      DeclTypeAbbrCodes);
   }
 
-  conformance->forEachValueWitness(nullptr,
-                                   [&](ValueDecl *req,
-                                       ConcreteDeclRef witness) {
-    writeSubstitutions(witness.getSubstitutions(), DeclTypeAbbrCodes);
-  });
   conformance->forEachTypeWitness(/*resolver=*/nullptr,
                                   [&](AssociatedTypeDecl *assocType,
                                       const Substitution &witness,
@@ -1099,16 +1099,24 @@ void Serializer::writeNormalConformance(
 }
 
 void
-Serializer::writeConformance(const ProtocolConformance *conformance,
+Serializer::writeConformance(ProtocolConformance *conformance,
+                             const std::array<unsigned, 256> &abbrCodes) {
+  writeConformance(ProtocolConformanceRef(conformance), abbrCodes);
+}
+
+void
+Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
                              const std::array<unsigned, 256> &abbrCodes) {
   using namespace decls_block;
 
-  if (!conformance) {
-    unsigned abbrCode = abbrCodes[NoConformanceLayout::Code];
-    NoConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode);
+  if (conformanceRef.isAbstract()) {
+    unsigned abbrCode = abbrCodes[AbstractProtocolConformanceLayout::Code];
+    AbstractProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                      addDeclRef(conformanceRef.getAbstract()));
     return;
   }
 
+  auto conformance = conformanceRef.getConcrete();
   switch (conformance->getKind()) {
   case ProtocolConformanceKind::Normal: {
     auto normal = cast<NormalProtocolConformance>(conformance);
@@ -1161,7 +1169,16 @@ Serializer::writeConformance(const ProtocolConformance *conformance,
 }
 
 void
-Serializer::writeConformances(ArrayRef<ProtocolConformance *> conformances,
+Serializer::writeConformances(ArrayRef<ProtocolConformanceRef> conformances,
+                              const std::array<unsigned, 256> &abbrCodes) {
+  using namespace decls_block;
+
+  for (auto conformance : conformances)
+    writeConformance(conformance, abbrCodes);
+}
+
+void
+Serializer::writeConformances(ArrayRef<ProtocolConformance*> conformances,
                               const std::array<unsigned, 256> &abbrCodes) {
   using namespace decls_block;
 
@@ -1175,12 +1192,8 @@ Serializer::writeSubstitutions(ArrayRef<Substitution> substitutions,
   using namespace decls_block;
   auto abbrCode = abbrCodes[BoundGenericSubstitutionLayout::Code];
   for (auto &sub : substitutions) {
-    SmallVector<DeclID, 16> conformanceData;
-    SmallVector<const ProtocolConformance *, 8> conformancesToWrite;
-
     BoundGenericSubstitutionLayout::emitRecord(
       Out, ScratchRecord, abbrCode,
-      addTypeRef(sub.getArchetype()),
       addTypeRef(sub.getReplacement()),
       sub.getConformances().size());
 
@@ -1714,6 +1727,30 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     return;
   }
 
+  case DAK_Swift3Migration: {
+    auto *theAttr = cast<Swift3MigrationAttr>(DA);
+
+    llvm::SmallString<32> blob;
+
+    unsigned renameLength = 0;
+    if (auto newName = theAttr->getRenamed()) {
+      llvm::raw_svector_ostream os(blob);
+      newName.print(os);
+      renameLength = os.str().size();
+    }
+
+    blob.append(theAttr->getMessage());
+
+    auto abbrCode = DeclTypeAbbrCodes[Swift3MigrationDeclAttrLayout::Code];
+    Swift3MigrationDeclAttrLayout::emitRecord(
+                                        Out, ScratchRecord, abbrCode,
+                                        theAttr->isImplicit(),
+                                        renameLength,
+                                        theAttr->getMessage().size(),
+                                        blob);
+    return;
+  }
+
   case DAK_WarnUnusedResult: {
     auto *theAttr = cast<WarnUnusedResultAttr>(DA);
 
@@ -1727,21 +1764,6 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
                                                theAttr->isImplicit(),
                                                endOfMessageIndex,
                                                blob);
-    return;
-  }
-
-  case DAK_MigrationId: {
-    auto *theAttr = cast<MigrationIdAttr>(DA);
-
-    // Compute the blob.
-    SmallString<128> blob;
-    blob += theAttr->getIdent();
-    uint64_t endOfIdentIndex = blob.size();
-    blob += theAttr->getPatternId();
-    auto abbrCode = DeclTypeAbbrCodes[MigrationIdDeclAttrLayout::Code];
-    MigrationIdDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                          endOfIdentIndex,
-                                          blob);
     return;
   }
   }
@@ -3270,7 +3292,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<XRefGenericParamPathPieceLayout>();
   registerDeclTypeAbbr<XRefInitializerPathPieceLayout>();
 
-  registerDeclTypeAbbr<NoConformanceLayout>();
+  registerDeclTypeAbbr<AbstractProtocolConformanceLayout>();
   registerDeclTypeAbbr<NormalProtocolConformanceLayout>();
   registerDeclTypeAbbr<SpecializedProtocolConformanceLayout>();
   registerDeclTypeAbbr<InheritedProtocolConformanceLayout>();
@@ -3674,6 +3696,18 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
           .push_back({ getStableFixity(OD->getKind()), addDeclRef(D) });
       }
 
+      // If this is a global variable, force the accessors to be
+      // serialized.
+      if (auto VD = dyn_cast<VarDecl>(D)) {
+        if (VD->getGetter())
+          addDeclRef(VD->getGetter());
+        if (VD->getSetter())
+          addDeclRef(VD->getSetter());
+      }
+
+      // If this nominal type has associated top-level decls for a
+      // derived conformance (for example, ==), force them to be
+      // serialized.
       if (auto IDC = dyn_cast<IterableDeclContext>(D)) {
         addOperatorsAndTopLevel(*this, IDC->getMembers(),
                                 operatorMethodDecls, topLevelDecls,
@@ -3691,8 +3725,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       hasLocalTypes = true;
 
       Mangle::Mangler DebugMangler(false);
-      DebugMangler.mangleType(TD->getDeclaredType(),
-                              ResilienceExpansion::Minimal, 0);
+      DebugMangler.mangleType(TD->getDeclaredType(), 0);
       auto MangledName = DebugMangler.finalize();
       assert(!MangledName.empty() && "Mangled type came back empty!");
       localTypeGenerator.insert(MangledName, {

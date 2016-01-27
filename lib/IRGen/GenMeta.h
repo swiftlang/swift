@@ -1,4 +1,4 @@
-//===--- GenMeta.h - Swift IR generation for metadata ----------*- C++ -*-===//
+//===--- GenMeta.h - Swift IR generation for metadata -----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -23,6 +23,8 @@
 namespace llvm {
   template <class T> class ArrayRef;
   class Constant;
+  class Function;
+  class GlobalVariable;
   class Value;
 }
 
@@ -269,16 +271,16 @@ namespace irgen {
 
     /// There is no unique accessor function for the given type metadata, but
     /// one should be made automatically.
-    NonUniqueAccessor,
-
-    /// The given type metadata should be accessed directly.
-    Direct,
+    NonUniqueAccessor
   };
+
+  /// Is it basically trivial to access the given metadata?  If so, we don't
+  /// need a cache variable in its accessor.
+  bool isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type);
 
   /// Determine how the given type metadata should be accessed.
   MetadataAccessStrategy getTypeMetadataAccessStrategy(IRGenModule &IGM,
-                                                       CanType type,
-                                                       bool preferDirectAccess);
+                                                       CanType type);
   
   /// Return the address of a function that will return type metadata 
   /// for the given non-dependent type.

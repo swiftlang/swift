@@ -3,6 +3,7 @@ set(swift_stdlib_unittest_module_depends
   SwiftPrivate SwiftPrivatePthreadExtras SwiftPrivateDarwinExtras)
 set(swift_stdlib_unittest_framework_depends)
 set(swift_stdlib_unittest_private_link_libraries)
+set(swift_stdlib_unittest_compile_flags)
 
 if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
   list(APPEND swift_stdlib_unittest_platform_sources
@@ -13,9 +14,12 @@ if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
   list(APPEND swift_stdlib_unittest_framework_depends
     Foundation)
 endif()
-if(SWIFT_HOST_VARIANT STREQUAL "linux")
+if(SWIFT_HOST_VARIANT STREQUAL "linux" OR SWIFT_HOST_VARIANT STREQUAL "freebsd")
   list(APPEND swift_stdlib_unittest_module_depends
     Glibc)
+endif()
+if(SWIFT_SERIALIZE_STDLIB_UNITTEST)
+  list(APPEND swift_stdlib_unittest_compile_flags "-Xfrontend" "-sil-serialize-all")
 endif()
 
 add_swift_library(swiftStdlibUnittest SHARED IS_STDLIB
@@ -23,11 +27,6 @@ add_swift_library(swiftStdlibUnittest SHARED IS_STDLIB
   # filename.
   StdlibUnittest.swift.gyb
 
-  CheckCollectionType.swift
-  CheckMutableCollectionType.swift.gyb
-  CheckRangeReplaceableCollectionType.swift
-  CheckRangeReplaceableSliceType.swift
-  CheckSequenceType.swift
   InterceptTraps.cpp
   LoggingWrappers.swift.gyb
   OpaqueIdentityFunctions.cpp
@@ -40,14 +39,9 @@ add_swift_library(swiftStdlibUnittest SHARED IS_STDLIB
   LifetimeTracked.swift
   ${swift_stdlib_unittest_platform_sources}
 
-  # Cannot serialize StdlibUnittest because of:
-  # <rdar://problem/18917405> Compiling StdlibUnittest with -sil-serialize-all
-  # crashes in SIL serializer
-  #
-  # SWIFT_COMPILE_FLAGS -Xfrontend -sil-serialize-all
-
   PRIVATE_LINK_LIBRARIES ${swift_stdlib_unittest_private_link_libraries}
   SWIFT_MODULE_DEPENDS ${swift_stdlib_unittest_module_depends}
+  SWIFT_COMPILE_FLAGS ${swift_stdlib_unittest_compile_flags}
   FRAMEWORK_DEPENDS ${swift_stdlib_unittest_framework_depends}
   INSTALL_IN_COMPONENT stdlib-experimental)
 

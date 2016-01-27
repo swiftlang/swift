@@ -1,4 +1,4 @@
-//===--- Leaks.mm ----------------------------------------*- C++ -*--------===//
+//===--- Leaks.mm -----------------------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -140,7 +140,7 @@ static void dumpSwiftHeapObjects() {
                       "\"name\": \"%s\", "
                       "\"kind\": \"%s\""
                       "}",
-              NTD->Name, kindDescriptor);
+              NTD->Name.get(), kindDescriptor);
       continue;
     }
 

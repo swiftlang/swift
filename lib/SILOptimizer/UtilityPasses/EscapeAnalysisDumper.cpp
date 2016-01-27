@@ -1,4 +1,4 @@
-//===-------- EscapeAnalysisDumper.cpp - Dumps the escape analysis --------===//
+//===--- EscapeAnalysisDumper.cpp - Dumps the escape analysis -------------===//
 //
 // This source file is part of the Swift.org open source project
 //

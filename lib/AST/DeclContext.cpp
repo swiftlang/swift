@@ -518,8 +518,12 @@ DeclContext::isCascadingContextForLookup(bool functionsAreNonCascading) const {
     break;
   }
 
-  case DeclContextKind::SubscriptDecl:
-    return false;
+  case DeclContextKind::SubscriptDecl: {
+    auto *SD = cast<SubscriptDecl>(this);
+    if (SD->hasAccessibility())
+      return SD->getFormalAccess() > Accessibility::Private;
+    break;
+  }
       
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:

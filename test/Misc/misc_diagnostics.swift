@@ -91,8 +91,7 @@ func testIS1() -> Int { return 0 }
 let _: String = testIS1() // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
 
 func insertA<T>(inout array : [T], elt : T) {
-  array.append(T); // expected-error {{cannot invoke 'append' with an argument list of type '((T).Type)'}}
-  // expected-note @-1 {{expected an argument list of type '(T)'}}
+  array.append(T); // expected-error {{ambiguous reference to member 'append'}}
 }
 
 // <rdar://problem/17875634> can't append to array of tuples
@@ -131,6 +130,6 @@ func test17875634() {
 
 // <rdar://problem/20770032> Pattern matching ranges against tuples crashes the compiler
 func test20770032() {
-  if case let 1...10 = (1, 1) { // expected-warning{{'let' pattern has no effect; sub-pattern didn't bind any variables}} {{11-15=}} expected-error{{expression pattern of type 'Range<Int>' cannot match values of type '(Int, Int)'}}
+  if case let 1...10 = (1, 1) { // expected-warning{{'let' pattern has no effect; sub-pattern didn't bind any variables}} {{11-15=}} expected-error{{cannot convert value of type '(Int, Int)' to expected argument type 'Range<Int>'}}
   }
 }

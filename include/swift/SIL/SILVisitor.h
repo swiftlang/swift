@@ -1,4 +1,4 @@
-//===--- SILVisitor.h - Defines the SILVisitor class -------------*- C++ -*-==//
+//===--- SILVisitor.h - Defines the SILVisitor class ------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -39,10 +39,6 @@ public:
 #include "swift/SIL/SILNodes.def"
     }
     llvm_unreachable("Not reachable, all cases handled");
-  }
-
-  ValueRetTy visit(SILValue V) {
-    return asImpl().visit(V.getDef());
   }
 
   // Define default dispatcher implementations chain to parent nodes.

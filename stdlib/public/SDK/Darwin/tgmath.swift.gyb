@@ -45,43 +45,51 @@ def cFuncSuffix(bits):
 
 # (T) -> T
 # These functions do not have a corresponding LLVM intrinsic
-UnaryFunctions = ['acos', 'asin', 'atan', 'tan',
-                  'acosh', 'asinh', 'atanh', 'cosh', 'sinh', 'tanh',
-                  'expm1',
-                  'log1p', 'logb',
-                  'cbrt', 'sqrt', 'erf', 'erfc', 'tgamma',
-                  ]
+UnaryFunctions = [
+    'acos', 'asin', 'atan', 'tan',
+    'acosh', 'asinh', 'atanh', 'cosh', 'sinh', 'tanh',
+    'expm1',
+    'log1p', 'logb',
+    'cbrt', 'sqrt', 'erf', 'erfc', 'tgamma',
+]
 
 # These functions have a corresponding LLVM intrinsic
 # We call this intrinsic via the Builtin method so keep this list in
 # sync with core/BuiltinMath.swift.gyb
-UnaryIntrinsicFunctions = ['cos', 'sin',
-                  'exp', 'exp2',
-                  'log', 'log10', 'log2',
-                  'fabs',
-                  'ceil', 'floor', 'nearbyint', 'rint', 'round', 'trunc',
-                  ]
+UnaryIntrinsicFunctions = [
+    'cos', 'sin',
+    'exp', 'exp2',
+    'log', 'log10', 'log2',
+    'fabs',
+    'ceil', 'floor', 'nearbyint', 'rint', 'round', 'trunc',
+]
 
 # (T, T) -> T
-BinaryFunctions = ['atan2', 'hypot', 'pow', 'fmod', 
-                   'remainder', 'copysign', 'nextafter', 'fdim', 'fmax', 'fmin']
+BinaryFunctions = [
+    'atan2', 'hypot', 'pow', 'fmod',
+    'remainder', 'copysign', 'nextafter', 'fdim', 'fmax', 'fmin'
+]
 
 # These functions have special implementations.
-OtherFunctions = ['fpclassify', 
-                  'isnormal', 'isfinite', 'isinf', 'isnan', 'signbit', 
-                  'modf', 'ldexp', 'frexp', 'ilogb', 'scalbn', 'lgamma', 
-                  'remquo', 'nan', 'fma', 
-                  'jn', 'yn']
+OtherFunctions = [
+    'fpclassify',
+    'isnormal', 'isfinite', 'isinf', 'isnan', 'signbit',
+    'modf', 'ldexp', 'frexp', 'ilogb', 'scalbn', 'lgamma',
+    'remquo', 'nan', 'fma',
+    'jn', 'yn'
+]
 
 # These functions are imported correctly as-is.             
 OkayFunctions = ['j0', 'j1', 'y0', 'y1']
 
 # These functions are not supported for various reasons.
-UnhandledFunctions = ['math_errhandling', 'scalbln', 
-                      'lrint', 'lround', 'llrint', 'llround', 'nexttoward', 
-                      'isgreater', 'isgreaterequal', 'isless', 'islessequal', 
-                      'islessgreater', 'isunordered', '__exp10', 
-                      '__sincos', '__cospi', '__sinpi', '__tanpi', '__sincospi']
+UnhandledFunctions = [
+    'math_errhandling', 'scalbln',
+    'lrint', 'lround', 'llrint', 'llround', 'nexttoward',
+    'isgreater', 'isgreaterequal', 'isless', 'islessequal',
+    'islessgreater', 'isunordered', '__exp10',
+    '__sincos', '__cospi', '__sinpi', '__tanpi', '__sincospi'
+]
 
 
 def AllFloatTypes():

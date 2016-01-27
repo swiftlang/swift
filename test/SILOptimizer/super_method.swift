@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil  %s -use-native-super-method | FileCheck %s
+// RUN: %target-swift-frontend -emit-sil  %s | FileCheck %s
 
 class Parent {
   @inline(never)
@@ -75,7 +75,7 @@ class ConcreteChild : GenericParent<String> {
   override init(a: String) {
     // CHECK-NOT: super_method {{%[0-9]+}} : $ConcreteChild, #GenericParent.init!initializer.1
     // CHECK: [[INIT_FN_REF:%[0-9]+]] = function_ref @_TFC12super_method13GenericParentcfT1ax_GS0_x_ : $@convention(method) <τ_0_0> (@in τ_0_0, @owned GenericParent<τ_0_0>) -> @owned GenericParent<τ_0_0> // user: %10
-    // CHECK-NEXT: apply [[INIT_FN_REF]]
+    // CHECK: apply [[INIT_FN_REF]]
     super.init(a: a)
   }
 }

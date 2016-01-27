@@ -1,4 +1,4 @@
-//===- CodeCompletion.h - Routines for code completion --------------------===//
+//===--- CodeCompletion.h - Routines for code completion --------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -387,6 +387,7 @@ enum class CodeCompletionDeclKind {
   Enum,
   EnumElement,
   Protocol,
+  AssociatedType,
   TypeAlias,
   GenericTypeParam,
   Constructor,
@@ -446,6 +447,7 @@ enum class CompletionKind {
   CallArg,
   ReturnStmtExpr,
   AfterPound,
+  GenericParams,
 };
 
 /// \brief A single code completion result.
@@ -774,6 +776,28 @@ void copyCodeCompletionResults(CodeCompletionResultSink &targetSink, CodeComplet
 
 } // namespace ide
 } // namespace swift
+
+template <> struct llvm::DenseMapInfo<swift::ide::CodeCompletionKeywordKind> {
+  using Kind = swift::ide::CodeCompletionKeywordKind;
+  static Kind getEmptyKey() { return Kind(~0u); }
+  static Kind getTombstoneKey() { return Kind(~1u); }
+  static unsigned getHashValue(const Kind &Val) { return unsigned(Val); }
+  static bool isEqual(const Kind &LHS, const Kind &RHS) { return LHS == RHS; }
+};
+template <> struct llvm::DenseMapInfo<swift::ide::CodeCompletionLiteralKind> {
+  using Kind = swift::ide::CodeCompletionLiteralKind;
+  static Kind getEmptyKey() { return Kind(~0u); }
+  static Kind getTombstoneKey() { return Kind(~1u); }
+  static unsigned getHashValue(const Kind &Val) { return unsigned(Val); }
+  static bool isEqual(const Kind &LHS, const Kind &RHS) { return LHS == RHS; }
+};
+template <> struct llvm::DenseMapInfo<swift::ide::CodeCompletionDeclKind> {
+  using Kind = swift::ide::CodeCompletionDeclKind;
+  static Kind getEmptyKey() { return Kind(~0u); }
+  static Kind getTombstoneKey() { return Kind(~1u); }
+  static unsigned getHashValue(const Kind &Val) { return unsigned(Val); }
+  static bool isEqual(const Kind &LHS, const Kind &RHS) { return LHS == RHS; }
+};
 
 #endif // SWIFT_IDE_CODE_COMPLETION_H
 

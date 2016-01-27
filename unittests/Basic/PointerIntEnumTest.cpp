@@ -1,4 +1,5 @@
 #include "swift/Basic/PointerIntEnum.h"
+#include "swift/Basic/type_traits.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "gtest/gtest.h"
 
@@ -6,503 +7,244 @@ using namespace swift;
 
 namespace {
 
-enum class EnumTy : uint64_t {
-  Invalid = 0,
-
-  // Pointer Kinds
-  Ptr1 = 1,
-  Ptr2 = 2,
-  Ptr3 = 3,
+enum class EnumTy : unsigned {
+  Ptr1 = 0,
+  Ptr2 = 1,
+  Ptr3 = 2,
+  FirstPointerKind = Ptr1,
   LastPointerKind = Ptr3,
 
-  // Index Kinds.
-  //
-  // When we have an index >= 4096, we malloc memory to store it. It needs to be
-  // able to be stored in at most 3 bits.
-  LargeIndex = 7,
-  Index1 = 8,
-  Index2 = 9,
-  Index3 = 10,
-  Index4 = 11,
-  Index5 = 12,
+  // Index Projection Kinds
+  FirstIndexKind = 7,
+  Index1 = PointerIntEnumIndexKindValue<0, EnumTy>::value,
+  Index2 = PointerIntEnumIndexKindValue<1, EnumTy>::value,
+  Index3 = PointerIntEnumIndexKindValue<2, EnumTy>::value,
+  Index4 = PointerIntEnumIndexKindValue<3, EnumTy>::value,
+  Index5 = PointerIntEnumIndexKindValue<4, EnumTy>::value,
   LastIndexKind = Index5,
 };
 
 using PointerIntEnumTy =
-  PointerIntEnum<EnumTy, void *, 3, 4, llvm::PointerLikeTypeTraits<void *>,
-                 true>;
+    PointerIntEnum<EnumTy, void *, 3, 4, llvm::PointerLikeTypeTraits<void *>>;
+
+static_assert(IsTriviallyCopyable<PointerIntEnumTy>::value,
+              "PointerIntEnum type should be trivially copyable");
+
+static constexpr uintptr_t InvalidStorage = uintptr_t(0) - 1;
 
 } // end anonymous namespace
 
-TEST(PointerIntEnumTest, DefaultConstructIsInvalid) {
+TEST(PointerIntEnumTest, DefaultConstructorYieldsInvalid) {
   PointerIntEnumTy Enum;
   EXPECT_FALSE(Enum.isValid());
-  EXPECT_TRUE(Enum.getKind() == EnumTy::Invalid);
+  EXPECT_TRUE(Enum.getStorage() == InvalidStorage);
 }
 
-TEST(PointerIntEnumTest, ConstructDestructInt) {
-  llvm::ArrayRef<EnumTy> Cases((EnumTy[5]){EnumTy::Index1, EnumTy::Index2,
-                                           EnumTy::Index3, EnumTy::Index4,
-                                           EnumTy::Index5},
-                               5);
+TEST(PointerIntEnumTest, PointerConstructor) {
+  int *data = new int[1];
+  PointerIntEnumTy Enum(EnumTy::Ptr1, data);
+  EXPECT_TRUE(Enum.isValid());
+  EXPECT_EQ(*Enum.getKind(), EnumTy::Ptr1);
+  EXPECT_EQ(Enum.getPointer(), data);
 
-  for (auto &Case : Cases) {
-    for (unsigned i = 0, e = 50; i < e; ++i) {
-      PointerIntEnumTy Enum(Case, i);
-      EXPECT_TRUE(Enum.isValid());
-      EXPECT_EQ(Enum.getKind(), Case);
-      EXPECT_EQ(Enum.getIndex(), i);
-      EXPECT_EQ(Enum.getRawKind(), Case);
-    }
+  // Make sure that the value is laid out correctly in memory.
+  uintptr_t Value = uintptr_t(data) | uintptr_t(EnumTy::Ptr1);
+  EXPECT_EQ(Enum.getStorage(), Value);
 
-    for (unsigned i = 0, e = 4096; i < e; ++i) {
-      PointerIntEnumTy Enum(Case, i);
-      EXPECT_TRUE(Enum.isValid());
-      EXPECT_EQ(Enum.getKind(), Case);
-      EXPECT_EQ(Enum.getIndex(), i);
-      EXPECT_EQ(Enum.getRawKind(), Case);
-    }
-
-    for (unsigned i = 4096, e = 10000; i < e; ++i) {
-      void *ptr;
-      uint64_t x;
-      {
-        PointerIntEnumTy Enum(Case, i);
-        EXPECT_TRUE(Enum.isValid());
-        EXPECT_EQ(Enum.getKind(), Case);
-        EXPECT_EQ(Enum.getIndex(), i);
-        EXPECT_EQ(Enum.getRawKind(), EnumTy::LargeIndex);
-        ptr = Enum.getPointer();
-        memcpy(&x, ptr, sizeof(x));
-      }
-      uint64_t y;
-      memcpy(&y, ptr, sizeof(y));
-      EXPECT_NE(y, x);
-      EXPECT_EQ(y, -1ULL);
-    }
-  }
+  delete[] data;
 }
 
-TEST(PointerIntEnumTest, ConstructDestructPointer) {
-  EnumTy *Enums = new EnumTy[3];
+TEST(PointerIntEnumTest, IndexConstructor) {
+  // First test a case that we can represent.
+  {
+    PointerIntEnumTy Enum(EnumTy::Index3, 0xBEEF);
+    EXPECT_TRUE(Enum.isValid());
+    EXPECT_EQ(*Enum.getKind(), EnumTy::Index3);
+    EXPECT_EQ(Enum.getIndex(), uintptr_t(0xBEEF));
 
-  Enums[0] = EnumTy::Ptr1;
-  Enums[1] = EnumTy::Ptr2;
-  Enums[2] = EnumTy::Ptr3;
-
-  for (unsigned ii = 0, ie = 3; ii < ie; ++ii) {
-    for (unsigned jj = 0, je = 3; jj < je; ++jj) {
-      void *Ptr = reinterpret_cast<void *>(&Enums[jj]);
-      PointerIntEnumTy Enum(Enums[ii], Ptr);
-      EXPECT_TRUE(Enum.isValid());
-      EXPECT_EQ(Enum.getKind(), Enums[ii]);
-      EXPECT_EQ(Enum.getPointer(), Ptr);
-      EXPECT_EQ(Enum.getRawKind(), Enums[ii]);
-    }
+    // Make sure that the value is laid out correctly in memory.
+    uintptr_t Value = (uintptr_t(0xBEEF) << 7) | uintptr_t(EnumTy::Index3);
+    EXPECT_EQ(Enum.getStorage(), Value);
   }
 
-  delete[] Enums;
-}
-
-TEST(PointerIntEnumTest, CopyConstructorLargeInt) {
-  PointerIntEnumTy E(EnumTy::Index2, 5000);
-  PointerIntEnumTy E2(E);
-
-  EXPECT_TRUE(E.isValid());
-  EXPECT_TRUE(E2.isValid());
-  EXPECT_EQ(E.getKind(), E2.getKind());
-  EXPECT_NE(E.getPointer(), E2.getPointer());
-  EXPECT_EQ(E.getRawKind(), E2.getRawKind());
-  EXPECT_EQ(E.getIndex(), E2.getIndex());
-}
-
-TEST(PointerIntEnumTest, CopyConstructorSmallInt) {
-  PointerIntEnumTy E(EnumTy::Index3, 5);
-  PointerIntEnumTy E2(E);
-
-  EXPECT_TRUE(E.isValid());
-  EXPECT_TRUE(E2.isValid());
-  EXPECT_EQ(E.getKind(), E2.getKind());
-  EXPECT_EQ(E.getRawKind(), E2.getRawKind());
-  EXPECT_EQ(E.getIndex(), E2.getIndex());
-}
-
-TEST(PointerIntEnumTest, CopyConstructorPointer) {
-  int *ptr = new int[1];
-  PointerIntEnumTy E(EnumTy::Ptr1, reinterpret_cast<void *>(ptr));
-  PointerIntEnumTy E2(E);
-
-  EXPECT_TRUE(E.isValid());
-  EXPECT_TRUE(E2.isValid());
-  EXPECT_EQ(E.getKind(), E2.getKind());
-  EXPECT_EQ(E.getPointer(), E2.getPointer());
-  EXPECT_EQ(E.getRawKind(), E2.getRawKind());
-  delete [] ptr;
-}
-
-TEST(PointerIntEnumTest, MoveConstructorLargeInt) {
-  PointerIntEnumTy E(EnumTy::Index2, 5000);
-  void *Ptr = E.getPointer();
+  // Then test the boundary from representable index to unrepresentable index.
+  uintptr_t MaxIndex = (uintptr_t(1) << (sizeof(uintptr_t) * CHAR_BIT - 7)) - 2;
+  {
+    PointerIntEnumTy Enum(EnumTy::Index3, MaxIndex + 1);
+    EXPECT_FALSE(Enum.isValid());
+    EXPECT_FALSE(Enum.getKind());
+    EXPECT_EQ(Enum.getStorage(), InvalidStorage);
+  }
 
   {
-    PointerIntEnumTy E2(std::move(E));
+    PointerIntEnumTy Enum(EnumTy::Index4, MaxIndex);
+    EXPECT_TRUE(Enum.isValid());
+    EXPECT_EQ(*Enum.getKind(), EnumTy::Index4);
+    EXPECT_EQ(Enum.getIndex(), MaxIndex);
 
-    EXPECT_FALSE(E.isValid());
-    EXPECT_EQ(E.getKind(), EnumTy::Invalid);
-    EXPECT_EQ(E.getRawKind(), EnumTy::Invalid);
-
-    EXPECT_TRUE(E2.isValid());
-    EXPECT_EQ(E2.getKind(), EnumTy::Index2);
-    EXPECT_EQ(E2.getRawKind(), EnumTy::LargeIndex);
-    EXPECT_EQ(E2.getIndex(), 5000U);
-    EXPECT_EQ(E2.getPointer(), Ptr);
+    // Make sure that the value is laid out correctly in memory.
+    uintptr_t Value = (uintptr_t(MaxIndex) << 7) | uintptr_t(EnumTy::Index4);
+    EXPECT_EQ(Enum.getStorage(), Value);
   }
-
-  uint64_t y;
-  memcpy(&y, Ptr, sizeof(y));
-  EXPECT_EQ(y, -1ULL);
 }
 
-TEST(PointerIntEnumTest, MoveConstructorSmallInt) {
-  PointerIntEnumTy E(EnumTy::Index2, 4095);
-  PointerIntEnumTy E2(std::move(E));
+TEST(PointerIntEnumTest, CopyConstructorAssignment) {
+  PointerIntEnumTy IntEnum(EnumTy::Index3, 0xBEEF);
+  uintptr_t IntEnumStorageValue =
+      (uintptr_t(0xBEEF) << 7) | uintptr_t(EnumTy::Index3);
+  int *data = new int[1];
+  PointerIntEnumTy PtrEnum(EnumTy::Ptr2, data);
+  uintptr_t PtrEnumStorageValue = uintptr_t(data) | uintptr_t(EnumTy::Ptr2);
 
-  EXPECT_FALSE(E.isValid());
-  EXPECT_EQ(E.getKind(), EnumTy::Invalid);
-  EXPECT_EQ(E.getRawKind(), EnumTy::Invalid);
+  PointerIntEnumTy Enum2(IntEnum);
+  PointerIntEnumTy Enum3 = IntEnum;
 
-  EXPECT_TRUE(E2.isValid());
-  EXPECT_EQ(E2.getKind(), EnumTy::Index2);
-  EXPECT_EQ(E2.getRawKind(), EnumTy::Index2);
-  EXPECT_EQ(E2.getIndex(), 4095U);
+  EXPECT_TRUE(Enum2.isValid());
+  EXPECT_EQ(*Enum2.getKind(), EnumTy::Index3);
+  EXPECT_EQ(Enum2.getIndex(), uintptr_t(0xBEEF));
+  EXPECT_EQ(Enum2.getStorage(), IntEnumStorageValue);
+  EXPECT_EQ(IntEnum, Enum2);
+  EXPECT_NE(PtrEnum, Enum2);
+
+  EXPECT_TRUE(Enum3.isValid());
+  EXPECT_EQ(*Enum3.getKind(), EnumTy::Index3);
+  EXPECT_EQ(Enum3.getIndex(), uintptr_t(0xBEEF));
+  EXPECT_EQ(Enum3.getStorage(), IntEnumStorageValue);
+  EXPECT_EQ(IntEnum, Enum3);
+  EXPECT_NE(PtrEnum, Enum3);
+
+  Enum3 = PtrEnum;
+  PointerIntEnumTy Enum4(PtrEnum);
+
+  EXPECT_TRUE(Enum3.isValid());
+  EXPECT_EQ(*Enum3.getKind(), EnumTy::Ptr2);
+  EXPECT_EQ(Enum3.getPointer(), data);
+  EXPECT_EQ(Enum3.getStorage(), PtrEnumStorageValue);
+  EXPECT_EQ(Enum3, PtrEnum);
+  EXPECT_NE(Enum3, IntEnum);
+
+  EXPECT_TRUE(Enum4.isValid());
+  EXPECT_EQ(*Enum4.getKind(), EnumTy::Ptr2);
+  EXPECT_EQ(Enum4.getPointer(), data);
+  EXPECT_EQ(Enum4.getStorage(), PtrEnumStorageValue);
+  EXPECT_EQ(Enum4, PtrEnum);
+  EXPECT_NE(Enum4, IntEnum);
+
+  // Round trip Enum3
+  Enum3 = IntEnum;
+  EXPECT_TRUE(Enum3.isValid());
+  EXPECT_EQ(*Enum3.getKind(), EnumTy::Index3);
+  EXPECT_EQ(Enum3.getIndex(), uintptr_t(0xBEEF));
+  EXPECT_EQ(Enum3.getStorage(), IntEnumStorageValue);
+  EXPECT_EQ(IntEnum, Enum3);
+  EXPECT_NE(PtrEnum, Enum3);
+
+  delete[] data;
 }
 
-TEST(PointerIntEnumTest, MoveConstructorPointer) {
-  int *InputPtr = new int[1];
-  InputPtr[0] = INT_MAX;
-  PointerIntEnumTy E(EnumTy::Ptr3, InputPtr);
-  void *Ptr = E.getPointer();
-  EXPECT_EQ(Ptr, InputPtr);
+// We have a trivial move constructor, so we copy when we move.
+TEST(PointerIntEnumTest, MoveConstructorAssignment) {
+  PointerIntEnumTy IntEnum(EnumTy::Index3, 0xBEEF);
+  uintptr_t IntEnumStorageValue =
+      (uintptr_t(0xBEEF) << 7) | uintptr_t(EnumTy::Index3);
+  int *data = new int[1];
+  PointerIntEnumTy PtrEnum(EnumTy::Ptr2, data);
+  uintptr_t PtrEnumStorageValue = uintptr_t(data) | uintptr_t(EnumTy::Ptr2);
 
-  {
-    PointerIntEnumTy E2(std::move(E));
+  PointerIntEnumTy Enum2(std::move(IntEnum));
+  PointerIntEnumTy Enum3 = std::move(IntEnum);
 
-    EXPECT_FALSE(E.isValid());
-    EXPECT_EQ(E.getKind(), EnumTy::Invalid);
-    EXPECT_EQ(E.getRawKind(), EnumTy::Invalid);
+  EXPECT_TRUE(Enum2.isValid());
+  EXPECT_EQ(*Enum2.getKind(), EnumTy::Index3);
+  EXPECT_EQ(Enum2.getIndex(), uintptr_t(0xBEEF));
+  EXPECT_EQ(Enum2.getStorage(), IntEnumStorageValue);
+  EXPECT_EQ(IntEnum, Enum2);
+  EXPECT_NE(PtrEnum, Enum2);
 
-    EXPECT_TRUE(E2.isValid());
-    EXPECT_EQ(E2.getKind(), EnumTy::Ptr3);
-    EXPECT_EQ(E2.getRawKind(), EnumTy::Ptr3);
-    EXPECT_EQ(E2.getPointer(), Ptr);
-  }
+  EXPECT_TRUE(Enum3.isValid());
+  EXPECT_EQ(*Enum3.getKind(), EnumTy::Index3);
+  EXPECT_EQ(Enum3.getIndex(), uintptr_t(0xBEEF));
+  EXPECT_EQ(Enum3.getStorage(), IntEnumStorageValue);
+  EXPECT_EQ(IntEnum, Enum3);
+  EXPECT_NE(PtrEnum, Enum3);
 
-  EXPECT_EQ(InputPtr[0], INT_MAX);
+  Enum3 = std::move(PtrEnum);
+  PointerIntEnumTy Enum4(std::move(PtrEnum));
 
-  delete [] InputPtr;
+  EXPECT_TRUE(Enum3.isValid());
+  EXPECT_EQ(*Enum3.getKind(), EnumTy::Ptr2);
+  EXPECT_EQ(Enum3.getPointer(), data);
+  EXPECT_EQ(Enum3.getStorage(), PtrEnumStorageValue);
+  EXPECT_EQ(Enum3, PtrEnum);
+  EXPECT_NE(Enum3, IntEnum);
+
+  EXPECT_TRUE(Enum4.isValid());
+  EXPECT_EQ(*Enum4.getKind(), EnumTy::Ptr2);
+  EXPECT_EQ(Enum4.getPointer(), data);
+  EXPECT_EQ(Enum4.getStorage(), PtrEnumStorageValue);
+  EXPECT_EQ(Enum4, PtrEnum);
+  EXPECT_NE(Enum4, IntEnum);
+
+  // Round trip Enum3
+  Enum3 = std::move(IntEnum);
+  EXPECT_TRUE(Enum3.isValid());
+  EXPECT_EQ(*Enum3.getKind(), EnumTy::Index3);
+  EXPECT_EQ(Enum3.getIndex(), uintptr_t(0xBEEF));
+  EXPECT_EQ(Enum3.getStorage(), IntEnumStorageValue);
+  EXPECT_EQ(IntEnum, Enum3);
+  EXPECT_NE(PtrEnum, Enum3);
+
+  delete[] data;
 }
 
-TEST(PointerIntEnumTest, CopyAssignInvalidToLargeInt) {
-  PointerIntEnumTy Invalid;
-  PointerIntEnumTy Large(EnumTy::Index3, 5000);
-
-  Invalid = Large;
-
-  EXPECT_TRUE(Invalid.isValid());
-  EXPECT_EQ(Invalid.getKind(), EnumTy::Index3);
-  EXPECT_EQ(Invalid.getRawKind(), EnumTy::LargeIndex);
-  EXPECT_EQ(Invalid.getIndex(), 5000U);
-
-  EXPECT_TRUE(Large.isValid());
-  EXPECT_EQ(Large.getKind(), EnumTy::Index3);
-  EXPECT_EQ(Large.getRawKind(), EnumTy::LargeIndex);
-  EXPECT_EQ(Large.getIndex(), 5000U);
-}
-
-TEST(PointerIntEnumTest, CopyAssignSmallIntToLargeInt) {
-  PointerIntEnumTy Small(EnumTy::Index2, 4095);
-  PointerIntEnumTy Large(EnumTy::Index3, 5000);
-
-  Small = Large;
-
-  EXPECT_TRUE(Small.isValid());
-  EXPECT_EQ(Small.getKind(), EnumTy::Index3);
-  EXPECT_EQ(Small.getRawKind(), EnumTy::LargeIndex);
-  EXPECT_EQ(Small.getIndex(), 5000U);
-
-  EXPECT_TRUE(Large.isValid());
-  EXPECT_EQ(Large.getKind(), EnumTy::Index3);
-  EXPECT_EQ(Large.getRawKind(), EnumTy::LargeIndex);
-  EXPECT_EQ(Large.getIndex(), 5000U);
-}
-
-TEST(PointerIntEnumTest, CopyAssignLargeIntToSmallInt) {
-  PointerIntEnumTy Small(EnumTy::Index2, 4095);
-  PointerIntEnumTy Large(EnumTy::Index3, 5000);
-  void *Ptr = Large.getPointer();
-
-  Large = Small;
-
-  uint64_t y;
-  memcpy(&y, Ptr, sizeof(y));
-  EXPECT_EQ(y, -1ULL);
-
-  EXPECT_TRUE(Small.isValid());
-  EXPECT_EQ(Small.getKind(), EnumTy::Index2);
-  EXPECT_EQ(Small.getRawKind(), EnumTy::Index2);
-  EXPECT_EQ(Small.getIndex(), 4095U);
-
-  EXPECT_TRUE(Large.isValid());
-  EXPECT_EQ(Large.getKind(), EnumTy::Index2);
-  EXPECT_EQ(Large.getRawKind(), EnumTy::Index2);
-  EXPECT_EQ(Large.getIndex(), 4095U);
-}
-
-TEST(PointerIntEnumTest, CopyAssignPointerToLargeInt) {
-  int *InputPtr = new int[1];
-  InputPtr[0] = INT_MAX;
-
-  void *Ptr1, *Ptr2;
-  uint64_t Ptr1Value, Ptr2Value;
-  {
-    PointerIntEnumTy Large(EnumTy::Index3, 5000);
-    Ptr1 = Large.getPointer();
-    memcpy(&Ptr1Value, Ptr1, sizeof(Ptr1Value));
-    EXPECT_NE(Ptr1Value, -1ULL);
-
-    {
-      PointerIntEnumTy Pointer(EnumTy::Ptr3, InputPtr);
-      void *Ptr = Pointer.getPointer();
-      EXPECT_EQ(Ptr, InputPtr);
-
-      Pointer = Large;
-      Ptr2 = Pointer.getPointer();
-      EXPECT_NE(Ptr1, Ptr2);
-
-      memcpy(&Ptr2Value, Ptr2, sizeof(Ptr2Value));
-      EXPECT_NE(Ptr2Value, -1ULL);
-
-      EXPECT_TRUE(Large.isValid());
-      EXPECT_EQ(Large.getKind(), EnumTy::Index3);
-      EXPECT_EQ(Large.getRawKind(), EnumTy::LargeIndex);
-      EXPECT_EQ(Large.getIndex(), 5000U);
-
-      EXPECT_TRUE(Pointer.isValid());
-      EXPECT_EQ(Pointer.getKind(), EnumTy::Index3);
-      EXPECT_EQ(Pointer.getRawKind(), EnumTy::LargeIndex);
-      EXPECT_EQ(Pointer.getIndex(), 5000U);
-    }
-
-    memcpy(&Ptr2Value, Ptr2, sizeof(Ptr2Value));
-    EXPECT_EQ(Ptr2Value, -1ULL);
-    memcpy(&Ptr1Value, Ptr1, sizeof(Ptr1Value));
-    EXPECT_NE(Ptr1Value, -1ULL);
-  }
-  memcpy(&Ptr1Value, Ptr1, sizeof(Ptr1Value));
-  EXPECT_EQ(Ptr1Value, -1ULL);
-
-  delete [] InputPtr;
-}
-
-TEST(PointerIntEnumTest, CopyAssignLargeIntToPointer) {
-  int *InputPtr = new int[1];
-  InputPtr[0] = INT_MAX;
-
-  PointerIntEnumTy Pointer(EnumTy::Ptr3, InputPtr);
-  PointerIntEnumTy Large(EnumTy::Index3, 5000);
-
-  void *Ptr = Large.getPointer();
-
-  uint64_t Value;
-  memcpy(&Value, Ptr, sizeof(Value));
-  EXPECT_NE(Value, -1ULL);
-
-  Large = Pointer;
-
-  memcpy(&Value, Ptr, sizeof(Value));
-  EXPECT_EQ(Value, -1ULL);
-
-  EXPECT_TRUE(Pointer.isValid());
-  EXPECT_EQ(Pointer.getKind(), EnumTy::Ptr3);
-  EXPECT_EQ(Pointer.getRawKind(), EnumTy::Ptr3);
-  EXPECT_EQ(Pointer.getPointer(), InputPtr);
-
-  EXPECT_TRUE(Large.isValid());
-  EXPECT_EQ(Large.getKind(), EnumTy::Ptr3);
-  EXPECT_EQ(Large.getRawKind(), EnumTy::Ptr3);
-  EXPECT_EQ(Large.getPointer(), InputPtr);
-
-  delete [] InputPtr;
-}
-
-TEST(PointerIntEnumTest, CopyAssignSmallIntToPointer) {
-  int *InputPtr = new int[1];
-  InputPtr[0] = INT_MAX;
-
-  PointerIntEnumTy Pointer(EnumTy::Ptr3, InputPtr);
-  PointerIntEnumTy Small(EnumTy::Index3, 4095);
-
-  Small = Pointer;
-
-  EXPECT_TRUE(Pointer.isValid());
-  EXPECT_EQ(Pointer.getKind(), EnumTy::Ptr3);
-  EXPECT_EQ(Pointer.getRawKind(), EnumTy::Ptr3);
-  EXPECT_EQ(Pointer.getPointer(), InputPtr);
-
-  EXPECT_TRUE(Small.isValid());
-  EXPECT_EQ(Small.getKind(), EnumTy::Ptr3);
-  EXPECT_EQ(Small.getRawKind(), EnumTy::Ptr3);
-  EXPECT_EQ(Small.getPointer(), InputPtr);
-
-  delete [] InputPtr;
-}
-
-TEST(PointerIntEnumTest, CopyAssignPointerToSmallInt) {
-  int *InputPtr = new int[1];
-  InputPtr[0] = INT_MAX;
-
-  PointerIntEnumTy Pointer(EnumTy::Ptr3, InputPtr);
-  PointerIntEnumTy Small(EnumTy::Index3, 4095);
-
-  EXPECT_TRUE(Pointer.isValid());
-  EXPECT_EQ(Pointer.getKind(), EnumTy::Ptr3);
-  EXPECT_EQ(Pointer.getRawKind(), EnumTy::Ptr3);
-  EXPECT_EQ(Pointer.getPointer(), InputPtr);
-
-  EXPECT_TRUE(Small.isValid());
-  EXPECT_EQ(Small.getKind(), EnumTy::Index3);
-  EXPECT_EQ(Small.getRawKind(), EnumTy::Index3);
-  EXPECT_EQ(Small.getIndex(), 4095U);
-
-  Pointer = Small;
-
-  EXPECT_TRUE(Pointer.isValid());
-  EXPECT_EQ(Pointer.getKind(), EnumTy::Index3);
-  EXPECT_EQ(Pointer.getRawKind(), EnumTy::Index3);
-  EXPECT_EQ(Pointer.getIndex(), 4095U);
-
-  EXPECT_TRUE(Small.isValid());
-  EXPECT_EQ(Small.getKind(), EnumTy::Index3);
-  EXPECT_EQ(Small.getRawKind(), EnumTy::Index3);
-  EXPECT_EQ(Small.getIndex(), 4095U);
-
-  delete [] InputPtr;
-}
-
-TEST(PointerIntEnumTest, MoveAssignSmallIntToLargeInt) {
-  PointerIntEnumTy Small(EnumTy::Index2, 4095);
-  PointerIntEnumTy Large(EnumTy::Index3, 5000);
-
-  Small = std::move(Large);
-
-  EXPECT_TRUE(Small.isValid());
-  EXPECT_EQ(Small.getKind(), EnumTy::Index3);
-  EXPECT_EQ(Small.getRawKind(), EnumTy::LargeIndex);
-  EXPECT_EQ(Small.getIndex(), 5000U);
-
-  EXPECT_TRUE(Large.isValid());
-  EXPECT_EQ(Large.getKind(), EnumTy::Index2);
-  EXPECT_EQ(Large.getRawKind(), EnumTy::Index2);
-  EXPECT_EQ(Large.getIndex(), 4095U);
-}
-
-TEST(PointerIntEnumTest, MoveAssignLargeIntToSmallInt) {
-  PointerIntEnumTy Small(EnumTy::Index2, 4095);
-  PointerIntEnumTy Large(EnumTy::Index3, 5000);
-
-  Large = std::move(Small);
-
-  EXPECT_TRUE(Small.isValid());
-  EXPECT_EQ(Small.getKind(), EnumTy::Index3);
-  EXPECT_EQ(Small.getRawKind(), EnumTy::LargeIndex);
-  EXPECT_EQ(Small.getIndex(), 5000U);
-
-  EXPECT_TRUE(Large.isValid());
-  EXPECT_EQ(Large.getKind(), EnumTy::Index2);
-  EXPECT_EQ(Large.getRawKind(), EnumTy::Index2);
-  EXPECT_EQ(Large.getIndex(), 4095U);
-}
-
-TEST(PointerIntEnumTest, MoveAssignPointerToLargeInt) {
-  int *IntPtr = new int[1];
-
-  PointerIntEnumTy Pointer(EnumTy::Ptr1, IntPtr);
-  PointerIntEnumTy Large(EnumTy::Index3, 5000);
-
-  Pointer = std::move(Large);
-
-  EXPECT_TRUE(Pointer.isValid());
-  EXPECT_EQ(Pointer.getKind(), EnumTy::Index3);
-  EXPECT_EQ(Pointer.getRawKind(), EnumTy::LargeIndex);
-  EXPECT_EQ(Pointer.getIndex(), 5000U);
-
-  EXPECT_TRUE(Large.isValid());
-  EXPECT_EQ(Large.getKind(), EnumTy::Ptr1);
-  EXPECT_EQ(Large.getRawKind(), EnumTy::Ptr1);
-  EXPECT_EQ(Large.getPointer(), IntPtr);
-
-  delete [] IntPtr;
-}
-
-TEST(PointerIntEnumTest, MoveAssignLargeIntToPointer) {
-  int *IntPtr = new int[1];
-
-  PointerIntEnumTy Pointer(EnumTy::Ptr1, IntPtr);
-  PointerIntEnumTy Large(EnumTy::Index3, 5000);
-
-  Large = std::move(Pointer);
-
-  EXPECT_TRUE(Pointer.isValid());
-  EXPECT_EQ(Pointer.getKind(), EnumTy::Index3);
-  EXPECT_EQ(Pointer.getRawKind(), EnumTy::LargeIndex);
-  EXPECT_EQ(Pointer.getIndex(), 5000U);
-
-  EXPECT_TRUE(Large.isValid());
-  EXPECT_EQ(Large.getKind(), EnumTy::Ptr1);
-  EXPECT_EQ(Large.getRawKind(), EnumTy::Ptr1);
-  EXPECT_EQ(Large.getPointer(), IntPtr);
-
-  delete [] IntPtr;
-}
-
-TEST(PointerIntEnumTest, MoveAssignSmallIntToPointer) {
-  int *IntPtr = new int[1];
-
-  PointerIntEnumTy Pointer(EnumTy::Ptr1, IntPtr);
-  PointerIntEnumTy Small(EnumTy::Index2, 4095U);
-
-  Pointer = std::move(Small);
-
-  EXPECT_TRUE(Pointer.isValid());
-  EXPECT_EQ(Pointer.getKind(), EnumTy::Index2);
-  EXPECT_EQ(Pointer.getRawKind(), EnumTy::Index2);
-  EXPECT_EQ(Pointer.getIndex(), 4095U);
-
-  EXPECT_TRUE(Small.isValid());
-  EXPECT_EQ(Small.getKind(), EnumTy::Ptr1);
-  EXPECT_EQ(Small.getRawKind(), EnumTy::Ptr1);
-  EXPECT_EQ(Small.getPointer(), IntPtr);
-
-  delete [] IntPtr;
-}
-
-TEST(PointerIntEnumTest, MoveAssignPointerToSmallInt) {
-  int *IntPtr = new int[1];
-
-  PointerIntEnumTy Pointer(EnumTy::Ptr1, IntPtr);
-  PointerIntEnumTy Small(EnumTy::Index2, 4095U);
-
-  Small = std::move(Pointer);
-
-  EXPECT_TRUE(Pointer.isValid());
-  EXPECT_EQ(Pointer.getKind(), EnumTy::Index2);
-  EXPECT_EQ(Pointer.getRawKind(), EnumTy::Index2);
-  EXPECT_EQ(Pointer.getIndex(), 4095U);
-
-  EXPECT_TRUE(Small.isValid());
-  EXPECT_EQ(Small.getKind(), EnumTy::Ptr1);
-  EXPECT_EQ(Small.getRawKind(), EnumTy::Ptr1);
-  EXPECT_EQ(Small.getPointer(), IntPtr);
-
-  delete [] IntPtr;
+TEST(PointerIntEnumTest, Comparisons) {
+  PointerIntEnumTy IndexCase1(EnumTy::Index1, 5);
+
+  // Make sure that enums with different cases but the same value always compare
+  // different.
+  PointerIntEnumTy IndexCase2(EnumTy::Index2, 5);
+  EXPECT_NE(IndexCase1, IndexCase2);
+
+  // Make sure that enums with the same case and the same value compare equal.
+  PointerIntEnumTy IndexCase3(EnumTy::Index1, 5);
+  EXPECT_EQ(IndexCase1, IndexCase3);
+
+  // Make sure that enums with the same case, but different values do not
+  // compare equal.
+  PointerIntEnumTy IndexCase4(EnumTy::Index1, 6);
+  EXPECT_NE(IndexCase1, IndexCase4);
+
+  int *data1 = new int[1];
+  int *data2 = new int[1];
+  PointerIntEnumTy PtrCase1(EnumTy::Ptr1, data1);
+
+  // Test that pointer enums with different cases but the same value compare
+  // different.
+  PointerIntEnumTy PtrCase2(EnumTy::Ptr2, data1);
+  EXPECT_NE(PtrCase1, PtrCase2);
+
+  // Test that pointer enums with the same case and data are equal.
+  PointerIntEnumTy PtrCase3(EnumTy::Ptr1, data1);
+  EXPECT_EQ(PtrCase1, PtrCase3);
+
+  // Test that pointer enums with the same case but different data are not
+  // equal.
+  PointerIntEnumTy PtrCase4(EnumTy::Ptr1, data2);
+  EXPECT_NE(PtrCase1, PtrCase4);
+
+  // Test that pointers and indices compare differently.
+  EXPECT_NE(IndexCase1, PtrCase1);
+
+  // Test comparison in between invalid and valid PointerIntEnums.
+  PointerIntEnumTy Invalid1;
+  PointerIntEnumTy Invalid2;
+  EXPECT_EQ(Invalid1, Invalid2);
+  EXPECT_NE(Invalid1, IndexCase1);
+  EXPECT_NE(Invalid1, PtrCase1);
+  EXPECT_NE(IndexCase1, Invalid1);
+  EXPECT_NE(PtrCase1, Invalid1);
+
+
+  delete[] data2;
+  delete[] data1;
 }

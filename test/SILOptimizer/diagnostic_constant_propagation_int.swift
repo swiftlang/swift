@@ -265,7 +265,7 @@ func testArithmeticOverflow_UInt_32bit() {
   }
 }
 
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
 
 func testArithmeticOverflow_Int_64bit() {
   do {

@@ -25,7 +25,8 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Mangle.h"
-#include "swift/AST/Parameter.h"
+#include "swift/AST/ParameterList.h"
+#include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/TypeLoc.h"
 #include "clang/Lex/MacroInfo.h"
 #include "llvm/ADT/SmallString.h"
@@ -401,7 +402,7 @@ bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
 
   auto hasInternalParameter = [](const ParameterList *params) -> bool {
     for (auto param : *params) {
-      if (param.decl->hasName() && param.decl->getNameStr().startswith("_"))
+      if (param->hasName() && param->getNameStr().startswith("_"))
         return true;
     }
     return false;
@@ -558,16 +559,15 @@ GenericParamList::getForwardingSubstitutions(ASTContext &C) {
   for (auto archetype : getAllNestedArchetypes()) {
     // "Check conformance" on each declared protocol to build a
     // conformance map.
-    SmallVector<ProtocolConformance *, 2> conformances;
+    SmallVector<ProtocolConformanceRef, 2> conformances;
 
-    for (ProtocolDecl *conformsTo : archetype->getConformsTo()) {
-      (void)conformsTo;
-      conformances.push_back(nullptr);
+    for (ProtocolDecl *proto : archetype->getConformsTo()) {
+      conformances.push_back(ProtocolConformanceRef(proto));
     }
 
     // Build an identity mapping with the derived conformances.
     auto replacement = SubstitutedType::get(archetype, archetype, C);
-    subs.push_back({archetype, replacement, C.AllocateCopy(conformances)});
+    subs.push_back({replacement, C.AllocateCopy(conformances)});
   }
 
   return C.AllocateCopy(subs);
@@ -641,7 +641,7 @@ GenericParamList::getAsGenericSignatureElements(ASTContext &C,
     
     // Collect conformance requirements declared on the archetype.
     if (auto super = archetype->getSuperclass()) {
-      requirements.push_back(Requirement(RequirementKind::Conformance,
+      requirements.push_back(Requirement(RequirementKind::Superclass,
                                          typeParamTy, super));
     }
     for (auto proto : archetype->getConformsTo()) {
@@ -659,8 +659,8 @@ GenericParamList::getAsGenericSignatureElements(ASTContext &C,
 
     // Add conformance requirements for this associated archetype.
     for (const auto &repr : getRequirements()) {
-      // Handle same-type requirements at last.
-      if (repr.getKind() != RequirementKind::Conformance)
+      // Handle same-type requirements later.
+      if (repr.getKind() != RequirementReprKind::TypeConstraint)
         continue;
 
       // Primary conformance declarations would have already been gathered as
@@ -669,13 +669,21 @@ GenericParamList::getAsGenericSignatureElements(ASTContext &C,
         if (!arch->getParent())
           continue;
 
-      auto depTyOfReqt = getAsDependentType(repr.getSubject(), archetypeMap);
-      if (depTyOfReqt.getPointer() != depTy.getPointer())
+      Type subject = getAsDependentType(repr.getSubject(), archetypeMap);
+      if (subject.getPointer() != depTy.getPointer())
         continue;
 
-      Requirement reqt(RequirementKind::Conformance,
-                       getAsDependentType(repr.getSubject(), archetypeMap),
-                       getAsDependentType(repr.getConstraint(), archetypeMap));
+      Type constraint =
+        getAsDependentType(repr.getConstraint(), archetypeMap);
+
+      RequirementKind kind;
+      if (constraint->getClassOrBoundGenericClass()) {
+        kind = RequirementKind::Superclass;
+      } else {
+        kind = RequirementKind::Conformance;
+      }
+
+      Requirement reqt(kind, subject, constraint);
       requirements.push_back(reqt);
     }
   }
@@ -1167,10 +1175,24 @@ static bool isPolymorphic(const AbstractStorageDecl *storage) {
   llvm_unreachable("bad DeclKind");
 }
 
+static ResilienceExpansion getResilienceExpansion(const DeclContext *DC) {
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC))
+    if (AFD->isTransparent() &&
+        AFD->getFormalAccess() == Accessibility::Public)
+      return ResilienceExpansion::Minimal;
+
+  return ResilienceExpansion::Maximal;
+}
+
 /// Determines the access semantics to use in a DeclRefExpr or
 /// MemberRefExpr use of this value in the specified context.
 AccessSemantics
 ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC) const {
+  // If we're inside a @_transparent function, use the most conservative
+  // access pattern, since we may be inlined from a different resilience
+  // domain.
+  ResilienceExpansion expansion = getResilienceExpansion(UseDC);
+
   if (auto *var = dyn_cast<AbstractStorageDecl>(this)) {
     // Observing member are accessed directly from within their didSet/willSet
     // specifiers.  This prevents assignments from becoming infinite loops.
@@ -1199,12 +1221,10 @@ ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC) const {
       if (isPolymorphic(var))
         return AccessSemantics::Ordinary;
 
-      // If the property is defined in a nominal type which must be accessed
-      // resiliently from the current module, we cannot do direct access.
-      auto VarDC = var->getDeclContext();
-      if (auto *nominal = VarDC->isNominalTypeOrNominalTypeExtensionContext())
-        if (!nominal->hasFixedLayout(UseDC->getParentModule()))
-          return AccessSemantics::Ordinary;
+      // If the property does not have a fixed layout from the given context,
+      // we cannot do direct access.
+      if (!var->hasFixedLayout(UseDC->getParentModule(), expansion))
+        return AccessSemantics::Ordinary;
 
       // We know enough about the property to perform direct access.
       return AccessSemantics::DirectToStorage;
@@ -1278,8 +1298,8 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
 
     case StoredWithTrivialAccessors:
     case AddressedWithTrivialAccessors: {
-        // If the property is defined in a non-final class or a protocol, the
-        // accessors are dynamically dispatched, and we cannot do direct access.
+      // If the property is defined in a non-final class or a protocol, the
+      // accessors are dynamically dispatched, and we cannot do direct access.
       if (isPolymorphic(this))
         return AccessStrategy::DispatchToAccessor;
 
@@ -1287,16 +1307,14 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
       // from some resilience domain, we cannot do direct access.
       //
       // As an optimization, we do want to perform direct accesses of stored
-      // properties of resilient types in the same resilience domain as the
-      // access.
+      // properties declared inside the same resilience domain as the access
+      // context.
       //
       // This is done by using DirectToStorage semantics above, with the
       // understanding that the access semantics are with respect to the
       // resilience domain of the accessor's caller.
-      auto DC = getDeclContext();
-      if (auto *nominal = DC->isNominalTypeOrNominalTypeExtensionContext())
-        if (!nominal->hasFixedLayout())
-          return AccessStrategy::DirectToAccessor;
+      if (!hasFixedLayout())
+        return AccessStrategy::DirectToAccessor;
 
       if (storageKind == StoredWithObservers ||
           storageKind == StoredWithTrivialAccessors) {
@@ -1324,6 +1342,39 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
   }
   llvm_unreachable("bad access semantics");
 }
+
+bool AbstractStorageDecl::hasFixedLayout() const {
+  // Private and internal variables always have a fixed layout.
+  // TODO: internal variables with availability information need to be
+  // resilient, since they can be used from @_transparent functions.
+  if (getFormalAccess() != Accessibility::Public)
+    return true;
+
+  // Check for an explicit @_fixed_layout attribute.
+  if (getAttrs().hasAttribute<FixedLayoutAttr>())
+    return true;
+
+  // If we're in a nominal type, just query the type.
+  auto nominal = getDeclContext()->isNominalTypeOrNominalTypeExtensionContext();
+  if (nominal)
+    return nominal->hasFixedLayout();
+
+  // Must use resilient access patterns.
+  assert(getDeclContext()->isModuleScopeContext());
+  return !getDeclContext()->getParentModule()->isResilienceEnabled();
+}
+
+bool AbstractStorageDecl::hasFixedLayout(ModuleDecl *M,
+                                         ResilienceExpansion expansion) const {
+  switch (expansion) {
+  case ResilienceExpansion::Minimal:
+    return hasFixedLayout();
+  case ResilienceExpansion::Maximal:
+    return hasFixedLayout() || M == getModuleContext();
+  }
+  llvm_unreachable("bad resilience expansion");
+}
+
 
 bool ValueDecl::isDefinition() const {
   switch (getKind()) {
@@ -1746,9 +1797,9 @@ Type ValueDecl::getInterfaceType() const {
     auto proto = cast<ProtocolDecl>(getDeclContext());
     (void)proto->getType(); // make sure we've computed the type.
     // FIXME: the generic parameter types list should never be empty.
-    auto selfTy = proto->getGenericParamTypes().empty()
+    auto selfTy = proto->getInnermostGenericParamTypes().empty()
                     ? proto->getProtocolSelf()->getType()
-                    : proto->getGenericParamTypes().back();
+                    : proto->getInnermostGenericParamTypes().back();
     auto &ctx = getASTContext();
     InterfaceTy = DependentMemberType::get(
                     selfTy,
@@ -1835,26 +1886,30 @@ bool NominalTypeDecl::hasFixedLayout() const {
   if (getAttrs().hasAttribute<FixedLayoutAttr>())
     return true;
 
-  if (hasClangNode()) {
-    // Classes imported from Objective-C *never* have a fixed layout.
-    // IRGen needs to use dynamic ivar layout to ensure that subclasses
-    // of Objective-C classes are resilient against base class size
-    // changes.
-    if (isa<ClassDecl>(this))
-      return false;
-
-    // Structs and enums imported from C *always* have a fixed layout.
-    // We know their size, and pass them as values in SIL and IRGen.
+  // Structs and enums imported from C *always* have a fixed layout.
+  // We know their size, and pass them as values in SIL and IRGen.
+  if (hasClangNode())
     return true;
-  }
 
-  // Objective-C enums always have a fixed layout.
+  // @objc enums always have a fixed layout.
   if (isa<EnumDecl>(this) && isObjC())
     return true;
 
   // Otherwise, access via indirect "resilient" interfaces.
-  return false;
+  return !getParentModule()->isResilienceEnabled();
 }
+
+bool NominalTypeDecl::hasFixedLayout(ModuleDecl *M,
+                                     ResilienceExpansion expansion) const {
+  switch (expansion) {
+  case ResilienceExpansion::Minimal:
+    return hasFixedLayout();
+  case ResilienceExpansion::Maximal:
+    return hasFixedLayout() || M == getModuleContext();
+  }
+  llvm_unreachable("bad resilience expansion");
+}
+
 
 /// Provide the set of parameters to a generic type, or null if
 /// this function is not generic.
@@ -2323,9 +2378,7 @@ static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
 
     NominalTypeDecl *NTD = const_cast<NominalTypeDecl*>(nominal);
     if (isa<ClassDecl>(nominal)) {
-      mangler.mangleNominalType(NTD,
-                                ResilienceExpansion::Minimal,
-                                Mangle::Mangler::BindGenerics::None);
+      mangler.mangleNominalType(NTD, Mangle::Mangler::BindGenerics::None);
     } else {
       mangler.mangleProtocolDecl(cast<ProtocolDecl>(NTD));
     }
@@ -3152,10 +3205,9 @@ SourceRange VarDecl::getSourceRange() const {
 }
 
 SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
-  // For a parameter, map back to it's parameter to get the TypeLoc.
+  // For a parameter, map back to its parameter to get the TypeLoc.
   if (auto *PD = dyn_cast<ParamDecl>(this)) {
-    auto &P = PD->getParameter();
-    if (auto typeRepr = P.decl->getTypeLoc().getTypeRepr())
+    if (auto typeRepr = PD->getTypeLoc().getTypeRepr())
       return typeRepr->getSourceRange();
   }
   
@@ -3222,7 +3274,10 @@ Pattern *VarDecl::getParentPattern() const {
 }
 
 bool VarDecl::isSelfParameter() const {
-  return isa<ParamDecl>(this) && getName() == getASTContext().Id_self;
+  // Note: we need to check the isImplicit() bit here to make sure that we
+  // don't classify explicit parameters declared with `self` as the self param.
+  return isa<ParamDecl>(this) && getName() == getASTContext().Id_self &&
+         isImplicit();
 }
 
 /// Return true if this stored property needs to be accessed with getters and
@@ -3359,24 +3414,6 @@ ParamDecl::ParamDecl(ParamDecl *PD)
     defaultArgumentKind(PD->defaultArgumentKind) {
 }
 
-Parameter &ParamDecl::getParameter() {
-  ArrayRef<ParameterList*> paramLists;
-  
-  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(getDeclContext()))
-    paramLists = AFD->getParameterLists();
-  else if (auto *CE = dyn_cast<ClosureExpr>(getDeclContext()))
-    paramLists = CE->getParameters();
-  else
-    paramLists = cast<SubscriptDecl>(getDeclContext())->getIndices();
-  
-  for (auto paramList : paramLists)
-    for (auto &param : *paramList)
-      if (param.decl == this)
-        return param;
-  llvm_unreachable("ParamDecl has no associated Parameter value?");
-}
-
-
 
 /// \brief Retrieve the type of 'self' for the given context.
 static Type getSelfTypeForContext(DeclContext *dc) {
@@ -3422,12 +3459,52 @@ ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
   return selfDecl;
 }
 
+/// Return the full source range of this parameter.
 SourceRange ParamDecl::getSourceRange() const {
-  return getParameter().getSourceRange();
+  SourceRange range;
+  
+  SourceLoc APINameLoc = getArgumentNameLoc();
+  SourceLoc nameLoc = getNameLoc();
+  
+  if (APINameLoc.isValid() && nameLoc.isInvalid())
+    range = APINameLoc;
+  else if (APINameLoc.isInvalid() && nameLoc.isValid())
+    range = nameLoc;
+  else
+    range = SourceRange(APINameLoc, nameLoc);
+  
+  if (range.isInvalid()) return range;
+  
+  // It would be nice to extend the front of the range to show where inout is,
+  // but we don't have that location info.  Extend the back of the range to the
+  // location of the default argument, or the typeloc if they are valid.
+  if (auto expr = getDefaultValue()) {
+    auto endLoc = expr->getExpr()->getEndLoc();
+    if (endLoc.isValid())
+      return SourceRange(range.Start, endLoc);
+  }
+  
+  // If the typeloc has a valid location, use it to end the range.
+  if (auto typeRepr = getTypeLoc().getTypeRepr()) {
+    auto endLoc = typeRepr->getEndLoc();
+    if (endLoc.isValid())
+      return SourceRange(range.Start, endLoc);
+  }
+  
+  // Otherwise, just return the info we have about the parameter.
+  return range;
 }
 
 Type ParamDecl::getVarargBaseTy(Type VarArgT) {
-  return Parameter::getVarargBaseTy(VarArgT);
+  TypeBase *T = VarArgT.getPointer();
+  if (ArraySliceType *AT = dyn_cast<ArraySliceType>(T))
+    return AT->getBaseType();
+  if (BoundGenericType *BGT = dyn_cast<BoundGenericType>(T)) {
+    // It's the stdlib Array<T>.
+    return BGT->getGenericArgs()[0];
+  }
+  assert(isa<ErrorType>(T));
+  return T;
 }
 
 /// Determine whether the given Swift type is an integral type, i.e.,
@@ -3654,15 +3731,14 @@ Type AbstractFunctionDecl::computeInterfaceSelfType(bool isInitializingCtor) {
 ///
 /// Note that some functions don't have an implicit 'self' decl, for example,
 /// free functions.  In this case nullptr is returned.
-ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl() const {
+ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl() {
   auto paramLists = getParameterLists();
   if (paramLists.empty())
     return nullptr;
 
   // "self" is always the first parameter list.
-  if (paramLists[0]->size() == 1 &&
-      paramLists[0]->get(0).decl->isSelfParameter())
-    return paramLists[0]->get(0).decl;
+  if (paramLists[0]->size() == 1 && paramLists[0]->get(0)->isSelfParameter())
+    return paramLists[0]->get(0);
   return nullptr;
 }
 
@@ -3679,8 +3755,8 @@ AbstractFunctionDecl::getDefaultArg(unsigned Index) const {
 
   for (auto paramList : paramLists) {
     if (Index < paramList->size()) {
-      auto &param = paramList->get(Index);
-      return { param.decl->getDefaultArgumentKind(), param.decl->getType() };
+      auto param = paramList->get(Index);
+      return { param->getDefaultArgumentKind(), param->getType() };
     }
     
     Index -= paramList->size();
@@ -4016,7 +4092,7 @@ bool FuncDecl::isUnaryOperator() const {
     = getDeclContext()->isProtocolOrProtocolExtensionContext() ? 1 : 0;
   
   auto *params = getParameterList(opArgIndex);
-  return params->size() == 1 && !params->get(0).isVariadic();
+  return params->size() == 1 && !params->get(0)->isVariadic();
 }
 
 bool FuncDecl::isBinaryOperator() const {
@@ -4027,7 +4103,7 @@ bool FuncDecl::isBinaryOperator() const {
     = getDeclContext()->isProtocolOrProtocolExtensionContext() ? 1 : 0;
   
   auto *params = getParameterList(opArgIndex);
-  return params->size() == 2 && !params->get(1).isVariadic();
+  return params->size() == 2 && !params->get(1)->isVariadic();
 }
 
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
@@ -4079,7 +4155,7 @@ bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
   if (params->size() != 1)
     return false;
 
-  return params->get(0).decl->getType()->isVoid();
+  return params->get(0)->getType()->isVoid();
 }
 
 DestructorDecl::DestructorDecl(Identifier NameHack, SourceLoc DestructorLoc,
@@ -4319,10 +4395,13 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
 
       if (isa<OtherConstructorDeclRefExpr>(Callee)) {
         arg = apply->getArg();
-      } else if (auto *UCE = dyn_cast<UnresolvedConstructorExpr>(Callee)) {
-        arg = UCE->getSubExpr();
       } else if (auto *CRE = dyn_cast<ConstructorRefCallExpr>(Callee)) {
         arg = CRE->getArg();
+      } else if (auto *dotExpr = dyn_cast<UnresolvedDotExpr>(Callee)) {
+        if (dotExpr->getName().getBaseName().str() != "init")
+          return { true, E };
+
+        arg = dotExpr->getBase();
       } else {
         // Not a constructor call.
         return { true, E };

@@ -74,7 +74,7 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   // abstraction pattern of the base.
   auto baseInfo = Types.getConstantInfo(base);
   auto derivedInfo = Types.getConstantInfo(derived);
-  auto basePattern = AbstractionPattern(baseInfo.LoweredType);
+  auto basePattern = AbstractionPattern(baseInfo.LoweredInterfaceType);
   
   auto overrideInfo = M.Types.getConstantOverrideInfo(derived, base);
 
@@ -94,7 +94,8 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
 
   SILGenFunction(*this, *thunk)
     .emitVTableThunk(derived, basePattern,
-                     overrideInfo.LoweredType, derivedInfo.LoweredType);
+                     overrideInfo.LoweredInterfaceType,
+                     derivedInfo.LoweredInterfaceType);
 
   return thunk;
 }

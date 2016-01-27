@@ -25,6 +25,7 @@
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/ADT/ilist.h"
 #include <string>
@@ -68,7 +69,7 @@ public:
     ProtocolDecl *Protocol;
     /// The ProtocolConformance satisfying the requirement. Null if the
     /// conformance is dependent.
-    ProtocolConformance *Witness;
+    ProtocolConformanceRef Witness;
   };
   
   /// A witness table entry referencing the protocol conformance for a refined

@@ -574,7 +574,12 @@ static void getEnumMirrorInfo(const OpaqueValue *value,
 
   unsigned payloadCases = Description.getNumPayloadCases();
 
-  unsigned tag = type->vw_getEnumTag(value);
+  // 'tag' is in the range [-ElementsWithPayload..ElementsWithNoPayload-1].
+  int tag = type->vw_getEnumTag(value);
+
+  // Convert resilient tag index to fragile tag index.
+  tag += payloadCases;
+
   const Metadata *payloadType = nullptr;
   bool indirect = false;
 

@@ -1,4 +1,4 @@
-//===-- GlobalARCPairingAnalysis.cpp - Global ARC Retain Release Pairing --===//
+//===--- GlobalARCPairingAnalysis.cpp - Global ARC Retain Release Pairing -===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -140,40 +140,49 @@ ARCMatchingSetBuilder::matchIncrementsToDecrements() {
 
     // We need to be known safe over all increments/decrements we are matching up
     // to ignore insertion points.
-    Flags.KnownSafe &= (*BURefCountState)->second.isKnownSafe();
+    bool BUIsKnownSafe = (*BURefCountState)->second.isKnownSafe();
+    DEBUG(llvm::dbgs() << "        KNOWNSAFE: "
+                       << (BUIsKnownSafe ? "true" : "false") << "\n");
+    Flags.KnownSafe &= BUIsKnownSafe;
 
     // We can only move instructions if we know that we are not partial. We can
     // still delete instructions in such cases though.
-    Flags.Partial |= (*BURefCountState)->second.isPartial();
+    bool BUIsPartial = (*BURefCountState)->second.isPartial();
+    DEBUG(llvm::dbgs() << "        PARTIAL: "
+                       << (BUIsPartial ? "true" : "false") << "\n");
+    Flags.Partial |= BUIsPartial;
 
     // Now that we know we have an inst, grab the decrement.
     for (auto DecIter : (*BURefCountState)->second.getInstructions()) {
       SILInstruction *Decrement = DecIter;
-      DEBUG(llvm::dbgs() << "    Decrement: " << *Decrement);
+      DEBUG(llvm::dbgs() << "        Decrement: " << *Decrement);
 
       // Now grab the increment matched up with the decrement from the bottom up map.
       // If we can't find it, bail we can't match this increment up with anything.
       auto TDRefCountState = TDMap.find(Decrement);
       if (TDRefCountState == TDMap.end()) {
-        DEBUG(llvm::dbgs() << "        FAILURE! Could not find state for "
-              "decrement.\n");
+        DEBUG(llvm::dbgs() << "            FAILURE! Could not find state for "
+                              "decrement.\n");
         return None;
       }
-      DEBUG(llvm::dbgs() << "        SUCCESS! Found state for decrement.\n");
+      DEBUG(llvm::dbgs() << "            SUCCESS! Found state for "
+                            "decrement.\n");
 
       // Make sure the increment we are looking at is also matched to our decrement.
       // Otherwise bail.
       if (!(*TDRefCountState)->second.isTrackingRefCountInst() ||
           !(*TDRefCountState)->second.containsInstruction(Increment)) {
-        DEBUG(llvm::dbgs() << "        FAILURE! Not tracking instruction or "
-              "found increment that did not match.\n");
+        DEBUG(
+            llvm::dbgs() << "            FAILURE! Not tracking instruction or "
+                            "found increment that did not match.\n");
         return None;
       }
 
       // Add the decrement to the decrement to move set. If we don't insert
       // anything, just continue.
       if (!MatchSet.Decrements.insert(Decrement)) {
-        DEBUG(llvm::dbgs() << "    SKIPPING! Already processed this decrement\n");
+        DEBUG(llvm::dbgs()
+              << "        SKIPPING! Already processed this decrement\n");
         continue;
       }
 
@@ -218,34 +227,42 @@ ARCMatchingSetBuilder::matchDecrementsToIncrements() {
 
     // We need to be known safe over all increments/decrements we are matching up
     // to ignore insertion points.
-    Flags.KnownSafe &= (*TDRefCountState)->second.isKnownSafe();
+    bool TDIsKnownSafe = (*TDRefCountState)->second.isKnownSafe();
+    DEBUG(llvm::dbgs() << "        KNOWNSAFE: "
+                       << (TDIsKnownSafe ? "true" : "false") << "\n");
+    Flags.KnownSafe &= TDIsKnownSafe;
 
     // We can only move instructions if we know that we are not partial. We can
     // still delete instructions in such cases though.
-    Flags.Partial |= (*TDRefCountState)->second.isPartial();
+    bool TDIsPartial = (*TDRefCountState)->second.isPartial();
+    DEBUG(llvm::dbgs() << "        PARTIAL: "
+                       << (TDIsPartial ? "true" : "false") << "\n");
+    Flags.Partial |= TDIsPartial;
 
     // Now that we know we have an inst, grab the decrement.
     for (auto IncIter : (*TDRefCountState)->second.getInstructions()) {
       SILInstruction *Increment = IncIter;
-      DEBUG(llvm::dbgs() << "    Increment: " << *Increment);
+      DEBUG(llvm::dbgs() << "        Increment: " << *Increment);
 
       // Now grab the increment matched up with the decrement from the bottom up map.
       // If we can't find it, bail we can't match this increment up with anything.
       auto BURefCountState = BUMap.find(Increment);
       if (BURefCountState == BUMap.end()) {
-        DEBUG(llvm::dbgs() << "        FAILURE! Could not find state for "
-              "increment.\n");
+        DEBUG(llvm::dbgs() << "            FAILURE! Could not find state for "
+                              "increment.\n");
         return None;
       }
 
-      DEBUG(llvm::dbgs() << "        SUCCESS! Found state for increment.\n");
+      DEBUG(
+          llvm::dbgs() << "            SUCCESS! Found state for increment.\n");
 
       // Make sure the increment we are looking at is also matched to our decrement.
       // Otherwise bail.
       if (!(*BURefCountState)->second.isTrackingRefCountInst() ||
           !(*BURefCountState)->second.containsInstruction(Decrement)) {
-        DEBUG(llvm::dbgs() << "        FAILURE! Not tracking instruction or "
-              "found increment that did not match.\n");
+        DEBUG(
+            llvm::dbgs() << "            FAILURE! Not tracking instruction or "
+                            "found increment that did not match.\n");
         return None;
       }
 

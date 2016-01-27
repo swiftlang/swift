@@ -40,7 +40,7 @@ import SwiftPrivate
 import SwiftPrivatePthreadExtras
 #if os(OSX) || os(iOS)
 import Darwin
-#elseif os(Linux)
+#elseif os(Linux) || os(FreeBSD)
 import Glibc
 #endif
 
@@ -68,15 +68,15 @@ public protocol RaceTestWithPerTrialDataType {
   ///
   /// This type should be a class.  (The harness will not pass struct instances
   /// between threads correctly.)
-  typealias RaceData : AnyObject
+  associatedtype RaceData : AnyObject
 
   /// Type of thread-local data.
   ///
   /// Thread-local data is newly created for every trial.
-  typealias ThreadLocalData
+  associatedtype ThreadLocalData
 
   /// Results of the observation made after performing an operation.
-  typealias Observation
+  associatedtype Observation
 
   init()
 

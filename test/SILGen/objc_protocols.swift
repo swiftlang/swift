@@ -235,16 +235,17 @@ extension InformallyFunging: NSFunging { }
 func testInitializableExistential(im: Initializable.Type, i: Int) -> Initializable {
   // CHECK: bb0([[META:%[0-9]+]] : $@thick Initializable.Type, [[I:%[0-9]+]] : $Int):
 // CHECK:   [[I2_BOX:%[0-9]+]] = alloc_box $Initializable
+// CHECK:   [[PB:%.*]] = project_box [[I2_BOX]]
 // CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_metatype [[META]] : $@thick Initializable.Type to $@thick (@opened([[N:".*"]]) Initializable).Type
 // CHECK:   [[ARCHETYPE_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[ARCHETYPE_META]] : $@thick (@opened([[N]]) Initializable).Type to $@objc_metatype (@opened([[N]]) Initializable).Type
 // CHECK:   [[I2_ALLOC:%[0-9]+]] = alloc_ref_dynamic [objc] [[ARCHETYPE_META_OBJC]] : $@objc_metatype (@opened([[N]]) Initializable).Type, $@opened([[N]]) Initializable
 // CHECK:   [[INIT_WITNESS:%[0-9]+]] = witness_method [volatile] $@opened([[N]]) Initializable, #Initializable.init!initializer.1.foreign, [[ARCHETYPE_META]]{{.*}} : $@convention(objc_method) <τ_0_0 where τ_0_0 : Initializable> (Int, @owned τ_0_0) -> @owned τ_0_0
 // CHECK:   [[I2:%[0-9]+]] = apply [[INIT_WITNESS]]<@opened([[N]]) Initializable>([[I]], [[I2_ALLOC]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Initializable> (Int, @owned τ_0_0) -> @owned τ_0_0
 // CHECK:   [[I2_EXIST_CONTAINER:%[0-9]+]] = init_existential_ref [[I2]] : $@opened([[N]]) Initializable : $@opened([[N]]) Initializable, $Initializable
-// CHECK:   store [[I2_EXIST_CONTAINER]] to [[I2_BOX]]#1 : $*Initializable
-// CHECK:   [[I2:%[0-9]+]] = load [[I2_BOX]]#1 : $*Initializable
+// CHECK:   store [[I2_EXIST_CONTAINER]] to [[PB]] : $*Initializable
+// CHECK:   [[I2:%[0-9]+]] = load [[PB]] : $*Initializable
 // CHECK:   strong_retain [[I2]] : $Initializable
-// CHECK:   strong_release [[I2_BOX]]#0 : $@box Initializable
+// CHECK:   strong_release [[I2_BOX]] : $@box Initializable
 // CHECK:   return [[I2]] : $Initializable
   var i2 = im.init(int: i)
   return i2

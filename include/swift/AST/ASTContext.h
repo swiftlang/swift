@@ -99,6 +99,26 @@ enum class AllocationArena {
   ConstraintSolver
 };
 
+/// Lists the set of "known" Foundation entities that are used in the
+/// compiler.
+///
+/// While the names of Foundation types aren't likely to change in
+/// Objective-C, their mapping into Swift can. Therefore, when
+/// referring to names of Foundation entities in Swift, use this enum
+/// and \c ASTContext::getSwiftName or \c ASTContext::getSwiftId.
+enum class KnownFoundationEntity {
+#define FOUNDATION_ENTITY(Name) Name,
+#include "swift/AST/KnownFoundationEntities.def"
+};
+
+/// Retrieve the Foundation entity kind for the given Objective-C
+/// entity name.
+Optional<KnownFoundationEntity> getKnownFoundationEntity(StringRef name);
+
+/// Determine with the non-prefixed name of the given known Foundation
+/// entity conflicts with the Swift standard library.
+bool nameConflictsWithStandardLibrary(KnownFoundationEntity entity);
+
 /// Callback function used when referring to a type member of a given
 /// type variable.
 typedef std::function<Type(TypeVariableType *, AssociatedTypeDecl *)>
@@ -486,7 +506,7 @@ public:
   // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast.
   FuncDecl *getIsOSVersionAtLeastDecl(LazyResolver *resolver) const;
   
-  /// \brief Look for the declaration with the given name within the
+  /// Look for the declaration with the given name within the
   /// swift module.
   void lookupInSwiftModule(StringRef name,
                            SmallVectorImpl<ValueDecl *> &results) const;
@@ -499,9 +519,10 @@ public:
                                   Type type,
                                   LazyResolver *resolver) const;
 
-  /// \brief Notify all of the mutation listeners that the given declaration
-  /// was just added.
-  void addedExternalDecl(Decl *decl);
+  /// Add a declaration to a list of declarations that need to be emitted
+  /// as part of the current module or source file, but are otherwise not
+  /// nested within it.
+  void addExternalDecl(Decl *decl);
 
   /// Add a cleanup function to be called when the ASTContext is deallocated.
   void addCleanup(std::function<void(void)> cleanup);
@@ -778,6 +799,16 @@ public:
   /// Diagnose any unsatisfied @objc optional requirements of
   /// protocols that conflict with methods.
   bool diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf);
+
+  /// Retrieve the Swift name for the given Foundation entity, where
+  /// "NS" prefix stripping will apply under omit-needless-words.
+  StringRef getSwiftName(KnownFoundationEntity kind);
+
+  /// Retrieve the Swift identifier for the given Foundation entity, where
+  /// "NS" prefix stripping will apply under omit-needless-words.
+  Identifier getSwiftId(KnownFoundationEntity kind) {
+    return getIdentifier(getSwiftName(kind));
+  }
 
   /// Try to dump the context of the given archetype.
   void dumpArchetypeContext(ArchetypeType *archetype,

@@ -1,17 +1,21 @@
 // RUN: %target-parse-verify-swift
 
-@_semantics("foo") // expected-note {{attribute already specified here}}
-@_semantics("bar") // expected-error {{duplicate attribute}}
+@_semantics("foo")
+@_semantics("bar")
 func duplicatesemantics() {}
 
-// Test parser recovery by having something that
-// should parse fine.
-func somethingThatShouldParseFine() {}
-
-
-func func_with_nested_semantics() {
+func func_with_nested_semantics_1() {
    @_semantics("exit") // expected-error {{attribute '_semantics' can only be used in a non-local scope}}
    func exit(code : UInt32) -> Void
    exit(0)
 }
 
+// Test parser recovery by having something that
+// should parse fine.
+func somethingThatShouldParseFine() {}
+
+func func_with_nested_semantics_2() {
+   @_semantics("exit") // expected-error {{attribute '_semantics' can only be used in a non-local scope}}
+   func exit(code : UInt32) -> Void
+   exit(0)
+}

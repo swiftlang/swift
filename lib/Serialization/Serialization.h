@@ -1,4 +1,4 @@
-//===--- Serialization.h - Read and write Swift modules -------------------===//
+//===--- Serialization.h - Read and write Swift modules ---------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -244,7 +244,11 @@ private:
   void writeRequirements(ArrayRef<Requirement> requirements);
 
   /// Writes a list of protocol conformances.
-  void writeConformances(ArrayRef<ProtocolConformance *> conformances,
+  void writeConformances(ArrayRef<ProtocolConformanceRef> conformances,
+                         const std::array<unsigned, 256> &abbrCodes);
+
+  /// Writes a list of protocol conformances.
+  void writeConformances(ArrayRef<ProtocolConformance*> conformances,
                          const std::array<unsigned, 256> &abbrCodes);
 
   /// Writes an array of members for a decl context.
@@ -392,7 +396,11 @@ public:
   void writeNormalConformance(const NormalProtocolConformance *conformance);
 
   /// Writes a protocol conformance.
-  void writeConformance(const ProtocolConformance *conformance,
+  void writeConformance(ProtocolConformanceRef conformance,
+                        const std::array<unsigned, 256> &abbrCodes);
+
+  /// Writes a protocol conformance.
+  void writeConformance(ProtocolConformance *conformance,
                         const std::array<unsigned, 256> &abbrCodes);
 
   /// Writes a generic parameter list.

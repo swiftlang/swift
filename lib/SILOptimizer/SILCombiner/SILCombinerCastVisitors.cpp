@@ -36,7 +36,7 @@ SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
   if (auto *URCI = dyn_cast<UncheckedRefCastInst>(RRPI->getOperand())) {
     // (ref_to_raw_pointer (unchecked_ref_cast x))
     //    -> (ref_to_raw_pointer x)
-    if (URCI->getOperand().getType().getSwiftType()
+    if (URCI->getOperand()->getType().getSwiftType()
         ->isAnyClassReferenceType()) {
       RRPI->setOperand(URCI->getOperand());
       return URCI->use_empty() ? eraseInstFromFunction(*URCI) : nullptr;
@@ -178,7 +178,7 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
       if (InstanceType.getAddressType() != PTAI->getType())
         return nullptr;
 
-      auto IRPI = cast<IndexRawPointerInst>(PTAI->getOperand().getDef());
+      auto IRPI = cast<IndexRawPointerInst>(PTAI->getOperand());
       SILValue Ptr = IRPI->getOperand(0);
       SILValue Distance = Bytes->getArguments()[0];
       auto *NewPTAI =
@@ -204,8 +204,8 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
                                            UADCI->getType());
 
   // (unchecked-addr-cast cls->superclass) -> (upcast cls->superclass)
-  if (UADCI->getType() != UADCI->getOperand().getType() &&
-      UADCI->getType().isSuperclassOf(UADCI->getOperand().getType()))
+  if (UADCI->getType() != UADCI->getOperand()->getType() &&
+      UADCI->getType().isSuperclassOf(UADCI->getOperand()->getType()))
     return Builder.createUpcast(UADCI->getLoc(), UADCI->getOperand(),
                                 UADCI->getType());
 
@@ -216,7 +216,7 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
   if (UADCI->use_empty())
     return nullptr;
 
-  SILType InputTy = UADCI->getOperand().getType();
+  SILType InputTy = UADCI->getOperand()->getType();
   SILType OutputTy = UADCI->getType();
 
   // If either type is address only, do not do anything here.
@@ -241,7 +241,7 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
     return nullptr;
 
   // For each user U of the unchecked_addr_cast...
-  for (auto U : getNonDebugUses(*UADCI))
+  for (auto U : getNonDebugUses(UADCI))
     // Check if it is load. If it is not a load, bail...
     if (!isa<LoadInst>(U->getUser()))
       return nullptr;
@@ -251,7 +251,7 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
 
   // Ok, we have all loads. Lets simplify this. Go back through the loads a
   // second time, rewriting them into a load + bitcast from our source.
-  auto UsesRange = getNonDebugUses(*UADCI);
+  auto UsesRange = getNonDebugUses(UADCI);
   for (auto UI = UsesRange.begin(), E = UsesRange.end(); UI != E;) {
     // Grab the original load.
     LoadInst *L = cast<LoadInst>(UI->getUser());
@@ -263,7 +263,7 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
                                                     OutputTy.getObjectType());
     // Replace all uses of the old load with the new bitcasted result and erase
     // the old load.
-    replaceInstUsesWith(*L, BitCast, 0);
+    replaceInstUsesWith(*L, BitCast);
     eraseInstFromFunction(*L);
   }
 
@@ -287,8 +287,8 @@ SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *URCI) {
                                               UI->getOperand(),
                                               URCI->getType());
 
-  if (URCI->getType() != URCI->getOperand().getType() &&
-      URCI->getType().isSuperclassOf(URCI->getOperand().getType()))
+  if (URCI->getType() != URCI->getOperand()->getType() &&
+      URCI->getType().isSuperclassOf(URCI->getOperand()->getType()))
     return Builder.createUpcast(URCI->getLoc(), URCI->getOperand(),
                                 URCI->getType());
 
@@ -304,11 +304,11 @@ SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *URCI) {
 
 SILInstruction *
 SILCombiner::visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI) {
-  SILType SrcTy = URCI->getSrc().getType();
+  SILType SrcTy = URCI->getSrc()->getType();
   if (!SrcTy.isLoadable(URCI->getModule()))
     return nullptr;
 
-  SILType DestTy = URCI->getDest().getType();
+  SILType DestTy = URCI->getDest()->getType();
   if (!DestTy.isLoadable(URCI->getModule()))
     return nullptr;
 
@@ -353,8 +353,8 @@ visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
       // unconditional_checked_cast -> unchecked_addr_cast
       return Builder.createUncheckedAddrCast(Loc, Op, LoweredTargetType);
     } else if (LoweredTargetType.isHeapObjectReferenceType()) {
-      if (!(Op.getType().isHeapObjectReferenceType() ||
-            Op.getType().isClassExistentialType())) {
+      if (!(Op->getType().isHeapObjectReferenceType() ||
+            Op->getType().isClassExistentialType())) {
         return nullptr;
       }
       // unconditional_checked_cast -> unchecked_ref_cast
@@ -441,7 +441,7 @@ visitMetatypeConversionInst(SILBuilder &Builder, ConversionInst *MCI,
   SILValue Op = MCI->getOperand(0);
   // Instruction has a proper target type already.
   SILType Ty = MCI->getType();
-  auto MetatypeTy = Op.getType().getAs<AnyMetatypeType>();
+  auto MetatypeTy = Op->getType().getAs<AnyMetatypeType>();
 
   if (MetatypeTy->getRepresentation() != Representation)
     return nullptr;

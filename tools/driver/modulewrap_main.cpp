@@ -1,4 +1,4 @@
-//===-- modulewrap_main.cpp - module wrapping utility -----------===//
+//===--- modulewrap_main.cpp - module wrapping utility --------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -28,6 +28,10 @@ option(SWIFT_STDLIB_ASSERTIONS
     "Enable internal checks for the Swift standard library (useful for debugging the library itself, does not affect checks required for safety)"
     "${SWIFT_STDLIB_ASSERTIONS_default}")
 
+option(SWIFT_SERIALIZE_STDLIB_UNITTEST
+    "Compile the StdlibUnittest module with -sil-serialize-all to increase the test coverage for the optimizer"
+    FALSE)
+
 option(SWIFT_BUILD_TOOLS
     "Build the Swift compiler and other tools"
     TRUE)
@@ -54,7 +58,7 @@ option(SWIFT_INCLUDE_DOCS
     "Create targets for building docs."
     TRUE)
 
-set(SWIFT_VERSION "2.2" CACHE STRING
+set(SWIFT_VERSION "3.0" CACHE STRING
     "The user-visible version of the Swift compiler")
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
@@ -154,7 +158,7 @@ option(SWIFT_AST_VERIFIER
     "Enable the AST verifier in the built compiler, and run it on every compilation"
     TRUE)
 
-option(SWIFT_VERIFY_ALL
+option(SWIFT_SIL_VERIFY_ALL
     "Run SIL verification after each transform when building Swift files in the build process"
     FALSE)
 
@@ -403,6 +407,14 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
     configure_sdk_unix(LINUX "Linux" "linux" "linux" "aarch64" "aarch64-unknown-linux-gnu")
     set(SWIFT_HOST_VARIANT_ARCH "aarch64")
     set(SWIFT_PRIMARY_VARIANT_ARCH_default "aarch64")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "ppc64")
+    configure_sdk_unix(LINUX "Linux" "linux" "linux" "powerpc64" "powerpc64-unknown-linux-gnu")
+    set(SWIFT_HOST_VARIANT_ARCH "powerpc64")
+    set(SWIFT_PRIMARY_VARIANT_ARCH_default "powerpc64")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "ppc64le")
+    configure_sdk_unix(LINUX "Linux" "linux" "linux" "powerpc64le" "powerpc64le-unknown-linux-gnu")
+    set(SWIFT_HOST_VARIANT_ARCH "powerpc64le")
+    set(SWIFT_PRIMARY_VARIANT_ARCH_default "powerpc64le")
   else()
     message(FATAL_ERROR "Unknown or unsupported architecture: ${CMAKE_SYSTEM_PROCESSOR}")
   endif()
@@ -580,6 +592,11 @@ endif()
 set(SWIFT_PRIMARY_VARIANT_SUFFIX
     "-${SWIFT_SDK_${SWIFT_PRIMARY_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_PRIMARY_VARIANT_ARCH}")
 
+# Clear universal library names to prevent adding duplicates
+foreach(sdk ${SWIFT_SDKS})
+  unset(UNIVERSAL_LIBRARY_NAMES_${SWIFT_SDK_${sdk}_LIB_SUBDIR} CACHE)
+endforeach()
+
 message(STATUS "Building host Swift tools for ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH}")
 message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "  Assertions: ${LLVM_ENABLE_ASSERTIONS}")
@@ -604,6 +621,10 @@ message(STATUS "")
 find_package(LibXml2)
 if(LIBXML2_FOUND)
   set(SWIFT_HAVE_LIBXML 1)
+endif()
+
+if (LLVM_ENABLE_DOXYGEN)
+  message(STATUS "Doxygen: enabled")
 endif()
 
 #

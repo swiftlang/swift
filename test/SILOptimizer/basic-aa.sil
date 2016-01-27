@@ -1,9 +1,75 @@
-// RUN: %target-sil-opt %s -aa=basic-aa -aa-dump -o /dev/null | FileCheck %s
+// RUN: %target-sil-opt -module-name Swift %s -aa=basic-aa -aa-dump -o /dev/null | FileCheck %s
 
 // REQUIRES: asserts
 
 import Builtin
-import Swift
+
+struct Int {
+  var _value: Builtin.Int64
+}
+
+struct Int32 {
+  var _value: Builtin.Int32
+}
+
+enum Optional<T> {
+case None
+case Some(T)
+}
+
+// CHECK-LABEL: @index_addr_inst_with_unknown_index
+// CHECK: PAIR #16.
+// CHECK-NEXT: %3 = index_addr %2 : $*Int, %1 : $Builtin.Word
+// CHECK-NEXT: %4 = index_addr %2 : $*Int, %1 : $Builtin.Word
+// CHECK-NEXT: MayAlias
+sil @index_addr_inst_with_unknown_index : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %212 = pointer_to_address %0 : $Builtin.RawPointer to $*Int
+  %214 = index_addr %212 : $*Int, %1 : $Builtin.Word
+  %2114 = index_addr %212 : $*Int, %1 : $Builtin.Word
+  br bb1
+
+bb1:
+  %3 = tuple()
+  return %3 : $()
+}
+
+// CHECK-LABEL: @index_addr_inst_with_same_constant_index
+// CHECK: PAIR #16.
+// CHECK-NEXT: %3 = index_addr %2 : $*Int, %1 : $Builtin.Word
+// CHECK-NEXT: %4 = index_addr %2 : $*Int, %1 : $Builtin.Word
+// CHECK-NEXT: MustAlias
+sil @index_addr_inst_with_same_constant_index : $@convention(thin) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %6 = integer_literal $Builtin.Word, 2
+  %212 = pointer_to_address %0 : $Builtin.RawPointer to $*Int
+  %214 = index_addr %212 : $*Int, %6 : $Builtin.Word
+  %2114 = index_addr %212 : $*Int, %6 : $Builtin.Word
+  br bb1
+
+bb1:
+  %3 = tuple()
+  return %3 : $()
+}
+
+// CHECK-LABEL: @index_addr_inst_with_different_constant_index
+// CHECK: PAIR #23.
+// CHECK-NEXT: %4 = index_addr %3 : $*Int, %1 : $Builtin.Word
+// CHECK-NEXT: %5 = index_addr %3 : $*Int, %2 : $Builtin.Word
+// CHECK-NEXT: NoAlias
+sil @index_addr_inst_with_different_constant_index : $@convention(thin) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %6 = integer_literal $Builtin.Word, 2
+  %7 = integer_literal $Builtin.Word, 3 
+  %212 = pointer_to_address %0 : $Builtin.RawPointer to $*Int
+  %214 = index_addr %212 : $*Int, %6 : $Builtin.Word
+  %2114 = index_addr %212 : $*Int, %7 : $Builtin.Word
+  br bb1
+
+bb1:
+  %3 = tuple()
+  return %3 : $()
+}
 
 // Address Arguments don't alias if they are arguments to the first BB.
 //
@@ -63,107 +129,79 @@ struct StructLvl1 {
 //
 // CHECK-LABEL: @different_alloc_stack_dont_alias
 
-// @local_storage cannot alias non @local_storage types.
+// cannot alias non types.
 // CHECK: PAIR #0.
-// CHECK-NEXT: (0):   %0 = alloc_stack $StructLvl1
-// CHECK-NEXT: (0):   %0 = alloc_stack $StructLvl1
+// CHECK-NEXT:   %0 = alloc_stack $StructLvl1
+// CHECK-NEXT:   %0 = alloc_stack $StructLvl1
 // CHECK-NEXT: MustAlias
 // CHECK: PAIR #1.
-// CHECK-NEXT: (0):   %0 = alloc_stack $StructLvl1
-// CHECK-NEXT: (1):   %0 = alloc_stack $StructLvl1
+// CHECK-NEXT:   %0 = alloc_stack $StructLvl1
+// CHECK-NEXT:   %1 = alloc_stack $StructLvl1
 // CHECK-NEXT: NoAlias
 // CHECK: PAIR #2.
-// CHECK-NEXT: (0):   %0 = alloc_stack $StructLvl1
-// CHECK-NEXT: (0):   %1 = alloc_stack $StructLvl1
-// CHECK-NEXT: NoAlias
+// CHECK-NEXT:   %0 = alloc_stack $StructLvl1
+// CHECK-NEXT:   %2 = struct_element_addr %0 : $*StructLvl1, #StructLvl1.sub
+// CHECK-NEXT: PartialAlias
 // CHECK: PAIR #3.
-// CHECK-NEXT: (0):   %0 = alloc_stack $StructLvl1
-// CHECK-NEXT: (1):   %1 = alloc_stack $StructLvl1
-// CHECK-NEXT: NoAlias
+// CHECK-NEXT:   %0 = alloc_stack $StructLvl1
+// CHECK-NEXT:   %3 = struct_element_addr %0 : $*StructLvl1, #StructLvl1.x
+// CHECK-NEXT: PartialAlias
 // CHECK: PAIR #4.
-// CHECK-NEXT: (0):   %0 = alloc_stack $StructLvl1
-// CHECK-NEXT: (0):   %2 = struct_element_addr %0#1 : $*StructLvl1, #StructLvl1.sub
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #14.
-// CHECK-NEXT: (0):   %0 = alloc_stack $StructLvl1
-// CHECK-NEXT: (0):   %14 = tuple ()
-// CHECK-NEXT: MayAlias
-
-// CHECK: PAIR #15.
-// CHECK-NEXT: (1):   %0 = alloc_stack $StructLvl1
-// CHECK-NEXT: (1):   %0 = alloc_stack $StructLvl1
-// CHECK-NEXT: MustAlias
-// CHECK: PAIR #16.
-// CHECK-NEXT: (1):   %0 = alloc_stack $StructLvl1
-// CHECK-NEXT: (0):   %1 = alloc_stack $StructLvl1
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #17.
-// CHECK-NEXT: (1):   %0 = alloc_stack $StructLvl1
-// CHECK-NEXT: (1):   %1 = alloc_stack $StructLvl1
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #18.
-// CHECK-NEXT: (1):   %0 = alloc_stack $StructLvl1
-// CHECK-NEXT: (0):   %2 = struct_element_addr %0#1 : $*StructLvl1, #StructLvl1.sub
-// CHECK-NEXT: PartialAlias
-// CHECK: PAIR #19.
-// CHECK-NEXT: (1):   %0 = alloc_stack $StructLvl1
-// CHECK-NEXT: (0):   %3 = struct_element_addr %0#1 : $*StructLvl1, #StructLvl1.x
-// CHECK-NEXT: PartialAlias
-// CHECK: PAIR #20.
-// CHECK-NEXT: (1):   %0 = alloc_stack $StructLvl1
-// CHECK-NEXT: (0):   %4 = struct_element_addr %2 : $*StructLvl2, #StructLvl2.tup
+// CHECK-NEXT:   %0 = alloc_stack $StructLvl1
+// CHECK-NEXT:   %4 = struct_element_addr %2 : $*StructLvl2, #StructLvl2.tup
 // CHECK-NEXT: PartialAlias
 
-// CHECK: PAIR #50.
-// CHECK-NEXT: (1):   %1 = alloc_stack $StructLvl1
-// CHECK-NEXT: (0):   %9 = struct_element_addr %7 : $*StructLvl2, #StructLvl2.tup
-// CHECK-NEXT: PartialAlias
-// CHECK: PAIR #51.
-// CHECK-NEXT: (1):   %1 = alloc_stack $StructLvl1
-// CHECK-NEXT: (0):   %10 = tuple_element_addr %9 : $*(Builtin.Int64, Builtin.Int32), 0
-// CHECK-NEXT: PartialAlias
-// CHECK: PAIR #52.
-// CHECK-NEXT: (1):   %1 = alloc_stack $StructLvl1
-// CHECK-NEXT: (0):   %11 = tuple_element_addr %9 : $*(Builtin.Int64, Builtin.Int32), 1
-// CHECK-NEXT: PartialAlias
-// CHECK: PAIR #53.
-// CHECK-NEXT: (1):   %1 = alloc_stack $StructLvl1
-// CHECK-NEXT: (0):   %14 = tuple ()
+// CHECK: PAIR #12.
+// CHECK-NEXT:   %0 = alloc_stack $StructLvl1
+// CHECK-NEXT:   %14 = tuple ()
 // CHECK-NEXT: MayAlias
-// CHECK: PAIR #55.
-// CHECK-NEXT: (0):   %2 = struct_element_addr %0#1 : $*StructLvl1, #StructLvl1.sub
-// CHECK-NEXT: (0):   %3 = struct_element_addr %0#1 : $*StructLvl1, #StructLvl1.x
+
+// CHECK: PAIR #21.
+// CHECK-NEXT:   %1 = alloc_stack $StructLvl1
+// CHECK-NEXT:   %9 = struct_element_addr %7 : $*StructLvl2, #StructLvl2.tup
+// CHECK-NEXT: PartialAlias
+// CHECK: PAIR #22.
+// CHECK-NEXT:   %1 = alloc_stack $StructLvl1
+// CHECK-NEXT:   %10 = tuple_element_addr %9 : $*(Builtin.Int64, Builtin.Int32), 0
+// CHECK-NEXT: PartialAlias
+// CHECK: PAIR #23.
+// CHECK-NEXT:   %1 = alloc_stack $StructLvl1
+// CHECK-NEXT:   %11 = tuple_element_addr %9 : $*(Builtin.Int64, Builtin.Int32), 1
+// CHECK-NEXT: PartialAlias
+// CHECK: PAIR #26.
+// CHECK-NEXT:   %2 = struct_element_addr %0 : $*StructLvl1, #StructLvl1.sub
+// CHECK-NEXT:   %3 = struct_element_addr %0 : $*StructLvl1, #StructLvl1.x
 // CHECK-NEXT: NoAlias
-// CHECK: PAIR #56.
-// CHECK-NEXT: (0):   %2 = struct_element_addr %0#1 : $*StructLvl1, #StructLvl1.sub
-// CHECK-NEXT: (0):   %4 = struct_element_addr %2 : $*StructLvl2, #StructLvl2.tup
+// CHECK: PAIR #27.
+// CHECK-NEXT:   %2 = struct_element_addr %0 : $*StructLvl1, #StructLvl1.sub
+// CHECK-NEXT:   %4 = struct_element_addr %2 : $*StructLvl2, #StructLvl2.tup
 // CHECK-NEXT: PartialAlias
-// CHECK: PAIR #57.
-// CHECK-NEXT: (0):   %2 = struct_element_addr %0#1 : $*StructLvl1, #StructLvl1.sub
-// CHECK-NEXT: (0):   %5 = tuple_element_addr %4 : $*(Builtin.Int64, Builtin.Int32), 0
+// CHECK: PAIR #28.
+// CHECK-NEXT:   %2 = struct_element_addr %0 : $*StructLvl1, #StructLvl1.sub
+// CHECK-NEXT:   %5 = tuple_element_addr %4 : $*(Builtin.Int64, Builtin.Int32), 0
 // CHECK-NEXT: PartialAlias
-// CHECK: PAIR #58.
-// CHECK-NEXT: (0):   %2 = struct_element_addr %0#1 : $*StructLvl1, #StructLvl1.sub
-// CHECK-NEXT: (0):   %6 = tuple_element_addr %4 : $*(Builtin.Int64, Builtin.Int32), 1
+// CHECK: PAIR #29.
+// CHECK-NEXT:   %2 = struct_element_addr %0 : $*StructLvl1, #StructLvl1.sub
+// CHECK-NEXT:   %6 = tuple_element_addr %4 : $*(Builtin.Int64, Builtin.Int32), 1
 // CHECK-NEXT: PartialAlias
 sil @different_alloc_stack_dont_alias : $@convention(thin) () -> () {
   %0 = alloc_stack $StructLvl1
   %1 = alloc_stack $StructLvl1
 
-  %2 = struct_element_addr %0#1 : $*StructLvl1, #StructLvl1.sub
-  %3 = struct_element_addr %0#1 : $*StructLvl1, #StructLvl1.x
+  %2 = struct_element_addr %0 : $*StructLvl1, #StructLvl1.sub
+  %3 = struct_element_addr %0 : $*StructLvl1, #StructLvl1.x
   %4 = struct_element_addr %2 : $*StructLvl2, #StructLvl2.tup
   %5 = tuple_element_addr %4 : $*(Builtin.Int64, Builtin.Int32), 0
   %6 = tuple_element_addr %4 : $*(Builtin.Int64, Builtin.Int32), 1
 
-  %7 = struct_element_addr %1#1 : $*StructLvl1, #StructLvl1.sub
-  %8 = struct_element_addr %1#1 : $*StructLvl1, #StructLvl1.x
+  %7 = struct_element_addr %1 : $*StructLvl1, #StructLvl1.sub
+  %8 = struct_element_addr %1 : $*StructLvl1, #StructLvl1.x
   %9 = struct_element_addr %7 : $*StructLvl2, #StructLvl2.tup
   %10 = tuple_element_addr %9 : $*(Builtin.Int64, Builtin.Int32), 0
   %11 = tuple_element_addr %9 : $*(Builtin.Int64, Builtin.Int32), 1
 
-  dealloc_stack %1#0 : $*@local_storage StructLvl1
-  dealloc_stack %0#0 : $*@local_storage StructLvl1
+  dealloc_stack %1 : $*StructLvl1
+  dealloc_stack %0 : $*StructLvl1
 
   %12 = tuple()
   return %12 : $()
@@ -172,51 +210,39 @@ sil @different_alloc_stack_dont_alias : $@convention(thin) () -> () {
 // Function Arguments cannot alias with no alias arguments or with identified
 // function locals.
 //
-// @args_dont_alias_with_identified_function_locals
+// CHECK-LABEL: @args_dont_alias_with_identified_function_locals
 // CHECK: PAIR #1.
-// CHECK-NEXT: (0):   %0 = argument of bb0 : $Builtin.NativeObject
-// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.NativeObject
+// CHECK-NEXT:   %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK-NEXT:   %1 = argument of bb0 : $Builtin.NativeObject
 // CHECK-NEXT: MayAlias
 // CHECK: PAIR #2.
-// CHECK-NEXT: (0):   %0 = argument of bb0 : $Builtin.NativeObject
-// CHECK-NEXT: (0):   %2 = argument of bb0 : $*Builtin.NativeObject
+// CHECK-NEXT:   %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK-NEXT:   %2 = argument of bb0 : $*Builtin.NativeObject
 // CHECK-NEXT: NoAlias
 // CHECK: PAIR #3.
-// CHECK-NEXT: (0):   %0 = argument of bb0 : $Builtin.NativeObject
-// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.NativeObject
+// CHECK-NEXT:   %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK-NEXT:   %3 = alloc_stack $Builtin.NativeObject
 // CHECK-NEXT: NoAlias
 // CHECK: PAIR #4.
-// CHECK-NEXT: (0):   %0 = argument of bb0 : $Builtin.NativeObject
-// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.NativeObject
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #5.
-// CHECK-NEXT: (0):   %0 = argument of bb0 : $Builtin.NativeObject
-// CHECK-NEXT: (0):   %5 = tuple ()
+// CHECK-NEXT:   %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK-NEXT:   %5 = tuple ()
 // CHECK-NEXT: MayAlias
+// CHECK: PAIR #6.
+// CHECK-NEXT:   %1 = argument of bb0 : $Builtin.NativeObject
+// CHECK-NEXT:   %2 = argument of bb0 : $*Builtin.NativeObject
+// CHECK-NEXT: NoAlias
 // CHECK: PAIR #7.
-// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.NativeObject
-// CHECK-NEXT: (0):   %2 = argument of bb0 : $*Builtin.NativeObject
+// CHECK-NEXT:   %1 = argument of bb0 : $Builtin.NativeObject
+// CHECK-NEXT:   %3 = alloc_stack $Builtin.NativeObject
 // CHECK-NEXT: NoAlias
-// CHECK: PAIR #8.
-// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.NativeObject
-// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.NativeObject
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #9.
-// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.NativeObject
-// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.NativeObject
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #12.
-// CHECK-NEXT: (0):   %2 = argument of bb0 : $*Builtin.NativeObject
-// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.NativeObject
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #13.
-// CHECK-NEXT: (0):   %2 = argument of bb0 : $*Builtin.NativeObject
-// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.NativeObject
+// CHECK: PAIR #10.
+// CHECK-NEXT:   %2 = argument of bb0 : $*Builtin.NativeObject
+// CHECK-NEXT:   %3 = alloc_stack $Builtin.NativeObject
 // CHECK-NEXT: NoAlias
 sil @args_dont_alias_with_identified_function_locals : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject, @in Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject, %2 : $*Builtin.NativeObject):
   %3 = alloc_stack $Builtin.NativeObject
-  dealloc_stack %3#0 : $*@local_storage Builtin.NativeObject
+  dealloc_stack %3 : $*Builtin.NativeObject
   %4 = tuple()
   return %4 : $()
 }
@@ -228,151 +254,131 @@ sil @use_native_object : $@convention(thin) (Builtin.NativeObject) -> ()
 //   %1, %3, %5, %7, %8, %9
 // Check every alias query involving those.
 
-// @escapesource_functionlocal_test_readwrite_nonescaping_alloca
+// CHECK-LABEL: @escapesource_functionlocal_test_escapesource_nonescapinglocal
 // Test %0
 
 // CHECK: PAIR #1.
-// CHECK: (0):   %0 = argument of bb0 : $*Builtin.NativeObject
-// CHECK: (0):   %1 = argument of bb0 : $Builtin.NativeObject
-// CHECK: NoAlias
+// CHECK-NEXT:   %0 = argument of bb0 : $*Builtin.NativeObject
+// CHECK-NEXT:   %1 = argument of bb0 : $Builtin.NativeObject
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #2.
+// CHECK-NEXT:   %0 = argument of bb0 : $*Builtin.NativeObject
+// CHECK-NEXT:   %2 = alloc_stack $Builtin.NativeObject
+// CHECK-NEXT: NoAlias
 // CHECK: PAIR #3.
-// CHECK: (0):   %0 = argument of bb0 : $*Builtin.NativeObject
-// CHECK: (1):   %2 = alloc_stack $Builtin.NativeObject
-// CHECK: NoAlias
+// CHECK-NEXT:   %0 = argument of bb0 : $*Builtin.NativeObject
+// CHECK-NEXT:   %3 = alloc_stack $Builtin.NativeObject
+// CHECK-NEXT: NoAlias
 // CHECK: PAIR #5.
-// CHECK: (0):   %0 = argument of bb0 : $*Builtin.NativeObject
-// CHECK: (1):   %3 = alloc_stack $Builtin.NativeObject
-// CHECK: NoAlias
-// CHECK: PAIR #7.
-// CHECK: (0):   %0 = argument of bb0 : $*Builtin.NativeObject
-// CHECK: (0):   %5 = apply %4() : $@convention(thin) () -> Builtin.NativeObject
-// CHECK: NoAlias
-// CHECK: PAIR #10.
-// CHECK: (0):   %0 = argument of bb0 : $*Builtin.NativeObject
-// CHECK: (0):   %8 = load %3#1 : $*Builtin.NativeObject
-// CHECK: NoAlias
+// CHECK-NEXT:   %0 = argument of bb0 : $*Builtin.NativeObject
+// CHECK-NEXT:   %5 = apply %4() : $@convention(thin) () -> Builtin.NativeObject
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #8.
+// CHECK-NEXT:   %0 = argument of bb0 : $*Builtin.NativeObject
+// CHECK-NEXT:   %8 = load %3 : $*Builtin.NativeObject
+// CHECK-NEXT: NoAlias
 
 // Test %1 (the aliasing argument)
 
-// CHECK: PAIR #13.
-// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.NativeObject
-// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.NativeObject
+// CHECK: PAIR #11.
+// CHECK-NEXT:   %1 = argument of bb0 : $Builtin.NativeObject
+// CHECK-NEXT:   %1 = argument of bb0 : $Builtin.NativeObject
 // CHECK-NEXT: MustAlias
-// CHECK: PAIR #14.
-// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.NativeObject
-// CHECK-NEXT: (0):   %2 = alloc_stack $Builtin.NativeObject
+// CHECK: PAIR #12.
+// CHECK-NEXT:   %1 = argument of bb0 : $Builtin.NativeObject
+// CHECK-NEXT:   %2 = alloc_stack $Builtin.NativeObject
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #13.
+// CHECK-NEXT:   %1 = argument of bb0 : $Builtin.NativeObject
+// CHECK-NEXT:   %3 = alloc_stack $Builtin.NativeObject
 // CHECK-NEXT: NoAlias
 // CHECK: PAIR #15.
-// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.NativeObject
-// CHECK-NEXT: (1):   %2 = alloc_stack $Builtin.NativeObject
-// CHECK-NEXT: NoAlias
+// CHECK-NEXT:   %1 = argument of bb0 : $Builtin.NativeObject
+// CHECK-NEXT:   %5 = apply %4() : $@convention(thin) () -> Builtin.NativeObject
+// CHECK-NEXT: MayAlias
 // CHECK: PAIR #16.
-// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.NativeObject
-// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.NativeObject
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #17.
-// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.NativeObject
-// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.NativeObject
-// CHECK-NEXT: NoAlias
+// CHECK-NEXT:   %1 = argument of bb0 : $Builtin.NativeObject
+// CHECK-NEXT:   %6 = load %0 : $*Builtin.NativeObject
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #18.
+// CHECK-NEXT:   %1 = argument of bb0 : $Builtin.NativeObject
+// CHECK-NEXT:   %8 = load %3 : $*Builtin.NativeObject
+// CHECK-NEXT: MayAlias
 // CHECK: PAIR #19.
-// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.NativeObject
-// CHECK-NEXT: (0):   %5 = apply %4() : $@convention(thin) () -> Builtin.NativeObject
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #20.
-// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.NativeObject
-// CHECK-NEXT: (0):   %6 = load %0 : $*Builtin.NativeObject
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #22.
-// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.NativeObject
-// CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.NativeObject
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #23.
-// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.NativeObject
-// CHECK-NEXT: (0):   %9 = apply %7(%8) : $@convention(thin) (Builtin.NativeObject) -> ()
+// CHECK-NEXT:   %1 = argument of bb0 : $Builtin.NativeObject
+// CHECK-NEXT:   %9 = apply %7(%8) : $@convention(thin) (Builtin.NativeObject) -> ()
 // CHECK-NEXT: MayAlias
 
 // Test %2
-// CHECK: PAIR #38.
-// CHECK: (1):   %2 = alloc_stack $Builtin.NativeObject
-// CHECK: (1):   %3 = alloc_stack $Builtin.NativeObject
-// CHECK: NoAlias
-// CHECK: PAIR #40.
-// CHECK: (1):   %2 = alloc_stack $Builtin.NativeObject
-// CHECK: (0):   %5 = apply %4() : $@convention(thin) () -> Builtin.NativeObject
-// CHECK: NoAlias
-// CHECK: PAIR #41.
-// CHECK: (1):   %2 = alloc_stack $Builtin.NativeObject
-// CHECK: (0):   %6 = load %0 : $*Builtin.NativeObject
-// CHECK: NoAlias
-// CHECK: PAIR #43.
-// CHECK: (1):   %2 = alloc_stack $Builtin.NativeObject
-// CHECK: (0):   %8 = load %3#1 : $*Builtin.NativeObject
-// CHECK: NoAlias
-// CHECK: PAIR #44.
-// CHECK: (1):   %2 = alloc_stack $Builtin.NativeObject
-// CHECK: (0):   %9 = apply %7(%8) : $@convention(thin) (Builtin.NativeObject) -> ()
-// CHECK: NoAlias
+// CHECK: PAIR #22.
+// CHECK-NEXT:   %2 = alloc_stack $Builtin.NativeObject
+// CHECK-NEXT:   %3 = alloc_stack $Builtin.NativeObject
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #24.
+// CHECK-NEXT:   %2 = alloc_stack $Builtin.NativeObject
+// CHECK-NEXT:   %5 = apply %4() : $@convention(thin) () -> Builtin.NativeObject
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #25.
+// CHECK-NEXT:   %2 = alloc_stack $Builtin.NativeObject
+// CHECK-NEXT:   %6 = load %0 : $*Builtin.NativeObject
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #27.
+// CHECK-NEXT:   %2 = alloc_stack $Builtin.NativeObject
+// CHECK-NEXT:   %8 = load %3 : $*Builtin.NativeObject
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #28.
+// CHECK-NEXT:   %2 = alloc_stack $Builtin.NativeObject
+// CHECK-NEXT:   %9 = apply %7(%8) : $@convention(thin) (Builtin.NativeObject) -> ()
+// CHECK-NEXT: MayAlias
 
 // Test %3 (the escaping alloca).
 
-// CHECK: PAIR #49.
-// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.NativeObject
-// CHECK-NEXT: (0):   %5 = apply %4() : $@convention(thin) () -> Builtin.NativeObject
+// CHECK: PAIR #32.
+// CHECK-NEXT:   %3 = alloc_stack $Builtin.NativeObject
+// CHECK-NEXT:   %5 = apply %4() : $@convention(thin) () -> Builtin.NativeObject
 // CHECK-NEXT: NoAlias
-// CHECK: PAIR #50.
-// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.NativeObject
-// CHECK-NEXT: (0):   %6 = load %0 : $*Builtin.NativeObject
+// CHECK: PAIR #33.
+// CHECK-NEXT:   %3 = alloc_stack $Builtin.NativeObject
+// CHECK-NEXT:   %6 = load %0 : $*Builtin.NativeObject
 // CHECK-NEXT: NoAlias
-// CHECK: PAIR #52.
-// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.NativeObject
-// CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.NativeObject
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #57.
-// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.NativeObject
-// CHECK-NEXT: (0):   %5 = apply %4() : $@convention(thin) () -> Builtin.NativeObject
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #58.
-// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.NativeObject
-// CHECK-NEXT: (0):   %6 = load %0 : $*Builtin.NativeObject
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #60.
-// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.NativeObject
-// CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.NativeObject
+// CHECK: PAIR #35.
+// CHECK-NEXT:   %3 = alloc_stack $Builtin.NativeObject
+// CHECK-NEXT:   %8 = load %3 : $*Builtin.NativeObject
 // CHECK-NEXT: NoAlias
 
 // Test %5 (the read write apply inst).
 
-// CHECK: PAIR #70.
-// CHECK-NEXT: (0):   %5 = apply %4() : $@convention(thin) () -> Builtin.NativeObject
-// CHECK-NEXT: (0):   %5 = apply %4() : $@convention(thin) () -> Builtin.NativeObject
+// CHECK: PAIR #45.
+// CHECK-NEXT:   %5 = apply %4() : $@convention(thin) () -> Builtin.NativeObject
+// CHECK-NEXT:   %5 = apply %4() : $@convention(thin) () -> Builtin.NativeObject
 // CHECK-NEXT: MustAlias
-// CHECK: PAIR #71.
-// CHECK-NEXT: (0):   %5 = apply %4() : $@convention(thin) () -> Builtin.NativeObject
-// CHECK-NEXT: (0):   %6 = load %0 : $*Builtin.NativeObject
+// CHECK: PAIR #46.
+// CHECK-NEXT:   %5 = apply %4() : $@convention(thin) () -> Builtin.NativeObject
+// CHECK-NEXT:   %6 = load %0 : $*Builtin.NativeObject
 // CHECK-NEXT: MayAlias
-// CHECK: PAIR #72.
-// CHECK-NEXT: (0):   %5 = apply %4() : $@convention(thin) () -> Builtin.NativeObject
+// CHECK: PAIR #47.
+// CHECK-NEXT:   %5 = apply %4() : $@convention(thin) () -> Builtin.NativeObject
 // CHECK-NEXT: function_ref use_native_object
 // CHECK-NEXT:   %7 = function_ref @use_native_object : $@convention(thin) (Builtin.NativeObject) -> ()
 // CHECK-NEXT: MayAlias
-// CHECK: PAIR #73.
-// CHECK-NEXT: (0):   %5 = apply %4() : $@convention(thin) () -> Builtin.NativeObject
-// CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.NativeObject
+// CHECK: PAIR #48.
+// CHECK-NEXT:   %5 = apply %4() : $@convention(thin) () -> Builtin.NativeObject
+// CHECK-NEXT:   %8 = load %3 : $*Builtin.NativeObject
 // CHECK-NEXT: MayAlias
-// CHECK: PAIR #74.
-// CHECK-NEXT: (0):   %5 = apply %4() : $@convention(thin) () -> Builtin.NativeObject
-// CHECK-NEXT: (0):   %9 = apply %7(%8) : $@convention(thin) (Builtin.NativeObject) -> ()
+// CHECK: PAIR #49.
+// CHECK-NEXT:   %5 = apply %4() : $@convention(thin) () -> Builtin.NativeObject
+// CHECK-NEXT:   %9 = apply %7(%8) : $@convention(thin) (Builtin.NativeObject) -> ()
 // CHECK-NEXT: MayAlias
 
 // Test %8 (the escaping load)
 
-// CHECK: PAIR #85.
-// CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.NativeObject
-// CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.NativeObject
+// CHECK: PAIR #60.
+// CHECK-NEXT:   %8 = load %3 : $*Builtin.NativeObject
+// CHECK-NEXT:   %8 = load %3 : $*Builtin.NativeObject
 // CHECK-NEXT: MustAlias
-// CHECK: PAIR #86.
-// CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.NativeObject
-// CHECK-NEXT: (0):   %9 = apply %7(%8) : $@convention(thin) (Builtin.NativeObject) -> ()
+// CHECK: PAIR #61.
+// CHECK-NEXT:   %8 = load %3 : $*Builtin.NativeObject
+// CHECK-NEXT:   %9 = apply %7(%8) : $@convention(thin) (Builtin.NativeObject) -> ()
 // CHECK-NEXT: MayAlias
 sil @escapesource_functionlocal_test_escapesource_nonescapinglocal : $@convention(thin) (@in Builtin.NativeObject, Builtin.NativeObject) -> () {
 bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.NativeObject):
@@ -382,28 +388,28 @@ bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.NativeObject):
   %5 = apply %4() : $@convention(thin) () -> Builtin.NativeObject
   %6 = load %0 : $*Builtin.NativeObject
   %7 = function_ref @use_native_object : $@convention(thin) (Builtin.NativeObject) -> ()
-  %8 = load %3#1 : $*Builtin.NativeObject
+  %8 = load %3 : $*Builtin.NativeObject
   %9 = apply %7(%8) : $@convention(thin) (Builtin.NativeObject) -> ()
-  dealloc_stack %3#0 : $*@local_storage Builtin.NativeObject
-  dealloc_stack %2#0 : $*@local_storage Builtin.NativeObject
+  dealloc_stack %3 : $*Builtin.NativeObject
+  dealloc_stack %2 : $*Builtin.NativeObject
   %12 = tuple ()
   return %12 : $()
 }
 
 // CHECK-LABEL: @projections_from_the_same_source_with_the_same_projection_path_mustalias
-// CHECK: PAIR #33.
-// CHECK-NEXT: (0):   %3 = tuple_element_addr %2 : $*(Builtin.Int64, Builtin.Int32), 1
-// CHECK-NEXT: (0):   %6 = tuple_element_addr %5 : $*(Builtin.Int64, Builtin.Int32), 1
+// CHECK: PAIR #24.
+// CHECK-NEXT:   %3 = tuple_element_addr %2 : $*(Builtin.Int64, Builtin.Int32), 1
+// CHECK-NEXT:   %6 = tuple_element_addr %5 : $*(Builtin.Int64, Builtin.Int32), 1
 // CHECK-NEXT: MustAlias
 sil @projections_from_the_same_source_with_the_same_projection_path_mustalias : $@convention(thin) () -> () {
   %0 = alloc_stack $StructLvl1
-  %1 = struct_element_addr %0#1 : $*StructLvl1, #StructLvl1.sub
+  %1 = struct_element_addr %0 : $*StructLvl1, #StructLvl1.sub
   %2 = struct_element_addr %1 : $*StructLvl2, #StructLvl2.tup
   %3 = tuple_element_addr %2 : $*(Builtin.Int64, Builtin.Int32), 1
-  %4 = struct_element_addr %0#1 : $*StructLvl1, #StructLvl1.sub
+  %4 = struct_element_addr %0 : $*StructLvl1, #StructLvl1.sub
   %5 = struct_element_addr %4 : $*StructLvl2, #StructLvl2.tup
   %6 = tuple_element_addr %5 : $*(Builtin.Int64, Builtin.Int32), 1
-  dealloc_stack %0#0 : $*@local_storage StructLvl1
+  dealloc_stack %0 : $*StructLvl1
   %7 = tuple()
   return %7 : $()
 }
@@ -415,12 +421,12 @@ class X { }
 
 // CHECK-LABEL: @globals_dont_alias
 // CHECK: PAIR #0.
-// CHECK-NEXT: (0):   %0 = global_addr @sil_global1 : $*Builtin.Int32
-// CHECK-NEXT: (0):   %0 = global_addr @sil_global1 : $*Builtin.Int32
+// CHECK-NEXT:   %0 = global_addr @sil_global1 : $*Builtin.Int32
+// CHECK-NEXT:   %0 = global_addr @sil_global1 : $*Builtin.Int32
 // CHECK-NEXT: MustAlias
 // CHECK: PAIR #1.
-// CHECK-NEXT: (0):   %0 = global_addr @sil_global1 : $*Builtin.Int32
-// CHECK-NEXT: (0):   %1 = global_addr @sil_global2 : $*Builtin.Int32
+// CHECK-NEXT:   %0 = global_addr @sil_global1 : $*Builtin.Int32
+// CHECK-NEXT:   %1 = global_addr @sil_global2 : $*Builtin.Int32
 // CHECK-NEXT: NoAlias
 sil @globals_dont_alias : $@convention(thin) () -> () {
   %0 = global_addr @sil_global1 : $*Builtin.Int32
@@ -431,8 +437,8 @@ sil @globals_dont_alias : $@convention(thin) () -> () {
 
 // CHECK-LABEL: @globals_and_allocs_dont_alias
 // CHECK: PAIR #1.
-// CHECK-NEXT: (0):   %0 = global_addr @sil_global1 : $*Builtin.Int32
-// CHECK-NEXT: (0):   %1 = alloc_ref $X
+// CHECK-NEXT:   %0 = global_addr @sil_global1 : $*Builtin.Int32
+// CHECK-NEXT:   %1 = alloc_ref $X
 // CHECK-NEXT: NoAlias
 sil @globals_and_allocs_dont_alias : $@convention(thin) () -> () {
   %0 = global_addr @sil_global1 : $*Builtin.Int32
@@ -446,16 +452,16 @@ sil_global @sil_global3 : $Int32
 
 // CHECK-LABEL: @globals_alias
 // CHECK: PAIR #0.
-// CHECK-NEXT: (0):   %0 = global_addr @sil_global3 : $*Int32
-// CHECK-NEXT: (0):   %0 = global_addr @sil_global3 : $*Int32
+// CHECK-NEXT:   %0 = global_addr @sil_global3 : $*Int32
+// CHECK-NEXT:   %0 = global_addr @sil_global3 : $*Int32
 // CHECK-NEXT: MustAlias
 // CHECK: PAIR #1.
-// CHECK-NEXT: (0):   %0 = global_addr @sil_global3 : $*Int32
-// CHECK-NEXT: (0):   %1 = global_addr @sil_global3 : $*Int32
+// CHECK-NEXT:   %0 = global_addr @sil_global3 : $*Int32
+// CHECK-NEXT:   %1 = global_addr @sil_global3 : $*Int32
 // CHECK-NEXT: MustAlias
 // CHECK: PAIR #2.
-// CHECK-NEXT: (0):   %0 = global_addr @sil_global3 : $*Int32
-// CHECK-NEXT: (0):   %2 = struct_element_addr %1 : $*Int32, #Int32._value
+// CHECK-NEXT:   %0 = global_addr @sil_global3 : $*Int32
+// CHECK-NEXT:   %2 = struct_element_addr %1 : $*Int32, #Int32._value
 // CHECK-NEXT: PartialAlias
 sil @globals_alias : $@convention(thin) () -> () {
   %0 = global_addr @sil_global3 : $*Int32
@@ -472,12 +478,12 @@ class HalfOpenRange {
 }
 // CHECK-LABEL: @different_fields
 // CHECK: PAIR #51.
-// CHECK-NEXT: (0):   %5 = ref_element_addr %4 : $HalfOpenRange, #HalfOpenRange.current
-// CHECK-NEXT: (0):   %7 = ref_element_addr %4 : $HalfOpenRange, #HalfOpenRange.end
+// CHECK-NEXT:   %5 = ref_element_addr %4 : $HalfOpenRange, #HalfOpenRange.current
+// CHECK-NEXT:   %7 = ref_element_addr %4 : $HalfOpenRange, #HalfOpenRange.end
 // CHECK-NEXT: NoAlias
 // CHECK: PAIR #64.
-// CHECK-NEXT: (0):   %9 = struct_element_addr %5 : $*Int32, #Int32._value
-// CHECK-NEXT: (0):   %10 = struct_element_addr %7 : $*Int32, #Int32._value
+// CHECK-NEXT:   %9 = struct_element_addr %5 : $*Int32, #Int32._value
+// CHECK-NEXT:   %10 = struct_element_addr %7 : $*Int32, #Int32._value
 // CHECK-NEXT: NoAlias
 sil @different_fields : $@convention(thin) () -> () {
   %0 = integer_literal $Builtin.Int32, 0
@@ -506,12 +512,12 @@ public final class C {
 
 // CHECK-LABEL: @ref_element_addr_and_object_itself
 // CHECK: PAIR #0.
-// CHECK-NEXT: (0):   %0 = alloc_ref $C                               // user: %1
-// CHECK-NEXT: (0):   %0 = alloc_ref $C                               // user: %1
+// CHECK-NEXT:   %0 = alloc_ref $C                               // user: %1
+// CHECK-NEXT:   %0 = alloc_ref $C                               // user: %1
 // CHECK-NEXT: MustAlias
 // CHECK: PAIR #1.
-// CHECK-NEXT: (0):   %0 = alloc_ref $C                               // user: %1
-// CHECK-NEXT: (0):   %1 = ref_element_addr %0 : $C, #C.a
+// CHECK-NEXT:   %0 = alloc_ref $C                               // user: %1
+// CHECK-NEXT:   %1 = ref_element_addr %0 : $C, #C.a
 // CHECK-NEXT: PartialAlias
 sil @ref_element_addr_and_object_itself : $@convention(thin) () -> () {
 bb0:
@@ -523,8 +529,8 @@ bb0:
 
 // CHECK-LABEL: @different_fields_of_different_refs
 // CHECK: PAIR #13.
-// CHECK-NEXT: (0):   %3 = ref_element_addr %0 : $C, #C.a
-// CHECK-NEXT: (0):   %4 = ref_element_addr %1 : $C, #C.b
+// CHECK-NEXT:   %3 = ref_element_addr %0 : $C, #C.a
+// CHECK-NEXT:   %4 = ref_element_addr %1 : $C, #C.b
 // CHECK-NEXT: NoAlias
 sil @different_fields_of_different_refs : $@convention(thin) (@owned C, @owned C, Int) -> Int {
 bb0(%0 : $C, %1 : $C, %2 : $Int):
@@ -535,8 +541,8 @@ bb0(%0 : $C, %1 : $C, %2 : $Int):
 
 // CHECK-LABEL: @non_escaping_local_object_does_not_alias_with_unknown
 // CHECK: PAIR #7.
-// CHECK-NEXT: (0):   %1 = alloc_ref $X                               // user: %3
-// CHECK-NEXT: (0):   %3 = apply %2(%1) : $@convention(thin) (X) -> X
+// CHECK-NEXT:   %1 = alloc_ref $X                               // user: %3
+// CHECK-NEXT:   %3 = apply %2(%1) : $@convention(thin) (X) -> X
 // CHECK-NEXT: NoAlias
 sil @non_escaping_local_object_does_not_alias_with_unknown : $@convention(thin) (X) -> () {
 bb0(%0 : $X):
@@ -556,15 +562,15 @@ bb0(%0 : $X):
 }
 
 // CHECK-LABEL: @alloc_stack_and_addr_cast
-// CHECK: PAIR #5.
-// CHECK-NEXT: (1):   %0 = alloc_stack $C                             // users: %1, %2
-// CHECK-NEXT: (0):   %1 = unchecked_addr_cast %0#1 : $*C to $*Optional<C>
+// CHECK: PAIR #1.
+// CHECK-NEXT:   %0 = alloc_stack $C                             // users: %1, %2
+// CHECK-NEXT:   %1 = unchecked_addr_cast %0 : $*C to $*Optional<C>
 // CHECK-NEXT: MayAlias
 sil @alloc_stack_and_addr_cast : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $C
-  %1 = unchecked_addr_cast %0#1 : $*C to $*Optional<C>
-  dealloc_stack %0#0 : $*@local_storage C
+  %1 = unchecked_addr_cast %0 : $*C to $*Optional<C>
+  dealloc_stack %0 : $*C
   %2 = tuple() 
   return %2 : $() 
 }

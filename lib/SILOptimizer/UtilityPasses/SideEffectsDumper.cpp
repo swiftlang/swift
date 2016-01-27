@@ -1,4 +1,4 @@
-//===------- SideEffectsDumper.cpp - Dumps the side effect analysis -------===//
+//===--- SideEffectsDumper.cpp - Dumps the side effect analysis -----------===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -1,4 +1,4 @@
-//===--- PlatformKind.cpp - Swift Language Platform Kinds -------*- C++ -*-===//
+//===--- PlatformKind.cpp - Swift Language Platform Kinds -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //

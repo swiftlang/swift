@@ -22,7 +22,7 @@ namespace swift {
 template<class ValueTy, class IndexTy = size_t>
 class ValueEnumerator {
   /// A running counter to enumerate values.
-  IndexTy counter;
+  IndexTy counter = 0;
 
   /// Maps values to unique integers.
   llvm::DenseMap<ValueTy, IndexTy> ValueToIndex;

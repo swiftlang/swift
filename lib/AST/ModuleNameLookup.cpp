@@ -1,4 +1,4 @@
-//===--- ModuleNameLookup.cpp - Name lookup within a module ----*- c++ -*--===//
+//===--- ModuleNameLookup.cpp - Name lookup within a module ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -1,4 +1,4 @@
-//===-- swift-demangle.cpp - Swift Demangler app ---------------------------===//
+//===--- swift-demangle.cpp - Swift Demangler app -------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

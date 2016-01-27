@@ -1,4 +1,4 @@
-//===---- DeadStoreElimination.cpp - SIL Dead Store Elimination -----===//
+//===--- DeadStoreElimination.cpp - SIL Dead Store Elimination ------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -96,6 +96,19 @@ enum class DSEKind : unsigned {
   PerformDSE = 2,
 };
 
+/// Return the deallocate stack instructions corresponding to the given
+/// AllocStackInst.
+static llvm::SmallVector<SILInstruction *, 1> findDeallocStackInst(
+                                                   AllocStackInst *ASI) {
+  llvm::SmallVector<SILInstruction *, 1> DSIs;
+  for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E; ++UI) {
+    if (DeallocStackInst *D = dyn_cast<DeallocStackInst>(UI->getUser())) {
+      DSIs.push_back(D);
+    }   
+  }
+  return DSIs;
+}
+
 //===----------------------------------------------------------------------===//
 //                             Utility Functions
 //===----------------------------------------------------------------------===//
@@ -112,20 +125,6 @@ static inline bool isPerformingDSE(DSEKind Kind) {
   return Kind == DSEKind::PerformDSE;
 }
 
-/// Return true if all basic blocks will have their successors processed if
-/// the basic blocks in the functions are iterated in post order.
-static bool isOneIterationFunction(PostOrderFunctionInfo *PO) {
-  llvm::DenseSet<SILBasicBlock *> HandledBBs;
-  for (SILBasicBlock *B : PO->getPostOrder()) {
-    for (auto &X : B->getSuccessors()) {
-      if (HandledBBs.find(X) == HandledBBs.end())
-        return false;
-    }
-    HandledBBs.insert(B);
-  }
-  return true;
-}
-
 /// Returns true if this is an instruction that may have side effects in a
 /// general sense but are inert from a load store perspective.
 static bool isDeadStoreInertInstruction(SILInstruction *Inst) {
@@ -138,6 +137,7 @@ static bool isDeadStoreInertInstruction(SILInstruction *Inst) {
   case ValueKind::CondFailInst:
   case ValueKind::IsUniqueInst:
   case ValueKind::IsUniqueOrPinnedInst:
+  case ValueKind::FixLifetimeInst:
     return true;
   default:
     return false;
@@ -149,6 +149,19 @@ static bool isDeadStoreInertInstruction(SILInstruction *Inst) {
 //===----------------------------------------------------------------------===//
 
 namespace {
+
+/// If this function has too many basic blocks or too many locations, it may
+/// take a long time to compute the genset and killset. The number of memory
+/// behavior or alias query we need to do in worst case is roughly linear to
+/// # of BBs x(times) # of locations.
+///
+/// we could run DSE on functions with 256 basic blocks and 256 locations,
+/// which is a large function.  
+constexpr unsigned MaxLSLocationBBMultiplicationNone = 256*256;
+
+/// we could run optimistic DSE on functions with less than 64 basic blocks
+/// and 64 locations which is a sizeable function.
+constexpr unsigned MaxLSLocationBBMultiplicationPessimistic = 64*64;
 
 /// If a large store is broken down to too many smaller stores, bail out.
 /// Currently, we only do partial dead store if we can form a single contiguous
@@ -178,7 +191,7 @@ class DSEContext;
 /// 2. When a load instruction is encountered, remove the loaded location and
 ///    any location it may alias with from the BBWriteSetMid.
 ///
-/// 3. When an instruction reads from  memory in an unknown way, the
+/// 3. When an instruction reads from memory in an unknown way, the
 ///    BBWriteSetMid bit is cleared if the instruction can read the
 ///    corresponding LSLocation.
 ///
@@ -221,6 +234,10 @@ public:
   /// point of the basic block.
   llvm::SmallBitVector BBMaxStoreSet;
 
+  /// If a bit in the vector is set, then the location is dead at the end of
+  /// this basic block. 
+  llvm::SmallBitVector BBDeallocateLocation;
+
   /// The dead stores in the current basic block.
   llvm::DenseSet<SILInstruction *> DeadStores;
 
@@ -237,11 +254,8 @@ public:
   /// Return the current basic block.
   SILBasicBlock *getBB() const { return BB; }
 
-  /// Initialize the bitvectors for the return basic block.
-  void initReturnBlock(DSEContext &Ctx);
-
   /// Initialize the bitvectors for the current basic block.
-  void init(DSEContext &Ctx, bool OneIterationFunction);
+  void init(DSEContext &Ctx, bool PessimisticDF);
 
   /// Check whether the BBWriteSetIn has changed. If it does, we need to rerun
   /// the data flow on this block's predecessors to reach fixed point.
@@ -251,6 +265,9 @@ public:
   void startTrackingLocation(llvm::SmallBitVector &BV, unsigned bit);
   void stopTrackingLocation(llvm::SmallBitVector &BV, unsigned bit);
   bool isTrackingLocation(llvm::SmallBitVector &BV, unsigned bit);
+
+  /// Set the store bit for stack slot deallocated in this basic block. 
+  void initStoreSetAtEndOfBlock(DSEContext &Ctx);
 };
 
 } // end anonymous namespace
@@ -281,6 +298,12 @@ bool BlockState::isTrackingLocation(llvm::SmallBitVector &BV, unsigned i) {
 namespace {
 
 class DSEContext {
+  enum class ProcessKind {
+    ProcessOptimistic = 0,
+    ProcessPessimistic = 1,
+    ProcessNone = 2,
+  }; 
+private:
   /// The module we are currently processing.
   SILModule *Mod;
 
@@ -326,6 +349,9 @@ class DSEContext {
   /// Contains a map between location to their index in the LocationVault.
   /// used to facilitate fast location to index lookup.
   LSLocationIndexMap LocToBitIndex;
+
+  /// Keeps a map between the accessed SILValue and the location.
+  LSLocationBaseMap BaseToLocIndex;
 
   /// Return the BlockState for the basic block this basic block belongs to.
   BlockState *getBlockState(SILBasicBlock *B) { return BBToLocState[B]; }
@@ -420,9 +446,13 @@ public:
   /// Returns the location vault of the current function.
   std::vector<LSLocation> &getLocationVault() { return LocationVault; }
 
+  /// Use a set of ad hoc rules to tell whether we should run a pessimistic
+  /// one iteration data flow on the function.
+  ProcessKind getProcessFunctionKind();
+
   /// Compute the kill set for the basic block. return true if the store set
   /// changes.
-  void processBasicBlockForDSE(SILBasicBlock *BB, bool OneIterationFunction);
+  void processBasicBlockForDSE(SILBasicBlock *BB, bool PessimisticDF);
 
   /// Compute the genset and killset for the current basic block.
   void processBasicBlockForGenKillSet(SILBasicBlock *BB);
@@ -440,21 +470,7 @@ public:
 
 } // end anonymous namespace
 
-void BlockState::initReturnBlock(DSEContext &Ctx) {
-  auto *EA = Ctx.getEA();
-  auto *Fn = Ctx.getFn();
-  std::vector<LSLocation> &LocationVault = Ctx.getLocationVault();
-
-  // We set the store bit at the end of the function if the location does
-  // not escape the function.
-  for (unsigned i = 0; i < LocationVault.size(); ++i) {
-    if (!LocationVault[i].isNonEscapingLocalLSLocation(Fn, EA))
-      continue;
-    startTrackingLocation(BBWriteSetOut, i);
-  }
-}
-
-void BlockState::init(DSEContext &Ctx, bool OneIterationFunction)  {
+void BlockState::init(DSEContext &Ctx, bool PessimisticDF)  {
   std::vector<LSLocation> &LV = Ctx.getLocationVault();
   LocationNum = LV.size();
   // For function that requires just 1 iteration of the data flow to converge
@@ -473,7 +489,7 @@ void BlockState::init(DSEContext &Ctx, bool OneIterationFunction)  {
   // However, by doing so, we can only eliminate the dead stores after the
   // data flow stabilizes.
   //
-  BBWriteSetIn.resize(LocationNum, !OneIterationFunction);
+  BBWriteSetIn.resize(LocationNum, !PessimisticDF);
   BBWriteSetOut.resize(LocationNum, false);
   BBWriteSetMid.resize(LocationNum, false);
 
@@ -484,10 +500,9 @@ void BlockState::init(DSEContext &Ctx, bool OneIterationFunction)  {
   // MaxStoreSet is optimistically set to true initially.
   BBMaxStoreSet.resize(LocationNum, true);
 
-  // If basic block has no successor, then all local writes can be considered
-  // dead for block with no successor.
-  if (BB->succ_empty()) 
-    initReturnBlock(Ctx);
+
+  // DeallocateLocation initially empty.
+  BBDeallocateLocation.resize(LocationNum, false);
 }
 
 unsigned DSEContext::getLocationBit(const LSLocation &Loc) {
@@ -501,11 +516,49 @@ unsigned DSEContext::getLocationBit(const LSLocation &Loc) {
   return Iter->second;
 }
 
+DSEContext::ProcessKind DSEContext::getProcessFunctionKind() {
+  bool RunOneIteration = true;
+  unsigned BBCount = 0;
+  unsigned LocationCount = LocationVault.size();
+
+  // If all basic blocks will have their successors processed if
+  // the basic blocks in the functions are iterated in post order.
+  // Then this function can be processed in one iteration, i.e. no
+  // need to generate the genset and killset.
+  auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
+  llvm::DenseSet<SILBasicBlock *> HandledBBs;
+  for (SILBasicBlock *B : PO->getPostOrder()) {
+    ++BBCount;
+    for (auto &X : B->getSuccessors()) {
+      if (HandledBBs.find(X) == HandledBBs.end()) {
+        RunOneIteration = false;
+        break;
+      }
+    }
+    HandledBBs.insert(B);
+  }
+
+  // Data flow may take too long to run.
+  if (BBCount * LocationCount > MaxLSLocationBBMultiplicationNone)
+    return ProcessKind::ProcessNone;
+
+  // This function's data flow would converge in 1 iteration.
+  if (RunOneIteration)
+    return ProcessKind::ProcessPessimistic;
+  
+  // We run one pessimistic data flow to do dead store elimination on
+  // the function.
+  if (BBCount * LocationCount > MaxLSLocationBBMultiplicationPessimistic)
+    return ProcessKind::ProcessPessimistic;
+
+  return ProcessKind::ProcessOptimistic;
+}
+
 void DSEContext::processBasicBlockForGenKillSet(SILBasicBlock *BB) {
   // Compute the MaxStoreSet at the end of the basic block.
   auto *BBState = getBlockState(BB);
   if (BB->succ_empty()) {
-    BBState->BBMaxStoreSet = BBState->BBWriteSetOut;
+    BBState->BBMaxStoreSet |= BBState->BBDeallocateLocation;
   } else {
     auto Iter = BB->succ_begin();
     BBState->BBMaxStoreSet = getBlockState(*Iter)->BBMaxStoreSet;
@@ -554,13 +607,13 @@ bool DSEContext::processBasicBlockWithGenKillSet(SILBasicBlock *BB) {
 }
 
 void DSEContext::processBasicBlockForDSE(SILBasicBlock *BB,
-                                         bool OneIterationFunction) {
+                                         bool PessimisticDF) {
   // If we know this is not a one iteration function which means its
   // its BBWriteSetIn and BBWriteSetOut have been computed and converged, 
   // and this basic block does not even have StoreInsts, there is no point
   // in processing every instruction in the basic block again as no store
   // will be eliminated. 
-  if (!OneIterationFunction && BBWithStores.find(BB) == BBWithStores.end())
+  if (!PessimisticDF && BBWithStores.find(BB) == BBWithStores.end())
        return;
 
   // Intersect in the successor WriteSetIns. A store is dead if it is not read
@@ -579,14 +632,33 @@ void DSEContext::processBasicBlockForDSE(SILBasicBlock *BB,
   S->BBWriteSetIn = S->BBWriteSetMid;
 }
 
+void BlockState::initStoreSetAtEndOfBlock(DSEContext &Ctx) {
+  std::vector<LSLocation> &LocationVault = Ctx.getLocationVault();
+  // We set the store bit at the end of the basic block in which a stack
+  // allocated location is deallocated.
+  for (unsigned i = 0; i < LocationVault.size(); ++i) {
+    // Turn on the store bit at the block which the stack slot is deallocated.
+    if (auto *ASI = dyn_cast<AllocStackInst>(LocationVault[i].getBase())) {
+      for (auto X : findDeallocStackInst(ASI)) {
+        SILBasicBlock *DSIBB = X->getParent();
+        if (DSIBB != BB)
+          continue;
+        startTrackingLocation(BBDeallocateLocation, i);
+      }
+    }
+  }
+}
+
 void DSEContext::mergeSuccessorLiveIns(SILBasicBlock *BB) {
   // If basic block has no successor, then all local writes can be considered
   // dead for block with no successor.
-  if (BB->succ_empty())
+  BlockState *C = getBlockState(BB);
+  if (BB->succ_empty()) {
+    C->BBWriteSetOut |= C->BBDeallocateLocation;
     return;
+  }
 
   // Use the first successor as the base condition.
-  BlockState *C = getBlockState(BB);
   auto Iter = BB->succ_begin();
   C->BBWriteSetOut = getBlockState(*Iter)->BBWriteSetIn;
 
@@ -605,12 +677,16 @@ void DSEContext::mergeSuccessorLiveIns(SILBasicBlock *BB) {
   for (auto EndIter = BB->succ_end(); Iter != EndIter; ++Iter) {
     C->BBWriteSetOut &= getBlockState(*Iter)->BBWriteSetIn;
   }
+
+  // We set the store bit at the end of the basic block in which a stack
+  // allocated location is deallocated.
+  C->BBWriteSetOut |= C->BBDeallocateLocation;
 }
 
 void DSEContext::invalidateLSLocationBaseForGenKillSet(SILInstruction *I) {
   BlockState *S = getBlockState(I);
   for (unsigned i = 0; i < S->LocationNum; ++i) {
-    if (LocationVault[i].getBase().getDef() != I)
+    if (LocationVault[i].getBase() != I)
       continue;
     S->startTrackingLocation(S->BBKillSet, i);
     S->stopTrackingLocation(S->BBGenSet, i);
@@ -622,7 +698,7 @@ void DSEContext::invalidateLSLocationBaseForDSE(SILInstruction *I) {
   for (unsigned i = 0; i < S->LocationNum; ++i) {
     if (!S->BBWriteSetMid.test(i))
       continue;
-    if (LocationVault[i].getBase().getDef() != I)
+    if (LocationVault[i].getBase() != I)
       continue;
     S->stopTrackingLocation(S->BBWriteSetMid, i);
   }
@@ -696,7 +772,13 @@ void DSEContext::processRead(SILInstruction *I, BlockState *S, SILValue Mem,
   //
   // This will make comparison between locations easier. This eases the
   // implementation of intersection operator in the data flow.
-  LSLocation L(Mem);
+  LSLocation L;
+  if (BaseToLocIndex.find(Mem) != BaseToLocIndex.end()) {
+    L = BaseToLocIndex[Mem];
+  } else {
+    SILValue UO = getUnderlyingObject(Mem);
+    L = LSLocation(UO, NewProjectionPath::getProjectionPath(UO, Mem));
+  }
 
   // If we cant figure out the Base or Projection Path for the read instruction,
   // process it as an unknown memory instruction for now.
@@ -775,7 +857,13 @@ void DSEContext::processWrite(SILInstruction *I, BlockState *S, SILValue Val,
   //
   // This will make comparison between locations easier. This eases the
   // implementation of intersection operator in the data flow.
-  LSLocation L(Mem);
+  LSLocation L;
+  if (BaseToLocIndex.find(Mem) != BaseToLocIndex.end()) {
+    L = BaseToLocIndex[Mem];
+  } else {
+    SILValue UO = getUnderlyingObject(Mem);
+    L = LSLocation(UO, NewProjectionPath::getProjectionPath(UO, Mem));
+  }
 
   // If we cant figure out the Base or Projection Path for the store
   // instruction, simply ignore it.
@@ -855,10 +943,10 @@ void DSEContext::processWrite(SILInstruction *I, BlockState *S, SILValue Val,
     // particular instruction may not be accessing the base, so we need to
     // *rebase* the locations w.r.t. to the current instruction.
     SILValue B = Locs[0].getBase();
-    Optional<ProjectionPath> BP = ProjectionPath::getAddrProjectionPath(B, Mem);
+    Optional<NewProjectionPath> BP = NewProjectionPath::getProjectionPath(B, Mem);
     // Strip off the projection path from base to the accessed field.
     for (auto &X : Alives) {
-      X.subtractPaths(BP);
+      X.removePathPrefix(BP);
     }
 
     // We merely setup the remaining live stores, but do not materialize in IR
@@ -1030,12 +1118,20 @@ bool DSEContext::run() {
   // Is this a one iteration function.
   auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
 
-  // Do we really need to run the iterative data flow on the function.
-  bool OneIterationFunction = isOneIterationFunction(PO);
-
   // Walk over the function and find all the locations accessed by
   // this function.
-  LSLocation::enumerateLSLocations(*F, LocationVault, LocToBitIndex, TE);
+  LSLocation::enumerateLSLocations(*F, LocationVault, LocToBitIndex,
+                                   BaseToLocIndex, TE);
+
+  // Check how to optimize this function.
+  ProcessKind Kind = getProcessFunctionKind();
+  
+  // We do not optimize this function at all.
+  if (Kind == ProcessKind::ProcessNone)
+      return false;
+
+  // Do we run a pessimistic data flow ?
+  bool PessimisticDF = Kind == ProcessKind::ProcessOptimistic ? false : true;
 
   // For all basic blocks in the function, initialize a BB state.
   //
@@ -1046,12 +1142,17 @@ bool DSEContext::run() {
     BlockStates.push_back(BlockState(&B));
     // Since we know all the locations accessed in this function, we can resize
     // the bit vector to the appropriate size.
-    BlockStates.back().init(*this, OneIterationFunction);
+    BlockStates.back().init(*this, PessimisticDF);
   }
 
   // Initialize the BBToLocState mapping.
   for (auto &S : BlockStates) {
     BBToLocState[S.getBB()] = &S;
+  }
+
+  // Initialize the store bit state at the end of each basic block.
+  for (auto &X : BlockStates) {
+    X.initStoreSetAtEndOfBlock(*this);
   }
 
   // We perform dead store elimination in the following phases.
@@ -1072,14 +1173,14 @@ bool DSEContext::run() {
   // on the function.
 
   // We need to run the iterative data flow on the function.
-  if (!OneIterationFunction) {
+  if (!PessimisticDF) {
     runIterativeDSE();
   }
 
   // The data flow has stabilized, run one last iteration over all the basic
   // blocks and try to remove dead stores.
   for (SILBasicBlock *B : PO->getPostOrder()) {
-    processBasicBlockForDSE(B, OneIterationFunction);
+    processBasicBlockForDSE(B, PessimisticDF);
   }
 
   // Finally, delete the dead stores and create the live stores.
@@ -1088,9 +1189,10 @@ bool DSEContext::run() {
     // Create the stores that are alive due to partial dead stores.
     for (auto &I : getBlockState(&BB)->LiveStores) {
       Changed = true;
-      SILInstruction *IT = cast<SILInstruction>(I.first)->getNextNode();
+      SILInstruction *Inst = cast<SILInstruction>(I.first);
+      auto *IT = &*std::next(Inst->getIterator());
       SILBuilderWithScope Builder(IT);
-      Builder.createStore(I.first.getLoc().getValue(), I.second, I.first);
+      Builder.createStore(Inst->getLoc(), I.second, Inst);
     }
     // Delete the dead stores.
     for (auto &I : getBlockState(&BB)->DeadStores) {

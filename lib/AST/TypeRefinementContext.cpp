@@ -1,4 +1,4 @@
-//===--- TypeRefinementContext.cpp - Swift Refinement Context ---*- C++ -*-===//
+//===--- TypeRefinementContext.cpp - Swift Refinement Context -------------===//
 //
 // This source file is part of the Swift.org open source project
 //

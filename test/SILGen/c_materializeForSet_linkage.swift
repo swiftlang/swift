@@ -10,5 +10,17 @@ protocol Pointable {
 }
 
 extension NSPoint: Pointable {}
-// CHECK-LABEL: sil shared @_TFFVSC7NSPointm1xSfU_FTBpRBBRS_MS__T_
-// CHECK-LABEL: sil shared @_TFFVSC7NSPointm1ySfU_FTBpRBBRS_MS__T_
+
+extension NSReferencePoint: Pointable {}
+
+// Make sure synthesized materializeForSet and its callbacks have shared linkage
+// for properties imported from Clang
+
+// CHECK-LABEL: sil shared [transparent] @_TFVSC7NSPointm1xSf
+// CHECK-LABEL: sil shared [transparent] @_TFVSC7NSPointm1ySf
+
+// CHECK-LABEL: sil shared [transparent] @_TFCSo16NSReferencePointm1xSf
+// CHECK-LABEL: sil shared [transparent] @_TFCSo16NSReferencePointm1ySf
+
+// CHECK-LABEL: sil shared [transparent] @_TFFCSo16NSReferencePointm1xSfU_XfTBpRBBRS_XMTS__T_
+// CHECK-LABEL: sil shared [transparent] @_TFFCSo16NSReferencePointm1ySfU_XfTBpRBBRS_XMTS__T_

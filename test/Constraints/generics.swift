@@ -43,7 +43,7 @@ func foo<T : P>(arg: T) -> T {
 
 // Associated types and metatypes
 protocol SomeProtocol {
-  typealias SomeAssociated
+  associatedtype SomeAssociated
 }
 
 func generic_metatypes<T : SomeProtocol>(x: T)
@@ -101,7 +101,7 @@ func foo2(p1: P1) -> P2 {
 
 // <rdar://problem/14005696>
 protocol BinaryMethodWorkaround {
-  typealias MySelf
+  associatedtype MySelf
 }
 
 protocol Squigglable : BinaryMethodWorkaround {
@@ -171,3 +171,43 @@ func r22459135() {
     }
   }
 }
+
+
+// <rdar://problem/19710848> QoI: Friendlier error message for "[] as Set"
+// <rdar://problem/22326930> QoI: "argument for generic parameter 'Element' could not be inferred" lacks context
+_ = [] as Set  // expected-error {{generic parameter 'Element' could not be inferred in cast to 'Set<_>}}
+
+
+//<rdar://problem/22509125> QoI: Error when unable to infer generic archetype lacks greatness
+func r22509125<T>(a : T?) { // expected-note {{in call to function 'r22509125'}}
+  r22509125(nil) // expected-error {{generic parameter 'T' could not be inferred}}
+}
+
+
+// <rdar://problem/24267414> QoI: error: cannot convert value of type 'Int' to specified type 'Int'
+struct R24267414<T> {  // expected-note {{'T' declared as parameter to type 'R24267414'}}
+  static func foo() -> Int {}
+}
+var _ : Int = R24267414.foo() // expected-error {{generic parameter 'T' could not be inferred}}
+
+
+// https://bugs.swift.org/browse/SR-599
+func SR599<T: IntegerType>() -> T.Type { return T.self }  // expected-note {{in call to function 'SR599'}}
+_ = SR599()         // expected-error {{generic parameter 'T' could not be inferred}}
+
+
+
+
+// <rdar://problem/19215114> QoI: Poor diagnostic when we are unable to infer type
+protocol Q19215114 {}
+protocol P19215114 {}
+
+// expected-note @+1 {{in call to function 'body9215114'}}
+func body9215114<T: P19215114, U: Q19215114>(t: T) -> (u: U) -> () {}
+
+func test9215114<T: P19215114, U: Q19215114>(t: T) -> (U) -> () {
+  //Should complain about not being able to infer type of U.
+  let f = body9215114(t)  // expected-error {{generic parameter 'T' could not be inferred}}
+  return f
+}
+

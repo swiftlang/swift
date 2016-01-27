@@ -1,4 +1,4 @@
-//===--- SILSuccessor.h - Terminator Instruction Successor -------*- C++ -*-==//
+//===--- SILSuccessor.h - Terminator Instruction Successor ------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

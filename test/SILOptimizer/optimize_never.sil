@@ -126,14 +126,14 @@ bb0(%0 : $D):
 sil hidden @_TFC14optimize_never1DcfT_S0_ : $@convention(method) (@owned D) -> @owned D {
 bb0(%0 : $D):
   %1 = alloc_stack $D
-  store %0 to %1#1 : $*D
+  store %0 to %1 : $*D
   %3 = upcast %0 : $D to $C
 
   %4 = function_ref @_TFC14optimize_never1CcfT_S0_ : $@convention(method) (@owned C) -> @owned C
   %5 = apply %4(%3) : $@convention(method) (@owned C) -> @owned C
   %6 = unchecked_ref_cast %5 : $C to $D
-  store %6 to %1#1 : $*D
-  dealloc_stack %1#0 : $*@local_storage D
+  store %6 to %1 : $*D
+  dealloc_stack %1 : $*D
   return %6 : $D
 }
 
@@ -161,8 +161,8 @@ sil [_semantics "optimize.sil.never"] @_TF14optimize_never4foo1urFTxCS_1C_Vs5Int
 bb0(%0 : $*T, %1 : $C):
   %4 = function_ref @_TF14optimize_never10transform1urFxVs5Int32 : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Int32
   %5 = alloc_stack $T
-  copy_addr %0 to [initialization] %5#1 : $*T
-  %7 = apply %4<T>(%5#1) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Int32
+  copy_addr %0 to [initialization] %5 : $*T
+  %7 = apply %4<T>(%5) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Int32
   %8 = class_method %1 : $C, #C.foo!1 : C -> () -> Int32 , $@convention(method) (@guaranteed C) -> Int32
   %9 = apply %8(%1) : $@convention(method) (@guaranteed C) -> Int32
   %10 = struct_extract %7 : $Int32, #Int32._value
@@ -173,7 +173,7 @@ bb0(%0 : $*T, %1 : $C):
   %15 = tuple_extract %13 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %15 : $Builtin.Int1
   %17 = struct $Int32 (%14 : $Builtin.Int32)
-  dealloc_stack %5#0 : $*@local_storage T
+  dealloc_stack %5 : $*T
   strong_release %1 : $C
   destroy_addr %0 : $*T
   return %17 : $Int32
@@ -195,10 +195,10 @@ bb0(%0 : $C):
   %3 = integer_literal $Builtin.Int32, 1
   %4 = struct $Int32 (%3 : $Builtin.Int32)
   %5 = alloc_stack $Int32
-  store %4 to %5#1 : $*Int32
+  store %4 to %5 : $*Int32
   strong_retain %0 : $C
-  %8 = apply %2<Int32>(%5#1, %0) : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned C) -> Int32
-  dealloc_stack %5#0 : $*@local_storage Int32
+  %8 = apply %2<Int32>(%5, %0) : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned C) -> Int32
+  dealloc_stack %5 : $*Int32
   strong_release %0 : $C
   return %8 : $Int32
 }
@@ -277,8 +277,8 @@ sil @_TF14optimize_never4foo3urFTxCS_1C_Vs5Int32 : $@convention(thin) <T> (@in T
 bb0(%0 : $*T, %1 : $C):
   %4 = function_ref @_TF14optimize_never10transform3urFxVs5Int32 : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Int32
   %5 = alloc_stack $T
-  copy_addr %0 to [initialization] %5#1 : $*T
-  %7 = apply %4<T>(%5#1) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Int32
+  copy_addr %0 to [initialization] %5 : $*T
+  %7 = apply %4<T>(%5) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Int32
   %8 = class_method %1 : $C, #C.foo!1 : C -> () -> Int32 , $@convention(method) (@guaranteed C) -> Int32
   %9 = apply %8(%1) : $@convention(method) (@guaranteed C) -> Int32
   %10 = struct_extract %7 : $Int32, #Int32._value
@@ -289,7 +289,7 @@ bb0(%0 : $*T, %1 : $C):
   %15 = tuple_extract %13 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %15 : $Builtin.Int1
   %17 = struct $Int32 (%14 : $Builtin.Int32)
-  dealloc_stack %5#0 : $*@local_storage T
+  dealloc_stack %5 : $*T
   strong_release %1 : $C
   destroy_addr %0 : $*T
   return %17 : $Int32
@@ -312,10 +312,10 @@ bb0(%0 : $C):
   %3 = integer_literal $Builtin.Int32, 1
   %4 = struct $Int32 (%3 : $Builtin.Int32)
   %5 = alloc_stack $Int32
-  store %4 to %5#1 : $*Int32
+  store %4 to %5 : $*Int32
   strong_retain %0 : $C
-  %8 = apply %2<Int32>(%5#1, %0) : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned C) -> Int32
-  dealloc_stack %5#0 : $*@local_storage Int32
+  %8 = apply %2<Int32>(%5, %0) : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned C) -> Int32
+  dealloc_stack %5 : $*Int32
   strong_release %0 : $C
   return %8 : $Int32
 }

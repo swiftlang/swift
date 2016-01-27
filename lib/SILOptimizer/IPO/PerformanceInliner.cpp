@@ -1,4 +1,4 @@
-//===- PerformanceInliner.cpp - Basic cost based inlining for performance -===//
+//===--- PerformanceInliner.cpp - Basic cost based performance inlining ---===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -310,7 +310,7 @@ SILValue ConstantTracker::scanProjections(SILValue addr,
                                           SmallVectorImpl<Projection> *Result) {
   for (;;) {
     if (Projection::isAddrProjection(addr)) {
-      SILInstruction *I = cast<SILInstruction>(addr.getDef());
+      SILInstruction *I = cast<SILInstruction>(addr);
       if (Result) {
         Optional<Projection> P = Projection::addressProjectionForInstruction(I);
         Result->push_back(P.getValue());
@@ -562,7 +562,7 @@ static bool calleeHasMinimalSelfRecursion(SILFunction *Callee) {
   return false;
 }
 
-// Returns the callee of an apply_inst if it is basically inlinable.
+// Returns the callee of an apply_inst if it is basically inlineable.
 SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
 
   SILFunction *Callee = AI.getCalleeFunction();
@@ -574,16 +574,16 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
 
   // Don't inline functions that are marked with the @_semantics or @effects
   // attribute if the inliner is asked not to inline them.
-  if (Callee->hasDefinedSemantics() || Callee->hasEffectsKind()) {
+  if (Callee->hasSemanticsAttrs() || Callee->hasEffectsKind()) {
     if (WhatToInline == InlineSelection::NoSemanticsAndGlobalInit) {
       DEBUG(llvm::dbgs() << "        FAIL: Function " << Callee->getName()
             << " has special semantics or effects attribute.\n");
       return nullptr;
     }
     // The "availability" semantics attribute is treated like global-init.
-    if (Callee->hasDefinedSemantics() &&
+    if (Callee->hasSemanticsAttrs() &&
         WhatToInline != InlineSelection::Everything &&
-        Callee->getSemanticsString().startswith("availability")) {
+        Callee->hasSemanticsAttrThatStartsWith("availability")) {
       return nullptr;
     }
   } else if (Callee->isGlobalInit()) {
@@ -717,7 +717,7 @@ static SILBasicBlock *getTakenBlock(TermInst *term,
   if (CheckedCastBranchInst *CCB = dyn_cast<CheckedCastBranchInst>(term)) {
     if (SILInstruction *def = constTracker.getDefInCaller(CCB->getOperand())) {
       if (UpcastInst *UCI = dyn_cast<UpcastInst>(def)) {
-        SILType castType = UCI->getOperand()->getType(0);
+        SILType castType = UCI->getOperand()->getType();
         if (CCB->getCastType().isSuperclassOf(castType)) {
           return CCB->getSuccessBB();
         }

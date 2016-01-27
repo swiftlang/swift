@@ -26,9 +26,9 @@
 // Useless copies of address-only types look like this:
 //
 // %copy = alloc_stack $T
-// copy_addr %arg to [initialization] %copy#1 : $*T
-// %ret = apply %callee<T>(%copy#1) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
-// dealloc_stack %copy#0 : $*@local_storage T
+// copy_addr %arg to [initialization] %copy : $*T
+// %ret = apply %callee<T>(%copy) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+// dealloc_stack %copy : $*T
 // destroy_addr %arg : $*T
 //
 // Eliminating the address-only copies eliminates a very expensive call to
@@ -453,7 +453,7 @@ protected:
 /// The collected use points will be consulted during forward and backward
 /// copy propagation.
 bool CopyForwarding::collectUsers() {
-  for (auto UI : CurrentDef.getUses()) {
+  for (auto UI : CurrentDef->getUses()) {
     SILInstruction *UserInst = UI->getUser();
     if (auto *Apply = dyn_cast<ApplyInst>(UserInst)) {
       /// A call to materializeForSet exposes an address within the parent
@@ -490,6 +490,8 @@ bool CopyForwarding::collectUsers() {
       break;
     case ValueKind::DebugValueAddrInst:
       SrcDebugValueInsts.insert(cast<DebugValueAddrInst>(UserInst));
+      break;
+    case ValueKind::DeallocStackInst:
       break;
     default:
       // Most likely one of:
@@ -529,7 +531,7 @@ bool CopyForwarding::propagateCopy(CopyAddrInst *CopyInst) {
 
   // Gather a list of CopyDest users in this block.
   SmallPtrSet<SILInstruction*, 16> DestUserInsts;
-  for (auto UI : CopyDest.getUses()) {
+  for (auto UI : CopyDest->getUses()) {
     SILInstruction *UserInst = UI->getUser();
     if (UserInst != CopyInst && UI->getUser()->getParent() == BB)
       DestUserInsts.insert(UI->getUser());
@@ -586,9 +588,11 @@ bool CopyForwarding::areCopyDestUsersDominatedBy(
   SILValue CopyDest = Copy->getDest();
   DominanceInfo *DT = nullptr;
 
-  for (auto *Use : CopyDest.getUses()) {
+  for (auto *Use : CopyDest->getUses()) {
     auto *UserInst = Use->getUser();
     if (UserInst == Copy)
+      continue;
+    if (isa<DeallocStackInst>(UserInst))
       continue;
 
     // Initialize the dominator tree info.
@@ -616,6 +620,38 @@ bool CopyForwarding::areCopyDestUsersDominatedBy(
   return true;
 }
 
+/// Returns the associated dealloc_stack if \p ASI has a single dealloc_stack.
+/// Usually this is the case, but the optimizations may generate something like:
+/// %1 = alloc_stack
+/// if (...) {
+///   dealloc_stack %1
+/// } else {
+///   dealloc_stack %1
+/// }
+static DeallocStackInst *getSingleDealloc(AllocStackInst *ASI) {
+  DeallocStackInst *SingleDSI = nullptr;
+  for (Operand *Use : ASI->getUses()) {
+    if (auto *DSI = dyn_cast<DeallocStackInst>(Use->getUser())) {
+      if (SingleDSI)
+        return nullptr;
+      SingleDSI = DSI;
+    }
+  }
+  return SingleDSI;
+}
+
+/// Replace all uses of \p ASI by \p RHS, except the dealloc_stack.
+static void replaceAllUsesExceptDealloc(AllocStackInst *ASI, ValueBase *RHS) {
+  llvm::SmallVector<Operand *, 8> Uses;
+  for (Operand *Use : ASI->getUses()) {
+    if (!isa<DeallocStackInst>(Use->getUser()))
+      Uses.push_back(Use);
+  }
+  for (Operand *Use : Uses) {
+    Use->set(RHS);
+  }
+}
+
 /// Perform forward copy-propagation. Find a set of uses that the given copy can
 /// forward to and replace them with the copy's source.
 ///
@@ -627,9 +663,9 @@ bool CopyForwarding::areCopyDestUsersDominatedBy(
 /// %copy = alloc_stack $T
 /// ...
 /// CurrentBlock:
-/// copy_addr %arg to [initialization] %copy#1 : $*T
+/// copy_addr %arg to [initialization] %copy : $*T
 /// ...
-/// %ret = apply %callee<T>(%copy#1) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+/// %ret = apply %callee<T>(%copy) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
 /// \endcode
 ///
 /// If the last use (deinit) is a copy, replace it with a destroy+copy[init].
@@ -679,14 +715,13 @@ bool CopyForwarding::forwardPropagateCopy(
   }
 
   SILInstruction *DefDealloc = nullptr;
-  if (isa<AllocStackInst>(CurrentDef)) {
-    SILValue StackAddr(CurrentDef.getDef(), 0);
-    if (!StackAddr.hasOneUse()) {
+  if (auto *ASI = dyn_cast<AllocStackInst>(CurrentDef)) {
+    DefDealloc = getSingleDealloc(ASI);
+    if (!DefDealloc) {
       DEBUG(llvm::dbgs() << "  Skipping copy" << *CopyInst
             << "  stack address has multiple uses.\n");
       return false;
     }
-    DefDealloc = StackAddr.use_begin()->getUser();
   }
 
   // Scan forward recording all operands that use CopyDest until we see the
@@ -764,13 +799,13 @@ findAddressRootAndUsers(ValueBase *Def,
                         SmallPtrSetImpl<SILInstruction*> &RootUserInsts) {
   if (isa<InitEnumDataAddrInst>(Def) || isa<InitExistentialAddrInst>(Def)) {
     SILValue InitRoot = cast<SILInstruction>(Def)->getOperand(0);
-    for (auto *Use : InitRoot.getUses()) {
+    for (auto *Use : InitRoot->getUses()) {
       auto *UserInst = Use->getUser();
       if (UserInst == Def)
         continue;
       RootUserInsts.insert(UserInst);
     }
-    return InitRoot.getDef();
+    return InitRoot;
   }
   return Def;
 }
@@ -782,7 +817,7 @@ bool CopyForwarding::backwardPropagateCopy(
   SmallPtrSetImpl<SILInstruction*> &DestUserInsts) {
 
   SILValue CopySrc = CopyInst->getSrc();
-  ValueBase *CopyDestDef = CopyInst->getDest().getDef();
+  ValueBase *CopyDestDef = CopyInst->getDest();
   SmallPtrSet<SILInstruction*, 8> RootUserInsts;
   ValueBase *CopyDestRoot = findAddressRootAndUsers(CopyDestDef, RootUserInsts);
 
@@ -1055,7 +1090,7 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
 ///   %2 = alloc_stack $T
 /// ... // arbitrary control flow, but no other uses of %0
 /// bbN:
-///   copy_addr [take] %2#1 to [initialization] %0 : $*T
+///   copy_addr [take] %2 to [initialization] %0 : $*T
 ///   ... // no writes
 ///   return
 static bool canNRVO(CopyAddrInst *CopyInst) {
@@ -1094,7 +1129,8 @@ static bool canNRVO(CopyAddrInst *CopyInst) {
 static void performNRVO(CopyAddrInst *CopyInst) {
   DEBUG(llvm::dbgs() << "NRVO eliminates copy" << *CopyInst);
   ++NumCopyNRVO;
-  CopyInst->getSrc().replaceAllUsesWith(CopyInst->getDest());
+  replaceAllUsesExceptDealloc(cast<AllocStackInst>(CopyInst->getSrc()),
+                              CopyInst->getDest());
   assert(CopyInst->getSrc() == CopyInst->getDest() && "bad NRVO");
   CopyInst->eraseFromParent();
 }

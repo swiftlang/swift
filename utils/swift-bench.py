@@ -37,11 +37,16 @@
 from __future__ import print_function
 
 import subprocess
-import numpy
 import re
 import os
 import sys
 import argparse
+import math
+
+
+# Calculate the population standard deviation
+def pstdev(l):
+    return (sum((x - sum(l) / float(len(l))) ** 2 for x in l) / len(l)) ** 0.5
 
 
 class SwiftBenchHarness:
@@ -54,18 +59,15 @@ class SwiftBenchHarness:
   minIterTime = 1
   optFlags = []
 
-
   def log(self, str, level):
     if self.verboseLevel >= level:
-      for i in range(1,level):
+      for _ in range(1, level):
         sys.stdout.write('  ')
       print(str)
-
 
   def runCommand(self, cmd):
     self.log('    Executing: ' + ' '.join(cmd), 1)
     return subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-
 
   def parseArguments(self):
     self.log("Parsing arguments.", 2)
@@ -97,7 +99,6 @@ class SwiftBenchHarness:
     self.log("Time limit: %s." % self.timeLimit, 3)
     self.log("Min sample time: %s." % self.minSampleTime, 3)
 
-
   def processSource(self, name):
     self.log("Processing source file: %s." % name, 2)
 
@@ -112,7 +113,7 @@ func _opaqueGetInt64(x: Int) -> Int
 public func getInt(x: Int) -> Int {
 #if arch(i386) || arch(arm)
   return _opaqueGetInt32(x)
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
   return _opaqueGetInt64(x)
 #else
   return x
@@ -175,7 +176,7 @@ main()
         benchName = m.group(1)
         # TODO: Keep track of the line number as well
         self.log("Benchmark found: %s" % benchName, 3)
-        self.tests[name+":"+benchName] = Test(benchName, name, "", "")
+        self.tests[name + ":" + benchName] = Test(benchName, name, "", "")
         testNames.append(benchName)
         if m.group(2):
           output += intoBench
@@ -192,14 +193,12 @@ main()
     with open(processedName, 'w') as f:
       f.write(output)
     for n in testNames:
-      self.tests[name+":"+n].processedSource = processedName
-
+      self.tests[name + ":" + n].processedSource = processedName
 
   def processSources(self):
     self.log("Processing sources: %s." % self.sources, 2)
     for s in self.sources:
       self.processSource(s)
-
 
   def compileOpaqueCFile(self):
     self.log("Generating and compiling C file with opaque functions.", 3)
@@ -214,8 +213,9 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
     self.runCommand(['clang++', 'opaque.cpp', '-o', 'opaque.o', '-c', '-O2'])
 
   compiledFiles = {}
+
   def compileSource(self, name):
-    self.tests[name].binary = "./"+self.tests[name].processedSource.split(os.extsep)[0]
+    self.tests[name].binary = "./" + self.tests[name].processedSource.split(os.extsep)[0]
     if not self.tests[name].processedSource in self.compiledFiles:
       try:
         self.runCommand([self.compiler, self.tests[name].processedSource, "-o", self.tests[name].binary + '.o', '-c'] + self.optFlags)
@@ -228,19 +228,16 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
     self.tests[name].status = status
     self.tests[name].output = output
 
-
   def compileSources(self):
     self.log("Compiling processed sources.", 2)
     self.compileOpaqueCFile()
     for t in self.tests:
       self.compileSource(t)
 
-
   def runBenchmarks(self):
     self.log("Running benchmarks.", 2)
     for t in self.tests:
       self.runBench(t)
-
 
   def parseBenchmarkOutput(self, res):
     # Parse lines like
@@ -252,7 +249,6 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
       return ("", 0, 0)
     return (m.group(1), m.group(2), m.group(3))
 
-
   def computeItersNumber(self, name):
     scale = 1
     spent = 0
@@ -263,7 +259,8 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
         r = self.runCommand([self.tests[name].binary, str(scale),
                              self.tests[name].name])
         (testName, itersComputed, execTime) = self.parseBenchmarkOutput(r)
-        spent = int(execTime) / 1000000 # Convert ns to ms
+        # Convert ns to ms
+        spent = int(execTime) / 1000000
         if spent <= self.minIterTime:
           scale *= 2
         if scale > sys.maxint:
@@ -284,7 +281,6 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
       samples = 1
     return (samples, scale)
 
-
   def runBench(self, name):
     if not self.tests[name].status == "":
       return
@@ -295,7 +291,7 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
       return
     samples = []
     self.log("Running bench: %s, numsamples: %d" % (name, numSamples), 2)
-    for i in range(0,numSamples):
+    for _ in range(0, numSamples):
       try:
         r = self.runCommand([self.tests[name].binary, str(iterScale),
                              self.tests[name].name])
@@ -309,7 +305,6 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
         break
     res = TestResults(name, samples)
     self.tests[name].results = res
-
 
   def reportResults(self):
     self.log("\nReporting results.", 2)
@@ -325,6 +320,7 @@ class Test:
     self.processedSource = processedSource
     self.binary = binary
     self.status = ""
+
   def Print(self):
     print("NAME: %s" % self.name)
     print("SOURCE: %s" % self.source)
@@ -344,21 +340,23 @@ class TestResults:
     self.samples = samples
     if len(samples) > 0:
       self.Process()
+
   def Process(self):
     self.minimum = min(self.samples)
     self.maximum = max(self.samples)
-    self.avg = sum(self.samples)/len(self.samples)
-    self.std = numpy.std(self.samples)
-    self.err = self.std/numpy.sqrt(len(self.samples))
-    self.int_min = self.avg - self.err*1.96
-    self.int_max = self.avg + self.err*1.96
+    self.avg = sum(self.samples) / len(self.samples)
+    self.std = pstdev(self.samples)
+    self.err = self.std / math.sqrt(len(self.samples))
+    self.int_min = self.avg - self.err * 1.96
+    self.int_max = self.avg + self.err * 1.96
+
   def Print(self):
     print("SAMPLES: %d" % len(self.samples))
     print("MIN: %3.2e" % self.minimum)
     print("MAX: %3.2e" % self.maximum)
     print("AVG: %3.2e" % self.avg)
     print("STD: %3.2e" % self.std)
-    print("ERR: %3.2e (%2.1f%%)" % (self.err, self.err*100/self.avg))
+    print("ERR: %3.2e (%2.1f%%)" % (self.err, self.err * 100 / self.avg))
     print("CONF INT 0.95: (%3.2e, %3.2e)" % (self.int_min, self.int_max))
     print("")
 

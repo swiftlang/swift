@@ -1,4 +1,4 @@
-//===--- LoggingWrappers.swift ---------------------------------------===//
+//===--- LoggingWrappers.swift.gyb ----------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,13 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 public protocol WrapperType {
-  typealias Base
+  associatedtype Base
   init(_: Base)
   var base: Base {get set}
 }
 
 public protocol LoggingType : WrapperType {
-  typealias Log : AnyObject
+  associatedtype Log : AnyObject
 }
 
 extension LoggingType {

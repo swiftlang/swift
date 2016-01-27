@@ -23,7 +23,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/Parameter.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
@@ -84,12 +84,12 @@ static Pattern *createTypedNamedPattern(VarDecl *decl) {
   return P;
 }
 
-template <size_t A, size_t B>
+#ifndef NDEBUG
 static bool verifyNameMapping(MappedTypeNameKind NameMapping,
-                              const char (&left)[A], const char (&right)[B]) {
-  return NameMapping == MappedTypeNameKind::DoNothing ||
-         strcmp(left, right) != 0;
+                              StringRef left, StringRef right) {
+  return NameMapping == MappedTypeNameKind::DoNothing || left != right;
 }
+#endif
 
 /// \brief Map a well-known C type to a swift type from the standard library.
 ///
@@ -321,9 +321,9 @@ static FuncDecl *makeRawValueTrivialGetter(ClangImporter::Implementation &Impl,
   if (Impl.hasFinishedTypeChecking())
     return getterDecl;
 
-  auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/ true);
+  auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/ true);
   auto valueRef = new (C) MemberRefExpr(selfRef, SourceLoc(),
-                                        rawDecl, SourceLoc(),
+                                        rawDecl, DeclNameLoc(),
                                         /*implicit*/ true);
   auto valueRet = new (C) ReturnStmt(SourceLoc(), valueRef);
   
@@ -332,8 +332,7 @@ static FuncDecl *makeRawValueTrivialGetter(ClangImporter::Implementation &Impl,
                                 /*implicit*/ true);
   getterDecl->setBody(body);
   
-  // Add as an external definition.
-  C.addedExternalDecl(getterDecl);
+  C.addExternalDecl(getterDecl);
 
   return getterDecl;
 }
@@ -380,11 +379,11 @@ static FuncDecl *makeRawValueTrivialSetter(ClangImporter::Implementation &Impl,
   if (Impl.hasFinishedTypeChecking())
     return setterDecl;
 
-  auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/ true);
-  auto dest = new (C) MemberRefExpr(selfRef, SourceLoc(), rawDecl, SourceLoc(),
+  auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/ true);
+  auto dest = new (C) MemberRefExpr(selfRef, SourceLoc(), rawDecl, DeclNameLoc(),
                                     /*implicit*/ true);
 
-  auto paramRef = new (C) DeclRefExpr(newValueDecl, SourceLoc(),
+  auto paramRef = new (C) DeclRefExpr(newValueDecl, DeclNameLoc(),
                                       /*implicit*/true);
 
   auto assign = new (C) AssignExpr(dest, SourceLoc(), paramRef,
@@ -394,8 +393,7 @@ static FuncDecl *makeRawValueTrivialSetter(ClangImporter::Implementation &Impl,
                                 /*implicit*/ true);
   setterDecl->setBody(body);
 
-  // Add as an external definition.
-  C.addedExternalDecl(setterDecl);
+  C.addExternalDecl(setterDecl);
 
   return setterDecl;
 }
@@ -445,13 +443,13 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   if (Impl.hasFinishedTypeChecking())
     return ctorDecl;
   
-  auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true);
-  auto paramRef = new (C) DeclRefExpr(param, SourceLoc(),
+  auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/true);
+  auto paramRef = new (C) DeclRefExpr(param, DeclNameLoc(),
                                       /*implicit*/ true);
   auto reinterpretCast
     = cast<FuncDecl>(getBuiltinValueDecl(C,C.getIdentifier("reinterpretCast")));
   auto reinterpretCastRef
-    = new (C) DeclRefExpr(reinterpretCast, SourceLoc(), /*implicit*/ true);
+    = new (C) DeclRefExpr(reinterpretCast, DeclNameLoc(), /*implicit*/ true);
   auto reinterpreted = new (C) CallExpr(reinterpretCastRef, paramRef,
                                         /*implicit*/ true);
   auto assign = new (C) AssignExpr(selfRef, SourceLoc(), reinterpreted,
@@ -461,7 +459,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   
   ctorDecl->setBody(body);
   
-  C.addedExternalDecl(ctorDecl);
+  C.addExternalDecl(ctorDecl);
   
   return ctorDecl;
 }
@@ -504,11 +502,11 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   if (Impl.hasFinishedTypeChecking())
     return getterDecl;
   
-  auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true);
+  auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/true);
   auto reinterpretCast
     = cast<FuncDecl>(getBuiltinValueDecl(C, C.getIdentifier("reinterpretCast")));
   auto reinterpretCastRef
-    = new (C) DeclRefExpr(reinterpretCast, SourceLoc(), /*implicit*/ true);
+    = new (C) DeclRefExpr(reinterpretCast, DeclNameLoc(), /*implicit*/ true);
   auto reinterpreted = new (C) CallExpr(reinterpretCastRef, selfRef,
                                         /*implicit*/ true);
   auto ret = new (C) ReturnStmt(SourceLoc(), reinterpreted);
@@ -516,7 +514,7 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
                                 /*implicit*/ true);
   
   getterDecl->setBody(body);
-  C.addedExternalDecl(getterDecl);
+  C.addExternalDecl(getterDecl);
   return getterDecl;
 }
 
@@ -620,43 +618,44 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
   {
     auto selfDecl = getterDecl->getImplicitSelfDecl();
 
-    auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/ true);
+    auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                       /*implicit*/ true);
     auto reinterpretCast = cast<FuncDecl>(getBuiltinValueDecl(
         C, C.getIdentifier("reinterpretCast")));
     auto reinterpretCastRef
-      = new (C) DeclRefExpr(reinterpretCast, SourceLoc(), /*implicit*/ true);
+      = new (C) DeclRefExpr(reinterpretCast, DeclNameLoc(), /*implicit*/ true);
     auto reinterpreted = new (C) CallExpr(reinterpretCastRef, selfRef,
                                           /*implicit*/ true);
     auto ret = new (C) ReturnStmt(SourceLoc(), reinterpreted);
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
                                   /*implicit*/ true);
     getterDecl->setBody(body);
-    C.addedExternalDecl(getterDecl);
+    C.addExternalDecl(getterDecl);
   }
 
   // Synthesize the setter body
   {
     auto inoutSelfDecl = setterDecl->getImplicitSelfDecl();
 
-    auto inoutSelfRef = new (C) DeclRefExpr(inoutSelfDecl, SourceLoc(),
+    auto inoutSelfRef = new (C) DeclRefExpr(inoutSelfDecl, DeclNameLoc(),
                                             /*implicit*/ true);
     auto inoutSelf = new (C) InOutExpr(SourceLoc(), inoutSelfRef,
       InOutType::get(importedUnionDecl->getType()), /*implicit*/ true);
 
-    auto newValueDecl = setterDecl->getParameterList(1)->get(0).decl;
+    auto newValueDecl = setterDecl->getParameterList(1)->get(0);
 
-    auto newValueRef = new (C) DeclRefExpr(newValueDecl, SourceLoc(),
+    auto newValueRef = new (C) DeclRefExpr(newValueDecl, DeclNameLoc(),
                                            /*implicit*/ true);
     auto addressofFn = cast<FuncDecl>(getBuiltinValueDecl(
       C, C.getIdentifier("addressof")));
     auto addressofFnRef
-      = new (C) DeclRefExpr(addressofFn, SourceLoc(), /*implicit*/ true);
+      = new (C) DeclRefExpr(addressofFn, DeclNameLoc(), /*implicit*/ true);
     auto selfPointer = new (C) CallExpr(addressofFnRef, inoutSelf,
                                           /*implicit*/ true);
     auto initializeFn = cast<FuncDecl>(getBuiltinValueDecl(
       C, C.getIdentifier("initialize")));
     auto initializeFnRef
-      = new (C) DeclRefExpr(initializeFn, SourceLoc(), /*implicit*/ true);
+      = new (C) DeclRefExpr(initializeFn, DeclNameLoc(), /*implicit*/ true);
     auto initializeArgs = TupleExpr::createImplicit(C,
                                                    { newValueRef, selfPointer },
                                                    {});
@@ -665,7 +664,7 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
     auto body = BraceStmt::create(C, SourceLoc(), { initialize }, SourceLoc(),
                                   /*implicit*/ true);
     setterDecl->setBody(body);
-    C.addedExternalDecl(setterDecl);
+    C.addExternalDecl(setterDecl);
   }
 
   return { getterDecl, setterDecl };
@@ -1103,18 +1102,12 @@ StringRef ClangImporter::Implementation::getCFTypeName(
 
   if (auto pointee = CFPointeeInfo::classifyTypedef(decl)) {
     auto name = decl->getName();
-    if (pointee.isRecord()) {
+    if (pointee.isRecord() || pointee.isTypedef()) {
       auto resultName = getImportedCFTypeName(name);
       if (secondaryName && name != resultName)
         *secondaryName = name;
 
       return resultName;
-    }
-
-    if (pointee.isTypedef() && secondaryName) {
-      StringRef otherName = getImportedCFTypeName(name);
-      if (otherName != name) 
-        *secondaryName = otherName;
     }
 
     return name;
@@ -1410,13 +1403,14 @@ namespace {
                 return nullptr;
 
               // If there is an alias (i.e., that doesn't have "Ref"),
-              // create that separate typedef.
+              // use that as the name of the typedef later; create a separate
+              // typedef for the one with "Ref".
               if (importedName.Alias) {
                 auto aliasWithoutRef =
                   Impl.createDeclWithClangNode<TypeAliasDecl>(
                     Decl,
                     Impl.importSourceLoc(Decl->getLocStart()),
-                    importedName.Alias.getBaseName(),
+                    Name,
                     Impl.importSourceLoc(Decl->getLocation()),
                     TypeLoc::withoutLoc(SwiftType),
                     DC);
@@ -1424,6 +1418,7 @@ namespace {
                 aliasWithoutRef->computeType();
                 SwiftType = aliasWithoutRef->getDeclaredType();
                 NameMapping = MappedTypeNameKind::DefineOnly;
+                Name = importedName.Alias.getBaseName();
 
                 // Store this alternative declaration.
                 alternateDecl = aliasWithoutRef;
@@ -1550,14 +1545,14 @@ namespace {
         // Construct the left-hand reference to self.
         Expr *lhs =
             new (context) DeclRefExpr(constructor->getImplicitSelfDecl(),
-                                      SourceLoc(), /*implicit=*/true);
+                                      DeclNameLoc(), /*implicit=*/true);
 
         // Construct the right-hand call to Builtin.zeroInitializer.
         Identifier zeroInitID = context.getIdentifier("zeroInitializer");
         auto zeroInitializerFunc =
             cast<FuncDecl>(getBuiltinValueDecl(context, zeroInitID));
         auto zeroInitializerRef = new (context) DeclRefExpr(zeroInitializerFunc,
-                                                            SourceLoc(),
+                                                            DeclNameLoc(),
                                                             /*implicit*/ true);
         auto emptyTuple = TupleExpr::createEmpty(context, SourceLoc(),
                                                  SourceLoc(),
@@ -1593,7 +1588,7 @@ namespace {
                                             /*static*/false, /*inout*/true);
 
       // Construct the set of parameters from the list of members.
-      SmallVector<Parameter, 8> valueParameters;
+      SmallVector<ParamDecl*, 8> valueParameters;
       for (auto var : members) {
         Identifier argName = wantCtorParamNames ? var->getName()
                                                 : Identifier();
@@ -1601,7 +1596,7 @@ namespace {
                                              SourceLoc(), argName,
                                              SourceLoc(), var->getName(),
                                              var->getType(), structDecl);
-        valueParameters.push_back(Parameter::withoutLoc(param));
+        valueParameters.push_back(param);
       }
 
       // self & param.
@@ -1646,14 +1641,14 @@ namespace {
               continue;
 
             // Construct left-hand side.
-            Expr *lhs = new (context) DeclRefExpr(selfDecl, SourceLoc(),
+            Expr *lhs = new (context) DeclRefExpr(selfDecl, DeclNameLoc(),
                                                   /*Implicit=*/true);
-            lhs = new (context) MemberRefExpr(lhs, SourceLoc(), var, SourceLoc(),
-                                              /*Implicit=*/true);
+            lhs = new (context) MemberRefExpr(lhs, SourceLoc(), var,
+                                              DeclNameLoc(), /*Implicit=*/true);
 
             // Construct right-hand side.
-            auto rhs = new (context) DeclRefExpr(valueParameters[i].decl,
-                                                 SourceLoc(),
+            auto rhs = new (context) DeclRefExpr(valueParameters[i],
+                                                 DeclNameLoc(),
                                                  /*Implicit=*/true);
 
             // Add assignment.
@@ -1764,7 +1759,7 @@ namespace {
       // Construct the original constant. Enum constants without payloads look
       // like simple values, but actually have type 'MyEnum.Type -> MyEnum'.
       auto constantRef = new (Impl.SwiftContext) DeclRefExpr(original,
-                                                             SourceLoc(),
+                                                             DeclNameLoc(),
                                                              /*implicit*/true);
       Type importedEnumTy = importedEnum->getDeclaredTypeInContext();
       auto typeRef = TypeExpr::createImplicit(importedEnumTy,
@@ -2073,7 +2068,7 @@ namespace {
       }
 
       // Add the type decl to ExternalDefinitions so that we can type-check
-      // raw values and IRGen can emit metadata for it.
+      // raw values and SILGen can emit witness tables for derived conformances.
       // FIXME: There might be better ways to do this.
       Impl.registerExternalDecl(result);
       return result;
@@ -2454,9 +2449,7 @@ namespace {
                                           decl->isVariadic(),
                                           decl->isNoReturn(),
                                           isInSystemModule(dc),
-                                          hasCustomName,
-                                          &bodyParams,
-                                          name);
+                                          hasCustomName, bodyParams, name);
       if (!type)
         return nullptr;
 
@@ -2464,11 +2457,7 @@ namespace {
       auto loc = Impl.importSourceLoc(decl->getLocation());
 
       // If we had no argument labels to start with, add empty labels now.
-      if (name.isSimpleName()) {
-        llvm::SmallVector<Identifier, 2> argNames(bodyParams->size(),
-                                                  Identifier());
-        name = DeclName(Impl.SwiftContext, name.getBaseName(), argNames);
-      }
+      assert(!name.isSimpleName() && "Cannot have a simple name here");
 
       // FIXME: Poor location info.
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
@@ -2736,8 +2725,6 @@ namespace {
                                       importedName,
                                       {decl->param_begin(), decl->param_size()},
                                       decl->isVariadic(), redundant);
-      if (result)
-        Impl.importAttributes(decl, result);
 
       if ((result || redundant) && member) {
         ++NumFactoryMethodsAsInitializers;
@@ -3518,7 +3505,7 @@ namespace {
 
     /// Build a declaration for an Objective-C subscript getter.
     FuncDecl *buildSubscriptGetterDecl(const FuncDecl *getter, Type elementTy,
-                               DeclContext *dc, Parameter index) {
+                                       DeclContext *dc, ParamDecl *index) {
       auto &context = Impl.SwiftContext;
       auto loc = getter->getLoc();
 
@@ -3558,7 +3545,7 @@ namespace {
 
       /// Build a declaration for an Objective-C subscript setter.
     FuncDecl *buildSubscriptSetterDecl(const FuncDecl *setter, Type elementTy,
-                                       DeclContext *dc, Parameter index) {
+                                       DeclContext *dc, ParamDecl *index) {
       auto &context = Impl.SwiftContext;
       auto loc = setter->getLoc();
 
@@ -3576,12 +3563,12 @@ namespace {
 
       auto paramVarDecl = new (context) ParamDecl(/*isLet=*/false, SourceLoc(),
                                                   Identifier(), loc,
-                                            valueIndex->get(0).decl->getName(),
+                                                  valueIndex->get(0)->getName(),
                                                   elementTy, dc);
       
       
       auto valueIndicesPL = ParameterList::create(context, {
-        Parameter::withoutLoc(paramVarDecl),
+        paramVarDecl,
         index
       });
       
@@ -3622,13 +3609,13 @@ namespace {
     }
     
     /// Retrieve the element type and of a subscript setter.
-    std::pair<Type, Parameter>
+    std::pair<Type, ParamDecl *>
     decomposeSubscriptSetter(FuncDecl *setter) {
       auto *PL = setter->getParameterList(1);
       if (PL->size() != 2)
-        return { nullptr, Parameter() };
+        return { nullptr, nullptr };
 
-      return { PL->get(0).decl->getType(), PL->get(1) };
+      return { PL->get(0)->getType(), PL->get(1) };
     }
 
     /// Rectify the (possibly different) types determined by the
@@ -3822,7 +3809,7 @@ namespace {
       }
 
       // Find the getter indices and make sure they match.
-      Parameter getterIndex;
+      ParamDecl *getterIndex;
       {
         auto params = getter->getParameterList(1);
         if (params->size() != 1)
@@ -3844,7 +3831,7 @@ namespace {
       };
 
       // If we have a setter, rectify it with the getter.
-      Parameter setterIndex;
+      ParamDecl *setterIndex;
       bool getterAndSetterInSameType = false;
       if (setter) {
         // Whether there is an existing read-only subscript for which
@@ -3879,7 +3866,7 @@ namespace {
 
         // Make sure that the index types are equivalent.
         // FIXME: Rectify these the same way we do for element types.
-        if (!setterIndex.decl->getType()->isEqual(getterIndex.decl->getType())){
+        if (!setterIndex->getType()->isEqual(getterIndex->getType())) {
           // If there is an existing subscript operation, we're done.
           if (existingSubscript)
             return decl == getter ? existingSubscript : nullptr;
@@ -3887,7 +3874,7 @@ namespace {
           // Otherwise, just forget we had a setter.
           // FIXME: This feels very, very wrong.
           setter = nullptr;
-          setterIndex = Parameter();
+          setterIndex = nullptr;
         }
 
         // If there is an existing subscript within this context, we
@@ -5400,7 +5387,7 @@ void ClangImporter::Implementation::finishPendingActions() {
         RegisteredExternalDecls.clear();
       } else {
         Decl *D = RegisteredExternalDecls.pop_back_val();
-        SwiftContext.addedExternalDecl(D);
+        SwiftContext.addExternalDecl(D);
         if (auto typeResolver = getTypeResolver())
           if (auto *nominal = dyn_cast<NominalTypeDecl>(D))
             if (!nominal->hasDelayedMembers())

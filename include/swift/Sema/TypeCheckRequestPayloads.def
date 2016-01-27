@@ -1,4 +1,4 @@
-//===-- TypeCheckRequestPayloads.def - Type Checking Payloads ---*- C++ -*-===//
+//===--- TypeCheckRequestPayloads.def - Type Checking Payloads --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

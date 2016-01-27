@@ -201,7 +201,6 @@ extension _ArrayBuffer {
   /// Copy the given subRange of this buffer into uninitialized memory
   /// starting at target.  Return a pointer past-the-end of the
   /// just-initialized memory.
-  @inline(never) // The copy loop blocks retain release matching.
   public func _uninitializedCopy(
     subRange: Range<Int>, target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element> {

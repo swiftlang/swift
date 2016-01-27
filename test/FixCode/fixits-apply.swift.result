@@ -38,7 +38,7 @@ func foo() -> Int {
   }
 }
 
-func goo(var e : ErrorType) {}
+func goo(e : ErrorType) {}
 
 struct Test1 : OptionSetType {
   init(rawValue: Int) {}

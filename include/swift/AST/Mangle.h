@@ -17,7 +17,6 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/ResilienceExpansion.h"
 
 namespace swift {
 
@@ -89,19 +88,11 @@ public:
   };
 
   /// Finish the mangling of the symbol and return the mangled name.
-  std::string finalize() {
-    assert(Storage.size() && "Mangling an empty name");
-    std::string result = std::string(Storage.data(), Storage.size());
-    Storage.clear();
-    return result;
-  }
+  std::string finalize();
 
   /// Finish the mangling of the symbol and write the mangled name into
   /// \p stream.
-  void finalize(llvm::raw_ostream &stream) {
-    std::string result = finalize();
-    stream.write(result.data(), result.size());
-  }
+  void finalize(llvm::raw_ostream &stream);
 
   void setModuleContext(ModuleDecl *M) { Mod = M; }
 
@@ -115,37 +106,29 @@ public:
   void mangleContext(const DeclContext *ctx, BindGenerics shouldBind);
   void mangleModule(const ModuleDecl *module);
   void mangleDeclName(const ValueDecl *decl);
-  void mangleDeclType(const ValueDecl *decl, ResilienceExpansion expansion,
-                      unsigned uncurryingLevel);
+  void mangleDeclType(const ValueDecl *decl, unsigned uncurryingLevel);
 
-  void mangleEntity(const ValueDecl *decl, ResilienceExpansion expansion,
-                    unsigned uncurryingLevel);
+  void mangleEntity(const ValueDecl *decl, unsigned uncurryingLevel);
   void mangleConstructorEntity(const ConstructorDecl *ctor, bool isAllocating,
-                               ResilienceExpansion kind,
                                unsigned uncurryingLevel);
   void mangleDestructorEntity(const DestructorDecl *decl, bool isDeallocating);
   void mangleIVarInitDestroyEntity(const ClassDecl *decl, bool isDestroyer);
   void mangleAccessorEntity(AccessorKind kind, AddressorKind addressorKind,
-                            const AbstractStorageDecl *decl,
-                            ResilienceExpansion expansion);
+                            const AbstractStorageDecl *decl);
   void mangleAddressorEntity(const ValueDecl *decl);
   void mangleGlobalGetterEntity(ValueDecl *decl);
   void mangleDefaultArgumentEntity(const DeclContext *ctx, unsigned index);
   void mangleInitializerEntity(const VarDecl *var);
   void mangleClosureEntity(const SerializedAbstractClosureExpr *closure,
-                           ResilienceExpansion explosion,
                            unsigned uncurryingLevel);
   void mangleClosureEntity(const AbstractClosureExpr *closure,
-                           ResilienceExpansion explosion,
                            unsigned uncurryingLevel);
   void mangleNominalType(const NominalTypeDecl *decl,
-                         ResilienceExpansion expansion,
                          BindGenerics shouldBind,
                          CanGenericSignature extGenericSig = nullptr,
                          const GenericParamList *extGenericParams = nullptr);
   void mangleProtocolDecl(const ProtocolDecl *protocol);
-  void mangleType(Type type, ResilienceExpansion expansion,
-                  unsigned uncurryingLevel);
+  void mangleType(Type type, unsigned uncurryingLevel);
   void mangleDirectness(bool isIndirect);
   void mangleProtocolName(const ProtocolDecl *protocol);
   void mangleProtocolConformance(const ProtocolConformance *conformance);
@@ -155,8 +138,7 @@ public:
 
   void mangleDeclTypeForDebugger(const ValueDecl *decl);
   void mangleTypeForDebugger(Type decl, const DeclContext *DC);
-  void mangleGenericSignature(const GenericSignature *sig,
-                              ResilienceExpansion expansion);
+  void mangleGenericSignature(const GenericSignature *sig);
 
   void mangleFieldOffsetFull(const ValueDecl *decl, bool isIndirect);
   void mangleTypeMetadataFull(CanType ty, bool isPattern);
@@ -194,8 +176,7 @@ public:
                         bool isOperator=false);
   void resetArchetypesDepth() { ArchetypesDepth = 0; }
 private:
-  void mangleFunctionType(AnyFunctionType *fn, ResilienceExpansion expansion,
-                          unsigned uncurryingLevel);
+  void mangleFunctionType(AnyFunctionType *fn, unsigned uncurryingLevel);
   void mangleProtocolList(ArrayRef<ProtocolDecl*> protocols);
   void mangleProtocolList(ArrayRef<Type> protocols);
   void mangleIdentifier(Identifier ident,
@@ -213,13 +194,12 @@ private:
     assert(DWARFMangling &&
            "sugared types are only legal when mangling for the debugger");
     auto *BlandTy = cast<T>(type.getPointer())->getSinglyDesugaredType();
-    mangleType(BlandTy, ResilienceExpansion::Minimal, 0);
+    mangleType(BlandTy, 0);
   }
 
   void mangleGenericSignatureParts(ArrayRef<GenericTypeParamType *> params,
                                    unsigned initialParamDepth,
-                                   ArrayRef<Requirement> requirements,
-                                   ResilienceExpansion expansion);
+                                   ArrayRef<Requirement> requirements);
   Type getDeclTypeForMangling(const ValueDecl *decl,
                               ArrayRef<GenericTypeParamType *> &genericParams,
                               unsigned &initialParamIndex,
@@ -229,8 +209,7 @@ private:
   void mangleGenericParamIndex(GenericTypeParamType *paramTy);
   void mangleAssociatedTypeName(DependentMemberType *dmt,
                                 bool canAbbreviate);
-  void mangleConstrainedType(CanType type,
-                             ResilienceExpansion expansion);
+  void mangleConstrainedType(CanType type);
   CanGenericSignature getCanonicalSignatureOrNull(GenericSignature *sig,
                                                   ModuleDecl &M);
 };

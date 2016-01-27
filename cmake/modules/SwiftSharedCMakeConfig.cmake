@@ -261,6 +261,11 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
 
   set(LLVM_INCLUDE_TESTS TRUE)
   set(LLVM_INCLUDE_DOCS TRUE)
+
+  option(LLVM_ENABLE_DOXYGEN "Enable doxygen support" FALSE)
+  if (LLVM_ENABLE_DOXYGEN)
+    find_package(Doxygen REQUIRED)
+  endif()
 endmacro()
 
 # Common cmake project config for unified builds.

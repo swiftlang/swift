@@ -55,7 +55,7 @@ for item in [AnyObject]() {  // No warning in for-each loop.
 
 
 // <rdar://problem/16574105> Type inference of _Nil very coherent but kind of useless
-var ptr = nil // expected-error {{type of expression is ambiguous without more context}}
+var ptr = nil // expected-error {{'nil' requires a contextual type}}
 
 func testAnyObjectOptional() -> AnyObject? {
   let x = testAnyObjectOptional()
@@ -83,8 +83,8 @@ func tuplePatternDestructuring(x : Int, y : Int) {
   let (i, j) = (b: x, a: y)
   _ = i+j
 
-  // FIXME: This diagnostic isn't right: rdar://20395243
-  let (x: g1, a: h1) = (b: x, a: y)  // expected-error {{'(b: Int, a: Int)' is not convertible to '(x: (b: Int, a: Int), a: (b: Int, a: Int))'}}
+  // <rdar://problem/20395243> QoI: type variable reconstruction failing for tuple types
+  let (x: g1, a: h1) = (b: x, a: y)  // expected-error {{tuple type '(b: Int, a: Int)' is not convertible to tuple '(x: _, a: _)'}}
 }
 
 // <rdar://problem/21057425> Crash while compiling attached test-app.

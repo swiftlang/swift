@@ -157,8 +157,8 @@ class ExplicitSelfRequiredTest {
   }
 }
 
-// expected-warning@+2 {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{57-60=}}
-// expected-warning@+1 {{Use of 'let' binding here is deprecated and will be removed in a future version of Swift}} {{64-68=}}
+// expected-error@+2 {{Use of 'var' binding here is not allowed}} {{57-60=}}
+// expected-warning@+1 {{'let' keyword is unnecessary; function parameters are immutable by default}} {{64-68=}}
 var testClosureArgumentPatterns: (Int, Int) -> Int = { (var x, let y) in x+y+1 }
 
 class SomeClass {
@@ -260,10 +260,13 @@ Void(0) // expected-error{{argument passed to call that takes no arguments}}
 _ = {0}
 
 // <rdar://problem/22086634> "multi-statement closures require an explicit return type" should be an error not a note
-let samples = {
+let samples = {   // expected-error {{type of expression is ambiguous without more context}}
+  // FIXME: This diagnostic should be improved, we can infer a type for the closure expr from
+  // its body (by trying really hard in diagnostic generation) and say that we need an explicit
+  // contextual result specified because we don't do cross-statement type inference or something.
           if (i > 10) { return true }
           else { return false }
-        }()  // expected-error {{cannot invoke closure of type '() -> _' with an argument list of type '()'}}
+        }()
 
 // <rdar://problem/19756953> Swift error: cannot capture '$0' before it is declared
 func f(fp : (Bool, Bool) -> Bool) {}

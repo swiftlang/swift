@@ -177,7 +177,15 @@ Lexer::Lexer(const LangOptions &Options,
   StringRef contents = SM.extractText(SM.getRangeForBuffer(BufferID));
   BufferStart = contents.data();
   BufferEnd = contents.data() + contents.size();
-  CurPtr = BufferStart;
+
+  // Check for Unicode BOM at start of file (Only UTF-8 BOM supported now).
+  size_t BOMLength = llvm::StringSwitch<size_t>(contents)
+    .StartsWith("\xEF\xBB\xBF", 3)
+    .Default(0);
+
+  // Since the UTF-8 BOM doesn't carry information (UTF-8 has no dependency
+  // on byte order), throw it away.
+  CurPtr = BufferStart + BOMLength;
 
   // Initialize code completion.
   if (BufferID == SM.getCodeCompletionBufferID()) {
@@ -648,14 +656,45 @@ void Lexer::lexOperatorIdentifier() {
       if (leftBound == rightBound || leftBound)
         break;
       return formToken(tok::amp_prefix, TokStart);
-    case '.':
+    case '.': {
       if (leftBound == rightBound)
         return formToken(tok::period, TokStart);
       if (rightBound)
         return formToken(tok::period_prefix, TokStart);
-      diagnose(TokStart, diag::lex_unary_postfix_dot_is_reserved);
-      // always emit 'tok::period' to avoid trickle down parse errors
-      return formToken(tok::period, TokStart);
+      
+      // If left bound but not right bound, handle some likely situations.
+      
+      // If there is just some horizontal whitespace before the next token, its
+      // addition is probably incorrect.
+      const char *AfterHorzWhitespace = CurPtr;
+      while (*AfterHorzWhitespace == ' ' || *AfterHorzWhitespace == '\t')
+        ++AfterHorzWhitespace;
+      
+      // First, when we are code completing "x.<ESC>", then make sure to return
+      // a tok::period, since that is what the user is wanting to know about.
+      // FIXME: isRightBound should consider this to be right bound.
+      if (*AfterHorzWhitespace == '\0' &&
+          AfterHorzWhitespace == CodeCompletionPtr) {
+        diagnose(TokStart, diag::expected_member_name);
+        return formToken(tok::period, TokStart);
+      }
+      
+      if (isRightBound(AfterHorzWhitespace, leftBound) &&
+          // Don't consider comments to be this.  A leading slash is probably
+          // either // or /* and most likely occurs just in our testsuite for
+          // expected-error lines.
+          *AfterHorzWhitespace != '/') {
+        diagnose(TokStart, diag::extra_whitespace_period)
+          .fixItRemoveChars(getSourceLoc(CurPtr),
+                            getSourceLoc(AfterHorzWhitespace));
+        return formToken(tok::period, TokStart);
+      }
+
+      // Otherwise, it is probably a missing member.
+      diagnose(TokStart, diag::expected_member_name);
+      //return formToken(tok::unknown, TokStart);
+      return lexImpl();
+    }
     case '?':
       if (leftBound)
         return formToken(tok::question_postfix, TokStart);
@@ -1433,7 +1472,7 @@ Restart:
   // Remember the start of the token so we can form the text range.
   const char *TokStart = CurPtr;
   
-  switch (*CurPtr++) {
+  switch ((signed char)*CurPtr++) {
   default: {
     char const *tmp = CurPtr-1;
     if (advanceIfValidStartOfIdentifier(tmp, BufferEnd))
@@ -1578,6 +1617,11 @@ Restart:
     if (getSubstring(TokStart + 1, 9).equals("available")) {
       CurPtr += 9;
       return formToken(tok::pound_available, TokStart);
+    }
+
+    if (getSubstring(TokStart + 1, 8).equals("selector")) {
+      CurPtr += 8;
+      return formToken(tok::pound_selector, TokStart);
     }
 
     // Allow a hashbang #! line at the beginning of the file.

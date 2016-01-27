@@ -82,6 +82,8 @@ public:
   ASTPrinter &operator<<(unsigned long long N);
   ASTPrinter &operator<<(UUID UU);
 
+  ASTPrinter &operator<<(DeclName name);
+
   void printName(Identifier Name,
                  PrintNameContext Context = PrintNameContext::Normal);
 

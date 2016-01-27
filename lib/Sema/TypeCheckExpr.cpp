@@ -105,8 +105,7 @@ Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
   // sugar on it.  If so, propagate the sugar to the curried result function
   // type.
   if (isa<ConstructorRefCallExpr>(E) && isa<TypeExpr>(E->getArg())) {
-    auto resultSugar =
-      E->getArg()->getType()->castTo<MetatypeType>()->getInstanceType();
+    auto resultSugar = cast<TypeExpr>(E->getArg())->getInstanceType();
 
     // The result of this apply is "(args) -> T" where T is the type being
     // constructed.  Apply the sugar onto it.
@@ -562,14 +561,14 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
 }
 
 Expr *TypeChecker::buildCheckedRefExpr(ValueDecl *value, DeclContext *UseDC,
-                                       SourceLoc loc, bool Implicit) {
+                                       DeclNameLoc loc, bool Implicit) {
   auto type = getUnopenedTypeOfReference(value, Type(), UseDC);
   AccessSemantics semantics = value->getAccessSemanticsFromContext(UseDC);
   return new (Context) DeclRefExpr(value, loc, Implicit, semantics, type);
 }
 
 Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
-                                DeclContext *UseDC, SourceLoc NameLoc,
+                                DeclContext *UseDC, DeclNameLoc NameLoc,
                                 bool Implicit, bool isSpecialized) {
   assert(!Decls.empty() && "Must have at least one declaration");
 
@@ -849,7 +848,7 @@ namespace {
               TC.diagnose(NTD->getLoc(), diag::type_declared_here);
 
               TC.diagnose(D->getLoc(), diag::decl_declared_here,
-                          D->getName());
+                          D->getFullName());
 
               return { false, DRE };
             }
@@ -929,7 +928,7 @@ namespace {
             }
           }
           TC.diagnose(capturedDecl->getLoc(), diag::decl_declared_here,
-                      capturedDecl->getName());
+                      capturedDecl->getFullName());
         }
         return false;
       };
@@ -990,8 +989,8 @@ namespace {
         // Can default parameter initializers capture state?  That seems like
         // a really bad idea.
         for (auto *paramList : AFD->getParameterLists())
-          for (auto &param : *paramList) {
-            if (auto E = param.getDefaultValue())
+          for (auto param : *paramList) {
+            if (auto E = param->getDefaultValue())
               E->getExpr()->walk(*this);
           }
         return false;

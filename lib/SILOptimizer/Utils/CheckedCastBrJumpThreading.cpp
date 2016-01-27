@@ -2,6 +2,7 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Local.h"
@@ -213,10 +214,10 @@ SILValue CheckedCastBrJumpThreading::isArgValueEquivalentToCondition(
     SILValue Value, SILBasicBlock *DomBB, SILValue DomValue,
     DominanceInfo *DT) {
   SmallPtrSet<ValueBase *, 16> SeenValues;
-  DomValue = DomValue.stripClassCasts();
+  DomValue = stripClassCasts(DomValue);
 
   while (true) {
-    Value = Value.stripClassCasts();
+    Value = stripClassCasts(Value);
     if (Value == DomValue)
       return Value;
 
@@ -226,7 +227,7 @@ SILValue CheckedCastBrJumpThreading::isArgValueEquivalentToCondition(
       return SILValue();
 
     // Have we visited this BB already?
-    if (!SeenValues.insert(Value.getDef()).second)
+    if (!SeenValues.insert(Value).second)
       return SILValue();
 
     if (SeenValues.size() > 10)
@@ -241,18 +242,18 @@ SILValue CheckedCastBrJumpThreading::isArgValueEquivalentToCondition(
       // Each incoming value should be either from a block
       // dominated by DomBB or it should be the value used in
       // condition in DomBB
-      Value = IncomingValue.stripClassCasts();
+      Value = stripClassCasts(IncomingValue);
       if (Value == DomValue)
         continue;
 
       // Values should be the same
       if (!Def)
-        Def = Value.getDef();
+        Def = Value;
 
-      if (Def != Value.getDef())
+      if (Def != Value)
         return SILValue();
 
-      if (!DT->dominates(DomBB, Value.getDef()->getParentBB()))
+      if (!DT->dominates(DomBB, Value->getParentBB()))
         return SILValue();
       // OK, this value is a potential candidate
     }
@@ -537,7 +538,7 @@ bool CheckedCastBrJumpThreading::areEquivalentConditionsAlongSomePaths() {
 }
 
 /// Check if conditions of CCBI and DomCCBI are equivalent along
-/// all or at least  some paths.
+/// all or at least some paths.
 bool CheckedCastBrJumpThreading::areEquivalentConditionsAlongPaths() {
   // Are conditions equivalent along all paths?
   if (DomCondition == Condition) {
@@ -578,7 +579,7 @@ bool CheckedCastBrJumpThreading::trySimplify(TermInst *Term) {
   // Init information about the checked_cast_br we try to
   // jump-thread.
   BB = Term->getParent();
-  Condition = Term->getOperand(0).stripClassCasts();
+  Condition = stripClassCasts(Term->getOperand(0));
   SuccessBB = CCBI->getSuccessBB();
   FailureBB = CCBI->getFailureBB();
 
@@ -636,7 +637,7 @@ bool CheckedCastBrJumpThreading::trySimplify(TermInst *Term) {
     // based on the found dominating checked_cast_br.
     DomSuccessBB = DomCCBI->getSuccessBB();
     DomFailureBB = DomCCBI->getFailureBB();
-    DomCondition = DomTerm->getOperand(0).stripClassCasts();
+    DomCondition = stripClassCasts(DomTerm->getOperand(0));
 
     // Init state variables for paths analysis
     SuccessPreds.clear();

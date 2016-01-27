@@ -13,9 +13,9 @@ func f<C : P2> (elements: C) {
 }
 
 protocol _CollectionType  {
-  typealias Index
+  associatedtype Index
 
-  typealias _Element
+  associatedtype _Element
   subscript(i: Index) -> _Element {get}
 }
 
@@ -38,7 +38,7 @@ C: MutableCollectionType
 
 // rdar://problem/21322215
 protocol FactoryType {
-  typealias Item
+  associatedtype Item
 }
 
 protocol MyCollectionType : Swift.CollectionType {}

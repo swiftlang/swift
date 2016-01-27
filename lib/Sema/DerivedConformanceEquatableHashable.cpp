@@ -1,4 +1,4 @@
-//===--- DerivedConformanceEquatableHashable.cpp - Derived Equatable & co. ===//
+//===--- DerivedConformanceEquatableHashable.cpp - Derived Equatable & co -===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -99,7 +99,7 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
     auto indexExpr = new (C) IntegerLiteralExpr(StringRef(indexStr.data(),
                                                 indexStr.size()), SourceLoc(),
                                                 /*implicit*/ true);
-    auto indexRef = new (C) DeclRefExpr(indexVar, SourceLoc(),
+    auto indexRef = new (C) DeclRefExpr(indexVar, DeclNameLoc(),
                                         /*implicit*/true);
     auto assignExpr = new (C) AssignExpr(indexRef, SourceLoc(),
                                          indexExpr, /*implicit*/ true);
@@ -111,7 +111,7 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
   }
   
   // generate: switch enumVar { }
-  auto enumRef = new (C) DeclRefExpr(enumVarDecl, SourceLoc(),
+  auto enumRef = new (C) DeclRefExpr(enumVarDecl, DeclNameLoc(),
                                       /*implicit*/true);
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), enumRef,
                                        SourceLoc(), cases, SourceLoc(), C);
@@ -119,8 +119,8 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
   stmts.push_back(indexBind);
   stmts.push_back(switchStmt);
 
-  return new (C) DeclRefExpr(indexVar, SourceLoc(), /*implicit*/ true,
-                                  AccessSemantics::Ordinary, intType);
+  return new (C) DeclRefExpr(indexVar, DeclNameLoc(), /*implicit*/ true,
+                             AccessSemantics::Ordinary, intType);
 }
 
 /// Derive the body for an '==' operator for an enum
@@ -129,8 +129,8 @@ static void deriveBodyEquatable_enum_eq(AbstractFunctionDecl *eqDecl) {
   ASTContext &C = parentDC->getASTContext();
 
   auto args = eqDecl->getParameterLists().back();
-  auto aParam = args->get(0).decl;
-  auto bParam = args->get(1).decl;
+  auto aParam = args->get(0);
+  auto bParam = args->get(1);
 
   CanType boolTy = C.getBoolDecl()->getDeclaredType().getCanonicalTypeOrNull();
 
@@ -154,7 +154,7 @@ static void deriveBodyEquatable_enum_eq(AbstractFunctionDecl *eqDecl) {
                                          { }, { }, SourceLoc(),
                                          /*HasTrailingClosure*/ false,
                                          /*Implicit*/ true, tType);
-  auto *cmpFuncExpr = new (C) DeclRefExpr(cmpFunc, SourceLoc(),
+  auto *cmpFuncExpr = new (C) DeclRefExpr(cmpFunc, DeclNameLoc(),
                                           /*implicit*/ true,
                                           AccessSemantics::Ordinary,
                                           cmpFunc->getType());
@@ -201,8 +201,8 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
   };
   
   auto params = ParameterList::create(C, {
-    Parameter::withoutLoc(getParamDecl("a")),
-    Parameter::withoutLoc(getParamDecl("b"))
+    getParamDecl("a"),
+    getParamDecl("b")
   });
   
   auto genericParams = parentDC->getGenericParamsOfContext();
@@ -265,11 +265,16 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
   eqDecl->setAccessibility(std::max(enumDecl->getFormalAccess(),
                                     Accessibility::Internal));
 
+  // If the enum was not imported, the derived conformance is either from the
+  // enum itself or an extension, in which case we will emit the declaration
+  // normally.
   if (enumDecl->hasClangNode())
-    tc.implicitlyDefinedFunctions.push_back(eqDecl);
+    tc.Context.addExternalDecl(eqDecl);
   
   // Since it's an operator we insert the decl after the type at global scope.
-  return insertOperatorDecl(C, cast<IterableDeclContext>(parentDecl), eqDecl);
+  insertOperatorDecl(C, cast<IterableDeclContext>(parentDecl), eqDecl);
+
+  return eqDecl;
 }
 
 ValueDecl *DerivedConformance::deriveEquatable(TypeChecker &tc,
@@ -306,7 +311,7 @@ deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
   
   auto memberRef = new (C) UnresolvedDotExpr(indexRef, SourceLoc(),
                                              C.Id_hashValue,
-                                             SourceLoc(),
+                                             DeclNameLoc(),
                                              /*implicit*/true);
   auto returnStmt = new (C) ReturnStmt(SourceLoc(), memberRef);
   statements.push_back(returnStmt);
@@ -396,8 +401,11 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
   getterDecl->setInterfaceType(interfaceType);
   getterDecl->setAccessibility(enumDecl->getFormalAccess());
 
+  // If the enum was not imported, the derived conformance is either from the
+  // enum itself or an extension, in which case we will emit the declaration
+  // normally.
   if (enumDecl->hasClangNode())
-    tc.implicitlyDefinedFunctions.push_back(getterDecl);
+    tc.Context.addExternalDecl(getterDecl);
   
   // Create the property.
   VarDecl *hashValueDecl = new (C) VarDecl(/*static*/ false,

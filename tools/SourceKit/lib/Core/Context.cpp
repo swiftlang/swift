@@ -17,9 +17,9 @@
 using namespace SourceKit;
 
 SourceKit::Context::Context(StringRef RuntimeLibPath)
-  : RuntimeLibPath(RuntimeLibPath) {
-  NotificationCtr.reset(new NotificationCenter());
-  SwiftLang = std::move(LangSupport::createSwiftLangSupport(*this));
+  : RuntimeLibPath(RuntimeLibPath),
+    SwiftLang(LangSupport::createSwiftLangSupport(*this)),
+    NotificationCtr(new NotificationCenter()) {
 }
 
 SourceKit::Context::~Context() {

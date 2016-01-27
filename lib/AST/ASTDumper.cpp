@@ -1,4 +1,4 @@
-//===--- ASTDumper.cpp - Swift Language AST Dumper-------------------------===//
+//===--- ASTDumper.cpp - Swift Language AST Dumper ------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -19,7 +19,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ForeignErrorConvention.h"
-#include "swift/AST/Parameter.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/APFloat.h"
@@ -89,6 +89,20 @@ void RequirementRepr::dump() const {
   llvm::errs() << "\n";
 }
 
+Optional<std::tuple<StringRef, StringRef, RequirementReprKind>>
+RequirementRepr::getAsAnalyzedWrittenString() const {
+  if(AsWrittenString.empty())
+    return None;
+  auto Pair = AsWrittenString.split("==");
+  auto Kind = RequirementReprKind::SameType;
+  if (Pair.second.empty()) {
+    Pair = AsWrittenString.split(":");
+    Kind =  RequirementReprKind::TypeConstraint;
+  }
+  assert(!Pair.second.empty() && "cannot get second type.");
+  return std::make_tuple(Pair.first.trim(), Pair.second.trim(), Kind);
+}
+
 void RequirementRepr::printImpl(raw_ostream &out, bool AsWritten) const {
   auto printTy = [&](const TypeLoc &TyLoc) {
     if (AsWritten && TyLoc.getTypeRepr()) {
@@ -99,21 +113,16 @@ void RequirementRepr::printImpl(raw_ostream &out, bool AsWritten) const {
   };
 
   switch (getKind()) {
-  case RequirementKind::Conformance:
+  case RequirementReprKind::TypeConstraint:
     printTy(getSubjectLoc());
     out << " : ";
     printTy(getConstraintLoc());
     break;
 
-  case RequirementKind::SameType:
+  case RequirementReprKind::SameType:
     printTy(getFirstTypeLoc());
     out << " == ";
     printTy(getSecondTypeLoc());
-    break;
-
-  case RequirementKind::WitnessMarker:
-    out << "witness marker for ";
-    printTy(getFirstTypeLoc());
     break;
   }
 }
@@ -473,7 +482,7 @@ namespace {
       OS << ")";
     }
 
-    void printDeclName(ValueDecl *D) {
+    void printDeclName(const ValueDecl *D) {
       if (D->getFullName())
         OS << '\"' << D->getFullName() << '\"';
       else
@@ -511,6 +520,10 @@ namespace {
         OS << " default=";
         defaultDef.print(OS);
       }
+      
+      if (decl->isRecursive())
+        OS << " <<RECURSIVE>>";
+      
       OS << ")";
     }
 
@@ -653,15 +666,8 @@ namespace {
       }
     }
 
-    void visitParamDecl(ParamDecl *VD) {
-      printCommon(VD, "param_decl");
-      if (!VD->isLet())
-        OS << " var";
-      if (VD->getName() != VD->getArgumentName()) {
-        OS << " argument_name=";
-        printName(OS, VD->getArgumentName());
-      }
-      OS << ')';
+    void visitParamDecl(ParamDecl *PD) {
+      printParameter(PD);
     }
 
     void visitEnumCaseDecl(EnumCaseDecl *ECD) {
@@ -773,27 +779,27 @@ namespace {
       }
     }
     
-    void printParameter(const Parameter &P) {
+    void printParameter(const ParamDecl *P) {
       OS.indent(Indent) << "(parameter ";
-      printDeclName(P.decl);
-      if (!P.decl->getArgumentName().empty())
-        OS << " apiName=" << P.decl->getArgumentName();
+      printDeclName(P);
+      if (!P->getArgumentName().empty())
+        OS << " apiName=" << P->getArgumentName();
       
       OS << " type=";
-      if (P.decl->hasType()) {
+      if (P->hasType()) {
         OS << '\'';
-        P.decl->getType().print(OS);
+        P->getType().print(OS);
         OS << '\'';
       } else
         OS << "<null type>";
       
-      if (!P.decl->isLet())
+      if (!P->isLet())
         OS << " mutable";
       
-      if (P.isVariadic())
+      if (P->isVariadic())
         OS << " variadic";
 
-      switch (P.decl->getDefaultArgumentKind()) {
+      switch (P->getDefaultArgumentKind()) {
       case DefaultArgumentKind::None: break;
       case DefaultArgumentKind::Column:
         printField("default_arg", "__COLUMN__");
@@ -813,12 +819,21 @@ namespace {
       case DefaultArgumentKind::Line:
         printField("default_arg", "__LINE__");
         break;
+      case DefaultArgumentKind::Nil:
+        printField("default_arg", "nil");
+        break;
+      case DefaultArgumentKind::EmptyArray:
+        printField("default_arg", "[]");
+        break;
+      case DefaultArgumentKind::EmptyDictionary:
+        printField("default_arg", "[:]");
+        break;
       case DefaultArgumentKind::Normal:
         printField("default_arg", "normal");
         break;
       }
       
-      if (auto init = P.getDefaultValue()) {
+      if (auto init = P->getDefaultValue()) {
         OS << " expression=\n";
         printRec(init->getExpr());
       }
@@ -951,7 +966,7 @@ namespace {
       OS.indent(Indent) << "(#if_decl\n";
       Indent += 2;
       for (auto &Clause : ICD->getClauses()) {
-        OS.indent(Indent) << (Clause.Cond ? "(#if:\n" : "#else");
+        OS.indent(Indent) << (Clause.Cond ? "(#if:\n" : "\n(#else:\n");
         if (Clause.Cond)
           printRec(Clause.Cond);
         
@@ -959,6 +974,8 @@ namespace {
           OS << '\n';
           printRec(D);
         }
+
+        OS << ')';
       }
     
       Indent -= 2;
@@ -996,24 +1013,6 @@ namespace {
   };
 } // end anonymous namespace.
 
-
-void Parameter::dump() const {
-  dump(llvm::errs(), 0);
-}
-
-void Parameter::dump(raw_ostream &OS, unsigned Indent) const {
-  llvm::Optional<llvm::SaveAndRestore<bool>> X;
-  
-  // Make sure to print type variables if we can get to ASTContext.
-  if (decl) {
-    X.emplace(llvm::SaveAndRestore<bool>(decl->getASTContext().LangOpts.DebugConstraintSolver,
-                                 true));
-  }
-
-  PrintDecl(OS, Indent).printParameter(*this);
-  llvm::errs() << '\n';
-}
-
 void ParameterList::dump() const {
   dump(llvm::errs(), 0);
 }
@@ -1022,8 +1021,8 @@ void ParameterList::dump(raw_ostream &OS, unsigned Indent) const {
   llvm::Optional<llvm::SaveAndRestore<bool>> X;
   
   // Make sure to print type variables if we can get to ASTContext.
-  if (size() != 0 && get(0).decl) {
-    auto &ctx = get(0).decl->getASTContext();
+  if (size() != 0 && get(0)) {
+    auto &ctx = get(0)->getASTContext();
     X.emplace(llvm::SaveAndRestore<bool>(ctx.LangOpts.DebugConstraintSolver,
                                          true));
   }
@@ -1043,7 +1042,7 @@ void Decl::dump(raw_ostream &OS, unsigned Indent) const {
   llvm::SaveAndRestore<bool> X(getASTContext().LangOpts.DebugConstraintSolver,
                                true);
   PrintDecl(OS, Indent).visit(const_cast<Decl *>(this));
-  llvm::errs() << '\n';
+  OS << '\n';
 }
 
 /// Print the given declaration context (with its parents).
@@ -1664,11 +1663,6 @@ public:
     E->getDeclRef().dump(OS);
     OS << ')';
   }
-  void visitUnresolvedConstructorExpr(UnresolvedConstructorExpr *E) {
-    printCommon(E, "unresolved_constructor") << '\n';
-    printRec(E->getSubExpr());
-    OS << ')';
-  }
   void visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *E) {
     printCommon(E, "overloaded_decl_ref_expr")
       << " name=" << E->getDecls()[0]->getName()
@@ -1819,15 +1813,6 @@ public:
   void visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     printCommon(E, "unresolved_dot_expr")
       << " field '" << E->getName() << "'";
-    if (E->getBase()) {
-      OS << '\n';
-      printRec(E->getBase());
-    }
-    OS << ')';
-  }
-  void visitUnresolvedSelectorExpr(UnresolvedSelectorExpr *E) {
-    printCommon(E, "unresolved_selector_expr")
-      << " selector '" << E->getName() << "'";
     if (E->getBase()) {
       OS << '\n';
       printRec(E->getBase());
@@ -2004,6 +1989,7 @@ public:
   void visitCaptureListExpr(CaptureListExpr *E) {
     printCommon(E, "capture_list");
     for (auto capture : E->getCaptureList()) {
+      OS << '\n';
       Indent += 2;
       printRec(capture.Var);
       printRec(capture.Init);
@@ -2028,6 +2014,8 @@ public:
     printClosure(E, "closure_expr");
     if (E->hasSingleExpressionBody())
       OS << " single-expression";
+    if (E->isVoidConversionClosure())
+      OS << " void-conversion";
     
     if (E->getParameters()) {
       OS << '\n';
@@ -2110,9 +2098,9 @@ public:
     printCommon(E, name) << ' ';
     if (auto checkedCast = dyn_cast<CheckedCastExpr>(E))
       OS << getCheckedCastKindName(checkedCast->getCastKind()) << ' ';
-    OS << "writtenType=";
+    OS << "writtenType='";
     E->getCastTypeLoc().getType().print(OS);
-    OS << '\n';
+    OS << "'\n";
     printRec(E->getSubExpr());
     OS << ')';
   }
@@ -2194,6 +2182,16 @@ public:
       OS << '\n';
       printRec(ExpTyR);
     }
+    OS << ')';
+  }
+  void visitObjCSelectorExpr(ObjCSelectorExpr *E) {
+    printCommon(E, "objc_selector_expr") << " decl=";
+    if (auto method = E->getMethod())
+      method->dumpRef(OS);
+    else
+      OS << "<unresolved>";
+    OS << '\n';
+    printRec(E->getSubExpr());
     OS << ')';
   }
 };
@@ -2337,7 +2335,7 @@ public:
   void visitNamedTypeRepr(NamedTypeRepr *T) {
     printCommon(T, "type_named");
     if (T->hasName())
-      OS << " id='" << T->getName();
+      OS << " id=" << T->getName();
     if (T->getTypeRepr()) {
       OS << '\n';
       printRec(T->getTypeRepr());
@@ -2395,15 +2393,25 @@ void Substitution::dump() const {
   if (!Conformance.size()) return;
 
   os << '[';
-  for (const auto *c : Conformance) {
-    os << ' ';
-    if (c) {
-      c->printName(os);
+  bool first = true;
+  for (auto &c : Conformance) {
+    if (first) {
+      first = false;
     } else {
-      os << "nullptr";
+      os << ' ';
     }
+    c.dump();
   }
   os << " ]";
+}
+
+void ProtocolConformanceRef::dump() const {
+  llvm::raw_ostream &os = llvm::errs();
+  if (isConcrete()) {
+    getConcrete()->printName(os);
+  } else {
+    os << "abstract:" << getAbstract()->getName();
+  }
 }
 
 void swift::dump(const ArrayRef<Substitution> &subs) {
@@ -2570,6 +2578,18 @@ namespace {
 
         case DefaultArgumentKind::Line:
           printField("default_arg", "__LINE__");
+          break;
+
+        case DefaultArgumentKind::Nil:
+          printField("default_arg", "nil");
+          break;
+
+        case DefaultArgumentKind::EmptyArray:
+          printField("default_arg", "[]");
+          break;
+
+        case DefaultArgumentKind::EmptyDictionary:
+          printField("default_arg", "[:]");
           break;
 
         case DefaultArgumentKind::Normal:

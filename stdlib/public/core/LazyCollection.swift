@@ -1,4 +1,4 @@
-//===--- LazyCollection.swift ---------------------------------*- swift -*-===//
+//===--- LazyCollection.swift ---------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -27,7 +27,7 @@ public protocol LazyCollectionType
   /// possibly with a simpler type.
   ///
   /// - See also: `elements`
-  typealias Elements: CollectionType = Self
+  associatedtype Elements: CollectionType = Self
 
 }
 

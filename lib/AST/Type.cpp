@@ -924,22 +924,6 @@ TypeDecl *TypeBase::getDirectlyReferencedTypeDecl() const {
   return nullptr;
 }
 
-StringRef TypeBase::getInferredDefaultArgString() {
-  if (auto structDecl = getStructOrBoundGenericStruct()) {
-    if (structDecl->getClangDecl()) {
-      for (auto attr : structDecl->getAttrs()) {
-        if (auto synthesizedProto = dyn_cast<SynthesizedProtocolAttr>(attr)) {
-          if (synthesizedProto->getProtocolKind()
-              == KnownProtocolKind::OptionSetType)
-            return "[]";
-        }
-      }
-    }
-  }
-
-  return "nil";
-}
-
 /// \brief Collect the protocols in the existential type T into the given
 /// vector.
 static void addProtocols(Type T, SmallVectorImpl<ProtocolDecl *> &Protocols) {
@@ -2221,6 +2205,7 @@ const {
   for (auto &reqt : getRequirements()) {
     switch (reqt.getKind()) {
     case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
     case RequirementKind::WitnessMarker:
       // Substituting the parameter eliminates conformance constraints rooted
       // in the parameter.
@@ -2474,6 +2459,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(DeclContext *dc) {
   // Find the superclass type with the context matching that of the member.
   auto ownerNominal = dc->isNominalTypeOrNominalTypeExtensionContext();
   while (!baseTy->is<ErrorType>() &&
+         baseTy->getAnyNominal() &&
          baseTy->getAnyNominal() != ownerNominal) {
     baseTy = baseTy->getSuperclass(resolver);
     assert(baseTy && "Couldn't find appropriate context");

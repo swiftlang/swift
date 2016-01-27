@@ -42,15 +42,15 @@ bb0:
   %1 = alloc_stack $Array<X>
   %3 = function_ref @_array_X_init : $@convention(thin) () -> @owned Array<X>
   %4 = apply %3() : $@convention(thin) () -> @owned Array<X>
-  store %4 to %1#1 : $*Array<X>
+  store %4 to %1 : $*Array<X>
 
   %m1 = function_ref @_array_X_mutate : $@convention(method) (@inout Array<X>) -> ()
-  %m2 = apply %m1(%1#1) : $@convention(method) (@inout Array<X>) -> ()
+  %m2 = apply %m1(%1) : $@convention(method) (@inout Array<X>) -> ()
 
-  %5 = load %1#1 : $*Array<X>
+  %5 = load %1 : $*Array<X>
   %6 = function_ref @_is_native_X_no_type_check : $@convention(method) (@guaranteed Array<X>) -> Bool
   %10 = apply %6(%5) : $@convention(method) (@guaranteed Array<X>) -> Bool
-  dealloc_stack %1#0 : $*@local_storage Array<X>
+  dealloc_stack %1 : $*Array<X>
   return %10 : $Bool
 }
 
@@ -63,15 +63,15 @@ bb0:
   %1 = alloc_stack $Array<X>
   %3 = function_ref @_array_X_init : $@convention(thin) () -> @owned Array<X>
   %4 = apply %3() : $@convention(thin) () -> @owned Array<X>
-  store %4 to %1#1 : $*Array<X>
+  store %4 to %1 : $*Array<X>
 
   %m1 = function_ref @_take_array_addr : $@convention(method) (@inout Array<X>) -> ()
-  %m2 = apply %m1(%1#1) : $@convention(method) (@inout Array<X>) -> ()
+  %m2 = apply %m1(%1) : $@convention(method) (@inout Array<X>) -> ()
 
-  %5 = load %1#1 : $*Array<X>
+  %5 = load %1 : $*Array<X>
   %6 = function_ref @_is_native_X_no_type_check : $@convention(method) (@guaranteed Array<X>) -> Bool
   %10 = apply %6(%5) : $@convention(method) (@guaranteed Array<X>) -> Bool
-  dealloc_stack %1#0 : $*@local_storage Array<X>
+  dealloc_stack %1 : $*Array<X>
   return %10 : $Bool
 }
 
@@ -84,14 +84,14 @@ bb0(%0 : $Array<X>):
   %1 = alloc_stack $Array<X>
   %3 = function_ref @_array_X_init : $@convention(thin) () -> @owned Array<X>
   %4 = apply %3() : $@convention(thin) () -> @owned Array<X>
-  store %4 to %1#1 : $*Array<X>
+  store %4 to %1 : $*Array<X>
 
-  store %0 to %1#1 : $*Array<X>
+  store %0 to %1 : $*Array<X>
 
-  %5 = load %1#1 : $*Array<X>
+  %5 = load %1 : $*Array<X>
   %6 = function_ref @_is_native_X_no_type_check : $@convention(method) (@guaranteed Array<X>) -> Bool
   %10 = apply %6(%5) : $@convention(method) (@guaranteed Array<X>) -> Bool
-  dealloc_stack %1#0 : $*@local_storage Array<X>
+  dealloc_stack %1 : $*Array<X>
   return %10 : $Bool
 }
 
@@ -196,15 +196,15 @@ bb0:
 sil @test_tuple_member_escapes : $@convention(thin) () -> Bool {
 bb0:
   %s1 = alloc_stack $(Array<X>, Builtin.Int64)
-  %a1 = tuple_element_addr %s1#1 : $*(Array<X>, Builtin.Int64), 0
+  %a1 = tuple_element_addr %s1 : $*(Array<X>, Builtin.Int64), 0
   %f1 = function_ref @_take_array_addr : $@convention(method) (@inout Array<X>) -> ()
   %x1 = apply %f1(%a1) : $@convention(method) (@inout Array<X>) -> ()
 
-  %t1 = load %s1#1 : $*(Array<X>, Builtin.Int64)
+  %t1 = load %s1 : $*(Array<X>, Builtin.Int64)
   %a2 = tuple_extract %t1 : $(Array<X>, Builtin.Int64), 0
   %f2 = function_ref @_is_native_X_no_type_check : $@convention(method) (@guaranteed Array<X>) -> Bool
   %r1 = apply %f2(%a2) : $@convention(method) (@guaranteed Array<X>) -> Bool
-  dealloc_stack %s1#0 : $*@local_storage (Array<X>, Builtin.Int64)
+  dealloc_stack %s1 : $*(Array<X>, Builtin.Int64)
   return %r1 : $Bool
 } 
 

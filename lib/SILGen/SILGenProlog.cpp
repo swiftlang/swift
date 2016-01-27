@@ -15,7 +15,7 @@
 #include "ManagedValue.h"
 #include "Scope.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/AST/Parameter.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/Basic/Fallthrough.h"
 
 using namespace swift;
@@ -306,9 +306,8 @@ struct ArgumentInitHelper {
     }
   }
 
-  void emitParam(Parameter &param) {
+  void emitParam(ParamDecl *PD) {
     ++ArgNo;
-    auto PD = param.decl;
     if (PD->hasName()) {
       makeArgumentIntoBinding(PD->getType(), &*f.begin(), PD);
       return;
@@ -349,8 +348,8 @@ static void makeArgument(Type ty, ParamDecl *decl,
 
 void SILGenFunction::bindParametersForForwarding(const ParameterList *params,
                                      SmallVectorImpl<SILValue> &parameters) {
-  for (auto &param : *params) {
-    makeArgument(param.decl->getType(), param.decl, parameters, *this);
+  for (auto param : *params) {
+    makeArgument(param->getType(), param, parameters, *this);
   }
 }
 

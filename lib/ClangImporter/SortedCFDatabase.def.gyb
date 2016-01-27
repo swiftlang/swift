@@ -17,7 +17,6 @@
 %{
 
 import re
-import sys
 import codecs
 
 prologueLines = ""
@@ -28,7 +27,7 @@ epilogueLines = ""
 lineForName = {}
 
 # Load the data file.
-with codecs.open(CFDatabaseFile, encoding=sys.getfilesystemencoding(), errors='strict') as f:
+with codecs.open(CFDatabaseFile, encoding='utf-8', errors='strict') as f:
   for line in f:
     # Pass through preprocessor directives literally.
     # Assume that they all fall into either a strict prologue or epilogue.
@@ -40,7 +39,7 @@ with codecs.open(CFDatabaseFile, encoding=sys.getfilesystemencoding(), errors='s
       continue
 
     # Otherwise, check for lines like FOO(BAR)
-    m = re.match('^\w+\((\w+)\)', line)   
+    m = re.match('^\w+\((\w+)\)', line)
     if m:
       lineForName[m.group(1)] = line
 }%

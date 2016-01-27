@@ -1,4 +1,4 @@
-//===--- EncodedSequence.h - A byte-encoded sequence -----------*- C++ -*-===//
+//===--- EncodedSequence.h - A byte-encoded sequence ------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

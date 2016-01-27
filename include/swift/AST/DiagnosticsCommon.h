@@ -1,4 +1,4 @@
-//===- DiagnosticsCommon.h - Shared Diagnostic Definitions ------*- C++ -*-===//
+//===--- DiagnosticsCommon.h - Shared Diagnostic Definitions ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -46,7 +46,7 @@ namespace swift {
     using DeclAttribute = const DeclAttribute *;
 
   // Declare common diagnostics objects with their appropriate types.
-#define DIAG(KIND,ID,Category,Options,Text,Signature) \
+#define DIAG(KIND,ID,Options,Text,Signature) \
     extern detail::DiagWithArguments<void Signature>::type ID;
 #include "DiagnosticsCommon.def"
   }

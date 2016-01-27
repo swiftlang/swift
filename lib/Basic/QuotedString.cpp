@@ -1,4 +1,4 @@
-//===--- QuotedString.cpp - Printing a string as a quoted string ---------===//
+//===--- QuotedString.cpp - Printing a string as a quoted string ----------===//
 //
 // This source file is part of the Swift.org open source project
 //

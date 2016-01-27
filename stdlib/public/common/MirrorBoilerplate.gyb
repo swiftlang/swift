@@ -25,14 +25,16 @@
 # this template, which is probably reasonable since those are "the meat" of every Mirror
 }%
 
-%import inspect,os.path,sys
+%import inspect
+%import os.path
+%import sys
 %sys.path = [os.path.split(inspect.getframeinfo(inspect.currentframe()).filename)[0] or '.'] + sys.path
 %import MirrorCommon
 %genericArgString = MirrorCommon.getGenericArgString(
-%                   genericArgs if 'genericArgs' in locals() else None,
-%                   genericConstraints if 'genericConstraints' in locals() else None)
+%    genericArgs if 'genericArgs' in locals() else None,
+%    genericConstraints if 'genericConstraints' in locals() else None)
 %disposition = MirrorCommon.getDisposition(
-%              disposition if 'disposition' in locals() else None)
+%    disposition if 'disposition' in locals() else None)
 var _value: ${introspecteeType}${genericArgString}
 
 init(_ x: ${introspecteeType}${genericArgString}) {

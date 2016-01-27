@@ -190,6 +190,9 @@ public struct NSZone : NilLiteralConvertible {
   }
 }
 
+// Note: NSZone becomes Zone in Swift 3.
+typealias Zone = NSZone
+
 //===----------------------------------------------------------------------===//
 // FIXME: @autoreleasepool substitute
 //===----------------------------------------------------------------------===//

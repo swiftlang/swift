@@ -91,15 +91,15 @@ func test3a(a: ZeroOneTwoThree) {
   var e : ZeroOneTwoThree = (.Three(1, 2, 3))
   var f = ZeroOneTwoThree.Unknown(.None, .Some(4), .Some(32))
 
-  var g = .None  // expected-error {{type of expression is ambiguous without more context}}
+  var g = .None  // expected-error {{reference to member 'None' cannot be resolved without a contextual type}}
 
   // Overload resolution can resolve this to the right constructor.
   var h = ZeroOneTwoThree(1)
 
   test3a;  // expected-error {{unused function}}
-  .Zero   // expected-error {{type of expression is ambiguous without more context}}
+  .Zero   // expected-error {{reference to member 'Zero' cannot be resolved without a contextual type}}
   test3a   // expected-error {{unused function}}
-  (.Zero) // expected-error {{type of expression is ambiguous without more context}}
+  (.Zero) // expected-error {{reference to member 'Zero' cannot be resolved without a contextual type}}
   test3a(.Zero)
 }
 
@@ -290,5 +290,16 @@ func testSimpleEnum() {
   let _ : SimpleEnum=.X    // expected-error {{'=' must have consistent whitespace on both sides}}
 }
 
+enum SR510: String {
+    case Thing = "thing"
+    case Bob = {"test"} // expected-error {{raw value for enum case must be a literal}}
+}
 
+
+// <rdar://problem/21269142> Diagnostic should say why enum has no .rawValue member
+enum E21269142 {  // expected-note {{did you mean to specify a raw type on the enum declaration?}}
+  case Foo
+}
+
+print(E21269142.Foo.rawValue)  // expected-error {{value of type 'E21269142' has no member 'rawValue'}}
 

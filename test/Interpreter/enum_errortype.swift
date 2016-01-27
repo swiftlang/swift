@@ -3,6 +3,14 @@
 
 import StdlibUnittest
 
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 enum ClericalErrorDomain: ErrorType {
   case MisplacedDocument(name: String)
   case AccidentallyErasedTape(fromMinute: Double, toMinute: Double)
@@ -22,3 +30,5 @@ EnumErrorType.test("default codes") {
   expectEqual(a._code, 0)
   expectEqual(b._code, 1)
 }
+
+runAllTests()

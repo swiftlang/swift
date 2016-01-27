@@ -1,4 +1,4 @@
-//===-- ASTVisitor.h - SILGen ASTVisitor specialization ---------*- C++ -*-===//
+//===--- ASTVisitor.h - SILGen ASTVisitor specialization --------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

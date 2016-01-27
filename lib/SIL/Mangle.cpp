@@ -46,12 +46,11 @@ using namespace Mangle;
 //===----------------------------------------------------------------------===//
 
 static void mangleSubstitution(Mangler &M, Substitution Sub) {
-  M.mangleType(Sub.getReplacement()->getCanonicalType(),
-               ResilienceExpansion::Minimal, 0);
+  M.mangleType(Sub.getReplacement()->getCanonicalType(), 0);
   for (auto C : Sub.getConformances()) {
-    if (!C)
+    if (C.isAbstract())
       return;
-    M.mangleProtocolConformance(C);
+    M.mangleProtocolConformance(C.getConcrete());
   }
 }
 
@@ -201,8 +200,8 @@ mangleClosureProp(PartialApplyInst *PAI) {
   // Then we mangle the types of the arguments that the partial apply is
   // specializing.
   for (auto &Op : PAI->getArgumentOperands()) {
-    SILType Ty = Op.get().getType();
-    M.mangleType(Ty.getSwiftRValueType(), ResilienceExpansion::Minimal, 0);
+    SILType Ty = Op.get()->getType();
+    M.mangleType(Ty.getSwiftRValueType(), 0);
   }
 }
 

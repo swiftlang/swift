@@ -51,7 +51,7 @@ The alternatives to generics tend to lead to poor solutions:
 
 * Object-oriented languages tend to use "top" types (id in Objective-C,
   java.lang.Object in pre-generics Java, etc.) for their containers and
-  algorithms, which gives up static type safety. Pre- generics Java forced the
+  algorithms, which gives up static type safety. Pre-generics Java forced the
   user to introduce run-time-checked type casts when interacting with containers
   (which is overly verbose), while Objective-C relies on id's unsound implicit
   conversion behavior to eliminate the need for casts.
@@ -242,7 +242,7 @@ us to cleanly describe a protocol for collections::
 
   protocol Collection {
     typealias Element
-    func forEach(callback : (value : Element) -> void)
+    func forEach(callback : (value : Element) -> Void)
     func add(value : Element)
   }
 
@@ -313,7 +313,7 @@ also know how to "draw!"::
 It is unlikely that Cowboy is meant to conform to Shape, but the method name and
 signatures match, so implicit conformance deduces that Cowboy conforms to
 Shape. Random collisions between types are fairly rare. However, when one is
-using protocol inheritance with fine- grained (semantic or mostly-semantic)
+using protocol inheritance with fine-grained (semantic or mostly-semantic)
 differences between protocols in the hierarchy, they become more common. See
 http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2005/n1798.html for examples
 of this problem as it surfaced with C++ concepts. It is not clear at this time
@@ -330,7 +330,7 @@ type::
 
   struct EmployeeList : Collection { // EmployeeList is a collection
     typealias Element = T
-    func forEach(callback : (value : Element) -> void) { /* Implement this */ }
+    func forEach(callback : (value : Element) -> Void) { /* Implement this */ }
     func add(value : Element) { /* Implement this */ }
   }
 
@@ -367,7 +367,7 @@ extensions, e.g.,::
 
   extension String : Collection {
     typealias Element = char
-    func forEach(callback : (value : Element) -> void) { /* use existing String routines to enumerate characters */ }
+    func forEach(callback : (value : Element) -> Void) { /* use existing String routines to enumerate characters */ }
     func add(value : Element) { self += value /* append character */ }
   }
 
@@ -835,7 +835,7 @@ cannot disambiguate the tokens::
 
 i.e.,::
 
-  identifier operator identifier operator unspaced_lparen integer- literal comma integer-literal rparen
+  identifier operator identifier operator unspaced_lparen integer-literal comma integer-literal rparen
 
 which can be interpreted as either::
 

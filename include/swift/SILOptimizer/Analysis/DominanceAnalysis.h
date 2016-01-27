@@ -1,4 +1,4 @@
-//===--- DominanceAnalysis.h - SIL Dominance Analysis -*- C++ -*-----------===//
+//===--- DominanceAnalysis.h - SIL Dominance Analysis -----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -20,7 +20,6 @@
 
 namespace swift {
 class SILModule;
-class SILValue;
 class SILInstruction;
 
 class DominanceAnalysis : public FunctionAnalysisBase<DominanceInfo> {

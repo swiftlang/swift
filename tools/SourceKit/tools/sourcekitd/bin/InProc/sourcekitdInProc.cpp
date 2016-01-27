@@ -97,9 +97,9 @@ void sourcekitd::set_interrupted_connection_handler(
                           sourcekitd_interrupted_connection_handler_t handler) {
 }
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // sourcekitd_request_sync
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 
 sourcekitd_response_t sourcekitd_send_request_sync(sourcekitd_object_t req) {
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);

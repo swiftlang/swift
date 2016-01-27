@@ -1,4 +1,4 @@
-//===--- ClangModuleLoader.h - Clang Module Loader Interface --*- C++ -*- -===//
+//===--- ClangModuleLoader.h - Clang Module Loader Interface ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

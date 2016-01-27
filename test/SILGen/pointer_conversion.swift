@@ -45,8 +45,8 @@ func arrayToPointer() {
   takesMutablePointer(&ints)
   // CHECK: [[TAKES_MUTABLE_POINTER:%.*]] = function_ref @_TF18pointer_conversion19takesMutablePointer
   // CHECK: [[CONVERT_MUTABLE:%.*]] = function_ref @_TFs37_convertMutableArrayToPointerArgument
-  // CHECK: apply [[CONVERT_MUTABLE]]<Int, UnsafeMutablePointer<Int>>([[TUPLE_BUF:%.*]]#1,
-  // CHECK: [[TUPLE:%.*]] = load [[TUPLE_BUF]]#1
+  // CHECK: apply [[CONVERT_MUTABLE]]<Int, UnsafeMutablePointer<Int>>([[TUPLE_BUF:%[0-9]*]],
+  // CHECK: [[TUPLE:%.*]] = load [[TUPLE_BUF]]
   // CHECK: [[OWNER:%.*]] = tuple_extract [[TUPLE]] : ${{.*}}, 0
   // CHECK: [[POINTER:%.*]] = tuple_extract [[TUPLE]] : ${{.*}}, 1
   // CHECK: apply [[TAKES_MUTABLE_POINTER]]([[POINTER]])
@@ -55,8 +55,8 @@ func arrayToPointer() {
   takesConstPointer(ints)
   // CHECK: [[TAKES_CONST_POINTER:%.*]] = function_ref @_TF18pointer_conversion17takesConstPointerFGSPSi_T_
   // CHECK: [[CONVERT_CONST:%.*]] = function_ref @_TFs35_convertConstArrayToPointerArgument
-  // CHECK: apply [[CONVERT_CONST]]<Int, UnsafePointer<Int>>([[TUPLE_BUF:%.*]]#1,
-  // CHECK: [[TUPLE:%.*]] = load [[TUPLE_BUF]]#1
+  // CHECK: apply [[CONVERT_CONST]]<Int, UnsafePointer<Int>>([[TUPLE_BUF:%[0-9]*]],
+  // CHECK: [[TUPLE:%.*]] = load [[TUPLE_BUF]]
   // CHECK: [[OWNER:%.*]] = tuple_extract [[TUPLE]] : ${{.*}}, 0
   // CHECK: [[POINTER:%.*]] = tuple_extract [[TUPLE]] : ${{.*}}, 1
   // CHECK: apply [[TAKES_CONST_POINTER]]([[POINTER]])
@@ -68,8 +68,8 @@ func stringToPointer(s: String) {
   takesConstVoidPointer(s)
   // CHECK: [[TAKES_CONST_VOID_POINTER:%.*]] = function_ref @_TF18pointer_conversion21takesConstVoidPointerFGSPT__T_
   // CHECK: [[CONVERT_STRING:%.*]] = function_ref @_TFs40_convertConstStringToUTF8PointerArgument
-  // CHECK: apply [[CONVERT_STRING]]<UnsafePointer<()>>([[TUPLE_BUF:%.*]]#1,
-  // CHECK: [[TUPLE:%.*]] = load [[TUPLE_BUF]]#1
+  // CHECK: apply [[CONVERT_STRING]]<UnsafePointer<()>>([[TUPLE_BUF:%[0-9]*]],
+  // CHECK: [[TUPLE:%.*]] = load [[TUPLE_BUF]]
   // CHECK: [[OWNER:%.*]] = tuple_extract [[TUPLE]] : ${{.*}}, 0
   // CHECK: [[POINTER:%.*]] = tuple_extract [[TUPLE]] : ${{.*}}, 1
   // CHECK: apply [[TAKES_CONST_VOID_POINTER]]([[POINTER]])
@@ -80,9 +80,10 @@ func stringToPointer(s: String) {
 func inoutToPointer() {
   var int = 0
   // CHECK: [[INT:%.*]] = alloc_box $Int
+  // CHECK: [[PB:%.*]] = project_box [[INT]]
   takesMutablePointer(&int)
   // CHECK: [[TAKES_MUTABLE:%.*]] = function_ref @_TF18pointer_conversion19takesMutablePointer
-  // CHECK: [[POINTER:%.*]] = address_to_pointer [[INT]]#1
+  // CHECK: [[POINTER:%.*]] = address_to_pointer [[PB]]
   // CHECK: [[CONVERT:%.*]] = function_ref @_TFs30_convertInOutToPointerArgument
   // CHECK: apply [[CONVERT]]<UnsafeMutablePointer<Int>>({{%.*}}, [[POINTER]])
   // CHECK: apply [[TAKES_MUTABLE]]
@@ -112,9 +113,10 @@ func takesPlusZeroOptionalPointer(x: AutoreleasingUnsafeMutablePointer<C?>) {}
 func classInoutToPointer() {
   var c = C()
   // CHECK: [[VAR:%.*]] = alloc_box $C
+  // CHECK: [[PB:%.*]] = project_box [[VAR]]
   takesPlusOnePointer(&c)
   // CHECK: [[TAKES_PLUS_ONE:%.*]] = function_ref @_TF18pointer_conversion19takesPlusOnePointer
-  // CHECK: [[POINTER:%.*]] = address_to_pointer [[INT]]#1
+  // CHECK: [[POINTER:%.*]] = address_to_pointer [[PB]]
   // CHECK: [[CONVERT:%.*]] = function_ref @_TFs30_convertInOutToPointerArgument
   // CHECK: apply [[CONVERT]]<UnsafeMutablePointer<C>>({{%.*}}, [[POINTER]])
   // CHECK: apply [[TAKES_PLUS_ONE]]
@@ -122,7 +124,7 @@ func classInoutToPointer() {
   takesPlusZeroPointer(&c)
   // CHECK: [[TAKES_PLUS_ZERO:%.*]] = function_ref @_TF18pointer_conversion20takesPlusZeroPointerFGVs33AutoreleasingUnsafeMutablePointerCS_1C_T_
   // CHECK: [[WRITEBACK:%.*]] = alloc_stack $@sil_unmanaged C
-  // CHECK: [[OWNED:%.*]] = load [[VAR]]
+  // CHECK: [[OWNED:%.*]] = load [[PB]]
   // CHECK: [[UNOWNED:%.*]] = ref_to_unmanaged [[OWNED]]
   // CHECK: store [[UNOWNED]] to [[WRITEBACK]]
   // CHECK: [[POINTER:%.*]] = address_to_pointer [[WRITEBACK]]
@@ -132,7 +134,7 @@ func classInoutToPointer() {
   // CHECK: [[UNOWNED_OUT:%.*]] = load [[WRITEBACK]]
   // CHECK: [[OWNED_OUT:%.*]] = unmanaged_to_ref [[UNOWNED_OUT]]
   // CHECK: retain_value [[OWNED_OUT]]
-  // CHECK: assign [[OWNED_OUT]] to [[VAR]]
+  // CHECK: assign [[OWNED_OUT]] to [[PB]]
 
   var cq: C? = C()
   takesPlusZeroOptionalPointer(&cq)
@@ -153,6 +155,6 @@ func functionInoutToPointer() {
   var f: () -> () = {}
 
   // CHECK: [[REABSTRACT_BUF:%.*]] = alloc_stack $@callee_owned (@out (), @in ()) -> ()
-  // CHECK: address_to_pointer [[REABSTRACT_BUF]]#1
+  // CHECK: address_to_pointer [[REABSTRACT_BUF]]
   takesMutableVoidPointer(&f)
 }

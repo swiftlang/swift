@@ -43,19 +43,19 @@ markUsed(b)
 markUsed(c) // expected-error {{use of unresolved identifier 'c'}}
 
 Foo.x()
-Foo.y() // expected-error {{type 'Foo' has no member 'y'}}
-Foo.z() // expected-error {{type 'Foo' has no member 'z'}}
+Foo.y() // expected-error {{'y' is inaccessible due to 'internal' protection level}}
+Foo.z() // expected-error {{'z' is inaccessible due to 'private' protection level}}
 // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
 // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
-// TESTABLE: :[[@LINE-3]]:{{[^:]+}}: error: type 'Foo' has no member 'z'
+// TESTABLE: :[[@LINE-3]]:{{[^:]+}}: error: 'z' is inaccessible due to 'private' protection level
 Foo.a()
 Foo.b()
-Foo.c() // expected-error {{type 'Foo' has no member 'c'}}
+Foo.c() // expected-error {{'c' is inaccessible due to 'private' protection level}}
 
-_ = Foo() // expected-error {{'Foo' cannot be constructed because it has no accessible initializers}}
+_ = Foo() // expected-error {{'Foo' initializer is inaccessible due to 'internal' protection level}}
 // TESTABLE-NOT: :[[@LINE-1]]:{{[^:]+}}:
-PrivateInit() // expected-error {{'PrivateInit' cannot be constructed because it has no accessible initializers}}
-// TESTABLE: :[[@LINE-1]]:{{[^:]+}}: error: 'PrivateInit' cannot be constructed because it has no accessible initializers
+_ = PrivateInit() // expected-error {{'PrivateInit' initializer is inaccessible due to 'private' protection level}}
+// TESTABLE: :[[@LINE-1]]:{{[^:]+}}: error: 'PrivateInit' initializer is inaccessible due to 'private' protection level
 
 var s = StructWithPrivateSetter()
 s.x = 42 // expected-error {{cannot assign to property: 'x' setter is inaccessible}}
@@ -70,8 +70,8 @@ class Sub : Base {
     // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
 
     method() // expected-error {{use of unresolved identifier 'method'}}
-    self.method() // expected-error {{value of type 'Sub' has no member 'method'}}
-    super.method() // expected-error {{value of type 'Base' has no member 'method'}}
+    self.method() // expected-error {{'method' is inaccessible due to 'internal' protection level}}
+    super.method() // expected-error {{'method' is inaccessible due to 'internal' protection level}}
     // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
     // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
     // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
@@ -104,7 +104,7 @@ extension Foo : MethodProto {} // expected-error {{type 'Foo' does not conform t
 
 
 protocol TypeProto {
-  typealias TheType // expected-note * {{protocol requires nested type 'TheType'}}
+  associatedtype TheType // expected-note * {{protocol requires nested type 'TheType'}}
 }
 
 extension OriginallyEmpty {}

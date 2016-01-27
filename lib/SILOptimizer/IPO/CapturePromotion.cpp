@@ -430,7 +430,8 @@ ClosureCloner::initCloned(SILFunction *Orig, StringRef ClonedName,
       Orig->getLocation(), Orig->isBare(), IsNotTransparent, Orig->isFragile(),
       Orig->isThunk(), Orig->getClassVisibility(), Orig->getInlineStrategy(),
       Orig->getEffectsKind(), Orig, Orig->getDebugScope());
-  Fn->setSemanticsAttr(Orig->getSemanticsAttr());
+  for (auto &Attr : Orig->getSemanticsAttrs())
+    Fn->addSemanticsAttr(Attr);
   Fn->setDeclCtx(Orig->getDeclContext());
   return Fn;
 }
@@ -491,7 +492,6 @@ ClosureCloner::populateCloned() {
 void ClosureCloner::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
   SILValue Operand = Inst->getOperand();
   if (auto *A = dyn_cast<ProjectBoxInst>(Operand)) {
-    assert(Operand.getResultNumber() == 0);
     auto I = ProjectBoxArgumentMap.find(A);
     if (I != ProjectBoxArgumentMap.end()) {
       getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
@@ -512,13 +512,12 @@ void
 ClosureCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
   SILValue Operand = Inst->getOperand();
   if (SILArgument *A = dyn_cast<SILArgument>(Operand)) {
-    assert(Operand.getResultNumber() == 0);
     auto I = BoxArgumentMap.find(A);
     if (I != BoxArgumentMap.end()) {
       // Releases of the box arguments get replaced with ReleaseValue of the new
       // object type argument.
       SILFunction &F = getBuilder().getFunction();
-      auto &typeLowering = F.getModule().getTypeLowering(I->second.getType());
+      auto &typeLowering = F.getModule().getTypeLowering(I->second->getType());
       SILBuilderWithPostProcess<ClosureCloner, 1> B(this, Inst);
       typeLowering.emitReleaseValue(B, Inst->getLoc(), I->second);
       return;
@@ -535,7 +534,6 @@ void
 ClosureCloner::visitStructElementAddrInst(StructElementAddrInst *Inst) {
   SILValue Operand = Inst->getOperand();
   if (auto *A = dyn_cast<ProjectBoxInst>(Operand)) {
-    assert(Operand.getResultNumber() == 0);
     auto I = ProjectBoxArgumentMap.find(A);
     if (I != ProjectBoxArgumentMap.end())
       return;
@@ -561,7 +559,6 @@ void
 ClosureCloner::visitLoadInst(LoadInst *Inst) {
   SILValue Operand = Inst->getOperand();
   if (auto *A = dyn_cast<ProjectBoxInst>(Operand)) {
-    assert(Operand.getResultNumber() == 0);
     auto I = ProjectBoxArgumentMap.find(A);
     if (I != ProjectBoxArgumentMap.end()) {
       // Loads of the address argument get eliminated completely; the uses of
@@ -570,9 +567,7 @@ ClosureCloner::visitLoadInst(LoadInst *Inst) {
       return;
     }
   } else if (auto *SEAI = dyn_cast<StructElementAddrInst>(Operand)) {
-    assert(Operand.getResultNumber() == 0);
     if (auto *A = dyn_cast<ProjectBoxInst>(SEAI->getOperand())) {
-      assert(SEAI->getOperand().getResultNumber() == 0);
       auto I = ProjectBoxArgumentMap.find(A);
       if (I != ProjectBoxArgumentMap.end()) {
         // Loads of a struct_element_addr of an argument get replaced with
@@ -725,9 +720,7 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
   SmallVector<SILInstruction*, 32> Mutations;
   
   // Scan the box for interesting uses.
-  SILValue Box = ABI->getContainerResult();
-  
-  for (Operand *O : Box.getUses()) {
+  for (Operand *O : ABI->getUses()) {
     if (auto *PAI = dyn_cast<PartialApplyInst>(O->getUser())) {
       unsigned OpNo = O->getOperandNumber();
       assert(OpNo != 0 && "Alloc box used as callee of partial apply?");
@@ -739,7 +732,7 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
         return false;
 
       auto Callee = PAI->getCallee();
-      auto CalleeTy = Callee.getType().castTo<SILFunctionType>();
+      auto CalleeTy = Callee->getType().castTo<SILFunctionType>();
 
       // Bail if the signature has any dependent types as we do not
       // currently support these.
@@ -777,22 +770,25 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       IM.insert(std::make_pair(PAI, Index));
       continue;
     }
+    if (auto *PBI = dyn_cast<ProjectBoxInst>(O->getUser())) {
+      // Check for mutations of the address component.
+      SILValue Addr = PBI;
+      // If the AllocBox is used by a mark_uninitialized, scan the MUI for
+      // interesting uses.
+      if (Addr->hasOneUse()) {
+        SILInstruction *SingleAddrUser = Addr->use_begin()->getUser();
+        if (isa<MarkUninitializedInst>(SingleAddrUser))
+          Addr = SILValue(SingleAddrUser);
+      }
 
+      for (Operand *AddrOp : Addr->getUses()) {
+        if (!isNonescapingUse(AddrOp, Mutations))
+          return false;
+      }
+      continue;
+    }
     // Verify that this use does not otherwise allow the alloc_box to
     // escape.
-    if (!isNonescapingUse(O, Mutations))
-      return false;
-  }
-  
-  // Check for mutations of the address component.
-  // If the AllocBox is used by a mark_uninitialized, scan the MUI for
-  // interesting uses.
-  SILValue Addr = ABI->getAddressResult();
-  if (Addr.hasOneUse())
-    if (auto MUI = dyn_cast<MarkUninitializedInst>(Addr.use_begin()->getUser()))
-      Addr = SILValue(MUI);
-
-  for (Operand *O : Addr.getUses()) {
     if (!isNonescapingUse(O, Mutations))
       return false;
   }
@@ -800,10 +796,12 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
   // Helper lambda function to determine if instruction b is strictly after
   // instruction a, assuming both are in the same basic block.
   auto isAfter = [](SILInstruction *a, SILInstruction *b) {
-    SILInstruction *f = &*b->getParent()->begin();
-    while (b != f) {
-      b = b->getPrevNode();
-      if (a == b)
+    auto fIter = b->getParent()->begin();
+    auto bIter = b->getIterator();
+    auto aIter = a->getIterator();
+    while (bIter != fIter) {
+      --bIter;
+      if (aIter == bIter)
         return true;
     }
     return false;
@@ -881,7 +879,6 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
   SILModule &M = PAI->getModule();
 
   auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
-  assert(FRI && PAI->getCallee().getResultNumber() == 0);
 
   // Clone the closure with the given promoted captures.
   SILFunction *ClonedFn = constructClonedFunction(PAI, FRI, PromotableIndices);
@@ -891,12 +888,12 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
   // closure.
   SILBuilderWithScope B(PAI);
   SILValue FnVal = B.createFunctionRef(PAI->getLoc(), ClonedFn);
-  SILType FnTy = FnVal.getType();
+  SILType FnTy = FnVal->getType();
 
   // Populate the argument list for a new partial_apply instruction, taking into
   // consideration any captures.
   auto CalleePInfo =
-      PAI->getCallee().getType().castTo<SILFunctionType>()->getParameters();
+      PAI->getCallee()->getType().castTo<SILFunctionType>()->getParameters();
   auto PInfo = PAI->getType().castTo<SILFunctionType>()->getParameters();
   unsigned FirstIndex = PInfo.size();
   unsigned OpNo = 1, OpCount = PAI->getNumOperands();
@@ -905,11 +902,10 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
     unsigned Index = OpNo - 1 + FirstIndex;
     if (PromotableIndices.count(Index)) {
       SILValue BoxValue = PAI->getOperand(OpNo);
-      assert(isa<AllocBoxInst>(BoxValue) &&
-             BoxValue.getResultNumber() == 0);
+      AllocBoxInst *ABI = cast<AllocBoxInst>(BoxValue);
 
       SILParameterInfo CPInfo = CalleePInfo[Index];
-      assert(CPInfo.getSILType() == BoxValue.getType() &&
+      assert(CPInfo.getSILType() == BoxValue->getType() &&
              "SILType of parameter info does not match type of parameter");
       // Cleanup the captured argument.
       releasePartialApplyCapturedArg(B, PAI->getLoc(), BoxValue,
@@ -917,15 +913,25 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
 
       // Load and copy from the address value, passing the result as an argument
       // to the new closure.
-      SILValue Addr = cast<AllocBoxInst>(BoxValue)->getAddressResult();
-      // If the address is marked uninitialized, load through the mark, so that
-      // DI can reason about it.
-      if (Addr.hasOneUse())
-        if (auto MUI = dyn_cast<MarkUninitializedInst>(
-                                                   Addr.use_begin()->getUser()))
-          Addr = SILValue(MUI);
+      SILValue Addr;
+      for (Operand *BoxUse : ABI->getUses()) {
+        auto *PBI = dyn_cast<ProjectBoxInst>(BoxUse->getUser());
+          // If the address is marked uninitialized, load through the mark, so
+          // that DI can reason about it.
+        if (PBI && PBI->hasOneUse()) {
+          SILInstruction *PBIUser = PBI->use_begin()->getUser();
+          if (isa<MarkUninitializedInst>(PBIUser))
+            Addr = PBIUser;
+          break;
+        }
+      }
+      // We only reuse an existing project_box if it directly follows the
+      // alloc_box. This makes sure that the project_box dominates the
+      // partial_apply.
+      if (!Addr)
+        Addr = getOrCreateProjectBox(ABI);
 
-      auto &typeLowering = M.getTypeLowering(Addr.getType());
+      auto &typeLowering = M.getTypeLowering(Addr->getType());
       Args.push_back(
         typeLowering.emitLoadOfCopy(B, PAI->getLoc(), Addr, IsNotTake));
       ++NumCapturesPromoted;
@@ -941,7 +947,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
   auto *NewPAI = B.createPartialApply(PAI->getLoc(), FnVal, SubstFnTy,
                                       PAI->getSubstitutions(), Args,
                                       PAI->getType());
-  SILValue(PAI, 0).replaceAllUsesWith(NewPAI);
+  PAI->replaceAllUsesWith(NewPAI);
   PAI->eraseFromParent();
   if (FRI->use_empty()) {
     FRI->eraseFromParent();

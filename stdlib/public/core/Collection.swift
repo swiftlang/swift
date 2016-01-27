@@ -30,14 +30,14 @@ public protocol Indexable {
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
-  typealias Index : ForwardIndexType
+  associatedtype Index : ForwardIndexType
 
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
   ///
   /// - Complexity: O(1)
-  var startIndex: Index {get}
+  var startIndex: Index { get }
 
   /// The collection's "past the end" position.
   ///
@@ -46,7 +46,7 @@ public protocol Indexable {
   /// `successor()`.
   ///
   /// - Complexity: O(1)
-  var endIndex: Index {get}
+  var endIndex: Index { get }
 
   // The declaration of _Element and subscript here is a trick used to
   // break a cyclic conformance/deduction that Swift can't handle.  We
@@ -56,23 +56,23 @@ public protocol Indexable {
   // its subscript.  Ideally we'd like to constrain this
   // Element to be the same as CollectionType.Generator.Element (see
   // below), but we have no way of expressing it today.
-  typealias _Element
+  associatedtype _Element
 
   /// Returns the element at the given `position`.
   ///
   /// - Complexity: O(1)
-  subscript(position: Index) -> _Element {get}
+  subscript(position: Index) -> _Element { get }
 }
 
 public protocol MutableIndexable {
-  typealias Index : ForwardIndexType
+  associatedtype Index : ForwardIndexType
 
-  var startIndex: Index {get}
-  var endIndex: Index {get}
+  var startIndex: Index { get }
+  var endIndex: Index { get }
 
-  typealias _Element
+  associatedtype _Element
 
-  subscript(position: Index) -> _Element {get set}
+  subscript(position: Index) -> _Element { get set }
 }
 
 /// A *generator* for an arbitrary *collection*.  Provided `C`
@@ -132,7 +132,7 @@ public protocol CollectionType : Indexable, SequenceType {
   /// By default, a `CollectionType` satisfies `SequenceType` by
   /// supplying an `IndexingGenerator` as its associated `Generator`
   /// type.
-  typealias Generator: GeneratorType = IndexingGenerator<Self>
+  associatedtype Generator: GeneratorType = IndexingGenerator<Self>
 
   // FIXME: Needed here so that the Generator is properly deduced from
   // a custom generate() function.  Otherwise we get an
@@ -150,16 +150,16 @@ public protocol CollectionType : Indexable, SequenceType {
   ///   `SequenceType`, but is restated here with stricter
   ///   constraints: in a `CollectionType`, the `SubSequence` should
   ///   also be a `CollectionType`.
-  typealias SubSequence: Indexable, SequenceType = Slice<Self>
+  associatedtype SubSequence: Indexable, SequenceType = Slice<Self>
 
   /// Returns the element at the given `position`.
-  subscript(position: Index) -> Generator.Element {get}
+  subscript(position: Index) -> Generator.Element { get }
 
   /// Returns a collection representing a contiguous sub-range of
   /// `self`'s elements.
   ///
   /// - Complexity: O(1)
-  subscript(bounds: Range<Index>) -> SubSequence {get}
+  subscript(bounds: Range<Index>) -> SubSequence { get }
 
   /// Returns `self[startIndex..<end]`
   ///
@@ -226,7 +226,7 @@ extension CollectionType where SubSequence == Self {
   /// If `!self.isEmpty`, remove the first element and return it, otherwise
   /// return `nil`.
   ///
-  /// - Complexity: O(`self.count`)
+  /// - Complexity: O(1)
   @warn_unused_result
   public mutating func popFirst() -> Generator.Element? {
     guard !isEmpty else { return nil }
@@ -234,17 +234,19 @@ extension CollectionType where SubSequence == Self {
     self = self[startIndex.successor()..<endIndex]
     return element
   }
+}
 
+extension CollectionType where
+    SubSequence == Self, Index : BidirectionalIndexType {
   /// If `!self.isEmpty`, remove the last element and return it, otherwise
   /// return `nil`.
   ///
-  /// - Complexity: O(`self.count`)
+  /// - Complexity: O(1)
   @warn_unused_result
   public mutating func popLast() -> Generator.Element? {
     guard !isEmpty else { return nil }
-    let lastElementIndex = startIndex.advancedBy(numericCast(count) - 1)
-    let element = self[lastElementIndex]
-    self = self[startIndex..<lastElementIndex]
+    let element = last!
+    self = self[startIndex..<endIndex.predecessor()]
     return element
   }
 }
@@ -652,7 +654,7 @@ public protocol MutableCollectionType : MutableIndexable, CollectionType {
   // FIXME: should be constrained to MutableCollectionType
   // (<rdar://problem/20715009> Implement recursive protocol
   // constraints)
-  typealias SubSequence : CollectionType /*: MutableCollectionType*/
+  associatedtype SubSequence : CollectionType /*: MutableCollectionType*/
     = MutableSlice<Self>
 
   /// Access the element at `position`.

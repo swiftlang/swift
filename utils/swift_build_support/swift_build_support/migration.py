@@ -45,7 +45,7 @@ def migrate_impl_args(argv, migrate_args):
     args = argv[:split_index]
     impl_args = argv[split_index:]
     impl_args_to_remove = []
-    for index, impl_arg in enumerate(impl_args):
+    for impl_arg in impl_args:
         if impl_arg.split('=')[0] in migrate_args:
             args.append(impl_arg)
             impl_args_to_remove.append(impl_arg)

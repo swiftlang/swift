@@ -1,4 +1,4 @@
-//===--- Lazy.h - A lazily-initialized object -----------------------------===//
+//===--- Lazy.h - A lazily-initialized object -------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -1,4 +1,4 @@
-//===--- Once.cpp - Runtime support for lazy initialization ----------------==//
+//===--- Once.cpp - Runtime support for lazy initialization ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //

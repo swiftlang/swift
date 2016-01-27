@@ -89,7 +89,7 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
     Linkage(unsigned(Linkage)),
     KeepAsPublic(false),
     ForeignBody(false),
-    EK(E) {
+    EffectsKindAttr(E) {
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);
   else
@@ -165,7 +165,7 @@ ASTContext &SILFunction::getASTContext() const {
 bool SILFunction::shouldOptimize() const {
   if (Module.getStage() == SILStage::Raw)
     return true;
-  return !hasSemanticsString("optimize.sil.never");
+  return !hasSemanticsAttr("optimize.sil.never");
 }
 
 Type SILFunction::mapTypeIntoContext(Type type) const {

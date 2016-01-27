@@ -1,4 +1,4 @@
-//===------------------- IVAnalysis.h - SIL IV Analysis -------*- C++ -*---===//
+//===--- IVAnalysis.h - SIL IV Analysis -------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

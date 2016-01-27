@@ -1,4 +1,4 @@
-//===- NullablePtr.h - A pointer that allows null ---------------*- C++ -*-===//
+//===--- NullablePtr.h - A pointer that allows null -------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

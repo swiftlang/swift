@@ -188,7 +188,7 @@ protected:
           MethodInfo *mi = getMethodInfo(funcDecl);
           ClassDecl *MethodCl = nullptr;
           if (MI->getNumOperands() == 1)
-            MethodCl = MI->getOperand(0)->getType(0).getClassOrBoundGenericClass();
+            MethodCl = MI->getOperand(0)->getType().getClassOrBoundGenericClass();
           ensureAlive(mi, dyn_cast<FuncDecl>(funcDecl), MethodCl);
         } else if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
           ensureAlive(FRI->getReferencedFunction());
@@ -389,7 +389,6 @@ public:
         F.dropAllReferences();
 
     // Next step: delete all dead functions.
-    bool NeedUpdate = false;
     for (auto FI = Module->begin(), EI = Module->end(); FI != EI;) {
       SILFunction *F = &*FI;
       ++FI;
@@ -397,7 +396,6 @@ public:
         DEBUG(llvm::dbgs() << "  erase dead function " << F->getName() << "\n");
         NumDeadFunc++;
         Module->eraseFunction(F);
-        NeedUpdate = true;
         DFEPass->invalidateAnalysis(F, SILAnalysis::InvalidationKind::Everything);
       }
     }

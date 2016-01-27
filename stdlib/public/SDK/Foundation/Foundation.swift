@@ -859,7 +859,7 @@ public func _convertNSSetToSet<T : Hashable>(s: NSSet?) -> Set<T> {
   return result!
 }
 
-// Set<T> is conditionally bridged to NSSet
+// Set<Element> is conditionally bridged to NSSet
 extension Set : _ObjectiveCBridgeable {
   public static func _getObjectiveCType() -> Any.Type {
     return NSSet.self
@@ -1042,6 +1042,9 @@ extension CGRectEdge {
 //===----------------------------------------------------------------------===//
 
 public typealias NSErrorPointer = AutoreleasingUnsafeMutablePointer<NSError?>
+
+// Note: NSErrorPointer becomes ErrorPointer in Swift 3.
+public typealias ErrorPointer = NSErrorPointer
 
 public // COMPILER_INTRINSIC
 let _nilObjCError: ErrorType = _GenericObjCError.NilError

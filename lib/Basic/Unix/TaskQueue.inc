@@ -1,4 +1,4 @@
-//===--- Unix/TaskQueue.inc - Unix-specific TaskQueue -----------*- C++ -*-===//
+//===--- TaskQueue.inc - Unix-specific TaskQueue ----------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

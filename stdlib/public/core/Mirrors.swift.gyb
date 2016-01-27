@@ -1,4 +1,4 @@
-//===--- Mirrors.swift.gyb - Common _MirrorType implementations -*- swift -*-==//
+//===--- Mirrors.swift.gyb - Common _MirrorType impls. --------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,7 +12,7 @@
 
 %{
 
-from SwiftIntTypes import *
+from SwiftIntTypes import all_integer_types
 
 # Number of bits in the Builtin.Word type
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8

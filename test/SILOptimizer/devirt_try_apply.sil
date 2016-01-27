@@ -220,14 +220,14 @@ bb0(%0 : $Derived1):
 sil hidden @_TFC16devirt_try_apply8Derived1cfMS0_FT_S0_ : $@convention(method) (@owned Derived1) -> @owned Derived1 {
 bb0(%0 : $Derived1):
   %1 = alloc_stack $Derived1
-  store %0 to %1#1 : $*Derived1
+  store %0 to %1 : $*Derived1
   %3 = upcast %0 : $Derived1 to $Base
 
   %4 = function_ref @_TFC16devirt_try_apply4BasecfMS0_FT_S0_ : $@convention(method) (@owned Base) -> @owned Base
   %7 = apply %4(%3) : $@convention(method) (@owned Base) -> @owned Base
   %8 = unchecked_ref_cast %7 : $Base to $Derived1
-  store %8 to %1#1 : $*Derived1
-  dealloc_stack %1#0 : $*@local_storage Derived1
+  store %8 to %1 : $*Derived1
+  dealloc_stack %1 : $*Derived1
   return %8 : $Derived1
 }
 
@@ -310,14 +310,14 @@ bb0(%0 : $Derived2):
 sil hidden @_TFC16devirt_try_apply8Derived2cfMS0_FT_S0_ : $@convention(method) (@owned Derived2) -> @owned Derived2 {
 bb0(%0 : $Derived2):
   %1 = alloc_stack $Derived2
-  store %0 to %1#1 : $*Derived2
+  store %0 to %1 : $*Derived2
   %3 = upcast %0 : $Derived2 to $Base
 
   %4 = function_ref @_TFC16devirt_try_apply4BasecfMS0_FT_S0_ : $@convention(method) (@owned Base) -> @owned Base
   %7 = apply %4(%3) : $@convention(method) (@owned Base) -> @owned Base
   %8 = unchecked_ref_cast %7 : $Base to $Derived2
-  store %8 to %1#1 : $*Derived2
-  dealloc_stack %1#0 : $*@local_storage Derived2
+  store %8 to %1 : $*Derived2
+  dealloc_stack %1 : $*Derived2
   return %8 : $Derived2
 }
 
@@ -423,14 +423,14 @@ bb0(%0 : $CP2):
 sil hidden @_TFC16devirt_try_apply3CP2cfMS0_FT_S0_ : $@convention(method) (@owned CP2) -> @owned CP2 {
 bb0(%0 : $CP2):
   %1 = alloc_stack $CP2
-  store %0 to %1#1 : $*CP2
+  store %0 to %1 : $*CP2
   %3 = upcast %0 : $CP2 to $CP1
 
   %4 = function_ref @_TFC16devirt_try_apply3CP1cfMS0_FT_S0_ : $@convention(method) (@owned CP1) -> @owned CP1
   %7 = apply %4(%3) : $@convention(method) (@owned CP1) -> @owned CP1
   %8 = unchecked_ref_cast %7 : $CP1 to $CP2
-  store %8 to %1#1 : $*CP2
-  dealloc_stack %1#0 : $*@local_storage CP2
+  store %8 to %1 : $*CP2
+  dealloc_stack %1 : $*CP2
   return %8 : $CP2
 }
 
@@ -455,22 +455,22 @@ bb0(%0 : $Base):
   %1 = alloc_stack $Optional<Int32>
   debug_value %0 : $Base
   %3 = alloc_stack $Optional<Int32>
-  inject_enum_addr %3#1 : $*Optional<Int32>, #Optional.None!enumelt
+  inject_enum_addr %3 : $*Optional<Int32>, #Optional.None!enumelt
   %5 = tuple ()
-  %6 = load %3#1 : $*Optional<Int32>
-  store %6 to %1#1 : $*Optional<Int32>
-  dealloc_stack %3#0 : $*@local_storage Optional<Int32>
+  %6 = load %3 : $*Optional<Int32>
+  store %6 to %1 : $*Optional<Int32>
+  dealloc_stack %3 : $*Optional<Int32>
   %9 = class_method %0 : $Base, #Base.foo!1 : Base -> () throws -> Int32? , $@convention(method) (@guaranteed Base) -> (Optional<Int32>, @error ErrorType)
   try_apply %9(%0) : $@convention(method) (@guaranteed Base) -> (Optional<Int32>, @error ErrorType), normal bb1, error bb4
 
 bb1(%11 : $Optional<Int32>):
-  store %11 to %1#1 : $*Optional<Int32>
+  store %11 to %1 : $*Optional<Int32>
   br bb2
 
 bb2:
-  %14 = load %1#1 : $*Optional<Int32>
+  %14 = load %1 : $*Optional<Int32>
   strong_release %0 : $Base
-  dealloc_stack %1#0 : $*@local_storage Optional<Int32>
+  dealloc_stack %1 : $*Optional<Int32>
   return %14 : $Optional<Int32>
 
 bb3:
@@ -495,26 +495,26 @@ bb0(%0 : $Base):
   %1 = alloc_stack $Optional<Base>
   debug_value %0 : $Base
   %3 = alloc_stack $Optional<Base>
-  inject_enum_addr %3#1 : $*Optional<Base>, #Optional.None!enumelt
+  inject_enum_addr %3 : $*Optional<Base>, #Optional.None!enumelt
   %5 = tuple ()
-  %6 = load %3#1 : $*Optional<Base>
-  store %6 to %1#1 : $*Optional<Base>
-  dealloc_stack %3#0 : $*@local_storage Optional<Base>
+  %6 = load %3 : $*Optional<Base>
+  store %6 to %1 : $*Optional<Base>
+  dealloc_stack %3 : $*Optional<Base>
   %9 = class_method %0 : $Base, #Base.boo1!1 : Base -> () throws -> Base , $@convention(method) (@guaranteed Base) -> (@owned Base, @error ErrorType)
   try_apply %9(%0) : $@convention(method) (@guaranteed Base) -> (@owned Base, @error ErrorType), normal bb1, error bb4
 
 bb1(%11 : $Base):
   %12 = enum $Optional<Base>, #Optional.Some!enumelt.1, %11 : $Base
-  store %12 to %1#1 : $*Optional<Base>
+  store %12 to %1 : $*Optional<Base>
   release_value %6 : $Optional<Base>
   br bb2
 
 bb2:
-  %16 = load %1#1 : $*Optional<Base>
+  %16 = load %1 : $*Optional<Base>
   retain_value %16 : $Optional<Base>
-  destroy_addr %1#1 : $*Optional<Base>
+  destroy_addr %1 : $*Optional<Base>
   strong_release %0 : $Base
-  dealloc_stack %1#0 : $*@local_storage Optional<Base>
+  dealloc_stack %1 : $*Optional<Base>
   return %16 : $Optional<Base>
 
 bb3:
@@ -536,25 +536,25 @@ bb0(%0 : $Base):
   %1 = alloc_stack $Optional<Base>
   debug_value %0 : $Base
   %3 = alloc_stack $Optional<Base>
-  inject_enum_addr %3#1 : $*Optional<Base>, #Optional.None!enumelt
+  inject_enum_addr %3 : $*Optional<Base>, #Optional.None!enumelt
   %5 = tuple ()
-  %6 = load %3#1 : $*Optional<Base>
-  store %6 to %1#1 : $*Optional<Base>
-  dealloc_stack %3#0 : $*@local_storage Optional<Base>
+  %6 = load %3 : $*Optional<Base>
+  store %6 to %1 : $*Optional<Base>
+  dealloc_stack %3 : $*Optional<Base>
   %9 = class_method %0 : $Base, #Base.boo2!1 : Base -> () throws -> Base? , $@convention(method) (@guaranteed Base) -> (@owned Optional<Base>, @error ErrorType)
   try_apply %9(%0) : $@convention(method) (@guaranteed Base) -> (@owned Optional<Base>, @error ErrorType), normal bb1, error bb4
 
 bb1(%11 : $Optional<Base>):
-  store %11 to %1#1 : $*Optional<Base>
+  store %11 to %1 : $*Optional<Base>
   release_value %6 : $Optional<Base>
   br bb2
 
 bb2:
-  %15 = load %1#1 : $*Optional<Base>
+  %15 = load %1 : $*Optional<Base>
   retain_value %15 : $Optional<Base>
-  destroy_addr %1#1 : $*Optional<Base>
+  destroy_addr %1 : $*Optional<Base>
   strong_release %0 : $Base
-  dealloc_stack %1#0 : $*@local_storage Optional<Base>
+  dealloc_stack %1 : $*Optional<Base>
   return %15 : $Optional<Base>
 
 bb3:
@@ -634,18 +634,18 @@ bb0:
   debug_value %3 : $CP2
   %5 = integer_literal $Builtin.Int32, 0
   %6 = struct $Int32 (%5 : $Builtin.Int32)
-  store %6 to %0#1 : $*Int32
+  store %6 to %0 : $*Int32
   %8 = class_method %3 : $CP2, #CP2.foo!1 : CP2 -> () throws -> Int32 , $@convention(method) (@guaranteed CP2) -> (Int32, @error ErrorType)
   try_apply %8(%3) : $@convention(method) (@guaranteed CP2) -> (Int32, @error ErrorType), normal bb1, error bb4
 
 bb1(%10 : $Int32):
-  store %10 to %0#1 : $*Int32
+  store %10 to %0 : $*Int32
   br bb2
 
 bb2:
-  %13 = load %0#1 : $*Int32
+  %13 = load %0 : $*Int32
   strong_release %3 : $CP2
-  dealloc_stack %0#0 : $*@local_storage Int32
+  dealloc_stack %0 : $*Int32
   return %13 : $Int32
 
 bb3:
@@ -666,7 +666,7 @@ sil @_TF16devirt_try_apply5test5FT_Vs5Int32 : $@convention(thin) () -> Int32 {
 bb0:
   %0 = alloc_stack $Int32
   %1 = alloc_stack $P
-  %2 = init_existential_addr %1#1 : $*P, $CP1
+  %2 = init_existential_addr %1 : $*P, $CP1
 
   %3 = function_ref @_TFC16devirt_try_apply3CP1CfMS0_FT_S0_ : $@convention(thin) (@thick CP1.Type) -> @owned CP1
   %4 = metatype $@thick CP1.Type
@@ -674,20 +674,20 @@ bb0:
   store %5 to %2 : $*CP1
   %7 = integer_literal $Builtin.Int32, 0
   %8 = struct $Int32 (%7 : $Builtin.Int32)
-  store %8 to %0#1 : $*Int32
-  %10 = open_existential_addr %1#1 : $*P to $*@opened("3F4928FC-364E-11E5-9488-B8E856428C60") P
+  store %8 to %0 : $*Int32
+  %10 = open_existential_addr %1 : $*P to $*@opened("3F4928FC-364E-11E5-9488-B8E856428C60") P
   %11 = witness_method $@opened("3F4928FC-364E-11E5-9488-B8E856428C60") P, #P.foo!1, %10 : $*@opened("3F4928FC-364E-11E5-9488-B8E856428C60") P : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> (Int32, @error ErrorType)
   try_apply %11<@opened("3F4928FC-364E-11E5-9488-B8E856428C60") P>(%10) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> (Int32, @error ErrorType), normal bb1, error bb4
 
 bb1(%13 : $Int32):
-  store %13 to %0#1 : $*Int32
+  store %13 to %0 : $*Int32
   br bb2
 
 bb2:
-  %16 = load %0#1 : $*Int32
-  destroy_addr %1#1 : $*P
-  dealloc_stack %1#0 : $*@local_storage P
-  dealloc_stack %0#0 : $*@local_storage Int32
+  %16 = load %0 : $*Int32
+  destroy_addr %1 : $*P
+  dealloc_stack %1 : $*P
+  dealloc_stack %0 : $*Int32
   return %16 : $Int32
 
 bb3:
@@ -724,18 +724,18 @@ bb0:
   %5 = integer_literal $Builtin.Int32, 0
   %6 = struct $Int32 (%5 : $Builtin.Int32)
   %7 = enum $Optional<Int32>, #Optional.Some!enumelt.1, %6 : $Int32
-  store %7 to %0#1 : $*Optional<Int32>
+  store %7 to %0 : $*Optional<Int32>
   %9 = class_method %3 : $Derived1, #Derived1.foo!1 : Derived1 -> () throws -> Int32? , $@convention(method) (@guaranteed Derived1) -> (Optional<Int32>, @error ErrorType)
   try_apply %9(%3) : $@convention(method) (@guaranteed Derived1) -> (Optional<Int32>, @error ErrorType), normal bb1, error bb4
 
 bb1(%11 : $Optional<Int32>):
-  store %11 to %0#1 : $*Optional<Int32>
+  store %11 to %0 : $*Optional<Int32>
   br bb2
 
 bb2:
-  %14 = load %0#1 : $*Optional<Int32>
+  %14 = load %0 : $*Optional<Int32>
   strong_release %3 : $Derived1
-  dealloc_stack %0#0 : $*@local_storage Optional<Int32>
+  dealloc_stack %0 : $*Optional<Int32>
   return %14 : $Optional<Int32>
 
 bb3:
@@ -772,18 +772,18 @@ bb0:
   %1 = alloc_ref $CP2
   %5 = integer_literal $Builtin.Int32, 0
   %6 = struct $Int32 (%5 : $Builtin.Int32)
-  store %6 to %0#1 : $*Int32
+  store %6 to %0 : $*Int32
   %8 = class_method %1 : $CP2, #CP2.foo!1 : CP2 -> () throws -> Int32 , $@convention(method) (@guaranteed CP2) -> (Int32, @error ErrorType)
   try_apply %8(%1) : $@convention(method) (@guaranteed CP2) -> (Int32, @error ErrorType), normal bb1, error bb4
 
 bb1(%10 : $Int32):
-  store %10 to %0#1 : $*Int32
+  store %10 to %0 : $*Int32
   br bb2
 
 bb2:
-  %13 = load %0#1 : $*Int32
+  %13 = load %0 : $*Int32
   strong_release %1 : $CP2
-  dealloc_stack %0#0 : $*@local_storage Int32
+  dealloc_stack %0 : $*Int32
   return %13 : $Int32
 
 bb3:

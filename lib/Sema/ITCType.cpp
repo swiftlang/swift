@@ -22,9 +22,9 @@
 #include "swift/AST/Decl.h"
 using namespace swift;
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Type resolution.
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 bool IterativeTypeChecker::isResolveTypeReprSatisfied(
        std::tuple<TypeRepr *, DeclContext *, unsigned> payload) {
   auto typeRepr = std::get<0>(payload);

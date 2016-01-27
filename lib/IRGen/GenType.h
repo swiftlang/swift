@@ -204,8 +204,8 @@ private:
     friend void TypeConverter::popGenericContext(CanGenericSignature signature);
     
 #ifndef NDEBUG
-    friend CanType TypeConverter::getTypeThatLoweredTo(llvm::Type *) const;
-    friend bool TypeConverter::isExemplarArchetype(ArchetypeType *) const;
+    friend CanType TypeConverter::getTypeThatLoweredTo(llvm::Type *t) const;
+    friend bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const;
 #endif
   };
   Types_t Types;
@@ -259,7 +259,7 @@ void emitInitializeArrayBackToFront(IRGenFunction &IGF,
 /// type of its field, which it is guaranteed to have identical layout to.
 SILType getSingletonAggregateFieldType(IRGenModule &IGM,
                                        SILType t,
-                                       ResilienceScope scope);
+                                       ResilienceExpansion expansion);
 
 } // end namespace irgen
 } // end namespace swift

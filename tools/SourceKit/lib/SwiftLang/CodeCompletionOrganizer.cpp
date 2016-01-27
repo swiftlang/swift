@@ -75,9 +75,9 @@ struct CodeCompletion::Group : public Item {
   }
 };
 
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 // extendCompletions
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 
 std::vector<Completion *> SourceKit::CodeCompletion::extendCompletions(
     ArrayRef<SwiftResult *> swiftResults, CompletionSink &sink,
@@ -181,9 +181,9 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
   return changed;
 }
 
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 // CodeCompletionOrganizer::Impl declaration
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 
 class CodeCompletionOrganizer::Impl {
   std::unique_ptr<Group> rootGroup;
@@ -197,6 +197,7 @@ public:
 
   void addCompletionsWithFilter(ArrayRef<Completion *> completions,
                                 StringRef filterText, Options options,
+                                const FilterRules &rules,
                                 Completion *&exactMatch);
 
   void sort(Options options);
@@ -243,9 +244,9 @@ public:
   }
 };
 
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 // CodeCompletionOrganizer implementation
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 
 CodeCompletionOrganizer::CodeCompletionOrganizer(const Options &options,
                                                  CompletionKind kind)
@@ -271,8 +272,9 @@ void CodeCompletionOrganizer::preSortCompletions(
 
 void CodeCompletionOrganizer::addCompletionsWithFilter(
     ArrayRef<Completion *> completions, StringRef filterText,
-    Completion *&exactMatch) {
-  impl.addCompletionsWithFilter(completions, filterText, options, exactMatch);
+    const FilterRules &rules, Completion *&exactMatch) {
+  impl.addCompletionsWithFilter(completions, filterText, options, rules,
+                                exactMatch);
 }
 
 void CodeCompletionOrganizer::groupAndSort(const Options &options) {
@@ -288,9 +290,9 @@ CodeCompletionViewRef CodeCompletionOrganizer::takeResultsView() {
   return impl.takeView();
 }
 
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 // ImportDepth
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 
 ImportDepth::ImportDepth(ASTContext &context, CompilerInvocation &invocation) {
   llvm::DenseSet<Module *> seen;
@@ -352,9 +354,9 @@ ImportDepth::ImportDepth(ASTContext &context, CompilerInvocation &invocation) {
   }
 }
 
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 // CodeCompletionOrganizer::Impl utilities
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 
 static StringRef copyString(llvm::BumpPtrAllocator &allocator, StringRef str) {
   char *newStr = allocator.Allocate<char>(str.size());
@@ -377,9 +379,9 @@ static std::unique_ptr<Result> make_result(Completion *result) {
 }
 
 
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 // CodeCompletionOrganizer::Impl implementation
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 
 CodeCompletionOrganizer::Impl::Impl(CompletionKind kind)
     : completionKind(kind) {
@@ -394,6 +396,7 @@ static bool matchesExpectedStyle(Completion *completion, NameStyle style) {
   case CodeCompletionDeclKind::Enum:
   case CodeCompletionDeclKind::Protocol:
   case CodeCompletionDeclKind::TypeAlias:
+  case CodeCompletionDeclKind::AssociatedType:
     return style.possiblyUpperCamelCase();
 
   case CodeCompletionDeclKind::StaticMethod:
@@ -424,9 +427,56 @@ static bool isHighPriorityKeyword(CodeCompletionKeywordKind kind) {
   }
 }
 
+bool FilterRules::hideCompletion(Completion *completion) const {
+
+  if (!completion->getName().empty()) {
+    auto I = hideByName.find(completion->getName());
+    if (I != hideByName.end())
+      return I->getValue();
+  }
+
+  switch (completion->getKind()) {
+  case Completion::Declaration:
+    break;
+  case Completion::Keyword: {
+    auto I = hideKeyword.find(completion->getKeywordKind());
+    if (I != hideKeyword.end())
+      return I->second;
+    if (hideAllKeywords)
+      return true;
+    break;
+  }
+  case Completion::Pattern: {
+    if (completion->hasCustomKind()) {
+      // FIXME: individual custom completions
+      if (hideCustomCompletions)
+        return true;
+    }
+    break;
+  }
+  case Completion::Literal: {
+    auto I = hideValueLiteral.find(completion->getLiteralKind());
+    if (I != hideValueLiteral.end())
+      return I->second;
+    if (hideAllValueLiterals)
+      return true;
+    break;
+  }
+  }
+
+  if (!completion->getModuleName().empty()) {
+    // FIXME: try each submodule chain starting from the most specific.
+    auto M = hideModule.find(completion->getModuleName());
+    if (M != hideModule.end())
+      return M->getValue();
+  }
+
+  return hideAll;
+}
+
 void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
     ArrayRef<Completion *> completions, StringRef filterText, Options options,
-    Completion *&exactMatch) {
+    const FilterRules &rules, Completion *&exactMatch) {
   assert(rootGroup);
 
   auto &contents = rootGroup->contents;
@@ -438,6 +488,9 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
         completionKind != CompletionKind::TypeSimpleBeginning &&
         completionKind != CompletionKind::PostfixExpr;
     for (Completion *completion : completions) {
+      if (rules.hideCompletion(completion))
+        continue;
+
       NameStyle style(completion->getName());
       bool hideUnderscore = options.hideUnderscores && style.leadingUnderscores;
       if (hideUnderscore && options.reallyHideAllUnderscores)
@@ -487,6 +540,9 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
   FuzzyStringMatcher pattern(filterText);
   pattern.normalize = true;
   for (Completion *completion : completions) {
+    if (rules.hideCompletion(completion))
+      continue;
+
     bool match = false;
     if (options.fuzzyMatching && filterText.size() >= options.minFuzzyLength) {
       match = pattern.matchesCandidate(completion->getName());
@@ -789,9 +845,9 @@ void CodeCompletionOrganizer::Impl::groupStemsRecursive(
   group->contents = std::move(newContents);
 }
 
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 // CodeCompletionView
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 
 static bool walkRecursive(CodeCompletionView::Walker &walker, const Item *item) {
   if (auto *result = dyn_cast<Result>(item))
@@ -843,9 +899,9 @@ bool LimitedResultView::walk(CodeCompletionView::Walker &walker) const {
   return true;
 }
 
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 // CompletionBuilder
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 
 void CompletionBuilder::getFilterName(CodeCompletionString *str,
                                       raw_ostream &OS) {
@@ -872,6 +928,7 @@ void CompletionBuilder::getFilterName(CodeCompletionString *str,
       bool shouldPrint = !C.isAnnotation();
       switch (C.getKind()) {
       case ChunkKind::TypeAnnotation:
+      case ChunkKind::CallParameterInternalName:
       case ChunkKind::CallParameterClosureType:
       case ChunkKind::CallParameterType:
       case ChunkKind::DeclAttrParamEqual:
@@ -994,9 +1051,9 @@ Completion *CompletionBuilder::finish() {
   return result;
 }
 
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 // NameStyle
-//==========================================================================//
+//===----------------------------------------------------------------------===//
 
 NameStyle::NameStyle(StringRef name)
     : leadingUnderscores(0), trailingUnderscores(0) {

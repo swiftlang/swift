@@ -20,7 +20,7 @@ extension P1 {
 }
 
 protocol P2 {
-  typealias AssocP2 : P1
+  associatedtype AssocP2 : P1
 
   func reqP2a() -> AssocP2
 }
@@ -36,7 +36,7 @@ extension P2 {
 }
 
 protocol P3 {
-  typealias AssocP3 : P2
+  associatedtype AssocP3 : P2
 
   func reqP3a() -> AssocP3
 }
@@ -48,7 +48,7 @@ extension P3 {
 }
 
 protocol P4 {
-  typealias AssocP4
+  associatedtype AssocP4
 
   func reqP4a() -> AssocP4
 }
@@ -71,7 +71,7 @@ extension P2 {
 
 // Use of 'Self' as a return type within a protocol extension.
 protocol SelfP1 {
-  typealias AssocType
+  associatedtype AssocType
 }
 
 protocol SelfP2 {
@@ -213,9 +213,9 @@ extension P4 where Self.AssocP4 == Bool {
 }
 
 func testP4(s4a: S4a, s4b: S4b, s4c: S4c, s4d: S4d) {
-  s4a.extP4a() // expected-error{{ambiguous reference to member 'extP4a'}}
+  s4a.extP4a() // expected-error{{ambiguous reference to member 'extP4a()'}}
   s4b.extP4a() // ok
-  s4c.extP4a() // expected-error{{ambiguous reference to member 'extP4a'}}
+  s4c.extP4a() // expected-error{{ambiguous reference to member 'extP4a()'}}
   s4c.extP4Int() // okay
   var b1 = s4d.extP4a() // okay, "Bool" version
   b1 = true // checks type above
@@ -269,7 +269,7 @@ extension S6d : P5 {
 }
 
 protocol P7 {
-  typealias P7Assoc
+  associatedtype P7Assoc
 
   func getP7Assoc() -> P7Assoc
 }
@@ -277,7 +277,7 @@ protocol P7 {
 struct P7FromP8<T> { }
 
 protocol P8 {
-  typealias P8Assoc
+  associatedtype P8Assoc
   func getP8Assoc() -> P8Assoc
 }
 
@@ -337,17 +337,17 @@ struct SConforms2b : PConforms2 {
 protocol _MySeq { }
 
 protocol MySeq : _MySeq {
-  typealias Generator : GeneratorType
+  associatedtype Generator : GeneratorType
   func myGenerate() -> Generator
 }
 
 protocol _MyCollection : _MySeq {
-  typealias Index : ForwardIndexType
+  associatedtype Index : ForwardIndexType
 
   var myStartIndex : Index { get }
   var myEndIndex : Index { get }
 
-  typealias _Element
+  associatedtype _Element
   subscript (i: Index) -> _Element { get }
 }
 
@@ -465,7 +465,7 @@ extension PConforms7 {
 struct SConforms7a : PConforms7 { }
 
 protocol PConforms8 {
-  typealias Assoc
+  associatedtype Assoc
 
   func method() -> Assoc
   var property: Assoc { get }
@@ -510,7 +510,7 @@ extension String : DefaultInitializable { }
 extension Int : DefaultInitializable { }
 
 protocol PConforms9 {
-  typealias Assoc : DefaultInitializable // expected-note{{protocol requires nested type 'Assoc'}}
+  associatedtype Assoc : DefaultInitializable // expected-note{{protocol requires nested type 'Assoc'}}
 
   func method() -> Assoc
   var property: Assoc { get }
@@ -571,7 +571,7 @@ struct SConforms11 : PConforms10, PConforms11 {}
 
 // Basic support
 protocol PTypeAlias1 {
-  typealias AssocType1
+  associatedtype AssocType1
 }
 
 extension PTypeAlias1 {
@@ -605,7 +605,7 @@ extension PTypeAliasSuper2 {
 }
 
 protocol PTypeAliasSub2 : PTypeAliasSuper2 {
-  typealias Helper
+  associatedtype Helper
   func foo() -> Helper
 }
 
@@ -688,7 +688,7 @@ func testPInherit(si2 : SInherit2, si3: SInherit3, si4: SInherit4) {
 }
 
 protocol PConstrained1 {
-  typealias AssocTypePC1
+  associatedtype AssocTypePC1
 }
 
 extension PConstrained1 {
@@ -731,7 +731,7 @@ func testPConstrained1(sc1: SConstrained1, sc2: SConstrained2,
 }
 
 protocol PConstrained2 {
-  typealias AssocTypePC2
+  associatedtype AssocTypePC2
 }
 
 protocol PConstrained3 : PConstrained2 {
@@ -791,7 +791,7 @@ extension PConstrained4 where Self : Superclass {
 
 protocol PConstrained5 { }
 protocol PConstrained6 {
-  typealias Assoc
+  associatedtype Assoc
 
   func foo()
 }

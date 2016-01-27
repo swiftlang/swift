@@ -1,4 +1,4 @@
-//===-- SpeculativeDevirtualizer.cpp -- Speculatively devirtualize calls --===//
+//===--- SpeculativeDevirtualizer.cpp - Speculatively devirtualize calls --===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "sil-speculative-devirtualizer-pass"
+#define DEBUG_TYPE "sil-speculative-devirtualizer"
 #include "swift/Basic/DemangleWrappers.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILArgument.h"
@@ -23,6 +23,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -306,8 +307,8 @@ static bool tryToSpeculateTarget(FullApplySite AI,
   // Strip any upcasts off of our 'self' value, potentially leaving us
   // with a value whose type is closer (in the class hierarchy) to the
   // actual dynamic type.
-  auto SubTypeValue = CMI->getOperand().stripUpCasts();
-  SILType SubType = SubTypeValue.getType();
+  auto SubTypeValue = stripUpCasts(CMI->getOperand());
+  SILType SubType = SubTypeValue->getType();
 
   // Bail if any generic types parameters of the class instance type are
   // unbound.
@@ -377,12 +378,15 @@ static bool tryToSpeculateTarget(FullApplySite AI,
     Subs.erase(RemovedIt, Subs.end());
   }
 
+  // Number of subclasses which cannot be handled by checked_cast_br checks.
+  int NotHandledSubsNum = 0;
   if (Subs.size() > MaxNumSpeculativeTargets) {
     DEBUG(llvm::dbgs() << "Class " << CD->getName() << " has too many ("
                        << Subs.size() << ") subclasses. Performing speculative "
                          "devirtualization only for the first "
                        << MaxNumSpeculativeTargets << " of them.\n");
 
+    NotHandledSubsNum += (Subs.size() - MaxNumSpeculativeTargets);
     Subs.erase(&Subs[MaxNumSpeculativeTargets], Subs.end());
   }
 
@@ -433,9 +437,6 @@ static bool tryToSpeculateTarget(FullApplySite AI,
 
   // TODO: The ordering of checks may benefit from using a PGO, because
   // the most probable alternatives could be checked first.
-
-  // Number of subclasses which cannot be handled by checked_cast_br checks.
-  int NotHandledSubsNum = 0;
 
   for (auto S : Subs) {
     DEBUG(llvm::dbgs() << "Inserting a speculative call for class "

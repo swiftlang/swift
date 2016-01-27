@@ -64,7 +64,7 @@ class Object(object):
     def __init__(self, obj):
         if isinstance(obj, Object):
             self._obj = conf.lib.sourcekitd_request_retain(obj)
-        elif isinstance(obj, (int,long,bool)):
+        elif isinstance(obj, (int, long, bool)):
             self._obj = conf.lib.sourcekitd_request_int64_create(obj)
         elif isinstance(obj, str):
             self._obj = conf.lib.sourcekitd_request_string_create(obj)
@@ -74,10 +74,10 @@ class Object(object):
             self._obj = conf.lib.sourcekitd_request_dictionary_create(
                 POINTER(c_void_p)(), POINTER(c_void_p)(), 0)
             self._as_parameter_ = self._obj
-            for k,v in obj.iteritems():
+            for k, v in obj.iteritems():
                 conf.lib.sourcekitd_request_dictionary_set_value(self,
                     UIdent(k), Object(v))
-        elif isinstance(obj, (list,tuple)):
+        elif isinstance(obj, (list, tuple)):
             self._obj = conf.lib.sourcekitd_request_array_create(
                 POINTER(c_void_p)(), 0)
             self._as_parameter_ = self._obj
@@ -182,8 +182,8 @@ class ErrorKind(object):
         """Get the enumeration name of this error kind."""
         if self._name_map is None:
             self._name_map = {}
-            for key,value in ErrorKind.__dict__.items():
-                if isinstance(value,ErrorKind):
+            for key, value in ErrorKind.__dict__.items():
+                if isinstance(value, ErrorKind):
                     self._name_map[value] = key
         return self._name_map[self]
 
@@ -226,7 +226,8 @@ class Variant(Structure):
     def to_python_array(self):
         def applier(index, value, arr):
             arr.append(value.to_python_object())
-            return 1 # continue
+            # continue
+            return 1
         arr = []
         conf.lib.sourcekitd_variant_array_apply_f(self, callbacks['array_applier'](applier), arr)
         return arr
@@ -234,7 +235,8 @@ class Variant(Structure):
     def to_python_dictionary(self):
         def applier(cobj, value, d):
             d[str(UIdent(cobj))] = value.to_python_object()
-            return 1 # continue
+            # continue
+            return 1
         d = {}
         conf.lib.sourcekitd_variant_dictionary_apply_f(self, callbacks['dictionary_applier'](applier), d)
         return d
@@ -265,8 +267,8 @@ class VariantType(object):
         """Get the enumeration name of this variant type."""
         if self._name_map is None:
             self._name_map = {}
-            for key,value in VariantType.__dict__.items():
-                if isinstance(value,VariantType):
+            for key, value in VariantType.__dict__.items():
+                if isinstance(value, VariantType):
                     self._name_map[value] = key
         return self._name_map[self]
 
@@ -295,7 +297,9 @@ callbacks['dictionary_applier'] = CFUNCTYPE(c_int, c_object_p, Variant, py_objec
 
 # Functions strictly alphabetical order.
 functionList = [
-  ("sourcekitd_cancel_request",
+  # FIXME: Fix PEP8 violation "continuation line under-indented for hanging
+  #        indent" (E121) and remove "noqa" marker.
+  ("sourcekitd_cancel_request",  # noqa
   	[c_void_p]),
 
   ("sourcekitd_initialize",
@@ -398,11 +402,11 @@ functionList = [
   	[Response],
   	c_bool),
 
-#  ("sourcekitd_send_request",
+  #  ("sourcekitd_send_request",
 
-   ("sourcekitd_send_request_sync",
-    [Object],
-    c_object_p),
+  ("sourcekitd_send_request_sync",
+  	[Object],
+  	c_object_p),
 
   # ("sourcekitd_set_interrupted_connection_handler",
 
@@ -426,8 +430,8 @@ functionList = [
   	c_char_p),
 
   ("sourcekitd_variant_array_apply_f",
-    [Variant, callbacks['array_applier'], py_object],
-    c_bool),
+  	[Variant, callbacks['array_applier'], py_object],
+  	c_bool),
 
 
   ("sourcekitd_variant_array_get_bool",
@@ -459,8 +463,8 @@ functionList = [
   	c_bool),
 
   ("sourcekitd_variant_dictionary_apply_f",
-    [Variant, callbacks['dictionary_applier'], py_object],
-    c_bool),
+  	[Variant, callbacks['dictionary_applier'], py_object],
+  	c_bool),
 
   ("sourcekitd_variant_dictionary_get_bool",
   	[Variant, UIdent],
@@ -469,19 +473,19 @@ functionList = [
   ("sourcekitd_variant_dictionary_get_int64",
   	[Variant, UIdent],
   	c_int64),
-  
+
   ("sourcekitd_variant_dictionary_get_string",
   	[Variant, UIdent],
   	c_char_p),
-  
+
   ("sourcekitd_variant_dictionary_get_value",
   	[Variant, UIdent],
   	Variant),
-  
+
   ("sourcekitd_variant_dictionary_get_uid",
   	[Variant, UIdent],
   	c_object_p),
-  
+
   ("sourcekitd_variant_get_type",
   	[Variant],
   	VariantType.from_id),
@@ -501,7 +505,7 @@ functionList = [
   ("sourcekitd_variant_uid_get_value",
   	[Variant],
   	c_object_p),
-  ]
+]
 
 
 class LibsourcekitdError(Exception):

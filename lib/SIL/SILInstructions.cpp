@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the high-level SILInstruction classes used for  SIL code.
+// This file defines the high-level SILInstruction classes used for SIL code.
 //
 //===----------------------------------------------------------------------===//
 
@@ -35,16 +35,6 @@ using namespace Lowering;
 // SILInstruction Subclasses
 //===----------------------------------------------------------------------===//
 
-// alloc_stack always returns two results: Builtin.RawPointer & LValue[EltTy]
-static SILTypeList *getAllocStackType(SILType eltTy, SILFunction &F) {
-  SILType resTys[] = {
-    eltTy.getLocalStorageType(),
-    eltTy.getAddressType()
-  };
-
-  return F.getModule().getSILTypeList(resTys);
-}
-
 template <typename INST>
 static void *allocateDebugVarCarryingInst(SILModule &M, SILDebugVariable Var) {
   return M.allocateInst(sizeof(INST) + Var.Name.size(), alignof(INST));
@@ -65,7 +55,7 @@ StringRef TailAllocatedDebugVariable::getName(const char *buf) const {
 AllocStackInst::AllocStackInst(SILDebugLocation *Loc, SILType elementType,
                                SILFunction &F, SILDebugVariable Var)
     : AllocationInst(ValueKind::AllocStackInst, Loc,
-                     getAllocStackType(elementType, F)),
+                     elementType.getAddressType()),
       VarInfo(Var, reinterpret_cast<char *>(this + 1)) {}
 
 AllocStackInst *AllocStackInst::create(SILDebugLocation *Loc,
@@ -87,23 +77,11 @@ AllocRefInst::AllocRefInst(SILDebugLocation *Loc, SILType elementType,
     : AllocationInst(ValueKind::AllocRefInst, Loc, elementType),
       StackPromotable(canBeOnStack), ObjC(objc) {}
 
-// alloc_box returns two results: Builtin.NativeObject & LValue[EltTy]
-static SILTypeList *getAllocBoxType(SILType EltTy, SILFunction &F) {
-  SILType boxTy = SILType::getPrimitiveObjectType(
-                                   SILBoxType::get(EltTy.getSwiftRValueType()));
-
-  SILType ResTys[] = {
-    boxTy,
-    EltTy.getAddressType()
-  };
-
-  return F.getModule().getSILTypeList(ResTys);
-}
-
 AllocBoxInst::AllocBoxInst(SILDebugLocation *Loc, SILType ElementType,
                            SILFunction &F, SILDebugVariable Var)
     : AllocationInst(ValueKind::AllocBoxInst, Loc,
-                     getAllocBoxType(ElementType, F)),
+                     SILType::getPrimitiveObjectType(
+                       SILBoxType::get(ElementType.getSwiftRValueType()))),
       VarInfo(Var, reinterpret_cast<char *>(this + 1)) {}
 
 AllocBoxInst *AllocBoxInst::create(SILDebugLocation *Loc, SILType ElementType,
@@ -149,28 +127,17 @@ VarDecl *DebugValueAddrInst::getDecl() const {
   return getLoc().getAsASTNode<VarDecl>();
 }
 
-static SILTypeList *getAllocExistentialBoxType(SILType ExistTy,
-                                               SILType ConcreteTy,
-                                               SILFunction &F) {
-  SILType Tys[] = {
-    ExistTy.getObjectType(),
-    ConcreteTy.getAddressType(),
-  };
-  return F.getModule().getSILTypeList(Tys);
-}
-
 AllocExistentialBoxInst::AllocExistentialBoxInst(
     SILDebugLocation *Loc, SILType ExistentialType, CanType ConcreteType,
-    SILType ConcreteLoweredType, ArrayRef<ProtocolConformance *> Conformances,
-    SILFunction *Parent)
+    ArrayRef<ProtocolConformanceRef> Conformances, SILFunction *Parent)
     : AllocationInst(ValueKind::AllocExistentialBoxInst, Loc,
-                     getAllocExistentialBoxType(ExistentialType,
-                                                ConcreteLoweredType, *Parent)),
+                     ExistentialType.getObjectType()),
       ConcreteType(ConcreteType), Conformances(Conformances) {}
 
 static void declareWitnessTable(SILModule &Mod,
-                                ProtocolConformance *C) {
-  if (!C) return;
+                                ProtocolConformanceRef conformanceRef) {
+  if (conformanceRef.isAbstract()) return;
+  auto C = conformanceRef.getConcrete();
   if (!Mod.lookUpWitnessTable(C, false).first)
     Mod.createWitnessTableDeclaration(C,
         TypeConverter::getLinkageForProtocolConformance(
@@ -180,17 +147,16 @@ static void declareWitnessTable(SILModule &Mod,
 
 AllocExistentialBoxInst *AllocExistentialBoxInst::create(
     SILDebugLocation *Loc, SILType ExistentialType, CanType ConcreteType,
-    SILType ConcreteLoweredType, ArrayRef<ProtocolConformance *> Conformances,
+    ArrayRef<ProtocolConformanceRef> Conformances,
     SILFunction *F) {
   SILModule &Mod = F->getModule();
   void *Buffer = Mod.allocateInst(sizeof(AllocExistentialBoxInst),
                                   alignof(AllocExistentialBoxInst));
-  for (ProtocolConformance *C : Conformances)
+  for (ProtocolConformanceRef C : Conformances)
     declareWitnessTable(Mod, C);
   return ::new (Buffer) AllocExistentialBoxInst(Loc,
                                                 ExistentialType,
                                                 ConcreteType,
-                                                ConcreteLoweredType,
                                                 Conformances, F);
 }
 
@@ -241,7 +207,7 @@ ApplyInst *ApplyInst::create(SILDebugLocation *Loc, SILValue Callee,
 bool swift::doesApplyCalleeHaveSemantics(SILValue callee, StringRef semantics) {
   if (auto *FRI = dyn_cast<FunctionRefInst>(callee))
     if (auto *F = FRI->getReferencedFunction())
-      return F->hasSemanticsString(semantics);
+      return F->hasSemanticsAttr(semantics);
   return false;
 }
 
@@ -310,9 +276,18 @@ void FunctionRefInst::dropReferencedFunction() {
   Function = nullptr;
 }
 
-GlobalAddrInst::GlobalAddrInst(SILDebugLocation *Loc, SILGlobalVariable *Global)
+AllocGlobalInst::AllocGlobalInst(SILDebugLocation *Loc,
+                                 SILGlobalVariable *Global)
+    : SILInstruction(ValueKind::AllocGlobalInst, Loc),
+      Global(Global) {}
+
+AllocGlobalInst::AllocGlobalInst(SILDebugLocation *Loc)
+    : SILInstruction(ValueKind::AllocGlobalInst, Loc) {}
+
+GlobalAddrInst::GlobalAddrInst(SILDebugLocation *Loc,
+                               SILGlobalVariable *Global)
     : LiteralInst(ValueKind::GlobalAddrInst, Loc,
-                  Global->getLoweredType().getAddressType()),
+              Global->getLoweredType().getAddressType()),
       Global(Global) {}
 
 GlobalAddrInst::GlobalAddrInst(SILDebugLocation *Loc, SILType Ty)
@@ -482,7 +457,7 @@ static SILType getPinResultType(SILType operandType) {
 }
 
 StrongPinInst::StrongPinInst(SILDebugLocation *Loc, SILValue operand)
-    : UnaryInstructionBase(Loc, operand, getPinResultType(operand.getType())) {}
+    : UnaryInstructionBase(Loc, operand, getPinResultType(operand->getType())) {}
 
 CopyAddrInst::CopyAddrInst(SILDebugLocation *Loc, SILValue SrcLValue,
                            SILValue DestLValue, IsTake_t isTakeOfSrc,
@@ -544,13 +519,13 @@ bool TupleExtractInst::isTrivialEltOfOneRCIDTuple() const {
 
   // If the elt we are extracting is trivial, we cannot have any non trivial
   // fields.
-  if (getOperand().getType().isTrivial(Mod))
+  if (getOperand()->getType().isTrivial(Mod))
     return false;
 
   // Ok, now we know that our tuple has non-trivial fields. Make sure that our
   // parent tuple has only one non-trivial field.
   bool FoundNonTrivialField = false;
-  SILType OpTy = getOperand().getType();
+  SILType OpTy = getOperand()->getType();
   unsigned FieldNo = getFieldNo();
 
   // For each element index of the tuple...
@@ -592,7 +567,7 @@ bool TupleExtractInst::isEltOnlyNonTrivialElt() const {
 
   // Ok, we know that the elt we are extracting is non-trivial. Make sure that
   // we have no other non-trivial elts.
-  SILType OpTy = getOperand().getType();
+  SILType OpTy = getOperand()->getType();
   unsigned FieldNo = getFieldNo();
 
   // For each element index of the tuple...
@@ -623,7 +598,7 @@ bool StructExtractInst::isTrivialFieldOfOneRCIDStruct() const {
   if (!getType().isTrivial(Mod))
     return false;
 
-  SILType StructTy = getOperand().getType();
+  SILType StructTy = getOperand()->getType();
 
   // If the elt we are extracting is trivial, we cannot have any non trivial
   // fields.
@@ -674,7 +649,7 @@ bool StructExtractInst::isFieldOnlyNonTrivialField() const {
   if (getType().isTrivial(Mod))
     return false;
 
-  SILType StructTy = getOperand().getType();
+  SILType StructTy = getOperand()->getType();
 
   // Ok, we are visiting a non-trivial field. Then for every stored field...
   for (VarDecl *D : getStructDecl()->getStoredProperties()) {
@@ -774,8 +749,13 @@ OperandValueArrayRef CondBranchInst::getFalseArgs() const {
   return Operands.asValueArray().slice(1 + NumTrueArgs, NumFalseArgs);
 }
 
-SILValue
-CondBranchInst::getArgForDestBB(SILBasicBlock *DestBB, SILArgument *A) {
+SILValue CondBranchInst::getArgForDestBB(const SILBasicBlock *DestBB,
+                                         const SILArgument *Arg) const {
+  return getArgForDestBB(DestBB, Arg->getIndex());
+}
+
+SILValue CondBranchInst::getArgForDestBB(const SILBasicBlock *DestBB,
+                                         unsigned ArgIndex) const {
   // If TrueBB and FalseBB equal, we cannot find an arg for this DestBB so
   // return an empty SILValue.
   if (getTrueBB() == getFalseBB()) {
@@ -783,14 +763,12 @@ CondBranchInst::getArgForDestBB(SILBasicBlock *DestBB, SILArgument *A) {
     return SILValue();
   }
 
-  unsigned i = A->getIndex();
-
   if (DestBB == getTrueBB())
-    return Operands[1 + i].get();
+    return Operands[1 + ArgIndex].get();
 
   assert(DestBB == getFalseBB()
          && "By process of elimination BB must be false BB");
-  return Operands[1 + NumTrueArgs + i].get();
+  return Operands[1 + NumTrueArgs + ArgIndex].get();
 }
 
 ArrayRef<Operand> CondBranchInst::getTrueOperands() const {
@@ -857,7 +835,7 @@ SwitchValueInst::SwitchValueInst(SILDebugLocation *Loc, SILValue Operand,
   auto *succs = getSuccessorBuf();
   unsigned OperandBitWidth = 0;
 
-  if (auto OperandTy = Operand.getType().getAs<BuiltinIntegerType>()) {
+  if (auto OperandTy = Operand->getType().getAs<BuiltinIntegerType>()) {
     OperandBitWidth = OperandTy->getGreatestWidth();
   }
 
@@ -928,7 +906,7 @@ SelectValueInst::SelectValueInst(SILDebugLocation *Loc, SILValue Operand,
 
   unsigned OperandBitWidth = 0;
 
-  if (auto OperandTy = Operand.getType().getAs<BuiltinIntegerType>()) {
+  if (auto OperandTy = Operand->getType().getAs<BuiltinIntegerType>()) {
     OperandBitWidth = OperandTy->getGreatestWidth();
   }
 
@@ -1051,13 +1029,15 @@ namespace {
   template <class Inst> EnumElementDecl *
   getUniqueCaseForDefaultValue(Inst *inst, SILValue enumValue) {
     assert(inst->hasDefault() && "doesn't have a default");
-    SILType enumType = enumValue.getType();
-
-    if (!enumType.hasFixedLayout(inst->getModule()))
-      return nullptr;
+    SILType enumType = enumValue->getType();
 
     EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
     assert(decl && "switch_enum operand is not an enum");
+
+    // FIXME: Get expansion from SILFunction
+    if (!decl->hasFixedLayout(inst->getModule().getSwiftModule(),
+                              ResilienceExpansion::Maximal))
+      return nullptr;
 
     llvm::SmallPtrSet<EnumElementDecl *, 4> unswitchedElts;
     for (auto elt : decl->getAllElements())
@@ -1139,7 +1119,7 @@ NullablePtr<EnumElementDecl> SwitchEnumInstBase::getUniqueCaseForDefault() {
 NullablePtr<EnumElementDecl>
 SwitchEnumInstBase::getUniqueCaseForDestination(SILBasicBlock *BB) {
   SILValue value = getOperand();
-  SILType enumType = value.getType();
+  SILType enumType = value->getType();
   EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
   assert(decl && "switch_enum operand is not an enum");
   (void)decl;
@@ -1229,7 +1209,7 @@ TypeConverter::getLinkageForProtocolConformance(const NormalProtocolConformance 
 /// deserialize the actual function definition if we need to.
 WitnessMethodInst *
 WitnessMethodInst::create(SILDebugLocation *Loc, CanType LookupType,
-                          ProtocolConformance *Conformance, SILDeclRef Member,
+                          ProtocolConformanceRef Conformance, SILDeclRef Member,
                           SILType Ty, SILFunction *F,
                           SILValue OpenedExistential, bool Volatile) {
   SILModule &Mod = F->getModule();
@@ -1243,12 +1223,12 @@ WitnessMethodInst::create(SILDebugLocation *Loc, CanType LookupType,
 
 InitExistentialAddrInst *InitExistentialAddrInst::create(
     SILDebugLocation *Loc, SILValue Existential, CanType ConcreteType,
-    SILType ConcreteLoweredType, ArrayRef<ProtocolConformance *> Conformances,
+    SILType ConcreteLoweredType, ArrayRef<ProtocolConformanceRef> Conformances,
     SILFunction *F) {
   SILModule &Mod = F->getModule();
   void *Buffer = Mod.allocateInst(sizeof(InitExistentialAddrInst),
                                   alignof(InitExistentialAddrInst));
-  for (ProtocolConformance *C : Conformances)
+  for (ProtocolConformanceRef C : Conformances)
     declareWitnessTable(Mod, C);
   return ::new (Buffer) InitExistentialAddrInst(Loc, Existential,
                                             ConcreteType,
@@ -1259,17 +1239,13 @@ InitExistentialAddrInst *InitExistentialAddrInst::create(
 InitExistentialRefInst *
 InitExistentialRefInst::create(SILDebugLocation *Loc, SILType ExistentialType,
                                CanType ConcreteType, SILValue Instance,
-                               ArrayRef<ProtocolConformance *> Conformances,
+                               ArrayRef<ProtocolConformanceRef> Conformances,
                                SILFunction *F) {
   SILModule &Mod = F->getModule();
   void *Buffer = Mod.allocateInst(sizeof(InitExistentialRefInst),
                                   alignof(InitExistentialRefInst));
-  for (ProtocolConformance *C : Conformances) {
-    if (!C)
-      continue;
-    if (!Mod.lookUpWitnessTable(C, false).first)
-      declareWitnessTable(Mod, C);
-  }
+  for (ProtocolConformanceRef C : Conformances)
+    declareWitnessTable(Mod, C);
 
   return ::new (Buffer) InitExistentialRefInst(Loc, ExistentialType,
                                                ConcreteType,
@@ -1279,41 +1255,36 @@ InitExistentialRefInst::create(SILDebugLocation *Loc, SILType ExistentialType,
 
 InitExistentialMetatypeInst::InitExistentialMetatypeInst(
     SILDebugLocation *Loc, SILType existentialMetatypeType, SILValue metatype,
-    ArrayRef<ProtocolConformance *> conformances)
+    ArrayRef<ProtocolConformanceRef> conformances)
     : UnaryInstructionBase(Loc, metatype, existentialMetatypeType),
-      LastConformance(nullptr) {
+      NumConformances(conformances.size()) {
   if (conformances.empty())
     return;
-  auto **offset = reinterpret_cast<ProtocolConformance **>(this + 1);
+  auto offset = reinterpret_cast<ProtocolConformanceRef*>(this + 1);
   memcpy(offset, &conformances[0],
-         conformances.size() * sizeof(ProtocolConformance *));
-  LastConformance = &offset[conformances.size() - 1];
+         conformances.size() * sizeof(ProtocolConformanceRef));
 }
 
 InitExistentialMetatypeInst *InitExistentialMetatypeInst::create(
     SILDebugLocation *Loc, SILType existentialMetatypeType, SILValue metatype,
-    ArrayRef<ProtocolConformance *> conformances, SILFunction *F) {
+    ArrayRef<ProtocolConformanceRef> conformances, SILFunction *F) {
   SILModule &M = F->getModule();
   unsigned size = sizeof(InitExistentialMetatypeInst);
-  size += conformances.size() * sizeof(ProtocolConformance *);
+  size += conformances.size() * sizeof(ProtocolConformanceRef);
 
   void *buffer = M.allocateInst(size, alignof(InitExistentialMetatypeInst));
-  for (ProtocolConformance *conformance : conformances)
-    if (!M.lookUpWitnessTable(conformance, false).first)
-      declareWitnessTable(M, conformance);
+  for (ProtocolConformanceRef conformance : conformances)
+    declareWitnessTable(M, conformance);
 
   return ::new (buffer) InitExistentialMetatypeInst(
       Loc, existentialMetatypeType, metatype, conformances);
 }
 
-ArrayRef<ProtocolConformance *>
+ArrayRef<ProtocolConformanceRef>
 InitExistentialMetatypeInst::getConformances() const {
-  if (!LastConformance)
-    return ArrayRef<ProtocolConformance *>();
   // The first conformance is going to be at *this[1];
-  auto **FirstConformance = reinterpret_cast<ProtocolConformance **>(
-      const_cast<InitExistentialMetatypeInst *>(this) + 1);
+  auto *FirstConformance =
+    reinterpret_cast<ProtocolConformanceRef const *>(this + 1);
   // Construct the protocol conformance list from the range of our conformances.
-  return ArrayRef<ProtocolConformance *>(FirstConformance,
-                                         LastConformance.get() + 1);
+  return ArrayRef<ProtocolConformanceRef>(FirstConformance, NumConformances);
 }

@@ -1,4 +1,4 @@
-//===-- CompilerInvocation.cpp - CompilerInvocation methods ---------------===//
+//===--- CompilerInvocation.cpp - CompilerInvocation methods --------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -22,6 +22,7 @@
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
 
 using namespace swift;
@@ -90,6 +91,34 @@ static void debugFailWithCrash() {
   LLVM_BUILTIN_TRAP;
 }
 
+static unsigned readFileList(std::vector<std::string> &inputFiles,
+                             const llvm::opt::Arg *filelistPath,
+                             const llvm::opt::Arg *primaryFileArg = nullptr) {
+  bool foundPrimaryFile = false;
+  unsigned primaryFileIndex = 0;
+  StringRef primaryFile;
+  if (primaryFileArg)
+    primaryFile = primaryFileArg->getValue();
+
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
+      llvm::MemoryBuffer::getFile(filelistPath->getValue());
+  assert(buffer && "can't read filelist; unrecoverable");
+
+  for (StringRef line : make_range(llvm::line_iterator(*buffer.get()), {})) {
+    inputFiles.push_back(line);
+    if (foundPrimaryFile)
+      continue;
+    if (line == primaryFile)
+      foundPrimaryFile = true;
+    else
+      ++primaryFileIndex;
+  }
+
+  if (primaryFileArg)
+    assert(foundPrimaryFile && "primary file not found in filelist");
+  return primaryFileIndex;
+}
+
 static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
                               DiagnosticEngine &Diags) {
   using namespace options;
@@ -120,6 +149,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
   Opts.DelayedFunctionBodyParsing |= Args.hasArg(OPT_delayed_function_body_parsing);
   Opts.EnableTesting |= Args.hasArg(OPT_enable_testing);
+  Opts.EnableResilience |= Args.hasArg(OPT_enable_resilience);
 
   Opts.PrintStats |= Args.hasArg(OPT_print_stats);
   Opts.PrintClangStats |= Args.hasArg(OPT_print_clang_stats);
@@ -142,16 +172,25 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     }
   }
 
-  for (const Arg *A : make_range(Args.filtered_begin(OPT_INPUT,
-                                                     OPT_primary_file),
-                                 Args.filtered_end())) {
-    if (A->getOption().matches(OPT_INPUT)) {
-      Opts.InputFilenames.push_back(A->getValue());
-    } else if (A->getOption().matches(OPT_primary_file)) {
-      Opts.PrimaryInput = SelectedInput(Opts.InputFilenames.size());
-      Opts.InputFilenames.push_back(A->getValue());
-    } else {
-      llvm_unreachable("Unknown input-related argument!");
+  if (const Arg *A = Args.getLastArg(OPT_filelist)) {
+    const Arg *primaryFileArg = Args.getLastArg(OPT_primary_file);
+    auto primaryFileIndex = readFileList(Opts.InputFilenames, A,
+                                         primaryFileArg);
+    if (primaryFileArg)
+      Opts.PrimaryInput = SelectedInput(primaryFileIndex);
+    assert(!Args.hasArg(OPT_INPUT) && "mixing -filelist with inputs");
+  } else {
+    for (const Arg *A : make_range(Args.filtered_begin(OPT_INPUT,
+                                                       OPT_primary_file),
+                                   Args.filtered_end())) {
+      if (A->getOption().matches(OPT_INPUT)) {
+        Opts.InputFilenames.push_back(A->getValue());
+      } else if (A->getOption().matches(OPT_primary_file)) {
+        Opts.PrimaryInput = SelectedInput(Opts.InputFilenames.size());
+        Opts.InputFilenames.push_back(A->getValue());
+      } else {
+        llvm_unreachable("Unknown input-related argument!");
+      }
     }
   }
 
@@ -290,7 +329,12 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   else
     Opts.InputKind = InputFileKind::IFK_Swift;
 
-  Opts.OutputFilenames = Args.getAllArgValues(OPT_o);
+  if (const Arg *A = Args.getLastArg(OPT_output_filelist)) {
+    readFileList(Opts.OutputFilenames, A);
+    assert(!Args.hasArg(OPT_o) && "don't use -o with -output-filelist");
+  } else {
+    Opts.OutputFilenames = Args.getAllArgValues(OPT_o);
+  }
 
   bool UserSpecifiedModuleName = false;
   {
@@ -662,16 +706,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalPatterns |=
     Args.hasArg(OPT_enable_experimental_patterns);
 
-  Opts.DisableSelfTypeMangling |=
-    Args.hasArg(OPT_disable_self_type_mangling);
-
-  Opts.EnableResilience = false;
-  if (auto A = Args.getLastArg(OPT_enable_resilience,
-                               OPT_disable_resilience)) {
-    Opts.EnableResilience
-      = A->getOption().matches(OPT_enable_resilience);
-  }
-
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
   
@@ -698,7 +732,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Opts.DebuggerSupport)
     Opts.EnableDollarIdentifiers = true;
   Opts.Playground |= Args.hasArg(OPT_playground);
+  Opts.Swift3Migration |= Args.hasArg(OPT_swift3_migration);
   Opts.WarnOmitNeedlessWords = Args.hasArg(OPT_warn_omit_needless_words);
+  Opts.OmitNeedlessWords |= Args.hasArg(OPT_enable_omit_needless_words);
 
   Opts.EnableThrowWithoutTry |= Args.hasArg(OPT_enable_throw_without_try);
 
@@ -881,6 +917,11 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
     Args.hasArg(OPT_show_diagnostics_after_fatal);
   Opts.UseColor |= Args.hasArg(OPT_color_diagnostics);
   Opts.FixitCodeForAllDiagnostics |= Args.hasArg(OPT_fixit_all);
+  Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
+  Opts.WarningsAsErrors |= Args.hasArg(OPT_warnings_as_errors);
+
+  assert(!(Opts.WarningsAsErrors && Opts.SuppressWarnings) &&
+         "conflicting arguments; should of been caught by driver");
 
   return false;
 }
@@ -1000,8 +1041,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
   Opts.EmitProfileCoverageMapping |= Args.hasArg(OPT_profile_coverage_mapping);
-  Opts.UseNativeSuperMethod |=
-    Args.hasArg(OPT_use_native_super_method);
   Opts.EnableGuaranteedClosureContexts |=
     Args.hasArg(OPT_enable_guaranteed_closure_contexts);
 
@@ -1082,6 +1121,13 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.LinkLibraries.push_back(LinkLibrary(A->getValue(), Kind));
   }
 
+  if (auto valueNames = Args.getLastArg(OPT_disable_llvm_value_names,
+                                        OPT_enable_llvm_value_names)) {
+    Opts.HasValueNamesSetting = true;
+    Opts.ValueNames =
+      valueNames->getOption().matches(OPT_enable_llvm_value_names);
+  }
+
   Opts.DisableLLVMOptzns |= Args.hasArg(OPT_disable_llvm_optzns);
   Opts.DisableLLVMARCOpts |= Args.hasArg(OPT_disable_llvm_arc_opts);
   Opts.DisableLLVMSLPVectorizer |= Args.hasArg(OPT_disable_llvm_slp_vectorizer);
@@ -1156,6 +1202,15 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
         Opts.CmdArgs.push_back('\0');
       }
     }
+  }
+
+  if (Args.hasArg(OPT_strip_field_names)) {
+    Opts.StripFieldNames = true;
+  }
+
+  if (Args.hasArg(OPT_strip_field_metadata)) {
+    Opts.StripFieldMetadata = true;
+    Opts.StripFieldNames = true;
   }
 
   return false;

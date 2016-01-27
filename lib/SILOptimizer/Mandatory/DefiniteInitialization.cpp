@@ -54,7 +54,7 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
   // assignment with a store.  If it has non-trivial type and is an
   // initialization, we can also replace it with a store.
   if (isInitialization == IsInitialization ||
-      Inst->getDest().getType().isTrivial(Inst->getModule())) {
+      Inst->getDest()->getType().isTrivial(Inst->getModule())) {
     B.createStore(Inst->getLoc(), Src, Inst->getDest());
   } else {
     // Otherwise, we need to replace the assignment with the full
@@ -1087,6 +1087,15 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
     noteUninitializedMembers(Use);
     return;
   }
+  
+  if (isa<PartialApplyInst>(Inst) && TheMemory.isClassInitSelf()) {
+    if (!shouldEmitError(Inst)) return;
+    
+    diagnose(Module, Inst->getLoc(), diag::self_closure_use_uninit);
+    noteUninitializedMembers(Use);
+    return;
+  }
+ 
 
   Diag<StringRef, bool> DiagMessage;
   if (isa<MarkFunctionEscapeInst>(Inst)) {
@@ -1115,7 +1124,7 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
 ///   %6 = enum $Optional<Enum>, #Optional.None!enumelt // user: %7
 ///   br bb2(%6 : $Optional<Enum>)                    // id: %7
 /// bb2(%8 : $Optional<Enum>):                        // Preds: bb0 bb1
-///   dealloc_stack %1#0 : $*@local_storage Enum      // id: %9
+///   dealloc_stack %1 : $*Enum                       // id: %9
 ///   return %8 : $Optional<Enum>                     // id: %10
 ///
 static bool isFailableInitReturnUseOfEnum(EnumInst *EI) {
@@ -1183,7 +1192,7 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
     ClassMethodInst *CMI = nullptr;
     ApplyInst *AI = nullptr;
     SILInstruction *Release = nullptr;
-    for (auto UI : SILValue(UCI, 0).getUses()) {
+    for (auto UI : UCI->getUses()) {
       auto *User = UI->getUser();
       if (auto *TAI = dyn_cast<ApplyInst>(User)) {
         if (!AI) {
@@ -1215,14 +1224,13 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
     // the generic error that we would emit before.
     //
     // That is the only case where we support pattern matching a release.
-    if (Release &&
+    if (Release && AI &&
         !AI->getSubstCalleeType()->getExtInfo().hasGuaranteedSelfParam())
       CMI = nullptr;
 
     if (AI && CMI) {
       // TODO: Could handle many other members more specifically.
-      auto *Decl = CMI->getMember().getDecl();
-      Method = dyn_cast<FuncDecl>(Decl);
+      Method = dyn_cast<FuncDecl>(CMI->getMember().getDecl());
     }
   }
 
@@ -1235,12 +1243,40 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
 
     // If this is a direct/devirt method application, check the location info.
     if (auto *Fn = cast<ApplyInst>(Inst)->getCalleeFunction()) {
-      if (Fn->hasLocation()) {
-        auto SILLoc = Fn->getLocation();
-        Method = SILLoc.getAsASTNode<FuncDecl>();
+      if (Fn->hasLocation())
+        Method = Fn->getLocation().getAsASTNode<FuncDecl>();
+    }
+  }
+  
+  // If this is part of a call to a witness method for a non-class-bound
+  // protocol in a root class, then we could have a store to a temporary whose
+  // address is passed into an apply.  Look through this pattern.
+  if (auto *SI = dyn_cast<StoreInst>(Inst)) {
+    if (SI->getSrc() == TheMemory.MemoryInst &&
+        isa<AllocStackInst>(SI->getDest()) &&
+        TheMemory.isClassInitSelf()) {
+      ApplyInst *TheApply = nullptr;
+      // Check to see if the address of the alloc_stack is only passed to one
+      // apply_inst.
+      for (auto UI : SI->getDest()->getUses()) {
+        if (auto *ApplyUser = dyn_cast<ApplyInst>(UI->getUser())) {
+          if (!TheApply && UI->getOperandNumber() == 1) {
+            TheApply = ApplyUser;
+          } else {
+            TheApply = nullptr;
+            break;
+          }
+        }
+      }
+      
+      if (TheApply) {
+        if (auto *Fn = TheApply->getCalleeFunction())
+          if (Fn->hasLocation())
+            Method = Fn->getLocation().getAsASTNode<FuncDecl>();
       }
     }
   }
+  
 
   // If we were able to find a method call, emit a diagnostic about the method.
   if (Method) {
@@ -1615,11 +1651,12 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
     // for self.  Make sure we're using its address result, not its refcount
     // result, and make sure that the box gets deallocated (not released)
     // since the pointer it contains will be manually cleaned up.
-    if (isa<AllocBoxInst>(Pointer))
-      Pointer = SILValue(Pointer.getDef(), 1);
+    auto *ABI = dyn_cast<AllocBoxInst>(Release->getOperand(0));
+    if (ABI)
+      Pointer = getOrCreateProjectBox(ABI);
 
     if (!consumed) {
-      if (Pointer.getType().isAddress())
+      if (Pointer->getType().isAddress())
         Pointer = B.createLoad(Loc, Pointer);
 
       auto MetatypeTy = CanMetatypeType::get(
@@ -1642,7 +1679,7 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
     }
     
     // dealloc_box the self box if necessary.
-    if (auto *ABI = dyn_cast<AllocBoxInst>(Release->getOperand(0))) {
+    if (ABI) {
       auto DB = B.createDeallocBox(Loc,
                                    ABI->getElementType(),
                                    ABI);
@@ -1664,7 +1701,7 @@ void LifetimeChecker::deleteDeadRelease(unsigned ReleaseID) {
 
 /// processNonTrivialRelease - We handle two kinds of release instructions here:
 /// destroy_addr for alloc_stack's and strong_release/dealloc_box for
-/// alloc_box's.  By the  time that DI gets here, we've validated that all uses
+/// alloc_box's.  By the time that DI gets here, we've validated that all uses
 /// of the memory location are valid.  Unfortunately, the uses being valid
 /// doesn't mean that the memory is actually initialized on all paths leading to
 /// a release.  As such, we have to push the releases up the CFG to where the
@@ -1750,7 +1787,7 @@ static void updateControlVariable(SILLocation Loc,
                                   SILValue ControlVariable,
                                   Identifier &OrFn,
                                   SILBuilder &B) {
-  SILType IVType = ControlVariable.getType().getObjectType();
+  SILType IVType = ControlVariable->getType().getObjectType();
 
   // Get the integer constant.
   SILValue MaskVal = B.createIntegerLiteral(Loc, IVType, Bitmask);
@@ -1781,7 +1818,7 @@ static SILValue testControlVariable(SILLocation Loc,
     ControlVariable = B.createLoad(Loc, ControlVariableAddr);
 
   SILValue CondVal = ControlVariable;
-  CanBuiltinIntegerType IVType = CondVal.getType().castTo<BuiltinIntegerType>();
+  CanBuiltinIntegerType IVType = CondVal->getType().castTo<BuiltinIntegerType>();
 
   // If this memory object has multiple tuple elements, we need to make sure
   // to test the right one.
@@ -1791,18 +1828,18 @@ static SILValue testControlVariable(SILLocation Loc,
   // Shift the mask down to this element.
   if (Elt != 0) {
     if (!ShiftRightFn.get())
-      ShiftRightFn = getBinaryFunction("lshr", CondVal.getType(),
+      ShiftRightFn = getBinaryFunction("lshr", CondVal->getType(),
                                        B.getASTContext());
-    SILValue Amt = B.createIntegerLiteral(Loc, CondVal.getType(), Elt);
+    SILValue Amt = B.createIntegerLiteral(Loc, CondVal->getType(), Elt);
     SILValue Args[] = { CondVal, Amt };
     
     CondVal = B.createBuiltin(Loc, ShiftRightFn,
-                              CondVal.getType(), {},
+                              CondVal->getType(), {},
                               Args);
   }
   
   if (!TruncateFn.get())
-    TruncateFn = getTruncateToI1Function(CondVal.getType(),
+    TruncateFn = getTruncateToI1Function(CondVal->getType(),
                                          B.getASTContext());
   return B.createBuiltin(Loc, TruncateFn,
                          SILType::getBuiltinIntegerType(1, B.getASTContext()),
@@ -1839,13 +1876,13 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
     auto *Term = BB.getTerminator();
     if (isa<ReturnInst>(Term) || isa<ThrowInst>(Term)) {
       B.setInsertionPoint(Term);
-      B.createDeallocStack(Loc, ControlVariableBox->getContainerResult());
+      B.createDeallocStack(Loc, ControlVariableBox);
     }
   }
   
   // Before the memory allocation, store zero in the control variable.
-  B.setInsertionPoint(TheMemory.MemoryInst->getNextNode());
-  SILValue ControlVariableAddr = SILValue(ControlVariableBox, 1);
+  B.setInsertionPoint(&*std::next(TheMemory.MemoryInst->getIterator()));
+  SILValue ControlVariableAddr = ControlVariableBox;
   auto Zero = B.createIntegerLiteral(Loc, IVType, 0);
   B.createStore(Loc, Zero, ControlVariableAddr);
   
@@ -2476,7 +2513,7 @@ static bool lowerRawSILOperations(SILFunction &Fn) {
 
       // mark_uninitialized just becomes a noop, resolving to its operand.
       if (auto *MUI = dyn_cast<MarkUninitializedInst>(Inst)) {
-        SILValue(MUI, 0).replaceAllUsesWith(MUI->getOperand());
+        MUI->replaceAllUsesWith(MUI->getOperand());
         MUI->eraseFromParent();
         Changed = true;
         continue;

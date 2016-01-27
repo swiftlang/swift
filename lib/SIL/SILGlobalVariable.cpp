@@ -67,6 +67,8 @@ SILGlobalVariable::~SILGlobalVariable() {
   getModule().GlobalVariableTable.erase(Name);
 }
 
+// FIXME
+
 static bool analyzeStaticInitializer(SILFunction *F, SILInstruction *&Val,
                                      SILGlobalVariable *&GVar) {
   Val = nullptr;
@@ -81,16 +83,18 @@ static bool analyzeStaticInitializer(SILFunction *F, SILInstruction *&Val,
   for (auto &I : *BB) {
     // Make sure we have a single GlobalAddrInst and a single StoreInst.
     // And the StoreInst writes to the GlobalAddrInst.
-    if (auto *sga = dyn_cast<GlobalAddrInst>(&I)) {
+    if (isa<AllocGlobalInst>(&I)) {
+      continue;
+    } else if (auto *sga = dyn_cast<GlobalAddrInst>(&I)) {
       if (SGA)
         return false;
       SGA = sga;
       GVar = SGA->getReferencedGlobal();
     } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
-      if (HasStore || SI->getDest().getDef() != SGA)
+      if (HasStore || SI->getDest() != SGA)
         return false;
       HasStore = true;
-      Val = dyn_cast<SILInstruction>(SI->getSrc().getDef());
+      Val = dyn_cast<SILInstruction>(SI->getSrc());
 
       // We only handle StructInst and TupleInst being stored to a
       // global variable for now.

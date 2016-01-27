@@ -146,14 +146,14 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
   Module *M = Context.TheBuiltinModule;
   DeclContext *DC = &M->getMainFile(FileUnitKind::Builtin);
 
-  SmallVector<Parameter, 4> params;
+  SmallVector<ParamDecl*, 4> params;
   for (Type argType : argTypes) {
     auto PD = new (Context) ParamDecl(/*IsLet*/true, SourceLoc(),
                                       Identifier(), SourceLoc(),
                                       Identifier(), argType,
                                       DC);
     PD->setImplicit();
-    params.push_back(Parameter::withoutLoc(PD));
+    params.push_back(PD);
   }
 
   auto *paramList = ParameterList::create(Context, params);
@@ -204,13 +204,13 @@ getBuiltinGenericFunction(Identifier Id,
   Module *M = Context.TheBuiltinModule;
   DeclContext *DC = &M->getMainFile(FileUnitKind::Builtin);
 
-  SmallVector<Parameter, 4> params;
+  SmallVector<ParamDecl*, 4> params;
   for (auto paramType : ArgBodyTypes) {
     auto PD = new (Context) ParamDecl(/*IsLet*/true, SourceLoc(),
                                       Identifier(), SourceLoc(),
                                       Identifier(), paramType, DC);
     PD->setImplicit();
-    params.push_back(Parameter::withoutLoc(PD));
+    params.push_back(PD);
   }
 
   
@@ -228,6 +228,7 @@ getBuiltinGenericFunction(Identifier Id,
                                TypeLoc::withoutLoc(ResBodyType), DC);
     
   func->setInterfaceType(InterfaceType);
+  func->setGenericSignature(Sig);
   func->setImplicit();
   func->setAccessibility(Accessibility::Public);
 
@@ -801,15 +802,6 @@ static ValueDecl *getReinterpretCastOperation(ASTContext &ctx,
   return builder.build(name);
 }
 
-static ValueDecl *getMarkDependenceOperation(ASTContext &ctx, Identifier name) {
-  // <T,U> (T,U) -> T
-  GenericSignatureBuilder builder(ctx, 2);
-  builder.addParameter(makeGenericParam(0));
-  builder.addParameter(makeGenericParam(1));
-  builder.setResult(makeGenericParam(0));
-  return builder.build(name);
-}
-
 static ValueDecl *getZeroInitializerOperation(ASTContext &Context,
                                              Identifier Id) {
   // <T> () -> T
@@ -969,59 +961,6 @@ static ValueDecl *getTryPinOperation(ASTContext &ctx, Identifier name) {
   GenericSignatureBuilder builder(ctx);
   builder.addParameter(makeConcrete(ctx.TheNativeObjectType));
   builder.setResult(makeGenericParam());
-  return builder.build(name);
-}
-
-static ValueDecl *getProjectValueBufferOperation(ASTContext &ctx,
-                                                 Identifier name) {
-  // <T> (inout Builtin.UnsafeValueBuffer, T.Type) -> Builtin.RawPointer
-  GenericSignatureBuilder builder(ctx);
-  builder.addParameter(makeConcrete(
-                              InOutType::get(ctx.TheUnsafeValueBufferType)));
-  builder.addParameter(makeMetatype(makeGenericParam()));
-  builder.setResult(makeConcrete(ctx.TheRawPointerType));
-  return builder.build(name);
-}
-
-static ValueDecl *getDeallocValueBufferOperation(ASTContext &ctx,
-                                                 Identifier name) {
-  // <T> (inout Builtin.UnsafeValueBuffer, T.Type) -> ()
-  GenericSignatureBuilder builder(ctx);
-  builder.addParameter(makeConcrete(
-                              InOutType::get(ctx.TheUnsafeValueBufferType)));
-  builder.addParameter(makeMetatype(makeGenericParam()));
-  builder.setResult(makeConcrete(ctx.TheRawPointerType));
-  return builder.build(name);
-}
-
-static ValueDecl *
-getMakeMaterializeForSetCallbackOperation(ASTContext &ctx, Identifier name) {
-  // <T>    ((Builtin.RawPointer,
-  //          inout Builtin.UnsafeValueBuffer,
-  //          inout T,
-  //          T.Type) -> ())
-  //      ->
-  //  @convention(thin) ((Builtin.RawPointer,
-  //          inout Builtin.UnsafeValueBuffer,
-  //          inout T,
-  //          @thick T.Type) -> ())
-  GenericSignatureBuilder builder(ctx);
-  builder.addParameter(
-    makeFunction(
-      makeTuple(makeConcrete(ctx.TheRawPointerType),
-                makeConcrete(InOutType::get(ctx.TheUnsafeValueBufferType)),
-                makeInOut(makeGenericParam()),
-                makeMetatype(makeGenericParam())),
-      makeConcrete(TupleType::getEmpty(ctx))));
-  builder.setResult(
-    makeFunction(
-      makeTuple(makeConcrete(ctx.TheRawPointerType),
-                makeConcrete(InOutType::get(ctx.TheUnsafeValueBufferType)),
-                makeInOut(makeGenericParam()),
-                makeMetatype(makeGenericParam(), MetatypeRepresentation::Thick)),
-      makeConcrete(TupleType::getEmpty(ctx)),
-      FunctionType::ExtInfo()
-        .withRepresentation(FunctionType::Representation::Thin)));
   return builder.build(name);
 }
 
@@ -1553,9 +1492,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::DeallocRaw:
     return getDeallocOperation(Context, Id);
 
-  case BuiltinValueKind::MarkDependence:
-    return getMarkDependenceOperation(Context, Id);
-
   case BuiltinValueKind::CastToNativeObject:
   case BuiltinValueKind::CastFromNativeObject:
   case BuiltinValueKind::CastToUnknownObject:
@@ -1580,19 +1516,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::ReinterpretCast:
     if (!Types.empty()) return nullptr;
     return getReinterpretCastOperation(Context, Id);
-
-  case BuiltinValueKind::AllocValueBuffer:
-  case BuiltinValueKind::ProjectValueBuffer:
-    if (!Types.empty()) return nullptr;
-    return getProjectValueBufferOperation(Context, Id);
-
-  case BuiltinValueKind::DeallocValueBuffer:
-    if (!Types.empty()) return nullptr;
-    return getDeallocValueBufferOperation(Context, Id);
-
-  case BuiltinValueKind::MakeMaterializeForSetCallback:
-    if (!Types.empty()) return nullptr;
-    return getMakeMaterializeForSetCallbackOperation(Context, Id);
       
   case BuiltinValueKind::AddressOf:
     if (!Types.empty()) return nullptr;

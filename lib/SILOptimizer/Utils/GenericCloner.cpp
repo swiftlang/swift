@@ -1,4 +1,4 @@
-//===--------- GenericCloner.cpp - Specializes generic functions  ---------===//
+//===--- GenericCloner.cpp - Specializes generic functions  ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -50,7 +50,9 @@ SILFunction *GenericCloner::initCloned(SILFunction *Orig,
       Orig->getInlineStrategy(), Orig->getEffectsKind(), Orig,
       Orig->getDebugScope(), Orig->getDeclContext());
   NewF->setDeclCtx(Orig->getDeclContext());
-  NewF->setSemanticsAttr(Orig->getSemanticsAttr());
+  for (auto &Attr : Orig->getSemanticsAttrs()) {
+    NewF->addSemanticsAttr(Attr);
+  }
   return NewF;
 }
 
@@ -83,16 +85,4 @@ void GenericCloner::populateCloned() {
     getBuilder().setInsertionPoint(BI->second);
     visit(BI->first->getTerminator());
   }
-}
-
-void dumpTypeSubstitutionMap(const TypeSubstitutionMap &map) {
-  llvm::errs() << "{\n";
-  for (auto &kv : map) {
-    llvm::errs() << "  ";
-    kv.first->print(llvm::errs());
-    llvm::errs() << " => ";
-    kv.second->print(llvm::errs());
-    llvm::errs() << "\n";
-  }
-  llvm::errs() << "}\n";
 }

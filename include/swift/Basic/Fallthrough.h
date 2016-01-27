@@ -1,4 +1,4 @@
-//===- Fallthrough.h - switch fallthrough annotation macro ------*- C++ -*-===//
+//===--- Fallthrough.h - switch fallthrough annotation macro ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

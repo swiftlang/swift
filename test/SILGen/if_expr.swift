@@ -33,16 +33,18 @@ func consumeAddressOnly(_: AddressOnly) {}
 func addr_only_ternary_1(x: Bool) -> AddressOnly {
   // CHECK: bb0([[RET:%.*]] : $*AddressOnly, {{.*}}):
   // CHECK: [[a:%[0-9]+]] = alloc_box $AddressOnly, var, name "a"
+  // CHECK: [[PBa:%.*]] = project_box [[a]]
   var a : AddressOnly = A()
   // CHECK: [[b:%[0-9]+]] = alloc_box $AddressOnly, var, name "b"
+  // CHECK: [[PBb:%.*]] = project_box [[b]]
   var b : AddressOnly = B()
 
   // CHECK:   cond_br {{%.*}}, [[TRUE:bb[0-9]+]], [[FALSE:bb[0-9]+]]
   // CHECK: [[TRUE]]:
-  // CHECK:   copy_addr [[a]]#1 to [initialization] [[RET]]
+  // CHECK:   copy_addr [[PBa]] to [initialization] [[RET]]
   // CHECK:   br [[CONT:bb[0-9]+]]
   // CHECK: [[FALSE]]:
-  // CHECK:   copy_addr [[b]]#1 to [initialization] [[RET]]
+  // CHECK:   copy_addr [[PBb]] to [initialization] [[RET]]
   // CHECK:   br [[CONT]]
   return x ? a : b
 }

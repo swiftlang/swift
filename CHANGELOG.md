@@ -1,5 +1,26 @@
-Latest
-------
+
+Swift 3
+-------
+
+* Curried function syntax has been removed, and now produces a compile-time
+  error.
+
+
+Swift 2.2
+---------
+
+* Associated types in protocols can now be specified with a new 'associatedtype'
+  declaration, to replace the use of 'typealias':
+
+    protocol P {
+      associatedtype Ty
+    }
+
+  The typealias keyword is still allowed (but deprecated and produces a warning)
+  in Swift 2.2. This warning will become an error in Swift 3.
+
+* Curried function syntax has been deprecated, and is slated to be removed in 
+  Swift 3.
 
 * The ++ and -- operators have been deprecated, and are slated to be removed in
   Swift 3.0.  As a replacement, please use "x += 1" on integer or floating point
@@ -98,6 +119,39 @@ Latest
 
 [lexicographical order]: https://en.wikipedia.org/wiki/Lexicographical_order
 [SE-0015]: https://github.com/apple/swift-evolution/blob/master/proposals/0015-tuple-comparison-operators.md
+
+* The `@objc(SomeName)` attribute is now supported on enums and enum cases to
+  rename the generated Objective-C declaration.
+
+  **(rdar://problem/21930334)**
+
+* When referencing a function or initializer, one can provide the
+  complete name, including argument labels. For example:
+
+      let fn1 = someView.insertSubview(_:at:)
+      let fn2 = someView.insertSubview(_:aboveSubview:)
+
+      let buttonFactory = UIButton.init(type:)
+
+  For more information, see [SE-0021](https://github.com/apple/swift-evolution/blob/master/proposals/0021-generalized-naming.md).
+
+* There is a new build configuration function, `#if swift(>=x.y)`, which
+  tests if the current Swift language version is at least `x.y`. This
+  allows you to conditionally compile code for multiple language
+  versions in the same file, even with different syntax, by deactivating
+  parsing in inactive code blocks. For example:
+
+  ```swift
+  #if swift(>=2.2)
+    // Only this code will be parsed in Swift 3
+    func foo(x: Int) -> (y: Int) -> () {}
+  #else
+    // This code is ignored entirely.
+    func foo(x: Int)(y: Int) {}
+  #endif
+  ```
+
+  For more information, see [SE-0020](https://github.com/apple/swift-evolution/blob/master/proposals/0020-if-swift-version.md).
 
 2015-09-17 [Xcode 7.1, Swift 2.1]
 ----------
@@ -1382,7 +1436,7 @@ Latest
   unique elements with full value semantics. It bridges with `NSSet`, providing
   functionality analogous to `Array` and `Dictionary`. **(14661754)**
 
-* The `if–let` construct has been expanded to allow testing multiple optionals
+* The `if-let` construct has been expanded to allow testing multiple optionals
   and guarding conditions in a single `if` (or `while`) statement using syntax
   similar to generic constraints:
 
@@ -1396,7 +1450,7 @@ Latest
   conditions, without introducing undesirable nesting (for instance, to avoid
   the optional unwrapping _"pyramid of doom"_).
 
-  Further, `if–let` now also supports a single leading boolean condition along
+  Further, `if-let` now also supports a single leading boolean condition along
   with optional binding `let` clauses. For example:
 
   ```swift
@@ -1406,7 +1460,7 @@ Latest
 
   **(19797158, 19382942)**
 
-* The `if–let` syntax has been extended to support a single leading boolean
+* The `if-let` syntax has been extended to support a single leading boolean
   condition along with optional binding `let` clauses.
 
   For example:

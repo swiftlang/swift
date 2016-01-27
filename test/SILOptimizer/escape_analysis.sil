@@ -314,39 +314,44 @@ bb0(%0 : $Pointer):
 
 // CHECK-LABEL: CG of test_partial_apply
 // CHECK-NEXT:    Arg %1 Esc: G, Succ: 
-// CHECK-NEXT:    Arg %2 Esc: A, Succ: (%5.2)
-// CHECK-NEXT:    Val %3 Esc: %12,%13,%15, Succ: (%5.1)
-// CHECK-NEXT:    Val %5 Esc: %12,%13,%14, Succ: (%5.1)
-// CHECK-NEXT:    Con %5.1 Esc: %12,%13,%14,%15, Succ: %2
-// CHECK-NEXT:    Con %5.2 Esc: G, Succ: 
-// CHECK-NEXT:    Val %10 Esc: %12,%13, Succ: %3, %5
+// CHECK-NEXT:    Arg %2 Esc: A, Succ: (%6.3)
+// CHECK-NEXT:    Val %3 Esc: %14,%15,%17, Succ: (%6.1)
+// CHECK-NEXT:    Val %6 Esc: %14,%15,%16, Succ: (%6.1)
+// CHECK-NEXT:    Con %6.1 Esc: %14,%15,%16,%17, Succ: (%6.2)
+// CHECK-NEXT:    Con %6.2 Esc: %14,%15,%16,%17, Succ: %2
+// CHECK-NEXT:    Con %6.3 Esc: G, Succ: 
+// CHECK-NEXT:    Val %12 Esc: %14,%15, Succ: %3, %6
 // CHECK-NEXT:  End
 sil @test_partial_apply : $@convention(thin) (Int64, @owned X, @owned Y) -> Int64 {
 bb0(%0 : $Int64, %1 : $X, %2 : $Y):
   %3 = alloc_box $Int64
-  store %0 to %3#1 : $*Int64
-  %5 = alloc_box $Y
-  store %2 to %5#1 : $*Y
-  %7 = function_ref @closure1 : $@convention(thin) (@owned X, @owned @box Int64, @owned @box Y) -> Int64
-  strong_retain %3#0 : $@box Int64
-  strong_retain %5#0 : $@box Y
-  %10 = partial_apply %7(%3#0, %5#0) : $@convention(thin) (@owned X, @owned @box Int64, @owned @box Y) -> Int64
-  strong_retain %10 : $@callee_owned (@owned X) -> Int64
-  %12 = apply %10(%1) : $@callee_owned (@owned X) -> Int64
-  strong_release %10 : $@callee_owned (@owned X) -> Int64
-  strong_release %5#0 : $@box Y
-  strong_release %3#0 : $@box Int64
-  return %12 : $Int64
+  %4 = project_box %3 : $@box Int64
+  store %0 to %4 : $*Int64
+  %6 = alloc_box $Y
+  %7 = project_box %6 : $@box Y
+  store %2 to %7 : $*Y
+  %9 = function_ref @closure1 : $@convention(thin) (@owned X, @owned @box Int64, @owned @box Y) -> Int64
+  strong_retain %3 : $@box Int64
+  strong_retain %6 : $@box Y
+  %12 = partial_apply %9(%3, %6) : $@convention(thin) (@owned X, @owned @box Int64, @owned @box Y) -> Int64
+  strong_retain %12 : $@callee_owned (@owned X) -> Int64
+  %14 = apply %12(%1) : $@callee_owned (@owned X) -> Int64
+  strong_release %12 : $@callee_owned (@owned X) -> Int64
+  strong_release %6 : $@box Y
+  strong_release %3 : $@box Int64
+  return %14 : $Int64
 }
 
 // CHECK-LABEL: CG of closure1
 // CHECK-NEXT:    Arg %0 Esc: G, Succ: 
 // CHECK-NEXT:    Arg %1 Esc: A, Succ: (%1.1)
 // CHECK-NEXT:    Con %1.1 Esc: A, Succ: (%1.2)
-// CHECK-NEXT:    Con %1.2 Esc: G, Succ: 
+// CHECK-NEXT:    Con %1.2 Esc: A, Succ: (%1.3)
+// CHECK-NEXT:    Con %1.3 Esc: G, Succ: 
 // CHECK-NEXT:    Arg %2 Esc: A, Succ: (%2.1)
 // CHECK-NEXT:    Con %2.1 Esc: A, Succ: (%2.2)
-// CHECK-NEXT:    Con %2.2 Esc: G, Succ:
+// CHECK-NEXT:    Con %2.2 Esc: A, Succ: (%2.3)
+// CHECK-NEXT:    Con %2.3 Esc: G, Succ: 
 // CHECK-NEXT:    Val %7 Esc: %8, Succ: %2
 // CHECK-NEXT:  End
 sil @closure1 : $@convention(thin) (@owned X, @owned @box Int64, @owned @box Y) -> Int64 {
@@ -365,7 +370,7 @@ bb0(%0 : $X, %1 : $@box Int64, %2 : $@box Y):
 // CHECK-NEXT:    Arg %0 Esc: G, Succ: 
 // CHECK-NEXT:    Arg %1 Esc: A, Succ: (%1.1)
 // CHECK-NEXT:    Con %1.1 Esc: A, Succ: (%1.2)
-// CHECK-NEXT:    Con %1.2 Esc: G, Succ: (%1.3)
+// CHECK-NEXT:    Con %1.2 Esc: A, Succ: (%1.3)
 // CHECK-NEXT:    Con %1.3 Esc: G, Succ: (%1.4)
 // CHECK-NEXT:    Con %1.4 Esc: G, Succ: %0
 // CHECK-NEXT:  End
@@ -383,31 +388,33 @@ bb0(%0 : $X, %1 : $@box Y):
 // Test partial_apply. The box escapes in the callee.
 
 // CHECK-LABEL: CG of test_escaped_box
-// CHECK-NEXT:    Val %1 Esc: G, Succ: (%5.1)
-// CHECK-NEXT:    Val %5 Esc: G, Succ: %1
-// CHECK-NEXT:    Con %5.1 Esc: G, Succ: (%5.2)
-// CHECK-NEXT:    Con %5.2 Esc: G, Succ: 
+// CHECK-NEXT:    Val %1 Esc: G, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: G, Succ: (%1.2)
+// CHECK-NEXT:    Con %1.2 Esc: G, Succ: (%1.3)
+// CHECK-NEXT:    Con %1.3 Esc: G, Succ: 
+// CHECK-NEXT:    Val %6 Esc: G, Succ: %1
 // CHECK-NEXT:  End
 sil @test_escaped_box : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_box $Int64
-  store %0 to %1#1 : $*Int64
+  %2 = project_box %1 : $@box Int64
+  store %0 to %2 : $*Int64
 
-  %3 = function_ref @let_box_escape : $@convention(thin) (@owned @box Int64) -> Int64
-  strong_retain %1#0 : $@box Int64
-  %5 = partial_apply %3(%1#0) : $@convention(thin) (@owned @box Int64) -> Int64
-  strong_retain %5 : $@callee_owned () -> Int64
-  %7 = apply %5() : $@callee_owned () -> Int64
-  strong_release %5 : $@callee_owned () -> Int64
-  strong_release %1#0 : $@box Int64
-  return %7 : $Int64
+  %4 = function_ref @let_box_escape : $@convention(thin) (@owned @box Int64) -> Int64
+  strong_retain %1 : $@box Int64
+  %6 = partial_apply %4(%1) : $@convention(thin) (@owned @box Int64) -> Int64
+  strong_retain %6 : $@callee_owned () -> Int64
+  %8 = apply %6() : $@callee_owned () -> Int64
+  strong_release %6 : $@callee_owned () -> Int64
+  strong_release %1 : $@box Int64
+  return %8 : $Int64
 }
-
 
 // CHECK-LABEL: CG of let_box_escape
 // CHECK-NEXT:    Arg %0 Esc: G, Succ: (%0.1)
 // CHECK-NEXT:    Con %0.1 Esc: G, Succ: (%0.2)
-// CHECK-NEXT:    Con %0.2 Esc: G, Succ: 
+// CHECK-NEXT:    Con %0.2 Esc: G, Succ: (%0.3)
+// CHECK-NEXT:    Con %0.3 Esc: G, Succ: 
 // CHECK-NEXT:  End
 sil @let_box_escape : $@convention(thin) (@owned @box Int64) -> Int64 {
 bb0(%0 : $@box Int64):
@@ -426,28 +433,30 @@ sil @takebox :  $@convention(thin) (@owned @box Int64) -> ()
 // The partial_apply itself escapes and therefore also the box escapes.
 
 // CHECK-LABEL: CG of test_escaped_partial_apply
-// CHECK-NEXT:    Val %1 Esc: G, Succ: 
-// CHECK-NEXT:    Val %5 Esc: G, Succ: %1
-// CHECK-NEXT:    Con %5.1 Esc: G, Succ: 
+// CHECK-NEXT:    Val %1 Esc: G, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: G, Succ: 
+// CHECK-NEXT:    Val %6 Esc: G, Succ: %1
 // CHECK-NEXT:  End
 sil @test_escaped_partial_apply : $@convention(thin) (Int64) -> () {
 bb0(%0 : $Int64):
   %1 = alloc_box $Int64
-  store %0 to %1#1 : $*Int64
-  %3 = function_ref @closure3 : $@convention(thin) (@owned @box Int64) -> Int64
-  strong_retain %1#0 : $@box Int64
-  %5 = partial_apply %3(%1#0) : $@convention(thin) (@owned @box Int64) -> Int64
-  strong_retain %5 : $@callee_owned () -> Int64
-  %6 = function_ref @take_partial_apply : $@convention(thin) (@owned @callee_owned () -> Int64) -> ()
-  %7 = apply %6(%5) : $@convention(thin) (@owned @callee_owned () -> Int64) -> ()
-  %8 = tuple()
-  return %8 : $()
+  %2 = project_box %1 : $@box Int64
+  store %0 to %2 : $*Int64
+  %4 = function_ref @closure3 : $@convention(thin) (@owned @box Int64) -> Int64
+  strong_retain %1 : $@box Int64
+  %6 = partial_apply %4(%1) : $@convention(thin) (@owned @box Int64) -> Int64
+  strong_retain %6 : $@callee_owned () -> Int64
+  %7 = function_ref @take_partial_apply : $@convention(thin) (@owned @callee_owned () -> Int64) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@owned @callee_owned () -> Int64) -> ()
+  %9 = tuple()
+  return %9 : $()
 }
 
 // CHECK-LABEL: CG of closure3
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
 // CHECK-NEXT:    Con %0.1 Esc: A, Succ: (%0.2)
-// CHECK-NEXT:    Con %0.2 Esc: G, Succ: 
+// CHECK-NEXT:    Con %0.2 Esc: A, Succ: (%0.3)
+// CHECK-NEXT:    Con %0.3 Esc: G, Succ: 
 // CHECK-NEXT:  End
 sil @closure3 : $@convention(thin) (@owned @box Int64) -> Int64 {
 bb0(%0 : $@box Int64):
@@ -614,7 +623,9 @@ bb2(%5 : $ErrorType):
 
 // CHECK-LABEL: CG of throwing_func
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: 
-// CHECK-NEXT:    Ret Esc: R, Succ: %0
+// CHECK-NEXT:    Val %3 Esc: G, Succ: (%3.1)
+// CHECK-NEXT:    Con %3.1 Esc: G, Succ: 
+// CHECK-NEXT:    Ret  Esc: R, Succ: %0
 // CHECK-NEXT:  End
 sil @throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error ErrorType) {
 bb0(%0 : $X):
@@ -622,9 +633,10 @@ bb0(%0 : $X):
 
 bb1:
   %2 = alloc_existential_box $ErrorType, $MyError
-  %3 = struct $MyError ()
-  store %3 to %2#1 : $*MyError
-  throw %2#0 : $ErrorType
+  %3 = project_existential_box $MyError in %2 : $ErrorType
+  %4 = struct $MyError ()
+  store %4 to %3 : $*MyError
+  throw %2 : $ErrorType
 
 bb2:
   return %0 : $X
@@ -652,6 +664,30 @@ bb2(%5 : $ErrorType):
 }
 
 sil @unknown_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error ErrorType)
+
+// Test that the deinit of a box itself does not capture anything.
+
+// CHECK-LABEL: CG of test_release_of_partial_apply_with_box
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%1.3)
+// CHECK-NEXT:    Val %1 Esc: %6, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: %6, Succ: (%1.2)
+// CHECK-NEXT:    Con %1.2 Esc: %6, Succ: %0
+// CHECK-NEXT:    Con %1.3 Esc: G, Succ: 
+// CHECK-NEXT:    Val %5 Esc: %6, Succ: %1
+// CHECK-NEXT:  End
+sil @test_release_of_partial_apply_with_box : $@convention(thin) (@owned Y) -> () {
+bb0(%0 : $Y):
+  %1 = alloc_box $Y
+  %2 = project_box %1 : $@box Y
+  store %0 to %2 : $*Y
+  %3 = function_ref @take_y_box : $@convention(thin) (@owned @box Y) -> ()
+  %4 = partial_apply %3(%1) : $@convention(thin) (@owned @box Y) -> ()
+  strong_release %4 : $@callee_owned () -> ()
+  %6 = tuple ()
+  return %6 : $()
+}
+
+sil @take_y_box : $@convention(thin) (@owned @box Y) -> ()
 
 // Test is an unknown value is merged correctly into the caller graph.
 
@@ -727,6 +763,39 @@ entry(%0 : $*Y, %1 : $*Y):
   return %r : $()
 }
 
+// CHECK-LABEL: CG of take_c_func
+// CHECK-NEXT:    Arg %0 Esc: G, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: G, Succ: 
+// CHECK-NEXT:    Ret  Esc: R, Succ: %0
+// CHECK-NEXT:  End
+sil @take_c_func : $@convention(thin) (@convention(c) () -> ()) -> @convention(c) () -> () {
+bb0(%0 : $@convention(c) () -> ()):
+  %3 = apply %0() : $@convention(c) () -> ()
+  return %0 : $@convention(c) () -> ()
+}
+
+// CHECK-LABEL: CG of c_func
+// CHECK-NEXT:  End
+sil @c_func : $@convention(c) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK-LABEL: CG of pass_c_func
+// CHECK-NEXT:    Val %2 Esc: , Succ: (%2.1)
+// CHECK-NEXT:    Con %2.1 Esc: G, Succ: 
+// CHECK-NEXT:  End
+sil @pass_c_func : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @take_c_func : $@convention(thin) (@convention(c) () -> ()) -> @convention(c) () -> ()
+  %1 = function_ref @c_func : $@convention(c) () -> ()
+  %3 = apply %0(%1) : $@convention(thin) (@convention(c) () -> ()) -> @convention(c) () -> ()
+  %4 = tuple ()
+  return %4 : $()
+}
+
+
 // CHECK-LABEL: CG of test_select_enum
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: 
 // CHECK-NEXT:    Arg %1 Esc: A, Succ: 
@@ -779,11 +848,11 @@ bb0(%0 : $Builtin.Int64, %1 : $X, %2 : $X, %3 : $X):
 sil @test_existential_addr : $@convention(thin) (@owned Pointer) -> () {
 bb0(%0 : $Pointer):
   %1 = alloc_stack $P
-  %2 = init_existential_addr %1#1 : $*P, $Pointer
+  %2 = init_existential_addr %1 : $*P, $Pointer
   store %0 to %2 : $*Pointer
-  %4 = open_existential_addr %1#1 : $*P to $*@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83") P
+  %4 = open_existential_addr %1 : $*P to $*@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83") P
   %5 = witness_method $@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83") P, #P.foo!1, %4 : $*@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83") P : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-  dealloc_stack %1#0 : $*@local_storage P
+  dealloc_stack %1 : $*P
   %7 = tuple ()                                   
   return %7 : $()                                 
 }
@@ -805,14 +874,16 @@ bb0(%0 : $X):
 
 // CHECK-LABEL: CG of test_unknown_store
 // CHECK-NEXT:    Arg %0 Esc: G, Succ: 
-// CHECK-NEXT:    Con %0.1 Esc: G, Succ: 
+// CHECK-NEXT:    Val %2 Esc: G, Succ: (%2.1)
+// CHECK-NEXT:    Con %2.1 Esc: G, Succ: %0
 // CHECK-NEXT:  End
 sil @test_unknown_store : $@convention(thin) (@owned ErrorClass) -> () {
 bb0(%0 : $ErrorClass):
   %2 = alloc_existential_box $ErrorType, $ErrorClass
-  store %0 to %2#1 : $*ErrorClass
-  %4 = tuple ()
-  return %4 : $()
+  %3 = project_existential_box $ErrorClass in %2 : $ErrorType
+  store %0 to %3 : $*ErrorClass
+  %5 = tuple ()
+  return %5 : $()
 }
 
 // CHECK-LABEL: CG of test_raw_pointer_to_ref
@@ -871,6 +942,28 @@ bb0(%0 : $*U, %1 : $*T, %2 : $@thick U.Type):
   unchecked_ref_cast_addr  T in %1 : $*T to U in %0 : $*U
   %5 = tuple ()
   return %5 : $()
+}
+
+// CHECK-LABEL: CG of test_pin
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: 
+// CHECK-NEXT:    Ret  Esc: R, Succ: %0
+// CHECK-NEXT:  End
+sil @test_pin : $@convention(thin) (Builtin.NativeObject) -> Optional<Builtin.NativeObject> {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = strong_pin %0 : $Builtin.NativeObject
+  return %1 : $Optional<Builtin.NativeObject>
+}
+
+// CHECK-LABEL: CG of test_unpin
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: A, Succ: (%0.2)
+// CHECK-NEXT:    Con %0.2 Esc: G, Succ: 
+// CHECK-NEXT:  End
+sil @test_unpin : $@convention(thin) (Optional<Builtin.NativeObject>) -> () {
+bb0(%0 : $Optional<Builtin.NativeObject>):
+  strong_unpin %0 : $Optional<Builtin.NativeObject>
+  %2 = tuple ()
+  return %2 : $()
 }
 
 // CHECK-LABEL: CG of arraysemantics_is_native_no_typecheck

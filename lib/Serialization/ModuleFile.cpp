@@ -1,4 +1,4 @@
-//===--- ModuleFile.cpp - Loading a serialized module -----------*- C++ -*-===//
+//===--- ModuleFile.cpp - Loading a serialized module ---------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -108,6 +108,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
       break;
     case options_block::IS_TESTABLE:
       extendedInfo.setIsTestable(true);
+      break;
+    case options_block::IS_RESILIENT:
+      extendedInfo.setIsResilient(true);
       break;
     default:
       // Unknown options record, possibly for use by a future version of the

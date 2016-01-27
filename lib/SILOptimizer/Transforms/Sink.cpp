@@ -1,4 +1,4 @@
-//===-- Sink.cpp ----- Code Sinking -----------------------------*- C++ -*-===//
+//===--- Sink.cpp ----- Code Sinking --------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,9 +9,12 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// Many SIL instructions that don't have side effects at the SIL level are
-// lowered to a sequence of LLVM instructions that does have side effects that
-// LLVM can't sink. This pass sinks instructions close to their users.
+///
+/// \file
+/// Many SIL instructions that don't have side effects at the SIL level are
+/// lowered to a sequence of LLVM instructions that does have side effects that
+/// LLVM can't sink. This pass sinks instructions close to their users.
+///
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sink-instructions"

@@ -30,7 +30,7 @@ struct OuterGeneric<D> {
   }
 
   protocol InnerProtocol { // expected-error{{declaration is only valid at file scope}}
-    typealias Rooster
+    associatedtype Rooster
     func flip(r: Rooster)
     func flop(t: D)
   }
@@ -93,7 +93,7 @@ class OuterGenericClass<T> {
   } 
 
   protocol InnerProtocol { // expected-error{{declaration is only valid at file scope}}
-    typealias Rooster
+    associatedtype Rooster
     func flip(r: Rooster)
     func flop(t: T)
   }
@@ -160,16 +160,16 @@ class OuterGenericClass<T> {
 }
 
 protocol OuterProtocol {
-  typealias Hen
+  associatedtype Hen
   protocol InnerProtocol { // expected-error{{type not allowed here}}
-    typealias Rooster
+    associatedtype Rooster
     func flip(r: Rooster)
     func flop(h: Hen)
   }
 }
 
 protocol Racoon {
-  typealias Stripes
+  associatedtype Stripes
   class Claw<T> { // expected-error{{type not allowed here}}
     func mangle(s: Stripes) {}
   }
@@ -194,3 +194,22 @@ func outerGenericFunction<T>(t: T) {
     func genericMethod<V where V : Racoon, V.Stripes == T>(t: T, u: U) -> V {}
   }
 }
+
+struct S1 {
+  // expected-error @+4 {{type member may not be named 'Type', since it would conflict with the 'foo.Type' expression}}
+  // expected-error @+3 {{type member may not be named 'Type', since it would conflict with the 'foo.Type' expression}}
+  // expected-note @+2 {{backticks can escape this name if it is important to use}} {{8-12=`Type`}}
+  // expected-note @+1 {{backticks can escape this name if it is important to use}} {{8-12=`Type`}}
+  enum Type {
+    case A
+  }
+}
+
+struct S2 {
+  enum `Type` {
+    case A
+  }
+}
+
+let s1: S1.Type = .A // expected-error{{type of expression is ambiguous without more context}}
+let s2: S2.`Type` = .A // no-error

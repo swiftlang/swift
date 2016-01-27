@@ -45,12 +45,13 @@ def cFuncSuffix(bits):
 
 # These functions have a corresponding LLVM intrinsic
 # Note, keep this up to date with Darwin/tgmath.swift.gyb
-UnaryIntrinsicFunctions = ['cos', 'sin',
-                  'exp', 'exp2',
-                  'log', 'log10', 'log2',
-                  'fabs',
-                  'ceil', 'floor', 'nearbyint', 'rint', 'round', 'trunc',
-                  ]
+UnaryIntrinsicFunctions = [
+    'cos', 'sin',
+    'exp', 'exp2',
+    'log', 'log10', 'log2',
+    'fabs',
+    'ceil', 'floor', 'nearbyint', 'rint', 'round', 'trunc',
+]
 
 def TypedUnaryIntrinsicFunctions():
     for ufunc in UnaryIntrinsicFunctions:

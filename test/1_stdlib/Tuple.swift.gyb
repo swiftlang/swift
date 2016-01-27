@@ -7,6 +7,13 @@
 
 import StdlibUnittest
 
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 var TupleTestSuite = TestSuite("Tuple")
 
 // Test tuple comparison operators
@@ -61,10 +68,10 @@ TupleTestSuite.test("Tuple/equality") {
 
 TupleTestSuite.test("Tuple/equality/sanity-check") {
   // sanity check all arities
-% for arity in range(2,maxArity+1):
-%   a = str(tuple(range(1, arity+1)))
-%   b = "({}, 0)".format(", ".join([str(i) for i in range(1,arity)]))
-%   c = "(0, {})".format(", ".join([str(i) for i in range(2,arity+1)]))
+% for arity in range(2, maxArity + 1):
+%   a = str(tuple(range(1, arity + 1)))
+%   b = "({}, 0)".format(", ".join([str(i) for i in range(1, arity)]))
+%   c = "(0, {})".format(", ".join([str(i) for i in range(2, arity + 1)]))
   expectTrue(${a} == ${a})
   expectTrue(${a} != ${b})
   expectTrue(${b} != ${a})
@@ -140,10 +147,10 @@ TupleTestSuite.test("Tuple/comparison") {
 
 TupleTestSuite.test("Tuple/comparison/sanity-check") {
   // sanity check all arities
-% for arity in range(2,maxArity+1):
-%   a = str(tuple(range(1, arity+1)))
-%   b = "({}, 0)".format(", ".join([str(i) for i in range(1,arity)]))
-%   c = "(0, {})".format(", ".join([str(i) for i in range(2,arity+1)]))
+% for arity in range(2, maxArity + 1):
+%   a = str(tuple(range(1, arity + 1)))
+%   b = "({}, 0)".format(", ".join([str(i) for i in range(1, arity)]))
+%   c = "(0, {})".format(", ".join([str(i) for i in range(2, arity + 1)]))
   expectTrue(${b} < ${a})
   expectTrue(${b} <= ${a})
   expectTrue(${a} > ${c})

@@ -1,4 +1,4 @@
-//===-- SILSROA.cpp - Scalar Replacement of Aggregates  -------------------===//
+//===--- SILSROA.cpp - Scalar Replacement of Aggregates  ------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -47,8 +47,6 @@ class SROAMemoryUseAnalyzer {
   llvm::SmallVector<LoadInst *, 4> Loads;
   // Stores to AI.
   llvm::SmallVector<StoreInst *, 4> Stores;
-  // Dealloc instructions for AI.
-  llvm::SmallVector<DeallocStackInst *, 4> Deallocs;
   // Instructions which extract from aggregates.
   llvm::SmallVector<SILInstruction *, 4> ExtractInsts;
 
@@ -125,7 +123,7 @@ unsigned SROAMemoryUseAnalyzer::getEltNoForProjection(SILInstruction *Inst) {
 bool SROAMemoryUseAnalyzer::analyze() {
   // We only know how to split structs and tuples... So if we have a scalar or a
   // different sort of aggregate, bail.
-  SILType Type = SILValue(AI, 1).getType();
+  SILType Type = AI->getType();
 
   TT = Type.getAs<TupleType>();
   SD = Type.getStructOrBoundGenericStruct();
@@ -139,14 +137,14 @@ bool SROAMemoryUseAnalyzer::analyze() {
   }
 
   // Go through uses of the memory allocation of AI...
-  for (auto *Operand : getNonDebugUses(SILValue(AI, 1))) {
+  for (auto *Operand : getNonDebugUses(SILValue(AI))) {
     SILInstruction *User = Operand->getUser();
     DEBUG(llvm::dbgs() << "    Visiting use: " << *User);
 
     // If we store the alloca pointer, we cannot analyze its uses so bail...
     // It is ok if we store into the alloca pointer though.
     if (auto *SI = dyn_cast<StoreInst>(User)) {
-      if (SI->getDest().getDef() == AI) {
+      if (SI->getDest() == AI) {
         DEBUG(llvm::dbgs() << "        Found a store into the "
               "projection.\n");
         Stores.push_back(SI);
@@ -182,6 +180,11 @@ bool SROAMemoryUseAnalyzer::analyze() {
       continue;
     }
 
+    if (isa<DeallocStackInst>(User)) {
+      // We can ignore the dealloc_stack.
+      continue;
+    }
+    
     // Otherwise we do not understand this instruction, so bail.
     DEBUG(llvm::dbgs() << "        Found unknown user, pointer escapes!\n");
     ++NumEscapingAllocas;
@@ -197,7 +200,7 @@ void
 SROAMemoryUseAnalyzer::
 createAllocas(llvm::SmallVector<AllocStackInst *, 4> &NewAllocations) {
   SILBuilderWithScope B(AI);
-  SILType Type = AI->getType(1).getObjectType();
+  SILType Type = AI->getType().getObjectType();
 
   if (TT) {
     for (unsigned EltNo : indices(TT->getElementTypes())) {
@@ -230,10 +233,10 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
     SILBuilderWithScope B(LI);
     llvm::SmallVector<SILValue, 4> Elements;
     for (auto *NewAI : NewAllocations)
-      Elements.push_back(B.createLoad(LI->getLoc(), SILValue(NewAI, 1)));
+      Elements.push_back(B.createLoad(LI->getLoc(), NewAI));
     auto *Agg = createAgg(B, LI->getLoc(), LI->getType().getObjectType(),
                           Elements);
-    SILValue(LI).replaceAllUsesWith(Agg);
+    LI->replaceAllUsesWith(Agg);
     LI->eraseFromParent();
   }
 
@@ -243,21 +246,20 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
     for (unsigned EltNo : indices(NewAllocations))
       B.createStore(SI->getLoc(),
                     createAggProjection(B, SI->getLoc(), SI->getSrc(), EltNo),
-                    SILValue(NewAllocations[EltNo], 1));
+                    NewAllocations[EltNo]);
     SI->eraseFromParent();
   }
 
   // Forward any field extracts to the new allocation.
   for (auto *Ext : ExtractInsts) {
-    SILValue NewValue = SILValue(NewAllocations[getEltNoForProjection(Ext)], 1);
-    SILValue(Ext).replaceAllUsesWith(NewValue);
+    AllocStackInst *NewValue = NewAllocations[getEltNoForProjection(Ext)];
+    Ext->replaceAllUsesWith(NewValue);
     Ext->eraseFromParent();
   }
 
-  // Find all dealloc instruction that touch the local storage handle for AI
-  // and then chop them up.
+  // Find all dealloc instructions for AI and then chop them up.
   llvm::SmallVector<DeallocStackInst *, 4> ToRemove;
-  for (auto *Operand : getNonDebugUses(SILValue(AI, 0))) {
+  for (auto *Operand : getNonDebugUses(SILValue(AI))) {
     SILInstruction *User = Operand->getUser();
     SILBuilderWithScope B(User);
 

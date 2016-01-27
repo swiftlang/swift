@@ -439,7 +439,6 @@ private:
   const char *findEndOfCurlyQuoteStringLiteral(const char*);
 };
   
-  
 } // end namespace swift
 
 #endif

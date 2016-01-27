@@ -276,10 +276,9 @@ typename TopDownDataflowRCStateVisitor<ARCState>::DataflowResult
 TopDownDataflowRCStateVisitor<ARCState>::
 visitStrongAllocBox(AllocBoxInst *ABI) {
   // Alloc box introduces a ref count of +1 on its container.
-  SILValue Container = ABI->getContainerResult();
-  auto &State = DataflowState.getTopDownRefCountState(Container);
-  State.initWithEntranceInst(ABI, Container);
-  return DataflowResult(Container);
+  auto &State = DataflowState.getTopDownRefCountState(ABI);
+  State.initWithEntranceInst(ABI, ABI);
+  return DataflowResult(ABI);
 }
 
 template <class ARCState>

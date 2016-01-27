@@ -1,4 +1,4 @@
-//===--- LineList.h - Data structures for Markup parsing ------------------===//
+//===--- LineList.h - Data structures for Markup parsing --------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend -emit-silgen -parse-stdlib -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module > %t.sil
+// RUN: %target-swift-frontend -emit-silgen -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module > %t.sil
 // RUN: FileCheck -check-prefix=TABLE -check-prefix=TABLE-ALL %s < %t.sil
 // RUN: FileCheck -check-prefix=SYMBOL %s < %t.sil
 
-// RUN: %target-swift-frontend -emit-silgen -parse-stdlib -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module -enable-testing > %t.testable.sil
+// RUN: %target-swift-frontend -emit-silgen -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module -enable-testing > %t.testable.sil
 // RUN: FileCheck -check-prefix=TABLE-TESTABLE -check-prefix=TABLE-ALL %s < %t.testable.sil
 // RUN: FileCheck -check-prefix=SYMBOL-TESTABLE %s < %t.testable.sil
 
@@ -491,7 +491,7 @@ struct ConformsWithDependentAssocType2<DD> : AssocTypeWithReqt {
 }
 // TABLE-LABEL: sil_witness_table hidden <DD> ConformsWithDependentAssocType2<DD>: AssocTypeWithReqt module witness_tables {
 // TABLE-NEXT:    associated_type AssocType: GenericAssocType<DD>
-// TABLE-NEXT:    associated_type_protocol (AssocType: AssocReqt): GenericAssocType<DD>: specialize <T = DD> (<T> GenericAssocType<T>: AssocReqt module witness_tables)
+// TABLE-NEXT:    associated_type_protocol (AssocType: AssocReqt): GenericAssocType<DD>: specialize <DD> (<T> GenericAssocType<T>: AssocReqt module witness_tables)
 // TABLE-NEXT:  }
 
 protocol InheritedFromObjC : ObjCProtocol {

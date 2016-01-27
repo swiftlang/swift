@@ -1,4 +1,4 @@
-//===-- ValueTracking.h - SIL Value Tracking Analysis ----------*- C++ -*--===//
+//===--- ValueTracking.h - SIL Value Tracking Analysis ----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -20,12 +20,6 @@
 #include "swift/SIL/SILInstruction.h"
 
 namespace swift {
-
-class SILValue;
-
-/// Strip off casts/indexing insts/address projections from V until there is
-/// nothing left to strip.
-SILValue getUnderlyingObject(SILValue V);
 
 /// Returns true if \p V is a function argument which may not alias to
 /// any other pointer in the function.

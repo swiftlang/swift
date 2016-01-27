@@ -1,4 +1,4 @@
-//===--------------- ARCAnalysis.h - SIL ARC Analysis ----*- C++ -*--------===//
+//===--- ARCAnalysis.h - SIL ARC Analysis -----------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -23,7 +23,6 @@
 
 namespace swift {
 
-class SILValue;
 class SILInstruction;
 class AliasAnalysis;
 class PostOrderAnalysis;

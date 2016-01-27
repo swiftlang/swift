@@ -11,13 +11,6 @@
 @_transparent public func standalone_function(x x: Int32, y: Int32) -> Int32 {
   return x
 }
-@_transparent public func curried_function(x x: Int32)(y: Int32) -> Int32 {
-  return standalone_function(x: x, y: y)
-}
-@_transparent public func calls(i i: Int32, j: Int32) {
-  var f1 = curried_function(x: i)
-  f1(y: j);
-}
 public func foo() -> Int32 { return 0 }
 public func runced() -> Bool { return true }
 

@@ -1,4 +1,4 @@
-//===----------- EscapeAnalysis.h - SIL Escape Analysis -*- C++ -*---------===//
+//===--- EscapeAnalysis.h - SIL Escape Analysis -----------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -297,7 +297,12 @@ private:
           return true;
       }
     }
-  };
+
+    /// Returns the content node if of this node if it exists in the graph.
+    CGNode *getContentNodeOrNull() const {
+      return pointsTo;
+    }
+};
 
   /// Mapping from nodes in a callee-graph to nodes in a caller-graph.
   class CGNodeMap {
@@ -371,8 +376,12 @@ public:
     /// The allocator for nodes.
     llvm::SpecificBumpPtrAllocator<CGNode> NodeAllocator;
 
+    /// True if this is a summary graph.
+    bool isSummaryGraph;
+    
     /// Constructs a connection graph for a function.
-    ConnectionGraph(SILFunction *F) : F(F) {
+    ConnectionGraph(SILFunction *F, bool isSummaryGraph) :
+      F(F), isSummaryGraph(isSummaryGraph) {
     }
 
     /// Returns true if the connection graph is empty.
@@ -433,11 +442,6 @@ public:
     /// Returns null, if V is not a "pointer".
     CGNode *getNode(ValueBase *V, EscapeAnalysis *EA, bool createIfNeeded = true);
 
-    /// Gets or creates a node for a SILValue (same as above).
-   CGNode *getNode(SILValue V, EscapeAnalysis *EA) {
-      return getNode(V.getDef(), EA, true);
-    }
-
     /// Gets or creates a content node to which \a AddrNode points to.
     CGNode *getContentNode(CGNode *AddrNode);
 
@@ -445,7 +449,8 @@ public:
     CGNode *getReturnNode() {
       if (!ReturnNode) {
         ReturnNode = allocNode(nullptr, NodeType::Return);
-        ReturnNode->mergeEscapeState(EscapeState::Return);
+        if (!isSummaryGraph)
+          ReturnNode->mergeEscapeState(EscapeState::Return);
       }
       return ReturnNode;
     }
@@ -529,11 +534,6 @@ public:
       return getNode(V, EA, false);
     }
 
-    /// Gets or creates a node for a SILValue (same as above).
-    CGNode *getNodeOrNull(SILValue V, EscapeAnalysis *EA) {
-      return getNode(V.getDef(), EA, false);
-    }
-
     /// Returns the number of use-points of a node.
     int getNumUsePoints(CGNode *Node) {
       assert(!Node->escapes() &&
@@ -581,7 +581,7 @@ private:
 
   /// All the information we keep for a function.
   struct FunctionInfo : public FunctionInfoBase<FunctionInfo> {
-    FunctionInfo(SILFunction *F) : Graph(F), SummaryGraph(F) { }
+    FunctionInfo(SILFunction *F) : Graph(F, false), SummaryGraph(F, true) { }
 
     /// The connection graph for the function. This is what clients of the
     /// analysis will see.
@@ -673,8 +673,8 @@ private:
   template<class SelectInst>
   void analyzeSelectInst(SelectInst *SI, ConnectionGraph *ConGraph);
 
-  /// Returns true if \p V is an Array or the storage reference of an array.
-  bool isArrayOrArrayStorage(SILValue V);
+  /// Returns true if a release of \p V is known to not capture its content.
+  bool deinitIsKnownToNotCapture(SILValue V);
 
   /// Sets all operands and results of \p I as global escaping.
   void setAllEscaping(SILInstruction *I, ConnectionGraph *ConGraph);
@@ -739,6 +739,14 @@ public:
   /// This means that either \p To is the same as \p V or contains a reference
   /// to \p V.
   bool canEscapeToValue(SILValue V, SILValue To);
+
+  /// Returns true if the parameter with index \p ParamIdx can escape in the
+  /// called function of apply site \p FAS.
+  /// If it is an indirect parameter and \p checkContentOfIndirectParam is true
+  /// then the escape status is not checked for the address itself but for the
+  /// referenced pointer (if the referenced type is a pointer).
+  bool canParameterEscape(FullApplySite FAS, int ParamIdx,
+                          bool checkContentOfIndirectParam);
 
   /// Returns true if the pointers \p V1 and \p V2 can possibly point to the
   /// same memory.

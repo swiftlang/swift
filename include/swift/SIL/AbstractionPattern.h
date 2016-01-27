@@ -248,23 +248,6 @@ class AbstractionPattern {
   };
   CanGenericSignature GenericSig;
 
-  static bool isOpaqueType(CanGenericSignature signature, CanType type) {
-    assert(signature || !type->hasTypeParameter());
-    if (auto arch = dyn_cast<ArchetypeType>(type))
-      return !arch->requiresClass();
-    // FIXME: Check class constraint of dependent types in their originating
-    // context.  Even for direct parameters this requires a more principled
-    // check than this.
-    if (auto paramType = dyn_cast<GenericTypeParamType>(type))
-      return isOpaqueType(signature, paramType);
-    if (isa<DependentMemberType>(type))
-      return true;
-    return false;
-  }
-
-  static bool isOpaqueType(CanGenericSignature signature,
-                           CanGenericTypeParamType type);
-
   Kind getKind() const { return Kind(TheKind); }
 
   CanGenericSignature getGenericSignatureForFunctionComponent() const {
@@ -297,36 +280,29 @@ class AbstractionPattern {
     return hasStoredObjCMethod();
   }
 
-  void initSwiftType(CanGenericSignature signature, CanType origType) {
+  void initSwiftType(CanGenericSignature signature, CanType origType,
+                     Kind kind = Kind::Type) {
     assert(signature || !origType->hasTypeParameter());
-    if (isOpaqueType(signature, origType)) {
-      TheKind = unsigned(Kind::Opaque);
-    } else {
-      TheKind = unsigned(Kind::Type);
-      OrigType = origType;
+    TheKind = unsigned(kind);
+    OrigType = origType;
+    GenericSig = CanGenericSignature();
+    if (origType->hasTypeParameter())
       GenericSig = signature;
-    }
   }
 
   void initClangType(CanGenericSignature signature,
                      CanType origType, const clang::Type *clangType,
                      Kind kind = Kind::ClangType) {
-    assert(!isOpaqueType(signature, origType));
-    TheKind = unsigned(kind);
-    OrigType = origType;
+    initSwiftType(signature, origType, kind);
     ClangType = clangType;
-    GenericSig = signature;
   }
 
   void initObjCMethod(CanGenericSignature signature,
                       CanType origType, const clang::ObjCMethodDecl *method,
                       Kind kind, EncodedForeignErrorInfo errorInfo) {
-    assert(!isOpaqueType(signature, origType));
-    TheKind = unsigned(kind);
-    OrigType = origType;
+    initSwiftType(signature, origType, kind);
     ObjCMethod = method;
     OtherData = errorInfo.getOpaqueValue();
-    GenericSig = signature;
   }
 
   AbstractionPattern() {}
@@ -353,6 +329,12 @@ public:
 
   static AbstractionPattern getInvalid() {
     return AbstractionPattern(Kind::Invalid);
+  }
+
+  bool hasGenericSignature() const {
+    return (getKind() == Kind::Type ||
+            hasStoredClangType() ||
+            hasStoredObjCMethod());
   }
 
   CanGenericSignature getGenericSignature() const {
@@ -498,10 +480,43 @@ public:
     return getKind() != Kind::Invalid;
   }
 
-  /// Is this abstraction pattern fully opaque?
-  bool isOpaque() const {
-    assert(isValid());
-    return getKind() == Kind::Opaque;
+  bool isTypeParameter() const {
+    switch (getKind()) {
+    case Kind::Opaque:
+      return true;
+    case Kind::Type: {
+      auto type = getType();
+      if (isa<ArchetypeType>(type) ||
+          isa<DependentMemberType>(type) ||
+          isa<AbstractTypeParamType>(type)) {
+        return true;
+      }
+      return false;
+    }
+    default:
+      return false;
+    }
+  }
+
+  bool requiresClass(ModuleDecl &module) {
+    switch (getKind()) {
+    case Kind::Opaque:
+      return false;
+    case Kind::Type: {
+      auto type = getType();
+      if (auto archetype = dyn_cast<ArchetypeType>(type))
+        return archetype->requiresClass();
+      else if (isa<DependentMemberType>(type) ||
+               isa<AbstractTypeParamType>(type)) {
+        assert(GenericSig &&
+               "Dependent type in pattern without generic signature?");
+        return GenericSig->requiresClass(type, module);
+      }
+      return false;
+    }
+    default:
+      return false;
+    }
   }
 
   /// Return the Swift type which provides structure for this

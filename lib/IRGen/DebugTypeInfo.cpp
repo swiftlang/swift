@@ -1,4 +1,4 @@
-//===--- DebugTypeInfo.cpp - Type Info for Debugging ------------*- C++ -*-===//
+//===--- DebugTypeInfo.cpp - Type Info for Debugging ----------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -112,6 +112,21 @@ DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, swift::Type Ty,
     Type = Ty.getPointer();
 
   initFromTypeInfo(size, align, StorageType, Info);
+}
+
+DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, swift::Type Ty,
+                             llvm::Type *StorageTy,
+                             Size size, Alignment align)
+  : DeclOrContext(Decl),
+    StorageType(StorageTy),
+    size(size),
+    align(align) {
+  // Prefer the original, potentially sugared version of the type if
+  // the type hasn't been mucked with by an optimization pass.
+  if (Decl->getType().getCanonicalTypeOrNull() == Ty.getCanonicalTypeOrNull())
+    Type = Decl->getType().getPointer();
+  else
+    Type = Ty.getPointer();
 }
 
 static bool typesEqual(Type A, Type B) {

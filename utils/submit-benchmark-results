@@ -32,13 +32,13 @@ def capture_with_result(args, include_stderr=False):
         stderr = subprocess.STDOUT
     try:
         p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=stderr)
-    except OSError,e:
+    except OSError, e:
         if e.errno == errno.ENOENT:
             sys.exit('no such file or directory: %r when running %s.' % (
-                  args[0], ' '.join(args)))
+                args[0], ' '.join(args)))
         raise
-    out,_ = p.communicate()
-    return out,p.wait()
+    out, _ = p.communicate()
+    return out, p.wait()
 
 def capture(args, include_stderr=False):
     """capture(command) - Run the given command (or argv list) in a shell and
@@ -52,8 +52,8 @@ def timestamp():
 
 def submit_results_to_server(results_data, submit_url):
     # Submit the URL encoded data.
-    data = urllib.urlencode({ 'input_data' : results_data,
-                              'commit' : '1' })
+    data = urllib.urlencode({'input_data': results_data,
+                             'commit': '1'})
     response = urllib2.urlopen(urllib2.Request(submit_url, data))
     result_data = response.read()
 
@@ -113,29 +113,31 @@ def main():
    utcnow = datetime.datetime.utcnow()
    start_time = utcnow - datetime.timedelta(seconds=data['elapsed'])
    end_time = utcnow
-   
+
    # Create the LNT report format.
    lnt_results = {}
    lnt_results['Machine'] = {
-      'Name' : machine_name,
-      'Info' : {
-         'hardware' : capture(["uname","-m"], include_stderr=True).strip(),
-         'name' : capture(["uname","-n"], include_stderr=True).strip(),
-         'os' : capture(["uname","-sr"], include_stderr=True).strip(),
-         'uname' : capture(["uname","-a"], include_stderr=True).strip(),
-         } }
+       'Name': machine_name,
+       'Info': {
+           'hardware': capture(["uname", "-m"], include_stderr=True).strip(),
+           'name': capture(["uname", "-n"], include_stderr=True).strip(),
+           'os': capture(["uname", "-sr"], include_stderr=True).strip(),
+           'uname': capture(["uname", "-a"], include_stderr=True).strip(),
+       }
+   }
 
    # FIXME: Record source versions for LLVM, Swift, etc.?
    lnt_results['Run'] = {
-      'Start Time' : start_time.strftime('%Y-%m-%d %H:%M:%S'),
-      'End Time' : end_time.strftime('%Y-%m-%d %H:%M:%S'),
-      'Info' : {
-         '__report_version__' : '1',
-         'tag' : 'nts',
-         'inferred_run_order' : run_order,
-         'run_order' : run_order,
-         'sw_vers' : capture(['sw_vers'], include_stderr=True).strip(),
-         } }
+       'Start Time': start_time.strftime('%Y-%m-%d %H:%M:%S'),
+       'End Time': end_time.strftime('%Y-%m-%d %H:%M:%S'),
+       'Info': {
+           '__report_version__': '1',
+           'tag': 'nts',
+           'inferred_run_order': run_order,
+           'run_order': run_order,
+           'sw_vers': capture(['sw_vers'], include_stderr=True).strip(),
+       }
+   }
 
    lnt_results['Tests'] = lnt_tests = []
    for test in data['tests']:
@@ -143,11 +145,11 @@ def main():
       code = test['code']
       if code not in ('PASS', 'XPASS', 'FAIL', 'XFAIL'):
          sys.stderr.write("ignoring test %r with result code %r" % (
-               test['name'], code))
+             test['name'], code))
          continue
 
       # Extract the test name, which is encoded as 'suite :: name'.
-      test_name = 'nts.%s' % (test['name'].split('::',1)[1][1:],)
+      test_name = 'nts.%s' % (test['name'].split('::', 1)[1][1:],)
 
       # Convert this test to the 'nts' schema.
       compile_success = test['metrics'].get('compile_success', 1)
@@ -159,19 +161,19 @@ def main():
       # FIXME: The XFAIL handling here isn't going to be right.
 
       if not compile_success:
-         lnt_tests.append({ 'Name' : '%s.compile.status' % (test_name,),
-                            'Info' : {},
-                            'Data' : [ FAIL ] })
+         lnt_tests.append({'Name': '%s.compile.status' % (test_name,),
+                           'Info': {},
+                           'Data': [FAIL]})
       if not exec_success:
-         lnt_tests.append({ 'Name' : '%s.exec.status' % (test_name,),
-                            'Info' : {},
-                            'Data' : [ FAIL ] })
-      lnt_tests.append({ 'Name' : '%s.compile' % (test_name,),
-                         'Info' : {},
-                         'Data' : [ compile_time ] })
-      lnt_tests.append({ 'Name' : '%s.exec' % (test_name,),
-                         'Info' : {},
-                         'Data' : [ exec_time ] })
+         lnt_tests.append({'Name': '%s.exec.status' % (test_name,),
+                           'Info': {},
+                           'Data': [FAIL]})
+      lnt_tests.append({'Name': '%s.compile' % (test_name,),
+                        'Info': {},
+                        'Data': [compile_time]})
+      lnt_tests.append({'Name': '%s.exec' % (test_name,),
+                        'Info': {},
+                        'Data': [exec_time]})
 
    # Create the report data.
    lnt_result_data = json.dumps(lnt_results, indent=2) + '\n'
@@ -179,13 +181,13 @@ def main():
    # Write the results, if requested.
    if opts.output:
       sys.stderr.write('%s: generating report: %r\n' % (
-            timestamp(), opts.output))
+          timestamp(), opts.output))
       with open(opts.output, 'w') as f:
          f.write(lnt_result_data)
 
    # Submit the results to an LNT server, if requested.
    if opts.submit_url:
       submit_results_to_server(lnt_result_data, opts.submit_url)
-      
+
 if __name__ == '__main__':
    main()

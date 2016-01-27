@@ -83,6 +83,42 @@ func _typeName(type: Any.Type, qualified: Bool = true) -> String {
     input: UnsafeBufferPointer(start: stringPtr, count: count))
 }
 
+@_silgen_name("swift_getTypeByMangledName")
+func _getTypeByMangledName(
+    name: UnsafePointer<UInt8>,
+    _ nameLength: UInt)
+  -> Any.Type?
+
+/// Lookup a class given a name. Until the demangled encoding of type
+/// names is stabilized, this is limited to top-level class names (Foo.bar).
+@warn_unused_result
+public // SPI(Foundation)
+func _typeByName(name: String) -> Any.Type? {
+  let components = name.characters.split{$0 == "."}.map(String.init)
+  guard components.count == 2 else {
+    return nil
+  }
+
+  // Note: explicitly build a class name to match on, rather than matching
+  // on the result of _typeName(), to ensure the type we are resolving is
+  // actually a class.
+  var name = "C"
+  if components[0] == "Swift" {
+    name += "Ss"
+  } else {
+    name += String(components[0].characters.count) + components[0]
+  }
+  name += String(components[1].characters.count) + components[1]
+
+  let nameUTF8 = Array(name.utf8)
+  return nameUTF8.withUnsafeBufferPointer { (nameUTF8) in
+    let type = _getTypeByMangledName(nameUTF8.baseAddress,
+                                     UInt(nameUTF8.endIndex))
+
+    return type
+  }
+}
+ 
 @warn_unused_result
 @_silgen_name("swift_stdlib_demangleName")
 func _stdlib_demangleNameImpl(

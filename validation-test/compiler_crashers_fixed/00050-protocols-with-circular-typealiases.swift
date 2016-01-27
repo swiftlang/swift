@@ -5,9 +5,9 @@
 // Similar to 010-circular-protocol-reference.swift, might be same underlying bug.
 
 protocol A {
-    typealias A = B
+    associatedtype A = B
 }
 
 protocol B {
-    typealias B = A
+    associatedtype B = A
 }

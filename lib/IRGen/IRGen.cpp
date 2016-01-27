@@ -443,6 +443,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
       // Emit protocol conformances into a section we can recognize at runtime.
       // In JIT mode these are manually registered above.
       IGM.emitProtocolConformances();
+      IGM.emitTypeMetadataRecords();
     }
 
     // Okay, emit any definitions that we suddenly need.

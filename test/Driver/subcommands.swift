@@ -1,5 +1,7 @@
 // Check that each of 'swift', 'swift repl', 'swift run' invoke the REPL.
 //
+// REQUIRES: swift_interpreter
+//
 // RUN: %swift_driver_plain -### 2>&1 | FileCheck -check-prefix=CHECK-SWIFT-INVOKES-REPL %s
 // RUN: %swift_driver_plain run -### 2>&1 | FileCheck -check-prefix=CHECK-SWIFT-INVOKES-REPL %s
 // RUN: %swift_driver_plain repl -### 2>&1 | FileCheck -check-prefix=CHECK-SWIFT-INVOKES-REPL %s

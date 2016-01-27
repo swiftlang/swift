@@ -595,7 +595,7 @@ public:
 
   virtual void
   loadAllConformances(const Decl *D, uint64_t contextData,
-                      SmallVectorImpl<ProtocolConformance*> &Conforms) override;
+                    SmallVectorImpl<ProtocolConformance*> &Conforms) override;
 
   virtual TypeLoc loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
                                             uint64_t contextData) override;
@@ -653,9 +653,7 @@ public:
   Optional<Substitution> maybeReadSubstitution(llvm::BitstreamCursor &Cursor);
 
   /// Recursively reads a protocol conformance from the given cursor.
-  ///
-  /// Note that a null conformance is valid for archetypes.
-  ProtocolConformance *readConformance(llvm::BitstreamCursor &Cursor);
+  ProtocolConformanceRef readConformance(llvm::BitstreamCursor &Cursor);
 
   /// Read the given normal conformance from the current module file.
   NormalProtocolConformance *

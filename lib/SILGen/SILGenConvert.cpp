@@ -87,10 +87,7 @@ void SILGenFunction::emitInjectOptionalValueInto(SILLocation loc,
                                             someDecl,
                                             loweredPayloadTy.getAddressType());
   
-  CanType formalOptType = optType.getSwiftRValueType();
-  auto archetype = formalOptType->getNominalOrBoundGenericNominal()
-    ->getGenericParams()->getPrimaryArchetypes()[0];
-  AbstractionPattern origType(archetype);
+  AbstractionPattern origType = AbstractionPattern::getOpaque();
 
   // Emit the value into the payload area.
   TemporaryInitialization emitInto(destPayload, CleanupHandle::invalid());
@@ -141,11 +138,8 @@ getOptionalSomeValue(SILLocation loc, ManagedValue value,
   assert(OTK != OTK_None);
   auto someDecl = getASTContext().getOptionalSomeDecl(OTK);
   
-  auto archetype = formalOptType->getNominalOrBoundGenericNominal()
-                        ->getGenericParams()->getPrimaryArchetypes()[0];
-  AbstractionPattern origType(archetype);
+  AbstractionPattern origType = AbstractionPattern::getOpaque();
 
-  
   // Reabstract input value to the type expected by the enum.
   value = emitSubstToOrigValue(loc, value, origType, formalObjectType);
 
@@ -155,19 +149,18 @@ getOptionalSomeValue(SILLocation loc, ManagedValue value,
   return emitManagedRValueWithCleanup(result, optTL);
 }
 
-static Substitution getSimpleSubstitution(GenericParamList &generics,
+static Substitution getSimpleSubstitution(GenericSignature *genericSig,
                                           CanType typeArg) {
-  assert(generics.getParams().size() == 1);
-  auto typeParamDecl = generics.getParams().front();
-  return Substitution{typeParamDecl->getArchetype(), typeArg, {}};
+  assert(genericSig->getGenericParams().size() == 1);
+  return Substitution{typeArg, {}};
 }
 
 /// Create the correct substitution for calling the given function at
 /// the given type.
 static Substitution getSimpleSubstitution(FuncDecl *fn, CanType typeArg) {
-  auto polyFnType =
-    cast<PolymorphicFunctionType>(fn->getType()->getCanonicalType());
-  return getSimpleSubstitution(polyFnType->getGenericParams(), typeArg);
+  auto genericFnType =
+    cast<GenericFunctionType>(fn->getInterfaceType()->getCanonicalType());
+  return getSimpleSubstitution(genericFnType->getGenericSignature(), typeArg);
 }
 
 static CanType getOptionalValueType(SILType optType,
@@ -181,7 +174,7 @@ static CanType getOptionalValueType(SILType optType,
 void SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
                                                       SILValue addr) {
   OptionalTypeKind OTK;
-  getOptionalValueType(addr.getType().getObjectType(), OTK);
+  getOptionalValueType(addr->getType().getObjectType(), OTK);
 
   // Generate code to the optional is present, and if not abort with a message
   // (provided by the stdlib).
@@ -208,7 +201,7 @@ void SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
 
 SILValue SILGenFunction::emitDoesOptionalHaveValue(SILLocation loc,
                                                    SILValue addrOrValue) {
-  SILType optType = addrOrValue.getType().getObjectType();
+  SILType optType = addrOrValue->getType().getObjectType();
   OptionalTypeKind optionalKind;
   getOptionalValueType(optType, optionalKind);
 
@@ -217,7 +210,7 @@ SILValue SILGenFunction::emitDoesOptionalHaveValue(SILLocation loc,
   SILValue no = B.createIntegerLiteral(loc, boolTy, 0);
   auto someDecl = getASTContext().getOptionalSomeDecl(optionalKind);
   
-  if (addrOrValue.getType().isAddress())
+  if (addrOrValue->getType().isAddress())
     return B.createSelectEnumAddr(loc, addrOrValue, boolTy, no,
                                   std::make_pair(someDecl, yes));
   return B.createSelectEnum(loc, addrOrValue, boolTy, no,
@@ -373,7 +366,7 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
 void SILGenFunction::OpaqueValueState::destroy(SILGenFunction &gen,
                                                SILLocation loc) {
   if (isConsumable && !hasBeenConsumed) {
-    auto &lowering = gen.getTypeLowering(value.getType().getSwiftRValueType());
+    auto &lowering = gen.getTypeLowering(value->getType().getSwiftRValueType());
     lowering.emitDestroyRValue(gen.B, loc, value);
   }
 }
@@ -418,11 +411,11 @@ ManagedValue SILGenFunction::emitExistentialErasure(
                             CanType concreteFormalType,
                             const TypeLowering &concreteTL,
                             const TypeLowering &existentialTL,
-                            const ArrayRef<ProtocolConformance *> &conformances,
+                            ArrayRef<ProtocolConformanceRef> conformances,
                             SGFContext C,
                             llvm::function_ref<ManagedValue (SGFContext)> F) {
   // Mark the needed conformances as used.
-  for (auto *conformance : conformances)
+  for (auto conformance : conformances)
     SGM.useConformance(conformance);
 
   switch (existentialTL.getLoweredType().getObjectType()
@@ -433,7 +426,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     assert(existentialTL.isLoadable());
 
     SILValue metatype = F(SGFContext()).getUnmanagedValue();
-    assert(metatype.getType().castTo<AnyMetatypeType>()->getRepresentation()
+    assert(metatype->getType().castTo<AnyMetatypeType>()->getRepresentation()
              == MetatypeRepresentation::Thick);
 
     auto upcast =
@@ -455,14 +448,13 @@ ManagedValue SILGenFunction::emitExistentialErasure(
   }
   case ExistentialRepresentation::Boxed: {
     // Allocate the existential.
-    auto box = B.createAllocExistentialBox(loc,
+    auto *existential = B.createAllocExistentialBox(loc,
                                            existentialTL.getLoweredType(),
                                            concreteFormalType,
-                                           concreteTL.getLoweredType(),
                                            conformances);
-    auto existential = box->getExistentialResult();
-    auto valueAddr = box->getValueAddressResult();
-
+    auto *valueAddr = B.createProjectExistentialBox(loc,
+                                           concreteTL.getLoweredType(),
+                                           existential);
     // Initialize the concrete value in-place.
     InitializationPtr init(
         new ExistentialInitialization(existential, valueAddr, concreteFormalType,
@@ -509,7 +501,7 @@ ManagedValue SILGenFunction::emitClassMetatypeToObject(SILLocation loc,
   SILValue value = v.getUnmanagedValue();
 
   // Convert the metatype to objc representation.
-  auto metatypeTy = value.getType().castTo<MetatypeType>();
+  auto metatypeTy = value->getType().castTo<MetatypeType>();
   auto objcMetatypeTy = CanMetatypeType::get(metatypeTy.getInstanceType(),
                                              MetatypeRepresentation::ObjC);
   value = B.createThickToObjCMetatype(loc, value,
@@ -527,7 +519,7 @@ ManagedValue SILGenFunction::emitExistentialMetatypeToObject(SILLocation loc,
   SILValue value = v.getUnmanagedValue();
   
   // Convert the metatype to objc representation.
-  auto metatypeTy = value.getType().castTo<ExistentialMetatypeType>();
+  auto metatypeTy = value->getType().castTo<ExistentialMetatypeType>();
   auto objcMetatypeTy = CanExistentialMetatypeType::get(
                                               metatypeTy.getInstanceType(),
                                               MetatypeRepresentation::ObjC);

@@ -1,4 +1,4 @@
-//===--- Constraint.cpp - Constraint in the Type Checker --------*- C++ -*-===//
+//===--- Constraint.cpp - Constraint in the Type Checker ------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -20,6 +20,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Fallthrough.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
 
 using namespace swift;
@@ -338,6 +339,10 @@ void Constraint::dump(SourceManager *sm) const {
 }
 
 void Constraint::dump(ConstraintSystem *CS) const {
+  // Print all type variables as $T0 instead of _ here.
+  llvm::SaveAndRestore<bool> X(CS->getASTContext().LangOpts.
+                               DebugConstraintSolver, true);
+  
   dump(&CS->getASTContext().SourceMgr);
 }
 

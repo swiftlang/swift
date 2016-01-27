@@ -11,11 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 %{
-def cmp(a,b,p):
+def cmp(a, b, p):
   if p:
-    return "isOrderedBefore("+a+", "+b+")"
+    return "isOrderedBefore(" + a + ", " + b + ")"
   else:
-    return "("+a+" < "+b+")"
+    return "(" + a + " < " + b + ")"
 
 }%
 

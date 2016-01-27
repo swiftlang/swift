@@ -50,7 +50,7 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &gen,
   // be optional, as opposed to simply having a null inhabitant.
   OptionalTypeKind errorPtrOptKind;
   if (SILType errorPtrObjectTy =
-        foreignErrorSlot.getType()
+        foreignErrorSlot->getType()
                         .getAnyOptionalObjectType(gen.SGM.M, errorPtrOptKind)) {
     SILBasicBlock *contBB = gen.createBasicBlock();
     SILBasicBlock *noSlotBB = gen.createBasicBlock();
@@ -78,7 +78,7 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &gen,
   // Okay, break down the components of SomePointer<SomeErrorType?>.
   // TODO: this should really be an unlowered AST type?
   CanType bridgedErrorPtrType =
-    foreignErrorSlot.getType().getSwiftRValueType();
+    foreignErrorSlot->getType().getSwiftRValueType();
 
   PointerTypeKind ptrKind;
   CanType bridgedErrorType =
@@ -213,8 +213,6 @@ SILValue SILGenFunction::
 emitBridgeReturnValueForForeignError(SILLocation loc,
                                      SILValue result,
                                      SILFunctionTypeRepresentation repr,
-                                     AbstractionPattern origNativeType,
-                                     CanType substNativeType,
                                      SILType bridgedType,
                                      SILValue foreignErrorSlot,
                                const ForeignErrorConvention &foreignError) {
@@ -242,8 +240,7 @@ emitBridgeReturnValueForForeignError(SILLocation loc,
       bridgedType.getSwiftRValueType().getAnyOptionalObjectType(optKind);
     ManagedValue bridgedResult =
       emitNativeToBridgedValue(loc, emitManagedRValueWithCleanup(result),
-                               repr, origNativeType, substNativeType,
-                               bridgedObjectType);
+                               repr, bridgedObjectType);
 
     auto someResult =
       B.createOptionalSome(loc, bridgedResult.forward(*this), optKind,
@@ -260,8 +257,7 @@ emitBridgeReturnValueForForeignError(SILLocation loc,
     // The actual result value just needs to be bridged normally.
     ManagedValue bridgedValue =
       emitNativeToBridgedValue(loc, emitManagedRValueWithCleanup(result),
-                               repr, origNativeType, substNativeType,
-                               bridgedType.getSwiftRValueType());
+                               repr, bridgedType.getSwiftRValueType());
     return bridgedValue.forward(*this);
   }
   }
@@ -296,8 +292,8 @@ void SILGenFunction::emitForeignErrorBlock(SILLocation loc,
 static SILValue emitUnwrapIntegerResult(SILGenFunction &gen,
                                         SILLocation loc,
                                         SILValue value) {
-  while (!value.getType().is<BuiltinIntegerType>()) {
-    auto structDecl = value.getType().getStructOrBoundGenericStruct();
+  while (!value->getType().is<BuiltinIntegerType>()) {
+    auto structDecl = value->getType().getStructOrBoundGenericStruct();
     assert(structDecl && "value for error result wasn't of struct type!");
     assert(std::next(structDecl->getStoredProperties().begin())
              == structDecl->getStoredProperties().end());
@@ -323,13 +319,13 @@ emitResultIsZeroErrorCheck(SILGenFunction &gen, SILLocation loc,
   SILValue resultValue =
     emitUnwrapIntegerResult(gen, loc, result.getUnmanagedValue());
   SILValue zero =
-    gen.B.createIntegerLiteral(loc, resultValue.getType(), 0);
+    gen.B.createIntegerLiteral(loc, resultValue->getType(), 0);
 
   ASTContext &ctx = gen.getASTContext();
   SILValue resultIsError =
     gen.B.createBuiltinBinaryFunction(loc,
                                       zeroIsError ? "cmp_eq" : "cmp_ne",
-                                      resultValue.getType(),
+                                      resultValue->getType(),
                                       SILType::getBuiltinIntegerType(1, ctx),
                                       {resultValue, zero});
 
@@ -355,7 +351,7 @@ emitResultIsNilErrorCheck(SILGenFunction &gen, SILLocation loc,
 
   OptionalTypeKind optKind;
   SILType resultObjectType =
-    optionalResult.getType().getAnyOptionalObjectType(gen.SGM.M, optKind);
+    optionalResult->getType().getAnyOptionalObjectType(gen.SGM.M, optKind);
 
   ASTContext &ctx = gen.getASTContext();
 
@@ -395,7 +391,7 @@ emitErrorIsNonNilErrorCheck(SILGenFunction &gen, SILLocation loc,
   SILValue optionalError = gen.B.createLoad(loc, errorSlot.getValue());
 
   OptionalTypeKind optKind;
-  optionalError.getType().getAnyOptionalObjectType(gen.SGM.M, optKind);
+  optionalError->getType().getAnyOptionalObjectType(gen.SGM.M, optKind);
 
   ASTContext &ctx = gen.getASTContext();
 

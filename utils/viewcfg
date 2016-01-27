@@ -55,7 +55,7 @@ class Block:
         self.succs = None
         self.lastLine = None
         self.index = Block.currentIndex
-        Block.currentIndex +=  1
+        Block.currentIndex += 1
         if preds is not None:
             for pred in re.split("[, %]", preds):
                 canPred = pred.strip()
@@ -89,7 +89,7 @@ def main():
             return
         suffix = sys.argv[1]
 
-    blocks = { }
+    blocks = {}
     curBlock = None
     silBlockPattern = re.compile(r'^(\S+)(\(.*\))?: *(\/\/ *Preds:(.*))?$')
     llvmBlockPattern1 = re.compile(r'^(\S+): *; *preds =(.*)?$')
@@ -125,10 +125,8 @@ def main():
             curBlock.addLine(line)
             blocks[blockName] = curBlock
 
-
     # Add empty blocks which we didn't see, but which are referenced.
-
-    newBlocks = { }
+    newBlocks = {}
     for name, block in blocks.iteritems():
         for adjName in (block.preds + block.getSuccs()):
             if adjName not in blocks:

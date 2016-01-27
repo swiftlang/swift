@@ -20,7 +20,7 @@ def merge_file_lists(src_root_dirs, skip_files, skip_subpaths):
     for src_root_dir in src_root_dirs:
         for src_dir, dirs, files in os.walk(src_root_dir):
             rel_dir = os.path.relpath(src_dir, src_root_dir)
-            rel_files = [os.path.join(rel_dir, file) for file in files+dirs
+            rel_files = [os.path.join(rel_dir, file) for file in files + dirs
                         if file not in skip_files]
             file_list.extend(filter(lambda file:
                                     file not in file_list, rel_files))
@@ -43,7 +43,7 @@ def merge_lipo_files(src_root_dirs, file_list, copy_verbatim_subpaths,
     corresponding subdirectory in dest_root_dir. If the subdirectory path matches
     copy_verbatim_subpaths, the whole subdirectory is recursively copied verbatim.
     """
-    lipo_cmd = [lipo_executable,"-create"]
+    lipo_cmd = [lipo_executable, "-create"]
 
     for file in file_list:
         file_paths = [os.path.join(dir, file) for dir in src_root_dirs
@@ -56,7 +56,7 @@ def merge_lipo_files(src_root_dirs, file_list, copy_verbatim_subpaths,
                                                                src_root_dirs[0]))
 
         if all([os.path.islink(item) for item in file_paths]):
-            #It's a symlink in all found instances, copy the link.
+            # It's a symlink in all found instances, copy the link.
             print("-- Creating symlink %s" % destPath)
             os.symlink(os.readlink(file_paths[0]), destPath)
         elif all([os.path.isdir(item) for item in file_paths]):
@@ -94,8 +94,8 @@ def merge_lipo_files(src_root_dirs, file_list, copy_verbatim_subpaths,
 
 def main():
     parser = argparse.ArgumentParser(
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            description="""
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="""
 This script merges and applies 'lipo' to directories. For each file present in
 any source directory, it will create a file in the destination directory.
 

@@ -1,4 +1,4 @@
-//===-------------- AliasAnalysis.cpp - SIL Alias Analysis ----------------===//
+//===--- AliasAnalysis.cpp - SIL Alias Analysis ---------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -23,6 +23,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -215,20 +216,20 @@ AliasResult AliasAnalysis::aliasAddressProjection(SILValue V1, SILValue V2,
   // If V2 is also a gep instruction with a must-alias or not-aliasing base
   // pointer, figure out if the indices of the GEPs tell us anything about the
   // derived pointers.
-  if (!Projection::isAddrProjection(V2)) {
+  if (!NewProjection::isAddressProjection(V2)) {
     // Ok, V2 is not an address projection. See if V2 after stripping casts
     // aliases O1. If so, then we know that V2 must partially alias V1 via a
     // must alias relation on O1. This ensures that given an alloc_stack and a
     // gep from that alloc_stack, we say that they partially alias.
-    if (isSameValueOrGlobal(O1, V2.stripCasts()))
+    if (isSameValueOrGlobal(O1, stripCasts(V2)))
       return AliasResult::PartialAlias;
 
     return AliasResult::MayAlias;
   }
   
-  assert(!Projection::isAddrProjection(O1) &&
+  assert(!NewProjection::isAddressProjection(O1) &&
          "underlying object may not be a projection");
-  assert(!Projection::isAddrProjection(O2) &&
+  assert(!NewProjection::isAddressProjection(O2) &&
          "underlying object may not be a projection");
 
   // Do the base pointers alias?
@@ -240,8 +241,8 @@ AliasResult AliasAnalysis::aliasAddressProjection(SILValue V1, SILValue V2,
     return AliasResult::NoAlias;
 
   // Let's do alias checking based on projections.
-  auto V1Path = ProjectionPath::getAddrProjectionPath(O1, V1, true);
-  auto V2Path = ProjectionPath::getAddrProjectionPath(O2, V2, true);
+  auto V1Path = NewProjectionPath::getProjectionPath(O1, V1);
+  auto V2Path = NewProjectionPath::getProjectionPath(O2, V2);
 
   // getUnderlyingPath and findAddressProjectionPathBetweenValues disagree on
   // what the base pointer of the two values are. Be conservative and return
@@ -273,7 +274,7 @@ AliasResult AliasAnalysis::aliasAddressProjection(SILValue V1, SILValue V2,
     return AliasResult::NoAlias;
 
   // If one of the GEPs is a super path of the other then they partially
-  // alias. W
+  // alias.
   if (BaseAlias == AliasResult::MustAlias &&
       isStrictSubSeqRelation(R))
     return AliasResult::PartialAlias;
@@ -299,6 +300,7 @@ static bool isTypedAccessOracle(SILInstruction *I) {
   case ValueKind::StoreInst:
   case ValueKind::AllocStackInst:
   case ValueKind::AllocBoxInst:
+  case ValueKind::ProjectBoxInst:
   case ValueKind::DeallocStackInst:
   case ValueKind::DeallocBoxInst:
     return true;
@@ -342,13 +344,13 @@ static SILType findTypedAccessType(SILValue V) {
   // typed oracle.
   if (auto *I = dyn_cast<SILInstruction>(V))
     if (isTypedAccessOracle(I))
-      return V.getType();
+      return V->getType();
 
   // Then look at any uses of V that potentially could act as a typed access
   // oracle.
-  for (auto Use : V.getUses())
+  for (auto Use : V->getUses())
     if (isTypedAccessOracle(Use->getUser()))
-      return V.getType();
+      return V->getType();
 
   // Otherwise return an empty SILType
   return SILType();
@@ -410,7 +412,7 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy, SILModule &Mod) {
 
   // Typed access based TBAA only occurs on pointers. If we reach this point and
   // do not have a pointer, be conservative and return that the two types may
-  // alias. *NOTE* This ensures we return may alias for local_storage.
+  // alias.
   if(!LTy.isAddress() || !RTy.isAddress())
     return true;
 
@@ -561,8 +563,8 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
   if (isSameValueOrGlobal(V1, V2))
     return AliasResult::MustAlias;
 
-  DEBUG(llvm::dbgs() << "ALIAS ANALYSIS:\n    V1: " << *V1.getDef()
-        << "    V2: " << *V2.getDef());
+  DEBUG(llvm::dbgs() << "ALIAS ANALYSIS:\n    V1: " << *V1
+        << "    V2: " << *V2);
 
   // Pass in both the TBAA types so we can perform typed access TBAA and the
   // actual types of V1, V2 so we can perform class based TBAA.
@@ -575,17 +577,17 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
 #endif
 
   // Strip off any casts on V1, V2.
-  V1 = V1.stripCasts();
-  V2 = V2.stripCasts();
-  DEBUG(llvm::dbgs() << "        After Cast Stripping V1:" << *V1.getDef());
-  DEBUG(llvm::dbgs() << "        After Cast Stripping V2:" << *V2.getDef());
+  V1 = stripCasts(V1);
+  V2 = stripCasts(V2);
+  DEBUG(llvm::dbgs() << "        After Cast Stripping V1:" << *V1);
+  DEBUG(llvm::dbgs() << "        After Cast Stripping V2:" << *V2);
 
   // Ok, we need to actually compute an Alias Analysis result for V1, V2. Begin
   // by finding the "base" of V1, V2 by stripping off all casts and GEPs.
   SILValue O1 = getUnderlyingObject(V1);
   SILValue O2 = getUnderlyingObject(V2);
-  DEBUG(llvm::dbgs() << "        Underlying V1:" << *O1.getDef());
-  DEBUG(llvm::dbgs() << "        Underlying V2:" << *O2.getDef());
+  DEBUG(llvm::dbgs() << "        Underlying V1:" << *O1);
+  DEBUG(llvm::dbgs() << "        Underlying V2:" << *O2);
 
   // If O1 and O2 do not equal, see if we can prove that they cannot be the
   // same object. If we can, return No Alias.
@@ -610,14 +612,15 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
 
   // First if one instruction is a gep and the other is not, canonicalize our
   // inputs so that V1 always is the instruction containing the GEP.
-  if (!Projection::isAddrProjection(V1) && Projection::isAddrProjection(V2)) {
+  if (!NewProjection::isAddressProjection(V1) &&
+       NewProjection::isAddressProjection(V2)) {
     std::swap(V1, V2);
     std::swap(O1, O2);
   }
 
   // If V1 is an address projection, attempt to use information from the
   // aggregate type tree to disambiguate it from V2.
-  if (Projection::isAddrProjection(V1)) {
+  if (NewProjection::isAddressProjection(V1)) {
     AliasResult Result = aliasAddressProjection(V1, V2, O1, O2);
     if (Result != AliasResult::MayAlias)
       return Result;
@@ -631,7 +634,7 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
 bool AliasAnalysis::canApplyDecrementRefCount(FullApplySite FAS, SILValue Ptr) {
   // Treat applications of @noreturn functions as decrementing ref counts. This
   // causes the apply to become a sink barrier for ref count increments.
-  if (FAS.getCallee().getType().getAs<SILFunctionType>()->isNoReturn())
+  if (FAS.getCallee()->getType().getAs<SILFunctionType>()->isNoReturn())
     return true;
 
   /// If the pointer cannot escape to the function we are done.
@@ -708,11 +711,13 @@ SILAnalysis *swift::createAliasAnalysis(SILModule *M) {
 
 AliasKeyTy AliasAnalysis::toAliasKey(SILValue V1, SILValue V2,
                                      SILType Type1, SILType Type2) {
-  size_t idx1 = AliasValueBaseToIndex.getIndex(V1.getDef());
-  size_t idx2 = AliasValueBaseToIndex.getIndex(V2.getDef());
-  unsigned R1 = V1.getResultNumber();
-  unsigned R2 = V2.getResultNumber();
+  size_t idx1 = AliasValueBaseToIndex.getIndex(V1);
+  assert(idx1 != std::numeric_limits<size_t>::max() &&
+         "~0 index reserved for empty/tombstone keys");
+  size_t idx2 = AliasValueBaseToIndex.getIndex(V2);
+  assert(idx2 != std::numeric_limits<size_t>::max() &&
+         "~0 index reserved for empty/tombstone keys");
   void *t1 = Type1.getOpaqueValue();
   void *t2 = Type2.getOpaqueValue();
-  return {idx1, idx2, R1, R2, t1, t2};
+  return {idx1, idx2, t1, t2};
 }

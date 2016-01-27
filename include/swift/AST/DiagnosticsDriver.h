@@ -1,4 +1,4 @@
-//===- DiagnosticsDriver.h - Diagnostic Definitions -------------*- C++ -*-===//
+//===--- DiagnosticsDriver.h - Diagnostic Definitions -----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -25,7 +25,7 @@
 namespace swift {
   namespace diag {
   // Declare common diagnostics objects with their appropriate types.
-#define DIAG(KIND,ID,Category,Options,Text,Signature) \
+#define DIAG(KIND,ID,Options,Text,Signature) \
   extern detail::DiagWithArguments<void Signature>::type ID;
 #include "DiagnosticsDriver.def"
   }

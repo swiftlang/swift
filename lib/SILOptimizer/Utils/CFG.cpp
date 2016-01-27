@@ -1,4 +1,4 @@
-//===--- CFG.cpp - Utilities for SIL CFG transformations --------*- C++ -*-===//
+//===--- CFG.cpp - Utilities for SIL CFG transformations ------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -63,10 +63,8 @@ TermInst *swift::addNewEdgeValueToBranch(TermInst *Branch, SILBasicBlock *Dest,
     assert(Args.size() == Dest->getNumBBArg());
     NewBr = Builder.createBranch(BI->getLoc(), BI->getDestBB(), Args);
   } else {
-    NewBr->dump();
     // At the moment we can only add arguments to br and cond_br.
     llvm_unreachable("Can't add argument to terminator");
-    return NewBr;
   }
 
   Branch->dropAllReferences();
@@ -174,8 +172,6 @@ void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
   SILBuilderWithScope B(T);
 
   switch (T->getTermKind()) {
-  case TermKind::Invalid:
-    llvm_unreachable("Unexpected terminator instruction!");
   // Only Branch and CondBranch may have arguments.
   case TermKind::BranchInst: {
     auto Br = dyn_cast<BranchInst>(T);
@@ -330,8 +326,6 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
   SILBuilderWithScope B(T);
 
   switch (T->getTermKind()) {
-  case TermKind::Invalid:
-    llvm_unreachable("Unexpected terminator instruction!");
   // Only Branch and CondBranch may have arguments.
   case TermKind::BranchInst: {
     auto Br = dyn_cast<BranchInst>(T);
@@ -496,8 +490,7 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
     assert(SuccBB->getNumBBArg() < 2 && "Can take at most one argument");
     if (!SuccBB->getNumBBArg())
       return;
-    Args.push_back(
-        SILValue(NewEdgeBB->createBBArg(SuccBB->getBBArg(0)->getType()), 0));
+    Args.push_back(NewEdgeBB->createBBArg(SuccBB->getBBArg(0)->getType()));
     return;
   }
 
@@ -507,8 +500,7 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
         (EdgeIdx == 0) ? DMBI->getHasMethodBB() : DMBI->getNoMethodBB();
     if (!SuccBB->getNumBBArg())
       return;
-    Args.push_back(
-        SILValue(NewEdgeBB->createBBArg(SuccBB->getBBArg(0)->getType()), 0));
+    Args.push_back(NewEdgeBB->createBBArg(SuccBB->getBBArg(0)->getType()));
     return;
   }
 
@@ -517,16 +509,14 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
     auto SuccBB = EdgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
     if (!SuccBB->getNumBBArg())
       return;
-    Args.push_back(
-        SILValue(NewEdgeBB->createBBArg(SuccBB->getBBArg(0)->getType()), 0));
+    Args.push_back(NewEdgeBB->createBBArg(SuccBB->getBBArg(0)->getType()));
     return;
   }
   if (auto CBI = dyn_cast<CheckedCastAddrBranchInst>(T)) {
     auto SuccBB = EdgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
     if (!SuccBB->getNumBBArg())
       return;
-    Args.push_back(
-        SILValue(NewEdgeBB->createBBArg(SuccBB->getBBArg(0)->getType()), 0));
+    Args.push_back(NewEdgeBB->createBBArg(SuccBB->getBBArg(0)->getType()));
     return;
   }
 
@@ -534,8 +524,7 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
     auto *SuccBB = EdgeIdx == 0 ? TAI->getNormalBB() : TAI->getErrorBB();
     if (!SuccBB->getNumBBArg())
       return;
-    Args.push_back(
-        SILValue(NewEdgeBB->createBBArg(SuccBB->getBBArg(0)->getType()), 0));
+    Args.push_back(NewEdgeBB->createBBArg(SuccBB->getBBArg(0)->getType()));
     return;
   }
 
@@ -739,7 +728,7 @@ bool swift::mergeBasicBlockWithSuccessor(SILBasicBlock *BB, DominanceInfo *DT,
   // If there are any BB arguments in the destination, replace them with the
   // branch operands, since they must dominate the dest block.
   for (unsigned i = 0, e = Branch->getArgs().size(); i != e; ++i)
-    SILValue(SuccBB->getBBArg(i)).replaceAllUsesWith(Branch->getArg(i));
+    SuccBB->getBBArg(i)->replaceAllUsesWith(Branch->getArg(i));
 
   Branch->eraseFromParent();
 

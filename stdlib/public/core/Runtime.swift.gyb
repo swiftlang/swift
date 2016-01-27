@@ -194,7 +194,7 @@ func _stdlib_atomicCompareExchangeStrongInt(
     object: UnsafeMutablePointer(target),
     expected: UnsafeMutablePointer(expected),
     desired: UInt32(bitPattern: Int32(desired)))
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
   return _stdlib_atomicCompareExchangeStrongUInt64(
     object: UnsafeMutablePointer(target),
     expected: UnsafeMutablePointer(expected),
@@ -209,7 +209,7 @@ func _swift_stdlib_atomicStoreInt(
   return _swift_stdlib_atomicStoreUInt32(
     object: UnsafeMutablePointer(target),
     desired: UInt32(bitPattern: Int32(desired)))
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
   return _swift_stdlib_atomicStoreUInt64(
     object: UnsafeMutablePointer(target),
     desired: UInt64(bitPattern: Int64(desired)))
@@ -224,7 +224,7 @@ public func _swift_stdlib_atomicLoadInt(
   return Int(Int32(bitPattern:
     _swift_stdlib_atomicLoadUInt32(
       object: UnsafeMutablePointer(target))))
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
   return Int(Int64(bitPattern:
     _swift_stdlib_atomicLoadUInt64(
       object: UnsafeMutablePointer(target))))
@@ -265,7 +265,7 @@ public func _swift_stdlib_atomicFetch${operation}Int(
     _swift_stdlib_atomicFetch${operation}UInt32(
       object: UnsafeMutablePointer(target),
       operand: UInt32(bitPattern: Int32(operand)))))
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
   return Int(Int64(bitPattern:
     _swift_stdlib_atomicFetch${operation}UInt64(
       object: UnsafeMutablePointer(target),

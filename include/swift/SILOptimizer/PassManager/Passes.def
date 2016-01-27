@@ -58,8 +58,8 @@ PASS(ClosureSpecializer, "closure-specialize",
 PASS(CodeSinking, "code-sinking",
      "Sinks code closer to users")
 PASS(ComputeDominanceInfo, "compute-dominance-info",
-     "Utility pass that computes dominance info for all functions in order to "
-     "help test dominanceinfo updating")
+     "Utility pass that computes (post-)dominance info for all functions in "
+     "order to help test dominanceinfo updating")
 PASS(ComputeLoopInfo, "compute-loop-info",
      "Utility pass that computes loop info for all functions in order to help "
      "test loop info updating")
@@ -157,6 +157,8 @@ PASS(MergeCondFails, "merge-cond_fails",
      "Remove redundant overflow checks")
 PASS(NoReturnFolding, "noreturn-folding",
      "Add 'unreachable' after noreturn calls")
+PASS(RCIdentityDumper, "rc-id-dumper",
+     "Dump the RCIdentity of all values in a function")
 // TODO: It makes no sense to have early inliner, late inliner, and
 // perf inliner in terms of names.
 PASS(PerfInliner, "inline",

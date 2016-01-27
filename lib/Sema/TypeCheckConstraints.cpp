@@ -46,9 +46,9 @@
 using namespace swift;
 using namespace constraints;
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Type variable implementation.
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 #pragma mark Type variable implementation
 
 void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
@@ -180,7 +180,10 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
         skipToNextAvailableInput();
       }
       sources[i] = TupleShuffleExpr::Variadic;
-      break;
+      
+      // Keep looking at subsequent arguments.  Non-variadic arguments may
+      // follow the variadic one.
+      continue;
     }
 
     // If there aren't any more inputs, we can use a default argument.
@@ -239,9 +242,9 @@ bool constraints::hasTrailingClosure(const ConstraintLocatorBuilder &locator) {
   return false;
 }
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // High-level entry points.
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 static unsigned getNumArgs(ValueDecl *value) {
   if (!isa<FuncDecl>(value)) return ~0U;
@@ -302,7 +305,7 @@ static void diagnoseBinOpSplit(UnresolvedDeclRefExpr *UDRE,
 
   unsigned splitLoc = splitCandidate.first;
   bool isBinOpFirst = splitCandidate.second;
-  StringRef nameStr = UDRE->getName().str();
+  StringRef nameStr = UDRE->getName().getBaseName().str();
   auto startStr = nameStr.substr(0, splitLoc);
   auto endStr = nameStr.drop_front(splitLoc);
 
@@ -330,7 +333,7 @@ static void diagnoseBinOpSplit(UnresolvedDeclRefExpr *UDRE,
 static bool diagnoseOperatorJuxtaposition(UnresolvedDeclRefExpr *UDRE,
                                     DeclContext *DC,
                                     TypeChecker &TC) {
-  Identifier name = UDRE->getName();
+  Identifier name = UDRE->getName().getBaseName();
   StringRef nameStr = name.str();
   if (!name.isOperator() || nameStr.size() < 2)
     return false;
@@ -369,8 +372,8 @@ static bool diagnoseOperatorJuxtaposition(UnresolvedDeclRefExpr *UDRE,
     // Perform name lookup for the first and second pieces.  If either fail to
     // be found, then it isn't a valid split.
     NameLookupOptions LookupOptions = defaultUnqualifiedLookupOptions;
-    if (isa<AbstractFunctionDecl>(DC))
-      LookupOptions |= NameLookupFlags::KnownPrivate;
+    // This is only used for diagnostics, so always use KnownPrivate.
+    LookupOptions |= NameLookupFlags::KnownPrivate;
     auto startLookup = TC.lookupUnqualified(DC, startName, UDRE->getLoc(),
                                        LookupOptions);
     if (!startLookup) continue;
@@ -434,7 +437,7 @@ static bool diagnoseOperatorJuxtaposition(UnresolvedDeclRefExpr *UDRE,
 Expr *TypeChecker::
 resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
-  Identifier Name = UDRE->getName();
+  DeclName Name = UDRE->getName();
   SourceLoc Loc = UDRE->getLoc();
 
   // Perform standard value name lookup.
@@ -450,9 +453,9 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     if (!diagnoseOperatorJuxtaposition(UDRE, DC, *this)) {
       diagnose(Loc, diag::use_unresolved_identifier, Name,
                UDRE->getName().isOperator())
-        .highlight(Loc);
+        .highlight(UDRE->getSourceRange());
     }
-    return new (Context) ErrorExpr(Loc);
+    return new (Context) ErrorExpr(UDRE->getSourceRange());
   }
 
   // FIXME: Need to refactor the way we build an AST node from a lookup result!
@@ -474,7 +477,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
         diagnose(Loc, diag::use_local_before_declaration, Name);
         diagnose(D->getLoc(), diag::decl_declared_here, Name);
       }
-      return new (Context) ErrorExpr(Loc);
+      return new (Context) ErrorExpr(UDRE->getSourceRange());
     }
     if (matchesDeclRefKind(D, UDRE->getRefKind()))
       ResultValues.push_back(D);
@@ -488,22 +491,24 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
       isa<TypeDecl>(ResultValues[0])) {
     // FIXME: This is odd.
     if (isa<ModuleDecl>(ResultValues[0])) {
-      return new (Context) DeclRefExpr(ResultValues[0], Loc, /*implicit=*/false,
+      return new (Context) DeclRefExpr(ResultValues[0], UDRE->getNameLoc(),
+                                       /*implicit=*/false,
                                        AccessSemantics::Ordinary,
                                        ResultValues[0]->getType());
     }
 
-    return TypeExpr::createForDecl(Loc, cast<TypeDecl>(ResultValues[0]));
+    return TypeExpr::createForDecl(Loc, cast<TypeDecl>(ResultValues[0]),
+                                   UDRE->isImplicit());
   }
   
   if (AllDeclRefs) {
     // Diagnose uses of operators that found no matching candidates.
     if (ResultValues.empty()) {
       assert(UDRE->getRefKind() != DeclRefKind::Ordinary);
-      diagnose(Loc, diag::use_nonmatching_operator, Name,
+      diagnose(Loc, diag::use_nonmatching_operator, Name.getBaseName(),
                UDRE->getRefKind() == DeclRefKind::BinaryOperator ? 0 :
                UDRE->getRefKind() == DeclRefKind::PrefixOperator ? 1 : 2);
-      return new (Context) ErrorExpr(Loc);
+      return new (Context) ErrorExpr(UDRE->getSourceRange());
     }
 
     // For operators, sort the results so that non-generic operations come
@@ -528,8 +533,8 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
       });
     }
 
-    return buildRefExpr(ResultValues, DC, Loc, UDRE->isImplicit(),
-                        UDRE->isSpecialized());
+    return buildRefExpr(ResultValues, DC, UDRE->getNameLoc(),
+                        UDRE->isImplicit(), UDRE->isSpecialized());
   }
 
   ResultValues.clear();
@@ -555,15 +560,17 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   if (AllMemberRefs) {
     Expr *BaseExpr;
     if (auto NTD = dyn_cast<NominalTypeDecl>(Base)) {
-      BaseExpr = TypeExpr::createForDecl(Loc, NTD);
+      BaseExpr = TypeExpr::createForDecl(Loc, NTD, /*implicit=*/true);
     } else {
-      BaseExpr = new (Context) DeclRefExpr(Base, Loc, /*implicit=*/true);
+      BaseExpr = new (Context) DeclRefExpr(Base, UDRE->getNameLoc(),
+                                           /*implicit=*/true);
     }
     
    
     // Otherwise, form an UnresolvedDotExpr and sema will resolve it based on
     // type information.
-    return new (Context) UnresolvedDotExpr(BaseExpr, SourceLoc(), Name, Loc,
+    return new (Context) UnresolvedDotExpr(BaseExpr, SourceLoc(), Name,
+                                           UDRE->getNameLoc(),
                                            UDRE->isImplicit());
   }
   
@@ -571,7 +578,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   // very broken, but it's still conceivable that this may happen due to
   // invalid shadowed declarations.
   // llvm_unreachable("Can't represent lookup result");
-  return new (Context) ErrorExpr(Loc);
+  return new (Context) ErrorExpr(UDRE->getSourceRange());
 }
 
 /// If an expression references 'self.init' or 'super.init' in an
@@ -579,10 +586,14 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
 /// Otherwise, return nil.
 VarDecl *
 TypeChecker::getSelfForInitDelegationInConstructor(DeclContext *DC,
-                                           UnresolvedConstructorExpr *ctorRef) {
+                                                   UnresolvedDotExpr *ctorRef) {
+  // If the reference isn't to a constructor, we're done.
+  if (ctorRef->getName().getBaseName() != Context.Id_init)
+    return nullptr;
+
   if (auto ctorContext
         = dyn_cast_or_null<ConstructorDecl>(DC->getInnermostMethodContext())) {
-    auto nestedArg = ctorRef->getSubExpr();
+    auto nestedArg = ctorRef->getBase();
     if (auto inout = dyn_cast<InOutExpr>(nestedArg))
       nestedArg = inout->getSubExpr();
     if (nestedArg->isSuperExpr())
@@ -715,9 +726,9 @@ namespace {
       // determine where to place the RebindSelfInConstructorExpr node.
       // When updating this logic, also update
       // RebindSelfInConstructorExpr::getCalledConstructor.
-      if (auto nestedCtor = dyn_cast<UnresolvedConstructorExpr>(expr)) {
+      if (auto unresolvedDot = dyn_cast<UnresolvedDotExpr>(expr)) {
         if (auto self
-              = TC.getSelfForInitDelegationInConstructor(DC, nestedCtor)) {
+              = TC.getSelfForInitDelegationInConstructor(DC, unresolvedDot)) {
           // Walk our ancestor expressions looking for the appropriate place
           // to insert the RebindSelfInConstructorExpr.
           Expr *target = nullptr;
@@ -730,7 +741,7 @@ namespace {
               foundRebind = true;
               break;
             }
-            
+
             // Recognize applications.
             if (auto apply = dyn_cast<ApplyExpr>(ancestor)) {
               // If we already saw an application, we're done.
@@ -739,7 +750,7 @@ namespace {
 
               // If the function being called is not our unresolved initializer
               // reference, we're done.
-              if (apply->getFn()->getSemanticsProvidingExpr() != nestedCtor)
+              if (apply->getFn()->getSemanticsProvidingExpr() != unresolvedDot)
                 break;
 
               foundApply = true;
@@ -852,19 +863,24 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     if (!TyExpr) return nullptr;
     
     auto *InnerTypeRepr = TyExpr->getTypeRepr();
-    assert(!TyExpr->isImplicit() && InnerTypeRepr &&
-           "This doesn't work on implicit TypeExpr's, "
-           "the TypeExpr should have been built correctly in the first place");
 
     if (MRE->getName() == TC.Context.Id_Protocol) {
+      assert(!TyExpr->isImplicit() && InnerTypeRepr &&
+             "This doesn't work on implicit TypeExpr's, "
+             "TypeExpr should have been built correctly in the first place");
       auto *NewTypeRepr =
-        new (TC.Context) ProtocolTypeRepr(InnerTypeRepr, MRE->getNameLoc());
+        new (TC.Context) ProtocolTypeRepr(InnerTypeRepr,
+                                          MRE->getNameLoc().getBaseNameLoc());
       return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
     }
     
     if (MRE->getName() == TC.Context.Id_Type) {
+      assert(!TyExpr->isImplicit() && InnerTypeRepr &&
+             "This doesn't work on implicit TypeExpr's, "
+             "TypeExpr should have been built correctly in the first place");
       auto *NewTypeRepr =
-        new (TC.Context) MetatypeTypeRepr(InnerTypeRepr, MRE->getNameLoc());
+        new (TC.Context) MetatypeTypeRepr(InnerTypeRepr,
+                                          MRE->getNameLoc().getBaseNameLoc());
       return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
     }
   }
@@ -1360,10 +1376,23 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
+  const Type originalType = expr->getType();
+  const bool needClearType = originalType && originalType->is<ErrorType>();
+  const auto recoverOriginalType = [&] () {
+    if (needClearType)
+      expr->setType(originalType);
+  };
+
+  // If the previous checking gives the expr error type, clear the result and
+  // re-check.
+  if (needClearType)
+    expr->setType(Type());
   if (solveForExpression(expr, dc, /*convertType*/Type(),
                          allowFreeTypeVariables, listener, cs, viable,
-                         TypeCheckExprFlags::SuppressDiagnostics))
+                         TypeCheckExprFlags::SuppressDiagnostics)) {
+    recoverOriginalType();
     return None;
+  }
 
   // Get the expression's simplified type.
   auto &solution = viable[0];
@@ -1373,6 +1402,8 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   assert(!exprType->hasTypeVariable() &&
          "free type variable with FreeTypeVariableBinding::GenericParameters?");
 
+  // Recover the original type if needed.
+  recoverOriginalType();
   return exprType;
 }
 
@@ -1561,10 +1592,9 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       InitType = solution.simplifyType(tc, InitType);
 
       // Convert the initializer to the type of the pattern.
+      // ignoreTopLevelInjection = Binding->isConditional()
       expr = solution.coerceToType(expr, InitType, Locator,
-                                   false
-                                   /*ignoreTopLevelInjection=
-                                     Binding->isConditional()*/);
+                                   false /* ignoreTopLevelInjection */);
       if (!expr) {
         return nullptr;
       }
@@ -2029,9 +2059,11 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   }
   
   // Build the 'expr ~= var' expression.
-  auto *matchOp = buildRefExpr(choices, DC, EP->getLoc(), /*Implicit=*/true);
+  // FIXME: Compound name locations.
+  auto *matchOp = buildRefExpr(choices, DC, DeclNameLoc(EP->getLoc()),
+                               /*Implicit=*/true);
   auto *matchVarRef = new (Context) DeclRefExpr(matchVar,
-                                                EP->getLoc(),
+                                                DeclNameLoc(EP->getLoc()),
                                                 /*Implicit=*/true);
   
   Expr *matchArgElts[] = {EP->getSubExpr(), matchVarRef};
@@ -2245,9 +2277,9 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc) {
   return false;
 }
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Debugging
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 #pragma mark Debugging
 
 void Solution::dump() const {

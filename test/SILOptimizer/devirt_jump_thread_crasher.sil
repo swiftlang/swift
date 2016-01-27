@@ -39,26 +39,26 @@ bb1(%5 : $Derived1):                    // Preds: bb0
   %6 = function_ref @method1 : $@convention(method) <τ_0_0> (@out MyOptional<τ_0_0>, @owned @callee_owned (@out τ_0_0, S) -> (), @guaranteed Derived1) -> () // user: %9
   strong_retain %1 : $@callee_owned (@out R, S) -> () // id: %7
   strong_retain %2 : $Base // id: %8
-  %9 = apply %6<R>(%3#1, %1, %5) : $@convention(method) <τ_0_0> (@out MyOptional<τ_0_0>, @owned @callee_owned (@out τ_0_0, S) -> (), @guaranteed Derived1) -> ()
+  %9 = apply %6<R>(%3, %1, %5) : $@convention(method) <τ_0_0> (@out MyOptional<τ_0_0>, @owned @callee_owned (@out τ_0_0, S) -> (), @guaranteed Derived1) -> ()
   br bb3                                          // id: %10
 
 bb2:                                              // Preds: bb0
   checked_cast_br [exact] %2 : $Base to $Derived2, bb6, bb7 // id: %11
 
 bb3:                                              // Preds: bb1 bb6 bb8 bb10
-  switch_enum_addr %3#1 : $*MyOptional<R>, case #MyOptional.Some!enumelt.1: bb4, case #MyOptional.None!enumelt: bb5 // id: %12
+  switch_enum_addr %3 : $*MyOptional<R>, case #MyOptional.Some!enumelt.1: bb4, case #MyOptional.None!enumelt: bb5 // id: %12
 
 bb4:                                              // Preds: bb3
-  %13 = unchecked_take_enum_data_addr %3#1 : $*MyOptional<R>, #MyOptional.Some!enumelt.1 // user: %14
+  %13 = unchecked_take_enum_data_addr %3 : $*MyOptional<R>, #MyOptional.Some!enumelt.1 // user: %14
   copy_addr [take] %13 to [initialization] %0 : $*R // id: %14
-  dealloc_stack %3#0 : $*@local_storage MyOptional<R> // id: %15
+  dealloc_stack %3 : $*MyOptional<R> // id: %15
   strong_release %2 : $Base // id: %16
   strong_release %1 : $@callee_owned (@out R, S) -> () // id: %17
   %18 = tuple ()                                  // user: %19
   return %18 : $()                                // id: %19
 
 bb5:                                              // Preds: bb3
-  dealloc_stack %3#0 : $*@local_storage MyOptional<R> // id: %20
+  dealloc_stack %3 : $*MyOptional<R> // id: %20
   unreachable                                     // id: %21
 
 bb6(%22 : $Derived2):             // Preds: bb2
@@ -73,7 +73,7 @@ bb8(%29 : $Base):          // Preds: bb7
   %30 = function_ref @method2 : $@convention(method) <τ_0_0> (@out MyOptional<τ_0_0>, @owned @callee_owned (@out τ_0_0, S) -> (), @guaranteed Base) -> () // user: %33
   strong_retain %1 : $@callee_owned (@out R, S) -> () // id: %31
   strong_retain %2 : $Base // id: %32
-  %33 = apply %30<R>(%3#1, %1, %29) : $@convention(method) <τ_0_0> (@out MyOptional<τ_0_0>, @owned @callee_owned (@out τ_0_0, S) -> (), @guaranteed Base) -> ()
+  %33 = apply %30<R>(%3, %1, %29) : $@convention(method) <τ_0_0> (@out MyOptional<τ_0_0>, @owned @callee_owned (@out τ_0_0, S) -> (), @guaranteed Base) -> ()
   br bb3                                          // id: %34
 
 bb9:                                              // Preds: bb7
@@ -86,7 +86,7 @@ bb10(%37 : $()):                                  // Preds: bb11 bb13
 bb11(%39 : $Derived1):                  // Preds: bb9
   strong_retain %39 : $Derived1         // id: %40
   %41 = function_ref @method1 : $@convention(method) <τ_0_0> (@out MyOptional<τ_0_0>, @owned @callee_owned (@out τ_0_0, S) -> (), @guaranteed Derived1) -> () // user: %42
-  %42 = apply %41<R>(%3#1, %1, %39) : $@convention(method) <τ_0_0> (@out MyOptional<τ_0_0>, @owned @callee_owned (@out τ_0_0, S) -> (), @guaranteed Derived1) -> () // user: %43
+  %42 = apply %41<R>(%3, %1, %39) : $@convention(method) <τ_0_0> (@out MyOptional<τ_0_0>, @owned @callee_owned (@out τ_0_0, S) -> (), @guaranteed Derived1) -> () // user: %43
   br bb10(%42 : $())                              // id: %43
 
 bb12:                                             // Preds: bb9
@@ -98,7 +98,7 @@ bb13(%45 : $()):                                  // Preds: bb14 bb15
 bb14(%47 : $Base):         // Preds: bb12
   strong_retain %47 : $Base // id: %48
   %49 = function_ref @method2 : $@convention(method) <τ_0_0> (@out MyOptional<τ_0_0>, @owned @callee_owned (@out τ_0_0, S) -> (), @guaranteed Base) -> () // user: %50
-  %50 = apply %49<R>(%3#1, %1, %47) : $@convention(method) <τ_0_0> (@out MyOptional<τ_0_0>, @owned @callee_owned (@out τ_0_0, S) -> (), @guaranteed Base) -> () // user: %51
+  %50 = apply %49<R>(%3, %1, %47) : $@convention(method) <τ_0_0> (@out MyOptional<τ_0_0>, @owned @callee_owned (@out τ_0_0, S) -> (), @guaranteed Base) -> () // user: %51
   br bb13(%50 : $())                              // id: %51
 
 bb15:                                             // Preds: bb12

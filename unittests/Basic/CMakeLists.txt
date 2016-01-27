@@ -20,7 +20,6 @@ add_swift_unittest(SwiftBasicTests
   Unicode.cpp
   BlotMapVectorTest.cpp
   PointerIntEnumTest.cpp
-  CompressionTests.cpp
   ${generated_tests}
   )
 
@@ -28,6 +27,5 @@ add_dependencies(SwiftBasicTests "${gyb_dependency_targets}")
 
 target_link_libraries(SwiftBasicTests
   swiftBasic
-  swiftABI
   clangBasic
   )

@@ -13,7 +13,6 @@
 #define DEBUG_TYPE "arc-sequence-opts"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "GlobalARCPairingAnalysis.h"
-#include "ProgramTerminationAnalysis.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
@@ -22,6 +21,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ProgramTerminationAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopRegionAnalysis.h"
@@ -55,7 +55,7 @@ static SILInstruction *createIncrement(SILValue Ptr, SILInstruction *InsertPt) {
 
   // If Ptr is refcounted itself, create the strong_retain and
   // return.
-  if (Ptr.getType().isReferenceCounted(B.getModule()))
+  if (Ptr->getType().isReferenceCounted(B.getModule()))
     return B.createStrongRetain(Loc, Ptr);
 
   // Otherwise, create the retain_value.
@@ -71,7 +71,7 @@ static SILInstruction *createDecrement(SILValue Ptr, SILInstruction *InsertPt) {
   auto Loc = SILFileLocation(SourceLoc());
 
   // If Ptr has reference semantics itself, create a strong_release.
-  if (Ptr.getType().isReferenceCounted(B.getModule()))
+  if (Ptr->getType().isReferenceCounted(B.getModule()))
     return B.createStrongRelease(Loc, Ptr);
 
   // Otherwise create a release value.

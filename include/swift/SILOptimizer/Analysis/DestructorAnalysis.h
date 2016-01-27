@@ -1,4 +1,4 @@
-//===--- DestructorAnalysis.h ------------------------------*- C++ -*------===//
+//===--- DestructorAnalysis.h -----------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -36,9 +36,9 @@ public:
 
 protected:
   bool cacheResult(CanType Type, bool Result);
-  bool isSafeType(Type);
-  bool implementsDestructorSafeContainerProtocol(NominalTypeDecl *);
-  bool areTypeParametersSafe(CanType);
+  bool isSafeType(Type Ty);
+  bool implementsDestructorSafeContainerProtocol(NominalTypeDecl *NomDecl);
+  bool areTypeParametersSafe(CanType Ty);
   ASTContext &getASTContext();
 };
 }

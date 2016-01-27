@@ -177,7 +177,7 @@ emitElementAddress(unsigned EltNo, SILLocation Loc, SILBuilder &B) const {
     if (IsSelf) {
       if (auto *NTD =
              cast_or_null<NominalTypeDecl>(PointeeType->getAnyNominal())) {
-        if (isa<ClassDecl>(NTD) && Ptr.getType().isAddress())
+        if (isa<ClassDecl>(NTD) && Ptr->getType().isAddress())
           Ptr = B.createLoad(Loc, Ptr);
         for (auto *VD : NTD->getStoredProperties()) {
           auto FieldType = VD->getType()->getCanonicalType();
@@ -333,7 +333,7 @@ onlyTouchesTrivialElements(const DIMemoryObjectInfo &MI) const {
 static void getScalarizedElementAddresses(SILValue Pointer, SILBuilder &B,
                                           SILLocation Loc,
                                       SmallVectorImpl<SILValue> &ElementAddrs) {
-  CanType AggType = Pointer.getType().getSwiftRValueType();
+  CanType AggType = Pointer->getType().getSwiftRValueType();
   TupleType *TT = AggType->castTo<TupleType>();
   for (auto &Field : TT->getElements()) {
     (void)Field;
@@ -347,7 +347,7 @@ static void getScalarizedElementAddresses(SILValue Pointer, SILBuilder &B,
 static void getScalarizedElements(SILValue V,
                                   SmallVectorImpl<SILValue> &ElementVals,
                                   SILLocation Loc, SILBuilder &B) {
-  TupleType *TT = V.getType().getSwiftRValueType()->castTo<TupleType>();
+  TupleType *TT = V->getType().getSwiftRValueType()->castTo<TupleType>();
   for (auto &Field : TT->getElements()) {
     (void)Field;
     ElementVals.push_back(B.emitTupleExtract(Loc, V, ElementVals.size()));
@@ -432,14 +432,15 @@ namespace {
           // ref_element_addrs.
           collectClassSelfUses();
       } else {
-        if (auto container = TheMemory.getContainer())
-          collectContainerUses(container, TheMemory.getAddress());
-        collectUses(TheMemory.getAddress(), 0);
+        if (auto *ABI = TheMemory.getContainer())
+          collectContainerUses(ABI);
+        else
+          collectUses(TheMemory.getAddress(), 0);
       }
 
       if (!isa<MarkUninitializedInst>(TheMemory.MemoryInst)) {
         // Collect information about the retain count result as well.
-        for (auto UI : SILValue(TheMemory.MemoryInst, 0).getUses()) {
+        for (auto UI : TheMemory.MemoryInst->getUses()) {
           auto *User = UI->getUser();
 
           // If this is a release or dealloc_stack, then remember it as such.
@@ -453,7 +454,7 @@ namespace {
 
   private:
     void collectUses(SILValue Pointer, unsigned BaseEltNo);
-    void collectContainerUses(SILValue Container, SILValue Pointer);
+    void collectContainerUses(AllocBoxInst *ABI);
     void recordFailureBB(TermInst *TI, SILBasicBlock *BB);
     void recordFailableInitCall(SILInstruction *I);
     void collectClassSelfUses();
@@ -497,7 +498,7 @@ collectTupleElementUses(TupleElementAddrInst *TEAI, unsigned BaseEltNo) {
   // BaseElt.  The uses hanging off the tuple_element_addr are going to be
   // counted as uses of the struct or enum itself.
   if (InStructSubElement || InEnumSubElement)
-    return collectUses(SILValue(TEAI, 0), BaseEltNo);
+    return collectUses(TEAI, BaseEltNo);
 
   assert(!IsSelfOfNonDelegatingInitializer && "self doesn't have tuple type");
 
@@ -510,7 +511,7 @@ collectTupleElementUses(TupleElementAddrInst *TEAI, unsigned BaseEltNo) {
     BaseEltNo += getElementCountRec(EltTy, false);
   }
   
-  collectUses(SILValue(TEAI, 0), BaseEltNo);
+  collectUses(TEAI, BaseEltNo);
 }
 
 void ElementUseCollector::collectStructElementUses(StructElementAddrInst *SEAI,
@@ -520,7 +521,7 @@ void ElementUseCollector::collectStructElementUses(StructElementAddrInst *SEAI,
   // current element.
   if (!IsSelfOfNonDelegatingInitializer) {
     llvm::SaveAndRestore<bool> X(InStructSubElement, true);
-    collectUses(SILValue(SEAI, 0), BaseEltNo);
+    collectUses(SEAI, BaseEltNo);
     return;
   }
 
@@ -536,42 +537,35 @@ void ElementUseCollector::collectStructElementUses(StructElementAddrInst *SEAI,
     BaseEltNo += getElementCountRec(FieldType, false);
   }
 
-  collectUses(SILValue(SEAI, 0), BaseEltNo);
+  collectUses(SEAI, BaseEltNo);
 }
 
-void ElementUseCollector::collectContainerUses(SILValue container,
-                                               SILValue pointer) {
-  auto pointeeType = pointer.getType().getObjectType();
-  for (auto UI : container.getUses()) {
+void ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
+  for (Operand *UI : ABI->getUses()) {
     auto *User = UI->getUser();
 
     // Deallocations and retain/release don't affect the value directly.
     if (isa<DeallocBoxInst>(User))
-      continue;
-    if (isa<DeallocStackInst>(User))
       continue;
     if (isa<StrongRetainInst>(User))
       continue;
     if (isa<StrongReleaseInst>(User))
       continue;
 
-    // TODO: We should consider uses of project_box as equivalent to uses of
-    // the box element. For now, just consider them escapes. We would need
-    // to fix this if we phased out alloc_box's #1 result.
-    //if (isa<ProjectBoxInst>(User)) {
-      // do something smart
-      // continue;
-    //}
+    if (isa<ProjectBoxInst>(User)) {
+      collectUses(User, 0);
+      continue;
+    }
 
     // Other uses of the container are considered escapes of the value.
-    addElementUses(0, pointeeType, User, DIUseKind::Escape);
+    addElementUses(0, ABI->getElementType(), User, DIUseKind::Escape);
   }
 }
 
 void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
-  assert(Pointer.getType().isAddress() &&
+  assert(Pointer->getType().isAddress() &&
          "Walked through the pointer to the value?");
-  SILType PointeeType = Pointer.getType().getObjectType();
+  SILType PointeeType = Pointer->getType().getObjectType();
 
   /// This keeps track of instructions in the use list that touch multiple tuple
   /// elements and should be scalarized.  This is done as a second phase to
@@ -579,7 +573,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
   ///
   SmallVector<SILInstruction*, 4> UsesToScalarize;
   
-  for (auto UI : Pointer.getUses()) {
+  for (auto UI : Pointer->getUses()) {
     auto *User = UI->getUser();
 
     // struct_element_addr P, #field indexes into the current element.
@@ -761,7 +755,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       // recursion that tuple stores are not scalarized outside, and that stores
       // should not be treated as partial stores.
       llvm::SaveAndRestore<bool> X(InEnumSubElement, true);
-      collectUses(SILValue(User, 0), BaseEltNo);
+      collectUses(User, BaseEltNo);
       continue;
     }
 
@@ -797,6 +791,10 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
+    if (isa<DeallocStackInst>(User)) {
+      continue;
+    }
+
     // Otherwise, the use is something complicated, it escapes.
     addElementUses(BaseEltNo, PointeeType, User, DIUseKind::Escape);
   }
@@ -820,7 +818,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       // Scalarize LoadInst
       if (auto *LI = dyn_cast<LoadInst>(User)) {
         SILValue Result = scalarizeLoad(LI, ElementAddrs);
-        SILValue(LI, 0).replaceAllUsesWith(Result);
+        LI->replaceAllUsesWith(Result);
         LI->eraseFromParent();
         continue;
       }
@@ -1171,7 +1169,7 @@ static bool isSelfInitUse(ValueMetatypeInst *Inst) {
 void ElementUseCollector::
 collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
                      llvm::SmallDenseMap<VarDecl*, unsigned> &EltNumbering) {
-  for (auto UI : ClassPointer.getUses()) {
+  for (auto UI : ClassPointer->getUses()) {
     auto *User = UI->getUser();
 
     // super_method always looks at the metatype for the class, not at any of
@@ -1231,6 +1229,11 @@ collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
         // always fine, even if self is uninitialized.
         continue;
     }
+    
+    // If this is a partial application of self, then this is an escape point
+    // for it.
+    if (isa<PartialApplyInst>(User))
+      Kind = DIUseKind::Escape;
 
     Uses.push_back(DIMemoryUse(User, Kind, 0, TheMemory.NumElements));
   }
@@ -1377,23 +1380,18 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
     Uses.push_back(DIMemoryUse(User, DIUseKind::Escape, 0, 1));
   }
 
-  // The MUI must be used on an alloc_box or alloc_stack instruction.  Chase
+  // The MUI must be used on a project_box or alloc_stack instruction.  Chase
   // down the box value to see if there are any releases.
-  auto *AI = cast<AllocationInst>(MUI->getOperand());
-  for (auto UI : SILValue(AI, 0).getUses()) {
+  if (isa<AllocStackInst>(MUI->getOperand()))
+    return;
+
+  auto *PBI = cast<ProjectBoxInst>(MUI->getOperand());
+  auto *ABI = cast<AllocBoxInst>(PBI->getOperand());
+
+  for (auto UI : ABI->getUses()) {
     SILInstruction *User = UI->getUser();
-
-    if (isa<StrongReleaseInst>(User)) {
+    if (isa<StrongReleaseInst>(User))
       Releases.push_back(User);
-      continue;
-    }
-
-    // Ignore the deallocation of the stack box.  Its contents will be
-    // uninitialized by the point it executes.
-    if (isa<DeallocStackInst>(User))
-      continue;
-
-    assert(0 && "Unknown use of box");
   }
 }
 

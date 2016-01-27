@@ -1,4 +1,4 @@
-//===---------- SILGlobalOpt.cpp - Optimize global initializers -----------===//
+//===--- GlobalOpt.cpp - Optimize global initializers ---------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -137,7 +137,7 @@ class InstructionsCloner : public SILClonerWithScopes<InstructionsCloner> {
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
     DestBB->push_back(Cloned);
     SILClonerWithScopes<InstructionsCloner>::postProcess(Orig, Cloned);
-    AvailVals.push_back(std::make_pair(Orig, SILValue(Cloned, 0)));
+    AvailVals.push_back(std::make_pair(Orig, Cloned));
   }
 
   // Clone all instructions from Insns into DestBB
@@ -241,10 +241,16 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
   Cloner.clone();
   GetterF->setInlined();
 
-  // Find the store instruction
+  // Find the store instruction and turn it into return.
+  // Remove the alloc_global instruction.
   auto BB = EntryBB;
   SILValue Val;
-  for (auto &I : *BB) {
+  for (auto II = BB->begin(), E = BB->end(); II != E;) {
+    auto &I = *II++;
+    if (isa<AllocGlobalInst>(&I)) {
+      I.eraseFromParent();
+      continue;
+    }
     if (StoreInst *SI = dyn_cast<StoreInst>(&I)) {
       Val = SI->getSrc();
       SILBuilderWithScope B(SI);
@@ -343,10 +349,10 @@ static bool isAvailabilityCheck(SILBasicBlock *BB) {
     return false;
   
   SILFunction *F = AI->getCalleeFunction();
-  if (!F || !F->hasDefinedSemantics())
+  if (!F || !F->hasSemanticsAttrs())
     return false;
-  
-  return F->getSemanticsString().startswith("availability");
+
+  return F->hasSemanticsAttrThatStartsWith("availability");
 }
 
 /// Returns true if there are any availability checks along the dominator tree
@@ -489,7 +495,13 @@ static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
   auto BB = EntryBB;
   SILValue Val;
   SILInstruction *Store;
-  for (auto &I : *BB) {
+  for (auto II = BB->begin(), E = BB->end(); II != E;) {
+    auto &I = *II++;
+    if (isa<AllocGlobalInst>(&I)) {
+      I.eraseFromParent();
+      continue;
+    }
+
     if (StoreInst *SI = dyn_cast<StoreInst>(&I)) {
       Val = SI->getSrc();
       Store = SI;

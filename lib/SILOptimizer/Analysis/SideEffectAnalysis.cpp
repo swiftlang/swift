@@ -1,4 +1,4 @@
-//===---------- SideEffectAnalysis.cpp - SIL Side Effect Analysis ---------===//
+//===--- SideEffectAnalysis.cpp - SIL Side Effect Analysis ----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -94,6 +94,7 @@ static SILValue skipAddrProjections(SILValue V) {
       case ValueKind::StructElementAddrInst:
       case ValueKind::TupleElementAddrInst:
       case ValueKind::RefElementAddrInst:
+      case ValueKind::ProjectBoxInst:
       case ValueKind::UncheckedTakeEnumDataAddrInst:
       case ValueKind::PointerToAddressInst:
         V = cast<SILInstruction>(V)->getOperand(0);
@@ -292,7 +293,11 @@ void SideEffectAnalysis::analyzeInstruction(FunctionInfo *FInfo,
 
     if (RecursionDepth < MaxRecursionDepth) {
       CalleeList Callees = BCA->getCalleeList(FAS);
-      if (Callees.allCalleesVisible()) {
+      if (Callees.allCalleesVisible() &&
+          // @callee_owned function calls implicitly release the context, which
+          // may call deinits of boxed values.
+          // TODO: be less conservative about what destructors might be called.
+          !FAS.getOrigCalleeType()->isCalleeConsumed()) {
         // Derive the effects of the apply from the known callees.
         for (SILFunction *Callee : Callees) {
           FunctionInfo *CalleeInfo = getFunctionInfo(Callee);
@@ -312,6 +317,11 @@ void SideEffectAnalysis::analyzeInstruction(FunctionInfo *FInfo,
   }
   // Handle some kind of instructions specially.
   switch (I->getKind()) {
+    case ValueKind::FixLifetimeInst:
+      // A fix_lifetime instruction acts like a read on the operand. Retains can move after it
+      // but the last release can't move before it.
+      FInfo->FE.getEffectsOn(I->getOperand(0))->Reads = true;
+      return;
     case ValueKind::AllocStackInst:
     case ValueKind::DeallocStackInst:
       return;
@@ -461,7 +471,11 @@ void SideEffectAnalysis::getEffects(FunctionEffects &ApplyEffects, FullApplySite
   }
 
   auto Callees = BCA->getCalleeList(FAS);
-  if (!Callees.allCalleesVisible()) {
+  if (!Callees.allCalleesVisible() ||
+      // @callee_owned function calls implicitly release the context, which
+      // may call deinits of boxed values.
+      // TODO: be less conservative about what destructors might be called.
+      FAS.getOrigCalleeType()->isCalleeConsumed()) {
     ApplyEffects.setWorstEffects();
     return;
   }

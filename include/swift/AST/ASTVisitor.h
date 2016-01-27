@@ -1,4 +1,4 @@
-//===-- ASTVisitor.h - Decl, Expr and Stmt Visitor --------------*- C++ -*-===//
+//===--- ASTVisitor.h - Decl, Expr and Stmt Visitor -------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -28,7 +28,6 @@
 
 namespace swift {
   class ParameterList;
-  struct Parameter;
   
 /// ASTVisitor - This is a simple visitor class for Swift expressions.
 template<typename ImplClass,
@@ -164,12 +163,8 @@ public:
   bool visit(ParameterList *PL) {
     return static_cast<ImplClass*>(this)->visitParameterList(PL);
   }
-  bool visit(Parameter &P) {
-    return static_cast<ImplClass*>(this)->visitParameter(P);
-  }
   
   bool visitParameterList(ParameterList *PL) { return false; }
-  bool visitParameter(Parameter &P) { return false; }
 };
   
   

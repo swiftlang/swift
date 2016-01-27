@@ -1,4 +1,4 @@
-//===--- ManagedBuffer.swift - variable-sized buffer of aligned memory ---===//
+//===--- ManagedBuffer.swift - variable-sized buffer of aligned memory ----===//
 //
 // This source file is part of the Swift.org open source project
 //

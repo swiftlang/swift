@@ -1,0 +1,13 @@
+[
+  {
+    key.kind: source.codecompletion.literal,
+    key.hide: 1,
+  },
+  {
+    key.kind: source.codecompletion.literal,
+    key.hide: 0,
+    key.uids: [
+      source.lang.swift.literal.string
+    ]
+  }
+]

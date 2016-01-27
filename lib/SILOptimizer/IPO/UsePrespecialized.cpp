@@ -1,4 +1,4 @@
-//===------- UsePrespecialized.cpp - use pre-specialized functions -------===//
+//===--- UsePrespecialized.cpp - use pre-specialized functions ------------===//
 //
 // This source file is part of the Swift.org open source project
 //

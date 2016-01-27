@@ -1,4 +1,4 @@
-//===--- ImporterImpl.h - Import Clang Modules - Implementation------------===//
+//===--- ImporterImpl.h - Import Clang Modules: Implementation --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -220,9 +220,30 @@ using api_notes::FactoryAsInitKind;
 
 /// \brief Implementation of the Clang importer.
 class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation 
-  : public LazyMemberLoader, public clang::ModuleFileExtension
+  : public LazyMemberLoader
 {
   friend class ClangImporter;
+
+  class SwiftNameLookupExtension : public clang::ModuleFileExtension {
+    Implementation &Impl;
+
+  public:
+    SwiftNameLookupExtension(Implementation &impl) : Impl(impl) { }
+
+    clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
+    llvm::hash_code hashExtension(llvm::hash_code code) const override;
+
+    std::unique_ptr<clang::ModuleFileExtensionWriter>
+    createExtensionWriter(clang::ASTWriter &writer) override;
+
+    std::unique_ptr<clang::ModuleFileExtensionReader>
+    createExtensionReader(const clang::ModuleFileExtensionMetadata &metadata,
+                          clang::ASTReader &reader,
+                          clang::serialization::ModuleFile &mod,
+                          const llvm::BitstreamCursor &stream) override;
+
+  };
+  friend class SwiftNameLookupExtension;
 
 public:
   /// \brief Describes how a particular C enumeration type will be imported
@@ -261,6 +282,16 @@ public:
     "<bridging-header-import>";
 
 private:
+  /// The Swift lookup table for the bridging header.
+  SwiftLookupTable BridgingHeaderLookupTable;
+
+  /// The Swift lookup tables, per module.
+  ///
+  /// Annoyingly, we list this table early so that it gets torn down after
+  /// the underlying Clang instances that reference it
+  /// (through the Swift name lookup module file extension).
+  llvm::StringMap<std::unique_ptr<SwiftLookupTable>> LookupTables;
+
   /// \brief A count of the number of load module operations.
   /// FIXME: Horrible, horrible hack for \c loadModule().
   unsigned ImportCounter = 0;
@@ -292,12 +323,6 @@ private:
   /// if type checking has begun.
   llvm::PointerIntPair<LazyResolver *, 1, bool> typeResolver;
 
-  /// The Swift lookup table for the bridging header.
-  SwiftLookupTable BridgingHeaderLookupTable;
-
-  /// The Swift lookup tables, per module.
-  llvm::StringMap<std::unique_ptr<SwiftLookupTable>> LookupTables;
-
 public:
   /// \brief Mapping of already-imported declarations.
   llvm::DenseMap<const clang::Decl *, Decl *> ImportedDecls;
@@ -313,6 +338,10 @@ public:
   /// ObjCBool.
   llvm::SmallDenseMap<const clang::TypedefNameDecl *, MappedTypeNameKind, 16>
     SpecialTypedefNames;
+
+  /// A mapping from module names to the prefixes placed on global names
+  /// in that module, e.g., the Foundation module uses the "NS" prefix.
+  llvm::StringMap<std::string> ModulePrefixes;
 
   /// Is the given identifier a reserved name in Swift?
   static bool isSwiftReservedName(StringRef name);
@@ -1128,20 +1157,21 @@ public:
                           bool isVariadic, bool isNoReturn,
                           bool isFromSystemModule,
                           bool hasCustomName,
-                          ParameterList **parameterList,
+                          ParameterList *&parameterList,
                           DeclName &name);
 
   Type importPropertyType(const clang::ObjCPropertyDecl *clangDecl,
                           bool isFromSystemModule);
 
-  /// Determine whether we can infer a default argument for a parameter with
-  /// the given \c type and (Clang) optionality.
-  bool canInferDefaultArgument(clang::Preprocessor &pp,
-                               clang::QualType type,
-                               OptionalTypeKind clangOptionality,
-                               Identifier baseName,
-                               unsigned numParams,
-                               bool isLastParameter);
+  /// Attempt to infer a default argument for a parameter with the
+  /// given Clang \c type, \c baseName, and optionality.
+  DefaultArgumentKind inferDefaultArgument(clang::Preprocessor &pp,
+                                           clang::QualType type,
+                                           OptionalTypeKind clangOptionality,
+                                           Identifier baseName,
+                                           unsigned numParams,
+                                           StringRef argumentLabel,
+                                           bool isLastParameter);
 
   /// Retrieve a bit vector containing the non-null argument
   /// annotations for the given declaration.
@@ -1277,20 +1307,6 @@ public:
       ASD->setSetterAccessibility(Accessibility::Public);
     return D;
   }
-
-  // Module file extension overrides
-
-  clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
-  llvm::hash_code hashExtension(llvm::hash_code code) const override;
-
-  std::unique_ptr<clang::ModuleFileExtensionWriter>
-  createExtensionWriter(clang::ASTWriter &writer) override;
-
-  std::unique_ptr<clang::ModuleFileExtensionReader>
-  createExtensionReader(const clang::ModuleFileExtensionMetadata &metadata,
-                        clang::ASTReader &reader,
-                        clang::serialization::ModuleFile &mod,
-                        const llvm::BitstreamCursor &stream) override;
 
   /// Find the lookup table that corresponds to the given Clang module.
   ///

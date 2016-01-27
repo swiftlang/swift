@@ -1,4 +1,4 @@
-//===--- MetadataCache.h - Implements the metadata cache -------*- C++ -*--===//
+//===--- MetadataCache.h - Implements the metadata cache --------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

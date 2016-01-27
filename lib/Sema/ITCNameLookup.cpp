@@ -21,9 +21,9 @@
 #include <tuple>
 using namespace swift;
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Qualified name lookup handling
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 bool IterativeTypeChecker::isQualifiedLookupInDeclContextSatisfied(
        TypeCheckRequest::DeclContextLookupPayloadType payload) {
   auto dc = payload.DC;
@@ -123,9 +123,9 @@ bool IterativeTypeChecker::breakCycleForQualifiedLookupInDeclContext(
   return false;
 }
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Qualified name lookup handling
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 bool IterativeTypeChecker::isUnqualifiedLookupInDeclContextSatisfied(
        TypeCheckRequest::DeclContextLookupPayloadType payload) {
   auto dc = payload.DC;

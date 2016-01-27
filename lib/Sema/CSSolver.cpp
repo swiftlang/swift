@@ -23,9 +23,9 @@
 using namespace swift;
 using namespace constraints;
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Constraint solver statistics
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "Constraint solver overall"
 #define JOIN(X,Y) JOIN2(X,Y)
 #define JOIN2(X,Y) X##Y
@@ -821,6 +821,15 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     auto first = cs.simplifyType(constraint->getFirstType());
     auto second = cs.simplifyType(constraint->getSecondType());
 
+    if (auto firstTyvar = first->getAs<TypeVariableType>()) {
+      if (auto secondTyvar = second->getAs<TypeVariableType>()) {
+        if (cs.getRepresentative(firstTyvar) ==
+            cs.getRepresentative(secondTyvar)) {
+          break;
+        }
+      }
+    }
+
     Type type;
     AllowedBindingKind kind;
     if (first->getAs<TypeVariableType>() == typeVar) {
@@ -1038,6 +1047,19 @@ static bool tryTypeVariableBindings(
     // Try each of the bindings in turn.
     ++cs.solverState->NumTypeVariableBindings;
     bool sawFirstLiteralConstraint = false;
+
+    if (tc.getLangOpts().DebugConstraintSolver) {
+      auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
+      log.indent(depth * 2) << "Active bindings: ";
+
+      for (auto binding : bindings) {
+        log << typeVar->getString() << " := "
+            << binding.BindingType->getString() << " ";
+      }
+
+      log <<"\n";
+    }
+
     for (auto binding : bindings) {
       auto type = binding.BindingType;
 
@@ -1052,8 +1074,8 @@ static bool tryTypeVariableBindings(
       if (tc.getLangOpts().DebugConstraintSolver) {
         auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
         log.indent(depth * 2)
-          << "(trying " << typeVar->getString()
-          << " := " << type->getString() << "\n";
+          << "(trying " << typeVar->getString() << " := " << type->getString()
+          << "\n";
       }
 
       // Try to solve the system with typeVar := type
@@ -1094,7 +1116,9 @@ static bool tryTypeVariableBindings(
 
     // Enumerate the supertypes of each of the types we tried.
     for (auto binding : bindings) {
-      auto type = binding.BindingType;
+      const auto type = binding.BindingType;
+      if (type->is<ErrorType>())
+        continue;
 
       // After our first pass, note that we've explored these
       // types.
@@ -1192,7 +1216,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
   // If there is more than one viable system, attempt to pick the best
   // solution.
-  if (solutions.size() > 1) {
+  auto size = solutions.size();
+  if (size > 1) {
     if (auto best = findBestSolution(solutions, /*minimize=*/false)) {
       if (*best != 0)
         solutions[0] = std::move(solutions[*best]);
@@ -1239,6 +1264,9 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
     solutions.push_back(std::move(solution));
     return false;
   }
+
+  // Contract the edges of the constraint graph.
+  CG.optimize();
 
   // Compute the connected components of the constraint graph.
   // FIXME: We're seeding typeVars with TypeVariables so that the
@@ -1560,21 +1588,25 @@ bool ConstraintSystem::solveSimplified(
     // constraints that could show up here?
     if (allowFreeTypeVariables != FreeTypeVariableBinding::Disallow &&
         hasFreeTypeVariables()) {
-      bool anyNonConformanceConstraints = false;
-      for (auto &constraint : InactiveConstraints) {
-        if (constraint.getKind() == ConstraintKind::ConformsTo ||
-            constraint.getKind() == ConstraintKind::SelfObjectOfProtocol ||
-            constraint.getKind() == ConstraintKind::TypeMember)
-          continue;
-
-        anyNonConformanceConstraints = true;
-        break;
-      }
 
       // If this solution is worse than the best solution we've seen so far,
       // skip it.
       if (worseThanBestSolution())
         return true;
+
+      bool anyNonConformanceConstraints = false;
+      for (auto &constraint : InactiveConstraints) {
+        switch (constraint.getClassification()) {
+        case ConstraintClassification::Relational:
+        case ConstraintClassification::Member:
+          continue;
+        default:
+          break;
+        }
+
+        anyNonConformanceConstraints = true;
+        break;
+      }
 
       if (!anyNonConformanceConstraints) {
         auto solution = finalize(allowFreeTypeVariables);
@@ -1634,7 +1666,7 @@ bool ConstraintSystem::solveSimplified(
     ++solverState->NumDisjunctionTerms;
     if (TC.getLangOpts().DebugConstraintSolver) {
       auto &log = getASTContext().TypeCheckerDebug->getStream();
-      log.indent(solverState->depth * 2)
+      log.indent(solverState->depth)
         << "(assuming ";
       constraint->print(log, &TC.Context.SourceMgr);
       log << '\n';
@@ -1700,7 +1732,7 @@ bool ConstraintSystem::solveSimplified(
 
     if (TC.getLangOpts().DebugConstraintSolver) {
       auto &log = getASTContext().TypeCheckerDebug->getStream();
-      log.indent(solverState->depth * 2) << ")\n";
+      log.indent(solverState->depth) << ")\n";
     }
   }
 

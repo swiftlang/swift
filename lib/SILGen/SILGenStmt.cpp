@@ -53,7 +53,8 @@ SILBasicBlock *SILGenFunction::createBasicBlock(FunctionSection section) {
     // The end of the ordinary section is just the end of the function
     // unless postmatter blocks exist.
     SILBasicBlock *afterBB =
-      (StartOfPostmatter ? StartOfPostmatter->getPrevNode() : nullptr);
+        (StartOfPostmatter ? &*std::prev(StartOfPostmatter->getIterator())
+                           : nullptr);
     return new (F.getModule()) SILBasicBlock(&F, afterBB);
   }
 
@@ -73,7 +74,7 @@ void SILGenFunction::eraseBasicBlock(SILBasicBlock *block) {
   assert(block->pred_empty() && "erasing block with predecessors");
   assert(block->empty() && "erasing block with content");
   if (block == StartOfPostmatter) {
-    StartOfPostmatter = block->getNextNode();
+    StartOfPostmatter = &*std::next(block->getIterator());
   }
   block->eraseFromParent();
 }
@@ -147,7 +148,7 @@ Condition SILGenFunction::emitCondition(Expr *E,
     FullExpr Scope(Cleanups, CleanupLocation(E));
     V = emitRValue(E).forwardAsSingleValue(*this, E);
   }
-  assert(V.getType().castTo<BuiltinIntegerType>()->isFixedWidth(1));
+  assert(V->getType().castTo<BuiltinIntegerType>()->isFixedWidth(1));
 
   return emitCondition(V, E, hasFalseCode, invertValue, contArgs);
 }

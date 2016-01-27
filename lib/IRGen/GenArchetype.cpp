@@ -19,7 +19,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/IRGenOptions.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/SmallString.h"
@@ -53,7 +52,7 @@ using namespace irgen;
 
 static llvm::Value *emitArchetypeTypeMetadataRef(IRGenFunction &IGF,
                                                  CanArchetypeType archetype) {
-  return IGF.getLocalTypeData(archetype, LocalTypeData::forMetatype());
+  return IGF.getLocalTypeData(archetype, LocalTypeDataKind::forTypeMetadata());
 }
 
 namespace {
@@ -88,8 +87,9 @@ public:
                                CanArchetypeType archetype,
                                unsigned which) const {
     assert(which < getNumStoredProtocols());
+    auto protocol = archetype->getConformsTo()[which];
     return IGF.getLocalTypeData(archetype,
-                          LocalTypeData::forArchetypeProtocolWitness(which));
+                 LocalTypeDataKind::forAbstractProtocolWitnessTable(protocol));
   }
 };
 
@@ -168,9 +168,9 @@ getArchetypeInfo(IRGenFunction &IGF, CanArchetypeType t, const TypeInfo &ti) {
 }
 
 /// Emit a single protocol witness table reference.
-llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
-                                        CanArchetypeType archetype,
-                                        ProtocolDecl *proto) {
+llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
+                                                 CanArchetypeType archetype,
+                                                 ProtocolDecl *proto) {
   assert(Lowering::TypeConverter::protocolRequiresWitnessTable(proto) &&
          "looking up witness table for protocol that doesn't have one");
 
@@ -188,8 +188,8 @@ llvm::Value *irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
                                                   CanArchetypeType origin,
                                                AssociatedTypeDecl *associate) {
   // Find the conformance of the origin to the associated type's protocol.
-  llvm::Value *wtable = emitWitnessTableRef(IGF, origin,
-                                            associate->getProtocol());
+  llvm::Value *wtable = emitArchetypeWitnessTableRef(IGF, origin,
+                                                     associate->getProtocol());
 
   // Find the origin's type metadata.
   llvm::Value *originMetadata = emitArchetypeTypeMetadataRef(IGF, origin);
@@ -204,8 +204,8 @@ irgen::emitAssociatedTypeWitnessTableRef(IRGenFunction &IGF,
                                          llvm::Value *associateMetadata,
                                          ProtocolDecl *associateProtocol) {
   // Find the conformance of the origin to the associated type's protocol.
-  llvm::Value *wtable = emitWitnessTableRef(IGF, origin,
-                                            associate->getProtocol());
+  llvm::Value *wtable = emitArchetypeWitnessTableRef(IGF, origin,
+                                                     associate->getProtocol());
 
   // Find the origin's type metadata.
   llvm::Value *originMetadata = emitArchetypeTypeMetadataRef(IGF, origin);
@@ -274,22 +274,8 @@ static void setMetadataRef(IRGenFunction &IGF,
                            llvm::Value *metadata) {
   assert(metadata->getType() == IGF.IGM.TypeMetadataPtrTy);
   IGF.setUnscopedLocalTypeData(CanType(archetype),
-                               LocalTypeData::forMetatype(),
+                               LocalTypeDataKind::forTypeMetadata(),
                                metadata);
-
-  // Create a shadow copy of the metadata in an alloca for the debug info.
-  StringRef Name = metadata->getName();
-  if (!IGF.IGM.Opts.Optimize) {
-    auto Alloca = IGF.createAlloca(metadata->getType(),
-                                   IGF.IGM.getPointerAlignment(), Name);
-    IGF.Builder.CreateAlignedStore(metadata, Alloca.getAddress(),
-                                   IGF.IGM.getPointerAlignment().getValue());
-    metadata = Alloca.getAddress();
-  }
-
-  // Emit debug info for the metadata.
-  if (IGF.IGM.DebugInfo)
-    IGF.IGM.DebugInfo->emitTypeMetadata(IGF, metadata, Name);
 }
 
 static void setWitnessTable(IRGenFunction &IGF,
@@ -298,8 +284,10 @@ static void setWitnessTable(IRGenFunction &IGF,
                             llvm::Value *wtable) {
   assert(wtable->getType() == IGF.IGM.WitnessTablePtrTy);
   assert(protocolIndex < archetype->getConformsTo().size());
+  auto protocol = archetype->getConformsTo()[protocolIndex];
   IGF.setUnscopedLocalTypeData(CanType(archetype),
-             LocalTypeData::forArchetypeProtocolWitness(protocolIndex), wtable);
+                  LocalTypeDataKind::forAbstractProtocolWitnessTable(protocol),
+                               wtable);
 }
 
 /// Inform IRGenFunction that the given archetype has the given value
@@ -308,9 +296,7 @@ void IRGenFunction::bindArchetype(ArchetypeType *archetype,
                                   llvm::Value *metadata,
                                   ArrayRef<llvm::Value*> wtables) {
   // Set the metadata pointer.
-  bool setNames = !archetype->getOpenedExistentialType();
-  if (setNames)
-    metadata->setName(archetype->getFullName());
+  setTypeMetadataName(IGM, metadata, CanType(archetype));
   setMetadataRef(*this, archetype, metadata);
 
   // Set the protocol witness tables.
@@ -321,10 +307,7 @@ void IRGenFunction::bindArchetype(ArchetypeType *archetype,
     if (!Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
       continue;
     auto wtable = wtables[wtableI++];
-    if (setNames) {
-      wtable->setName(Twine(archetype->getFullName()) + "." +
-                      proto->getName().str());
-    }
+    setProtocolWitnessTableName(IGM, wtable, CanType(archetype), proto);
     setWitnessTable(*this, archetype, i, wtable);
   }
   assert(wtableI == wtables.size());

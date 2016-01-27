@@ -64,7 +64,7 @@ generally *should* use a keyword.  For example, ``String(33, radix:
    they're converting.  Secondly, avoiding method or property syntax
    provides a distinct context for code completion.  Rather than
    appearing in completions offered after ``.``, for example, the
-   available conversions could show up whenever the user hit the “tab”
+   available conversions could show up whenever the user hit the "tab"
    key after an expression.
 
 Protocols with restricted conformance rules

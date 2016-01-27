@@ -354,7 +354,7 @@ public:
       ValueDecl *D = cast<DeclRefExpr>(E)->getDecl();
       Added<Expr *> DRE = 
         new (Context) DeclRefExpr(ConcreteDeclRef(D),
-                                  cast<DeclRefExpr>(E)->getLoc(),
+                                  cast<DeclRefExpr>(E)->getNameLoc(),
                                   true, // implicit
                                   AccessSemantics::Ordinary,
                                   cast<DeclRefExpr>(E)->getType());
@@ -370,7 +370,7 @@ public:
         new (Context) MemberRefExpr(*BaseVariable.first,
                                     cast<MemberRefExpr>(E)->getDotLoc(),
                                     ConcreteDeclRef(M),
-                                    cast<MemberRefExpr>(E)->getSourceRange(),
+                                    cast<MemberRefExpr>(E)->getNameLoc(),
                                     true, // implicit
                                     AccessSemantics::Ordinary));
       return std::make_pair(MRE, M);
@@ -530,7 +530,7 @@ public:
               buildPatternAndVariable(AE->getSrc());
             DeclRefExpr *DRE =
               new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
-                                        SourceLoc(),
+                                        DeclNameLoc(),
                                         true, // implicit
                                         AccessSemantics::Ordinary,
                                         AE->getSrc()->getType());
@@ -544,7 +544,7 @@ public:
             
             Added<Stmt *> Log(buildLoggerCall(
               new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
-                                        SourceLoc(),
+                                        DeclNameLoc(),
                                         true, // implicit
                                         AccessSemantics::Ordinary,
                                         AE->getSrc()->getType()),
@@ -625,7 +625,7 @@ public:
               buildPatternAndVariable(E);
             Added<Stmt *> Log = buildLoggerCall(
               new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
-                                        SourceLoc(),
+                                        DeclNameLoc(),
                                         true, // implicit
                                         AccessSemantics::Ordinary,
                                         E->getType()),
@@ -644,7 +644,7 @@ public:
               buildPatternAndVariable(E);
             Added<Stmt *> Log = buildLoggerCall(
               new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
-                                        SourceLoc(),
+                                        DeclNameLoc(),
                                         true, // implicit
                                         AccessSemantics::Ordinary,
                                         E->getType()),
@@ -665,7 +665,7 @@ public:
               buildPatternAndVariable(RS->getResult());
             DeclRefExpr *DRE =
               new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
-                                        SourceLoc(),
+                                        DeclNameLoc(),
                                         true, // implicit
                                         AccessSemantics::Ordinary,
                                         RS->getResult()->getType());
@@ -674,7 +674,7 @@ public:
                                                        true); // implicit
             Added<Stmt *> Log = buildLoggerCall(
               new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
-                                        SourceLoc(),
+                                        DeclNameLoc(),
                                         true, // implicit
                                         AccessSemantics::Ordinary,
                                         RS->getResult()->getType()),
@@ -749,7 +749,7 @@ public:
 
     return buildLoggerCall(
       new (Context) DeclRefExpr(ConcreteDeclRef(VD),
-                                SourceLoc(),
+                                DeclNameLoc(),
                                 true, // implicit
                                 AccessSemantics::Ordinary,
                                 Type()),
@@ -767,7 +767,7 @@ public:
   
       return buildLoggerCall(
         new (Context) DeclRefExpr(ConcreteDeclRef(VD),
-                                  SourceLoc(),
+                                  DeclNameLoc(),
                                   true, // implicit
                                   AccessSemantics::Ordinary,
                                   Type()),
@@ -786,7 +786,7 @@ public:
         new (Context) MemberRefExpr(B,
                                     SourceLoc(),
                                     M,
-                                    SourceRange(),
+                                    DeclNameLoc(),
                                     true, // implicit
                                     AccessSemantics::Ordinary),
         MRE->getSourceRange(), M.getDecl()->getName().str().str().c_str());
@@ -802,7 +802,7 @@ public:
       std::pair<PatternBindingDecl*, VarDecl*> PV =
         buildPatternAndVariable(PE->getSubExpr());
       PE->setSubExpr(new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
-                                               SourceLoc(),
+                                               DeclNameLoc(),
                                                true, // implicit
                                                AccessSemantics::Ordinary,
                                                PE->getSubExpr()->getType()));
@@ -831,7 +831,7 @@ public:
           TE->setElement(0,
                          new (Context) DeclRefExpr(
                            ConcreteDeclRef(PV.second),
-                           SourceLoc(),
+                           DeclNameLoc(),
                            true, // implicit
                            AccessSemantics::Ordinary,
                            TE->getElement(0)->getType()));
@@ -841,7 +841,7 @@ public:
             buildPatternAndVariable(TE);
           Print->setArg(new (Context) DeclRefExpr(
                           ConcreteDeclRef(PV.second),
-                          SourceLoc(),
+                          DeclNameLoc(),
                           true, // implicit
                           AccessSemantics::Ordinary,
                           TE->getType()));
@@ -863,7 +863,7 @@ public:
       new (Context) UnresolvedDeclRefExpr(
         Context.getIdentifier(LoggerName),
         DeclRefKind::Ordinary,
-        AE->getSourceRange().End);
+        DeclNameLoc(AE->getSourceRange().End));
 
     std::tie(ArgPattern, ArgVariable) =
       maybeFixupPrintArgument(AE);
@@ -982,7 +982,7 @@ public:
       new (Context) UnresolvedDeclRefExpr(
         Context.getIdentifier(LoggerName),
         DeclRefKind::Ordinary,
-        SR.End);
+        DeclNameLoc(SR.End));
 
     LoggerRef->setImplicit(true);
 
@@ -1032,7 +1032,7 @@ public:
       buildPatternAndVariable(*Apply);
 
     DeclRefExpr *DRE = new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
-                                                 SourceLoc(),
+                                                 DeclNameLoc(),
                                                  true, // implicit
                                                  AccessSemantics::Ordinary,
                                                  Apply->getType());
@@ -1051,7 +1051,7 @@ public:
       new (Context) UnresolvedDeclRefExpr(
         Context.getIdentifier("$builtin_send_data"),
         DeclRefKind::Ordinary,
-        SourceLoc());
+        DeclNameLoc());
 
     SendDataRef->setImplicit(true);
 

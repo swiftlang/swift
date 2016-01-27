@@ -28,9 +28,11 @@ struct S {
     // CHECK: bb0([[X:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $*S):
     member = x
     // CHECK: [[THIS_LOCAL:%[0-9]+]] = alloc_box $S
-    // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Int
-    // CHECK: [[MEMBER:%[0-9]+]] = struct_element_addr [[THIS_LOCAL]]#1 : $*S, #S.member
-    // CHECK: copy_addr [[XADDR]]#1 to [[MEMBER]]
+    // CHECK: [[PBTHIS:%.*]] = project_box [[THIS_LOCAL]]
+    // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
+    // CHECK: [[XADDR:%.*]] = project_box [[XBOX]]
+    // CHECK: [[MEMBER:%[0-9]+]] = struct_element_addr [[PBTHIS]] : $*S, #S.member
+    // CHECK: copy_addr [[XADDR]] to [[MEMBER]]
   }
 
   class SC {

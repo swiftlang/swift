@@ -1,4 +1,4 @@
-//===--- Debug.h - Swift Runtime debug helpers ----------------------------===//
+//===--- Debug.h - Swift Runtime debug helpers ------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

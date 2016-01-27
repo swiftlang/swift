@@ -38,7 +38,7 @@ func useTwoIdentical(xi: Int, yi: Float) {
   y = twoIdentical(1.0, y)
   y = twoIdentical(y, 1.0)
   
-  twoIdentical(x, y) // expected-error{{cannot invoke 'twoIdentical' with an argument list of type '(Int, Float)'}} expected-note{{expected an argument list of type '(T, T)'}}
+  twoIdentical(x, y) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
 }
 
 func mySwap<T>(inout x: T,
@@ -78,11 +78,10 @@ func passFunction(f: (Int) -> Float, x: Int, y: Float) {
    acceptFunction(f, y, y) // expected-error{{cannot convert value of type '(Int) -> Float' to expected argument type '(_) -> _'}}
 }
 
-func returnTuple<T, U>(_: T) -> (T, U) { }
+func returnTuple<T, U>(_: T) -> (T, U) { } // expected-note {{in call to function 'returnTuple'}}
 
 func testReturnTuple(x: Int, y: Float) {
-  returnTuple(x) // expected-error{{cannot invoke 'returnTuple' with an argument list of type '(Int)'}}
-  // expected-note @-1 {{expected an argument list of type '(T)'}}
+  returnTuple(x) // expected-error{{generic parameter 'T' could not be inferred}}
   
   var _ : (Int, Float) = returnTuple(x)
   var _ : (Float, Float) = returnTuple(y)
@@ -206,17 +205,17 @@ extension Int : IsBefore {
 
 func callMin(x: Int, y: Int, a: Float, b: Float) {
   min2(x, y)
-  min2(a, b) // expected-error{{cannot invoke 'min2' with an argument list of type '(Float, Float)'}} expected-note {{expected an argument list of type '(T, T)'}}
+  min2(a, b) // expected-error{{argument type 'Float' does not conform to expected type 'IsBefore'}}
 }
 
-func rangeOfIsBefore<
+func rangeOfIsBefore<  // expected-note {{in call to function 'rangeOfIsBefore'}}
   R : GeneratorType where R.Element : IsBefore
 >(range : R) { }
 
 
 func callRangeOfIsBefore(ia: [Int], da: [Double]) {
   rangeOfIsBefore(ia.generate())
-  rangeOfIsBefore(da.generate()) // expected-error{{cannot invoke 'rangeOfIsBefore' with an argument list of type '(IndexingGenerator<[Double]>)'}} expected-note{{expected an argument list of type '(R)'}}
+  rangeOfIsBefore(da.generate()) // expected-error{{generic parameter 'R' could not be inferred}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -266,7 +265,7 @@ func testGetVectorSize(vi: MyVector<Int>, vf: MyVector<Float>) {
 postfix operator <*> {}
 
 protocol MetaFunction {
-  typealias Result
+  associatedtype Result
   postfix func <*> (_: Self) -> Result?
 }
 
@@ -288,3 +287,15 @@ var iy2 : Inty = "hello" // expected-error{{cannot convert value of type 'String
 class DeducePropertyParams {
   let badSet: Set = ["Hello"]
 }
+
+// SR-69
+struct A {}
+func foo() {
+    for i in min(1,2) { // expected-error{{type 'Int' does not conform to protocol 'SequenceType'}}
+    }
+    let j = min(Int(3), Float(2.5)) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
+    let k = min(A(), A()) // expected-error{{argument type 'A' does not conform to expected type 'Comparable'}}
+    let oi : Int? = 5
+    let l = min(3, oi) // expected-error{{value of optional type 'Int?' not unwrapped; did you mean to use '!' or '?'?}}
+}
+

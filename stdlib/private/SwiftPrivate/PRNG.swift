@@ -32,7 +32,7 @@ public func rand64() -> UInt64 {
 public func randInt() -> Int {
 #if arch(i386) || arch(arm)
   return Int(Int32(bitPattern: rand32()))
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
   return Int(Int64(bitPattern: rand64()))
 #else
   fatalError("unimplemented")

@@ -1,4 +1,4 @@
-//===--- ForeignErrorConvention.h - Error conventions ----------*- C++ -*-===//
+//===--- ForeignErrorConvention.h - Error conventions -----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

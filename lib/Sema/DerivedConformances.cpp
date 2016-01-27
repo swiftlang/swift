@@ -40,7 +40,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
 
     // Retrieve the requirement.
     auto results = proto->lookupDirect(name);
-    return  results.empty() ? nullptr : results.front();
+    return results.empty() ? nullptr : results.front();
   };
 
   // Properties.
@@ -93,9 +93,9 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
   return nullptr;
 }
 
-void DerivedConformance::_insertOperatorDecl(ASTContext &C,
-                                             IterableDeclContext *scope,
-                                             Decl *member) {
+void DerivedConformance::insertOperatorDecl(ASTContext &C,
+                                            IterableDeclContext *scope,
+                                            Decl *member) {
   // Find the module.
   auto mod = member->getModuleContext();
 
@@ -118,7 +118,7 @@ DerivedConformance::createSelfDeclRef(AbstractFunctionDecl *fn) {
   ASTContext &C = fn->getASTContext();
 
   auto selfDecl = fn->getImplicitSelfDecl();
-  return new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true);
+  return new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/true);
 }
 
 FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
@@ -170,8 +170,11 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   getterDecl->setInterfaceType(interfaceType);
   getterDecl->setAccessibility(typeDecl->getFormalAccess());
 
-  if (typeDecl->hasClangNode())
-    tc.implicitlyDefinedFunctions.push_back(getterDecl);
+  // If the enum was not imported, the derived conformance is either from the
+  // enum itself or an extension, in which case we will emit the declaration
+  // normally.
+  if (parentDecl->hasClangNode())
+    tc.Context.addExternalDecl(getterDecl);
 
   return getterDecl;
 }

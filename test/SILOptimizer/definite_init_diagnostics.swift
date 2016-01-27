@@ -1160,3 +1160,57 @@ let x: String? // expected-note 2 {{constant defined here}}
 print(x?.characters.count) // expected-error {{constant 'x' used before being initialized}}
 print(x!) // expected-error {{constant 'x' used before being initialized}}
 
+
+// <rdar://problem/22723281> QoI: [DI] Misleading error from Swift compiler when using an instance method in init()
+protocol PMI {
+  func getg()
+}
+
+extension PMI {
+  func getg() {}
+}
+
+class WS: PMI {
+  final let x: String  // expected-note {{'self.x' not initialized}}
+  
+  init() {
+    getg()   // expected-error {{use of 'self' in method call 'getg' before all stored properties are initialized}}
+    self.x = "foo"
+  }
+}
+
+// <rdar://problem/23013334> DI QoI: Diagnostic claims that property is being used when it actually isn't
+class r23013334 {
+  var B: Int   // expected-note {{'self.B' not initialized}}
+  var A: String
+  
+  init(A: String) throws {
+    self.A = A
+    self.A.withCString { cString -> () in  // expected-error {{'self' captured by a closure before all members were initialized}}
+
+      print(self.A)
+      return ()
+    }
+    
+    self.B = 0
+  }
+  
+}
+
+class r23013334Derived : rdar16119509_Base {
+  var B: Int   // expected-note {{'self.B' not initialized}}
+  var A: String
+  
+  init(A: String) throws {
+    self.A = A
+    self.A.withCString { cString -> () in  // expected-error {{'self' captured by a closure before all members were initialized}}
+      
+      print(self.A)
+      return ()
+    }
+    
+    self.B = 0
+  }
+
+}
+

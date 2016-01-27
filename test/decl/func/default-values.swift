@@ -27,12 +27,6 @@ func returnWithDefault() -> (a: Int, b: Int = 42) { // expected-error{{default a
   return 5 // expected-error{{cannot convert return expression of type 'Int' to return type '(a: Int, b: Int)'}}
 }
 
-// Only the first parameter list of a curried function can have a
-// default argument.
-func curried(i: Int = 1) // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-     (f : Float = 2) { // expected-error{{default argument is only permitted for a non-curried function parameter}}{{17-20=}}
-}
-
 func selectorStyle(i: Int = 1, withFloat f: Float = 2) { }
 
 // Default arguments of constructors.

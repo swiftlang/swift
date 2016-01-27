@@ -388,6 +388,19 @@ internal var _objectPointerLowSpareBitShift: UInt {
 internal var _objCTaggedPointerBits: UInt {
     @inline(__always) get { return 0x8000_0000_0000_0000 }
 }
+#elseif arch(powerpc64) || arch(powerpc64le)
+internal var _objectPointerSpareBits: UInt {
+  @inline(__always) get { return 0x0000_0000_0000_0007 }
+}
+internal var _objectPointerIsObjCBit: UInt {
+  @inline(__always) get { return 0x0000_0000_0000_0002 }
+}
+internal var _objectPointerLowSpareBitShift: UInt {
+    @inline(__always) get { return 0 }
+}
+internal var _objCTaggedPointerBits: UInt {
+    @inline(__always) get { return 0 }
+}
 #endif
 
 /// Extract the raw bits of `x`.

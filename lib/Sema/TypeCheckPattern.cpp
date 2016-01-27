@@ -156,7 +156,8 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
     assert(components.empty() && "decl ref should be root element of expr");
     // Track the AST location of the component.
     components.push_back(
-      new (C) SimpleIdentTypeRepr(udre->getLoc(), udre->getName()));
+      new (C) SimpleIdentTypeRepr(udre->getLoc(),
+                                  udre->getName().getBaseName()));
     return true;
   }
   
@@ -168,7 +169,7 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
 
     // Track the AST location of the new component.
     components.push_back(
-      new (C) SimpleIdentTypeRepr(ude->getLoc(), ude->getName()));
+      new (C) SimpleIdentTypeRepr(ude->getLoc(), ude->getName().getBaseName()));
     return true;
   }
   
@@ -405,11 +406,13 @@ public:
       subPattern = getSubExprPattern(arg);
     }
     
-    return new (TC.Context) EnumElementPattern(TypeLoc(), ume->getDotLoc(),
-                                               ume->getNameLoc(),
-                                               ume->getName(),
-                                               nullptr,
-                                               subPattern);
+    // FIXME: Compound names.
+    return new (TC.Context) EnumElementPattern(
+                              TypeLoc(), ume->getDotLoc(),
+                              ume->getNameLoc().getBaseNameLoc(),
+                              ume->getName().getBaseName(),
+                              nullptr,
+                              subPattern);
   }
   
   // Member syntax 'T.Element' forms a pattern if 'T' is an enum and the
@@ -431,16 +434,19 @@ public:
     if (!enumDecl)
       return nullptr;
 
+    // FIXME: Argument labels?
     EnumElementDecl *referencedElement
-      = lookupEnumMemberElement(TC, DC, ty, ude->getName());
+      = lookupEnumMemberElement(TC, DC, ty, ude->getName().getBaseName());
     
     // Build a TypeRepr from the head of the full path.
+    // FIXME: Compound names.
     TypeLoc loc(repr);
     loc.setType(ty);
     return new (TC.Context) EnumElementPattern(loc,
                                                ude->getDotLoc(),
-                                               ude->getNameLoc(),
-                                               ude->getName(),
+                                               ude->getNameLoc()
+                                                 .getBaseNameLoc(),
+                                               ude->getName().getBaseName(),
                                                referencedElement,
                                                nullptr);
   }
@@ -467,14 +473,15 @@ public:
     //
     // Try looking up an enum element in context.
     if (EnumElementDecl *referencedElement
-        = lookupUnqualifiedEnumMemberElement(TC, DC, ude->getName())) {
+        = lookupUnqualifiedEnumMemberElement(TC, DC,
+                                             ude->getName().getBaseName())) {
       auto *enumDecl = referencedElement->getParentEnum();
       auto enumTy = enumDecl->getDeclaredTypeInContext();
       TypeLoc loc = TypeLoc::withoutLoc(enumTy);
       
       return new (TC.Context) EnumElementPattern(loc, SourceLoc(),
                                                  ude->getLoc(),
-                                                 ude->getName(),
+                                                 ude->getName().getBaseName(),
                                                  referencedElement,
                                                  nullptr);
     }
@@ -706,11 +713,10 @@ static bool validateTypedPattern(TypeChecker &TC, DeclContext *DC,
 }
 
 
-static bool validateParameterType(Parameter &param, DeclContext *DC,
+static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
                                   TypeResolutionOptions options,
                                   GenericTypeResolver *resolver,
                                   TypeChecker &TC) {
-  auto decl = param.decl;
   if (auto ty = decl->getTypeLoc().getType())
     return ty->is<ErrorType>();
   
@@ -718,13 +724,13 @@ static bool validateParameterType(Parameter &param, DeclContext *DC,
                                   options|TR_FunctionInput, resolver);
   
   Type Ty = decl->getTypeLoc().getType();
-  if (param.isVariadic() && !hadError) {
+  if (decl->isVariadic() && !hadError) {
     // If isn't legal to declare something both inout and variadic.
     if (Ty->is<InOutType>()) {
-      TC.diagnose(param.getStartLoc(), diag::inout_cant_be_variadic);
+      TC.diagnose(decl->getStartLoc(), diag::inout_cant_be_variadic);
       hadError = true;
     } else {
-      Ty = TC.getArraySliceType(param.getStartLoc(), Ty);
+      Ty = TC.getArraySliceType(decl->getStartLoc(), Ty);
       if (Ty.isNull()) {
         hadError = true;
       }
@@ -744,14 +750,14 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
                                          GenericTypeResolver *resolver) {
   bool hadError = false;
   
-  for (auto &param : *PL) {
-    if (param.decl->getTypeLoc().getTypeRepr())
+  for (auto param : *PL) {
+    if (param->getTypeLoc().getTypeRepr())
       hadError |= validateParameterType(param, DC, options, resolver, *this);
     
-    auto type = param.decl->getTypeLoc().getType();
-    if (!type && param.decl->hasType()) {
-      type = param.decl->getType();
-      param.decl->getTypeLoc().setType(type);
+    auto type = param->getTypeLoc().getType();
+    if (!type && param->hasType()) {
+      type = param->getType();
+      param->getTypeLoc().setType(type);
     }
     
     // If there was no type specified, and if we're not looking at a
@@ -762,19 +768,18 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
       // Closure argument lists are allowed to be missing types.
       if (options & TR_InExpression)
         continue;
-      param.decl->setInvalid();
+      param->setInvalid();
     }
     
-    VarDecl *var = param.decl;
-    if (var->isInvalid()) {
-      var->overwriteType(ErrorType::get(Context));
+    if (param->isInvalid()) {
+      param->overwriteType(ErrorType::get(Context));
       hadError = true;
     } else
-      var->overwriteType(type);
+      param->overwriteType(type);
     
-    checkTypeModifyingDeclAttributes(var);
-    if (var->getType()->is<InOutType>())
-      var->setLet(false);
+    checkTypeModifyingDeclAttributes(param);
+    if (param->getType()->is<InOutType>())
+      param->setLet(false);
   }
   
   return hadError;
@@ -934,7 +939,8 @@ static bool coercePatternViaConditionalDowncast(TypeChecker &tc,
   matchVar->setHasNonPatternBindingInit();
 
   // Form the cast $match as? T, which produces an optional.
-  Expr *matchRef = new (tc.Context) DeclRefExpr(matchVar, pattern->getLoc(),
+  Expr *matchRef = new (tc.Context) DeclRefExpr(matchVar,
+                                                DeclNameLoc(pattern->getLoc()),
                                                 /*Implicit=*/true);
   Expr *cast = new (tc.Context) ConditionalCheckedCastExpr(
                                   matchRef,
@@ -1558,30 +1564,29 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, DeclContext *DC,
   bool hadError = paramListType->is<ErrorType>();
 
   // Sometimes a scalar type gets applied to a single-argument parameter list.
-  auto handleParameter = [&](Parameter &param, Type ty) -> bool {
+  auto handleParameter = [&](ParamDecl *param, Type ty) -> bool {
     bool hadError = false;
     
     // Check that the type, if explicitly spelled, is ok.
-    if (param.decl->getTypeLoc().getTypeRepr()) {
+    if (param->getTypeLoc().getTypeRepr()) {
       hadError |= validateParameterType(param, DC, TypeResolutionOptions(),
                                         nullptr, *this);
       
       // Now that we've type checked the explicit argument type, see if it
       // agrees with the contextual type.
-      if (!hadError && !ty->isEqual(param.decl->getTypeLoc().getType()) &&
+      if (!hadError && !ty->isEqual(param->getTypeLoc().getType()) &&
           !ty->is<ErrorType>())
-        param.decl->overwriteType(ty);
+        param->overwriteType(ty);
     }
     
-    auto *var = param.decl;
-    if (var->isInvalid())
-      var->overwriteType(ErrorType::get(Context));
+    if (param->isInvalid())
+      param->overwriteType(ErrorType::get(Context));
     else
-      var->overwriteType(ty);
+      param->overwriteType(ty);
     
-    checkTypeModifyingDeclAttributes(var);
+    checkTypeModifyingDeclAttributes(param);
     if (ty->is<InOutType>())
-      var->setLet(false);
+      param->setLet(false);
     return hadError;
   };
 
@@ -1617,19 +1622,11 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, DeclContext *DC,
     else
       CoercionType = tupleTy->getElement(i).getType();
     
-    // If the tuple pattern had a label for the tuple element, it must match
-    // the label for the tuple type being matched.
-    auto argName = param.decl->getArgumentName();
-    if (!hadError && !argName.empty() &&
-        argName != tupleTy->getElement(i).getName()) {
-      diagnose(param.decl->getArgumentNameLoc(),
-               diag::tuple_pattern_label_mismatch,
-               argName, tupleTy->getElement(i).getName());
-      hadError = true;
-    }
+    assert(param->getArgumentName().empty() &&
+           "Closures cannot have API names");
     
     hadError |= handleParameter(param, CoercionType);
-    assert(!param.getDefaultValue() && "Closures cannot have default args");
+    assert(!param->isDefaultArgument() && "Closures cannot have default args");
   }
   
   return hadError;

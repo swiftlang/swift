@@ -30,7 +30,7 @@ if '-primary-file' in sys.argv:
   # Modify all files after the primary file.
   # Ideally this would modify every non-primary file, but that's harder to
   # infer without actually parsing the arguments.
-  for file in sys.argv[primaryFileIndex+1:]:
+  for file in sys.argv[primaryFileIndex + 1:]:
     if file.startswith('-'):
       break
     os.utime(file, None)

@@ -46,8 +46,49 @@ function(add_sourcekit_symbol_exports target_name export_file)
   
     set_property(TARGET ${target_name} APPEND_STRING PROPERTY
                  LINK_FLAGS " -Wl,-exported_symbols_list,${CMAKE_CURRENT_BINARY_DIR}/symbol.exports")
+
     add_dependencies(${target_name} ${target_name}_exports)
   endif()
+endfunction()
+
+# Add default compiler and linker flags to 'target'.
+#
+# FIXME: this is a HACK.  All SourceKit CMake code using this function
+# should be rewritten to use 'add_swift_library'.
+function(add_sourcekit_default_compiler_flags target)
+  set(sdk "${SWIFT_HOST_VARIANT_SDK}")
+  set(arch "${SWIFT_HOST_VARIANT_ARCH}")
+  set(c_compile_flags)
+  set(link_flags)
+
+  # Add variant-specific flags.
+  set(build_type "${CMAKE_BUILD_TYPE}")
+  set(enable_assertions "${LLVM_ENABLE_ASSERTIONS}")
+  set(analyze_code_coverage "${SWIFT_ANALYZE_CODE_COVERAGE}")
+  _add_variant_c_compile_flags(
+      "${sdk}"
+      "${arch}"
+      "${build_type}"
+      "${enable_assertions}"
+      "${analyze_code_coverage}"
+      c_compile_flags)
+  _add_variant_link_flags(
+      "${sdk}"
+      "${arch}"
+      "${build_type}"
+      "${enable_assertions}"
+      "${analyze_code_coverage}"
+      link_flags)
+
+  # Convert variables to space-separated strings.
+  _list_escape_for_shell("${c_compile_flags}" c_compile_flags)
+  _list_escape_for_shell("${link_flags}" link_flags)
+
+  # Set compilation and link flags.
+  set_property(TARGET "${target}" APPEND_STRING PROPERTY
+      COMPILE_FLAGS " ${c_compile_flags}")
+  set_property(TARGET "${target}" APPEND_STRING PROPERTY
+      LINK_FLAGS " ${link_flags}")
 endfunction()
 
 # Add a new SourceKit library.
@@ -152,6 +193,7 @@ macro(add_sourcekit_library name)
       ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
       RUNTIME DESTINATION "bin")
   set_target_properties(${name} PROPERTIES FOLDER "SourceKit libraries")
+  add_sourcekit_default_compiler_flags("${name}")
 endmacro()
 
 # Add a new SourceKit executable.
@@ -196,8 +238,14 @@ macro(add_sourcekit_executable name)
       set_target_properties(${name}
         PROPERTIES
         LINK_FLAGS "-Wl,-exported_symbol,_main")
+
+      if(SWIFT_ANALYZE_CODE_COVERAGE)
+        set_property(TARGET "${name}" APPEND_STRING PROPERTY
+            LINK_FLAGS " -fprofile-instr-generate=swift-%p.profraw -fcoverage-mapping")
+      endif()
     endif()
   endif()
+  add_sourcekit_default_compiler_flags("${name}")
 endmacro()
 
 # Add a new SourceKit framework.
@@ -313,6 +361,7 @@ macro(add_sourcekit_framework name)
         COMMAND ${CMAKE_COMMAND} -E copy "${hdr}" "${framework_location}/Headers/${hdrname}")
     endforeach()
   endif()
+  add_sourcekit_default_compiler_flags("${name}")
 endmacro(add_sourcekit_framework)
 
 # Add a new SourceKit XPC service to a framework.
@@ -339,7 +388,7 @@ macro(add_sourcekit_xpc_service name framework_target)
   endif()
 
   set(XPCSERVICE_NAME ${name})  
-  set(XPCSERVICE_IDENTIFIER "com.apple.${name}")  
+  set(XPCSERVICE_IDENTIFIER "${name}.${SOURCEKIT_VERSION_STRING}")
   set(XPCSERVICE_BUNDLE_VERSION "${SOURCEKIT_VERSION_STRING}")
   set(XPCSERVICE_SHORT_VERSION_STRING "1.0")
   configure_file(
@@ -384,21 +433,10 @@ macro(add_sourcekit_xpc_service name framework_target)
         LINK_FLAGS "-Wl,-exported_symbol,_main")
     endif()
   endif()
+  add_sourcekit_default_compiler_flags("${name}")
 endmacro()
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-  # Choose an SDK if none was set.
-  set(MODULES_SDK "" CACHE PATH
-      "Path to the modules-enabled SDK to use")
-  if (NOT MODULES_SDK)
-    execute_process(COMMAND xcrun --sdk macosx --show-sdk-path
-      OUTPUT_VARIABLE MODULES_SDK
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
-  endif()
-  if(NOT EXISTS "${MODULES_SDK}/System/Library/Frameworks/module.map")
-    message(FATAL_ERROR "A modules-enabled SDK is required for SourceKit on OS X.")
-  endif()
-
   # Choose a deployment target if none was set.
   set(SOURCEKIT_DEPLOYMENT_TARGET "" CACHE STRING 
       "Deployment target for SourceKit.")

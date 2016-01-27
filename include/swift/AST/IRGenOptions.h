@@ -126,6 +126,16 @@ public:
   /// Whether we should embed the bitcode file.
   IRGenEmbedMode EmbedMode : 2;
 
+  /// Add names to LLVM values.
+  unsigned HasValueNamesSetting : 1;
+  unsigned ValueNames : 1;
+
+  /// Only strip the field names section from nominal type field metadata.
+  unsigned StripFieldNames : 1;
+
+  /// Strip all nominal type field metadata.
+  unsigned StripFieldMetadata : 1;
+
   /// List of backend command-line options for -embed-bitcode.
   std::vector<uint8_t> CmdArgs;
 
@@ -135,9 +145,11 @@ public:
                    DisableLLVMARCOpts(false), DisableLLVMSLPVectorizer(false),
                    DisableFPElim(true), Playground(false),
                    EmitStackPromotionChecks(false), GenerateProfile(false),
-                   EmbedMode(IRGenEmbedMode::None)
+                   EmbedMode(IRGenEmbedMode::None),
+                   HasValueNamesSetting(false), ValueNames(false),
+                   StripFieldNames(false), StripFieldMetadata(false)
                    {}
-  
+
   /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.
   StringRef getSingleOutputFilename() const {

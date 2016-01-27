@@ -11,9 +11,11 @@
 from __future__ import print_function
 
 try:
-    import ConfigParser # Python 2
+    # Python 2
+    import ConfigParser
 except ImportError:
-    import configparser as ConfigParser # Python 3
+    # Python 3
+    import configparser as ConfigParser
 
 import os
 import pipes
@@ -67,7 +69,7 @@ def print_with_argv0(message):
 
 
 def quote_shell_command(args):
-    return " ".join([ pipes.quote(a) for a in args ])
+    return " ".join([pipes.quote(a) for a in args])
 
 
 def check_call(args, print_command=False, verbose=False):
@@ -188,13 +190,13 @@ def get_preset_options(substitutions, preset_file_names, preset_name):
                          "': " + ", ".join(missing_opts))
         sys.exit(1)
 
-    return build_script_opts + [ "--" ] + build_script_impl_opts
+    return build_script_opts + ["--"] + build_script_impl_opts
 
 
 def get_all_preset_names(preset_file_names):
     config = _load_preset_files_impl(preset_file_names)
-    return [ name[len(_PRESET_PREFIX):] for name in config.sections()
-             if name.startswith(_PRESET_PREFIX) ]
+    return [name[len(_PRESET_PREFIX):] for name in config.sections()
+            if name.startswith(_PRESET_PREFIX)]
 
 
 # A context manager for changing the current working directory.

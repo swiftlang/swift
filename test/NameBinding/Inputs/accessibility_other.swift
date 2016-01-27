@@ -7,11 +7,11 @@ private let c = 0
 extension Foo {
   public static func a() {}
   internal static func b() {}
-  private static func c() {}
+  private static func c() {}  // expected-note {{'c' declared here}}
 }
 
 struct PrivateInit {
-  private init() {}
+  private init() {}  // expected-note {{'init' declared here}}
 }
 
 extension Foo {

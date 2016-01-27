@@ -1,4 +1,4 @@
-//===-------- Passes.cpp - Swift Compiler SIL Pass Entrypoints ------------===//
+//===--- Passes.cpp - Swift Compiler SIL Pass Entrypoints -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -40,13 +40,13 @@ llvm::cl::opt<bool>
     SILViewCFG("sil-view-cfg", llvm::cl::init(false),
                llvm::cl::desc("Enable the sil cfg viewer pass"));
 
-llvm::cl::opt<bool>
-    SILViewGuaranteedCFG("sil-view-guaranteed-cfg", llvm::cl::init(false),
-               llvm::cl::desc("Enable the sil cfg viewer pass after diagnostics"));
+llvm::cl::opt<bool> SILViewGuaranteedCFG(
+    "sil-view-guaranteed-cfg", llvm::cl::init(false),
+    llvm::cl::desc("Enable the sil cfg viewer pass after diagnostics"));
 
-llvm::cl::opt<bool>
-    SILViewSILGenCFG("sil-view-silgen-cfg", llvm::cl::init(false),
-               llvm::cl::desc("Enable the sil cfg viewer pass before diagnostics"));
+llvm::cl::opt<bool> SILViewSILGenCFG(
+    "sil-view-silgen-cfg", llvm::cl::init(false),
+    llvm::cl::desc("Enable the sil cfg viewer pass before diagnostics"));
 
 using namespace swift;
 
@@ -200,7 +200,6 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   PM.addDeadStoreElimination();
   PM.addCSE();
   PM.addEarlyCodeMotion();
-  PM.addARCSequenceOpts();
 
   PM.addSILLinker();
 
@@ -452,7 +451,8 @@ descriptorsForFile(StringRef Filename,
 
   auto *RootList = cast<yaml::SequenceNode>(N);
 
-  for (auto &PMDescriptorIter : make_range(RootList->begin(), RootList->end())) {
+  for (auto &PMDescriptorIter :
+       make_range(RootList->begin(), RootList->end())) {
     PMDescriptor PM(cast<yaml::SequenceNode>(&PMDescriptorIter));
     Descriptors.push_back(std::move(PM));
   }

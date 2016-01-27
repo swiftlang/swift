@@ -264,42 +264,6 @@ swift::swift_getGenericMetadata(GenericMetadata *pattern,
   return entry->Value;
 }
 
-/// Fast entry points.
-const Metadata *
-swift::swift_getGenericMetadata1(GenericMetadata *pattern, const void*argument){
-  assert(pattern->NumKeyArguments == 1);
-  return swift_getGenericMetadata(pattern, &argument);
-}
-
-const Metadata *
-swift::swift_getGenericMetadata2(GenericMetadata *pattern,
-                                 const void *arg0, const void *arg1) {
-  const void *args[] = {arg0, arg1};
-  assert(pattern->NumKeyArguments == 2);
-  return swift_getGenericMetadata(pattern, args);
-}
-
-const Metadata *
-swift::swift_getGenericMetadata3(GenericMetadata *pattern,
-                                 const void *arg0,
-                                 const void *arg1,
-                                 const void *arg2) {
-  const void *args[] = {arg0, arg1, arg2};
-  assert(pattern->NumKeyArguments == 3);
-  return swift_getGenericMetadata(pattern, args);
-}
-
-const Metadata *
-swift::swift_getGenericMetadata4(GenericMetadata *pattern,
-                                 const void *arg0,
-                                 const void *arg1,
-                                 const void *arg2,
-                                 const void *arg3) {
-  const void *args[] = {arg0, arg1, arg2, arg3};
-  assert(pattern->NumKeyArguments == 4);
-  return swift_getGenericMetadata(pattern, args);
-}
-
 namespace {
   class ObjCClassCacheEntry : public CacheEntry<ObjCClassCacheEntry> {
     FullMetadata<ObjCClassWrapperMetadata> Metadata;
@@ -1633,7 +1597,7 @@ void swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
   rodata->InstanceStart = size;
 
   auto &allocator = unsafeGetInitializedCache(
-                                 self->getDescription()->GenericMetadataPattern)
+                           self->getDescription()->getGenericMetadataPattern())
     .getAllocator();
 
   // Always clone the ivar descriptors.
@@ -2426,7 +2390,7 @@ Metadata::getGenericPattern() const {
   auto ntd = getNominalTypeDescriptor();
   if (!ntd)
     return nullptr;
-  return ntd->GenericMetadataPattern;
+  return ntd->getGenericMetadataPattern();
 }
 
 const ClassMetadata *

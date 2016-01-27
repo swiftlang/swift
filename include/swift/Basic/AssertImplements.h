@@ -1,4 +1,4 @@
-//===- AssertImplements.h - Assert that a class overrides a function ------===//
+//===--- AssertImplements.h - Assert that a class overrides a function ----===//
 //
 // This source file is part of the Swift.org open source project
 //

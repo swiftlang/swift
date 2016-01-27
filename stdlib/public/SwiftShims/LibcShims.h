@@ -1,4 +1,4 @@
-//===--- LibcShims.h - Access to POSIX for Swift's core stdlib -----------===//
+//===--- LibcShims.h - Access to POSIX for Swift's core stdlib --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

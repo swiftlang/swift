@@ -258,6 +258,10 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         skipExtraTopLevelRBraces())
       continue;
 
+    // Eat invalid tokens instead of allowing them to produce downstream errors.
+    if (consumeIf(tok::unknown))
+      continue;
+           
     bool NeedParseErrorRecovery = false;
     ASTNode Result;
 
@@ -815,7 +819,8 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
 
   // Form the call, which will be emitted on any path that needs to run the
   // code.
-  auto DRE = new (Context) DeclRefExpr(tempDecl, loc, /*Implicit*/true,
+  auto DRE = new (Context) DeclRefExpr(tempDecl, DeclNameLoc(loc),
+                                       /*Implicit*/true,
                                        AccessSemantics::DirectToStorage);
   auto args = TupleExpr::createEmpty(Context, loc, loc, true);
   auto call = new (Context) CallExpr(DRE, args, /*implicit*/true);
@@ -1525,16 +1530,10 @@ ConfigParserState Parser::evaluateConfigConditionExpr(Expr *configExpr) {
     while (iOperand < numElements) {
       
       if (auto *UDREOp = dyn_cast<UnresolvedDeclRefExpr>(elements[iOperator])) {
-        auto name = UDREOp->getName().str();
+        auto name = UDREOp->getName().getBaseName().str();
 
         if (name.equals("||") || name.equals("&&")) {
           auto rhs = evaluateConfigConditionExpr(elements[iOperand]);
-
-          if (result.getKind() == ConfigExprKind::CompilerVersion
-              || rhs.getKind() == ConfigExprKind::CompilerVersion) {
-            diagnose(UDREOp->getLoc(), diag::cannot_combine_compiler_version);
-            return ConfigParserState::error();
-          }
 
           if (name.equals("||")) {
             result = result || rhs;
@@ -1563,7 +1562,7 @@ ConfigParserState Parser::evaluateConfigConditionExpr(Expr *configExpr) {
   
   // Evaluate a named reference expression.
   if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(configExpr)) {
-    auto name = UDRE->getName().str();
+    auto name = UDRE->getName().getBaseName().str();
     return ConfigParserState(Context.LangOpts.hasBuildConfigOption(name),
                              ConfigExprKind::DeclRef);
   }
@@ -1576,7 +1575,8 @@ ConfigParserState Parser::evaluateConfigConditionExpr(Expr *configExpr) {
   // Evaluate a negation (unary "!") expression.
   if (auto *PUE = dyn_cast<PrefixUnaryExpr>(configExpr)) {
     // If the PUE is not a negation expression, return false
-    auto name = cast<UnresolvedDeclRefExpr>(PUE->getFn())->getName().str();
+    auto name =
+      cast<UnresolvedDeclRefExpr>(PUE->getFn())->getName().getBaseName().str();
     if (name != "!") {
       diagnose(PUE->getLoc(), diag::unsupported_build_config_unary_expression);
       return ConfigParserState::error();
@@ -1589,18 +1589,25 @@ ConfigParserState Parser::evaluateConfigConditionExpr(Expr *configExpr) {
   if (auto *CE = dyn_cast<CallExpr>(configExpr)) {
     // look up target config, and compare value
     auto fnNameExpr = dyn_cast<UnresolvedDeclRefExpr>(CE->getFn());
-    
+
     // Get the arg, which should be in a paren expression.
-    auto *PE = dyn_cast<ParenExpr>(CE->getArg());
-    if (!fnNameExpr || !PE) {
+    if (!fnNameExpr) {
       diagnose(CE->getLoc(), diag::unsupported_target_config_expression);
       return ConfigParserState::error();
     }
 
-    auto fnName = fnNameExpr->getName().str();
+    auto fnName = fnNameExpr->getName().getBaseName().str();
+
+    auto *PE = dyn_cast<ParenExpr>(CE->getArg());
+    if (!PE) {
+      auto diag = diagnose(CE->getLoc(),
+                           diag::target_config_expected_one_argument);
+      return ConfigParserState::error();
+    }
 
     if (!fnName.equals("arch") && !fnName.equals("os") &&
         !fnName.equals("_runtime") &&
+        !fnName.equals("swift") &&
         !fnName.equals("_compiler_version")) {
       diagnose(CE->getLoc(), diag::unsupported_target_config_expression);
       return ConfigParserState::error();
@@ -1609,7 +1616,7 @@ ConfigParserState Parser::evaluateConfigConditionExpr(Expr *configExpr) {
     if (fnName.equals("_compiler_version")) {
       if (auto SLE = dyn_cast<StringLiteralExpr>(PE->getSubExpr())) {
         if (SLE->getValue().empty()) {
-          diagnose(CE->getLoc(), diag::empty_compiler_version_string);
+          diagnose(CE->getLoc(), diag::empty_version_string);
           return ConfigParserState::error();
         }
         auto versionRequirement =
@@ -1625,11 +1632,49 @@ ConfigParserState Parser::evaluateConfigConditionExpr(Expr *configExpr) {
                  "string literal");
         return ConfigParserState::error();
       }
+    } else if(fnName.equals("swift")) {
+      auto PUE = dyn_cast<PrefixUnaryExpr>(PE->getSubExpr());
+      if (!PUE) {
+        diagnose(PE->getSubExpr()->getLoc(),
+                 diag::unsupported_target_config_argument,
+                 "a unary comparison, such as '>=2.2'");
+        return ConfigParserState::error();
+      }
+
+      auto prefix = dyn_cast<UnresolvedDeclRefExpr>(PUE->getFn());
+      auto versionArg = PUE->getArg();
+      auto versionStartLoc = versionArg->getStartLoc();
+      auto endLoc = Lexer::getLocForEndOfToken(SourceMgr,
+                                               versionArg->getSourceRange().End);
+      CharSourceRange versionCharRange(SourceMgr, versionStartLoc,
+                                       endLoc);
+      auto versionString = SourceMgr.extractText(versionCharRange);
+
+      auto versionRequirement =
+        version::Version::parseVersionString(versionString,
+                                             versionStartLoc,
+                                             &Diags);
+
+      if (!versionRequirement.hasValue())
+        return ConfigParserState::error();
+
+      auto thisVersion = version::Version::getCurrentLanguageVersion();
+
+      if (!prefix->getName().getBaseName().str().equals(">=")) {
+        diagnose(PUE->getFn()->getLoc(),
+                 diag::unexpected_version_comparison_operator)
+          .fixItReplace(PUE->getFn()->getLoc(), ">=");
+        return ConfigParserState::error();
+      }
+
+      auto VersionNewEnough = thisVersion >= versionRequirement.getValue();
+      return ConfigParserState(VersionNewEnough,
+                               ConfigExprKind::LanguageVersion);
     } else {
       if (auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(PE->getSubExpr())) {
         // The sub expression should be an UnresolvedDeclRefExpr (we won't
         // tolerate extra parens).
-        auto argument = UDRE->getName().str();
+        auto argument = UDRE->getName().getBaseName().str();
 
         // Error for values that don't make sense if there's a clear definition
         // of the possible values (as there is for _runtime).
@@ -1808,10 +1853,9 @@ ParserResult<Stmt> Parser::parseStmtRepeat(LabeledStmtInfo labelInfo) {
   SourceLoc whileLoc;
 
   if (!consumeIf(tok::kw_while, whileLoc)) {
-    diagnose(whileLoc, diag::expected_while_after_repeat_body);
-    if (body.isNonNull())
-      return body;
-    return makeParserError();
+    diagnose(body.getPtrOrNull()->getEndLoc(),
+             diag::expected_while_after_repeat_body);
+    return body;
   }
 
   ParserResult<Expr> condition;

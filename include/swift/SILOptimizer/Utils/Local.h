@@ -31,16 +31,9 @@ class DominanceInfo;
 using UserTransform = std::function<SILInstruction *(Operand *)>;
 using ValueBaseUserRange =
   TransformRange<IteratorRange<ValueBase::use_iterator>, UserTransform>;
-using ValueUserRange =
-  TransformRange<IteratorRange<SILValue::use_iterator>, UserTransform>;
 
 inline ValueBaseUserRange makeUserRange(
     iterator_range<ValueBase::use_iterator> R) {
-  auto toUser = [](Operand *O) { return O->getUser(); };
-  return makeTransformRange(makeIteratorRange(R.begin(), R.end()),
-                            UserTransform(toUser));
-}
-inline ValueUserRange makeUserRange(iterator_range<SILValue::use_iterator> R) {
   auto toUser = [](Operand *O) { return O->getUser(); };
   return makeTransformRange(makeIteratorRange(R.begin(), R.end()),
                             UserTransform(toUser));
@@ -110,6 +103,11 @@ Optional<SILValue> castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
 /// ABI compatible type if necessary.
 bool canCastValueToABICompatibleType(SILModule &M,
                                      SILType SrcTy, SILType DestTy);
+
+/// Returns a project_box if it is the next instruction after \p ABI and
+/// and has \p ABI as operand. Otherwise it creates a new project_box right
+/// after \p ABI and returns it.
+ProjectBoxInst *getOrCreateProjectBox(AllocBoxInst *ABI);
 
 /// Replace an apply with an instruction that produces the same value,
 /// then delete the apply and the instructions that produce its callee
@@ -244,7 +242,7 @@ public:
   }
 
   ValueLifetime computeFromDirectUses() {
-    return computeFromUserList(makeUserRange(DefValue.getUses()),
+    return computeFromUserList(makeUserRange(DefValue->getUses()),
                                std::false_type());
   }
 
@@ -320,7 +318,7 @@ class BaseThreadingCloner : public SILClonerWithScopes<BaseThreadingCloner> {
     // A terminator defines no values. Keeping terminators in the AvailVals list
     // is problematic because terminators get replaced during SSA update.
     if (!isa<TermInst>(Orig))
-      AvailVals.push_back(std::make_pair(Orig, SILValue(Cloned, 0)));
+      AvailVals.push_back(std::make_pair(Orig, SILValue(Cloned)));
   }
 };
 
@@ -342,9 +340,9 @@ public:
     // Create block arguments.
     unsigned ArgIdx = 0;
     for (auto Arg : BI->getArgs()) {
-      assert(Arg.getType() == DestBB->getBBArg(ArgIdx)->getType() &&
+      assert(Arg->getType() == DestBB->getBBArg(ArgIdx)->getType() &&
              "Types must match");
-      auto *BlockArg = EdgeBB->createBBArg(Arg.getType());
+      auto *BlockArg = EdgeBB->createBBArg(Arg->getType());
       ValueMap[DestBB->getBBArg(ArgIdx)] = SILValue(BlockArg);
       AvailVals.push_back(std::make_pair(DestBB->getBBArg(ArgIdx), BlockArg));
       ++ArgIdx;
@@ -436,7 +434,7 @@ class CastOptimizer {
       SILBasicBlock *SuccessBB,
       SILBasicBlock *FailureBB);
 
-  /// Optimize a cast from   a Swift type implementing _ObjectiveCBridgeable
+  /// Optimize a cast from a Swift type implementing _ObjectiveCBridgeable
   /// into a bridged ObjC type.
   SILInstruction *
   optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
@@ -649,6 +647,13 @@ void replaceLoadSequence(SILInstruction *I,
 /// Do we have enough information to determine all callees that could
 /// be reached by calling the function represented by Decl?
 bool calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl);
+
+/// Hoist the address projection rooted in \p Op to \p InsertBefore.
+/// Requires the projected value to dominate the insertion point.
+///
+/// Will look through single basic block predecessor arguments.
+void hoistAddressProjections(Operand &Op, SILInstruction *InsertBefore,
+                             DominanceInfo *DomTree);
 
 } // end namespace swift
 
