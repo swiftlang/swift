@@ -19,10 +19,6 @@
 // RUN: %target-run %t/after_before
 // RUN: %target-run %t/after_after
 
-// Requires protocol conformance tables to be able to reference
-// resilient type metadata
-// XFAIL: *
-
 import StdlibUnittest
 import struct_resilient_remove_conformance
 
@@ -52,6 +48,14 @@ protocol MyPoint3DLike {
 extension RemoveConformance : MyPointLike {}
 extension RemoveConformance : MyPoint3DLike {}
 
+@inline(never) func workWithMyPointLike<T>(t: T) {
+  var p = t as! MyPointLike
+  p.x = 50
+  p.y = 60
+  expectEqual(p.x, 50)
+  expectEqual(p.y, 60)
+}
+
 StructResilientRemoveConformanceTest.test("MyPointLike") {
   var p: MyPointLike = RemoveConformance()
 
@@ -61,6 +65,8 @@ StructResilientRemoveConformanceTest.test("MyPointLike") {
     expectEqual(p.x, 50)
     expectEqual(p.y, 60)
   }
+
+  workWithMyPointLike(p)
 }
 #endif
 

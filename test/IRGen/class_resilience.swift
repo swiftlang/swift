@@ -230,7 +230,7 @@ public class MyResilientChild : MyResilientParent {
 // CHECK-LABEL: define private %swift.type* @create_generic_metadata_ClassWithResilientProperty(%swift.type_pattern*, i8**)
 // CHECK:             [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(
 // CHECK:             [[SIZE_METADATA:%.*]] = call %swift.type* @_TMaV16resilient_struct4Size()
-// CHECK:             call void @swift_initClassMetadata_UniversalStrategy(
+// CHECK:             call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], %swift.type_pattern* %0,
 // CHECK-native:      [[METADATA_PTR:%.*]] = bitcast %swift.type* [[METADATA]] to [[INT]]*
 // CHECK-native-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_PTR]], [[INT]] 12
 // CHECK-native-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_PTR]]
@@ -247,7 +247,7 @@ public class MyResilientChild : MyResilientParent {
 // CHECK-LABEL: define private %swift.type* @create_generic_metadata_ClassWithResilientlySizedProperty(%swift.type_pattern*, i8**)
 // CHECK:             [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(
 // CHECK:             [[RECTANGLE_METADATA:%.*]] = call %swift.type* @_TMaV16resilient_struct9Rectangle()
-// CHECK:             call void @swift_initClassMetadata_UniversalStrategy(
+// CHECK:             call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], %swift.type_pattern* %0,
 // CHECK-native:      [[METADATA_PTR:%.*]] = bitcast %swift.type* [[METADATA]] to [[INT]]*
 // CHECK-native-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_PTR]], [[INT]] 11
 // CHECK-native-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_PTR]]

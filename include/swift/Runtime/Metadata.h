@@ -1105,11 +1105,7 @@ public:
   /// Get the nominal type descriptor if this metadata describes a nominal type,
   /// or return null if it does not.
   const NominalTypeDescriptor *getNominalTypeDescriptor() const;
-  
-  /// Get the generic metadata pattern from which this generic type instance was
-  /// instantiated, or null if the type is not generic.
-  const GenericMetadata *getGenericPattern() const;
-  
+
   /// Get the class object for this type if it has one, or return null if the
   /// type is not a class (or not a class with a class object).
   const ClassMetadata *getClassObject() const;
@@ -1309,20 +1305,15 @@ struct NominalTypeDescriptor {
       }
     } Enum;
   };
-  
-  RelativeDirectPointerIntPair<GenericMetadata, NominalTypeKind>
-    GenericMetadataPatternAndKind;
 
-  /// A pointer to the generic metadata pattern that is used to instantiate
-  /// instances of this type. Zero if the type is not generic.
-  GenericMetadata *getGenericMetadataPattern() const {
-    return const_cast<GenericMetadata*>(
-                                    GenericMetadataPatternAndKind.getPointer());
-  }
+  using MetadataAccessor = const Metadata *();
 
-  NominalTypeKind getKind() const {
-    return GenericMetadataPatternAndKind.getInt();
-  }
+  /// A pointer to the metadata accessor function that is used to instantiate
+  /// instances of this type. Zero if the type is not resilient or generic.
+  RelativeDirectPointer<MetadataAccessor> MetadataAccessorFn;
+
+  /// The kind of type described by this nominal type descriptor.
+  NominalTypeKind Kind;
 
   /// The generic parameter descriptor header. This describes how to find and
   /// parse the generic parameter vector in metadata records for this nominal
@@ -2172,7 +2163,7 @@ private:
     RelativeDirectPointer<Metadata> DirectType;
 
     /// The generic metadata pattern for an unbound generic type.
-    RelativeDirectPointer<GenericMetadata> GenericPattern;
+    RelativeDirectPointer<NominalTypeDescriptor> TypeDescriptor;
   };
 
   /// Flags describing the type metadata record.
@@ -2194,19 +2185,19 @@ public:
       break;
         
     case TypeMetadataRecordKind::UniqueIndirectClass:
-    case TypeMetadataRecordKind::UniqueGenericPattern:
+    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
       assert(false && "not direct type metadata");
     }
 
     return DirectType;
   }
- 
-  const GenericMetadata *getGenericPattern() const {
+
+  const NominalTypeDescriptor *getNominalTypeDescriptor() const {
     switch (Flags.getTypeKind()) {
     case TypeMetadataRecordKind::Universal:
       return nullptr;
 
-    case TypeMetadataRecordKind::UniqueGenericPattern:
+    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
       break;
         
     case TypeMetadataRecordKind::UniqueDirectClass:
@@ -2216,9 +2207,9 @@ public:
       assert(false && "not generic metadata pattern");
     }
     
-    return GenericPattern;
+    return TypeDescriptor;
   }
-  
+
   /// Get the canonical metadata for the type referenced by this record, or
   /// return null if the record references a generic or universal type.
   const Metadata *getCanonicalTypeMetadata() const;
@@ -2290,9 +2281,9 @@ private:
     /// An indirect reference to the metadata.
     RelativeIndirectablePointer<const ClassMetadata *> IndirectClass;
     
-    /// The generic metadata pattern for a generic type which has instances that
-    /// conform to the protocol.
-    RelativeIndirectablePointer<GenericMetadata> GenericPattern;
+    /// The nominal type descriptor for a resilient or generic type which has
+    /// instances that conform to the protocol.
+    RelativeIndirectablePointer<NominalTypeDescriptor> TypeDescriptor;
   };
   
   
@@ -2337,7 +2328,7 @@ public:
         
     case TypeMetadataRecordKind::UniqueDirectClass:
     case TypeMetadataRecordKind::UniqueIndirectClass:
-    case TypeMetadataRecordKind::UniqueGenericPattern:
+    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
       assert(false && "not direct type metadata");
     }
 
@@ -2354,7 +2345,7 @@ public:
         
     case TypeMetadataRecordKind::UniqueDirectType:
     case TypeMetadataRecordKind::NonuniqueDirectType:
-    case TypeMetadataRecordKind::UniqueGenericPattern:
+    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
     case TypeMetadataRecordKind::UniqueIndirectClass:
       assert(false && "not direct class object");
     }
@@ -2375,19 +2366,19 @@ public:
     case TypeMetadataRecordKind::UniqueDirectType:
     case TypeMetadataRecordKind::UniqueDirectClass:
     case TypeMetadataRecordKind::NonuniqueDirectType:
-    case TypeMetadataRecordKind::UniqueGenericPattern:
+    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
       assert(false && "not indirect class object");
     }
     
     return IndirectClass;
   }
   
-  const GenericMetadata *getGenericPattern() const {
+  const NominalTypeDescriptor *getNominalTypeDescriptor() const {
     switch (Flags.getTypeKind()) {
     case TypeMetadataRecordKind::Universal:
       return nullptr;
 
-    case TypeMetadataRecordKind::UniqueGenericPattern:
+    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
       break;
         
     case TypeMetadataRecordKind::UniqueDirectClass:
@@ -2397,7 +2388,7 @@ public:
       assert(false && "not generic metadata pattern");
     }
     
-    return GenericPattern;
+    return TypeDescriptor;
   }
   
   /// Get the directly-referenced static witness table.
@@ -2645,6 +2636,7 @@ struct ClassFieldLayout {
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
 extern "C" void swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
+                                      GenericMetadata *pattern,
                                       size_t numFields,
                                       const ClassFieldLayout *fieldLayouts,
                                       size_t *fieldOffsets);

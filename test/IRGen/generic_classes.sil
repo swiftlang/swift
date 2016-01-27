@@ -20,8 +20,10 @@ import Swift
 // CHECK:   i32 15,
 // --       field names
 // CHECK:   [7 x i8]* [[ROOTGENERIC_FIELDS]]
-// --       generic metadata pattern
-// CHECK:   @_TMPC15generic_classes11RootGeneric
+// --       generic metadata accessor function
+// CHECK:   @_TMaC15generic_classes11RootGeneric
+// --       nominal type kind
+// CHECK:   i32 0,
 // --       generic parameter vector offset
 // CHECK:   i32 10,
 // --       generic parameter count, primary count, witness table counts
@@ -58,7 +60,9 @@ import Swift
 // CHECK:   i32 11,
 // --       field names
 // CHECK:   [7 x i8]* [[ROOTGENERIC_FIELDS]]
-// --       no generic metadata pattern, kind 0
+// --       no metadata accessor
+// CHECK:   i32 0,
+// --       nominal type kind
 // CHECK:   i32 0,
 // --       0 = no generic parameter vector
 // CHECK:   i32 0,
@@ -308,7 +312,7 @@ entry(%c : $RootGeneric<Int32>):
 
 // CHECK: define private %swift.type* @create_generic_metadata_RootGeneric(%swift.type_pattern*, i8**) {{.*}} {
 // -- initialize the dependent field offsets
-// CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* {{%.*}}, i64 3, i64* {{%.*}}, i64* {{%.*}})
+// CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* {{%.*}}, %swift.type_pattern* %0, i64 3, i64* {{%.*}}, i64* {{%.*}})
 // CHECK: }
 
 // CHECK: define private %swift.type* @create_generic_metadata_RootGenericFixedLayout(%swift.type_pattern*, i8**) {{.*}} {
@@ -371,6 +375,6 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   store i64 [[SIZE]], i64* [[SIZE_ADDR]], align 8
 // CHECK:   [[ALIGN_ADDR:%.*]] = getelementptr inbounds [2 x i64], [2 x i64]* [[TYPES]], i32 0, i32 1
 // CHECK:   store i64 [[ALIGN]], i64* [[ALIGN_ADDR]], align 8
-// CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], i64 1, i64* [[SIZE_ADDR]], i64* [[OFFSETS]])
+// CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], %swift.type_pattern* %0, i64 1, i64* [[SIZE_ADDR]], i64* [[OFFSETS]])
 // CHECK:   ret %swift.type* [[METADATA]]
 // CHECK: }

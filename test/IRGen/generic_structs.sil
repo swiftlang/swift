@@ -19,8 +19,10 @@ import Builtin
 // CHECK:   i32 3,
 // --       field names
 // CHECK:   [3 x i8]* [[SINGLEDYNAMIC_FIELDS]]
-// --       generic metadata pattern, kind 1 (struct)
-// CHECK:   i32 add ({{.*}}@_TMPV15generic_structs13SingleDynamic{{.*}}, i32 1)
+// --       metadata accessor function
+// CHECK:   @_TMaV15generic_structs13SingleDynamic
+// --       nominal type kind
+// CHECK:   i32 1,
 // --       generic parameter vector offset
 // CHECK:   i32 4,
 // --       generic parameter count, primary counts; generic parameter witness counts
@@ -60,8 +62,10 @@ import Builtin
 // CHECK:   i32 3,
 // --       field names
 // CHECK:   [5 x i8]* [[DYNAMICWITHREQUIREMENTS_FIELDS]]
-// --       generic metadata pattern
-// CHECK:   i32 add ({{.*}}@_TMPV15generic_structs23DynamicWithRequirements{{.*}}, i32 1)
+// --       metadata accessor function
+// CHECK:   @_TMaV15generic_structs23DynamicWithRequirements
+// --       nominal type kind
+// CHECK:   i32 1,
 // --       generic parameter vector offset
 // CHECK:   i32 5,
 // --       generic parameter count; primary count; generic parameter witness counts
