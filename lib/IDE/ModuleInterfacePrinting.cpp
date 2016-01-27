@@ -115,9 +115,10 @@ getUnderlyingClangModuleForImport(ImportDecl *Import) {
 void swift::ide::printModuleInterface(Module *M,
                                       ModuleTraversalOptions TraversalOptions,
                                       ASTPrinter &Printer,
-                                      const PrintOptions &Options) {
+                                      const PrintOptions &Options,
+                                      const bool PrintSynthesizedExtensions) {
   printSubmoduleInterface(M, M->getName().str(), TraversalOptions, Printer,
-                          Options);
+                          Options, PrintSynthesizedExtensions);
 }
 
 static void adjustPrintOptions(PrintOptions &AdjustedOptions) {
@@ -133,12 +134,50 @@ static void adjustPrintOptions(PrintOptions &AdjustedOptions) {
   AdjustedOptions.PrintDefaultParameterPlaceholder = true;
 }
 
+bool isConditionalExtension(ExtensionDecl *ED) {
+  if (auto *GPs = ED->getGenericParams()) {
+    if (!GPs->getRequirements().empty())
+      return true;
+  }
+  return false;
+}
+
+void findExtensionsFromConformingProtocols(Decl *D,
+                                           llvm::SmallPtrSetImpl<ExtensionDecl*> &Results) {
+  NominalTypeDecl* NTD = dyn_cast<NominalTypeDecl>(D);
+  if (!NTD || NTD->getKind() == DeclKind::Protocol)
+    return;
+  std::vector<NominalTypeDecl*> Unhandled;
+  auto addTypeLocNominal = [&](TypeLoc TL){
+    if (TL.getType()) {
+      if (auto D = TL.getType()->getAnyNominal()) {
+        Unhandled.push_back(D);
+      }
+    }
+  };
+  for (auto TL : NTD->getInherited()) {
+    addTypeLocNominal(TL);
+  }
+  while(!Unhandled.empty()) {
+    NominalTypeDecl* Back = Unhandled.back();
+    Unhandled.pop_back();
+    for (ExtensionDecl *E : Back->getExtensions()) {
+      if(isConditionalExtension(E))
+        Results.insert(E);
+      for (auto TL : Back->getInherited()) {
+        addTypeLocNominal(TL);
+      }
+    }
+  }
+}
+
 void swift::ide::printSubmoduleInterface(
        Module *M,
        ArrayRef<StringRef> FullModuleName,
        ModuleTraversalOptions TraversalOptions,
        ASTPrinter &Printer,
-       const PrintOptions &Options) {
+       const PrintOptions &Options,
+       const bool PrintSynthesizedExtensions) {
   auto AdjustedOptions = Options;
   adjustPrintOptions(AdjustedOptions);
 
@@ -380,6 +419,24 @@ void swift::ide::printSubmoduleInterface(
               if (auto N = dyn_cast<NominalTypeDecl>(Sub))
                 SubDecls.push(N);
           }
+          if (!PrintSynthesizedExtensions)
+            continue;
+
+          // Print synthesized extensions.
+          llvm::SmallPtrSet<ExtensionDecl *, 10> ExtensionsFromConformances;
+          findExtensionsFromConformingProtocols(D, ExtensionsFromConformances);
+          AdjustedOptions.initArchetypeTransformerForSynthesizedExtensions(NTD);
+          for (auto ET : ExtensionsFromConformances) {
+            if (!shouldPrint(ET, AdjustedOptions))
+              continue;
+            Printer << "\n";
+            Printer << "/// Synthesized extension from ";
+            ET->getExtendedTypeLoc().getType().print(Printer, AdjustedOptions);
+            Printer << "\n";
+            ET->print(Printer, AdjustedOptions);
+            Printer << "\n";
+          }
+          AdjustedOptions.clearArchetypeTransformerForSynthesizedExtensions();
         }
       }
       return true;

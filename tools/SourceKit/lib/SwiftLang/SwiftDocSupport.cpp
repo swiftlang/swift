@@ -666,7 +666,7 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx, StringRef ModuleName,
   SmallString<128> Text;
   llvm::raw_svector_ostream OS(Text);
   AnnotatingPrinter Printer(OS);
-  printModuleInterface(M, TraversalOptions, Printer, Options);
+  printModuleInterface(M, TraversalOptions, Printer, Options, false);
 
   Info.Text = OS.str();
   Info.TopEntities = std::move(Printer.TopEntities);

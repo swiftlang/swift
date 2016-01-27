@@ -3098,8 +3098,14 @@ Type swift::checkMemberType(DeclContext &DC, Type BaseTy,
   if (Names.empty())
     return BaseTy;
   ConstraintSystemOptions Options = ConstraintSystemFlags::AllowFixes;
+
+  std::unique_ptr<TypeChecker> CreatedTC;
+  // If the current ast context has no type checker, create one for it.
   auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());
-  assert(TC && "Expected a type resolver");
+  if (!TC) {
+    CreatedTC.reset(new TypeChecker(DC.getASTContext()));
+    TC = CreatedTC.get();
+  }
   ConstraintSystem CS(*TC, &DC, Options);
   auto Loc = CS.getConstraintLocator(nullptr);
 

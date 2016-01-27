@@ -462,6 +462,11 @@ AccessibilityFilter(
         clEnumValEnd));
 
 static llvm::cl::opt<bool>
+SynthesizeExtension("synthesize-extension",
+                    llvm::cl::desc("Print synthesized extensions from conforming protocols."),
+                    llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 SkipPrivateStdlibDecls("skip-private-stdlib-decls",
                 llvm::cl::desc("Don't print declarations that start with '_'"),
                 llvm::cl::init(false));
@@ -1573,7 +1578,8 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
                           const std::vector<std::string> ModulesToPrint,
                           ide::ModuleTraversalOptions TraversalOptions,
                           const PrintOptions &Options,
-                          bool AnnotatePrint) {
+                          bool AnnotatePrint,
+                          bool SynthesizeExtensions) {
   CompilerInvocation Invocation(InitInvok);
 
   CompilerInstance CI;
@@ -1633,7 +1639,8 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
       }
     }
 
-    printSubmoduleInterface(M, ModuleName, TraversalOptions, *Printer, Options);
+    printSubmoduleInterface(M, ModuleName, TraversalOptions, *Printer, Options,
+                            SynthesizeExtensions);
   }
 
   return ExitCode;
@@ -2626,7 +2633,7 @@ int main(int argc, char *argv[]) {
 
     ExitCode = doPrintModules(
         InitInvok, options::ModuleToPrint, TraversalOptions, PrintOpts,
-        options::AnnotatePrint);
+        options::AnnotatePrint, options::SynthesizeExtension);
     break;
   }
 
