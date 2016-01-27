@@ -1,5 +1,6 @@
 add_swift_library(swiftFoundation IS_SDK_OVERLAY
   Foundation.swift
+  FoundationMirrors.swift.gyb
   NSError.swift
   NSStringAPI.swift
   NSValue.swift

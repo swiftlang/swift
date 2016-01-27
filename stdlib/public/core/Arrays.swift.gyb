@@ -780,11 +780,11 @@ extension ${Self} : _ArrayType {
   }
 }
 
-extension ${Self} : CustomReflectable {
+extension ${Self} : _Reflectable {
   /// Returns a mirror that reflects `self`.
   @warn_unused_result
-  public func customMirror() -> Mirror {
-    return Mirror(self, unlabeledChildren: self, displayStyle: .Collection)
+  public func _getMirror() -> _MirrorType {
+    return _ArrayTypeMirror(self)
   }
 }
 

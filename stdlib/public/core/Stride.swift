@@ -142,7 +142,7 @@ public struct StrideToGenerator<Element : Strideable> : GeneratorType {
 }
 
 /// A `SequenceType` of values formed by striding over a half-open interval.
-public struct StrideTo<Element : Strideable> : SequenceType, CustomReflectable {
+public struct StrideTo<Element : Strideable> : SequenceType {
   // FIXME: should really be a CollectionType, as it is multipass
 
   @available(*, unavailable, renamed="Element")
@@ -167,10 +167,6 @@ public struct StrideTo<Element : Strideable> : SequenceType, CustomReflectable {
   let start: Element
   let end: Element
   let stride: Element.Stride
-
-  public func customMirror() -> Mirror {
-    return Mirror(self, children: ["from": start, "to": end, "by": stride])
-  }
 }
 
 extension Strideable {
@@ -220,7 +216,7 @@ public struct StrideThroughGenerator<Element : Strideable> : GeneratorType {
 }
 
 /// A `SequenceType` of values formed by striding over a closed interval.
-public struct StrideThrough<Element : Strideable> : SequenceType, CustomReflectable {
+public struct StrideThrough<Element : Strideable> : SequenceType {
   // FIXME: should really be a CollectionType, as it is multipass
 
   @available(*, unavailable, renamed="Element")
@@ -244,10 +240,6 @@ public struct StrideThrough<Element : Strideable> : SequenceType, CustomReflecta
   let start: Element
   let end: Element
   let stride: Element.Stride
-
-  public func customMirror() -> Mirror {
-    return Mirror(self, children: ["from": start, "through": end, "by": stride])
-  }
 }
 
 extension Strideable {

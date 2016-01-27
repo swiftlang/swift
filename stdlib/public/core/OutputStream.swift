@@ -82,93 +82,81 @@ public protocol CustomDebugStringConvertible {
 // Default (ad-hoc) printing
 //===----------------------------------------------------------------------===//
 
-@_silgen_name("swift_EnumCaseName")
-func _getEnumCaseName<T>(value: T) -> UnsafePointer<CChar>
-
-@_silgen_name("swift_OpaqueSummary")
-func _opaqueSummary(metadata: Any.Type) -> UnsafePointer<CChar>
-
 /// Do our best to print a value that cannot be printed directly.
 internal func _adHocPrint<T, TargetStream : OutputStreamType>(
-    value: T, _ mirror: Mirror, inout _ target: TargetStream,
-    isDebugPrint: Bool
+    value: T, inout _ target: TargetStream, isDebugPrint: Bool
 ) {
   func printTypeName(type: Any.Type) {
     // Print type names without qualification, unless we're debugPrint'ing.
     target.write(_typeName(type, qualified: isDebugPrint))
   }
 
-  if let displayStyle = mirror.displayStyle {
-    switch displayStyle {
-      case .Optional:
-        if let child = mirror.children.first {
-          debugPrint(child.1, terminator: "", toStream: &target)
-        } else {
-          debugPrint("nil", terminator: "", toStream: &target)
-        }
-      case .Tuple:
-        target.write("(")
-        var first = true
-        for (_, value) in mirror.children {
-          if first {
-            first = false
-          } else {
-            target.write(", ")
-          }
-          debugPrint(value, terminator: "", toStream: &target)
-        }
-        target.write(")")
-      case .Struct:
-        printTypeName(mirror.subjectType)
-        target.write("(")
-        var first = true
-        for (label, value) in mirror.children {
-          if let label = label {
-            if first {
-              first = false
-            } else {
-              target.write(", ")
-            }
-            print(label, terminator: "", toStream: &target)
-            target.write(": ")
-            debugPrint(value, terminator: "", toStream: &target)
-          }
-        }
-        target.write(")")
-      case .Enum:
-        if let caseName = String.fromCString(_getEnumCaseName(value)) {
-          // Write the qualified type name in debugPrint.
-          if isDebugPrint {
-            printTypeName(mirror.subjectType)
-            target.write(".")
-          }
-          target.write(caseName)
-        } else {
-          // If the case name is garbage, just print the type name.
-          printTypeName(mirror.subjectType)
-        }
-        if let (_, value) = mirror.children.first {
-          if (Mirror(reflecting: value).displayStyle == .Tuple) {
-            debugPrint(value, terminator: "", toStream: &target)
-          } else {
-            target.write("(")
-            debugPrint(value, terminator: "", toStream: &target)
-            target.write(")")
-          }
-        }
-      default:
-        target.write(_typeName(mirror.subjectType))
+  let mirror = _reflect(value)
+  switch mirror {
+  // Checking the mirror kind is not a good way to implement this, but we don't
+  // have a more expressive reflection API now.
+  case is _TupleMirror:
+    target.write("(")
+    var first = true
+    for i in 0..<mirror.count {
+      if first {
+        first = false
+      } else {
+        target.write(", ")
+      }
+      let (_, elementMirror) = mirror[i]
+      let elt = elementMirror.value
+      debugPrint(elt, terminator: "", toStream: &target)
     }
-  } else if let metatypeValue = value as? Any.Type {
-    // Metatype
-    printTypeName(metatypeValue)
-  } else {
-    // Fall back to the type or an opaque summary of the kind
-    if let opaqueSummary = String.fromCString(_opaqueSummary(mirror.subjectType)) {
-      target.write(opaqueSummary)
+    target.write(")")
+
+  case is _StructMirror:
+    printTypeName(mirror.valueType)
+    target.write("(")
+    var first = true
+    for i in 0..<mirror.count {
+      if first {
+        first = false
+      } else {
+        target.write(", ")
+      }
+      let (label, elementMirror) = mirror[i]
+      print(label, terminator: "", toStream: &target)
+      target.write(": ")
+      debugPrint(elementMirror.value, terminator: "", toStream: &target)
+    }
+    target.write(")")
+
+  case let enumMirror as _EnumMirror:
+    if let caseName = String.fromCString(enumMirror.caseName) {
+      // Write the qualified type name in debugPrint.
+      if isDebugPrint {
+        target.write(_typeName(mirror.valueType))
+        target.write(".")
+      }
+      target.write(caseName)
     } else {
-      target.write(_typeName(mirror.subjectType, qualified: true))
+      // If the case name is garbage, just print the type name.
+      printTypeName(mirror.valueType)
     }
+
+    if mirror.count == 0 {
+      return
+    }
+    let (_, payload) = mirror[0]
+    if payload is _TupleMirror {
+      debugPrint(payload.value, terminator: "", toStream: &target)
+      return
+    }
+    target.write("(")
+    debugPrint(payload.value, terminator: "", toStream: &target)
+    target.write(")")
+
+  case is _MetatypeMirror:
+    printTypeName(mirror.value as! Any.Type)
+
+  default:
+    print(mirror.summary, terminator: "", toStream: &target)
   }
 }
 
@@ -202,8 +190,7 @@ internal func _print_unlocked<T, TargetStream : OutputStreamType>(
     return
   }
 
-  let mirror = Mirror(reflecting: value)
-  _adHocPrint(value, mirror, &target, isDebugPrint: false)
+  _adHocPrint(value, &target, isDebugPrint: false)
 }
 
 /// Returns the result of `print`'ing `x` into a `String`.
@@ -248,72 +235,7 @@ public func _debugPrint_unlocked<T, TargetStream : OutputStreamType>(
     return
   }
 
-  let mirror = Mirror(reflecting: value)
-  _adHocPrint(value, mirror, &target, isDebugPrint: true)
-}
-
-internal func _dumpPrint<T, TargetStream : OutputStreamType>(
-    value: T, _ mirror: Mirror, inout _ target: TargetStream
-) {
-  if let displayStyle = mirror.displayStyle {
-    // Containers and tuples are always displayed in terms of their element count
-    switch displayStyle {
-      case .Tuple:
-        let count = mirror.children.count
-        target.write(count == 1 ? "(1 element)" : "(\(count) elements)")
-        return
-      case .Collection:
-        let count = mirror.children.count
-        target.write(count == 1 ? "1 element" : "\(count) elements")
-        return
-      case .Dictionary:
-        let count = mirror.children.count
-        target.write(count == 1 ? "1 key/value pair" : "\(count) key/value pairs")
-        return
-      case .Set:
-        let count = mirror.children.count
-        target.write(count == 1 ? "1 member" : "\(count) members")
-        return
-      default:
-        break
-    }
-  }
-
-  if let debugPrintableObject = value as? CustomDebugStringConvertible {
-    debugPrintableObject.debugDescription.writeTo(&target)
-    return
-  }
-
-  if let printableObject = value as? CustomStringConvertible {
-    printableObject.description.writeTo(&target)
-    return
-  }
-
-  if let streamableObject = value as? Streamable {
-    streamableObject.writeTo(&target)
-    return
-  }
-
-  if let displayStyle = mirror.displayStyle {
-    switch displayStyle {
-      case .Class, .Struct:
-        // Classes and structs without custom representations are displayed as
-        // their fully qualified type name
-        target.write(_typeName(mirror.subjectType, qualified: true))
-        return
-      case .Enum:
-        target.write(_typeName(mirror.subjectType, qualified: true))
-        if let caseName = String.fromCString(_getEnumCaseName(value)) {
-          target.write(".")
-          target.write(caseName)
-        }
-        return
-      default:
-        break
-    }
-  }
-
-  _adHocPrint(value, mirror, &target, isDebugPrint: true)
+  _adHocPrint(value, &target, isDebugPrint: true)
 }
 
 //===----------------------------------------------------------------------===//

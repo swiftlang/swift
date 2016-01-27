@@ -51,9 +51,9 @@ class NSBetter : NSGood {
 }
 
 // CHECK-LABEL: Swift ObjC subclass:
-// CHECK-NEXT:    <Reflection.NSBetter: {{0x[0-9a-f]+}}> #0
+// CHECK-NEXT:    Reflection.NSBetter #0
 // CHECK-NEXT:      super: Reflection.NSGood
-// CHECK-NEXT:        super: NSObject
+// CHECK-NEXT:        super: <Reflection.NSBetter: {{0x[0-9a-f]+}}>
 print("Swift ObjC subclass:")
 dump(NSBetter())
 
@@ -70,7 +70,6 @@ print("We cannot reflect \(NSComparisonResult.OrderedAscending) yet")
 // <rdar://problem/16592777>
 // CHECK-LABEL: NSURL:
 // CHECK-NEXT:    file:///Volumes/
-// CHECK-NEXT:    - super: NSObject
 print("NSURL:")
 dump(NSURL(fileURLWithPath: "/Volumes", isDirectory: true))
 
@@ -78,8 +77,8 @@ dump(NSURL(fileURLWithPath: "/Volumes", isDirectory: true))
 //    associated enum tag.
 
 // CHECK-NEXT: got the expected quick look text
-switch PlaygroundQuickLook(reflecting: "woozle wuzzle" as NSString) {
-case .Text("woozle wuzzle"):
+switch _reflect("woozle wuzzle" as NSString).quickLookObject {
+case .Some(.Text("woozle wuzzle")):
   print("got the expected quick look text")
 case _:
   print("got something else")
@@ -87,15 +86,15 @@ case _:
 
 // CHECK-NEXT: foobar
 let somesubclassofnsstring = ("foo" + "bar") as NSString
-switch PlaygroundQuickLook(reflecting: somesubclassofnsstring) {
-  case .Text(let text): print(text)
+switch _reflect(somesubclassofnsstring).quickLookObject {
+  case .Some(.Text(let text)): print(text)
   default: print("not the expected quicklook")
 }
 
 // CHECK-NEXT: got the expected quick look attributed string
 let astr = NSAttributedString(string: "yizzle pizzle")
-switch PlaygroundQuickLook(reflecting: astr as NSAttributedString) {
-case .AttributedString(let astr2 as NSAttributedString)
+switch _reflect(astr as NSAttributedString).quickLookObject {
+case .Some(.AttributedString(let astr2 as NSAttributedString))
 where astr === astr2:
   print("got the expected quick look attributed string")
 case _:
@@ -103,32 +102,32 @@ case _:
 }
 
 // CHECK-NEXT: got the expected quick look int
-switch PlaygroundQuickLook(reflecting: Int.max as NSNumber) {
-case .Int(+Int64(Int.max)):
+switch _reflect(Int.max as NSNumber).quickLookObject {
+case .Some(.Int(+Int64(Int.max))):
   print("got the expected quick look int")
 case _:
   print("got something else")
 }
 
 // CHECK-NEXT: got the expected quick look uint
-switch PlaygroundQuickLook(reflecting: NSNumber(unsignedLongLong: UInt64.max)) {
-case .UInt(UInt64.max):
+switch _reflect(NSNumber(unsignedLongLong: UInt64.max)).quickLookObject {
+case .Some(.UInt(UInt64.max)):
   print("got the expected quick look uint")
 case _:
   print("got something else")
 }
 
 // CHECK-NEXT: got the expected quick look double
-switch PlaygroundQuickLook(reflecting: 22.5 as NSNumber) {
-case .Double(22.5):
+switch _reflect(22.5 as NSNumber).quickLookObject {
+case .Some(.Double(22.5)):
   print("got the expected quick look double")
 case _:
   print("got something else")
 }
 
 // CHECK-NEXT: got the expected quick look float
-switch PlaygroundQuickLook(reflecting: Float32(1.25)) {
-case .Float(1.25):
+switch _reflect(Float32(1.25)).quickLookObject {
+case .Some(.Float(1.25)):
   print("got the expected quick look float")
 case _:
   print("got something else")
@@ -139,74 +138,90 @@ case _:
 // CHECK-NEXT: got the expected quick look bezier path
 
 let image = OSImage(contentsOfFile:Process.arguments[1])!
-switch PlaygroundQuickLook(reflecting: image) {
-case .Image(let image2 as OSImage) where image === image2:
+switch _reflect(image).quickLookObject {
+case .Some(.Image(let image2 as OSImage)) where image === image2:
   print("got the expected quick look image")
 case _:
   print("got something else")
 }
 
 let color = OSColor.blackColor()
-switch PlaygroundQuickLook(reflecting: color) {
-case .Color(let color2 as OSColor) where color === color2:
+switch _reflect(color).quickLookObject {
+case .Some(.Color(let color2 as OSColor)) where color === color2:
   print("got the expected quick look color")
 case _:
   print("got something else")
 }
 
 let path = OSBezierPath()
-switch PlaygroundQuickLook(reflecting: path) {
-case .BezierPath(let path2 as OSBezierPath) where path === path2:
+switch _reflect(path).quickLookObject {
+case .Some(.BezierPath(let path2 as OSBezierPath)) where path === path2:
   print("got the expected quick look bezier path")
 case _:
   print("got something else")
 }
 
-// CHECK-LABEL: Reflecting NSArray:
-// CHECK-NEXT: [ 1 2 3 4 5 ]
-print("Reflecting NSArray:")
 let intNSArray : NSArray = [1 as NSNumber,2 as NSNumber,3 as NSNumber,4 as NSNumber,5 as NSNumber]
-let arrayMirror = Mirror(reflecting: intNSArray)
-var buffer = "[ "
-for i in arrayMirror.children {
-  buffer += "\(i.1) "
-}
-buffer += "]"
-print(buffer)
+let intNSArrayMirror = _reflect(intNSArray)
+// CHECK-NEXT: 5 elements
+print(intNSArrayMirror.summary)
+// CHECK-NEXT: [0]: 1
+print("\(intNSArrayMirror[0].0): \(intNSArrayMirror[0].1.summary)")
+// CHECK-NEXT: [4]: 5
+print("\(intNSArrayMirror[4].0): \(intNSArrayMirror[4].1.summary)")
 
-// CHECK-LABEL: Reflecting NSSet:
-// CHECK-NEXT: NSSet reflection working fine
-print("Reflecting NSSet:")
+
 let numset = NSSet(objects: 1,2,3,4)
-let numsetMirror = Mirror(reflecting: numset)
-var numsetNumbers = Set<Int>()
-for i in numsetMirror.children {
-  if let number = i.1 as? Int {
-    numsetNumbers.insert(number)
+let numsetMirror = _reflect(numset)
+// CHECK-NEXT: 4 elements
+print(numsetMirror.summary)
+// CHECK-NEXT: I see all four elements
+let num0 = (numsetMirror[0].1.summary)
+let num1 = (numsetMirror[1].1.summary)
+let num2 = (numsetMirror[2].1.summary)
+let num3 = (numsetMirror[3].1.summary)
+let have1 = (num0 == "1" || num1 == "1" || num2 == "1" || num3 == "1")
+let have2 = (num0 == "2" || num1 == "2" || num2 == "2" || num3 == "2")
+let have3 = (num0 == "3" || num1 == "3" || num2 == "3" || num3 == "3")
+let have4 = (num0 == "4" || num1 == "4" || num2 == "4" || num3 == "4")
+if have1 && have2 && have3 && have4 {
+  print("I see all four elements")
+} else {
+  print("I see \(num0), \(num1), \(num2), \(num3)")
+}
+
+// CHECK-NEXT: 42
+class MyQLTestClass {
+  @objc func debugQuickLookObject() -> AnyObject {
+    return (42 as NSNumber)
   }
 }
-if numsetNumbers == Set([1, 2, 3, 4]) {
-  print("NSSet reflection working fine")
-} else {
-  print("NSSet reflection broken: here are the numbers we got: \(numsetNumbers)")
+
+switch _reflect(MyQLTestClass()).quickLookObject {
+  case .Some(.Int(let value)): print(value)
+  case .Some(_): print("non-Int object")
+  default: print("None")
+}
+
+// CHECK-NEXT: nil is good here
+class MyNonQLTestClass {
+  func debugQuickLookObject() -> AnyObject {
+    return (42 as NSNumber)
+  }
+}
+
+switch _reflect(MyNonQLTestClass()).quickLookObject {
+  case .Some(.Int(let value)): print(value)
+  case .Some(_): print("non-Int object")
+  default: print("nil is good here")
 }
 
 // CHECK-NEXT: (3.0, 6.0)
-// CHECK-NEXT:   x: 3.0
-// CHECK-NEXT:   y: 6.0
-dump(CGPoint(x: 3,y: 6))
+print(_reflect(CGPoint(x: 3,y: 6)).summary)
 // CHECK-NEXT: (30.0, 60.0)
-// CHECK-NEXT:   width: 30.0
-// CHECK-NEXT:   height: 60.0
-dump(CGSize(width: 30, height: 60))
+print(_reflect(CGSize(width: 30, height: 60)).summary)
 // CHECK-NEXT: (50.0, 60.0, 100.0, 150.0)
-// CHECK-NEXT:  origin: (50.0, 60.0)
-// CHECK-NEXT:    x: 50.0
-// CHECK-NEXT:    y: 60.0
-// CHECK-NEXT:  size: (100.0, 150.0)
-// CHECK-NEXT:    width: 100.0
-// CHECK-NEXT:    height: 150.0
-dump(CGRect(x: 50, y: 60, width: 100, height: 150))
+print(_reflect(CGRect(x: 50, y: 60, width: 100, height: 150)).summary)
 
 // rdar://problem/18513769 -- Make sure that QuickLookObject lookup correctly
 // manages memory.
@@ -260,7 +275,7 @@ class HasStringQLO : CanaryBase {
 
 func testQLO<T : CanaryBase>(type: T.Type) {
   autoreleasepool {
-    _ = PlaygroundQuickLook(reflecting: type.init())
+    _ = _reflect(type.init()).quickLookObject
   }
 }
 

@@ -76,6 +76,7 @@ set(SWIFTLIB_ESSENTIAL
   Print.swift
   REPL.swift
   Range.swift
+  RangeMirrors.swift.gyb
   RangeReplaceableCollectionType.swift
   Reflection.swift
   Repeat.swift
@@ -91,6 +92,7 @@ set(SWIFTLIB_ESSENTIAL
   Sort.swift.gyb
   StaticString.swift
   Stride.swift
+  StrideMirrors.swift.gyb
   StringCharacterView.swift # ORDER DEPENDENCY: Must precede String.swift
   String.swift
   StringBridge.swift
@@ -101,6 +103,7 @@ set(SWIFTLIB_ESSENTIAL
   StringUnicodeScalarView.swift
   StringUTF16.swift
   StringUTF8.swift
+  StringUTFViewsMirrors.swift.gyb
   SwiftNativeNSArray.swift
   Unicode.swift
   UnicodeScalar.swift
@@ -118,6 +121,7 @@ set(SWIFTLIB_SOURCES
   ### PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
   Availability.swift
   Bit.swift
+  CollectionMirrors.swift.gyb
   CollectionOfOne.swift
   ExistentialCollection.swift.gyb
   Mirror.swift
