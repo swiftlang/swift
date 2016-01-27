@@ -115,8 +115,7 @@ class ProfdataMergerProcess(Process):
                 self.merge_file_buffer()
                 FILE_QUEUE.task_done()
 
-def main():
-
+def run_server():
     pid = os.getpid()
     if os.path.exists(CONFIG.pid_file_path):
         with open(CONFIG.pid_file_path) as pidfile:
@@ -151,25 +150,42 @@ def main():
             merge_final.filename_buffer.append(p.profdata_path)
     merge_final.merge_file_buffer()
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-d", "--debug",
-        help="Run in foreground and report status.",
-        action="store_true")
-    parser.add_argument("-o", "--output-dir",
-        help="The directory to write the PID file and final profdata file.",
-        default="/tmp")
-    args = parser.parse_args()
+def stop_server(args):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect(SERVER_ADDRESS)
+    sock.send(TESTS_FINISHED_SENTINEL)
+    sock.close()
+
+def start_server(args):
+    global CONFIG
     CONFIG = Config(args.debug, args.output_dir)
-    if not CONFIG.debug:
-        pid = os.fork()
-        if pid != 0:
-            sys.exit(0) # kill the parent process we forked from.
     try:
-        main()
+        if not CONFIG.debug:
+            pid = os.fork()
+            if pid != 0:
+                sys.exit(0) # kill the parent process we forked from.
+        run_server()
     finally:
         if os.path.exists(CONFIG.pid_file_path):
             os.remove(CONFIG.pid_file_path)
         if os.path.exists(CONFIG.tmp_dir):
             shutil.rmtree(CONFIG.tmp_dir, ignore_errors=True)
 
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers()
+
+    start = subparsers.add_parser("start")
+    start.add_argument("-d", "--debug",
+        help="Run in foreground and report status.",
+        action="store_true")
+    start.add_argument("-o", "--output-dir",
+        help="The directory to write the PID file and final profdata file.",
+        default="/tmp")
+    start.set_defaults(func=start_server)
+
+    stop = subparsers.add_parser("stop")
+    stop.set_defaults(func=stop_server)
+
+    args = parser.parse_args()
+    args.func(args)
