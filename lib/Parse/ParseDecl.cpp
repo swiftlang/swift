@@ -3832,7 +3832,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
 
     // Remember this pattern/init pair for our ultimate PatternBindingDecl. The
     // Initializer will be added later when/if it is parsed.
-    PBDEntries.push_back({pattern, nullptr, SourceRange()});
+    PBDEntries.push_back({pattern, nullptr});
     
     Expr *PatternInit = nullptr;
     
@@ -3892,9 +3892,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       // Remember this init for the PatternBindingDecl.
       PatternInit = init.getPtrOrNull();
       PBDEntries.back().setInit(PatternInit);
-      if (PatternInit) {
-        PBDEntries.back().setOrigInitRange(PatternInit->getSourceRange());
-      }
 
       // If we allocated an initContext and the expression had a closure in it,
       // we'll need to keep the initContext around.

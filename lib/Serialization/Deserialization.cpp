@@ -2639,7 +2639,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     SmallVector<PatternBindingEntry, 2> patterns;
     patterns.reserve(numPatterns);
     for (unsigned i = 0; i != numPatterns; ++i) {
-      patterns.push_back({ maybeReadPattern(), nullptr, SourceRange() });
+      patterns.push_back({ maybeReadPattern(), nullptr });
       assert(patterns.back().getPattern());
     }
 
